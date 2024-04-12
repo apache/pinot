@@ -98,16 +98,11 @@ public class MmapMemory implements Memory {
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public synchronized void close() {
     try {
       if (!_closed) {
-        synchronized (this) {
-          if (!_closed) {
-            _section._unmapFun.unmap();
-            _closed = true;
-          }
-        }
+        _section._unmapFun.unmap();
+        _closed = true;
       }
     } catch (InvocationTargetException | IllegalAccessException e) {
       throw new RuntimeException("Error while calling unmap", e);
@@ -118,7 +113,7 @@ public class MmapMemory implements Memory {
   protected void finalize()
       throws Throwable {
     if (!_closed) {
-      LOGGER.warn("Mmap section of " + _size + " wasn't explicitly closed");
+      LOGGER.warn("Mmap section of size: {} wasn't explicitly closed", _size);
       close();
     }
     super.finalize();

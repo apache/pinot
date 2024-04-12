@@ -31,8 +31,8 @@ public class SchemaConformingTransformerConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Name of the field that should contain extra fields that are not part of the schema.")
   private final String _indexableExtrasField;
 
-  @JsonPropertyDescription(
-      "Like indexableExtrasField except it only contains fields with the suffix in unindexableFieldSuffix.")
+  @JsonPropertyDescription("Like indexableExtrasField except it only contains fields with the suffix in "
+      + "unindexableFieldSuffix.")
   private final String _unindexableExtrasField;
 
   @JsonPropertyDescription("The suffix of fields that must be stored in unindexableExtrasField")

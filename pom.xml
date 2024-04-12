@@ -26,7 +26,7 @@
   <parent>
     <groupId>org.apache</groupId>
     <artifactId>apache</artifactId>
-    <version>21</version>
+    <version>31</version>
   </parent>
 
   <groupId>org.apache.pinot</groupId>
@@ -147,16 +147,17 @@
     <swagger-ui.version>5.13.0</swagger-ui.version>
     <hadoop.version>3.3.6</hadoop.version>
     <jsonpath.version>2.9.0</jsonpath.version>
-    <jsonsmart.version>2.5.0</jsonsmart.version>
+    <jsonsmart.version>2.5.1</jsonsmart.version>
     <quartz.version>2.3.2</quartz.version>
     <calcite.version>1.36.0</calcite.version>
     <lucene.version>9.8.0</lucene.version>
-    <reflections.version>0.9.11</reflections.version>
+    <reflections.version>0.10.2</reflections.version>
     <!-- helix-core, spark-core use libraries from io.dropwizard.metrics -->
     <dropwizard-metrics.version>4.2.25</dropwizard-metrics.version>
     <snappy-java.version>1.1.10.5</snappy-java.version>
     <zstd-jni.version>1.5.6-2</zstd-jni.version>
     <lz4-java.version>1.8.0</lz4-java.version>
+    <libthrift.verion>0.20.0</libthrift.verion>
     <log4j.version>2.23.1</log4j.version>
     <slf4j.version>2.0.12</slf4j.version>
     <netty.version>4.1.108.Final</netty.version>
@@ -166,12 +167,12 @@
     <jmh.version>1.37</jmh.version>
     <audienceannotations.version>0.15.0</audienceannotations.version>
     <clp-ffi.version>0.4.4</clp-ffi.version>
-    <stax2-api.version>4.1</stax2-api.version>
-    <aws.sdk.version>2.25.17</aws.sdk.version>
+    <stax2-api.version>4.2.2</stax2-api.version>
+    <aws.sdk.version>2.25.29</aws.sdk.version>
     <joda-time.version>2.12.7</joda-time.version>
     <janino.version>3.1.12</janino.version>
-    <testng.version>7.9.0</testng.version>
-    <woodstox.version>6.4.0</woodstox.version>
+    <testng.version>7.10.1</testng.version>
+    <woodstox.version>6.6.2</woodstox.version>
     <sslcontext.kickstart.version>8.2.0</sslcontext.kickstart.version>
 
     <!-- Apache Commons Libraries -->
@@ -182,7 +183,7 @@
     <commons-math3.version>3.6.1</commons-math3.version>
     <commons-csv.version>1.10.0</commons-csv.version>
     <commons-configuration2.version>2.10.1</commons-configuration2.version>
-    <commons-io.version>2.15.1</commons-io.version>
+    <commons-io.version>2.16.1</commons-io.version>
     <commons-codec.version>1.16.1</commons-codec.version>
     <commons-cli.version>1.6.0</commons-cli.version>
     <commons-net.version>3.10.0</commons-net.version>
@@ -195,7 +196,7 @@
     <jakarta.servlet-api.version>6.0.0</jakarta.servlet-api.version>
     <jakarta.inject-api.version>2.0.1</jakarta.inject-api.version>
     <jakarta.validation-api.version>3.0.2</jakarta.validation-api.version>
-    <jakarta.annotation-api.version>2.1.1</jakarta.annotation-api.version>
+    <jakarta.annotation-api.version>3.0.0</jakarta.annotation-api.version>
     <jakarta.xml.bind-api.version>4.0.2</jakarta.xml.bind-api.version>
     <jakarta.ws.rs-api.version>3.1.0</jakarta.ws.rs-api.version>
     <jakarta.activation-api.version>2.1.3</jakarta.activation-api.version>
@@ -211,8 +212,14 @@
     <javax.activation.version>1.1.1</javax.activation.version>
     <javax.jsp-api.version>2.2</javax.jsp-api.version>
 
+    <!-- HTTP Components Libraries -->
+    <httpclient.version>4.5.14</httpclient.version>
+    <httpcore.version>4.4.16</httpcore.version>
+    <httpclient5.version>5.3.1</httpclient5.version>
+    <httpcore5.version>5.2.4</httpcore5.version>
+
     <!-- Google Libraries -->
-    <google.cloud.libraries.version>26.34.0</google.cloud.libraries.version>
+    <google.cloud.libraries.version>26.37.0</google.cloud.libraries.version>
     <google.auth.version>1.23.0</google.auth.version>
     <gson.version>2.10.1</gson.version>
     <guava.version>33.1.0-jre</guava.version>
@@ -220,7 +227,7 @@
     <protobuf.version>3.25.2</protobuf.version>
     <grpc.version>1.61.1</grpc.version>
 
-    <confluent.version>7.6.0</confluent.version>
+    <confluent.version>7.6.1</confluent.version>
 
     <!-- Configuration for Scala -->
     <scala.version>2.12.18</scala.version>
@@ -237,7 +244,7 @@
     <jettison.version>1.5.4</jettison.version>
     <eclipse.jetty.version>9.4.54.v20240208</eclipse.jetty.version>
     <nimbus-jose-jwt.version>9.37.3</nimbus-jose-jwt.version>
-    <bouncycastle.version>1.77</bouncycastle.version>
+    <bouncycastle.version>1.78</bouncycastle.version>
     <airlift.version>0.26</airlift.version>
     <pulsar.version>2.11.4</pulsar.version>
   </properties>
@@ -419,7 +426,7 @@
       <dependency>
         <groupId>nl.jqno.equalsverifier</groupId>
         <artifactId>equalsverifier</artifactId>
-        <version>3.15.8</version>
+        <version>3.16.1</version>
         <scope>test</scope>
       </dependency>
       <dependency>
@@ -461,27 +468,6 @@
             <artifactId>slf4j-log4j12</artifactId>
           </exclusion>
         </exclusions>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.httpcomponents</groupId>
-        <artifactId>httpmime</artifactId>
-        <version>4.5.13</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.httpcomponents</groupId>
-        <artifactId>httpclient</artifactId>
-        <version>4.5.14</version>
-        <exclusions>
-          <exclusion>
-            <groupId>commons-logging</groupId>
-            <artifactId>commons-logging</artifactId>
-          </exclusion>
-        </exclusions>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.httpcomponents</groupId>
-        <artifactId>httpcore</artifactId>
-        <version>4.4.13</version>
       </dependency>
 
       <!-- netty BOM -->
@@ -556,7 +542,7 @@
       <dependency>
         <groupId>org.apache.thrift</groupId>
         <artifactId>libthrift</artifactId>
-        <version>0.15.0</version>
+        <version>${libthrift.verion}</version>
       </dependency>
       <dependency>
         <groupId>org.quartz-scheduler</groupId>
@@ -847,6 +833,39 @@
         <version>${javax.jsp-api.version}</version>
       </dependency>
 
+      <!-- HTTP Components Libraries -->
+      <dependency>
+        <groupId>org.apache.httpcomponents</groupId>
+        <artifactId>httpmime</artifactId>
+        <version>${httpclient.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.httpcomponents</groupId>
+        <artifactId>httpclient</artifactId>
+        <version>${httpclient.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>commons-logging</groupId>
+            <artifactId>commons-logging</artifactId>
+          </exclusion>
+        </exclusions>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.httpcomponents</groupId>
+        <artifactId>httpcore</artifactId>
+        <version>${httpcore.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.httpcomponents.client5</groupId>
+        <artifactId>httpclient5</artifactId>
+        <version>${httpclient5.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.httpcomponents.core5</groupId>
+        <artifactId>httpcore5</artifactId>
+        <version>${httpcore5.version}</version>
+      </dependency>
+
       <!-- Google Libraries -->
       <dependency>
         <groupId>com.google.cloud</groupId>
@@ -859,13 +878,13 @@
       <dependency>
         <groupId>com.google.apis</groupId>
         <artifactId>google-api-services-storage</artifactId>
-        <version>v1-rev20240209-2.0.0</version>
+        <version>v1-rev20240319-2.0.0</version>
       </dependency>
       <!-- Solve the dependency converge issue between guava and calcite-core -->
       <dependency>
         <groupId>com.google.errorprone</groupId>
         <artifactId>error_prone_annotations</artifactId>
-        <version>2.25.0</version>
+        <version>2.26.1</version>
       </dependency>
       <!-- Legacy Google Libraries -->
       <dependency>
@@ -882,7 +901,7 @@
       <dependency>
         <groupId>com.google.j2objc</groupId>
         <artifactId>j2objc-annotations</artifactId>
-        <version>2.8</version>
+        <version>3.0.0</version>
       </dependency>
 
       <!-- Hadoop -->
@@ -1204,7 +1223,7 @@
       <dependency>
         <groupId>org.apache.datasketches</groupId>
         <artifactId>datasketches-java</artifactId>
-        <version>5.0.1</version>
+        <version>5.0.2</version>
       </dependency>
       <dependency>
         <groupId>com.dynatrace.hash4j</groupId>
@@ -1358,12 +1377,17 @@
       <dependency>
         <groupId>com.github.jnr</groupId>
         <artifactId>jnr-posix</artifactId>
-        <version>3.1.15</version>
+        <version>3.1.19</version>
+      </dependency>
+      <dependency>
+        <groupId>com.github.jnr</groupId>
+        <artifactId>jnr-ffi</artifactId>
+        <version>2.2.16</version>
       </dependency>
       <dependency>
         <groupId>com.github.jnr</groupId>
         <artifactId>jnr-constants</artifactId>
-        <version>0.10.3</version>
+        <version>0.10.4</version>
       </dependency>
       <dependency>
         <groupId>info.picocli</groupId>
@@ -1373,13 +1397,13 @@
       <dependency>
         <groupId>org.glassfish.tyrus.bundles</groupId>
         <artifactId>tyrus-standalone-client</artifactId>
-        <version>2.1.4</version>
+        <version>2.1.5</version>
       </dependency>
       <!-- kafka_2.10 & jmh-core use jopt-simple -->
       <dependency>
         <groupId>net.sf.jopt-simple</groupId>
         <artifactId>jopt-simple</artifactId>
-        <version>4.6</version>
+        <version>5.0.4</version>
       </dependency>
       <dependency>
         <groupId>org.reflections</groupId>
@@ -1400,7 +1424,7 @@
       <dependency>
         <groupId>com.github.seancfoley</groupId>
         <artifactId>ipaddress</artifactId>
-        <version>5.3.4</version>
+        <version>5.5.0</version>
       </dependency>
 
       <dependency>
@@ -1411,7 +1435,7 @@
       <dependency>
         <groupId>net.openhft</groupId>
         <artifactId>chronicle-core</artifactId>
-        <version>2.25ea10</version>
+        <version>2.25ea13</version>
       </dependency>
       <dependency>
         <groupId>org.ow2.asm</groupId>
@@ -1583,7 +1607,7 @@
         <plugin>
           <groupId>com.diffplug.spotless</groupId>
           <artifactId>spotless-maven-plugin</artifactId>
-          <version>2.28.0</version>
+          <version>2.43.0</version>
           <executions>
             <execution>
               <phase>verify</phase>
@@ -1656,7 +1680,7 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-javadoc-plugin</artifactId>
-          <version>3.2.0</version>
+          <version>3.6.3</version>
           <configuration>
             <!-- Remove this after fixing all javadoc warnings -->
             <doclint>none</doclint>
@@ -1935,7 +1959,7 @@
           <dependency>
             <groupId>com.puppycrawl.tools</groupId>
             <artifactId>checkstyle</artifactId>
-            <version>8.45.1</version>
+            <version>10.15.0</version>
           </dependency>
         </dependencies>
         <executions>
@@ -2161,7 +2185,7 @@
       <plugin>
         <groupId>org.apache.rat</groupId>
         <artifactId>apache-rat-plugin</artifactId>
-        <version>0.13</version>
+        <version>0.16.1</version>
         <executions>
           <execution>
             <phase>verify</phase>
@@ -2330,7 +2354,7 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-project-info-reports-plugin</artifactId>
-        <version>2.7</version>
+        <version>3.5.0</version>
         <configuration>
           <dependencyLocationsEnabled>false</dependencyLocationsEnabled>
         </configuration>

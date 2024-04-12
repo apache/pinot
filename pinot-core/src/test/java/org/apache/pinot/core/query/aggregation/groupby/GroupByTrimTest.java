@@ -41,6 +41,7 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoa
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -119,7 +120,8 @@ public class GroupByTrimTest {
     queryContext.setMinServerGroupTrimSize(minServerGroupTrimSize);
 
     // Create a query operator
-    Operator<GroupByResultsBlock> groupByOperator = new GroupByPlanNode(_indexSegment, queryContext).run();
+    Operator<GroupByResultsBlock> groupByOperator =
+        new GroupByPlanNode(new SegmentContext(_indexSegment), queryContext).run();
     GroupByCombineOperator combineOperator =
         new GroupByCombineOperator(Collections.singletonList(groupByOperator), queryContext, _executorService);
 

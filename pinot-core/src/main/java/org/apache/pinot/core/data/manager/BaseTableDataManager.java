@@ -63,6 +63,8 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoa
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.spi.ImmutableSegment;
+import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoader;
@@ -431,6 +433,14 @@ public abstract class BaseTableDataManager implements TableDataManager {
       return _errorCache.asMap().entrySet().stream().filter(map -> map.getKey().getLeft().equals(_tableNameWithType))
           .collect(Collectors.toMap(map -> map.getKey().getRight(), Map.Entry::getValue));
     }
+  }
+
+  @Override
+  public List<SegmentContext> getSegmentContexts(List<IndexSegment> selectedSegments,
+      Map<String, String> queryOptions) {
+    List<SegmentContext> segmentContexts = new ArrayList<>(selectedSegments.size());
+    selectedSegments.forEach(s -> segmentContexts.add(new SegmentContext(s)));
+    return segmentContexts;
   }
 
   @Override

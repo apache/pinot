@@ -588,7 +588,7 @@ public class PinotTenantRestletResource {
       }
     }
 
-    boolean enable = StateType.ENABLE.name().equalsIgnoreCase(state) ? true : false;
+    boolean enable = StateType.ENABLE.name().equalsIgnoreCase(state);
     ObjectNode instanceResult = JsonUtils.newObjectNode();
     String instance = null;
     try {

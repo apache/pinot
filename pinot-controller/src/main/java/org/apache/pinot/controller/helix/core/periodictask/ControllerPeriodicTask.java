@@ -20,7 +20,6 @@ package org.apache.pinot.controller.helix.core.periodictask;
 
 import com.google.common.collect.Sets;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Properties;
@@ -69,12 +68,8 @@ public abstract class ControllerPeriodicTask<C> extends BasePeriodicTask {
       // Check if we have a specific table against which this task needs to be run.
       String propTableNameWithType = (String) periodicTaskProperties.get(PeriodicTask.PROPERTY_KEY_TABLE_NAME);
       // Process the tables that are managed by this controller
-      List<String> allTables = propTableNameWithType == null
-          ? _pinotHelixResourceManager.getDatabaseNames().stream()
-            .map(_pinotHelixResourceManager::getAllTables)
-            .flatMap(List::stream)
-            .collect(Collectors.toList())
-          : Collections.singletonList(propTableNameWithType);
+      List<String> allTables =
+          propTableNameWithType != null ? List.of(propTableNameWithType) : _pinotHelixResourceManager.getAllTables();
 
       Set<String> currentLeaderOfTables = allTables.stream()
           .filter(_leadControllerManager::isLeaderForTable)

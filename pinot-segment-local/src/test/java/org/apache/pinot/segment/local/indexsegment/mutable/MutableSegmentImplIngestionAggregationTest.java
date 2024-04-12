@@ -480,6 +480,8 @@ public class MutableSegmentImplIngestionAggregationTest {
     Assert.assertThrows(IllegalArgumentException.class, () -> {
       mutableSegmentImpl.index(row, defaultMetadata);
     });
+
+    mutableSegmentImpl.destroy();
   }
 
   private BigDecimal generateRandomBigDecimal(Random random, int maxPrecision, int scale) {

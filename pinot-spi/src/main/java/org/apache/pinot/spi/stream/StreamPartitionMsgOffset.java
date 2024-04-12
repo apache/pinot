@@ -48,7 +48,10 @@ public interface StreamPartitionMsgOffset extends Comparable<StreamPartitionMsgO
   String toString();
 
   /**
-   * Converts the string to a {@link StreamPartitionMsgOffset}
+   * @deprecated Should be done via a static function
    */
-  StreamPartitionMsgOffset fromString(String streamPartitionMsgOffsetStr);
+  @Deprecated
+  default StreamPartitionMsgOffset fromString(String streamPartitionMsgOffsetStr) {
+    throw new UnsupportedOperationException();
+  }
 }

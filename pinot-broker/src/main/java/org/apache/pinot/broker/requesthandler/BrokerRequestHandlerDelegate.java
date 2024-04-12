@@ -82,7 +82,7 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
 
   @Override
   public BrokerResponse handleRequest(JsonNode request, @Nullable SqlNodeAndOptions sqlNodeAndOptions,
-      @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext, HttpHeaders httpHeaders)
+      @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext, @Nullable HttpHeaders httpHeaders)
       throws Exception {
     requestContext.setBrokerId(_brokerId);
     if (sqlNodeAndOptions == null) {
@@ -96,13 +96,13 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
       }
     }
     if (request.has(CommonConstants.Broker.Request.QUERY_OPTIONS)) {
-      sqlNodeAndOptions.setExtraOptions(RequestUtils.getOptionsFromJson(request,
-          CommonConstants.Broker.Request.QUERY_OPTIONS));
+      sqlNodeAndOptions.setExtraOptions(
+          RequestUtils.getOptionsFromJson(request, CommonConstants.Broker.Request.QUERY_OPTIONS));
     }
 
-    if (_multiStageBrokerRequestHandler != null && Boolean.parseBoolean(sqlNodeAndOptions.getOptions().get(
-          CommonConstants.Broker.Request.QueryOptionKey.USE_MULTISTAGE_ENGINE))) {
-        return _multiStageBrokerRequestHandler.handleRequest(request, requesterIdentity, requestContext, httpHeaders);
+    if (_multiStageBrokerRequestHandler != null && Boolean.parseBoolean(
+        sqlNodeAndOptions.getOptions().get(CommonConstants.Broker.Request.QueryOptionKey.USE_MULTISTAGE_ENGINE))) {
+      return _multiStageBrokerRequestHandler.handleRequest(request, requesterIdentity, requestContext, httpHeaders);
     } else {
       return _singleStageBrokerRequestHandler.handleRequest(request, sqlNodeAndOptions, requesterIdentity,
           requestContext, httpHeaders);

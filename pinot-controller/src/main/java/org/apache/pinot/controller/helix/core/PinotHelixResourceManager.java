@@ -716,13 +716,12 @@ public class PinotHelixResourceManager {
   }
 
   /**
-   * Get all table names (with type suffix) in default database.
+   * Get all table names (with type suffix) in all databases.
    *
-   * @return List of table names in default database
+   * @return List of table names
    */
-  @Deprecated
   public List<String> getAllTables() {
-    return getAllTables(null);
+    return getAllResources().stream().filter(TableNameBuilder::isTableResource).collect(Collectors.toList());
   }
 
   /**
@@ -732,23 +731,18 @@ public class PinotHelixResourceManager {
    * @return List of table names in provided database name
    */
   public List<String> getAllTables(@Nullable String databaseName) {
-    List<String> tableNames = new ArrayList<>();
-    for (String resourceName : getAllResources()) {
-      if (TableNameBuilder.isTableResource(resourceName)
-          && DatabaseUtils.isPartOfDatabase(resourceName, databaseName)) {
-        tableNames.add(resourceName);
-      }
-    }
-    return tableNames;
+    return getAllResources().stream().filter(
+        resourceName -> TableNameBuilder.isTableResource(resourceName) && DatabaseUtils.isPartOfDatabase(resourceName,
+            databaseName)).collect(Collectors.toList());
   }
 
   /**
-   * Get all offline table names from default database.
+   * Get all offline table names from all databases.
    *
-   * @return List of offline table names in default database
+   * @return List of offline table names
    */
   public List<String> getAllOfflineTables() {
-    return getAllOfflineTables(null);
+    return getAllResources().stream().filter(TableNameBuilder::isOfflineTableResource).collect(Collectors.toList());
   }
 
   /**
@@ -758,23 +752,18 @@ public class PinotHelixResourceManager {
    * @return List of offline table names in provided database name
    */
   public List<String> getAllOfflineTables(@Nullable String databaseName) {
-    List<String> offlineTableNames = new ArrayList<>();
-    for (String resourceName : getAllResources()) {
-      if (DatabaseUtils.isPartOfDatabase(resourceName, databaseName)
-          && TableNameBuilder.isOfflineTableResource(resourceName)) {
-        offlineTableNames.add(resourceName);
-      }
-    }
-    return offlineTableNames;
+    return getAllResources().stream().filter(
+        resourceName -> TableNameBuilder.isOfflineTableResource(resourceName) && DatabaseUtils.isPartOfDatabase(
+            resourceName, databaseName)).collect(Collectors.toList());
   }
 
   /**
-   * Get all dimension table names from default database.
+   * Get all dimension table names from all databases.
    *
-   * @return List of dimension table names in default database
+   * @return List of dimension table names
    */
   public List<String> getAllDimensionTables() {
-    return getAllDimensionTables(null);
+    return _tableCache.getAllDimensionTables();
   }
 
   /**
@@ -785,17 +774,16 @@ public class PinotHelixResourceManager {
    */
   public List<String> getAllDimensionTables(@Nullable String databaseName) {
     return _tableCache.getAllDimensionTables().stream()
-        .filter(table -> DatabaseUtils.isPartOfDatabase(table, databaseName))
-        .collect(Collectors.toList());
+        .filter(table -> DatabaseUtils.isPartOfDatabase(table, databaseName)).collect(Collectors.toList());
   }
 
   /**
-   * Get all realtime table names from default database.
+   * Get all realtime table names from all databases.
    *
-   * @return List of realtime table names in default database
+   * @return List of realtime table names
    */
   public List<String> getAllRealtimeTables() {
-    return getAllRealtimeTables(null);
+    return getAllResources().stream().filter(TableNameBuilder::isRealtimeTableResource).collect(Collectors.toList());
   }
 
   /**
@@ -805,23 +793,19 @@ public class PinotHelixResourceManager {
    * @return List of realtime table names in provided database name
    */
   public List<String> getAllRealtimeTables(@Nullable String databaseName) {
-    List<String> realtimeTableNames = new ArrayList<>();
-    for (String resourceName : getAllResources()) {
-      if (DatabaseUtils.isPartOfDatabase(resourceName, databaseName)
-          && TableNameBuilder.isRealtimeTableResource(resourceName)) {
-        realtimeTableNames.add(resourceName);
-      }
-    }
-    return realtimeTableNames;
+    return getAllResources().stream().filter(
+        resourceName -> TableNameBuilder.isRealtimeTableResource(resourceName) && DatabaseUtils.isPartOfDatabase(
+            resourceName, databaseName)).collect(Collectors.toList());
   }
 
   /**
-   * Get all raw table names in default database.
+   * Get all raw table names in all databases.
    *
-   * @return List of raw table names in default database
+   * @return List of raw table names
    */
   public List<String> getAllRawTables() {
-    return getAllRawTables(null);
+    return getAllResources().stream().filter(TableNameBuilder::isTableResource)
+        .map(TableNameBuilder::extractRawTableName).distinct().collect(Collectors.toList());
   }
 
   /**
@@ -831,14 +815,9 @@ public class PinotHelixResourceManager {
    * @return List of raw table names in provided database name
    */
   public List<String> getAllRawTables(@Nullable String databaseName) {
-    Set<String> rawTableNames = new HashSet<>();
-    for (String resourceName : getAllResources()) {
-      if (TableNameBuilder.isTableResource(resourceName)
-          && DatabaseUtils.isPartOfDatabase(resourceName, databaseName)) {
-        rawTableNames.add(TableNameBuilder.extractRawTableName(resourceName));
-      }
-    }
-    return new ArrayList<>(rawTableNames);
+    return getAllResources().stream().filter(
+        resourceName -> TableNameBuilder.isTableResource(resourceName) && DatabaseUtils.isPartOfDatabase(resourceName,
+            databaseName)).map(TableNameBuilder::extractRawTableName).distinct().collect(Collectors.toList());
   }
 
   /**
