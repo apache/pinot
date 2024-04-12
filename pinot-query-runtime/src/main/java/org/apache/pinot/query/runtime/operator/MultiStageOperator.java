@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
+import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Stopwatch;
 import java.io.DataInput;
@@ -43,11 +44,13 @@ public abstract class MultiStageOperator<K extends Enum<K> & StatMap.Key>
     implements Operator<TransferableBlock>, AutoCloseable {
 
   protected final OpChainExecutionContext _context;
+  protected final String _operatorId;
   protected final StatMap<K> _statMap;
   protected boolean _isEarlyTerminated;
 
   public MultiStageOperator(OpChainExecutionContext context, Class<K> keyStatClass) {
     _context = context;
+    _operatorId = Joiner.on("_").join(getClass().getSimpleName(), _context.getStageId(), _context.getServer());
     _isEarlyTerminated = false;
     _statMap = new StatMap<>(keyStatClass);
   }
@@ -64,6 +67,9 @@ public abstract class MultiStageOperator<K extends Enum<K> & StatMap.Key>
   public TransferableBlock nextBlock() {
     if (Tracing.ThreadAccountantOps.isInterrupted()) {
       throw new EarlyTerminationException("Interrupted while processing next block");
+    }
+    if (logger().isDebugEnabled()) {
+      logger().debug("Operator {}: Reading next block", _operatorId);
     }
     try (InvocationScope ignored = Tracing.getTracer().createScope(getClass())) {
       TransferableBlock nextBlock;
@@ -82,6 +88,9 @@ public abstract class MultiStageOperator<K extends Enum<K> & StatMap.Key>
         } catch (Exception e) {
           nextBlock = TransferableBlockUtils.getErrorTransferableBlock(e);
         }
+      }
+      if (logger().isDebugEnabled()) {
+        logger().debug("Operator {}. Block of type {} ready to send", _operatorId, nextBlock.getType());
       }
       return nextBlock;
     }

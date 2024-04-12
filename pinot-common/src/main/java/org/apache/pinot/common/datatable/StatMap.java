@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.EnumMap;
 import java.util.Map;
 import java.util.Objects;
@@ -50,13 +51,14 @@ import org.apache.pinot.spi.utils.JsonUtils;
  */
 public class StatMap<K extends Enum<K> & StatMap.Key> {
   private final Class<K> _keyClass;
-  private final EnumMap<K, Object> _map;
+  private final Map<K, Object> _map;
 
   private static final ConcurrentHashMap<Class<?>, Object[]> KEYS_BY_CLASS = new ConcurrentHashMap<>();
 
   public StatMap(Class<K> keyClass) {
     _keyClass = keyClass;
-    _map = new EnumMap<>(keyClass);
+    // TODO: Study whether this is fine or we should impose a single thread policy in StatMaps
+    _map = Collections.synchronizedMap(new EnumMap<>(keyClass));
   }
 
   public int getInt(K key) {
