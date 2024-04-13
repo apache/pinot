@@ -46,12 +46,12 @@ jobs:
       - name: Setup node
         uses: actions/setup-node@v3
         with:
-          node-version: v10.16.1
+          node-version: v16.15.0
           cache: 'npm'
           cache-dependency-path: pinot-controller/src/main/resources/package-lock.json
       - name: Install npm
         run: |
-          npm install -g npm@6.10.0
+          npm install -g npm@8.5.5
           npm --version
       - name: Pinot Compatibility Regression Testing
         if : ${{github.event_name == 'workflow_dispatch'}}
