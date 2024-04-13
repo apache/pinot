@@ -168,12 +168,12 @@
     <audienceannotations.version>0.15.0</audienceannotations.version>
     <clp-ffi.version>0.4.4</clp-ffi.version>
     <stax2-api.version>4.2.2</stax2-api.version>
-    <aws.sdk.version>2.25.29</aws.sdk.version>
+    <aws.sdk.version>2.25.30</aws.sdk.version>
     <joda-time.version>2.12.7</joda-time.version>
     <janino.version>3.1.12</janino.version>
     <testng.version>7.10.1</testng.version>
     <woodstox.version>6.6.2</woodstox.version>
-    <sslcontext.kickstart.version>8.2.0</sslcontext.kickstart.version>
+    <sslcontext.kickstart.version>8.3.4</sslcontext.kickstart.version>
 
     <!-- Apache Commons Libraries -->
     <commons-lang3.version>3.14.0</commons-lang3.version>
@@ -210,7 +210,7 @@
     <javax.ws.rs-api.version>2.1.1</javax.ws.rs-api.version>
     <javax.jsr311-api.version>1.1.1</javax.jsr311-api.version>
     <javax.activation.version>1.1.1</javax.activation.version>
-    <javax.jsp-api.version>2.2</javax.jsp-api.version>
+    <javax.jsp-api.version>2.3.3</javax.jsp-api.version>
 
     <!-- HTTP Components Libraries -->
     <httpclient.version>4.5.14</httpclient.version>
@@ -492,7 +492,7 @@
       <dependency>
         <groupId>it.unimi.dsi</groupId>
         <artifactId>fastutil</artifactId>
-        <version>8.2.3</version>
+        <version>8.5.13</version>
       </dependency>
       <dependency>
         <groupId>joda-time</groupId>
@@ -1809,7 +1809,7 @@
         <plugin>
           <groupId>com.mycila</groupId>
           <artifactId>license-maven-plugin</artifactId>
-          <version>4.2</version>
+          <version>4.3</version>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
@@ -2068,7 +2068,7 @@
       <plugin>
         <groupId>com.mycila</groupId>
         <artifactId>license-maven-plugin</artifactId>
-        <version>4.2</version>
+        <version>4.3</version>
         <configuration>
           <licenseSets>
             <licenseSet>
