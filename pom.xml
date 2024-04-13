@@ -157,6 +157,7 @@
     <snappy-java.version>1.1.10.5</snappy-java.version>
     <zstd-jni.version>1.5.6-2</zstd-jni.version>
     <lz4-java.version>1.8.0</lz4-java.version>
+    <libthrift.verion>0.20.0</libthrift.verion>
     <log4j.version>2.23.1</log4j.version>
     <slf4j.version>2.0.12</slf4j.version>
     <netty.version>4.1.108.Final</netty.version>
@@ -167,7 +168,7 @@
     <audienceannotations.version>0.15.0</audienceannotations.version>
     <clp-ffi.version>0.4.4</clp-ffi.version>
     <stax2-api.version>4.2.2</stax2-api.version>
-    <aws.sdk.version>2.25.28</aws.sdk.version>
+    <aws.sdk.version>2.25.29</aws.sdk.version>
     <joda-time.version>2.12.7</joda-time.version>
     <janino.version>3.1.12</janino.version>
     <testng.version>7.10.1</testng.version>
@@ -182,7 +183,7 @@
     <commons-math3.version>3.6.1</commons-math3.version>
     <commons-csv.version>1.10.0</commons-csv.version>
     <commons-configuration2.version>2.10.1</commons-configuration2.version>
-    <commons-io.version>2.15.1</commons-io.version>
+    <commons-io.version>2.16.1</commons-io.version>
     <commons-codec.version>1.16.1</commons-codec.version>
     <commons-cli.version>1.6.0</commons-cli.version>
     <commons-net.version>3.10.0</commons-net.version>
@@ -211,6 +212,12 @@
     <javax.activation.version>1.1.1</javax.activation.version>
     <javax.jsp-api.version>2.2</javax.jsp-api.version>
 
+    <!-- HTTP Components Libraries -->
+    <httpclient.version>4.5.14</httpclient.version>
+    <httpcore.version>4.4.16</httpcore.version>
+    <httpclient5.version>5.3.1</httpclient5.version>
+    <httpcore5.version>5.2.4</httpcore5.version>
+
     <!-- Google Libraries -->
     <google.cloud.libraries.version>26.37.0</google.cloud.libraries.version>
     <google.auth.version>1.23.0</google.auth.version>
@@ -220,7 +227,7 @@
     <protobuf.version>3.25.2</protobuf.version>
     <grpc.version>1.61.1</grpc.version>
 
-    <confluent.version>7.6.0</confluent.version>
+    <confluent.version>7.6.1</confluent.version>
 
     <!-- Configuration for Scala -->
     <scala.version>2.12.18</scala.version>
@@ -462,27 +469,6 @@
           </exclusion>
         </exclusions>
       </dependency>
-      <dependency>
-        <groupId>org.apache.httpcomponents</groupId>
-        <artifactId>httpmime</artifactId>
-        <version>4.5.13</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.httpcomponents</groupId>
-        <artifactId>httpclient</artifactId>
-        <version>4.5.14</version>
-        <exclusions>
-          <exclusion>
-            <groupId>commons-logging</groupId>
-            <artifactId>commons-logging</artifactId>
-          </exclusion>
-        </exclusions>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.httpcomponents</groupId>
-        <artifactId>httpcore</artifactId>
-        <version>4.4.13</version>
-      </dependency>
 
       <!-- netty BOM -->
       <dependency>
@@ -556,7 +542,7 @@
       <dependency>
         <groupId>org.apache.thrift</groupId>
         <artifactId>libthrift</artifactId>
-        <version>0.15.0</version>
+        <version>${libthrift.verion}</version>
       </dependency>
       <dependency>
         <groupId>org.quartz-scheduler</groupId>
@@ -845,6 +831,39 @@
         <groupId>javax.servlet.jsp</groupId>
         <artifactId>javax.servlet.jsp-api</artifactId>
         <version>${javax.jsp-api.version}</version>
+      </dependency>
+
+      <!-- HTTP Components Libraries -->
+      <dependency>
+        <groupId>org.apache.httpcomponents</groupId>
+        <artifactId>httpmime</artifactId>
+        <version>${httpclient.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.httpcomponents</groupId>
+        <artifactId>httpclient</artifactId>
+        <version>${httpclient.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>commons-logging</groupId>
+            <artifactId>commons-logging</artifactId>
+          </exclusion>
+        </exclusions>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.httpcomponents</groupId>
+        <artifactId>httpcore</artifactId>
+        <version>${httpcore.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.httpcomponents.client5</groupId>
+        <artifactId>httpclient5</artifactId>
+        <version>${httpclient5.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.httpcomponents.core5</groupId>
+        <artifactId>httpcore5</artifactId>
+        <version>${httpcore5.version}</version>
       </dependency>
 
       <!-- Google Libraries -->
@@ -1358,12 +1377,17 @@
       <dependency>
         <groupId>com.github.jnr</groupId>
         <artifactId>jnr-posix</artifactId>
-        <version>3.1.15</version>
+        <version>3.1.19</version>
+      </dependency>
+      <dependency>
+        <groupId>com.github.jnr</groupId>
+        <artifactId>jnr-ffi</artifactId>
+        <version>2.2.16</version>
       </dependency>
       <dependency>
         <groupId>com.github.jnr</groupId>
         <artifactId>jnr-constants</artifactId>
-        <version>0.10.3</version>
+        <version>0.10.4</version>
       </dependency>
       <dependency>
         <groupId>info.picocli</groupId>
@@ -1400,7 +1424,7 @@
       <dependency>
         <groupId>com.github.seancfoley</groupId>
         <artifactId>ipaddress</artifactId>
-        <version>5.3.4</version>
+        <version>5.5.0</version>
       </dependency>
 
       <dependency>
@@ -2161,7 +2185,7 @@
       <plugin>
         <groupId>org.apache.rat</groupId>
         <artifactId>apache-rat-plugin</artifactId>
-        <version>0.13</version>
+        <version>0.16.1</version>
         <executions>
           <execution>
             <phase>verify</phase>
