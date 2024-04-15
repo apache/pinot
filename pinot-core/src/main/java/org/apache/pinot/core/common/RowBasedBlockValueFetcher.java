@@ -65,6 +65,8 @@ public class RowBasedBlockValueFetcher {
           return new BigDecimalValueFetcher(blockValSet.getBigDecimalValuesSV());
         case STRING:
           return new StringSingleValueFetcher(blockValSet.getStringValuesSV());
+        case MAP:
+          return new StringSingleValueFetcher(blockValSet.getStringValuesSV());
         case BYTES:
           return new BytesValueFetcher(blockValSet.getBytesValuesSV());
         case UNKNOWN:

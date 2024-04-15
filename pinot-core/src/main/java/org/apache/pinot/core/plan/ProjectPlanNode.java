@@ -26,6 +26,7 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.HashUtil;
+import org.apache.pinot.core.map.MapUtils;
 import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.DocIdSetOperator;
 import org.apache.pinot.core.operator.ProjectionOperator;
@@ -67,15 +68,28 @@ public class ProjectPlanNode implements PlanNode {
   @Override
   public BaseProjectOperator<?> run() {
     Set<String> projectionColumns = new HashSet<>();
+
     boolean hasNonIdentifierExpression = false;
     for (ExpressionContext expression : _expressions) {
       expression.getColumns(projectionColumns);
+
       if (expression.getType() != ExpressionContext.Type.IDENTIFIER) {
         hasNonIdentifierExpression = true;
       }
     }
     Map<String, DataSource> dataSourceMap = new HashMap<>(HashUtil.getHashMapCapacity(projectionColumns.size()));
     projectionColumns.forEach(column -> dataSourceMap.put(column, _indexSegment.getDataSource(column)));
+
+    // TODO(ERICH): if the expression type is an item op with map col then create a MapDataSource and pass the key
+    for (ExpressionContext expression : _expressions) {
+      MapUtils.addMapItemOperationsToDataSourceMap(_indexSegment, dataSourceMap, expression);
+    }
+
+    if (_queryContext.getFilter() != null && _queryContext.getFilter().getPredicate() != null) {
+      MapUtils.addMapItemOperationsToDataSourceMap(_indexSegment, dataSourceMap,
+          _queryContext.getFilter().getPredicate().getLhs());
+    }
+
     // NOTE: Skip creating DocIdSetOperator when maxDocsPerCall is 0 (for selection query with LIMIT 0)
     DocIdSetOperator docIdSetOperator =
         _maxDocsPerCall > 0 ? new DocIdSetPlanNode(_segmentContext, _queryContext, _maxDocsPerCall,

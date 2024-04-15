@@ -434,6 +434,9 @@ public class SelectionOperatorUtils {
           case STRING_ARRAY:
             dataTableBuilder.setColumn(i, (String[]) columnValue);
             break;
+          case MAP:
+            dataTableBuilder.setColumn(i, (String) columnValue);
+            break;
 
           default:
             throw new IllegalStateException(
@@ -492,6 +495,9 @@ public class SelectionOperatorUtils {
           break;
         case UNKNOWN:
           row[i] = null;
+          break;
+        case MAP:
+          row[i] = dataTable.getString(rowId, i);
           break;
 
         // Multi-value column

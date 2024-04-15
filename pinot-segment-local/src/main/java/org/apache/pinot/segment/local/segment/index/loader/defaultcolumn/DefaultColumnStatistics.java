@@ -30,20 +30,27 @@ public class DefaultColumnStatistics implements ColumnStatistics {
   private final Object _maxValue;
   private final Object _uniqueValuesSet;
   private final int _cardinality = 1;
-  private final int _lengthOfShortestElement = -1;
-  private final int _lengthOfLargestElement = -1;
+  private final int _lengthOfShortestElement;
+  private final int _lengthOfLargestElement;
   private final boolean _isSorted;
   private final int _totalNumberOfEntries;
   private final int _maxNumberOfMultiValues;
 
   public DefaultColumnStatistics(Object minValue, Object maxValue, Object uniqueValuesSet, boolean isSorted,
       int totalNumberOfEntries, int maxNumberOfMultiValues) {
+    this(minValue, maxValue, uniqueValuesSet, isSorted, totalNumberOfEntries, maxNumberOfMultiValues, -1, -1);
+  }
+
+  public DefaultColumnStatistics(Object minValue, Object maxValue, Object uniqueValuesSet, boolean isSorted,
+      int totalNumberOfEntries, int maxNumberOfMultiValues, int lengthOfShortestElement, int lengthOfLargestElement) {
     _minValue = minValue;
     _maxValue = maxValue;
     _uniqueValuesSet = uniqueValuesSet;
     _isSorted = isSorted;
     _totalNumberOfEntries = totalNumberOfEntries;
     _maxNumberOfMultiValues = maxNumberOfMultiValues;
+    _lengthOfShortestElement = lengthOfShortestElement;
+    _lengthOfLargestElement = lengthOfLargestElement;
   }
 
   @Override

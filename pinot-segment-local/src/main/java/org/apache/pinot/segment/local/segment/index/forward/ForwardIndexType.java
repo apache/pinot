@@ -33,6 +33,7 @@ import org.apache.pinot.segment.local.realtime.impl.forward.CLPMutableForwardInd
 import org.apache.pinot.segment.local.realtime.impl.forward.FixedByteMVMutableForwardIndex;
 import org.apache.pinot.segment.local.realtime.impl.forward.FixedByteSVMutableForwardIndex;
 import org.apache.pinot.segment.local.realtime.impl.forward.VarByteSVMutableForwardIndex;
+import org.apache.pinot.segment.local.realtime.impl.map.MutableMapIndexImpl;
 import org.apache.pinot.segment.local.segment.index.loader.ConfigurableFromIndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.ForwardIndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
@@ -59,6 +60,7 @@ import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
+import org.apache.pinot.spi.config.table.MapIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -109,7 +111,10 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
             }
           }
         }
-        forwardIndexConfig = new ForwardIndexConfig.Builder().withCompressionCodec(compressionCodec).build();
+        MapIndexConfig mapIndexConfig = indexLoadingConfig.getMapIndexConfigs().get(column);
+        forwardIndexConfig = new ForwardIndexConfig.Builder()
+            .withMapIndexConfig(mapIndexConfig)
+            .withCompressionCodec(compressionCodec).build();
       } else {
         forwardIndexConfig = ForwardIndexConfig.DISABLED;
       }
@@ -201,7 +206,9 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
 
   public String getFileExtension(ColumnMetadata columnMetadata) {
     if (columnMetadata.isSingleValue()) {
-      if (!columnMetadata.hasDictionary()) {
+      if (columnMetadata.getDataType().getStoredType() == FieldSpec.DataType.MAP) {
+        return V1Constants.Indexes.MAP_FORWARD_INDEX_FILE_EXTENSION;
+      } else if (!columnMetadata.hasDictionary()) {
         return V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION;
       } else if (columnMetadata.isSorted()) {
         return V1Constants.Indexes.SORTED_SV_FORWARD_INDEX_FILE_EXTENSION;
@@ -265,6 +272,14 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
     String column = context.getFieldSpec().getName();
     String segmentName = context.getSegmentName();
     FieldSpec.DataType storedType = context.getFieldSpec().getDataType().getStoredType();
+
+    if (storedType == FieldSpec.DataType.MAP) {
+      MapIndexConfig mapConfig = config.getMapIndexConfig();
+      return new MutableMapIndexImpl(mapConfig, context.getMemoryManager(),
+          context.getCapacity(), context.isOffHeap(), false, context.getConsumerDir().getPath(),
+          context.getSegmentName());
+    }
+
     int fixedLengthBytes = context.getFixedLengthBytes();
     boolean isSingleValue = context.getFieldSpec().isSingleValueField();
     if (!context.hasDictionary()) {
