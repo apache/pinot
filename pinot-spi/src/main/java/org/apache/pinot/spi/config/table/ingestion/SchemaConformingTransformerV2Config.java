@@ -16,15 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+
 package org.apache.pinot.spi.config.table.ingestion;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
@@ -79,25 +78,24 @@ public class SchemaConformingTransformerV2Config extends BaseJsonConfig {
   @JsonPropertyDescription("Array of paths to exclude from merged text index.")
   private Set<String> _mergedTextIndexPathToExclude = new HashSet<>();
 
-  // TODO: set default value from CLPRewriter once it open sourced
-  @JsonPropertyDescription("Array of suffix to exclude from merged text index.")
-  private List<String> _mergedTextIndexSuffixToExclude = Arrays.asList("_logtype", "_dictionaryVars", "_encodedVars");
-
   @JsonPropertyDescription("Dedicated fields to double ingest into json_data column")
   private Set<String> _fieldsToDoubleIngest = new HashSet<>();
 
   @JsonCreator
   public SchemaConformingTransformerV2Config(
       @JsonProperty("enableIndexableExtras") @Nullable Boolean enableIndexableExtras,
-      @JsonProperty("indexableExtrasField") String indexableExtrasField,
+      @JsonProperty("indexableExtrasField") @Nullable String indexableExtrasField,
       @JsonProperty("enableUnindexableExtras") @Nullable Boolean enableUnindexableExtras,
       @JsonProperty("unindexableExtrasField") @Nullable String unindexableExtrasField,
       @JsonProperty("unindexableFieldSuffix") @Nullable String unindexableFieldSuffix,
       @JsonProperty("fieldPathsToDrop") @Nullable Set<String> fieldPathsToDrop,
       @JsonProperty("fieldPathsToKeepSameAsInput") @Nullable Set<String> fieldPathsToPreserveInput,
+      @JsonProperty("columnNameToJsonKeyPathMap") @Nullable Map<String, String> columnNameToJsonKeyPathMap,
       @JsonProperty("mergedTextIndexField") @Nullable String mergedTextIndexField,
       @JsonProperty("mergedTextIndexDocumentMaxLength") @Nullable Integer mergedTextIndexDocumentMaxLength,
       @JsonProperty("mergedTextIndexShinglingOverlapLength") @Nullable Integer mergedTextIndexShinglingOverlapLength,
+      @JsonProperty("mergedTextIndexBinaryTokenDetectionMinLength")
+      @Nullable Integer mergedTextIndexBinaryTokenDetectionMinLength, // Deprecated, add it to be backward compatible
       @JsonProperty("mergedTextIndexBinaryDocumentDetectionMinLength")
       @Nullable Integer mergedTextIndexBinaryDocumentDetectionMinLength,
       @JsonProperty("mergedTextIndexPathToExclude") @Nullable Set<String> mergedTextIndexPathToExclude,
@@ -110,17 +108,24 @@ public class SchemaConformingTransformerV2Config extends BaseJsonConfig {
     setUnindexableFieldSuffix(unindexableFieldSuffix);
     setFieldPathsToDrop(fieldPathsToDrop);
     setFieldPathsToPreserveInput(fieldPathsToPreserveInput);
+    setColumnNameToJsonKeyPathMap(columnNameToJsonKeyPathMap);
 
     setMergedTextIndexField(mergedTextIndexField);
     setMergedTextIndexDocumentMaxLength(mergedTextIndexDocumentMaxLength);
     setMergedTextIndexShinglingDocumentOverlapLength(mergedTextIndexShinglingOverlapLength);
+    mergedTextIndexBinaryDocumentDetectionMinLength = mergedTextIndexBinaryDocumentDetectionMinLength == null
+        ? mergedTextIndexBinaryTokenDetectionMinLength : mergedTextIndexBinaryDocumentDetectionMinLength;
     setMergedTextIndexBinaryDocumentDetectionMinLength(mergedTextIndexBinaryDocumentDetectionMinLength);
     setMergedTextIndexPathToExclude(mergedTextIndexPathToExclude);
     setFieldsToDoubleIngest(fieldsToDoubleIngest);
   }
 
+  public Boolean isEnableIndexableExtras() {
+    return _enableIndexableExtras;
+  }
+
   public SchemaConformingTransformerV2Config setEnableIndexableExtras(Boolean enableIndexableExtras) {
-    _enableIndexableExtras = enableIndexableExtras == null ? _enableUnindexableExtras : enableIndexableExtras;
+    _enableIndexableExtras = enableIndexableExtras == null ? _enableIndexableExtras : enableIndexableExtras;
     return this;
   }
 
@@ -131,6 +136,10 @@ public class SchemaConformingTransformerV2Config extends BaseJsonConfig {
   public SchemaConformingTransformerV2Config setIndexableExtrasField(String indexableExtrasField) {
     _indexableExtrasField = indexableExtrasField == null ? _indexableExtrasField : indexableExtrasField;
     return this;
+  }
+
+  public Boolean isEnableUnindexableExtras() {
+    return _enableUnindexableExtras;
   }
 
   public SchemaConformingTransformerV2Config setEnableUnindexableExtras(Boolean enableUnindexableExtras) {
@@ -230,10 +239,6 @@ public class SchemaConformingTransformerV2Config extends BaseJsonConfig {
 
   public Set<String> getMergedTextIndexPathToExclude() {
     return _mergedTextIndexPathToExclude;
-  }
-
-  public List<String> getMergedTextIndexSuffixToExclude() {
-    return _mergedTextIndexSuffixToExclude;
   }
 
   public SchemaConformingTransformerV2Config setMergedTextIndexPathToExclude(Set<String> mergedTextIndexPathToExclude) {

@@ -132,6 +132,8 @@ public class SchemaConformingTransformerV2 implements RecordTransformer {
   private static final int MAXIMUM_LUCENE_DOCUMENT_SIZE = 32766;
   private static final String MIN_DOCUMENT_LENGTH_DESCRIPTION =
       "key length + `:` + shingle index overlap length + one non-overlap char";
+  private static final List<String> MERGED_TEXT_INDEX_SUFFIX_TO_EXCLUDE = Arrays.asList("_logtype", "_dictionaryVars",
+      "_encodedVars");
 
   private final boolean _continueOnError;
   private final SchemaConformingTransformerV2Config _transformerConfig;
@@ -188,6 +190,20 @@ public class SchemaConformingTransformerV2 implements RecordTransformer {
     String unindexableExtrasFieldName = transformerConfig.getUnindexableExtrasField();
     if (null != unindexableExtrasFieldName) {
       SchemaConformingTransformer.getAndValidateExtrasFieldType(schema, indexableExtrasFieldName);
+    }
+
+    Map<String, String> columnNameToJsonKeyPathMap = transformerConfig.getColumnNameToJsonKeyPathMap();
+    for (Map.Entry<String, String> entry : columnNameToJsonKeyPathMap.entrySet()) {
+      String columnName = entry.getKey();
+      FieldSpec fieldSpec = schema.getFieldSpecFor(entry.getKey());
+      Preconditions.checkState(null != fieldSpec, "Field '%s' doesn't exist in schema", columnName);
+    }
+    Set<String> preserveFieldNames = transformerConfig.getFieldPathsToPreserveInput();
+    for (String preserveFieldName : preserveFieldNames) {
+      Preconditions.checkState(
+          columnNameToJsonKeyPathMap.values().contains(preserveFieldName)
+              || schema.getFieldSpecFor(preserveFieldName) != null,
+          "Preserved path '%s' doesn't exist in columnNameToJsonKeyPathMap or schema", preserveFieldName);
     }
 
     validateSchemaAndCreateTree(schema, transformerConfig);
@@ -265,7 +281,7 @@ public class SchemaConformingTransformerV2 implements RecordTransformer {
           currentNode = childNode;
         }
       }
-      currentNode.setColumn(jsonKeyPathToColumnNameMap.get(field));
+      currentNode.setColumn(jsonKeyPathToColumnNameMap.get(field), schema);
     }
 
     return rootNode;
@@ -382,10 +398,6 @@ public class SchemaConformingTransformerV2 implements RecordTransformer {
     }
 
     String keyJsonPath = String.join(".", jsonPath);
-    if (_transformerConfig.getFieldPathsToPreserveInput().contains(keyJsonPath)) {
-      outputRecord.putValue(keyJsonPath, value);
-      return extraFieldsContainer;
-    }
 
     Set<String> fieldPathsToDrop = _transformerConfig.getFieldPathsToDrop();
     if (null != fieldPathsToDrop && fieldPathsToDrop.contains(keyJsonPath)) {
@@ -393,6 +405,14 @@ public class SchemaConformingTransformerV2 implements RecordTransformer {
     }
 
     SchemaTreeNode currentNode = parentNode == null ? null : parentNode.getChild(key);
+    if (_transformerConfig.getFieldPathsToPreserveInput().contains(keyJsonPath)) {
+      if (currentNode != null) {
+        outputRecord.putValue(currentNode.getColumnName(), currentNode.getValue(value));
+      } else {
+        outputRecord.putValue(keyJsonPath, value);
+      }
+      return extraFieldsContainer;
+    }
     String unindexableFieldSuffix = _transformerConfig.getUnindexableFieldSuffix();
     isIndexable = isIndexable && (null == unindexableFieldSuffix || !key.endsWith(unindexableFieldSuffix));
     if (!(value instanceof Map)) {
@@ -406,7 +426,7 @@ public class SchemaConformingTransformerV2 implements RecordTransformer {
           if (_transformerConfig.getFieldsToDoubleIngest().contains(keyJsonPath)) {
             extraFieldsContainer.addIndexableEntry(key, value);
           }
-          mergedTextIndexMap.put(keyJsonPath, value);
+          mergedTextIndexMap.put(currentNode.getColumnName(), value);
         } else {
           // Out of schema
           if (storeIndexableExtras) {
@@ -609,7 +629,7 @@ public class SchemaConformingTransformerV2 implements RecordTransformer {
         .filter(kv -> !_transformerConfig.getMergedTextIndexPathToExclude().contains(kv.getKey())).filter(
         kv -> !base64ValueFilter(kv.getValue().toString().getBytes(),
             _transformerConfig.getMergedTextIndexBinaryDocumentDetectionMinLength())).filter(
-        kv -> _transformerConfig.getMergedTextIndexSuffixToExclude().stream()
+        kv -> MERGED_TEXT_INDEX_SUFFIX_TO_EXCLUDE.stream()
             .anyMatch(suffix -> !kv.getKey().endsWith(suffix))).forEach(kv -> {
       if (null == mergedTextIndexShinglingOverlapLength) {
         generateTextIndexLuceneDocument(kv, luceneDocuments, mergedTextIndexDocumentMaxLength);
@@ -660,11 +680,12 @@ class SchemaTreeNode {
     return _isColumn;
   }
 
-  public void setColumn(String columnName) {
+  public void setColumn(String columnName, Schema schema) {
     if (columnName == null) {
       _columnName = getJsonKeyPath();
     } else {
       _columnName = columnName;
+      _fieldSpec = schema.getFieldSpecFor(columnName);
     }
     _isColumn = true;
   }
@@ -710,6 +731,9 @@ class SchemaTreeNode {
         }
         if (value instanceof Object[]) {
           return JsonUtils.objectToString(Arrays.asList((Object[]) value));
+        }
+        if (value instanceof Map) {
+          return JsonUtils.objectToString(value);
         }
       } catch (JsonProcessingException e) {
         return value.toString();

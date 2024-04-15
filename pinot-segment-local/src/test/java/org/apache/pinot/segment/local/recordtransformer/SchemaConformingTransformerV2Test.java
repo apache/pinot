@@ -97,20 +97,21 @@ public class SchemaConformingTransformerV2Test {
     IngestionConfig ingestionConfig = new IngestionConfig();
     SchemaConformingTransformerV2Config schemaConformingTransformerV2Config =
         new SchemaConformingTransformerV2Config(true, INDEXABLE_EXTRAS_FIELD_NAME, true, UNINDEXABLE_EXTRAS_FIELD_NAME,
-            UNINDEXABLE_FIELD_SUFFIX, null, null, null, null, null, null, null, null);
+            UNINDEXABLE_FIELD_SUFFIX, null, null, null, null, null, null, null, null, null, null);
     ingestionConfig.setSchemaConformingTransformerV2Config(schemaConformingTransformerV2Config);
     return new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setIngestionConfig(ingestionConfig)
         .build();
   }
 
   private static TableConfig createDefaultTableConfig(String indexableExtrasField, String unindexableExtrasField,
-      String unindexableFieldSuffix, Set<String> fieldPathsToDrop, Set<String> fieldPathsToPreserve,
-      String mergedTextIndexField) {
+      String unindexableFieldSuffix, Set<String> fieldPathsToDrop, Set<String> fieldPathsToPreserve, Map<String,
+      String> columnNameToJsonKeyPathMap, String mergedTextIndexField) {
     IngestionConfig ingestionConfig = new IngestionConfig();
     SchemaConformingTransformerV2Config schemaConformingTransformerV2Config =
         new SchemaConformingTransformerV2Config(indexableExtrasField != null, indexableExtrasField,
             unindexableExtrasField != null, unindexableExtrasField, unindexableFieldSuffix, fieldPathsToDrop,
-            fieldPathsToPreserve, mergedTextIndexField, null, null, null, null, null);
+            fieldPathsToPreserve, columnNameToJsonKeyPathMap, mergedTextIndexField, null, null, null, null, null,
+            null);
     ingestionConfig.setSchemaConformingTransformerV2Config(schemaConformingTransformerV2Config);
     return new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setIngestionConfig(ingestionConfig)
         .build();
@@ -630,19 +631,24 @@ public class SchemaConformingTransformerV2Test {
     CustomObjectNode expectedJsonNodeWithMergedTextIndex;
     Schema.SchemaBuilder schemaBuilder;
 
-    String destColumnName = "someMeaningfulName";
+    String destStrColumnName = "myStringName";
+    String destMapColumnName = "myMapName";
     // make array field as single value STRING, test the conversion function
-    // ignore the column nestedFields
+    // drop the column nestedFields.mapFields
     // preserve the entire mapField value
+    // preserve the nestedFields.arrayField value and test the conversion function
     // map the column someMeaningfulName to nestedFields.stringField
+    // abandon the json_data extra field
+    // mergedTextIndex should contain columns who are not in preserved or dropped list
     schemaBuilder = createDefaultSchemaBuilder().addSingleValueDimension("arrayField", DataType.STRING)
-        .addSingleValueDimension(TEST_JSON_MAP_FIELD_NAME, DataType.STRING)
-        .addSingleValueDimension(TEST_JSON_NESTED_MAP_FIELD_NAME, DataType.JSON)
-        .addSingleValueDimension(destColumnName, DataType.STRING);
+        .addSingleValueDimension(destMapColumnName, DataType.STRING)
+        .addSingleValueDimension(TEST_JSON_NESTED_MAP_FIELD_NAME + "." + TEST_JSON_ARRAY_FIELD_NAME, DataType.STRING)
+        .addSingleValueDimension(destStrColumnName, DataType.STRING);
 
     Map<String, String> keyMapping = new HashMap<>() {
       {
-        put(destColumnName, TEST_JSON_NESTED_MAP_FIELD_NAME + "." + TEST_JSON_STRING_FIELD_NAME);
+        put(destStrColumnName, TEST_JSON_NESTED_MAP_FIELD_NAME + "." + TEST_JSON_STRING_FIELD_NAME);
+        put(destMapColumnName, TEST_JSON_MAP_FIELD_NAME);
       }
     };
     Set<String> pathToDrop = new HashSet<>() {
@@ -653,27 +659,21 @@ public class SchemaConformingTransformerV2Test {
     Set<String> pathToPreserve = new HashSet<>() {
       {
         add(TEST_JSON_MAP_FIELD_NAME);
+        add(TEST_JSON_NESTED_MAP_FIELD_NAME + "." + TEST_JSON_ARRAY_FIELD_NAME);
       }
     };
 
     /*
     {
       "arrayField":[0,1,2,3],
-      "nestedFields.stringField":"a",
-      "mapField":{
+      "myStringName":"a",
+      "nestedFirlds.arrayField":[0,1,2,3],
+      "myMapName":{
         "arrayField":[0,1,2,3],
         "nullField":null,
         "stringField":"a",
         "intField_noIndex":9,
         "string_noIndex":"z"
-      }
-      "indexableExtras":{
-        "nullField":null,
-        "stringField":"a",
-        "nestedFields":{
-          "arrayField":[0, 1, 2, 3],
-          "nullField":null,
-        }
       },
       "unindexableExtras":{
         "intField_noIndex":9,
@@ -689,21 +689,18 @@ public class SchemaConformingTransformerV2Test {
         }
       },
       __mergedTextIndex: [
-        "[0, 1, 2, 3]:arrayField", "a:stringField",
-        "[0, 1, 2, 3]:nestedFields.arrayField", "a:nestedFields.stringField",
+        "[0, 1, 2, 3]:arrayField", "a:nestedFields.stringField",
       ]
     }
     */
     expectedJsonNode = CustomObjectNode.create()
         .set(TEST_JSON_ARRAY_FIELD_NAME, N.textNode("[0,1,2,3]"))
-        .set(destColumnName, TEST_JSON_STRING_NODE)
-        .set(TEST_JSON_MAP_FIELD_NAME, TEST_JSON_MAP_NODE_WITH_NO_IDX)
-        .set(INDEXABLE_EXTRAS_FIELD_NAME,
-            CustomObjectNode.create().set(TEST_JSON_NULL_FIELD_NAME, TEST_JSON_NULL_NODE)
-                .set(TEST_JSON_STRING_FIELD_NAME, TEST_JSON_STRING_NODE)
-                .set(TEST_JSON_NESTED_MAP_FIELD_NAME,
-                    CustomObjectNode.create().set(TEST_JSON_ARRAY_FIELD_NAME, TEST_JSON_ARRAY_NODE)
-                        .set(TEST_JSON_NULL_FIELD_NAME, TEST_JSON_NULL_NODE)))
+        .set(destStrColumnName, TEST_JSON_STRING_NODE)
+        // For single value field, it would serialize the value whose format is slightly different
+        .set(destMapColumnName,
+            N.textNode("{\"arrayField\":[0,1,2,3],\"nullField\":null,\"stringField\":\"a\",\"intField_noIndex\":9,"
+                + "\"stringField_noIndex\":\"z\"}"))
+        .set(TEST_JSON_NESTED_MAP_FIELD_NAME + "." + TEST_JSON_ARRAY_FIELD_NAME, N.textNode("[0,1,2,3]"))
 
         .set(UNINDEXABLE_EXTRAS_FIELD_NAME,
             CustomObjectNode.create().set(TEST_JSON_INT_NO_IDX_FIELD_NAME, TEST_INT_NODE)
@@ -713,9 +710,9 @@ public class SchemaConformingTransformerV2Test {
                     .set(TEST_JSON_STRING_NO_IDX_FIELD_NAME, TEST_JSON_STRING_NO_IDX_NODE)));
 
     expectedJsonNodeWithMergedTextIndex = expectedJsonNode.deepCopy().set(MERGED_TEXT_INDEX_FIELD_NAME,
-        N.arrayNode().add("[0,1,2,3]:arrayField").add("a:stringField").add("[0,1,2,3]:nestedFields.arrayField").add(
-            "a:nestedFields.stringField"));
-    transformKeyValueTransformation(
+        N.arrayNode().add("[0,1,2,3]:arrayField").add("a:" + destStrColumnName));
+    // test with no json_data
+    transformKeyValueTransformation(null, UNINDEXABLE_EXTRAS_FIELD_NAME, MERGED_TEXT_INDEX_FIELD_NAME,
         schemaBuilder.addMultiValueDimension(MERGED_TEXT_INDEX_FIELD_NAME, DataType.STRING).build(), keyMapping,
         pathToDrop, pathToPreserve, inputJsonNode, expectedJsonNodeWithMergedTextIndex);
   }
@@ -731,10 +728,10 @@ public class SchemaConformingTransformerV2Test {
         null, null, null, inputRecordJsonNode.toString(), ouputRecordJsonNode.toString());
   }
 
-  private void transformKeyValueTransformation(Schema schema, Map<String, String> keyMapping,
-      Set<String> fieldPathsToDrop, Set<String> fieldPathsToPreserve, JsonNode inputRecordJsonNode,
-      JsonNode ouputRecordJsonNode) {
-    testTransform(INDEXABLE_EXTRAS_FIELD_NAME, UNINDEXABLE_EXTRAS_FIELD_NAME, MERGED_TEXT_INDEX_FIELD_NAME, schema,
+  private void transformKeyValueTransformation(String indexableExtraField, String unindeableExtraField,
+      String mergedTextIndexField, Schema schema, Map<String, String> keyMapping, Set<String> fieldPathsToDrop,
+      Set<String> fieldPathsToPreserve, JsonNode inputRecordJsonNode, JsonNode ouputRecordJsonNode) {
+    testTransform(indexableExtraField, unindeableExtraField, mergedTextIndexField, schema,
         keyMapping, fieldPathsToDrop, fieldPathsToPreserve, inputRecordJsonNode.toString(),
         ouputRecordJsonNode.toString());
   }
@@ -745,8 +742,7 @@ public class SchemaConformingTransformerV2Test {
       String expectedOutputRecordJSONString) {
     TableConfig tableConfig =
         createDefaultTableConfig(indexableExtrasField, unindexableExtrasField, UNINDEXABLE_FIELD_SUFFIX,
-            fieldPathsToDrop, fieldPathsToPreserve, mergedTextIndexField);
-    tableConfig.getIngestionConfig().getSchemaConformingTransformerV2Config().setColumnNameToJsonKeyPathMap(keyMapping);
+            fieldPathsToDrop, fieldPathsToPreserve, keyMapping, mergedTextIndexField);
     GenericRow outputRecord = transformRow(tableConfig, schema, inputRecordJSONString);
     Map<String, Object> expectedOutputRecordMap = jsonStringToMap(expectedOutputRecordJSONString);
 
@@ -809,8 +805,8 @@ public class SchemaConformingTransformerV2Test {
       Schema schema = createDefaultSchemaBuilder().addSingleValueDimension("a.b", DataType.STRING)
           .addSingleValueDimension("a.b.c", DataType.INT).build();
       SchemaConformingTransformerV2.validateSchema(schema,
-          new SchemaConformingTransformerV2Config(null, INDEXABLE_EXTRAS_FIELD_NAME, null, null, null, null, null, null,
-              null, null, null, null, null));
+          new SchemaConformingTransformerV2Config(null, INDEXABLE_EXTRAS_FIELD_NAME, null, null, null, null, null,
+              null, null, null, null, null, null, null, null));
     } catch (Exception ex) {
       fail("Should not have thrown any exception when overlapping schema occurs");
     }
@@ -820,8 +816,8 @@ public class SchemaConformingTransformerV2Test {
       Schema schema = createDefaultSchemaBuilder().addSingleValueDimension("a.b.c", DataType.INT)
           .addSingleValueDimension("a.b", DataType.STRING).build();
       SchemaConformingTransformerV2.validateSchema(schema,
-          new SchemaConformingTransformerV2Config(null, INDEXABLE_EXTRAS_FIELD_NAME, null, null, null, null, null, null,
-              null, null, null, null, null));
+          new SchemaConformingTransformerV2Config(null, INDEXABLE_EXTRAS_FIELD_NAME, null, null, null, null, null,
+              null, null, null, null, null, null, null, null));
     } catch (Exception ex) {
       fail("Should not have thrown any exception when overlapping schema occurs");
     }
