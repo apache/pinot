@@ -30,6 +30,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueFixedB
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueSortedForwardIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueUnsortedForwardIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueVarByteRawIndexCreator;
+import org.apache.pinot.segment.local.segment.creator.impl.map.MapIndexCreator;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.DictIdCompressionType;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
@@ -50,6 +51,10 @@ public class ForwardIndexCreatorFactory {
     FieldSpec fieldSpec = context.getFieldSpec();
     String columnName = fieldSpec.getName();
     int numTotalDocs = context.getTotalDocs();
+
+    if (fieldSpec.getDataType().getStoredType() == DataType.MAP) {
+      return new MapIndexCreator(context, columnName, indexConfig.getMapIndexConfig());
+    }
 
     if (context.hasDictionary()) {
       // Dictionary enabled columns

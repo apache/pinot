@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.segment.local.segment.index.loader;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.annotations.VisibleForTesting;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -34,11 +36,13 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.segment.local.segment.index.column.PhysicalColumnIndexContainer;
+import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGeneratorMode;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.ColumnConfigDeserializer;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
+import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.IndexConfigDeserializer;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.RangeIndexConfig;
@@ -53,6 +57,7 @@ import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.JsonIndexConfig;
+import org.apache.pinot.spi.config.table.MapIndexConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
@@ -60,6 +65,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.TimestampIndexUtils;
 import org.slf4j.Logger;
@@ -84,6 +90,7 @@ public class IndexLoadingConfig {
   private Set<String> _fstIndexColumns = new HashSet<>();
   private FSTType _fstIndexType = FSTType.LUCENE;
   private Map<String, JsonIndexConfig> _jsonIndexConfigs = new HashMap<>();
+  private Map<String, MapIndexConfig> _mapIndexConfigs = new HashMap<>();
   private Map<String, H3IndexConfig> _h3IndexConfigs = new HashMap<>();
   private Map<String, VectorIndexConfig> _vectorIndexConfigs = new HashMap<>();
   private Set<String> _noDictionaryColumns = new HashSet<>(); // TODO: replace this by _noDictionaryConfig.
@@ -216,6 +223,7 @@ public class IndexLoadingConfig {
     }
 
     extractCompressionConfigs(tableConfig);
+    extractMapConfigs(tableConfig);
     extractTextIndexColumnsFromTableConfig(tableConfig);
     extractFSTIndexColumnsFromTableConfig(tableConfig);
     extractH3IndexConfigsFromTableConfig(tableConfig);
@@ -356,6 +364,29 @@ public class IndexLoadingConfig {
       String column = fieldConfig.getName();
       if (fieldConfig.getCompressionCodec() != null) {
         _compressionConfigs.put(column, fieldConfig.getCompressionCodec());
+      }
+    }
+  }
+
+  /**
+   * Extracts configurations for forward indexes on Map type columns.
+   * @param tableConfig table config
+   */
+  private void extractMapConfigs(TableConfig tableConfig) {
+    List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
+    if (fieldConfigList == null) {
+      return;
+    }
+
+    for (FieldConfig fieldConfig : fieldConfigList) {
+      String column = fieldConfig.getName();
+      JsonNode jsonNode = fieldConfig.getIndexes().get(ForwardIndexType.INDEX_DISPLAY_NAME);
+      if (jsonNode != null) {
+        try {
+          ForwardIndexConfig config = JsonUtils.jsonNodeToObject(jsonNode, ForwardIndexConfig.class);
+          _mapIndexConfigs.put(column, config.getMapIndexConfig());
+        } catch (IOException ioe) {
+        }
       }
     }
   }
@@ -540,6 +571,10 @@ public class IndexLoadingConfig {
 
   public Map<String, JsonIndexConfig> getJsonIndexConfigs() {
     return unmodifiable(_jsonIndexConfigs);
+  }
+
+  public Map<String, MapIndexConfig> getMapIndexConfigs() {
+    return unmodifiable(_mapIndexConfigs);
   }
 
   public Map<String, H3IndexConfig> getH3IndexConfigs() {

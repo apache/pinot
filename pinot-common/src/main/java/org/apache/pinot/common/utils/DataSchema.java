@@ -206,6 +206,7 @@ public class DataSchema {
     TIMESTAMP(LONG, NullValuePlaceHolder.LONG),
     STRING(NullValuePlaceHolder.STRING),
     JSON(STRING, NullValuePlaceHolder.STRING),
+    MAP(null),
     BYTES(NullValuePlaceHolder.INTERNAL_BYTES),
     OBJECT(null),
     INT_ARRAY(NullValuePlaceHolder.INT_ARRAY),
@@ -494,6 +495,7 @@ public class DataSchema {
           return new Timestamp((long) value).toString();
         case STRING:
         case JSON:
+        case MAP:
           return value.toString();
         case BYTES:
           return ((ByteArray) value).toHexString();
@@ -676,6 +678,8 @@ public class DataSchema {
           return STRING;
         case JSON:
           return JSON;
+        case MAP:
+          return MAP;
         case BYTES:
           return BYTES;
         case UNKNOWN:

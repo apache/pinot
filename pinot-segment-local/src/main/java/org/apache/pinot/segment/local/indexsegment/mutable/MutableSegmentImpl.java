@@ -55,6 +55,7 @@ import org.apache.pinot.segment.local.realtime.impl.nullvalue.MutableNullValueVe
 import org.apache.pinot.segment.local.segment.index.datasource.ImmutableDataSource;
 import org.apache.pinot.segment.local.segment.index.datasource.MutableDataSource;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
+import org.apache.pinot.segment.local.segment.index.map.MutableMapDataSource;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnContext;
@@ -387,7 +388,8 @@ public class MutableSegmentImpl implements MutableSegment {
 
   private <C extends IndexConfig> void addMutableIndex(Map<IndexType, MutableIndex> mutableIndexes,
       IndexType<C, ?, ?> indexType, MutableIndexContext context, FieldIndexConfigs indexConfigs) {
-    MutableIndex mutableIndex = indexType.createMutableIndex(context, indexConfigs.getConfig(indexType));
+    C indexConfig = indexConfigs.getConfig(indexType);
+    MutableIndex mutableIndex = indexType.createMutableIndex(context, indexConfig);
     if (mutableIndex != null) {
       mutableIndexes.put(indexType, mutableIndex);
     }
@@ -401,6 +403,10 @@ public class MutableSegmentImpl implements MutableSegment {
    */
   private boolean isNoDictionaryColumn(FieldIndexConfigs indexConfigs, FieldSpec fieldSpec, String column) {
     DataType dataType = fieldSpec.getDataType();
+    if (fieldSpec.getDataType() == DataType.MAP) {
+      return true;
+    }
+
     if (indexConfigs == null) {
       return false;
     }
@@ -647,6 +653,7 @@ public class MutableSegmentImpl implements MutableSegment {
       }
 
       Object value = row.getValue(column);
+
       if (value == null) {
         // the value should not be null unless something is broken upstream but this will lead to inappropriate reuse
         // of the dictionary id if this somehow happens. An NPE here can corrupt indexes leading to incorrect query
@@ -691,7 +698,8 @@ public class MutableSegmentImpl implements MutableSegment {
         if (dictId < 0) {
           // Update min/max value from raw value
           // NOTE: Skip updating min/max value for aggregated metrics because the value will change over time.
-          if (!isAggregateMetricsEnabled() || fieldSpec.getFieldType() != FieldSpec.FieldType.METRIC) {
+          if (fieldSpec.getDataType() != DataType.MAP
+              && (!isAggregateMetricsEnabled() || fieldSpec.getFieldType() != FieldSpec.FieldType.METRIC)) {
             Comparable comparable;
             if (dataType == BYTES) {
               comparable = new ByteArray((byte[]) value);
@@ -1300,10 +1308,18 @@ public class MutableSegmentImpl implements MutableSegment {
     }
 
     DataSource toDataSource() {
-      return new MutableDataSource(_fieldSpec, _numDocsIndexed, _valuesInfo._numValues,
-          _valuesInfo._maxNumValuesPerMVEntry, _dictionary == null ? -1 : _dictionary.length(), _partitionFunction,
-          _partitions, _minValue, _maxValue, _mutableIndexes, _dictionary, _nullValueVector,
-          _valuesInfo._varByteMVMaxRowLengthInBytes);
+      // If this column is a Map column then return a MutableMapDataSource
+      if (_fieldSpec.getDataType() == DataType.MAP) {
+        return new MutableMapDataSource(_fieldSpec, _numDocsIndexed, _valuesInfo._numValues,
+            _valuesInfo._maxNumValuesPerMVEntry, _dictionary == null ? -1 : _dictionary.length(),
+            _partitionFunction, _partitions, _minValue, _maxValue, _mutableIndexes, _dictionary,
+            _valuesInfo._varByteMVMaxRowLengthInBytes);
+      } else {
+        return new MutableDataSource(_fieldSpec, _numDocsIndexed, _valuesInfo._numValues,
+            _valuesInfo._maxNumValuesPerMVEntry, _dictionary == null ? -1 : _dictionary.length(), _partitionFunction,
+            _partitions, _minValue, _maxValue, _mutableIndexes, _dictionary, _nullValueVector,
+            _valuesInfo._varByteMVMaxRowLengthInBytes);
+      }
     }
 
     @Override

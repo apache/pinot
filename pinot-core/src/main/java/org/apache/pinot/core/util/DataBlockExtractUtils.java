@@ -94,6 +94,9 @@ public final class DataBlockExtractUtils {
       case STRING_ARRAY:
         return dataBlock.getStringArray(rowId, colId);
 
+      case MAP:
+        return dataBlock.getMap(rowId, colId);
+
       // Special intermediate result for aggregation function
       case OBJECT:
         return ObjectSerDeUtils.deserialize(dataBlock.getCustomObject(rowId, colId));

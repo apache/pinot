@@ -72,7 +72,7 @@ public class DataTypeTransformer implements RecordTransformer {
         }
 
         PinotDataType dest = entry.getValue();
-        if (dest != PinotDataType.JSON) {
+        if (dest != PinotDataType.JSON && dest != PinotDataType.MAP) {
           value = standardize(column, value, dest.isSingleValue());
         }
 
@@ -88,6 +88,9 @@ public class DataTypeTransformer implements RecordTransformer {
           // Multi-value column
           Object[] values = (Object[]) value;
           source = PinotDataType.getMultiValueType(values[0].getClass());
+        } else if (value instanceof Map) {
+          // Single-value column
+          source = PinotDataType.getSingleValueType(value.getClass());  // Change to set type to MAP?
         } else {
           // Single-value column
           source = PinotDataType.getSingleValueType(value.getClass());

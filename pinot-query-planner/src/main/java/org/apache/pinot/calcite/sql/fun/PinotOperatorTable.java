@@ -210,7 +210,7 @@ public class PinotOperatorTable implements SqlOperatorTable {
       SqlStdOperatorTable.MINUTE,
       SqlStdOperatorTable.SECOND,
 
-      SqlStdOperatorTable.ITEM,
+      // SqlStdOperatorTable.ITEM,
       SqlStdOperatorTable.ARRAY_VALUE_CONSTRUCTOR,
       SqlStdOperatorTable.LISTAGG
   );

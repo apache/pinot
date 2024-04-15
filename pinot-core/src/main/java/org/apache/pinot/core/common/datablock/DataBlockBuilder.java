@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.util.List;
+import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.io.output.UnsynchronizedByteArrayOutputStream;
 import org.apache.pinot.common.CustomObject;
@@ -34,6 +35,7 @@ import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.datablock.RowDataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.common.utils.MapUtils;
 import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
@@ -169,6 +171,11 @@ public class DataBlockBuilder {
             break;
           case STRING_ARRAY:
             setColumn(rowBuilder, byteBuffer, (String[]) value);
+            break;
+
+          // Map column
+          case MAP:
+            setColumn(rowBuilder, byteBuffer, (Map<String, Object>) value);
             break;
 
           // Special intermediate result for aggregation function
@@ -343,6 +350,18 @@ public class DataBlockBuilder {
           }
           break;
 
+        // Map column
+        case MAP:
+          for (int rowId = 0; rowId < numRows; rowId++) {
+            value = column[rowId];
+            if (value == null) {
+              nullBitmaps[colId].add(rowId);
+              value = nullPlaceholders[colId];
+            }
+            setColumn(columnarBuilder, byteBuffer, (Map<String, Object>) value);
+          }
+          break;
+
         // Special intermediate result for aggregation function
         case OBJECT:
           for (int rowId = 0; rowId < numRows; rowId++) {
@@ -411,6 +430,19 @@ public class DataBlockBuilder {
     byte[] bytes = value.getBytes();
     byteBuffer.putInt(bytes.length);
     builder._variableSizeDataByteArrayOutputStream.write(bytes);
+  }
+
+  private static void setColumn(DataBlockBuilder builder, ByteBuffer byteBuffer, @Nullable Map<String, Object> value)
+      throws IOException {
+    byteBuffer.putInt(builder._variableSizeDataByteArrayOutputStream.size());
+    if (value == null) {
+      byteBuffer.putInt(0);
+      builder._variableSizeDataOutputStream.writeInt(CustomObject.NULL_TYPE_VALUE);
+    } else {
+      byte[] bytes = MapUtils.serializeMap(value);
+      byteBuffer.putInt(bytes.length);
+      builder._variableSizeDataByteArrayOutputStream.write(bytes);
+    }
   }
 
   // TODO: Move ser/de into AggregationFunction interface

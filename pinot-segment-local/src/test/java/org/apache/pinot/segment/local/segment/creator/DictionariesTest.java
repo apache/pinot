@@ -45,6 +45,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.stats.DoubleColumnPre
 import org.apache.pinot.segment.local.segment.creator.impl.stats.FloatColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.IntColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.LongColumnPreIndexStatsCollector;
+import org.apache.pinot.segment.local.segment.creator.impl.stats.MapColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.StringColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.index.readers.BigDecimalDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.DoubleDictionary;
@@ -357,6 +358,65 @@ public class DictionariesTest {
   }
 
   @Test
+  public void testMapColumnPreIndexStatsCollector() {
+    AbstractColumnStatisticsCollector statsCollector = buildStatsCollector("column1", DataType.MAP, true);
+    statsCollector.collect(Map.of("a", 1, "b", 2));
+    Assert.assertFalse(statsCollector.isSorted());
+    statsCollector.collect(Map.of("foo", 1, "bar", 2));
+    Assert.assertFalse(statsCollector.isSorted());
+    statsCollector.collect(Map.of("zaz", 1, "fizz", 2));
+    Assert.assertFalse(statsCollector.isSorted());
+    statsCollector.collect(Map.of("foo", 5, "bar", -3));
+    Assert.assertFalse(statsCollector.isSorted());
+    statsCollector.collect(Map.of("aStr", "hello", "bStr", "ABCDEFG"));
+    Assert.assertFalse(statsCollector.isSorted());
+    statsCollector.collect(Map.of("aStr", "zyzzyzxyx", "bStr", "zzz"));
+    Assert.assertFalse(statsCollector.isSorted());
+    statsCollector.seal();
+    Assert.assertEquals(statsCollector.getCardinality(), 8);
+    Assert.assertEquals((String) statsCollector.getMinValue(), "a");
+    Assert.assertEquals((String) statsCollector.getMaxValue(), "zaz");
+    Assert.assertFalse(statsCollector.isSorted());
+
+    MapColumnPreIndexStatsCollector mapStats = (MapColumnPreIndexStatsCollector) statsCollector;
+    AbstractColumnStatisticsCollector aStats = mapStats.getKeyStatistics("a");
+    Assert.assertNotNull(aStats);
+    Assert.assertEquals(aStats.getMinValue(), 1);
+    Assert.assertEquals(aStats.getMaxValue(), 1);
+
+    AbstractColumnStatisticsCollector bStats = mapStats.getKeyStatistics("b");
+    Assert.assertNotNull(bStats);
+    Assert.assertEquals(bStats.getMinValue(), 2);
+    Assert.assertEquals(bStats.getMaxValue(), 2);
+
+    AbstractColumnStatisticsCollector fooStats = mapStats.getKeyStatistics("foo");
+    Assert.assertNotNull(fooStats);
+    Assert.assertEquals(fooStats.getMinValue(), 1);
+    Assert.assertEquals(fooStats.getMaxValue(), 5);
+
+    AbstractColumnStatisticsCollector barStats = mapStats.getKeyStatistics("bar");
+    Assert.assertNotNull(barStats);
+    Assert.assertEquals(barStats.getMinValue(), -3);
+    Assert.assertEquals(barStats.getMaxValue(), 2);
+
+    AbstractColumnStatisticsCollector aStrStats = mapStats.getKeyStatistics("aStr");
+    Assert.assertNotNull(aStrStats);
+    Assert.assertEquals(aStrStats.getMinValue(), "hello");
+    Assert.assertEquals(aStrStats.getMaxValue(), "zyzzyzxyx");
+    Assert.assertEquals(aStrStats.getLengthOfLargestElement(), "zyzzyzxyx".length());
+    Assert.assertEquals(aStrStats.getLengthOfShortestElement(), -1);
+    Assert.assertEquals(aStrStats.getMaxRowLengthInBytes(), "zyzzyzxyx".length());
+
+    AbstractColumnStatisticsCollector bStrStats = mapStats.getKeyStatistics("bStr");
+    Assert.assertNotNull(bStrStats);
+    Assert.assertEquals(bStrStats.getMinValue(), "ABCDEFG");
+    Assert.assertEquals(bStrStats.getMaxValue(), "zzz");
+    Assert.assertEquals(bStrStats.getLengthOfLargestElement(), "ABCDEFG".length());
+    Assert.assertEquals(bStrStats.getLengthOfShortestElement(), -1);
+    Assert.assertEquals(bStrStats.getMaxRowLengthInBytes(), "ABCDEFG".length());
+  }
+
+  @Test
   public void testStringColumnPreIndexStatsCollectorForRandomString() {
     AbstractColumnStatisticsCollector statsCollector = buildStatsCollector("column1", DataType.STRING);
     statsCollector.collect("a");
@@ -530,6 +590,8 @@ public class DictionariesTest {
         return new StringColumnPreIndexStatsCollector(column, statsCollectorConfig);
       case BYTES:
         return new BytesColumnPredIndexStatsCollector(column, statsCollectorConfig);
+      case MAP:
+        return new MapColumnPreIndexStatsCollector(column, statsCollectorConfig);
       default:
         throw new IllegalArgumentException("Illegal data type for stats builder: " + dataType);
     }

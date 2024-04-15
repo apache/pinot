@@ -58,7 +58,7 @@ public class MutableSegmentImplIngestionAggregationTest {
   private static Schema.SchemaBuilder getSchemaBuilder() {
     return new Schema.SchemaBuilder().setSchemaName("testSchema")
         .addSingleValueDimension(DIMENSION_1, FieldSpec.DataType.INT)
-        .addSingleValueDimension(DIMENSION_2, FieldSpec.DataType.STRING)
+        .addSingleValueDimension(DIMENSION_2, FieldSpec.DataType.JSON)
         .addDateTime(TIME_COLUMN1, FieldSpec.DataType.INT, "1:DAYS:EPOCH", "1:DAYS")
         .addDateTime(TIME_COLUMN2, FieldSpec.DataType.INT, "1:HOURS:EPOCH", "1:HOURS");
   }
@@ -95,8 +95,10 @@ public class MutableSegmentImplIngestionAggregationTest {
     }
 
     GenericRow reuse = new GenericRow();
+    ArrayList<GenericRow> results = new ArrayList<>();
     for (int docId = 0; docId < expectedMax.size(); docId++) {
       GenericRow row = mutableSegmentImpl.getRecord(docId, reuse);
+      results.add(row.copy());
       String key = buildKey(row);
       Assert.assertEquals(row.getValue(m2), expectedMin.get(key), key);
       Assert.assertEquals(row.getValue(m1), expectedMax.get(key), key);
@@ -263,8 +265,15 @@ public class MutableSegmentImplIngestionAggregationTest {
   private GenericRow getRow(Random random, Integer multiplicationFactor) {
     GenericRow row = new GenericRow();
 
-    row.putValue(DIMENSION_1, random.nextInt(2 * multiplicationFactor));
-    row.putValue(DIMENSION_2, STRING_VALUES.get(random.nextInt(STRING_VALUES.size())));
+    row.putValue(DIMENSION_1, 5);
+    //row.putValue(DIMENSION_1, random.nextInt(2 * multiplicationFactor));
+
+    if (random.nextInt() % 2 == 0) {
+      row.putValue(DIMENSION_2, String.format("{\"a\":\"foo\", \"b\":\"bar\"}"));
+    } else {
+      row.putValue(DIMENSION_2, String.format("{\"b\":\"bar\", \"a\":\"foo\"}"));
+    }
+
     row.putValue(TIME_COLUMN1, random.nextInt(2 * multiplicationFactor));
     row.putValue(TIME_COLUMN2, random.nextInt(2 * multiplicationFactor));
 

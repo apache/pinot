@@ -211,6 +211,12 @@ public enum TransformFunctionType {
   VECTOR_DIMS("vectorDims", ReturnTypes.INTEGER, OperandTypes.ARRAY),
   VECTOR_NORM("vectorNorm", ReturnTypes.DOUBLE, OperandTypes.ARRAY),
 
+  // MAP Functions
+  ITEM("item",
+      ReturnTypes.cascade(opBinding -> opBinding.getOperandType(0).getComponentType(),
+          SqlTypeTransforms.FORCE_NULLABLE),
+      OperandTypes.family(List.of(SqlTypeFamily.MAP, SqlTypeFamily.STRING))),
+
   // Trigonometry
   SIN("sin"),
   COS("cos"),

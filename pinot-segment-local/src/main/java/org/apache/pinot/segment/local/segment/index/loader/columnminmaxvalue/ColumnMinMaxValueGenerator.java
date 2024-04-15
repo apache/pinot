@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentColumnarIndexCreator;
@@ -371,9 +372,30 @@ public class ColumnMinMaxValueGenerator {
           maxValue = new ByteArray(max);
           break;
         }
-        default:
-          throw new IllegalStateException("Unsupported data type: " + dataType + " for column: " + columnName);
-      }
+          case MAP:
+            String min = null;
+            String max = null;
+            if (isSingleValue) {
+              for (int docId = 0; docId < numDocs; docId++) {
+                Set<String> keys = rawIndexReader.getMap(docId, readerContext).keySet();
+                for (String key : keys) {
+                  if (min == null || StringUtils.compare(min, key) > 0) {
+                    min = key;
+                  }
+                  if (max == null || StringUtils.compare(max, key) < 0) {
+                    max = key;
+                  }
+                }
+              }
+              minValue = min;
+              maxValue = max;
+            } else {
+              throw new UnsupportedOperationException("MAP columns cannot be Multi Value");
+            }
+            break;
+          default:
+            throw new IllegalStateException("Unsupported data type: " + dataType + " for column: " + columnName);
+        }
       SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName, minValue, maxValue,
           storedType);
     }
