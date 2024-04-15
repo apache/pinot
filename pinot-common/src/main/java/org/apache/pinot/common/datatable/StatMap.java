@@ -275,36 +275,11 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
   public void serialize(DataOutput output)
       throws IOException {
 
-    for (Map.Entry<K, Object> entry : _map.entrySet()) {
-      K key = entry.getKey();
-      Object value = entry.getValue();
-      switch (key.getType()) {
-        case BOOLEAN:
-          if (value == null || !(boolean) value) {
-            throw new IllegalStateException("Boolean value must be true but " + value + " is stored for key " + key);
-          }
-          break;
-        case INT:
-          if (value == null || (int) value == 0) {
-            throw new IllegalStateException("Int value must be non-zero but " + value + " is stored for key " + key);
-          }
-          break;
-        case LONG:
-          if (value == null || (long) value == 0) {
-            throw new IllegalStateException("Long value must be non-zero but " + value + " is stored for key " + key);
-          }
-          break;
-        case STRING:
-          if (value == null) {
-            throw new IllegalStateException("String value must be non-null but null is stored for key " + key);
-          }
-          break;
-        default:
-          throw new IllegalArgumentException("Unsupported type: " + key.getType());
-      }
-    }
+    assert checkContainsNoDefault() : "No default value should be stored in the map";
     output.writeByte(_map.size());
 
+    // We use written keys just to fail fast in tests if the number of keys written
+    // is not the same as the number of keys
     int writtenKeys = 0;
     K[] keys = (K[]) KEYS_BY_CLASS.computeIfAbsent(_keyClass, k -> k.getEnumConstants());
     for (int ordinal = 0; ordinal < keys.length; ordinal++) {
@@ -349,6 +324,38 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
       }
     }
     assert writtenKeys == _map.size() : "Written keys " + writtenKeys + " but map size " + _map.size();
+  }
+
+  private boolean checkContainsNoDefault() {
+    for (Map.Entry<K, Object> entry : _map.entrySet()) {
+      K key = entry.getKey();
+      Object value = entry.getValue();
+      switch (key.getType()) {
+        case BOOLEAN:
+          if (value == null || !(boolean) value) {
+            throw new IllegalStateException("Boolean value must be true but " + value + " is stored for key " + key);
+          }
+          break;
+        case INT:
+          if (value == null || (int) value == 0) {
+            throw new IllegalStateException("Int value must be non-zero but " + value + " is stored for key " + key);
+          }
+          break;
+        case LONG:
+          if (value == null || (long) value == 0) {
+            throw new IllegalStateException("Long value must be non-zero but " + value + " is stored for key " + key);
+          }
+          break;
+        case STRING:
+          if (value == null) {
+            throw new IllegalStateException("String value must be non-null but null is stored for key " + key);
+          }
+          break;
+        default:
+          throw new IllegalArgumentException("Unsupported type: " + key.getType());
+      }
+    }
+    return true;
   }
 
   public static String getDefaultStatName(Key key) {
