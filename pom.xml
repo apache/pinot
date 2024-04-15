@@ -187,6 +187,7 @@
     <commons-codec.version>1.16.1</commons-codec.version>
     <commons-cli.version>1.6.0</commons-cli.version>
     <commons-net.version>3.10.0</commons-net.version>
+    <commons-validator.version>1.8.0</commons-validator.version>
     <!-- Legacy Apache Commons Libraries -->
     <commons-lang.version>2.6</commons-lang.version>
     <commons-collections.version>3.2.2</commons-collections.version>
@@ -727,6 +728,11 @@
         <groupId>commons-net</groupId>
         <artifactId>commons-net</artifactId>
         <version>${commons-net.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>commons-validator</groupId>
+        <artifactId>commons-validator</artifactId>
+        <version>${commons-validator.version}</version>
       </dependency>
       <!-- Legacy Apache Commons Libraries -->
       <dependency>
