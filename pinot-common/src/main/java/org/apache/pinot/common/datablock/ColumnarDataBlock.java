@@ -29,7 +29,7 @@ import org.apache.pinot.common.utils.DataSchema;
  * Column-wise data table. It stores data in columnar-major format.
  */
 public class ColumnarDataBlock extends BaseDataBlock {
-  private static final int VERSION = 1;
+  private static final int VERSION = 2;
   protected int[] _cumulativeColumnOffsetSizeInBytes;
   protected int[] _columnSizeInBytes;
 

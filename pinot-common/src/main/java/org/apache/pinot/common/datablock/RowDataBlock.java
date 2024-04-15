@@ -29,7 +29,7 @@ import org.apache.pinot.common.utils.DataSchema;
  * Wrapper for row-wise data table. It stores data in row-major format.
  */
 public class RowDataBlock extends BaseDataBlock {
-  private static final int VERSION = 1;
+  private static final int VERSION = 2;
   protected int[] _columnOffsets;
   protected int _rowSizeInBytes;
 
