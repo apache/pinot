@@ -37,11 +37,16 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.common.datatable.StatMap;
+import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.QueryServerEnclosure;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.routing.QueryServerInstance;
+import org.apache.pinot.query.runtime.operator.LeafStageTransferableBlockOperator;
+import org.apache.pinot.query.runtime.operator.MultiStageOperator;
+import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.query.testutils.MockInstanceDataManagerFactory;
 import org.apache.pinot.query.testutils.QueryTestUtils;
@@ -269,63 +274,39 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
         queryResult -> compareRowEquals(queryResult.getResultTable(), expectedRows, keepOutputRowOrder));
   }
 
-  // TODO: metadata tests should be rewritten to actually read the expected metadata from resources
-//  @Test(dataProvider = "testResourceQueryTestCaseProviderWithMetadata")
-//  public void testQueryTestCasesWithMetadata(String testCaseName, boolean isIgnored, String sql, String h2Sql,
-//      String expect, int numSegments)
-//      throws Exception {
-//    runQuery(sql, expect, true).ifPresent(queryResult -> {
-//      BrokerResponseNativeV2 brokerResponseNative = new BrokerResponseNativeV2();
-//      for (MultiStageQueryStats.StageStats.Closed stageStats : queryResult.getQueryStats()) {
-//        stageStats.accept();
-//      }
-//      executionStatsAggregatorMap.get(0).setStats(brokerResponseNative);
-//      Assert.assertFalse(executionStatsAggregatorMap.isEmpty());
-//      for (Integer stageId : executionStatsAggregatorMap.keySet()) {
-//        if (stageId > 0) {
-//          BrokerResponseStats brokerResponseStats = new BrokerResponseStats();
-//          executionStatsAggregatorMap.get(stageId).setStageLevelStats(null, brokerResponseStats, null);
-//          brokerResponseNative.addStageStat(stageId, brokerResponseStats);
-//        }
-//      }
-//
-//      Assert.assertEquals(brokerResponseNative.getNumSegmentsQueried(), numSegments);
-//
-//      Map<Integer, BrokerResponseStats> stageIdStats = brokerResponseNative.getStageIdStats();
-//      int numTables = 0;
-//      for (Integer stageId : stageIdStats.keySet()) {
-//        // check stats only for leaf stage
-//        BrokerResponseStats brokerResponseStats = stageIdStats.get(stageId);
-//
-//        if (brokerResponseStats.getTableNames().isEmpty()) {
-//          continue;
-//        }
-//
-//        String tableName = brokerResponseStats.getTableNames().get(0);
-//        Assert.assertEquals(brokerResponseStats.getTableNames().size(), 1);
-//        numTables++;
-//        TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
-//        if (tableType == null) {
-//          tableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
-//        }
-//
-//        Assert.assertNotNull(_tableToSegmentMap.get(tableName));
-//        Assert.assertEquals(brokerResponseStats.getNumSegmentsQueried(), _tableToSegmentMap.get(tableName).size());
-//
-//        Assert.assertFalse(brokerResponseStats.getOperatorStats().isEmpty());
-//        Map<String, Map<String, String>> operatorStats = brokerResponseStats.getOperatorStats();
-//        for (Map.Entry<String, Map<String, String>> entry : operatorStats.entrySet()) {
-//          if (entry.getKey().contains("LEAF_STAGE")) {
-//            Assert.assertNotNull(entry.getValue().get(DataTable.MetadataKey.NUM_SEGMENTS_QUERIED.getName()));
-//          } else {
-//            Assert.assertNotNull(entry.getValue().get(DataTable.MetadataKey.NUM_BLOCKS.getName()));
-//          }
-//        }
-//      }
-//
-//      Assert.assertTrue(numTables > 0);
-//    });
-//  }
+  @Test(dataProvider = "testResourceQueryTestCaseProviderWithMetadata")
+  public void testQueryTestCasesWithMetadata(String testCaseName, boolean isIgnored, String sql, String h2Sql,
+      String expect, int numSegments)
+      throws Exception {
+    runQuery(sql, expect, true).ifPresent(queryResult -> {
+      BrokerResponseNativeV2 brokerResponseNative = new BrokerResponseNativeV2();
+      for (MultiStageQueryStats.StageStats.Closed stageStats : queryResult.getQueryStats()) {
+        stageStats.forEach((type, stats) -> type.mergeInto(brokerResponseNative, stats));
+      }
+
+      Assert.assertEquals(brokerResponseNative.getNumSegmentsQueried(), numSegments);
+
+      for (MultiStageQueryStats.StageStats.Closed queryStats : queryResult.getQueryStats()) {
+        queryStats.forEach((type, stats) -> {
+          if (type == MultiStageOperator.Type.LEAF) {
+            @SuppressWarnings("unchecked")
+            StatMap<LeafStageTransferableBlockOperator.StatKey> leafStats =
+                (StatMap<LeafStageTransferableBlockOperator.StatKey>) stats;
+            String tableName = leafStats.getString(LeafStageTransferableBlockOperator.StatKey.TABLE);
+
+            TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
+            if (tableType == null) {
+              tableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
+            }
+
+            Assert.assertNotNull(_tableToSegmentMap.get(tableName));
+            int numSegmentsQueried = leafStats.getInt(LeafStageTransferableBlockOperator.StatKey.NUM_SEGMENTS_QUERIED);
+            Assert.assertEquals(numSegmentsQueried, _tableToSegmentMap.get(tableName).size());
+          }
+        });
+      }
+    });
+  }
 
   private Optional<QueryDispatcher.QueryResult> runQuery(String sql, final String except, boolean trace)
       throws Exception {
