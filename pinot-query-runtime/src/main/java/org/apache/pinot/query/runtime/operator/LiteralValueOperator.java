@@ -80,11 +80,11 @@ public class LiteralValueOperator extends MultiStageOperator {
       _isLiteralBlockReturned = true;
       return _rexLiteralBlock;
     } else {
-      return createLeafBlock();
+      return createEosBlock();
     }
   }
 
-  protected TransferableBlock createLeafBlock() {
+  protected TransferableBlock createEosBlock() {
     return TransferableBlockUtils.getEndOfStreamTransferableBlock(
         MultiStageQueryStats.createLiteral(_context.getStageId(), _statMap));
   }
