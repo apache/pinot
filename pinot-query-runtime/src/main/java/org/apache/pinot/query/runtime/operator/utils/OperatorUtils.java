@@ -21,16 +21,9 @@ package org.apache.pinot.query.runtime.operator.utils;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.lang.StringUtils;
-import org.apache.pinot.common.datatable.DataTable;
-import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
-import org.apache.pinot.query.runtime.operator.OperatorStats;
-import org.apache.pinot.spi.utils.JsonUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 public class OperatorUtils {
-  private static final Logger LOGGER = LoggerFactory.getLogger(OperatorUtils.class);
   private static final Map<String, String> OPERATOR_TOKEN_MAPPING = new HashMap<>();
 
   static {
@@ -61,26 +54,5 @@ public class OperatorUtils {
     functionName = StringUtils.remove(functionName, " ");
     functionName = OPERATOR_TOKEN_MAPPING.getOrDefault(functionName, functionName);
     return functionName;
-  }
-
-  public static void recordTableName(OperatorStats operatorStats, DispatchablePlanFragment dispatchablePlanFragment) {
-    String tableName = dispatchablePlanFragment.getTableName();
-    if (tableName != null) {
-      operatorStats.recordSingleStat(DataTable.MetadataKey.TABLE.getName(), tableName);
-    }
-  }
-
-  public static String operatorStatsToJson(OperatorStats operatorStats) {
-    try {
-      Map<String, Object> jsonOut = new HashMap<>();
-      jsonOut.put("requestId", operatorStats.getRequestId());
-      jsonOut.put("stageId", operatorStats.getStageId());
-      jsonOut.put("serverAddress", operatorStats.getServerAddress().toString());
-      jsonOut.put("executionStats", operatorStats.getExecutionStats());
-      return JsonUtils.objectToString(jsonOut);
-    } catch (Exception e) {
-      LOGGER.warn("Error occurred while serializing operatorStats: {}", operatorStats, e);
-    }
-    return null;
   }
 }
