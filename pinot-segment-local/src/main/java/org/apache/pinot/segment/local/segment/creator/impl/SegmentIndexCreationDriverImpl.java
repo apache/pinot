@@ -93,7 +93,6 @@ import org.slf4j.LoggerFactory;
 // TODO: Check resource leaks
 public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDriver {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentIndexCreationDriverImpl.class);
-
   private SegmentGeneratorConfig _config;
   private RecordReader _recordReader;
   private SegmentPreIndexStatsContainer _segmentStats;

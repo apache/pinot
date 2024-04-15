@@ -44,6 +44,8 @@ public class FunctionDefinitionRegistryTest {
       "geotoh3",
       // ArrayToMV and ArrayValueConstructor are placeholder functions without implementation
       "arraytomv", "arrayvalueconstructor",
+      // item is used for map type, not needed for register
+      "item",
       // Scalar function
       "scalar",
       // Functions without scalar function counterpart as of now

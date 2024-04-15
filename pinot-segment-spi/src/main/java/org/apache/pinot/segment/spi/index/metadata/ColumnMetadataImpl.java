@@ -294,6 +294,10 @@ public class ColumnMetadataImpl implements ColumnMetadata {
           builder.setMinValue(BytesUtils.toByteArray(minString));
           builder.setMaxValue(BytesUtils.toByteArray(maxString));
           break;
+        case MAP:
+          builder.setMinValue(minString);
+          builder.setMaxValue(maxString);
+          break;
         default:
           throw new IllegalStateException("Unsupported data type: " + dataType + " for column: " + column);
       }
