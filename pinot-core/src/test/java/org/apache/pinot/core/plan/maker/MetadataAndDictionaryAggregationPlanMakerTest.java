@@ -144,6 +144,8 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
   @AfterClass
   public void destroySegment() {
     _indexSegment.destroy();
+    _upsertIndexSegment.offload();
+    _upsertIndexSegment.destroy();
   }
 
   @AfterTest

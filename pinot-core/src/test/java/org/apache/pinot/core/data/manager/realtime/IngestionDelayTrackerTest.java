@@ -24,20 +24,22 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-public class IngestionDelayTrackerTest {
+import static org.mockito.Mockito.mock;
 
+
+public class IngestionDelayTrackerTest {
+  private static final String REALTIME_TABLE_NAME = "testTable_REALTIME";
   private static final int TIMER_THREAD_TICK_INTERVAL_MS = 100;
 
+  private final ServerMetrics _serverMetrics = mock(ServerMetrics.class);
+  private final RealtimeTableDataManager _realtimeTableDataManager = mock(RealtimeTableDataManager.class);
+
   private IngestionDelayTracker createTracker() {
-    ServerMetrics serverMetrics = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
-    RealtimeTableDataManager realtimeTableDataManager = new RealtimeTableDataManager(null);
     IngestionDelayTracker ingestionDelayTracker =
-        new IngestionDelayTracker(serverMetrics, "dummyTable_RT",
-            realtimeTableDataManager, () -> true);
+        new IngestionDelayTracker(_serverMetrics, REALTIME_TABLE_NAME, _realtimeTableDataManager, () -> true);
     // With no samples, the time reported must be zero
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionDelayMs(0), 0);
     return ingestionDelayTracker;
@@ -45,23 +47,18 @@ public class IngestionDelayTrackerTest {
 
   @Test
   public void testTrackerConstructors() {
-    ServerMetrics serverMetrics = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
-    RealtimeTableDataManager realtimeTableDataManager = new RealtimeTableDataManager(null);
     // Test regular constructor
     IngestionDelayTracker ingestionDelayTracker =
-        new IngestionDelayTracker(serverMetrics, "dummyTable_RT",
-            realtimeTableDataManager, () -> true);
+        new IngestionDelayTracker(_serverMetrics, REALTIME_TABLE_NAME, _realtimeTableDataManager, () -> true);
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionDelayMs(0), 0);
     ingestionDelayTracker.shutdown();
     // Test constructor with timer arguments
-    ingestionDelayTracker =
-        new IngestionDelayTracker(serverMetrics, "dummyTable_RT",
-            realtimeTableDataManager, TIMER_THREAD_TICK_INTERVAL_MS, () -> true);
+    ingestionDelayTracker = new IngestionDelayTracker(_serverMetrics, REALTIME_TABLE_NAME, _realtimeTableDataManager,
+        TIMER_THREAD_TICK_INTERVAL_MS, () -> true);
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionDelayMs(0), 0);
     // Test bad timer args to the constructor
     try {
-      new IngestionDelayTracker(serverMetrics, "dummyTable_RT",
-              realtimeTableDataManager, 0, () -> true);
+      new IngestionDelayTracker(_serverMetrics, REALTIME_TABLE_NAME, _realtimeTableDataManager, 0, () -> true);
       Assert.fail("Must have asserted due to invalid arguments"); // Constructor must assert
     } catch (Exception e) {
       if ((e instanceof NullPointerException) || !(e instanceof RuntimeException)) {
@@ -140,8 +137,8 @@ public class IngestionDelayTrackerTest {
     ZoneId zoneId = ZoneId.systemDefault();
     Clock clock = Clock.fixed(now, zoneId);
     ingestionDelayTracker.setClock(clock);
-    ingestionDelayTracker.updateIngestionDelay((clock.millis() - partition0Delay0),
-        (clock.millis() - partition0Delay0), partition0);
+    ingestionDelayTracker.updateIngestionDelay((clock.millis() - partition0Delay0), (clock.millis() - partition0Delay0),
+        partition0);
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionDelayMs(partition0), partition0Delay0);
     Assert.assertEquals(ingestionDelayTracker.getPartitionEndToEndIngestionDelayMs(partition0), partition0Delay0);
     // Advance clock and test aging

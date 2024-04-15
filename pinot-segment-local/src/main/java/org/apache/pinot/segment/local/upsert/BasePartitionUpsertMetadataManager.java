@@ -62,7 +62,6 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImp
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.utils.HashUtils;
-import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.MutableSegment;
@@ -524,20 +523,13 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   @VisibleForTesting
   public void addSegment(ImmutableSegmentImpl segment, @Nullable ThreadSafeMutableRoaringBitmap validDocIds,
       @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, Iterator<RecordInfo> recordInfoIterator) {
-    String segmentName = segment.getSegmentName();
-    Lock segmentLock = SegmentLocks.getSegmentLock(_tableNameWithType, segmentName);
-    segmentLock.lock();
-    try {
-      if (validDocIds == null) {
-        validDocIds = new ThreadSafeMutableRoaringBitmap();
-      }
-      if (queryableDocIds == null && _deleteRecordColumn != null) {
-        queryableDocIds = new ThreadSafeMutableRoaringBitmap();
-      }
-      addOrReplaceSegment(segment, validDocIds, queryableDocIds, recordInfoIterator, null, null);
-    } finally {
-      segmentLock.unlock();
+    if (validDocIds == null) {
+      validDocIds = new ThreadSafeMutableRoaringBitmap();
     }
+    if (queryableDocIds == null && _deleteRecordColumn != null) {
+      queryableDocIds = new ThreadSafeMutableRoaringBitmap();
+    }
+    addOrReplaceSegment(segment, validDocIds, queryableDocIds, recordInfoIterator, null, null);
   }
 
   protected abstract void addOrReplaceSegment(ImmutableSegmentImpl segment, ThreadSafeMutableRoaringBitmap validDocIds,
@@ -637,51 +629,43 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   public void replaceSegment(ImmutableSegment segment, @Nullable ThreadSafeMutableRoaringBitmap validDocIds,
       @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, @Nullable Iterator<RecordInfo> recordInfoIterator,
       IndexSegment oldSegment) {
-    String segmentName = segment.getSegmentName();
-    Lock segmentLock = SegmentLocks.getSegmentLock(_tableNameWithType, segmentName);
-
     // Currently when TTL is enabled, we don't support skip loading out-of-TTL segment with snapshots, since we don't
     // know which docs are valid in the new segment.
     // TODO: when ttl is enabled, we can allow
     //       (1) skip loading segments without any invalid docs.
     //       (2) assign the invalid docs from the replaced segment to the new segment.
-    segmentLock.lock();
-    try {
-      MutableRoaringBitmap validDocIdsForOldSegment =
-          oldSegment.getValidDocIds() != null ? oldSegment.getValidDocIds().getMutableRoaringBitmap() : null;
-      if (recordInfoIterator != null) {
-        Preconditions.checkArgument(segment instanceof ImmutableSegmentImpl,
-            "Got unsupported segment implementation: {} for segment: {}, table: {}", segment.getClass(), segmentName,
-            _tableNameWithType);
-        if (validDocIds == null) {
-          validDocIds = new ThreadSafeMutableRoaringBitmap();
-        }
-        if (queryableDocIds == null && _deleteRecordColumn != null) {
-          queryableDocIds = new ThreadSafeMutableRoaringBitmap();
-        }
-        addOrReplaceSegment((ImmutableSegmentImpl) segment, validDocIds, queryableDocIds, recordInfoIterator,
-            oldSegment, validDocIdsForOldSegment);
+    String segmentName = segment.getSegmentName();
+    MutableRoaringBitmap validDocIdsForOldSegment =
+        oldSegment.getValidDocIds() != null ? oldSegment.getValidDocIds().getMutableRoaringBitmap() : null;
+    if (recordInfoIterator != null) {
+      Preconditions.checkArgument(segment instanceof ImmutableSegmentImpl,
+          "Got unsupported segment implementation: {} for segment: {}, table: {}", segment.getClass(), segmentName,
+          _tableNameWithType);
+      if (validDocIds == null) {
+        validDocIds = new ThreadSafeMutableRoaringBitmap();
       }
+      if (queryableDocIds == null && _deleteRecordColumn != null) {
+        queryableDocIds = new ThreadSafeMutableRoaringBitmap();
+      }
+      addOrReplaceSegment((ImmutableSegmentImpl) segment, validDocIds, queryableDocIds, recordInfoIterator, oldSegment,
+          validDocIdsForOldSegment);
+    }
 
-      if (validDocIdsForOldSegment != null && !validDocIdsForOldSegment.isEmpty()) {
-        int numKeysNotReplaced = validDocIdsForOldSegment.getCardinality();
-        if (_partialUpsertHandler != null) {
-          // For partial-upsert table, because we do not restore the original record location when removing the primary
-          // keys not replaced, it can potentially cause inconsistency between replicas. This can happen when a
-          // consuming segment is replaced by a committed segment that is consumed from a different server with
-          // different records (some stream consumer cannot guarantee consuming the messages in the same order).
-          _logger.warn("Found {} primary keys not replaced when replacing segment: {} for partial-upsert table. This "
-              + "can potentially cause inconsistency between replicas", numKeysNotReplaced, segmentName);
-          _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.PARTIAL_UPSERT_KEYS_NOT_REPLACED,
-              numKeysNotReplaced);
-        } else {
-          _logger.info("Found {} primary keys not replaced when replacing segment: {}", numKeysNotReplaced,
-              segmentName);
-        }
-        removeSegment(oldSegment, validDocIdsForOldSegment);
+    if (validDocIdsForOldSegment != null && !validDocIdsForOldSegment.isEmpty()) {
+      int numKeysNotReplaced = validDocIdsForOldSegment.getCardinality();
+      if (_partialUpsertHandler != null) {
+        // For partial-upsert table, because we do not restore the original record location when removing the primary
+        // keys not replaced, it can potentially cause inconsistency between replicas. This can happen when a
+        // consuming segment is replaced by a committed segment that is consumed from a different server with
+        // different records (some stream consumer cannot guarantee consuming the messages in the same order).
+        _logger.warn("Found {} primary keys not replaced when replacing segment: {} for partial-upsert table. This "
+            + "can potentially cause inconsistency between replicas", numKeysNotReplaced, segmentName);
+        _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.PARTIAL_UPSERT_KEYS_NOT_REPLACED,
+            numKeysNotReplaced);
+      } else {
+        _logger.info("Found {} primary keys not replaced when replacing segment: {}", numKeysNotReplaced, segmentName);
       }
-    } finally {
-      segmentLock.unlock();
+      removeSegment(oldSegment, validDocIdsForOldSegment);
     }
   }
 
@@ -739,14 +723,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       return;
     }
 
-    Lock segmentLock = SegmentLocks.getSegmentLock(_tableNameWithType, segmentName);
-    segmentLock.lock();
-    try {
-      _logger.info("Removing {} primary keys for segment: {}", validDocIds.getCardinality(), segmentName);
-      removeSegment(segment, validDocIds);
-    } finally {
-      segmentLock.unlock();
-    }
+    _logger.info("Removing {} primary keys for segment: {}", validDocIds.getCardinality(), segmentName);
+    removeSegment(segment, validDocIds);
 
     // Update metrics
     long numPrimaryKeys = getNumPrimaryKeys();

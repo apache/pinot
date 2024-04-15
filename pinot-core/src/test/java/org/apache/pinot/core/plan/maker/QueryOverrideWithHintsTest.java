@@ -106,6 +106,10 @@ public class QueryOverrideWithHintsTest {
     }
 
     @Override
+    public void offload() {
+    }
+
+    @Override
     public void destroy() {
     }
   };

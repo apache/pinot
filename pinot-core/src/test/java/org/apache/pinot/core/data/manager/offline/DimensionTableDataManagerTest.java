@@ -35,10 +35,12 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.SchemaUtils;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
+import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentCreationDriverFactory;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderTest;
+import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
@@ -96,8 +98,8 @@ public class DimensionTableDataManagerTest {
     assertNotNull(schemaPathUrl);
     assertNotNull(configPathUrl);
     File csvFile = new File(dataPathUrl.getFile());
-    Schema schema = createSchema(new File(schemaPathUrl.getFile()));
     TableConfig tableConfig = createTableConfig(new File(configPathUrl.getFile()));
+    Schema schema = createSchema(new File(schemaPathUrl.getFile()));
 
     // create segment
     File tableDataDir = new File(TEMP_DIR, OFFLINE_TABLE_NAME);
@@ -111,7 +113,7 @@ public class DimensionTableDataManagerTest {
 
     String segmentName = driver.getSegmentName();
     _indexDir = new File(tableDataDir, segmentName);
-    _indexLoadingConfig = new IndexLoadingConfig();
+    _indexLoadingConfig = new IndexLoadingConfig(tableConfig, schema);
     _segmentMetadata = new SegmentMetadataImpl(_indexDir);
     _segmentZKMetadata = new SegmentZKMetadata(segmentName);
     _segmentZKMetadata.setCrc(Long.parseLong(_segmentMetadata.getCrc()));
@@ -147,7 +149,7 @@ public class DimensionTableDataManagerTest {
     TableConfig tableConfig = getTableConfig(false, false);
     DimensionTableDataManager tableDataManager =
         DimensionTableDataManager.createInstanceByTableName(OFFLINE_TABLE_NAME);
-    tableDataManager.init(instanceDataManagerConfig, tableConfig, helixManager, null, null);
+    tableDataManager.init(instanceDataManagerConfig, helixManager, new SegmentLocks(), tableConfig, null, null);
     tableDataManager.start();
     return tableDataManager;
   }
@@ -169,13 +171,13 @@ public class DimensionTableDataManagerTest {
     assertEquals(tableDataManager, returnedManager, "Manager should return already created instance");
 
     // assert that segments are released after loading data
-    tableDataManager.addSegment(_indexDir, _indexLoadingConfig);
+    tableDataManager.addSegment(ImmutableSegmentLoader.load(_indexDir, _indexLoadingConfig));
     for (SegmentDataManager segmentManager : returnedManager.acquireAllSegments()) {
       assertEquals(segmentManager.getReferenceCount() - 1, // Subtract this acquisition
           1, // Default ref count
           "Reference counts should be same before and after segment loading.");
       returnedManager.releaseSegment(segmentManager);
-      returnedManager.removeSegment(segmentManager.getSegmentName());
+      returnedManager.offloadSegment(segmentManager.getSegmentName());
     }
 
     // try fetching non-existent table
@@ -197,7 +199,7 @@ public class DimensionTableDataManagerTest {
     GenericRow resp = tableDataManager.lookupRowByPrimaryKey(new PrimaryKey(new String[]{"SF"}));
     assertNull(resp, "Response should be null if no segment is loaded");
 
-    tableDataManager.addSegment(_indexDir, _indexLoadingConfig);
+    tableDataManager.addSegment(ImmutableSegmentLoader.load(_indexDir, _indexLoadingConfig));
 
     // Confirm table is loaded and available for lookup
     resp = tableDataManager.lookupRowByPrimaryKey(new PrimaryKey(new String[]{"SF"}));
@@ -220,7 +222,7 @@ public class DimensionTableDataManagerTest {
     assertEquals(segmentManagers.size(), 1, "Should have exactly one segment manager");
     SegmentDataManager segMgr = segmentManagers.get(0);
     String segmentName = segMgr.getSegmentName();
-    tableDataManager.removeSegment(segmentName);
+    tableDataManager.offloadSegment(segmentName);
     // confirm table is cleaned up
     resp = tableDataManager.lookupRowByPrimaryKey(new PrimaryKey(new String[]{"SF"}));
     assertNull(resp, "Response should be null if no segment is loaded");
@@ -235,8 +237,7 @@ public class DimensionTableDataManagerTest {
         SchemaUtils.toZNRecord(getSchema()));
     when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
     DimensionTableDataManager tableDataManager = makeTableDataManager(helixManager);
-
-    tableDataManager.addSegment(_indexDir, _indexLoadingConfig);
+    tableDataManager.addSegment(ImmutableSegmentLoader.load(_indexDir, _indexLoadingConfig));
 
     // Confirm table is loaded and available for lookup
     GenericRow resp = tableDataManager.lookupRowByPrimaryKey(new PrimaryKey(new String[]{"SF"}));
@@ -283,7 +284,7 @@ public class DimensionTableDataManagerTest {
     GenericRow resp = tableDataManager.lookupRowByPrimaryKey(new PrimaryKey(new String[]{"SF"}));
     assertNull(resp, "Response should be null if no segment is loaded");
 
-    tableDataManager.addSegment(_indexDir, _indexLoadingConfig);
+    tableDataManager.addSegment(ImmutableSegmentLoader.load(_indexDir, _indexLoadingConfig));
 
     // Confirm table is loaded and available for lookup
     resp = tableDataManager.lookupRowByPrimaryKey(new PrimaryKey(new String[]{"SF"}));
@@ -306,7 +307,7 @@ public class DimensionTableDataManagerTest {
     assertEquals(segmentManagers.size(), 1, "Should have exactly one segment manager");
     SegmentDataManager segMgr = segmentManagers.get(0);
     String segmentName = segMgr.getSegmentName();
-    tableDataManager.removeSegment(segmentName);
+    tableDataManager.offloadSegment(segmentName);
     // confirm table is cleaned up
     resp = tableDataManager.lookupRowByPrimaryKey(new PrimaryKey(new String[]{"SF"}));
     assertNull(resp, "Response should be null if no segment is loaded");
@@ -329,7 +330,7 @@ public class DimensionTableDataManagerTest {
     assertNull(resp, "Response should be null if no segment is loaded");
 
     try {
-      tableDataManager.addSegment(_indexDir, _indexLoadingConfig);
+      tableDataManager.addSegment(ImmutableSegmentLoader.load(_indexDir, _indexLoadingConfig));
       fail("Should error out when ErrorOnDuplicatePrimaryKey is configured to true");
     } catch (Exception e) {
       // expected;

@@ -101,10 +101,10 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
         throws InterruptedException {
       HelixTaskResult result = new HelixTaskResult();
       _logger.info("Handling message: {}", _message);
+      _segmentRefreshSemaphore.acquireSema(_segmentName, _logger);
       try {
-        _segmentRefreshSemaphore.acquireSema(_segmentName, _logger);
         // The number of retry times depends on the retry count in Constants.
-        _instanceDataManager.addOrReplaceSegment(_tableNameWithType, _segmentName);
+        _instanceDataManager.replaceSegment(_tableNameWithType, _segmentName);
         result.setSuccess(true);
       } catch (Exception e) {
         _metrics.addMeteredTableValue(_tableNameWithType, ServerMeter.REFRESH_FAILURES, 1);

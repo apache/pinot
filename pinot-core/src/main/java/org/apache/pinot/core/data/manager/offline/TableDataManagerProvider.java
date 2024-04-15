@@ -30,6 +30,7 @@ import org.apache.helix.HelixManager;
 import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
@@ -42,20 +43,24 @@ import org.apache.pinot.spi.utils.IngestionConfigUtils;
  */
 public class TableDataManagerProvider {
   private final InstanceDataManagerConfig _instanceDataManagerConfig;
+  private final HelixManager _helixManager;
+  private final SegmentLocks _segmentLocks;
   private final Semaphore _segmentBuildSemaphore;
 
-  public TableDataManagerProvider(InstanceDataManagerConfig instanceDataManagerConfig) {
+  public TableDataManagerProvider(InstanceDataManagerConfig instanceDataManagerConfig, HelixManager helixManager,
+      SegmentLocks segmentLocks) {
     _instanceDataManagerConfig = instanceDataManagerConfig;
+    _helixManager = helixManager;
+    _segmentLocks = segmentLocks;
     int maxParallelSegmentBuilds = instanceDataManagerConfig.getMaxParallelSegmentBuilds();
     _segmentBuildSemaphore = maxParallelSegmentBuilds > 0 ? new Semaphore(maxParallelSegmentBuilds, true) : null;
   }
 
-  public TableDataManager getTableDataManager(TableConfig tableConfig, HelixManager helixManager) {
-    return getTableDataManager(tableConfig, helixManager, null, null, () -> true);
+  public TableDataManager getTableDataManager(TableConfig tableConfig) {
+    return getTableDataManager(tableConfig, null, null, () -> true);
   }
 
-  public TableDataManager getTableDataManager(TableConfig tableConfig, HelixManager helixManager,
-      @Nullable ExecutorService segmentPreloadExecutor,
+  public TableDataManager getTableDataManager(TableConfig tableConfig, @Nullable ExecutorService segmentPreloadExecutor,
       @Nullable LoadingCache<Pair<String, String>, SegmentErrorInfo> errorCache,
       Supplier<Boolean> isServerReadyToServeQueries) {
     TableDataManager tableDataManager;
@@ -80,7 +85,8 @@ public class TableDataManagerProvider {
       default:
         throw new IllegalStateException();
     }
-    tableDataManager.init(_instanceDataManagerConfig, tableConfig, helixManager, segmentPreloadExecutor, errorCache);
+    tableDataManager.init(_instanceDataManagerConfig, _helixManager, _segmentLocks, tableConfig, segmentPreloadExecutor,
+        errorCache);
     return tableDataManager;
   }
 }
