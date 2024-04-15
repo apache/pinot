@@ -186,10 +186,5 @@ public class MetadataBlockTest extends BaseDataBlockContract {
     protected int positionOffsetInVariableBufferAndGetLength(int rowId, int colId) {
       return 0;
     }
-
-    @Override
-    public DataBlock toDataOnlyDataTable() {
-      return null;
-    }
   }
 }

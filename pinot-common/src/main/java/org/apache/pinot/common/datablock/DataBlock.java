@@ -80,8 +80,6 @@ public interface DataBlock {
   @Nullable
   RoaringBitmap getNullRowIds(int colId);
 
-  DataBlock toDataOnlyDataTable();
-
   enum Type {
     ROW(0),
     COLUMNAR(1),

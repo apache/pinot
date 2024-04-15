@@ -82,11 +82,6 @@ public class ColumnarDataBlock extends BaseDataBlock {
   }
 
   @Override
-  public ColumnarDataBlock toDataOnlyDataTable() {
-    return new ColumnarDataBlock(_numRows, _dataSchema, _stringDictionary, _fixedSizeDataBytes, _variableSizeDataBytes);
-  }
-
-  @Override
   public boolean equals(Object o) {
     if (this == o) {
       return true;

@@ -74,11 +74,6 @@ public class RowDataBlock extends BaseDataBlock {
     return _fixedSizeData.getInt(offset + 4);
   }
 
-  @Override
-  public RowDataBlock toDataOnlyDataTable() {
-    return new RowDataBlock(_numRows, _dataSchema, _stringDictionary, _fixedSizeDataBytes, _variableSizeDataBytes);
-  }
-
   public int getRowSizeInBytes() {
     return _rowSizeInBytes;
   }

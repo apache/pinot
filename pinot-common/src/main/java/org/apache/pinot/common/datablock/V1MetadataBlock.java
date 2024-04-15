@@ -162,9 +162,4 @@ public class V1MetadataBlock extends BaseDataBlock {
   protected int positionOffsetInVariableBufferAndGetLength(int rowId, int colId) {
     throw new UnsupportedOperationException("Metadata block uses JSON encoding for field access");
   }
-
-  @Override
-  public MetadataBlock toDataOnlyDataTable() {
-    throw new UnsupportedOperationException();
-  }
 }

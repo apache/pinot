@@ -196,11 +196,6 @@ public class MetadataBlock extends BaseDataBlock {
     return Objects.hash(_statsByStage, _type);
   }
 
-  @Override
-  public MetadataBlock toDataOnlyDataTable() {
-    throw new UnsupportedOperationException();
-  }
-
   public enum MetadataBlockType {
     /**
      * Indicates that this block is the final block to be sent
