@@ -245,21 +245,27 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     Set<String> enabledServers = new HashSet<>();
     List<String> newEnabledServers = new ArrayList<>();
     for (ZNRecord instanceConfigZNRecord : instanceConfigZNRecords) {
+      // Put instance initialization logics into try-catch block to prevent bad server configs affecting the entire
+      // cluster
       String instanceId = instanceConfigZNRecord.getId();
-      if (isEnabledServer(instanceConfigZNRecord)) {
-        enabledServers.add(instanceId);
+      try {
+        if (isEnabledServer(instanceConfigZNRecord)) {
+          enabledServers.add(instanceId);
 
-        // Always refresh the server instance with the latest instance config in case it changes
-        InstanceConfig instanceConfig = new InstanceConfig(instanceConfigZNRecord);
-        ServerInstance serverInstance = new ServerInstance(instanceConfig);
-        if (_enabledServerInstanceMap.put(instanceId, serverInstance) == null) {
-          newEnabledServers.add(instanceId);
+          // Always refresh the server instance with the latest instance config in case it changes
+          InstanceConfig instanceConfig = new InstanceConfig(instanceConfigZNRecord);
+          ServerInstance serverInstance = new ServerInstance(instanceConfig);
+          if (_enabledServerInstanceMap.put(instanceId, serverInstance) == null) {
+            newEnabledServers.add(instanceId);
 
-          // NOTE: Remove new enabled server from excluded servers because the server is likely being restarted
-          if (_excludedServers.remove(instanceId)) {
-            LOGGER.info("Got excluded server: {} re-enabled, including it into the routing", instanceId);
+            // NOTE: Remove new enabled server from excluded servers because the server is likely being restarted
+            if (_excludedServers.remove(instanceId)) {
+              LOGGER.info("Got excluded server: {} re-enabled, including it into the routing", instanceId);
+            }
           }
         }
+      } catch (Exception e) {
+        LOGGER.error("Cannot add server instance {}, ignored it, due to error", instanceId, e);
       }
     }
     List<String> newDisabledServers = new ArrayList<>();
