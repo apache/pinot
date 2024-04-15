@@ -170,35 +170,6 @@ public class OpChainTest {
         "Expected execution time to be not collected");
   }
 
-  // TODO: Create a test that verifies multiple operators in the chain are correctly traced
-//  @Test
-//  public void testStatsCollectionTracingEnabledMultipleOperators() {
-//    long dummyOperatorWaitTime = 1000L;
-//
-//    OpChainExecutionContext context = new OpChainExecutionContext(_mailboxService1, 123L, Long.MAX_VALUE,
-//        ImmutableMap.of(CommonConstants.Broker.Request.TRACE, "true"), _stageMetadata, _workerMetadata, null);
-//    Stack<MultiStageOperator> operators = getFullOpChain(context, dummyOperatorWaitTime);
-//
-//    OpChain opChain = new OpChain(context, operators.peek());
-//    TransferableBlock eosBlock = drainOpChain(opChain);
-//
-//    OpChainExecutionContext secondStageContext = new OpChainExecutionContext(_mailboxService2, 123L, Long.MAX_VALUE,
-//        ImmutableMap.of(CommonConstants.Broker.Request.TRACE, "true"), _stageMetadata, _workerMetadata, null);
-//    MailboxReceiveOperator secondStageReceiveOp =
-//        new MailboxReceiveOperator(secondStageContext, RelDistribution.Type.BROADCAST_DISTRIBUTED, 1);
-//
-//    int numOperators = operators.size();
-//    assertEquals(opChain.getStats().getOperatorStatsMap().size(), numOperators);
-//    while (!operators.isEmpty()) {
-//      assertTrue(opChain.getStats().getOperatorStatsMap().containsKey(operators.pop().getOperatorId()));
-//    }
-//
-//    while (!secondStageReceiveOp.nextBlock().isEndOfStreamBlock()) {
-//      // Drain the mailbox
-//    }
-//    assertEquals(secondStageContext.getCurrentStageStats().getOperatorStatsMap().size(), numOperators + 1);
-//  }
-
   private Stack<MultiStageOperator> getFullOpChain(OpChainExecutionContext context, long waitTimeInMillis) {
     Stack<MultiStageOperator> operators = new Stack<>();
     DataSchema upStreamSchema = new DataSchema(new String[]{"intCol"}, new ColumnDataType[]{ColumnDataType.INT});
