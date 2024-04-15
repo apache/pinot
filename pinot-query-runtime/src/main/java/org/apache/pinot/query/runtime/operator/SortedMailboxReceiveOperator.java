@@ -99,7 +99,6 @@ public class SortedMailboxReceiveOperator extends BaseMailboxReceiveOperator {
         // specific stats.
         _eosBlock = updateEosBlock(block, _statMap);
         if (!_rows.isEmpty()) {
-
           // TODO: This might not be efficient because we are sorting all the received rows. We should use a k-way merge
           //       when sender side is sorted.
           _rows.sort(
