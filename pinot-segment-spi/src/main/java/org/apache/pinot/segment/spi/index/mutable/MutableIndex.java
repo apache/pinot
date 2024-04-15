@@ -60,4 +60,12 @@ public interface MutableIndex extends IndexReader {
    * @param docId The document id of the given row. A non-negative value.
    */
   void add(@Nonnull Object[] values, @Nullable int[] dictIds, int docId);
+
+  /**
+   * Commits the mutable index artifacts to disk. This is used in preparation for realtime segment conversion.
+   * commit() should be implemented to perform any required actions before using mutable segment artifacts to
+   * optimize realtime segment conversion.
+   */
+  default void commit() {
+  }
 }
