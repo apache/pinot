@@ -578,9 +578,6 @@ public abstract class BaseServerStarter implements ServiceStartable {
     _serverInstance = new ServerInstance(serverConf, _helixManager, accessControlFactory);
     ServerMetrics serverMetrics = _serverInstance.getServerMetrics();
 
-    // Enable Server level realtime ingestion rate limier
-    RealtimeConsumptionRateManager.getInstance().createServerRateLimiter(_serverConf, serverMetrics);
-
     InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
     instanceDataManager.setSupplierOfIsServerReadyToServeQueries(() -> _isServerReadyToServeQueries);
     // initialize the thread accountant for query killing
@@ -638,6 +635,9 @@ public abstract class BaseServerStarter implements ServiceStartable {
     }
 
     preServeQueries();
+
+    // Enable Server level realtime ingestion rate limier
+    RealtimeConsumptionRateManager.getInstance().createServerRateLimiter(_serverConf, serverMetrics);
 
     // Start the query server after finishing the service status check. If the query server is started before all the
     // segments are loaded, broker might not have finished processing the callback of routing table update, and start
