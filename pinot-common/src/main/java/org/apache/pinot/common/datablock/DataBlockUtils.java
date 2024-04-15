@@ -67,15 +67,30 @@ public final class DataBlockUtils {
     return new MetadataBlock(MetadataBlock.MetadataBlockType.EOS);
   }
 
+  /**
+   * Reads an integer from the given byte buffer.
+   * <p>
+   * The returned integer contains both the version and the type of the data block.
+   * {@link #getVersion(int)} and {@link #getType(int)} can be used to extract the version and the type.
+   * @param byteBuffer byte buffer to read from. A single int will be read
+   */
   public static int readVersionType(ByteBuffer byteBuffer) {
     return byteBuffer.getInt();
+  }
+
+  public static int getVersion(int versionType) {
+    return versionType & ((1 << VERSION_TYPE_SHIFT) - 1);
+  }
+
+  public static DataBlock.Type getType(int versionType) {
+    return DataBlock.Type.fromOrdinal(versionType >> VERSION_TYPE_SHIFT);
   }
 
   public static DataBlock getDataBlock(ByteBuffer byteBuffer)
       throws IOException {
     int versionType = readVersionType(byteBuffer);
-    int version = versionType & ((1 << VERSION_TYPE_SHIFT) - 1);
-    DataBlock.Type type = DataBlock.Type.fromOrdinal(versionType >> VERSION_TYPE_SHIFT);
+    int version = getVersion(versionType);
+    DataBlock.Type type = getType(versionType);
     switch (type) {
       case COLUMNAR:
         return new ColumnarDataBlock(byteBuffer);
