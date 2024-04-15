@@ -74,7 +74,7 @@ public class BrokerResponseNativeV2 extends BrokerResponseNative {
     return new BrokerResponseNativeV2();
   }
 
-  public void addStageStat(JsonNode stageStats) {
+  public void addStageStats(JsonNode stageStats) {
     ObjectNode node = JsonUtils.newObjectNode();
     node.put("stage", _stageIdStats.size());
     node.set("stats", stageStats);

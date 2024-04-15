@@ -269,7 +269,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     for (int i = 0; i < queryStats.size(); i++) {
       MultiStageQueryStats.StageStats.Closed stageStats = queryStats.get(i);
       if (stageStats == null) {
-        brokerResponse.addStageStat(JsonUtils.newObjectNode());
+        brokerResponse.addStageStats(JsonUtils.newObjectNode());
       } else {
         stageStats.forEach((type, stats) -> type.mergeInto(brokerResponse, stats));
 
@@ -277,7 +277,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         MultiStageStatsTreeBuilder treeBuilder = new MultiStageStatsTreeBuilder(stageStats);
         PlanNode fragmentRoot = dispatchablePlanFragment.getPlanFragment().getFragmentRoot();
         JsonNode node = fragmentRoot.visit(treeBuilder, null);
-        brokerResponse.addStageStat(node);
+        brokerResponse.addStageStats(node);
       }
     }
   }
