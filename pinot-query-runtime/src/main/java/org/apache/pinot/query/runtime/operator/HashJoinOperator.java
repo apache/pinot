@@ -67,7 +67,7 @@ import org.slf4j.LoggerFactory;
  */
 // TODO: Move inequi out of hashjoin. (https://github.com/apache/pinot/issues/9728)
 // TODO: Support memory size based resource limit.
-public class HashJoinOperator extends MultiStageOperator<HashJoinOperator.StatKey> {
+public class HashJoinOperator extends MultiStageOperator {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(HashJoinOperator.class);
   private static final String EXPLAIN_NAME = "HASH_JOIN";
@@ -85,14 +85,15 @@ public class HashJoinOperator extends MultiStageOperator<HashJoinOperator.StatKe
   // Only used for right join and full join to output non-matched right rows.
   private final Map<Object, BitSet> _matchedRightRows;
 
-  private final MultiStageOperator<?> _leftTableOperator;
-  private final MultiStageOperator<?> _rightTableOperator;
+  private final MultiStageOperator _leftTableOperator;
+  private final MultiStageOperator _rightTableOperator;
   private final JoinRelType _joinType;
   private final DataSchema _resultSchema;
   private final int _leftColumnSize;
   private final int _resultColumnSize;
   private final List<TransformOperand> _joinClauseEvaluators;
   private boolean _isHashTableBuilt;
+  private final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
 
   // Used by non-inner join.
   // Needed to indicate we have finished processing all results after returning last block.
@@ -120,9 +121,9 @@ public class HashJoinOperator extends MultiStageOperator<HashJoinOperator.StatKe
   @Nullable
   private MultiStageQueryStats _queryStats = null;
 
-  public HashJoinOperator(OpChainExecutionContext context, MultiStageOperator<?> leftTableOperator,
-      MultiStageOperator<?> rightTableOperator, DataSchema leftSchema, JoinNode node) {
-    super(context, StatKey.class);
+  public HashJoinOperator(OpChainExecutionContext context, MultiStageOperator leftTableOperator,
+      MultiStageOperator rightTableOperator, DataSchema leftSchema, JoinNode node) {
+    super(context);
     Preconditions.checkState(SUPPORTED_JOIN_TYPES.contains(node.getJoinRelType()),
         "Join type: " + node.getJoinRelType() + " is not supported!");
     _joinType = node.getJoinRelType();
@@ -155,13 +156,9 @@ public class HashJoinOperator extends MultiStageOperator<HashJoinOperator.StatKe
   }
 
   @Override
-  public StatKey getExecutionTimeKey() {
-    return StatKey.EXECUTION_TIME_MS;
-  }
-
-  @Override
-  public StatKey getEmittedRowsKey() {
-    return StatKey.EMITTED_ROWS;
+  public void registerExecution(long time, int numRows) {
+    _statMap.merge(StatKey.EXECUTION_TIME_MS, time);
+    _statMap.merge(StatKey.EMITTED_ROWS, numRows);
   }
 
   @Override
@@ -205,7 +202,7 @@ public class HashJoinOperator extends MultiStageOperator<HashJoinOperator.StatKe
 
   // TODO: Separate left and right table operator.
   @Override
-  public List<MultiStageOperator<?>> getChildOperators() {
+  public List<MultiStageOperator> getChildOperators() {
     return ImmutableList.of(_leftTableOperator, _rightTableOperator);
   }
 

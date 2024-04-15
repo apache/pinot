@@ -34,17 +34,18 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class LiteralValueOperator extends MultiStageOperator<LiteralValueOperator.StatKey> {
+public class LiteralValueOperator extends MultiStageOperator {
   private static final String EXPLAIN_NAME = "LITERAL_VALUE_PROVIDER";
   private static final Logger LOGGER = LoggerFactory.getLogger(LiteralValueOperator.class);
 
   private final DataSchema _dataSchema;
   private final TransferableBlock _rexLiteralBlock;
   private boolean _isLiteralBlockReturned;
+  private final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
 
   public LiteralValueOperator(OpChainExecutionContext context, DataSchema dataSchema,
       List<List<RexExpression>> rexLiteralRows) {
-    super(context, StatKey.class);
+    super(context);
     _dataSchema = dataSchema;
     _rexLiteralBlock = constructBlock(rexLiteralRows);
     // only return a single literal block when it is the 1st virtual server. otherwise, result will be duplicated.
@@ -52,13 +53,9 @@ public class LiteralValueOperator extends MultiStageOperator<LiteralValueOperato
   }
 
   @Override
-  public StatKey getExecutionTimeKey() {
-    return StatKey.EXECUTION_TIME_MS;
-  }
-
-  @Override
-  public StatKey getEmittedRowsKey() {
-    return StatKey.EMITTED_ROWS;
+  public void registerExecution(long time, int numRows) {
+    _statMap.merge(StatKey.EXECUTION_TIME_MS, time);
+    _statMap.merge(StatKey.EMITTED_ROWS, numRows);
   }
 
   @Override
@@ -67,7 +64,7 @@ public class LiteralValueOperator extends MultiStageOperator<LiteralValueOperato
   }
 
   @Override
-  public List<MultiStageOperator<?>> getChildOperators() {
+  public List<MultiStageOperator> getChildOperators() {
     return ImmutableList.of();
   }
 

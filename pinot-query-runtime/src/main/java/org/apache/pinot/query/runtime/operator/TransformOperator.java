@@ -45,19 +45,20 @@ import org.slf4j.LoggerFactory;
  * Note: Function transform only runs functions from v1 engine scalar function factory, which only does argument count
  * and canonicalized function name matching (lower case).
  */
-public class TransformOperator extends MultiStageOperator<TransformOperator.StatKey> {
+public class TransformOperator extends MultiStageOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(TransformOperator.class);
   private static final String EXPLAIN_NAME = "TRANSFORM";
 
-  private final MultiStageOperator<?> _upstreamOperator;
+  private final MultiStageOperator _upstreamOperator;
   private final List<TransformOperand> _transformOperandsList;
   private final int _resultColumnSize;
   // TODO: Check type matching between resultSchema and the actual result.
   private final DataSchema _resultSchema;
+  private final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
 
-  public TransformOperator(OpChainExecutionContext context, MultiStageOperator<?> upstreamOperator,
+  public TransformOperator(OpChainExecutionContext context, MultiStageOperator upstreamOperator,
       DataSchema resultSchema, List<RexExpression> transforms, DataSchema upstreamDataSchema) {
-    super(context, StatKey.class);
+    super(context);
     Preconditions.checkState(!transforms.isEmpty(), "transform operand should not be empty.");
     Preconditions.checkState(resultSchema.size() == transforms.size(),
         "result schema size:" + resultSchema.size() + " doesn't match transform operand size:" + transforms.size());
@@ -71,13 +72,9 @@ public class TransformOperator extends MultiStageOperator<TransformOperator.Stat
   }
 
   @Override
-  public StatKey getExecutionTimeKey() {
-    return StatKey.EXECUTION_TIME_MS;
-  }
-
-  @Override
-  public StatKey getEmittedRowsKey() {
-    return StatKey.EMITTED_ROWS;
+  public void registerExecution(long time, int numRows) {
+    _statMap.merge(StatKey.EXECUTION_TIME_MS, time);
+    _statMap.merge(StatKey.EMITTED_ROWS, numRows);
   }
 
   @Override
@@ -86,7 +83,7 @@ public class TransformOperator extends MultiStageOperator<TransformOperator.Stat
   }
 
   @Override
-  public List<MultiStageOperator<?>> getChildOperators() {
+  public List<MultiStageOperator> getChildOperators() {
     return ImmutableList.of(_upstreamOperator);
   }
 
@@ -106,7 +103,7 @@ public class TransformOperator extends MultiStageOperator<TransformOperator.Stat
     TransferableBlock block = _upstreamOperator.nextBlock();
     if (block.isEndOfStreamBlock()) {
       if (block.isSuccessfulEndOfStreamBlock()) {
-        return updateEosBlock(block);
+        return updateEosBlock(block, _statMap);
       } else {
         return block;
       }

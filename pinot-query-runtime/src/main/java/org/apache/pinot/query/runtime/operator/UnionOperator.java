@@ -40,7 +40,7 @@ public class UnionOperator extends SetOperator {
   private MultiStageQueryStats _queryStats = null;
   private int _finishedChildren = 0;
 
-  public UnionOperator(OpChainExecutionContext opChainExecutionContext, List<MultiStageOperator<?>> upstreamOperators,
+  public UnionOperator(OpChainExecutionContext opChainExecutionContext, List<MultiStageOperator> upstreamOperators,
       DataSchema dataSchema) {
     super(opChainExecutionContext, upstreamOperators, dataSchema);
   }
@@ -66,9 +66,9 @@ public class UnionOperator extends SetOperator {
     if (_upstreamErrorBlock != null) {
       return _upstreamErrorBlock;
     }
-    List<MultiStageOperator<?>> childOperators = getChildOperators();
+    List<MultiStageOperator> childOperators = getChildOperators();
     for (int i = _finishedChildren; i < childOperators.size(); i++) {
-      MultiStageOperator<?> upstreamOperator = childOperators.get(i);
+      MultiStageOperator upstreamOperator = childOperators.get(i);
       TransferableBlock block = upstreamOperator.nextBlock();
       if (block.isDataBlock()) {
         return block;
@@ -82,7 +82,7 @@ public class UnionOperator extends SetOperator {
       }
     }
     assert _queryStats != null : "Should have at least one EOS block from the upstream operators";
-    addStats(_queryStats);
+    addStats(_queryStats, _statMap);
     return TransferableBlockUtils.getEndOfStreamTransferableBlock(_queryStats);
   }
 

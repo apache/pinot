@@ -51,7 +51,7 @@ import org.slf4j.LoggerFactory;
  *
  * TODO: Add support to sort the data prior to sending if sorting is enabled
  */
-public class MailboxSendOperator extends MultiStageOperator<MailboxSendOperator.StatKey> {
+public class MailboxSendOperator extends MultiStageOperator {
   public static final EnumSet<RelDistribution.Type> SUPPORTED_EXCHANGE_TYPES =
       EnumSet.of(RelDistribution.Type.SINGLETON, RelDistribution.Type.RANDOM_DISTRIBUTED,
           RelDistribution.Type.BROADCAST_DISTRIBUTED, RelDistribution.Type.HASH_DISTRIBUTED);
@@ -59,13 +59,14 @@ public class MailboxSendOperator extends MultiStageOperator<MailboxSendOperator.
   private static final Logger LOGGER = LoggerFactory.getLogger(MailboxSendOperator.class);
   private static final String EXPLAIN_NAME = "MAILBOX_SEND";
 
-  private final MultiStageOperator<?> _sourceOperator;
+  private final MultiStageOperator _sourceOperator;
   private final BlockExchange _exchange;
   private final List<RexExpression> _collationKeys;
   private final List<RelFieldCollation.Direction> _collationDirections;
   private final boolean _isSortOnSender;
+  private final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
 
-  public MailboxSendOperator(OpChainExecutionContext context, MultiStageOperator<?> sourceOperator,
+  public MailboxSendOperator(OpChainExecutionContext context, MultiStageOperator sourceOperator,
       RelDistribution.Type distributionType, @Nullable List<Integer> distributionKeys,
       @Nullable List<RexExpression> collationKeys, @Nullable List<RelFieldCollation.Direction> collationDirections,
       boolean isSortOnSender, int receiverStageId) {
@@ -81,7 +82,7 @@ public class MailboxSendOperator extends MultiStageOperator<MailboxSendOperator.
       Function<StatMap<StatKey>, BlockExchange> exchangeFactory,
       @Nullable List<RexExpression> collationKeys, @Nullable List<RelFieldCollation.Direction> collationDirections,
       boolean isSortOnSender) {
-    super(context, MailboxSendOperator.StatKey.class);
+    super(context);
     _sourceOperator = sourceOperator;
     _exchange = exchangeFactory.apply(_statMap);
     _collationKeys = collationKeys;
@@ -111,13 +112,9 @@ public class MailboxSendOperator extends MultiStageOperator<MailboxSendOperator.
   }
 
   @Override
-  public StatKey getExecutionTimeKey() {
-    return StatKey.EXECUTION_TIME_MS;
-  }
-
-  @Override
-  public StatKey getEmittedRowsKey() {
-    return StatKey.EMITTED_ROWS;
+  public void registerExecution(long time, int numRows) {
+    _statMap.merge(StatKey.EXECUTION_TIME_MS, time);
+    _statMap.merge(StatKey.EMITTED_ROWS, numRows);
   }
 
   @Override
@@ -131,7 +128,7 @@ public class MailboxSendOperator extends MultiStageOperator<MailboxSendOperator.
   }
 
   @Override
-  public List<MultiStageOperator<?>> getChildOperators() {
+  public List<MultiStageOperator> getChildOperators() {
     return Collections.singletonList(_sourceOperator);
   }
 
@@ -146,7 +143,7 @@ public class MailboxSendOperator extends MultiStageOperator<MailboxSendOperator.
     try {
       TransferableBlock block = _sourceOperator.nextBlock();
       if (block.isSuccessfulEndOfStreamBlock()) {
-        updateEosBlock(block);
+        updateEosBlock(block, _statMap);
         // no need to check early terminate signal b/c the current block is already EOS
         sendTransferableBlock(block);
       } else {

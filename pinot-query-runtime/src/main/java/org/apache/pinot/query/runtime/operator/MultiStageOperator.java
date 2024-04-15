@@ -38,19 +38,17 @@ import org.apache.pinot.spi.trace.Tracing;
 import org.slf4j.Logger;
 
 
-public abstract class MultiStageOperator<K extends Enum<K> & StatMap.Key>
+public abstract class MultiStageOperator
     implements Operator<TransferableBlock>, AutoCloseable {
 
   protected final OpChainExecutionContext _context;
   protected final String _operatorId;
-  protected final StatMap<K> _statMap;
   protected boolean _isEarlyTerminated;
 
-  public MultiStageOperator(OpChainExecutionContext context, Class<K> keyStatClass) {
+  public MultiStageOperator(OpChainExecutionContext context) {
     _context = context;
     _operatorId = Joiner.on("_").join(getClass().getSimpleName(), _context.getStageId(), _context.getServer());
     _isEarlyTerminated = false;
-    _statMap = new StatMap<>(keyStatClass);
   }
 
   /**
@@ -64,15 +62,7 @@ public abstract class MultiStageOperator<K extends Enum<K> & StatMap.Key>
 
   public abstract Type getOperatorType();
 
-  /**
-   * Returns the key that should be used to record execution time.
-   */
-  public abstract K getExecutionTimeKey();
-
-  /**
-   * Returns the key that should be used to record the number of emitted rows.
-   */
-  public abstract K getEmittedRowsKey();
+  public abstract void registerExecution(long time, int numRows);
 
   @Override
   public TransferableBlock nextBlock() {
@@ -91,8 +81,7 @@ public abstract class MultiStageOperator<K extends Enum<K> & StatMap.Key>
         } catch (Exception e) {
           nextBlock = TransferableBlockUtils.getErrorTransferableBlock(e);
         }
-        _statMap.merge(getExecutionTimeKey(), executeStopwatch.elapsed(TimeUnit.MILLISECONDS));
-        _statMap.merge(getEmittedRowsKey(), nextBlock.getNumRows());
+        registerExecution(executeStopwatch.elapsed(TimeUnit.MILLISECONDS), nextBlock.getNumRows());
       } else {
         try {
           nextBlock = getNextBlock();
@@ -113,7 +102,7 @@ public abstract class MultiStageOperator<K extends Enum<K> & StatMap.Key>
 
   protected void earlyTerminate() {
     _isEarlyTerminated = true;
-    for (MultiStageOperator<?> child : getChildOperators()) {
+    for (MultiStageOperator child : getChildOperators()) {
       child.earlyTerminate();
     }
   }
@@ -127,11 +116,11 @@ public abstract class MultiStageOperator<K extends Enum<K> & StatMap.Key>
    *   <li>The holder already contains the stats of the previous operators of the same stage in inorder</li>
    * </ol>
    */
-  protected void addStats(MultiStageQueryStats holder) {
+  protected void addStats(MultiStageQueryStats holder, StatMap<?> statMap) {
     Preconditions.checkArgument(holder.getCurrentStageId() == _context.getStageId(),
         "The holder's stage id should be the same as the current operator's stage id. Expected %s, got %s",
         _context.getStageId(), holder.getCurrentStageId());
-    holder.getCurrentStats().addLastOperator(getOperatorType(), _statMap);
+    holder.getCurrentStats().addLastOperator(getOperatorType(), statMap);
   }
 
   protected boolean shouldCollectStats() {
@@ -139,13 +128,13 @@ public abstract class MultiStageOperator<K extends Enum<K> & StatMap.Key>
   }
 
   @Override
-  public abstract List<MultiStageOperator<?>> getChildOperators();
+  public abstract List<MultiStageOperator> getChildOperators();
 
   // TODO: Ideally close() call should finish within request deadline.
   // TODO: Consider passing deadline as part of the API.
   @Override
   public void close() {
-    for (MultiStageOperator<?> op : getChildOperators()) {
+    for (MultiStageOperator op : getChildOperators()) {
       try {
         op.close();
       } catch (Exception e) {
@@ -156,7 +145,7 @@ public abstract class MultiStageOperator<K extends Enum<K> & StatMap.Key>
   }
 
   public void cancel(Throwable e) {
-    for (MultiStageOperator<?> op : getChildOperators()) {
+    for (MultiStageOperator op : getChildOperators()) {
       try {
         op.cancel(e);
       } catch (Exception e2) {
@@ -170,15 +159,15 @@ public abstract class MultiStageOperator<K extends Enum<K> & StatMap.Key>
    * Receives the EOS block from upstream operator and updates the stats.
    * <p>
    * The fact that the EOS belongs to the upstream operator is not an actual requirement. Actual requirements are listed
-   * in {@link #addStats(MultiStageQueryStats)}
+   * in {@link #addStats(MultiStageQueryStats, StatMap)}
    * @param upstreamEos
    * @return
    */
-  protected TransferableBlock updateEosBlock(TransferableBlock upstreamEos) {
+  protected TransferableBlock updateEosBlock(TransferableBlock upstreamEos, StatMap<?> statMap) {
     assert upstreamEos.isSuccessfulEndOfStreamBlock();
     MultiStageQueryStats queryStats = upstreamEos.getQueryStats();
     assert queryStats != null;
-    addStats(queryStats);
+    addStats(queryStats, statMap);
     return upstreamEos;
   }
 

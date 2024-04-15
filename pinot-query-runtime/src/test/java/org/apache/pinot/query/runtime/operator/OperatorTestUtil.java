@@ -68,7 +68,7 @@ public class OperatorTestUtil {
   private OperatorTestUtil() {
   }
 
-  public static MultiStageOperator<?> getOperator(String operatorName) {
+  public static MultiStageOperator getOperator(String operatorName) {
     return MOCK_OPERATOR_FACTORY.buildMockOperator(operatorName);
   }
 

@@ -59,27 +59,28 @@ import org.slf4j.LoggerFactory;
  * Output data will be in the format of [group by key, aggregate result1, ... aggregate resultN]
  * When the list of aggregation calls is empty, this class is used to calculate distinct result based on group by keys.
  */
-public class AggregateOperator extends MultiStageOperator<AggregateOperator.StatKey> {
+public class AggregateOperator extends MultiStageOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(AggregateOperator.class);
   private static final String EXPLAIN_NAME = "AGGREGATE_OPERATOR";
   private static final CountAggregationFunction COUNT_STAR_AGG_FUNCTION =
       new CountAggregationFunction(Collections.singletonList(ExpressionContext.forIdentifier("*")), false);
   private static final ExpressionContext PLACEHOLDER_IDENTIFIER = ExpressionContext.forIdentifier("__PLACEHOLDER__");
 
-  private final MultiStageOperator<?> _inputOperator;
+  private final MultiStageOperator _inputOperator;
   private final DataSchema _resultSchema;
   private final AggType _aggType;
   private final MultistageAggregationExecutor _aggregationExecutor;
   private final MultistageGroupByExecutor _groupByExecutor;
   @Nullable
   private TransferableBlock _eosBlock;
+  private final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
 
   private boolean _hasConstructedAggregateBlock;
 
-  public AggregateOperator(OpChainExecutionContext context, MultiStageOperator<?> inputOperator,
+  public AggregateOperator(OpChainExecutionContext context, MultiStageOperator inputOperator,
       DataSchema resultSchema, List<RexExpression> aggCalls, List<RexExpression> groupSet, AggType aggType,
       List<Integer> filterArgIndices, @Nullable AbstractPlanNode.NodeHint nodeHint) {
-    super(context, StatKey.class);
+    super(context);
     _inputOperator = inputOperator;
     _resultSchema = resultSchema;
     _aggType = aggType;
@@ -123,13 +124,9 @@ public class AggregateOperator extends MultiStageOperator<AggregateOperator.Stat
   }
 
   @Override
-  public StatKey getExecutionTimeKey() {
-    return StatKey.EXECUTION_TIME_MS;
-  }
-
-  @Override
-  public StatKey getEmittedRowsKey() {
-    return StatKey.EMITTED_ROWS;
+  public void registerExecution(long time, int numRows) {
+    _statMap.merge(StatKey.EXECUTION_TIME_MS, time);
+    _statMap.merge(StatKey.EMITTED_ROWS, numRows);
   }
 
   @Override
@@ -143,7 +140,7 @@ public class AggregateOperator extends MultiStageOperator<AggregateOperator.Stat
   }
 
   @Override
-  public List<MultiStageOperator<?>> getChildOperators() {
+  public List<MultiStageOperator> getChildOperators() {
     return ImmutableList.of(_inputOperator);
   }
 
@@ -165,7 +162,7 @@ public class AggregateOperator extends MultiStageOperator<AggregateOperator.Stat
       return finalBlock;
     }
     assert finalBlock.isSuccessfulEndOfStreamBlock() : "Final block must be EOS block";
-    _eosBlock = updateEosBlock(finalBlock);
+    _eosBlock = updateEosBlock(finalBlock, _statMap);
     return produceAggregatedBlock(finalBlock);
   }
 

@@ -43,12 +43,12 @@ import org.apache.pinot.segment.spi.IndexSegment;
  * The right child operator is consumed in a blocking manner, and the left child operator is consumed in a non-blocking
  * UnionOperator: The right child operator is consumed in a blocking manner.
  */
-public abstract class SetOperator extends MultiStageOperator<SetOperator.StatKey> {
+public abstract class SetOperator extends MultiStageOperator {
   protected final Set<Record> _rightRowSet;
 
-  private final List<MultiStageOperator<?>> _upstreamOperators;
-  private final MultiStageOperator<?> _leftChildOperator;
-  private final MultiStageOperator<?> _rightChildOperator;
+  private final List<MultiStageOperator> _upstreamOperators;
+  private final MultiStageOperator _leftChildOperator;
+  private final MultiStageOperator _rightChildOperator;
 
   private final DataSchema _dataSchema;
 
@@ -56,10 +56,11 @@ public abstract class SetOperator extends MultiStageOperator<SetOperator.StatKey
   protected TransferableBlock _upstreamErrorBlock;
   @Nullable
   private MultiStageQueryStats _rightQueryStats = null;
+  protected final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
 
-  public SetOperator(OpChainExecutionContext opChainExecutionContext, List<MultiStageOperator<?>> upstreamOperators,
+  public SetOperator(OpChainExecutionContext opChainExecutionContext, List<MultiStageOperator> upstreamOperators,
       DataSchema dataSchema) {
-    super(opChainExecutionContext, StatKey.class);
+    super(opChainExecutionContext);
     _dataSchema = dataSchema;
     _upstreamOperators = upstreamOperators;
     _leftChildOperator = getChildOperators().get(0);
@@ -69,17 +70,13 @@ public abstract class SetOperator extends MultiStageOperator<SetOperator.StatKey
   }
 
   @Override
-  public StatKey getExecutionTimeKey() {
-    return StatKey.EXECUTION_TIME_MS;
+  public void registerExecution(long time, int numRows) {
+    _statMap.merge(StatKey.EXECUTION_TIME_MS, time);
+    _statMap.merge(StatKey.EMITTED_ROWS, numRows);
   }
 
   @Override
-  public StatKey getEmittedRowsKey() {
-    return StatKey.EMITTED_ROWS;
-  }
-
-  @Override
-  public List<MultiStageOperator<?>> getChildOperators() {
+  public List<MultiStageOperator> getChildOperators() {
     return _upstreamOperators;
   }
 

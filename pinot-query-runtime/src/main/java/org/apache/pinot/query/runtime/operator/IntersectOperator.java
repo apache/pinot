@@ -35,7 +35,7 @@ public class IntersectOperator extends SetOperator {
   private static final String EXPLAIN_NAME = "INTERSECT";
 
   public IntersectOperator(OpChainExecutionContext opChainExecutionContext,
-      List<MultiStageOperator<?>> upstreamOperators,
+      List<MultiStageOperator> upstreamOperators,
       DataSchema dataSchema) {
     super(opChainExecutionContext, upstreamOperators, dataSchema);
   }

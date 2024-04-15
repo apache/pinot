@@ -50,18 +50,19 @@ import org.slf4j.LoggerFactory;
     3) All boolean scalar functions we have that take tranformOperand.
     Note: Scalar functions are the ones we have in v1 engine and only do function name and arg # matching.
  */
-public class FilterOperator extends MultiStageOperator<FilterOperator.StatKey> {
+public class FilterOperator extends MultiStageOperator {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(FilterOperator.class);
   private static final String EXPLAIN_NAME = "FILTER";
 
-  private final MultiStageOperator<?> _upstreamOperator;
+  private final MultiStageOperator _upstreamOperator;
   private final TransformOperand _filterOperand;
   private final DataSchema _dataSchema;
+  private final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
 
-  public FilterOperator(OpChainExecutionContext context, MultiStageOperator<?> upstreamOperator, DataSchema dataSchema,
+  public FilterOperator(OpChainExecutionContext context, MultiStageOperator upstreamOperator, DataSchema dataSchema,
       RexExpression filter) {
-    super(context, StatKey.class);
+    super(context);
     _upstreamOperator = upstreamOperator;
     _dataSchema = dataSchema;
     _filterOperand = TransformOperandFactory.getTransformOperand(filter, dataSchema);
@@ -70,13 +71,9 @@ public class FilterOperator extends MultiStageOperator<FilterOperator.StatKey> {
   }
 
   @Override
-  public StatKey getExecutionTimeKey() {
-    return StatKey.EXECUTION_TIME_MS;
-  }
-
-  @Override
-  public StatKey getEmittedRowsKey() {
-    return StatKey.EMITTED_ROWS;
+  public void registerExecution(long time, int numRows) {
+    _statMap.merge(StatKey.EXECUTION_TIME_MS, time);
+    _statMap.merge(StatKey.EMITTED_ROWS, numRows);
   }
 
   @Override
@@ -90,7 +87,7 @@ public class FilterOperator extends MultiStageOperator<FilterOperator.StatKey> {
   }
 
   @Override
-  public List<MultiStageOperator<?>> getChildOperators() {
+  public List<MultiStageOperator> getChildOperators() {
     return ImmutableList.of(_upstreamOperator);
   }
 
@@ -107,7 +104,7 @@ public class FilterOperator extends MultiStageOperator<FilterOperator.StatKey> {
       if (block.isErrorBlock()) {
         return block;
       }
-      return updateEosBlock(block);
+      return updateEosBlock(block, _statMap);
     }
     List<Object[]> resultRows = new ArrayList<>();
     for (Object[] row : block.getContainer()) {

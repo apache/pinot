@@ -177,7 +177,7 @@ public class OpChainTest {
 //
 //    OpChainExecutionContext context = new OpChainExecutionContext(_mailboxService1, 123L, Long.MAX_VALUE,
 //        ImmutableMap.of(CommonConstants.Broker.Request.TRACE, "true"), _stageMetadata, _workerMetadata, null);
-//    Stack<MultiStageOperator<?>> operators = getFullOpChain(context, dummyOperatorWaitTime);
+//    Stack<MultiStageOperator> operators = getFullOpChain(context, dummyOperatorWaitTime);
 //
 //    OpChain opChain = new OpChain(context, operators.peek());
 //    TransferableBlock eosBlock = drainOpChain(opChain);
@@ -199,8 +199,8 @@ public class OpChainTest {
 //    assertEquals(secondStageContext.getCurrentStageStats().getOperatorStatsMap().size(), numOperators + 1);
 //  }
 
-  private Stack<MultiStageOperator<?>> getFullOpChain(OpChainExecutionContext context, long waitTimeInMillis) {
-    Stack<MultiStageOperator<?>> operators = new Stack<>();
+  private Stack<MultiStageOperator> getFullOpChain(OpChainExecutionContext context, long waitTimeInMillis) {
+    Stack<MultiStageOperator> operators = new Stack<>();
     DataSchema upStreamSchema = new DataSchema(new String[]{"intCol"}, new ColumnDataType[]{ColumnDataType.INT});
     //Mailbox Receive Operator
     try {
@@ -264,21 +264,18 @@ public class OpChainTest {
     return resultBlock;
   }
 
-  static class DummyMultiStageOperator extends MultiStageOperator<LiteralValueOperator.StatKey> {
+  static class DummyMultiStageOperator extends MultiStageOperator {
     private static final Logger LOGGER = LoggerFactory.getLogger(DummyMultiStageOperator.class);
+    private final StatMap<LiteralValueOperator.StatKey> _statMap = new StatMap<>(LiteralValueOperator.StatKey.class);
 
     public DummyMultiStageOperator(OpChainExecutionContext context) {
-      super(context, LiteralValueOperator.StatKey.class);
+      super(context);
     }
 
     @Override
-    public LiteralValueOperator.StatKey getExecutionTimeKey() {
-      return LiteralValueOperator.StatKey.EXECUTION_TIME_MS;
-    }
-
-    @Override
-    public LiteralValueOperator.StatKey getEmittedRowsKey() {
-      return LiteralValueOperator.StatKey.EMITTED_ROWS;
+    public void registerExecution(long time, int numRows) {
+      _statMap.merge(LiteralValueOperator.StatKey.EXECUTION_TIME_MS, time);
+      _statMap.merge(LiteralValueOperator.StatKey.EMITTED_ROWS, numRows);
     }
 
     @Override
@@ -302,7 +299,7 @@ public class OpChainTest {
     }
 
     @Override
-    public List<MultiStageOperator<?>> getChildOperators() {
+    public List<MultiStageOperator> getChildOperators() {
       return Collections.emptyList();
     }
 
@@ -313,26 +310,23 @@ public class OpChainTest {
     }
   }
 
-  static class DummyMultiStageCallableOperator extends MultiStageOperator<TransformOperator.StatKey> {
+  static class DummyMultiStageCallableOperator extends MultiStageOperator {
     private static final Logger LOGGER = LoggerFactory.getLogger(DummyMultiStageCallableOperator.class);
-    private final MultiStageOperator<?> _upstream;
+    private final MultiStageOperator _upstream;
     private final long _sleepTimeInMillis;
+    private final StatMap<TransformOperator.StatKey> _statMap = new StatMap<>(TransformOperator.StatKey.class);
 
-    public DummyMultiStageCallableOperator(OpChainExecutionContext context, MultiStageOperator<?> upstream,
+    public DummyMultiStageCallableOperator(OpChainExecutionContext context, MultiStageOperator upstream,
         long sleepTimeInMillis) {
-      super(context, TransformOperator.StatKey.class);
+      super(context);
       _upstream = upstream;
       _sleepTimeInMillis = sleepTimeInMillis;
     }
 
     @Override
-    public TransformOperator.StatKey getExecutionTimeKey() {
-      return TransformOperator.StatKey.EXECUTION_TIME_MS;
-    }
-
-    @Override
-    public TransformOperator.StatKey getEmittedRowsKey() {
-      return TransformOperator.StatKey.EMITTED_ROWS;
+    public void registerExecution(long time, int numRows) {
+      _statMap.merge(TransformOperator.StatKey.EXECUTION_TIME_MS, time);
+      _statMap.merge(TransformOperator.StatKey.EMITTED_ROWS, numRows);
     }
 
     @Override
@@ -341,7 +335,7 @@ public class OpChainTest {
     }
 
     @Override
-    public List<MultiStageOperator<?>> getChildOperators() {
+    public List<MultiStageOperator> getChildOperators() {
       return ImmutableList.of(_upstream);
     }
 

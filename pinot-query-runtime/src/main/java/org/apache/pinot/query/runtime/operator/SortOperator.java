@@ -40,23 +40,24 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class SortOperator extends MultiStageOperator<SortOperator.StatKey> {
+public class SortOperator extends MultiStageOperator {
   private static final String EXPLAIN_NAME = "SORT";
   private static final Logger LOGGER = LoggerFactory.getLogger(SortOperator.class);
 
-  private final MultiStageOperator<?> _upstreamOperator;
+  private final MultiStageOperator _upstreamOperator;
   private final int _fetch;
   private final int _offset;
   private final DataSchema _dataSchema;
   private final PriorityQueue<Object[]> _priorityQueue;
   private final ArrayList<Object[]> _rows;
   private final int _numRowsToKeep;
+  private final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
 
   private boolean _hasConstructedSortedBlock;
   @Nullable
   private TransferableBlock _eosBlock = null;
 
-  public SortOperator(OpChainExecutionContext context, MultiStageOperator<?> upstreamOperator,
+  public SortOperator(OpChainExecutionContext context, MultiStageOperator upstreamOperator,
       List<RexExpression> collationKeys, List<RelFieldCollation.Direction> collationDirections,
       List<RelFieldCollation.NullDirection> collationNullDirections, int fetch, int offset, DataSchema dataSchema,
       boolean isInputSorted) {
@@ -66,11 +67,11 @@ public class SortOperator extends MultiStageOperator<SortOperator.StatKey> {
   }
 
   @VisibleForTesting
-  SortOperator(OpChainExecutionContext context, MultiStageOperator<?> upstreamOperator,
+  SortOperator(OpChainExecutionContext context, MultiStageOperator upstreamOperator,
       List<RexExpression> collationKeys, List<RelFieldCollation.Direction> collationDirections,
       List<RelFieldCollation.NullDirection> collationNullDirections, int fetch, int offset, DataSchema dataSchema,
       boolean isInputSorted, int defaultHolderCapacity, int defaultResponseLimit) {
-    super(context, StatKey.class);
+    super(context);
     _upstreamOperator = upstreamOperator;
     _fetch = fetch;
     _offset = Math.max(offset, 0);
@@ -95,13 +96,9 @@ public class SortOperator extends MultiStageOperator<SortOperator.StatKey> {
   }
 
   @Override
-  public StatKey getExecutionTimeKey() {
-    return StatKey.EXECUTION_TIME_MS;
-  }
-
-  @Override
-  public StatKey getEmittedRowsKey() {
-    return StatKey.EMITTED_ROWS;
+  public void registerExecution(long time, int numRows) {
+    _statMap.merge(StatKey.EXECUTION_TIME_MS, time);
+    _statMap.merge(StatKey.EMITTED_ROWS, numRows);
   }
 
   @Override
@@ -115,7 +112,7 @@ public class SortOperator extends MultiStageOperator<SortOperator.StatKey> {
   }
 
   @Override
-  public List<MultiStageOperator<?>> getChildOperators() {
+  public List<MultiStageOperator> getChildOperators() {
     return ImmutableList.of(_upstreamOperator);
   }
 
@@ -140,7 +137,7 @@ public class SortOperator extends MultiStageOperator<SortOperator.StatKey> {
     if (finalBlock.isErrorBlock()) {
       return finalBlock;
     }
-    _eosBlock = updateEosBlock(finalBlock);
+    _eosBlock = updateEosBlock(finalBlock, _statMap);
     return produceSortedBlock();
   }
 

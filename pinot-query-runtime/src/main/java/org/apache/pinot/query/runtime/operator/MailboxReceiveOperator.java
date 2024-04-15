@@ -59,7 +59,7 @@ public class MailboxReceiveOperator extends BaseMailboxReceiveOperator {
       block = _multiConsumer.readBlockBlocking();
     }
     if (block.isSuccessfulEndOfStreamBlock()) {
-      updateEosBlock(block);
+      updateEosBlock(block, _statMap);
     }
     return block;
   }

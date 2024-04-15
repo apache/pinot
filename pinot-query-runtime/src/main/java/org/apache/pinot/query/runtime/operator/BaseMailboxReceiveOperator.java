@@ -44,16 +44,17 @@ import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
  * When exchangeType is Singleton, we find the mapping mailbox for the mailboxService. If not found, use empty list.
  * When exchangeType is non-Singleton, we pull from each instance in round-robin way to get matched mailbox content.
  */
-public abstract class BaseMailboxReceiveOperator extends MultiStageOperator<BaseMailboxReceiveOperator.StatKey> {
+public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
   protected final MailboxService _mailboxService;
   protected final RelDistribution.Type _exchangeType;
   protected final List<String> _mailboxIds;
   protected final BlockingMultiStreamConsumer.OfTransferableBlock _multiConsumer;
   protected final List<StatMap<ReceivingMailbox.StatKey>> _receivingStats;
+  protected final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
 
   public BaseMailboxReceiveOperator(OpChainExecutionContext context, RelDistribution.Type exchangeType,
       int senderStageId) {
-    super(context, StatKey.class);
+    super(context);
     _mailboxService = context.getMailboxService();
     Preconditions.checkState(MailboxSendOperator.SUPPORTED_EXCHANGE_TYPES.contains(exchangeType),
         "Unsupported exchange type: %s", exchangeType);
@@ -89,7 +90,7 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator<Base
   }
 
   @Override
-  public List<MultiStageOperator<?>> getChildOperators() {
+  public List<MultiStageOperator> getChildOperators() {
     return Collections.emptyList();
   }
 
@@ -106,21 +107,17 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator<Base
   }
 
   @Override
-  protected TransferableBlock updateEosBlock(TransferableBlock upstreamEos) {
+  protected TransferableBlock updateEosBlock(TransferableBlock upstreamEos, StatMap<?> statMap) {
     for (StatMap<ReceivingMailbox.StatKey> receivingStats : _receivingStats) {
       addReceivingStats(receivingStats);
     }
-    return super.updateEosBlock(upstreamEos);
+    return super.updateEosBlock(upstreamEos, statMap);
   }
 
   @Override
-  public StatKey getExecutionTimeKey() {
-    return StatKey.EXECUTION_TIME_MS;
-  }
-
-  @Override
-  public StatKey getEmittedRowsKey() {
-    return StatKey.EMITTED_ROWS;
+  public void registerExecution(long time, int numRows) {
+    _statMap.merge(StatKey.EXECUTION_TIME_MS, time);
+    _statMap.merge(StatKey.EMITTED_ROWS, numRows);
   }
 
   private void addReceivingStats(StatMap<ReceivingMailbox.StatKey> from) {

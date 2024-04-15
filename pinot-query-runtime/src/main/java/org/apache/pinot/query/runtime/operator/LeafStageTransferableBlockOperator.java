@@ -74,7 +74,7 @@ import org.slf4j.LoggerFactory;
  *       thus requires canonicalization.</li>
  * </ul>
  */
-public class LeafStageTransferableBlockOperator extends MultiStageOperator<LeafStageTransferableBlockOperator.StatKey> {
+public class LeafStageTransferableBlockOperator extends MultiStageOperator {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(LeafStageTransferableBlockOperator.class);
   private static final String EXPLAIN_NAME = "LEAF_STAGE_TRANSFER_OPERATOR";
@@ -92,10 +92,11 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator<LeafS
 
   private Future<Void> _executionFuture;
   private volatile Map<Integer, String> _exceptions;
+  private final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
 
   public LeafStageTransferableBlockOperator(OpChainExecutionContext context, List<ServerQueryRequest> requests,
       DataSchema dataSchema, QueryExecutor queryExecutor, ExecutorService executorService) {
-    super(context, StatKey.class);
+    super(context);
     int numRequests = requests.size();
     Preconditions.checkArgument(numRequests == 1 || numRequests == 2, "Expected 1 or 2 requests, got: %s", numRequests);
     _requests = requests;
@@ -110,13 +111,9 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator<LeafS
   }
 
   @Override
-  public StatKey getExecutionTimeKey() {
-    return StatKey.EXECUTION_TIME_MS;
-  }
-
-  @Override
-  public StatKey getEmittedRowsKey() {
-    return StatKey.EMITTED_ROWS;
+  public void registerExecution(long time, int numRows) {
+    _statMap.merge(StatKey.EXECUTION_TIME_MS, time);
+    _statMap.merge(StatKey.EMITTED_ROWS, numRows);
   }
 
   @Override
@@ -130,7 +127,7 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator<LeafS
   }
 
   @Override
-  public List<MultiStageOperator<?>> getChildOperators() {
+  public List<MultiStageOperator> getChildOperators() {
     return Collections.emptyList();
   }
 

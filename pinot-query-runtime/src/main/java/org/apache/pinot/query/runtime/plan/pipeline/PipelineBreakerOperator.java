@@ -38,7 +38,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class PipelineBreakerOperator extends MultiStageOperator<PipelineBreakerOperator.StatKey> {
+public class PipelineBreakerOperator extends MultiStageOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(PipelineBreakerOperator.class);
   private static final String EXPLAIN_NAME = "PIPELINE_BREAKER";
 
@@ -48,9 +48,10 @@ public class PipelineBreakerOperator extends MultiStageOperator<PipelineBreakerO
   private TransferableBlock _errorBlock;
   @Nullable
   private MultiStageQueryStats _queryStats = null;
+  private final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
 
   public PipelineBreakerOperator(OpChainExecutionContext context, Map<Integer, Operator<TransferableBlock>> workerMap) {
-    super(context, StatKey.class);
+    super(context);
     _workerMap = workerMap;
     _resultMap = new HashMap<>();
     for (int workerKey : workerMap.keySet()) {
@@ -59,17 +60,13 @@ public class PipelineBreakerOperator extends MultiStageOperator<PipelineBreakerO
   }
 
   @Override
-  public StatKey getExecutionTimeKey() {
-    return StatKey.EXECUTION_TIME_MS;
+  public void registerExecution(long time, int numRows) {
+    _statMap.merge(StatKey.EXECUTION_TIME_MS, time);
+    _statMap.merge(StatKey.EMITTED_ROWS, numRows);
   }
 
   @Override
-  public StatKey getEmittedRowsKey() {
-    return StatKey.EMITTED_ROWS;
-  }
-
-  @Override
-  public List<MultiStageOperator<?>> getChildOperators() {
+  public List<MultiStageOperator> getChildOperators() {
     throw new UnsupportedOperationException();
   }
 
@@ -156,7 +153,7 @@ public class PipelineBreakerOperator extends MultiStageOperator<PipelineBreakerO
       }
     }
     assert _queryStats != null;
-    addStats(_queryStats);
+    addStats(_queryStats, _statMap);
     return TransferableBlockUtils.getEndOfStreamTransferableBlock(_queryStats);
   }
 

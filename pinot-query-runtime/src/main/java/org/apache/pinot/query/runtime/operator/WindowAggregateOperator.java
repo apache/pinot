@@ -79,7 +79,7 @@ import org.slf4j.LoggerFactory;
  *     4. Add support for null direction handling (even for PARTITION BY only queries with custom null direction)
  *     5. Add support for multiple window groups (each WindowAggregateOperator should still work on a single group)
  */
-public class WindowAggregateOperator extends MultiStageOperator<WindowAggregateOperator.StatKey> {
+public class WindowAggregateOperator extends MultiStageOperator {
   private static final String EXPLAIN_NAME = "WINDOW";
   private static final Logger LOGGER = LoggerFactory.getLogger(WindowAggregateOperator.class);
 
@@ -88,7 +88,7 @@ public class WindowAggregateOperator extends MultiStageOperator<WindowAggregateO
   // List of ranking window functions whose output depends on the ordering of input rows and not on the actual values
   private static final Set<String> RANKING_FUNCTION_NAMES = ImmutableSet.of("RANK", "DENSE_RANK");
 
-  private final MultiStageOperator<?> _inputOperator;
+  private final MultiStageOperator _inputOperator;
   private final List<RexExpression> _groupSet;
   private final OrderSetInfo _orderSetInfo;
   private final WindowFrame _windowFrame;
@@ -103,8 +103,9 @@ public class WindowAggregateOperator extends MultiStageOperator<WindowAggregateO
   private boolean _hasReturnedWindowAggregateBlock;
   @Nullable
   private TransferableBlock _eosBlock = null;
+  private final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
 
-  public WindowAggregateOperator(OpChainExecutionContext context, MultiStageOperator<?> inputOperator,
+  public WindowAggregateOperator(OpChainExecutionContext context, MultiStageOperator inputOperator,
       List<RexExpression> groupSet, List<RexExpression> orderSet, List<RelFieldCollation.Direction> orderSetDirection,
       List<RelFieldCollation.NullDirection> orderSetNullDirection, List<RexExpression> aggCalls, int lowerBound,
       int upperBound, WindowNode.WindowFrameType windowFrameType, List<RexExpression> constants,
@@ -114,13 +115,13 @@ public class WindowAggregateOperator extends MultiStageOperator<WindowAggregateO
   }
 
   @VisibleForTesting
-  public WindowAggregateOperator(OpChainExecutionContext context, MultiStageOperator<?> inputOperator,
+  public WindowAggregateOperator(OpChainExecutionContext context, MultiStageOperator inputOperator,
       List<RexExpression> groupSet, List<RexExpression> orderSet, List<RelFieldCollation.Direction> orderSetDirection,
       List<RelFieldCollation.NullDirection> orderSetNullDirection, List<RexExpression> aggCalls, int lowerBound,
       int upperBound, WindowNode.WindowFrameType windowFrameType, List<RexExpression> constants,
       DataSchema resultSchema, DataSchema inputSchema,
       Map<String, Function<ColumnDataType, AggregationUtils.Merger>> mergers) {
-    super(context, StatKey.class);
+    super(context);
 
     _inputOperator = inputOperator;
     _groupSet = groupSet;
@@ -154,13 +155,9 @@ public class WindowAggregateOperator extends MultiStageOperator<WindowAggregateO
   }
 
   @Override
-  public StatKey getExecutionTimeKey() {
-    return StatKey.EXECUTION_TIME_MS;
-  }
-
-  @Override
-  public StatKey getEmittedRowsKey() {
-    return StatKey.EMITTED_ROWS;
+  public void registerExecution(long time, int numRows) {
+    _statMap.merge(StatKey.EXECUTION_TIME_MS, time);
+    _statMap.merge(StatKey.EMITTED_ROWS, numRows);
   }
 
   @Override
@@ -169,7 +166,7 @@ public class WindowAggregateOperator extends MultiStageOperator<WindowAggregateO
   }
 
   @Override
-  public List<MultiStageOperator<?>> getChildOperators() {
+  public List<MultiStageOperator> getChildOperators() {
     return ImmutableList.of(_inputOperator);
   }
 
@@ -193,7 +190,7 @@ public class WindowAggregateOperator extends MultiStageOperator<WindowAggregateO
     if (finalBlock.isErrorBlock()) {
       return finalBlock;
     }
-    _eosBlock = updateEosBlock(finalBlock);
+    _eosBlock = updateEosBlock(finalBlock, _statMap);
     return produceWindowAggregatedBlock();
   }
 
