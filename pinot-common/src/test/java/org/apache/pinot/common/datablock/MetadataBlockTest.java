@@ -34,7 +34,6 @@ public class MetadataBlockTest extends BaseDataBlockContract {
     return new MetadataBlock(byteBuffer);
   }
 
-  // TODO: Add more tests for MetadataBlock serialization/deserialization
   @Test
   public void emptyMetadataBlock()
       throws Exception {
