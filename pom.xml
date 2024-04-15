@@ -130,7 +130,7 @@
 
     <!-- Configuration for Packaging -->
     <shade.prefix>org.apache.pinot.shaded</shade.prefix>
-    <maven-jar-plugin.version>3.3.0</maven-jar-plugin.version>
+    <maven-jar-plugin.version>3.4.0</maven-jar-plugin.version>
 
     <avro.version>1.11.3</avro.version>
     <parquet.version>1.13.1</parquet.version>
