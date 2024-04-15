@@ -70,25 +70,27 @@ public class StringFunctionsTest {
   @DataProvider(name = "isJson")
   public static Object[][] isJsonTestCases() {
     return new Object[][]{
-        {"", true}, {"{\"key\": \"value\"}", true}, {"{\"key\": \"value\", }", false}, {"{\"key\": \"va", false}
+        {"", true},
+        {"{\"key\": \"value\"}", true},
+        {"{\"key\": \"value\", }", false},
+        {"{\"key\": \"va", false}
     };
   }
 
   @DataProvider(name = "prefixAndSuffixTestCases")
   public static Object[][] prefixAndSuffixTestCases() {
     return new Object[][]{
-        {
-            "abcde", 3, new String[]{"a", "ab", "abc"}, new String[]{"e", "de", "cde"}, new String[]{
-            "^a", "^ab", "^abc"
-        }, new String[]{"e$", "de$", "cde$"}
-        }, {"abcde", 0, new String[]{}, new String[]{}, new String[]{}, new String[]{}}, {
-        "abcde", 9, new String[]{"a", "ab", "abc", "abcd", "abcde"}, new String[]{"e", "de", "cde", "bcde", "abcde"},
-        new String[]{"^a", "^ab", "^abc", "^abcd", "^abcde"}, new String[]{"e$", "de$", "cde$", "bcde$", "abcde$"}
-    }, {"a", 3, new String[]{"a"}, new String[]{"a"}, new String[]{"^a"}, new String[]{"a$"}}, {"a", 0,
-        new String[]{}, new String[]{}, new String[]{}, new String[]{}}, {"a", 9, new String[]{"a"},
-        new String[]{"a"}, new String[]{"^a"}, new String[]{"a$"}}, {"", 3, new String[]{}, new String[]{},
-        new String[]{}, new String[]{}}, {"", 0, new String[]{}, new String[]{}, new String[]{}, new String[]{}}, {""
-        , 9, new String[]{}, new String[]{}, new String[]{}, new String[]{}}
+        {"abcde", 3, new String[]{"a", "ab", "abc"}, new String[]{"e", "de", "cde"}, new String[]{
+            "^a", "^ab", "^abc"}, new String[]{"e$", "de$", "cde$"}},
+        {"abcde", 0, new String[]{}, new String[]{}, new String[]{}, new String[]{}},
+        {"abcde", 9, new String[]{"a", "ab", "abc", "abcd", "abcde"}, new String[]{"e", "de", "cde", "bcde", "abcde"},
+        new String[]{"^a", "^ab", "^abc", "^abcd", "^abcde"}, new String[]{"e$", "de$", "cde$", "bcde$", "abcde$"}},
+        {"a", 3, new String[]{"a"}, new String[]{"a"}, new String[]{"^a"}, new String[]{"a$"}},
+        {"a", 0, new String[]{}, new String[]{}, new String[]{}, new String[]{}},
+        {"a", 9, new String[]{"a"}, new String[]{"a"}, new String[]{"^a"}, new String[]{"a$"}},
+        {"", 3, new String[]{}, new String[]{}, new String[]{}, new String[]{}},
+        {"", 0, new String[]{}, new String[]{}, new String[]{}, new String[]{}},
+        {"", 9, new String[]{}, new String[]{}, new String[]{}, new String[]{}}
     };
   }
 
@@ -96,12 +98,17 @@ public class StringFunctionsTest {
   public static Object[][] ngramTestCases() {
     return new Object[][]{
         {"abcd", 0, 3, new String[]{"abc", "bcd"}, new String[]{"a", "b", "c", "d", "ab", "bc", "cd", "abc", "bcd"}},
-        {"abcd", 2, 2, new String[]{"ab", "bc", "cd"}, new String[]{"ab", "bc", "cd"}}, {"abcd", 3, 0, new String[]{}
-        , new String[]{}}, {"abc", 0, 3, new String[]{"abc"}, new String[]{"a", "b", "c", "ab", "bc", "abc"}}, {"abc"
-        , 3, 0, new String[]{}, new String[]{}}, {"abc", 3, 3, new String[]{"abc"}, new String[]{"abc"}}, {"a", 0, 3,
-        new String[]{}, new String[]{"a"}}, {"a", 2, 3, new String[]{}, new String[]{}}, {"a", 3, 3, new String[]{},
-        new String[]{}}, {"", 3, 0, new String[]{}, new String[]{}}, {"", 3, 3, new String[]{}, new String[]{}}, {"",
-        0, 3, new String[]{}, new String[]{}}
+        {"abcd", 2, 2, new String[]{"ab", "bc", "cd"}, new String[]{"ab", "bc", "cd"}},
+        {"abcd", 3, 0, new String[]{}, new String[]{}},
+        {"abc", 0, 3, new String[]{"abc"}, new String[]{"a", "b", "c", "ab", "bc", "abc"}},
+        {"abc", 3, 0, new String[]{}, new String[]{}},
+        {"abc", 3, 3, new String[]{"abc"}, new String[]{"abc"}},
+        {"a", 0, 3, new String[]{}, new String[]{"a"}},
+        {"a", 2, 3, new String[]{}, new String[]{}},
+        {"a", 3, 3, new String[]{}, new String[]{}},
+        {"", 3, 0, new String[]{}, new String[]{}},
+        {"", 3, 3, new String[]{}, new String[]{}},
+        {"", 0, 3, new String[]{}, new String[]{}}
     };
   }
 
@@ -120,10 +127,10 @@ public class StringFunctionsTest {
   @Test(dataProvider = "prefixAndSuffixTestCases")
   public void testPrefixAndSuffix(String input, int length, String[] expectedPrefix, String[] expectedSuffix,
       String[] expectedPrefixWithRegexChar, String[] expectedSuffixWithRegexChar) {
-    assertEquals(StringFunctions.uniquePrefixes(input, length), expectedPrefix);
-    assertEquals(StringFunctions.uniqueSuffixes(input, length), expectedSuffix);
-    assertEquals(StringFunctions.uniquePrefixesWithPrefix(input, length, "^"), expectedPrefixWithRegexChar);
-    assertEquals(StringFunctions.uniqueSuffixesWithSuffix(input, length, "$"), expectedSuffixWithRegexChar);
+    assertEquals(StringFunctions.prefixes(input, length), expectedPrefix);
+    assertEquals(StringFunctions.suffixes(input, length), expectedSuffix);
+    assertEquals(StringFunctions.prefixesWithPrefix(input, length, "^"), expectedPrefixWithRegexChar);
+    assertEquals(StringFunctions.suffixesWithSuffix(input, length, "$"), expectedSuffixWithRegexChar);
   }
 
   @Test(dataProvider = "ngramTestCases")

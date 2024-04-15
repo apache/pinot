@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.common.function.scalar;
 
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
+import it.unimi.dsi.fastutil.objects.ObjectList;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
@@ -30,6 +32,7 @@ import java.util.Base64;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.utils.RegexpPatternConverterUtils;
 import org.apache.pinot.spi.annotations.ScalarFunction;
@@ -588,12 +591,12 @@ public class StringFunctions {
    * @return generate an array of prefix strings of the string that are shorter than the specified length.
    */
   @ScalarFunction
-  public static String[] uniquePrefixes(String input, int maxlength) {
-    ObjectSet<String> prefixSet = new ObjectLinkedOpenHashSet<>();
+  public static String[] prefixes(String input, int maxlength) {
+    ObjectList<String> prefixList = new ObjectArrayList<>();
     for (int prefixLength = 1; prefixLength <= maxlength && prefixLength <= input.length(); prefixLength++) {
-      prefixSet.add(input.substring(0, prefixLength));
+      prefixList.add(input.substring(0, prefixLength));
     }
-    return prefixSet.toArray(new String[0]);
+    return prefixList.toArray(new String[0]);
   }
 
   /**
@@ -603,15 +606,15 @@ public class StringFunctions {
    * @return generate an array of prefix matchers of the string that are shorter than the specified length.
    */
   @ScalarFunction
-  public static String[] uniquePrefixesWithPrefix(String input, int maxlength, String prefix) {
+  public static String[] prefixesWithPrefix(String input, int maxlength, @Nullable String prefix) {
     if (prefix == null) {
-      return uniquePrefixes(input, maxlength);
+      return prefixes(input, maxlength);
     }
-    ObjectSet<String> prefixSet = new ObjectLinkedOpenHashSet<>();
+    ObjectList<String> prefixList = new ObjectArrayList<>();
     for (int prefixLength = 1; prefixLength <= maxlength && prefixLength <= input.length(); prefixLength++) {
-      prefixSet.add(prefix + input.substring(0, prefixLength));
+      prefixList.add(prefix + input.substring(0, prefixLength));
     }
-    return prefixSet.toArray(new String[0]);
+    return prefixList.toArray(new String[0]);
   }
 
   /**
@@ -620,12 +623,12 @@ public class StringFunctions {
    * @return generate an array of suffix strings of the string that are shorter than the specified length.
    */
   @ScalarFunction
-  public static String[] uniqueSuffixes(String input, int maxlength) {
-    ObjectSet<String> suffixSet = new ObjectLinkedOpenHashSet<>();
+  public static String[] suffixes(String input, int maxlength) {
+    ObjectList<String> suffixList = new ObjectArrayList<>();
     for (int suffixLength = 1; suffixLength <= maxlength && suffixLength <= input.length(); suffixLength++) {
-      suffixSet.add(input.substring(input.length() - suffixLength));
+      suffixList.add(input.substring(input.length() - suffixLength));
     }
-    return suffixSet.toArray(new String[0]);
+    return suffixList.toArray(new String[0]);
   }
 
   /**
@@ -635,21 +638,21 @@ public class StringFunctions {
    * @return generate an array of suffix matchers of the string that are shorter than the specified length.
    */
   @ScalarFunction
-  public static String[] uniqueSuffixesWithSuffix(String input, int maxlength, String suffix) {
+  public static String[] suffixesWithSuffix(String input, int maxlength, @Nullable String suffix) {
     if (suffix == null) {
-      return uniqueSuffixes(input, maxlength);
+      return suffixes(input, maxlength);
     }
-    ObjectSet<String> suffixSet = new ObjectLinkedOpenHashSet<>();
+    ObjectList<String> suffixList = new ObjectArrayList<>();
     for (int suffixLength = 1; suffixLength <= maxlength && suffixLength <= input.length(); suffixLength++) {
-      suffixSet.add(input.substring(input.length() - suffixLength) + suffix);
+      suffixList.add(input.substring(input.length() - suffixLength) + suffix);
     }
-    return suffixSet.toArray(new String[0]);
+    return suffixList.toArray(new String[0]);
   }
 
   /**
    * @param input an input string for ngram generations.
    * @param length the max length of the ngram for the string.
-   * @return generate an array of ngram of the string that length are exactly matching the specified length.
+   * @return generate an array of unique ngram of the string that length are exactly matching the specified length.
    */
   @ScalarFunction
   public static String[] uniqueNgrams(String input, int length) {
