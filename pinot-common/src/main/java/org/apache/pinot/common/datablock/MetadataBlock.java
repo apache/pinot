@@ -57,6 +57,21 @@ public class MetadataBlock extends BaseDataBlock {
     _statsByStage = statsByStage;
   }
 
+  MetadataBlock(ByteBuffer byteBuffer)
+      throws IOException {
+    super(byteBuffer);
+    // Remember: At this point deserializeMetadata is already being called.
+    if (_fixedSizeDataBytes == null) {
+       if (_errCodeToExceptionMap.isEmpty()) {
+         _type = MetadataBlockType.EOS;
+       } else {
+         _type = MetadataBlockType.ERROR;
+       }
+    } else {
+      _type = MetadataBlockType.values()[_fixedSizeDataBytes[0]];
+    }
+  }
+
   @Override
   protected void serializeMetadata(DataOutputStream output)
       throws IOException {
@@ -82,21 +97,6 @@ public class MetadataBlock extends BaseDataBlock {
           }
         }
       }
-    }
-  }
-
-  public MetadataBlock(ByteBuffer byteBuffer)
-      throws IOException {
-    super(byteBuffer);
-    // Remember: At this point deserializeMetadata is already being called.
-    if (_fixedSizeDataBytes == null) {
-       if (_errCodeToExceptionMap.isEmpty()) {
-         _type = MetadataBlockType.EOS;
-       } else {
-         _type = MetadataBlockType.ERROR;
-       }
-    } else {
-      _type = MetadataBlockType.values()[_fixedSizeDataBytes[0]];
     }
   }
 

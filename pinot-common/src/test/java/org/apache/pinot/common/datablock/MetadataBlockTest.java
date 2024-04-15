@@ -126,7 +126,7 @@ public class MetadataBlockTest extends BaseDataBlockContract {
 
     // When:
     ByteBuffer buff = ByteBuffer.wrap(bytes);
-    buff.getInt(); // consume the version information before decoding
+    DataBlockUtils.readVersionType(buff); // consume the version information before decoding
     MetadataBlock metadataBlock = new MetadataBlock(buff);
 
     // Then:
@@ -146,7 +146,7 @@ public class MetadataBlockTest extends BaseDataBlockContract {
 
     // When:
     ByteBuffer buff = ByteBuffer.wrap(bytes);
-    buff.getInt(); // consume the version information before decoding
+    DataBlockUtils.readVersionType(buff); // consume the version information before decoding
     MetadataBlock metadataBlock = new MetadataBlock(buff);
 
     // Then:
