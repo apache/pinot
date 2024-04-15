@@ -30,10 +30,8 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
-import org.apache.pulsar.client.api.MessageId;
 import org.apache.pulsar.client.api.SubscriptionInitialPosition;
 
 
@@ -46,17 +44,15 @@ public class PulsarConfig {
   public static final String BOOTSTRAP_SERVERS = "bootstrap.servers";
   public static final String AUTHENTICATION_TOKEN = "authenticationToken";
   public static final String TLS_TRUST_CERTS_FILE_PATH = "tlsTrustCertsFilePath";
-
   public static final String OAUTH_ISSUER_URL = "issuerUrl";
   public static final String OAUTH_CREDS_FILE_PATH = "credsFilePath";
   public static final String OAUTH_AUDIENCE = "audience";
   public static final String ENABLE_KEY_VALUE_STITCH = "enableKeyValueStitch";
   public static final String METADATA_FIELDS = "metadata.fields"; //list of the metadata fields comma separated
 
-  private final String _pulsarTopicName;
   private final String _subscriberId;
+  private final String _pulsarTopicName;
   private final String _bootstrapServers;
-  private final MessageId _initialMessageId;
   private final SubscriptionInitialPosition _subscriptionInitialPosition;
   private final String _authenticationToken;
   private final String _tlsTrustCertsFilePath;
@@ -74,6 +70,7 @@ public class PulsarConfig {
   private final boolean _enableKeyValueStitch;
   private final boolean _populateMetadata;
   private final Set<PulsarStreamMessageMetadata.PulsarMessageMetadataValue> _metadataFields;
+
   public PulsarConfig(StreamConfig streamConfig, String subscriberId) {
     Map<String, String> streamConfigMap = streamConfig.getStreamConfigsMap();
     _subscriberId = subscriberId;
@@ -82,28 +79,24 @@ public class PulsarConfig {
     _bootstrapServers = getConfigValue(streamConfigMap, BOOTSTRAP_SERVERS);
     Preconditions.checkNotNull(_bootstrapServers, "No brokers provided in the config");
 
+    _subscriptionInitialPosition = PulsarUtils.offsetCriteriaToSubscription(streamConfig.getOffsetCriteria());
     _authenticationToken = getConfigValue(streamConfigMap, AUTHENTICATION_TOKEN);
     _tlsTrustCertsFilePath = getConfigValue(streamConfigMap, TLS_TRUST_CERTS_FILE_PATH);
-    _enableKeyValueStitch = Boolean.parseBoolean(getConfigValue(streamConfigMap, ENABLE_KEY_VALUE_STITCH));
-
-    OffsetCriteria offsetCriteria = streamConfig.getOffsetCriteria();
-
-    _subscriptionInitialPosition = PulsarUtils.offsetCriteriaToSubscription(offsetCriteria);
-    _initialMessageId = PulsarUtils.offsetCriteriaToMessageId(offsetCriteria);
-    _populateMetadata = Boolean.parseBoolean(getConfigValueOrDefault(streamConfigMap,
-        StreamConfigProperties.METADATA_POPULATE, "false"));
-    String metadataFieldsToExtractCSV = getConfigValueOrDefault(streamConfigMap, METADATA_FIELDS, "");
-    if (StringUtils.isBlank(metadataFieldsToExtractCSV) || !_populateMetadata) {
-      _metadataFields = Collections.emptySet();
-    } else {
-      _metadataFields = parseConfigStringToEnumSet(metadataFieldsToExtractCSV);
-    }
     _issuerUrl = getConfigValue(streamConfigMap, OAUTH_ISSUER_URL);
     _credentialsFilePath = getConfigValue(streamConfigMap, OAUTH_CREDS_FILE_PATH);
     if (StringUtils.isNotBlank(_credentialsFilePath)) {
       validateOAuthCredFile();
     }
     _audience = getConfigValue(streamConfigMap, OAUTH_AUDIENCE);
+
+    _enableKeyValueStitch = Boolean.parseBoolean(getConfigValue(streamConfigMap, ENABLE_KEY_VALUE_STITCH));
+    _populateMetadata = Boolean.parseBoolean(getConfigValue(streamConfigMap, StreamConfigProperties.METADATA_POPULATE));
+    String metadataFieldsToExtractCSV = getConfigValueOrDefault(streamConfigMap, METADATA_FIELDS, "");
+    if (StringUtils.isBlank(metadataFieldsToExtractCSV) || !_populateMetadata) {
+      _metadataFields = Collections.emptySet();
+    } else {
+      _metadataFields = parseConfigStringToEnumSet(metadataFieldsToExtractCSV);
+    }
   }
 
   @VisibleForTesting
@@ -111,13 +104,13 @@ public class PulsarConfig {
     try {
       URL credFilePathUrl = new URL(_credentialsFilePath);
       if (!"file".equals(credFilePathUrl.getProtocol())) {
-        throw new IllegalArgumentException("Invalid credentials file path: " + _credentialsFilePath
-            + ". URL protocol must be file://");
+        throw new IllegalArgumentException(
+            "Invalid credentials file path: " + _credentialsFilePath + ". URL protocol must be file://");
       }
       File credFile = new File(credFilePathUrl.getPath());
       if (!credFile.exists()) {
-        throw new IllegalArgumentException("Invalid credentials file path: " + _credentialsFilePath
-            + ". File does not exist.");
+        throw new IllegalArgumentException(
+            "Invalid credentials file path: " + _credentialsFilePath + ". File does not exist.");
       }
     } catch (MalformedURLException mue) {
       throw new IllegalArgumentException("Invalid credentials file path: " + _credentialsFilePath, mue);
@@ -136,16 +129,14 @@ public class PulsarConfig {
       String listOfMetadataFields) {
     try {
       String[] metadataFieldsArr = listOfMetadataFields.split(",");
-      return Stream.of(metadataFieldsArr)
-          .map(String::trim)
-          .filter(StringUtils::isNotBlank)
-          .map(PulsarStreamMessageMetadata.PulsarMessageMetadataValue::findByKey)
-          .filter(Objects::nonNull)
+      return Stream.of(metadataFieldsArr).map(String::trim).filter(StringUtils::isNotBlank)
+          .map(PulsarStreamMessageMetadata.PulsarMessageMetadataValue::findByKey).filter(Objects::nonNull)
           .collect(Collectors.toSet());
     } catch (Exception e) {
       throw new IllegalArgumentException("Invalid metadata fields list: " + listOfMetadataFields, e);
     }
   }
+
   public String getPulsarTopicName() {
     return _pulsarTopicName;
   }
@@ -156,10 +147,6 @@ public class PulsarConfig {
 
   public String getBootstrapServers() {
     return _bootstrapServers;
-  }
-
-  public MessageId getInitialMessageId() {
-    return _initialMessageId;
   }
 
   public SubscriptionInitialPosition getInitialSubscriberPosition() {
@@ -173,16 +160,6 @@ public class PulsarConfig {
   public String getTlsTrustCertsFilePath() {
     return _tlsTrustCertsFilePath;
   }
-  public boolean getEnableKeyValueStitch() {
-    return _enableKeyValueStitch;
-  }
-  public boolean isPopulateMetadata() {
-    return _populateMetadata;
-  }
-
-  public Set<PulsarStreamMessageMetadata.PulsarMessageMetadataValue> getMetadataFields() {
-    return _metadataFields;
-  }
 
   public String getIssuerUrl() {
     return _issuerUrl;
@@ -194,5 +171,17 @@ public class PulsarConfig {
 
   public String getAudience() {
     return _audience;
+  }
+
+  public boolean getEnableKeyValueStitch() {
+    return _enableKeyValueStitch;
+  }
+
+  public boolean isPopulateMetadata() {
+    return _populateMetadata;
+  }
+
+  public Set<PulsarStreamMessageMetadata.PulsarMessageMetadataValue> getMetadataFields() {
+    return _metadataFields;
   }
 }

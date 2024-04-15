@@ -267,7 +267,7 @@ jobs:
       matrix:
         test_suite: [ "compatibility-verifier/sample-test-suite" ]
         old_commit: [
-          "release-0.12.1", "release-1.0.0", "master"
+          "release-0.12.1", "release-1.0.0", "release-1.1.0", "master"
         ]
     name: Pinot Compatibility Regression Testing against ${{ matrix.old_commit }} on ${{ matrix.test_suite }}
     steps:
@@ -281,12 +281,12 @@ jobs:
       - name: Setup node
         uses: actions/setup-node@v4
         with:
-          node-version: v10.16.1
+          node-version: v16.15.0
           cache: 'npm'
           cache-dependency-path: pinot-controller/src/main/resources/package-lock.json
       - name: Install npm
         run: |
-          npm install -g npm@6.10.0
+          npm install -g npm@8.5.5
           npm --version
       # Step that does that actual cache save and restore
       - uses: actions/cache@v4

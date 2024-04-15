@@ -16,13 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.util;
+package org.apache.pinot.core.util;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
-import org.apache.pinot.core.util.QueryMultiThreadingUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

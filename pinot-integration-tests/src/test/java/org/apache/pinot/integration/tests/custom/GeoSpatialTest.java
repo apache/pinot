@@ -398,7 +398,7 @@ public class GeoSpatialTest extends CustomDataQueryClusterIntegrationTest {
     JsonNode rows = pinotResponse.get("resultTable").get("rows");
     for (int i = 0; i < rows.size(); i++) {
       JsonNode row = rows.get(i);
-      boolean actualResult = row.get(0).intValue() == 1 ? true : false;
+      boolean actualResult = row.get(0).intValue() == 1;
       boolean expectedResult = row.get(1).booleanValue();
       Assert.assertEquals(actualResult, expectedResult);
     }

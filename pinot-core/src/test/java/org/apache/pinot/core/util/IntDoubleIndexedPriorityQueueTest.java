@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.util;
+package org.apache.pinot.core.util;
 
 import it.unimi.dsi.fastutil.ints.Int2DoubleMap;
 import it.unimi.dsi.fastutil.ints.Int2DoubleOpenHashMap;
@@ -24,7 +24,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;
-import org.apache.pinot.core.util.IntDoubleIndexedPriorityQueue;
 import org.apache.pinot.spi.utils.Pairs;
 import org.testng.Assert;
 import org.testng.annotations.Test;

@@ -16,22 +16,16 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.utils.request;
+package org.apache.pinot.query.runtime.operator.window;
 
-import org.apache.calcite.sql.SqlLiteral;
-import org.apache.calcite.sql.parser.SqlParserPos;
-import org.apache.pinot.common.request.Expression;
-import org.apache.pinot.common.request.ExpressionType;
-import org.testng.Assert;
-import org.testng.annotations.Test;
+import java.util.List;
 
 
-public class RequestUtilsTest {
-  @Test
-  public void testNullLiteralParsing() {
-    SqlLiteral nullLiteral = SqlLiteral.createNull(SqlParserPos.ZERO);
-    Expression nullExpr = RequestUtils.getLiteralExpression(nullLiteral);
-    Assert.assertEquals(nullExpr.getType(), ExpressionType.LITERAL);
-    Assert.assertEquals(nullExpr.getLiteral().getNullValue(), true);
-  }
+public interface WindowFunction {
+
+  /**
+   * @param rows List of rows to process
+   * @return List of rows with the window function applied
+   */
+  List<Object[]> processRows(List<Object[]> rows);
 }

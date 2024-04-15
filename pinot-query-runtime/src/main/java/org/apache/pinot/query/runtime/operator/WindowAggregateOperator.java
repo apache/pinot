@@ -45,6 +45,7 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.utils.AggregationUtils;
 import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
+import org.apache.pinot.query.runtime.operator.window.ValueWindowFunction;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -196,6 +197,11 @@ public class WindowAggregateOperator extends MultiStageOperator {
 
   private void validateAggregationCalls(String functionName,
       Map<String, Function<ColumnDataType, AggregationUtils.Merger>> mergers) {
+    if (ValueWindowFunction.VALUE_WINDOW_FUNCTION_MAP.containsKey(functionName)) {
+      Preconditions.checkState(_windowFrame.getWindowFrameType() == WindowNode.WindowFrameType.RANGE,
+          String.format("Only RANGE type frames are supported at present for VALUE function: %s", functionName));
+      return;
+    }
     if (!mergers.containsKey(functionName)) {
       throw new IllegalStateException("Unexpected aggregation function name: " + functionName);
     }
@@ -240,13 +246,18 @@ public class WindowAggregateOperator extends MultiStageOperator {
       for (Map.Entry<Key, List<Object[]>> e : _partitionRows.entrySet()) {
         Key partitionKey = e.getKey();
         List<Object[]> rowList = e.getValue();
-        for (Object[] existingRow : rowList) {
+        for (int rowId = 0; rowId < rowList.size(); rowId++) {
+          Object[] existingRow = rowList.get(rowId);
           Object[] row = new Object[existingRow.length + _aggCalls.size()];
           Key orderKey = (_isPartitionByOnly && CollectionUtils.isEmpty(_orderSetInfo.getOrderSet())) ? emptyOrderKey
               : AggregationUtils.extractRowKey(existingRow, _orderSetInfo.getOrderSet());
           System.arraycopy(existingRow, 0, row, 0, existingRow.length);
           for (int i = 0; i < _windowAccumulators.length; i++) {
-            row[i + existingRow.length] = _windowAccumulators[i].getRangeResultForKeys(partitionKey, orderKey);
+            if (_windowAccumulators[i]._valueWindowFunction == null) {
+              row[i + existingRow.length] = _windowAccumulators[i].getRangeResultForKeys(partitionKey, orderKey);
+            } else {
+              row[i + existingRow.length] = _windowAccumulators[i].getValueResultForKeys(orderKey, rowId, rowList);
+            }
           }
           // Convert the results from Accumulator to the desired type
           TypeUtils.convertRow(row, resultStoredTypes);
@@ -309,7 +320,9 @@ public class WindowAggregateOperator extends MultiStageOperator {
               : AggregationUtils.extractRowKey(row, _orderSetInfo.getOrderSet());
           int aggCallsSize = _aggCalls.size();
           for (int i = 0; i < aggCallsSize; i++) {
-            _windowAccumulators[i].accumulateRangeResults(key, orderKey, row);
+            if (_windowAccumulators[i]._valueWindowFunction == null) {
+              _windowAccumulators[i].accumulateRangeResults(key, orderKey, row);
+            }
           }
         }
       } else {
@@ -451,11 +464,15 @@ public class WindowAggregateOperator extends MultiStageOperator {
   private static class WindowAggregateAccumulator extends AggregationUtils.Accumulator {
     private static final Map<String, Function<ColumnDataType, AggregationUtils.Merger>> WIN_AGG_MERGERS =
         ImmutableMap.<String, Function<ColumnDataType, AggregationUtils.Merger>>builder()
-            .putAll(AggregationUtils.Accumulator.MERGERS).put("ROW_NUMBER", cdt -> new MergeRowNumber())
-            .put("RANK", cdt -> new MergeRank()).put("DENSE_RANK", cdt -> new MergeDenseRank()).build();
+            .putAll(AggregationUtils.Accumulator.MERGERS)
+            .put("ROW_NUMBER", cdt -> new MergeRowNumber())
+            .put("RANK", cdt -> new MergeRank())
+            .put("DENSE_RANK", cdt -> new MergeDenseRank())
+            .build();
 
     private final boolean _isPartitionByOnly;
     private final boolean _isRankingWindowFunction;
+    private final ValueWindowFunction _valueWindowFunction;
 
     // Fields needed only for RANGE frame type queries (ORDER BY)
     private final Map<Key, OrderKeyResult> _orderByResults = new HashMap<>();
@@ -466,6 +483,7 @@ public class WindowAggregateOperator extends MultiStageOperator {
       super(aggCall, merger, functionName, inputSchema);
       _isPartitionByOnly = CollectionUtils.isEmpty(orderSetInfo.getOrderSet()) || orderSetInfo.isPartitionByOnly();
       _isRankingWindowFunction = RANKING_FUNCTION_NAMES.contains(functionName);
+      _valueWindowFunction = ValueWindowFunction.construnctValueWindowFunction(functionName);
     }
 
     /**
@@ -533,6 +551,14 @@ public class WindowAggregateOperator extends MultiStageOperator {
 
     public Map<Key, OrderKeyResult> getRangeOrderByResults() {
       return _orderByResults;
+    }
+
+    public Object getValueResultForKeys(Key orderKey, int rowId, List<Object[]> partitionRows) {
+      Object[] row = _valueWindowFunction.processRow(rowId, partitionRows);
+      if (row == null) {
+        return null;
+      }
+      return _inputRef == -1 ? _literal : row[_inputRef];
     }
 
     static class OrderKeyResult {
