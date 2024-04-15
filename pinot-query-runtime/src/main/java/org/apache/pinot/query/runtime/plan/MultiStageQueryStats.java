@@ -583,7 +583,8 @@ public class MultiStageQueryStats {
           MultiStageOperator.Type type = allTypes[ordinal];
           operatorTypes.add(type);
 
-          StatMap<?> opStatMap = type.deserializeStats(input);
+          @SuppressWarnings("unchecked")
+          StatMap<?> opStatMap = StatMap.deserialize(input, type.getStatKeyClass());
           operatorStats.add(opStatMap);
         }
         return new Closed(operatorTypes, operatorStats);

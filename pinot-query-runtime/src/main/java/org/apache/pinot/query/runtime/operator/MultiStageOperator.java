@@ -21,8 +21,6 @@ package org.apache.pinot.query.runtime.operator;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Stopwatch;
-import java.io.DataInput;
-import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.datatable.DataTable;
@@ -55,12 +53,25 @@ public abstract class MultiStageOperator<K extends Enum<K> & StatMap.Key>
     _statMap = new StatMap<>(keyStatClass);
   }
 
+  /**
+   * Returns the logger for the operator.
+   * <p>
+   * This method is used to generic multi-stage operator messages using the name of the specific operator.
+   * Implementations should not allocate new loggers for each call but instead reuse some (probably static and final)
+   * attribute.
+   */
   protected abstract Logger logger();
 
   public abstract Type getOperatorType();
 
+  /**
+   * Returns the key that should be used to record execution time.
+   */
   public abstract K getExecutionTimeKey();
 
+  /**
+   * Returns the key that should be used to record the number of emitted rows.
+   */
   public abstract K getEmittedRowsKey();
 
   @Override
@@ -171,6 +182,12 @@ public abstract class MultiStageOperator<K extends Enum<K> & StatMap.Key>
     return upstreamEos;
   }
 
+  /**
+   * This enum is used to identify the operation type.
+   * <p>
+   * This is mostly used in the context of stats collection, where we use this enum in the serialization form in order
+   * to identify the type of the stats in an efficient way.
+   */
   public enum Type {
     AGGREGATE(AggregateOperator.StatKey.class) {
       @Override
@@ -298,16 +315,22 @@ public abstract class MultiStageOperator<K extends Enum<K> & StatMap.Key>
       _statKeyClass = statKeyClass;
     }
 
-    @SuppressWarnings("unchecked")
-    public StatMap<?> deserializeStats(DataInput input)
-        throws IOException {
-      return StatMap.deserialize(input, _statKeyClass);
-    }
-
+    /**
+     * Gets the class of the stat key for this operator type.
+     * <p>
+     * Notice that this is not including the generic type parameter, because Java generic types are not expressive
+     * enough indicate what we want to say, so generics here are more problematic than useful.
+     */
     public Class getStatKeyClass() {
       return _statKeyClass;
     }
 
+    /**
+     * Merges the stats from the given map into the given broker response.
+     * <p>
+     * Each literal has its own implementation of this method, which assumes the given map is of the correct type
+     * (compatible with {@link #getStatKeyClass()}). This is a way to avoid casting in the caller.
+     */
     public abstract void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map);
   }
 }
