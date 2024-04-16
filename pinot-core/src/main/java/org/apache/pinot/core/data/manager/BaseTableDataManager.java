@@ -153,6 +153,13 @@ public abstract class BaseTableDataManager implements TableDataManager {
     if (_peerDownloadScheme == null) {
       _peerDownloadScheme = instanceDataManagerConfig.getSegmentPeerDownloadScheme();
     }
+    if (_peerDownloadScheme != null) {
+      _peerDownloadScheme = _peerDownloadScheme.toLowerCase();
+      Preconditions.checkState(
+          CommonConstants.HTTP_PROTOCOL.equals(_peerDownloadScheme) || CommonConstants.HTTPS_PROTOCOL.equals(
+              _peerDownloadScheme), "Unsupported peer download scheme: %s for table: %s", _peerDownloadScheme,
+          _tableNameWithType);
+    }
 
     _streamSegmentDownloadUntarRateLimitBytesPerSec =
         instanceDataManagerConfig.getStreamSegmentDownloadUntarRateLimit();
@@ -691,7 +698,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
       throws Exception {
     Preconditions.checkState(_peerDownloadScheme != null, "Download peers require non null peer download scheme");
     List<URI> peerSegmentURIs =
-        PeerServerSegmentFinder.getPeerServerURIs(segmentName, _peerDownloadScheme, _helixManager, _tableNameWithType);
+        PeerServerSegmentFinder.getPeerServerURIs(_helixManager, _tableNameWithType, segmentName, _peerDownloadScheme);
     if (peerSegmentURIs.isEmpty()) {
       String msg = String.format("segment %s doesn't have any peers", segmentName);
       LOGGER.warn(msg);
