@@ -584,14 +584,16 @@ public class StringFunctions {
    * TODO: Revisit if index should be one-based (both Presto and Postgres use one-based index, which starts with 1)
    * @param input
    * @param delimiter
-   * @param index
+   * @param index we allow negative value for index which indicates the index from the end.
    * @return splits string on specified delimiter and returns String at specified index from the split.
    */
   @ScalarFunction
   public static String splitPart(String input, String delimiter, int index) {
     String[] splitString = StringUtils.splitByWholeSeparator(input, delimiter);
-    if (index < splitString.length) {
+    if (index >= 0 && index < splitString.length) {
       return splitString[index];
+    } else if (index < 0 && index >= -splitString.length) {
+      return splitString[splitString.length + index];
     } else {
       return "null";
     }
@@ -601,30 +603,16 @@ public class StringFunctions {
    * @param input the input String to be split into parts.
    * @param delimiter the specified delimiter to split the input string.
    * @param index the specified index for the splitted parts to be returned.
-   * @param max the max count of parts that the input string can be splitted into.
+   * @param limit the max count of parts that the input string can be splitted into.
    * @return splits string on the delimiter with the limit count and returns String at specified index from the split.
    */
   @ScalarFunction
-  public static String splitPart(String input, String delimiter, int index, int max) {
-    String[] splitString = StringUtils.splitByWholeSeparator(input, delimiter, max);
-    if (index < splitString.length) {
+  public static String splitPart(String input, String delimiter, int index, int limit) {
+    String[] splitString = StringUtils.splitByWholeSeparator(input, delimiter, limit);
+    if (index >= 0 && index < splitString.length) {
       return splitString[index];
-    } else {
-      return "null";
-    }
-  }
-
-  /**
-   * @param input the input String to be split into parts.
-   * @param delimiter the specified delimiter to split the input string.
-   * @param index the specified index for the splitted parts to be returned.
-   * @return splits string on the delimiter with the limit count and returns String at specified index from the split.
-   */
-  @ScalarFunction
-  public static String splitPartFromEnd(String input, String delimiter, int index) {
-    String[] splitString = StringUtils.splitByWholeSeparator(input, delimiter);
-    if (index < splitString.length) {
-      return splitString[splitString.length - 1 - index];
+    } else if (index < 0 && index >= -splitString.length) {
+      return splitString[splitString.length + index];
     } else {
       return "null";
     }
