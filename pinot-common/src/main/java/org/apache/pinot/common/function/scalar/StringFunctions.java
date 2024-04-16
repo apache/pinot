@@ -602,12 +602,12 @@ public class StringFunctions {
   /**
    * @param input the input String to be split into parts.
    * @param delimiter the specified delimiter to split the input string.
-   * @param index the specified index for the splitted parts to be returned.
    * @param limit the max count of parts that the input string can be splitted into.
+   * @param index the specified index for the splitted parts to be returned.
    * @return splits string on the delimiter with the limit count and returns String at specified index from the split.
    */
   @ScalarFunction
-  public static String splitPart(String input, String delimiter, int index, int limit) {
+  public static String splitPart(String input, String delimiter, int limit, int index) {
     String[] splitString = StringUtils.splitByWholeSeparator(input, delimiter, limit);
     if (index >= 0 && index < splitString.length) {
       return splitString[index];

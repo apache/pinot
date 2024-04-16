@@ -86,6 +86,6 @@ public class StringFunctionsTest {
   public void testSplitPart(String input, String delimiter, int index, int limit, String expectedToken,
       String expectedTokenWithLimitCounts) {
     assertEquals(StringFunctions.splitPart(input, delimiter, index), expectedToken);
-    assertEquals(StringFunctions.splitPart(input, delimiter, index, limit), expectedTokenWithLimitCounts);
+    assertEquals(StringFunctions.splitPart(input, delimiter, limit, index), expectedTokenWithLimitCounts);
   }
 }
