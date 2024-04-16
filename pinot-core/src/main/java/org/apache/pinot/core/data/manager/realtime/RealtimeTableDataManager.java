@@ -406,7 +406,11 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
               _tableNameWithType));
       PartitionUpsertMetadataManager partitionUpsertMetadataManager =
           _tableUpsertMetadataManager.getOrCreatePartitionManager(partitionId);
-      partitionUpsertMetadataManager.preloadSegments(indexLoadingConfig);
+      try {
+        partitionUpsertMetadataManager.preloadSegments(indexLoadingConfig);
+      } finally {
+        partitionUpsertMetadataManager.decreaseReferenceCount();
+      }
       // Continue to add segment after preloading, as the segment might not be added by preloading.
     }
     SegmentDataManager segmentDataManager = _segmentDataManagerMap.get(segmentName);
@@ -565,9 +569,13 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     if (partitionUpsertMetadataManager.isPreloading()) {
       // Preloading segment is ensured to be handled by a single thread, so no need to take the segment upsert lock.
       // Besides, preloading happens before the table partition is made ready for any queries.
-      partitionUpsertMetadataManager.preloadSegment(immutableSegment);
-      registerSegment(segmentName, newSegmentManager);
-      _logger.info("Preloaded immutable segment: {} to upsert-enabled table: {}", segmentName, _tableNameWithType);
+      try {
+        partitionUpsertMetadataManager.preloadSegment(immutableSegment);
+        registerSegment(segmentName, newSegmentManager);
+        _logger.info("Preloaded immutable segment: {} to upsert-enabled table: {}", segmentName, _tableNameWithType);
+      } finally {
+        partitionUpsertMetadataManager.decreaseReferenceCount();
+      }
       return;
     }
     // Replacing segment takes multiple steps, and particularly need to access the oldSegment. Replace segment may
@@ -610,6 +618,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
         releaseSegment(oldSegmentManager);
       }
     } finally {
+      partitionUpsertMetadataManager.decreaseReferenceCount();
       segmentLock.unlock();
     }
   }
