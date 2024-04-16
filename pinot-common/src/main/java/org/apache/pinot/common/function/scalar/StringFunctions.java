@@ -18,9 +18,7 @@
  */
 package org.apache.pinot.common.function.scalar;
 
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
-import it.unimi.dsi.fastutil.objects.ObjectList;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
@@ -592,11 +590,12 @@ public class StringFunctions {
    */
   @ScalarFunction
   public static String[] prefixes(String input, int maxlength) {
-    ObjectList<String> prefixList = new ObjectArrayList<>();
-    for (int prefixLength = 1; prefixLength <= maxlength && prefixLength <= input.length(); prefixLength++) {
-      prefixList.add(input.substring(0, prefixLength));
+    int arrLength = Math.min(maxlength, input.length());
+    String[] prefixArr = new String[arrLength];
+    for (int prefixIdx = 1; prefixIdx <= arrLength; prefixIdx++) {
+      prefixArr[prefixIdx - 1] = input.substring(0, prefixIdx);
     }
-    return prefixList.toArray(new String[0]);
+    return prefixArr;
   }
 
   /**
@@ -605,16 +604,17 @@ public class StringFunctions {
    * @param prefix the prefix to be prepended to prefix strings generated. e.g. '^' for regex matching
    * @return generate an array of prefix matchers of the string that are shorter than the specified length.
    */
-  @ScalarFunction
+  @ScalarFunction(nullableParameters = true, names = {"prefix"})
   public static String[] prefixesWithPrefix(String input, int maxlength, @Nullable String prefix) {
     if (prefix == null) {
       return prefixes(input, maxlength);
     }
-    ObjectList<String> prefixList = new ObjectArrayList<>();
-    for (int prefixLength = 1; prefixLength <= maxlength && prefixLength <= input.length(); prefixLength++) {
-      prefixList.add(prefix + input.substring(0, prefixLength));
+    int arrLength = Math.min(maxlength, input.length());
+    String[] prefixArr = new String[arrLength];
+    for (int prefixIdx = 1; prefixIdx <= arrLength; prefixIdx++) {
+      prefixArr[prefixIdx - 1] = prefix + input.substring(0, prefixIdx);
     }
-    return prefixList.toArray(new String[0]);
+    return prefixArr;
   }
 
   /**
@@ -624,11 +624,12 @@ public class StringFunctions {
    */
   @ScalarFunction
   public static String[] suffixes(String input, int maxlength) {
-    ObjectList<String> suffixList = new ObjectArrayList<>();
-    for (int suffixLength = 1; suffixLength <= maxlength && suffixLength <= input.length(); suffixLength++) {
-      suffixList.add(input.substring(input.length() - suffixLength));
+    int arrLength = Math.min(maxlength, input.length());
+    String[] suffixArr = new String[arrLength];
+    for (int suffixIdx = 1; suffixIdx <= arrLength; suffixIdx++) {
+      suffixArr[suffixIdx - 1] = input.substring(input.length() - suffixIdx);
     }
-    return suffixList.toArray(new String[0]);
+    return suffixArr;
   }
 
   /**
@@ -637,16 +638,17 @@ public class StringFunctions {
    * @param suffix the suffix string to be appended for suffix strings generated. e.g. '$' for regex matching.
    * @return generate an array of suffix matchers of the string that are shorter than the specified length.
    */
-  @ScalarFunction
+  @ScalarFunction(nullableParameters = true, names = {"suffix"})
   public static String[] suffixesWithSuffix(String input, int maxlength, @Nullable String suffix) {
     if (suffix == null) {
       return suffixes(input, maxlength);
     }
-    ObjectList<String> suffixList = new ObjectArrayList<>();
-    for (int suffixLength = 1; suffixLength <= maxlength && suffixLength <= input.length(); suffixLength++) {
-      suffixList.add(input.substring(input.length() - suffixLength) + suffix);
+    int arrLength = Math.min(maxlength, input.length());
+    String[] suffixArr = new String[arrLength];
+    for (int suffixIdx = 1; suffixIdx <= arrLength; suffixIdx++) {
+      suffixArr[suffixIdx - 1] = input.substring(input.length() - suffixIdx) + suffix;
     }
-    return suffixList.toArray(new String[0]);
+    return suffixArr;
   }
 
   /**
