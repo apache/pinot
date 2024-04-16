@@ -138,15 +138,12 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.UPSERT_TABLE_COUNT, context._upsertTableCount);
     _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.DISABLED_TABLE_COUNT, context._disabledTables.size());
 
-    AtomicInteger totalTierBackendTables = new AtomicInteger();
-    context._tierBackendTableCountMap.forEach((tier, count) -> {
-      // metric for total number of tables using a particular tier backend
-      _controllerMetrics.setOrUpdateGauge(tier + ControllerGauge.TIER_BACKEND_TABLE_COUNT.getGaugeName(), count);
-      totalTierBackendTables.addAndGet(count);
-        });
+    // metric for total number of tables using a particular tier backend
+    context._tierBackendTableCountMap.forEach((tier, count) ->
+      _controllerMetrics.setOrUpdateGauge(tier + ControllerGauge.TIER_BACKEND_TABLE_COUNT.getGaugeName(), count));
     // metric for total number of tables having tier backend configured
     _controllerMetrics.setOrUpdateGauge(ControllerGauge.TIER_BACKEND_TABLE_COUNT.getGaugeName(),
-        totalTierBackendTables.get());
+        context._tierBackendConfiguredTableCount);
 
     //emit a 0 for tables that are not paused/disabled. This makes alert expressions simpler as we don't have to deal
     // with missing metrics
@@ -194,6 +191,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
       }
       tierBackendSet.forEach(tierBackend -> context._tierBackendTableCountMap.put(tierBackend,
               context._tierBackendTableCountMap.getOrDefault(tierBackend, 0) + 1));
+      context._tierBackendConfiguredTableCount += tierBackendSet.isEmpty() ? 0 : 1;
     }
     int replication = tableConfig.getReplication();
     _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.REPLICATION_FROM_CONFIG, replication);
@@ -415,6 +413,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     private int _realTimeTableCount;
     private int _offlineTableCount;
     private int _upsertTableCount;
+    private int _tierBackendConfiguredTableCount;
     private Map<String, Integer> _tierBackendTableCountMap = new HashMap<>();
     private Set<String> _processedTables = new HashSet<>();
     private Set<String> _disabledTables = new HashSet<>();
