@@ -84,6 +84,7 @@ public abstract class BaseMinionStarter implements ServiceStartable {
   protected MinionConf _config;
   protected String _hostname;
   protected int _port;
+  protected int _tlsPort;
   protected String _instanceId;
   protected HelixManager _helixManager;
   protected TaskExecutorFactoryRegistry _taskExecutorFactoryRegistry;
@@ -116,6 +117,7 @@ public abstract class BaseMinionStarter implements ServiceStartable {
       _instanceId = CommonConstants.Helix.PREFIX_OF_MINION_INSTANCE + _hostname + "_" + _port;
     }
     _listenerConfigs = ListenerConfigUtil.buildMinionConfigs(_config);
+    _tlsPort = ListenerConfigUtil.findLastTlsPort(_listenerConfigs, 0);
     _helixManager = new ZKHelixManager(helixClusterName, _instanceId, InstanceType.PARTICIPANT, zkAddress);
     MinionTaskZkMetadataManager minionTaskZkMetadataManager = new MinionTaskZkMetadataManager(_helixManager);
     _taskExecutorFactoryRegistry = new TaskExecutorFactoryRegistry(minionTaskZkMetadataManager, _config);
@@ -123,6 +125,20 @@ public abstract class BaseMinionStarter implements ServiceStartable {
     _executorService =
         Executors.newCachedThreadPool(new ThreadFactoryBuilder().setNameFormat("async-task-thread-%d").build());
     MinionEventObservers.init(_config, _executorService);
+  }
+
+  private void updateInstanceConfigIfNeeded() {
+    InstanceConfig instanceConfig = HelixHelper.getInstanceConfig(_helixManager, _instanceId);
+    boolean updated = HelixHelper.updateHostnamePort(instanceConfig, _hostname, _port);
+    if (_tlsPort > 0) {
+      updated |= HelixHelper.updateTlsPort(instanceConfig, _tlsPort);
+    }
+    updated |= HelixHelper.addDefaultTags(instanceConfig,
+        () -> Collections.singletonList(CommonConstants.Helix.CONTROLLER_INSTANCE));
+    updated |= HelixHelper.removeDisabledPartitions(instanceConfig);
+    if (updated) {
+      HelixHelper.updateInstanceConfig(_helixManager, instanceConfig);
+    }
   }
 
   private void setupHelixSystemProperties() {
@@ -300,17 +316,6 @@ public abstract class BaseMinionStarter implements ServiceStartable {
     });
 
     LOGGER.info("Pinot minion started");
-  }
-
-  private void updateInstanceConfigIfNeeded() {
-    InstanceConfig instanceConfig = HelixHelper.getInstanceConfig(_helixManager, _instanceId);
-    boolean updated = HelixHelper.updateHostnamePort(instanceConfig, _hostname, _port);
-    updated |= HelixHelper.addDefaultTags(instanceConfig,
-        () -> Collections.singletonList(CommonConstants.Helix.UNTAGGED_MINION_INSTANCE));
-    updated |= HelixHelper.removeDisabledPartitions(instanceConfig);
-    if (updated) {
-      HelixHelper.updateInstanceConfig(_helixManager, instanceConfig);
-    }
   }
 
   /**
