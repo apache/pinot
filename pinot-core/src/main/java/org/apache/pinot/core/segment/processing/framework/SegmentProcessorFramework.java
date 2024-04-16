@@ -290,8 +290,7 @@ public class SegmentProcessorFramework {
           GenericRowFileRecordReader recordReaderForRange = recordReader.getRecordReaderForRange(startRowId, endRowId);
           SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
           driver.init(generatorConfig, new RecordReaderSegmentCreationDataSource(recordReaderForRange),
-              RecordEnricherPipeline.getPassThroughPipeline(),
-              TransformPipeline.getPassThroughPipeline());
+              RecordEnricherPipeline.getPassThroughPipeline(), TransformPipeline.getPassThroughPipeline());
           driver.build();
           outputSegmentDirs.add(driver.getOutputDirectory());
           _segmentNumRowProvider.updateSegmentInfo(driver.getSegmentStats().getTotalDocCount(),
