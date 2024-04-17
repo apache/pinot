@@ -51,6 +51,7 @@ public class ExchangeNode extends AbstractPlanNode {
   @ProtoProperties
   private boolean _isPrePartitioned = false;
 
+  // FIXME: Ser/de doesn't work on this field. Currently it is always empty.
   @ProtoProperties
   private List<RelFieldCollation> _collations;
 
