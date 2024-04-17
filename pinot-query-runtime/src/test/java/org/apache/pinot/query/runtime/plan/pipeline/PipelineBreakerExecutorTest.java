@@ -31,7 +31,7 @@ import org.apache.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
-import org.apache.pinot.query.planner.physical.MailboxIdUtils;
+import org.apache.pinot.query.planner.physical.MailboxId;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.routing.MailboxInfo;
@@ -61,8 +61,8 @@ import static org.mockito.Mockito.when;
 public class PipelineBreakerExecutorTest {
   private static final DataSchema DATA_SCHEMA =
       new DataSchema(new String[]{"col1", "col2"}, new DataSchema.ColumnDataType[]{INT, INT});
-  private static final String MAILBOX_ID_1 = MailboxIdUtils.toMailboxId(0, 1, 0, 0, 0);
-  private static final String MAILBOX_ID_2 = MailboxIdUtils.toMailboxId(0, 2, 0, 0, 0);
+  private static final MailboxId MAILBOX_ID_1 = new MailboxId(0, 1, 0, 0, 0);
+  private static final MailboxId MAILBOX_ID_2 = new MailboxId(0, 2, 0, 0, 0);
 
   private final VirtualServerAddress _server = new VirtualServerAddress("localhost", 123, 0);
   private final ExecutorService _executor = Executors.newCachedThreadPool();
@@ -88,8 +88,8 @@ public class PipelineBreakerExecutorTest {
     when(_mailboxService.getHostname()).thenReturn("localhost");
     when(_mailboxService.getPort()).thenReturn(123);
 
-    when(_mailbox1.getId()).thenReturn("mailbox1");
-    when(_mailbox2.getId()).thenReturn("mailbox2");
+    when(_mailbox1.getId()).thenReturn(new MailboxId(0, 1, 0, 0, 0));
+    when(_mailbox2.getId()).thenReturn(new MailboxId(0, 2, 0, 0, 0));
   }
 
   @AfterMethod

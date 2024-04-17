@@ -19,6 +19,7 @@
 package org.apache.pinot.query.mailbox;
 
 import java.util.concurrent.TimeoutException;
+import org.apache.pinot.query.planner.physical.MailboxId;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.spi.exception.QueryCancelledException;
@@ -29,7 +30,7 @@ import org.slf4j.LoggerFactory;
 public class InMemorySendingMailbox implements SendingMailbox {
   private static final Logger LOGGER = LoggerFactory.getLogger(InMemorySendingMailbox.class);
 
-  private final String _id;
+  private final MailboxId _id;
   private final MailboxService _mailboxService;
   private final long _deadlineMs;
 
@@ -37,7 +38,7 @@ public class InMemorySendingMailbox implements SendingMailbox {
   private volatile boolean _isTerminated;
   private volatile boolean _isEarlyTerminated;
 
-  public InMemorySendingMailbox(String id, MailboxService mailboxService, long deadlineMs) {
+  public InMemorySendingMailbox(MailboxId id, MailboxService mailboxService, long deadlineMs) {
     _id = id;
     _mailboxService = mailboxService;
     _deadlineMs = deadlineMs;

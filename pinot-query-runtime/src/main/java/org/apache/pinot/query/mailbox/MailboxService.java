@@ -25,6 +25,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.query.mailbox.channel.ChannelManager;
 import org.apache.pinot.query.mailbox.channel.GrpcMailboxServer;
+import org.apache.pinot.query.planner.physical.MailboxId;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,9 +44,9 @@ public class MailboxService {
    * We use a cache to ensure the receiving mailbox are not leaked in the cases where the corresponding OpChain is
    * either never registered or died before the sender finished sending data.
    */
-  private final Cache<String, ReceivingMailbox> _receivingMailboxCache =
+  private final Cache<MailboxId, ReceivingMailbox> _receivingMailboxCache =
       CacheBuilder.newBuilder().expireAfterAccess(DANGLING_RECEIVING_MAILBOX_EXPIRY_SECONDS, TimeUnit.SECONDS)
-          .removalListener((RemovalListener<String, ReceivingMailbox>) notification -> {
+          .removalListener((RemovalListener<MailboxId, ReceivingMailbox>) notification -> {
             if (notification.wasEvicted()) {
               int numPendingBlocks = notification.getValue().getNumPendingBlocks();
               if (numPendingBlocks > 0) {
@@ -99,7 +100,7 @@ public class MailboxService {
    * not open the underlying channel or acquire any additional resources. Instead, it will initialize lazily when the
    * data is sent for the first time.
    */
-  public SendingMailbox getSendingMailbox(String hostname, int port, String mailboxId, long deadlineMs) {
+  public SendingMailbox getSendingMailbox(String hostname, int port, MailboxId mailboxId, long deadlineMs) {
     if (_hostname.equals(hostname) && _port == port) {
       return new InMemorySendingMailbox(mailboxId, this, deadlineMs);
     } else {
@@ -110,7 +111,7 @@ public class MailboxService {
   /**
    * Returns the receiving mailbox for the given mailbox id.
    */
-  public ReceivingMailbox getReceivingMailbox(String mailboxId) {
+  public ReceivingMailbox getReceivingMailbox(MailboxId mailboxId) {
     try {
       return _receivingMailboxCache.get(mailboxId, () -> new ReceivingMailbox(mailboxId));
     } catch (ExecutionException e) {
