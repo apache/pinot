@@ -27,6 +27,7 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelShuttle;
 import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.core.Exchange;
+import org.apache.calcite.rel.logical.PinotRelExchangeType;
 
 
 /**
