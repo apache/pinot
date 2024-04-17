@@ -86,7 +86,8 @@ public class MultiValueFixedByteRawIndexCreator implements ForwardIndexCreator {
         TARGET_MAX_CHUNK_SIZE / (totalMaxLength + VarByteChunkForwardIndexWriter.CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE), 1)
         : DEFAULT_NUM_DOCS_PER_CHUNK;
     // For columns with very small max value, target chunk size should also be capped to reduce memory during read
-    int dynamicTargetChunkSize = Math.min(totalMaxLength * DEFAULT_NUM_DOCS_PER_CHUNK, TARGET_MAX_CHUNK_SIZE);
+    int dynamicTargetChunkSize =
+        (int) Math.min((long) totalMaxLength * DEFAULT_NUM_DOCS_PER_CHUNK, TARGET_MAX_CHUNK_SIZE);
     _indexWriter =
         writerVersion < VarByteChunkForwardIndexWriterV4.VERSION ? new VarByteChunkForwardIndexWriter(indexFile,
             compressionType, totalDocs, numDocsPerChunk, totalMaxLength, writerVersion)
