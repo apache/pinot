@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -276,7 +277,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
     // collect all resources which have this instance in the ideal state
     List<String> resourcesToMonitor = new ArrayList<>();
 
-    Set<String> consumingSegments = new HashSet<>();
+    Map<String, Set<String>> consumingSegments = new HashMap<>();
     boolean checkRealtime = realtimeConsumptionCatchupWaitMs > 0;
     if (isFreshnessStatusCheckerEnabled && realtimeMinFreshnessMs <= 0) {
       LOGGER.warn("Realtime min freshness {} must be > 0. Setting relatime min freshness to default {}.",
@@ -304,7 +305,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
           for (String partitionName : idealState.getPartitionSet()) {
             if (StateModel.SegmentStateModel.CONSUMING.equals(
                 idealState.getInstanceStateMap(partitionName).get(_instanceId))) {
-              consumingSegments.add(partitionName);
+              consumingSegments.computeIfAbsent(resourceName, k -> new HashSet<>()).add(partitionName);
             }
           }
         }
@@ -360,21 +361,14 @@ public abstract class BaseServerStarter implements ServiceStartable {
         new ServiceStatus.MultipleCallbackServiceStatusCallback(serviceStatusCallbackListBuilder.build()));
   }
 
-  private Set<String> getConsumingSegments() {
+  private Set<String> getConsumingSegments(String tableName) {
     Set<String> consumingSegments = new HashSet<>();
-    for (String resourceName : _helixAdmin.getResourcesInCluster(_helixClusterName)) {
-      // Only monitor table resources
-      if (!TableNameBuilder.isTableResource(resourceName)) {
-        continue;
-      }
-      // Only monitor enabled realtime table
-      IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, resourceName);
-      if (idealState.isEnabled() && TableNameBuilder.isRealtimeTableResource(resourceName)) {
-        for (String partitionName : idealState.getPartitionSet()) {
-          if (StateModel.SegmentStateModel.CONSUMING.equals(
-              idealState.getInstanceStateMap(partitionName).get(_instanceId))) {
-            consumingSegments.add(partitionName);
-          }
+    IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableName);
+    if (idealState.isEnabled() && TableNameBuilder.isRealtimeTableResource(tableName)) {
+      for (String partitionName : idealState.getPartitionSet()) {
+        if (StateModel.SegmentStateModel.CONSUMING.equals(
+            idealState.getInstanceStateMap(partitionName).get(_instanceId))) {
+          consumingSegments.add(partitionName);
         }
       }
     }

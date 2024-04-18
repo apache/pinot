@@ -20,7 +20,9 @@
 package org.apache.pinot.server.starter.helix;
 
 import com.google.common.collect.ImmutableSet;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
@@ -43,7 +45,7 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     private final long _now;
 
     public FakeFreshnessBasedConsumptionStatusChecker(InstanceDataManager instanceDataManager,
-        Set<String> consumingSegments, long minFreshnessMs, long idleTimeoutMs, long now) {
+        Map<String, Set<String>> consumingSegments, long minFreshnessMs, long idleTimeoutMs, long now) {
       super(instanceDataManager, consumingSegments, minFreshnessMs, idleTimeoutMs);
       _now = now;
     }
@@ -59,7 +61,9 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     String segA0 = "tableA__0__0__123Z";
     String segA1 = "tableA__1__0__123Z";
     String segB0 = "tableB__0__0__123Z";
-    Set<String> consumingSegments = ImmutableSet.of(segA0, segA1, segB0);
+    Map<String, Set<String>> consumingSegments = new HashMap<>();
+    consumingSegments.put("tableA_REALTIME", ImmutableSet.of(segA0, segA1));
+    consumingSegments.put("tableB_REALTIME", ImmutableSet.of(segB0));
     InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
     FreshnessBasedConsumptionStatusChecker statusChecker =
         new FreshnessBasedConsumptionStatusChecker(instanceDataManager, consumingSegments, 10000L, 0L);
@@ -126,16 +130,16 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     String segA0 = "tableA__0__0__123Z";
     String segA1 = "tableA__1__0__123Z";
     String segB0 = "tableB__0__0__123Z";
-    Set<String> consumingSegments = new HashSet<>();
-    consumingSegments.add(segA0);
-    consumingSegments.add(segA1);
-    consumingSegments.add(segB0);
-    Set<String> updatedConsumingSegments = new HashSet<>(consumingSegments);
+    Map<String, Set<String>> consumingSegments = new HashMap<>();
+    consumingSegments.computeIfAbsent("tableA_REALTIME", k -> new HashSet<>()).add(segA0);
+    consumingSegments.computeIfAbsent("tableA_REALTIME", k -> new HashSet<>()).add(segA1);
+    consumingSegments.computeIfAbsent("tableB_REALTIME", k -> new HashSet<>()).add(segB0);
+    Map<String, Set<String>> updatedConsumingSegments = new HashMap<>(consumingSegments);
     InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
     FreshnessBasedConsumptionStatusChecker statusChecker =
         new FreshnessBasedConsumptionStatusChecker(instanceDataManager, consumingSegments,
             // Create a new Set instance to keep statusChecker._consumingSegments and this Set separate.
-            () -> new HashSet<>(updatedConsumingSegments), 10L, 0L);
+            updatedConsumingSegments::get, 10L, 0L);
 
     // TableDataManager is not set up yet
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 3);
@@ -165,9 +169,9 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     when(segMngrA0.getCurrentOffset()).thenReturn(new LongMsgOffset(20));
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 2);
     // Remove the missing segments and check again.
-    updatedConsumingSegments.remove(segA1);
+    updatedConsumingSegments.get("tableA_REALTIME").remove(segA1);
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 1);
-    updatedConsumingSegments.remove(segB0);
+    updatedConsumingSegments.remove("tableB_REALTIME");
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 0);
   }
 
@@ -185,7 +189,9 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     String segA0 = "tableA__0__0__123Z";
     String segA1 = "tableA__1__0__123Z";
     String segB0 = "tableB__0__0__123Z";
-    Set<String> consumingSegments = ImmutableSet.of(segA0, segA1, segB0);
+    Map<String, Set<String>> consumingSegments = new HashMap<>();
+    consumingSegments.put("tableA_REALTIME", ImmutableSet.of(segA0, segA1));
+    consumingSegments.put("tableB_REALTIME", ImmutableSet.of(segB0));
     InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
     FreshnessBasedConsumptionStatusChecker statusChecker =
         new FakeFreshnessBasedConsumptionStatusChecker(instanceDataManager, consumingSegments, 10L, 0L, 100L);
@@ -247,7 +253,9 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     String segA0 = "tableA__0__0__123Z";
     String segA1 = "tableA__1__0__123Z";
     String segB0 = "tableB__0__0__123Z";
-    Set<String> consumingSegments = ImmutableSet.of(segA0, segA1, segB0);
+    Map<String, Set<String>> consumingSegments = new HashMap<>();
+    consumingSegments.put("tableA_REALTIME", ImmutableSet.of(segA0, segA1));
+    consumingSegments.put("tableB_REALTIME", ImmutableSet.of(segB0));
     InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
     long idleTimeoutMs = 10L;
     FreshnessBasedConsumptionStatusChecker statusChecker =
@@ -322,7 +330,9 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     String segA0 = "tableA__0__0__123Z";
     String segA1 = "tableA__1__0__123Z";
     String segB0 = "tableB__0__0__123Z";
-    Set<String> consumingSegments = ImmutableSet.of(segA0, segA1, segB0);
+    Map<String, Set<String>> consumingSegments = new HashMap<>();
+    consumingSegments.put("tableA_REALTIME", ImmutableSet.of(segA0, segA1));
+    consumingSegments.put("tableB_REALTIME", ImmutableSet.of(segB0));
     InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
     FreshnessBasedConsumptionStatusChecker statusChecker =
         new FakeFreshnessBasedConsumptionStatusChecker(instanceDataManager, consumingSegments, 10L, 0L, 100L);
@@ -371,7 +381,9 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     String segA0 = "tableA__0__0__123Z";
     String segA1 = "tableA__1__0__123Z";
     String segB0 = "tableB__0__0__123Z";
-    Set<String> consumingSegments = ImmutableSet.of(segA0, segA1, segB0);
+    Map<String, Set<String>> consumingSegments = new HashMap<>();
+    consumingSegments.put("tableA_REALTIME", ImmutableSet.of(segA0, segA1));
+    consumingSegments.put("tableB_REALTIME", ImmutableSet.of(segB0));
     InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
     FreshnessBasedConsumptionStatusChecker statusChecker =
         new FakeFreshnessBasedConsumptionStatusChecker(instanceDataManager, consumingSegments, 10L, 0L, 100L);
@@ -429,7 +441,9 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     String segA0 = "tableA__0__0__123Z";
     String segA1 = "tableA__1__0__123Z";
     String segB0 = "tableB__0__0__123Z";
-    Set<String> consumingSegments = ImmutableSet.of(segA0, segA1, segB0);
+    Map<String, Set<String>> consumingSegments = new HashMap<>();
+    consumingSegments.put("tableA_REALTIME", ImmutableSet.of(segA0, segA1));
+    consumingSegments.put("tableB_REALTIME", ImmutableSet.of(segB0));
     InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
     FreshnessBasedConsumptionStatusChecker statusChecker =
         new FakeFreshnessBasedConsumptionStatusChecker(instanceDataManager, consumingSegments, 10L, 0L, 100L);
