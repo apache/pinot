@@ -173,7 +173,7 @@ public final class TableConfigUtils {
       }
       validateTierConfigList(tableConfig.getTierConfigsList());
       validateIndexingConfig(tableConfig.getIndexingConfig(), schema);
-      validateFieldConfigList(tableConfig.getFieldConfigList(), tableConfig.getIndexingConfig(), schema);
+      validateFieldConfigList(tableConfig, schema);
       validateInstancePartitionsTypeMapConfig(tableConfig);
       validatePartitionedReplicaGroupInstance(tableConfig);
       if (!skipTypes.contains(ValidationType.UPSERT)) {
@@ -1209,8 +1209,10 @@ public final class TableConfigUtils {
    * Additional checks for TEXT and FST index types
    * Validates index compatibility for forward index disabled columns
    */
-  private static void validateFieldConfigList(@Nullable List<FieldConfig> fieldConfigList,
-      IndexingConfig indexingConfig, @Nullable Schema schema) {
+  private static void validateFieldConfigList(TableConfig tableConfig, @Nullable Schema schema) {
+    List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
+    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+    TableType tableType = tableConfig.getTableType();
     if (fieldConfigList == null) {
       return;
     }
@@ -1254,7 +1256,7 @@ public final class TableConfigUtils {
           "Column: %s defined in field config list must be a valid column defined in the schema", columnName);
 
       // Validate the forward index disabled compatibility with other indexes if enabled for this column
-      validateForwardIndexDisabledIndexCompatibility(columnName, fieldConfig, indexingConfig, schema);
+      validateForwardIndexDisabledIndexCompatibility(columnName, fieldConfig, indexingConfig, schema, tableType);
 
       if (CollectionUtils.isNotEmpty(fieldConfig.getIndexTypes())) {
         for (FieldConfig.IndexType indexType : fieldConfig.getIndexTypes()) {
@@ -1300,7 +1302,7 @@ public final class TableConfigUtils {
    * back or generate a new index for existing segments is to either refresh or back-fill the segments.
    */
   private static void validateForwardIndexDisabledIndexCompatibility(String columnName, FieldConfig fieldConfig,
-      IndexingConfig indexingConfig, Schema schema) {
+      IndexingConfig indexingConfig, Schema schema, TableType tableType) {
     Map<String, String> fieldConfigProperties = fieldConfig.getProperties();
     if (fieldConfigProperties == null) {
       return;
@@ -1313,16 +1315,20 @@ public final class TableConfigUtils {
       return;
     }
 
+    // For tables with columnMajorSegmentBuilderEnabled being true, the forward index should not be disabled.
+    Preconditions.checkState(tableType != TableType.REALTIME,
+        String.format("Cannot disable forward index for column %s, as the table type is REALTIME.", columnName));
+
     FieldSpec fieldSpec = schema.getFieldSpecFor(columnName);
     // Check for the range index since the index itself relies on the existence of the forward index to work.
     if (indexingConfig.getRangeIndexColumns() != null && indexingConfig.getRangeIndexColumns().contains(columnName)) {
       Preconditions.checkState(fieldSpec.isSingleValueField(), String.format("Feature not supported for multi-value "
           + "columns with range index. Cannot disable forward index for column %s. Disable range index on this "
-          + "column to use this feature", columnName));
+          + "column to use this feature.", columnName));
       Preconditions.checkState(indexingConfig.getRangeIndexVersion() == BitSlicedRangeIndexCreator.VERSION,
           String.format("Feature not supported for single-value columns with range index version < 2. Cannot disable "
               + "forward index for column %s. Either disable range index or create range index with"
-              + " version >= 2 to use this feature", columnName));
+              + " version >= 2 to use this feature.", columnName));
     }
 
     Preconditions.checkState(!indexingConfig.isOptimizeDictionaryForMetrics() && !indexingConfig.isOptimizeDictionary(),

@@ -78,7 +78,7 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
       // for realtime
       _indexCreator =
           new LuceneTextIndexCreator(column, new File(segmentIndexDir.getAbsolutePath() + "/" + segmentName),
-              false /* commitOnClose */, config);
+              false /* commitOnClose */, true, null, config);
       IndexWriter indexWriter = _indexCreator.getIndexWriter();
       _searcherManager = new SearcherManager(indexWriter, false, false, null);
       _analyzer = _indexCreator.getIndexWriter().getConfig().getAnalyzer();
@@ -179,6 +179,17 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
       throw new RuntimeException(e);
     }
     return actualDocIDs;
+  }
+
+  @Override
+  public void commit() {
+    try {
+      _indexCreator.getIndexWriter().commit();
+    } catch (Exception e) {
+      LOGGER.error("Failed to commit the realtime lucene text index for column {}, exception {}", _column,
+          e.getMessage());
+      throw new RuntimeException(e);
+    }
   }
 
   @Override

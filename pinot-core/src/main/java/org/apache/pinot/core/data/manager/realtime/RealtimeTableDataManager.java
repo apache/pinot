@@ -635,17 +635,15 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       } catch (Exception e) {
         _logger.warn("Download segment {} from deepstore uri {} failed.", segmentName, uri, e);
         // Download from deep store failed; try to download from peer if peer download is setup for the table.
-        if (isPeerSegmentDownloadEnabled(tableConfig)) {
-          downloadSegmentFromPeer(segmentName, tableConfig.getValidationConfig().getPeerSegmentDownloadScheme(),
-              indexLoadingConfig);
+        if (_peerDownloadScheme != null) {
+          downloadSegmentFromPeer(segmentName, indexLoadingConfig);
         } else {
           throw e;
         }
       }
     } else {
-      if (isPeerSegmentDownloadEnabled(tableConfig)) {
-        downloadSegmentFromPeer(segmentName, tableConfig.getValidationConfig().getPeerSegmentDownloadScheme(),
-            indexLoadingConfig);
+      if (_peerDownloadScheme != null) {
+        downloadSegmentFromPeer(segmentName, indexLoadingConfig);
       } else {
         throw new RuntimeException("Peer segment download not enabled for segment " + segmentName);
       }
@@ -687,23 +685,16 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     replaceLLSegment(segmentName, indexLoadingConfig);
   }
 
-  private boolean isPeerSegmentDownloadEnabled(TableConfig tableConfig) {
-    return
-        CommonConstants.HTTP_PROTOCOL.equalsIgnoreCase(tableConfig.getValidationConfig().getPeerSegmentDownloadScheme())
-            || CommonConstants.HTTPS_PROTOCOL.equalsIgnoreCase(
-            tableConfig.getValidationConfig().getPeerSegmentDownloadScheme());
-  }
-
-  private void downloadSegmentFromPeer(String segmentName, String downloadScheme,
-      IndexLoadingConfig indexLoadingConfig) {
+  private void downloadSegmentFromPeer(String segmentName, IndexLoadingConfig indexLoadingConfig) {
     File tempRootDir = null;
     try {
       tempRootDir = getTmpSegmentDataDir("tmp-" + segmentName + "." + System.currentTimeMillis());
       File segmentTarFile = new File(tempRootDir, segmentName + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
       // Next download the segment from a randomly chosen server using configured download scheme (http or https).
-      SegmentFetcherFactory.getSegmentFetcher(downloadScheme).fetchSegmentToLocal(segmentName, () -> {
+      SegmentFetcherFactory.getSegmentFetcher(_peerDownloadScheme).fetchSegmentToLocal(segmentName, () -> {
         List<URI> peerServerURIs =
-            PeerServerSegmentFinder.getPeerServerURIs(segmentName, downloadScheme, _helixManager);
+            PeerServerSegmentFinder.getPeerServerURIs(_helixManager, _tableNameWithType, segmentName,
+                _peerDownloadScheme);
         Collections.shuffle(peerServerURIs);
         return peerServerURIs;
       }, segmentTarFile);
@@ -711,7 +702,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
           segmentTarFile.length());
       untarAndMoveSegment(segmentName, indexLoadingConfig, segmentTarFile, tempRootDir);
     } catch (Exception e) {
-      _logger.warn("Download and move segment {} from peer with scheme {} failed.", segmentName, downloadScheme, e);
+      _logger.warn("Download and move segment {} from peer with scheme {} failed.", segmentName, _peerDownloadScheme,
+          e);
       throw new RuntimeException(e);
     } finally {
       FileUtils.deleteQuietly(tempRootDir);

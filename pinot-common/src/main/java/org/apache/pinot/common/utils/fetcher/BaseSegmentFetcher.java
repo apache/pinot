@@ -42,13 +42,13 @@ public abstract class BaseSegmentFetcher implements SegmentFetcher {
   public static final String RETRY_DELAY_SCALE_FACTOR_CONFIG_KEY = "retry.delay.scale.factor";
   public static final int DEFAULT_RETRY_COUNT = 3;
   public static final int DEFAULT_RETRY_WAIT_MS = 100;
-  public static final int DEFAULT_RETRY_DELAY_SCALE_FACTOR = 5;
+  public static final double DEFAULT_RETRY_DELAY_SCALE_FACTOR = 5;
 
   protected final Logger _logger = LoggerFactory.getLogger(getClass().getSimpleName());
 
   protected int _retryCount;
   protected int _retryWaitMs;
-  protected int _retryDelayScaleFactor;
+  protected double _retryDelayScaleFactor;
   protected AuthProvider _authProvider;
 
   @Override
@@ -58,9 +58,8 @@ public abstract class BaseSegmentFetcher implements SegmentFetcher {
     _retryDelayScaleFactor = config.getProperty(RETRY_DELAY_SCALE_FACTOR_CONFIG_KEY, DEFAULT_RETRY_DELAY_SCALE_FACTOR);
     _authProvider = AuthProviderUtils.extractAuthProvider(config, CommonConstants.KEY_OF_AUTH);
     doInit(config);
-    _logger
-        .info("Initialized with retryCount: {}, retryWaitMs: {}, retryDelayScaleFactor: {}", _retryCount, _retryWaitMs,
-            _retryDelayScaleFactor);
+    _logger.info("Initialized with retryCount: {}, retryWaitMs: {}, retryDelayScaleFactor: {}", _retryCount,
+        _retryWaitMs, _retryDelayScaleFactor);
   }
 
   /**

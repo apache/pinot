@@ -150,7 +150,7 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
     verifyTaskCount(task1.get(0), 0, 1, 1, 2);
     // Should generate one more task, with two sub-tasks. Both of these sub-tasks will wait
     // since we have one minion instance that is still running one of the sub-tasks.
-    List<String> task2 = _taskManager.scheduleTask(TASK_TYPE);
+    List<String> task2 = _taskManager.scheduleTask(TASK_TYPE, null);
     assertNotNull(task2);
     assertEquals(task2.size(), 1);
     assertTrue(_helixTaskResourceManager.getTasksInProgress(TASK_TYPE).contains(task2.get(0)));
@@ -160,7 +160,7 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
     // Our test task generator does not generate if there are already this many sub-tasks in the
     // running+waiting count already.
     assertNull(_taskManager.scheduleTasks().get(TASK_TYPE));
-    assertNull(_taskManager.scheduleTask(TASK_TYPE));
+    assertNull(_taskManager.scheduleTask(TASK_TYPE, null));
 
     // Wait at most 60 seconds for all tasks IN_PROGRESS
     TestUtils.waitForCondition(input -> {
