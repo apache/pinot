@@ -234,12 +234,12 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends BaseC
     long expectedWatermark = _dataSmallestTimeMs + 86400000;
     for (int i = 0; i < 3; i++) {
       // Schedule task
-      assertNotNull(_taskManager.scheduleTasks(_realtimeTableName)
+      assertNotNull(_taskManager.scheduleTasks(Collections.singletonList(_realtimeTableName), false, null)
           .get(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE));
       assertTrue(_taskResourceManager.getTaskQueues().contains(
           PinotHelixTaskResourceManager.getHelixJobQueueName(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE)));
       // Should not generate more tasks
-      assertNull(_taskManager.scheduleTasks(_realtimeTableName)
+      assertNull(_taskManager.scheduleTasks(Collections.singletonList(_realtimeTableName), false, null)
           .get(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE));
 
       // Wait at most 600 seconds for all tasks COMPLETED
@@ -286,12 +286,12 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends BaseC
     _taskManager.cleanUpTask();
     for (int i = 0; i < 3; i++) {
       // Schedule task
-      assertNotNull(_taskManager.scheduleTasks(_realtimeMetadataTableName)
+      assertNotNull(_taskManager.scheduleTasks(Collections.singletonList(_realtimeMetadataTableName), false, null)
           .get(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE));
       assertTrue(_taskResourceManager.getTaskQueues().contains(
           PinotHelixTaskResourceManager.getHelixJobQueueName(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE)));
       // Should not generate more tasks
-      assertNull(_taskManager.scheduleTasks(_realtimeMetadataTableName)
+      assertNull(_taskManager.scheduleTasks(Collections.singletonList(_realtimeMetadataTableName), false, null)
           .get(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE));
 
       // Wait at most 600 seconds for all tasks COMPLETED

@@ -411,9 +411,11 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     int numTasks = 0;
     List<String> taskList;
     for (String tasks =
-        _taskManager.scheduleTasks(offlineTableName).get(MinionConstants.MergeRollupTask.TASK_TYPE).get(0);
+        _taskManager.scheduleTasks(Collections.singletonList(offlineTableName), false, null)
+            .get(MinionConstants.MergeRollupTask.TASK_TYPE).get(0);
         tasks != null;
-        taskList = _taskManager.scheduleTasks(offlineTableName).get(MinionConstants.MergeRollupTask.TASK_TYPE),
+        taskList = _taskManager.scheduleTasks(Collections.singletonList(offlineTableName), false, null)
+            .get(MinionConstants.MergeRollupTask.TASK_TYPE),
         tasks = taskList != null ? taskList.get(0) : null,
         numTasks++) {
       assertEquals(_helixTaskResourceManager.getSubtaskConfigs(tasks).size(), expectedNumSubTasks[numTasks]);
@@ -421,7 +423,8 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
           .contains(PinotHelixTaskResourceManager.getHelixJobQueueName(MinionConstants.MergeRollupTask.TASK_TYPE)));
       // Will not schedule task if there's incomplete task
       assertNull(
-          _taskManager.scheduleTasks(offlineTableName).get(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE));
+          _taskManager.scheduleTasks(Collections.singletonList(offlineTableName), false, null)
+              .get(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE));
       waitForTaskToComplete();
 
       // Check watermark
@@ -527,9 +530,11 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     int numTasks = 0;
     List<String> taskList;
     for (String tasks =
-        _taskManager.scheduleTasks(offlineTableName).get(MinionConstants.MergeRollupTask.TASK_TYPE).get(0);
+        _taskManager.scheduleTasks(Collections.singletonList(offlineTableName), false, null)
+            .get(MinionConstants.MergeRollupTask.TASK_TYPE).get(0);
         tasks != null;
-        taskList = _taskManager.scheduleTasks(offlineTableName).get(MinionConstants.MergeRollupTask.TASK_TYPE),
+        taskList = _taskManager.scheduleTasks(Collections.singletonList(offlineTableName), false, null)
+            .get(MinionConstants.MergeRollupTask.TASK_TYPE),
         tasks = taskList != null ? taskList.get(0) : null,
         numTasks++) {
       assertEquals(_helixTaskResourceManager.getSubtaskConfigs(tasks).size(), expectedNumSubTasks[numTasks]);
@@ -537,7 +542,8 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
           .contains(PinotHelixTaskResourceManager.getHelixJobQueueName(MinionConstants.MergeRollupTask.TASK_TYPE)));
       // Will not schedule task if there's incomplete task
       assertNull(
-          _taskManager.scheduleTasks(offlineTableName).get(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE));
+          _taskManager.scheduleTasks(Collections.singletonList(offlineTableName), false, null)
+              .get(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE));
       waitForTaskToComplete();
 
       // Check watermark
@@ -636,9 +642,11 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     int numTasks = 0;
     List<String> taskList;
     for (String tasks =
-        _taskManager.scheduleTasks(offlineTableName).get(MinionConstants.MergeRollupTask.TASK_TYPE).get(0);
+        _taskManager.scheduleTasks(Collections.singletonList(offlineTableName), false, null)
+            .get(MinionConstants.MergeRollupTask.TASK_TYPE).get(0);
         tasks != null;
-        taskList = _taskManager.scheduleTasks(offlineTableName).get(MinionConstants.MergeRollupTask.TASK_TYPE),
+        taskList = _taskManager.scheduleTasks(Collections.singletonList(offlineTableName), false, null)
+            .get(MinionConstants.MergeRollupTask.TASK_TYPE),
         tasks = taskList != null ? taskList.get(0) : null,
         numTasks++) {
       assertEquals(_helixTaskResourceManager.getSubtaskConfigs(tasks).size(), 1);
@@ -646,7 +654,8 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
           .contains(PinotHelixTaskResourceManager.getHelixJobQueueName(MinionConstants.MergeRollupTask.TASK_TYPE)));
       // Will not schedule task if there's incomplete task
       assertNull(
-          _taskManager.scheduleTasks(offlineTableName).get(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE));
+          _taskManager.scheduleTasks(Collections.singletonList(offlineTableName), false, null)
+              .get(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE));
       waitForTaskToComplete();
 
       // Check watermark
@@ -788,9 +797,11 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     int numTasks = 0;
     List<String> taskList;
     for (String tasks =
-        _taskManager.scheduleTasks(offlineTableName).get(MinionConstants.MergeRollupTask.TASK_TYPE).get(0);
+        _taskManager.scheduleTasks(Collections.singletonList(offlineTableName), false, null)
+            .get(MinionConstants.MergeRollupTask.TASK_TYPE).get(0);
         tasks != null;
-        taskList = _taskManager.scheduleTasks(offlineTableName).get(MinionConstants.MergeRollupTask.TASK_TYPE),
+        taskList = _taskManager.scheduleTasks(Collections.singletonList(offlineTableName), false, null)
+            .get(MinionConstants.MergeRollupTask.TASK_TYPE),
         tasks = taskList != null ? taskList.get(0) : null,
         numTasks++) {
       assertEquals(_helixTaskResourceManager.getSubtaskConfigs(tasks).size(), expectedNumSubTasks[numTasks]);
@@ -798,7 +809,8 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
           .contains(PinotHelixTaskResourceManager.getHelixJobQueueName(MinionConstants.MergeRollupTask.TASK_TYPE)));
       // Will not schedule task if there's incomplete task
       assertNull(
-          _taskManager.scheduleTasks(offlineTableName).get(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE));
+          _taskManager.scheduleTasks(Collections.singletonList(offlineTableName), false, null)
+              .get(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE));
       waitForTaskToComplete();
 
       // Check watermark
@@ -921,9 +933,11 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     int numTasks = 0;
     List<String> taskList;
     for (String tasks =
-        taskManager.scheduleTasks(realtimeTableName).get(MinionConstants.MergeRollupTask.TASK_TYPE).get(0);
+        taskManager.scheduleTasks(Collections.singletonList(realtimeTableName), false, null)
+            .get(MinionConstants.MergeRollupTask.TASK_TYPE).get(0);
         tasks != null;
-        taskList = taskManager.scheduleTasks(realtimeTableName).get(MinionConstants.MergeRollupTask.TASK_TYPE),
+        taskList = taskManager.scheduleTasks(Collections.singletonList(realtimeTableName), false, null)
+            .get(MinionConstants.MergeRollupTask.TASK_TYPE),
         tasks = taskList != null ? taskList.get(0) : null,
         numTasks++) {
 //      assertEquals(helixTaskResourceManager.getSubtaskConfigs(tasks).size(), expectedNumSubTasks[numTasks]);
@@ -932,7 +946,8 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
 
       // Will not schedule task if there's incomplete task
       assertNull(
-          taskManager.scheduleTasks(realtimeTableName).get(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE));
+          taskManager.scheduleTasks(Collections.singletonList(realtimeTableName), false, null)
+              .get(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE));
       waitForTaskToComplete();
 
       // Check watermark
@@ -1027,9 +1042,11 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     int numTasks = 0;
     List<String> taskList;
     for (String tasks =
-        taskManager.scheduleTasks(realtimeTableName).get(MinionConstants.MergeRollupTask.TASK_TYPE).get(0);
+        taskManager.scheduleTasks(Collections.singletonList(realtimeTableName), false, null)
+            .get(MinionConstants.MergeRollupTask.TASK_TYPE).get(0);
         tasks != null; taskList =
-        taskManager.scheduleTasks(realtimeTableName).get(MinionConstants.MergeRollupTask.TASK_TYPE),
+        taskManager.scheduleTasks(Collections.singletonList(realtimeTableName), false, null)
+            .get(MinionConstants.MergeRollupTask.TASK_TYPE),
         tasks = taskList != null ? taskList.get(0) : null,
         numTasks++) {
       assertTrue(helixTaskResourceManager.getTaskQueues()
@@ -1037,7 +1054,8 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
 
       // Will not schedule task if there's incomplete task
       assertNull(
-          taskManager.scheduleTasks(realtimeTableName).get(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE));
+          taskManager.scheduleTasks(Collections.singletonList(realtimeTableName), false, null)
+              .get(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE));
       waitForTaskToComplete();
 
       // Check not using watermarks
@@ -1069,9 +1087,11 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     waitForAllDocsLoaded(600_000L);
 
     for (String tasks =
-        taskManager.scheduleTasks(realtimeTableName).get(MinionConstants.MergeRollupTask.TASK_TYPE).get(0);
+        taskManager.scheduleTasks(Collections.singletonList(realtimeTableName), false, null)
+            .get(MinionConstants.MergeRollupTask.TASK_TYPE).get(0);
         tasks != null; taskList =
-        taskManager.scheduleTasks(realtimeTableName).get(MinionConstants.MergeRollupTask.TASK_TYPE),
+        taskManager.scheduleTasks(Collections.singletonList(realtimeTableName), false, null)
+            .get(MinionConstants.MergeRollupTask.TASK_TYPE),
         tasks = taskList != null ? taskList.get(0) : null,
         numTasks++) {
       waitForTaskToComplete();
