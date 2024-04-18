@@ -138,8 +138,13 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
     FreshnessBasedConsumptionStatusChecker statusChecker =
         new FreshnessBasedConsumptionStatusChecker(instanceDataManager, consumingSegments,
-            // Create a new Set instance to keep statusChecker._consumingSegments and this Set separate.
-            updatedConsumingSegments::get, 10L, 0L);
+            // Create a new Set instance to keep statusChecker._consumingSegments and updatedConsumingSegments
+            // separate, as we'll update updatedConsumingSegments. Otherwise, statusChecker._consumingSegments is
+            // updated directly, reducing the test coverage.
+            (tableName) -> {
+              Set<String> updated = updatedConsumingSegments.get(tableName);
+              return updated == null ? null : new HashSet<>(updated);
+            }, 10L, 0L);
 
     // TableDataManager is not set up yet
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 3);
