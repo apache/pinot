@@ -18,10 +18,17 @@
  */
 package org.apache.pinot.controller.helix.core.minion.generator;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.net.URI;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
+import org.apache.commons.lang.StringUtils;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.task.JobConfig;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
@@ -29,6 +36,7 @@ import org.apache.pinot.controller.api.exception.UnknownTaskTypeException;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
+import org.apache.pinot.core.util.PeerServerSegmentFinder;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,6 +48,7 @@ import org.slf4j.LoggerFactory;
  */
 public abstract class BaseTaskGenerator implements PinotTaskGenerator {
   protected static final Logger LOGGER = LoggerFactory.getLogger(BaseTaskGenerator.class);
+  protected static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   protected ClusterInfoAccessor _clusterInfoAccessor;
 
@@ -130,5 +139,46 @@ public abstract class BaseTaskGenerator implements PinotTaskGenerator {
   @Override
   public String getMinionInstanceTag(TableConfig tableConfig) {
     return TaskGeneratorUtils.extractMinionInstanceTag(tableConfig, getTaskType());
+  }
+
+  @Override
+  public boolean isAllowDownloadFromServer(TableConfig tableConfig) {
+    return TaskGeneratorUtils.extractMinionAllowDownloadFromServer(tableConfig, getTaskType());
+  }
+
+  public List<URI> getSegmentServerURIs(TableConfig tableConfig, String segmentName) {
+    // TODO add validation check if allowDownloadFromServer is enabled then peer segment download scheme should be set
+    String peerDownloadScheme = tableConfig.getValidationConfig().getPeerSegmentDownloadScheme();
+    List<URI> segmentServerURIs = PeerServerSegmentFinder.getPeerServerURIs(
+        _clusterInfoAccessor.getPinotHelixResourceManager().getHelixZkManager(),
+        tableConfig.getTableName(), segmentName, peerDownloadScheme);
+    Collections.shuffle(segmentServerURIs);
+    return segmentServerURIs;
+  }
+
+  public Map<String, String> getBaseTaskConfigs(TableConfig tableConfig, List<String> segmentNames) {
+    Map<String, String> baseConfigs = new HashMap<>();
+    baseConfigs.put(MinionConstants.TABLE_NAME_KEY, tableConfig.getTableName());
+    baseConfigs.put(MinionConstants.SEGMENT_NAME_KEY, StringUtils.join(segmentNames,
+          MinionConstants.SEGMENT_NAME_SEPARATOR));
+    Map<String, List<String>> segmentServerUriMap = new HashMap<>();
+    if (isAllowDownloadFromServer(tableConfig)) {
+      segmentServerUriMap = segmentNames.stream()
+          .collect(Collectors.toMap(
+              segmentName -> segmentName,
+              segmentName -> getSegmentServerURIs(tableConfig, segmentName)
+                  .stream().map(URI::toString).collect(Collectors.toList())
+          ));
+    }
+    if (!segmentServerUriMap.isEmpty()) {
+      try {
+        baseConfigs.put(MinionConstants.SEGMENT_SERVER_URIS_LIST_KEY,
+            OBJECT_MAPPER.writeValueAsString(segmentServerUriMap));
+      } catch (JsonProcessingException e) {
+        LOGGER.warn("Failed to serialize segment server URI map: {}, ignoring allowDownloadFromServer config",
+            segmentServerUriMap, e);
+      }
+    }
+    return baseConfigs;
   }
 }

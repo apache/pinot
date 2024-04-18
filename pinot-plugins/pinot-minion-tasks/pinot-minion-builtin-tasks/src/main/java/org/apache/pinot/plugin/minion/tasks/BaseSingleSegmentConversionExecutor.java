@@ -21,11 +21,13 @@ package org.apache.pinot.plugin.minion.tasks;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.File;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.http.Header;
 import org.apache.http.HttpHeaders;
@@ -105,14 +107,8 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
       _eventObserver.notifyProgress(_pinotTaskConfig, "Downloading segment from: " + downloadURL);
       File tarredSegmentFile = new File(tempDataDir, "tarredSegment");
       LOGGER.info("Downloading segment from {} to {}", downloadURL, tarredSegmentFile.getAbsolutePath());
-      try {
-        SegmentFetcherFactory.fetchAndDecryptSegmentToLocal(downloadURL, tarredSegmentFile, crypterName);
-      } catch (Exception e) {
-        _minionMetrics.addMeteredTableValue(tableNameWithType, MinionMeter.SEGMENT_DOWNLOAD_FAIL_COUNT, 1L);
-        LOGGER.error("Segment download failed for {}, crypter:{}", downloadURL, crypterName, e);
-        _eventObserver.notifyTaskError(_pinotTaskConfig, e);
-        Utils.rethrowException(e);
-      }
+      downloadSegmentToLocal(tableNameWithType, segmentName, downloadURL,
+          MinionTaskUtils.getSegmentServerUrisList(configs), tarredSegmentFile, crypterName);
 
       // Un-tar the segment file
       _eventObserver.notifyProgress(_pinotTaskConfig, "Decompressing segment from: " + downloadURL);
@@ -229,6 +225,35 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
       return segmentConversionResult;
     } finally {
       FileUtils.deleteQuietly(tempDataDir);
+    }
+  }
+
+  private void downloadSegmentToLocal(String tableNameWithType, String segmentName, String deepstoreURL,
+      Map<String, List<String>> segmentServiceUrisList, File tarredSegmentFile, String crypterName) {
+    LOGGER.info("Downloading segment from {} to {}", deepstoreURL, tarredSegmentFile.getAbsolutePath());
+    try {
+      // download from deepstore first
+      SegmentFetcherFactory.fetchAndDecryptSegmentToLocal(deepstoreURL, tarredSegmentFile, crypterName);
+    } catch (Exception e) {
+      _minionMetrics.addMeteredTableValue(tableNameWithType, MinionMeter.SEGMENT_DOWNLOAD_FAIL_COUNT, 1L);
+      LOGGER.error("Segment download failed from deepstore for {}, crypter:{}", deepstoreURL, crypterName, e);
+      if (!segmentServiceUrisList.isEmpty()) {
+        try {
+          LOGGER.info("Trying to download form servers for segment {} post deepstore download failed", segmentName);
+          SegmentFetcherFactory.getSegmentFetcher(
+                  getTableConfig(tableNameWithType).getValidationConfig().getPeerSegmentDownloadScheme())
+              .fetchSegmentToLocal(segmentName, () ->
+                      segmentServiceUrisList.get(segmentName).stream().map(URI::create).collect(Collectors.toList()),
+                  tarredSegmentFile);
+        } catch (Exception c) {
+          LOGGER.error("Segment download failed from servers for {}, crypter:{}", segmentName, crypterName, e);
+          _eventObserver.notifyTaskError(_pinotTaskConfig, c);
+          Utils.rethrowException(c);
+        }
+      } else {
+        _eventObserver.notifyTaskError(_pinotTaskConfig, e);
+        Utils.rethrowException(e);
+      }
     }
   }
 

@@ -38,8 +38,10 @@ import org.apache.http.Header;
 import org.apache.http.NameValuePair;
 import org.apache.http.message.BasicHeader;
 import org.apache.http.message.BasicNameValuePair;
+import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
+import org.apache.pinot.common.metrics.MinionMeter;
 import org.apache.pinot.common.restlet.resources.StartReplaceSegmentsRequest;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
@@ -182,6 +184,7 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
     Map<String, String> configs = pinotTaskConfig.getConfigs();
     String tableNameWithType = configs.get(MinionConstants.TABLE_NAME_KEY);
     String inputSegmentNames = configs.get(MinionConstants.SEGMENT_NAME_KEY);
+    String[] segmentNames = inputSegmentNames.split(MinionConstants.SEGMENT_NAME_SEPARATOR);
     String uploadURL = configs.get(MinionConstants.UPLOAD_URL_KEY);
     String downloadURLString = configs.get(MinionConstants.DOWNLOAD_URL_KEY);
     String[] downloadURLs = downloadURLString.split(MinionConstants.URL_SEPARATOR);
@@ -196,12 +199,13 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
       int numRecords = 0;
 
       for (int i = 0; i < downloadURLs.length; i++) {
+        String segmentName = segmentNames[i];
         // Download the segment file
         _eventObserver.notifyProgress(_pinotTaskConfig, String
             .format("Downloading segment from: %s (%d out of %d)", downloadURLs[i], (i + 1), downloadURLs.length));
         File tarredSegmentFile = new File(tempDataDir, "tarredSegmentFile_" + i);
-        LOGGER.info("Downloading segment from {} to {}", downloadURLs[i], tarredSegmentFile.getAbsolutePath());
-        SegmentFetcherFactory.fetchAndDecryptSegmentToLocal(downloadURLs[i], tarredSegmentFile, crypterName);
+        downloadSegmentToLocal(tableNameWithType, segmentName, downloadURLs[i],
+            MinionTaskUtils.getSegmentServerUrisList(configs), tarredSegmentFile, crypterName);
 
         // Un-tar the segment file
         _eventObserver.notifyProgress(_pinotTaskConfig, String
@@ -378,6 +382,35 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
         break;
       default:
         throw new UnsupportedOperationException("Unrecognized push mode - " + pushMode);
+    }
+  }
+
+  private void downloadSegmentToLocal(String tableNameWithType, String segmentName, String deepstoreURL,
+      Map<String, List<String>> segmentServiceUrisList, File tarredSegmentFile, String crypterName) {
+    LOGGER.info("Downloading segment from {} to {}", deepstoreURL, tarredSegmentFile.getAbsolutePath());
+    try {
+      // download from deepstore first
+      SegmentFetcherFactory.fetchAndDecryptSegmentToLocal(deepstoreURL, tarredSegmentFile, crypterName);
+    } catch (Exception e) {
+      _minionMetrics.addMeteredTableValue(tableNameWithType, MinionMeter.SEGMENT_DOWNLOAD_FAIL_COUNT, 1L);
+      LOGGER.error("Segment download failed from deepstore for {}, crypter:{}", deepstoreURL, crypterName, e);
+      if (!segmentServiceUrisList.isEmpty()) {
+        try {
+          LOGGER.info("Trying to download form servers for segment {} post deepstore download failed", segmentName);
+          SegmentFetcherFactory.getSegmentFetcher(
+                  getTableConfig(tableNameWithType).getValidationConfig().getPeerSegmentDownloadScheme())
+              .fetchSegmentToLocal(segmentName, () ->
+                      segmentServiceUrisList.get(segmentName).stream().map(URI::create).collect(Collectors.toList()),
+                  tarredSegmentFile);
+        } catch (Exception c) {
+          LOGGER.error("Segment download failed from servers for {}, crypter:{}", segmentName, crypterName, e);
+          _eventObserver.notifyTaskError(_pinotTaskConfig, c);
+          Utils.rethrowException(c);
+        }
+      } else {
+        _eventObserver.notifyTaskError(_pinotTaskConfig, e);
+        Utils.rethrowException(e);
+      }
     }
   }
 

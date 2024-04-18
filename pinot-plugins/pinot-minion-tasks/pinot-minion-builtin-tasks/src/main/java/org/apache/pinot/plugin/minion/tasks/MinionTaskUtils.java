@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.plugin.minion.tasks;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -30,6 +33,7 @@ import org.apache.pinot.common.restlet.resources.ValidDocIdsBitmapResponse;
 import org.apache.pinot.common.utils.config.InstanceUtils;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
 import org.apache.pinot.controller.util.ServerSegmentMetadataReader;
+import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.minion.MinionContext;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.LocalPinotFS;
@@ -48,6 +52,7 @@ public class MinionTaskUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(MinionTaskUtils.class);
 
   private static final String DEFAULT_DIR_PATH_TERMINATOR = "/";
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   private MinionTaskUtils() {
   }
@@ -184,5 +189,17 @@ public class MinionTaskUtils {
       throw new IllegalStateException("Failed to find any ONLINE servers for segment: " + segmentName);
     }
     return servers;
+  }
+
+  public static Map<String, List<String>> getSegmentServerUrisList(Map<String, String> configs)
+      throws JsonProcessingException {
+    String segmentServerURIs = configs.getOrDefault(MinionConstants.SEGMENT_SERVER_URIS_LIST_KEY, "");
+    Map<String, List<String>> segmentServerUrisList = new HashMap<>();
+    if (!segmentServerURIs.equals("")) {
+      segmentServerUrisList = OBJECT_MAPPER.readValue(configs.get(MinionConstants.SEGMENT_SERVER_URIS_LIST_KEY),
+          new TypeReference<>() {
+          });
+    }
+    return segmentServerUrisList;
   }
 }
