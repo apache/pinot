@@ -22,7 +22,7 @@ import java.io.File;
 import java.net.URLDecoder;
 import org.apache.commons.io.FileUtils;
 import org.testng.annotations.Test;
-
+import org.testng.Assert;
 
 public class ParquetNativeRecordReaderFullTest {
   protected final File _tempDir = new File(FileUtils.getTempDirectory(), "ParquetNativeRecordReaderFullTest");
@@ -128,14 +128,17 @@ public class ParquetNativeRecordReaderFullTest {
     File dataFile = new File(URLDecoder.decode(getClass().getClassLoader().getResource(filePath).getFile(), "UTF-8"));
     ParquetNativeRecordReader recordReader = new ParquetNativeRecordReader();
     recordReader.init(dataFile, null, null);
+    int counter = 0;
     while (recordReader.hasNext()) {
       recordReader.next();
+      counter++;
     }
     recordReader.rewind();
     while (recordReader.hasNext()) {
       recordReader.next();
+      counter--;
     }
-
+    Assert.assertEquals(counter, 0);
     recordReader.close();
   }
 }
