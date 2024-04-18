@@ -265,7 +265,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
           }
         }
       } catch (Exception e) {
-        LOGGER.error("Cannot add server instance {}, ignored it, due to error", instanceId, e);
+        LOGGER.error("Caught exception while adding instance: {}, ignoring it", instanceId, e);
       }
     }
     List<String> newDisabledServers = new ArrayList<>();
