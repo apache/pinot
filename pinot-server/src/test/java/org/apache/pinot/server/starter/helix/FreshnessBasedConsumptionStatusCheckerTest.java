@@ -20,6 +20,7 @@
 package org.apache.pinot.server.starter.helix;
 
 import com.google.common.collect.ImmutableSet;
+import java.util.HashSet;
 import java.util.Set;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
@@ -116,6 +117,57 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     // segA1              200                      200                    100               0
     // segB0              2000                     2000                   100               0
     when(segMngrB0.getCurrentOffset()).thenReturn(new LongMsgOffset(2000));
+    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 0);
+  }
+
+  @Test
+  public void testWithDroppedTableAndSegment()
+      throws InterruptedException {
+    String segA0 = "tableA__0__0__123Z";
+    String segA1 = "tableA__1__0__123Z";
+    String segB0 = "tableB__0__0__123Z";
+    Set<String> consumingSegments = new HashSet<>();
+    consumingSegments.add(segA0);
+    consumingSegments.add(segA1);
+    consumingSegments.add(segB0);
+    Set<String> updatedConsumingSegments = new HashSet<>(consumingSegments);
+    InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
+    FreshnessBasedConsumptionStatusChecker statusChecker =
+        new FreshnessBasedConsumptionStatusChecker(instanceDataManager, consumingSegments,
+            // Create a new Set instance to keep statusChecker._consumingSegments and this Set separate.
+            () -> new HashSet<>(updatedConsumingSegments), 10L, 0L);
+
+    // TableDataManager is not set up yet
+    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 3);
+
+    // setup TableDataMangers
+    TableDataManager tableDataManagerA = mock(TableDataManager.class);
+    when(instanceDataManager.getTableDataManager("tableA_REALTIME")).thenReturn(tableDataManagerA);
+    when(instanceDataManager.getTableDataManager("tableB_REALTIME")).thenReturn(null);
+
+    // setup SegmentDataManagers
+    RealtimeSegmentDataManager segMngrA0 = mock(RealtimeSegmentDataManager.class);
+    when(tableDataManagerA.acquireSegment(segA0)).thenReturn(segMngrA0);
+    when(tableDataManagerA.acquireSegment(segA1)).thenReturn(null);
+
+    when(segMngrA0.fetchLatestStreamOffset(5000)).thenReturn(new LongMsgOffset(20));
+    when(segMngrA0.getCurrentOffset()).thenReturn(new LongMsgOffset(0));
+    // ensure negative values are ignored
+    setupLatestIngestionTimestamp(segMngrA0, Long.MIN_VALUE);
+
+    //              current offset          latest stream offset    current time    last ingestion time
+    // segA0              0                       20                     100               Long.MIN_VALUE
+    // segA1 (segment is absent)
+    // segB0 (table is absent)
+    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 3);
+
+    // updatedConsumingSegments still provide 3 segments to checker but one has caught up.
+    when(segMngrA0.getCurrentOffset()).thenReturn(new LongMsgOffset(20));
+    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 2);
+    // Remove the missing segments and check again.
+    updatedConsumingSegments.remove(segA1);
+    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 1);
+    updatedConsumingSegments.remove(segB0);
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 0);
   }
 

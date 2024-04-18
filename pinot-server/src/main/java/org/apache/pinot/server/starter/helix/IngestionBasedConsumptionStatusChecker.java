@@ -21,6 +21,9 @@ package org.apache.pinot.server.starter.helix;
 
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
@@ -37,18 +40,26 @@ public abstract class IngestionBasedConsumptionStatusChecker {
 
   // constructor parameters
   protected final InstanceDataManager _instanceDataManager;
-  protected final Set<String> _consumingSegments;
+  protected volatile Set<String> _consumingSegments;
+  protected final Supplier<Set<String>> _consumingSegmentsSupplier;
 
-  // helper variable
-  private final Set<String> _caughtUpSegments = new HashSet<>();
+  // helper variable, which is thread safe, as the method might be called from multiple threads when the health check
+  // endpoint is called by many probes.
+  private final Set<String> _caughtUpSegments = ConcurrentHashMap.newKeySet();
 
-  public IngestionBasedConsumptionStatusChecker(InstanceDataManager instanceDataManager,
-      Set<String> consumingSegments) {
+  /**
+   * Both consumingSegments and consumingSegmentsSupplier are provided as it can be costly to get consumingSegments
+   * via the supplier, so only use it when any missing segment is detected.
+   */
+  public IngestionBasedConsumptionStatusChecker(InstanceDataManager instanceDataManager, Set<String> consumingSegments,
+      @Nullable Supplier<Set<String>> consumingSegmentsSupplier) {
     _instanceDataManager = instanceDataManager;
     _consumingSegments = consumingSegments;
+    _consumingSegmentsSupplier = consumingSegmentsSupplier;
   }
 
   public int getNumConsumingSegmentsNotReachedIngestionCriteria() {
+    Set<String> missingSegments = new HashSet<>();
     for (String segName : _consumingSegments) {
       if (_caughtUpSegments.contains(segName)) {
         continue;
@@ -56,6 +67,7 @@ public abstract class IngestionBasedConsumptionStatusChecker {
       TableDataManager tableDataManager = getTableDataManager(segName);
       if (tableDataManager == null) {
         _logger.info("TableDataManager is not yet setup for segment {}. Will check consumption status later", segName);
+        missingSegments.add(segName);
         continue;
       }
       SegmentDataManager segmentDataManager = null;
@@ -64,6 +76,7 @@ public abstract class IngestionBasedConsumptionStatusChecker {
         if (segmentDataManager == null) {
           _logger.info("SegmentDataManager is not yet setup for segment {}. Will check consumption status later",
               segName);
+          missingSegments.add(segName);
           continue;
         }
         if (!(segmentDataManager instanceof RealtimeSegmentDataManager)) {
@@ -83,6 +96,12 @@ public abstract class IngestionBasedConsumptionStatusChecker {
           tableDataManager.releaseSegment(segmentDataManager);
         }
       }
+    }
+    if (!missingSegments.isEmpty() && _consumingSegmentsSupplier != null) {
+      _consumingSegments = _consumingSegmentsSupplier.get();
+      _caughtUpSegments.retainAll(_consumingSegments);
+      _logger.warn("Found missing segments: {}. Refreshed consumingSegments: {} and caughtUpSegments: {}",
+          missingSegments, _consumingSegments, _caughtUpSegments);
     }
     return _consumingSegments.size() - _caughtUpSegments.size();
   }

@@ -332,7 +332,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
             realtimeMinFreshnessMs, idleTimeoutMs);
         FreshnessBasedConsumptionStatusChecker freshnessStatusChecker =
             new FreshnessBasedConsumptionStatusChecker(_serverInstance.getInstanceDataManager(), consumingSegments,
-                realtimeMinFreshnessMs, idleTimeoutMs);
+                this::getConsumingSegments, realtimeMinFreshnessMs, idleTimeoutMs);
         Supplier<Integer> getNumConsumingSegmentsNotReachedMinFreshness =
             freshnessStatusChecker::getNumConsumingSegmentsNotReachedIngestionCriteria;
         serviceStatusCallbackListBuilder.add(
@@ -341,7 +341,8 @@ public abstract class BaseServerStarter implements ServiceStartable {
       } else if (isOffsetBasedConsumptionStatusCheckerEnabled) {
         LOGGER.info("Setting up offset based status checker");
         OffsetBasedConsumptionStatusChecker consumptionStatusChecker =
-            new OffsetBasedConsumptionStatusChecker(_serverInstance.getInstanceDataManager(), consumingSegments);
+            new OffsetBasedConsumptionStatusChecker(_serverInstance.getInstanceDataManager(), consumingSegments,
+                this::getConsumingSegments);
         Supplier<Integer> getNumConsumingSegmentsNotReachedTheirLatestOffset =
             consumptionStatusChecker::getNumConsumingSegmentsNotReachedIngestionCriteria;
         serviceStatusCallbackListBuilder.add(
@@ -357,6 +358,27 @@ public abstract class BaseServerStarter implements ServiceStartable {
     LOGGER.info("Registering service status handler");
     ServiceStatus.setServiceStatusCallback(_instanceId,
         new ServiceStatus.MultipleCallbackServiceStatusCallback(serviceStatusCallbackListBuilder.build()));
+  }
+
+  private Set<String> getConsumingSegments() {
+    Set<String> consumingSegments = new HashSet<>();
+    for (String resourceName : _helixAdmin.getResourcesInCluster(_helixClusterName)) {
+      // Only monitor table resources
+      if (!TableNameBuilder.isTableResource(resourceName)) {
+        continue;
+      }
+      // Only monitor enabled realtime table
+      IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, resourceName);
+      if (idealState.isEnabled() && TableNameBuilder.isRealtimeTableResource(resourceName)) {
+        for (String partitionName : idealState.getPartitionSet()) {
+          if (StateModel.SegmentStateModel.CONSUMING.equals(
+              idealState.getInstanceStateMap(partitionName).get(_instanceId))) {
+            consumingSegments.add(partitionName);
+          }
+        }
+      }
+    }
+    return consumingSegments;
   }
 
   private void updateInstanceConfigIfNeeded(ServerConf serverConf) {
