@@ -123,7 +123,7 @@ public class ParquetNativeRecordReaderFullTest {
     //testParquetFile("test-data2/uniform_encryption.parquet.encrypted");
   }
 
-  protected void testParquetFile(String filePath)
+protected void testParquetFile(String filePath)
       throws Exception {
     File dataFile = new File(URLDecoder.decode(getClass().getClassLoader().getResource(filePath).getFile(), "UTF-8"));
     ParquetNativeRecordReader recordReader = new ParquetNativeRecordReader();
