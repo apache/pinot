@@ -33,6 +33,7 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/../..</pinot.root>
+    <shade.phase.prop>package</shade.phase.prop>
   </properties>
   <build>
     <resources>

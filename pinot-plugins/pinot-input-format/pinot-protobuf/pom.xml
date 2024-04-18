@@ -37,7 +37,7 @@
     <pinot.root>${basedir}/../../..</pinot.root>
     <kafka.lib.version>2.8.1</kafka.lib.version>
     <testcontainers.version>1.19.7</testcontainers.version>
-    <phase.prop>package</phase.prop>
+    <shade.phase.prop>package</shade.phase.prop>
   </properties>
   <repositories>
     <repository>
