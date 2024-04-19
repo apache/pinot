@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.controller.helix.core.minion;
 
-import java.util.Collections;
 import java.util.Date;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.metrics.ControllerMeter;
@@ -66,7 +65,7 @@ public class CronJobScheduleJob implements Job {
         return;
       }
       long jobStartTime = System.currentTimeMillis();
-      pinotTaskManager.scheduleTask(taskType, Collections.singletonList(table), null);
+      pinotTaskManager.scheduleTaskForTable(taskType, table, null);
       LOGGER.info("Finished CronJob: table - {}, task - {}, next runtime is {}", table, taskType,
           jobExecutionContext.getNextFireTime());
       pinotTaskManager.getControllerMetrics().addTimedTableValue(PinotTaskManager.getCronJobName(table, taskType),

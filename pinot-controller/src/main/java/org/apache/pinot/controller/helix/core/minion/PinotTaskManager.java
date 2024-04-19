@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -479,17 +480,45 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
   }
 
   /**
+   * Public API to schedule tasks (all task types) for all tables.
+   * It might be called from the non-leader controller.
+   * Returns a map from the task type to the list of tasks scheduled.
+   */
+  public synchronized Map<String, List<String>> scheduleAllTasksForAllTables(@Nullable String minionInstanceTag) {
+    return scheduleTasks(_pinotHelixResourceManager.getAllTables(), false, minionInstanceTag);
+  }
+
+  /**
    * Public API to schedule tasks (all task types) for all tables in given database.
    * It might be called from the non-leader controller.
    * Returns a map from the task type to the list of tasks scheduled.
    */
-  public synchronized Map<String, List<String>> scheduleTasksForDatabase(@Nullable String database,
+  public synchronized Map<String, List<String>> scheduleAllTasksForDatabase(@Nullable String database,
       @Nullable String minionInstanceTag) {
     return scheduleTasks(_pinotHelixResourceManager.getAllTables(database), false, minionInstanceTag);
   }
 
   /**
-   * Public API to schedule task for the given task type in given database.
+   * Public API to schedule tasks (all task types) for the given table.
+   * It might be called from the non-leader controller.
+   * Returns a map from the task type to the list of tasks scheduled.
+   */
+  public synchronized Map<String, List<String>> scheduleAllTasksForTable(String tableNameWithType,
+      @Nullable String minionInstanceTag) {
+    return scheduleTasks(Collections.singletonList(tableNameWithType), false, minionInstanceTag);
+  }
+
+  /**
+   * Public API to schedule task for the given task type for all tables in cluster.
+   * It might be called from the non-leader controller.
+   * Returns the list of task name, or {@code null} if no task is scheduled.
+   */
+  public synchronized List<String> scheduleTaskForAllTables(String taskType, @Nullable String minionInstanceTag) {
+    return scheduleTask(taskType, _pinotHelixResourceManager.getAllTables(), minionInstanceTag);
+  }
+
+  /**
+   * Public API to schedule task for the given task type for all tables in given database.
    * It might be called from the non-leader controller.
    * Returns the list of task name, or {@code null} if no task is scheduled.
    */
@@ -500,15 +529,22 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
   }
 
   /**
+   * Public API to schedule task for the given task type for the give table.
+   * It might be called from the non-leader controller.
+   * Returns the list of task name, or {@code null} if no task is scheduled.
+   */
+  @Nullable
+  public synchronized List<String> scheduleTaskForTable(String taskType, String tableNameWithType,
+      @Nullable String minionInstanceTag) {
+    return scheduleTask(taskType, Collections.singletonList(tableNameWithType), minionInstanceTag);
+  }
+
+  /**
    * Helper method to schedule tasks (all task types) for the given tables that have the tasks enabled. Returns a map
    * from the task type to the list of the tasks scheduled.
    */
-  public synchronized Map<String, List<String>> scheduleTasks(@Nullable List<String> tableNamesWithType,
+  private synchronized Map<String, List<String>> scheduleTasks(List<String> tableNamesWithType,
       boolean isLeader, @Nullable String minionInstanceTag) {
-    // if no table list is provided, find all tables
-    if (tableNamesWithType == null) {
-      tableNamesWithType = _pinotHelixResourceManager.getAllTables();
-    }
     _controllerMetrics.addMeteredGlobalValue(ControllerMeter.NUMBER_TIMES_SCHEDULE_TASKS_CALLED, 1L);
 
     // Scan all table configs to get the tables with tasks enabled
@@ -547,12 +583,8 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
   }
 
   @Nullable
-  public synchronized List<String> scheduleTask(String taskType, @Nullable List<String> tables,
+  private synchronized List<String> scheduleTask(String taskType, List<String> tables,
       @Nullable String minionInstanceTag) {
-    // if list of tables provided is null, then fetch all tables
-    if (tables == null) {
-      tables = _pinotHelixResourceManager.getAllTables();
-    }
     PinotTaskGenerator taskGenerator = _taskGeneratorRegistry.getTaskGenerator(taskType);
     Preconditions.checkState(taskGenerator != null, "Task type: %s is not registered", taskType);
 
