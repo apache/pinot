@@ -22,7 +22,6 @@ package org.apache.pinot.server.starter.helix;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
-import javax.annotation.Nullable;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
@@ -38,12 +37,7 @@ import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 public class OffsetBasedConsumptionStatusChecker extends IngestionBasedConsumptionStatusChecker {
 
   public OffsetBasedConsumptionStatusChecker(InstanceDataManager instanceDataManager,
-      Map<String, Set<String>> consumingSegments) {
-    this(instanceDataManager, consumingSegments, null);
-  }
-
-  public OffsetBasedConsumptionStatusChecker(InstanceDataManager instanceDataManager,
-      Map<String, Set<String>> consumingSegments, @Nullable Function<String, Set<String>> consumingSegmentsSupplier) {
+      Map<String, Set<String>> consumingSegments, Function<String, Set<String>> consumingSegmentsSupplier) {
     super(instanceDataManager, consumingSegments, consumingSegmentsSupplier);
   }
 

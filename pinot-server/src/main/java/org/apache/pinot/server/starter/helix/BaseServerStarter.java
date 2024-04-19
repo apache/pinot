@@ -154,8 +154,8 @@ public abstract class BaseServerStarter implements ServiceStartable {
     _helixClusterName = _serverConf.getProperty(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME);
     ServiceStartableUtils.applyClusterConfig(_serverConf, _zkAddress, _helixClusterName, ServiceRole.SERVER);
 
-    PinotInsecureMode.setPinotInInsecureMode(
-        Boolean.valueOf(_serverConf.getProperty(CommonConstants.CONFIG_OF_PINOT_INSECURE_MODE,
+    PinotInsecureMode.setPinotInInsecureMode(Boolean.parseBoolean(
+        _serverConf.getProperty(CommonConstants.CONFIG_OF_PINOT_INSECURE_MODE,
             CommonConstants.DEFAULT_PINOT_INSECURE_MODE)));
 
     setupHelixSystemProperties();
@@ -276,7 +276,6 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
     // collect all resources which have this instance in the ideal state
     List<String> resourcesToMonitor = new ArrayList<>();
-
     Map<String, Set<String>> consumingSegments = new HashMap<>();
     boolean checkRealtime = realtimeConsumptionCatchupWaitMs > 0;
     if (isFreshnessStatusCheckerEnabled && realtimeMinFreshnessMs <= 0) {
@@ -290,23 +289,22 @@ public abstract class BaseServerStarter implements ServiceStartable {
       if (!TableNameBuilder.isTableResource(resourceName)) {
         continue;
       }
-
       // Only monitor enabled resources
       IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, resourceName);
-      if (idealState.isEnabled()) {
-
-        for (String partitionName : idealState.getPartitionSet()) {
-          if (idealState.getInstanceSet(partitionName).contains(_instanceId)) {
-            resourcesToMonitor.add(resourceName);
-            break;
-          }
+      if (idealState == null || !idealState.isEnabled()) {
+        continue;
+      }
+      for (String partitionName : idealState.getPartitionSet()) {
+        if (idealState.getInstanceSet(partitionName).contains(_instanceId)) {
+          resourcesToMonitor.add(resourceName);
+          break;
         }
-        if (checkRealtime && TableNameBuilder.isRealtimeTableResource(resourceName)) {
-          for (String partitionName : idealState.getPartitionSet()) {
-            if (StateModel.SegmentStateModel.CONSUMING.equals(
-                idealState.getInstanceStateMap(partitionName).get(_instanceId))) {
-              consumingSegments.computeIfAbsent(resourceName, k -> new HashSet<>()).add(partitionName);
-            }
+      }
+      if (checkRealtime && TableNameBuilder.isRealtimeTableResource(resourceName)) {
+        for (String partitionName : idealState.getPartitionSet()) {
+          if (StateModel.SegmentStateModel.CONSUMING.equals(
+              idealState.getInstanceStateMap(partitionName).get(_instanceId))) {
+            consumingSegments.computeIfAbsent(resourceName, k -> new HashSet<>()).add(partitionName);
           }
         }
       }
@@ -361,15 +359,16 @@ public abstract class BaseServerStarter implements ServiceStartable {
         new ServiceStatus.MultipleCallbackServiceStatusCallback(serviceStatusCallbackListBuilder.build()));
   }
 
-  private Set<String> getConsumingSegments(String tableName) {
+  private Set<String> getConsumingSegments(String realtimeTableName) {
+    IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, realtimeTableName);
+    if (idealState == null || !idealState.isEnabled()) {
+      return null;
+    }
     Set<String> consumingSegments = new HashSet<>();
-    IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableName);
-    if (idealState.isEnabled() && TableNameBuilder.isRealtimeTableResource(tableName)) {
-      for (String partitionName : idealState.getPartitionSet()) {
-        if (StateModel.SegmentStateModel.CONSUMING.equals(
-            idealState.getInstanceStateMap(partitionName).get(_instanceId))) {
-          consumingSegments.add(partitionName);
-        }
+    for (String partitionName : idealState.getPartitionSet()) {
+      if (StateModel.SegmentStateModel.CONSUMING.equals(
+          idealState.getInstanceStateMap(partitionName).get(_instanceId))) {
+        consumingSegments.add(partitionName);
       }
     }
     return consumingSegments;
@@ -534,12 +533,13 @@ public abstract class BaseServerStarter implements ServiceStartable {
       }
     }
 
-    boolean exitServerOnIncompleteStartup = _serverConf.getProperty(
-        Server.CONFIG_OF_EXIT_ON_SERVICE_STATUS_CHECK_FAILURE,
-        Server.DEFAULT_EXIT_ON_SERVICE_STATUS_CHECK_FAILURE);
+    boolean exitServerOnIncompleteStartup =
+        _serverConf.getProperty(Server.CONFIG_OF_EXIT_ON_SERVICE_STATUS_CHECK_FAILURE,
+            Server.DEFAULT_EXIT_ON_SERVICE_STATUS_CHECK_FAILURE);
     if (exitServerOnIncompleteStartup) {
-      String errorMessage = String.format("Service status %s has not turned GOOD within %dms: %s. Exiting server.",
-          serviceStatus, System.currentTimeMillis() - startTimeMs, ServiceStatus.getStatusDescription());
+      String errorMessage =
+          String.format("Service status %s has not turned GOOD within %dms: %s. Exiting server.", serviceStatus,
+              System.currentTimeMillis() - startTimeMs, ServiceStatus.getStatusDescription());
       throw new IllegalStateException(errorMessage);
     }
     LOGGER.warn("Service status has not turned GOOD within {}ms: {}", System.currentTimeMillis() - startTimeMs,
@@ -597,8 +597,8 @@ public abstract class BaseServerStarter implements ServiceStartable {
     InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
     instanceDataManager.setSupplierOfIsServerReadyToServeQueries(() -> _isServerReadyToServeQueries);
     // initialize the thread accountant for query killing
-    Tracing.ThreadAccountantOps
-        .initializeThreadAccountant(_serverConf.subset(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX), _instanceId);
+    Tracing.ThreadAccountantOps.initializeThreadAccountant(
+        _serverConf.subset(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX), _instanceId);
     initSegmentFetcher(_serverConf);
     StateModelFactory<?> stateModelFactory =
         new SegmentOnlineOfflineStateModelFactory(_instanceId, instanceDataManager);

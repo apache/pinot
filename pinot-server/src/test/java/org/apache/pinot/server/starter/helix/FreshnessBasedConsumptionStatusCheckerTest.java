@@ -46,7 +46,7 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
 
     public FakeFreshnessBasedConsumptionStatusChecker(InstanceDataManager instanceDataManager,
         Map<String, Set<String>> consumingSegments, long minFreshnessMs, long idleTimeoutMs, long now) {
-      super(instanceDataManager, consumingSegments, minFreshnessMs, idleTimeoutMs);
+      super(instanceDataManager, consumingSegments, consumingSegments::get, minFreshnessMs, idleTimeoutMs);
       _now = now;
     }
 
@@ -66,7 +66,8 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     consumingSegments.put("tableB_REALTIME", ImmutableSet.of(segB0));
     InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
     FreshnessBasedConsumptionStatusChecker statusChecker =
-        new FreshnessBasedConsumptionStatusChecker(instanceDataManager, consumingSegments, 10000L, 0L);
+        new FreshnessBasedConsumptionStatusChecker(instanceDataManager, consumingSegments, consumingSegments::get,
+            10000L, 0L);
 
     // TableDataManager is not set up yet
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 3);

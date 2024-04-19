@@ -48,7 +48,7 @@ public class OffsetBasedConsumptionStatusCheckerTest {
     consumingSegments.put("tableB_REALTIME", ImmutableSet.of(segB0));
     InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
     OffsetBasedConsumptionStatusChecker statusChecker =
-        new OffsetBasedConsumptionStatusChecker(instanceDataManager, consumingSegments);
+        new OffsetBasedConsumptionStatusChecker(instanceDataManager, consumingSegments, consumingSegments::get);
 
     // setup TableDataMangers
     TableDataManager tableDataManagerA = mock(TableDataManager.class);
@@ -98,7 +98,7 @@ public class OffsetBasedConsumptionStatusCheckerTest {
     InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
 
     OffsetBasedConsumptionStatusChecker statusChecker =
-        new OffsetBasedConsumptionStatusChecker(instanceDataManager, consumingSegments);
+        new OffsetBasedConsumptionStatusChecker(instanceDataManager, consumingSegments, consumingSegments::get);
 
     // TableDataManager is not set up yet
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 3);
@@ -160,7 +160,7 @@ public class OffsetBasedConsumptionStatusCheckerTest {
     consumingSegments.put("tableB_REALTIME", ImmutableSet.of(segB0));
     InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
     OffsetBasedConsumptionStatusChecker statusChecker =
-        new OffsetBasedConsumptionStatusChecker(instanceDataManager, consumingSegments);
+        new OffsetBasedConsumptionStatusChecker(instanceDataManager, consumingSegments, consumingSegments::get);
 
     // setup TableDataMangers
     TableDataManager tableDataManagerA = mock(TableDataManager.class);
@@ -212,7 +212,7 @@ public class OffsetBasedConsumptionStatusCheckerTest {
     consumingSegments.put("tableB_REALTIME", ImmutableSet.of(segB0));
     InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
     OffsetBasedConsumptionStatusChecker statusChecker =
-        new OffsetBasedConsumptionStatusChecker(instanceDataManager, consumingSegments);
+        new OffsetBasedConsumptionStatusChecker(instanceDataManager, consumingSegments, consumingSegments::get);
 
     // setup TableDataMangers
     TableDataManager tableDataManagerA = mock(TableDataManager.class);
