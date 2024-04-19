@@ -53,27 +53,6 @@ public class CommonsConfigurationUtils {
   }
 
   /**
-   * Instantiate a {@link PropertiesConfiguration} from a {@link File}.
-   * @param file containing properties
-   * @return a {@link PropertiesConfiguration} instance. Empty if file does not exist.
-   */
-  public static PropertiesConfiguration fromFile(File file)
-      throws ConfigurationException {
-    return fromFile(file, false, true,
-        PropertyIOFactoryKind.DefaultPropertyConfigurationIOFactory);
-  }
-
-  /**
-   * Instantiate a {@link PropertiesConfiguration} from an {@link InputStream}.
-   * @param stream containing properties
-   * @return a {@link PropertiesConfiguration} instance.
-   */
-  public static PropertiesConfiguration fromInputStream(InputStream stream)
-      throws ConfigurationException {
-    return fromInputStream(stream, false, true, PropertyIOFactoryKind.DefaultPropertyConfigurationIOFactory);
-  }
-
-  /**
    * Instantiate a {@link PropertiesConfiguration} from an {@link String}.
    * @param path representing the path of file
    * @return a {@link PropertiesConfiguration} instance.
@@ -86,13 +65,17 @@ public class CommonsConfigurationUtils {
   /**
    * Instantiate a {@link PropertiesConfiguration} from an {@link String}.
    * @param path representing the path of file
-   * @param setIOFactory representing to set the IOFactory or not
    * @param setDefaultDelimiter representing to set the default list delimiter.
    * @return a {@link PropertiesConfiguration} instance.
    */
+  public static PropertiesConfiguration fromPath(String path, boolean setDefaultDelimiter,
+      PropertyIOFactoryKind ioFactoryKind)
   public static PropertiesConfiguration fromPath(@Nullable String path, boolean setIOFactory,
       boolean setDefaultDelimiter, PropertyIOFactoryKind ioFactoryKind)
       throws ConfigurationException {
+    PropertiesConfiguration config = createPropertiesConfiguration(setDefaultDelimiter, ioFactoryKind);
+    FileHandler fileHandler = new FileHandler(config);
+    fileHandler.load(path);
     PropertiesConfiguration config = createPropertiesConfiguration(setIOFactory, setDefaultDelimiter);
     // if provided path is non-empty, load the existing properties from provided file path
     if (StringUtils.isNotEmpty(path)) {
@@ -105,16 +88,28 @@ public class CommonsConfigurationUtils {
   /**
    * Instantiate a {@link PropertiesConfiguration} from an {@link InputStream}.
    * @param stream containing properties
-   * @param setIOFactory representing to set the IOFactory or not
+   * @return a {@link PropertiesConfiguration} instance.
+   */
+  public static PropertiesConfiguration fromInputStream(InputStream stream)
+      throws ConfigurationException {
+    return fromInputStream(stream, true, PropertyIOFactoryKind.DefaultPropertyConfigurationIOFactory);
+  }
+
+  /**
+   * Instantiate a {@link PropertiesConfiguration} from an {@link InputStream}.
+   * @param stream containing properties
    * @param setDefaultDelimiter representing to set the default list delimiter.
    * @return a {@link PropertiesConfiguration} instance.
    */
-  public static PropertiesConfiguration fromInputStream(InputStream stream, boolean setIOFactory,
+  public static PropertiesConfiguration fromInputStream(InputStream stream,
       boolean setDefaultDelimiter, PropertyIOFactoryKind ioFactoryKind)
       boolean setDefaultDelimiter, PropertyReaderKind ioFactoryKind)
   public static PropertiesConfiguration fromInputStream(@Nullable InputStream stream, boolean setIOFactory,
       boolean setDefaultDelimiter)
       throws ConfigurationException {
+    PropertiesConfiguration config = createPropertiesConfiguration(setDefaultDelimiter, ioFactoryKind);
+    FileHandler fileHandler = new FileHandler(config);
+    fileHandler.load(stream);
     PropertiesConfiguration config = createPropertiesConfiguration(setIOFactory, setDefaultDelimiter);
     // if provided stream is not null, load the existing properties from provided input stream.
     if (stream != null) {
@@ -127,12 +122,10 @@ public class CommonsConfigurationUtils {
   /**
    * Instantiate a Segment Metadata {@link PropertiesConfiguration} from a {@link File}.
    * @param file containing properties
-   * @param setIOFactory representing to set the IOFactory or not
    * @param setDefaultDelimiter representing to set the default list delimiter.
    * @return a {@link PropertiesConfiguration} instance.
    */
-  public static PropertiesConfiguration getSegmentMetadataFromFile(File file, boolean setIOFactory,
-      boolean setDefaultDelimiter)
+  public static PropertiesConfiguration getSegmentMetadataFromFile(File file, boolean setDefaultDelimiter)
       throws ConfigurationException {
     PropertyIOFactoryKind ioFactoryKind = PropertyIOFactoryKind.DefaultPropertyConfigurationIOFactory;
 
@@ -140,22 +133,32 @@ public class CommonsConfigurationUtils {
       ioFactoryKind = PropertyIOFactoryKind.SegmentMetadataIOFactory;
     }
 
-    return fromFile(file, setIOFactory, setDefaultDelimiter, ioFactoryKind);
+    return fromFile(file, setDefaultDelimiter, ioFactoryKind);
   }
 
   /**
    * Instantiate a {@link PropertiesConfiguration} from a {@link File}.
    * @param file containing properties
-   * @param setIOFactory representing to set the IOFactory or not
+   * @return a {@link PropertiesConfiguration} instance. Empty if file does not exist.
+   */
+  public static PropertiesConfiguration fromFile(File file)
+      throws ConfigurationException {
+    return fromFile(file, true, PropertyIOFactoryKind.DefaultPropertyConfigurationIOFactory);
+  }
+
+  /**
+   * Instantiate a {@link PropertiesConfiguration} from a {@link File}.
+   * @param file containing properties
    * @param setDefaultDelimiter representing to set the default list delimiter.
    * @return a {@link PropertiesConfiguration} instance.
    */
+  public static PropertiesConfiguration fromFile(File file,
   public static PropertiesConfiguration fromFile(@Nullable File file, boolean setIOFactory, boolean setDefaultDelimiter)
   public static PropertiesConfiguration fromFile(File file, boolean setIOFactory,
       boolean setDefaultDelimiter, PropertyIOFactoryKind ioFactoryKind)
       throws ConfigurationException {
     Preconditions.checkNotNull(file, "File object can not be null for loading configurations");
-    PropertiesConfiguration config = createPropertiesConfiguration(setIOFactory, setDefaultDelimiter, ioFactoryKind);
+    PropertiesConfiguration config = createPropertiesConfiguration(setDefaultDelimiter, ioFactoryKind);
     FileHandler fileHandler = new FileHandler(config);
     // check if file exists, load the properties otherwise set the file.
     if (file.exists()) {
@@ -168,14 +171,24 @@ public class CommonsConfigurationUtils {
     return config;
   }
 
+  /**
+   * save the segment metadata configuration content into the provided file based on the version header.
+   * @param propertiesConfiguration a {@link PropertiesConfiguration} instance.
+   * @param file a {@link File} instance.
+   * @param versionHeader a {@link String} instance.
+   */
   public static void saveSegmentMetadataToFile(PropertiesConfiguration propertiesConfiguration, File file,
       String versionHeader) {
     if (StringUtils.isNotEmpty(versionHeader)) {
       String header = String.format("%s=%s", VERSION_HEADER_IDENTIFIER, versionHeader);
       propertiesConfiguration.setHeader(header);
 
-      // set segment metadata IOFactory
-      propertiesConfiguration.setIOFactory(createPropertyIOFactory(PropertyIOFactoryKind.SegmentMetadataIOFactory));
+      // checks whether the provided versionHeader equals to SegmentMetadataIOFactory kind.
+      // if true, set IO factory as SegmentMetadataIOFactory
+      if (PropertyIOFactoryKind.SegmentMetadataIOFactory.getVersion().equals(versionHeader)) {
+        // set segment metadata IOFactory
+        propertiesConfiguration.setIOFactory(createPropertyIOFactory(PropertyIOFactoryKind.SegmentMetadataIOFactory));
+      }
     }
     saveToFile(propertiesConfiguration, file);
   }
@@ -186,7 +199,6 @@ public class CommonsConfigurationUtils {
    * @param file a {@link File} instance.
    */
   public static void saveToFile(PropertiesConfiguration propertiesConfiguration, File file) {
-    Preconditions.checkNotNull(file, "File object can not be null for saving configurations");
     FileHandler fileHandler = new FileHandler(propertiesConfiguration);
     fileHandler.setFile(file);
     try {
@@ -325,24 +337,21 @@ public class CommonsConfigurationUtils {
 
   /**
    * creates the instance of the {@link org.apache.commons.configuration2.PropertiesConfiguration}
-   * with custom od default {@link org.apache.commons.configuration2.PropertiesConfiguration.IOFactory}
+   * with custom IO factory based on kind {@link org.apache.commons.configuration2.PropertiesConfiguration.IOFactory}
    * and legacy list delimiter {@link org.apache.commons.configuration2.convert.LegacyListDelimiterHandler}
    *
-   * @param setIOFactory sets the IOFactory
    * @param setDefaultDelimiter sets the default list delimiter.
    * @param ioFactoryKind IOFactory kind
    * @return PropertiesConfiguration
    */
-  private static PropertiesConfiguration createPropertiesConfiguration(boolean setIOFactory,
-      boolean setDefaultDelimiter, PropertyIOFactoryKind ioFactoryKind) {
+  private static PropertiesConfiguration createPropertiesConfiguration(boolean setDefaultDelimiter,
+      PropertyIOFactoryKind ioFactoryKind) {
     PropertiesConfiguration config = new PropertiesConfiguration();
 
-    // setting IO Reader Factory
-    if (setIOFactory) {
-      config.setIOFactory(createPropertyIOFactory(ioFactoryKind));
-    }
+    // setting IO Reader Factory of the configuration.
+    config.setIOFactory(createPropertyIOFactory(ioFactoryKind));
 
-    // setting DEFAULT_LIST_DELIMITER
+    // setting the DEFAULT_LIST_DELIMITER
     if (setDefaultDelimiter) {
       config.setListDelimiterHandler(new LegacyListDelimiterHandler(DEFAULT_LIST_DELIMITER));
     }
@@ -352,7 +361,6 @@ public class CommonsConfigurationUtils {
 
   /**
    * Creates the IOFactory based on the provided kind.
-   *
    * @param ioFactoryKind IOFactory kind
    * @return IOFactory
    */
@@ -362,6 +370,7 @@ public class CommonsConfigurationUtils {
         return new ConfigFilePropertyIOFactory();
       case SegmentMetadataIOFactory:
         return new SegmentMetadataPropertyIOFactory();
+      case DefaultPropertyConfigurationIOFactory:
       default:
         return new PropertiesConfiguration.DefaultIOFactory();
     }
@@ -381,7 +390,7 @@ public class CommonsConfigurationUtils {
         String fileFirstLine = reader.readLine();
         // header version is written as a comment and start with '# '
         String versionHeaderCommentPrefix = String.format("# %s", VERSION_HEADER_IDENTIFIER);
-        // check whether the segment has the version header or not
+        // check whether the file has the version header or not
         if (StringUtils.startsWith(fileFirstLine, versionHeaderCommentPrefix)) {
           String[] headerKeyValue = fileFirstLine.split("=");
           if (headerKeyValue.length == 2) {

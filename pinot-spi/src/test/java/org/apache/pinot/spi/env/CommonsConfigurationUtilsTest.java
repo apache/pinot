@@ -59,7 +59,7 @@ public class CommonsConfigurationUtilsTest {
   public void testSegmentMetadataFromFile() {
     // load the existing config and check the properties config instance
     try {
-      PropertiesConfiguration config = CommonsConfigurationUtils.getSegmentMetadataFromFile(CONFIG_FILE, false, true);
+      PropertiesConfiguration config = CommonsConfigurationUtils.getSegmentMetadataFromFile(CONFIG_FILE, true);
       assertNotNull(config);
 
       config.setProperty("testKey", "testValue");
@@ -68,7 +68,7 @@ public class CommonsConfigurationUtilsTest {
       CommonsConfigurationUtils.saveSegmentMetadataToFile(config, CONFIG_FILE, "version1");
 
       // reading the property with header.
-      config = CommonsConfigurationUtils.getSegmentMetadataFromFile(CONFIG_FILE, false, true);
+      config = CommonsConfigurationUtils.getSegmentMetadataFromFile(CONFIG_FILE, true);
       assertNotNull(config);
       assertNotNull(config.getHeader());
     } catch (Exception ex) {
@@ -77,7 +77,7 @@ public class CommonsConfigurationUtilsTest {
 
     // load the non-existing file and expect the exception
     Assert.expectThrows(NullPointerException.class,
-        () -> CommonsConfigurationUtils.getSegmentMetadataFromFile(null, false, true));
+        () -> CommonsConfigurationUtils.getSegmentMetadataFromFile(null, true));
   }
 
   @Test
@@ -137,7 +137,7 @@ public class CommonsConfigurationUtilsTest {
       return;
     }
 
-    PropertiesConfiguration configuration = CommonsConfigurationUtils.fromFile(CONFIG_FILE, false, true,
+    PropertiesConfiguration configuration = CommonsConfigurationUtils.fromFile(CONFIG_FILE, true,
         PropertyIOFactoryKind.DefaultPropertyConfigurationIOFactory);
     configuration.setProperty(PROPERTY_KEY, replacedValue);
     String recoveredValue = CommonsConfigurationUtils.recoverSpecialCharacterInPropertyValue(
@@ -145,7 +145,7 @@ public class CommonsConfigurationUtilsTest {
     assertEquals(recoveredValue, value);
 
     CommonsConfigurationUtils.saveToFile(configuration, CONFIG_FILE);
-    configuration = CommonsConfigurationUtils.fromFile(CONFIG_FILE, false, true,
+    configuration = CommonsConfigurationUtils.fromFile(CONFIG_FILE, true,
         PropertyIOFactoryKind.DefaultPropertyConfigurationIOFactory);
     recoveredValue = CommonsConfigurationUtils.recoverSpecialCharacterInPropertyValue(
         (String) configuration.getProperty(PROPERTY_KEY));
