@@ -489,7 +489,7 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
     Assert.assertTrue(resultBeforeOffline.getResultSet(0).getLong(0) > 0);
 
     // schedule offline segment generation
-    Assert.assertNotNull(_controllerStarter.getTaskManager().scheduleTasks());
+    Assert.assertNotNull(_controllerStarter.getTaskManager().scheduleAllTasksForAllTables(null));
 
     // wait for offline segments
     JsonNode offlineSegments = TestUtils.waitForResult(() -> {

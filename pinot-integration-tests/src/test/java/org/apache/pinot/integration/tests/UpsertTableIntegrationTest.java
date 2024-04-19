@@ -471,8 +471,8 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
     waitForAllDocsLoaded(tableName, 600_000L, 1000);
     assertEquals(getScore(tableName), 3692);
     waitForNumQueriedSegmentsToConverge(tableName, 10_000L, 3);
-
-    assertNotNull(_taskManager.scheduleTasks(TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(tableName))
+    String realtimeTableName = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(tableName);
+    assertNotNull(_taskManager.scheduleAllTasksForTable(realtimeTableName, null)
         .get(MinionConstants.UpsertCompactionTask.TASK_TYPE));
     waitForTaskToComplete();
     waitForAllDocsLoaded(tableName, 600_000L, 3);
@@ -501,8 +501,8 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
     waitForAllDocsLoaded(tableName, 600_000L, 2000);
     assertEquals(getScore(tableName), 3692);
     waitForNumQueriedSegmentsToConverge(tableName, 10_000L, 5);
-
-    assertNotNull(_taskManager.scheduleTasks(TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(tableName))
+    String realtimeTableName = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(tableName);
+    assertNotNull(_taskManager.scheduleAllTasksForTable(realtimeTableName, null)
         .get(MinionConstants.UpsertCompactionTask.TASK_TYPE));
     waitForTaskToComplete();
     waitForAllDocsLoaded(tableName, 600_000L, 3);
@@ -546,7 +546,8 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
 
     // Run segment compaction. This time, we expect that the deleting rows are still there because they are
     // as part of the consuming segment
-    assertNotNull(_taskManager.scheduleTasks(TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(tableName))
+    String realtimeTableName = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(tableName);
+    assertNotNull(_taskManager.scheduleAllTasksForTable(realtimeTableName, null)
         .get(MinionConstants.UpsertCompactionTask.TASK_TYPE));
     waitForTaskToComplete();
     waitForAllDocsLoaded(tableName, 600_000L, 3);
@@ -563,7 +564,8 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
     assertEquals(getNumDeletedRows(tableName), 2);
 
     // Run segment compaction. This time, we expect that the deleting rows are cleaned up
-    assertNotNull(_taskManager.scheduleTasks(TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(tableName))
+    realtimeTableName = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(tableName);
+    assertNotNull(_taskManager.scheduleAllTasksForTable(realtimeTableName, null)
         .get(MinionConstants.UpsertCompactionTask.TASK_TYPE));
     waitForTaskToComplete();
     waitForAllDocsLoaded(tableName, 600_000L, 3);

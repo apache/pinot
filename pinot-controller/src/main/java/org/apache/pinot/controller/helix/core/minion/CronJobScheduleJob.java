@@ -65,7 +65,7 @@ public class CronJobScheduleJob implements Job {
         return;
       }
       long jobStartTime = System.currentTimeMillis();
-      pinotTaskManager.scheduleTask(taskType, table);
+      pinotTaskManager.scheduleTaskForTable(taskType, table, null);
       LOGGER.info("Finished CronJob: table - {}, task - {}, next runtime is {}", table, taskType,
           jobExecutionContext.getNextFireTime());
       pinotTaskManager.getControllerMetrics().addTimedTableValue(PinotTaskManager.getCronJobName(table, taskType),
