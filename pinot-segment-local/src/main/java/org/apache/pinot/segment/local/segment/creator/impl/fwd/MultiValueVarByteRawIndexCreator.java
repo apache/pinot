@@ -38,7 +38,6 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 public class MultiValueVarByteRawIndexCreator implements ForwardIndexCreator {
   private static final int DEFAULT_NUM_DOCS_PER_CHUNK = 1000;
   private static final int TARGET_MIN_CHUNK_SIZE = 4 * 1024;
-  private static final int TARGET_MAX_CHUNK_SIZE = 1024 * 1024;
 
   private final VarByteChunkWriter _indexWriter;
   private final DataType _valueType;
@@ -58,7 +57,7 @@ public class MultiValueVarByteRawIndexCreator implements ForwardIndexCreator {
       int totalDocs, DataType valueType, int maxRowLengthInBytes, int maxNumberOfElements)
       throws IOException {
     this(baseIndexDir, compressionType, column, totalDocs, valueType, ForwardIndexConfig.DEFAULT_RAW_WRITER_VERSION,
-        maxRowLengthInBytes, maxNumberOfElements);
+        maxRowLengthInBytes, maxNumberOfElements, ForwardIndexConfig.DEFAULT_TARGET_MAX_CHUNK_SIZE);
   }
 
   /**
@@ -74,18 +73,19 @@ public class MultiValueVarByteRawIndexCreator implements ForwardIndexCreator {
    * @param writerVersion writer format version
    */
   public MultiValueVarByteRawIndexCreator(File baseIndexDir, ChunkCompressionType compressionType, String column,
-      int totalDocs, DataType valueType, int writerVersion, int maxRowLengthInBytes, int maxNumberOfElements)
+      int totalDocs, DataType valueType, int writerVersion, int maxRowLengthInBytes, int maxNumberOfElements,
+      int targetMaxChunkSizeBytes)
       throws IOException {
     //we will prepend the actual content with numElements and length array containing length of each element
     int totalMaxLength = getTotalRowStorageBytes(maxNumberOfElements, maxRowLengthInBytes);
 
     File file = new File(baseIndexDir, column + Indexes.RAW_MV_FORWARD_INDEX_FILE_EXTENSION);
     int numDocsPerChunk = Math.max(
-        TARGET_MAX_CHUNK_SIZE / (totalMaxLength + VarByteChunkForwardIndexWriter.CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE),
+        targetMaxChunkSizeBytes / (totalMaxLength + VarByteChunkForwardIndexWriter.CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE),
         1);
     // For columns with very small max value, target chunk size should also be capped to reduce memory during read
     int dynamicTargetChunkSize =
-        Math.max(Math.min(totalMaxLength * DEFAULT_NUM_DOCS_PER_CHUNK, TARGET_MAX_CHUNK_SIZE), TARGET_MIN_CHUNK_SIZE);
+        Math.max(Math.min(totalMaxLength * DEFAULT_NUM_DOCS_PER_CHUNK, targetMaxChunkSizeBytes), TARGET_MIN_CHUNK_SIZE);
     _indexWriter = writerVersion < VarByteChunkForwardIndexWriterV4.VERSION ? new VarByteChunkForwardIndexWriter(file,
         compressionType, totalDocs, numDocsPerChunk, totalMaxLength, writerVersion)
         : new VarByteChunkForwardIndexWriterV4(file, compressionType, dynamicTargetChunkSize);

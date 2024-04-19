@@ -38,7 +38,6 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 public class MultiValueFixedByteRawIndexCreator implements ForwardIndexCreator {
   private static final int DEFAULT_NUM_DOCS_PER_CHUNK = 1000;
   private static final int TARGET_MIN_CHUNK_SIZE = 4 * 1024;
-  private static final int TARGET_MAX_CHUNK_SIZE = 1024 * 1024;
 
   private final VarByteChunkWriter _indexWriter;
   private final DataType _valueType;
@@ -51,44 +50,39 @@ public class MultiValueFixedByteRawIndexCreator implements ForwardIndexCreator {
    * @param column Name of column to index
    * @param totalDocs Total number of documents to index
    * @param valueType Type of the values
-   */
-  public MultiValueFixedByteRawIndexCreator(File baseIndexDir, ChunkCompressionType compressionType, String column,
-      int totalDocs, DataType valueType, int maxNumberOfMultiValueElements)
-      throws IOException {
-    this(baseIndexDir, compressionType, column, totalDocs, valueType, maxNumberOfMultiValueElements, false,
-        ForwardIndexConfig.DEFAULT_RAW_WRITER_VERSION);
-  }
-
-  /**
-   * Create a var-byte raw index creator for the given column
-   *
-   * @param baseIndexDir Index directory
-   * @param compressionType Type of compression to use
-   * @param column Name of column to index
-   * @param totalDocs Total number of documents to index
-   * @param valueType Type of the values
    * @param deriveNumDocsPerChunk true if writer should auto-derive the number of rows per chunk
    * @param writerVersion writer format version
+   * @param targetMaxChunkSizeBytes target max chunk size in bytes, applicable only for V4 or when
+   *                                deriveNumDocsPerChunk is true
    */
   public MultiValueFixedByteRawIndexCreator(File baseIndexDir, ChunkCompressionType compressionType, String column,
       int totalDocs, DataType valueType, int maxNumberOfMultiValueElements, boolean deriveNumDocsPerChunk,
-      int writerVersion)
+      int writerVersion, int targetMaxChunkSizeBytes)
       throws IOException {
     this(new File(baseIndexDir, column + Indexes.RAW_MV_FORWARD_INDEX_FILE_EXTENSION), compressionType, totalDocs,
-        valueType, maxNumberOfMultiValueElements, deriveNumDocsPerChunk, writerVersion);
+        valueType, maxNumberOfMultiValueElements, deriveNumDocsPerChunk, writerVersion, targetMaxChunkSizeBytes);
   }
 
   public MultiValueFixedByteRawIndexCreator(File indexFile, ChunkCompressionType compressionType, int totalDocs,
       DataType valueType, int maxNumberOfMultiValueElements, boolean deriveNumDocsPerChunk, int writerVersion)
       throws IOException {
+    this(indexFile, compressionType, totalDocs, valueType, maxNumberOfMultiValueElements, deriveNumDocsPerChunk,
+        writerVersion, ForwardIndexConfig.DEFAULT_TARGET_MAX_CHUNK_SIZE);
+  }
+
+
+  public MultiValueFixedByteRawIndexCreator(File indexFile, ChunkCompressionType compressionType, int totalDocs,
+      DataType valueType, int maxNumberOfMultiValueElements, boolean deriveNumDocsPerChunk, int writerVersion,
+      int targetMaxChunkSizeBytes)
+      throws IOException {
     // Store the length followed by the values
     int totalMaxLength = Integer.BYTES + (maxNumberOfMultiValueElements * valueType.getStoredType().size());
     int numDocsPerChunk = deriveNumDocsPerChunk ? Math.max(
-        TARGET_MAX_CHUNK_SIZE / (totalMaxLength + VarByteChunkForwardIndexWriter.CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE), 1)
-        : DEFAULT_NUM_DOCS_PER_CHUNK;
+        targetMaxChunkSizeBytes / (totalMaxLength + VarByteChunkForwardIndexWriter.CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE),
+        1) : DEFAULT_NUM_DOCS_PER_CHUNK;
     // For columns with very small max value, target chunk size should also be capped to reduce memory during read
     int dynamicTargetChunkSize =
-        Math.max(Math.min(totalMaxLength * DEFAULT_NUM_DOCS_PER_CHUNK, TARGET_MAX_CHUNK_SIZE), TARGET_MIN_CHUNK_SIZE);
+        Math.max(Math.min(totalMaxLength * DEFAULT_NUM_DOCS_PER_CHUNK, targetMaxChunkSizeBytes), TARGET_MIN_CHUNK_SIZE);
     _indexWriter =
         writerVersion < VarByteChunkForwardIndexWriterV4.VERSION ? new VarByteChunkForwardIndexWriter(indexFile,
             compressionType, totalDocs, numDocsPerChunk, totalMaxLength, writerVersion)

@@ -31,7 +31,6 @@ import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
-
 /**
  * Raw (non-dictionary-encoded) forward index creator for single-value column of variable length data type (BIG_DECIMAL,
  * STRING, BYTES).
@@ -39,7 +38,6 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 public class SingleValueVarByteRawIndexCreator implements ForwardIndexCreator {
   private static final int DEFAULT_NUM_DOCS_PER_CHUNK = 1000;
   private static final int TARGET_MIN_CHUNK_SIZE = 4 * 1024;
-  private static final int TARGET_MAX_CHUNK_SIZE = 1024 * 1024;
 
   private final VarByteChunkWriter _indexWriter;
   private final DataType _valueType;
@@ -58,7 +56,7 @@ public class SingleValueVarByteRawIndexCreator implements ForwardIndexCreator {
       int totalDocs, DataType valueType, int maxLength)
       throws IOException {
     this(baseIndexDir, compressionType, column, totalDocs, valueType, maxLength, false,
-        ForwardIndexConfig.DEFAULT_RAW_WRITER_VERSION);
+        ForwardIndexConfig.DEFAULT_RAW_WRITER_VERSION, ForwardIndexConfig.DEFAULT_TARGET_MAX_CHUNK_SIZE);
   }
 
   /**
@@ -71,17 +69,21 @@ public class SingleValueVarByteRawIndexCreator implements ForwardIndexCreator {
    * @param maxLength length of longest entry (in bytes)
    * @param deriveNumDocsPerChunk true if writer should auto-derive the number of rows per chunk
    * @param writerVersion writer format version
+   * @param targetMaxChunkSizeBytes target max chunk size in bytes, applicable only for V4 or when
+   *                                deriveNumDocsPerChunk is true
    * @throws IOException
    */
   public SingleValueVarByteRawIndexCreator(File baseIndexDir, ChunkCompressionType compressionType, String column,
-      int totalDocs, DataType valueType, int maxLength, boolean deriveNumDocsPerChunk, int writerVersion)
+      int totalDocs, DataType valueType, int maxLength, boolean deriveNumDocsPerChunk, int writerVersion,
+      int targetMaxChunkSizeBytes)
       throws IOException {
     File file = new File(baseIndexDir, column + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
-    int numDocsPerChunk = deriveNumDocsPerChunk ? getNumDocsPerChunk(maxLength) : DEFAULT_NUM_DOCS_PER_CHUNK;
+    int numDocsPerChunk =
+        deriveNumDocsPerChunk ? getNumDocsPerChunk(maxLength, targetMaxChunkSizeBytes) : DEFAULT_NUM_DOCS_PER_CHUNK;
 
     // For columns with very small max value, target chunk size should also be capped to reduce memory during read
     int dynamicTargetChunkSize =
-        Math.max(Math.min(maxLength * DEFAULT_NUM_DOCS_PER_CHUNK, TARGET_MAX_CHUNK_SIZE), TARGET_MIN_CHUNK_SIZE);
+        Math.max(Math.min(maxLength * DEFAULT_NUM_DOCS_PER_CHUNK, targetMaxChunkSizeBytes), TARGET_MIN_CHUNK_SIZE);
     _indexWriter = writerVersion < VarByteChunkForwardIndexWriterV4.VERSION ? new VarByteChunkForwardIndexWriter(file,
         compressionType, totalDocs, numDocsPerChunk, maxLength, writerVersion)
         : new VarByteChunkForwardIndexWriterV4(file, compressionType, dynamicTargetChunkSize);
@@ -89,9 +91,9 @@ public class SingleValueVarByteRawIndexCreator implements ForwardIndexCreator {
   }
 
   @VisibleForTesting
-  public static int getNumDocsPerChunk(int lengthOfLongestEntry) {
+  public static int getNumDocsPerChunk(int lengthOfLongestEntry, int targetMaxChunkSizeBytes) {
     int overheadPerEntry = lengthOfLongestEntry + VarByteChunkForwardIndexWriter.CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE;
-    return Math.max(TARGET_MAX_CHUNK_SIZE / overheadPerEntry, 1);
+    return Math.max(targetMaxChunkSizeBytes / overheadPerEntry, 1);
   }
 
   @Override

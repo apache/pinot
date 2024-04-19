@@ -337,7 +337,8 @@ public class ForwardIndexTypeTest {
                   + "      \"forward\": {"
                   + "        \"chunkCompressionType\": " + valueJson + ",\n"
                   + "        \"deriveNumDocsPerChunk\": true,\n"
-                  + "        \"rawIndexWriterVersion\": 10\n"
+                  + "        \"rawIndexWriterVersion\": 10,\n"
+                  + "        \"targetMaxChunkSize\": \"512K\"\n"
                   + "      }"
                   + "    }\n"
                   + " }"
@@ -349,6 +350,7 @@ public class ForwardIndexTypeTest {
               .withDictIdCompressionType(expectedDictCompression)
               .withDeriveNumDocsPerChunk(true)
               .withRawIndexWriterVersion(10)
+              .withTargetMaxChunkSize(512 * 1024)
               .build()
       );
     }
