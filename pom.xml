@@ -155,6 +155,7 @@
     <calcite.version>1.36.0</calcite.version>
     <lucene.version>9.8.0</lucene.version>
     <reflections.version>0.10.2</reflections.version>
+    <dynatrace.hash4j.version>0.17.0</dynatrace.hash4j.version>
     <!-- helix-core, spark-core use libraries from io.dropwizard.metrics -->
     <dropwizard-metrics.version>4.2.25</dropwizard-metrics.version>
     <snappy-java.version>1.1.10.5</snappy-java.version>
@@ -1242,7 +1243,7 @@
       <dependency>
         <groupId>com.dynatrace.hash4j</groupId>
         <artifactId>hash4j</artifactId>
-        <version>0.13.0</version>
+        <version>${dynatrace.hash4j.version}</version>
       </dependency>
       <dependency>
         <groupId>com.tdunning</groupId>
