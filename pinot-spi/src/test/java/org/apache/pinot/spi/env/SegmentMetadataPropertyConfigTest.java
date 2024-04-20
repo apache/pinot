@@ -60,74 +60,27 @@ public class SegmentMetadataPropertyConfigTest {
   @Test
   public void testSegmentMetadataPropertyConfiguration()
       throws ConfigurationException {
-    PropertiesConfiguration configuration =
-        CommonsConfigurationUtils.getSegmentMetadataFromFile(CONFIG_FILE, true);
-
-    // setting the random value of the test keys
-    for (String key: TEST_PROPERTY_KEY) {
-      configuration.setProperty(key, RandomStringUtils.randomAscii(5));
-    }
-    // recovered keys from the configuration.
-    List<String> recoveredKeys = CommonsConfigurationUtils.getKeys(configuration);
-    testPropertyKeys(recoveredKeys, TEST_PROPERTY_KEY);
-
-    CommonsConfigurationUtils.saveSegmentMetadataToFile(configuration, CONFIG_FILE, null); // save the configuration.
-
-    // reading the configuration from saved file.
-    configuration = CommonsConfigurationUtils.getSegmentMetadataFromFile(CONFIG_FILE, true);
-    recoveredKeys = CommonsConfigurationUtils.getKeys(configuration);
-    testPropertyKeys(recoveredKeys, TEST_PROPERTY_KEY);
+    testSegmentMetadataPropertiesConfiguration(null, TEST_PROPERTY_KEY);
   }
 
   @Test
   public void testSegmentMetadataPropertyConfigurationWithHeader()
       throws ConfigurationException {
-    PropertiesConfiguration configuration =
-        CommonsConfigurationUtils.getSegmentMetadataFromFile(CONFIG_FILE, true);
-
-    // setting the random value of the test keys
-    for (String key: TEST_PROPERTY_KEY) {
-      configuration.setProperty(key, RandomStringUtils.randomAscii(5));
-    }
-    // recovered keys from the configuration.
-    List<String> recoveredKeys = CommonsConfigurationUtils.getKeys(configuration);
-    testPropertyKeys(recoveredKeys, TEST_PROPERTY_KEY);
-
-    // save the configuration.
-    CommonsConfigurationUtils.saveSegmentMetadataToFile(configuration, CONFIG_FILE,
-        PropertyIOFactoryKind.SegmentMetadataIOFactory.getVersion());
-
-    // reading the configuration from saved file.
-    configuration = CommonsConfigurationUtils.getSegmentMetadataFromFile(CONFIG_FILE, true);
-    recoveredKeys = CommonsConfigurationUtils.getKeys(configuration);
-    // assert that Header is not null for the config.
-    assertNotNull(configuration.getHeader());
-
-    // assert that configuration has SegmentMetadataPropertyIOFactory
-    assertEquals(configuration.getIOFactory().getClass(), SegmentMetadataPropertyIOFactory.class);
-    testPropertyKeys(recoveredKeys, TEST_PROPERTY_KEY);
+    testSegmentMetadataPropertiesConfiguration(CommonsConfigurationUtils.PROPERTIES_CONFIGURATION_HEADER_VERSION_2,
+        TEST_PROPERTY_KEY);
   }
 
   @Test
   public void testSegmentMetadataReaderWithSpecialCharsPropertyKeys()
       throws ConfigurationException {
-    PropertiesConfiguration configuration =
-        CommonsConfigurationUtils.getSegmentMetadataFromFile(CONFIG_FILE, true);
+    testSegmentMetadataPropertiesConfiguration(null, TEST_PROPERTY_KEY_WITH_SPECIAL_CHAR);
+  }
 
-    // setting the random value of the test keys
-    for (String key: TEST_PROPERTY_KEY_WITH_SPECIAL_CHAR) {
-      configuration.setProperty(key, RandomStringUtils.randomAscii(5));
-    }
-    // recovered keys from the configuration.
-    List<String> recoveredKeys = CommonsConfigurationUtils.getKeys(configuration);
-    testPropertyKeys(recoveredKeys, TEST_PROPERTY_KEY_WITH_SPECIAL_CHAR);
-
-    CommonsConfigurationUtils.saveSegmentMetadataToFile(configuration, CONFIG_FILE, null); // save the configuration.
-
-    // reading the configuration from saved file.
-    configuration = CommonsConfigurationUtils.getSegmentMetadataFromFile(CONFIG_FILE, true);
-    recoveredKeys = CommonsConfigurationUtils.getKeys(configuration);
-    testPropertyKeys(recoveredKeys, TEST_PROPERTY_KEY_WITH_SPECIAL_CHAR);
+  @Test
+  public void testSegmentMetadataReaderWithSpecialCharsPropertyKeysWithHeader()
+      throws ConfigurationException {
+    testSegmentMetadataPropertiesConfiguration(CommonsConfigurationUtils.PROPERTIES_CONFIGURATION_HEADER_VERSION_2,
+        TEST_PROPERTY_KEY_WITH_SPECIAL_CHAR);
   }
 
   @Test
@@ -166,8 +119,8 @@ public class SegmentMetadataPropertyConfigTest {
     PropertiesConfiguration configuration =
         CommonsConfigurationUtils.getSegmentMetadataFromFile(oldSegmentProperties, true);
 
-    // assert that Header is not null for the config.
-    assertNotNull(configuration.getHeader());
+    // assert that Header is equals to '# version=2'
+    assertEquals(configuration.getHeader(), "# version=2");
 
     // assert that configuration has SegmentMetadataPropertyIOFactory
     assertEquals(configuration.getIOFactory().getClass(), SegmentMetadataPropertyIOFactory.class);
@@ -197,6 +150,34 @@ public class SegmentMetadataPropertyConfigTest {
     // asserting segment.index.version
     String segmentIndexVersion = configuration.getString("segment.index.version");
     assertEquals(segmentIndexVersion, "v3");
+  }
+
+  private static void testSegmentMetadataPropertiesConfiguration(String versionHeader, String[] keysArray)
+      throws ConfigurationException {
+    PropertiesConfiguration configuration =
+        CommonsConfigurationUtils.getSegmentMetadataFromFile(CONFIG_FILE, true);
+
+    // setting the random value of the test keys
+    for (String key: keysArray) {
+      configuration.setProperty(key, RandomStringUtils.randomAscii(5));
+    }
+    // recovered keys from the configuration.
+    List<String> recoveredKeys = CommonsConfigurationUtils.getKeys(configuration);
+    testPropertyKeys(recoveredKeys, keysArray);
+
+    // save the configuration.
+    CommonsConfigurationUtils.saveSegmentMetadataToFile(configuration, CONFIG_FILE, versionHeader);
+
+    if (versionHeader != null) {
+      String expectedHeader =
+          String.format("%s=%s", CommonsConfigurationUtils.VERSION_HEADER_IDENTIFIER, versionHeader);
+      assertEquals(configuration.getHeader(), expectedHeader);
+    }
+
+    // reading the configuration from saved file.
+    configuration = CommonsConfigurationUtils.getSegmentMetadataFromFile(CONFIG_FILE, true);
+    recoveredKeys = CommonsConfigurationUtils.getKeys(configuration);
+    testPropertyKeys(recoveredKeys, keysArray);
   }
 
   private static void testPropertyKeys(List<String> recoveredKeys, String[] actualKeys) {

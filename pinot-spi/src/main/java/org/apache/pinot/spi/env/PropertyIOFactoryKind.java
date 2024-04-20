@@ -19,28 +19,19 @@
 package org.apache.pinot.spi.env;
 
 public enum PropertyIOFactoryKind {
-  ConfigFileIOFactory("3") {
+  ConfigFileIOFactory {
     public String toString() {
       return "ConfigFile";
     }
   },
-  SegmentMetadataIOFactory("2") {
+  SegmentMetadataIOFactory {
     public String toString() {
       return "SegmentMetadata";
     }
   },
-  DefaultPropertyConfigurationIOFactory("1") {
+  DefaultPropertyConfigurationIOFactory {
     public String toString() {
       return "Default";
     }
-  };
-
-  private final String _version;
-  PropertyIOFactoryKind(String version) {
-    _version = version;
-  }
-
-  public String getVersion() {
-    return _version;
   }
 }

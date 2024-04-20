@@ -40,6 +40,7 @@ import static org.testng.Assert.assertTrue;
 public class CommonsConfigurationUtilsTest {
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "CommonsConfigurationUtilsTest");
   private static final File CONFIG_FILE = new File(TEMP_DIR, "config");
+  private static final File SEGMENT_METADATA_CONFIG_FILE = new File(TEMP_DIR, "segmentMetadataConfig");
   private static final String PROPERTY_KEY = "testKey";
   private static final int NUM_ROUNDS = 10000;
 
@@ -59,18 +60,20 @@ public class CommonsConfigurationUtilsTest {
   public void testSegmentMetadataFromFile() {
     // load the existing config and check the properties config instance
     try {
-      PropertiesConfiguration config = CommonsConfigurationUtils.getSegmentMetadataFromFile(CONFIG_FILE, true);
+      PropertiesConfiguration config = CommonsConfigurationUtils
+          .getSegmentMetadataFromFile(SEGMENT_METADATA_CONFIG_FILE, true);
       assertNotNull(config);
 
       config.setProperty("testKey", "testValue");
 
       // add the segment version header to the file and read it again
-      CommonsConfigurationUtils.saveSegmentMetadataToFile(config, CONFIG_FILE, "version1");
+      CommonsConfigurationUtils.saveSegmentMetadataToFile(config, CONFIG_FILE,
+          CommonsConfigurationUtils.PROPERTIES_CONFIGURATION_HEADER_VERSION_2);
 
       // reading the property with header.
       config = CommonsConfigurationUtils.getSegmentMetadataFromFile(CONFIG_FILE, true);
       assertNotNull(config);
-      assertNotNull(config.getHeader());
+      assertEquals(config.getHeader(), "# version=2");
     } catch (Exception ex) {
       Assert.fail("should not throw ConfigurationException exception with valid file");
     }

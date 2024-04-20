@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.spi.env;
 
-import com.google.common.base.Preconditions;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
@@ -47,7 +46,14 @@ import org.apache.commons.lang3.StringUtils;
  */
 public class CommonsConfigurationUtils {
   private static final Character DEFAULT_LIST_DELIMITER = ',';
-  private static final String VERSION_HEADER_IDENTIFIER = "version";
+  public static final String VERSION_HEADER_IDENTIFIER = "version";
+
+  // usage: default header version of all configurations.
+  // if properties configuration doesn't contain header version, it will be considered as 1
+  public static final String PROPERTIES_CONFIGURATION_HEADER_VERSION_1 = "1";
+
+  // usage: used in reading segment metadata with 'SegmentMetadataIOFactory' IO Factory.
+  public static final String PROPERTIES_CONFIGURATION_HEADER_VERSION_2 = "2";
 
   private CommonsConfigurationUtils() {
   }
@@ -129,7 +135,7 @@ public class CommonsConfigurationUtils {
       throws ConfigurationException {
     PropertyIOFactoryKind ioFactoryKind = PropertyIOFactoryKind.DefaultPropertyConfigurationIOFactory;
 
-    if (PropertyIOFactoryKind.SegmentMetadataIOFactory.getVersion().equals(getConfigurationHeaderVersion(file))) {
+    if (PROPERTIES_CONFIGURATION_HEADER_VERSION_2.equals(getConfigurationHeaderVersion(file))) {
       ioFactoryKind = PropertyIOFactoryKind.SegmentMetadataIOFactory;
     }
 
@@ -157,7 +163,6 @@ public class CommonsConfigurationUtils {
   public static PropertiesConfiguration fromFile(File file, boolean setIOFactory,
       boolean setDefaultDelimiter, PropertyIOFactoryKind ioFactoryKind)
       throws ConfigurationException {
-    Preconditions.checkNotNull(file, "File object can not be null for loading configurations");
     PropertiesConfiguration config = createPropertiesConfiguration(setDefaultDelimiter, ioFactoryKind);
     FileHandler fileHandler = new FileHandler(config);
     // check if file exists, load the properties otherwise set the file.
@@ -185,7 +190,7 @@ public class CommonsConfigurationUtils {
 
       // checks whether the provided versionHeader equals to SegmentMetadataIOFactory kind.
       // if true, set IO factory as SegmentMetadataIOFactory
-      if (PropertyIOFactoryKind.SegmentMetadataIOFactory.getVersion().equals(versionHeader)) {
+      if (PROPERTIES_CONFIGURATION_HEADER_VERSION_2.equals(versionHeader)) {
         // set segment metadata IOFactory
         propertiesConfiguration.setIOFactory(createPropertyIOFactory(PropertyIOFactoryKind.SegmentMetadataIOFactory));
       }
@@ -370,7 +375,6 @@ public class CommonsConfigurationUtils {
         return new ConfigFilePropertyIOFactory();
       case SegmentMetadataIOFactory:
         return new SegmentMetadataPropertyIOFactory();
-      case DefaultPropertyConfigurationIOFactory:
       default:
         return new PropertiesConfiguration.DefaultIOFactory();
     }
@@ -384,7 +388,7 @@ public class CommonsConfigurationUtils {
    */
   private static String getConfigurationHeaderVersion(File file)
       throws ConfigurationException {
-    String versionValue = PropertyIOFactoryKind.DefaultPropertyConfigurationIOFactory.getVersion();
+    String versionValue = PROPERTIES_CONFIGURATION_HEADER_VERSION_1;
     if (file.exists()) {
       try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
         String fileFirstLine = reader.readLine();
@@ -394,7 +398,7 @@ public class CommonsConfigurationUtils {
         if (StringUtils.startsWith(fileFirstLine, versionHeaderCommentPrefix)) {
           String[] headerKeyValue = fileFirstLine.split("=");
           if (headerKeyValue.length == 2) {
-            versionValue = headerKeyValue[1]; // set version value
+            versionValue = headerKeyValue[1];
           }
         }
       } catch (IOException exception) {
