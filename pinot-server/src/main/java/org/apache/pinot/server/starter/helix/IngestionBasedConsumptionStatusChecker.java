@@ -21,6 +21,7 @@ package org.apache.pinot.server.starter.helix;
 
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
@@ -54,7 +55,9 @@ public abstract class IngestionBasedConsumptionStatusChecker {
   // This might be called by multiple threads, thus synchronized to be correct.
   public synchronized int getNumConsumingSegmentsNotReachedIngestionCriteria() {
     Set<String> tablesWithMissingSegment = new HashSet<>();
-    for (Map.Entry<String, Set<String>> tableSegments : _consumingSegmentsByTable.entrySet()) {
+    Iterator<Map.Entry<String, Set<String>>> itr = _consumingSegmentsByTable.entrySet().iterator();
+    while (itr.hasNext()) {
+      Map.Entry<String, Set<String>> tableSegments = itr.next();
       String tableNameWithType = tableSegments.getKey();
       TableDataManager tableDataManager = _instanceDataManager.getTableDataManager(tableNameWithType);
       if (tableDataManager == null) {
@@ -68,14 +71,13 @@ public abstract class IngestionBasedConsumptionStatusChecker {
         if (caughtUpSegments.contains(segName)) {
           continue;
         }
-        SegmentDataManager segmentDataManager = null;
+        SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segName);
+        if (segmentDataManager == null) {
+          _logger.info("No SegmentDataManager for segment: {}. Will check consumption status later", segName);
+          tablesWithMissingSegment.add(tableNameWithType);
+          continue;
+        }
         try {
-          segmentDataManager = tableDataManager.acquireSegment(segName);
-          if (segmentDataManager == null) {
-            _logger.info("No SegmentDataManager for segment: {}. Will check consumption status later", segName);
-            tablesWithMissingSegment.add(tableNameWithType);
-            continue;
-          }
           if (!(segmentDataManager instanceof RealtimeSegmentDataManager)) {
             // There's a possibility that a consuming segment has converted to a committed segment. If that's the case,
             // segment data manager will not be of type RealtimeSegmentDataManager.
@@ -88,10 +90,14 @@ public abstract class IngestionBasedConsumptionStatusChecker {
             caughtUpSegments.add(segName);
           }
         } finally {
-          if (segmentDataManager != null) {
-            tableDataManager.releaseSegment(segmentDataManager);
-          }
+          tableDataManager.releaseSegment(segmentDataManager);
         }
+      }
+      int numLaggingSegments = consumingSegments.size() - caughtUpSegments.size();
+      if (numLaggingSegments == 0) {
+        _logger.info("Consuming segments from table: {} have all caught up", tableNameWithType);
+        itr.remove();
+        _caughtUpSegmentsByTable.remove(tableNameWithType);
       }
     }
     if (!tablesWithMissingSegment.isEmpty()) {

@@ -359,6 +359,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
         new ServiceStatus.MultipleCallbackServiceStatusCallback(serviceStatusCallbackListBuilder.build()));
   }
 
+  @Nullable
   private Set<String> getConsumingSegments(String realtimeTableName) {
     IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, realtimeTableName);
     if (idealState == null || !idealState.isEnabled()) {
