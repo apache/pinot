@@ -19,7 +19,10 @@
 package org.apache.pinot.plugin.inputformat.protobuf;
 
 import com.google.common.base.Preconditions;
+import com.google.protobuf.Descriptors;
+import com.google.protobuf.Message;
 import java.io.File;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.URL;
 import java.net.URLClassLoader;
@@ -41,7 +44,9 @@ public class ProtoBufCodeGenMessgeDecoder implements StreamMessageDecoder<byte[]
 
   public static final String PROTOBUF_JAR_FILE_PATH = "jarFile";
   public static final String PROTO_CLASS_NAME = "protoClassName";
+  public static final String EXTRACTOR_PACKAGE_NAME = "org.apache.pinot.plugin.inputformat.protobuf.decoder";
   public static final String EXTRACTOR_CLASS_NAME = "ProtobufRecorderMessageExtractor";
+  public static final String EXTRACTOR_METHOD_NAME = "execute";
   private Class _recordExtractor = ProtoBufMessageDecoder.class;
   private Method _decodeMethod;
 
@@ -57,11 +62,12 @@ public class ProtoBufCodeGenMessgeDecoder implements StreamMessageDecoder<byte[]
     String protoClassName = props.getOrDefault(PROTO_CLASS_NAME, "");
     String jarPath = props.getOrDefault(PROTOBUF_JAR_FILE_PATH, "");
     ClassLoader protoMessageClsLoader = loadClass(jarPath);
-    String codeGenCode = new MessageCodeGen().codegen(protoMessageClsLoader, protoClassName, fieldsToRead);
-    _recordExtractor = compileClass(protoMessageClsLoader, EXTRACTOR_CLASS_NAME, codeGenCode);
-    _decodeMethod = _recordExtractor.getMethod("execute", byte[].class, GenericRow.class);
+    Descriptors.Descriptor descriptor = getDescriptorForProtoClass(protoMessageClsLoader, protoClassName);
+    String codeGenCode = new MessageCodeGen().codegen(descriptor, fieldsToRead);
+    _recordExtractor = compileClass(
+        protoMessageClsLoader, EXTRACTOR_PACKAGE_NAME + "." + EXTRACTOR_CLASS_NAME, codeGenCode);
+    _decodeMethod = _recordExtractor.getMethod(EXTRACTOR_METHOD_NAME, byte[].class, GenericRow.class);
   }
-
 
   @Nullable
   @Override
@@ -80,7 +86,7 @@ public class ProtoBufCodeGenMessgeDecoder implements StreamMessageDecoder<byte[]
     return decode(Arrays.copyOfRange(payload, offset, offset + length), destination);
   }
 
-  private static ClassLoader loadClass(String jarFilePath) {
+  public static ClassLoader loadClass(String jarFilePath) {
     try {
       File file = ProtoBufUtils.getFileCopiedToLocal(jarFilePath);
       URL url = file.toURI().toURL();
@@ -91,7 +97,7 @@ public class ProtoBufCodeGenMessgeDecoder implements StreamMessageDecoder<byte[]
     }
   }
 
-  public static Class compileClass(ClassLoader classloader, String className, String code)
+  private Class compileClass(ClassLoader classloader, String className, String code)
       throws ClassNotFoundException {
     SimpleCompiler simpleCompiler = new SimpleCompiler();
     simpleCompiler.setParentClassLoader(classloader);
@@ -103,6 +109,13 @@ public class ProtoBufCodeGenMessgeDecoder implements StreamMessageDecoder<byte[]
           "Program cannot be compiled. This is a bug. Please file an issue.", t);
     }
     return simpleCompiler.getClassLoader()
-        .loadClass("org.apache.pinot.plugin.inputformat.protobuf.decoder." + className);
+        .loadClass(className);
+  }
+
+  public static Descriptors.Descriptor getDescriptorForProtoClass(ClassLoader protoMessageClsLoader,
+      String protoClassName)
+      throws NoSuchMethodException, ClassNotFoundException, InvocationTargetException, IllegalAccessException {
+    Class<? extends Message> updateMessage = (Class<Message>) protoMessageClsLoader.loadClass(protoClassName);
+    return (Descriptors.Descriptor) updateMessage.getMethod("getDescriptor").invoke(null);
   }
 }

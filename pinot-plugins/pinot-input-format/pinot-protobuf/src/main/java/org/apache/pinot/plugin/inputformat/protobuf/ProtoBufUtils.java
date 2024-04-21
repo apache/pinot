@@ -74,7 +74,12 @@ public class ProtoBufUtils {
     return dstFile;
   }
 
-
+  // This is needed since the generated class name is not always the same as the proto file name.
+  // The descriptor that we get from the jar drops the first prefix of the proto class name.
+  // For example, insead of com.data.example.ExampleProto we get data.example.ExampleProto.
+  // Copied from Flink codebase.
+  // https://github.com/apache/flink/blob/master/flink-formats/flink-protobuf/
+  // src/main/java/org/apache/flink/formats/protobuf/util/PbCodegenUtils.java
   public static String getFullJavaName(Descriptors.Descriptor descriptor) {
     if (null != descriptor.getContainingType()) {
       // nested type
@@ -138,6 +143,64 @@ public class ProtoBufUtils {
       } else {
         return outerName;
       }
+    }
+  }
+
+  /**
+   * Get java type str from {@link Descriptors.FieldDescriptor} which directly fetched from protobuf object.
+   *
+   * @return The returned code phrase will be used as java type str in codegen sections.
+   */
+  public static String getTypeStrFromProto(Descriptors.FieldDescriptor fd, boolean isList) {
+    String typeStr;
+    switch (fd.getJavaType()) {
+      case MESSAGE:
+        if (fd.isMapField()) {
+          // map
+          Descriptors.FieldDescriptor keyFd =
+              fd.getMessageType().findFieldByName("key");
+          Descriptors.FieldDescriptor valueFd =
+              fd.getMessageType().findFieldByName("value");
+          // key and value cannot be repeated
+          String keyTypeStr = getTypeStrFromProto(keyFd, false);
+          String valueTypeStr = getTypeStrFromProto(valueFd, false);
+          typeStr = "Map<" + keyTypeStr + "," + valueTypeStr + ">";
+        } else {
+          // simple message
+          typeStr = getFullJavaName(fd.getMessageType());
+        }
+        break;
+      case INT:
+        typeStr = "Integer";
+        break;
+      case LONG:
+        typeStr = "Long";
+        break;
+      case STRING:
+        typeStr = "String";
+        break;
+      case ENUM:
+        typeStr = getFullJavaName(fd.getEnumType());
+        break;
+      case FLOAT:
+        typeStr = "Float";
+        break;
+      case DOUBLE:
+        typeStr = "Double";
+        break;
+      case BYTE_STRING:
+        typeStr = "ByteString";
+        break;
+      case BOOLEAN:
+        typeStr = "Boolean";
+        break;
+      default:
+        throw new RuntimeException("do not support field type: " + fd.getJavaType());
+    }
+    if (isList) {
+      return "List<" + typeStr + ">";
+    } else {
+      return typeStr;
     }
   }
 }

@@ -19,16 +19,16 @@
 package org.apache.pinot.plugin.inputformat.protobuf.codegen;
 
 import com.google.protobuf.Descriptors;
-import com.google.protobuf.Message;
 import com.google.protobuf.ProtobufInternalUtils;
-import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.plugin.inputformat.protobuf.ProtoBufCodeGenMessgeDecoder;
 import org.apache.pinot.plugin.inputformat.protobuf.ProtoBufUtils;
@@ -36,24 +36,27 @@ import org.apache.pinot.plugin.inputformat.protobuf.ProtoBufUtils;
 
 public class MessageCodeGen {
 
-  public String codegen(ClassLoader protoMessageClsLoader, String protoClassName, Set<String> fieldsToRead)
-      throws ClassNotFoundException, InvocationTargetException, NoSuchMethodException, IllegalAccessException,
-             InstantiationException {
-    Descriptors.Descriptor descriptor = getDescriptorForProtoClass(protoMessageClsLoader, protoClassName);
+  public String codegen(Descriptors.Descriptor descriptor, Set<String> fieldsToRead) {
+    // Generate the code for each message type in the fieldsToRead and the descriptor
     HashMap<String, MessageDecoderMethod> msgDecodeCode = generateMessageDeserializeCode(descriptor, fieldsToRead);
-    return generateCode(descriptor, fieldsToRead, msgDecodeCode);
+    return generateRecordExtractorCode(descriptor, fieldsToRead, msgDecodeCode);
   }
 
-  public String generateCode(
+  /*
+   * Generate the code for the Record Extractor that's specific to the given descriptor
+   * Generates a class org.apache.pinot.plugin.inputformat.protobuf.decoder.ProtobufRecorderMessageExtractor with a
+   * static method execute that takes a byte array and a GenericRow object and populates the GenericRow object with the
+   * values using the message decoder generated before for the main class in the descriptor.
+   */
+  public String generateRecordExtractorCode(
       Descriptors.Descriptor descriptor,
       Set<String> fieldsToRead,
-      HashMap<String, MessageDecoderMethod> msgDecodeCode)
-      throws ClassNotFoundException, NoSuchMethodException, InvocationTargetException, IllegalAccessException {
+      HashMap<String, MessageDecoderMethod> msgDecodeCode) {
     String fullyQualifiedMsgName = ProtoBufUtils.getFullJavaName(descriptor);
 
     StringBuilder code = new StringBuilder();
-    code.append("package org.apache.pinot.plugin.inputformat.protobuf.decoder;\n");
-    code.append(addImports(Set.of(
+    code.append(completeLine("package " + ProtoBufCodeGenMessgeDecoder.EXTRACTOR_PACKAGE_NAME, 0));
+    code.append(addImports(List.of(
         "org.apache.pinot.spi.data.readers.GenericRow",
         "java.util.ArrayList",
         "java.util.HashMap",
@@ -63,21 +66,30 @@ public class MessageCodeGen {
     code.append(String.format("public class %s {\n", ProtoBufCodeGenMessgeDecoder.EXTRACTOR_CLASS_NAME));
     int indent = 1;
     code.append(
-        addIndent("public static GenericRow execute(byte[] from, GenericRow to) throws Exception {", indent));
+        addIndent(String.format("public static GenericRow %s(byte[] from, GenericRow to) throws Exception {",
+            ProtoBufCodeGenMessgeDecoder.EXTRACTOR_METHOD_NAME), indent));
+    // Call the decode method for the main class in the descriptor and populate the GenericRow object
+    // Example: Map<String, Object> msgMap = decodeSample_SampleRecordMessage(Sample.SampleRecord.parseFrom(from));
     code.append(
         completeLine(String.format("Map<String, Object> msgMap = %s(%s.parseFrom(from))",
                 msgDecodeCode.get(ProtoBufUtils.getFullJavaName(descriptor)).getMethodName(),
                 fullyQualifiedMsgName),
             ++indent));
 
+    // Find all the fields in the descriptor to read based on fieldsToRead
     List<Descriptors.FieldDescriptor> allDesc = new ArrayList<>();
     if (fieldsToRead != null && !fieldsToRead.isEmpty()) {
-      for (String fieldName: fieldsToRead) {
+      for (String fieldName: fieldsToRead.stream().sorted().collect(Collectors.toList())) {
+        if (descriptor.findFieldByName(fieldName) == null) {
+          throw new IllegalArgumentException("Field " + fieldName + " not found in the descriptor");
+        }
         allDesc.add(descriptor.findFieldByName(fieldName));
       }
     } else {
       allDesc = descriptor.getFields();
     }
+    // Add the values to the GenericRow object
+    // Example: to.putValue("email", msgMap.getOrDefault("email", null));
     for (Descriptors.FieldDescriptor desc: allDesc) {
       code.append(
           completeLine(String.format("to.putValue(\"%s\", msgMap.getOrDefault(\"%s\", null))",
@@ -91,27 +103,12 @@ public class MessageCodeGen {
       code.append("\n");
       code.append(msgCode.getCode());
     }
-    code.append(addIndent("}\n", --indent));
+    code.append(addIndent("}", --indent));
     return code.toString();
   }
 
-  public String addImports(Set<String> classNames) {
-    String code = "";
-    for (String className: classNames) {
-      code = code + "import " + className + ";\n";
-    }
-    return code;
-  }
 
-  private Descriptors.Descriptor getDescriptorForProtoClass(
-      ClassLoader protoMessageClsLoader,
-      String protoClassName)
-      throws NoSuchMethodException, ClassNotFoundException, InvocationTargetException, IllegalAccessException,
-             InstantiationException {
-    Class<? extends Message> updateMessage = (Class<Message>) protoMessageClsLoader.loadClass(protoClassName);
-    return (Descriptors.Descriptor) updateMessage.getMethod("getDescriptor").invoke(null);
-  }
-
+  // Generates methods to decode each message type in the descriptor as needed.
   public HashMap<String, MessageDecoderMethod> generateMessageDeserializeCode(
       Descriptors.Descriptor mainDescriptor, Set<String> fieldsToRead) {
     HashMap<String, MessageDecoderMethod> msgDecodeCode = new HashMap<>();
@@ -125,10 +122,10 @@ public class MessageCodeGen {
     return msgDecodeCode;
   }
 
-  private void generateDecodeCodeForAMessage(
-      HashMap<String, MessageDecoderMethod> msgDecodeCode,
-      Queue<Descriptors.Descriptor> queue,
-      Set<String> fieldsToRead) {
+
+  // Generates the code to decode a message type and adds it to the msgDecodeCode map
+  void generateDecodeCodeForAMessage(Map<String, MessageDecoderMethod> msgDecodeCode,
+      Queue<Descriptors.Descriptor> queue, Set<String> fieldsToRead) {
     Descriptors.Descriptor descriptor = queue.remove();
     String fullyQualifiedMsgName = ProtoBufUtils.getFullJavaName(descriptor);
     int varNum = 1;
@@ -138,13 +135,15 @@ public class MessageCodeGen {
     StringBuilder code = new StringBuilder();
     String methodNameOfDecoder = getDecoderMethodName(fullyQualifiedMsgName);
     int indent = 1;
+    // Creates decoder method for a message type. Example method signature:
+    // public static Map<String, Object> decodeSample_SampleRecordMessage(Sample.SampleRecord msg)
     code.append(addIndent(
-        String.format("private static Map<String, Object> %s(%s msg) {", methodNameOfDecoder,
+        String.format("public static Map<String, Object> %s(%s msg) {", methodNameOfDecoder,
             fullyQualifiedMsgName), indent));
     code.append(completeLine("Map<String, Object> msgMap = new HashMap<>()", ++indent));
     List<Descriptors.FieldDescriptor> descriptorsToDerive = new ArrayList<>();
     if (fieldsToRead != null && !fieldsToRead.isEmpty()) {
-      for (String fieldName: fieldsToRead) {
+      for (String fieldName: fieldsToRead.stream().sorted().collect(Collectors.toList())) {
         descriptorsToDerive.add(descriptor.findFieldByName(fieldName));
       }
     } else {
@@ -167,10 +166,63 @@ public class MessageCodeGen {
         case SINT64:
         case DOUBLE:
         case FLOAT:
-        case BOOL:
+          /* Generate code for scalar field extraction
+           Example: If field has presence
+            if (msg.hasEmail()) {
+              msgMap.put("email", msg.getEmail());
+            }
+           OR if no presence:
+            msgMap.put("email", msg.getEmail());
+           OR if repeated:
+            if (msg.getEmailCount() > 0) {
+             msgMap.put("email", msg.getEmailList().toArray());
+            }
+          */
           code.append(codeForScalarFieldExtraction(desc, fieldNameInCode, indent));
           break;
+        case BOOL:
+          /* Generate code for boolean field extraction
+           Example: If field has presence
+             if (msg.hasIsRegistered()) {
+               msgMap.put("is_registered", String.valueOf(msg.getIsRegistered()));
+             }
+           OR if no presence:
+             msgMap.put("is_registered", String.valueOf(msg.getIsRegistered()));
+           OR if repeated:
+             List<Object> list1 = new ArrayList<>();
+             for (String row: msg.getIsRegisteredList()) {
+               list3.add(String.valueOf(row));
+             }
+             if (!list1.isEmpty()) {
+                msgMap.put("is_registered", list1.toArray());
+             }
+          */
+          code.append(codeForComplexFieldExtraction(
+              desc,
+              fieldNameInCode,
+              "String",
+              indent,
+              ++varNum,
+              "String.valueOf",
+              ""));
+          break;
         case BYTES:
+          /* Generate code for bytes field extraction
+            Example: If field has presence
+              if (msg.hasEmail()) {
+                msgMap.put("email", msg.getEmail().toByteArray());
+              }
+            OR if no presence:
+              msgMap.put("email", msg.getEmail().toByteArray());
+            OR if repeated:
+              List<Object> list1 = new ArrayList<>();
+              for (com.google.protobuf.ByteString row: msg.getEmailList()) {
+                list1.add(row.toByteArray());
+              }
+              if (!list1.isEmpty()) {
+                msgMap.put("email", list1.toArray());
+              }
+           */
           code.append(codeForComplexFieldExtraction(
               desc,
               fieldNameInCode,
@@ -181,6 +233,22 @@ public class MessageCodeGen {
               ".toByteArray()"));
           break;
         case ENUM:
+          /* Generate code for enum field extraction
+            Example: If field has presence
+              if (msg.hasStatus()) {
+                msgMap.put("status", msg.getStatus().name());
+              }
+            OR if no presence:
+              msgMap.put("status", msg.getStatus().name());
+            OR if repeated:
+              List<Object> list1 = new ArrayList<>();
+              for (Status row: msg.getStatusList()) {
+                list1.add(row.name());
+              }
+              if (!list1.isEmpty()) {
+                msgMap.put("status", list1.toArray());
+              }
+           */
           code.append(codeForComplexFieldExtraction(
               desc,
               fieldNameInCode,
@@ -192,17 +260,49 @@ public class MessageCodeGen {
           break;
         case MESSAGE:
           String messageType = ProtoBufUtils.getFullJavaName(desc.getMessageType());
-          if (!msgDecodeCode.containsKey(messageType)) {
-            queue.add(desc.getMessageType());
+          if (desc.isMapField()) {
+            // Generated code for Map extraction. The key for the map is always a scalar object in Protobuf.
+            Descriptors.FieldDescriptor valueDescriptor = desc.getMessageType().findFieldByName("value");
+            if (valueDescriptor.getType() == Descriptors.FieldDescriptor.Type.MESSAGE) {
+              /* Generate code for map field extraction if the value type is a message
+              Example: If field has presence
+                if (msg.hasComplexMap()) {
+                  Map<Object, Map<String, Object>> map1 = new HashMap<>();
+                  for (Map.Entry<String, ComplexTypes.TestMessage.NestedMessage> entry: msg.getComplexMapMap()
+                    .entrySet()) {
+                    map1.put(entry.getKey(), decodeComplexTypes_TestMessage_NestedMessageMessage(entry.getValue()));
+                  }
+                  msgMap.put("complex_map", map1);
+                }
+              OR if no presence:
+                Map<Object, Map<String, Object>> map1 = new HashMap<>();
+                for (Map.Entry<String, ComplexTypes.TestMessage.NestedMessage> entry: msg.getComplexMapMap().entrySet())
+                {
+                  map1.put(entry.getKey(), decodeComplexTypes_TestMessage_NestedMessageMessage(entry.getValue()));
+                }
+                msgMap.put("complex_map", map1);
+             */
+              String valueDescClassName = ProtoBufUtils.getFullJavaName(valueDescriptor.getMessageType());
+              if (!msgDecodeCode.containsKey(valueDescClassName)) {
+                queue.add(valueDescriptor.getMessageType());
+              }
+              code.append(codeForMapWithValueMessageType(desc, fieldNameInCode, valueDescClassName, indent, varNum));
+              break;
+            } else {
+              /* Generate code for map field extraction if the value type is a scalar
+                msgMap.put("simple_map", msg.getSimpleMapMap());
+               */
+              code.append(completeLine(putFieldInMsgMapCode(desc.getName(),
+                  getProtoFieldMethodName(fieldNameInCode + "Map"), null, null),
+                  indent));
+            }
+          } else {
+            if (!msgDecodeCode.containsKey(messageType)) {
+              queue.add(desc.getMessageType());
+            }
+            code.append(codeForComplexFieldExtraction(desc, fieldNameInCode, messageType, indent, ++varNum,
+                getDecoderMethodName(messageType), ""));
           }
-          code.append(codeForComplexFieldExtraction(
-              desc,
-              fieldNameInCode,
-              messageType,
-              indent,
-              ++varNum,
-              getDecoderMethodName(messageType),
-              ""));
           break;
         default:
           break;
@@ -213,35 +313,104 @@ public class MessageCodeGen {
     msgDecodeCode.put(fullyQualifiedMsgName, new MessageDecoderMethod(methodNameOfDecoder, code.toString()));
   }
 
-  private StringBuilder codeForScalarFieldExtraction(
-      Descriptors.FieldDescriptor desc, String fieldNameInCode, int indent) {
+  /* Generate code for map field extraction if the value type is a Message
+   * Example: If field has presence
+   *   if (msg.hasComplexMap()) {
+   *    Map<Object, Map<String, Object>> map1 = new HashMap<>();
+   *    for (Map.Entry<String, ComplexTypes.TestMessage.NestedMessage> entry: msg.getComplexMapMap().entrySet()) {
+   *      map1.put(entry.getKey(), decodeComplexTypes_TestMessage_NestedMessageMessage(entry.getValue()));
+   *    }
+   *    msgMap.put("complex_map", map1);
+   *  }
+   * OR if no presence:
+   *   Map<Object, Map<String, Object>> map1 = new HashMap<>();
+   *     for (Map.Entry<String, ComplexTypes.TestMessage.NestedMessage> entry: msg.getComplexMapMap().entrySet()) {
+   *     map1.put(entry.getKey(), decodeComplexTypes_TestMessage_NestedMessageMessage(entry.getValue()));
+   *   }
+   *   msgMap.put("complex_map", map1);
+   *
+   *  @param desc Field descriptor for the map field
+   *  @param fieldNameInCode Field name in the generated code
+   *  @param valueDescClassName Full class name of the value type in the map field
+   *  @param indent Indentation level
+   *  @param varNum Variable number to use in the generated code
+   */
+  StringBuilder codeForMapWithValueMessageType(Descriptors.FieldDescriptor desc,
+      String fieldNameInCode,
+      String valueDescClassName,
+      int indent,
+      int varNum) {
+    StringBuilder code = new StringBuilder();
+    varNum++;
+    String mapVarName = "map" + varNum;
+    StringBuilder code1 = new StringBuilder();
+    code.append(
+        completeLine(String.format("Map<Object, Map<String, Object>> %s = new HashMap<>()", mapVarName), indent));
+    code.append(addIndent(String.format("for (Map.Entry<%s, %s> entry: msg.%s().entrySet()) {",
+        ProtoBufUtils.getTypeStrFromProto(desc.getMessageType().findFieldByName("key"), false),
+        ProtoBufUtils.getTypeStrFromProto(desc, false),
+        getProtoFieldMethodName(fieldNameInCode + "Map")), indent));
+    code.append(completeLine(String.format("%s.put(entry.getKey(), %s( (%s) entry.getValue()))", mapVarName,
+        getDecoderMethodName(valueDescClassName), valueDescClassName), ++indent));
+    code.append(addIndent("}", --indent));
+    code.append(completeLine(String.format("msgMap.put(\"%s\", %s)", desc.getName(), mapVarName), indent));
+    return code;
+  }
+
+    /*
+    * Generate code for scalar field extraction
+    * Example: If field has presence
+    *   if (msg.hasEmail()) {
+    *     msgMap.put("email", msg.getEmail());
+    *   }
+    * OR if no presence:
+    *   msgMap.put("email", msg.getEmail());
+    * OR if repeated:
+    *  if (msg.getEmailCount() > 0) {
+    *    msgMap.put("email", msg.getEmailList().toArray());
+    *  }
+   */
+  StringBuilder codeForScalarFieldExtraction(Descriptors.FieldDescriptor desc, String fieldNameInCode, int indent) {
     StringBuilder code = new StringBuilder();
     if (desc.isRepeated()) {
       code.append(addIndent(String.format("if (msg.%s() > 0) {", getCountMethodName(fieldNameInCode)), indent));
       code.append(completeLine(
-          putFieldInMsgMapCode(desc.getName(), getProtoFieldListMethodName(fieldNameInCode) + "().toArray"),
+          putFieldInMsgMapCode(desc.getName(),
+              getProtoFieldListMethodName(fieldNameInCode) + "().toArray", null, null),
           ++indent));
       code.append(addIndent("}", --indent));
     } else if (desc.hasPresence()) {
       code.append(addIndent(String.format("if (msg.%s()) {", hasPresenceMethodName(fieldNameInCode)), indent));
       code.append(completeLine(
-          putFieldInMsgMapCode(desc.getName(), getProtoFieldMethodName(fieldNameInCode)),
+          putFieldInMsgMapCode(desc.getName(), getProtoFieldMethodName(fieldNameInCode), null, null),
           ++indent));
       code.append(addIndent("}", --indent));
     } else {
-      code.append(completeLine(putFieldInMsgMapCode(desc.getName(), getProtoFieldMethodName(fieldNameInCode)), indent));
+      code.append(completeLine(
+          putFieldInMsgMapCode(desc.getName(), getProtoFieldMethodName(fieldNameInCode), null, null), indent));
     }
     return code;
   }
 
-  private StringBuilder codeForComplexFieldExtraction(
-      Descriptors.FieldDescriptor desc,
-      String fieldNameInCode,
-      String javaFieldType,
-      int indent,
-      int varNum,
-      String decoderMethod,
-      String additionalExtractions) {
+  /*
+   * Generate code for complex field extraction
+   * Example: If field has presence
+   *   if (msg.hasNestedMessage()) {
+   *     msgMap.put("nested_message", decodeComplexTypes_TestMessage_NestedMessageMessage(msg.getNestedMessage()));
+   *   }
+   * OR if no presence:
+   *   msgMap.put("nested_message", decodeComplexTypes_TestMessage_NestedMessageMessage(msg.getNestedMessage()));
+   * OR if repeated:
+   *   List<Object> list1 = new ArrayList<>();
+   *   for (ComplexTypes.TestMessage.NestedMessage row: msg.getRepeatedNestedMessagesList()) {
+   *     list1.add(decodeComplexTypes_TestMessage_NestedMessageMessage(row));
+   *   }
+   *   if (!list1.isEmpty()) {
+   *     msgMap.put("repeated_nested_messages", list1.toArray());
+   *   }
+   */
+  StringBuilder codeForComplexFieldExtraction(Descriptors.FieldDescriptor desc, String fieldNameInCode,
+      String javaFieldType, int indent, int varNum, String decoderMethod, String additionalExtractions) {
     StringBuilder code = new StringBuilder();
     if (StringUtils.isBlank(additionalExtractions)) {
       additionalExtractions = "";
@@ -271,7 +440,7 @@ public class MessageCodeGen {
       code.append(completeLine(putFieldInMsgMapCode(
           desc.getName(), getProtoFieldMethodName(fieldNameInCode), decoderMethod, additionalExtractions),
           ++indent));
-      code.append(addIndent("}", indent--));
+      code.append(addIndent("}", --indent));
     } else {
       code.append(completeLine(putFieldInMsgMapCode(
           desc.getName(), getProtoFieldMethodName(fieldNameInCode), decoderMethod, additionalExtractions),
@@ -300,12 +469,8 @@ public class MessageCodeGen {
     return String.format("get%sCount", msgNameInCode);
   }
 
-  private String putFieldInMsgMapCode(String fieldNameInProto, String methodToCall) {
-    return String.format("msgMap.put(\"%s\", msg.%s())", fieldNameInProto, methodToCall);
-  }
-
-  private String putFieldInMsgMapCode(String fieldNameInProto,
-      String getFieldMethodName, String optionalDecodeMethod, String optionalAdditionalCalls) {
+  protected String putFieldInMsgMapCode(String fieldNameInProto, String getFieldMethodName, String optionalDecodeMethod,
+      String optionalAdditionalCalls) {
     if (StringUtils.isBlank(optionalAdditionalCalls)) {
       optionalAdditionalCalls = "";
     }
@@ -317,27 +482,28 @@ public class MessageCodeGen {
         fieldNameInProto, getFieldMethodName, optionalAdditionalCalls);
   }
 
+  protected String addImports(List<String> classNames) {
+    StringBuilder code = new StringBuilder();
+    for (String className: classNames) {
+      code.append("import ").append(className).append(";\n");
+    }
+    return code.toString();
+  }
 
-
+  // Adds a ';' and newline at the end of the line and adds the indent spaces at the beginning
   protected String completeLine(String line, int indent) {
-    StringBuilder sb = new StringBuilder();
-    sb.append(" ".repeat(Math.max(0, indent)));
-    sb.append(line);
-    sb.append(";\n");
-    return sb.toString();
+    return "  ".repeat(Math.max(0, indent)) + line + ";\n";
   }
 
+  // Adds a newline at the end of the line and adds the indent spaces at the beginning
   protected String addIndent(String line, int indent) {
-    StringBuilder sb = new StringBuilder();
-    sb.append(" ".repeat(Math.max(0, indent)));
-    sb.append(line);
-    sb.append("\n");
-    return sb.toString();
+    return "  ".repeat(Math.max(0, indent)) + line + "\n";
   }
 
-  private class MessageDecoderMethod {
-    private String _methodName;
-    private String _code;
+  // Stores the method name and the code for the message decoder
+  static class MessageDecoderMethod {
+    private final String _methodName;
+    private final String _code;
 
     MessageDecoderMethod(String methodName, String code) {
       _methodName = methodName;
