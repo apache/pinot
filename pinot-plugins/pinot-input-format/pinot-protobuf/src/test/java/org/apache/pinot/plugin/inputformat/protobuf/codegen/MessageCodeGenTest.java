@@ -43,7 +43,6 @@ import org.testng.annotations.Test;
 import static org.apache.pinot.plugin.inputformat.protobuf.ProtoBufTestDataGenerator.*;
 import static org.testng.Assert.assertEquals;
 
-
 public class MessageCodeGenTest {
     @Test
     public void testCompleteLine() {

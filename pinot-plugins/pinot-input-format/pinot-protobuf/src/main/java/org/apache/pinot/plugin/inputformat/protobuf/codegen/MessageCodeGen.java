@@ -30,7 +30,6 @@ import java.util.Queue;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.lang.StringUtils;
-import org.apache.pinot.plugin.inputformat.protobuf.ProtoBufCodeGenMessageDecoder;
 import org.apache.pinot.plugin.inputformat.protobuf.ProtoBufUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,6 +39,7 @@ public class MessageCodeGen {
   public static final String EXTRACTOR_PACKAGE_NAME = "org.apache.pinot.plugin.inputformat.protobuf.decoder";
   public static final String EXTRACTOR_CLASS_NAME = "ProtobufRecorderMessageExtractor";
   public static final String EXTRACTOR_METHOD_NAME = "execute";
+
   public String codegen(Descriptors.Descriptor descriptor, Set<String> fieldsToRead) {
     // Generate the code for each message type in the fieldsToRead and the descriptor
     HashMap<String, MessageDecoderMethod> msgDecodeCode = generateMessageDeserializeCode(descriptor, fieldsToRead);
@@ -59,7 +59,7 @@ public class MessageCodeGen {
     String fullyQualifiedMsgName = ProtoBufUtils.getFullJavaName(descriptor);
 
     StringBuilder code = new StringBuilder();
-    code.append(completeLine("package " + ProtoBufCodeGenMessageDecoder.EXTRACTOR_PACKAGE_NAME, 0));
+    code.append(completeLine("package " + EXTRACTOR_PACKAGE_NAME, 0));
     code.append(addImports(List.of(
         "org.apache.pinot.spi.data.readers.GenericRow",
         "java.util.ArrayList",
@@ -67,11 +67,11 @@ public class MessageCodeGen {
         "java.util.List",
         "java.util.Map")));
     code.append("\n");
-    code.append(String.format("public class %s {\n", ProtoBufCodeGenMessageDecoder.EXTRACTOR_CLASS_NAME));
+    code.append(String.format("public class %s {\n", EXTRACTOR_CLASS_NAME));
     int indent = 1;
     code.append(
         addIndent(String.format("public static GenericRow %s(byte[] from, GenericRow to) throws Exception {",
-            ProtoBufCodeGenMessageDecoder.EXTRACTOR_METHOD_NAME), indent));
+            EXTRACTOR_METHOD_NAME), indent));
     // Call the decode method for the main class in the descriptor and populate the GenericRow object
     // Example: Map<String, Object> msgMap = decodeSample_SampleRecordMessage(Sample.SampleRecord.parseFrom(from));
     code.append(
@@ -257,7 +257,7 @@ public class MessageCodeGen {
           code.append(codeForComplexFieldExtraction(
               desc,
               fieldNameInCode,
-              ProtoBufUtils.getFullJavaName(desc.getEnumType()),
+              ProtoBufUtils.getFullJavaNameForEnum(desc.getEnumType()),
               indent,
               ++varNum,
               "",
@@ -354,8 +354,8 @@ public class MessageCodeGen {
     code.append(
         completeLine(String.format("Map<Object, Map<String, Object>> %s = new HashMap<>()", mapVarName), indent));
     code.append(addIndent(String.format("for (Map.Entry<%s, %s> entry: msg.%s().entrySet()) {",
-        ProtoBufUtils.getTypeStrFromProto(desc.getMessageType().findFieldByName("key"), false),
-        ProtoBufUtils.getTypeStrFromProto(desc, false),
+        ProtoBufUtils.getTypeStrFromProto(desc.getMessageType().findFieldByName("key")),
+        ProtoBufUtils.getTypeStrFromProto(desc),
         getProtoFieldMethodName(fieldNameInCode + "Map")), indent));
     code.append(completeLine(String.format("%s.put(entry.getKey(), %s( (%s) entry.getValue()))", mapVarName,
         getDecoderMethodName(valueDescClassName), valueDescClassName), ++indent));

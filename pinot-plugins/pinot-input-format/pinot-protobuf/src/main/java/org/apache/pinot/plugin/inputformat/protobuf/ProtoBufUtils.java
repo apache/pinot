@@ -41,19 +41,19 @@ public class ProtoBufUtils {
 
   public static File getFileCopiedToLocal(String filePath)
       throws Exception {
-    URI descriptorFileURI = URI.create(filePath);
-    String scheme = descriptorFileURI.getScheme();
+    URI fileURI = URI.create(filePath);
+    String scheme = fileURI.getScheme();
     if (scheme == null) {
       scheme = PinotFSFactory.LOCAL_PINOT_FS_SCHEME;
     }
     if (PinotFSFactory.isSchemeSupported(scheme)) {
       PinotFS pinotFS = PinotFSFactory.create(scheme);
       Path localTmpDir = Files.createTempDirectory(TMP_DIR_PREFIX + System.currentTimeMillis());
-      File protoDescriptorLocalFile = createLocalFile(descriptorFileURI, localTmpDir.toFile());
+      File localFile = createLocalFile(fileURI, localTmpDir.toFile());
       LOGGER.info("Copying protocol buffer jar/descriptor file from source: {} to dst: {}", filePath,
-          protoDescriptorLocalFile.getAbsolutePath());
-      pinotFS.copyToLocalFile(descriptorFileURI, protoDescriptorLocalFile);
-      return protoDescriptorLocalFile;
+          localFile.getAbsolutePath());
+      pinotFS.copyToLocalFile(fileURI, localFile);
+      return localFile;
     } else {
       throw new RuntimeException(String.format("Scheme: %s not supported in PinotFSFactory"
           + " for protocol buffer jar/descriptor file: %s.", scheme, filePath));
@@ -73,34 +73,26 @@ public class ProtoBufUtils {
     return dstFile;
   }
 
-  // Copied from Flink codebase. https://github.com/apache/flink/blob/master/flink-formats/flink-protobuf/
-  // src/main/java/org/apache/flink/formats/protobuf/util/PbCodegenUtils.java
-  // This is needed since the generated class name is not always the same as the proto file name.
-  // The descriptor that we get from the jar drops the first prefix of the proto class name.
-  // For example, insead of com.data.example.ExampleProto we get data.example.ExampleProto.
-  // Copied from Flink codebase.
-  // https://github.com/apache/flink/blob/master/flink-formats/flink-protobuf/
-  // src/main/java/org/apache/flink/formats/protobuf/util/PbCodegenUtils.java
   public static String getFullJavaName(Descriptors.Descriptor descriptor) {
+    String prefix;
     if (null != descriptor.getContainingType()) {
       // nested type
-      String parentJavaFullName = getFullJavaName(descriptor.getContainingType());
-      return parentJavaFullName + "." + descriptor.getName();
+      prefix = getFullJavaName(descriptor.getContainingType());
     } else {
       // top level message
-      String outerProtoName = getOuterProtoPrefix(descriptor.getFile());
-      return outerProtoName + descriptor.getName();
+      prefix = getOuterProtoPrefix(descriptor.getFile());
     }
+    return prefix + "." + descriptor.getName();
   }
 
-  public static String getFullJavaName(Descriptors.EnumDescriptor enumDescriptor) {
+  public static String getFullJavaNameForEnum(Descriptors.EnumDescriptor enumDescriptor) {
     if (null != enumDescriptor.getContainingType()) {
       return getFullJavaName(enumDescriptor.getContainingType())
           + "."
           + enumDescriptor.getName();
     } else {
       String outerProtoName = getOuterProtoPrefix(enumDescriptor.getFile());
-      return outerProtoName + enumDescriptor.getName();
+      return outerProtoName + "." + enumDescriptor.getName();
     }
   }
 
@@ -110,41 +102,36 @@ public class ProtoBufUtils {
             ? fileDescriptor.getOptions().getJavaPackage()
             : fileDescriptor.getPackage();
     if (fileDescriptor.getOptions().getJavaMultipleFiles()) {
-      return javaPackageName + ".";
-    } else {
-      String outerClassName = getOuterClassName(fileDescriptor);
-      return javaPackageName + "." + outerClassName + ".";
-    }
-  }
-
-  public static String getOuterClassName(Descriptors.FileDescriptor fileDescriptor) {
-    if (fileDescriptor.getOptions().hasJavaOuterClassname()) {
-      return fileDescriptor.getOptions().getJavaOuterClassname();
+      return javaPackageName;
+    } else if (fileDescriptor.getOptions().hasJavaOuterClassname()) {
+      return javaPackageName + "." + fileDescriptor.getOptions().hasJavaOuterClassname();
     } else {
       String[] fileNames = fileDescriptor.getName().split("/");
       String fileName = fileNames[fileNames.length - 1];
       String outerName = ProtobufInternalUtils.underScoreToCamelCase(fileName.split("\\.")[0], true);
-      // https://developers.google.com/protocol-buffers/docs/reference/java-generated#invocation
-      // The name of the wrapper class is determined by converting the base name of the .proto
-      // file to camel case if the java_outer_classname option is not specified.
-      // For example, foo_bar.proto produces the class name FooBar. If there is a service,
-      // enum, or message (including nested types) in the file with the same name,
-      // "OuterClass" will be appended to the wrapper class's name.
-      boolean hasSameNameMessage =
-          fileDescriptor.getMessageTypes().stream()
-              .anyMatch(f -> f.getName().equals(outerName));
-      boolean hasSameNameEnum =
-          fileDescriptor.getEnumTypes().stream()
-              .anyMatch(f -> f.getName().equals(outerName));
-      boolean hasSameNameService =
-          fileDescriptor.getServices().stream()
-              .anyMatch(f -> f.getName().equals(outerName));
-      if (hasSameNameMessage || hasSameNameEnum || hasSameNameService) {
-        return outerName + PB_OUTER_CLASS_SUFFIX;
+      if (hasTypeWithName(fileDescriptor.getMessageTypes(), outerName)
+          || hasTypeWithName(fileDescriptor.getEnumTypes(), outerName)
+          || hasTypeWithName(fileDescriptor.getServices(), outerName)) {
+        // https://developers.google.com/protocol-buffers/docs/reference/java-generated#invocation
+        // The name of the wrapper class is determined by converting the base name of the .proto
+        // file to camel case if the java_outer_classname option is not specified.
+        // For example, foo_bar.proto produces the class name FooBar. If there is a service,
+        // enum, or message (including nested types) in the file with the same name,
+        // "OuterClass" will be appended to the wrapper class's name.
+        return javaPackageName + "." + outerName + PB_OUTER_CLASS_SUFFIX;
       } else {
-        return outerName;
+        return javaPackageName + "." + outerName;
       }
     }
+  }
+
+  private static boolean hasTypeWithName(Iterable<? extends Descriptors.GenericDescriptor> descriptors, String name) {
+    for (Descriptors.GenericDescriptor descriptor : descriptors) {
+      if (descriptor.getName().equals(name)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**
@@ -152,56 +139,39 @@ public class ProtoBufUtils {
    *
    * @return The returned code phrase will be used as java type str in codegen sections.
    */
-  public static String getTypeStrFromProto(Descriptors.FieldDescriptor fd, boolean isList) {
-    String typeStr;
-    switch (fd.getJavaType()) {
+  public static String getTypeStrFromProto(Descriptors.FieldDescriptor desc) {
+    switch (desc.getJavaType()) {
+      case INT:
+        return "Integer";
+      case LONG:
+        return "Long";
+      case STRING:
+        return "String";
+      case FLOAT:
+        return "Float";
+      case DOUBLE:
+        return "Double";
+      case BYTE_STRING:
+        return "ByteString";
+      case BOOLEAN:
+        return "Boolean";
+      case ENUM:
+        return getFullJavaNameForEnum(desc.getEnumType());
       case MESSAGE:
-        if (fd.isMapField()) {
+        if (desc.isMapField()) {
           // map
-          Descriptors.FieldDescriptor keyFd =
-              fd.getMessageType().findFieldByName("key");
-          Descriptors.FieldDescriptor valueFd =
-              fd.getMessageType().findFieldByName("value");
+          final Descriptors.FieldDescriptor key = desc.getMessageType().findFieldByName("key");
+          final Descriptors.FieldDescriptor value = desc.getMessageType().findFieldByName("value");
           // key and value cannot be repeated
-          String keyTypeStr = getTypeStrFromProto(keyFd, false);
-          String valueTypeStr = getTypeStrFromProto(valueFd, false);
-          typeStr = "Map<" + keyTypeStr + "," + valueTypeStr + ">";
+          String keyTypeStr = getTypeStrFromProto(key);
+          String valueTypeStr = getTypeStrFromProto(value);
+          return "Map<" + keyTypeStr + "," + valueTypeStr + ">";
         } else {
           // simple message
-          typeStr = getFullJavaName(fd.getMessageType());
+          return getFullJavaName(desc.getMessageType());
         }
-        break;
-      case INT:
-        typeStr = "Integer";
-        break;
-      case LONG:
-        typeStr = "Long";
-        break;
-      case STRING:
-        typeStr = "String";
-        break;
-      case ENUM:
-        typeStr = getFullJavaName(fd.getEnumType());
-        break;
-      case FLOAT:
-        typeStr = "Float";
-        break;
-      case DOUBLE:
-        typeStr = "Double";
-        break;
-      case BYTE_STRING:
-        typeStr = "ByteString";
-        break;
-      case BOOLEAN:
-        typeStr = "Boolean";
-        break;
       default:
-        throw new RuntimeException("do not support field type: " + fd.getJavaType());
-    }
-    if (isList) {
-      return "List<" + typeStr + ">";
-    } else {
-      return typeStr;
+        throw new RuntimeException("do not support field type: " + desc.getJavaType());
     }
   }
 }

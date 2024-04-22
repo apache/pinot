@@ -39,6 +39,7 @@ import org.slf4j.LoggerFactory;
 
 public class ProtoBufCodeGenMessageDecoder implements StreamMessageDecoder<byte[]> {
   private static final Logger LOGGER = LoggerFactory.getLogger(ProtoBufCodeGenMessageDecoder.class);
+
   public static final String PROTOBUF_JAR_FILE_PATH = "jarFile";
   public static final String PROTO_CLASS_NAME = "protoClassName";
   private Class _recordExtractor = ProtoBufMessageDecoder.class;
@@ -59,7 +60,8 @@ public class ProtoBufCodeGenMessageDecoder implements StreamMessageDecoder<byte[
     Descriptors.Descriptor descriptor = getDescriptorForProtoClass(protoMessageClsLoader, protoClassName);
     String codeGenCode = new MessageCodeGen().codegen(descriptor, fieldsToRead);
     _recordExtractor = compileClass(
-        protoMessageClsLoader, MessageCodeGen.EXTRACTOR_PACKAGE_NAME + "." + MessageCodeGen.EXTRACTOR_CLASS_NAME, codeGenCode);
+        protoMessageClsLoader,
+        MessageCodeGen.EXTRACTOR_PACKAGE_NAME + "." + MessageCodeGen.EXTRACTOR_CLASS_NAME, codeGenCode);
     _decodeMethod = _recordExtractor.getMethod(MessageCodeGen.EXTRACTOR_METHOD_NAME, byte[].class, GenericRow.class);
   }
 

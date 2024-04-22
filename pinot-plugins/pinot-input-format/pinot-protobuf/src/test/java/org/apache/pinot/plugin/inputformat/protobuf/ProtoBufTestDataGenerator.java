@@ -64,6 +64,7 @@ public class ProtoBufTestDataGenerator {
   public static final String REPEATED_FLOATS = "repeated_floats";
   public static final String REPEATED_BOOLS = "repeated_bools";
   public static final String REPEATED_BYTES = "repeated_bytes";
+  public static final String REPEATED_ENUMS = "repeated_enums";
 
   public static ComplexTypes.TestMessage getComplexTypeObject(Map<String, Object> inputRecord)
       throws IOException {
