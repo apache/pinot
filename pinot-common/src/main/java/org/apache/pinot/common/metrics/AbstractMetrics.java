@@ -31,6 +31,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.spi.metrics.PinotGauge;
 import org.apache.pinot.spi.metrics.PinotMeter;
@@ -764,6 +765,10 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
 
   private String composeTableGaugeName(final String tableName, final String key, final G gauge) {
     return gauge.getGaugeName() + "." + getTableName(tableName) + "." + key;
+  }
+
+  public String composePluginGaugeName(String pluginName, Gauge gauge) {
+    return pluginName + StringUtils.capitalize(gauge.getGaugeName());
   }
 
   /**

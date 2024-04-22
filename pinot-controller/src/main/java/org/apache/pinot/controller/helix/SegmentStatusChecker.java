@@ -80,6 +80,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
   private long _lastDisabledTableLogTimestamp = 0;
 
   private TableSizeReader _tableSizeReader;
+  private Set<String> _tierBackendGauges = new HashSet<>();
 
   /**
    * Constructs the segment status checker.
@@ -137,9 +138,13 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.UPSERT_TABLE_COUNT, context._upsertTableCount);
     _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.DISABLED_TABLE_COUNT, context._disabledTables.size());
 
+    _tierBackendGauges.forEach(_controllerMetrics::removeGauge);
     // metric for total number of tables using a particular tier backend
-    context._tierBackendTableCountMap.forEach((tier, count) ->
-      _controllerMetrics.setOrUpdateGauge(tier + ControllerGauge.TIER_BACKEND_TABLE_COUNT.getGaugeName(), count));
+    context._tierBackendTableCountMap.forEach((tier, count) -> {
+      String gaugeName = _controllerMetrics.composePluginGaugeName(tier, ControllerGauge.TIER_BACKEND_TABLE_COUNT);
+      _controllerMetrics.setOrUpdateGauge(gaugeName, count);
+      _tierBackendGauges.add(gaugeName);
+    });
     // metric for total number of tables having tier backend configured
     _controllerMetrics.setOrUpdateGauge(ControllerGauge.TIER_BACKEND_TABLE_COUNT.getGaugeName(),
         context._tierBackendConfiguredTableCount);
