@@ -142,8 +142,8 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     // metric for total number of tables using a particular tier backend
     context._tierBackendTableCountMap.forEach((tier, count) -> {
       String gaugeName = _controllerMetrics.composePluginGaugeName(tier, ControllerGauge.TIER_BACKEND_TABLE_COUNT);
-      _controllerMetrics.setOrUpdateGauge(gaugeName, count);
       _tierBackendGauges.add(gaugeName);
+      _controllerMetrics.setOrUpdateGauge(gaugeName, count);
     });
     // metric for total number of tables having tier backend configured
     _controllerMetrics.setOrUpdateGauge(ControllerGauge.TIER_BACKEND_TABLE_COUNT.getGaugeName(),
