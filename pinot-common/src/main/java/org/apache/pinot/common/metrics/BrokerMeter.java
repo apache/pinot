@@ -82,11 +82,23 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
 
   HELIX_ZOOKEEPER_RECONNECTS("reconnects", true),
 
+  /**
+   * Number of requests dropped due to access error.
+   * <p>
+   * This metric is tracked of each table. So if a query touches multiple tables, this metric will be incremented for
+   * each table.
+   */
   REQUEST_DROPPED_DUE_TO_ACCESS_ERROR("requestsDropped", false),
 
   GROUP_BY_SIZE("queries", false),
-  TOTAL_SERVER_RESPONSE_SIZE("queries", false),
+  TOTAL_SERVER_RESPONSE_SIZE("bytes", false),
 
+  /**
+   * Number of queries that have been denied due to quota exceeded.
+   * <p>
+   * This metric is tracked of each table. So if a query touches multiple tables, this metric will be incremented for
+   * each table.
+   */
   QUERY_QUOTA_EXCEEDED("exceptions", false),
 
   // tracks a case a segment is not hosted by any server
@@ -102,7 +114,23 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
   NETTY_CONNECTION_BYTES_RECEIVED("nettyConnection", true),
 
   PROACTIVE_CLUSTER_CHANGE_CHECK("proactiveClusterChangeCheck", true),
-  DIRECT_MEMORY_OOM("directMemoryOOMCount", true);
+  DIRECT_MEMORY_OOM("directMemoryOOMCount", true),
+
+
+  /**
+   * Number of multi-stage queries that have been started.
+   * <p>
+   * Unlike {@link #MULTI_STAGE_QUERIES_BY_TABLE}, this metric is global and not attached to a particular table.
+   * That means it can be used to know how many multi-stage queries have been started in total.
+   */
+  MULTI_STAGE_QUERIES_EXECUTED("queries", true),
+  /**
+   * Number of multi-stage queries that have been started touched a given table.
+   * <p>
+   * In case the query touch multiple tables (ie using joins)1, this metric will be incremented for each table, so the
+   * sum of this metric across all tables should be greater or equal than {@link #MULTI_STAGE_QUERIES_EXECUTED}.
+   */
+  MULTI_STAGE_QUERIES_BY_TABLE("queries", false);
 
   private final String _brokerMeterName;
   private final String _unit;
