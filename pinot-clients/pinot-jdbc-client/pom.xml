@@ -33,7 +33,6 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/../..</pinot.root>
-    <shade.phase.prop>package</shade.phase.prop>
   </properties>
   <build>
     <resources>
@@ -82,4 +81,18 @@
       <artifactId>jsr305</artifactId>
     </dependency>
   </dependencies>
+  <profiles>
+    <profile>
+      <id>build-shaded-jar</id>
+      <activation>
+        <property>
+          <name>skipShade</name>
+          <value>!true</value>
+        </property>
+      </activation>
+      <properties>
+        <shade.phase.prop>package</shade.phase.prop>
+      </properties>
+    </profile>
+  </profiles>
 </project>

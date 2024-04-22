@@ -35,7 +35,6 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/../../..</pinot.root>
-    <shade.phase.prop>package</shade.phase.prop>
     <reactive.version>1.0.2</reactive.version>
     <localstack-utils.version>0.2.23</localstack-utils.version>
   </properties>
@@ -133,4 +132,19 @@
     </dependency>
 
   </dependencies>
+
+  <profiles>
+    <profile>
+      <id>build-shaded-jar</id>
+      <activation>
+        <property>
+          <name>skipShade</name>
+          <value>!true</value>
+        </property>
+      </activation>
+      <properties>
+        <shade.phase.prop>package</shade.phase.prop>
+      </properties>
+    </profile>
+  </profiles>
 </project>

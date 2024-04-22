@@ -36,7 +36,6 @@
   <properties>
     <pinot.root>${basedir}/../../..</pinot.root>
     <s3mock.version>2.12.2</s3mock.version>
-    <shade.phase.prop>package</shade.phase.prop>
   </properties>
 
   <dependencies>
@@ -65,4 +64,19 @@
       <scope>test</scope>
     </dependency>
   </dependencies>
+
+  <profiles>
+    <profile>
+      <id>build-shaded-jar</id>
+      <activation>
+        <property>
+          <name>skipShade</name>
+          <value>!true</value>
+        </property>
+      </activation>
+      <properties>
+        <shade.phase.prop>package</shade.phase.prop>
+      </properties>
+    </profile>
+  </profiles>
 </project>
