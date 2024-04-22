@@ -41,11 +41,9 @@ import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.calcite.jdbc.CalciteSchemaBuilder;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.exception.QueryException;
-import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.BrokerQueryPhase;
-import org.apache.pinot.common.metrics.BrokerTimer;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
@@ -109,7 +107,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   protected BrokerResponse handleRequest(long requestId, String query, @Nullable SqlNodeAndOptions sqlNodeAndOptions,
       JsonNode request, @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext,
       HttpHeaders httpHeaders) {
-    LOGGER.info("SQL query for request {}: {}", requestId, query);
+    LOGGER.debug("SQL query for request {}: {}", requestId, query);
 
     long compilationStartTimeNs;
     long queryTimeoutMs;
@@ -175,9 +173,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     _brokerMetrics.addMeteredGlobalValue(BrokerMeter.MULTI_STAGE_QUERIES_EXECUTED, 1);
     for (String tableName : tableNames) {
-      _brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.QUERIES, 1);
       _brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.MULTI_STAGE_QUERIES_BY_TABLE, 1);
-      _brokerMetrics.addValueToTableGauge(tableName, BrokerGauge.REQUEST_SIZE, query.length());
     }
 
     requestContext.setTableNames(List.copyOf(tableNames));
@@ -189,18 +185,12 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     // Validate table access.
     if (!hasTableAccess(requesterIdentity, tableNames, requestContext, httpHeaders)) {
-      for (String tableName : tableNames) {
-        _brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
-      }
       throw new WebApplicationException("Permission denied", Response.Status.FORBIDDEN);
     }
 
     // Validate QPS quota
     if (hasExceededQPSQuota(tableNames, requestContext)) {
       String errorMessage = String.format("Request %d: %s exceeds query quota.", requestId, query);
-      for (String rawTableName : tableNames) {
-        _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.QUERY_QUOTA_EXCEEDED, 1);
-      }
       return new BrokerResponseNative(QueryException.getException(QueryException.QUOTA_EXCEEDED_ERROR, errorMessage));
     }
 
@@ -276,18 +266,10 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     brokerResponse.setPartialResult(isPartialResult(brokerResponse));
 
     // Set total query processing time
+    // TODO: Currently we don't emit metric for QUERY_TOTAL_TIME_MS
     long totalTimeMs = TimeUnit.NANOSECONDS.toMillis(
         sqlNodeAndOptions.getParseTimeNs() + (executionEndTimeNs - compilationStartTimeNs));
     brokerResponse.setTimeUsedMs(totalTimeMs);
-    if (brokerResponse.isNumGroupsLimitReached()) {
-      for (String tableName : tableNames) {
-        _brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.BROKER_RESPONSES_WITH_NUM_GROUPS_LIMIT_REACHED, 1);
-      }
-    }
-    for (String tableName : tableNames) {
-      _brokerMetrics.addTimedTableValue(tableName, BrokerTimer.QUERY_TOTAL_TIME_MS, totalTimeMs,
-          TimeUnit.MILLISECONDS);
-    }
     requestContext.setQueryProcessingTime(totalTimeMs);
     requestContext.setTraceInfo(brokerResponse.getTraceInfo());
     augmentStatistics(requestContext, brokerResponse);

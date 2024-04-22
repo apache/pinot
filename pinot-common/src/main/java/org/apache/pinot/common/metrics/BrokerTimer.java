@@ -29,20 +29,6 @@ public enum BrokerTimer implements AbstractMetrics.Timer {
   ROUTING_TABLE_UPDATE_TIME(true),
   CLUSTER_CHANGE_QUEUE_TIME(true), // metric tracking the freshness lag for consuming segments
   FRESHNESS_LAG_MS(false),
-  /**
-   * Clock time spent in the broker for processing a query. This includes time spent in the following phases:
-   * <ol>
-   *   <li>Query validation</li>
-   *   <li>Query compilation</li>
-   *   <li>Query planning</li>
-   *   <li>Query execution</li>
-   * </ol>
-   * <p>
-   * But do not include response serialization.
-   * <p>
-   * This metric is tracked of each table. So if a query touches multiple tables, this metric will be incremented for
-   * each table.
-   */
   QUERY_TOTAL_TIME_MS(false),
 
   // The latency of sending the request from broker to server
