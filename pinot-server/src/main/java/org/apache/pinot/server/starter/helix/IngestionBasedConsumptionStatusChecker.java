@@ -54,15 +54,18 @@ public abstract class IngestionBasedConsumptionStatusChecker {
 
   // This might be called by multiple threads, thus synchronized to be correct.
   public synchronized int getNumConsumingSegmentsNotReachedIngestionCriteria() {
-    Set<String> tablesWithMissingSegment = new HashSet<>();
+    // If the checker found any consuming segments are missing or committed for a table, it should reset the set of
+    // consuming segments for the table to continue to monitor the freshness, otherwise the checker might get stuck
+    // on deleted segments or tables, or miss new consuming segments created in the table and get ready prematurely.
+    Set<String> tablesToRefresh = new HashSet<>();
     Iterator<Map.Entry<String, Set<String>>> itr = _consumingSegmentsByTable.entrySet().iterator();
     while (itr.hasNext()) {
       Map.Entry<String, Set<String>> tableSegments = itr.next();
       String tableNameWithType = tableSegments.getKey();
       TableDataManager tableDataManager = _instanceDataManager.getTableDataManager(tableNameWithType);
       if (tableDataManager == null) {
-        _logger.info("No tableDataManager for table: {}. Will check consumption status later", tableNameWithType);
-        tablesWithMissingSegment.add(tableNameWithType);
+        _logger.info("No tableDataManager for table: {}. Refresh table's consuming segments", tableNameWithType);
+        tablesToRefresh.add(tableNameWithType);
         continue;
       }
       Set<String> consumingSegments = tableSegments.getValue();
@@ -73,16 +76,19 @@ public abstract class IngestionBasedConsumptionStatusChecker {
         }
         SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segName);
         if (segmentDataManager == null) {
-          _logger.info("No SegmentDataManager for segment: {}. Will check consumption status later", segName);
-          tablesWithMissingSegment.add(tableNameWithType);
+          _logger.info("No segmentDataManager for segment: {} from table: {}. Refresh table's consuming segments",
+              segName, tableNameWithType);
+          tablesToRefresh.add(tableNameWithType);
           continue;
         }
         try {
           if (!(segmentDataManager instanceof RealtimeSegmentDataManager)) {
-            // There's a possibility that a consuming segment has converted to a committed segment. If that's the case,
-            // segment data manager will not be of type RealtimeSegmentDataManager.
-            _logger.info("Segment: {} is already committed and is considered caught up.", segName);
-            caughtUpSegments.add(segName);
+            // It's possible that the consuming segment has been committed by another server. In this case, we should
+            // get the new consuming segments for the table and continue to monitor their consumption status, until the
+            // current server catches up the consuming segments.
+            _logger.info("Segment: {} from table: {} is already committed. Refresh table's consuming segments.",
+                segName, tableNameWithType);
+            tablesToRefresh.add(tableNameWithType);
             continue;
           }
           RealtimeSegmentDataManager rtSegmentDataManager = (RealtimeSegmentDataManager) segmentDataManager;
@@ -100,8 +106,8 @@ public abstract class IngestionBasedConsumptionStatusChecker {
         _caughtUpSegmentsByTable.remove(tableNameWithType);
       }
     }
-    if (!tablesWithMissingSegment.isEmpty()) {
-      for (String tableNameWithType : tablesWithMissingSegment) {
+    if (!tablesToRefresh.isEmpty()) {
+      for (String tableNameWithType : tablesToRefresh) {
         Set<String> updatedConsumingSegments = _consumingSegmentsSupplier.apply(tableNameWithType);
         if (updatedConsumingSegments == null || updatedConsumingSegments.isEmpty()) {
           _consumingSegmentsByTable.remove(tableNameWithType);
@@ -112,8 +118,9 @@ public abstract class IngestionBasedConsumptionStatusChecker {
           _caughtUpSegmentsByTable.computeIfAbsent(tableNameWithType, k -> new HashSet<>())
               .retainAll(updatedConsumingSegments);
           _logger.info(
-              "Updated consumingSegments: {} and caughtUpSegments: {} for table: {}, as found missing segments from it",
-              updatedConsumingSegments, _caughtUpSegmentsByTable.get(tableNameWithType), tableNameWithType);
+              "Updated consumingSegments: {} and caughtUpSegments: {} for table: {}, as consuming segments were "
+                  + "missing or committed", updatedConsumingSegments, _caughtUpSegmentsByTable.get(tableNameWithType),
+              tableNameWithType);
         }
       }
     }

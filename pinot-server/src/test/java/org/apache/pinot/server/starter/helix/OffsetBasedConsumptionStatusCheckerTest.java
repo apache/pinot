@@ -48,7 +48,8 @@ public class OffsetBasedConsumptionStatusCheckerTest {
     consumingSegments.put("tableB_REALTIME", ImmutableSet.of(segB0));
     InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
     OffsetBasedConsumptionStatusChecker statusChecker =
-        new OffsetBasedConsumptionStatusChecker(instanceDataManager, consumingSegments, consumingSegments::get);
+        new OffsetBasedConsumptionStatusChecker(instanceDataManager, consumingSegments,
+            ConsumptionStatusCheckerTestUtils.getConsumingSegments(consumingSegments));
 
     // setup TableDataMangers
     TableDataManager tableDataManagerA = mock(TableDataManager.class);
@@ -98,7 +99,8 @@ public class OffsetBasedConsumptionStatusCheckerTest {
     InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
 
     OffsetBasedConsumptionStatusChecker statusChecker =
-        new OffsetBasedConsumptionStatusChecker(instanceDataManager, consumingSegments, consumingSegments::get);
+        new OffsetBasedConsumptionStatusChecker(instanceDataManager, consumingSegments,
+            ConsumptionStatusCheckerTestUtils.getConsumingSegments(consumingSegments));
 
     // TableDataManager is not set up yet
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 3);
@@ -160,7 +162,8 @@ public class OffsetBasedConsumptionStatusCheckerTest {
     consumingSegments.put("tableB_REALTIME", ImmutableSet.of(segB0));
     InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
     OffsetBasedConsumptionStatusChecker statusChecker =
-        new OffsetBasedConsumptionStatusChecker(instanceDataManager, consumingSegments, consumingSegments::get);
+        new OffsetBasedConsumptionStatusChecker(instanceDataManager, consumingSegments,
+            ConsumptionStatusCheckerTestUtils.getConsumingSegments(consumingSegments));
 
     // setup TableDataMangers
     TableDataManager tableDataManagerA = mock(TableDataManager.class);
@@ -198,6 +201,8 @@ public class OffsetBasedConsumptionStatusCheckerTest {
     // segB0        committed at 1200               1500
     when(segMngrA0.getCurrentOffset()).thenReturn(new LongMsgOffset(20));
     when(segMngrA1.getCurrentOffset()).thenReturn(new LongMsgOffset(200));
+    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 1);
+    consumingSegments.get("tableB_REALTIME").remove(segB0);
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 0);
   }
 
@@ -212,7 +217,8 @@ public class OffsetBasedConsumptionStatusCheckerTest {
     consumingSegments.put("tableB_REALTIME", ImmutableSet.of(segB0));
     InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
     OffsetBasedConsumptionStatusChecker statusChecker =
-        new OffsetBasedConsumptionStatusChecker(instanceDataManager, consumingSegments, consumingSegments::get);
+        new OffsetBasedConsumptionStatusChecker(instanceDataManager, consumingSegments,
+            ConsumptionStatusCheckerTestUtils.getConsumingSegments(consumingSegments));
 
     // setup TableDataMangers
     TableDataManager tableDataManagerA = mock(TableDataManager.class);
