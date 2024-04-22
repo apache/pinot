@@ -32,7 +32,7 @@ import org.apache.pinot.spi.stream.StreamMessageDecoder;
 public class FakeStreamMessageDecoder implements StreamMessageDecoder<byte[]> {
 
   @Override
-  public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName) {
+  public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName, Schema tableSchema) {
   }
 
   @Override
