@@ -99,20 +99,14 @@ public class ServerRoutingStatsManagerTest {
 
     List<Pair<String, Integer>> numInFlightReqList = manager.fetchNumInFlightRequestsForAllServers();
     assertTrue(numInFlightReqList.isEmpty());
-    Integer numInFlightReq = manager.fetchNumInFlightRequestsForServer("testServer");
-    assertNull(numInFlightReq);
 
     List<Pair<String, Double>> latencyList = manager.fetchEMALatencyForAllServers();
     assertTrue(latencyList.isEmpty());
 
-    Double latency = manager.fetchEMALatencyForServer("testServer");
-    assertNull(latency);
-
     List<Pair<String, Double>> scoreList = manager.fetchHybridScoreForAllServers();
     assertTrue(scoreList.isEmpty());
 
-    Double score = manager.fetchHybridScoreForServer("testServer");
-    assertNull(score);
+    assertStatsNullForInstance(manager, "testServer");
   }
 
   @Test
@@ -309,6 +303,29 @@ public class ServerRoutingStatsManagerTest {
     assertEquals(score, 10.0);
     score = manager.fetchHybridScoreForServer("server1");
     assertEquals(score, 54.0);
+
+    // assert true to ensure server1 is in the stats map
+    assertTrue(manager.resetServerStats("server1"));
+
+    // ensure server2 has not changeed
+    score = manager.fetchHybridScoreForServer("server2");
+    assertEquals(score, 10.0);
+    assertStatsNullForInstance(manager, "server1");
+
+    manager.resetAllServersStats();
+    assertStatsNullForInstance(manager, "server1");
+    assertStatsNullForInstance(manager, "server2");
+  }
+
+  private void assertStatsNullForInstance(ServerRoutingStatsManager manager, String instanceId) {
+    Integer numInFlightReq = manager.fetchNumInFlightRequestsForServer(instanceId);
+    assertNull(numInFlightReq);
+
+    Double latency = manager.fetchEMALatencyForServer(instanceId);
+    assertNull(latency);
+
+    Double score = manager.fetchHybridScoreForServer(instanceId);
+    assertNull(score);
   }
 
   private void waitForStatsUpdate(ServerRoutingStatsManager serverRoutingStatsManager, long taskCount) {

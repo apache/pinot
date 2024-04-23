@@ -41,6 +41,7 @@ import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
+import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 
 import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
@@ -59,6 +60,9 @@ public class PinotBrokerRouting {
 
   @Inject
   BrokerRoutingManager _routingManager;
+
+  @Inject
+  private ServerRoutingStatsManager _serverRoutingStatsManager;
 
   @PUT
   @Produces(MediaType.TEXT_PLAIN)
@@ -107,5 +111,37 @@ public class PinotBrokerRouting {
       @Context HttpHeaders headers) {
     _routingManager.removeRouting(DatabaseUtils.translateTableName(tableNameWithType, headers));
     return "Success";
+  }
+
+  @PUT
+  @Produces(MediaType.TEXT_PLAIN)
+  @Path("/routing/resetServerRoutingStats")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.RESET_SERVER_ROUTING_STATS)
+  @ApiOperation(value = "Reset all server routing stats", notes = "Reset all server routing stats")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 500, message = "Internal server error")
+  })
+  public String resetServerRoutingStats() {
+    _serverRoutingStatsManager.resetAllServersStats();
+    return "Success";
+  }
+
+  @PUT
+  @Produces(MediaType.TEXT_PLAIN)
+  @Path("/routing/resetServerRoutingStats/{instanceId}")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.RESET_SERVER_ROUTING_STATS)
+  @ApiOperation(value = "Reset the given server's routing stats", notes = "Reset the given server's routing stats")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 500, message = "Internal server error")
+  })
+  public String resetServerRoutingStatsForInstance(
+      @ApiParam(value = "Instance ID") @PathParam("instanceId") String instanceId) {
+    if (_serverRoutingStatsManager.resetServerStats(instanceId)) {
+      return "Success";
+    } else {
+      return "instance: " + instanceId + " not found in routing stats.";
+    }
   }
 }

@@ -50,6 +50,7 @@ public class ServerRoutingStatsManager {
   private final PinotConfiguration _config;
   private final BrokerMetrics _brokerMetrics;
   private volatile boolean _isEnabled;
+  private boolean _resetStatsForNewServers;
   private ConcurrentHashMap<String, ServerRoutingStatsEntry> _serverQueryStatsMap;
 
   // Main executor service for collecting and aggregating stats for all servers.
@@ -79,6 +80,14 @@ public class ServerRoutingStatsManager {
 
     LOGGER.info("Initializing ServerRoutingStatsManager for Adaptive Server Selection.");
 
+    _resetStatsForNewServers = _config.getProperty(AdaptiveServerSelector.CONFIG_OF_RESET_STATS_FOR_NEW_SERVERS,
+        AdaptiveServerSelector.DEFAULT_RESET_STATS_FOR_NEW_SERVERS);
+    if (_resetStatsForNewServers) {
+      LOGGER.info("Server stats will be reset for new servers.");
+    } else {
+      LOGGER.info("Server stats will not be reset for new servers.");
+    }
+
     _alpha = _config.getProperty(AdaptiveServerSelector.CONFIG_OF_EWMA_ALPHA,
         AdaptiveServerSelector.DEFAULT_EWMA_ALPHA);
     _autoDecayWindowMs = _config.getProperty(AdaptiveServerSelector.CONFIG_OF_AUTODECAY_WINDOW_MS,
@@ -96,13 +105,17 @@ public class ServerRoutingStatsManager {
 
     _periodicTaskExecutor = Executors.newSingleThreadScheduledExecutor();
 
-    // Entries in this map are never deleted unless the broker process restarts. This is okay for now because the
-    // number of servers will be finite and should not cause memory bloat.
+    // Entries in this map are never deleted unless the broker process restarts or server stats are reset.
+    // This is okay for now because the number of servers will be finite and should not cause memory bloat.
     _serverQueryStatsMap = new ConcurrentHashMap<>();
   }
 
   public boolean isEnabled() {
     return _isEnabled;
+  }
+
+  public boolean shouldResetStatsForNewServers() {
+    return _resetStatsForNewServers;
   }
 
   public void shutDown() {
@@ -132,6 +145,32 @@ public class ServerRoutingStatsManager {
 
     ThreadPoolExecutor tpe = (ThreadPoolExecutor) _executorService;
     return tpe.getCompletedTaskCount();
+  }
+
+  /**
+   * Remove the given instance id from the server stats map.
+   * If the server was in the stats map, return true.
+   */
+  public boolean resetServerStats(String instanceId) {
+    if (!_isEnabled) {
+      return false;
+    }
+
+    // Remove the server stats from the map, and only log if the server was actually removed.
+    if (instanceId != null && _serverQueryStatsMap.remove(instanceId) != null) {
+      LOGGER.info("Server {} removed from ServerRoutingStatsManager.", instanceId);
+      return true;
+    }
+    return false;
+  }
+
+  public void resetAllServersStats() {
+    if (!_isEnabled) {
+      return;
+    }
+
+    LOGGER.info("Resetting all server stats in ServerRoutingStatsManager.");
+    _serverQueryStatsMap.clear();
   }
 
   /**
