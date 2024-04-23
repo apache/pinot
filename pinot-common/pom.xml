@@ -62,6 +62,27 @@
         <artifactId>protobuf-maven-plugin</artifactId>
       </plugin>
 
+      <plugin>
+        <groupId>com.diffplug.spotless</groupId>
+        <artifactId>spotless-maven-plugin</artifactId>
+        <configuration>
+          <java>
+            <includes>
+              <include>src/main/java/**/*.java</include>
+              <include>src/test/java/**/*.java</include>
+            </includes>
+            <excludes>
+              <exclude>src/main/java/org/apache/pinot/common/request/*.java</exclude>
+              <exclude>src/main/java/org/apache/pinot/common/response/ProcessingException.java</exclude>
+            </excludes>
+            <importOrder>
+              <order>,\#</order>
+            </importOrder>
+            <removeUnusedImports/>
+          </java>
+        </configuration>
+      </plugin>
+
       <!-- Following plugins and their configurations are used to generate the custom Calcite's SQL parser -->
       <!-- Copy the templates present in the codegen directory to ${project.build.directory}/codegen -->
       <plugin>
@@ -129,31 +150,6 @@
         </executions>
       </plugin>
     </plugins>
-
-    <pluginManagement>
-      <plugins>
-        <plugin>
-          <groupId>com.diffplug.spotless</groupId>
-          <artifactId>spotless-maven-plugin</artifactId>
-          <configuration>
-            <java>
-              <includes>
-                <include>src/main/java/**/*.java</include>
-                <include>src/test/java/**/*.java</include>
-              </includes>
-              <excludes>
-                <exclude>src/main/java/org/apache/pinot/common/request/*.java</exclude>
-                <exclude>src/main/java/org/apache/pinot/common/response/ProcessingException.java</exclude>
-              </excludes>
-              <importOrder>
-                <order>,\#</order>
-              </importOrder>
-              <removeUnusedImports/>
-            </java>
-          </configuration>
-        </plugin>
-      </plugins>
-    </pluginManagement>
   </build>
   <dependencies>
     <dependency>
