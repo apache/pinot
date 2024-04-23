@@ -317,19 +317,26 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
           // Leaf nodes compile the plan node into a single operator and therefore return a single stat
           return selfNode(type);
         }
-        int childrenSize = node.getInputs().size();
+        List<PlanNode> inputs = node.getInputs();
+        int childrenSize = inputs.size();
+        LOGGER.warn("Skipping unexpected node {} when stat of type {} was found at index {}",
+            node.getClass(), type, _index);
         switch (childrenSize) {
           case 0:
-            LOGGER.warn("Skipping unexpected node {} when stat of type {} was found at index {}",
-                node.getClass(), type, _index);
             return JsonUtils.newObjectNode();
           case 1:
-            LOGGER.warn("Skipping unexpected node {} when stat of type {} was found at index {}",
-                node.getClass(), type, _index);
-            return node.getInputs().get(0).visit(this, null);
+            return inputs.get(0).visit(this, null);
           default:
-            throw new IllegalStateException("Expected operator type: " + expectedType + ", but got: " + type + " with "
-                + childrenSize + " inputs");
+            ObjectNode json = JsonUtils.newObjectNode();
+            ArrayNode children = JsonUtils.newArrayNode();
+            for (int i = 0; i < childrenSize; i++) {
+              _index--;
+              if (inputs.size() > i) {
+                children.add(inputs.get(i).visit(this, null));
+              }
+            }
+            json.set(CHILDREN_KEY, children);
+            return json;
         }
       }
       ObjectNode json = selfNode(type);
