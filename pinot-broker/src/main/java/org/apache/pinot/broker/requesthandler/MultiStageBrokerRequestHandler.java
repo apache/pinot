@@ -305,6 +305,13 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     private JsonNode recursiveCase(AbstractPlanNode node, MultiStageOperator.Type expectedType) {
       MultiStageOperator.Type type = _stageStats.getOperatorType(_index);
+      /*
+       Sometimes the operator type is not what we expect, but we can still build the tree
+       This always happen in stage 0, in which case we have two operators but we only have stats for the receive
+       operator.
+       This may also happen leaf stages, in which case the all the stage but the send operator will be compiled into
+       a single leaf node.
+      */
       if (type != expectedType) {
         if (type == MultiStageOperator.Type.LEAF) {
           // Leaf nodes compile the plan node into a single operator and therefore return a single stat
