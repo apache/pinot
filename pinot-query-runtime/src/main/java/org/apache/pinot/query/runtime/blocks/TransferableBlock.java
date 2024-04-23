@@ -54,7 +54,7 @@ public class TransferableBlock implements Block {
   @Nullable
   private final MultiStageQueryStats _queryStats;
 
-  public TransferableBlock(List<Object[]> container, @Nullable DataSchema dataSchema, DataBlock.Type type) {
+  public TransferableBlock(List<Object[]> container, DataSchema dataSchema, DataBlock.Type type) {
     _container = container;
     _dataSchema = dataSchema;
     Preconditions.checkArgument(type == DataBlock.Type.ROW || type == DataBlock.Type.COLUMNAR,
@@ -146,13 +146,6 @@ public class TransferableBlock implements Block {
       }
     }
     return _container;
-  }
-
-  /**
-   * Returns whether the data block is already constructed.
-   */
-  boolean isDataBlockConstructed() {
-    return _dataBlock != null;
   }
 
   /**
