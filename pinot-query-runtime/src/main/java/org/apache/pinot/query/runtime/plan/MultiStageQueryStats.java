@@ -28,7 +28,6 @@ import java.io.DataOutput;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -285,24 +284,8 @@ public class MultiStageQueryStats {
             myStats.merge(dis);
           }
         } catch (IOException ex) {
-          boolean assertOn = false;
-          // *assigns* true if assertions are on.
-          //CHECKSTYLE:OFF
-          assert assertOn = true;
-          if (assertOn) {
-            throw new UncheckedIOException("Error deserializing stats on stage " + i, ex);
-          }
-          //CHECKSTYLE:ON
           LOGGER.warn("Error deserializing stats on stage " + i + ". Considering the new stats empty", ex);
         } catch (IllegalArgumentException | IllegalStateException ex) {
-          boolean assertOn = false;
-          // *assigns* true if assertions are on.
-          //CHECKSTYLE:OFF
-          assert assertOn = true;
-          if (assertOn) {
-            throw ex;
-          }
-          //CHECKSTYLE:ON
           LOGGER.warn("Error merging stats on stage " + i + ". Ignoring the new stats", ex);
         }
       }
