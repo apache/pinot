@@ -60,6 +60,14 @@ public class VarByteChunkForwardIndexReaderV4
   private final boolean _isSingleValue;
   private final long _chunksStartOffset;
 
+  // TODO: persist _longestLengthOfEntry in Table V5 header.
+  // If _longestLengthOfEntry > _maxReusableByteSize, we won't expand the _reusableBytes array.
+  // Make the value of _maxReusableByteSize as a tableConfig's fieldConfig.
+  // The default value is 0, meaning no reuse.
+  // make it static and set to 1024*1024 for temporary benchmarking.
+  public static int _maxReusableByteSize = 1024 * 1024;
+  public static ThreadLocal<byte[]> _reusableBytes = ThreadLocal.withInitial(() -> new byte[0]);
+
   public VarByteChunkForwardIndexReaderV4(PinotDataBuffer dataBuffer, FieldSpec.DataType storedType,
       boolean isSingleValue) {
     int version = dataBuffer.getInt(0);
@@ -108,22 +116,32 @@ public class VarByteChunkForwardIndexReaderV4
 
   @Override
   public BigDecimal getBigDecimal(int docId, ReaderContext context) {
-    return BigDecimalUtils.deserialize(context.getValue(docId));
+    ReadResult res = context.getValue(docId);
+    ByteBuffer byteBuffer = ByteBuffer.wrap(res.getBytes(), 0, res.getLength());
+    return BigDecimalUtils.deserialize(byteBuffer);
   }
 
   @Override
   public String getString(int docId, ReaderContext context) {
-    return new String(context.getValue(docId), StandardCharsets.UTF_8);
+    ReadResult res = context.getValue(docId);
+    return new String(res.getBytes(), 0, res.getLength(), StandardCharsets.UTF_8);
   }
 
   @Override
   public byte[] getBytes(int docId, ReaderContext context) {
-    return context.getValue(docId);
+    ReadResult res = context.getValue(docId);
+    if (!res.isReusable()) {
+      return res.getBytes();
+    }
+    byte[] bytes = new byte[res.getLength()];
+    System.arraycopy(res.getBytes(), 0, bytes, 0, res.getLength());
+    return bytes;
   }
 
   @Override
   public int getIntMV(int docId, int[] valueBuffer, VarByteChunkForwardIndexReaderV4.ReaderContext context) {
-    ByteBuffer byteBuffer = ByteBuffer.wrap(context.getValue(docId));
+    ReadResult res = context.getValue(docId);
+    ByteBuffer byteBuffer = ByteBuffer.wrap(res.getBytes(), 0, res.getLength());
     int numValues = byteBuffer.getInt();
     for (int i = 0; i < numValues; i++) {
       valueBuffer[i] = byteBuffer.getInt();
@@ -133,7 +151,8 @@ public class VarByteChunkForwardIndexReaderV4
 
   @Override
   public int[] getIntMV(int docId, VarByteChunkForwardIndexReaderV4.ReaderContext context) {
-    ByteBuffer byteBuffer = ByteBuffer.wrap(context.getValue(docId));
+    ReadResult res = context.getValue(docId);
+    ByteBuffer byteBuffer = ByteBuffer.wrap(res.getBytes(), 0, res.getLength());
     int numValues = byteBuffer.getInt();
     int[] valueBuffer = new int[numValues];
     for (int i = 0; i < numValues; i++) {
@@ -144,7 +163,8 @@ public class VarByteChunkForwardIndexReaderV4
 
   @Override
   public int getLongMV(int docId, long[] valueBuffer, VarByteChunkForwardIndexReaderV4.ReaderContext context) {
-    ByteBuffer byteBuffer = ByteBuffer.wrap(context.getValue(docId));
+    ReadResult res = context.getValue(docId);
+    ByteBuffer byteBuffer = ByteBuffer.wrap(res.getBytes(), 0, res.getLength());
     int numValues = byteBuffer.getInt();
     for (int i = 0; i < numValues; i++) {
       valueBuffer[i] = byteBuffer.getLong();
@@ -154,7 +174,8 @@ public class VarByteChunkForwardIndexReaderV4
 
   @Override
   public long[] getLongMV(int docId, VarByteChunkForwardIndexReaderV4.ReaderContext context) {
-    ByteBuffer byteBuffer = ByteBuffer.wrap(context.getValue(docId));
+    ReadResult res = context.getValue(docId);
+    ByteBuffer byteBuffer = ByteBuffer.wrap(res.getBytes(), 0, res.getLength());
     int numValues = byteBuffer.getInt();
     long[] valueBuffer = new long[numValues];
     for (int i = 0; i < numValues; i++) {
@@ -165,7 +186,8 @@ public class VarByteChunkForwardIndexReaderV4
 
   @Override
   public int getFloatMV(int docId, float[] valueBuffer, VarByteChunkForwardIndexReaderV4.ReaderContext context) {
-    ByteBuffer byteBuffer = ByteBuffer.wrap(context.getValue(docId));
+    ReadResult res = context.getValue(docId);
+    ByteBuffer byteBuffer = ByteBuffer.wrap(res.getBytes(), 0, res.getLength());
     int numValues = byteBuffer.getInt();
     for (int i = 0; i < numValues; i++) {
       valueBuffer[i] = byteBuffer.getFloat();
@@ -175,7 +197,8 @@ public class VarByteChunkForwardIndexReaderV4
 
   @Override
   public float[] getFloatMV(int docId, VarByteChunkForwardIndexReaderV4.ReaderContext context) {
-    ByteBuffer byteBuffer = ByteBuffer.wrap(context.getValue(docId));
+    ReadResult res = context.getValue(docId);
+    ByteBuffer byteBuffer = ByteBuffer.wrap(res.getBytes(), 0, res.getLength());
     int numValues = byteBuffer.getInt();
     float[] valueBuffer = new float[numValues];
     for (int i = 0; i < numValues; i++) {
@@ -186,7 +209,8 @@ public class VarByteChunkForwardIndexReaderV4
 
   @Override
   public int getDoubleMV(int docId, double[] valueBuffer, VarByteChunkForwardIndexReaderV4.ReaderContext context) {
-    ByteBuffer byteBuffer = ByteBuffer.wrap(context.getValue(docId));
+    ReadResult res = context.getValue(docId);
+    ByteBuffer byteBuffer = ByteBuffer.wrap(res.getBytes(), 0, res.getLength());
     int numValues = byteBuffer.getInt();
     for (int i = 0; i < numValues; i++) {
       valueBuffer[i] = byteBuffer.getDouble();
@@ -196,7 +220,8 @@ public class VarByteChunkForwardIndexReaderV4
 
   @Override
   public double[] getDoubleMV(int docId, VarByteChunkForwardIndexReaderV4.ReaderContext context) {
-    ByteBuffer byteBuffer = ByteBuffer.wrap(context.getValue(docId));
+    ReadResult res = context.getValue(docId);
+    ByteBuffer byteBuffer = ByteBuffer.wrap(res.getBytes(), 0, res.getLength());
     int numValues = byteBuffer.getInt();
     double[] valueBuffer = new double[numValues];
     for (int i = 0; i < numValues; i++) {
@@ -207,36 +232,39 @@ public class VarByteChunkForwardIndexReaderV4
 
   @Override
   public int getStringMV(int docId, String[] valueBuffer, VarByteChunkForwardIndexReaderV4.ReaderContext context) {
-    ByteBuffer byteBuffer = ByteBuffer.wrap(context.getValue(docId));
+    ReadResult res = context.getValue(docId);
+    byte[] bytes = res.getBytes();
+    ByteBuffer byteBuffer = ByteBuffer.wrap(res.getBytes(), 0, res.getLength());
     int numValues = byteBuffer.getInt();
-    byteBuffer.position((numValues + 1) * Integer.BYTES);
+    int offset = (numValues + 1) * Integer.BYTES;
     for (int i = 0; i < numValues; i++) {
       int length = byteBuffer.getInt((i + 1) * Integer.BYTES);
-      byte[] bytes = new byte[length];
-      byteBuffer.get(bytes);
-      valueBuffer[i] = new String(bytes, StandardCharsets.UTF_8);
+      valueBuffer[i] = new String(bytes, offset, length, StandardCharsets.UTF_8);
+      offset += length;
     }
     return numValues;
   }
 
   @Override
   public String[] getStringMV(int docId, VarByteChunkForwardIndexReaderV4.ReaderContext context) {
-    ByteBuffer byteBuffer = ByteBuffer.wrap(context.getValue(docId));
+    ReadResult res = context.getValue(docId);
+    byte[] bytes = res.getBytes();
+    ByteBuffer byteBuffer = ByteBuffer.wrap(bytes, 0, res.getLength());
     int numValues = byteBuffer.getInt();
-    byteBuffer.position((numValues + 1) * Integer.BYTES);
+    int offset = (numValues + 1) * Integer.BYTES;
     String[] valueBuffer = new String[numValues];
     for (int i = 0; i < numValues; i++) {
       int length = byteBuffer.getInt((i + 1) * Integer.BYTES);
-      byte[] bytes = new byte[length];
-      byteBuffer.get(bytes);
-      valueBuffer[i] = new String(bytes, StandardCharsets.UTF_8);
+      valueBuffer[i] = new String(bytes, offset, length, StandardCharsets.UTF_8);
+      offset += length;
     }
     return valueBuffer;
   }
 
   @Override
   public int getBytesMV(int docId, byte[][] valueBuffer, VarByteChunkForwardIndexReaderV4.ReaderContext context) {
-    ByteBuffer byteBuffer = ByteBuffer.wrap(context.getValue(docId));
+    ReadResult res = context.getValue(docId);
+    ByteBuffer byteBuffer = ByteBuffer.wrap(res.getBytes(), 0, res.getLength());
     int numValues = byteBuffer.getInt();
     byteBuffer.position((numValues + 1) * Integer.BYTES);
     for (int i = 0; i < numValues; i++) {
@@ -250,7 +278,8 @@ public class VarByteChunkForwardIndexReaderV4
 
   @Override
   public byte[][] getBytesMV(int docId, VarByteChunkForwardIndexReaderV4.ReaderContext context) {
-    ByteBuffer byteBuffer = ByteBuffer.wrap(context.getValue(docId));
+    ReadResult res = context.getValue(docId);
+    ByteBuffer byteBuffer = ByteBuffer.wrap(res.getBytes(), 0, res.getLength());
     int numValues = byteBuffer.getInt();
     byteBuffer.position((numValues + 1) * Integer.BYTES);
     byte[][] valueBuffer = new byte[numValues][];
@@ -294,6 +323,30 @@ public class VarByteChunkForwardIndexReaderV4
     throw new UnsupportedOperationException("Forward index is not fixed length type");
   }
 
+  static class ReadResult {
+    private boolean _isReusable;
+    private int _length;
+    private byte[] _bytes;
+
+    ReadResult(boolean isReusable, int length, byte[] bytes) {
+      _isReusable = isReusable;
+      _length = length;
+      _bytes = bytes;
+    }
+
+    boolean isReusable() {
+      return _isReusable;
+    }
+
+    int getLength() {
+      return _length;
+    }
+
+    byte[] getBytes() {
+      return _bytes;
+    }
+  }
+
   public static abstract class ReaderContext implements ForwardIndexReaderContext {
 
     protected final PinotDataBuffer _chunks;
@@ -319,7 +372,7 @@ public class VarByteChunkForwardIndexReaderV4
       }
     }
 
-    public byte[] getValue(int docId) {
+    public ReadResult getValue(int docId) {
       if (docId >= _docIdOffset && docId < _nextDocIdOffset) {
         return readSmallUncompressedValue(docId);
       } else {
@@ -350,12 +403,25 @@ public class VarByteChunkForwardIndexReaderV4
       return (low - 1) * METADATA_ENTRY_SIZE;
     }
 
-    protected abstract byte[] processChunkAndReadFirstValue(int docId, long offset, long limit)
+    protected ReadResult getOrExpandOrAllocateBytes(int length) {
+      // as time goes by, the _reusableBytes.length will be dynamically adjusted to
+      // the longest length of entry byte size smaller than or equal to _maxReusableByteSize
+      if (length > _maxReusableByteSize) {
+        return new ReadResult(false, length, new byte[length]);
+      }
+      // TODO: replace _maxAllocatedByteArraySizeForStrings with _longestLengthOfStringsEntry
+      if (_reusableBytes.get().length < _maxReusableByteSize) {
+        _reusableBytes.set(new byte[_maxReusableByteSize]);
+      }
+      return new ReadResult(true, length, _reusableBytes.get());
+    }
+
+    protected abstract ReadResult processChunkAndReadFirstValue(int docId, long offset, long limit)
         throws IOException;
 
-    protected abstract byte[] readSmallUncompressedValue(int docId);
+    protected abstract ReadResult readSmallUncompressedValue(int docId);
 
-    private byte[] decompressAndRead(int docId)
+    private ReadResult decompressAndRead(int docId)
         throws IOException {
       long metadataEntry = chunkIndexFor(docId);
       int info = _metadata.getInt(metadataEntry);
@@ -405,7 +471,7 @@ public class VarByteChunkForwardIndexReaderV4
     }
 
     @Override
-    protected byte[] processChunkAndReadFirstValue(int docId, long offset, long limit) {
+    protected ReadResult processChunkAndReadFirstValue(int docId, long offset, long limit) {
       _chunk = _chunks.toDirectByteBuffer(offset, (int) (limit - offset));
       if (!_regularChunk) {
         return readHugeValue();
@@ -414,23 +480,25 @@ public class VarByteChunkForwardIndexReaderV4
       return readSmallUncompressedValue(docId);
     }
 
-    private byte[] readHugeValue() {
-      byte[] value = new byte[_chunk.capacity()];
-      _chunk.get(value);
-      return value;
+    private ReadResult readHugeValue() {
+      int length = _chunk.capacity();
+      ReadResult res = getOrExpandOrAllocateBytes(length);
+      _chunk.get(res.getBytes(), 0, length);
+      return res;
     }
 
     @Override
-    protected byte[] readSmallUncompressedValue(int docId) {
+    protected ReadResult readSmallUncompressedValue(int docId) {
       int index = docId - _docIdOffset;
       int offset = _chunk.getInt((index + 1) * Integer.BYTES);
       int nextOffset =
           index == _numDocsInCurrentChunk - 1 ? _chunk.limit() : _chunk.getInt((index + 2) * Integer.BYTES);
-      byte[] bytes = new byte[nextOffset - offset];
+      int length = nextOffset - offset;
+      ReadResult res = getOrExpandOrAllocateBytes(length);
       _chunk.position(offset);
-      _chunk.get(bytes);
+      _chunk.get(res.getBytes(), 0, length);
       _chunk.position(0);
-      return bytes;
+      return res;
     }
 
     @Override
@@ -453,7 +521,7 @@ public class VarByteChunkForwardIndexReaderV4
     }
 
     @Override
-    protected byte[] processChunkAndReadFirstValue(int docId, long offset, long limit)
+    protected ReadResult processChunkAndReadFirstValue(int docId, long offset, long limit)
         throws IOException {
       _decompressedBuffer.clear();
       ByteBuffer compressed = _chunks.toDirectByteBuffer(offset, (int) (limit - offset));
@@ -467,38 +535,40 @@ public class VarByteChunkForwardIndexReaderV4
     }
 
     @Override
-    protected byte[] readSmallUncompressedValue(int docId) {
+    protected ReadResult readSmallUncompressedValue(int docId) {
       int index = docId - _docIdOffset;
       int offset = _decompressedBuffer.getInt((index + 1) * Integer.BYTES);
       int nextOffset = index == _numDocsInCurrentChunk - 1 ? _decompressedBuffer.limit()
           : _decompressedBuffer.getInt((index + 2) * Integer.BYTES);
-      byte[] bytes = new byte[nextOffset - offset];
+      int length = nextOffset - offset;
+      ReadResult res = getOrExpandOrAllocateBytes(length);
       _decompressedBuffer.position(offset);
-      _decompressedBuffer.get(bytes);
+      _decompressedBuffer.get(res.getBytes(), 0, length);
       _decompressedBuffer.position(0);
-      return bytes;
+      return res;
     }
 
-    private byte[] readHugeCompressedValue(ByteBuffer compressed, int decompressedLength)
+    private ReadResult readHugeCompressedValue(ByteBuffer compressed, int decompressedLength)
         throws IOException {
       // huge values don't have length prefixes; they occupy the entire chunk so are unambiguous
-      byte[] value = new byte[decompressedLength];
+      ReadResult res = getOrExpandOrAllocateBytes(decompressedLength);
       if (_chunkCompressionType == ChunkCompressionType.SNAPPY
           || _chunkCompressionType == ChunkCompressionType.ZSTANDARD) {
         // snappy and zstandard don't work without direct buffers
-        decompressViaDirectBuffer(compressed, value);
+        decompressViaDirectBuffer(compressed, res.getBytes(), decompressedLength);
       } else {
-        _chunkDecompressor.decompress(compressed, ByteBuffer.wrap(value).order(ByteOrder.LITTLE_ENDIAN));
+        _chunkDecompressor.decompress(compressed,
+                ByteBuffer.wrap(res.getBytes(), 0, decompressedLength).order(ByteOrder.LITTLE_ENDIAN));
       }
-      return value;
+      return res;
     }
 
-    private void decompressViaDirectBuffer(ByteBuffer compressed, byte[] target)
+    private void decompressViaDirectBuffer(ByteBuffer compressed, byte[] target, int length)
         throws IOException {
-      ByteBuffer buffer = ByteBuffer.allocateDirect(target.length).order(ByteOrder.LITTLE_ENDIAN);
+      ByteBuffer buffer = ByteBuffer.allocateDirect(length).order(ByteOrder.LITTLE_ENDIAN);
       try {
         _chunkDecompressor.decompress(compressed, buffer);
-        buffer.get(target);
+        buffer.get(target, 0, length);
       } finally {
         if (CleanerUtil.UNMAP_SUPPORTED) {
           CleanerUtil.getCleaner().freeBuffer(buffer);
