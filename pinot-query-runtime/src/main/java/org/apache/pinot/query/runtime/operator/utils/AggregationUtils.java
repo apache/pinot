@@ -194,23 +194,17 @@ public class AggregationUtils {
     protected final int _inputRef;
     protected final Object _literal;
     protected final Map<Key, Object> _results = new HashMap<>();
-    protected final Merger _merger;
     protected final ColumnDataType _dataType;
 
     public Map<Key, Object> getResults() {
       return _results;
     }
 
-    public Merger getMerger() {
-      return _merger;
-    }
-
     public ColumnDataType getDataType() {
       return _dataType;
     }
 
-    public Accumulator(RexExpression.FunctionCall aggCall,
-        Map<String, Function<ColumnDataType, AggregationUtils.Merger>> merger, String functionName,
+    public Accumulator(RexExpression.FunctionCall aggCall, String functionName,
         DataSchema inputSchema) {
       // agg function operand should either be a InputRef or a Literal
       RexExpression rexExpression = toAggregationFunctionOperand(aggCall);
@@ -222,20 +216,6 @@ public class AggregationUtils {
         _inputRef = -1;
         _literal = ((RexExpression.Literal) rexExpression).getValue();
         _dataType = rexExpression.getDataType();
-      }
-      _merger = merger.containsKey(functionName) ? merger.get(functionName).apply(_dataType) : null;
-    }
-
-    public void accumulate(Key key, Object[] row) {
-      // TODO: fix that single agg result (original type) has different type from multiple agg results (double).
-      Object currentRes = _results.get(key);
-      Object value = _inputRef == -1 ? _literal : row[_inputRef];
-
-      if (currentRes == null) {
-        _results.put(key, _merger.init(value, _dataType));
-      } else {
-        Object mergedResult = _merger.merge(currentRes, value);
-        _results.put(key, mergedResult);
       }
     }
 
