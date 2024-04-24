@@ -131,7 +131,7 @@
     <!-- Configuration for Packaging -->
     <shade.prefix>org.apache.pinot.shaded</shade.prefix>
     <maven-jar-plugin.version>3.4.1</maven-jar-plugin.version>
-    <maven-shade-plugin.version>3.5.2</maven-shade-plugin.version>
+    <maven-shade-plugin.version>3.5.3</maven-shade-plugin.version>
     <shade.phase.prop>none</shade.phase.prop>
 
     <avro.version>1.11.3</avro.version>
