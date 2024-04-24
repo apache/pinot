@@ -18,11 +18,10 @@
  */
 package org.apache.pinot.segment.spi.utils;
 
-import org.testng.Assert;
-import org.testng.annotations.Test;
-
 import java.util.Arrays;
 import java.util.List;
+import org.testng.Assert;
+import org.testng.annotations.Test;
 
 public class CsvParserTest {
     @Test
