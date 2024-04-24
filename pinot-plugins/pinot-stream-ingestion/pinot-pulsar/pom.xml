@@ -37,7 +37,6 @@
   <properties>
     <shade.phase.prop>package</shade.phase.prop>
     <pinot.root>${basedir}/../../..</pinot.root>
-    <pulsar.version>3.2.2</pulsar.version>
     <testcontainers.pulsar.version>1.19.7</testcontainers.pulsar.version>
   </properties>
 
