@@ -148,15 +148,10 @@ public class TextIndexUtils {
         LOGGER.error(exceptionMessage);
         throw new ReflectiveOperationException(exceptionMessage);
       }
-      if (luceneAnalyzerClassArgs.isEmpty()) {
-        // Default constructor
-        analyzer = (Analyzer) luceneAnalyzerClass.getConstructor().newInstance();
-      } else {
-        // Non-default constructor
-        analyzer = (Analyzer) luceneAnalyzerClass
-                .getConstructor(argClasses.toArray(new Class<?>[0])).newInstance(argValues.toArray(new Object[0]));
-      }
-      return analyzer;
+
+      // Return a new instance of custom lucene analyzer class
+      return (Analyzer) luceneAnalyzerClass.getConstructor(argClasses.toArray(new Class<?>[0]))
+              .newInstance(argValues.toArray(new Object[0]));
     }
   }
 
