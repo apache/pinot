@@ -130,14 +130,14 @@ public class TextIndexUtils {
       // Generate args type list
       List<Class<?>> argClasses = new ArrayList<>();
       for (String argType : luceneAnalyzerClassArgsTypes) {
-        argClasses.add(parseSupportedType(argType));
+        argClasses.add(parseSupportedTypes(argType));
       }
 
       // Best effort coercion to the analyzer argument type
       // Note only a subset of class types is supported, unsupported ones can be added in the future
       List<Object> argValues = new ArrayList<>();
       for (int i = 0; i < luceneAnalyzerClassArgs.size(); i++) {
-        argValues.add(parseSupportedTypes(luceneAnalyzerClassArgs.get(i), argClasses.get(i)));
+        argValues.add(parseSupportedTypeValues(luceneAnalyzerClassArgs.get(i), argClasses.get(i)));
       }
 
       // Initialize the custom analyzer class with custom analyzer args
@@ -166,7 +166,7 @@ public class TextIndexUtils {
    * @return Class object of the value type
    * @throws ClassNotFoundException when the value type is not supported
    */
-  public static Class<?> parseSupportedType(String valueTypeString) throws ClassNotFoundException {
+  public static Class<?> parseSupportedTypes(String valueTypeString) throws ClassNotFoundException {
     try {
       // Support both primitive types + class
       switch (valueTypeString) {
@@ -202,7 +202,7 @@ public class TextIndexUtils {
    * @return class object of the value, auto-boxed if it is a primitive type
    * @throws ReflectiveOperationException if value cannot be coerced without ambiguity or encountered unsupported type
    */
-  public static Object parseSupportedTypes(String stringValue, Class<?> clazz) throws ReflectiveOperationException {
+  public static Object parseSupportedTypeValues(String stringValue, Class<?> clazz) throws ReflectiveOperationException {
     try {
       if (clazz.equals(String.class)) {
         return stringValue;
