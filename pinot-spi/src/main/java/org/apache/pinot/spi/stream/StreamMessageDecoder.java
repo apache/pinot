@@ -61,7 +61,7 @@ public interface StreamMessageDecoder<T> {
    */
   default void init(Set<String> fieldsToRead, StreamConfig streamConfig, TableConfig tableConfig, Schema schema)
       throws Exception {
-    init(streamConfig.getDecoderProperties(), fields, streamConfig.getTopicName());
+    init(streamConfig.getDecoderProperties(), fieldsToRead, streamConfig.getTopicName());
   }
 
   /**
