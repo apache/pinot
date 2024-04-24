@@ -47,8 +47,8 @@ public class CsvParser {
         Stream<String> tokenStream;
         if (escapeComma) {
             // Use regular expression to split on "," unless it is "\,"
-            tokenStream = Arrays.stream(input.split("(?<!\\\\),")).map(s -> s.replace("\\,", ","));
-            tokenStream = tokenStream.map(s -> s.replace("\\,", ","));
+            tokenStream = Arrays.stream(input.split("(?<!\\\\),"))
+                    .map(s -> s.replace("\\,", ","));
         } else {
             tokenStream = Arrays.stream(input.split(","));
         }
