@@ -197,7 +197,8 @@ public class TextIndexUtils {
    * @return class object of the value, auto-boxed if it is a primitive type
    * @throws ReflectiveOperationException if value cannot be coerced without ambiguity or encountered unsupported type
    */
-  public static Object parseSupportedTypeValues(String stringValue, Class<?> clazz) throws ReflectiveOperationException {
+  public static Object parseSupportedTypeValues(String stringValue, Class<?> clazz)
+          throws ReflectiveOperationException {
     try {
       if (clazz.equals(String.class)) {
         return stringValue;
