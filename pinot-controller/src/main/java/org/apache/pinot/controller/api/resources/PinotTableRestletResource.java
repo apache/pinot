@@ -634,7 +634,8 @@ public class PinotTableRestletResource {
       @ApiParam(value = "How long to wait for next status update (i.e. heartbeat) before the job is considered failed")
       @DefaultValue("3600000") @QueryParam("heartbeatTimeoutInMs") long heartbeatTimeoutInMs,
       @ApiParam(value = "Max number of attempts to rebalance") @DefaultValue("3") @QueryParam("maxAttempts")
-      int maxAttempts,
+      int maxAttempts, @ApiParam(value = "Timeout to help skip retrying old rebalance jobs") @DefaultValue("3600000")
+      @QueryParam("skipRetryTimeoutInMs") long skipRetryTimeoutInMs,
       @ApiParam(value = "Initial delay to exponentially backoff retry") @DefaultValue("300000")
       @QueryParam("retryInitialDelayInMs") long retryInitialDelayInMs,
       @ApiParam(value = "Whether to update segment target tier as part of the rebalance") @DefaultValue("false")
@@ -660,6 +661,7 @@ public class PinotTableRestletResource {
     heartbeatTimeoutInMs = Math.max(heartbeatTimeoutInMs, 3 * heartbeatIntervalInMs);
     rebalanceConfig.setHeartbeatTimeoutInMs(heartbeatTimeoutInMs);
     rebalanceConfig.setMaxAttempts(maxAttempts);
+    rebalanceConfig.setSkipRetryTimeoutInMs(skipRetryTimeoutInMs);
     rebalanceConfig.setRetryInitialDelayInMs(retryInitialDelayInMs);
     rebalanceConfig.setUpdateTargetTier(updateTargetTier);
     String rebalanceJobId = TableRebalancer.createUniqueRebalanceJobIdentifier();

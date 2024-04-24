@@ -162,6 +162,40 @@ public class RebalanceCheckerTest {
   }
 
   @Test
+  public void testSkipOldFailedJobs()
+      throws Exception {
+    String tableName = "table01";
+    Map<String, Map<String, String>> allJobMetadata = new HashMap<>();
+
+    // Original job run as job1 failed recently
+    RebalanceConfig jobCfg = new RebalanceConfig();
+    TableRebalanceProgressStats stats = new TableRebalanceProgressStats();
+    stats.setStatus(RebalanceResult.Status.FAILED);
+    stats.setStartTimeMs(1000);
+    TableRebalanceContext jobCtx = TableRebalanceContext.forInitialAttempt("job1", jobCfg);
+    Map<String, String> jobMetadata = ZkBasedTableRebalanceObserver.createJobMetadata(tableName, "job1", stats, jobCtx);
+    allJobMetadata.put("job1", jobMetadata);
+
+    // Original job run as job2 failed long time ago
+    jobCfg = new RebalanceConfig();
+    stats = new TableRebalanceProgressStats();
+    stats.setStatus(RebalanceResult.Status.FAILED);
+    stats.setStartTimeMs(2000);
+    jobCtx = TableRebalanceContext.forInitialAttempt("job2", jobCfg);
+    jobMetadata = ZkBasedTableRebalanceObserver.createJobMetadata(tableName, "job2", stats, jobCtx);
+    jobMetadata.put(CommonConstants.ControllerJob.SUBMISSION_TIME_MS,
+        String.valueOf(System.currentTimeMillis() - jobCfg.getSkipRetryTimeoutInMs() - 1));
+    allJobMetadata.put("job2", jobMetadata);
+
+    // Only need to retry job1 and job3, as job2 is completed and job4 is from old version of code.
+    Map<String, Set<Pair<TableRebalanceContext, Long>>> jobs =
+        RebalanceChecker.getCandidateJobs(tableName, allJobMetadata);
+    assertEquals(jobs.size(), 1);
+    assertTrue(jobs.containsKey("job1"));
+    assertEquals(jobs.get("job1").size(), 1);
+  }
+
+  @Test
   public void testGetLatestJob() {
     Map<String, Set<Pair<TableRebalanceContext, Long>>> jobs = new HashMap<>();
     // The most recent job run is job1_3, and within 3 maxAttempts.

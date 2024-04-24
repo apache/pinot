@@ -289,7 +289,12 @@ public class RebalanceChecker extends ControllerPeriodicTask<Void> {
       if (jobStatus == RebalanceResult.Status.FAILED || jobStatus == RebalanceResult.Status.ABORTED) {
         LOGGER.info("Found rebalance job: {} for original job: {} has been stopped with status: {}", jobId,
             originalJobId, jobStatus);
-        candidates.computeIfAbsent(originalJobId, (k) -> new HashSet<>()).add(Pair.of(jobCtx, jobStartTimeMs));
+        long skipRetryTimeoutInMs = jobCtx.getConfig().getSkipRetryTimeoutInMs();
+        if (nowMs - statsUpdatedAt > skipRetryTimeoutInMs) {
+          LOGGER.info("Skip rebalance job: {} as its status got older timeout: {}", jobId, skipRetryTimeoutInMs);
+        } else {
+          candidates.computeIfAbsent(originalJobId, (k) -> new HashSet<>()).add(Pair.of(jobCtx, jobStartTimeMs));
+        }
         continue;
       }
       if (jobStatus == RebalanceResult.Status.CANCELLED) {

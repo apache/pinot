@@ -102,10 +102,18 @@ public class RebalanceConfig {
   @ApiModelProperty(example = "3600000")
   private long _heartbeatTimeoutInMs = 3600000L;
 
+  // Max number of attempts to rebalance, including the original rebalance job run.
   @JsonProperty("maxAttempts")
   @ApiModelProperty(example = "3")
   private int _maxAttempts = 3;
 
+  // Ignore rebalance jobs older than this timeout. The cleanup of job status is based on a max number (100 by
+  // default). In case there were very old job status left in ZK, this config avoids unexpected retries due to them.
+  @JsonProperty("skipRetryTimeoutInMs")
+  @ApiModelProperty(example = "86400000")
+  private long _skipRetryTimeoutInMs = 86400000;
+
+  // Initial delay to exponentially backoff retry.
   @JsonProperty("retryInitialDelayInMs")
   @ApiModelProperty(example = "300000")
   private long _retryInitialDelayInMs = 300000L;
@@ -222,6 +230,14 @@ public class RebalanceConfig {
     _maxAttempts = maxAttempts;
   }
 
+  public long getSkipRetryTimeoutInMs() {
+    return _skipRetryTimeoutInMs;
+  }
+
+  public void setSkipRetryTimeoutInMs(long skipRetryTimeoutInMs) {
+    _skipRetryTimeoutInMs = skipRetryTimeoutInMs;
+  }
+
   public long getRetryInitialDelayInMs() {
     return _retryInitialDelayInMs;
   }
@@ -234,12 +250,12 @@ public class RebalanceConfig {
   public String toString() {
     return "RebalanceConfig{" + "_dryRun=" + _dryRun + ", _reassignInstances=" + _reassignInstances
         + ", _includeConsuming=" + _includeConsuming + ", _bootstrap=" + _bootstrap + ", _downtime=" + _downtime
-        + ", _minAvailableReplicas=" + _minAvailableReplicas + ", _bestEfforts=" + _bestEfforts
-        + ", _externalViewCheckIntervalInMs=" + _externalViewCheckIntervalInMs
+        + ", _minAvailableReplicas=" + _minAvailableReplicas + ", _lowDiskMode=" + _lowDiskMode + ", _bestEfforts="
+        + _bestEfforts + ", _externalViewCheckIntervalInMs=" + _externalViewCheckIntervalInMs
         + ", _externalViewStabilizationTimeoutInMs=" + _externalViewStabilizationTimeoutInMs + ", _updateTargetTier="
         + _updateTargetTier + ", _heartbeatIntervalInMs=" + _heartbeatIntervalInMs + ", _heartbeatTimeoutInMs="
-        + _heartbeatTimeoutInMs + ", _maxAttempts=" + _maxAttempts + ", _retryInitialDelayInMs="
-        + _retryInitialDelayInMs + '}';
+        + _heartbeatTimeoutInMs + ", _maxAttempts=" + _maxAttempts + ", _skipRetryTimeoutInMs=" + _skipRetryTimeoutInMs
+        + ", _retryInitialDelayInMs=" + _retryInitialDelayInMs + '}';
   }
 
   public static RebalanceConfig copy(RebalanceConfig cfg) {
@@ -257,6 +273,7 @@ public class RebalanceConfig {
     rc._heartbeatIntervalInMs = cfg._heartbeatIntervalInMs;
     rc._heartbeatTimeoutInMs = cfg._heartbeatTimeoutInMs;
     rc._maxAttempts = cfg._maxAttempts;
+    rc._skipRetryTimeoutInMs = cfg._skipRetryTimeoutInMs;
     rc._retryInitialDelayInMs = cfg._retryInitialDelayInMs;
     return rc;
   }
