@@ -265,6 +265,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     for (int i = 0; i < queryStats.size(); i++) {
       MultiStageQueryStats.StageStats.Closed stageStats = queryStats.get(i);
       if (stageStats == null) {
+        // This should never happen, but we are adding an empty json to be sure we do not fail with a NPE in this case
         brokerResponse.addStageStats(JsonUtils.newObjectNode());
       } else {
         stageStats.forEach((type, stats) -> type.mergeInto(brokerResponse, stats));
