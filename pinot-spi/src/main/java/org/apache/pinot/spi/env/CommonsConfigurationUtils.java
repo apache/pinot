@@ -34,7 +34,6 @@ import java.util.stream.StreamSupport;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration2.Configuration;
 import org.apache.commons.configuration2.PropertiesConfiguration;
-import org.apache.commons.configuration2.PropertiesConfiguration.IOFactory;
 import org.apache.commons.configuration2.convert.LegacyListDelimiterHandler;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.configuration2.io.FileHandler;
@@ -50,9 +49,10 @@ public class CommonsConfigurationUtils {
 
   // usage: default header version of all configurations.
   // if properties configuration doesn't contain header version, it will be considered as 1
-  public static final String PROPERTIES_CONFIGURATION_HEADER_VERSION_1 = "1";
+  public static final String DEFAULT_PROPERTIES_CONFIGURATION_HEADER_VERSION = "1";
 
   // usage: used in reading segment metadata with 'SegmentMetadataIOFactory' IO Factory.
+  // version signifies that segment metadata or other properties configurations contains keys with no special character.
   public static final String PROPERTIES_CONFIGURATION_HEADER_VERSION_2 = "2";
 
   private CommonsConfigurationUtils() {
@@ -65,6 +65,7 @@ public class CommonsConfigurationUtils {
    */
   public static PropertiesConfiguration fromPath(String path)
       throws ConfigurationException {
+    return fromPath(path, true, null);
     return fromPath(path, false, true, PropertyIOFactoryKind.DefaultPropertyConfigurationIOFactory);
   }
 
@@ -72,9 +73,11 @@ public class CommonsConfigurationUtils {
    * Instantiate a {@link PropertiesConfiguration} from an {@link String}.
    * @param path representing the path of file
    * @param setDefaultDelimiter representing to set the default list delimiter.
+   * @param ioFactoryKind representing to set IOFactory. It can be null.
    * @return a {@link PropertiesConfiguration} instance.
    */
   public static PropertiesConfiguration fromPath(String path, boolean setDefaultDelimiter,
+      @Nullable PropertyIOFactoryKind ioFactoryKind)
       PropertyIOFactoryKind ioFactoryKind)
   public static PropertiesConfiguration fromPath(@Nullable String path, boolean setIOFactory,
       boolean setDefaultDelimiter, PropertyIOFactoryKind ioFactoryKind)
@@ -105,9 +108,11 @@ public class CommonsConfigurationUtils {
    * Instantiate a {@link PropertiesConfiguration} from an {@link InputStream}.
    * @param stream containing properties
    * @param setDefaultDelimiter representing to set the default list delimiter.
+   * @param ioFactoryKind representing to set IOFactory. It can be null.
    * @return a {@link PropertiesConfiguration} instance.
    */
   public static PropertiesConfiguration fromInputStream(InputStream stream,
+      boolean setDefaultDelimiter, @Nullable PropertyIOFactoryKind ioFactoryKind)
       boolean setDefaultDelimiter, PropertyIOFactoryKind ioFactoryKind)
       boolean setDefaultDelimiter, PropertyReaderKind ioFactoryKind)
   public static PropertiesConfiguration fromInputStream(@Nullable InputStream stream, boolean setIOFactory,
@@ -135,6 +140,7 @@ public class CommonsConfigurationUtils {
       throws ConfigurationException {
     PropertyIOFactoryKind ioFactoryKind = PropertyIOFactoryKind.DefaultPropertyConfigurationIOFactory;
 
+    // if segment metadata contains version header with value '2', set SegmentMetadataIOFactory as IO factory.
     if (PROPERTIES_CONFIGURATION_HEADER_VERSION_2.equals(getConfigurationHeaderVersion(file))) {
       ioFactoryKind = PropertyIOFactoryKind.SegmentMetadataIOFactory;
     }
@@ -156,9 +162,11 @@ public class CommonsConfigurationUtils {
    * Instantiate a {@link PropertiesConfiguration} from a {@link File}.
    * @param file containing properties
    * @param setDefaultDelimiter representing to set the default list delimiter.
+   * @param ioFactoryKind representing to set IOFactory. It can be null.
    * @return a {@link PropertiesConfiguration} instance.
    */
   public static PropertiesConfiguration fromFile(File file,
+      boolean setDefaultDelimiter, @Nullable PropertyIOFactoryKind ioFactoryKind)
   public static PropertiesConfiguration fromFile(@Nullable File file, boolean setIOFactory, boolean setDefaultDelimiter)
   public static PropertiesConfiguration fromFile(File file, boolean setIOFactory,
       boolean setDefaultDelimiter, PropertyIOFactoryKind ioFactoryKind)

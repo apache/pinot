@@ -18,20 +18,38 @@
  */
 package org.apache.pinot.spi.env;
 
+import org.apache.commons.configuration2.PropertiesConfiguration;
+
 public enum PropertyIOFactoryKind {
   ConfigFileIOFactory {
     public String toString() {
       return "ConfigFile";
+    }
+
+    @Override
+    public ConfigFilePropertyIOFactory getInstance() {
+      return new ConfigFilePropertyIOFactory();
     }
   },
   SegmentMetadataIOFactory {
     public String toString() {
       return "SegmentMetadata";
     }
+    @Override
+    public SegmentMetadataPropertyIOFactory getInstance() {
+      return new SegmentMetadataPropertyIOFactory();
+    }
   },
   DefaultPropertyConfigurationIOFactory {
     public String toString() {
       return "Default";
     }
-  }
+    @Override
+    public PropertiesConfiguration.DefaultIOFactory getInstance() {
+      return new PropertiesConfiguration.DefaultIOFactory();
+    }
+  };
+
+  // get the instance of the IO factory.
+  public abstract PropertiesConfiguration.DefaultIOFactory getInstance();
 }
