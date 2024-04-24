@@ -194,7 +194,7 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
 
   private Constructor<QueryParserBase> getQueryParserWithStringAndAnalyzerTypeConstructor(String queryParserClassName)
           throws ReflectiveOperationException {
-    // Fail-fast if the query parser if specified class is not QueryParseBase class
+    // Fail-fast if the query parser is specified class is not QueryParseBase class
     final Class<?> queryParserClass = Class.forName(queryParserClassName);
     if (!QueryParserBase.class.isAssignableFrom(queryParserClass)) {
       throw new ReflectiveOperationException("The specified lucene query parser class " + queryParserClassName
