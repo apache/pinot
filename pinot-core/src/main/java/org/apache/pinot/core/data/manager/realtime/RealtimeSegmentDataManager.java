@@ -1791,13 +1791,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     String decoderClass = _streamConfig.getDecoderClass();
     try {
       Map<String, String> decoderProperties = _streamConfig.getDecoderProperties();
-    StreamMessageDecoder decoder = PluginManager.get().createInstance(decoderClass);
-    try {
-      decoder.init(decoderProperties, fieldsToRead, _streamConfig.getTopicName());
-    } catch (UnsupportedOperationException e) {
-      // Backward compatibility
+      StreamMessageDecoder decoder = PluginManager.get().createInstance(decoderClass);
       decoder.init(fieldsToRead, _streamConfig, _tableConfig, _schema);
-    }
       return decoder;
     } catch (Exception e) {
       throw new RuntimeException(
