@@ -1787,7 +1787,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
    * @param fieldsToRead The fields to read from the source stream
    * @return The initialized StreamMessageDecoder
    */
-  private StreamMessageDecoder create(Set<String> fieldsToRead) {
+  private StreamMessageDecoder createMessageDecoder(Set<String> fieldsToRead) {
     String decoderClass = _streamConfig.getDecoderClass();
     try {
       Map<String, String> decoderProperties = _streamConfig.getDecoderProperties();

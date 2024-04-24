@@ -59,7 +59,7 @@ public interface StreamMessageDecoder<T> {
    * @param schema Schema of the table
    * @throws Exception
    */
-  default void init(@Nullable Set<String> fields, StreamConfig streamConfig, TableConfig tableConfig, Schema schema)
+  default void init(Set<String> fieldsToRead, StreamConfig streamConfig, TableConfig tableConfig, Schema schema)
       throws Exception {
     init(streamConfig.getDecoderProperties(), fields, streamConfig.getTopicName());
   }
