@@ -75,6 +75,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.metrics.PinotMeter;
+import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.recordenricher.RecordEnricherPipeline;
 import org.apache.pinot.spi.stream.ConsumerPartitionState;
 import org.apache.pinot.spi.stream.LongMsgOffset;
@@ -91,7 +92,6 @@ import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
 import org.apache.pinot.spi.stream.StreamDataDecoder;
 import org.apache.pinot.spi.stream.StreamDataDecoderImpl;
 import org.apache.pinot.spi.stream.StreamDataDecoderResult;
-import org.apache.pinot.spi.stream.StreamDecoderProvider;
 import org.apache.pinot.spi.stream.StreamMessage;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
@@ -1505,7 +1505,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     // Create message decoder
     Set<String> fieldsToRead = IngestionUtils.getFieldsForRecordExtractor(_tableConfig.getIngestionConfig(), _schema);
     try {
-      StreamMessageDecoder streamMessageDecoder = StreamDecoderProvider.create(_streamConfig, fieldsToRead);
+      StreamMessageDecoder streamMessageDecoder = create(fieldsToRead);
       _streamDataDecoder = new StreamDataDecoderImpl(streamMessageDecoder);
     } catch (Exception e) {
       _realtimeTableDataManager.addSegmentError(_segmentNameStr,
@@ -1777,6 +1777,31 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       }
       _lastConsumedCount = _numRowsConsumed;
       _lastLogTime = now;
+    }
+  }
+
+  /**
+   * Creates a {@link StreamMessageDecoder} using properties in {@link StreamConfig}.
+   *
+   * @param streamConfig The stream config from the table config
+   * @param fieldsToRead The fields to read from the source stream
+   * @return The initialized StreamMessageDecoder
+   */
+  private StreamMessageDecoder create(Set<String> fieldsToRead) {
+    String decoderClass = _streamConfig.getDecoderClass();
+    try {
+      Map<String, String> decoderProperties = _streamConfig.getDecoderProperties();
+    StreamMessageDecoder decoder = PluginManager.get().createInstance(decoderClass);
+    try {
+      decoder.init(decoderProperties, fieldsToRead, _streamConfig.getTopicName());
+    } catch (UnsupportedOperationException e) {
+      // Backward compatibility
+      decoder.init(fieldsToRead, _streamConfig, _tableConfig, _schema);
+    }
+      return decoder;
+    } catch (Exception e) {
+      throw new RuntimeException(
+          "Caught exception while creating StreamMessageDecoder from stream config: " + _streamConfig, e);
     }
   }
 
