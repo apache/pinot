@@ -240,6 +240,7 @@
 
     <flink.version>1.14.6</flink.version>
 
+    <!-- Solve conflict across dependencies -->
     <kotlin.stdlib.version>1.9.23</kotlin.stdlib.version>
     <okio.version>3.9.0</okio.version>
     <kerby.version>2.0.3</kerby.version>
@@ -249,8 +250,7 @@
     <eclipse.jetty.version>9.4.54.v20240208</eclipse.jetty.version>
     <nimbus-jose-jwt.version>9.37.3</nimbus-jose-jwt.version>
     <bouncycastle.version>1.78</bouncycastle.version>
-    <airlift.version>0.26</airlift.version>
-    <pulsar.version>2.11.4</pulsar.version>
+    <aircompressor.version>0.26</aircompressor.version>
   </properties>
 
   <profiles>
@@ -1561,19 +1561,7 @@
         <version>${sslcontext.kickstart.version}</version>
       </dependency>
 
-      <!-- Pulsar -->
-      <dependency>
-        <groupId>org.apache.pulsar</groupId>
-        <artifactId>pulsar-client-original</artifactId>
-        <version>${pulsar.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pulsar</groupId>
-        <artifactId>pulsar-client-admin-original</artifactId>
-        <version>${pulsar.version}</version>
-      </dependency>
-
-      <!-- bouncycastle libraries are used by Kafka and Pulsar plugins -->
+      <!-- Bouncy Castle libraries are used by Kafka and Pulsar plugins -->
       <dependency>
         <groupId>org.bouncycastle</groupId>
         <artifactId>bcpkix-jdk18on</artifactId>
@@ -1586,27 +1574,24 @@
       </dependency>
       <dependency>
         <groupId>org.bouncycastle</groupId>
-        <artifactId>bcpkix-jdk15to18</artifactId>
+        <artifactId>bcutil-jdk18on</artifactId>
         <version>${bouncycastle.version}</version>
       </dependency>
       <dependency>
         <groupId>org.bouncycastle</groupId>
-        <artifactId>bcprov-ext-jdk15to18</artifactId>
-        <version>${bouncycastle.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.bouncycastle</groupId>
-        <artifactId>bcprov-jdk15to18</artifactId>
+        <artifactId>bcprov-ext-jdk18on</artifactId>
         <version>${bouncycastle.version}</version>
       </dependency>
 
+      <!-- Used by ORC, Parquet and Pulsar -->
       <dependency>
         <groupId>io.airlift</groupId>
         <artifactId>aircompressor</artifactId>
-        <version>${airlift.version}</version>
+        <version>${aircompressor.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
+
   <build>
     <defaultGoal>clean install</defaultGoal>
     <extensions>
