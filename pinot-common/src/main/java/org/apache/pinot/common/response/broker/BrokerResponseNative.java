@@ -18,28 +18,21 @@
  */
 package org.apache.pinot.common.response.broker;
 
-import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
-import com.fasterxml.jackson.databind.JsonNode;
+import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.common.datatable.DataTable;
-import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -59,7 +52,6 @@ import org.slf4j.LoggerFactory;
     "segmentStatistics", "traceInfo", "partialResult"
 })
 public class BrokerResponseNative implements BrokerResponse {
-  private static final Logger LOGGER = LoggerFactory.getLogger(BrokerResponseNative.class);
   public static final BrokerResponseNative EMPTY_RESULT = BrokerResponseNative.empty();
   public static final BrokerResponseNative NO_TABLE_RESULT =
       new BrokerResponseNative(QueryException.BROKER_RESOURCE_MISSING_ERROR);
@@ -71,29 +63,43 @@ public class BrokerResponseNative implements BrokerResponse {
   private String _brokerId;
   private int _numServersQueried = 0;
   private int _numServersResponded = 0;
+  private long _numDocsScanned = 0L;
+  private long _numEntriesScannedInFilter = 0L;
+  private long _numEntriesScannedPostFilter = 0L;
+  private long _numSegmentsQueried = 0L;
+  private long _numSegmentsProcessed = 0L;
+  private long _numSegmentsMatched = 0L;
+  private long _numConsumingSegmentsQueried = 0L;
+  private long _numConsumingSegmentsProcessed = 0L;
+  private long _numConsumingSegmentsMatched = 0L;
+  // the timestamp indicating the freshness of the data queried in consuming segments.
+  // This can be ingestion timestamp if provided by the stream, or the last index time
+  private long _minConsumingFreshnessTimeMs = 0L;
   private long _brokerReduceTimeMs = 0L;
-  /**
-   * Whether the max rows in join has been reached.
-   * <p>
-   * This max can be set by using PinotHintOptions.JOIN_HINT_OPTIONS and defaults to
-   * HashJoiner.MAX_ROWS_IN_JOIN_DEFAULT.
-   */
-  private boolean _maxRowsInJoinReached = false;
-  private boolean _partialResult = false;
+
+  private long _totalDocs = 0L;
+  private boolean _numGroupsLimitReached = false;
+  private long _timeUsedMs = 0L;
   private long _offlineThreadCpuTimeNs = 0L;
   private long _realtimeThreadCpuTimeNs = 0L;
   private long _offlineSystemActivitiesCpuTimeNs = 0L;
   private long _realtimeSystemActivitiesCpuTimeNs = 0L;
   private long _offlineResponseSerializationCpuTimeNs = 0L;
   private long _realtimeResponseSerializationCpuTimeNs = 0L;
+  private long _offlineTotalCpuTimeNs = 0L;
+  private long _realtimeTotalCpuTimeNs = 0L;
   private long _numSegmentsPrunedByBroker = 0L;
+  private long _numSegmentsPrunedByServer = 0L;
+  private long _numSegmentsPrunedInvalid = 0L;
+  private long _numSegmentsPrunedByLimit = 0L;
+  private long _numSegmentsPrunedByValue = 0L;
+  private long _explainPlanNumEmptyFilterSegments = 0L;
+  private long _explainPlanNumMatchAllFilterSegments = 0L;
   private int _numRowsResultSet = 0;
   private ResultTable _resultTable;
   private Map<String, String> _traceInfo = new HashMap<>();
-  private Map<String, JsonNode> _traceInfo2 = new HashMap<>();
   private List<QueryProcessingException> _processingExceptions = new ArrayList<>();
   private List<String> _segmentStatistics = new ArrayList<>();
-  private final StatMap<DataTable.MetadataKey> _serverStats = new StatMap<>(DataTable.MetadataKey.class);
 
   public BrokerResponseNative() {
   }
@@ -124,6 +130,7 @@ public class BrokerResponseNative implements BrokerResponse {
     return new BrokerResponseNative();
   }
 
+  @VisibleForTesting
   public static BrokerResponseNative fromJsonString(String jsonString)
       throws IOException {
     return JsonUtils.stringToObject(jsonString, BrokerResponseNative.class);
@@ -136,7 +143,6 @@ public class BrokerResponseNative implements BrokerResponse {
   }
 
   @JsonProperty("offlineSystemActivitiesCpuTimeNs")
-  @Override
   public void setOfflineSystemActivitiesCpuTimeNs(long offlineSystemActivitiesCpuTimeNs) {
     _offlineSystemActivitiesCpuTimeNs = offlineSystemActivitiesCpuTimeNs;
   }
@@ -148,7 +154,6 @@ public class BrokerResponseNative implements BrokerResponse {
   }
 
   @JsonProperty("realtimeSystemActivitiesCpuTimeNs")
-  @Override
   public void setRealtimeSystemActivitiesCpuTimeNs(long realtimeSystemActivitiesCpuTimeNs) {
     _realtimeSystemActivitiesCpuTimeNs = realtimeSystemActivitiesCpuTimeNs;
   }
@@ -160,7 +165,6 @@ public class BrokerResponseNative implements BrokerResponse {
   }
 
   @JsonProperty("offlineThreadCpuTimeNs")
-  @Override
   public void setOfflineThreadCpuTimeNs(long timeUsedMs) {
     _offlineThreadCpuTimeNs = timeUsedMs;
   }
@@ -172,7 +176,6 @@ public class BrokerResponseNative implements BrokerResponse {
   }
 
   @JsonProperty("realtimeThreadCpuTimeNs")
-  @Override
   public void setRealtimeThreadCpuTimeNs(long timeUsedMs) {
     _realtimeThreadCpuTimeNs = timeUsedMs;
   }
@@ -184,7 +187,6 @@ public class BrokerResponseNative implements BrokerResponse {
   }
 
   @JsonProperty("offlineResponseSerializationCpuTimeNs")
-  @Override
   public void setOfflineResponseSerializationCpuTimeNs(long offlineResponseSerializationCpuTimeNs) {
     _offlineResponseSerializationCpuTimeNs = offlineResponseSerializationCpuTimeNs;
   }
@@ -196,7 +198,6 @@ public class BrokerResponseNative implements BrokerResponse {
   }
 
   @JsonProperty("realtimeResponseSerializationCpuTimeNs")
-  @Override
   public void setRealtimeResponseSerializationCpuTimeNs(long realtimeResponseSerializationCpuTimeNs) {
     _realtimeResponseSerializationCpuTimeNs = realtimeResponseSerializationCpuTimeNs;
   }
@@ -204,27 +205,23 @@ public class BrokerResponseNative implements BrokerResponse {
   @JsonProperty("offlineTotalCpuTimeNs")
   @Override
   public long getOfflineTotalCpuTimeNs() {
-    return getOfflineThreadCpuTimeNs() + getOfflineSystemActivitiesCpuTimeNs()
-        + getOfflineResponseSerializationCpuTimeNs();
+    return _offlineTotalCpuTimeNs;
+  }
+
+  @JsonProperty("offlineTotalCpuTimeNs")
+  public void setOfflineTotalCpuTimeNs(long offlineTotalCpuTimeNs) {
+    _offlineTotalCpuTimeNs = offlineTotalCpuTimeNs;
   }
 
   @JsonProperty("realtimeTotalCpuTimeNs")
   @Override
   public long getRealtimeTotalCpuTimeNs() {
-    return getRealtimeThreadCpuTimeNs() + getRealtimeSystemActivitiesCpuTimeNs()
-        + getRealtimeResponseSerializationCpuTimeNs();
+    return _realtimeTotalCpuTimeNs;
   }
 
-  @JsonAnySetter
-  public void setServerStats(String key, Object value) {
-    switch (key) {
-      case "offlineTotalCpuTimeNs":
-      case "realtimeTotalCpuTimeNs":
-        LOGGER.debug("Ignoring server stat key: {} with value: {}", key, value);
-        break;
-      default:
-        throw new IllegalArgumentException("JSON field " + key + " not recognized");
-    }
+  @JsonProperty("realtimeTotalCpuTimeNs")
+  public void setRealtimeTotalCpuTimeNs(long realtimeTotalCpuTimeNs) {
+    _realtimeTotalCpuTimeNs = realtimeTotalCpuTimeNs;
   }
 
   @JsonProperty("numSegmentsPrunedByBroker")
@@ -242,75 +239,67 @@ public class BrokerResponseNative implements BrokerResponse {
   @JsonProperty("numSegmentsPrunedByServer")
   @Override
   public long getNumSegmentsPrunedByServer() {
-    return _serverStats.getLong(DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_BY_SERVER);
+    return _numSegmentsPrunedByServer;
   }
 
   @JsonProperty("numSegmentsPrunedByServer")
-  @Override
   public void setNumSegmentsPrunedByServer(long numSegmentsPrunedByServer) {
-    _serverStats.merge(DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_BY_SERVER, (int) numSegmentsPrunedByServer);
+    _numSegmentsPrunedByServer = numSegmentsPrunedByServer;
   }
 
   @JsonProperty("numSegmentsPrunedInvalid")
   @Override
   public long getNumSegmentsPrunedInvalid() {
-    return _serverStats.getLong(DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_INVALID);
+    return _numSegmentsPrunedInvalid;
   }
 
   @JsonProperty("numSegmentsPrunedInvalid")
-  @Override
   public void setNumSegmentsPrunedInvalid(long numSegmentsPrunedInvalid) {
-    _serverStats.merge(DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_INVALID, (int) numSegmentsPrunedInvalid);
+    _numSegmentsPrunedInvalid = numSegmentsPrunedInvalid;
   }
 
   @JsonProperty("numSegmentsPrunedByLimit")
   @Override
   public long getNumSegmentsPrunedByLimit() {
-    return _serverStats.getLong(DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_BY_LIMIT);
+    return _numSegmentsPrunedByLimit;
   }
 
   @JsonProperty("numSegmentsPrunedByLimit")
-  @Override
   public void setNumSegmentsPrunedByLimit(long numSegmentsPrunedByLimit) {
-    _serverStats.merge(DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_BY_LIMIT, (int) numSegmentsPrunedByLimit);
+    _numSegmentsPrunedByLimit = numSegmentsPrunedByLimit;
   }
 
   @JsonProperty("numSegmentsPrunedByValue")
   @Override
   public long getNumSegmentsPrunedByValue() {
-    return _serverStats.getLong(DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_BY_VALUE);
+    return _numSegmentsPrunedByValue;
   }
 
   @JsonProperty("numSegmentsPrunedByValue")
-  @Override
   public void setNumSegmentsPrunedByValue(long numSegmentsPrunedByValue) {
-    _serverStats.merge(DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_BY_VALUE, (int) numSegmentsPrunedByValue);
+    _numSegmentsPrunedByValue = numSegmentsPrunedByValue;
   }
 
   @JsonProperty("explainPlanNumEmptyFilterSegments")
   @Override
   public long getExplainPlanNumEmptyFilterSegments() {
-    return _serverStats.getLong(DataTable.MetadataKey.EXPLAIN_PLAN_NUM_EMPTY_FILTER_SEGMENTS);
+    return _explainPlanNumEmptyFilterSegments;
   }
 
   @JsonProperty("explainPlanNumEmptyFilterSegments")
-  @Override
   public void setExplainPlanNumEmptyFilterSegments(long explainPlanNumEmptyFilterSegments) {
-    _serverStats.merge(DataTable.MetadataKey.EXPLAIN_PLAN_NUM_EMPTY_FILTER_SEGMENTS,
-        (int) explainPlanNumEmptyFilterSegments);
+    _explainPlanNumEmptyFilterSegments = explainPlanNumEmptyFilterSegments;
   }
 
   @JsonProperty("explainPlanNumMatchAllFilterSegments")
   @Override
   public long getExplainPlanNumMatchAllFilterSegments() {
-    return _serverStats.getLong(DataTable.MetadataKey.EXPLAIN_PLAN_NUM_MATCH_ALL_FILTER_SEGMENTS);
+    return _explainPlanNumMatchAllFilterSegments;
   }
 
   @JsonProperty("explainPlanNumMatchAllFilterSegments")
-  @Override
   public void setExplainPlanNumMatchAllFilterSegments(long explainPlanNumMatchAllFilterSegments) {
-    _serverStats.merge(DataTable.MetadataKey.EXPLAIN_PLAN_NUM_MATCH_ALL_FILTER_SEGMENTS,
-        (int) explainPlanNumMatchAllFilterSegments);
+    _explainPlanNumMatchAllFilterSegments = explainPlanNumMatchAllFilterSegments;
   }
 
   @JsonProperty("resultTable")
@@ -347,7 +336,6 @@ public class BrokerResponseNative implements BrokerResponse {
   }
 
   @JsonProperty("numServersQueried")
-  @Override
   public void setNumServersQueried(int numServersQueried) {
     _numServersQueried = numServersQueried;
   }
@@ -366,172 +354,154 @@ public class BrokerResponseNative implements BrokerResponse {
 
   @JsonProperty("numDocsScanned")
   public long getNumDocsScanned() {
-    return _serverStats.getLong(DataTable.MetadataKey.NUM_DOCS_SCANNED);
+    return _numDocsScanned;
   }
 
   @JsonProperty("numDocsScanned")
   public void setNumDocsScanned(long numDocsScanned) {
-    _serverStats.merge(DataTable.MetadataKey.NUM_DOCS_SCANNED, numDocsScanned);
+    _numDocsScanned = numDocsScanned;
   }
 
   @JsonProperty("numEntriesScannedInFilter")
   @Override
   public long getNumEntriesScannedInFilter() {
-    return _serverStats.getLong(DataTable.MetadataKey.NUM_ENTRIES_SCANNED_IN_FILTER);
+    return _numEntriesScannedInFilter;
   }
 
   @JsonProperty("numEntriesScannedInFilter")
   public void setNumEntriesScannedInFilter(long numEntriesScannedInFilter) {
-    _serverStats.merge(DataTable.MetadataKey.NUM_ENTRIES_SCANNED_IN_FILTER, numEntriesScannedInFilter);
+    _numEntriesScannedInFilter = numEntriesScannedInFilter;
   }
 
   @JsonProperty("numEntriesScannedPostFilter")
   @Override
   public long getNumEntriesScannedPostFilter() {
-    return _serverStats.getLong(DataTable.MetadataKey.NUM_ENTRIES_SCANNED_POST_FILTER);
+    return _numEntriesScannedPostFilter;
   }
 
   @JsonProperty("numEntriesScannedPostFilter")
   public void setNumEntriesScannedPostFilter(long numEntriesScannedPostFilter) {
-    _serverStats.merge(DataTable.MetadataKey.NUM_ENTRIES_SCANNED_POST_FILTER, numEntriesScannedPostFilter);
+    _numEntriesScannedPostFilter = numEntriesScannedPostFilter;
   }
 
   @JsonProperty("numSegmentsQueried")
   @Override
   public long getNumSegmentsQueried() {
-    return _serverStats.getLong(DataTable.MetadataKey.NUM_SEGMENTS_QUERIED);
+    return _numSegmentsQueried;
   }
 
   @JsonProperty("numSegmentsQueried")
   public void setNumSegmentsQueried(long numSegmentsQueried) {
-    _serverStats.merge(DataTable.MetadataKey.NUM_SEGMENTS_QUERIED, (int) numSegmentsQueried);
+    _numSegmentsQueried = numSegmentsQueried;
   }
 
   @JsonProperty("numSegmentsProcessed")
   @Override
   public long getNumSegmentsProcessed() {
-    return _serverStats.getLong(DataTable.MetadataKey.NUM_SEGMENTS_PROCESSED);
+    return _numSegmentsProcessed;
   }
 
   @JsonProperty("numSegmentsProcessed")
   public void setNumSegmentsProcessed(long numSegmentsProcessed) {
-    _serverStats.merge(DataTable.MetadataKey.NUM_SEGMENTS_PROCESSED, (int) numSegmentsProcessed);
+    _numSegmentsProcessed = numSegmentsProcessed;
   }
 
   @JsonProperty("numSegmentsMatched")
   @Override
   public long getNumSegmentsMatched() {
-    return _serverStats.getLong(DataTable.MetadataKey.NUM_SEGMENTS_MATCHED);
+    return _numSegmentsMatched;
   }
 
   @JsonProperty("numSegmentsMatched")
   public void setNumSegmentsMatched(long numSegmentsMatched) {
-    _serverStats.merge(DataTable.MetadataKey.NUM_SEGMENTS_MATCHED, (int) numSegmentsMatched);
+    _numSegmentsMatched = numSegmentsMatched;
   }
 
   @JsonProperty("numConsumingSegmentsQueried")
   @Override
   public long getNumConsumingSegmentsQueried() {
-    return _serverStats.getLong(DataTable.MetadataKey.NUM_CONSUMING_SEGMENTS_QUERIED);
+    return _numConsumingSegmentsQueried;
   }
 
   @JsonProperty("numConsumingSegmentsQueried")
   public void setNumConsumingSegmentsQueried(long numConsumingSegmentsQueried) {
-    _serverStats.merge(DataTable.MetadataKey.NUM_CONSUMING_SEGMENTS_QUERIED, (int) numConsumingSegmentsQueried);
+    _numConsumingSegmentsQueried = numConsumingSegmentsQueried;
   }
 
   @JsonProperty("numConsumingSegmentsProcessed")
   @Override
   public long getNumConsumingSegmentsProcessed() {
-    return _serverStats.getLong(DataTable.MetadataKey.NUM_CONSUMING_SEGMENTS_PROCESSED);
+    return _numConsumingSegmentsProcessed;
   }
 
   @JsonProperty("numConsumingSegmentsProcessed")
   public void setNumConsumingSegmentsProcessed(long numConsumingSegmentsProcessed) {
-    _serverStats.merge(DataTable.MetadataKey.NUM_CONSUMING_SEGMENTS_PROCESSED, (int) numConsumingSegmentsProcessed);
+    _numConsumingSegmentsProcessed = numConsumingSegmentsProcessed;
   }
 
   @JsonProperty("numConsumingSegmentsMatched")
   @Override
   public long getNumConsumingSegmentsMatched() {
-    return _serverStats.getLong(DataTable.MetadataKey.NUM_CONSUMING_SEGMENTS_MATCHED);
+    return _numConsumingSegmentsMatched;
   }
 
   @JsonProperty("numConsumingSegmentsMatched")
   public void setNumConsumingSegmentsMatched(long numConsumingSegmentsMatched) {
-    _serverStats.merge(DataTable.MetadataKey.NUM_CONSUMING_SEGMENTS_MATCHED, (int) numConsumingSegmentsMatched);
+    _numConsumingSegmentsMatched = numConsumingSegmentsMatched;
   }
 
   @JsonProperty("minConsumingFreshnessTimeMs")
   @Override
   public long getMinConsumingFreshnessTimeMs() {
-    return _serverStats.getLong(DataTable.MetadataKey.MIN_CONSUMING_FRESHNESS_TIME_MS);
+    return _minConsumingFreshnessTimeMs;
   }
 
   @JsonProperty("minConsumingFreshnessTimeMs")
   public void setMinConsumingFreshnessTimeMs(long minConsumingFreshnessTimeMs) {
-    _serverStats.merge(DataTable.MetadataKey.MIN_CONSUMING_FRESHNESS_TIME_MS, minConsumingFreshnessTimeMs);
+    _minConsumingFreshnessTimeMs = minConsumingFreshnessTimeMs;
   }
 
   @JsonProperty("totalDocs")
   @Override
   public long getTotalDocs() {
-    return _serverStats.getLong(DataTable.MetadataKey.TOTAL_DOCS);
+    return _totalDocs;
   }
 
   @JsonProperty("totalDocs")
   public void setTotalDocs(long totalDocs) {
-    _serverStats.merge(DataTable.MetadataKey.TOTAL_DOCS, totalDocs);
+    _totalDocs = totalDocs;
   }
 
   @JsonProperty("numGroupsLimitReached")
   @Override
   public boolean isNumGroupsLimitReached() {
-    return _serverStats.getBoolean(DataTable.MetadataKey.NUM_GROUPS_LIMIT_REACHED);
+    return _numGroupsLimitReached;
   }
 
   @JsonProperty("numGroupsLimitReached")
   public void setNumGroupsLimitReached(boolean numGroupsLimitReached) {
-    _serverStats.merge(DataTable.MetadataKey.NUM_GROUPS_LIMIT_REACHED, numGroupsLimitReached);
+    _numGroupsLimitReached = numGroupsLimitReached;
   }
 
-  public void mergeNumGroupsLimitReached(boolean numGroupsLimitReached) {
-    _serverStats.merge(DataTable.MetadataKey.NUM_GROUPS_LIMIT_REACHED, numGroupsLimitReached);
-  }
-
-  @JsonProperty("maxRowsInJoinReached")
-  @Override
+  @JsonProperty(access = JsonProperty.Access.READ_ONLY)
   public boolean isMaxRowsInJoinReached() {
-    return _maxRowsInJoinReached;
+    return false;
   }
 
-  public void setMaxRowsInJoinReached(boolean maxRowsInJoinReached) {
-    _maxRowsInJoinReached = maxRowsInJoinReached;
-  }
-
-  public void mergeMaxRowsInJoinReached(boolean maxRowsInJoinReached) {
-    _maxRowsInJoinReached |= maxRowsInJoinReached;
-  }
-
-  @JsonProperty("partialResult")
+  @JsonProperty(access = JsonProperty.Access.READ_ONLY)
   public boolean isPartialResult() {
-    return _partialResult;
-  }
-
-  @JsonProperty("partialResult")
-  public void setPartialResult(boolean partialResult) {
-    _partialResult = partialResult;
+    return isNumGroupsLimitReached() || getExceptionsSize() > 0 || isMaxRowsInJoinReached();
   }
 
   @JsonProperty("timeUsedMs")
   public long getTimeUsedMs() {
-    return _serverStats.getLong(DataTable.MetadataKey.TIME_USED_MS);
+    return _timeUsedMs;
   }
 
   @JsonProperty("timeUsedMs")
   @Override
   public void setTimeUsedMs(long timeUsedMs) {
-    _serverStats.merge(DataTable.MetadataKey.TIME_USED_MS, timeUsedMs);
+    _timeUsedMs = timeUsedMs;
   }
 
   @JsonProperty("numRowsResultSet")
@@ -541,7 +511,6 @@ public class BrokerResponseNative implements BrokerResponse {
   }
 
   @JsonProperty("numRowsResultSet")
-  @Override
   public void setNumRowsResultSet(int numRowsResultSet) {
     _numRowsResultSet = numRowsResultSet;
   }
@@ -564,40 +533,12 @@ public class BrokerResponseNative implements BrokerResponse {
   @JsonProperty("traceInfo")
   public void setTraceInfo(Map<String, String> traceInfo) {
     _traceInfo = traceInfo;
-    _traceInfo2.clear();
-    for (Map.Entry<String, String> entry : _traceInfo.entrySet()) {
-      try {
-        _traceInfo2.put(entry.getKey(), JsonUtils.stringToJsonNode(entry.getValue()));
-      } catch (IOException e) {
-          LOGGER.debug("Caught exception while converting entry " + entry.getKey() + " from traceInfo to "
-              + "traceInfo2", e);
-      }
-    }
-  }
-
-  @JsonProperty("traceInfo2")
-  public Map<String, JsonNode> getTraceInfo2() {
-    return _traceInfo2;
-  }
-
-  @JsonProperty("traceInfo2")
-  public void setTraceInfo2(Map<String, JsonNode> traceInfo) {
-    _traceInfo2 = traceInfo;
-    _traceInfo.clear();
-    for (Map.Entry<String, JsonNode> entry : _traceInfo2.entrySet()) {
-      _traceInfo.put(entry.getKey(), entry.getValue().toString());
-    }
-  }
-
-  @Override
-  public String toJsonString()
-      throws IOException {
-    return JsonUtils.objectToString(this);
   }
 
   @JsonIgnore
   @Override
   public void setExceptions(List<ProcessingException> exceptions) {
+    _processingExceptions.clear();
     for (ProcessingException exception : exceptions) {
       _processingExceptions.add(new QueryProcessingException(exception.getErrorCode(), exception.getMessage()));
     }
@@ -647,29 +588,5 @@ public class BrokerResponseNative implements BrokerResponse {
   @Override
   public void setBrokerReduceTimeMs(long brokerReduceTimeMs) {
     _brokerReduceTimeMs = brokerReduceTimeMs;
-  }
-
-  public void addServerStats(StatMap<DataTable.MetadataKey> serverStats) {
-    // Set execution statistics.
-    _serverStats.merge(serverStats);
-
-    long threadCpuTimeNs = serverStats.getLong(DataTable.MetadataKey.THREAD_CPU_TIME_NS);
-    long systemActivitiesCpuTimeNs = serverStats.getLong(DataTable.MetadataKey.SYSTEM_ACTIVITIES_CPU_TIME_NS);
-    long responseSerializationCpuTimeNs = serverStats.getLong(DataTable.MetadataKey.RESPONSE_SER_CPU_TIME_NS);
-
-    String tableName = serverStats.getString(DataTable.MetadataKey.TABLE);
-    if (tableName != null) {
-      TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
-
-      if (tableType == TableType.OFFLINE) {
-        _offlineThreadCpuTimeNs += threadCpuTimeNs;
-        _offlineSystemActivitiesCpuTimeNs += systemActivitiesCpuTimeNs;
-        _offlineResponseSerializationCpuTimeNs += responseSerializationCpuTimeNs;
-      } else {
-        _realtimeThreadCpuTimeNs += threadCpuTimeNs;
-        _realtimeSystemActivitiesCpuTimeNs += systemActivitiesCpuTimeNs;
-        _realtimeResponseSerializationCpuTimeNs += responseSerializationCpuTimeNs;
-      }
-    }
   }
 }

@@ -107,8 +107,8 @@ public class QueryLoggerTest {
         + "brokerReduceTimeMs=22,"
         + "exceptions=0,"
         + "serverStats=serverStats,"
-        + "offlineThreadCpuTimeNs(total/thread/sysActivity/resSer):48/15/16/17,"
-        + "realtimeThreadCpuTimeNs(total/thread/sysActivity/resSer):60/19/20/21,"
+        + "offlineThreadCpuTimeNs(total/thread/sysActivity/resSer):14/15/16/17,"
+        + "realtimeThreadCpuTimeNs(total/thread/sysActivity/resSer):18/19/20/21,"
         + "clientIp=ip,"
         + "query=SELECT * FROM foo");
   }
@@ -259,9 +259,11 @@ public class QueryLoggerTest {
     response.setExceptions(
         IntStream.range(0, numExceptions)
             .mapToObj(i -> new ProcessingException()).collect(Collectors.toList()));
+    response.setOfflineTotalCpuTimeNs(14);
     response.setOfflineThreadCpuTimeNs(15);
     response.setOfflineSystemActivitiesCpuTimeNs(16);
     response.setOfflineResponseSerializationCpuTimeNs(17);
+    response.setRealtimeTotalCpuTimeNs(18);
     response.setRealtimeThreadCpuTimeNs(19);
     response.setRealtimeSystemActivitiesCpuTimeNs(20);
     response.setRealtimeResponseSerializationCpuTimeNs(21);

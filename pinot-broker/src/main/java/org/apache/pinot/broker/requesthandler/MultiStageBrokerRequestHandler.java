@@ -244,16 +244,12 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     fillOldBrokerResponseStats(brokerResponse, queryResults.getQueryStats(), dispatchableSubPlan);
 
-    // Set partial result flag
-    brokerResponse.setPartialResult(isPartialResult(brokerResponse));
-
     // Set total query processing time
     // TODO: Currently we don't emit metric for QUERY_TOTAL_TIME_MS
     long totalTimeMs = TimeUnit.NANOSECONDS.toMillis(
         sqlNodeAndOptions.getParseTimeNs() + (executionEndTimeNs - compilationStartTimeNs));
     brokerResponse.setTimeUsedMs(totalTimeMs);
     requestContext.setQueryProcessingTime(totalTimeMs);
-    requestContext.setTraceInfo(brokerResponse.getTraceInfo());
     augmentStatistics(requestContext, brokerResponse);
 
     // Log query and stats
@@ -476,7 +472,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     }
   }
 
-  private BrokerResponseNative constructMultistageExplainPlan(String sql, String plan) {
+  private BrokerResponse constructMultistageExplainPlan(String sql, String plan) {
     BrokerResponseNative brokerResponse = BrokerResponseNative.empty();
     List<Object[]> rows = new ArrayList<>();
     rows.add(new Object[]{sql, plan});
@@ -487,7 +483,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   }
 
   @Override
-  protected BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
+  protected BrokerResponse processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
       BrokerRequest serverBrokerRequest, @Nullable BrokerRequest offlineBrokerRequest,
       @Nullable Map<ServerInstance, Pair<List<String>, List<String>>> offlineRoutingTable,
       @Nullable BrokerRequest realtimeBrokerRequest,

@@ -761,7 +761,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
           realtimeRoutingTable = null;
         }
       }
-      BrokerResponseNative brokerResponse;
+      BrokerResponse brokerResponse;
       if (_queriesById != null) {
         // Start to track the running query for cancellation just before sending it out to servers to avoid any
         // potential failures that could happen before sending it out, like failures to calculate the routing table etc.
@@ -798,7 +798,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_NUM_GROUPS_LIMIT_REACHED,
             1);
       }
-      brokerResponse.setPartialResult(isPartialResult(brokerResponse));
 
       // Set total query processing time
       long totalTimeMs = TimeUnit.NANOSECONDS.toMillis(executionEndTimeNs - compilationStartTimeNs);
@@ -1870,7 +1869,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    * Processes the optimized broker requests for both OFFLINE and REALTIME table.
    * TODO: Directly take PinotQuery
    */
-  protected abstract BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
+  protected abstract BrokerResponse processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
       BrokerRequest serverBrokerRequest, @Nullable BrokerRequest offlineBrokerRequest,
       @Nullable Map<ServerInstance, Pair<List<String>, List<String>>> offlineRoutingTable,
       @Nullable BrokerRequest realtimeBrokerRequest,
