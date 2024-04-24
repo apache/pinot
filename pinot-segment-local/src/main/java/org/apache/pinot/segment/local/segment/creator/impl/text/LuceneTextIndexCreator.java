@@ -27,7 +27,6 @@ import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.CharArraySet;
-import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.StoredField;
@@ -118,14 +117,7 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
       // to V3 if segmentVersion is set to V3 in SegmentGeneratorConfig.
       _indexFile = getV1TextIndexFile(segmentIndexDir);
 
-      Analyzer luceneAnalyzer;
-      if (luceneAnalyzerClass.isEmpty() || luceneAnalyzerClass.equals(StandardAnalyzer.class.getName())) {
-        luceneAnalyzer = TextIndexUtils.getStandardAnalyzerWithCustomizedStopWords(config.getStopWordsInclude(),
-            config.getStopWordsExclude());
-      } else {
-        luceneAnalyzer = TextIndexUtils.getAnalyzerFromClassName(luceneAnalyzerClass);
-      }
-
+      Analyzer luceneAnalyzer = TextIndexUtils.getAnalyzer(config);
       IndexWriterConfig indexWriterConfig = new IndexWriterConfig(luceneAnalyzer);
       indexWriterConfig.setRAMBufferSizeMB(config.getLuceneMaxBufferSizeMB());
       indexWriterConfig.setCommitOnClose(commit);

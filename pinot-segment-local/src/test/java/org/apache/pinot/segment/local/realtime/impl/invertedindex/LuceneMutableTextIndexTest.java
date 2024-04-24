@@ -19,29 +19,137 @@
 package org.apache.pinot.segment.local.realtime.impl.invertedindex;
 
 import java.io.File;
+import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.io.FileUtils;
+import org.apache.lucene.analysis.Analyzer;
+import org.apache.lucene.analysis.core.KeywordTokenizer;
+import org.apache.lucene.queryparser.classic.QueryParser;
 import org.apache.lucene.search.SearcherManager;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 
 
 public class LuceneMutableTextIndexTest {
+  private static final AtomicInteger SEGMENT_NAME_SUFFIX_COUNTER = new AtomicInteger(0);
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "LuceneMutableIndexTest");
   private static final String TEXT_COLUMN_NAME = "testColumnName";
+  private static final String CUSTOM_ANALYZER_FQCN = CustomAnalyzer.class.getName();
+  private static final String CUSTOM_QUERY_PARSER_FQCN = CustomQueryParser.class.getName();
   private static final RealtimeLuceneTextIndexSearcherPool SEARCHER_POOL =
       RealtimeLuceneTextIndexSearcherPool.init(1);
-
   private RealtimeLuceneTextIndex _realtimeLuceneTextIndex;
+
+
+  @Test
+  public void testDefaultAnalyzerAndDefaultQueryParser() {
+    // Test queries with standard analyzer with default configurations used by Pinot
+    configureIndex(null, null, null, null);
+    assertEquals(_realtimeLuceneTextIndex.getDocIds("stream"), ImmutableRoaringBitmap.bitmapOf(0));
+    assertEquals(_realtimeLuceneTextIndex.getDocIds("/.*house.*/"), ImmutableRoaringBitmap.bitmapOf(1));
+    assertEquals(_realtimeLuceneTextIndex.getDocIds("invalid"), ImmutableRoaringBitmap.bitmapOf());
+  }
+
+  @Test
+  public void testCustomAnalyzerWithNoArgsAndDefaultQueryParser() {
+    // Test query with CustomKeywordAnalyzer without any args
+    configureIndex(CUSTOM_ANALYZER_FQCN, null, null, null);
+    assertEquals(_realtimeLuceneTextIndex.getDocIds(
+            "/.*processing for data ware.*/"), ImmutableRoaringBitmap.bitmapOf(1));
+    assertEquals(_realtimeLuceneTextIndex.getDocIds(
+            "columnar processing for data warehouses"), ImmutableRoaringBitmap.bitmapOf(1));
+  }
+
+  @Test
+  public void testCustomAnalyzerWithNoArgsAndCustomQueryParser() {
+    // Test queries with CustomKeywordAnalyzer without any args and CustomQueryParser
+    configureIndex(CUSTOM_ANALYZER_FQCN, null, null, CUSTOM_QUERY_PARSER_FQCN);
+    assertEquals(_realtimeLuceneTextIndex.getDocIds(
+            "/.*processing for data ware.*/"), ImmutableRoaringBitmap.bitmapOf(1));
+    assertEquals(_realtimeLuceneTextIndex.getDocIds(
+            "columnar processing for data warehouses"), ImmutableRoaringBitmap.bitmapOf(1));
+  }
+
+  @Test
+  public void testCustomAnalyzerWithTwoStringArgsAndCustomQueryParser() {
+    // Test queries with CustomKeywordAnalyzer with two java.lang.String args and CustomQueryParser
+    configureIndex(CUSTOM_ANALYZER_FQCN,
+            "a,b", List.of("java.lang.String", "java.lang.String"), CUSTOM_QUERY_PARSER_FQCN);
+    assertEquals(_realtimeLuceneTextIndex.getDocIds(
+            "/.*processing for data ware.*/"), ImmutableRoaringBitmap.bitmapOf(1));
+    assertEquals(_realtimeLuceneTextIndex.getDocIds(
+            "columnar processing for data warehouses"), ImmutableRoaringBitmap.bitmapOf(1));
+  }
+
+  @Test
+  public void testCustomAnalyzerWithOneStringOneIntegerParametersAndCustomQueryParser() {
+    // Test queries with CustomKeywordAnalyzer w/ two String.class args and ExtendedQueryParser
+    configureIndex(CUSTOM_ANALYZER_FQCN,
+            "a,123", List.of("java.lang.String", "java.lang.Integer"), CUSTOM_QUERY_PARSER_FQCN);
+    assertEquals(_realtimeLuceneTextIndex.getDocIds(
+            "/.*processing for data ware.*/"), ImmutableRoaringBitmap.bitmapOf(1));
+    assertEquals(_realtimeLuceneTextIndex.getDocIds(
+            "columnar processing for data warehouses"), ImmutableRoaringBitmap.bitmapOf(1));
+  }
+
+  @Test
+  public void testCustomAnalyzerWithOnePrimitiveIntParametersAndCustomQueryParser() {
+    // Test queries with CustomKeywordAnalyzer w/ two String.class args and ExtendedQueryParser
+    configureIndex(CUSTOM_ANALYZER_FQCN,
+            "123", List.of("java.lang.Integer.TYPE"), CUSTOM_QUERY_PARSER_FQCN);
+    assertEquals(_realtimeLuceneTextIndex.getDocIds(
+            "/.*processing for data ware.*/"), ImmutableRoaringBitmap.bitmapOf(1));
+    assertEquals(_realtimeLuceneTextIndex.getDocIds(
+            "columnar processing for data warehouses"), ImmutableRoaringBitmap.bitmapOf(1));
+  }
+
+  @Test(expectedExceptions = ExecutionException.class,
+          expectedExceptionsMessageRegExp = ".*TEXT_MATCH query timeout on realtime consuming segment.*")
+  public void testQueryCancellationIsSuccessful() throws Exception {
+    // Test queries with standard analyzer with default configurations used by Pinot
+    configureIndex(null, null, null, null);
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    Future<MutableRoaringBitmap> res = executor.submit(() -> _realtimeLuceneTextIndex.getDocIds("/.*read.*/"));
+    executor.shutdownNow();
+    res.get();
+  }
+
+  private static class CustomQueryParser extends QueryParser {
+    public CustomQueryParser(String field, Analyzer analyzer) {
+      super(field, analyzer);
+    }
+  }
+
+  public static class CustomAnalyzer extends Analyzer {
+    public CustomAnalyzer() {
+      super();
+    }
+
+    public CustomAnalyzer(String stringArg1, String stringArg2) {
+      super();
+    }
+
+    public CustomAnalyzer(String stringArg1, Integer integerArg2) {
+      super();
+    }
+
+    public CustomAnalyzer(int intArg2) {
+      super();
+    }
+
+    protected Analyzer.TokenStreamComponents createComponents(String fieldName) {
+      return new Analyzer.TokenStreamComponents(new KeywordTokenizer());
+    }
+  }
 
   private String[][] getTextData() {
     return new String[][]{
@@ -55,13 +163,15 @@ public class LuceneMutableTextIndexTest {
     };
   }
 
-  @BeforeClass
-  public void setUp()
-      throws Exception {
-    TextIndexConfig config =
-            new TextIndexConfig(false, null, null, false, false, null, null, true, 500, null, false);
-    _realtimeLuceneTextIndex =
-        new RealtimeLuceneTextIndex(TEXT_COLUMN_NAME, INDEX_DIR, "fooBar", config);
+  private void configureIndex(String analyzerClass, String analyzerClassArgs, List<String> analyzerClassArgTypes,
+                              String queryParserClass) {
+    TextIndexConfig config = new TextIndexConfig(false, null, null, false, false, null, null, true, 500,
+            analyzerClass, analyzerClassArgs, analyzerClassArgTypes, queryParserClass, false);
+
+    // Note that segment name must be unique on each query setup, otherwise `testQueryCancellationIsSuccessful` method
+    // will cause unit test to fail due to inability to release a lock.
+    _realtimeLuceneTextIndex = new RealtimeLuceneTextIndex(TEXT_COLUMN_NAME, INDEX_DIR,
+            "fooBar" + SEGMENT_NAME_SUFFIX_COUNTER.getAndIncrement(), config);
     String[][] documents = getTextData();
     String[][] repeatedDocuments = getRepeatedData();
 
@@ -86,22 +196,5 @@ public class LuceneMutableTextIndexTest {
   @AfterClass
   public void tearDown() {
     _realtimeLuceneTextIndex.close();
-  }
-
-  @Test
-  public void testQueries() {
-    assertEquals(_realtimeLuceneTextIndex.getDocIds("stream"), ImmutableRoaringBitmap.bitmapOf(0));
-    assertEquals(_realtimeLuceneTextIndex.getDocIds("/.*house.*/"), ImmutableRoaringBitmap.bitmapOf(1));
-    assertEquals(_realtimeLuceneTextIndex.getDocIds("invalid"), ImmutableRoaringBitmap.bitmapOf());
-  }
-
-  @Test(expectedExceptions = ExecutionException.class,
-      expectedExceptionsMessageRegExp = ".*TEXT_MATCH query timeout on realtime consuming segment.*")
-  public void testQueryCancellationIsSuccessful()
-      throws InterruptedException, ExecutionException {
-    ExecutorService executor = Executors.newSingleThreadExecutor();
-    Future<MutableRoaringBitmap> res = executor.submit(() -> _realtimeLuceneTextIndex.getDocIds("/.*read.*/"));
-    executor.shutdownNow();
-    res.get();
   }
 }

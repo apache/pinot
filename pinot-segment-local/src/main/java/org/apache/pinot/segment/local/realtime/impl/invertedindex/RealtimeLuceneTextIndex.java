@@ -19,12 +19,13 @@
 package org.apache.pinot.segment.local.realtime.impl.invertedindex;
 
 import java.io.File;
+import java.lang.reflect.Constructor;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.index.IndexWriter;
-import org.apache.lucene.queryparser.classic.QueryParser;
+import org.apache.lucene.queryparser.classic.QueryParserBase;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.SearcherManager;
@@ -52,6 +53,7 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
   private final LuceneTextIndexCreator _indexCreator;
   private SearcherManager _searcherManager;
   private Analyzer _analyzer;
+  private Constructor<QueryParserBase> _queryParserClassConstructor;
   private final String _column;
   private final String _segmentName;
   private boolean _enablePrefixSuffixMatchingInPhraseQueries = false;
@@ -82,6 +84,8 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
       IndexWriter indexWriter = _indexCreator.getIndexWriter();
       _searcherManager = new SearcherManager(indexWriter, false, false, null);
       _analyzer = _indexCreator.getIndexWriter().getConfig().getAnalyzer();
+      _queryParserClassConstructor =
+              getQueryParserWithStringAndAnalyzerTypeConstructor(config.getLuceneQueryParserClass());
       _enablePrefixSuffixMatchingInPhraseQueries = config.isEnablePrefixSuffixMatchingInPhraseQueries();
     } catch (Exception e) {
       LOGGER.error("Failed to instantiate realtime Lucene index reader for column {}, exception {}", column,
@@ -122,12 +126,19 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
     Callable<MutableRoaringBitmap> searchCallable = () -> {
       IndexSearcher indexSearcher = null;
       try {
-        QueryParser parser = new QueryParser(_column, _analyzer);
+        // Lucene Query Parser can be stateful, we will instantiate a new instance for each query
+        QueryParserBase parser = _queryParserClassConstructor.newInstance(_column, _analyzer);
         if (_enablePrefixSuffixMatchingInPhraseQueries) {
+          // TODO: this code path is semi-broken as the default QueryParser does not always utilizes the analyzer
+          // passed into the constructor for wildcards in phrases in favor of using a custom Lucene query parser
+          // https://github.com/elastic/elasticsearch/issues/22540
           parser.setAllowLeadingWildcard(true);
         }
         Query query = parser.parse(searchQuery);
         if (_enablePrefixSuffixMatchingInPhraseQueries) {
+          // TODO: this code path is semi-broken as the default QueryParser does not always utilizes the analyzer
+          // passed into the constructor for wildcards in phrases in favor of using a custom Lucene query parser
+          // https://github.com/elastic/elasticsearch/issues/22540
           query = LuceneTextIndexUtils.convertToMultiTermSpanQuery(query);
         }
         indexSearcher = _searcherManager.acquire();
@@ -179,6 +190,27 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
       throw new RuntimeException(e);
     }
     return actualDocIDs;
+  }
+
+  private Constructor<QueryParserBase> getQueryParserWithStringAndAnalyzerTypeConstructor(String queryParserClassName)
+          throws ReflectiveOperationException {
+    // Fail-fast if the query parser if specified class is not QueryParseBase class
+    final Class<?> queryParserClass = Class.forName(queryParserClassName);
+    if (!QueryParserBase.class.isAssignableFrom(queryParserClass)) {
+      throw new ReflectiveOperationException("The specified lucene query parser class " + queryParserClassName
+              + " is not assignable from " + QueryParserBase.class.getCanonicalName());
+    }
+    // Fail-fast if the query parser does not have the required constructor used by this class
+    try {
+      queryParserClass.getConstructor(String.class, Analyzer.class);
+    } catch (NoSuchMethodException ex) {
+      throw new ReflectiveOperationException("The specified lucene query parser class " + queryParserClassName
+              + " is not assignable from does not have the required constructor method with parameter type "
+              + "[String.class, Analyzer.class]"
+        );
+    }
+
+    return (Constructor<QueryParserBase>) queryParserClass.getConstructor(String.class, Analyzer.class);
   }
 
   @Override
