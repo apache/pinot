@@ -29,6 +29,7 @@ import org.apache.calcite.rel.RelInput;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.core.SortExchange;
+import org.apache.calcite.rel.logical.PinotRelExchangeType;
 
 
 /**

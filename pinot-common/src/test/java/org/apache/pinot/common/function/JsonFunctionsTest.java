@@ -21,12 +21,14 @@ package org.apache.pinot.common.function;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.jayway.jsonpath.InvalidJsonException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.function.scalar.JsonFunctions;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -85,6 +87,65 @@ public class JsonFunctionsTest {
     assertEquals(JsonFunctions.jsonPathDouble("not json", "$.actor.aaa", 53.2), 53.2);
     assertEquals(JsonFunctions.jsonPathDouble(null, "$.actor.aaa", 53.2), 53.2);
     assertTrue(Double.isNaN(JsonFunctions.jsonPathDouble(jsonString, "$.actor.aaa")));
+  }
+
+  @Test
+  public void testJsonPathStringWithDefaultValue()
+      throws JsonProcessingException {
+    String jsonString = "{\"name\": \"Pete\", \"age\": 24}";
+    assertEquals(JsonFunctions.jsonPathString(jsonString, "$.name", "default"), "Pete");
+    assertEquals(JsonFunctions.jsonPathString(jsonString, "$.missing", "default"), "default");
+    assertNull(JsonFunctions.jsonPathString(jsonString, "$.missing", null));
+    assertEquals(JsonFunctions.jsonPathString(jsonString, "$.age", "default"), "24");
+    assertEquals(JsonFunctions.jsonPathString(jsonString, "$.age"), "24");
+    assertEquals(JsonFunctions.jsonPathString(jsonString, "$.age", null), "24");
+  }
+
+  @Test
+  public void testJsonPathStringWithoutDefaultValue()
+      throws JsonProcessingException {
+    String jsonString = "{\"name\": \"Pete\", \"age\": 24}";
+    assertEquals(JsonFunctions.jsonPathString(jsonString, "$.name"), "Pete");
+    assertNull(JsonFunctions.jsonPathString(jsonString, "$.missing"));
+    assertNull(JsonFunctions.jsonPathString(jsonString, "$.missing", null));
+    assertEquals(JsonFunctions.jsonPathString(jsonString, "$.age"), "24");
+  }
+
+  @Test
+  public void testJsonPathStringWithInvalidJson()
+      throws JsonProcessingException {
+    try {
+      JsonFunctions.jsonPathString("not json", "$.anything");
+      Assert.fail("Should have thrown InvalidJsonException");
+    } catch (InvalidJsonException e) {
+      // Expected
+    }
+    try {
+      JsonFunctions.jsonPathString(null, "$.anything");
+      Assert.fail("Should have thrown IllegalArgumentException");
+    } catch (IllegalArgumentException e) {
+      // Expected
+    }
+
+    assertEquals(JsonFunctions.jsonPathString(null, "$.actor.aaa", "foo"), "foo");
+  }
+
+  @Test
+  public void testJsonPathStringWithNullValue()
+      throws JsonProcessingException {
+    String result = JsonFunctions.jsonPathString("{\"foo\": null}", "$.foo");
+
+    assertNull(result, "Expected null json value. Received instead "
+        + (result == null ? "Java null value" : result + " of type " + result.getClass()));
+
+    assertEquals(JsonFunctions.jsonPathString("{\"foo\": null}", "$.foo", "default"), "default");
+  }
+
+  @Test
+  public void testJsonPathStringWithStringNull()
+      throws JsonProcessingException {
+    assertEquals(JsonFunctions.jsonPathString("{\"foo\": \"null\"}", "$.foo"), "null");
+    assertEquals(JsonFunctions.jsonPathString("{\"foo\": \"null\"}", "$.foo", "default"), "null");
   }
 
   @Test

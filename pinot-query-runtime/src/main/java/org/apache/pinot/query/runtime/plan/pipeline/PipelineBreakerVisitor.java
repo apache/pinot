@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.query.runtime.plan.pipeline;
 
-import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
+import org.apache.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.query.planner.plannode.DefaultPostOrderTraversalVisitor;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;

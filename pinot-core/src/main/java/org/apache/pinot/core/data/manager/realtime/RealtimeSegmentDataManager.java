@@ -307,6 +307,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
   private final StreamPartitionMsgOffset _latestStreamOffsetAtStartupTime;
   private final CompletionMode _segmentCompletionMode;
+  private final List<String> _filteredMessageOffsets = new ArrayList<>();
+  private boolean _trackFilteredMessageOffsets = false;
 
   // TODO each time this method is called, we print reason for stop. Good to print only once.
   private boolean endCriteriaReached() {
@@ -609,6 +611,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         if (reusedResult.getSkippedRowCount() > 0) {
           realtimeRowsDroppedMeter = _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.REALTIME_ROWS_FILTERED,
               reusedResult.getSkippedRowCount(), realtimeRowsDroppedMeter);
+          if (_trackFilteredMessageOffsets) {
+            _filteredMessageOffsets.add(offset.toString());
+          }
         }
         if (reusedResult.getIncompleteRowCount() > 0) {
           realtimeIncompleteRowsConsumedMeter =
@@ -1421,6 +1426,12 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         .createRateLimiter(_streamConfig, _tableNameWithType, _serverMetrics, _clientId);
     _serverRateLimiter = RealtimeConsumptionRateManager.getInstance().getServerRateLimiter();
 
+    if (tableConfig.getIngestionConfig() != null
+        && tableConfig.getIngestionConfig().getStreamIngestionConfig() != null) {
+      _trackFilteredMessageOffsets =
+          tableConfig.getIngestionConfig().getStreamIngestionConfig().isTrackFilteredMessageOffsets();
+    }
+
     List<String> sortedColumns = indexLoadingConfig.getSortedColumns();
     String sortedColumn;
     if (sortedColumns.isEmpty()) {
@@ -1758,6 +1769,12 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       _segmentLogger.info(
           "Consumed {} events from (rate:{}/s), currentOffset={}, numRowsConsumedSoFar={}, numRowsIndexedSoFar={}",
           rowsConsumed, consumedRate, _currentOffset, _numRowsConsumed, _numRowsIndexed);
+      if (_filteredMessageOffsets.size() > 0) {
+        if (_trackFilteredMessageOffsets) {
+          _segmentLogger.info("Filtered events with offsets: {}", _filteredMessageOffsets);
+        }
+        _filteredMessageOffsets.clear();
+      }
       _lastConsumedCount = _numRowsConsumed;
       _lastLogTime = now;
     }

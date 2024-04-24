@@ -19,7 +19,9 @@
 
 package org.apache.pinot.server.starter.helix;
 
+import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
@@ -37,9 +39,10 @@ public class FreshnessBasedConsumptionStatusChecker extends IngestionBasedConsum
   private final long _minFreshnessMs;
   private final long _idleTimeoutMs;
 
-  public FreshnessBasedConsumptionStatusChecker(InstanceDataManager instanceDataManager, Set<String> consumingSegments,
+  public FreshnessBasedConsumptionStatusChecker(InstanceDataManager instanceDataManager,
+      Map<String, Set<String>> consumingSegments, Function<String, Set<String>> consumingSegmentsSupplier,
       long minFreshnessMs, long idleTimeoutMs) {
-    super(instanceDataManager, consumingSegments);
+    super(instanceDataManager, consumingSegments, consumingSegmentsSupplier);
     _minFreshnessMs = minFreshnessMs;
     _idleTimeoutMs = idleTimeoutMs;
   }

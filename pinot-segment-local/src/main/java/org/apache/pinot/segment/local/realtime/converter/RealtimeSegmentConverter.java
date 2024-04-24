@@ -118,6 +118,9 @@ public class RealtimeSegmentConverter {
     genConfig.setNullHandlingEnabled(_nullHandlingEnabled);
     genConfig.setSegmentZKPropsConfig(_segmentZKPropsConfig);
 
+    // flush any artifacts to disk to improve mutable to immutable segment conversion
+    _realtimeSegmentImpl.commit();
+
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     try (PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader()) {
       int[] sortedDocIds = _columnIndicesForRealtimeTable.getSortedColumn() != null
