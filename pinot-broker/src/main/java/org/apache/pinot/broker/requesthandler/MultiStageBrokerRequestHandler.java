@@ -171,9 +171,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     DispatchableSubPlan dispatchableSubPlan = queryPlanResult.getQueryPlan();
     Set<String> tableNames = queryPlanResult.getTableNames();
 
-    _brokerMetrics.addMeteredGlobalValue(BrokerMeter.MULTI_STAGE_QUERIES_EXECUTED, 1);
+    _brokerMetrics.addMeteredGlobalValue(BrokerMeter.MULTI_STAGE_QUERIES_GLOBAL, 1);
     for (String tableName : tableNames) {
-      _brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.MULTI_STAGE_QUERIES_BY_TABLE, 1);
+      _brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.MULTI_STAGE_QUERIES, 1);
     }
 
     requestContext.setTableNames(List.copyOf(tableNames));
