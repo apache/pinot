@@ -62,6 +62,7 @@ import org.apache.pinot.common.utils.ServiceStatus.Status;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.common.utils.regex.PatternFactory;
 import org.apache.pinot.common.utils.tls.PinotInsecureMode;
 import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.common.version.PinotVersion;
@@ -650,6 +651,10 @@ public abstract class BaseServerStarter implements ServiceStartable {
         throw e;
       }
     }
+
+    // Initialize regex pattern factory
+    PatternFactory.init(
+        _serverConf.getProperty(Server.CONFIG_OF_SERVER_QUERY_REGEX_CLASS, Server.DEFAULT_SERVER_QUERY_REGEX_CLASS));
 
     preServeQueries();
 
