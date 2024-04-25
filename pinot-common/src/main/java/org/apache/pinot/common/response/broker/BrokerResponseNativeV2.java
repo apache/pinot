@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.response.broker;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -25,6 +26,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.response.BrokerResponse;
@@ -119,6 +121,11 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
 
   public void mergeMaxRows(long maxRows) {
     _maxRows = Math.max(_maxRows, maxRows);
+  }
+
+  @Override
+  public long getTimeUsedMs() {
+    return _serverStats.getLong(DataTable.MetadataKey.TIME_USED_MS);
   }
 
   @Override
@@ -279,11 +286,13 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
   }
 
   @Override
-  public void setResultTable(ResultTable resultTable) {
+  public void setResultTable(@Nullable ResultTable resultTable) {
     _resultTable = resultTable;
   }
 
+  @Nullable
   @Override
+  @JsonInclude(JsonInclude.Include.NON_NULL)
   public ResultTable getResultTable() {
     return _resultTable;
   }

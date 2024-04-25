@@ -20,6 +20,7 @@ package org.apache.pinot.common.response;
 
 import java.io.IOException;
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -50,6 +51,8 @@ public interface BrokerResponse {
    * @param numServersResponded number of servers responded.
    */
   void setNumServersResponded(int numServersResponded);
+
+  long getTimeUsedMs();
 
   /**
    * Set the total time used in request handling, into the broker response.
@@ -148,12 +151,13 @@ public interface BrokerResponse {
    * set the result table.
    * @param resultTable result table to be set.
    */
-  void setResultTable(ResultTable resultTable);
+  void setResultTable(@Nullable ResultTable resultTable);
 
   /**
    * Get the result table.
    * @return result table.
    */
+  @Nullable
   ResultTable getResultTable();
 
   /**

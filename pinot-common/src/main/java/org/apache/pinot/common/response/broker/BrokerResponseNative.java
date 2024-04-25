@@ -494,6 +494,7 @@ public class BrokerResponseNative implements BrokerResponse {
   }
 
   @JsonProperty("timeUsedMs")
+  @Override
   public long getTimeUsedMs() {
     return _timeUsedMs;
   }
@@ -538,7 +539,8 @@ public class BrokerResponseNative implements BrokerResponse {
   @JsonIgnore
   @Override
   public void setExceptions(List<ProcessingException> exceptions) {
-    _processingExceptions.clear();
+    // TODO: This is incorrect. It is adding and not setting the exceptions
+    //   But there is some code that seems to depend on this.
     for (ProcessingException exception : exceptions) {
       _processingExceptions.add(new QueryProcessingException(exception.getErrorCode(), exception.getMessage()));
     }

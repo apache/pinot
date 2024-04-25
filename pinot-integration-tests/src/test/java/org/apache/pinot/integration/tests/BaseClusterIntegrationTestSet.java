@@ -406,7 +406,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     for (String query : queries) {
       JsonNode response = postQuery(query);
       for (String statName : statNames) {
-        assertTrue(response.has(statName));
+        assertTrue(response.has(statName), "Response does not contain stat: " + statName);
       }
     }
   }
