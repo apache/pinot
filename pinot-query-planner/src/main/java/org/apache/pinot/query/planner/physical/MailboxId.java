@@ -71,7 +71,6 @@ public class MailboxId {
 
   @Override
   public String toString() {
-    // CHECKSTYLE:OFF
     // @formatter:off
     return "{\"requestId\":" + _requestId
         + ",\"senderStageId\":" + _senderStageId
@@ -80,7 +79,6 @@ public class MailboxId {
         + ",\"receiverWorkerId\":" + _receiverWorkerId
         + "}";
     // @formatter:on
-    // CHECKSTYLE:ON
   }
 
   @Override
