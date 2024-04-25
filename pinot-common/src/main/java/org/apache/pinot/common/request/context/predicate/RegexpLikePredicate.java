@@ -19,8 +19,8 @@
 package org.apache.pinot.common.request.context.predicate;
 
 import java.util.Objects;
-import org.apache.pinot.common.utils.regex.Pattern;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.utils.regex.Pattern;
 import org.apache.pinot.common.utils.regex.PatternFactory;
 
 /**
