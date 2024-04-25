@@ -1884,7 +1884,7 @@
         <plugin>
           <groupId>net.alchim31.maven</groupId>
           <artifactId>scala-maven-plugin</artifactId>
-          <version>3.2.2</version>
+          <version>4.9.0</version>
           <executions>
             <execution>
               <id>add-source</id>
@@ -1920,6 +1920,9 @@
           </executions>
           <configuration>
             <scalaVersion>${scala.version}</scalaVersion>
+            <release>${jdk.version}</release>
+            <source>${jdk.version}</source>
+            <target>${jdk.version}</target>
             <args>
               <arg>-unchecked</arg>
               <arg>-deprecation</arg>
@@ -1930,10 +1933,6 @@
               <jvmArg>-Xmx1024m</jvmArg>
             </jvmArgs>
             <javacArgs>
-              <javacArg>-source</javacArg>
-              <javacArg>${jdk.version}</javacArg>
-              <javacArg>-target</javacArg>
-              <javacArg>${jdk.version}</javacArg>
               <javacArg>-Xlint:all,-serial,-path</javacArg>
             </javacArgs>
           </configuration>
