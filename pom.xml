@@ -1611,7 +1611,6 @@
           <version>2.43.0</version>
           <executions>
             <execution>
-              <phase>verify</phase>
               <goals>
                 <goal>check</goal>
               </goals>
