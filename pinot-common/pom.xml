@@ -67,18 +67,10 @@
         <artifactId>spotless-maven-plugin</artifactId>
         <configuration>
           <java>
-            <includes>
-              <include>src/main/java/**/*.java</include>
-              <include>src/test/java/**/*.java</include>
-            </includes>
             <excludes>
               <exclude>src/main/java/org/apache/pinot/common/request/*.java</exclude>
               <exclude>src/main/java/org/apache/pinot/common/response/ProcessingException.java</exclude>
             </excludes>
-            <importOrder>
-              <order>,\#</order>
-            </importOrder>
-            <removeUnusedImports/>
           </java>
         </configuration>
       </plugin>
