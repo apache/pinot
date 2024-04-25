@@ -1611,6 +1611,7 @@
           <version>2.43.0</version>
           <executions>
             <execution>
+              <phase>verify</phase>
               <goals>
                 <goal>check</goal>
               </goals>
@@ -1622,10 +1623,6 @@
                 <include>src/main/java/**/*.java</include>
                 <include>src/test/java/**/*.java</include>
               </includes>
-              <excludes>
-                <exclude>src/main/java/org/apache/pinot/common/request/*.java</exclude>
-                <exclude>src/main/java/org/apache/pinot/common/response/ProcessingException.java</exclude>
-              </excludes>
               <importOrder>
                 <order>,\#</order>
               </importOrder>
