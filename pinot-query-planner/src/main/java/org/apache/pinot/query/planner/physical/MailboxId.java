@@ -59,9 +59,31 @@ public class MailboxId {
   }
 
   public static MailboxId fromPipeString(String mailboxIdStr) {
-    String[] parts = mailboxIdStr.split("\\" + SEPARATOR);
-    return new MailboxId(Long.parseLong(parts[0]), Integer.parseInt(parts[1]), Integer.parseInt(parts[2]),
-        Integer.parseInt(parts[3]), Integer.parseInt(parts[4]));
+    int requestEnd = mailboxIdStr.indexOf(SEPARATOR);
+    if (requestEnd == -1) {
+      throw new IllegalArgumentException("Invalid mailboxId string: " + mailboxIdStr + ". No " + SEPARATOR + " found");
+    }
+    int senderStageEnd = mailboxIdStr.indexOf(SEPARATOR, requestEnd + 1);
+    if (senderStageEnd == -1) {
+      throw new IllegalArgumentException("Invalid mailboxId string: " + mailboxIdStr + ". No sender stage found");
+    }
+    int senderWorkerEnd = mailboxIdStr.indexOf(SEPARATOR, senderStageEnd + 1);
+    if (senderWorkerEnd == -1) {
+      throw new IllegalArgumentException("Invalid mailboxId string: " + mailboxIdStr + ". No sender worker found");
+    }
+    int receiverStageEnd = mailboxIdStr.indexOf(SEPARATOR, senderWorkerEnd + 1);
+    if (receiverStageEnd == -1) {
+      throw new IllegalArgumentException("Invalid mailboxId string: " + mailboxIdStr + ". No receiver stage found");
+    }
+    if (receiverStageEnd == mailboxIdStr.length() - 1) {
+      throw new IllegalArgumentException("Invalid mailboxId string: " + mailboxIdStr + ". No receiver worker found");
+    }
+    return new MailboxId(
+        Long.parseLong(mailboxIdStr.substring(0, requestEnd)),
+        Integer.parseInt(mailboxIdStr.substring(requestEnd + 1, senderStageEnd)),
+        Integer.parseInt(mailboxIdStr.substring(senderStageEnd + 1, senderWorkerEnd)),
+        Integer.parseInt(mailboxIdStr.substring(senderWorkerEnd + 1, receiverStageEnd)),
+        Integer.parseInt(mailboxIdStr.substring(receiverStageEnd + 1)));
   }
 
   public String toPipeString() {
