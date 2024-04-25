@@ -118,8 +118,8 @@ public class TextIndexUtils {
     List<String> luceneAnalyzerClassArgs = config.getLuceneAnalyzerClassArgs();
     List<String> luceneAnalyzerClassArgsTypes = config.getLuceneAnalyzerClassArgTypes();
 
-    if (null == luceneAnalyzerClassName || luceneAnalyzerClassName.isEmpty() ||
-            (luceneAnalyzerClassName.equals(StandardAnalyzer.class.getName())
+    if (null == luceneAnalyzerClassName || luceneAnalyzerClassName.isEmpty()
+            || (luceneAnalyzerClassName.equals(StandardAnalyzer.class.getName())
                     && luceneAnalyzerClassArgs.isEmpty() && luceneAnalyzerClassArgsTypes.isEmpty())) {
       // When there is no analyzer defined, or when StandardAnalyzer (default) is used without arguments,
       // use existing logic to obtain an instance of StandardAnalyzer with customized stop words
