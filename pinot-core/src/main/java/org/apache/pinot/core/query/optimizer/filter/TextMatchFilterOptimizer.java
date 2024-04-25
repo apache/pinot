@@ -162,7 +162,7 @@ public class TextMatchFilterOptimizer implements FilterOptimizer {
         mergedTextMatchFilter = String.join(SPACE + operator + SPACE, literals);
       }
       Expression mergedTextMatchExpression = RequestUtils.getFunctionExpression(FilterKind.TEXT_MATCH.name());
-      Expression mergedTextMatchFilterExpression = RequestUtils.getLiteralExpression(mergedTextMatchFilter);
+      Expression mergedTextMatchFilterExpression = RequestUtils.getLiteralExpression("(" + mergedTextMatchFilter + ")");
       mergedTextMatchExpression.getFunctionCall()
           .setOperands(Arrays.asList(entry.getKey(), mergedTextMatchFilterExpression));
 
