@@ -288,6 +288,7 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
     return _resultTable;
   }
 
+  @JsonProperty("exceptions")
   @Override
   public List<QueryProcessingException> getProcessingExceptions() {
     return List.of();
