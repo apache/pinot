@@ -930,7 +930,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
    * @param batchFirstOffset The offset of the first message in the batch.
    */
   private void validateStartOffset(StreamPartitionMsgOffset startOffset, StreamPartitionMsgOffset batchFirstOffset) {
-    if (batchFirstOffset.compareTo(startOffset) > 0) {
+    if (!_partitionGroupConsumer.isOffsetMismatchAcceptable(startOffset, batchFirstOffset)) {
       _serverMetrics.addMeteredTableValue(_tableStreamName, ServerMeter.STREAM_DATA_LOSS, 1L);
       String message =
           "startOffset(" + startOffset + ") is older than topic's beginning offset(" + batchFirstOffset + ")";
