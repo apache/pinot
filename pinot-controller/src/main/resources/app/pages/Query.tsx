@@ -137,6 +137,7 @@ const responseStatCols = [
   'timeUsedMs',
   'numDocsScanned',
   'totalDocs',
+  'maxRowsInOperator',
   'numServersQueried',
   'numServersResponded',
   'numSegmentsQueried',
