@@ -402,15 +402,6 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
     }
   }
 
-  /**
-   * Leaf stage operators should always collect stats for the tables used in queries
-   * Otherwise the Broker response will just contain zeros for every stat value
-   */
-  @Override
-  protected boolean shouldCollectStats() {
-    return true;
-  }
-
   @Override
   public void close() {
     if (_executionFuture != null) {

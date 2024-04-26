@@ -74,21 +74,14 @@ public abstract class MultiStageOperator
     }
     try (InvocationScope ignored = Tracing.getTracer().createScope(getClass())) {
       TransferableBlock nextBlock;
-      if (shouldCollectStats()) {
-        Stopwatch executeStopwatch = Stopwatch.createStarted();
-        try {
-          nextBlock = getNextBlock();
-        } catch (Exception e) {
-          nextBlock = TransferableBlockUtils.getErrorTransferableBlock(e);
-        }
-        registerExecution(executeStopwatch.elapsed(TimeUnit.MILLISECONDS), nextBlock.getNumRows());
-      } else {
-        try {
-          nextBlock = getNextBlock();
-        } catch (Exception e) {
-          nextBlock = TransferableBlockUtils.getErrorTransferableBlock(e);
-        }
+      Stopwatch executeStopwatch = Stopwatch.createStarted();
+      try {
+        nextBlock = getNextBlock();
+      } catch (Exception e) {
+        nextBlock = TransferableBlockUtils.getErrorTransferableBlock(e);
       }
+      registerExecution(executeStopwatch.elapsed(TimeUnit.MILLISECONDS), nextBlock.getNumRows());
+
       if (logger().isDebugEnabled()) {
         logger().debug("Operator {}. Block of type {} ready to send", _operatorId, nextBlock.getType());
       }
@@ -121,10 +114,6 @@ public abstract class MultiStageOperator
         "The holder's stage id should be the same as the current operator's stage id. Expected %s, got %s",
         _context.getStageId(), holder.getCurrentStageId());
     holder.getCurrentStats().addLastOperator(getOperatorType(), statMap);
-  }
-
-  protected boolean shouldCollectStats() {
-    return _context.isTraceEnabled();
   }
 
   @Override

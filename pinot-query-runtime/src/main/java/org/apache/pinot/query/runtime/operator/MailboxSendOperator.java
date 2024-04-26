@@ -184,15 +184,6 @@ public class MailboxSendOperator extends MultiStageOperator {
     return isEarlyTerminated;
   }
 
-  /**
-   * This method is overridden to return true because this operator is last in the chain and needs to collect
-   * execution time stats
-   */
-  @Override
-  protected boolean shouldCollectStats() {
-    return true;
-  }
-
   @Override
   public void close() {
     super.close();
