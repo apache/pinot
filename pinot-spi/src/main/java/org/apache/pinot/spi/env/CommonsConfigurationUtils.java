@@ -125,7 +125,19 @@ public class CommonsConfigurationUtils {
     } else {
       fileHandler.setFile(file);
     }
+    checkForDuplicateKeys(config);
     return config;
+  }
+
+  private static void checkForDuplicateKeys(PropertiesConfiguration config) throws ConfigurationException {
+    Iterator<String> keys = config.getKeys();
+    while (keys.hasNext()) {
+      String key = keys.next();
+      Object value = config.getProperty(key);
+      if (!(value instanceof String)) {
+        throw new ConfigurationException(String.format("duplicate key found in properties configuration file %s", key));
+      }
+    }
   }
 
   /**

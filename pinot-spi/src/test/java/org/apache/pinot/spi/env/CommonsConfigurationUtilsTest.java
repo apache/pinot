@@ -20,7 +20,10 @@ package org.apache.pinot.spi.env;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.URL;
+
 import org.apache.commons.configuration2.PropertiesConfiguration;
+import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -28,8 +31,8 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
+import static org.testng.Assert.fail;
 
 
 public class CommonsConfigurationUtilsTest {
@@ -88,6 +91,25 @@ public class CommonsConfigurationUtilsTest {
     for (int i = 0; i < NUM_ROUNDS; i++) {
       testPropertyValueWithSpecialCharacters(RandomStringUtils.randomAscii(5));
       testPropertyValueWithSpecialCharacters(StringUtils.remove(RandomStringUtils.random(5), '\0'));
+    }
+  }
+
+  @Test
+  public void testDuplicateKeysInPropertiesFile() throws Exception {
+    String propertiesFile = "pinot-configuration-duplicate-keys";
+    String duplicatePropertyKey = "controller.data.dir";
+
+    URL resource = CommonsConfigurationUtilsTest.class.getClassLoader().getResource(propertiesFile);
+    if(resource == null) {
+      fail("unable to get test file");
+    }
+
+    File file = new File(resource.getFile());
+    try {
+      CommonsConfigurationUtils.fromFile(file);
+      fail("expecting ConfigurationException");
+    } catch (ConfigurationException e) {
+      assert(e.getMessage()).equals(String.format("duplicate key found in properties configuration file %s", duplicatePropertyKey));
     }
   }
 
