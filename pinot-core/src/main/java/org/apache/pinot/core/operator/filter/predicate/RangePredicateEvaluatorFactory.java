@@ -122,11 +122,10 @@ public class RangePredicateEvaluatorFactory {
     // Exclusive
     final int _endDictId;
     final int _numMatchingDictIds;
-    int[] _matchingDictIds;
 
     SortedDictionaryBasedRangePredicateEvaluator(RangePredicate rangePredicate, Dictionary dictionary,
         DataType dataType) {
-      super(rangePredicate);
+      super(rangePredicate, dictionary);
       String lowerBound = rangePredicate.getLowerBound();
       String upperBound = rangePredicate.getUpperBound();
       boolean lowerInclusive = rangePredicate.isLowerInclusive();
@@ -161,8 +160,8 @@ public class RangePredicateEvaluatorFactory {
         }
       }
 
-      _numMatchingDictIds = _endDictId - _startDictId;
-      if (_numMatchingDictIds <= 0) {
+      _numMatchingDictIds = Integer.max(_endDictId - _startDictId, 0);
+      if (_numMatchingDictIds == 0) {
         _alwaysFalse = true;
       } else if (dictionary.length() == _numMatchingDictIds) {
         _alwaysTrue = true;
@@ -175,6 +174,46 @@ public class RangePredicateEvaluatorFactory {
 
     public int getEndDictId() {
       return _endDictId;
+    }
+
+    @Override
+    protected int[] calculateMatchingDictIds() {
+      if (_numMatchingDictIds == 0) {
+        return new int[0];
+      } else {
+        int[] matchingDictIds = new int[_numMatchingDictIds];
+        for (int i = 0; i < _numMatchingDictIds; i++) {
+          matchingDictIds[i] = _startDictId + i;
+        }
+        return matchingDictIds;
+      }
+    }
+
+    @Override
+    protected int[] calculateNonMatchingDictIds() {
+      int dictionarySize = _dictionary.length();
+      if (_numMatchingDictIds == 0) {
+        int[] nonMatchingDictIds = new int[dictionarySize];
+        for (int i = 0; i < dictionarySize; i++) {
+          nonMatchingDictIds[i] = i;
+        }
+        return nonMatchingDictIds;
+      } else {
+        int[] nonMatchingDictIds = new int[dictionarySize - _numMatchingDictIds];
+        int index = 0;
+        for (int i = 0; i < _startDictId; i++) {
+          nonMatchingDictIds[index++] = i;
+        }
+        for (int i = _endDictId; i < dictionarySize; i++) {
+          nonMatchingDictIds[index++] = i;
+        }
+        return nonMatchingDictIds;
+      }
+    }
+
+    @Override
+    public int getNumMatchingItems() {
+      return _numMatchingDictIds;
     }
 
     @Override
@@ -196,31 +235,6 @@ public class RangePredicateEvaluatorFactory {
     }
 
     @Override
-    public int getNumMatchingDictIds() {
-      return _numMatchingDictIds;
-    }
-
-    @Override
-    public int[] getMatchingDictIds() {
-      if (_matchingDictIds == null) {
-        if (_numMatchingDictIds <= 0) {
-          _matchingDictIds = new int[0];
-        } else {
-          _matchingDictIds = new int[_numMatchingDictIds];
-          for (int i = 0; i < _numMatchingDictIds; i++) {
-            _matchingDictIds[i] = _startDictId + i;
-          }
-        }
-      }
-      return _matchingDictIds;
-    }
-
-    @Override
-    public int getNumMatchingItems() {
-      return Math.max(_numMatchingDictIds, 0);
-    }
-
-    @Override
     public int getInclusiveLowerBound() {
       return getStartDictId();
     }
@@ -238,15 +252,13 @@ public class RangePredicateEvaluatorFactory {
     // TODO: Tune this threshold
     private static final int DICT_ID_SET_BASED_CARDINALITY_THRESHOLD = 1000;
 
-    final Dictionary _dictionary;
     final boolean _dictIdSetBased;
     final IntSet _matchingDictIdSet;
     final BaseRawValueBasedPredicateEvaluator _rawValueBasedEvaluator;
 
     UnsortedDictionaryBasedRangePredicateEvaluator(RangePredicate rangePredicate, Dictionary dictionary,
         DataType dataType) {
-      super(rangePredicate);
-      _dictionary = dictionary;
+      super(rangePredicate, dictionary);
       int cardinality = dictionary.length();
       if (cardinality < DICT_ID_SET_BASED_CARDINALITY_THRESHOLD) {
         _dictIdSetBased = true;
@@ -275,6 +287,16 @@ public class RangePredicateEvaluatorFactory {
     }
 
     @Override
+    public int[] getMatchingDictIds() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public int getNumMatchingItems() {
+      return _matchingDictIdSet != null ? _matchingDictIdSet.size() : Integer.MIN_VALUE;
+    }
+
+    @Override
     public boolean applySV(int dictId) {
       if (_dictIdSetBased) {
         return _matchingDictIdSet.contains(dictId);
@@ -298,16 +320,6 @@ public class RangePredicateEvaluatorFactory {
             throw new IllegalStateException("Unsupported value type: " + _dictionary.getValueType());
         }
       }
-    }
-
-    @Override
-    public int getNumMatchingItems() {
-      return _matchingDictIdSet == null ? super.getNumMatchingItems() : _matchingDictIdSet.size();
-    }
-
-    @Override
-    public int[] getMatchingDictIds() {
-      throw new UnsupportedOperationException();
     }
   }
 
