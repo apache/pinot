@@ -1338,6 +1338,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       _segmentLogger.error("Could not stop consumer thread");
     }
     _realtimeSegment.destroy();
+    if (_partitionUpsertMetadataManager != null) {
+      _partitionUpsertMetadataManager.decreaseReferenceCount();
+    }
     closeStreamConsumers();
     cleanupMetrics();
   }

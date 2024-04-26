@@ -122,6 +122,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   // The lock and boolean flag ensure only one thread can start preloading and preloading happens only once.
   private final Lock _preloadLock = new ReentrantLock();
   private volatile boolean _isPreloading;
+  // When no threads are using the manager and no segments are tracked, we can reset _isPreloading in order to
+  // preload segments again.
+  private int _referenceCount = 0;
 
   protected BasePartitionUpsertMetadataManager(String tableNameWithType, int partitionId, UpsertContext context) {
     _tableNameWithType = tableNameWithType;
@@ -145,6 +148,24 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     } else {
       _largestSeenComparisonValue = new AtomicDouble(Double.MIN_VALUE);
       deleteWatermark();
+    }
+  }
+
+  @Override
+  public synchronized void increaseReferenceCount() {
+    _referenceCount++;
+  }
+
+  @Override
+  public synchronized void decreaseReferenceCount() {
+    _referenceCount--;
+  }
+
+  protected synchronized void tryResetIsPreloading() {
+    if (_enableSnapshot && _context.isPreloadEnabled() && _referenceCount == 0 && _trackedSegments.isEmpty()) {
+      _isPreloading = true;
+      _logger.info("Reset isPreloading to preload segments for table: {} partition: {} again", _tableNameWithType,
+          _partitionId);
     }
   }
 

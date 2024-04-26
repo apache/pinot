@@ -37,8 +37,15 @@ public class ConcurrentMapTableUpsertMetadataManager extends BaseTableUpsertMeta
 
   @Override
   public ConcurrentMapPartitionUpsertMetadataManager getOrCreatePartitionManager(int partitionId) {
-    return _partitionMetadataManagerMap.computeIfAbsent(partitionId,
-        k -> new ConcurrentMapPartitionUpsertMetadataManager(_tableNameWithType, k, _context));
+    return _partitionMetadataManagerMap.compute(partitionId, (k, mgr) -> {
+      if (mgr == null) {
+        mgr = new ConcurrentMapPartitionUpsertMetadataManager(_tableNameWithType, partitionId, _context);
+      } else {
+        mgr.tryResetIsPreloading();
+      }
+      mgr.increaseReferenceCount();
+      return mgr;
+    });
   }
 
   @Override
