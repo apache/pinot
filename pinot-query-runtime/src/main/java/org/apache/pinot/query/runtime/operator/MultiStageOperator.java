@@ -184,7 +184,7 @@ public abstract class MultiStageOperator
         @SuppressWarnings("unchecked")
         StatMap<AggregateOperator.StatKey> stats = (StatMap<AggregateOperator.StatKey>) map;
         response.mergeNumGroupsLimitReached(stats.getBoolean(AggregateOperator.StatKey.NUM_GROUPS_LIMIT_REACHED));
-        response.mergeMaxRows(stats.getLong(AggregateOperator.StatKey.EMITTED_ROWS));
+        response.mergeMaxRowsInOperator(stats.getLong(AggregateOperator.StatKey.EMITTED_ROWS));
       }
     },
     FILTER(FilterOperator.StatKey.class) {
@@ -192,7 +192,7 @@ public abstract class MultiStageOperator
       public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
         @SuppressWarnings("unchecked")
         StatMap<FilterOperator.StatKey> stats = (StatMap<FilterOperator.StatKey>) map;
-        response.mergeMaxRows(stats.getLong(FilterOperator.StatKey.EMITTED_ROWS));
+        response.mergeMaxRowsInOperator(stats.getLong(FilterOperator.StatKey.EMITTED_ROWS));
       }
     },
     HASH_JOIN(HashJoinOperator.StatKey.class) {
@@ -200,7 +200,7 @@ public abstract class MultiStageOperator
       public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
         @SuppressWarnings("unchecked")
         StatMap<HashJoinOperator.StatKey> stats = (StatMap<HashJoinOperator.StatKey>) map;
-        response.mergeMaxRows(stats.getLong(HashJoinOperator.StatKey.EMITTED_ROWS));
+        response.mergeMaxRowsInOperator(stats.getLong(HashJoinOperator.StatKey.EMITTED_ROWS));
         response.mergeMaxRowsInJoinReached(stats.getBoolean(HashJoinOperator.StatKey.MAX_ROWS_IN_JOIN_REACHED));
       }
     },
@@ -209,7 +209,7 @@ public abstract class MultiStageOperator
       public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
         @SuppressWarnings("unchecked")
         StatMap<SetOperator.StatKey> stats = (StatMap<SetOperator.StatKey>) map;
-        response.mergeMaxRows(stats.getLong(SetOperator.StatKey.EMITTED_ROWS));
+        response.mergeMaxRowsInOperator(stats.getLong(SetOperator.StatKey.EMITTED_ROWS));
       }
     },
     LEAF(LeafStageTransferableBlockOperator.StatKey.class) {
@@ -218,7 +218,7 @@ public abstract class MultiStageOperator
         @SuppressWarnings("unchecked")
         StatMap<LeafStageTransferableBlockOperator.StatKey> stats =
             (StatMap<LeafStageTransferableBlockOperator.StatKey>) map;
-        response.mergeMaxRows(stats.getLong(LeafStageTransferableBlockOperator.StatKey.EMITTED_ROWS));
+        response.mergeMaxRowsInOperator(stats.getLong(LeafStageTransferableBlockOperator.StatKey.EMITTED_ROWS));
 
         StatMap<DataTable.MetadataKey> v1Stats = new StatMap<>(DataTable.MetadataKey.class);
         for (LeafStageTransferableBlockOperator.StatKey statKey : stats.keySet()) {
@@ -238,7 +238,7 @@ public abstract class MultiStageOperator
       public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
         @SuppressWarnings("unchecked")
         StatMap<BaseMailboxReceiveOperator.StatKey> stats = (StatMap<BaseMailboxReceiveOperator.StatKey>) map;
-        response.mergeMaxRows(stats.getLong(BaseMailboxReceiveOperator.StatKey.EMITTED_ROWS));
+        response.mergeMaxRowsInOperator(stats.getLong(BaseMailboxReceiveOperator.StatKey.EMITTED_ROWS));
       }
     },
     MAILBOX_SEND(MailboxSendOperator.StatKey.class) {
@@ -246,7 +246,7 @@ public abstract class MultiStageOperator
       public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
         @SuppressWarnings("unchecked")
         StatMap<MailboxSendOperator.StatKey> stats = (StatMap<MailboxSendOperator.StatKey>) map;
-        response.mergeMaxRows(stats.getLong(MailboxSendOperator.StatKey.EMITTED_ROWS));
+        response.mergeMaxRowsInOperator(stats.getLong(MailboxSendOperator.StatKey.EMITTED_ROWS));
       }
     },
     MINUS(SetOperator.StatKey.class) {
@@ -254,7 +254,7 @@ public abstract class MultiStageOperator
       public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
         @SuppressWarnings("unchecked")
         StatMap<SetOperator.StatKey> stats = (StatMap<SetOperator.StatKey>) map;
-        response.mergeMaxRows(stats.getLong(SetOperator.StatKey.EMITTED_ROWS));
+        response.mergeMaxRowsInOperator(stats.getLong(SetOperator.StatKey.EMITTED_ROWS));
       }
     },
     PIPELINE_BREAKER(PipelineBreakerOperator.StatKey.class) {
@@ -262,15 +262,15 @@ public abstract class MultiStageOperator
       public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
         @SuppressWarnings("unchecked")
         StatMap<PipelineBreakerOperator.StatKey> stats = (StatMap<PipelineBreakerOperator.StatKey>) map;
-        response.mergeMaxRows(stats.getLong(PipelineBreakerOperator.StatKey.EMITTED_ROWS));
+        response.mergeMaxRowsInOperator(stats.getLong(PipelineBreakerOperator.StatKey.EMITTED_ROWS));
       }
     },
-    SORT(SortOperator.StatKey.class) {
+    SORT_OR_LIMIT(SortOperator.StatKey.class) {
       @Override
       public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
         @SuppressWarnings("unchecked")
         StatMap<SortOperator.StatKey> stats = (StatMap<SortOperator.StatKey>) map;
-        response.mergeMaxRows(stats.getLong(SortOperator.StatKey.EMITTED_ROWS));
+        response.mergeMaxRowsInOperator(stats.getLong(SortOperator.StatKey.EMITTED_ROWS));
       }
     },
     TRANSFORM(TransformOperator.StatKey.class) {
@@ -278,7 +278,7 @@ public abstract class MultiStageOperator
       public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
         @SuppressWarnings("unchecked")
         StatMap<TransformOperator.StatKey> stats = (StatMap<TransformOperator.StatKey>) map;
-        response.mergeMaxRows(stats.getLong(TransformOperator.StatKey.EMITTED_ROWS));
+        response.mergeMaxRowsInOperator(stats.getLong(TransformOperator.StatKey.EMITTED_ROWS));
       }
     },
     UNION(SetOperator.StatKey.class) {
@@ -286,7 +286,7 @@ public abstract class MultiStageOperator
       public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
         @SuppressWarnings("unchecked")
         StatMap<SetOperator.StatKey> stats = (StatMap<SetOperator.StatKey>) map;
-        response.mergeMaxRows(stats.getLong(SetOperator.StatKey.EMITTED_ROWS));
+        response.mergeMaxRowsInOperator(stats.getLong(SetOperator.StatKey.EMITTED_ROWS));
       }
     },
     WINDOW(WindowAggregateOperator.StatKey.class) {
@@ -294,7 +294,7 @@ public abstract class MultiStageOperator
       public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
         @SuppressWarnings("unchecked")
         StatMap<WindowAggregateOperator.StatKey> stats = (StatMap<WindowAggregateOperator.StatKey>) map;
-        response.mergeMaxRows(stats.getLong(WindowAggregateOperator.StatKey.EMITTED_ROWS));
+        response.mergeMaxRowsInOperator(stats.getLong(WindowAggregateOperator.StatKey.EMITTED_ROWS));
       }
     },;
 

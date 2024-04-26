@@ -103,7 +103,7 @@ public class SortOperator extends MultiStageOperator {
 
   @Override
   public Type getOperatorType() {
-    return Type.SORT;
+    return Type.SORT_OR_LIMIT;
   }
 
   @Override
@@ -137,6 +137,7 @@ public class SortOperator extends MultiStageOperator {
     if (finalBlock.isErrorBlock()) {
       return finalBlock;
     }
+    _statMap.merge(StatKey.REQUIRE_SORT, _priorityQueue != null);
     _eosBlock = updateEosBlock(finalBlock, _statMap);
     return produceSortedBlock();
   }
@@ -204,7 +205,13 @@ public class SortOperator extends MultiStageOperator {
         return true;
       }
     },
-    EMITTED_ROWS(StatMap.Type.LONG);
+    EMITTED_ROWS(StatMap.Type.LONG),
+    REQUIRE_SORT(StatMap.Type.BOOLEAN) {
+      @Override
+      public boolean includeDefaultInJson() {
+        return true;
+      }
+    };
     private final StatMap.Type _type;
 
     StatKey(StatMap.Type type) {

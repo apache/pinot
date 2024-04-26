@@ -128,6 +128,17 @@ public interface BrokerResponse {
   long getMinConsumingFreshnessTimeMs();
 
   /**
+   * Get the max number of rows seen by a single operator in the query processing chain.
+   * <p>
+   * In single-stage this value is equal to {@link #getNumEntriesScannedPostFilter()} because single-stage operators
+   * cannot generate more rows than the number of rows received. This is not the case in multi-stage operators, where
+   * operators like join or union can emit more rows than the ones received on each of its children operators.
+   */
+  default long getMaxRowsInOperator() {
+    return getNumEntriesScannedPostFilter();
+  }
+
+  /**
    * Get total number of documents within the table hit.
    */
   long getTotalDocs();

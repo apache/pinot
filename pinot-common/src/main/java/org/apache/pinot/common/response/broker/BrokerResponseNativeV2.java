@@ -21,7 +21,6 @@ package org.apache.pinot.common.response.broker;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -32,7 +31,6 @@ import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
@@ -54,7 +52,7 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 })
 public class BrokerResponseNativeV2 implements BrokerResponse {
 
-  private final List<JsonNode> _stageIdStats = new ArrayList<>();
+  private ObjectNode _stageStats = null;
   /**
    * The max number of rows seen at runtime.
    * <p>
@@ -62,7 +60,7 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
    * virtual rows can be generated. For example, in a join query, the number of rows can be more than the number of rows
    * in the table.
    */
-  private long _maxRows = 0;
+  private long _maxRowsInOperator = 0;
   private final StatMap<DataTable.MetadataKey> _serverStats = new StatMap<>(DataTable.MetadataKey.class);
   private List<QueryProcessingException> _processingExceptions;
   private ResultTable _resultTable;
@@ -102,25 +100,22 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
     return new BrokerResponseNativeV2();
   }
 
-  public void addStageStats(JsonNode stageStats) {
-    ObjectNode node = JsonUtils.newObjectNode();
-    node.put("stage", _stageIdStats.size());
-    node.set("stats", stageStats);
-    _stageIdStats.add(node);
+  public void setStageStats(ObjectNode stageStats) {
+    _stageStats = stageStats;
   }
 
   @JsonProperty
-  public List<JsonNode> getStageStats() {
-    return _stageIdStats;
+  public ObjectNode getStageStats() {
+    return _stageStats;
   }
 
   @JsonProperty
-  public long getMaxRows() {
-    return _maxRows;
+  public long getMaxRowsInOperator() {
+    return _maxRowsInOperator;
   }
 
-  public void mergeMaxRows(long maxRows) {
-    _maxRows = Math.max(_maxRows, maxRows);
+  public void mergeMaxRowsInOperator(long maxRows) {
+    _maxRowsInOperator = Math.max(_maxRowsInOperator, maxRows);
   }
 
   @Override

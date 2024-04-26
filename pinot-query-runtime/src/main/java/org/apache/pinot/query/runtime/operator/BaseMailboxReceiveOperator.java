@@ -74,7 +74,6 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
         .collect(Collectors.toList());
     _receivingStats = asyncStreams.stream().map(stream -> stream._mailbox.getStatMap()).collect(Collectors.toList());
     _multiConsumer = new BlockingMultiStreamConsumer.OfTransferableBlock(context, asyncStreams);
-    _statMap.merge(StatKey.FROM_STAGE, senderStageId);
     _statMap.merge(StatKey.FAN_IN, _mailboxIds.size());
   }
 
@@ -180,12 +179,6 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
       @Override
       public boolean includeDefaultInJson() {
         return true;
-      }
-    },
-    FROM_STAGE(StatMap.Type.INT) {
-      @Override
-      public int merge(int value1, int value2) {
-        return StatMap.Key.eqNotZero(value1, value2);
       }
     },
     /**

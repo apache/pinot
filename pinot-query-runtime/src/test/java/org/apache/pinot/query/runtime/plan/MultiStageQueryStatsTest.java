@@ -66,16 +66,15 @@ public class MultiStageQueryStatsTest {
         .customizeOpen(open ->
           open.addLastOperator(MultiStageOperator.Type.MAILBOX_RECEIVE,
                   new StatMap<>(BaseMailboxReceiveOperator.StatKey.class)
-                      .merge(BaseMailboxReceiveOperator.StatKey.FROM_STAGE, 2)
                       .merge(BaseMailboxReceiveOperator.StatKey.EXECUTION_TIME_MS, 100)
                       .merge(BaseMailboxReceiveOperator.StatKey.EMITTED_ROWS, 10))
-              .addLastOperator(MultiStageOperator.Type.SORT,
+              .addLastOperator(MultiStageOperator.Type.SORT_OR_LIMIT,
                   new StatMap<>(SortOperator.StatKey.class)
                       .merge(SortOperator.StatKey.EXECUTION_TIME_MS, 10)
                       .merge(SortOperator.StatKey.EMITTED_ROWS, 10))
               .addLastOperator(MultiStageOperator.Type.MAILBOX_SEND,
                   new StatMap<>(MailboxSendOperator.StatKey.class)
-                      .merge(MailboxSendOperator.StatKey.TO_STAGE, 0)
+                      .merge(MailboxSendOperator.StatKey.STAGE, 1)
                       .merge(MailboxSendOperator.StatKey.EXECUTION_TIME_MS, 100)
                       .merge(MailboxSendOperator.StatKey.EMITTED_ROWS, 10))
         )
@@ -92,7 +91,7 @@ public class MultiStageQueryStatsTest {
                         .merge(LeafStageTransferableBlockOperator.StatKey.TABLE, "a"))
                 .addLastOperator(MultiStageOperator.Type.MAILBOX_SEND,
                     new StatMap<>(MailboxSendOperator.StatKey.class)
-                        .merge(MailboxSendOperator.StatKey.TO_STAGE, 1)
+                        .merge(MailboxSendOperator.StatKey.STAGE, 2)
                         .merge(MailboxSendOperator.StatKey.EXECUTION_TIME_MS, 135)
                         .merge(MailboxSendOperator.StatKey.EMITTED_ROWS, 5))
                 .close())

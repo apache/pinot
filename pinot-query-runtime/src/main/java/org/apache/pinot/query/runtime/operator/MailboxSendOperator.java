@@ -73,7 +73,7 @@ public class MailboxSendOperator extends MultiStageOperator {
     this(context, sourceOperator,
         statMap -> getBlockExchange(context, distributionType, distributionKeys, receiverStageId, statMap),
         collationKeys, collationDirections, isSortOnSender);
-    _statMap.merge(StatKey.TO_STAGE, receiverStageId);
+    _statMap.merge(StatKey.STAGE, context.getStageId());
     _statMap.merge(StatKey.PARALLELISM, 1);
   }
 
@@ -218,7 +218,7 @@ public class MailboxSendOperator extends MultiStageOperator {
         return true;
       }
     },
-    TO_STAGE(StatMap.Type.INT) {
+    STAGE(StatMap.Type.INT) {
       @Override
       public int merge(int value1, int value2) {
         return StatMap.Key.eqNotZero(value1, value2);
