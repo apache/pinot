@@ -123,22 +123,23 @@ public class ParquetNativeRecordReaderFullTest {
     //testParquetFile("test-data2/uniform_encryption.parquet.encrypted");
   }
 
-protected void testParquetFile(String filePath)
+  protected void testParquetFile(String filePath)
       throws Exception {
     File dataFile = new File(URLDecoder.decode(getClass().getClassLoader().getResource(filePath).getFile(), "UTF-8"));
     ParquetNativeRecordReader recordReader = new ParquetNativeRecordReader();
     recordReader.init(dataFile, null, null);
-    int counter = 0;
+    int numDocsForFirstPass = 0;
     while (recordReader.hasNext()) {
       recordReader.next();
-      counter++;
+      numDocsForFirstPass++;
     }
     recordReader.rewind();
+    int numDocsForSecondPass = 0;
     while (recordReader.hasNext()) {
       recordReader.next();
-      counter--;
+      numDocsForSecondPass++;
     }
-    Assert.assertEquals(counter, 0);
+    Assert.assertEquals(numDocsForFirstPass, numDocsForSecondPass);
     recordReader.close();
   }
 }
