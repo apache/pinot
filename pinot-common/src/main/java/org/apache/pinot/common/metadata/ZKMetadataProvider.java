@@ -313,7 +313,7 @@ public class ZKMetadataProvider {
     }
     try {
       UserConfig userConfig = AccessControlUserConfigUtils.fromZNRecord(znRecord);
-      return ConfigUtils.applyConfigWithEnvVariables(userConfig);
+      return ConfigUtils.applyConfigWithEnvVariablesAndSystemProperties(userConfig);
     } catch (Exception e) {
       LOGGER.error("Caught exception while getting user configuration for user: {}", username, e);
       return null;
@@ -422,7 +422,7 @@ public class ZKMetadataProvider {
     }
     try {
       TableConfig tableConfig = TableConfigUtils.fromZNRecord(znRecord);
-      return ConfigUtils.applyConfigWithEnvVariables(tableConfig);
+      return ConfigUtils.applyConfigWithEnvVariablesAndSystemProperties(tableConfig);
     } catch (Exception e) {
       LOGGER.error("Caught exception while creating table config from ZNRecord: {}", znRecord.getId(), e);
       return null;
