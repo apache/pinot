@@ -131,7 +131,7 @@
     <!-- Configuration for Packaging -->
     <shade.prefix>org.apache.pinot.shaded</shade.prefix>
     <maven-jar-plugin.version>3.4.1</maven-jar-plugin.version>
-    <maven-shade-plugin.version>3.5.2</maven-shade-plugin.version>
+    <maven-shade-plugin.version>3.5.3</maven-shade-plugin.version>
     <shade.phase.prop>none</shade.phase.prop>
 
     <avro.version>1.11.3</avro.version>
@@ -159,7 +159,7 @@
     <!-- helix-core, spark-core use libraries from io.dropwizard.metrics -->
     <dropwizard-metrics.version>4.2.25</dropwizard-metrics.version>
     <snappy-java.version>1.1.10.5</snappy-java.version>
-    <zstd-jni.version>1.5.6-2</zstd-jni.version>
+    <zstd-jni.version>1.5.6-3</zstd-jni.version>
     <lz4-java.version>1.8.0</lz4-java.version>
     <libthrift.verion>0.20.0</libthrift.verion>
     <log4j.version>2.23.1</log4j.version>
@@ -172,12 +172,16 @@
     <audienceannotations.version>0.15.0</audienceannotations.version>
     <clp-ffi.version>0.4.4</clp-ffi.version>
     <stax2-api.version>4.2.2</stax2-api.version>
-    <aws.sdk.version>2.25.36</aws.sdk.version>
+    <aws.sdk.version>2.25.38</aws.sdk.version>
     <joda-time.version>2.12.7</joda-time.version>
     <janino.version>3.1.12</janino.version>
     <testng.version>7.10.1</testng.version>
     <woodstox.version>6.6.2</woodstox.version>
     <sslcontext.kickstart.version>8.3.4</sslcontext.kickstart.version>
+
+    <confluent.version>7.6.1</confluent.version>
+    <pulsar.version>3.2.2</pulsar.version>
+    <flink.version>1.14.6</flink.version>
 
     <!-- Apache Commons Libraries -->
     <commons-lang3.version>3.14.0</commons-lang3.version>
@@ -232,19 +236,15 @@
     <protobuf.version>3.25.2</protobuf.version>
     <grpc.version>1.61.1</grpc.version>
 
-    <confluent.version>7.6.1</confluent.version>
-
     <!-- Configuration for Scala -->
     <scala.version>2.12.18</scala.version>
     <scala.compat.version>2.12</scala.compat.version>
-
-    <flink.version>1.14.6</flink.version>
 
     <!-- Solve conflict across dependencies -->
     <kotlin.stdlib.version>1.9.23</kotlin.stdlib.version>
     <okio.version>3.9.0</okio.version>
     <kerby.version>2.0.3</kerby.version>
-    <jline.version>3.26.0</jline.version>
+    <jline.version>3.26.1</jline.version>
     <wildfly.version>1.7.0.Final</wildfly.version>
     <jettison.version>1.5.4</jettison.version>
     <eclipse.jetty.version>9.4.54.v20240208</eclipse.jetty.version>
@@ -254,20 +254,6 @@
   </properties>
 
   <profiles>
-    <profile>
-      <id>not-java-21</id>
-      <activation>
-        <jdk>!21</jdk>
-      </activation>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>com.diffplug.spotless</groupId>
-            <artifactId>spotless-maven-plugin</artifactId>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
     <profile>
       <id>github-actions</id>
       <activation>
@@ -1609,7 +1595,6 @@
           <version>2.43.0</version>
           <executions>
             <execution>
-              <phase>verify</phase>
               <goals>
                 <goal>check</goal>
               </goals>
@@ -1884,7 +1869,7 @@
         <plugin>
           <groupId>net.alchim31.maven</groupId>
           <artifactId>scala-maven-plugin</artifactId>
-          <version>3.2.2</version>
+          <version>4.9.0</version>
           <executions>
             <execution>
               <id>add-source</id>
@@ -1920,6 +1905,9 @@
           </executions>
           <configuration>
             <scalaVersion>${scala.version}</scalaVersion>
+            <release>${jdk.version}</release>
+            <source>${jdk.version}</source>
+            <target>${jdk.version}</target>
             <args>
               <arg>-unchecked</arg>
               <arg>-deprecation</arg>
@@ -1930,10 +1918,6 @@
               <jvmArg>-Xmx1024m</jvmArg>
             </jvmArgs>
             <javacArgs>
-              <javacArg>-source</javacArg>
-              <javacArg>${jdk.version}</javacArg>
-              <javacArg>-target</javacArg>
-              <javacArg>${jdk.version}</javacArg>
               <javacArg>-Xlint:all,-serial,-path</javacArg>
             </javacArgs>
           </configuration>
@@ -2063,6 +2047,10 @@
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>sonar-maven-plugin</artifactId>
         <version>2.7.1</version>
+      </plugin>
+      <plugin>
+        <groupId>com.diffplug.spotless</groupId>
+        <artifactId>spotless-maven-plugin</artifactId>
       </plugin>
       <plugin>
         <groupId>com.mycila</groupId>
