@@ -220,7 +220,7 @@ public class ForwardIndexConfig extends IndexConfig {
     private boolean _deriveNumDocsPerChunk = false;
     private int _rawIndexWriterVersion = DEFAULT_RAW_WRITER_VERSION;
     private String _targetMaxChunkSize;
-    private int _targetDocsPerChunk;
+    private int _targetDocsPerChunk = DEFAULT_TARGET_DOCS_PER_CHUNK;
 
     public Builder() {
     }
