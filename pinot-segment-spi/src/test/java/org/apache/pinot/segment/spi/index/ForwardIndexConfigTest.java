@@ -87,7 +87,8 @@ public class ForwardIndexConfigTest {
         + "        \"chunkCompressionType\": \"SNAPPY\",\n"
         + "        \"deriveNumDocsPerChunk\": true,\n"
         + "        \"rawIndexWriterVersion\": 10,\n"
-        + "        \"targetMaxChunkSize\": \"512K\"\n"
+        + "        \"targetMaxChunkSize\": \"512K\",\n"
+        + "        \"targetDocsPerChunk\": \"2000\"\n"
         + "}";
     ForwardIndexConfig config = JsonUtils.stringToObject(confStr, ForwardIndexConfig.class);
 
@@ -96,5 +97,6 @@ public class ForwardIndexConfigTest {
     assertTrue(config.isDeriveNumDocsPerChunk(), "Unexpected deriveNumDocsPerChunk");
     assertEquals(config.getRawIndexWriterVersion(), 10, "Unexpected rawIndexWriterVersion");
     assertEquals(config.getTargetMaxChunkSizeBytes(), 512 * 1024, "Unexpected targetMaxChunkSizeBytes");
+    assertEquals(config.getTargetDocsPerChunk(), 2000, "Unexpected defaultTargetDocsPerChunk");
   }
 }

@@ -36,7 +36,6 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
  * BYTES).
  */
 public class MultiValueVarByteRawIndexCreator implements ForwardIndexCreator {
-  private static final int DEFAULT_NUM_DOCS_PER_CHUNK = 1000;
   private static final int TARGET_MIN_CHUNK_SIZE = 4 * 1024;
 
   private final VarByteChunkWriter _indexWriter;
@@ -57,7 +56,8 @@ public class MultiValueVarByteRawIndexCreator implements ForwardIndexCreator {
       int totalDocs, DataType valueType, int maxRowLengthInBytes, int maxNumberOfElements)
       throws IOException {
     this(baseIndexDir, compressionType, column, totalDocs, valueType, ForwardIndexConfig.DEFAULT_RAW_WRITER_VERSION,
-        maxRowLengthInBytes, maxNumberOfElements, ForwardIndexConfig.DEFAULT_TARGET_MAX_CHUNK_SIZE);
+        maxRowLengthInBytes, maxNumberOfElements, ForwardIndexConfig.DEFAULT_TARGET_MAX_CHUNK_SIZE,
+        ForwardIndexConfig.DEFAULT_TARGET_DOCS_PER_CHUNK);
   }
 
   /**
@@ -74,7 +74,7 @@ public class MultiValueVarByteRawIndexCreator implements ForwardIndexCreator {
    */
   public MultiValueVarByteRawIndexCreator(File baseIndexDir, ChunkCompressionType compressionType, String column,
       int totalDocs, DataType valueType, int writerVersion, int maxRowLengthInBytes, int maxNumberOfElements,
-      int targetMaxChunkSizeBytes)
+      int targetMaxChunkSizeBytes, int targetDocsPerChunk)
       throws IOException {
     //we will prepend the actual content with numElements and length array containing length of each element
     int totalMaxLength = getTotalRowStorageBytes(maxNumberOfElements, maxRowLengthInBytes);
@@ -85,7 +85,7 @@ public class MultiValueVarByteRawIndexCreator implements ForwardIndexCreator {
         1);
     // For columns with very small max value, target chunk size should also be capped to reduce memory during read
     int dynamicTargetChunkSize =
-        Math.max(Math.min(totalMaxLength * DEFAULT_NUM_DOCS_PER_CHUNK, targetMaxChunkSizeBytes), TARGET_MIN_CHUNK_SIZE);
+        Math.max(Math.min(totalMaxLength * targetDocsPerChunk, targetMaxChunkSizeBytes), TARGET_MIN_CHUNK_SIZE);
     _indexWriter = writerVersion < VarByteChunkForwardIndexWriterV4.VERSION ? new VarByteChunkForwardIndexWriter(file,
         compressionType, totalDocs, numDocsPerChunk, totalMaxLength, writerVersion)
         : new VarByteChunkForwardIndexWriterV4(file, compressionType, dynamicTargetChunkSize);

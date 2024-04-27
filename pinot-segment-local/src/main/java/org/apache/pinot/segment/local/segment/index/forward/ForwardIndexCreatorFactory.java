@@ -81,13 +81,15 @@ public class ForwardIndexCreatorFactory {
       boolean deriveNumDocsPerChunk = indexConfig.isDeriveNumDocsPerChunk();
       int writerVersion = indexConfig.getRawIndexWriterVersion();
       int targetMaxChunkSize = indexConfig.getTargetMaxChunkSizeBytes();
+      int targetDocsPerChunk = indexConfig.getTargetDocsPerChunk();
       if (fieldSpec.isSingleValueField()) {
         return getRawIndexCreatorForSVColumn(indexDir, chunkCompressionType, columnName, storedType, numTotalDocs,
-            context.getLengthOfLongestEntry(), deriveNumDocsPerChunk, writerVersion, targetMaxChunkSize);
+            context.getLengthOfLongestEntry(), deriveNumDocsPerChunk, writerVersion, targetMaxChunkSize,
+            targetDocsPerChunk);
       } else {
         return getRawIndexCreatorForMVColumn(indexDir, chunkCompressionType, columnName, storedType, numTotalDocs,
             context.getMaxNumberOfMultiValueElements(), deriveNumDocsPerChunk, writerVersion,
-            context.getMaxRowLengthInBytes(), targetMaxChunkSize);
+            context.getMaxRowLengthInBytes(), targetMaxChunkSize, targetDocsPerChunk);
       }
     }
   }
@@ -98,7 +100,7 @@ public class ForwardIndexCreatorFactory {
    */
   public static ForwardIndexCreator getRawIndexCreatorForSVColumn(File indexDir, ChunkCompressionType compressionType,
       String column, DataType storedType, int numTotalDocs, int lengthOfLongestEntry, boolean deriveNumDocsPerChunk,
-      int writerVersion, int targetMaxChunkSize)
+      int writerVersion, int targetMaxChunkSize, int targetDocsPerChunk)
       throws IOException {
     switch (storedType) {
       case INT:
@@ -106,12 +108,12 @@ public class ForwardIndexCreatorFactory {
       case FLOAT:
       case DOUBLE:
         return new SingleValueFixedByteRawIndexCreator(indexDir, compressionType, column, numTotalDocs, storedType,
-            writerVersion);
+            writerVersion, targetDocsPerChunk);
       case BIG_DECIMAL:
       case STRING:
       case BYTES:
         return new SingleValueVarByteRawIndexCreator(indexDir, compressionType, column, numTotalDocs, storedType,
-            lengthOfLongestEntry, deriveNumDocsPerChunk, writerVersion, targetMaxChunkSize);
+            lengthOfLongestEntry, deriveNumDocsPerChunk, writerVersion, targetMaxChunkSize, targetDocsPerChunk);
       default:
         throw new IllegalStateException("Unsupported stored type: " + storedType);
     }
@@ -123,7 +125,8 @@ public class ForwardIndexCreatorFactory {
    */
   public static ForwardIndexCreator getRawIndexCreatorForMVColumn(File indexDir, ChunkCompressionType compressionType,
       String column, DataType storedType, int numTotalDocs, int maxNumberOfMultiValueElements,
-      boolean deriveNumDocsPerChunk, int writerVersion, int maxRowLengthInBytes, int targetMaxChunkSize)
+      boolean deriveNumDocsPerChunk, int writerVersion, int maxRowLengthInBytes, int targetMaxChunkSize,
+      int targetDocsPerChunk)
       throws IOException {
     switch (storedType) {
       case INT:
@@ -131,11 +134,12 @@ public class ForwardIndexCreatorFactory {
       case FLOAT:
       case DOUBLE:
         return new MultiValueFixedByteRawIndexCreator(indexDir, compressionType, column, numTotalDocs, storedType,
-            maxNumberOfMultiValueElements, deriveNumDocsPerChunk, writerVersion, targetMaxChunkSize);
+            maxNumberOfMultiValueElements, deriveNumDocsPerChunk, writerVersion, targetMaxChunkSize,
+            targetDocsPerChunk);
       case STRING:
       case BYTES:
         return new MultiValueVarByteRawIndexCreator(indexDir, compressionType, column, numTotalDocs, storedType,
-            writerVersion, maxRowLengthInBytes, maxNumberOfMultiValueElements, targetMaxChunkSize);
+            writerVersion, maxRowLengthInBytes, maxNumberOfMultiValueElements, targetMaxChunkSize, targetDocsPerChunk);
       default:
         throw new IllegalStateException("Unsupported stored type: " + storedType);
     }
