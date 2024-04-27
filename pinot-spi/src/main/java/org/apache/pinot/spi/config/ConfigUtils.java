@@ -23,6 +23,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.JsonNodeType;
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -35,37 +36,47 @@ public class ConfigUtils {
   private static final Map<String, String> ENVIRONMENT_VARIABLES = System.getenv();
 
   /**
-   * Apply environment variables to any given BaseJsonConfig.
+   * Apply system properties and environment variables to any given BaseJsonConfig.
+   * Environment variables take precedence over system properties.
+   * Since the System properties are mutable, this method will read it at runtime.
    *
-   * @return Config with environment variable applied.
+   * @return Config with both system properties and environment variables applied.
    */
-  public static <T extends BaseJsonConfig> T applyConfigWithEnvVariables(T config) {
-    return applyConfigWithEnvVariables(ENVIRONMENT_VARIABLES, config);
+  public static <T extends BaseJsonConfig> T applyConfigWithEnvVariablesAndSystemProperties(T config) {
+    Map<String, String> combinedMap = new HashMap<>();
+    // Add all system properties to the map
+    System.getProperties().forEach((key, value) -> combinedMap.put(String.valueOf(key), String.valueOf(value)));
+    // Add all environment variables to the map, potentially overwriting system properties
+    combinedMap.putAll(ENVIRONMENT_VARIABLES);
+    return applyConfigWithEnvVariablesAndSystemProperties(combinedMap, config);
   }
 
   /**
-   * Apply environment variables to any given BaseJsonConfig.
+   * Apply a map of config to any given BaseJsonConfig with templates.
    *
-   * @return Config with environment variable applied.
+   * @return Config with the configs applied.
    */
-  public static <T extends BaseJsonConfig> T applyConfigWithEnvVariables(Map<String, String> environment, T config) {
+  public static <T extends BaseJsonConfig> T applyConfigWithEnvVariablesAndSystemProperties(
+      Map<String, String> configValues, T configTemplate) {
     JsonNode jsonNode;
     try {
-      jsonNode = applyConfigWithEnvVariables(environment, config.toJsonNode());
+      jsonNode = applyConfigWithEnvVariablesAndSystemProperties(configValues, configTemplate.toJsonNode());
     } catch (RuntimeException e) {
       throw new RuntimeException(String
-          .format("Unable to apply environment variables on json config class [%s].", config.getClass().getName()), e);
+          .format("Unable to apply environment variables on json config class [%s].",
+              configTemplate.getClass().getName()), e);
     }
     try {
-      return (T) JsonUtils.jsonNodeToObject(jsonNode, config.getClass());
+      return (T) JsonUtils.jsonNodeToObject(jsonNode, configTemplate.getClass());
     } catch (IOException e) {
       throw new RuntimeException(String
           .format("Unable to read JsonConfig to class [%s] after applying environment variables, jsonConfig is: '%s'.",
-              config.getClass().getName(), jsonNode.toString()), e);
+              configTemplate.getClass().getName(), jsonNode.toString()), e);
     }
   }
 
-  private static JsonNode applyConfigWithEnvVariables(Map<String, String> environment, JsonNode jsonNode) {
+  private static JsonNode applyConfigWithEnvVariablesAndSystemProperties(Map<String, String> configValues,
+      JsonNode jsonNode) {
     final JsonNodeType nodeType = jsonNode.getNodeType();
     switch (nodeType) {
       case OBJECT:
@@ -73,7 +84,7 @@ public class ConfigUtils {
           Iterator<Map.Entry<String, JsonNode>> iterator = jsonNode.fields();
           while (iterator.hasNext()) {
             final Map.Entry<String, JsonNode> next = iterator.next();
-            next.setValue(applyConfigWithEnvVariables(environment, next.getValue()));
+            next.setValue(applyConfigWithEnvVariablesAndSystemProperties(configValues, next.getValue()));
           }
         }
         break;
@@ -82,7 +93,7 @@ public class ConfigUtils {
           ArrayNode arrayNode = (ArrayNode) jsonNode;
           for (int i = 0; i < arrayNode.size(); i++) {
             JsonNode arrayElement = arrayNode.get(i);
-            arrayNode.set(i, applyConfigWithEnvVariables(environment, arrayElement));
+            arrayNode.set(i, applyConfigWithEnvVariablesAndSystemProperties(configValues, arrayElement));
           }
         }
         break;
@@ -91,7 +102,7 @@ public class ConfigUtils {
         if (field.startsWith("${") && field.endsWith("}")) {
           String[] envVarSplits = field.substring(2, field.length() - 1).split(":", 2);
           String envVarKey = envVarSplits[0];
-          String value = environment.get(envVarKey);
+          String value = configValues.get(envVarKey);
           if (value != null) {
             return JsonNodeFactory.instance.textNode(value);
           } else if (envVarSplits.length > 1) {
