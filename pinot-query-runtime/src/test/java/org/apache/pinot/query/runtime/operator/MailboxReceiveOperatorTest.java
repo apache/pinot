@@ -28,7 +28,7 @@ import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
-import org.apache.pinot.query.planner.physical.MailboxIdUtils;
+import org.apache.pinot.query.planner.physical.MailboxId;
 import org.apache.pinot.query.routing.MailboxInfo;
 import org.apache.pinot.query.routing.MailboxInfos;
 import org.apache.pinot.query.routing.SharedMailboxInfos;
@@ -55,8 +55,8 @@ import static org.testng.Assert.assertTrue;
 public class MailboxReceiveOperatorTest {
   private static final DataSchema DATA_SCHEMA =
       new DataSchema(new String[]{"col1", "col2"}, new DataSchema.ColumnDataType[]{INT, INT});
-  private static final String MAILBOX_ID_1 = MailboxIdUtils.toMailboxId(0, 1, 0, 0, 0);
-  private static final String MAILBOX_ID_2 = MailboxIdUtils.toMailboxId(0, 1, 1, 0, 0);
+  private static final MailboxId MAILBOX_ID_1 = new MailboxId(0, 1, 0, 0, 0);
+  private static final MailboxId MAILBOX_ID_2 = new MailboxId(0, 1, 1, 0, 0);
 
   private StageMetadata _stageMetadataBoth;
   private StageMetadata _stageMetadata1;

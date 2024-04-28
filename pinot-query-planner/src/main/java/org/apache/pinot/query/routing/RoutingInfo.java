@@ -18,12 +18,15 @@
  */
 package org.apache.pinot.query.routing;
 
+import org.apache.pinot.query.planner.physical.MailboxId;
+
+
 public class RoutingInfo {
   private final String _hostname;
   private final int _port;
-  private final String _mailboxId;
+  private final MailboxId _mailboxId;
 
-  public RoutingInfo(String hostname, int port, String mailboxId) {
+  public RoutingInfo(String hostname, int port, MailboxId mailboxId) {
     _hostname = hostname;
     _port = port;
     _mailboxId = mailboxId;
@@ -37,7 +40,7 @@ public class RoutingInfo {
     return _port;
   }
 
-  public String getMailboxId() {
+  public MailboxId getMailboxId() {
     return _mailboxId;
   }
 }

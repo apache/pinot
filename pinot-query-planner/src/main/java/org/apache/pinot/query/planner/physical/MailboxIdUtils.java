@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.planner.physical;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.query.routing.MailboxInfo;
@@ -31,13 +30,6 @@ public class MailboxIdUtils {
 
   public static final char SEPARATOR = '|';
 
-  @VisibleForTesting
-  public static String toMailboxId(long requestId, int senderStageId, int senderWorkerId, int receiverStageId,
-      int receiverWorkerId) {
-    return Long.toString(requestId) + SEPARATOR + senderStageId + SEPARATOR + senderWorkerId + SEPARATOR
-        + receiverStageId + SEPARATOR + receiverWorkerId;
-  }
-
   public static List<RoutingInfo> toRoutingInfos(long requestId, int senderStageId, int senderWorkerId,
       int receiverStageId, List<MailboxInfo> receiverMailboxInfos) {
     List<RoutingInfo> routingInfos = new ArrayList<>();
@@ -46,18 +38,18 @@ public class MailboxIdUtils {
       int port = mailboxInfo.getPort();
       for (int receiverWorkerId : mailboxInfo.getWorkerIds()) {
         routingInfos.add(new RoutingInfo(hostname, port,
-            toMailboxId(requestId, senderStageId, senderWorkerId, receiverStageId, receiverWorkerId)));
+            new MailboxId(requestId, senderStageId, senderWorkerId, receiverStageId, receiverWorkerId)));
       }
     }
     return routingInfos;
   }
 
-  public static List<String> toMailboxIds(long requestId, int senderStageId, List<MailboxInfo> senderMailboxInfos,
+  public static List<MailboxId> toMailboxIds(long requestId, int senderStageId, List<MailboxInfo> senderMailboxInfos,
       int receiverStageId, int receiverWorkerId) {
-    List<String> mailboxIds = new ArrayList<>();
+    List<MailboxId> mailboxIds = new ArrayList<>();
     for (MailboxInfo mailboxInfo : senderMailboxInfos) {
       for (int senderWorkerId : mailboxInfo.getWorkerIds()) {
-        mailboxIds.add(toMailboxId(requestId, senderStageId, senderWorkerId, receiverStageId, receiverWorkerId));
+        mailboxIds.add(new MailboxId(requestId, senderStageId, senderWorkerId, receiverStageId, receiverWorkerId));
       }
     }
     return mailboxIds;

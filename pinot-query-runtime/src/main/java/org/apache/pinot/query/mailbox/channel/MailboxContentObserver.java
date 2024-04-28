@@ -29,6 +29,7 @@ import org.apache.pinot.common.proto.Mailbox.MailboxContent;
 import org.apache.pinot.common.proto.Mailbox.MailboxStatus;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
+import org.apache.pinot.query.planner.physical.MailboxId;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.slf4j.Logger;
@@ -57,7 +58,8 @@ public class MailboxContentObserver implements StreamObserver<MailboxContent> {
 
   @Override
   public void onNext(MailboxContent mailboxContent) {
-    String mailboxId = mailboxContent.getMailboxId();
+    String mailboxIdStr = mailboxContent.getMailboxId();
+    MailboxId mailboxId = MailboxId.fromPipeString(mailboxIdStr);
     if (_mailbox == null) {
       _mailbox = _mailboxService.getReceivingMailbox(mailboxId);
     }
@@ -80,7 +82,7 @@ public class MailboxContentObserver implements StreamObserver<MailboxContent> {
       ReceivingMailbox.ReceivingMailboxStatus status = _mailbox.offer(block, timeoutMs);
       switch (status) {
         case SUCCESS:
-          _responseObserver.onNext(MailboxStatus.newBuilder().setMailboxId(mailboxId)
+          _responseObserver.onNext(MailboxStatus.newBuilder().setMailboxId(mailboxIdStr)
               .putMetadata(ChannelUtils.MAILBOX_METADATA_BUFFER_SIZE_KEY,
                   Integer.toString(_mailbox.getNumPendingBlocks())).build());
           break;
@@ -98,7 +100,7 @@ public class MailboxContentObserver implements StreamObserver<MailboxContent> {
           break;
         case EARLY_TERMINATED:
           LOGGER.debug("Mailbox: {} has been early terminated", mailboxId);
-          _responseObserver.onNext(MailboxStatus.newBuilder().setMailboxId(mailboxId)
+          _responseObserver.onNext(MailboxStatus.newBuilder().setMailboxId(mailboxIdStr)
               .putMetadata(ChannelUtils.MAILBOX_METADATA_REQUEST_EARLY_TERMINATE, "true").build());
           break;
         default:

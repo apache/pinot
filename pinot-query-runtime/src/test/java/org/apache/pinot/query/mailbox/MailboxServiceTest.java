@@ -24,7 +24,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.query.planner.physical.MailboxIdUtils;
+import org.apache.pinot.query.planner.physical.MailboxId;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.OperatorTestUtil;
@@ -70,7 +70,7 @@ public class MailboxServiceTest {
   @Test
   public void testLocalHappyPathSendFirst()
       throws Exception {
-    String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
+    MailboxId mailboxId = createMailboxId();
 
     // Sends are non-blocking as long as channel capacity is not breached
     SendingMailbox sendingMailbox =
@@ -103,7 +103,7 @@ public class MailboxServiceTest {
   @Test
   public void testLocalHappyPathReceiveFirst()
       throws Exception {
-    String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
+    MailboxId mailboxId = createMailboxId();
 
     ReceivingMailbox receivingMailbox = _mailboxService1.getReceivingMailbox(mailboxId);
     AtomicInteger numCallbacks = new AtomicInteger();
@@ -141,7 +141,7 @@ public class MailboxServiceTest {
   @Test
   public void testLocalCancelledBySender()
       throws Exception {
-    String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
+    MailboxId mailboxId = createMailboxId();
     SendingMailbox sendingMailbox =
         _mailboxService1.getSendingMailbox("localhost", _mailboxService1.getPort(), mailboxId, Long.MAX_VALUE);
     ReceivingMailbox receivingMailbox = _mailboxService1.getReceivingMailbox(mailboxId);
@@ -168,7 +168,7 @@ public class MailboxServiceTest {
 
   @Test
   public void testLocalCancelledBySenderBeforeSend() {
-    String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
+    MailboxId mailboxId = createMailboxId();
     SendingMailbox sendingMailbox =
         _mailboxService1.getSendingMailbox("localhost", _mailboxService1.getPort(), mailboxId, Long.MAX_VALUE);
     ReceivingMailbox receivingMailbox = _mailboxService1.getReceivingMailbox(mailboxId);
@@ -195,7 +195,7 @@ public class MailboxServiceTest {
   @Test
   public void testLocalCancelledByReceiver()
       throws Exception {
-    String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
+    MailboxId mailboxId = createMailboxId();
     SendingMailbox sendingMailbox =
         _mailboxService1.getSendingMailbox("localhost", _mailboxService1.getPort(), mailboxId, Long.MAX_VALUE);
     ReceivingMailbox receivingMailbox = _mailboxService1.getReceivingMailbox(mailboxId);
@@ -223,7 +223,7 @@ public class MailboxServiceTest {
   @Test
   public void testLocalTimeOut()
       throws Exception {
-    String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
+    MailboxId mailboxId = createMailboxId();
     long deadlineMs = System.currentTimeMillis() + 1000;
     SendingMailbox sendingMailbox =
         _mailboxService1.getSendingMailbox("localhost", _mailboxService1.getPort(), mailboxId, deadlineMs);
@@ -258,7 +258,7 @@ public class MailboxServiceTest {
   @Test
   public void testLocalBufferFull()
       throws Exception {
-    String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
+    MailboxId mailboxId = createMailboxId();
     SendingMailbox sendingMailbox =
         _mailboxService1.getSendingMailbox("localhost", _mailboxService1.getPort(), mailboxId,
             System.currentTimeMillis() + 1000);
@@ -296,7 +296,7 @@ public class MailboxServiceTest {
   @Test
   public void testLocalEarlyTerminated()
       throws Exception {
-    String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
+    MailboxId mailboxId = createMailboxId();
     SendingMailbox sendingMailbox =
         _mailboxService1.getSendingMailbox("localhost", _mailboxService1.getPort(), mailboxId, Long.MAX_VALUE);
     ReceivingMailbox receivingMailbox = _mailboxService1.getReceivingMailbox(mailboxId);
@@ -322,7 +322,7 @@ public class MailboxServiceTest {
   @Test
   public void testRemoteHappyPathSendFirst()
       throws Exception {
-    String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
+    MailboxId mailboxId = createMailboxId();
 
     // Sends are non-blocking as long as channel capacity is not breached
     SendingMailbox sendingMailbox =
@@ -360,7 +360,7 @@ public class MailboxServiceTest {
   @Test
   public void testRemoteHappyPathReceiveFirst()
       throws Exception {
-    String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
+    MailboxId mailboxId = createMailboxId();
 
     ReceivingMailbox receivingMailbox = _mailboxService1.getReceivingMailbox(mailboxId);
     AtomicInteger numCallbacks = new AtomicInteger();
@@ -404,7 +404,7 @@ public class MailboxServiceTest {
   @Test
   public void testRemoteCancelledBySender()
       throws Exception {
-    String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
+    MailboxId mailboxId = createMailboxId();
     SendingMailbox sendingMailbox =
         _mailboxService2.getSendingMailbox("localhost", _mailboxService1.getPort(), mailboxId, Long.MAX_VALUE);
     ReceivingMailbox receivingMailbox = _mailboxService1.getReceivingMailbox(mailboxId);
@@ -439,7 +439,7 @@ public class MailboxServiceTest {
   @Test
   public void testRemoteCancelledBySenderBeforeSend()
       throws Exception {
-    String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
+    MailboxId mailboxId = createMailboxId();
     SendingMailbox sendingMailbox =
         _mailboxService2.getSendingMailbox("localhost", _mailboxService1.getPort(), mailboxId, Long.MAX_VALUE);
     ReceivingMailbox receivingMailbox = _mailboxService1.getReceivingMailbox(mailboxId);
@@ -473,7 +473,7 @@ public class MailboxServiceTest {
   @Test
   public void testRemoteCancelledByReceiver()
       throws Exception {
-    String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
+    MailboxId mailboxId = createMailboxId();
     SendingMailbox sendingMailbox =
         _mailboxService2.getSendingMailbox("localhost", _mailboxService1.getPort(), mailboxId, Long.MAX_VALUE);
     ReceivingMailbox receivingMailbox = _mailboxService1.getReceivingMailbox(mailboxId);
@@ -506,7 +506,7 @@ public class MailboxServiceTest {
   @Test
   public void testRemoteTimeOut()
       throws Exception {
-    String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
+    MailboxId mailboxId = createMailboxId();
     long deadlineMs = System.currentTimeMillis() + 1000;
     SendingMailbox sendingMailbox =
         _mailboxService2.getSendingMailbox("localhost", _mailboxService1.getPort(), mailboxId, deadlineMs);
@@ -549,7 +549,7 @@ public class MailboxServiceTest {
   @Test
   public void testRemoteBufferFull()
       throws Exception {
-    String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
+    MailboxId mailboxId = createMailboxId();
     SendingMailbox sendingMailbox =
         _mailboxService2.getSendingMailbox("localhost", _mailboxService1.getPort(), mailboxId,
             System.currentTimeMillis() + 1000);
@@ -587,7 +587,7 @@ public class MailboxServiceTest {
   @Test
   public void testRemoteEarlyTerminated()
       throws Exception {
-    String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
+    MailboxId mailboxId = createMailboxId();
 
     // Sends are non-blocking as long as channel capacity is not breached
     SendingMailbox sendingMailbox =
@@ -613,5 +613,9 @@ public class MailboxServiceTest {
 
     // sending side should early terminate
     TestUtils.waitForCondition(aVoid -> sendingMailbox.isEarlyTerminated(), 1000L, "Failed to early-terminate sender");
+  }
+
+  private MailboxId createMailboxId() {
+    return new MailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
   }
 }

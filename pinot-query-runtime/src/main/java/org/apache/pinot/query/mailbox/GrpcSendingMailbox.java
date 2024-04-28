@@ -28,6 +28,7 @@ import org.apache.pinot.common.proto.Mailbox.MailboxContent;
 import org.apache.pinot.common.proto.PinotMailboxGrpc;
 import org.apache.pinot.query.mailbox.channel.ChannelManager;
 import org.apache.pinot.query.mailbox.channel.MailboxStatusObserver;
+import org.apache.pinot.query.planner.physical.MailboxId;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.slf4j.Logger;
@@ -40,7 +41,7 @@ import org.slf4j.LoggerFactory;
 public class GrpcSendingMailbox implements SendingMailbox {
   private static final Logger LOGGER = LoggerFactory.getLogger(GrpcSendingMailbox.class);
 
-  private final String _id;
+  private final MailboxId _id;
   private final ChannelManager _channelManager;
   private final String _hostname;
   private final int _port;
@@ -49,7 +50,7 @@ public class GrpcSendingMailbox implements SendingMailbox {
 
   private StreamObserver<MailboxContent> _contentObserver;
 
-  public GrpcSendingMailbox(String id, ChannelManager channelManager, String hostname, int port, long deadlineMs) {
+  public GrpcSendingMailbox(MailboxId id, ChannelManager channelManager, String hostname, int port, long deadlineMs) {
     _id = id;
     _channelManager = channelManager;
     _hostname = hostname;
@@ -121,6 +122,6 @@ public class GrpcSendingMailbox implements SendingMailbox {
     DataBlock dataBlock = block.getDataBlock();
     byte[] bytes = dataBlock.toBytes();
     ByteString byteString = UnsafeByteOperations.unsafeWrap(bytes);
-    return MailboxContent.newBuilder().setMailboxId(_id).setPayload(byteString).build();
+    return MailboxContent.newBuilder().setMailboxId(_id.toPipeString()).setPayload(byteString).build();
   }
 }

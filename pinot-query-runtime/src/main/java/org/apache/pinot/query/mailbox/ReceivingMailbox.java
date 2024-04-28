@@ -25,6 +25,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
+import org.apache.pinot.query.planner.physical.MailboxId;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.slf4j.Logger;
@@ -44,7 +45,7 @@ public class ReceivingMailbox {
   private static final TransferableBlock CANCELLED_ERROR_BLOCK =
       TransferableBlockUtils.getErrorTransferableBlock(new RuntimeException("Cancelled by receiver"));
 
-  private final String _id;
+  private final MailboxId _id;
   // TODO: Make the queue size configurable
   // TODO: Revisit if this is the correct way to apply back pressure
   private final BlockingQueue<TransferableBlock> _blocks = new ArrayBlockingQueue<>(DEFAULT_MAX_PENDING_BLOCKS);
@@ -54,7 +55,7 @@ public class ReceivingMailbox {
   @Nullable
   private volatile Reader _reader;
 
-  public ReceivingMailbox(String id) {
+  public ReceivingMailbox(MailboxId id) {
     _id = id;
   }
 
@@ -68,7 +69,7 @@ public class ReceivingMailbox {
     _reader = reader;
   }
 
-  public String getId() {
+  public MailboxId getId() {
     return _id;
   }
 

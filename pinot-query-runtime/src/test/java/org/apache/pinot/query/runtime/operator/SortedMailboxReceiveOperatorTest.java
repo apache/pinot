@@ -33,7 +33,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
 import org.apache.pinot.query.planner.logical.RexExpression;
-import org.apache.pinot.query.planner.physical.MailboxIdUtils;
+import org.apache.pinot.query.planner.physical.MailboxId;
 import org.apache.pinot.query.routing.MailboxInfo;
 import org.apache.pinot.query.routing.MailboxInfos;
 import org.apache.pinot.query.routing.SharedMailboxInfos;
@@ -63,8 +63,8 @@ public class SortedMailboxReceiveOperatorTest {
   private static final List<RexExpression> COLLATION_KEYS = Collections.singletonList(new RexExpression.InputRef(0));
   private static final List<Direction> COLLATION_DIRECTIONS = Collections.singletonList(Direction.ASCENDING);
   private static final List<NullDirection> COLLATION_NULL_DIRECTIONS = Collections.singletonList(NullDirection.LAST);
-  private static final String MAILBOX_ID_1 = MailboxIdUtils.toMailboxId(0, 1, 0, 0, 0);
-  private static final String MAILBOX_ID_2 = MailboxIdUtils.toMailboxId(0, 1, 1, 0, 0);
+  private static final MailboxId MAILBOX_ID_1 = new MailboxId(0, 1, 0, 0, 0);
+  private static final MailboxId MAILBOX_ID_2 = new MailboxId(0, 1, 1, 0, 0);
 
   private StageMetadata _stageMetadataBoth;
   private StageMetadata _stageMetadata1;
