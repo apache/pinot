@@ -35,8 +35,6 @@ public class IntegerTupleSketchValueAggregatorTest {
     return is.compact().toByteArray();
   }
 
-  ;
-
   @Test
   public void initialShouldParseASketch() {
     IntegerTupleSketchValueAggregator agg = new IntegerTupleSketchValueAggregator(IntegerSummary.Mode.Sum);

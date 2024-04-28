@@ -21,8 +21,6 @@ package org.apache.pinot.segment.local.aggregator;
 import java.util.List;
 import org.apache.datasketches.cpc.CpcSketch;
 import org.apache.datasketches.cpc.CpcUnion;
-import org.apache.datasketches.theta.Sketch;
-import org.apache.datasketches.theta.Union;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.segment.local.utils.CustomSerDeUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;

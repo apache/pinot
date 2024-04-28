@@ -43,7 +43,8 @@ public class DistinctCountCPCSketchValueAggregatorTest {
     IntStream.range(0, 100).forEach(input::update);
     DistinctCountCPCSketchValueAggregator agg = new DistinctCountCPCSketchValueAggregator(Collections.emptyList());
     byte[] bytes = agg.serializeAggregatedValue(input);
-    assertEquals(Math.round(toSketch(agg.getInitialAggregatedValue(bytes)).getEstimate()), Math.round(input.getEstimate()));
+    assertEquals(Math.round(toSketch(agg.getInitialAggregatedValue(bytes)).getEstimate()),
+        Math.round(input.getEstimate()));
     assertEquals(agg.getMaxAggregatedValueByteSize(), 2580);
   }
 
