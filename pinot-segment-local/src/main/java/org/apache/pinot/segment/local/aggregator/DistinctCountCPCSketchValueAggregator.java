@@ -21,6 +21,8 @@ package org.apache.pinot.segment.local.aggregator;
 import java.util.List;
 import org.apache.datasketches.cpc.CpcSketch;
 import org.apache.datasketches.cpc.CpcUnion;
+import org.apache.datasketches.theta.Sketch;
+import org.apache.datasketches.theta.Union;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.segment.local.utils.CustomSerDeUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
@@ -28,12 +30,10 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
-public class DistinctCountCPCSketchValueAggregator implements ValueAggregator<Object, CpcSketch> {
+public class DistinctCountCPCSketchValueAggregator implements ValueAggregator<Object, Object> {
   public static final DataType AGGREGATED_VALUE_TYPE = DataType.BYTES;
 
   private final int _lgK;
-
-  private int _maxByteSize;
 
   public DistinctCountCPCSketchValueAggregator(List<ExpressionContext> arguments) {
     // length 1 means we use the Helix default
@@ -55,64 +55,61 @@ public class DistinctCountCPCSketchValueAggregator implements ValueAggregator<Ob
   }
 
   @Override
-  public CpcSketch getInitialAggregatedValue(Object rawValue) {
-    CpcSketch initialValue;
+  public Object getInitialAggregatedValue(Object rawValue) {
+    CpcUnion cpcUnion = new CpcUnion(_lgK);
     if (rawValue instanceof byte[]) { // Serialized Sketch
       byte[] bytes = (byte[]) rawValue;
-      initialValue = deserializeAggregatedValue(bytes);
-      _maxByteSize = Math.max(_maxByteSize, bytes.length);
+      cpcUnion.update(deserializeAggregatedValue(bytes));
     } else if (rawValue instanceof byte[][]) { // Multiple Serialized Sketches
       byte[][] serializedSketches = (byte[][]) rawValue;
-      CpcUnion union = new CpcUnion(_lgK);
       for (byte[] bytes : serializedSketches) {
-        union.update(deserializeAggregatedValue(bytes));
+        cpcUnion.update(deserializeAggregatedValue(bytes));
       }
-      initialValue = union.getResult();
-      updateMaxByteSize(initialValue);
     } else {
-      initialValue = empty();
-      addObjectToSketch(rawValue, initialValue);
-      updateMaxByteSize(initialValue);
+      CpcSketch pristineSketch = empty();
+      addObjectToSketch(rawValue, pristineSketch);
+      cpcUnion.update(pristineSketch);
     }
-    return initialValue;
+    return cpcUnion;
   }
 
   @Override
-  public CpcSketch applyRawValue(CpcSketch value, Object rawValue) {
+  public Object applyRawValue(Object aggregatedValue, Object rawValue) {
+    CpcUnion cpcUnion = extractUnion(aggregatedValue);
     if (rawValue instanceof byte[]) {
       byte[] bytes = (byte[]) rawValue;
-      CpcSketch sketch = union(value, deserializeAggregatedValue(bytes));
-      updateMaxByteSize(sketch);
-      return sketch;
+      CpcSketch sketch = deserializeAggregatedValue(bytes);
+      cpcUnion.update(sketch);
     } else {
-      addObjectToSketch(rawValue, value);
-      updateMaxByteSize(value);
-      return value;
+      CpcSketch pristineSketch = empty();
+      addObjectToSketch(rawValue, pristineSketch);
+      cpcUnion.update(pristineSketch);
     }
+    return cpcUnion;
   }
 
   @Override
-  public CpcSketch applyAggregatedValue(CpcSketch value, CpcSketch aggregatedValue) {
-    CpcSketch result = union(value, aggregatedValue);
-    updateMaxByteSize(result);
-    return result;
+  public Object applyAggregatedValue(Object value, Object aggregatedValue) {
+    CpcUnion cpcUnion = extractUnion(aggregatedValue);
+    CpcSketch sketch = extractSketch(value);
+    cpcUnion.update(sketch);
+    return cpcUnion;
   }
 
   @Override
-  public CpcSketch cloneAggregatedValue(CpcSketch value) {
+  public Object cloneAggregatedValue(Object value) {
     return deserializeAggregatedValue(serializeAggregatedValue(value));
   }
 
   @Override
   public int getMaxAggregatedValueByteSize() {
-    // NOTE: For aggregated metrics, initial aggregated value might have not been generated. Returns the byte size
-    //       based on lgK.
-    return _maxByteSize > 0 ? _maxByteSize : CpcSketch.getMaxSerializedBytes(_lgK);
+    return CpcSketch.getMaxSerializedBytes(_lgK);
   }
 
   @Override
-  public byte[] serializeAggregatedValue(CpcSketch value) {
-    return CustomSerDeUtils.DATA_SKETCH_CPC_SER_DE.serialize(value);
+  public byte[] serializeAggregatedValue(Object value) {
+    CpcSketch sketch = extractSketch(value);
+    return CustomSerDeUtils.DATA_SKETCH_CPC_SER_DE.serialize(sketch);
   }
 
   @Override
@@ -181,9 +178,32 @@ public class DistinctCountCPCSketchValueAggregator implements ValueAggregator<Ob
     }
   }
 
-  private void updateMaxByteSize(CpcSketch sketch) {
-    if (sketch != null) {
-      _maxByteSize = Math.max(_maxByteSize, sketch.toByteArray().length);
+  private CpcUnion extractUnion(Object value) {
+    if (value == null) {
+      return new CpcUnion(_lgK);
+    } else if (value instanceof CpcUnion) {
+      return (CpcUnion) value;
+    } else if (value instanceof CpcSketch) {
+      CpcSketch sketch = (CpcSketch) value;
+      CpcUnion cpcUnion = new CpcUnion(_lgK);
+      cpcUnion.update(sketch);
+      return cpcUnion;
+    } else {
+      throw new IllegalStateException(
+          "Unsupported data type for CPC Sketch aggregation: " + value.getClass().getSimpleName());
+    }
+  }
+
+  private CpcSketch extractSketch(Object value) {
+    if (value == null) {
+      return empty();
+    } else if (value instanceof CpcUnion) {
+      return ((CpcUnion) value).getResult();
+    } else if (value instanceof CpcSketch) {
+      return (CpcSketch) value;
+    } else {
+      throw new IllegalStateException(
+          "Unsupported data type for CPC Sketch aggregation: " + value.getClass().getSimpleName());
     }
   }
 

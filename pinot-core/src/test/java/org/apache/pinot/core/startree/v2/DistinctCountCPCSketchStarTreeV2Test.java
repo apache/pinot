@@ -21,6 +21,7 @@ package org.apache.pinot.core.startree.v2;
 import java.util.Collections;
 import java.util.Random;
 import org.apache.datasketches.cpc.CpcSketch;
+import org.apache.datasketches.cpc.CpcUnion;
 import org.apache.pinot.segment.local.aggregator.DistinctCountCPCSketchValueAggregator;
 import org.apache.pinot.segment.local.aggregator.ValueAggregator;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -28,10 +29,10 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import static org.testng.Assert.assertEquals;
 
 
-public class DistinctCountCPCSketchStarTreeV2Test extends BaseStarTreeV2Test<Object, CpcSketch> {
+public class DistinctCountCPCSketchStarTreeV2Test extends BaseStarTreeV2Test<Object, Object> {
 
   @Override
-  ValueAggregator<Object, CpcSketch> getValueAggregator() {
+  ValueAggregator<Object, Object> getValueAggregator() {
     return new DistinctCountCPCSketchValueAggregator(Collections.emptyList());
   }
 
@@ -46,7 +47,18 @@ public class DistinctCountCPCSketchStarTreeV2Test extends BaseStarTreeV2Test<Obj
   }
 
   @Override
-  void assertAggregatedValue(CpcSketch starTreeResult, CpcSketch nonStarTreeResult) {
-    assertEquals((long) starTreeResult.getEstimate(), (long) nonStarTreeResult.getEstimate());
+  void assertAggregatedValue(Object starTreeResult, Object nonStarTreeResult) {
+    assertEquals((long) toSketch(starTreeResult).getEstimate(), (long) toSketch(nonStarTreeResult).getEstimate());
+  }
+
+  private CpcSketch toSketch(Object value) {
+    if (value instanceof CpcUnion) {
+      return ((CpcUnion) value).getResult();
+    } else if (value instanceof CpcSketch) {
+      return (CpcSketch) value;
+    } else {
+      throw new IllegalStateException(
+          "Unsupported data type for CPC Sketch aggregation: " + value.getClass().getSimpleName());
+    }
   }
 }
