@@ -20,6 +20,7 @@ package org.apache.pinot.core.startree.v2;
 
 import java.util.Random;
 import org.apache.datasketches.tuple.Sketch;
+import org.apache.datasketches.tuple.Union;
 import org.apache.datasketches.tuple.aninteger.IntegerSketch;
 import org.apache.datasketches.tuple.aninteger.IntegerSummary;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
@@ -30,11 +31,10 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import static org.testng.Assert.assertEquals;
 
 
-public class DistinctCountIntegerSumTupleSketchStarTreeV2Test
-    extends BaseStarTreeV2Test<byte[], Sketch<IntegerSummary>> {
+public class DistinctCountIntegerSumTupleSketchStarTreeV2Test extends BaseStarTreeV2Test<byte[], Object> {
 
   @Override
-  ValueAggregator<byte[], Sketch<IntegerSummary>> getValueAggregator() {
+  ValueAggregator<byte[], Object> getValueAggregator() {
     return new IntegerTupleSketchValueAggregator(IntegerSummary.Mode.Sum);
   }
 
@@ -51,7 +51,19 @@ public class DistinctCountIntegerSumTupleSketchStarTreeV2Test
   }
 
   @Override
-  void assertAggregatedValue(Sketch<IntegerSummary> starTreeResult, Sketch<IntegerSummary> nonStarTreeResult) {
-    assertEquals(starTreeResult.getEstimate(), nonStarTreeResult.getEstimate());
+  void assertAggregatedValue(Object starTreeResult, Object nonStarTreeResult) {
+    assertEquals(toSketch(starTreeResult).getEstimate(), toSketch(nonStarTreeResult).getEstimate());
+  }
+
+  @SuppressWarnings("unchecked")
+  private Sketch<IntegerSummary> toSketch(Object value) {
+    if (value instanceof Union) {
+      return ((Union) value).getResult();
+    } else if (value instanceof Sketch) {
+      return ((Sketch) value);
+    } else {
+      throw new IllegalStateException(
+          "Unsupported data type for Integer Tuple Sketch aggregation: " + value.getClass().getSimpleName());
+    }
   }
 }
