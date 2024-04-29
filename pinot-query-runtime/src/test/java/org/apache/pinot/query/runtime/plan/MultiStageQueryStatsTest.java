@@ -87,7 +87,8 @@ public class MultiStageQueryStatsTest {
                         .merge(LeafStageTransferableBlockOperator.StatKey.NUM_DOCS_SCANNED, 10)
                         .merge(LeafStageTransferableBlockOperator.StatKey.NUM_ENTRIES_SCANNED_POST_FILTER, 5)
                         .merge(LeafStageTransferableBlockOperator.StatKey.TOTAL_DOCS, 5)
-                        .merge(LeafStageTransferableBlockOperator.StatKey.EXECUTION_TIME_MS, 95))
+                        .merge(LeafStageTransferableBlockOperator.StatKey.EXECUTION_TIME_MS, 95)
+                        .merge(LeafStageTransferableBlockOperator.StatKey.TABLE, "a"))
                 .addLastOperator(MultiStageOperator.Type.MAILBOX_SEND,
                     new StatMap<>(MailboxSendOperator.StatKey.class)
                         .merge(MailboxSendOperator.StatKey.STAGE, 2)

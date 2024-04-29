@@ -82,6 +82,9 @@ public class InStageStatsTreeBuilder implements PlanNodeVisitor<ObjectNode, Void
      a single leaf node.
     */
     if (type != expectedType) {
+      if (type == MultiStageOperator.Type.LEAF) {
+        return selfNode(MultiStageOperator.Type.LEAF);
+      }
       List<PlanNode> inputs = node.getInputs();
       int childrenSize = inputs.size();
       switch (childrenSize) {
@@ -165,9 +168,7 @@ public class InStageStatsTreeBuilder implements PlanNodeVisitor<ObjectNode, Void
 
   @Override
   public ObjectNode visitTableScan(TableScanNode node, Void context) {
-    ObjectNode jsonNodes = recursiveCase(node, MultiStageOperator.Type.LEAF);
-    jsonNodes.put("table", node.getTableName());
-    return jsonNodes;
+    return recursiveCase(node, MultiStageOperator.Type.LEAF);
   }
 
   @Override

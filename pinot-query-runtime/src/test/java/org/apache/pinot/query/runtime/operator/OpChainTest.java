@@ -166,8 +166,8 @@ public class OpChainTest {
     @SuppressWarnings("unchecked")
     StatMap<LiteralValueOperator.StatKey> lastOperatorStats =
         (StatMap<LiteralValueOperator.StatKey>) queryStats.getCurrentStats().getLastOperatorStats();
-    assertEquals(lastOperatorStats.getLong(LiteralValueOperator.StatKey.EXECUTION_TIME_MS), 0L,
-        "Expected execution time to be not collected");
+    assertNotEquals(lastOperatorStats.getLong(LiteralValueOperator.StatKey.EXECUTION_TIME_MS), 0L,
+        "Expected execution time to be collected");
   }
 
   private Stack<MultiStageOperator> getFullOpChain(OpChainExecutionContext context, long waitTimeInMillis) {

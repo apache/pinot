@@ -121,6 +121,23 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
     return this;
   }
 
+  public String getString(K key) {
+    Preconditions.checkArgument(key.getType() == Type.STRING, "Key %s is of type %s, not STRING", key, key.getType());
+    Object o = _map.get(key);
+    return o == null ? null : (String) o;
+  }
+
+  public StatMap<K> merge(K key, String value) {
+    String oldValue = getString(key);
+    String newValue = key.merge(oldValue, value);
+    if (newValue == null) {
+      _map.remove(key);
+    } else {
+      _map.put(key, newValue);
+    }
+    return this;
+  }
+
   /**
    * Returns the value associated with the key.
    * <p>
@@ -134,6 +151,8 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
         return getInt(key);
       case LONG:
         return getLong(key);
+      case STRING:
+        return getString(key);
       default:
         throw new IllegalArgumentException("Unsupported type: " + key.getType());
     }
@@ -164,6 +183,9 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
         case LONG:
           merge(key, (long) value);
           break;
+        case STRING:
+          merge(key, (String) value);
+          break;
         default:
           throw new IllegalArgumentException("Unsupported type: " + key.getType());
       }
@@ -188,6 +210,9 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
           break;
         case LONG:
           merge(key, input.readLong());
+          break;
+        case STRING:
+          merge(key, input.readUTF());
           break;
         default:
           throw new IllegalStateException("Unknown type " + key.getType());
@@ -228,6 +253,15 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
             }
           } else {
             node.put(key.getStatName(), (long) value);
+          }
+          break;
+        case STRING:
+          if (value == null) {
+            if (key.includeDefaultInJson()) {
+              node.put(key.getStatName(), "");
+            }
+          } else {
+            node.put(key.getStatName(), (String) value);
           }
           break;
         default:
@@ -276,6 +310,15 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
           }
           break;
         }
+        case STRING: {
+          String value = getString(key);
+          if (value != null) {
+            writtenKeys++;
+            output.writeByte(ordinal);
+            output.writeUTF(value);
+          }
+          break;
+        }
         default:
           throw new IllegalStateException("Unknown type " + key.getType());
       }
@@ -301,6 +344,11 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
         case LONG:
           if (value == null || (long) value == 0) {
             throw new IllegalStateException("Long value must be non-zero but " + value + " is stored for key " + key);
+          }
+          break;
+        case STRING:
+          if (value == null) {
+            throw new IllegalStateException("String value must be non-null but null is stored for key " + key);
           }
           break;
         default:
@@ -444,6 +492,7 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
   public enum Type {
     BOOLEAN,
     INT,
-    LONG
+    LONG,
+    STRING
   }
 }

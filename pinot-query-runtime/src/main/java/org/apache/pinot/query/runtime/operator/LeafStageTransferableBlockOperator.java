@@ -107,6 +107,8 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
     Integer maxStreamingPendingBlocks = QueryOptionsUtils.getMaxStreamingPendingBlocks(context.getOpChainMetadata());
     _blockingQueue = new ArrayBlockingQueue<>(maxStreamingPendingBlocks != null ? maxStreamingPendingBlocks
         : QueryOptionValue.DEFAULT_MAX_STREAMING_PENDING_BLOCKS);
+    String tableName = context.getLeafStageContext().getStagePlan().getStageMetadata().getTableName();
+    _statMap.merge(StatKey.TABLE, tableName);
   }
 
   @Override
@@ -170,6 +172,9 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
         switch (key) {
           case UNKNOWN:
             LOGGER.debug("Skipping unknown execution stat: {}", entry.getKey());
+            break;
+          case TABLE:
+            _statMap.merge(StatKey.TABLE, entry.getValue());
             break;
           case NUM_DOCS_SCANNED:
             _statMap.merge(StatKey.NUM_DOCS_SCANNED, Long.parseLong(entry.getValue()));
@@ -545,6 +550,7 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
   }
 
   public enum StatKey implements StatMap.Key {
+    TABLE(StatMap.Type.STRING, null),
     EXECUTION_TIME_MS(StatMap.Type.LONG, BrokerResponseNativeV2.StatKey.TIME_USED_MS) {
       @Override
       public boolean includeDefaultInJson() {
@@ -638,6 +644,9 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
             break;
           case BOOLEAN:
             oldMetadata.merge(_brokerKey, stats.getBoolean(this));
+            break;
+          case STRING:
+            oldMetadata.merge(_brokerKey, stats.getString(this));
             break;
           default:
             throw new IllegalStateException("Unsupported type: " + _type);

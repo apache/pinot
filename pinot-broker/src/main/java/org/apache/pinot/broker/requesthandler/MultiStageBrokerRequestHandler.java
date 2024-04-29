@@ -260,7 +260,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     brokerResponse.setStageStats(treeBuilder.jsonStatsByStage(0));
 
     for (MultiStageQueryStats.StageStats.Closed stageStats : queryStats) {
-      stageStats.forEach((type, stats) -> type.mergeInto(brokerResponse, stats));
+      if (stageStats != null) { // for example pipeline breaker may not have stats
+        stageStats.forEach((type, stats) -> type.mergeInto(brokerResponse, stats));
+      }
     }
   }
 

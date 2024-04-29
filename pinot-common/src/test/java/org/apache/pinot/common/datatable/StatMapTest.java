@@ -61,6 +61,15 @@ public class StatMapTest {
     statMap.merge(stat, true);
   }
 
+  @Test(dataProvider = "allTypeStats", expectedExceptions = IllegalArgumentException.class)
+  public void dynamicTypeCheckPutString(MyStats stat) {
+    if (stat.getType() == StatMap.Type.STRING) {
+      throw new SkipException("Skipping STRING test");
+    }
+    StatMap<MyStats> statMap = new StatMap<>(MyStats.class);
+    statMap.merge(stat, "foo");
+  }
+
   @Test(dataProvider = "allTypeStats")
   public void singleEncodeDecode(MyStats stat)
       throws IOException {
@@ -74,6 +83,9 @@ public class StatMapTest {
         break;
       case LONG:
         statMap.merge(stat, 1L);
+        break;
+      case STRING:
+        statMap.merge(stat, "foo");
         break;
       default:
         throw new IllegalStateException();
@@ -95,6 +107,9 @@ public class StatMapTest {
           break;
         case LONG:
           statMap.merge(stat, 1L);
+          break;
+        case STRING:
+          statMap.merge(stat, "foo");
           break;
         default:
           throw new IllegalStateException();
@@ -137,19 +152,23 @@ public class StatMapTest {
       new StatMap<>(MyStats.class)
         .merge(MyStats.BOOL_KEY, true)
         .merge(MyStats.LONG_KEY, 1L)
-        .merge(MyStats.INT_KEY, 1),
+        .merge(MyStats.INT_KEY, 1)
+        .merge(MyStats.STR_KEY, "foo"),
       new StatMap<>(MyStats.class)
         .merge(MyStats.BOOL_KEY, false)
         .merge(MyStats.LONG_KEY, 1L)
-        .merge(MyStats.INT_KEY, 1),
+        .merge(MyStats.INT_KEY, 1)
+        .merge(MyStats.STR_KEY, "foo"),
       new StatMap<>(MyStats.class)
         .merge(MyStats.BOOL_KEY, true)
         .merge(MyStats.LONG_KEY, 0L)
-        .merge(MyStats.INT_KEY, 1),
+        .merge(MyStats.INT_KEY, 1)
+        .merge(MyStats.STR_KEY, "foo"),
       new StatMap<>(MyStats.class)
         .merge(MyStats.BOOL_KEY, false)
         .merge(MyStats.LONG_KEY, 1L)
-        .merge(MyStats.INT_KEY, 0),
+        .merge(MyStats.INT_KEY, 0)
+        .merge(MyStats.STR_KEY, "foo"),
       new StatMap<>(MyStats.class)
         .merge(MyStats.BOOL_KEY, false)
         .merge(MyStats.LONG_KEY, 1L)
@@ -173,7 +192,8 @@ public class StatMapTest {
   public enum MyStats implements StatMap.Key {
     BOOL_KEY(StatMap.Type.BOOLEAN),
     LONG_KEY(StatMap.Type.LONG),
-    INT_KEY(StatMap.Type.INT);
+    INT_KEY(StatMap.Type.INT),
+    STR_KEY(StatMap.Type.STRING);
 
     private final StatMap.Type _type;
 
