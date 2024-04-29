@@ -884,7 +884,7 @@
       <dependency>
         <groupId>com.google.errorprone</groupId>
         <artifactId>error_prone_annotations</artifactId>
-        <version>2.26.1</version>
+        <version>2.27.0</version>
       </dependency>
       <!-- Legacy Google Libraries -->
       <dependency>
