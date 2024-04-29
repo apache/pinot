@@ -175,7 +175,7 @@
     <aws.sdk.version>2.25.39</aws.sdk.version>
     <joda-time.version>2.12.7</joda-time.version>
     <janino.version>3.1.12</janino.version>
-    <testng.version>7.10.1</testng.version>
+    <testng.version>7.10.2</testng.version>
     <woodstox.version>6.6.2</woodstox.version>
     <sslcontext.kickstart.version>8.3.4</sslcontext.kickstart.version>
 
