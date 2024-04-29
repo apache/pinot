@@ -26,12 +26,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.ProcessingException;
-import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
 /**
@@ -61,22 +58,11 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
    * in the table.
    */
   private long _maxRowsInOperator = 0;
-  private final StatMap<DataTable.MetadataKey> _serverStats = new StatMap<>(DataTable.MetadataKey.class);
-  private List<QueryProcessingException> _processingExceptions;
+  private final StatMap<StatKey> _brokerStats = new StatMap<>(StatKey.class);
+  private final List<QueryProcessingException> _processingExceptions;
   private ResultTable _resultTable;
-  private boolean _maxRowsInJoinReached;
-  private int _numServersResponded;
-  private int _numServersQueried;
-  private long _offlineThreadCpuTimeNs;
-  private long _realtimeThreadCpuTimeNs;
-  private long _offlineSystemActivitiesCpuTimeNs;
-  private long _realtimeSystemActivitiesCpuTimeNs;
-  private long _offlineResponseSerializationCpuTimeNs;
-  private long _realtimeResponseSerializationCpuTimeNs;
-  private long _numSegmentsPrunedByBroker;
   private String _requestId;
   private String _brokerId;
-  private long _brokerReduceTimeMs;
 
   public BrokerResponseNativeV2() {
     _processingExceptions = new ArrayList<>();
@@ -120,106 +106,106 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
 
   @Override
   public long getTimeUsedMs() {
-    return _serverStats.getLong(DataTable.MetadataKey.TIME_USED_MS);
+    return _brokerStats.getLong(StatKey.TIME_USED_MS);
   }
 
   @Override
   public void setTimeUsedMs(long timeUsedMs) {
-    _serverStats.merge(DataTable.MetadataKey.TIME_USED_MS, timeUsedMs);
+    _brokerStats.merge(StatKey.TIME_USED_MS, timeUsedMs);
   }
 
   @Override
   public long getNumDocsScanned() {
-    return _serverStats.getLong(DataTable.MetadataKey.NUM_DOCS_SCANNED);
+    return _brokerStats.getLong(StatKey.NUM_DOCS_SCANNED);
   }
 
   @Override
   public long getNumEntriesScannedInFilter() {
-    return _serverStats.getLong(DataTable.MetadataKey.NUM_ENTRIES_SCANNED_IN_FILTER);
+    return _brokerStats.getLong(StatKey.NUM_ENTRIES_SCANNED_IN_FILTER);
   }
 
   @Override
   public long getNumEntriesScannedPostFilter() {
-    return _serverStats.getLong(DataTable.MetadataKey.NUM_ENTRIES_SCANNED_POST_FILTER);
+    return _brokerStats.getLong(StatKey.NUM_ENTRIES_SCANNED_POST_FILTER);
   }
 
   @Override
   public long getNumSegmentsQueried() {
-    return _serverStats.getLong(DataTable.MetadataKey.NUM_SEGMENTS_QUERIED);
+    return _brokerStats.getLong(StatKey.NUM_SEGMENTS_QUERIED);
   }
 
   @Override
   public long getNumSegmentsProcessed() {
-    return _serverStats.getLong(DataTable.MetadataKey.NUM_SEGMENTS_PROCESSED);
+    return _brokerStats.getLong(StatKey.NUM_SEGMENTS_PROCESSED);
   }
 
   @Override
   public long getNumSegmentsMatched() {
-    return _serverStats.getLong(DataTable.MetadataKey.NUM_SEGMENTS_MATCHED);
+    return _brokerStats.getLong(StatKey.NUM_SEGMENTS_MATCHED);
   }
 
   @Override
   public long getNumConsumingSegmentsQueried() {
-    return _serverStats.getLong(DataTable.MetadataKey.NUM_CONSUMING_SEGMENTS_QUERIED);
+    return _brokerStats.getLong(StatKey.NUM_CONSUMING_SEGMENTS_QUERIED);
   }
 
   @Override
   public long getNumConsumingSegmentsProcessed() {
-    return _serverStats.getLong(DataTable.MetadataKey.NUM_CONSUMING_SEGMENTS_PROCESSED);
+    return _brokerStats.getLong(StatKey.NUM_CONSUMING_SEGMENTS_PROCESSED);
   }
 
   @Override
   public long getNumConsumingSegmentsMatched() {
-    return _serverStats.getLong(DataTable.MetadataKey.NUM_CONSUMING_SEGMENTS_MATCHED);
+    return _brokerStats.getLong(StatKey.NUM_CONSUMING_SEGMENTS_MATCHED);
   }
 
   @Override
   public long getMinConsumingFreshnessTimeMs() {
-    return _serverStats.getLong(DataTable.MetadataKey.MIN_CONSUMING_FRESHNESS_TIME_MS);
+    return _brokerStats.getLong(StatKey.MIN_CONSUMING_FRESHNESS_TIME_MS);
   }
 
   @Override
   public long getTotalDocs() {
-    return _serverStats.getLong(DataTable.MetadataKey.TOTAL_DOCS);
+    return _brokerStats.getLong(StatKey.TOTAL_DOCS);
   }
 
   @Override
   public boolean isNumGroupsLimitReached() {
-    return _serverStats.getBoolean(DataTable.MetadataKey.NUM_GROUPS_LIMIT_REACHED);
+    return _brokerStats.getBoolean(StatKey.NUM_GROUPS_LIMIT_REACHED);
   }
 
   public void mergeNumGroupsLimitReached(boolean numGroupsLimitReached) {
-    _serverStats.merge(DataTable.MetadataKey.NUM_GROUPS_LIMIT_REACHED, numGroupsLimitReached);
+    _brokerStats.merge(StatKey.NUM_GROUPS_LIMIT_REACHED, numGroupsLimitReached);
   }
 
   @Override
   public long getNumSegmentsPrunedByServer() {
-    return _serverStats.getLong(DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_BY_SERVER);
+    return _brokerStats.getLong(StatKey.NUM_SEGMENTS_PRUNED_BY_SERVER);
   }
 
   @Override
   public long getNumSegmentsPrunedInvalid() {
-    return _serverStats.getLong(DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_INVALID);
+    return _brokerStats.getLong(StatKey.NUM_SEGMENTS_PRUNED_INVALID);
   }
 
   @Override
   public long getNumSegmentsPrunedByLimit() {
-    return _serverStats.getLong(DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_BY_LIMIT);
+    return _brokerStats.getLong(StatKey.NUM_SEGMENTS_PRUNED_BY_LIMIT);
   }
 
   @Override
   public long getNumSegmentsPrunedByValue() {
-    return _serverStats.getLong(DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_BY_VALUE);
+    return _brokerStats.getLong(StatKey.NUM_SEGMENTS_PRUNED_BY_VALUE);
   }
 
   @Override
   public long getExplainPlanNumEmptyFilterSegments() {
-    return _serverStats.getLong(DataTable.MetadataKey.EXPLAIN_PLAN_NUM_EMPTY_FILTER_SEGMENTS);
+    return _brokerStats.getLong(StatKey.EXPLAIN_PLAN_NUM_EMPTY_FILTER_SEGMENTS);
   }
 
   @Override
   public long getExplainPlanNumMatchAllFilterSegments() {
-    return _serverStats.getLong(DataTable.MetadataKey.EXPLAIN_PLAN_NUM_MATCH_ALL_FILTER_SEGMENTS);
+    return _brokerStats.getLong(StatKey.EXPLAIN_PLAN_NUM_MATCH_ALL_FILTER_SEGMENTS);
   }
 
   @Override
@@ -247,32 +233,32 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
 
   @Override
   public int getNumServersQueried() {
-    return _numServersQueried;
+    return _brokerStats.getInt(StatKey.NUM_SERVERS_QUERIED);
   }
 
   @Override
   public void setNumServersQueried(int numServersQueried) {
-    _numServersQueried = numServersQueried;
+    _brokerStats.merge(StatKey.NUM_SERVERS_QUERIED, numServersQueried);
   }
 
   @Override
   public int getNumServersResponded() {
-    return _numServersResponded;
+    return _brokerStats.getInt(StatKey.NUM_SERVERS_RESPONDED);
   }
 
   @Override
   public void setNumServersResponded(int numServersResponded) {
-    _numServersResponded = numServersResponded;
+    _brokerStats.merge(StatKey.NUM_SERVERS_RESPONDED, numServersResponded);
   }
 
   @JsonProperty("maxRowsInJoinReached")
   public boolean isMaxRowsInJoinReached() {
-    return _maxRowsInJoinReached;
+    return _brokerStats.getBoolean(StatKey.MAX_ROWS_IN_JOIN_REACHED);
   }
 
   @JsonProperty("maxRowsInJoinReached")
   public void mergeMaxRowsInJoinReached(boolean maxRowsInJoinReached) {
-    _maxRowsInJoinReached |= maxRowsInJoinReached;
+    _brokerStats.merge(StatKey.MAX_ROWS_IN_JOIN_REACHED, maxRowsInJoinReached);
   }
 
   @Override
@@ -298,49 +284,50 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
     return List.of();
   }
 
+  @JsonProperty(access = JsonProperty.Access.READ_ONLY)
   @Override
   public int getNumRowsResultSet() {
-    return 0;
+    return BrokerResponse.super.getNumRowsResultSet();
   }
 
   @Override
   public long getOfflineThreadCpuTimeNs() {
-    return _offlineThreadCpuTimeNs;
+    return 0;
   }
 
   @Override
   public long getRealtimeThreadCpuTimeNs() {
-    return _realtimeThreadCpuTimeNs;
+    return 0;
   }
 
   @Override
   public long getOfflineSystemActivitiesCpuTimeNs() {
-    return _offlineSystemActivitiesCpuTimeNs;
+    return 0;
   }
 
   @Override
   public long getRealtimeSystemActivitiesCpuTimeNs() {
-    return _realtimeSystemActivitiesCpuTimeNs;
+    return 0;
   }
 
   @Override
   public long getOfflineResponseSerializationCpuTimeNs() {
-    return _offlineResponseSerializationCpuTimeNs;
+    return 0;
   }
 
   @Override
   public long getRealtimeResponseSerializationCpuTimeNs() {
-    return _realtimeResponseSerializationCpuTimeNs;
+    return 0;
   }
 
   @Override
   public long getNumSegmentsPrunedByBroker() {
-    return _numSegmentsPrunedByBroker;
+    return _brokerStats.getInt(StatKey.NUM_SEGMENTS_PRUNED_BY_BROKER);
   }
 
   @Override
   public void setNumSegmentsPrunedByBroker(long numSegmentsPrunedByBroker) {
-    _numSegmentsPrunedByBroker = numSegmentsPrunedByBroker;
+    _brokerStats.merge(StatKey.NUM_SEGMENTS_PRUNED_BY_BROKER, (int) numSegmentsPrunedByBroker);
   }
 
   @Override
@@ -365,12 +352,12 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
 
   @Override
   public long getBrokerReduceTimeMs() {
-    return _brokerReduceTimeMs;
+    return _brokerStats.getLong(StatKey.BROKER_REDUCE_TIME_MS);
   }
 
   @Override
   public void setBrokerReduceTimeMs(long brokerReduceTimeMs) {
-    _brokerReduceTimeMs = brokerReduceTimeMs;
+    _brokerStats.merge(StatKey.BROKER_REDUCE_TIME_MS, brokerReduceTimeMs);
   }
 
   @JsonProperty(access = JsonProperty.Access.READ_ONLY)
@@ -379,27 +366,55 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
     return isNumGroupsLimitReached() || getExceptionsSize() > 0 || isMaxRowsInJoinReached();
   }
 
-  public void addServerStats(StatMap<DataTable.MetadataKey> serverStats) {
+  public void addServerStats(StatMap<StatKey> serverStats) {
     // Set execution statistics.
-    _serverStats.merge(serverStats);
+    _brokerStats.merge(serverStats);
+  }
 
-    long threadCpuTimeNs = serverStats.getLong(DataTable.MetadataKey.THREAD_CPU_TIME_NS);
-    long systemActivitiesCpuTimeNs = serverStats.getLong(DataTable.MetadataKey.SYSTEM_ACTIVITIES_CPU_TIME_NS);
-    long responseSerializationCpuTimeNs = serverStats.getLong(DataTable.MetadataKey.RESPONSE_SER_CPU_TIME_NS);
-
-    String tableName = serverStats.getString(DataTable.MetadataKey.TABLE);
-    if (tableName != null) {
-      TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
-
-      if (tableType == TableType.OFFLINE) {
-        _offlineThreadCpuTimeNs += threadCpuTimeNs;
-        _offlineSystemActivitiesCpuTimeNs += systemActivitiesCpuTimeNs;
-        _offlineResponseSerializationCpuTimeNs += responseSerializationCpuTimeNs;
-      } else {
-        _realtimeThreadCpuTimeNs += threadCpuTimeNs;
-        _realtimeSystemActivitiesCpuTimeNs += systemActivitiesCpuTimeNs;
-        _realtimeResponseSerializationCpuTimeNs += responseSerializationCpuTimeNs;
+  public enum StatKey implements StatMap.Key {
+    TIME_USED_MS(StatMap.Type.LONG),
+    NUM_DOCS_SCANNED(StatMap.Type.LONG),
+    NUM_ENTRIES_SCANNED_IN_FILTER(StatMap.Type.LONG),
+    NUM_ENTRIES_SCANNED_POST_FILTER(StatMap.Type.LONG),
+    NUM_SEGMENTS_QUERIED(StatMap.Type.INT),
+    NUM_SEGMENTS_PROCESSED(StatMap.Type.INT),
+    NUM_SEGMENTS_MATCHED(StatMap.Type.INT),
+    NUM_CONSUMING_SEGMENTS_QUERIED(StatMap.Type.INT),
+    NUM_CONSUMING_SEGMENTS_PROCESSED(StatMap.Type.INT),
+    NUM_CONSUMING_SEGMENTS_MATCHED(StatMap.Type.INT),
+    MIN_CONSUMING_FRESHNESS_TIME_MS(StatMap.Type.LONG) {
+      @Override
+      public long merge(long value1, long value2) {
+        return StatMap.Key.minPositive(value1, value2);
       }
+    },
+    TOTAL_DOCS(StatMap.Type.LONG),
+    NUM_GROUPS_LIMIT_REACHED(StatMap.Type.BOOLEAN),
+    NUM_SEGMENTS_PRUNED_BY_SERVER(StatMap.Type.INT),
+    NUM_SEGMENTS_PRUNED_INVALID(StatMap.Type.INT),
+    NUM_SEGMENTS_PRUNED_BY_LIMIT(StatMap.Type.INT),
+    NUM_SEGMENTS_PRUNED_BY_VALUE(StatMap.Type.INT),
+    NUM_SERGMENTS_PRUNED_BY_BROKER(StatMap.Type.INT),
+    EXPLAIN_PLAN_NUM_EMPTY_FILTER_SEGMENTS(StatMap.Type.INT),
+    EXPLAIN_PLAN_NUM_MATCH_ALL_FILTER_SEGMENTS(StatMap.Type.INT),
+    THREAD_CPU_TIME_NS(StatMap.Type.LONG),
+    SYSTEM_ACTIVITIES_CPU_TIME_NS(StatMap.Type.LONG),
+    RESPONSE_SER_CPU_TIME_NS(StatMap.Type.LONG),
+    NUM_SEGMENTS_PRUNED_BY_BROKER(StatMap.Type.INT),
+    MAX_ROWS_IN_JOIN_REACHED(StatMap.Type.BOOLEAN),
+    NUM_SERVERS_RESPONDED(StatMap.Type.INT),
+    NUM_SERVERS_QUERIED(StatMap.Type.INT),
+    BROKER_REDUCE_TIME_MS(StatMap.Type.LONG);
+
+    private final StatMap.Type _type;
+
+    StatKey(StatMap.Type type) {
+      _type = type;
+    }
+
+    @Override
+    public StatMap.Type getType() {
+      return _type;
     }
   }
 }

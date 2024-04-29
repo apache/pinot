@@ -23,7 +23,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Stopwatch;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
 import org.apache.pinot.core.common.Operator;
@@ -209,11 +208,11 @@ public abstract class MultiStageOperator
             (StatMap<LeafStageTransferableBlockOperator.StatKey>) map;
         response.mergeMaxRowsInOperator(stats.getLong(LeafStageTransferableBlockOperator.StatKey.EMITTED_ROWS));
 
-        StatMap<DataTable.MetadataKey> v1Stats = new StatMap<>(DataTable.MetadataKey.class);
+        StatMap<BrokerResponseNativeV2.StatKey> brokerStats = new StatMap<>(BrokerResponseNativeV2.StatKey.class);
         for (LeafStageTransferableBlockOperator.StatKey statKey : stats.keySet()) {
-          statKey.updateV1Metadata(v1Stats, stats);
+          statKey.updateBrokerMetadata(brokerStats, stats);
         }
-        response.addServerStats(v1Stats);
+        response.addServerStats(brokerStats);
       }
     },
     LITERAL(LiteralValueOperator.StatKey.class) {

@@ -19,7 +19,9 @@
 package org.apache.pinot.query.runtime.queries;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStream;
@@ -35,17 +37,20 @@ import java.util.Set;
 import java.util.TimeZone;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.QueryServerEnclosure;
 import org.apache.pinot.query.mailbox.MailboxService;
+import org.apache.pinot.query.planner.PlanFragment;
+import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
+import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.routing.QueryServerInstance;
+import org.apache.pinot.query.runtime.MultiStageStatsTreeBuilder;
 import org.apache.pinot.query.runtime.operator.LeafStageTransferableBlockOperator;
-import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.query.testutils.MockInstanceDataManagerFactory;
@@ -274,6 +279,40 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
         queryResult -> compareRowEquals(queryResult.getResultTable(), expectedRows, keepOutputRowOrder));
   }
 
+  private Map<String, JsonNode> tableToStats(String sql, QueryDispatcher.QueryResult queryResult) {
+
+    List<PlanNode> planNodes = planQuery(sql).getQueryPlan().getQueryStageList().stream()
+        .map(DispatchablePlanFragment::getPlanFragment)
+        .map(PlanFragment::getFragmentRoot)
+        .collect(Collectors.toList());
+
+    MultiStageStatsTreeBuilder multiStageStatsTreeBuilder =
+        new MultiStageStatsTreeBuilder(planNodes, queryResult.getQueryStats());
+    ObjectNode jsonNodes = multiStageStatsTreeBuilder.jsonStatsByStage(1);
+
+    Map<String, JsonNode> map = new HashMap<>();
+    tableToStatsRec(map, jsonNodes);
+    return map;
+  }
+
+  private void tableToStatsRec(Map<String, JsonNode> map, ObjectNode node) {
+    JsonNode type = node.get("type");
+    if (type == null || !type.equals("LEAF")) {
+      return;
+    }
+    String tableName = node.get("table").asText();
+    JsonNode old = map.put(tableName, node);
+    if (old != null) {
+      throw new RuntimeException("Found at least two leaf stages for table " + tableName);
+    }
+    JsonNode children = node.get("children");
+    if (children != null) {
+      for (JsonNode child : children) {
+        tableToStatsRec(map, (ObjectNode) child);
+      }
+    }
+  }
+
   @Test(dataProvider = "testResourceQueryTestCaseProviderWithMetadata")
   public void testQueryTestCasesWithMetadata(String testCaseName, boolean isIgnored, String sql, String h2Sql,
       String expect, int numSegments)
@@ -286,24 +325,18 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
 
       Assert.assertEquals(brokerResponseNative.getNumSegmentsQueried(), numSegments);
 
-      for (MultiStageQueryStats.StageStats.Closed queryStats : queryResult.getQueryStats()) {
-        queryStats.forEach((type, stats) -> {
-          if (type == MultiStageOperator.Type.LEAF) {
-            @SuppressWarnings("unchecked")
-            StatMap<LeafStageTransferableBlockOperator.StatKey> leafStats =
-                (StatMap<LeafStageTransferableBlockOperator.StatKey>) stats;
-            String tableName = leafStats.getString(LeafStageTransferableBlockOperator.StatKey.TABLE);
+      Map<String, JsonNode> tableToStats = tableToStats(sql, queryResult);
+      for (Map.Entry<String, JsonNode> entry : tableToStats.entrySet()) {
+        String tableName = entry.getKey();
+        TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
+        if (tableType == null) {
+          tableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
+        }
 
-            TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
-            if (tableType == null) {
-              tableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
-            }
-
-            Assert.assertNotNull(_tableToSegmentMap.get(tableName));
-            int numSegmentsQueried = leafStats.getInt(LeafStageTransferableBlockOperator.StatKey.NUM_SEGMENTS_QUERIED);
-            Assert.assertEquals(numSegmentsQueried, _tableToSegmentMap.get(tableName).size());
-          }
-        });
+        Assert.assertNotNull(_tableToSegmentMap.get(tableName));
+        String statName = LeafStageTransferableBlockOperator.StatKey.NUM_SEGMENTS_QUERIED.getStatName();
+        int numSegmentsQueried = entry.getValue().get(statName).asInt();
+        Assert.assertEquals(numSegmentsQueried, _tableToSegmentMap.get(tableName).size());
       }
     });
   }

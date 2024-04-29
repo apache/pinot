@@ -90,17 +90,7 @@ public interface DataTable {
   DataTable toDataOnlyDataTable();
 
   enum MetadataValueType {
-    INT(StatMap.Type.INT), LONG(StatMap.Type.LONG), STRING(StatMap.Type.STRING);
-
-    private final StatMap.Type _statMapType;
-
-    MetadataValueType(StatMap.Type statMapType) {
-      _statMapType = statMapType;
-    }
-
-    public StatMap.Type getType() {
-      return _statMapType;
-    }
+    INT, LONG, STRING
   }
 
   /* The MetadataKey is used since V3, where we present metadata as Map<MetadataKey, String>
@@ -110,7 +100,7 @@ public interface DataTable {
    *  - NEVER decrease MAX_ID
    *  Otherwise, backward compatibility will be broken.
    */
-  enum MetadataKey implements StatMap.Key {
+  enum MetadataKey {
     UNKNOWN(0, "unknown", MetadataValueType.STRING),
     TABLE(1, "table", MetadataValueType.STRING),
     NUM_DOCS_SCANNED(2, "numDocsScanned", MetadataValueType.LONG),
@@ -122,14 +112,9 @@ public interface DataTable {
     NUM_CONSUMING_SEGMENTS_QUERIED(8, "numConsumingSegmentsQueried", MetadataValueType.INT),
     // the timestamp indicating the freshness of the data queried in consuming segments.
     // This can be ingestion timestamp if provided by the stream, or the last index time
-    MIN_CONSUMING_FRESHNESS_TIME_MS(9, "minConsumingFreshnessTimeMs", MetadataValueType.LONG) {
-      @Override
-      public long merge(long value1, long value2) {
-        return StatMap.Key.minPositive(value1, value2);
-      }
-    },
+    MIN_CONSUMING_FRESHNESS_TIME_MS(9, "minConsumingFreshnessTimeMs", MetadataValueType.LONG),
     TOTAL_DOCS(10, "totalDocs", MetadataValueType.LONG),
-    NUM_GROUPS_LIMIT_REACHED(11, "numGroupsLimitReached", MetadataValueType.STRING, StatMap.Type.BOOLEAN),
+    NUM_GROUPS_LIMIT_REACHED(11, "numGroupsLimitReached", MetadataValueType.STRING),
     TIME_USED_MS(12, "timeUsedMs", MetadataValueType.LONG),
     TRACE_INFO(13, "traceInfo", MetadataValueType.STRING),
     REQUEST_ID(14, "requestId", MetadataValueType.LONG),
@@ -150,18 +135,10 @@ public interface DataTable {
     NUM_ROWS(29, "numRows", MetadataValueType.INT),
     OPERATOR_EXECUTION_TIME_MS(30, "operatorExecutionTimeMs", MetadataValueType.LONG),
     OPERATOR_ID(31, "operatorId", MetadataValueType.STRING),
-    OPERATOR_EXEC_START_TIME_MS(32, "operatorExecStartTimeMs", MetadataValueType.LONG) {
-      @Override
-      public long merge(long value1, long value2) {
-        return StatMap.Key.minPositive(value1, value2);
-      }
-    },
-    OPERATOR_EXEC_END_TIME_MS(33, "operatorExecEndTimeMs", MetadataValueType.LONG) {
-      @Override
-      public long merge(long value1, long value2) {
-        return Math.max(value1, value2);
-      }
-    },;
+    OPERATOR_EXEC_START_TIME_MS(32, "operatorExecStartTimeMs", MetadataValueType.LONG),
+    OPERATOR_EXEC_END_TIME_MS(33, "operatorExecEndTimeMs", MetadataValueType.LONG),
+    // Not actually used
+    MAX_ROWS_IN_JOIN_REACHED(34, "maxRowsInJoinReached", MetadataValueType.STRING);
 
     // We keep this constant to track the max id added so far for backward compatibility.
     // Increase it when adding new keys, but NEVER DECREASE IT!!!
@@ -173,17 +150,11 @@ public interface DataTable {
     private final int _id;
     private final String _name;
     private final MetadataValueType _valueType;
-    private final StatMap.Type _statMapType;
 
     MetadataKey(int id, String name, MetadataValueType valueType) {
-      this(id, name, valueType, valueType.getType());
-    }
-
-    MetadataKey(int id, String name, MetadataValueType valueType, StatMap.Type statMapType) {
       _id = id;
       _name = name;
       _valueType = valueType;
-      _statMapType = statMapType;
     }
 
     /**
@@ -217,16 +188,6 @@ public interface DataTable {
     // getValueType returns the value type(int/long/String) of the enum key.
     public MetadataValueType getValueType() {
       return _valueType;
-    }
-
-    @Override
-    public String getStatName() {
-      return getName();
-    }
-
-    @Override
-    public StatMap.Type getType() {
-      return _statMapType;
     }
 
     static {

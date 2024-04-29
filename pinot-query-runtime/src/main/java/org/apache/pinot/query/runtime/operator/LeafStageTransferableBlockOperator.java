@@ -39,6 +39,7 @@ import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
@@ -106,8 +107,6 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
     Integer maxStreamingPendingBlocks = QueryOptionsUtils.getMaxStreamingPendingBlocks(context.getOpChainMetadata());
     _blockingQueue = new ArrayBlockingQueue<>(maxStreamingPendingBlocks != null ? maxStreamingPendingBlocks
         : QueryOptionValue.DEFAULT_MAX_STREAMING_PENDING_BLOCKS);
-    String tableName = context.getLeafStageContext().getStagePlan().getStageMetadata().getTableName();
-    _statMap.merge(StatKey.TABLE, tableName);
   }
 
   @Override
@@ -171,9 +170,6 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
         switch (key) {
           case UNKNOWN:
             LOGGER.debug("Skipping unknown execution stat: {}", entry.getKey());
-            break;
-          case TABLE:
-            _statMap.merge(StatKey.TABLE, entry.getValue());
             break;
           case NUM_DOCS_SCANNED:
             _statMap.merge(StatKey.NUM_DOCS_SCANNED, Long.parseLong(entry.getValue()));
@@ -261,9 +257,6 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
             break;
           case OPERATOR_EXECUTION_TIME_MS:
             _statMap.merge(StatKey.OPERATOR_EXECUTION_TIME_MS, Long.parseLong(entry.getValue()));
-            break;
-          case OPERATOR_ID:
-            _statMap.merge(StatKey.OPERATOR_ID, entry.getValue());
             break;
           case OPERATOR_EXEC_START_TIME_MS:
             _statMap.merge(StatKey.OPERATOR_EXEC_START_TIME_MS, Long.parseLong(entry.getValue()));
@@ -552,14 +545,13 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
   }
 
   public enum StatKey implements StatMap.Key {
-    TABLE(StatMap.Type.STRING),
-    EXECUTION_TIME_MS(StatMap.Type.LONG, null, DataTable.MetadataKey.TIME_USED_MS) {
+    EXECUTION_TIME_MS(StatMap.Type.LONG, BrokerResponseNativeV2.StatKey.TIME_USED_MS) {
       @Override
       public boolean includeDefaultInJson() {
         return true;
       }
     },
-    EMITTED_ROWS(StatMap.Type.LONG, null, DataTable.MetadataKey.NUM_ROWS) {
+    EMITTED_ROWS(StatMap.Type.LONG, null) {
       @Override
       public boolean includeDefaultInJson() {
         return true;
@@ -582,31 +574,31 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
     },
     TOTAL_DOCS(StatMap.Type.LONG),
     NUM_GROUPS_LIMIT_REACHED(StatMap.Type.BOOLEAN),
-    //TRACE_INFO(StatMap.Type.STRING),
-    //REQUEST_ID(StatMap.Type.LONG),
-    NUM_RESIZES(StatMap.Type.INT),
-    RESIZE_TIME_MS(StatMap.Type.LONG),
-    THREAD_CPU_TIME_NS(StatMap.Type.LONG),
-    SYSTEM_ACTIVITIES_CPU_TIME_NS(StatMap.Type.LONG),
-    RESPONSE_SER_CPU_TIME_NS(StatMap.Type.LONG, "responseSerializationCpuTimeNs"),
+    NUM_RESIZES(StatMap.Type.INT, null),
+    RESIZE_TIME_MS(StatMap.Type.LONG, null),
+    THREAD_CPU_TIME_NS(StatMap.Type.LONG, null),
+    SYSTEM_ACTIVITIES_CPU_TIME_NS(StatMap.Type.LONG, null),
+    RESPONSE_SER_CPU_TIME_NS(StatMap.Type.LONG, null) {
+      @Override
+      public String getStatName() {
+        return "responseSerializationCpuTimeNs";
+      }
+    },
     NUM_SEGMENTS_PRUNED_BY_SERVER(StatMap.Type.INT),
     NUM_SEGMENTS_PRUNED_INVALID(StatMap.Type.INT),
     NUM_SEGMENTS_PRUNED_BY_LIMIT(StatMap.Type.INT),
     NUM_SEGMENTS_PRUNED_BY_VALUE(StatMap.Type.INT),
-    //EXPLAIN_PLAN_NUM_EMPTY_FILTER_SEGMENTS(StatMap.Type.INT),
-    //EXPLAIN_PLAN_NUM_MATCH_ALL_FILTER_SEGMENTS(StatMap.Type.INT),
     NUM_CONSUMING_SEGMENTS_PROCESSED(StatMap.Type.INT),
     NUM_CONSUMING_SEGMENTS_MATCHED(StatMap.Type.INT),
-    NUM_BLOCKS(StatMap.Type.INT),
-    OPERATOR_EXECUTION_TIME_MS(StatMap.Type.LONG),
-    OPERATOR_ID(StatMap.Type.STRING),
-    OPERATOR_EXEC_START_TIME_MS(StatMap.Type.LONG) {
+    NUM_BLOCKS(StatMap.Type.INT, null),
+    OPERATOR_EXECUTION_TIME_MS(StatMap.Type.LONG, null),
+    OPERATOR_EXEC_START_TIME_MS(StatMap.Type.LONG, null) {
       @Override
       public long merge(long value1, long value2) {
         return StatMap.Key.minPositive(value1, value2);
       }
     },
-    OPERATOR_EXEC_END_TIME_MS(StatMap.Type.LONG) {
+    OPERATOR_EXEC_END_TIME_MS(StatMap.Type.LONG, null) {
       @Override
       public long merge(long value1, long value2) {
         return Math.max(value1, value2);
@@ -614,28 +606,16 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
     },;
     private final StatMap.Type _type;
     @Nullable
-    private final DataTable.MetadataKey _v1Key;
-    private final String _statName;
+    private final BrokerResponseNativeV2.StatKey _brokerKey;
 
     StatKey(StatMap.Type type) {
-      this(type, null);
-    }
-
-    StatKey(StatMap.Type type, @Nullable String statName) {
       _type = type;
-      _statName = statName == null ? StatMap.getDefaultStatName(this) : statName;
-      _v1Key = DataTable.MetadataKey.getByName(getStatName());
+      _brokerKey = BrokerResponseNativeV2.StatKey.valueOf(name());
     }
 
-    StatKey(StatMap.Type type, @Nullable String statName, @Nullable DataTable.MetadataKey v1Key) {
+    StatKey(StatMap.Type type, @Nullable BrokerResponseNativeV2.StatKey brokerKey) {
       _type = type;
-      _statName = statName == null ? StatMap.getDefaultStatName(this) : statName;
-      _v1Key = v1Key == null ? DataTable.MetadataKey.getByName(getStatName()) : v1Key;
-    }
-
-    @Override
-    public String getStatName() {
-      return _statName;
+      _brokerKey = brokerKey;
     }
 
     @Override
@@ -643,24 +623,21 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
       return _type;
     }
 
-    public void updateV1Metadata(StatMap<DataTable.MetadataKey> oldMetadata, StatMap<StatKey> stats) {
-      if (_v1Key != null) {
+    public void updateBrokerMetadata(StatMap<BrokerResponseNativeV2.StatKey> oldMetadata, StatMap<StatKey> stats) {
+      if (_brokerKey != null) {
         switch (_type) {
           case LONG:
-            if (_v1Key.getType() == StatMap.Type.INT) {
-              oldMetadata.merge(_v1Key, (int) stats.getLong(this));
+            if (_brokerKey.getType() == StatMap.Type.INT) {
+              oldMetadata.merge(_brokerKey, (int) stats.getLong(this));
             } else {
-              oldMetadata.merge(_v1Key, stats.getLong(this));
+              oldMetadata.merge(_brokerKey, stats.getLong(this));
             }
             break;
           case INT:
-            oldMetadata.merge(_v1Key, stats.getInt(this));
+            oldMetadata.merge(_brokerKey, stats.getInt(this));
             break;
           case BOOLEAN:
-            oldMetadata.merge(_v1Key, stats.getBoolean(this));
-            break;
-          case STRING:
-            oldMetadata.merge(_v1Key, stats.getString(this));
+            oldMetadata.merge(_brokerKey, stats.getBoolean(this));
             break;
           default:
             throw new IllegalStateException("Unsupported type: " + _type);

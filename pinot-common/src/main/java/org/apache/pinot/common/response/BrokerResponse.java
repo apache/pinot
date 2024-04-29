@@ -179,7 +179,10 @@ public interface BrokerResponse {
   /**
    * Get the total number of rows in result set
    */
-  int getNumRowsResultSet();
+  default int getNumRowsResultSet() {
+    ResultTable resultTable = getResultTable();
+    return resultTable == null ? 0 : resultTable.getRows().size();
+  }
 
   /**
    * Get the thread cpu time used against offline table in request handling, from the broker response.

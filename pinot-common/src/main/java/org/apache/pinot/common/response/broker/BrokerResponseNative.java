@@ -511,15 +511,10 @@ public class BrokerResponseNative implements BrokerResponse {
     _timeUsedMs = timeUsedMs;
   }
 
-  @JsonProperty("numRowsResultSet")
+  @JsonProperty(access = JsonProperty.Access.READ_ONLY)
   @Override
   public int getNumRowsResultSet() {
-    return _numRowsResultSet;
-  }
-
-  @JsonProperty("numRowsResultSet")
-  public void setNumRowsResultSet(int numRowsResultSet) {
-    _numRowsResultSet = numRowsResultSet;
+    return BrokerResponse.super.getNumRowsResultSet();
   }
 
   @JsonProperty("segmentStatistics")

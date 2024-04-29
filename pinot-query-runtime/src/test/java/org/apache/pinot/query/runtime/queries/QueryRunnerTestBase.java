@@ -98,6 +98,12 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
   // QUERY UTILS
   // --------------------------------------------------------------------------
 
+  protected QueryEnvironment.QueryPlannerResult planQuery(String sql) {
+    long requestId = REQUEST_ID_GEN.getAndIncrement();
+    SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sql);
+    return _queryEnvironment.planQuery(sql, sqlNodeAndOptions, requestId);
+  }
+
   /**
    * Dispatch query to each pinot-server. The logic should mimic QueryDispatcher.submit() but does not actually make
    * ser/de dispatches.
