@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.sql.parsers.rewriter;
 
-import java.util.Collections;
+import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.Function;
@@ -49,8 +49,10 @@ public class OrdinalsUpdater implements QueryRewriter {
         if (isNullsLast != null) {
           functionToSet = functionToSet.getOperands().get(0).getFunctionCall();
         }
-        functionToSet.setOperands(
-            Collections.singletonList(getExpressionFromOrdinal(pinotQuery.getSelectList(), ordinal)));
+        // NOTE: Create an ArrayList because we might need to modify the list later
+        List<Expression> newOperands = new ArrayList<>(1);
+        newOperands.add(getExpressionFromOrdinal(pinotQuery.getSelectList(), ordinal));
+        functionToSet.setOperands(newOperands);
       }
     }
     return pinotQuery;

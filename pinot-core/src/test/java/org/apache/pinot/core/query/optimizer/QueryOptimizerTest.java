@@ -79,10 +79,8 @@ public class QueryOptimizerTest {
   }
 
   private static Expression getEqFilterExpression(String column, Object value) {
-    Expression eqFilterExpression = RequestUtils.getFunctionExpression(FilterKind.EQUALS.name());
-    eqFilterExpression.getFunctionCall().setOperands(
-        Arrays.asList(RequestUtils.getIdentifierExpression(column), RequestUtils.getLiteralExpression(value)));
-    return eqFilterExpression;
+    return RequestUtils.getFunctionExpression(FilterKind.EQUALS.name(), RequestUtils.getIdentifierExpression(column),
+        RequestUtils.getLiteralExpression(value));
   }
 
   @Test
@@ -182,10 +180,8 @@ public class QueryOptimizerTest {
   }
 
   private static Expression getRangeFilterExpression(String column, String rangeString) {
-    Expression rangeFilterExpression = RequestUtils.getFunctionExpression(FilterKind.RANGE.name());
-    rangeFilterExpression.getFunctionCall().setOperands(
-        Arrays.asList(RequestUtils.getIdentifierExpression(column), RequestUtils.getLiteralExpression(rangeString)));
-    return rangeFilterExpression;
+    return RequestUtils.getFunctionExpression(FilterKind.RANGE.name(), RequestUtils.getIdentifierExpression(column),
+        RequestUtils.getLiteralExpression(rangeString));
   }
 
   @Test

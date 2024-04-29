@@ -223,9 +223,9 @@ public class QueryOverrideWithHintsTest {
   public void testRewriteExpressionsWithHints() {
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(
         "SELECT datetrunc('MONTH', ts), count(*), sum(abc) from myTable group by datetrunc('MONTH', ts) ");
-    Expression dateTruncFunctionExpr = RequestUtils.getFunctionExpression("datetrunc");
-    dateTruncFunctionExpr.getFunctionCall().setOperands(new ArrayList<>(
-        ImmutableList.of(RequestUtils.getLiteralExpression("MONTH"), RequestUtils.getIdentifierExpression("ts"))));
+    Expression dateTruncFunctionExpr =
+        RequestUtils.getFunctionExpression("datetrunc", RequestUtils.getLiteralExpression("MONTH"),
+            RequestUtils.getIdentifierExpression("ts"));
     Expression timestampIndexColumn = RequestUtils.getIdentifierExpression("$ts$MONTH");
     pinotQuery.setExpressionOverrideHints(ImmutableMap.of(dateTruncFunctionExpr, timestampIndexColumn));
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(pinotQuery);
@@ -238,9 +238,9 @@ public class QueryOverrideWithHintsTest {
   public void testNotRewriteExpressionsWithHints() {
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(
         "SELECT datetrunc('DAY', ts), count(*), sum(abc) from myTable group by datetrunc('DAY', ts)");
-    Expression dateTruncFunctionExpr = RequestUtils.getFunctionExpression("datetrunc");
-    dateTruncFunctionExpr.getFunctionCall().setOperands(new ArrayList<>(
-        ImmutableList.of(RequestUtils.getLiteralExpression("DAY"), RequestUtils.getIdentifierExpression("ts"))));
+    Expression dateTruncFunctionExpr =
+        RequestUtils.getFunctionExpression("datetrunc", RequestUtils.getLiteralExpression("DAY"),
+            RequestUtils.getIdentifierExpression("ts"));
     Expression timestampIndexColumn = RequestUtils.getIdentifierExpression("$ts$DAY");
     pinotQuery.setExpressionOverrideHints(ImmutableMap.of(dateTruncFunctionExpr, timestampIndexColumn));
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(pinotQuery);
