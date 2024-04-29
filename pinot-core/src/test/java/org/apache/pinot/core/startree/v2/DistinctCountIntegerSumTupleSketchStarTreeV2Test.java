@@ -52,7 +52,10 @@ public class DistinctCountIntegerSumTupleSketchStarTreeV2Test extends BaseStarTr
 
   @Override
   void assertAggregatedValue(Object starTreeResult, Object nonStarTreeResult) {
-    assertEquals(toSketch(starTreeResult).getEstimate(), toSketch(nonStarTreeResult).getEstimate());
+    // Use error at (lgK=14, stddev=2) from:
+    // https://datasketches.apache.org/docs/Theta/ThetaErrorTable.html
+    double delta = (1 << 14) * 0.01563;
+    assertEquals(toSketch(starTreeResult).getEstimate(), toSketch(nonStarTreeResult).getEstimate(), delta);
   }
 
   @SuppressWarnings("unchecked")
