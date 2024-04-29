@@ -47,10 +47,13 @@ public class DistinctCountThetaSketchValueAggregatorTest {
     Sketch result = input.compact();
     DistinctCountThetaSketchValueAggregator agg = new DistinctCountThetaSketchValueAggregator();
     byte[] bytes = agg.serializeAggregatedValue(result);
-    assertEquals(toSketch(agg.getInitialAggregatedValue(bytes)).getEstimate(), result.getEstimate());
-
+    Sketch initSketch = toSketch(agg.getInitialAggregatedValue(bytes));
+    Union union =
+        Union.builder().setNominalEntries(CommonConstants.Helix.DEFAULT_THETA_SKETCH_NOMINAL_ENTRIES).buildUnion();
+    union.union(initSketch);
+    assertEquals(initSketch.getEstimate(), result.getEstimate());
     // and should update the max size
-    assertEquals(agg.getMaxAggregatedValueByteSize(), result.getCurrentBytes());
+    assertEquals(agg.getMaxAggregatedValueByteSize(), union.getCurrentBytes());
   }
 
   @Test
@@ -76,13 +79,11 @@ public class DistinctCountThetaSketchValueAggregatorTest {
     Sketch result = toSketch(agg.applyAggregatedValue(result1, result2));
     Union union =
         Union.builder().setNominalEntries(CommonConstants.Helix.DEFAULT_THETA_SKETCH_NOMINAL_ENTRIES).buildUnion();
-
-    Sketch merged = union.union(result1, result2);
-
+    union.union(result1);
+    union.union(result2);
+    Sketch merged = union.getResult();
     assertEquals(result.getEstimate(), merged.getEstimate());
-
-    // and should update the max size
-    assertEquals(agg.getMaxAggregatedValueByteSize(), merged.getCurrentBytes());
+    assertEquals(agg.getMaxAggregatedValueByteSize(), union.getCurrentBytes());
   }
 
   @Test
@@ -98,13 +99,12 @@ public class DistinctCountThetaSketchValueAggregatorTest {
     Sketch result = toSketch(agg.applyRawValue(result1, result2bytes));
     Union union =
         Union.builder().setNominalEntries(CommonConstants.Helix.DEFAULT_THETA_SKETCH_NOMINAL_ENTRIES).buildUnion();
-
-    Sketch merged = union.union(result1, result2);
-
+    union.union(result1);
+    union.union(result2);
+    Sketch merged = union.getResult();
     assertEquals(result.getEstimate(), merged.getEstimate());
-
     // and should update the max size
-    assertEquals(agg.getMaxAggregatedValueByteSize(), merged.getCurrentBytes());
+    assertEquals(agg.getMaxAggregatedValueByteSize(), union.getCurrentBytes());
   }
 
   @Test
@@ -114,12 +114,12 @@ public class DistinctCountThetaSketchValueAggregatorTest {
     Sketch result1 = input1.compact();
     DistinctCountThetaSketchValueAggregator agg = new DistinctCountThetaSketchValueAggregator();
     Sketch result = toSketch(agg.applyRawValue(result1, "world"));
-
+    Union union =
+        Union.builder().setNominalEntries(CommonConstants.Helix.DEFAULT_THETA_SKETCH_NOMINAL_ENTRIES).buildUnion();
+    union.union(result);
     assertEquals(result.getEstimate(), 2.0);
-
     // and should update the max size
-    assertEquals(agg.getMaxAggregatedValueByteSize(), 32 // may change in future versions of datasketches
-    );
+    assertEquals(agg.getMaxAggregatedValueByteSize(), union.getCurrentBytes());
   }
 
   @Test
@@ -130,12 +130,12 @@ public class DistinctCountThetaSketchValueAggregatorTest {
     DistinctCountThetaSketchValueAggregator agg = new DistinctCountThetaSketchValueAggregator();
     String[] strings = {"hello", "world", "this", "is", "some", "strings"};
     Sketch result = toSketch(agg.applyRawValue(result1, (Object) strings));
-
+    Union union =
+        Union.builder().setNominalEntries(CommonConstants.Helix.DEFAULT_THETA_SKETCH_NOMINAL_ENTRIES).buildUnion();
+    union.union(result);
     assertEquals(result.getEstimate(), 6.0);
-
     // and should update the max size
-    assertEquals(agg.getMaxAggregatedValueByteSize(), 64 // may change in future versions of datasketches
-    );
+    assertEquals(agg.getMaxAggregatedValueByteSize(), union.getCurrentBytes());
   }
 
   @Test
