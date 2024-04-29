@@ -49,6 +49,8 @@ public class TextIndexUtils {
     FileUtils.deleteQuietly(luceneMappingFile);
     File luceneV9IndexFile = new File(segDir, column + Indexes.LUCENE_V9_TEXT_INDEX_FILE_EXTENSION);
     FileUtils.deleteQuietly(luceneV9IndexFile);
+    File luceneV99IndexFile = new File(segDir, column + Indexes.LUCENE_V99_TEXT_INDEX_FILE_EXTENSION);
+    FileUtils.deleteQuietly(luceneV99IndexFile);
     File luceneV9MappingFile = new File(segDir, column + Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION);
     FileUtils.deleteQuietly(luceneV9MappingFile);
 
@@ -61,7 +63,8 @@ public class TextIndexUtils {
     //@formatter:off
     return new File(segDir, column + Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION).exists()
         || new File(segDir, column + Indexes.LUCENE_V9_TEXT_INDEX_FILE_EXTENSION).exists()
-        || new File(segDir, column + Indexes.NATIVE_TEXT_INDEX_FILE_EXTENSION).exists();
+        || new File(segDir, column + Indexes.NATIVE_TEXT_INDEX_FILE_EXTENSION).exists()
+        || new File(segDir, column + Indexes.LUCENE_V99_TEXT_INDEX_FILE_EXTENSION).exists();
     //@formatter:on
   }
 

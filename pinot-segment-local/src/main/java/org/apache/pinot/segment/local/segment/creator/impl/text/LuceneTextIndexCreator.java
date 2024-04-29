@@ -330,7 +330,7 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
   }
 
   private File getV1TextIndexFile(File indexDir) {
-    String luceneIndexDirectory = _textColumn + V1Constants.Indexes.LUCENE_V9_TEXT_INDEX_FILE_EXTENSION;
+    String luceneIndexDirectory = _textColumn + V1Constants.Indexes.LUCENE_V99_TEXT_INDEX_FILE_EXTENSION;
     return new File(indexDir, luceneIndexDirectory);
   }
 
@@ -339,7 +339,7 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
     String tmpSegmentName = indexDir.getParentFile().getName();
     String segmentName = tmpSegmentName.substring(tmpSegmentName.indexOf("tmp-") + 4, tmpSegmentName.lastIndexOf('-'));
     String mutableDir = indexDir.getParentFile().getParentFile().getParent() + "/consumers/" + segmentName + "/"
-        + _textColumn + V1Constants.Indexes.LUCENE_V9_TEXT_INDEX_FILE_EXTENSION;
+        + _textColumn + V1Constants.Indexes.LUCENE_V99_TEXT_INDEX_FILE_EXTENSION;
     return new File(mutableDir);
   }
 }
