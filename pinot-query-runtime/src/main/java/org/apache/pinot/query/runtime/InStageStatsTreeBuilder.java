@@ -106,10 +106,9 @@ public class InStageStatsTreeBuilder implements PlanNodeVisitor<ObjectNode, Void
       }
     }
     ObjectNode json = selfNode(type);
-
     List<PlanNode> inputs = node.getInputs();
-    ArrayNode children = JsonUtils.newArrayNode();
     int size = inputs.size();
+    JsonNode[] childrenArr = new JsonNode[size];
     if (size > _index) {
       LOGGER.warn("Operator {} has {} inputs but only {} stats are left", type, size,
           _index);
@@ -119,9 +118,10 @@ public class InStageStatsTreeBuilder implements PlanNodeVisitor<ObjectNode, Void
       PlanNode planNode = inputs.get(i);
       _index--;
       JsonNode child = planNode.visit(this, null);
-      children.add(child);
+
+      childrenArr[i] = child;
     }
-    json.set(CHILDREN_KEY, children);
+    json.set(CHILDREN_KEY, JsonUtils.objectToJsonNode(childrenArr));
     return json;
   }
 
