@@ -119,7 +119,9 @@ public class HashJoinOperator extends MultiStageOperator {
   private int _currentRowsInHashTable = 0;
 
   @Nullable
-  private MultiStageQueryStats _queryStats = null;
+  private MultiStageQueryStats _rightSideStats = null;
+  @Nullable
+  private MultiStageQueryStats _leftSideStats = null;
 
   public HashJoinOperator(OpChainExecutionContext context, MultiStageOperator leftTableOperator,
       MultiStageOperator rightTableOperator, DataSchema leftSchema, JoinNode node) {
@@ -216,8 +218,8 @@ public class HashJoinOperator extends MultiStageOperator {
   protected TransferableBlock getNextBlock()
       throws ProcessingException {
     if (_isTerminated) {
-      assert _queryStats != null;
-      return TransferableBlockUtils.getEndOfStreamTransferableBlock(_queryStats);
+      assert _leftSideStats != null;
+      return TransferableBlockUtils.getEndOfStreamTransferableBlock(_leftSideStats);
     }
     if (!_isHashTableBuilt) {
       // Build JOIN hash table
@@ -272,8 +274,8 @@ public class HashJoinOperator extends MultiStageOperator {
       _upstreamErrorBlock = rightBlock;
     } else {
       _isHashTableBuilt = true;
-      _queryStats = rightBlock.getQueryStats();
-      assert _queryStats != null;
+      _rightSideStats = rightBlock.getQueryStats();
+      assert _rightSideStats != null;
     }
     _statMap.merge(StatKey.TIME_BUILDING_HASH_TABLE_MS, System.currentTimeMillis() - startTime);
   }
@@ -284,13 +286,13 @@ public class HashJoinOperator extends MultiStageOperator {
       return _upstreamErrorBlock;
     }
     if (leftBlock.isSuccessfulEndOfStreamBlock()) {
-      assert _queryStats != null;
-      MultiStageQueryStats leftQueryStats = leftBlock.getQueryStats();
-      assert leftQueryStats != null;
-      _queryStats.mergeInOrder(leftQueryStats, getOperatorType(), _statMap);
+      assert _rightSideStats != null;
+      _leftSideStats = leftBlock.getQueryStats();
+      assert _leftSideStats != null;
+      _leftSideStats.mergeInOrder(_rightSideStats, getOperatorType(), _statMap);
 
       if (!needUnmatchedRightRows()) {
-        return TransferableBlockUtils.getEndOfStreamTransferableBlock(_queryStats);
+        return TransferableBlockUtils.getEndOfStreamTransferableBlock(_leftSideStats);
       }
       // TODO: Moved to a different function.
       // Return remaining non-matched rows for non-inner join.
