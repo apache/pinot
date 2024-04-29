@@ -48,7 +48,11 @@ public class DistinctCountCPCSketchStarTreeV2Test extends BaseStarTreeV2Test<Obj
 
   @Override
   void assertAggregatedValue(Object starTreeResult, Object nonStarTreeResult) {
-    assertEquals((long) toSketch(starTreeResult).getEstimate(), (long) toSketch(nonStarTreeResult).getEstimate());
+    // Use error at (lgK=12, stddev=2) from:
+    // https://datasketches.apache.org/docs/CPC/CpcPerformance.html
+    double delta = (1 << 12) * 0.01;
+    assertEquals((long) toSketch(starTreeResult).getEstimate(), (long) toSketch(nonStarTreeResult).getEstimate(),
+        delta);
   }
 
   private CpcSketch toSketch(Object value) {
