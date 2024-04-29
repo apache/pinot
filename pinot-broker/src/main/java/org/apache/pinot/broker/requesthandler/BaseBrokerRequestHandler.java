@@ -1877,11 +1877,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       ServerStats serverStats, RequestContext requestContext)
       throws Exception;
 
-  protected static boolean isPartialResult(BrokerResponse brokerResponse) {
-    return brokerResponse.isNumGroupsLimitReached() || brokerResponse.isMaxRowsInJoinReached()
-        || brokerResponse.getExceptionsSize() > 0;
-  }
-
   protected static void augmentStatistics(RequestContext statistics, BrokerResponse response) {
     statistics.setTotalDocs(response.getTotalDocs());
     statistics.setNumDocsScanned(response.getNumDocsScanned());
