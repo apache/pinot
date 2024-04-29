@@ -50,7 +50,7 @@ public class IntegerTupleSketchValueAggregatorTest {
     IntegerTupleSketchValueAggregator agg = new IntegerTupleSketchValueAggregator(IntegerSummary.Mode.Sum);
     Sketch<IntegerSummary> merged = toSketch(agg.applyAggregatedValue(s1, s2));
     assertEquals(merged.getEstimate(), 2.0);
-    assertEquals(agg.getMaxAggregatedValueByteSize(), 786456);
+    assertEquals(agg.getMaxAggregatedValueByteSize(), 196632);
   }
 
   @Test
@@ -62,7 +62,7 @@ public class IntegerTupleSketchValueAggregatorTest {
     IntegerTupleSketchValueAggregator agg = new IntegerTupleSketchValueAggregator(IntegerSummary.Mode.Sum);
     Sketch<IntegerSummary> merged = toSketch(agg.applyRawValue(s1, agg.serializeAggregatedValue(s2)));
     assertEquals(merged.getEstimate(), 2.0);
-    assertEquals(agg.getMaxAggregatedValueByteSize(), 786456);
+    assertEquals(agg.getMaxAggregatedValueByteSize(), 196632);
   }
 
   @SuppressWarnings("unchecked")
