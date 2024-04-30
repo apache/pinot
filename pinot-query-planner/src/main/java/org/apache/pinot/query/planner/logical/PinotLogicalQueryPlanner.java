@@ -29,25 +29,30 @@ import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
 import org.apache.calcite.rel.logical.PinotRelExchangeType;
+import org.apache.pinot.common.metrics.BrokerMeter;
+import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.SubPlan;
 import org.apache.pinot.query.planner.SubPlanMetadata;
+import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.query.planner.plannode.WindowNode;
 
 
 /**
  * PinotLogicalQueryPlanner walks top-down from {@link RelRoot} and construct a forest of trees with {@link PlanNode}.
  */
 public class PinotLogicalQueryPlanner {
-  private PinotLogicalQueryPlanner() {
-  }
+
+  private boolean _windowFunctionFound = false;
+  private boolean _joinFound = false;
 
   /**
    * Converts a Calcite {@link RelRoot} into a Pinot {@link SubPlan}.
    */
-  public static SubPlan makePlan(RelRoot relRoot) {
+  public SubPlan makePlan(RelRoot relRoot) {
     PlanNode rootNode = relNodeToPlanNode(relRoot.rel);
     PlanFragment rootFragment = planNodeToPlanFragment(rootNode);
     return new SubPlan(rootFragment,
@@ -81,6 +86,24 @@ public class PinotLogicalQueryPlanner {
 
   private static PlanNode relNodeToPlanNode(RelNode node) {
     PlanNode planNode = RelToPlanNodeConverter.toPlanNode(node, -1);
+
+    if (planNode instanceof JoinNode) {
+      BrokerMetrics brokerMetrics = BrokerMetrics.get();
+      brokerMetrics.addMeteredGlobalValue(BrokerMeter.JOIN_COUNT, 1);
+      if (!_joinFound) {
+        brokerMetrics.addMeteredGlobalValue(BrokerMeter.QUERIES_WITH_JOINS, 1);
+        _joinFound = true;
+      }
+    }
+    if (planNode instanceof WindowNode) {
+      BrokerMetrics brokerMetrics = BrokerMetrics.get();
+      brokerMetrics.addMeteredGlobalValue(BrokerMeter.WINDOW_COUNT, 1);
+      if (!_windowFunctionFound) {
+        brokerMetrics.addMeteredGlobalValue(BrokerMeter.QUERIES_WITH_WINDOW, 1);
+        _windowFunctionFound = true;
+      }
+    }
+
     List<RelNode> inputs = node.getInputs();
     for (RelNode input : inputs) {
       planNode.addInput(relNodeToPlanNode(input));
