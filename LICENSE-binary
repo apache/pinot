@@ -371,8 +371,8 @@ jakarta.validation:jakarta.validation-api:2.0.2
 javax.inject:javax.inject:1
 javax.validation:validation-api:2.0.1.Final
 joda-time:joda-time:2.12.5
-net.java.dev.jna:jna-platform:5.6.0
-net.java.dev.jna:jna:5.5.0
+net.java.dev.jna:jna-platform:5.14.0
+net.java.dev.jna:jna:5.14.0
 net.minidev:accessors-smart:2.5.0
 net.minidev:json-smart:2.5.0
 net.openhft:chronicle-analytics:2.24ea0
