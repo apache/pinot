@@ -83,7 +83,7 @@ public class LuceneMutableTextIndexTest {
   public void testCustomAnalyzerWithTwoStringArgsAndCustomQueryParser() {
     // Test queries with CustomKeywordAnalyzer with two java.lang.String args and CustomQueryParser
     configureIndex(CUSTOM_ANALYZER_FQCN,
-            "a,b", List.of("java.lang.String", "java.lang.String"), CUSTOM_QUERY_PARSER_FQCN);
+            "a,b", "java.lang.String, java.lang.String", CUSTOM_QUERY_PARSER_FQCN);
     assertEquals(_realtimeLuceneTextIndex.getDocIds(
             "/.*processing for data ware.*/"), ImmutableRoaringBitmap.bitmapOf(1));
     assertEquals(_realtimeLuceneTextIndex.getDocIds(
@@ -94,7 +94,7 @@ public class LuceneMutableTextIndexTest {
   public void testCustomAnalyzerWithOneStringOneIntegerParametersAndCustomQueryParser() {
     // Test queries with CustomKeywordAnalyzer w/ two String.class args and ExtendedQueryParser
     configureIndex(CUSTOM_ANALYZER_FQCN,
-            "a,123", List.of("java.lang.String", "java.lang.Integer"), CUSTOM_QUERY_PARSER_FQCN);
+            "a,123", "java.lang.String,java.lang.Integer", CUSTOM_QUERY_PARSER_FQCN);
     assertEquals(_realtimeLuceneTextIndex.getDocIds(
             "/.*processing for data ware.*/"), ImmutableRoaringBitmap.bitmapOf(1));
     assertEquals(_realtimeLuceneTextIndex.getDocIds(
@@ -105,7 +105,7 @@ public class LuceneMutableTextIndexTest {
   public void testCustomAnalyzerWithOnePrimitiveIntParametersAndCustomQueryParser() {
     // Test queries with CustomKeywordAnalyzer w/ two String.class args and ExtendedQueryParser
     configureIndex(CUSTOM_ANALYZER_FQCN,
-            "123", List.of("java.lang.Integer.TYPE"), CUSTOM_QUERY_PARSER_FQCN);
+            "123", "java.lang.Integer.TYPE", CUSTOM_QUERY_PARSER_FQCN);
     assertEquals(_realtimeLuceneTextIndex.getDocIds(
             "/.*processing for data ware.*/"), ImmutableRoaringBitmap.bitmapOf(1));
     assertEquals(_realtimeLuceneTextIndex.getDocIds(
@@ -163,7 +163,7 @@ public class LuceneMutableTextIndexTest {
     };
   }
 
-  private void configureIndex(String analyzerClass, String analyzerClassArgs, List<String> analyzerClassArgTypes,
+  private void configureIndex(String analyzerClass, String analyzerClassArgs, String analyzerClassArgTypes,
                               String queryParserClass) {
     TextIndexConfig config = new TextIndexConfig(false, null, null, false, false, null, null, true, 500,
             analyzerClass, analyzerClassArgs, analyzerClassArgTypes, queryParserClass, false);
