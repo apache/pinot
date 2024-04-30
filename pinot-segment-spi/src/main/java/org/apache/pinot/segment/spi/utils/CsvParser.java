@@ -35,7 +35,7 @@ public class CsvParser {
      * and other white space characters. These characters are sometimes expected to be part of the actual argument.
      *
      * @param input  string to split on comma
-     * @param escapeComma whether we should ignore "\," during splitting, replace it with "," after split
+     * @param escapeComma if true, we do not split on escaped commas, and we replace "\," with "," after the split
      * @param trim   whether we should trim each tokenized terms
      * @return a list of values, empty list if input is empty or null
      */
@@ -58,5 +58,22 @@ public class CsvParser {
         }
 
         return tokenStream.collect(Collectors.toList());
+    }
+
+    /**
+     * Parse the input list of string with customized serialization behavior.
+     * @param input containing a list of string to be serialized
+     * @param escapeComma if true, escape commas by replacing "," with "\," before the join
+     * @param trim whether we should trim each tokenized terms before serialization
+     * @return serialized string representing the input list of string
+     */
+    public static String serialize(List<String> input, boolean escapeComma, boolean trim) {
+        Stream<String> tokenStream = input.stream();
+        if (escapeComma) {
+            tokenStream = tokenStream.map(s -> s.replaceAll(",", "\\,"));
+        } if (trim) {
+            tokenStream = tokenStream.map(String::trim);
+        }
+        return tokenStream.collect(Collectors.joining(","));
     }
 }

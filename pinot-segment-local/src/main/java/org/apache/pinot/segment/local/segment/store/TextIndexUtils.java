@@ -146,7 +146,6 @@ public class TextIndexUtils {
 
       // Initialize the custom analyzer class with custom analyzer args
       Class<?> luceneAnalyzerClass = Class.forName(luceneAnalyzerClassName);
-      Analyzer analyzer;
       if (!Analyzer.class.isAssignableFrom(luceneAnalyzerClass)) {
         String exceptionMessage = "Custom analyzer must be a child of " + Analyzer.class.getCanonicalName();
         LOGGER.error(exceptionMessage);

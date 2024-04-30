@@ -66,7 +66,7 @@ public class TextIndexConfig extends IndexConfig {
       @JsonProperty("luceneMaxBufferSizeMB") Integer luceneMaxBufferSizeMB,
       @JsonProperty("luceneAnalyzerClass") String luceneAnalyzerClass,
       @JsonProperty("luceneAnalyzerClassArgs") String luceneAnalyzerClassArgs,
-      @JsonProperty("luceneAnalyzerClassArgTypes") List<String> luceneAnalyzerClassArgTypes,
+      @JsonProperty("luceneAnalyzerClassArgTypes") String luceneAnalyzerClassArgTypes,
       @JsonProperty("luceneQueryParserClass") String luceneQueryParserClass,
       @JsonProperty("enablePrefixSuffixMatchingInPhraseQueries") Boolean enablePrefixSuffixMatchingInPhraseQueries) {
     super(disabled);
@@ -87,8 +87,7 @@ public class TextIndexConfig extends IndexConfig {
     // List<String>. This is because the args may contain comma and other special characters such as space. Therefore,
     // we use our own csv parser to parse the values directly.
     _luceneAnalyzerClassArgs = CsvParser.parse(luceneAnalyzerClassArgs, true, false);
-    _luceneAnalyzerClassArgTypes =
-        luceneAnalyzerClassArgTypes == null ? Collections.emptyList() : luceneAnalyzerClassArgTypes;
+    _luceneAnalyzerClassArgTypes = CsvParser.parse(luceneAnalyzerClassArgTypes, false, true);
     _luceneQueryParserClass = luceneQueryParserClass == null
             ? FieldConfig.TEXT_INDEX_DEFAULT_LUCENE_QUERY_PARSER_CLASS : luceneQueryParserClass;
     _enablePrefixSuffixMatchingInPhraseQueries =
@@ -219,8 +218,9 @@ public class TextIndexConfig extends IndexConfig {
     public TextIndexConfig build() {
       return new TextIndexConfig(false, _fstType, _rawValueForTextIndex, _enableQueryCache, _useANDForMultiTermQueries,
           _stopWordsInclude, _stopWordsExclude, _luceneUseCompoundFile, _luceneMaxBufferSizeMB, _luceneAnalyzerClass,
-          String.join(",", _luceneAnalyzerClassArgs), _luceneAnalyzerClassArgTypes, _luceneQueryParserClass,
-          _enablePrefixSuffixMatchingInPhraseQueries);
+          CsvParser.serialize(_luceneAnalyzerClassArgs, false, false),
+          CsvParser.serialize(_luceneAnalyzerClassArgTypes, false, false),
+          _luceneQueryParserClass, _enablePrefixSuffixMatchingInPhraseQueries);
     }
 
     public abstract AbstractBuilder withProperties(@Nullable Map<String, String> textIndexProperties);

@@ -41,6 +41,7 @@ import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentStatsHistory;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndexSearcherPool;
 import org.apache.pinot.segment.local.segment.index.column.PhysicalColumnIndexContainer;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
 import org.apache.pinot.segment.local.segment.store.SegmentLocalFSDirectory;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProviderFactory;
 import org.apache.pinot.segment.spi.ColumnMetadata;
@@ -52,6 +53,7 @@ import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
+import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
@@ -84,6 +86,7 @@ public class RealtimeSegmentConverterTest {
   private static final String LONG_COLUMN4 = "long_col4";
   private static final String MV_INT_COLUMN = "mv_col";
   private static final String DATE_TIME_COLUMN = "date_time_col";
+  private static final FSTType NULL_FST_TYPE = null;
 
   private static final File TMP_DIR =
       new File(FileUtils.getTempDirectory(), RealtimeSegmentConverterTest.class.getName());
@@ -472,9 +475,7 @@ public class RealtimeSegmentConverterTest {
     String tableNameWithType = tableConfig.getTableName();
     String segmentName = "testTable__0__0__123456";
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
-    TextIndexConfig textIndexConfig =
-        new TextIndexConfig(false, null, null, false, false, Collections.emptyList(), Collections.emptyList(), false,
-            500, null, null, null, null, false);
+    TextIndexConfig textIndexConfig = new TextIndexConfigBuilder(NULL_FST_TYPE).build();
 
     RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder =
         new RealtimeSegmentConfig.Builder().setTableNameWithType(tableNameWithType).setSegmentName(segmentName)
