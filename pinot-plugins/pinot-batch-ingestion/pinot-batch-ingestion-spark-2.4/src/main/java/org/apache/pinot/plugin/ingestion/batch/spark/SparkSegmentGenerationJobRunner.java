@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.net.URI;
 import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -283,7 +284,8 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
 
           // Tar segment directory to compress file
           File localSegmentDir = new File(localOutputTempDir, segmentName);
-          String segmentTarFileName = URLEncoder.encode(segmentName + Constants.TAR_GZ_FILE_EXT, "UTF-8");
+          String segmentTarFileName = URLEncoder.encode(segmentName + Constants.TAR_GZ_FILE_EXT,
+              StandardCharsets.UTF_8);
           File localSegmentTarFile = new File(localOutputTempDir, segmentTarFileName);
           LOGGER.info("Tarring segment from: {} to: {}", localSegmentDir, localSegmentTarFile);
           TarGzCompressionUtils.createTarGzFile(localSegmentDir, localSegmentTarFile);
@@ -299,7 +301,8 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
               _spec.isOverwriteOutput());
 
           // Create and upload segment metadata tar file
-          String metadataTarFileName = URLEncoder.encode(segmentName + Constants.METADATA_TAR_GZ_FILE_EXT, "UTF-8");
+          String metadataTarFileName = URLEncoder.encode(segmentName + Constants.METADATA_TAR_GZ_FILE_EXT,
+              StandardCharsets.UTF_8);
           URI outputMetadataTarURI = relativeOutputPath.resolve(metadataTarFileName);
 
           if (finalOutputDirFS.exists(outputMetadataTarURI) && (_spec.isOverwriteOutput()

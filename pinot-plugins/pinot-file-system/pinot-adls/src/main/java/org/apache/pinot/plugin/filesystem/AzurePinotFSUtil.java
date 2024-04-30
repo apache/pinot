@@ -23,6 +23,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 
 
 /**
@@ -41,12 +42,10 @@ public class AzurePinotFSUtil {
    *
    * @param uri a uri path
    * @return path in Azure Data Lake Gen2 format
-   * @throws IOException
    */
-  public static String convertUriToAzureStylePath(URI uri)
-      throws IOException {
+  public static String convertUriToAzureStylePath(URI uri) {
     // Pinot side code uses `URLEncoder` when building uri
-    String path = URLDecoder.decode(uri.getRawPath(), "UTF-8");
+    String path = URLDecoder.decode(uri.getRawPath(), StandardCharsets.UTF_8);
     if (path.startsWith(DIRECTORY_DELIMITER)) {
       path = path.substring(1);
     }

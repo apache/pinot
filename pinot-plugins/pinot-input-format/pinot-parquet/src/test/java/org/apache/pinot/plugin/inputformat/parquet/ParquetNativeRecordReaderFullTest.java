@@ -20,6 +20,7 @@ package org.apache.pinot.plugin.inputformat.parquet;
 
 import java.io.File;
 import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import org.apache.commons.io.FileUtils;
 import org.testng.annotations.Test;
 
@@ -125,7 +126,8 @@ public class ParquetNativeRecordReaderFullTest {
 
   protected void testParquetFile(String filePath)
       throws Exception {
-    File dataFile = new File(URLDecoder.decode(getClass().getClassLoader().getResource(filePath).getFile(), "UTF-8"));
+    File dataFile = new File(URLDecoder.decode(getClass().getClassLoader().getResource(filePath).getFile(),
+        StandardCharsets.UTF_8));
     ParquetNativeRecordReader recordReader = new ParquetNativeRecordReader();
     recordReader.init(dataFile, null, null);
     while (recordReader.hasNext()) {

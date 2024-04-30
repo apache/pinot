@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -265,7 +266,7 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
         String segmentName = taskRunner.run();
         // Tar segment directory to compress file
         localSegmentDir = new File(localOutputTempDir, segmentName);
-        String segmentTarFileName = URLEncoder.encode(segmentName + Constants.TAR_GZ_FILE_EXT, "UTF-8");
+        String segmentTarFileName = URLEncoder.encode(segmentName + Constants.TAR_GZ_FILE_EXT, StandardCharsets.UTF_8);
         localSegmentTarFile = new File(localOutputTempDir, segmentTarFileName);
         LOGGER.info("Tarring segment from: {} to: {}", localSegmentDir, localSegmentTarFile);
         TarGzCompressionUtils.createTarGzFile(localSegmentDir, localSegmentTarFile);

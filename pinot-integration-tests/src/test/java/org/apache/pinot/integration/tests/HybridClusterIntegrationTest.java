@@ -21,6 +21,7 @@ package org.apache.pinot.integration.tests;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -269,9 +270,9 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
     String encodedSQL;
-    encodedSQL = URLEncoder.encode("select * from " + realtimeTableName, "UTF-8");
+    encodedSQL = URLEncoder.encode("select * from " + realtimeTableName, StandardCharsets.UTF_8);
     Assert.assertNotNull(getDebugInfo("debug/routingTable/sql?query=" + encodedSQL));
-    encodedSQL = URLEncoder.encode("select * from " + offlineTableName, "UTF-8");
+    encodedSQL = URLEncoder.encode("select * from " + offlineTableName, StandardCharsets.UTF_8);
     Assert.assertNotNull(getDebugInfo("debug/routingTable/sql?query=" + encodedSQL));
   }
 

@@ -25,6 +25,7 @@ import java.io.Serializable;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.FileSystems;
 import java.nio.file.PathMatcher;
 import java.nio.file.Paths;
@@ -407,7 +408,7 @@ public class SegmentPushUtils implements Serializable {
     try {
       if (fileSystem instanceof LocalPinotFS) {
         // For local file system, we don't need to copy the tar file.
-        tarFile = new File(URLDecoder.decode(tarFileURI.getRawPath(), "UTF-8"));
+        tarFile = new File(URLDecoder.decode(tarFileURI.getRawPath(), StandardCharsets.UTF_8));
       } else {
         // For other file systems, we need to download the file to local file system
         fileSystem.copyToLocalFile(tarFileURI, tarFile);

@@ -804,24 +804,20 @@ public class StringFunctions {
    *
    * @param input plaintext string
    * @return url encoded string
-   * @throws UnsupportedEncodingException
    */
   @ScalarFunction
-  public static String encodeUrl(String input)
-      throws UnsupportedEncodingException {
-    return URLEncoder.encode(input, StandardCharsets.UTF_8.toString());
+  public static String encodeUrl(String input) {
+    return URLEncoder.encode(input, StandardCharsets.UTF_8);
   }
 
   /**
    *
    * @param input url encoded string
    * @return plaintext string
-   * @throws UnsupportedEncodingException
    */
   @ScalarFunction
-  public static String decodeUrl(String input)
-      throws UnsupportedEncodingException {
-    return URLDecoder.decode(input, StandardCharsets.UTF_8.toString());
+  public static String decodeUrl(String input) {
+    return URLDecoder.decode(input, StandardCharsets.UTF_8);
   }
 
   /**
