@@ -50,30 +50,29 @@ public class FSTBasedRegexpPredicateEvaluatorFactory {
    * Matches regexp query using FSTIndexReader.
    */
   private static class FSTBasedRegexpPredicateEvaluator extends BaseDictionaryBasedPredicateEvaluator {
-    final Dictionary _dictionary;
-    final ImmutableRoaringBitmap _dictIds;
+    final ImmutableRoaringBitmap _matchingDictIdBitmap;
 
     public FSTBasedRegexpPredicateEvaluator(RegexpLikePredicate regexpLikePredicate, TextIndexReader fstIndexReader,
         Dictionary dictionary) {
-      super(regexpLikePredicate);
-      _dictionary = dictionary;
+      super(regexpLikePredicate, dictionary);
       String searchQuery = RegexpPatternConverterUtils.regexpLikeToLuceneRegExp(regexpLikePredicate.getValue());
-      _dictIds = fstIndexReader.getDictIds(searchQuery);
+      _matchingDictIdBitmap = fstIndexReader.getDictIds(searchQuery);
+      int numMatchingDictIds = _matchingDictIdBitmap.getCardinality();
+      if (numMatchingDictIds == 0) {
+        _alwaysFalse = true;
+      } else if (dictionary.length() == numMatchingDictIds) {
+        _alwaysTrue = true;
+      }
     }
 
     @Override
-    public boolean isAlwaysFalse() {
-      return _dictIds.isEmpty();
-    }
-
-    @Override
-    public boolean isAlwaysTrue() {
-      return _dictIds.getCardinality() == _dictionary.length();
+    protected int[] calculateMatchingDictIds() {
+      return _matchingDictIdBitmap.toArray();
     }
 
     @Override
     public boolean applySV(int dictId) {
-      return _dictIds.contains(dictId);
+      return _matchingDictIdBitmap.contains(dictId);
     }
 
     @Override
@@ -87,11 +86,6 @@ public class FSTBasedRegexpPredicateEvaluatorFactory {
         }
       }
       return matches;
-    }
-
-    @Override
-    public int[] getMatchingDictIds() {
-      return _dictIds.toArray();
     }
   }
 }

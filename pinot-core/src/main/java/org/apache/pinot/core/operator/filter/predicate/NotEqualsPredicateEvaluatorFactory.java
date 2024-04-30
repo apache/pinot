@@ -58,8 +58,7 @@ public class NotEqualsPredicateEvaluatorFactory {
    * @param dataType Data type for the column
    * @return Raw value based NOT_EQ predicate evaluator
    */
-  public static NeqRawPredicateEvaluator newRawValueBasedEvaluator(NotEqPredicate notEqPredicate,
-      DataType dataType) {
+  public static NeqRawPredicateEvaluator newRawValueBasedEvaluator(NotEqPredicate notEqPredicate, DataType dataType) {
     String value = notEqPredicate.getValue();
     switch (dataType) {
       case INT:
@@ -87,12 +86,9 @@ public class NotEqualsPredicateEvaluatorFactory {
 
   private static final class DictionaryBasedNeqPredicateEvaluator extends BaseDictionaryBasedPredicateEvaluator {
     final int _nonMatchingDictId;
-    final int[] _nonMatchingDictIds;
-    final Dictionary _dictionary;
-    int[] _matchingDictIds;
 
     DictionaryBasedNeqPredicateEvaluator(NotEqPredicate notEqPredicate, Dictionary dictionary, DataType dataType) {
-      super(notEqPredicate);
+      super(notEqPredicate, dictionary);
       String predicateValue = PredicateUtils.getStoredValue(notEqPredicate.getValue(), dataType);
       _nonMatchingDictId = dictionary.indexOf(predicateValue);
       if (_nonMatchingDictId >= 0) {
@@ -104,7 +100,11 @@ public class NotEqualsPredicateEvaluatorFactory {
         _nonMatchingDictIds = new int[0];
         _alwaysTrue = true;
       }
-      _dictionary = dictionary;
+    }
+
+    @Override
+    protected int[] calculateMatchingDictIds() {
+      return PredicateUtils.getDictIds(_dictionary.length(), _nonMatchingDictId);
     }
 
     @Override
@@ -128,33 +128,6 @@ public class NotEqualsPredicateEvaluatorFactory {
         }
       }
       return matches;
-    }
-
-    @Override
-    public int[] getMatchingDictIds() {
-      if (_matchingDictIds == null) {
-        int dictionarySize = _dictionary.length();
-        if (_nonMatchingDictId >= 0) {
-          _matchingDictIds = new int[dictionarySize - 1];
-          int index = 0;
-          for (int dictId = 0; dictId < dictionarySize; dictId++) {
-            if (dictId != _nonMatchingDictId) {
-              _matchingDictIds[index++] = dictId;
-            }
-          }
-        } else {
-          _matchingDictIds = new int[dictionarySize];
-          for (int dictId = 0; dictId < dictionarySize; dictId++) {
-            _matchingDictIds[dictId] = dictId;
-          }
-        }
-      }
-      return _matchingDictIds;
-    }
-
-    @Override
-    public int[] getNonMatchingDictIds() {
-      return _nonMatchingDictIds;
     }
   }
 

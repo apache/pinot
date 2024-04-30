@@ -18,17 +18,34 @@
  */
 package org.apache.pinot.core.operator.filter.predicate;
 
+import it.unimi.dsi.fastutil.ints.IntArrayList;
+import it.unimi.dsi.fastutil.ints.IntList;
 import java.math.BigDecimal;
 import org.apache.pinot.common.request.context.predicate.Predicate;
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 public abstract class BaseDictionaryBasedPredicateEvaluator extends BasePredicateEvaluator {
+  protected final Dictionary _dictionary;
   protected boolean _alwaysTrue;
   protected boolean _alwaysFalse;
+  protected int[] _matchingDictIds;
+  protected int[] _nonMatchingDictIds;
 
-  protected BaseDictionaryBasedPredicateEvaluator(Predicate predicate) {
+  protected BaseDictionaryBasedPredicateEvaluator(Predicate predicate, Dictionary dictionary) {
     super(predicate);
+    _dictionary = dictionary;
+  }
+
+  @Override
+  public final boolean isDictionaryBased() {
+    return true;
+  }
+
+  @Override
+  public DataType getDataType() {
+    return DataType.INT;
   }
 
   @Override
@@ -42,13 +59,33 @@ public abstract class BaseDictionaryBasedPredicateEvaluator extends BasePredicat
   }
 
   @Override
-  public final boolean isDictionaryBased() {
-    return true;
+  public int[] getMatchingDictIds() {
+    if (_matchingDictIds == null) {
+      _matchingDictIds = calculateMatchingDictIds();
+    }
+    return _matchingDictIds;
   }
 
-  @Override
-  public DataType getDataType() {
-    return DataType.INT;
+  protected int[] calculateMatchingDictIds() {
+    IntList matchingDictIds = new IntArrayList();
+    int dictionarySize = _dictionary.length();
+    for (int dictId = 0; dictId < dictionarySize; dictId++) {
+      if (applySV(dictId)) {
+        matchingDictIds.add(dictId);
+      }
+    }
+    return matchingDictIds.toIntArray();
+  }
+
+  public int[] getNonMatchingDictIds() {
+    if (_nonMatchingDictIds == null) {
+      _nonMatchingDictIds = calculateNonMatchingDictIds();
+    }
+    return _nonMatchingDictIds;
+  }
+
+  protected int[] calculateNonMatchingDictIds() {
+    return PredicateUtils.flipDictIds(getMatchingDictIds(), _dictionary.length());
   }
 
   @Override
@@ -103,12 +140,6 @@ public abstract class BaseDictionaryBasedPredicateEvaluator extends BasePredicat
 
   @Override
   public final boolean applyMV(byte[][] values, int length) {
-    throw new UnsupportedOperationException();
-  }
-
-  // NOTE: override it for exclusive predicate
-  @Override
-  public int[] getNonMatchingDictIds() {
     throw new UnsupportedOperationException();
   }
 

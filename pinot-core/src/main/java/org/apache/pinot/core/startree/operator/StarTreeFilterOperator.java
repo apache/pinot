@@ -18,9 +18,11 @@
  */
 package org.apache.pinot.core.startree.operator;
 
+import it.unimi.dsi.fastutil.ints.IntImmutableList;
 import it.unimi.dsi.fastutil.ints.IntIterator;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
+import it.unimi.dsi.fastutil.objects.ObjectBooleanPair;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -175,19 +177,17 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
           _predicateEvaluatorsMap.get(remainingPredicateColumn);
       DataSource dataSource = _starTreeV2.getDataSource(remainingPredicateColumn);
       for (CompositePredicateEvaluator compositePredicateEvaluator : compositePredicateEvaluators) {
-        List<PredicateEvaluator> predicateEvaluators = compositePredicateEvaluator.getPredicateEvaluators();
+        List<ObjectBooleanPair<PredicateEvaluator>> predicateEvaluators =
+            compositePredicateEvaluator.getPredicateEvaluators();
         int numPredicateEvaluators = predicateEvaluators.size();
         if (numPredicateEvaluators == 1) {
           // Single predicate evaluator
-          childFilterOperators.add(
-              FilterOperatorUtils.getLeafFilterOperator(_queryContext, predicateEvaluators.get(0), dataSource,
-                  numDocs));
+          childFilterOperators.add(getFilterOperator(predicateEvaluators.get(0), dataSource, numDocs));
         } else {
           // Predicate evaluators conjoined with OR
           List<BaseFilterOperator> orChildFilterOperators = new ArrayList<>(numPredicateEvaluators);
-          for (PredicateEvaluator childPredicateEvaluator : predicateEvaluators) {
-            orChildFilterOperators.add(
-                FilterOperatorUtils.getLeafFilterOperator(_queryContext, childPredicateEvaluator, dataSource, numDocs));
+          for (ObjectBooleanPair<PredicateEvaluator> childPredicateEvaluator : predicateEvaluators) {
+            orChildFilterOperators.add(getFilterOperator(childPredicateEvaluator, dataSource, numDocs));
           }
           childFilterOperators.add(
               FilterOperatorUtils.getOrFilterOperator(_queryContext, orChildFilterOperators, numDocs));
@@ -196,6 +196,17 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
     }
 
     return FilterOperatorUtils.getAndFilterOperator(_queryContext, childFilterOperators, numDocs);
+  }
+
+  private BaseFilterOperator getFilterOperator(ObjectBooleanPair<PredicateEvaluator> predicateEvaluator,
+      DataSource dataSource, int numDocs) {
+    BaseFilterOperator leafFilterOperator =
+        FilterOperatorUtils.getLeafFilterOperator(_queryContext, predicateEvaluator.left(), dataSource, numDocs);
+    if (predicateEvaluator.rightBoolean()) {
+      return FilterOperatorUtils.getNotFilterOperator(_queryContext, leafFilterOperator, numDocs);
+    } else {
+      return leafFilterOperator;
+    }
   }
 
   /**
@@ -386,24 +397,28 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
       }
 
       int getPriority(CompositePredicateEvaluator compositePredicateEvaluator) {
-        List<PredicateEvaluator> predicateEvaluators = compositePredicateEvaluator.getPredicateEvaluators();
+        List<ObjectBooleanPair<PredicateEvaluator>> predicateEvaluators =
+            compositePredicateEvaluator.getPredicateEvaluators();
         if (predicateEvaluators.size() == 1) {
-          switch (predicateEvaluators.get(0).getPredicateType()) {
+          ObjectBooleanPair<PredicateEvaluator> predicateEvaluator = predicateEvaluators.get(0);
+          boolean negated = predicateEvaluator.rightBoolean();
+          switch (predicateEvaluator.left().getPredicateType()) {
             case EQ:
-              return 1;
+              return negated ? 5 : 1;
             case IN:
-              return 2;
+              return negated ? 4 : 2;
             case RANGE:
               return 3;
-            case NOT_EQ:
             case NOT_IN:
-              return 4;
+              return negated ? 2 : 4;
+            case NOT_EQ:
+              return negated ? 1 : 5;
             default:
-              throw new UnsupportedOperationException();
+              throw new IllegalStateException();
           }
         } else {
           // Process OR at last
-          return 5;
+          return 6;
         }
       }
     });
@@ -433,12 +448,25 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
    * Returns the matching dictionary ids for the given composite predicate evaluator.
    */
   private IntSet getMatchingDictIds(CompositePredicateEvaluator compositePredicateEvaluator) {
-    IntSet matchingDictIds = new IntOpenHashSet();
-    for (PredicateEvaluator predicateEvaluator : compositePredicateEvaluator.getPredicateEvaluators()) {
-      for (int matchingDictId : predicateEvaluator.getMatchingDictIds()) {
-        matchingDictIds.add(matchingDictId);
+    List<ObjectBooleanPair<PredicateEvaluator>> predicateEvaluators =
+        compositePredicateEvaluator.getPredicateEvaluators();
+    if (predicateEvaluators.size() == 1) {
+      ObjectBooleanPair<PredicateEvaluator> predicateEvaluator = predicateEvaluators.get(0);
+      if (predicateEvaluator.rightBoolean()) {
+        return new IntOpenHashSet(predicateEvaluator.left().getNonMatchingDictIds());
+      } else {
+        return new IntOpenHashSet(predicateEvaluator.left().getMatchingDictIds());
       }
+    } else {
+      IntSet matchingDictIds = new IntOpenHashSet();
+      for (ObjectBooleanPair<PredicateEvaluator> predicateEvaluator : predicateEvaluators) {
+        if (predicateEvaluator.rightBoolean()) {
+          matchingDictIds.addAll(new IntImmutableList(predicateEvaluator.left().getNonMatchingDictIds()));
+        } else {
+          matchingDictIds.addAll(new IntImmutableList(predicateEvaluator.left().getMatchingDictIds()));
+        }
+      }
+      return matchingDictIds;
     }
-    return matchingDictIds;
   }
 }
