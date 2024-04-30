@@ -86,8 +86,10 @@ public class PartialUpsertHandlerTest {
     newRowData.put("hoursSinceEpoch", null); // testing null comparison column
     GenericRow newRecord = initGenericRow(new GenericRow(), newRowData);
     LazyRow prevRecord = mock(LazyRow.class);
-    mockLazyRow(prevRecord, Map.of("pk", "pk1", "field1", 5L, "field2", "set", "hoursSinceEpoch", 2L));
+    mockLazyRow(prevRecord,
+        Map.of("pk", "pk1", "field1", 5L, "field2", "set", "field3", new Integer[]{0}, "hoursSinceEpoch", 2L));
     Map<String, Object> expectedData = new HashMap<>(Map.of("pk", "pk1", "field2", "reset", "hoursSinceEpoch", 2L));
+    expectedData.put("field3", null);
     expectedData.put("field1", Long.MIN_VALUE);
     GenericRow expectedRecord = initGenericRow(new GenericRow(), expectedData);
     expectedRecord.addNullValueField("field1");
@@ -138,6 +140,7 @@ public class PartialUpsertHandlerTest {
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("pk", FieldSpec.DataType.STRING)
         .addSingleValueDimension("field1", FieldSpec.DataType.LONG)
         .addSingleValueDimension("field2", FieldSpec.DataType.STRING)
+        .addMultiValueDimension("field3", FieldSpec.DataType.INT)
         .addDateTime("hoursSinceEpoch", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS")
         .setPrimaryKeyColumns(Arrays.asList("pk")).build();
 
@@ -169,6 +172,7 @@ public class PartialUpsertHandlerTest {
       }
       if ((newRow.getValue("field2")).equals("reset")) {
         resultHolder.put("field1", null);
+        resultHolder.put("field3", null);
       }
     };
   }

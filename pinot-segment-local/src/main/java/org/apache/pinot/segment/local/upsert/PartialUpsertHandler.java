@@ -84,7 +84,13 @@ public class PartialUpsertHandler {
       row.putValue(column, mergedValue);
     } else {
       // if column exists but mapped to a null value then merger result was a null value
-      row.putDefaultNullValue(column, _fieldSpecMap.get(column).getDefaultNullValue());
+      if (_fieldSpecMap.get(column).isSingleValueField()) {
+        row.putDefaultNullValue(column, _fieldSpecMap.get(column).getDefaultNullValue());
+      } else {
+        // multivalue must necessarily use null or MutableSegmentImpl.updateDictionary fails due to typecasting
+        // primitive to array
+        row.putDefaultNullValue(column, null);
+      }
     }
   }
 }
