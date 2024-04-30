@@ -96,6 +96,10 @@ public interface MessageBatch<T> {
     return false;
   }
 
+  default boolean hasMissingOffsets() {
+    return false;
+  }
+
   @Deprecated
   default T getMessageAtIndex(int index) {
     throw new UnsupportedOperationException();

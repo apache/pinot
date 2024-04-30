@@ -33,6 +33,7 @@ public class KafkaMessageBatch implements MessageBatch<byte[]> {
   private final long _offsetOfNextBatch;
   private final long _firstOffset;
   private final StreamMessageMetadata _lastMessageMetadata;
+  private final boolean _isMissingMessages;
 
   /**
    * @param messages the messages, which may be smaller than {@see unfilteredMessageCount}
@@ -43,12 +44,13 @@ public class KafkaMessageBatch implements MessageBatch<byte[]> {
    *                            delay when a batch has all messages filtered.
    */
   public KafkaMessageBatch(List<BytesStreamMessage> messages, int unfilteredMessageCount, long offsetOfNextBatch,
-      long firstOffset, @Nullable StreamMessageMetadata lastMessageMetadata) {
+      long firstOffset, @Nullable StreamMessageMetadata lastMessageMetadata, boolean isMissingMessages) {
     _messages = messages;
     _unfilteredMessageCount = unfilteredMessageCount;
     _offsetOfNextBatch = offsetOfNextBatch;
     _firstOffset = firstOffset;
     _lastMessageMetadata = lastMessageMetadata;
+    _isMissingMessages = isMissingMessages;
   }
 
   @Override
@@ -81,5 +83,10 @@ public class KafkaMessageBatch implements MessageBatch<byte[]> {
   @Override
   public StreamMessageMetadata getLastMessageMetadata() {
     return _lastMessageMetadata;
+  }
+
+  @Override
+  public boolean hasMissingOffsets() {
+    return _isMissingMessages;
   }
 }

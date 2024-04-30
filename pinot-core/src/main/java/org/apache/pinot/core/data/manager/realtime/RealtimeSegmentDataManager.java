@@ -470,7 +470,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
       StreamPartitionMsgOffset batchFirstOffset = messageBatch.getFirstMessageOffset();
       if (batchFirstOffset != null) {
-        validateStartOffset(_currentOffset, batchFirstOffset);
+        validateStartOffset(messageBatch);
       }
 
       boolean endCriteriaReached = processStreamEvents(messageBatch, idlePipeSleepTimeMillis);
@@ -926,14 +926,14 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
    * batchFirstOffset should be less than or equal to startOffset.
    * If batchFirstOffset is greater, then some messages were not received.
    *
-   * @param startOffset The offset of the first message desired, inclusive.
-   * @param batchFirstOffset The offset of the first message in the batch.
+   * @param messageBatch Message batch to validate
    */
-  private void validateStartOffset(StreamPartitionMsgOffset startOffset, StreamPartitionMsgOffset batchFirstOffset) {
-    if (!_partitionGroupConsumer.isOffsetMismatchAcceptable(startOffset, batchFirstOffset)) {
+  private void validateStartOffset(MessageBatch messageBatch) {
+    if (messageBatch.hasMissingOffsets()) {
       _serverMetrics.addMeteredTableValue(_tableStreamName, ServerMeter.STREAM_DATA_LOSS, 1L);
       String message =
-          "startOffset(" + startOffset + ") is older than topic's beginning offset(" + batchFirstOffset + ")";
+          "Message loss detected in stream partition: " + _partitionGroupId + " for table: " + _tableNameWithType
+              + " startOffset: " + _startOffset + " batchFirstOffset: " + messageBatch.getFirstMessageOffset();
       _segmentLogger.error(message);
       _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(), message, null));
     }
