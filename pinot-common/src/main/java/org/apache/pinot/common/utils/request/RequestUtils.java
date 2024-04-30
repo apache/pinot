@@ -24,8 +24,10 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableSet;
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -301,6 +303,43 @@ public class RequestUtils {
     return RequestUtils.getLiteralExpression(object.toString());
   }
 
+  public static Function getFunction(String canonicalName, List<Expression> operands) {
+    Function function = new Function(canonicalName);
+    function.setOperands(operands);
+    return function;
+  }
+
+  public static Function getFunction(String canonicalName, Expression operand) {
+    // NOTE: Create an ArrayList because we might need to modify the list later
+    List<Expression> operands = new ArrayList<>(1);
+    operands.add(operand);
+    return getFunction(canonicalName, operands);
+  }
+
+  public static Function getFunction(String canonicalName, Expression... operands) {
+    // NOTE: Create an ArrayList because we might need to modify the list later
+    return getFunction(canonicalName, new ArrayList<>(Arrays.asList(operands)));
+  }
+
+  public static Expression getFunctionExpression(Function function) {
+    Expression expression = new Expression(ExpressionType.FUNCTION);
+    expression.setFunctionCall(function);
+    return expression;
+  }
+
+  public static Expression getFunctionExpression(String canonicalName, List<Expression> operands) {
+    return getFunctionExpression(getFunction(canonicalName, operands));
+  }
+
+  public static Expression getFunctionExpression(String canonicalName, Expression operand) {
+    return getFunctionExpression(getFunction(canonicalName, operand));
+  }
+
+  public static Expression getFunctionExpression(String canonicalName, Expression... operands) {
+    return getFunctionExpression(getFunction(canonicalName, operands));
+  }
+
+  @Deprecated
   public static Expression getFunctionExpression(String canonicalName) {
     assert canonicalName.equalsIgnoreCase(canonicalizeFunctionNamePreservingSpecialKey(canonicalName));
     Expression expression = new Expression(ExpressionType.FUNCTION);
