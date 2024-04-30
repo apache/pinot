@@ -71,7 +71,8 @@ public class CsvParser {
         Stream<String> tokenStream = input.stream();
         if (escapeComma) {
             tokenStream = tokenStream.map(s -> s.replaceAll(",", "\\,"));
-        } if (trim) {
+        }
+        if (trim) {
             tokenStream = tokenStream.map(String::trim);
         }
         return tokenStream.collect(Collectors.joining(","));
