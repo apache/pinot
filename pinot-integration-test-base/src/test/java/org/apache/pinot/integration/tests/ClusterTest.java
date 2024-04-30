@@ -25,8 +25,6 @@ import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -56,6 +54,7 @@ import org.apache.pinot.broker.broker.helix.BaseBrokerStarter;
 import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
+import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.minion.BaseMinionStarter;
@@ -456,8 +455,9 @@ public abstract class ClusterTest extends ControllerTest {
       FileUploadDownloadClient fileUploadDownloadClient, File segmentTarFile)
       throws IOException, HttpErrorStatusException {
     List<Header> headers = ImmutableList.of(new BasicHeader(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI,
-        "file://" + segmentTarFile.getParentFile().getAbsolutePath() + "/" + URLEncoder.encode(segmentTarFile.getName(),
-            StandardCharsets.UTF_8)), new BasicHeader(FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE,
+        "file://" + segmentTarFile.getParentFile().getAbsolutePath() + "/"
+            + URIUtils.encode(segmentTarFile.getName())),
+        new BasicHeader(FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE,
         FileUploadDownloadClient.FileUploadType.METADATA.toString()));
     // Add table name and table type as request parameters
     NameValuePair tableNameValuePair =

@@ -22,8 +22,6 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.List;
 import java.util.UUID;
@@ -35,6 +33,7 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.pinot.common.segment.generation.SegmentGenerationUtils;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationJobUtils;
 import org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationTaskRunner;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -176,7 +175,7 @@ public class HadoopSegmentCreationMapper extends Mapper<LongWritable, Text, Long
 
       // Tar segment directory to compress file
       File localSegmentDir = new File(localOutputTempDir, segmentName);
-      String segmentTarFileName = URLEncoder.encode(segmentName + Constants.TAR_GZ_FILE_EXT, StandardCharsets.UTF_8);
+      String segmentTarFileName = URIUtils.encode(segmentName + Constants.TAR_GZ_FILE_EXT);
       File localSegmentTarFile = new File(localOutputTempDir, segmentTarFileName);
       LOGGER.info("Tarring segment from: {} to: {}", localSegmentDir, localSegmentTarFile);
       TarGzCompressionUtils.createTarGzFile(localSegmentDir, localSegmentTarFile);
@@ -191,8 +190,7 @@ public class HadoopSegmentCreationMapper extends Mapper<LongWritable, Text, Long
           _spec.isOverwriteOutput());
 
       // Create and upload segment metadata tar file
-      String metadataTarFileName = URLEncoder.encode(segmentName + Constants.METADATA_TAR_GZ_FILE_EXT,
-          StandardCharsets.UTF_8);
+      String metadataTarFileName = URIUtils.encode(segmentName + Constants.METADATA_TAR_GZ_FILE_EXT);
       URI outputMetadataTarURI = relativeOutputPath.resolve(metadataTarFileName);
       if (outputDirFS.exists(outputMetadataTarURI) && (_spec.isOverwriteOutput() || !_spec.isCreateMetadataTarGz())) {
         LOGGER.info("Deleting existing metadata tar gz file: {}", outputMetadataTarURI);

@@ -324,8 +324,7 @@ public class S3PinotFS extends BasePinotFS {
   private boolean copyFile(URI srcUri, URI dstUri)
       throws IOException {
     try {
-      String encodedUrl = null;
-      encodedUrl = URLEncoder.encode(srcUri.getHost() + srcUri.getPath(), StandardCharsets.UTF_8);
+      String encodedUrl = URLEncoder.encode(srcUri.getHost() + srcUri.getPath(), StandardCharsets.UTF_8);
 
       String dstPath = sanitizePath(dstUri.getPath());
       CopyObjectRequest copyReq = generateCopyObjectRequest(encodedUrl, dstUri, dstPath, null);

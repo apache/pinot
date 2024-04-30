@@ -21,8 +21,6 @@ package org.apache.pinot.common.function.scalar;
 import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
 import java.io.UnsupportedEncodingException;
-import java.net.URLDecoder;
-import java.net.URLEncoder;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.text.Normalizer;
@@ -33,6 +31,7 @@ import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.utils.RegexpPatternConverterUtils;
+import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.utils.JsonUtils;
 
@@ -807,7 +806,7 @@ public class StringFunctions {
    */
   @ScalarFunction
   public static String encodeUrl(String input) {
-    return URLEncoder.encode(input, StandardCharsets.UTF_8);
+    return URIUtils.encode(input);
   }
 
   /**
@@ -817,7 +816,7 @@ public class StringFunctions {
    */
   @ScalarFunction
   public static String decodeUrl(String input) {
-    return URLDecoder.decode(input, StandardCharsets.UTF_8);
+    return URIUtils.decode(input);
   }
 
   /**

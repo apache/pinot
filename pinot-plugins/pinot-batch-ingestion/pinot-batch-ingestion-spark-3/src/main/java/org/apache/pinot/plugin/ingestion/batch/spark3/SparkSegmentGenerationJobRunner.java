@@ -22,8 +22,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.Serializable;
 import java.net.URI;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -35,6 +33,7 @@ import java.util.UUID;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.segment.generation.SegmentGenerationUtils;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationJobUtils;
 import org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationTaskRunner;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -282,8 +281,7 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
 
           // Tar segment directory to compress file
           File localSegmentDir = new File(localOutputTempDir, segmentName);
-          String segmentTarFileName = URLEncoder.encode(segmentName + Constants.TAR_GZ_FILE_EXT,
-              StandardCharsets.UTF_8);
+          String segmentTarFileName = URIUtils.encode(segmentName + Constants.TAR_GZ_FILE_EXT);
           File localSegmentTarFile = new File(localOutputTempDir, segmentTarFileName);
           LOGGER.info("Tarring segment from: {} to: {}", localSegmentDir, localSegmentTarFile);
           TarGzCompressionUtils.createTarGzFile(localSegmentDir, localSegmentTarFile);
@@ -299,8 +297,7 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
               _spec.isOverwriteOutput());
 
           // Create and upload segment metadata tar file
-          String metadataTarFileName = URLEncoder.encode(segmentName + Constants.METADATA_TAR_GZ_FILE_EXT,
-              StandardCharsets.UTF_8);
+          String metadataTarFileName = URIUtils.encode(segmentName + Constants.METADATA_TAR_GZ_FILE_EXT);
           URI outputMetadataTarURI = relativeOutputPath.resolve(metadataTarFileName);
           if (finalOutputDirFS.exists(outputMetadataTarURI) && (_spec.isOverwriteOutput()
               || !_spec.isCreateMetadataTarGz())) {

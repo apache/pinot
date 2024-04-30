@@ -20,8 +20,6 @@ package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -29,6 +27,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.broker.broker.helix.BaseBrokerStarter;
+import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -270,9 +269,9 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
     String encodedSQL;
-    encodedSQL = URLEncoder.encode("select * from " + realtimeTableName, StandardCharsets.UTF_8);
+    encodedSQL = URIUtils.encode("select * from " + realtimeTableName);
     Assert.assertNotNull(getDebugInfo("debug/routingTable/sql?query=" + encodedSQL));
-    encodedSQL = URLEncoder.encode("select * from " + offlineTableName, StandardCharsets.UTF_8);
+    encodedSQL = URIUtils.encode("select * from " + offlineTableName);
     Assert.assertNotNull(getDebugInfo("debug/routingTable/sql?query=" + encodedSQL));
   }
 

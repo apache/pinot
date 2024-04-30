@@ -24,11 +24,10 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.testng.Assert;
@@ -85,9 +84,7 @@ public class SegmentGenerationUtilsTest {
       Assert.assertTrue(e instanceof URISyntaxException);
     }
     URI outputSegmentTarURI = SegmentGenerationUtils.getRelativeOutputPath(inputDirURI, inputFileURI, outputDirURI)
-        .resolve(new URI(
-            URLEncoder.encode("table_OFFLINE_2021-02-01_09:39:00.000_2021-02-01_11:59:00.000_2.tar.gz",
-                StandardCharsets.UTF_8)));
+        .resolve(new URI(URIUtils.encode("table_OFFLINE_2021-02-01_09:39:00.000_2021-02-01_11:59:00.000_2.tar.gz")));
     Assert.assertEquals(outputSegmentTarURI.toString(),
         "hdfs://namenode2/output/dir/subdir/table_OFFLINE_2021-02-01_09%3A39%3A00.000_2021-02-01_11%3A59%3A00.000_2"
             + ".tar.gz");

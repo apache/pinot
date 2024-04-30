@@ -92,21 +92,11 @@ public class URIUtils {
   }
 
   public static String encode(String string) {
-    try {
-      return URLEncoder.encode(string, StandardCharsets.UTF_8);
-    } catch (Exception e) {
-      // Should never happen
-      throw new RuntimeException(e);
-    }
+    return URLEncoder.encode(string, StandardCharsets.UTF_8);
   }
 
   public static String decode(String string) {
-    try {
-      return URLDecoder.decode(string, StandardCharsets.UTF_8);
-    } catch (Exception e) {
-      // Should never happen
-      throw new RuntimeException(e);
-    }
+    return URLDecoder.decode(string, StandardCharsets.UTF_8);
   }
 
   /**
