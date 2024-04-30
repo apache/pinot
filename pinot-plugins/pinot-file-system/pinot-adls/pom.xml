@@ -45,6 +45,12 @@
       <groupId>com.azure</groupId>
       <artifactId>azure-identity</artifactId>
       <version>1.12.0</version>
+      <exclusions>
+        <exclusion>
+          <groupId>net.java.dev.jna</groupId>
+          <artifactId>jna-platform</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
   </dependencies>
   <dependencyManagement>
@@ -63,16 +69,6 @@
         <groupId>io.projectreactor</groupId>
         <artifactId>reactor-core</artifactId>
         <version>3.6.5</version>
-      </dependency>
-      <dependency>
-        <groupId>net.java.dev.jna</groupId>
-        <artifactId>jna-platform</artifactId>
-        <version>${jna.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>net.java.dev.jna</groupId>
-        <artifactId>jna</artifactId>
-        <version>${jna.version}</version>
       </dependency>
       <dependency>
         <groupId>com.microsoft.azure</groupId>
