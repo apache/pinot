@@ -493,12 +493,6 @@ public class BrokerResponseNative implements BrokerResponse {
     return isNumGroupsLimitReached() || getExceptionsSize() > 0 || isMaxRowsInJoinReached();
   }
 
-  @JsonProperty(access = JsonProperty.Access.READ_ONLY)
-  @Override
-  public long getMaxRowsInOperator() {
-    return BrokerResponse.super.getMaxRowsInOperator();
-  }
-
   @JsonProperty("timeUsedMs")
   @Override
   public long getTimeUsedMs() {

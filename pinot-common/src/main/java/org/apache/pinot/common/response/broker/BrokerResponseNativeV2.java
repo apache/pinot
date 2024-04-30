@@ -95,7 +95,10 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
     return _stageStats;
   }
 
-  @JsonProperty
+  /**
+   * Get the max number of rows seen by a single operator in the query processing chain.
+   */
+  @JsonProperty(access = JsonProperty.Access.READ_ONLY)
   public long getMaxRowsInOperator() {
     return _maxRowsInOperator;
   }

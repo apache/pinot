@@ -293,7 +293,6 @@ const getQueryResults = (params) => {
     const columnStats = ['timeUsedMs',
       'numDocsScanned',
       'totalDocs',
-      'maxRowsInOperator',
       'numServersQueried',
       'numServersResponded',
       'numSegmentsQueried',
@@ -323,8 +322,7 @@ const getQueryResults = (params) => {
       },
       queryStats: {
         columns: columnStats,
-        records: [[queryResponse.timeUsedMs, queryResponse.numDocsScanned, queryResponse.totalDocs,
-          queryResponse.maxRowsInOperator, queryResponse.numServersQueried, queryResponse.numServersResponded,
+        records: [[queryResponse.timeUsedMs, queryResponse.numDocsScanned, queryResponse.totalDocs, queryResponse.numServersQueried, queryResponse.numServersResponded,
           queryResponse.numSegmentsQueried, queryResponse.numSegmentsProcessed, queryResponse.numSegmentsMatched, queryResponse.numConsumingSegmentsQueried,
           queryResponse.numEntriesScannedInFilter, queryResponse.numEntriesScannedPostFilter, queryResponse.numGroupsLimitReached,
           queryResponse.partialResponse ? queryResponse.partialResponse : '-', queryResponse.minConsumingFreshnessTimeMs,

@@ -140,8 +140,7 @@ declare module 'Models' {
     },
     timeUsedMs: number
     numDocsScanned: number
-    totalDocs: number,
-    maxRowsInOperator: number,
+    totalDocs: number
     numServersQueried: number
     numServersResponded: number
     numSegmentsQueried: number
