@@ -116,24 +116,24 @@ public class TextIndexUtils {
   public static Analyzer getAnalyzer(TextIndexConfig config) throws ReflectiveOperationException {
     String luceneAnalyzerClassName = config.getLuceneAnalyzerClass();
     List<String> luceneAnalyzerClassArgs = config.getLuceneAnalyzerClassArgs();
-    List<String> luceneAnalyzerClassArgsTypes = config.getLuceneAnalyzerClassArgTypes();
+    List<String> luceneAnalyzerClassArgTypes = config.getLuceneAnalyzerClassArgTypes();
 
     if (null == luceneAnalyzerClassName || luceneAnalyzerClassName.isEmpty()
             || (luceneAnalyzerClassName.equals(StandardAnalyzer.class.getName())
-                    && luceneAnalyzerClassArgs.isEmpty() && luceneAnalyzerClassArgsTypes.isEmpty())) {
+                    && luceneAnalyzerClassArgs.isEmpty() && luceneAnalyzerClassArgTypes.isEmpty())) {
       // When there is no analyzer defined, or when StandardAnalyzer (default) is used without arguments,
       // use existing logic to obtain an instance of StandardAnalyzer with customized stop words
       return TextIndexUtils.getStandardAnalyzerWithCustomizedStopWords(
               config.getStopWordsInclude(), config.getStopWordsExclude());
     } else {
       // Custom analyzer + custom configs via reflection
-      if (luceneAnalyzerClassArgs.size() != luceneAnalyzerClassArgsTypes.size()) {
+      if (luceneAnalyzerClassArgs.size() != luceneAnalyzerClassArgTypes.size()) {
         throw new ReflectiveOperationException("Mismatch of the number of analyzer arguments and arguments types.");
       }
 
       // Generate args type list
       List<Class<?>> argClasses = new ArrayList<>();
-      for (String argType : luceneAnalyzerClassArgsTypes) {
+      for (String argType : luceneAnalyzerClassArgTypes) {
         argClasses.add(parseSupportedTypes(argType));
       }
 

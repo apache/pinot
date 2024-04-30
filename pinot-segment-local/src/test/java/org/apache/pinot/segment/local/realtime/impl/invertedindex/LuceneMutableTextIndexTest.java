@@ -29,7 +29,9 @@ import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.core.KeywordTokenizer;
 import org.apache.lucene.queryparser.classic.QueryParser;
 import org.apache.lucene.search.SearcherManager;
+import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
+import org.apache.pinot.spi.config.table.FSTType;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.annotations.AfterClass;
@@ -164,8 +166,21 @@ public class LuceneMutableTextIndexTest {
 
   private void configureIndex(String analyzerClass, String analyzerClassArgs, String analyzerClassArgTypes,
                               String queryParserClass) {
-    TextIndexConfig config = new TextIndexConfig(false, null, null, false, false, null, null, true, 500,
-            analyzerClass, analyzerClassArgs, analyzerClassArgTypes, queryParserClass, false);
+    FSTType fstType = null;
+    TextIndexConfigBuilder builder = new TextIndexConfigBuilder(fstType);
+    if (null != analyzerClass) {
+      builder.withLuceneAnalyzerClass(analyzerClass);
+    }
+    if (null != analyzerClassArgs) {
+      builder.withLuceneAnalyzerClassArgs(analyzerClassArgs);
+    }
+    if (null != analyzerClassArgTypes) {
+      builder.withLuceneAnalyzerClassArgTypes(analyzerClassArgTypes);
+    }
+    if (null != queryParserClass) {
+      builder.withLuceneQueryParserClass(queryParserClass);
+    }
+    TextIndexConfig config = builder.build();
 
     // Note that segment name must be unique on each query setup, otherwise `testQueryCancellationIsSuccessful` method
     // will cause unit test to fail due to inability to release a lock.

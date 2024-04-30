@@ -21,6 +21,7 @@ package org.apache.pinot.segment.spi.utils;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.regex.Matcher;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.annotation.Nullable;
@@ -70,7 +71,7 @@ public class CsvParser {
     public static String serialize(List<String> input, boolean escapeComma, boolean trim) {
         Stream<String> tokenStream = input.stream();
         if (escapeComma) {
-            tokenStream = tokenStream.map(s -> s.replaceAll(",", "\\,"));
+            tokenStream = tokenStream.map(s -> s.replaceAll(",", Matcher.quoteReplacement("\\,")));
         }
         if (trim) {
             tokenStream = tokenStream.map(String::trim);

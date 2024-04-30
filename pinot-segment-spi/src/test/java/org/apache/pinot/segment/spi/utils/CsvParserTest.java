@@ -27,8 +27,10 @@ public class CsvParserTest {
     @Test
     public void testEscapeTrueTrimFalse() {
         String input = " \\,.\n\t()[]{}\"':=-_$\\?@&|#+/,:=[]$@&|#";
-        List<String> expectedOutput = Arrays.asList(" ,.\n\t()[]{}\"':=-_$\\?@&|#+/", ":=[]$@&|#");
-        Assert.assertEquals(CsvParser.parse(input, true, false), expectedOutput);
+        List<String> actualParsedOutput = CsvParser.parse(input, true, false);
+        List<String> expectedParsedOutput = Arrays.asList(" ,.\n\t()[]{}\"':=-_$\\?@&|#+/", ":=[]$@&|#");
+        Assert.assertEquals(actualParsedOutput, expectedParsedOutput);
+        Assert.assertEquals(CsvParser.serialize(actualParsedOutput, true, false), input);
     }
 
     @Test

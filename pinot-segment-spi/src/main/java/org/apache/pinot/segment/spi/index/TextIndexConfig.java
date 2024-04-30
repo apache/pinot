@@ -218,7 +218,7 @@ public class TextIndexConfig extends IndexConfig {
     public TextIndexConfig build() {
       return new TextIndexConfig(false, _fstType, _rawValueForTextIndex, _enableQueryCache, _useANDForMultiTermQueries,
           _stopWordsInclude, _stopWordsExclude, _luceneUseCompoundFile, _luceneMaxBufferSizeMB, _luceneAnalyzerClass,
-          CsvParser.serialize(_luceneAnalyzerClassArgs, false, false),
+          CsvParser.serialize(_luceneAnalyzerClassArgs, true, false),
           CsvParser.serialize(_luceneAnalyzerClassArgTypes, false, false),
           _luceneQueryParserClass, _enablePrefixSuffixMatchingInPhraseQueries);
     }
@@ -266,7 +266,7 @@ public class TextIndexConfig extends IndexConfig {
     }
 
     public AbstractBuilder withLuceneAnalyzerClassArgTypes(String luceneAnalyzerClassArgTypes) {
-      _luceneAnalyzerClassArgs = CsvParser.parse(luceneAnalyzerClassArgTypes, false, true);
+      _luceneAnalyzerClassArgTypes = CsvParser.parse(luceneAnalyzerClassArgTypes, false, true);
       return this;
     }
 
