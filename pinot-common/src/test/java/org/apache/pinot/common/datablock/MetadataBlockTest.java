@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.datablock;
 
+import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Collections;
@@ -63,7 +64,7 @@ public class MetadataBlockTest extends BaseDataBlockContract {
   @Test
   public void shouldDecodeV1MetadataBlockError()
       throws IOException {
-    V1MetadataBlock v1MetadataBlock = new V1MetadataBlock(V1MetadataBlock.MetadataBlockType.ERROR);
+    V1MetadataBlock v1MetadataBlock = new V1MetadataBlock(MetadataBlock.MetadataBlockType.ERROR);
     v1MetadataBlock.addException(250, "timeout");
     v1MetadataBlock.addException(500, "server error");
 
@@ -75,13 +76,13 @@ public class MetadataBlockTest extends BaseDataBlockContract {
     MetadataBlock metadataBlock = (MetadataBlock) dataBlock;
     assertEquals(metadataBlock.getType(), MetadataBlock.MetadataBlockType.ERROR, "Expected error type");
     assertEquals(metadataBlock.getStatsByStage(), Collections.emptyList(), "Expected no stats by stage");
-    assertEquals(metadataBlock.getExceptions().size(), v1MetadataBlock.getExceptions().size(), "Expected exceptions");
+    assertEquals(metadataBlock.getExceptions(), v1MetadataBlock.getExceptions(), "Expected exceptions");
   }
 
   @Test
   public void shouldDecodeV1MetadataBlockEmptyStats()
       throws IOException {
-    V1MetadataBlock v1MetadataBlock = new V1MetadataBlock(V1MetadataBlock.MetadataBlockType.EOS, new HashMap<>());
+    V1MetadataBlock v1MetadataBlock = new V1MetadataBlock(MetadataBlock.MetadataBlockType.EOS, new HashMap<>());
 
     byte[] bytes = v1MetadataBlock.toBytes();
     ByteBuffer buff = ByteBuffer.wrap(bytes);
@@ -91,7 +92,7 @@ public class MetadataBlockTest extends BaseDataBlockContract {
     MetadataBlock metadataBlock = (MetadataBlock) dataBlock;
     assertEquals(metadataBlock.getType(), MetadataBlock.MetadataBlockType.EOS, "Expected EOS type");
     assertEquals(metadataBlock.getStatsByStage(), Collections.emptyList(), "Expected no stats by stage");
-    assertEquals(metadataBlock.getExceptions().size(), v1MetadataBlock.getExceptions().size(), "Expected exceptions");
+    assertEquals(metadataBlock.getExceptions(), v1MetadataBlock.getExceptions(), "Expected exceptions");
   }
 
   @Test
@@ -100,7 +101,7 @@ public class MetadataBlockTest extends BaseDataBlockContract {
     HashMap<String, String> stats = new HashMap<>();
     stats.put("foo", "bar");
     stats.put("baz", "qux");
-    V1MetadataBlock v1MetadataBlock = new V1MetadataBlock(V1MetadataBlock.MetadataBlockType.EOS, stats);
+    V1MetadataBlock v1MetadataBlock = new V1MetadataBlock(MetadataBlock.MetadataBlockType.EOS, stats);
 
     byte[] bytes = v1MetadataBlock.toBytes();
     ByteBuffer buff = ByteBuffer.wrap(bytes);
@@ -110,7 +111,7 @@ public class MetadataBlockTest extends BaseDataBlockContract {
     MetadataBlock metadataBlock = (MetadataBlock) dataBlock;
     assertEquals(metadataBlock.getType(), MetadataBlock.MetadataBlockType.EOS, "Expected EOS type");
     assertEquals(metadataBlock.getStatsByStage(), Collections.emptyList(), "Expected no stats by stage");
-    assertEquals(metadataBlock.getExceptions().size(), v1MetadataBlock.getExceptions().size(), "Expected exceptions");
+    assertEquals(metadataBlock.getExceptions(), Collections.emptyMap(), "Expected no exceptions");
   }
 
   @Test
@@ -161,6 +162,61 @@ public class MetadataBlockTest extends BaseDataBlockContract {
     // (should through exception)
     block.getInt(0, 0);
   }
+
+  @Test
+  public void emptyEosCanBeReadInV1()
+      throws IOException {
+    ByteBuffer stats = ByteBuffer.wrap(new byte[]{0, 0, 0, 0});
+    MetadataBlock metadataBlock = new MetadataBlock(MetadataBlock.MetadataBlockType.EOS, Lists.newArrayList(stats));
+
+    byte[] bytes = metadataBlock.toBytes();
+
+    // This is how V1 blocks were deserialized
+    ByteBuffer buff = ByteBuffer.wrap(bytes);
+    DataBlockUtils.readVersionType(buff); // consume the version information before decoding
+    V1MetadataBlock v1MetadataBlock = new V1MetadataBlock(buff);
+
+    assertEquals(v1MetadataBlock.getType(), MetadataBlock.MetadataBlockType.EOS, "Expected EOS type");
+    assertEquals(v1MetadataBlock.getStats(), Collections.emptyMap(), "Expected no stats by stage");
+    assertEquals(v1MetadataBlock.getExceptions(), metadataBlock.getExceptions(), "Expected no exceptions");
+  }
+
+  @Test
+  public void notEmptyEosCanBeReadInV1()
+      throws IOException {
+    MetadataBlock metadataBlock = new MetadataBlock(MetadataBlock.MetadataBlockType.EOS);
+
+    byte[] bytes = metadataBlock.toBytes();
+
+    // This is how V1 blocks were deserialized
+    ByteBuffer buff = ByteBuffer.wrap(bytes);
+    DataBlockUtils.readVersionType(buff); // consume the version information before decoding
+    V1MetadataBlock v1MetadataBlock = new V1MetadataBlock(buff);
+
+
+    assertEquals(v1MetadataBlock.getType(), MetadataBlock.MetadataBlockType.EOS, "Expected EOS type");
+    assertEquals(v1MetadataBlock.getStats(), Collections.emptyMap(), "Expected no stats by stage");
+    assertEquals(v1MetadataBlock.getExceptions(), metadataBlock.getExceptions(), "Expected no exceptions");
+  }
+
+  @Test
+  public void errorCanBeReadInV1()
+      throws IOException {
+    MetadataBlock metadataBlock = new MetadataBlock(MetadataBlock.MetadataBlockType.ERROR);
+    metadataBlock.addException(250, "timeout");
+
+    byte[] bytes = metadataBlock.toBytes();
+
+    // This is how V1 blocks were deserialized
+    ByteBuffer buff = ByteBuffer.wrap(bytes);
+    DataBlockUtils.readVersionType(buff); // consume the version information before decoding
+    V1MetadataBlock v1MetadataBlock = new V1MetadataBlock(buff);
+
+    assertEquals(v1MetadataBlock.getType(), MetadataBlock.MetadataBlockType.ERROR, "Expected error type");
+    assertEquals(v1MetadataBlock.getStats(), Collections.emptyMap(), "Expected no stats by stage");
+    assertEquals(v1MetadataBlock.getExceptions(), metadataBlock.getExceptions(), "Expected exceptions");
+  }
+
 
   /**
    * This is mostly just used as an internal serialization tool

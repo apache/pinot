@@ -49,21 +49,6 @@ public class V1MetadataBlock extends BaseDataBlock {
   @VisibleForTesting
   static final int VERSION = 1;
 
-  public enum MetadataBlockType {
-    /**
-     * Indicates that this block is the final block to be sent
-     * (End Of Stream) as part of an operator chain computation.
-     */
-    EOS,
-
-    /**
-     * An {@code ERROR} metadata block indicates that there was
-     * some error during computation. To retrieve the error that
-     * occurred, use {@link MetadataBlock#getExceptions()}
-     */
-    ERROR
-  }
-
   /**
    * Used to serialize the contents of the metadata block conveniently and in
    * a backwards compatible way. Use JSON because the performance of metadata block
@@ -106,11 +91,11 @@ public class V1MetadataBlock extends BaseDataBlock {
 
   private final Contents _contents;
 
-  public V1MetadataBlock(MetadataBlockType type) {
+  public V1MetadataBlock(MetadataBlock.MetadataBlockType type) {
     this(type, new HashMap<>());
   }
 
-  public V1MetadataBlock(MetadataBlockType type, Map<String, String> stats) {
+  public V1MetadataBlock(MetadataBlock.MetadataBlockType type, Map<String, String> stats) {
     super(0, null, new String[0], new byte[]{0}, toContents(new Contents(type.name(), stats)));
     _contents = new Contents(type.name(), stats);
   }
@@ -133,15 +118,15 @@ public class V1MetadataBlock extends BaseDataBlock {
     }
   }
 
-  public MetadataBlockType getType() {
+  public MetadataBlock.MetadataBlockType getType() {
     String type = _contents.getType();
 
     // if type is null, then we're reading a legacy block where we didn't encode any
     // data. assume that it is an EOS block if there's no exceptions and an ERROR block
     // otherwise
     return type == null
-        ? (getExceptions().isEmpty() ? MetadataBlockType.EOS : MetadataBlockType.ERROR)
-        : MetadataBlockType.valueOf(type);
+        ? (getExceptions().isEmpty() ? MetadataBlock.MetadataBlockType.EOS : MetadataBlock.MetadataBlockType.ERROR)
+        : MetadataBlock.MetadataBlockType.valueOf(type);
   }
 
   public Map<String, String> getStats() {

@@ -105,7 +105,7 @@ public class MetadataBlock extends BaseDataBlock {
     switch (version) {
       case 1: {
         V1MetadataBlock decoded = new V1MetadataBlock(byteBuffer);
-        if (decoded.getType() == V1MetadataBlock.MetadataBlockType.ERROR) {
+        if (decoded.getType() == MetadataBlockType.ERROR) {
           MetadataBlock metadataBlock = new MetadataBlock(MetadataBlockType.ERROR);
           for (Map.Entry<Integer, String> entry : decoded.getExceptions().entrySet()) {
             metadataBlock.addException(entry.getKey(), entry.getValue());
