@@ -231,7 +231,7 @@ public class DictionaryIndexType
     if (optimizeDictionary) {
       // Do not create dictionaries for json or text index columns as they are high-cardinality values almost always
       if ((fieldIndexConfigs.getConfig(StandardIndexes.json()).isEnabled() || fieldIndexConfigs.getConfig(
-          StandardIndexes.text()).isEnabled() || fieldIndexConfigs.getConfig(StandardIndexes.inverted()).isEnabled())) {
+          StandardIndexes.text()).isEnabled())) {
         return false;
       }
       // Do not create dictionary if index size with dictionary is going to be larger than index size without dictionary
