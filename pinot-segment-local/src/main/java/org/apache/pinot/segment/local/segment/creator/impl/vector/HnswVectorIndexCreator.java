@@ -61,7 +61,8 @@ public class HnswVectorIndexCreator implements VectorIndexCreator {
     try {
       // segment generation is always in V1 and later we convert (as part of post creation processing)
       // to V3 if segmentVersion is set to V3 in SegmentGeneratorConfig.
-      File indexFile = new File(segmentIndexDir, _vectorColumn + V1Constants.Indexes.VECTOR_HNSW_INDEX_FILE_EXTENSION);
+      File indexFile = new File(segmentIndexDir, _vectorColumn
+          + V1Constants.Indexes.VECTOR_V99_HNSW_INDEX_FILE_EXTENSION);
       _indexDirectory = FSDirectory.open(indexFile.toPath());
       LOGGER.info("Creating HNSW index for column: {} at path: {} with {} for segment: {}", column,
           indexFile.getAbsolutePath(), vectorIndexConfig.getProperties(), segmentIndexDir.getAbsolutePath());

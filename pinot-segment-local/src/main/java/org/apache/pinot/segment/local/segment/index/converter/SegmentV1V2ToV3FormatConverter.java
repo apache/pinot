@@ -110,10 +110,10 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
       if (file.isFile() && file.exists()) {
         FileUtils.deleteQuietly(file);
       }
-      if (file.isDirectory() && file.getName().endsWith(V1Constants.Indexes.LUCENE_V9_TEXT_INDEX_FILE_EXTENSION)) {
+      if (file.isDirectory() && file.getName().endsWith(V1Constants.Indexes.LUCENE_V99_TEXT_INDEX_FILE_EXTENSION)) {
         FileUtils.deleteDirectory(file);
       }
-      if (file.isDirectory() && file.getName().endsWith(V1Constants.Indexes.VECTOR_HNSW_INDEX_FILE_EXTENSION)) {
+      if (file.isDirectory() && file.getName().endsWith(V1Constants.Indexes.VECTOR_V99_HNSW_INDEX_FILE_EXTENSION)) {
         FileUtils.deleteDirectory(file);
       }
     }
@@ -226,7 +226,7 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
   private void copyLuceneTextIndexIfExists(File segmentDirectory, File v3Dir)
       throws IOException {
     // TODO: see if this can be done by reusing some existing methods
-    String suffix = V1Constants.Indexes.LUCENE_V9_TEXT_INDEX_FILE_EXTENSION;
+    String suffix = V1Constants.Indexes.LUCENE_V99_TEXT_INDEX_FILE_EXTENSION;
     File[] textIndexFiles = segmentDirectory.listFiles(new FilenameFilter() {
       @Override
       public boolean accept(File dir, String name) {
@@ -263,7 +263,7 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
   private void copyVectorIndexIfExists(File segmentDirectory, File v3Dir)
       throws IOException {
     // TODO: see if this can be done by reusing some existing methods
-    String suffix = V1Constants.Indexes.VECTOR_HNSW_INDEX_FILE_EXTENSION;
+    String suffix = V1Constants.Indexes.VECTOR_V99_HNSW_INDEX_FILE_EXTENSION;
     File[] vectorIndexFiles = segmentDirectory.listFiles(new FilenameFilter() {
       @Override
       public boolean accept(File dir, String name) {
