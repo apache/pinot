@@ -68,8 +68,8 @@ public class ForwardIndexConfig extends IndexConfig {
     }
     _targetMaxChunkSize =
         targetMaxChunkSize == null ? DataSizeUtils.fromBytes(DEFAULT_TARGET_MAX_CHUNK_SIZE) : targetMaxChunkSize;
-    _targetDocsPerChunk =
-        targetDocsPerChunk == null ? DEFAULT_TARGET_DOCS_PER_CHUNK : targetDocsPerChunk;
+    _targetDocsPerChunk = targetDocsPerChunk == null ? DEFAULT_TARGET_DOCS_PER_CHUNK
+        : targetDocsPerChunk < 0 ? Integer.MAX_VALUE : targetDocsPerChunk;
 
     if (compressionCodec != null) {
       switch (compressionCodec) {

@@ -81,6 +81,15 @@ public class ForwardIndexConfigTest {
   }
 
   @Test
+  public void withNegativeTargetDocsPerChunk()
+      throws JsonProcessingException {
+    String confStr = "{\"targetDocsPerChunk\": \"-1\"}";
+    ForwardIndexConfig config = JsonUtils.stringToObject(confStr, ForwardIndexConfig.class);
+
+    assertEquals(config.getTargetDocsPerChunk(), Integer.MAX_VALUE, "Unexpected defaultTargetDocsPerChunk");
+  }
+
+  @Test
   public void withSomeData()
       throws JsonProcessingException {
     String confStr = "{\n"
