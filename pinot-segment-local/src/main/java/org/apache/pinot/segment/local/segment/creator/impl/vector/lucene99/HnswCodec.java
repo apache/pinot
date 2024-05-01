@@ -16,8 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.segment.creator.impl.vector.lucene95;
+package org.apache.pinot.segment.local.segment.creator.impl.vector.lucene99;
 
+import org.apache.lucene.backward_codecs.lucene90.Lucene90PostingsFormat;
 import org.apache.lucene.codecs.DocValuesFormat;
 import org.apache.lucene.codecs.FilterCodec;
 import org.apache.lucene.codecs.KnnVectorsFormat;
@@ -25,8 +26,7 @@ import org.apache.lucene.codecs.PointsFormat;
 import org.apache.lucene.codecs.PostingsFormat;
 import org.apache.lucene.codecs.lucene90.Lucene90DocValuesFormat;
 import org.apache.lucene.codecs.lucene90.Lucene90PointsFormat;
-import org.apache.lucene.codecs.lucene90.Lucene90PostingsFormat;
-import org.apache.lucene.codecs.lucene95.Lucene95Codec;
+import org.apache.lucene.codecs.lucene99.Lucene99Codec;
 import org.apache.lucene.codecs.perfield.PerFieldDocValuesFormat;
 import org.apache.lucene.codecs.perfield.PerFieldKnnVectorsFormat;
 import org.apache.lucene.codecs.perfield.PerFieldPostingsFormat;
@@ -36,7 +36,7 @@ import org.apache.lucene.codecs.perfield.PerFieldPostingsFormat;
  * Extend the Lucene 9.5 index format
  * The major change here is to allow custom: @link{org.apache.lucene.codecs.KnnVectorsFormat}
  *
- * @see org.apache.lucene.codecs.lucene95 package documentation for file format details.
+ * @see org.apache.lucene.codecs.lucene99 package documentation for file format details.
  */
 public class HnswCodec extends FilterCodec {
 
@@ -73,8 +73,8 @@ public class HnswCodec extends FilterCodec {
    *
    * @param mode stored fields compression mode to use for newly flushed/merged segments.
    */
-  public HnswCodec(Lucene95Codec.Mode mode, KnnVectorsFormat defaultKnnVectorsFormat) {
-    super("Lucene95", new Lucene95Codec(mode));
+  public HnswCodec(Lucene99Codec.Mode mode, KnnVectorsFormat defaultKnnVectorsFormat) {
+    super("Lucene99", new Lucene99Codec(mode));
     _defaultKnnVectorsFormat = defaultKnnVectorsFormat;
     _defaultPostingsFormat = new Lucene90PostingsFormat();
     _defaultDVFormat = new Lucene90DocValuesFormat();
@@ -123,7 +123,7 @@ public class HnswCodec extends FilterCodec {
   /**
    * Returns the vectors format that should be used for writing new segments of <code>field</code>
    *
-   * <p>The default implementation always returns "Lucene95".
+   * <p>The default implementation always returns "Lucene99".
    *
    * <p><b>WARNING:</b> if you subclass, you are responsible for index backwards compatibility:
    * future version of Lucene are only guaranteed to be able to read the default implementation.

@@ -26,6 +26,47 @@ import static org.testng.Assert.assertEquals;
 
 public class StringFunctionsTest {
 
+  @DataProvider(name = "splitPartTestCases")
+  public static Object[][] splitPartTestCases() {
+    return new Object[][]{
+        {"org.apache.pinot.common.function", ".", 0, 100, "org", "org"},
+        {"org.apache.pinot.common.function", ".", 10, 100, "null", "null"},
+        {"org.apache.pinot.common.function", ".", 1, 0, "apache", "apache"},
+        {"org.apache.pinot.common.function", ".", 1, 1, "apache", "null"},
+        {"org.apache.pinot.common.function", ".", 0, 1, "org", "org.apache.pinot.common.function"},
+        {"org.apache.pinot.common.function", ".", 1, 2, "apache", "apache.pinot.common.function"},
+        {"org.apache.pinot.common.function", ".", 2, 3, "pinot", "pinot.common.function"},
+        {"org.apache.pinot.common.function", ".", 3, 4, "common", "common.function"},
+        {"org.apache.pinot.common.function", ".", 4, 5, "function", "function"},
+        {"org.apache.pinot.common.function", ".", 5, 6, "null", "null"},
+        {"org.apache.pinot.common.function", ".", 3, 3, "common", "null"},
+        {"+++++", "+", 0, 100, "", ""},
+        {"+++++", "+", 1, 100, "null", "null"},
+        // note that splitPart will split with limit first, then lookup by index from START or END.
+        {"org.apache.pinot.common.function", ".", -1, 100, "function", "function"},
+        {"org.apache.pinot.common.function", ".", -10, 100, "null", "null"},
+        {"org.apache.pinot.common.function", ".", -2, 0, "common", "common"}, // Case: limit=0 is not taking effect.
+        {"org.apache.pinot.common.function", ".", -1, 1, "function", "org.apache.pinot.common.function"},
+        {"org.apache.pinot.common.function", ".", -2, 1, "common", "null"},
+        {"org.apache.pinot.common.function", ".", -1, 2, "function", "apache.pinot.common.function"},
+        {"org.apache.pinot.common.function", ".", -2, 2, "common", "org"},
+        {"org.apache.pinot.common.function", ".", -1, 3, "function", "pinot.common.function"},
+        {"org.apache.pinot.common.function", ".", -3, 3, "pinot", "org"},
+        {"org.apache.pinot.common.function", ".", -4, 3, "apache", "null"},
+        {"org.apache.pinot.common.function", ".", -1, 4, "function", "common.function"},
+        {"org.apache.pinot.common.function", ".", -3, 4, "pinot", "apache"},
+        {"org.apache.pinot.common.function", ".", -4, 4, "apache", "org"},
+        {"org.apache.pinot.common.function", ".", -1, 5, "function", "function"},
+        {"org.apache.pinot.common.function", ".", -5, 5, "org", "org"},
+        {"org.apache.pinot.common.function", ".", -6, 5, "null", "null"},
+        {"org.apache.pinot.common.function", ".", -1, 6, "function", "function"},
+        {"org.apache.pinot.common.function", ".", -5, 6, "org", "org"},
+        {"org.apache.pinot.common.function", ".", -6, 6, "null", "null"},
+        {"+++++", "+", -1, 100, "", ""},
+        {"+++++", "+", -2, 100, "null", "null"},
+    };
+  }
+
   @DataProvider(name = "isJson")
   public static Object[][] isJsonTestCases() {
     return new Object[][]{
@@ -36,8 +77,65 @@ public class StringFunctionsTest {
     };
   }
 
+  @DataProvider(name = "prefixAndSuffixTestCases")
+  public static Object[][] prefixAndSuffixTestCases() {
+    return new Object[][]{
+        {"abcde", 3, new String[]{"a", "ab", "abc"}, new String[]{"e", "de", "cde"}, new String[]{
+            "^a", "^ab", "^abc"}, new String[]{"e$", "de$", "cde$"}},
+        {"abcde", 0, new String[]{}, new String[]{}, new String[]{}, new String[]{}},
+        {"abcde", 9, new String[]{"a", "ab", "abc", "abcd", "abcde"}, new String[]{"e", "de", "cde", "bcde", "abcde"},
+        new String[]{"^a", "^ab", "^abc", "^abcd", "^abcde"}, new String[]{"e$", "de$", "cde$", "bcde$", "abcde$"}},
+        {"a", 3, new String[]{"a"}, new String[]{"a"}, new String[]{"^a"}, new String[]{"a$"}},
+        {"a", 0, new String[]{}, new String[]{}, new String[]{}, new String[]{}},
+        {"a", 9, new String[]{"a"}, new String[]{"a"}, new String[]{"^a"}, new String[]{"a$"}},
+        {"", 3, new String[]{}, new String[]{}, new String[]{}, new String[]{}},
+        {"", 0, new String[]{}, new String[]{}, new String[]{}, new String[]{}},
+        {"", 9, new String[]{}, new String[]{}, new String[]{}, new String[]{}}
+    };
+  }
+
+  @DataProvider(name = "ngramTestCases")
+  public static Object[][] ngramTestCases() {
+    return new Object[][]{
+        {"abcd", 0, 3, new String[]{"abc", "bcd"}, new String[]{"a", "b", "c", "d", "ab", "bc", "cd", "abc", "bcd"}},
+        {"abcd", 2, 2, new String[]{"ab", "bc", "cd"}, new String[]{"ab", "bc", "cd"}},
+        {"abcd", 3, 0, new String[]{}, new String[]{}},
+        {"abc", 0, 3, new String[]{"abc"}, new String[]{"a", "b", "c", "ab", "bc", "abc"}},
+        {"abc", 3, 0, new String[]{}, new String[]{}},
+        {"abc", 3, 3, new String[]{"abc"}, new String[]{"abc"}},
+        {"a", 0, 3, new String[]{}, new String[]{"a"}},
+        {"a", 2, 3, new String[]{}, new String[]{}},
+        {"a", 3, 3, new String[]{}, new String[]{}},
+        {"", 3, 0, new String[]{}, new String[]{}},
+        {"", 3, 3, new String[]{}, new String[]{}},
+        {"", 0, 3, new String[]{}, new String[]{}}
+    };
+  }
+
   @Test(dataProvider = "isJson")
   public void testIsJson(String input, boolean expectedValue) {
     assertEquals(StringFunctions.isJson(input), expectedValue);
+  }
+
+  @Test(dataProvider = "splitPartTestCases")
+  public void testSplitPart(String input, String delimiter, int index, int limit, String expectedToken,
+      String expectedTokenWithLimitCounts) {
+    assertEquals(StringFunctions.splitPart(input, delimiter, index), expectedToken);
+    assertEquals(StringFunctions.splitPart(input, delimiter, limit, index), expectedTokenWithLimitCounts);
+  }
+
+  @Test(dataProvider = "prefixAndSuffixTestCases")
+  public void testPrefixAndSuffix(String input, int length, String[] expectedPrefix, String[] expectedSuffix,
+      String[] expectedPrefixWithRegexChar, String[] expectedSuffixWithRegexChar) {
+    assertEquals(StringFunctions.prefixes(input, length), expectedPrefix);
+    assertEquals(StringFunctions.suffixes(input, length), expectedSuffix);
+    assertEquals(StringFunctions.prefixesWithPrefix(input, length, "^"), expectedPrefixWithRegexChar);
+    assertEquals(StringFunctions.suffixesWithSuffix(input, length, "$"), expectedSuffixWithRegexChar);
+  }
+
+  @Test(dataProvider = "ngramTestCases")
+  public void testNGram(String input, int minGram, int maxGram, String[] expectedExactNGram, String[] expectedNGram) {
+    assertEquals(StringFunctions.uniqueNgrams(input, maxGram), expectedExactNGram);
+    assertEquals(StringFunctions.uniqueNgrams(input, minGram, maxGram), expectedNGram);
   }
 }

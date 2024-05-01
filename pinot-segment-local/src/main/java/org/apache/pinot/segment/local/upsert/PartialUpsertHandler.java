@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.upsert;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -47,12 +48,24 @@ public class PartialUpsertHandler {
   private final TreeMap<String, FieldSpec> _fieldSpecMap;
   private final PartialUpsertMerger _partialUpsertMerger;
 
+  private final Map<String, Object> _defaultNullValues = new HashMap<>();
+
   public PartialUpsertHandler(Schema schema, List<String> comparisonColumns, UpsertConfig upsertConfig) {
     _primaryKeyColumns = schema.getPrimaryKeyColumns();
     _comparisonColumns = comparisonColumns;
     _fieldSpecMap = schema.getFieldSpecMap();
     _partialUpsertMerger =
         PartialUpsertMergerFactory.getPartialUpsertMerger(_primaryKeyColumns, comparisonColumns, upsertConfig);
+    // cache default null values to handle null merger results
+    for (Map.Entry<String, FieldSpec> entry : schema.getFieldSpecMap().entrySet()) {
+      String column = entry.getKey();
+      FieldSpec fieldSpec = entry.getValue();
+      if (fieldSpec.isSingleValueField()) {
+        _defaultNullValues.put(column, fieldSpec.getDefaultNullValue());
+      } else {
+        _defaultNullValues.put(column, new Object[]{fieldSpec.getDefaultNullValue()});
+      }
+    }
   }
 
   public void merge(LazyRow previousRow, GenericRow newRow, Map<String, Object> resultHolder) {
@@ -83,8 +96,7 @@ public class PartialUpsertHandler {
       row.removeNullValueField(column);
       row.putValue(column, mergedValue);
     } else {
-      // if column exists but mapped to a null value then merger result was a null value
-      row.putDefaultNullValue(column, _fieldSpecMap.get(column).getDefaultNullValue());
+      row.putDefaultNullValue(column, _defaultNullValues.get(column));
     }
   }
 }

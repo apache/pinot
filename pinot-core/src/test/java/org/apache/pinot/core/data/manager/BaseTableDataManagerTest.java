@@ -38,7 +38,6 @@ import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.common.utils.fetcher.BaseSegmentFetcher;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.core.data.manager.offline.OfflineTableDataManager;
-import org.apache.pinot.core.util.PeerServerSegmentFinder;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
@@ -645,26 +644,6 @@ public class BaseTableDataManagerTest {
       tmgr.downloadAndDecrypt("seg01", zkmd, tempRootDir);
     }
     verify(tmgr, times(1)).downloadFromPeersWithoutStreaming("seg01", zkmd, destFile);
-  }
-
-  // happy case: download from peers
-  @Test
-  public void testDownloadFromPeersWithoutStreaming()
-      throws Exception {
-    URI uri = mockRemoteCopy();
-    InstanceDataManagerConfig config = createDefaultInstanceDataManagerConfig();
-    when(config.getSegmentPeerDownloadScheme()).thenReturn("http");
-    HelixManager helixManager = mock(HelixManager.class);
-    BaseTableDataManager tmgr = createTableManager(config, helixManager);
-    File tempRootDir = tmgr.getTmpSegmentDataDir("test-download-peer-without-streaming");
-    File destFile = new File(tempRootDir, "seg01" + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
-    try (MockedStatic<PeerServerSegmentFinder> mockPeerSegFinder = mockStatic(PeerServerSegmentFinder.class)) {
-      mockPeerSegFinder.when(
-              () -> PeerServerSegmentFinder.getPeerServerURIs("seg01", "http", helixManager, TABLE_NAME_WITH_TYPE))
-          .thenReturn(Collections.singletonList(uri));
-      tmgr.downloadFromPeersWithoutStreaming("seg01", mock(SegmentZKMetadata.class), destFile);
-    }
-    assertEquals(FileUtils.readFileToString(destFile), "this is from somewhere remote");
   }
 
   @Test

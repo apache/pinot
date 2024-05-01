@@ -44,23 +44,16 @@ import org.apache.pinot.spi.utils.retry.RetryPolicies;
 public class HttpSegmentFetcher extends BaseSegmentFetcher {
   protected FileUploadDownloadClient _httpClient;
 
+  @VisibleForTesting
+  void setHttpClient(FileUploadDownloadClient httpClient) {
+    _httpClient = httpClient;
+  }
+
   @Override
   protected void doInit(PinotConfiguration config) {
-    _httpClient = new FileUploadDownloadClient(HttpClientConfig.newBuilder(config).build());
-  }
-
-  public HttpSegmentFetcher() {
-  }
-
-  @VisibleForTesting
-  protected HttpSegmentFetcher(FileUploadDownloadClient httpClient, PinotConfiguration config) {
-    _httpClient = httpClient;
-    _retryCount = config.getProperty(RETRY_COUNT_CONFIG_KEY, DEFAULT_RETRY_COUNT);
-    _retryWaitMs = config.getProperty(RETRY_WAIT_MS_CONFIG_KEY, DEFAULT_RETRY_WAIT_MS);
-    _retryDelayScaleFactor = config.getProperty(RETRY_DELAY_SCALE_FACTOR_CONFIG_KEY, DEFAULT_RETRY_DELAY_SCALE_FACTOR);
-    _logger
-        .info("Initialized with retryCount: {}, retryWaitMs: {}, retryDelayScaleFactor: {}", _retryCount, _retryWaitMs,
-            _retryDelayScaleFactor);
+    if (_httpClient == null) {
+      _httpClient = new FileUploadDownloadClient(HttpClientConfig.newBuilder(config).build());
+    }
   }
 
   @Override
@@ -87,9 +80,8 @@ public class HttpSegmentFetcher extends BaseSegmentFetcher {
           httpHeaders.add(new BasicHeader(HttpHeaders.HOST, hostName + ":" + port));
         }
         int statusCode = _httpClient.downloadFile(uri, dest, _authProvider, httpHeaders);
-        _logger
-            .info("Downloaded segment from: {} to: {} of size: {}; Response status code: {}", uri, dest, dest.length(),
-                statusCode);
+        _logger.info("Downloaded segment from: {} to: {} of size: {}; Response status code: {}", uri, dest,
+            dest.length(), statusCode);
         return true;
       } catch (HttpErrorStatusException e) {
         int statusCode = e.getStatusCode();

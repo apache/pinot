@@ -153,6 +153,13 @@ public abstract class BaseTableDataManager implements TableDataManager {
     if (_peerDownloadScheme == null) {
       _peerDownloadScheme = instanceDataManagerConfig.getSegmentPeerDownloadScheme();
     }
+    if (_peerDownloadScheme != null) {
+      _peerDownloadScheme = _peerDownloadScheme.toLowerCase();
+      Preconditions.checkState(
+          CommonConstants.HTTP_PROTOCOL.equals(_peerDownloadScheme) || CommonConstants.HTTPS_PROTOCOL.equals(
+              _peerDownloadScheme), "Unsupported peer download scheme: %s for table: %s", _peerDownloadScheme,
+          _tableNameWithType);
+    }
 
     _streamSegmentDownloadUntarRateLimitBytesPerSec =
         instanceDataManagerConfig.getStreamSegmentDownloadUntarRateLimit();
@@ -686,27 +693,22 @@ public abstract class BaseTableDataManager implements TableDataManager {
     }
   }
 
-  // not thread safe. Caller should invoke it with safe concurrency control.
   protected void downloadFromPeersWithoutStreaming(String segmentName, SegmentZKMetadata zkMetadata, File destTarFile)
       throws Exception {
-    Preconditions.checkState(_peerDownloadScheme != null, "Download peers require non null peer download scheme");
-    List<URI> peerSegmentURIs =
-        PeerServerSegmentFinder.getPeerServerURIs(segmentName, _peerDownloadScheme, _helixManager, _tableNameWithType);
-    if (peerSegmentURIs.isEmpty()) {
-      String msg = String.format("segment %s doesn't have any peers", segmentName);
-      LOGGER.warn(msg);
-      // HelixStateTransitionHandler would catch the runtime exception and mark the segment state as Error
-      throw new RuntimeException(msg);
-    }
+    Preconditions.checkState(_peerDownloadScheme != null, "Peer download is not enabled for table: %s",
+        _tableNameWithType);
     try {
-      // Next download the segment from a randomly chosen server using configured scheme.
-      SegmentFetcherFactory.fetchAndDecryptSegmentToLocal(peerSegmentURIs, destTarFile, zkMetadata.getCrypterName());
-      LOGGER.info("Fetched segment {} from peers: {} to: {} of size: {}", segmentName, peerSegmentURIs, destTarFile,
+      SegmentFetcherFactory.fetchAndDecryptSegmentToLocal(segmentName, _peerDownloadScheme, () -> {
+        List<URI> peerServerURIs =
+            PeerServerSegmentFinder.getPeerServerURIs(_helixManager, _tableNameWithType, segmentName,
+                _peerDownloadScheme);
+        Collections.shuffle(peerServerURIs);
+        return peerServerURIs;
+      }, destTarFile, zkMetadata.getCrypterName());
+      _logger.info("Downloaded tarred segment: {} from peers to: {}, file length: {}", segmentName, destTarFile,
           destTarFile.length());
-    } catch (AttemptsExceededException e) {
-      LOGGER.error("Attempts exceeded when downloading segment: {} for table: {} from peers {} to: {}", segmentName,
-          _tableNameWithType, peerSegmentURIs, destTarFile);
-      _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.SEGMENT_DOWNLOAD_FROM_PEERS_FAILURES, 1L);
+    } catch (Exception e) {
+      _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.SEGMENT_DOWNLOAD_FROM_PEERS_FAILURES, 1);
       throw e;
     }
   }

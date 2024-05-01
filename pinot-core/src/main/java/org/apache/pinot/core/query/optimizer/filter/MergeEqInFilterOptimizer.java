@@ -19,7 +19,6 @@
 package org.apache.pinot.core.query.optimizer.filter;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -164,16 +163,12 @@ public class MergeEqInFilterOptimizer implements FilterOptimizer {
   private static Expression getFilterExpression(Expression lhs, Set<Expression> values) {
     int numValues = values.size();
     if (numValues == 1) {
-      Expression eqFilter = RequestUtils.getFunctionExpression(FilterKind.EQUALS.name());
-      eqFilter.getFunctionCall().setOperands(Arrays.asList(lhs, values.iterator().next()));
-      return eqFilter;
+      return RequestUtils.getFunctionExpression(FilterKind.EQUALS.name(), lhs, values.iterator().next());
     } else {
-      Expression inFilter = RequestUtils.getFunctionExpression(FilterKind.IN.name());
       List<Expression> operands = new ArrayList<>(numValues + 1);
       operands.add(lhs);
       operands.addAll(values);
-      inFilter.getFunctionCall().setOperands(operands);
-      return inFilter;
+      return RequestUtils.getFunctionExpression(FilterKind.IN.name(), operands);
     }
   }
 }

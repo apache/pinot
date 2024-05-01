@@ -102,35 +102,24 @@ public interface PredicateEvaluator {
   boolean applyMV(int[] values, int length);
 
   /**
+   * Get the number of matching items. Negative number indicates exclusive (e.g. NOT_EQ, NOT_IN) match. Returns
+   * {@code Integer.MIN_VALUE} if not applicable.
+   */
+  default int getNumMatchingItems() {
+    return Integer.MIN_VALUE;
+  }
+
+  /**
    * APIs for dictionary based predicate evaluator
    */
 
   /**
-   * return the number of matching items specified by predicate
-   * negative number indicates exclusive (not eq, not in) match
-   * return {@code Integer.MIN_VALUE} for not applicable
-   */
-  default int getNumMatchingItems() {
-    return Integer.MIN_VALUE;
-  };
-
-  /**
-   * Get the number of matching dictionary ids.
-   */
-  int getNumMatchingDictIds();
-
-  /**
-   * Get the matching dictionary ids.
+   * Get the matching dictionary ids. The returned ids should be sorted.
    */
   int[] getMatchingDictIds();
 
   /**
-   * Get the number of non-matching dictionary ids.
-   */
-  int getNumNonMatchingDictIds();
-
-  /**
-   * Get the non-matching dictionary ids.
+   * Get the non-matching dictionary ids. The returned ids should be sorted.
    */
   int[] getNonMatchingDictIds();
 

@@ -19,15 +19,20 @@
 package org.apache.pinot.query.planner.serde;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Maps;
 import com.google.protobuf.ByteString;
 import java.lang.reflect.Field;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -35,14 +40,14 @@ import org.apache.pinot.spi.utils.ByteArray;
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class ProtoSerializationUtils {
-  private static final String ENUM_VALUE_KEY = "ENUM_VALUE_KEY";
-  private static final String NULL_OBJECT_CLASSNAME = "null";
-  private static final Plan.ObjectField NULL_OBJECT_VALUE = Plan.ObjectField.newBuilder()
-      .setObjectClassName(NULL_OBJECT_CLASSNAME).build();
-
   private ProtoSerializationUtils() {
-    // do not instantiate.
   }
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(ProtoSerializationUtils.class);
+  private static final String ENUM_VALUE_KEY = "ENUM_VALUE_KEY";
+  private static final String NULL_OBJECT_CLASS_NAME = "null";
+  private static final Plan.ObjectField NULL_OBJECT_VALUE =
+      Plan.ObjectField.newBuilder().setObjectClassName(NULL_OBJECT_CLASS_NAME).build();
 
   /**
    * Reflectively set object's field based on {@link Plan.ObjectField} provided.
@@ -51,20 +56,22 @@ public class ProtoSerializationUtils {
    * @param objectField the proto ObjectField from which the object will be set.
    */
   public static void setObjectFieldToObject(Object object, Plan.ObjectField objectField) {
+    Class<?> clazz = object.getClass();
     Map<String, Plan.MemberVariableField> memberVariablesMap = objectField.getMemberVariablesMap();
-    for (Map.Entry<String, Plan.MemberVariableField> e : memberVariablesMap.entrySet()) {
+    for (Map.Entry<String, Plan.MemberVariableField> entry : memberVariablesMap.entrySet()) {
+      String fieldName = entry.getKey();
       try {
-        Field declaredField = object.getClass().getDeclaredField(e.getKey());
+        Field declaredField = clazz.getDeclaredField(fieldName);
         if (declaredField.isAnnotationPresent(ProtoProperties.class)) {
-          Object memberVarObject = constructMemberVariable(e.getValue());
-          if (memberVarObject != null) {
+          Object value = constructMemberVariable(entry.getValue(), declaredField.getGenericType());
+          if (value != null) {
             declaredField.setAccessible(true);
-            declaredField.set(object, memberVarObject);
+            declaredField.set(object, value);
           }
         }
-      } catch (NoSuchFieldException | IllegalAccessException ex) {
-        throw new IllegalStateException("Unable to set Object " + object.getClass() + " on field " + e.getKey()
-            + "with object of type: " + objectField.getObjectClassName(), ex);
+      } catch (Exception e) {
+        throw new IllegalStateException(
+            String.format("Caught exception while setting field: %s on object: %s", fieldName, clazz), e);
       }
     }
   }
@@ -75,7 +82,7 @@ public class ProtoSerializationUtils {
    * @param object object to be converted.
    * @return the converted proto ObjectField.
    */
-  public static Plan.ObjectField convertObjectToObjectField(Object object) {
+  public static Plan.ObjectField convertObjectToObjectField(@Nullable Object object) {
     if (object != null) {
       Plan.ObjectField.Builder builder = Plan.ObjectField.newBuilder();
       builder.setObjectClassName(object.getClass().getName());
@@ -182,22 +189,24 @@ public class ProtoSerializationUtils {
   // Deserialize Utils
   // --------------------------------------------------------------------------
 
-  private static Object constructMemberVariable(Plan.MemberVariableField memberVariableField) {
-    switch (memberVariableField.getMemberVariableFieldCase()) {
+  @Nullable
+  private static Object constructMemberVariable(Plan.MemberVariableField value, Type type) {
+    switch (value.getMemberVariableFieldCase()) {
       case LITERALFIELD:
-        return constructLiteral(memberVariableField.getLiteralField());
+        return constructLiteral(value.getLiteralField());
       case LISTFIELD:
-        return constructList(memberVariableField.getListField());
+        return constructList(value.getListField(), type);
       case MAPFIELD:
-        return constructMap(memberVariableField.getMapField());
+        return constructMap(value.getMapField(), type);
       case OBJECTFIELD:
-        return constructObject(memberVariableField.getObjectField());
+        return constructObject(value.getObjectField(), type);
       case MEMBERVARIABLEFIELD_NOT_SET:
       default:
         return null;
     }
   }
 
+  @Nullable
   private static Object constructLiteral(Plan.LiteralField literalField) {
     switch (literalField.getLiteralFieldCase()) {
       case BOOLFIELD:
@@ -220,39 +229,52 @@ public class ProtoSerializationUtils {
     }
   }
 
-  private static List constructList(Plan.ListField listField) {
-    List list = new ArrayList();
-    for (Plan.MemberVariableField e : listField.getContentList()) {
-      list.add(constructMemberVariable(e));
+  private static List constructList(Plan.ListField listValue, Type type) {
+    Preconditions.checkState(type instanceof ParameterizedType, "List field must be parameterized");
+    Type elementType = ((ParameterizedType) type).getActualTypeArguments()[0];
+    List<Plan.MemberVariableField> values = listValue.getContentList();
+    List list = new ArrayList(values.size());
+    for (Plan.MemberVariableField value : values) {
+      list.add(constructMemberVariable(value, elementType));
     }
     return list;
   }
 
-  private static Map constructMap(Plan.MapField mapField) {
-    Map map = new HashMap();
-    for (Map.Entry<String, Plan.MemberVariableField> e : mapField.getContentMap().entrySet()) {
-      map.put(e.getKey(), constructMemberVariable(e.getValue()));
+  private static Map<String, Object> constructMap(Plan.MapField mapValue, Type type) {
+    Preconditions.checkState(type instanceof ParameterizedType, "Map field must be parameterized");
+    Type valueType = ((ParameterizedType) type).getActualTypeArguments()[1];
+    Map<String, Plan.MemberVariableField> values = mapValue.getContentMap();
+    Map<String, Object> map = Maps.newHashMapWithExpectedSize(values.size());
+    for (Map.Entry<String, Plan.MemberVariableField> entry : values.entrySet()) {
+      map.put(entry.getKey(), constructMemberVariable(entry.getValue(), valueType));
     }
     return map;
   }
 
-  private static Object constructObject(Plan.ObjectField objectField) {
-    if (!NULL_OBJECT_CLASSNAME.equals(objectField.getObjectClassName())) {
-      try {
-        Class<?> clazz = Class.forName(objectField.getObjectClassName());
-        if (clazz.isEnum()) {
-          return Enum.valueOf((Class<Enum>) clazz,
-              objectField.getMemberVariablesOrDefault(ENUM_VALUE_KEY, null).getLiteralField().getStringField());
-        } else {
-          Object obj = clazz.newInstance();
-          setObjectFieldToObject(obj, objectField);
-          return obj;
-        }
-      } catch (ClassNotFoundException | InstantiationException | IllegalAccessException e) {
-        throw new IllegalStateException("Unable to create Object of type: " + objectField.getObjectClassName(), e);
-      }
-    } else {
+  @Nullable
+  static Object constructObject(Plan.ObjectField value, Type type) {
+    String objectClassName = value.getObjectClassName();
+    if (objectClassName.equals(NULL_OBJECT_CLASS_NAME)) {
       return null;
+    }
+    Class<?> clazz;
+    try {
+      clazz = Class.forName(objectClassName);
+    } catch (ClassNotFoundException e) {
+      LOGGER.debug("Failed to find class: {}, falling back to: {}", objectClassName, type);
+      clazz = (Class<?>) type;
+    }
+    try {
+      if (clazz.isEnum()) {
+        return Enum.valueOf((Class<Enum>) clazz,
+            value.getMemberVariablesOrDefault(ENUM_VALUE_KEY, null).getLiteralField().getStringField());
+      } else {
+        Object object = clazz.getConstructor().newInstance();
+        setObjectFieldToObject(object, value);
+        return object;
+      }
+    } catch (Exception e) {
+      throw new IllegalStateException("Caught exception while creating object of type: " + clazz, e);
     }
   }
 }

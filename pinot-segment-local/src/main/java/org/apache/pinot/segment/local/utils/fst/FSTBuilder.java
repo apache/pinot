@@ -36,28 +36,31 @@ import org.slf4j.LoggerFactory;
  */
 public class FSTBuilder {
   public static final Logger LOGGER = LoggerFactory.getLogger(FSTBuilder.class);
-  private final FSTCompiler<Long> _builder = new FSTCompiler<>(FST.INPUT_TYPE.BYTE4, PositiveIntOutputs.getSingleton());
+  private final FSTCompiler<Long> _fstCompiler =
+      (new FSTCompiler.Builder<>(FST.INPUT_TYPE.BYTE4, PositiveIntOutputs.getSingleton())).build();
   private final IntsRefBuilder _scratch = new IntsRefBuilder();
 
   public static FST<Long> buildFST(SortedMap<String, Integer> input)
       throws IOException {
     PositiveIntOutputs fstOutput = PositiveIntOutputs.getSingleton();
-    FSTCompiler<Long> fstCompiler = new FSTCompiler<>(FST.INPUT_TYPE.BYTE4, fstOutput);
+    FSTCompiler.Builder<Long> fstCompilerBuilder = new FSTCompiler.Builder<>(FST.INPUT_TYPE.BYTE4, fstOutput);
+    FSTCompiler<Long> fstCompiler = fstCompilerBuilder.build();
 
     IntsRefBuilder scratch = new IntsRefBuilder();
     for (Map.Entry<String, Integer> entry : input.entrySet()) {
       fstCompiler.add(Util.toUTF16(entry.getKey(), scratch), entry.getValue().longValue());
     }
-    return fstCompiler.compile();
+
+    return FST.fromFSTReader(fstCompiler.compile(), fstCompiler.getFSTReader());
   }
 
   public void addEntry(String key, Integer value)
       throws IOException {
-    _builder.add(Util.toUTF16(key, _scratch), value.longValue());
+    _fstCompiler.add(Util.toUTF16(key, _scratch), value.longValue());
   }
 
   public FST<Long> done()
       throws IOException {
-    return _builder.compile();
+    return FST.fromFSTReader(_fstCompiler.compile(), _fstCompiler.getFSTReader());
   }
 }

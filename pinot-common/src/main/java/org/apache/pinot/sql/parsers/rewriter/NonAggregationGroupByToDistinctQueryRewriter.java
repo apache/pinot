@@ -18,8 +18,9 @@
  */
 package org.apache.pinot.sql.parsers.rewriter;
 
-import java.util.Collections;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.Function;
@@ -76,9 +77,11 @@ public class NonAggregationGroupByToDistinctQueryRewriter implements QueryRewrit
     }
     Set<Expression> groupByExpressions = new HashSet<>(pinotQuery.getGroupByList());
     if (selectExpressions.equals(groupByExpressions)) {
-      Expression distinct = RequestUtils.getFunctionExpression("distinct");
-      distinct.getFunctionCall().setOperands(pinotQuery.getSelectList());
-      pinotQuery.setSelectList(Collections.singletonList(distinct));
+      Expression distinct = RequestUtils.getFunctionExpression("distinct", pinotQuery.getSelectList());
+      // NOTE: Create an ArrayList because we might need to modify the list later
+      List<Expression> newSelectList = new ArrayList<>(1);
+      newSelectList.add(distinct);
+      pinotQuery.setSelectList(newSelectList);
       pinotQuery.setGroupByList(null);
       return pinotQuery;
     } else {

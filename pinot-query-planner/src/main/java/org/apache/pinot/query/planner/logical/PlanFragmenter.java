@@ -24,7 +24,7 @@ import it.unimi.dsi.fastutil.ints.IntList;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.calcite.rel.RelDistribution;
-import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
+import org.apache.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.SubPlan;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
