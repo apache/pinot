@@ -130,8 +130,8 @@
 
     <!-- Configuration for Packaging -->
     <shade.prefix>org.apache.pinot.shaded</shade.prefix>
-    <maven-jar-plugin.version>3.4.0</maven-jar-plugin.version>
-    <maven-shade-plugin.version>3.5.2</maven-shade-plugin.version>
+    <maven-jar-plugin.version>3.4.1</maven-jar-plugin.version>
+    <maven-shade-plugin.version>3.5.3</maven-shade-plugin.version>
     <shade.phase.prop>none</shade.phase.prop>
 
     <avro.version>1.11.3</avro.version>
@@ -147,18 +147,19 @@
     <hk2.version>2.6.1</hk2.version>
     <javassist.version>3.30.2-GA</javassist.version>
     <swagger.version>1.6.14</swagger.version>
-    <swagger-ui.version>5.15.0</swagger-ui.version>
+    <swagger-ui.version>5.17.0</swagger-ui.version>
     <hadoop.version>3.3.6</hadoop.version>
     <jsonpath.version>2.9.0</jsonpath.version>
     <jsonsmart.version>2.5.1</jsonsmart.version>
     <quartz.version>2.3.2</quartz.version>
     <calcite.version>1.36.0</calcite.version>
-    <lucene.version>9.8.0</lucene.version>
+    <lucene.version>9.10.0</lucene.version>
     <reflections.version>0.10.2</reflections.version>
+    <dynatrace.hash4j.version>0.17.0</dynatrace.hash4j.version>
     <!-- helix-core, spark-core use libraries from io.dropwizard.metrics -->
     <dropwizard-metrics.version>4.2.25</dropwizard-metrics.version>
     <snappy-java.version>1.1.10.5</snappy-java.version>
-    <zstd-jni.version>1.5.6-2</zstd-jni.version>
+    <zstd-jni.version>1.5.6-3</zstd-jni.version>
     <lz4-java.version>1.8.0</lz4-java.version>
     <libthrift.verion>0.20.0</libthrift.verion>
     <log4j.version>2.23.1</log4j.version>
@@ -171,12 +172,16 @@
     <audienceannotations.version>0.15.0</audienceannotations.version>
     <clp-ffi.version>0.4.4</clp-ffi.version>
     <stax2-api.version>4.2.2</stax2-api.version>
-    <aws.sdk.version>2.25.33</aws.sdk.version>
+    <aws.sdk.version>2.25.40</aws.sdk.version>
     <joda-time.version>2.12.7</joda-time.version>
     <janino.version>3.1.12</janino.version>
-    <testng.version>7.10.1</testng.version>
+    <testng.version>7.10.2</testng.version>
     <woodstox.version>6.6.2</woodstox.version>
     <sslcontext.kickstart.version>8.3.4</sslcontext.kickstart.version>
+
+    <confluent.version>7.6.1</confluent.version>
+    <pulsar.version>3.2.2</pulsar.version>
+    <flink.version>1.14.6</flink.version>
 
     <!-- Apache Commons Libraries -->
     <commons-lang3.version>3.14.0</commons-lang3.version>
@@ -187,7 +192,7 @@
     <commons-csv.version>1.10.0</commons-csv.version>
     <commons-configuration2.version>2.10.1</commons-configuration2.version>
     <commons-io.version>2.16.1</commons-io.version>
-    <commons-codec.version>1.16.1</commons-codec.version>
+    <commons-codec.version>1.17.0</commons-codec.version>
     <commons-cli.version>1.7.0</commons-cli.version>
     <commons-net.version>3.10.0</commons-net.version>
     <commons-validator.version>1.8.0</commons-validator.version>
@@ -231,43 +236,25 @@
     <protobuf.version>3.25.2</protobuf.version>
     <grpc.version>1.61.1</grpc.version>
 
-    <confluent.version>7.6.1</confluent.version>
-
     <!-- Configuration for Scala -->
-    <scala.version>2.12.18</scala.version>
+    <scala.version>2.12.19</scala.version>
     <scala.compat.version>2.12</scala.compat.version>
 
-    <flink.version>1.14.6</flink.version>
-
+    <!-- Solve conflict across dependencies -->
     <kotlin.stdlib.version>1.9.23</kotlin.stdlib.version>
     <okio.version>3.9.0</okio.version>
     <kerby.version>2.0.3</kerby.version>
-    <!-- Newer version jline requires java 21 -->
-    <jline.version>3.24.1</jline.version>
+    <jline.version>3.26.1</jline.version>
     <wildfly.version>1.7.0.Final</wildfly.version>
     <jettison.version>1.5.4</jettison.version>
     <eclipse.jetty.version>9.4.54.v20240208</eclipse.jetty.version>
     <nimbus-jose-jwt.version>9.37.3</nimbus-jose-jwt.version>
     <bouncycastle.version>1.78</bouncycastle.version>
-    <airlift.version>0.26</airlift.version>
-    <pulsar.version>2.11.4</pulsar.version>
+    <aircompressor.version>0.26</aircompressor.version>
+    <jna.version>5.14.0</jna.version>
   </properties>
 
   <profiles>
-    <profile>
-      <id>not-java-21</id>
-      <activation>
-        <jdk>!21</jdk>
-      </activation>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>com.diffplug.spotless</groupId>
-            <artifactId>spotless-maven-plugin</artifactId>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
     <profile>
       <id>github-actions</id>
       <activation>
@@ -456,7 +443,7 @@
       <dependency>
         <groupId>org.roaringbitmap</groupId>
         <artifactId>RoaringBitmap</artifactId>
-        <version>1.0.5</version>
+        <version>1.0.6</version>
       </dependency>
       <dependency>
         <groupId>com.101tec</groupId>
@@ -898,7 +885,7 @@
       <dependency>
         <groupId>com.google.errorprone</groupId>
         <artifactId>error_prone_annotations</artifactId>
-        <version>2.26.1</version>
+        <version>2.27.0</version>
       </dependency>
       <!-- Legacy Google Libraries -->
       <dependency>
@@ -1237,12 +1224,12 @@
       <dependency>
         <groupId>org.apache.datasketches</groupId>
         <artifactId>datasketches-java</artifactId>
-        <version>5.0.2</version>
+        <version>6.0.0</version>
       </dependency>
       <dependency>
         <groupId>com.dynatrace.hash4j</groupId>
         <artifactId>hash4j</artifactId>
-        <version>0.13.0</version>
+        <version>${dynatrace.hash4j.version}</version>
       </dependency>
       <dependency>
         <groupId>com.tdunning</groupId>
@@ -1444,12 +1431,12 @@
       <dependency>
         <groupId>net.openhft</groupId>
         <artifactId>posix</artifactId>
-        <version>2.23.2</version>
+        <version>2.25ea0</version>
       </dependency>
       <dependency>
         <groupId>net.openhft</groupId>
         <artifactId>chronicle-core</artifactId>
-        <version>2.25ea13</version>
+        <version>2.25ea14</version>
       </dependency>
       <dependency>
         <groupId>org.ow2.asm</groupId>
@@ -1458,8 +1445,13 @@
       </dependency>
       <dependency>
         <groupId>net.java.dev.jna</groupId>
+        <artifactId>jna-platform</artifactId>
+        <version>${jna.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>net.java.dev.jna</groupId>
         <artifactId>jna</artifactId>
-        <version>5.5.0</version>
+        <version>${jna.version}</version>
       </dependency>
 
       <dependency>
@@ -1561,19 +1553,7 @@
         <version>${sslcontext.kickstart.version}</version>
       </dependency>
 
-      <!-- Pulsar -->
-      <dependency>
-        <groupId>org.apache.pulsar</groupId>
-        <artifactId>pulsar-client-original</artifactId>
-        <version>${pulsar.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pulsar</groupId>
-        <artifactId>pulsar-client-admin-original</artifactId>
-        <version>${pulsar.version}</version>
-      </dependency>
-
-      <!-- bouncycastle libraries are used by Kafka and Pulsar plugins -->
+      <!-- Bouncy Castle libraries are used by Kafka and Pulsar plugins -->
       <dependency>
         <groupId>org.bouncycastle</groupId>
         <artifactId>bcpkix-jdk18on</artifactId>
@@ -1586,27 +1566,24 @@
       </dependency>
       <dependency>
         <groupId>org.bouncycastle</groupId>
-        <artifactId>bcpkix-jdk15to18</artifactId>
+        <artifactId>bcutil-jdk18on</artifactId>
         <version>${bouncycastle.version}</version>
       </dependency>
       <dependency>
         <groupId>org.bouncycastle</groupId>
-        <artifactId>bcprov-ext-jdk15to18</artifactId>
-        <version>${bouncycastle.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.bouncycastle</groupId>
-        <artifactId>bcprov-jdk15to18</artifactId>
+        <artifactId>bcprov-ext-jdk18on</artifactId>
         <version>${bouncycastle.version}</version>
       </dependency>
 
+      <!-- Used by ORC, Parquet and Pulsar -->
       <dependency>
         <groupId>io.airlift</groupId>
         <artifactId>aircompressor</artifactId>
-        <version>${airlift.version}</version>
+        <version>${aircompressor.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
+
   <build>
     <defaultGoal>clean install</defaultGoal>
     <extensions>
@@ -1624,7 +1601,6 @@
           <version>2.43.0</version>
           <executions>
             <execution>
-              <phase>verify</phase>
               <goals>
                 <goal>check</goal>
               </goals>
@@ -1899,7 +1875,7 @@
         <plugin>
           <groupId>net.alchim31.maven</groupId>
           <artifactId>scala-maven-plugin</artifactId>
-          <version>3.2.2</version>
+          <version>4.9.0</version>
           <executions>
             <execution>
               <id>add-source</id>
@@ -1935,6 +1911,9 @@
           </executions>
           <configuration>
             <scalaVersion>${scala.version}</scalaVersion>
+            <release>${jdk.version}</release>
+            <source>${jdk.version}</source>
+            <target>${jdk.version}</target>
             <args>
               <arg>-unchecked</arg>
               <arg>-deprecation</arg>
@@ -1945,10 +1924,6 @@
               <jvmArg>-Xmx1024m</jvmArg>
             </jvmArgs>
             <javacArgs>
-              <javacArg>-source</javacArg>
-              <javacArg>${jdk.version}</javacArg>
-              <javacArg>-target</javacArg>
-              <javacArg>${jdk.version}</javacArg>
               <javacArg>-Xlint:all,-serial,-path</javacArg>
             </javacArgs>
           </configuration>
@@ -1973,7 +1948,7 @@
           <dependency>
             <groupId>com.puppycrawl.tools</groupId>
             <artifactId>checkstyle</artifactId>
-            <version>10.15.0</version>
+            <version>10.16.0</version>
           </dependency>
         </dependencies>
         <executions>
@@ -2078,6 +2053,10 @@
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>sonar-maven-plugin</artifactId>
         <version>2.7.1</version>
+      </plugin>
+      <plugin>
+        <groupId>com.diffplug.spotless</groupId>
+        <artifactId>spotless-maven-plugin</artifactId>
       </plugin>
       <plugin>
         <groupId>com.mycila</groupId>

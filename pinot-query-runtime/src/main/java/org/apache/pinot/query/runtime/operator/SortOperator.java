@@ -21,7 +21,7 @@ package org.apache.pinot.query.runtime.operator;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
-import java.util.LinkedList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.PriorityQueue;
 import javax.annotation.Nullable;
@@ -129,16 +129,16 @@ public class SortOperator extends MultiStageOperator {
         return TransferableBlockUtils.getEndOfStreamTransferableBlock();
       }
     } else {
-      LinkedList<Object[]> rows = new LinkedList<>();
-      while (_priorityQueue.size() > _offset) {
-        Object[] row = _priorityQueue.poll();
-        rows.addFirst(row);
-      }
-      if (rows.size() == 0) {
+      int resultSize = _priorityQueue.size() - _offset;
+      if (resultSize <= 0) {
         return TransferableBlockUtils.getEndOfStreamTransferableBlock();
-      } else {
-        return new TransferableBlock(rows, _dataSchema, DataBlock.Type.ROW);
       }
+      Object[][] rowsArr = new Object[resultSize][];
+      for (int i = resultSize - 1; i >= 0; i--) {
+        Object[] row = _priorityQueue.poll();
+        rowsArr[i] = row;
+      }
+      return new TransferableBlock(Arrays.asList(rowsArr), _dataSchema, DataBlock.Type.ROW);
     }
   }
 

@@ -29,9 +29,7 @@ import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.io.File;
-import java.io.UnsupportedEncodingException;
 import java.net.URI;
-import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
@@ -207,11 +205,7 @@ public class TablesResource {
 
     List<String> decodedColumns = new ArrayList<>(columns.size());
     for (String column : columns) {
-      try {
-        decodedColumns.add(URLDecoder.decode(column, StandardCharsets.UTF_8.name()));
-      } catch (UnsupportedEncodingException e) {
-        throw new RuntimeException(e.getCause());
-      }
+      decodedColumns.add(URIUtils.decode(column));
     }
 
     boolean allColumns = false;
@@ -380,19 +374,11 @@ public class TablesResource {
       List<String> columns, @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     for (int i = 0; i < columns.size(); i++) {
-      try {
-        columns.set(i, URLDecoder.decode(columns.get(i), StandardCharsets.UTF_8.name()));
-      } catch (UnsupportedEncodingException e) {
-        throw new RuntimeException(e.getCause());
-      }
+      columns.set(i, URIUtils.decode(columns.get(i)));
     }
 
     TableDataManager tableDataManager = ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableName);
-    try {
-      segmentName = URLDecoder.decode(segmentName, StandardCharsets.UTF_8.name());
-    } catch (UnsupportedEncodingException e) {
-      throw new RuntimeException(e.getCause());
-    }
+    segmentName = URIUtils.decode(segmentName);
     SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segmentName);
     if (segmentDataManager == null) {
       throw new WebApplicationException(String.format("Table %s segments %s does not exist", tableName, segmentName),

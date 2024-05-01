@@ -19,8 +19,6 @@
 package org.apache.pinot.sql.parsers.rewriter;
 
 import com.google.common.base.Preconditions;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import org.apache.commons.lang3.EnumUtils;
 import org.apache.pinot.common.request.Expression;
@@ -96,10 +94,7 @@ public class PredicateComparisonRewriter implements QueryRewriter {
         case AND:
         case OR:
         case NOT:
-          for (int i = 0; i < operands.size(); i++) {
-            Expression operand = operands.get(i);
-            operands.set(i, updatePredicate(operand));
-          }
+          operands.replaceAll(PredicateComparisonRewriter::updatePredicate);
           break;
         case EQUALS:
         case NOT_EQUALS:
@@ -122,8 +117,7 @@ public class PredicateComparisonRewriter implements QueryRewriter {
 
           // Handle predicate like 'a > b' -> 'a - b > 0'
           if (!secondOperand.isSetLiteral()) {
-            Expression minusExpression = RequestUtils.getFunctionExpression("minus");
-            minusExpression.getFunctionCall().setOperands(Arrays.asList(firstOperand, secondOperand));
+            Expression minusExpression = RequestUtils.getFunctionExpression("minus", firstOperand, secondOperand);
             operands.set(0, minusExpression);
             operands.set(1, RequestUtils.getLiteralExpression(0));
             break;
@@ -181,14 +175,8 @@ public class PredicateComparisonRewriter implements QueryRewriter {
    * @return Rewritten expression
    */
   private static Expression convertPredicateToEqualsBooleanExpression(Expression expression) {
-    Expression newExpression;
-    newExpression = RequestUtils.getFunctionExpression(FilterKind.EQUALS.name());
-    List<Expression> operands = new ArrayList<>();
-    operands.add(expression);
-    operands.add(RequestUtils.getLiteralExpression(true));
-    newExpression.getFunctionCall().setOperands(operands);
-
-    return newExpression;
+    return RequestUtils.getFunctionExpression(FilterKind.EQUALS.name(), expression,
+        RequestUtils.getLiteralExpression(true));
   }
 
   /**

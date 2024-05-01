@@ -24,7 +24,6 @@ import java.io.InputStream;
 import java.io.Serializable;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.net.URLDecoder;
 import java.nio.file.FileSystems;
 import java.nio.file.PathMatcher;
 import java.nio.file.Paths;
@@ -44,6 +43,7 @@ import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.name.SegmentNameUtils;
@@ -407,7 +407,7 @@ public class SegmentPushUtils implements Serializable {
     try {
       if (fileSystem instanceof LocalPinotFS) {
         // For local file system, we don't need to copy the tar file.
-        tarFile = new File(URLDecoder.decode(tarFileURI.getRawPath(), "UTF-8"));
+        tarFile = new File(URIUtils.decode(tarFileURI.getRawPath()));
       } else {
         // For other file systems, we need to download the file to local file system
         fileSystem.copyToLocalFile(tarFileURI, tarFile);

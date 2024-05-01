@@ -20,12 +20,12 @@ package org.apache.pinot.segment.local.segment.store;
 
 import java.io.File;
 import org.apache.commons.io.FileUtils;
-import org.apache.lucene.codecs.lucene95.Lucene95Codec;
-import org.apache.lucene.codecs.lucene95.Lucene95HnswVectorsFormat;
+import org.apache.lucene.codecs.lucene99.Lucene99Codec;
+import org.apache.lucene.codecs.lucene99.Lucene99HnswVectorsFormat;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.index.VectorSimilarityFunction;
-import org.apache.pinot.segment.local.segment.creator.impl.vector.lucene95.HnswCodec;
-import org.apache.pinot.segment.local.segment.creator.impl.vector.lucene95.HnswVectorsFormat;
+import org.apache.pinot.segment.local.segment.creator.impl.vector.lucene99.HnswCodec;
+import org.apache.pinot.segment.local.segment.creator.impl.vector.lucene99.HnswVectorsFormat;
 import org.apache.pinot.segment.spi.V1Constants.Indexes;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 
@@ -38,17 +38,21 @@ public class VectorIndexUtils {
     // Remove the lucene index file and potentially the docId mapping file.
     File luceneIndexFile = new File(segDir, column + Indexes.VECTOR_HNSW_INDEX_FILE_EXTENSION);
     FileUtils.deleteQuietly(luceneIndexFile);
+    File luceneV99IndexFile = new File(segDir, column + Indexes.VECTOR_V99_HNSW_INDEX_FILE_EXTENSION);
+    FileUtils.deleteQuietly(luceneV99IndexFile);
     File luceneMappingFile = new File(segDir, column + Indexes.VECTOR_HNSW_INDEX_DOCID_MAPPING_FILE_EXTENSION);
     FileUtils.deleteQuietly(luceneMappingFile);
 
     // Remove the native index file
     File nativeIndexFile = new File(segDir, column + Indexes.VECTOR_INDEX_FILE_EXTENSION);
     FileUtils.deleteQuietly(nativeIndexFile);
+    File nativeV99IndexFile = new File(segDir, column + Indexes.VECTOR_V99_INDEX_FILE_EXTENSION);
+    FileUtils.deleteQuietly(nativeV99IndexFile);
   }
 
   static boolean hasVectorIndex(File segDir, String column) {
-    return new File(segDir, column + Indexes.VECTOR_HNSW_INDEX_FILE_EXTENSION).exists() || new File(segDir,
-        column + Indexes.VECTOR_INDEX_FILE_EXTENSION).exists();
+    return new File(segDir, column + Indexes.VECTOR_V99_HNSW_INDEX_FILE_EXTENSION).exists() || new File(segDir,
+        column + Indexes.VECTOR_V99_INDEX_FILE_EXTENSION).exists();
   }
 
   public static VectorSimilarityFunction toSimilarityFunction(
@@ -81,17 +85,17 @@ public class VectorIndexUtils {
     indexWriterConfig.setUseCompoundFile(useCompoundFile);
 
     int maxCon = Integer.parseInt(vectorIndexConfig.getProperties()
-        .getOrDefault("maxCon", String.valueOf(Lucene95HnswVectorsFormat.DEFAULT_MAX_CONN)));
+        .getOrDefault("maxCon", String.valueOf(Lucene99HnswVectorsFormat.DEFAULT_MAX_CONN)));
     int beamWidth = Integer.parseInt(vectorIndexConfig.getProperties()
-        .getOrDefault("beamWidth", String.valueOf(Lucene95HnswVectorsFormat.DEFAULT_BEAM_WIDTH)));
+        .getOrDefault("beamWidth", String.valueOf(Lucene99HnswVectorsFormat.DEFAULT_BEAM_WIDTH)));
     int maxDimensions = Integer.parseInt(vectorIndexConfig.getProperties()
         .getOrDefault("maxDimensions", String.valueOf(HnswVectorsFormat.DEFAULT_MAX_DIMENSIONS)));
 
     HnswVectorsFormat knnVectorsFormat =
         new HnswVectorsFormat(maxCon, beamWidth, maxDimensions);
 
-    Lucene95Codec.Mode mode = Lucene95Codec.Mode.valueOf(vectorIndexConfig.getProperties()
-        .getOrDefault("mode", Lucene95Codec.Mode.BEST_SPEED.name()));
+    Lucene99Codec.Mode mode = Lucene99Codec.Mode.valueOf(vectorIndexConfig.getProperties()
+        .getOrDefault("mode", Lucene99Codec.Mode.BEST_SPEED.name()));
     indexWriterConfig.setCodec(new HnswCodec(mode, knnVectorsFormat));
     return indexWriterConfig;
   }

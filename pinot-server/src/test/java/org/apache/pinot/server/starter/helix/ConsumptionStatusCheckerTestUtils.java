@@ -16,30 +16,23 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.operator.filter.predicate;
+package org.apache.pinot.server.starter.helix;
 
-import org.apache.pinot.common.request.context.predicate.Predicate;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Function;
 
 
-public abstract class BasePredicateEvaluator implements PredicateEvaluator {
-  protected final Predicate _predicate;
-
-  protected BasePredicateEvaluator(Predicate predicate) {
-    _predicate = predicate;
+class ConsumptionStatusCheckerTestUtils {
+  private ConsumptionStatusCheckerTestUtils() {
   }
 
-  @Override
-  public Predicate getPredicate() {
-    return _predicate;
-  }
-
-  @Override
-  public Predicate.Type getPredicateType() {
-    return getPredicate().getType();
-  }
-
-  @Override
-  public final boolean isExclusive() {
-    return getPredicateType().isExclusive();
+  public static Function<String, Set<String>> getConsumingSegments(Map<String, Set<String>> consumingSegments) {
+    // Create a new Set instance to keep updates separated from the consumingSegments.
+    return (tableName) -> {
+      Set<String> updated = consumingSegments.get(tableName);
+      return updated == null ? null : new HashSet<>(updated);
+    };
   }
 }

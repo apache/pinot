@@ -28,7 +28,6 @@ import java.util.TreeMap;
 import org.apache.commons.io.FileUtils;
 import org.apache.lucene.store.OutputStreamDataOutput;
 import org.apache.lucene.util.fst.FST;
-import org.apache.lucene.util.fst.OffHeapFSTStore;
 import org.apache.lucene.util.fst.Outputs;
 import org.apache.lucene.util.fst.PositiveIntOutputs;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
@@ -78,7 +77,6 @@ public class FSTBuilderTest {
     PinotDataBuffer pinotDataBuffer =
         PinotDataBuffer.mapFile(fstFile, true, 0, fstFile.length(), ByteOrder.BIG_ENDIAN, "");
     PinotBufferIndexInput indexInput = new PinotBufferIndexInput(pinotDataBuffer, 0L, fstFile.length());
-    FST<Long> readFST = new FST(indexInput, indexInput, outputs, new OffHeapFSTStore());
 
     List<Long> results = RegexpMatcher.regexMatch("hello.*123", fst);
     Assert.assertEquals(results.size(), 1);

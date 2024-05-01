@@ -19,6 +19,7 @@
 package org.apache.pinot.controller.helix;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -50,6 +51,7 @@ import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentMa
 import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -78,6 +80,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
   private long _lastDisabledTableLogTimestamp = 0;
 
   private TableSizeReader _tableSizeReader;
+  private Set<String> _tierBackendGauges = new HashSet<>();
 
   /**
    * Constructs the segment status checker.
@@ -135,6 +138,17 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.UPSERT_TABLE_COUNT, context._upsertTableCount);
     _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.DISABLED_TABLE_COUNT, context._disabledTables.size());
 
+    _tierBackendGauges.forEach(_controllerMetrics::removeGauge);
+    // metric for total number of tables using a particular tier backend
+    context._tierBackendTableCountMap.forEach((tier, count) -> {
+      String gaugeName = _controllerMetrics.composePluginGaugeName(tier, ControllerGauge.TIER_BACKEND_TABLE_COUNT);
+      _tierBackendGauges.add(gaugeName);
+      _controllerMetrics.setOrUpdateGauge(gaugeName, count);
+    });
+    // metric for total number of tables having tier backend configured
+    _controllerMetrics.setOrUpdateGauge(ControllerGauge.TIER_BACKEND_TABLE_COUNT.getGaugeName(),
+        context._tierBackendConfiguredTableCount);
+
     //emit a 0 for tables that are not paused/disabled. This makes alert expressions simpler as we don't have to deal
     // with missing metrics
     context._processedTables.forEach(tableNameWithType -> {
@@ -170,6 +184,18 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     }
     if (tableConfig.isUpsertEnabled()) {
       context._upsertTableCount++;
+    }
+    List<TierConfig> tierConfigList = tableConfig.getTierConfigsList();
+    if (tierConfigList != null && !tierConfigList.isEmpty()) {
+      Set<String> tierBackendSet = new HashSet<>(tierConfigList.size());
+      for (TierConfig config : tierConfigList) {
+        if (config.getTierBackend() != null) {
+          tierBackendSet.add(config.getTierBackend());
+        }
+      }
+      tierBackendSet.forEach(tierBackend -> context._tierBackendTableCountMap.put(tierBackend,
+              context._tierBackendTableCountMap.getOrDefault(tierBackend, 0) + 1));
+      context._tierBackendConfiguredTableCount += tierBackendSet.isEmpty() ? 0 : 1;
     }
     int replication = tableConfig.getReplication();
     _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.REPLICATION_FROM_CONFIG, replication);
@@ -391,6 +417,8 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     private int _realTimeTableCount;
     private int _offlineTableCount;
     private int _upsertTableCount;
+    private int _tierBackendConfiguredTableCount;
+    private Map<String, Integer> _tierBackendTableCountMap = new HashMap<>();
     private Set<String> _processedTables = new HashSet<>();
     private Set<String> _disabledTables = new HashSet<>();
     private Set<String> _pausedTables = new HashSet<>();

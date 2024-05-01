@@ -85,6 +85,9 @@ rules:
 - pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.offlineTableCount\"><>(\\w+)"
   name: "pinot_controller_offlineTableCount_$1"
   cache: true
+- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.tierBackendTableCount\\.(\\w+)\"><>(\\w+)"
+  name: "pinot_controller_tierBackendTableCount_$1_$2"
+  cache: true
 - pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ValidationMetrics\", name=\"pinot\\.controller\\.(([^.]+)\\.)?([^.]*)\\.(\\w+)\"><>(\\w+)"
   name: "pinot_controller_validateion_$4_$5"
   cache: true

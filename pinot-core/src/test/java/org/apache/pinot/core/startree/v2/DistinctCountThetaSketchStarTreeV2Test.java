@@ -20,6 +20,7 @@ package org.apache.pinot.core.startree.v2;
 
 import java.util.Random;
 import org.apache.datasketches.theta.Sketch;
+import org.apache.datasketches.theta.Union;
 import org.apache.pinot.segment.local.aggregator.DistinctCountThetaSketchValueAggregator;
 import org.apache.pinot.segment.local.aggregator.ValueAggregator;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -27,10 +28,10 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import static org.testng.Assert.assertEquals;
 
 
-public class DistinctCountThetaSketchStarTreeV2Test extends BaseStarTreeV2Test<Object, Sketch> {
+public class DistinctCountThetaSketchStarTreeV2Test extends BaseStarTreeV2Test<Object, Object> {
 
   @Override
-  ValueAggregator<Object, Sketch> getValueAggregator() {
+  ValueAggregator<Object, Object> getValueAggregator() {
     return new DistinctCountThetaSketchValueAggregator();
   }
 
@@ -45,7 +46,21 @@ public class DistinctCountThetaSketchStarTreeV2Test extends BaseStarTreeV2Test<O
   }
 
   @Override
-  void assertAggregatedValue(Sketch starTreeResult, Sketch nonStarTreeResult) {
-    assertEquals(starTreeResult.getEstimate(), nonStarTreeResult.getEstimate());
+  void assertAggregatedValue(Object starTreeResult, Object nonStarTreeResult) {
+    // Use error at (lgK=14, stddev=2) from:
+    // https://datasketches.apache.org/docs/Theta/ThetaErrorTable.html
+    double delta = (1 << 14) * 0.01563;
+    assertEquals(toSketch(starTreeResult).getEstimate(), toSketch(nonStarTreeResult).getEstimate(), delta);
+  }
+
+  private Sketch toSketch(Object value) {
+    if (value instanceof Union) {
+      return ((Union) value).getResult();
+    } else if (value instanceof Sketch) {
+      return (Sketch) value;
+    } else {
+      throw new IllegalStateException(
+          "Unsupported data type for Theta Sketch aggregation: " + value.getClass().getSimpleName());
+    }
   }
 }

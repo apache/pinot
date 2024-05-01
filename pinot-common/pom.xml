@@ -33,7 +33,6 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/..</pinot.root>
-    <shade.phase.prop>package</shade.phase.prop>
   </properties>
 
   <build>
@@ -61,6 +60,19 @@
       <plugin>
         <groupId>org.xolstice.maven.plugins</groupId>
         <artifactId>protobuf-maven-plugin</artifactId>
+      </plugin>
+
+      <plugin>
+        <groupId>com.diffplug.spotless</groupId>
+        <artifactId>spotless-maven-plugin</artifactId>
+        <configuration>
+          <java>
+            <excludes>
+              <exclude>src/main/java/org/apache/pinot/common/request/*.java</exclude>
+              <exclude>src/main/java/org/apache/pinot/common/response/ProcessingException.java</exclude>
+            </excludes>
+          </java>
+        </configuration>
       </plugin>
 
       <!-- Following plugins and their configurations are used to generate the custom Calcite's SQL parser -->
@@ -130,31 +142,6 @@
         </executions>
       </plugin>
     </plugins>
-
-    <pluginManagement>
-      <plugins>
-        <plugin>
-          <groupId>com.diffplug.spotless</groupId>
-          <artifactId>spotless-maven-plugin</artifactId>
-          <configuration>
-            <java>
-              <includes>
-                <include>src/main/java/**/*.java</include>
-                <include>src/test/java/**/*.java</include>
-              </includes>
-              <excludes>
-                <exclude>src/main/java/org/apache/pinot/common/request/*.java</exclude>
-                <exclude>src/main/java/org/apache/pinot/common/response/ProcessingException.java</exclude>
-              </excludes>
-              <importOrder>
-                <order>,\#</order>
-              </importOrder>
-              <removeUnusedImports/>
-            </java>
-          </configuration>
-        </plugin>
-      </plugins>
-    </pluginManagement>
   </build>
   <dependencies>
     <dependency>
@@ -413,6 +400,16 @@
           </plugin>
         </plugins>
       </build>
+    </profile>
+
+    <profile>
+      <id>build-shaded-jar</id>
+      <activation>
+        <activeByDefault>true</activeByDefault>
+      </activation>
+      <properties>
+        <shade.phase.prop>package</shade.phase.prop>
+      </properties>
     </profile>
   </profiles>
 </project>

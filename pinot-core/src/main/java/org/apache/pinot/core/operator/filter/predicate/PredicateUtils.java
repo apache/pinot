@@ -190,4 +190,38 @@ public class PredicateUtils {
     }
     return dictIdSet;
   }
+
+  public static int[] flipDictIds(int[] dictIds, int length) {
+    int numDictIds = dictIds.length;
+    int[] flippedDictIds = new int[length - numDictIds];
+    int flippedDictIdsIndex = 0;
+    int dictIdsIndex = 0;
+    for (int dictId = 0; dictId < length; dictId++) {
+      if (dictIdsIndex < numDictIds && dictId == dictIds[dictIdsIndex]) {
+        dictIdsIndex++;
+      } else {
+        flippedDictIds[flippedDictIdsIndex++] = dictId;
+      }
+    }
+    return flippedDictIds;
+  }
+
+  public static int[] getDictIds(int length, int excludeId) {
+    int[] dictIds;
+    if (excludeId >= 0) {
+      dictIds = new int[length - 1];
+      int index = 0;
+      for (int dictId = 0; dictId < length; dictId++) {
+        if (dictId != excludeId) {
+          dictIds[index++] = dictId;
+        }
+      }
+    } else {
+      dictIds = new int[length];
+      for (int dictId = 0; dictId < length; dictId++) {
+        dictIds[dictId] = dictId;
+      }
+    }
+    return dictIds;
+  }
 }

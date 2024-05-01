@@ -65,6 +65,7 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   NUM_MINION_SUBTASKS_ERROR("NumMinionSubtasksError", true),
   PERCENT_MINION_SUBTASKS_IN_QUEUE("PercentMinionSubtasksInQueue", true),
   PERCENT_MINION_SUBTASKS_IN_ERROR("PercentMinionSubtasksInError", true),
+  TIER_BACKEND_TABLE_COUNT("TierBackendTableCount", true),
 
   // Pinot controller leader
   PINOT_CONTROLLER_LEADER("PinotControllerLeader", true),
