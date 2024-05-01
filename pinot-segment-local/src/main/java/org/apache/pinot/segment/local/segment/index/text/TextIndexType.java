@@ -76,7 +76,7 @@ public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexR
       V1Constants.Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION,
       V1Constants.Indexes.NATIVE_TEXT_INDEX_FILE_EXTENSION,
       V1Constants.Indexes.LUCENE_V9_TEXT_INDEX_FILE_EXTENSION,
-      V1Constants.Indexes.LUCENE_V99_FST_INDEX_FILE_EXTENSION
+      V1Constants.Indexes.LUCENE_V99_TEXT_INDEX_FILE_EXTENSION
   );
 
   protected TextIndexType() {
