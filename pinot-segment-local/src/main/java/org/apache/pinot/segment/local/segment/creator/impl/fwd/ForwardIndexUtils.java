@@ -19,7 +19,7 @@
 package org.apache.pinot.segment.local.segment.creator.impl.fwd;
 
 public class ForwardIndexUtils {
-  public static final int TARGET_MIN_CHUNK_SIZE = 4 * 1024;
+  private static final int TARGET_MIN_CHUNK_SIZE = 4 * 1024;
 
   private ForwardIndexUtils() {
   }
@@ -27,14 +27,14 @@ public class ForwardIndexUtils {
   /**
    * Get the dynamic target chunk size based on the maximum length of the values, target number of documents per chunk.
    *
-   * If targetDocsPerChunk is Integer.MAX_VALUE, the target chunk size is the targetMaxChunkSizeBytes and chunk size
+   * If targetDocsPerChunk is negative, the target chunk size is the targetMaxChunkSizeBytes and chunk size
    * shall not be dynamically chosen
    * @param maxLength max length of the values
    * @param targetDocsPerChunk target number of documents to store per chunk
    * @param targetMaxChunkSizeBytes target max chunk size in bytes
    */
   public static int getDynamicTargetChunkSize(int maxLength, int targetDocsPerChunk, int targetMaxChunkSizeBytes) {
-    if (targetDocsPerChunk == Integer.MAX_VALUE) {
+    if (targetDocsPerChunk < 0) {
       return targetMaxChunkSizeBytes;
     }
     return Math.max(Math.min(maxLength * targetDocsPerChunk, targetMaxChunkSizeBytes), TARGET_MIN_CHUNK_SIZE);

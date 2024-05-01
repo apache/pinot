@@ -86,7 +86,7 @@ public class ForwardIndexConfigTest {
     String confStr = "{\"targetDocsPerChunk\": \"-1\"}";
     ForwardIndexConfig config = JsonUtils.stringToObject(confStr, ForwardIndexConfig.class);
 
-    assertEquals(config.getTargetDocsPerChunk(), Integer.MAX_VALUE, "Unexpected defaultTargetDocsPerChunk");
+    assertEquals(config.getTargetDocsPerChunk(), -1, "Unexpected defaultTargetDocsPerChunk");
   }
 
   @Test
