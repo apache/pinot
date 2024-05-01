@@ -314,13 +314,21 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     Tracing.ThreadAccountantOps.setupRunner(String.valueOf(requestId));
 
     try {
-      long compilationStartTimeNs;
+      // Parse the query if needed
+      if (sqlNodeAndOptions == null) {
+        try {
+          sqlNodeAndOptions = RequestUtils.parseQuery(query, request);
+        } catch (Exception e) {
+          // Do not log or emit metric here because it is pure user error
+          requestContext.setErrorCode(QueryException.SQL_PARSING_ERROR_CODE);
+          return new BrokerResponseNative(QueryException.getException(QueryException.SQL_PARSING_ERROR, e));
+        }
+      }
+
+      // Compile the request into PinotQuery
+      long compilationStartTimeNs = System.nanoTime();
       PinotQuery pinotQuery;
       try {
-        // Parse the request
-        sqlNodeAndOptions = sqlNodeAndOptions != null ? sqlNodeAndOptions : RequestUtils.parseQuery(query, request);
-        // Compile the request into PinotQuery
-        compilationStartTimeNs = System.nanoTime();
         pinotQuery = CalciteSqlParser.compileToPinotQuery(sqlNodeAndOptions);
       } catch (Exception e) {
         LOGGER.info("Caught exception while compiling SQL request {}: {}, {}", requestId, query, e.getMessage());

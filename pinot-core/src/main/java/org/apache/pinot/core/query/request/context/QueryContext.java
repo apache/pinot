@@ -460,7 +460,6 @@ public class QueryContext {
     private int _limit;
     private int _offset;
     private Map<String, String> _queryOptions;
-    private Map<String, String> _debugOptions;
     private Map<ExpressionContext, ExpressionContext> _expressionOverrideHints;
     private boolean _explain;
 

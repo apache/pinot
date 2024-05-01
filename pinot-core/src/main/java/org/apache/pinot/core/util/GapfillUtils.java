@@ -277,9 +277,8 @@ public class GapfillUtils {
       return pinotQuery;
     }
 
-    // Carry over the query and debug options from the original query
+    // Carry over the query options from the original query
     Map<String, String> queryOptions = pinotQuery.getQueryOptions();
-    Map<String, String> debugOptions = pinotQuery.getDebugOptions();
 
     while (pinotQuery.getDataSource().getSubquery() != null) {
       pinotQuery = pinotQuery.getDataSource().getSubquery();
@@ -321,7 +320,6 @@ public class GapfillUtils {
     }
 
     strippedPinotQuery.setQueryOptions(queryOptions);
-    strippedPinotQuery.setDebugOptions(debugOptions);
     return strippedPinotQuery;
   }
 

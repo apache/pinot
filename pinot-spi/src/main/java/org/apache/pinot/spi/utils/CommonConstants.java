@@ -345,7 +345,6 @@ public class CommonConstants {
     public static class Request {
       public static final String SQL = "sql";
       public static final String TRACE = "trace";
-      public static final String DEBUG_OPTIONS = "debugOptions";
       public static final String QUERY_OPTIONS = "queryOptions";
 
       public static class QueryOptionKey {
@@ -395,14 +394,6 @@ public class CommonConstants {
         // Indicates the maximum length of serialized response across all servers for a query. This value is equally
         // divided across all servers processing the query.
         public static final String MAX_QUERY_RESPONSE_SIZE_BYTES = "maxQueryResponseSizeBytes";
-
-        // TODO: Remove these keys (only apply to PQL) after releasing 0.11.0
-        @Deprecated
-        public static final String PRESERVE_TYPE = "preserveType";
-        @Deprecated
-        public static final String RESPONSE_FORMAT = "responseFormat";
-        @Deprecated
-        public static final String GROUP_BY_MODE = "groupByMode";
       }
 
       public static class QueryOptionValue {

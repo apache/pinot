@@ -162,14 +162,10 @@ public class CalciteSqlParser {
   }
 
   public static PinotQuery compileToPinotQuery(SqlNodeAndOptions sqlNodeAndOptions) {
-    // Compile Sql without OPTION statements.
+    // Compile SqlNode into PinotQuery
     PinotQuery pinotQuery = compileSqlNodeToPinotQuery(sqlNodeAndOptions.getSqlNode());
-
-    // Set Option statements to PinotQuery.
-    Map<String, String> options = sqlNodeAndOptions.getOptions();
-    if (!options.isEmpty()) {
-      pinotQuery.setQueryOptions(options);
-    }
+    // Set query options into PinotQuery
+    pinotQuery.setQueryOptions(sqlNodeAndOptions.getOptions());
     return pinotQuery;
   }
 

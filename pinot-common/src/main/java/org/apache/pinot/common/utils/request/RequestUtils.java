@@ -44,7 +44,7 @@ import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
-import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlCompilationException;
@@ -80,33 +80,15 @@ public class RequestUtils {
   @VisibleForTesting
   public static void setOptions(SqlNodeAndOptions sqlNodeAndOptions, JsonNode jsonRequest) {
     Map<String, String> queryOptions = new HashMap<>();
-    if (jsonRequest.has(CommonConstants.Broker.Request.DEBUG_OPTIONS)) {
-      Map<String, String> debugOptions = RequestUtils.getOptionsFromJson(jsonRequest,
-          CommonConstants.Broker.Request.DEBUG_OPTIONS);
-      // TODO: remove debug options after releasing 0.11.0.
-      if (!debugOptions.isEmpty()) {
-        // NOTE: Debug options are deprecated. Put all debug options into query options for backward compatibility.
-        LOGGER.debug("Debug options are set to: {}", debugOptions);
-        queryOptions.putAll(debugOptions);
-      }
+    if (jsonRequest.has(Request.QUERY_OPTIONS)) {
+      queryOptions.putAll(getOptionsFromString(jsonRequest.get(Request.QUERY_OPTIONS).asText()));
     }
-    if (jsonRequest.has(CommonConstants.Broker.Request.QUERY_OPTIONS)) {
-      Map<String, String> queryOptionsFromJson = RequestUtils.getOptionsFromJson(jsonRequest,
-          CommonConstants.Broker.Request.QUERY_OPTIONS);
-      queryOptions.putAll(queryOptionsFromJson);
-    }
-    boolean enableTrace = jsonRequest.has(CommonConstants.Broker.Request.TRACE) && jsonRequest.get(
-        CommonConstants.Broker.Request.TRACE).asBoolean();
-    if (enableTrace) {
-      queryOptions.put(CommonConstants.Broker.Request.TRACE, "true");
+    if (jsonRequest.has(Request.TRACE) && jsonRequest.get(Request.TRACE).asBoolean()) {
+      queryOptions.put(Request.TRACE, "true");
     }
     if (!queryOptions.isEmpty()) {
       LOGGER.debug("Query options are set to: {}", queryOptions);
     }
-    // TODO: Remove the SQL query options after releasing 0.11.0
-    // The query engine will break if these 2 options are missing during version upgrade.
-    queryOptions.put(CommonConstants.Broker.Request.QueryOptionKey.GROUP_BY_MODE, CommonConstants.Broker.Request.SQL);
-    queryOptions.put(CommonConstants.Broker.Request.QueryOptionKey.RESPONSE_FORMAT, CommonConstants.Broker.Request.SQL);
     // Setting all query options back into SqlNodeAndOptions. The above ordering matters due to priority overwrite rule
     sqlNodeAndOptions.setExtraOptions(queryOptions);
   }
@@ -414,8 +396,7 @@ public class RequestUtils {
     if (dataSource.getSubquery() != null) {
       return getTableNames(dataSource.getSubquery());
     } else if (dataSource.isSetJoin()) {
-      return ImmutableSet.<String>builder()
-          .addAll(getTableNames(dataSource.getJoin().getLeft()))
+      return ImmutableSet.<String>builder().addAll(getTableNames(dataSource.getJoin().getLeft()))
           .addAll(getTableNames(dataSource.getJoin().getLeft())).build();
     }
     return ImmutableSet.of(dataSource.getTableName());
@@ -425,6 +406,7 @@ public class RequestUtils {
     return getTableNames(pinotQuery.getDataSource());
   }
 
+  @Deprecated
   public static Map<String, String> getOptionsFromJson(JsonNode request, String optionsKey) {
     return getOptionsFromString(request.get(optionsKey).asText());
   }
