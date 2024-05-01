@@ -327,7 +327,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       }
       long minConsumingFreshnessTimeMs = 0;
       if (minIngestionTimeMs != Long.MAX_VALUE) {
-        minConsumingFreshnessTimeMs = minIndexTimeMs;
+        minConsumingFreshnessTimeMs = minIngestionTimeMs;
       } else if (minIndexTimeMs != Long.MAX_VALUE) {
         minConsumingFreshnessTimeMs = minIndexTimeMs;
       } else if (maxEndTimeMs != Long.MIN_VALUE) {

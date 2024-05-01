@@ -24,7 +24,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.net.URI;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -1361,8 +1360,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         try {
           int percentile = Integer.parseInt(remainingFunctionName);
           function.setOperator("percentilesmarttdigest");
-          function.setOperands(
-              Arrays.asList(function.getOperands().get(0), RequestUtils.getLiteralExpression(percentile)));
+          function.addToOperands(RequestUtils.getLiteralExpression(percentile));
         } catch (Exception e) {
           throw new BadQueryRequestException("Illegal function name: " + functionName);
         }
@@ -1370,8 +1368,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         try {
           int percentile = Integer.parseInt(remainingFunctionName.substring(0, remainingFunctionName.length() - 2));
           function.setOperator("percentilesmarttdigest");
-          function.setOperands(
-              Arrays.asList(function.getOperands().get(0), RequestUtils.getLiteralExpression(percentile)));
+          function.addToOperands(RequestUtils.getLiteralExpression(percentile));
         } catch (Exception e) {
           throw new BadQueryRequestException("Illegal function name: " + functionName);
         }
@@ -1849,18 +1846,17 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    */
   private static void attachTimeBoundary(PinotQuery pinotQuery, TimeBoundaryInfo timeBoundaryInfo,
       boolean isOfflineRequest) {
+    String functionName = isOfflineRequest ? FilterKind.LESS_THAN_OR_EQUAL.name() : FilterKind.GREATER_THAN.name();
     String timeColumn = timeBoundaryInfo.getTimeColumn();
     String timeValue = timeBoundaryInfo.getTimeValue();
-    Expression timeFilterExpression = RequestUtils.getFunctionExpression(
-        isOfflineRequest ? FilterKind.LESS_THAN_OR_EQUAL.name() : FilterKind.GREATER_THAN.name());
-    timeFilterExpression.getFunctionCall().setOperands(
-        Arrays.asList(RequestUtils.getIdentifierExpression(timeColumn), RequestUtils.getLiteralExpression(timeValue)));
+    Expression timeFilterExpression =
+        RequestUtils.getFunctionExpression(functionName, RequestUtils.getIdentifierExpression(timeColumn),
+            RequestUtils.getLiteralExpression(timeValue));
 
     Expression filterExpression = pinotQuery.getFilterExpression();
     if (filterExpression != null) {
-      Expression andFilterExpression = RequestUtils.getFunctionExpression(FilterKind.AND.name());
-      andFilterExpression.getFunctionCall().setOperands(Arrays.asList(filterExpression, timeFilterExpression));
-      pinotQuery.setFilterExpression(andFilterExpression);
+      pinotQuery.setFilterExpression(
+          RequestUtils.getFunctionExpression(FilterKind.AND.name(), filterExpression, timeFilterExpression));
     } else {
       pinotQuery.setFilterExpression(timeFilterExpression);
     }

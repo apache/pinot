@@ -1441,8 +1441,8 @@ public class SegmentPreProcessorTest {
     // V1 use separate file for each column index.
     File iiFile = new File(_indexDir, strColumn + V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION);
     File rgFile = new File(_indexDir, strColumn + V1Constants.Indexes.BITMAP_RANGE_INDEX_FILE_EXTENSION);
-    File txtFile = new File(_indexDir, strColumn + V1Constants.Indexes.LUCENE_V9_TEXT_INDEX_FILE_EXTENSION);
-    File fstFile = new File(_indexDir, strColumn + V1Constants.Indexes.LUCENE_V9_FST_INDEX_FILE_EXTENSION);
+    File txtFile = new File(_indexDir, strColumn + V1Constants.Indexes.LUCENE_V99_TEXT_INDEX_FILE_EXTENSION);
+    File fstFile = new File(_indexDir, strColumn + V1Constants.Indexes.LUCENE_V99_FST_INDEX_FILE_EXTENSION);
     File bfFile = new File(_indexDir, strColumn + V1Constants.Indexes.BLOOM_FILTER_FILE_EXTENSION);
 
     assertFalse(iiFile.exists());

@@ -989,6 +989,7 @@ public class TableConfigUtilsTest {
   @Test
   public void testValidateFieldConfig() {
     Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addDateTime(TIME_COLUMN, FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS")
         .addSingleValueDimension("myCol1", FieldSpec.DataType.STRING)
         .addMultiValueDimension("myCol2", FieldSpec.DataType.INT)
         .addSingleValueDimension("intCol", FieldSpec.DataType.INT).build();
@@ -1190,7 +1191,7 @@ public class TableConfigUtilsTest {
       Assert.fail("Should fail for MV myCol2 with forward index disabled but has range and inverted index");
     } catch (Exception e) {
       Assert.assertEquals(e.getMessage(), "Feature not supported for multi-value columns with range index. "
-          + "Cannot disable forward index for column myCol2. Disable range index on this column to use this feature");
+          + "Cannot disable forward index for column myCol2. Disable range index on this column to use this feature.");
     }
 
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
@@ -1210,7 +1211,7 @@ public class TableConfigUtilsTest {
     } catch (Exception e) {
       Assert.assertEquals(e.getMessage(), "Feature not supported for single-value columns with range index version "
           + "< 2. Cannot disable forward index for column myCol1. Either disable range index or create range index "
-          + "with version >= 2 to use this feature");
+          + "with version >= 2 to use this feature.");
     }
 
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
@@ -1276,6 +1277,24 @@ public class TableConfigUtilsTest {
       TableConfigUtils.validate(tableConfig, schema);
     } catch (Exception e) {
       Assert.fail("Range index with forward index disabled no dictionary column is allowed");
+    }
+
+    // Disabling forward index for realtime table will make the validation failed.
+    Map<String, String> streamConfigs = getStreamConfigs();
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setTimeColumnName(TIME_COLUMN)
+        .setNoDictionaryColumns(Arrays.asList("intCol")).setStreamConfigs(streamConfigs).build();
+    try {
+      // Enable forward index disabled flag for a column with inverted index index and disable dictionary
+      Map<String, String> fieldConfigProperties = new HashMap<>();
+      fieldConfigProperties.put(FieldConfig.FORWARD_INDEX_DISABLED, Boolean.TRUE.toString());
+      FieldConfig fieldConfig =
+          new FieldConfig("intCol", FieldConfig.EncodingType.RAW, FieldConfig.IndexType.INVERTED, null, null, null,
+              fieldConfigProperties);
+      tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
+      TableConfigUtils.validate(tableConfig, schema);
+    } catch (Exception e) {
+      Assert.assertEquals(e.getMessage(),
+          "Cannot disable forward index for column intCol, as the table type is REALTIME.");
     }
   }
 

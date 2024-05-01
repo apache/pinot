@@ -98,7 +98,7 @@ public class QueryLogger {
       long numDroppedLogsSinceLastLog = _numDroppedLogs.getAndSet(0);
       if (numDroppedLogsSinceLastLog > 0) {
         _logger.warn("{} logs were dropped. (log max rate per second: {})", numDroppedLogsSinceLastLog,
-            _droppedLogRateLimiter.getRate());
+            _logRateLimiter.getRate());
       }
     }
   }

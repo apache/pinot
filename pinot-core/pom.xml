@@ -185,33 +185,9 @@
       <activation>
         <activeByDefault>false</activeByDefault>
       </activation>
-      <build>
-        <plugins>
-          <plugin>
-            <artifactId>maven-shade-plugin</artifactId>
-            <executions>
-              <execution>
-                <phase>package</phase>
-                <goals>
-                  <goal>shade</goal>
-                </goals>
-                <configuration>
-                  <relocations>
-                    <relocation>
-                      <pattern>com.google.common.base</pattern>
-                      <shadedPattern>${shade.prefix}.com.google.common.base</shadedPattern>
-                    </relocation>
-                    <relocation>
-                      <pattern>org.apache.http</pattern>
-                      <shadedPattern>${shade.prefix}.org.apache.http</shadedPattern>
-                    </relocation>
-                  </relocations>
-                </configuration>
-              </execution>
-            </executions>
-          </plugin>
-        </plugins>
-      </build>
+      <properties>
+        <shade.phase.prop>package</shade.phase.prop>
+      </properties>
     </profile>
   </profiles>
 </project>

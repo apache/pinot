@@ -23,8 +23,9 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
-
 
 /**
  * Interface for a decoder of messages fetched from the stream
@@ -46,8 +47,22 @@ public interface StreamMessageDecoder<T> {
    * @param topicName Topic name of the stream
    * @throws Exception If an error occurs
    */
-  void init(Map<String, String> props, Set<String> fieldsToRead, String topicName)
-      throws Exception;
+  default void init(Map<String, String> props, Set<String> fieldsToRead, String topicName)
+      throws Exception {
+    throw new UnsupportedOperationException("init method not implemented");
+  }
+
+  /**
+   * Initializes the decoder.
+   * @param streamConfig Can be derived from tableConfig but is passed explicitly to avoid redundant computation
+   * @param tableConfig Table Config of the table
+   * @param schema Schema of the table
+   * @throws Exception
+   */
+  default void init(Set<String> fieldsToRead, StreamConfig streamConfig, TableConfig tableConfig, Schema schema)
+      throws Exception {
+    init(streamConfig.getDecoderProperties(), fieldsToRead, streamConfig.getTopicName());
+  }
 
   /**
    * Decodes a row.

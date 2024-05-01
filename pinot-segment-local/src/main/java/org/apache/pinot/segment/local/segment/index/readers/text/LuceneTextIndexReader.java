@@ -171,7 +171,7 @@ public class LuceneTextIndexReader implements TextIndexReader {
       return docIds;
     } catch (Exception e) {
       String msg =
-          "Caught excepttion while searching the text index for column:" + _column + " search query:" + searchQuery;
+          "Caught exception while searching the text index for column:" + _column + " search query:" + searchQuery;
       throw new RuntimeException(msg, e);
     }
   }

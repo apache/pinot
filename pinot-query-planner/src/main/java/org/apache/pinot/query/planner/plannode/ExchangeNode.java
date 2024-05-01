@@ -22,7 +22,7 @@ import java.util.List;
 import java.util.Set;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelFieldCollation;
-import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
+import org.apache.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.serde.ProtoProperties;
 
@@ -51,6 +51,7 @@ public class ExchangeNode extends AbstractPlanNode {
   @ProtoProperties
   private boolean _isPrePartitioned = false;
 
+  // FIXME: Ser/de doesn't work on this field. Currently it is always empty.
   @ProtoProperties
   private List<RelFieldCollation> _collations;
 

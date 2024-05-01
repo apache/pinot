@@ -232,7 +232,7 @@ public class TextIndexConfig extends IndexConfig {
         && _fstType == that._fstType && Objects.equals(_rawValueForTextIndex, that._rawValueForTextIndex)
         && Objects.equals(_stopWordsInclude, that._stopWordsInclude) && Objects.equals(_stopWordsExclude,
         that._stopWordsExclude) && _luceneUseCompoundFile == that._luceneUseCompoundFile
-        && _luceneMaxBufferSizeMB == that._luceneMaxBufferSizeMB;
+        && _luceneMaxBufferSizeMB == that._luceneMaxBufferSizeMB && _luceneAnalyzerClass == that._luceneAnalyzerClass;
   }
 
   @Override

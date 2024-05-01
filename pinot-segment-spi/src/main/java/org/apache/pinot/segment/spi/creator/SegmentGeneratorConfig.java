@@ -120,6 +120,7 @@ public class SegmentGeneratorConfig implements Serializable {
   private boolean _optimizeDictionary = false;
   private boolean _optimizeDictionaryForMetrics = false;
   private double _noDictionarySizeRatioThreshold = IndexingConfig.DEFAULT_NO_DICTIONARY_SIZE_RATIO_THRESHOLD;
+  private boolean _realtimeConversion = false;
   private final Map<String, FieldIndexConfigs> _indexConfigsByColName;
 
   // constructed from FieldConfig
@@ -721,6 +722,14 @@ public class SegmentGeneratorConfig implements Serializable {
 
   public double getNoDictionarySizeRatioThreshold() {
     return _noDictionarySizeRatioThreshold;
+  }
+
+  public boolean isRealtimeConversion() {
+    return _realtimeConversion;
+  }
+
+  public void setRealtimeConversion(boolean realtimeConversion) {
+    _realtimeConversion = realtimeConversion;
   }
 
   public void setNoDictionarySizeRatioThreshold(double noDictionarySizeRatioThreshold) {

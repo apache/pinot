@@ -1483,7 +1483,8 @@ public class PinotLLCRealtimeSegmentManager {
           LOGGER.info("Fixing LLC segment {} whose deep store copy is unavailable", segmentName);
           // Find servers which have online replica
           List<URI> peerSegmentURIs =
-              PeerServerSegmentFinder.getPeerServerURIs(segmentName, CommonConstants.HTTP_PROTOCOL, _helixManager);
+              PeerServerSegmentFinder.getPeerServerURIs(_helixManager, realtimeTableName, segmentName,
+                  CommonConstants.HTTP_PROTOCOL);
           if (peerSegmentURIs.isEmpty()) {
             throw new IllegalStateException(
                 String.format("Failed to upload segment %s to deep store because no online replica is found",

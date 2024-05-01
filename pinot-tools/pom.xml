@@ -146,40 +146,6 @@
       <artifactId>pinot-pulsar</artifactId>
       <version>${project.version}</version>
       <scope>runtime</scope>
-      <exclusions>
-        <exclusion>
-          <groupId>com.google.errorprone</groupId>
-          <artifactId>error_prone_annotations</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.codehaus.mojo</groupId>
-          <artifactId>animal-sniffer-annotations</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>com.google.api.grpc</groupId>
-          <artifactId>proto-google-common-protos</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.glassfish.jersey.containers</groupId>
-          <artifactId>jersey-container-servlet-core</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>io.grpc</groupId>
-          <artifactId>grpc-protobuf-lite</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>io.grpc</groupId>
-          <artifactId>grpc-context</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>com.typesafe.netty</groupId>
-          <artifactId>netty-reactive-streams</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>com.beust</groupId>
-          <artifactId>jcommander</artifactId>
-        </exclusion>
-      </exclusions>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
@@ -207,10 +173,6 @@
     <dependency>
       <groupId>info.picocli</groupId>
       <artifactId>picocli</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>io.airlift</groupId>
-      <artifactId>aircompressor</artifactId>
     </dependency>
     <dependency>
       <groupId>org.testng</groupId>

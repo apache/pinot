@@ -180,18 +180,8 @@ public class BenchmarkScanDocIdIterators {
     }
 
     @Override
-    public int getNumMatchingDictIds() {
-      return 0;
-    }
-
-    @Override
     public int[] getMatchingDictIds() {
       return new int[0];
-    }
-
-    @Override
-    public int getNumNonMatchingDictIds() {
-      return 0;
     }
 
     @Override

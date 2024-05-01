@@ -766,6 +766,10 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     return gauge.getGaugeName() + "." + getTableName(tableName) + "." + key;
   }
 
+  public String composePluginGaugeName(String pluginName, Gauge gauge) {
+    return gauge.getGaugeName() + "." + pluginName;
+  }
+
   /**
    * Remove gauge from Pinot metrics.
    * @param gaugeName gauge name
