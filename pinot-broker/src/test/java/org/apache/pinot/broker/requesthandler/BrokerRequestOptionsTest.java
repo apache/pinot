@@ -26,68 +26,40 @@ import org.apache.pinot.spi.utils.CommonConstants.Broker.Request;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
-import org.testng.Assert;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 /**
  * Tests the various options set in the broker request
  */
 public class BrokerRequestOptionsTest {
-  // TODO: remove this legacy option size checker after 0.11 release cut.
-  private static final int LEGACY_PQL_QUERY_OPTION_SIZE = 2;
 
   @Test
   public void testSetOptions() {
-    long requestId = 1;
     String query = "select * from testTable";
 
     // None of the options
     ObjectNode jsonRequest = JsonUtils.newObjectNode();
-    SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(query);;
+    SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(query);
     RequestUtils.setOptions(sqlNodeAndOptions, jsonRequest);
-    Assert.assertEquals(sqlNodeAndOptions.getOptions().size(), 0 + LEGACY_PQL_QUERY_OPTION_SIZE);
+    assertTrue(sqlNodeAndOptions.getOptions().isEmpty());
 
     // TRACE
     // Has trace false
     jsonRequest.put(Request.TRACE, false);
     sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(query);
     RequestUtils.setOptions(sqlNodeAndOptions, jsonRequest);
-    Assert.assertEquals(sqlNodeAndOptions.getOptions().size(), 0 + LEGACY_PQL_QUERY_OPTION_SIZE);
+    assertTrue(sqlNodeAndOptions.getOptions().isEmpty());
 
     // Has trace true
     jsonRequest.put(Request.TRACE, true);
     sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(query);
     RequestUtils.setOptions(sqlNodeAndOptions, jsonRequest);
-    Assert.assertEquals(sqlNodeAndOptions.getOptions().size(), 1 + LEGACY_PQL_QUERY_OPTION_SIZE);
-    Assert.assertEquals(sqlNodeAndOptions.getOptions().get(Request.TRACE), "true");
-
-    // DEBUG_OPTIONS (debug options will also be included as query options)
-    // Has debugOptions
-    jsonRequest = JsonUtils.newObjectNode();
-    jsonRequest.put(Request.DEBUG_OPTIONS, "debugOption1=foo");
-    sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(query);
-    RequestUtils.setOptions(sqlNodeAndOptions, jsonRequest);
-    Assert.assertEquals(sqlNodeAndOptions.getOptions().size(), 1 + LEGACY_PQL_QUERY_OPTION_SIZE);
-    Assert.assertEquals(sqlNodeAndOptions.getOptions().get("debugOption1"), "foo");
-
-    // Has multiple debugOptions
-    jsonRequest.put(Request.DEBUG_OPTIONS, "debugOption1=foo;debugOption2=bar");
-    sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(query);
-    RequestUtils.setOptions(sqlNodeAndOptions, jsonRequest);
-    Assert.assertEquals(sqlNodeAndOptions.getOptions().size(), 2 + LEGACY_PQL_QUERY_OPTION_SIZE);
-    Assert.assertEquals(sqlNodeAndOptions.getOptions().get("debugOption1"), "foo");
-    Assert.assertEquals(sqlNodeAndOptions.getOptions().get("debugOption2"), "bar");
-
-    // Invalid debug options
-    jsonRequest.put(Request.DEBUG_OPTIONS, "debugOption1");
-    sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(query);
-    try {
-      RequestUtils.setOptions(sqlNodeAndOptions, jsonRequest);
-      Assert.fail();
-    } catch (Exception e) {
-      // Expected
-    }
+    assertEquals(sqlNodeAndOptions.getOptions().size(), 1);
+    assertEquals(sqlNodeAndOptions.getOptions().get(Request.TRACE), "true");
 
     // QUERY_OPTIONS
     jsonRequest = JsonUtils.newObjectNode();
@@ -97,41 +69,28 @@ public class BrokerRequestOptionsTest {
     queryOptions.put("queryOption1", "foo");
     sqlNodeAndOptions.getOptions().putAll(queryOptions);
     RequestUtils.setOptions(sqlNodeAndOptions, jsonRequest);
-    Assert.assertEquals(sqlNodeAndOptions.getOptions().size(), 1 + LEGACY_PQL_QUERY_OPTION_SIZE);
-    Assert.assertEquals(sqlNodeAndOptions.getOptions().get("queryOption1"), "foo");
+    assertEquals(sqlNodeAndOptions.getOptions().size(), 1);
+    assertEquals(sqlNodeAndOptions.getOptions().get("queryOption1"), "foo");
 
     // Has queryOptions in query
     sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions("SET queryOption1='foo'; select * from testTable");
     RequestUtils.setOptions(sqlNodeAndOptions, jsonRequest);
-    Assert.assertEquals(sqlNodeAndOptions.getOptions().size(), 1 + LEGACY_PQL_QUERY_OPTION_SIZE);
-    Assert.assertEquals(sqlNodeAndOptions.getOptions().get("queryOption1"), "foo");
+    assertEquals(sqlNodeAndOptions.getOptions().size(), 1);
+    assertEquals(sqlNodeAndOptions.getOptions().get("queryOption1"), "foo");
 
     // Has query options in json payload
     jsonRequest.put(Request.QUERY_OPTIONS, "queryOption1=foo");
     sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(query);
     RequestUtils.setOptions(sqlNodeAndOptions, jsonRequest);
-    Assert.assertEquals(sqlNodeAndOptions.getOptions().size(), 1 + LEGACY_PQL_QUERY_OPTION_SIZE);
-    Assert.assertEquals(sqlNodeAndOptions.getOptions().get("queryOption1"), "foo");
+    assertEquals(sqlNodeAndOptions.getOptions().size(), 1);
+    assertEquals(sqlNodeAndOptions.getOptions().get("queryOption1"), "foo");
 
     // Has query options in both json payload and sqlNodeAndOptions, sqlNodeAndOptions takes priority
     jsonRequest.put(Request.QUERY_OPTIONS, "queryOption1=bar;queryOption2=moo");
     sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions("SET queryOption1='foo'; select * from testTable;");
     RequestUtils.setOptions(sqlNodeAndOptions, jsonRequest);
-    Assert.assertEquals(sqlNodeAndOptions.getOptions().size(), 2 + LEGACY_PQL_QUERY_OPTION_SIZE);
-    Assert.assertEquals(sqlNodeAndOptions.getOptions().get("queryOption1"), "foo");
-    Assert.assertEquals(sqlNodeAndOptions.getOptions().get("queryOption2"), "moo");
-
-    // Has all 3
-    jsonRequest = JsonUtils.newObjectNode();
-    jsonRequest.put(Request.TRACE, true);
-    jsonRequest.put(Request.DEBUG_OPTIONS, "debugOption1=foo");
-    jsonRequest.put(Request.QUERY_OPTIONS, "queryOption1=bar;queryOption2=moo");
-    sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(query);
-    RequestUtils.setOptions(sqlNodeAndOptions, jsonRequest);
-    Assert.assertEquals(sqlNodeAndOptions.getOptions().size(), 4 + LEGACY_PQL_QUERY_OPTION_SIZE);
-    Assert.assertEquals(sqlNodeAndOptions.getOptions().get("queryOption1"), "bar");
-    Assert.assertEquals(sqlNodeAndOptions.getOptions().get("queryOption2"), "moo");
-    Assert.assertEquals(sqlNodeAndOptions.getOptions().get(Request.TRACE), "true");
-    Assert.assertEquals(sqlNodeAndOptions.getOptions().get("debugOption1"), "foo");
+    assertEquals(sqlNodeAndOptions.getOptions().size(), 2);
+    assertEquals(sqlNodeAndOptions.getOptions().get("queryOption1"), "foo");
+    assertEquals(sqlNodeAndOptions.getOptions().get("queryOption2"), "moo");
   }
 }

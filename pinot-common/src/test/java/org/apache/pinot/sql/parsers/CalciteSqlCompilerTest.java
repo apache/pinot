@@ -827,7 +827,7 @@ public class CalciteSqlCompilerTest {
   public void testQueryOptions() {
     PinotQuery pinotQuery = compileToPinotQuery("select * from vegetables where name <> 'Brussels sprouts'");
     Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 0);
-    Assert.assertNull(pinotQuery.getQueryOptions());
+    Assert.assertTrue(pinotQuery.getQueryOptions().isEmpty());
 
     pinotQuery =
         compileToPinotQuery("select * from vegetables where name <> 'Brussels sprouts' OPTION (delicious=yes)");
@@ -863,7 +863,7 @@ public class CalciteSqlCompilerTest {
   public void testQuerySetOptions() {
     PinotQuery pinotQuery = compileToPinotQuery("select * from vegetables where name <> 'Brussels sprouts'");
     Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 0);
-    Assert.assertNull(pinotQuery.getQueryOptions());
+    Assert.assertTrue(pinotQuery.getQueryOptions().isEmpty());
 
     pinotQuery = compileToPinotQuery("SET delicious='yes'; select * from vegetables where name <> 'Brussels sprouts'");
     Assert.assertEquals(pinotQuery.getQueryOptionsSize(), 1);
@@ -3136,7 +3136,10 @@ public class CalciteSqlCompilerTest {
     DataSource right = join.getRight();
     Assert.assertEquals(right.getTableName(), "T2");
     PinotQuery rightSubquery = right.getSubquery();
-    Assert.assertEquals(rightSubquery, compileToPinotQuery("SELECT a, COUNT(*) AS b FROM T3 GROUP BY a"));
+    // NOTE: Subquery doesn't have query options
+    PinotQuery expected = compileToPinotQuery("SELECT a, COUNT(*) AS b FROM T3 GROUP BY a");
+    expected.setQueryOptions(null);
+    Assert.assertEquals(rightSubquery, expected);
     Assert.assertEquals(join.getCondition(), compileToExpression("T1.key = T2.key"));
 
     query = "SELECT T1.a, T2.b FROM T1 JOIN (SELECT key, COUNT(*) AS b FROM T3 JOIN T4 GROUP BY key) AS T2 "
@@ -3152,7 +3155,10 @@ public class CalciteSqlCompilerTest {
     right = join.getRight();
     Assert.assertEquals(right.getTableName(), "T2");
     rightSubquery = right.getSubquery();
-    Assert.assertEquals(rightSubquery, compileToPinotQuery("SELECT key, COUNT(*) AS b FROM T3 JOIN T4 GROUP BY key"));
+    // NOTE: Subquery doesn't have query options
+    expected = compileToPinotQuery("SELECT key, COUNT(*) AS b FROM T3 JOIN T4 GROUP BY key");
+    expected.setQueryOptions(null);
+    Assert.assertEquals(rightSubquery, expected);
     Assert.assertEquals(join.getCondition(), compileToExpression("T1.key = T2.key"));
 
     // test for self join queries.
@@ -3168,7 +3174,10 @@ public class CalciteSqlCompilerTest {
     right = join.getRight();
     Assert.assertEquals(right.getTableName(), "self");
     rightSubquery = right.getSubquery();
-    Assert.assertEquals(rightSubquery, compileToPinotQuery("SELECT key FROM T1"));
+    // NOTE: Subquery doesn't have query options
+    expected = compileToPinotQuery("SELECT key FROM T1");
+    expected.setQueryOptions(null);
+    Assert.assertEquals(rightSubquery, expected);
     Assert.assertEquals(join.getCondition(), compileToExpression("T1.key = self.key"));
   }
 

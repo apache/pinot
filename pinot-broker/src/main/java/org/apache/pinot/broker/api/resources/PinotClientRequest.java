@@ -114,7 +114,6 @@ public class PinotClientRequest {
   @ManualAuthorization
   public void processSqlQueryGet(@ApiParam(value = "Query", required = true) @QueryParam("sql") String query,
       @ApiParam(value = "Trace enabled") @QueryParam(Request.TRACE) String traceEnabled,
-      @ApiParam(value = "Debug options") @QueryParam(Request.DEBUG_OPTIONS) String debugOptions,
       @Suspended AsyncResponse asyncResponse, @Context org.glassfish.grizzly.http.server.Request requestContext,
       @Context HttpHeaders httpHeaders) {
     try {
@@ -122,9 +121,6 @@ public class PinotClientRequest {
       requestJson.put(Request.SQL, query);
       if (traceEnabled != null) {
         requestJson.put(Request.TRACE, traceEnabled);
-      }
-      if (debugOptions != null) {
-        requestJson.put(Request.DEBUG_OPTIONS, debugOptions);
       }
       BrokerResponse brokerResponse = executeSqlQuery(requestJson, makeHttpIdentity(requestContext), true, httpHeaders);
       asyncResponse.resume(getPinotQueryResponse(brokerResponse));

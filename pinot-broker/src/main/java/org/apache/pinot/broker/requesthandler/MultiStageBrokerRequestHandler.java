@@ -109,26 +109,25 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       HttpHeaders httpHeaders) {
     LOGGER.debug("SQL query for request {}: {}", requestId, query);
 
-    long compilationStartTimeNs;
+    // Parse the query if needed
+    if (sqlNodeAndOptions == null) {
+      try {
+        sqlNodeAndOptions = RequestUtils.parseQuery(query, request);
+      } catch (Exception e) {
+        // Do not log or emit metric here because it is pure user error
+        requestContext.setErrorCode(QueryException.SQL_PARSING_ERROR_CODE);
+        return new BrokerResponseNative(QueryException.getException(QueryException.SQL_PARSING_ERROR, e));
+      }
+    }
+
+    // Compile the request
+    long compilationStartTimeNs = System.nanoTime();
     long queryTimeoutMs;
     QueryEnvironment.QueryPlannerResult queryPlanResult;
-    try {
-      // Parse the request
-      sqlNodeAndOptions = sqlNodeAndOptions != null ? sqlNodeAndOptions : RequestUtils.parseQuery(query, request);
-    } catch (RuntimeException e) {
-      String consolidatedMessage = ExceptionUtils.consolidateExceptionMessages(e);
-      LOGGER.info("Caught exception parsing request {}: {}, {}", requestId, query, consolidatedMessage);
-      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS, 1);
-      requestContext.setErrorCode(QueryException.SQL_PARSING_ERROR_CODE);
-      return new BrokerResponseNative(
-          QueryException.getException(QueryException.SQL_PARSING_ERROR, consolidatedMessage));
-    }
     try {
       Long timeoutMsFromQueryOption = QueryOptionsUtils.getTimeoutMs(sqlNodeAndOptions.getOptions());
       queryTimeoutMs = timeoutMsFromQueryOption == null ? _brokerTimeoutMs : timeoutMsFromQueryOption;
       String database = DatabaseUtils.extractDatabaseFromQueryRequest(sqlNodeAndOptions.getOptions(), httpHeaders);
-      // Compile the request
-      compilationStartTimeNs = System.nanoTime();
       QueryEnvironment queryEnvironment = new QueryEnvironment(new TypeFactory(new TypeSystem()),
           CalciteSchemaBuilder.asRootSchema(new PinotCatalog(database, _tableCache), database), _workerManager,
           _tableCache);
