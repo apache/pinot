@@ -34,7 +34,7 @@ public class ForwardIndexUtils {
    * @param targetMaxChunkSizeBytes target max chunk size in bytes
    */
   public static int getDynamicTargetChunkSize(int maxLength, int targetDocsPerChunk, int targetMaxChunkSizeBytes) {
-    if (targetDocsPerChunk < 0) {
+    if (targetDocsPerChunk < 0 || (long) maxLength * targetDocsPerChunk > Integer.MAX_VALUE) {
       return targetMaxChunkSizeBytes;
     }
     return Math.max(Math.min(maxLength * targetDocsPerChunk, targetMaxChunkSizeBytes), TARGET_MIN_CHUNK_SIZE);
