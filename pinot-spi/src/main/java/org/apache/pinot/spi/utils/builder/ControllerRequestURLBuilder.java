@@ -568,12 +568,7 @@ public class ControllerRequestURLBuilder {
   }
 
   private static String encode(String s) {
-    try {
-      return URLEncoder.encode(s, StandardCharsets.UTF_8);
-    } catch (Exception e) {
-      // Should never happen
-      throw new RuntimeException(e);
-    }
+    return URLEncoder.encode(s, StandardCharsets.UTF_8);
   }
 
   public String forSegmentUpload() {
