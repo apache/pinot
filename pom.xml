@@ -237,7 +237,7 @@
     <grpc.version>1.61.1</grpc.version>
 
     <!-- Configuration for Scala -->
-    <scala.version>2.12.19</scala.version>
+    <scala.version>2.13.14</scala.version>
     <scala.compat.version>2.12</scala.compat.version>
 
     <!-- Solve conflict across dependencies -->
