@@ -88,11 +88,12 @@ public class PartialUpsertHandlerTest {
     LazyRow prevRecord = mock(LazyRow.class);
     mockLazyRow(prevRecord,
         Map.of("pk", "pk1", "field1", 5L, "field2", "set", "field3", new Integer[]{0}, "hoursSinceEpoch", 2L));
-    Map<String, Object> expectedData = new HashMap<>(Map.of("pk", "pk1", "field2", "reset", "hoursSinceEpoch", 2L));
-    expectedData.put("field3", null);
+    Map<String, Object> expectedData = new HashMap<>(
+        Map.of("pk", "pk1", "field2", "reset", "hoursSinceEpoch", 2L));
     expectedData.put("field1", Long.MIN_VALUE);
     GenericRow expectedRecord = initGenericRow(new GenericRow(), expectedData);
     expectedRecord.addNullValueField("field1");
+    expectedRecord.putDefaultNullValue("field3", new Object[]{Integer.MIN_VALUE});
 
     testCustomMerge(prevRecord, newRecord, expectedRecord, getCustomMerger());
   }
