@@ -23,9 +23,9 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -188,11 +188,7 @@ public class LocalPinotFS extends BasePinotFS {
   private static File toFile(URI uri) {
     // NOTE: Do not use new File(uri) because scheme might not exist and it does not decode '+' to ' '
     //       Do not use uri.getPath() because it does not decode '+' to ' '
-    try {
-      return new File(URLDecoder.decode(uri.getRawPath(), "UTF-8"));
-    } catch (UnsupportedEncodingException e) {
-      throw new RuntimeException(e);
-    }
+    return new File(URLDecoder.decode(uri.getRawPath(), StandardCharsets.UTF_8));
   }
 
   private static void copy(File srcFile, File dstFile, boolean recursive)

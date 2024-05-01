@@ -21,8 +21,6 @@ package org.apache.pinot.common.function.scalar;
 import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
 import java.io.UnsupportedEncodingException;
-import java.net.URLDecoder;
-import java.net.URLEncoder;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.text.Normalizer;
@@ -33,6 +31,7 @@ import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.utils.RegexpPatternConverterUtils;
+import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.utils.JsonUtils;
 
@@ -804,24 +803,20 @@ public class StringFunctions {
    *
    * @param input plaintext string
    * @return url encoded string
-   * @throws UnsupportedEncodingException
    */
   @ScalarFunction
-  public static String encodeUrl(String input)
-      throws UnsupportedEncodingException {
-    return URLEncoder.encode(input, StandardCharsets.UTF_8.toString());
+  public static String encodeUrl(String input) {
+    return URIUtils.encode(input);
   }
 
   /**
    *
    * @param input url encoded string
    * @return plaintext string
-   * @throws UnsupportedEncodingException
    */
   @ScalarFunction
-  public static String decodeUrl(String input)
-      throws UnsupportedEncodingException {
-    return URLDecoder.decode(input, StandardCharsets.UTF_8.toString());
+  public static String decodeUrl(String input) {
+    return URIUtils.decode(input);
   }
 
   /**
