@@ -36,7 +36,6 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
  * BYTES).
  */
 public class MultiValueVarByteRawIndexCreator implements ForwardIndexCreator {
-  private static final int TARGET_MIN_CHUNK_SIZE = 4 * 1024;
 
   private final VarByteChunkWriter _indexWriter;
   private final DataType _valueType;
