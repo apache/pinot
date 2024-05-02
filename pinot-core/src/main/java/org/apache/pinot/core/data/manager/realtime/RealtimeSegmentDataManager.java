@@ -1539,6 +1539,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           localStreamDataDecoder.set(new StreamDataDecoderImpl(streamMessageDecoder));
           return true;
         } catch (Exception e) {
+          _segmentLogger.warn("Failed to initialize the StreamMessageDecoder: ", e);
           return false;
         }
       });
