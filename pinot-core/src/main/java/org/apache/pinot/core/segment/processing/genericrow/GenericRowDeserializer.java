@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.segment.processing.genericrow;
 
+import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -169,6 +170,60 @@ public class GenericRowDeserializer {
         offset += Integer.BYTES;
       }
     }
+  }
+
+  public List<Object> getSortedColumnValueList(long offset, int numFieldsToCompare) {
+    List<Object> sortedColumnList = new ArrayList<>();
+    for (int i = 0; i < numFieldsToCompare; i++) {
+      switch (_storedTypes[i]) {
+        case INT:
+          sortedColumnList.add(_dataBuffer.getInt(offset));
+          offset += Integer.BYTES;
+          break;
+        case LONG:
+          sortedColumnList.add(_dataBuffer.getLong(offset));
+          offset += Long.BYTES;
+          break;
+        case FLOAT:
+          sortedColumnList.add(_dataBuffer.getFloat(offset));
+          offset += Float.BYTES;
+          break;
+        case DOUBLE:
+          sortedColumnList.add(_dataBuffer.getDouble(offset));
+          offset += Double.BYTES;
+          break;
+        case BIG_DECIMAL: {
+          int numBytes = _dataBuffer.getInt(offset);
+          offset += Integer.BYTES;
+          byte[] bigDecimalBytes = new byte[numBytes];
+          _dataBuffer.copyTo(offset, bigDecimalBytes);
+          offset += numBytes;
+          sortedColumnList.add(BigDecimalUtils.deserialize(bigDecimalBytes));
+          break;
+        }
+        case STRING: {
+          int numBytes = _dataBuffer.getInt(offset);
+          offset += Integer.BYTES;
+          byte[] stringBytes = new byte[numBytes];
+          _dataBuffer.copyTo(offset, stringBytes);
+          offset += numBytes;
+          sortedColumnList.add(new String(stringBytes, UTF_8));
+          break;
+        }
+        case BYTES: {
+          int numBytes = _dataBuffer.getInt(offset);
+          offset += Integer.BYTES;
+          byte[] bytes = new byte[numBytes];
+          _dataBuffer.copyTo(offset, bytes);
+          offset += numBytes;
+          sortedColumnList.add(bytes);
+          break;
+        }
+        default:
+          throw new IllegalStateException("Unsupported SV stored type: " + _storedTypes[i]);
+      }
+    }
+    return sortedColumnList;
   }
 
   /**

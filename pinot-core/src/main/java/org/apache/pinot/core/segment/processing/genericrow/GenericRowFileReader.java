@@ -82,6 +82,10 @@ public class GenericRowFileReader implements Closeable {
     return _deserializer.compare(offset1, offset2, _numSortFields);
   }
 
+  public List<Object> getSortedColumnValueList(int rowId) {
+    long offset = _offsetBuffer.getLong((long) rowId << 3); // rowId * Long.BYTES
+    return _deserializer.getSortedColumnValueList(offset, _numSortFields);
+  }
   /**
    * Returns a record reader for the rows within the file. Records are sorted if sort order is configured.
    */

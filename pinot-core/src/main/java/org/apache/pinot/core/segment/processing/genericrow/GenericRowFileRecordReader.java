@@ -20,7 +20,11 @@ package org.apache.pinot.core.segment.processing.genericrow;
 
 import it.unimi.dsi.fastutil.Arrays;
 import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
@@ -34,7 +38,7 @@ public class GenericRowFileRecordReader implements RecordReader {
   private final GenericRowFileReader _fileReader;
   private final int _startRowId;
   private final int _endRowId;
-  private final int[] _sortedRowIds;
+  private int[] _sortedRowIds;
 
   private int _nextRowId;
 
@@ -44,18 +48,43 @@ public class GenericRowFileRecordReader implements RecordReader {
     _startRowId = 0;
     _endRowId = numRows;
     if (fileReader.getNumSortFields() > 0) {
-      _sortedRowIds = new int[numRows];
-      for (int i = 0; i < numRows; i++) {
-        _sortedRowIds[i] = i;
-      }
-      Arrays
-          .quickSort(0, _endRowId, (i1, i2) -> _fileReader.compare(_sortedRowIds[i1], _sortedRowIds[i2]), (i1, i2) -> {
-            int temp = _sortedRowIds[i1];
-            _sortedRowIds[i1] = _sortedRowIds[i2];
-            _sortedRowIds[i2] = temp;
-          });
+//      _sortedRowIds = new int[numRows];
+//      for (int i = 0; i < numRows; i++) {
+//        _sortedRowIds[i] = i;
+//      }
+//      Arrays
+//          .quickSort(0, _endRowId, (i1, i2) -> _fileReader.compare(_sortedRowIds[i1], _sortedRowIds[i2]), (i1, i2) -> {
+//            int temp = _sortedRowIds[i1];
+//            _sortedRowIds[i1] = _sortedRowIds[i2];
+//            _sortedRowIds[i2] = temp;
+//          });
+      doExternalSort();
     } else {
       _sortedRowIds = null;
+    }
+  }
+
+  private void doExternalSort() {
+    List<List<Object>> sortColumnList = new ArrayList<>();
+    for (int i = _startRowId; i < _endRowId; i++) {
+      List<Object> sortedColumnValueList = _fileReader.getSortedColumnValueList(i);
+      sortColumnList.add(sortedColumnValueList);
+    }
+
+    _sortedRowIds = new int[_fileReader.getNumRows()];
+    for (int i = 0; i < _fileReader.getNumRows(); i++) {
+      _sortedRowIds[i] = i;
+    }
+
+    for (int i = 0; i < _fileReader.getNumSortFields(); i++) {
+      Map<Object,Integer> m = new TreeMap<>();
+      for (int j = 0; j < _fileReader.getNumRows(); j++) {
+        m.put(sortColumnList.get(j).get(i), _sortedRowIds[j]);
+      }
+      int k = 0;
+      for (Map.Entry<Object,Integer> entry : m.entrySet()) {
+        _sortedRowIds[k++] = entry.getValue();
+      }
     }
   }
 
