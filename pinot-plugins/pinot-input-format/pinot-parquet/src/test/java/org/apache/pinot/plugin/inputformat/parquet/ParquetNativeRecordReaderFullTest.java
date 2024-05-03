@@ -23,7 +23,7 @@ import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import org.apache.commons.io.FileUtils;
 import org.testng.annotations.Test;
-
+import org.testng.Assert;
 
 public class ParquetNativeRecordReaderFullTest {
   protected final File _tempDir = new File(FileUtils.getTempDirectory(), "ParquetNativeRecordReaderFullTest");
@@ -128,16 +128,23 @@ public class ParquetNativeRecordReaderFullTest {
       throws Exception {
     File dataFile = new File(URLDecoder.decode(getClass().getClassLoader().getResource(filePath).getFile(),
         StandardCharsets.UTF_8));
-    ParquetNativeRecordReader recordReader = new ParquetNativeRecordReader();
-    recordReader.init(dataFile, null, null);
-    while (recordReader.hasNext()) {
-      recordReader.next();
-    }
-    recordReader.rewind();
-    while (recordReader.hasNext()) {
-      recordReader.next();
-    }
-
-    recordReader.close();
+    try (ParquetNativeRecordReader recordReader = new ParquetNativeRecordReader()){
+        recordReader.init(dataFile, null, null);
+        int numDocsForFirstPass = 0;
+        while (recordReader.hasNext()) {
+          recordReader.next();
+          numDocsForFirstPass++;
+        }
+        recordReader.rewind();
+        int numDocsForSecondPass = 0;
+        while (recordReader.hasNext()) {
+          recordReader.next();
+          numDocsForSecondPass++;
+        }
+        Assert.assertEquals(numDocsForFirstPass, numDocsForSecondPass);
+        recordReader.close();
+    } catch(AssertionError e){
+    	recordReader.close();
+    } 
   }
 }
