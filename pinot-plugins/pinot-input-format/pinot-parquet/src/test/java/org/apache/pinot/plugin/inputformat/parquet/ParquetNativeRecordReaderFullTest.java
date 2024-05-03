@@ -147,4 +147,4 @@ public class ParquetNativeRecordReaderFullTest {
     } catch (AssertionError e) {
     }
   }
-}
+}  
