@@ -39,6 +39,7 @@ public class KafkaConsumerFactory extends StreamConsumerFactory {
   @Override
   public PartitionGroupConsumer createPartitionGroupConsumer(String clientId,
       PartitionGroupConsumptionStatus partitionGroupConsumptionStatus) {
+    KafkaConfigBackwardCompatibleUtils.handleStreamConfig(_streamConfig);
     return new KafkaPartitionLevelConsumer(clientId, _streamConfig,
         partitionGroupConsumptionStatus.getPartitionGroupId());
   }
