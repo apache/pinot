@@ -128,7 +128,8 @@ public class ParquetNativeRecordReaderFullTest {
       throws Exception {
     File dataFile = new File(URLDecoder.decode(getClass().getClassLoader().getResource(filePath).getFile(),
         StandardCharsets.UTF_8));
-    try (ParquetNativeRecordReader recordReader = new ParquetNativeRecordReader()){
+
+    try (ParquetNativeRecordReader recordReader = new ParquetNativeRecordReader()) {
         recordReader.init(dataFile, null, null);
         int numDocsForFirstPass = 0;
         while (recordReader.hasNext()) {
@@ -141,10 +142,9 @@ public class ParquetNativeRecordReaderFullTest {
           recordReader.next();
           numDocsForSecondPass++;
         }
-        Assert.assertEquals(numDocsForFirstPass, numDocsForSecondPass);
         recordReader.close();
-    } catch(AssertionError e){
-    	recordReader.close();
-    } 
+        Assert.assertEquals(numDocsForFirstPass, numDocsForSecondPass);
+    } catch (AssertionError e) {
+    }
   }
 }
