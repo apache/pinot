@@ -37,7 +37,10 @@ spec:
       labels:
         {{- include "pinot.brokerLabels" . | nindent 8 }}
       annotations:
-{{ toYaml .Values.broker.podAnnotations | indent 8 }}
+        {{- if .Values.broker.automaticReload.enabled }}
+        checksum/config: {{- include (print $.Template.BasePath "/broker/configmap.yaml") . | sha256sum }}
+        {{- end }}
+{{ toYaml .Values.broker.podAnnotations | nindent 8 }}
     spec:
       terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
       serviceAccountName: {{ include "pinot.serviceAccountName" . }}
