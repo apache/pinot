@@ -553,7 +553,7 @@ public class PinotTaskRestletResource {
 
   @GET
   @Path("/tasks/scheduler/jobDetails")
-  @Authorize(targetType = TargetType.TABLE, action = Actions.Table.GET_SCHEDULER_JOB_DETAILS)
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_SCHEDULER_JOB_DETAILS)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation("Fetch job details for table tasks")
   public Map<String, Object> getCronSchedulerJobDetails(
