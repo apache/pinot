@@ -54,7 +54,7 @@ public class SingleValueVarByteRawIndexCreator implements ForwardIndexCreator {
       int totalDocs, DataType valueType, int maxLength)
       throws IOException {
     this(baseIndexDir, compressionType, column, totalDocs, valueType, maxLength, false,
-        ForwardIndexConfig.DEFAULT_RAW_WRITER_VERSION, ForwardIndexConfig.DEFAULT_TARGET_MAX_CHUNK_SIZE,
+        ForwardIndexConfig.DEFAULT_RAW_WRITER_VERSION, ForwardIndexConfig.DEFAULT_TARGET_MAX_CHUNK_SIZE_BYTES,
         ForwardIndexConfig.DEFAULT_TARGET_DOCS_PER_CHUNK);
   }
 

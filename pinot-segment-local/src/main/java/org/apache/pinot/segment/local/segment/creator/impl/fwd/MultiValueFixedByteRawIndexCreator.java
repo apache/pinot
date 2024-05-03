@@ -66,7 +66,7 @@ public class MultiValueFixedByteRawIndexCreator implements ForwardIndexCreator {
       DataType valueType, int maxNumberOfMultiValueElements, boolean deriveNumDocsPerChunk, int writerVersion)
       throws IOException {
     this(indexFile, compressionType, totalDocs, valueType, maxNumberOfMultiValueElements, deriveNumDocsPerChunk,
-        writerVersion, ForwardIndexConfig.DEFAULT_TARGET_MAX_CHUNK_SIZE,
+        writerVersion, ForwardIndexConfig.DEFAULT_TARGET_MAX_CHUNK_SIZE_BYTES,
         ForwardIndexConfig.DEFAULT_TARGET_DOCS_PER_CHUNK);
   }
 

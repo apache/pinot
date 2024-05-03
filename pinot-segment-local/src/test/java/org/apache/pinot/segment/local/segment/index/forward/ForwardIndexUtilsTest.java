@@ -40,7 +40,8 @@ public class ForwardIndexUtilsTest {
         {100, 1000, 1024 * 1024, 1000 * 100}, // small maxValue returns dynamic chunk
         {100, Integer.MAX_VALUE, 1024 * 1024, 1024 * 1024}, // overflow falls back to targetMaxChunkSizeBytes
         {100, -1, 1024 * 1024, 1024 * 1024}, // negative targetDocsPerChunk falls back to targetMaxChunkSizeBytes
-        {2000, 1000, 1024 * 1024, 1024 * 1024} // large maxValue limited by targetMaxChunkSizeBytes
+        {2000, 1000, 1024 * 1024, 1024 * 1024}, // large maxValue limited by targetMaxChunkSizeBytes
+        {100, -1, 1024, 4 * 1024} // tiny targetMaxChunkSizeBytes falls back to TARGET_MIN_CHUNK_SIZE
     };
   }
 }

@@ -36,7 +36,9 @@ import org.apache.pinot.spi.utils.DataSizeUtils;
 
 public class ForwardIndexConfig extends IndexConfig {
   public static final int DEFAULT_RAW_WRITER_VERSION = 2;
-  public static final int DEFAULT_TARGET_MAX_CHUNK_SIZE = 1024 * 1024; // 1MB
+  public static final int DEFAULT_TARGET_MAX_CHUNK_SIZE_BYTES = 1024 * 1024; // 1MB
+  public static final String DEFAULT_TARGET_MAX_CHUNK_SIZE =
+      DataSizeUtils.fromBytes(DEFAULT_TARGET_MAX_CHUNK_SIZE_BYTES);
   public static final int DEFAULT_TARGET_DOCS_PER_CHUNK = 1000;
   public static final ForwardIndexConfig DISABLED =
       new ForwardIndexConfig(true, null, null, null, null, null, null, null);
@@ -47,6 +49,7 @@ public class ForwardIndexConfig extends IndexConfig {
   private final boolean _deriveNumDocsPerChunk;
   private final int _rawIndexWriterVersion;
   private final String _targetMaxChunkSize;
+  private final int _targetMaxChunkSizeBytes;
   private final int _targetDocsPerChunk;
 
   @Nullable
@@ -66,8 +69,10 @@ public class ForwardIndexConfig extends IndexConfig {
       throw new IllegalStateException(
           "targetMaxChunkSize should only be used when deriveNumDocsPerChunk is true or rawIndexWriterVersion is 4");
     }
+    _targetMaxChunkSizeBytes = targetMaxChunkSize == null ? DEFAULT_TARGET_MAX_CHUNK_SIZE_BYTES
+        : (int) DataSizeUtils.toBytes(targetMaxChunkSize);
     _targetMaxChunkSize =
-        targetMaxChunkSize == null ? DataSizeUtils.fromBytes(DEFAULT_TARGET_MAX_CHUNK_SIZE) : targetMaxChunkSize;
+        targetMaxChunkSize == null ? DEFAULT_TARGET_MAX_CHUNK_SIZE : targetMaxChunkSize;
     _targetDocsPerChunk = targetDocsPerChunk == null ? DEFAULT_TARGET_DOCS_PER_CHUNK : targetDocsPerChunk;
 
     if (compressionCodec != null) {
@@ -175,7 +180,7 @@ public class ForwardIndexConfig extends IndexConfig {
 
   @JsonIgnore
   public int getTargetMaxChunkSizeBytes() {
-    return (int) DataSizeUtils.toBytes(_targetMaxChunkSize);
+    return _targetMaxChunkSizeBytes;
   }
 
   @JsonIgnore
