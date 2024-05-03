@@ -317,7 +317,8 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     final String resultTag = "resultTable";
 
     // dropResults=true - resultTable must not be in the response
-    Assert.assertFalse(postQueryWithOptions(query, "dropResults=true").has(resultTag));
+    JsonNode jsonNode = postQueryWithOptions(query, "dropResults=true");
+    Assert.assertFalse(jsonNode.has(resultTag));
 
     // dropResults=TrUE (case insensitive match) - resultTable must not be in the response
     Assert.assertFalse(postQueryWithOptions(query, "dropResults=TrUE").has(resultTag));

@@ -21,12 +21,10 @@ package org.apache.pinot.common.response.broker;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.spi.utils.JsonUtils;
 
 
 // TODO: Decouple the execution stats aggregator logic and make it into a util that can aggregate 2 values with the
@@ -107,11 +105,6 @@ public class BrokerResponseStats extends BrokerResponseNative {
   @JsonProperty("stageExecutionUnit")
   public void setStageExecutionUnit(int stageExecutionUnit) {
     _stageExecutionUnit = stageExecutionUnit;
-  }
-
-  public String toJsonString()
-      throws IOException {
-    return JsonUtils.objectToString(this);
   }
 
   @JsonProperty("operatorStats")

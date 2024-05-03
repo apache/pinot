@@ -33,10 +33,13 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.datatable.DataTable;
+import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
@@ -52,8 +55,11 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
+import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionValue;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -70,6 +76,8 @@ import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionValu
  * </ul>
  */
 public class LeafStageTransferableBlockOperator extends MultiStageOperator {
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(LeafStageTransferableBlockOperator.class);
   private static final String EXPLAIN_NAME = "LEAF_STAGE_TRANSFER_OPERATOR";
 
   // Use a special results block to indicate that this is the last results block
@@ -85,7 +93,7 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
 
   private Future<Void> _executionFuture;
   private volatile Map<Integer, String> _exceptions;
-  private volatile Map<String, String> _executionStats;
+  private final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
 
   public LeafStageTransferableBlockOperator(OpChainExecutionContext context, List<ServerQueryRequest> requests,
       DataSchema dataSchema, QueryExecutor queryExecutor, ExecutorService executorService) {
@@ -99,6 +107,24 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
     Integer maxStreamingPendingBlocks = QueryOptionsUtils.getMaxStreamingPendingBlocks(context.getOpChainMetadata());
     _blockingQueue = new ArrayBlockingQueue<>(maxStreamingPendingBlocks != null ? maxStreamingPendingBlocks
         : QueryOptionValue.DEFAULT_MAX_STREAMING_PENDING_BLOCKS);
+    String tableName = context.getLeafStageContext().getStagePlan().getStageMetadata().getTableName();
+    _statMap.merge(StatKey.TABLE, tableName);
+  }
+
+  @Override
+  public void registerExecution(long time, int numRows) {
+    _statMap.merge(StatKey.EXECUTION_TIME_MS, time);
+    _statMap.merge(StatKey.EMITTED_ROWS, numRows);
+  }
+
+  @Override
+  public Type getOperatorType() {
+    return Type.LEAF;
+  }
+
+  @Override
+  protected Logger logger() {
+    return LOGGER;
   }
 
   @Override
@@ -135,14 +161,125 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
     }
   }
 
-  private TransferableBlock constructMetadataBlock() {
-    // All data blocks have been returned. Record the stats and return EOS.
-    Map<String, String> executionStats = _executionStats;
+  private void mergeExecutionStats(@Nullable Map<String, String> executionStats) {
     if (executionStats != null) {
-      OperatorStats operatorStats = _opChainStats.getOperatorStats(_context, getOperatorId());
-      operatorStats.recordExecutionStats(executionStats);
+      for (Map.Entry<String, String> entry : executionStats.entrySet()) {
+        DataTable.MetadataKey key = DataTable.MetadataKey.getByName(entry.getKey());
+        if (key == null) {
+          LOGGER.debug("Skipping unknown execution stat: {}", entry.getKey());
+          continue;
+        }
+        switch (key) {
+          case UNKNOWN:
+            LOGGER.debug("Skipping unknown execution stat: {}", entry.getKey());
+            break;
+          case TABLE:
+            _statMap.merge(StatKey.TABLE, entry.getValue());
+            break;
+          case NUM_DOCS_SCANNED:
+            _statMap.merge(StatKey.NUM_DOCS_SCANNED, Long.parseLong(entry.getValue()));
+            break;
+          case NUM_ENTRIES_SCANNED_IN_FILTER:
+            _statMap.merge(StatKey.NUM_ENTRIES_SCANNED_IN_FILTER, Long.parseLong(entry.getValue()));
+            break;
+          case NUM_ENTRIES_SCANNED_POST_FILTER:
+            _statMap.merge(StatKey.NUM_ENTRIES_SCANNED_POST_FILTER, Long.parseLong(entry.getValue()));
+            break;
+          case NUM_SEGMENTS_QUERIED:
+            _statMap.merge(StatKey.NUM_SEGMENTS_QUERIED, Integer.parseInt(entry.getValue()));
+            break;
+          case NUM_SEGMENTS_PROCESSED:
+            _statMap.merge(StatKey.NUM_SEGMENTS_PROCESSED, Integer.parseInt(entry.getValue()));
+            break;
+          case NUM_SEGMENTS_MATCHED:
+            _statMap.merge(StatKey.NUM_SEGMENTS_MATCHED, Integer.parseInt(entry.getValue()));
+            break;
+          case NUM_CONSUMING_SEGMENTS_QUERIED:
+            _statMap.merge(StatKey.NUM_CONSUMING_SEGMENTS_QUERIED, Integer.parseInt(entry.getValue()));
+            break;
+          case MIN_CONSUMING_FRESHNESS_TIME_MS:
+            _statMap.merge(StatKey.MIN_CONSUMING_FRESHNESS_TIME_MS, Long.parseLong(entry.getValue()));
+            break;
+          case TOTAL_DOCS:
+            _statMap.merge(StatKey.TOTAL_DOCS, Long.parseLong(entry.getValue()));
+            break;
+          case NUM_GROUPS_LIMIT_REACHED:
+            _statMap.merge(StatKey.NUM_GROUPS_LIMIT_REACHED, Boolean.parseBoolean(entry.getValue()));
+            break;
+          case TIME_USED_MS:
+            _statMap.merge(StatKey.EXECUTION_TIME_MS, Long.parseLong(entry.getValue()));
+            break;
+          case TRACE_INFO:
+            LOGGER.debug("Skipping trace info: {}", entry.getValue());
+            break;
+          case REQUEST_ID:
+            LOGGER.debug("Skipping request ID: {}", entry.getValue());
+            break;
+          case NUM_RESIZES:
+            _statMap.merge(StatKey.NUM_RESIZES, Integer.parseInt(entry.getValue()));
+            break;
+          case RESIZE_TIME_MS:
+            _statMap.merge(StatKey.RESIZE_TIME_MS, Long.parseLong(entry.getValue()));
+            break;
+          case THREAD_CPU_TIME_NS:
+            _statMap.merge(StatKey.THREAD_CPU_TIME_NS, Long.parseLong(entry.getValue()));
+            break;
+          case SYSTEM_ACTIVITIES_CPU_TIME_NS:
+            _statMap.merge(StatKey.SYSTEM_ACTIVITIES_CPU_TIME_NS, Long.parseLong(entry.getValue()));
+            break;
+          case RESPONSE_SER_CPU_TIME_NS:
+            _statMap.merge(StatKey.RESPONSE_SER_CPU_TIME_NS, Long.parseLong(entry.getValue()));
+            break;
+          case NUM_SEGMENTS_PRUNED_BY_SERVER:
+            _statMap.merge(StatKey.NUM_SEGMENTS_PRUNED_BY_SERVER, Integer.parseInt(entry.getValue()));
+            break;
+          case NUM_SEGMENTS_PRUNED_INVALID:
+            _statMap.merge(StatKey.NUM_SEGMENTS_PRUNED_INVALID, Integer.parseInt(entry.getValue()));
+            break;
+          case NUM_SEGMENTS_PRUNED_BY_LIMIT:
+            _statMap.merge(StatKey.NUM_SEGMENTS_PRUNED_BY_LIMIT, Integer.parseInt(entry.getValue()));
+            break;
+          case NUM_SEGMENTS_PRUNED_BY_VALUE:
+            _statMap.merge(StatKey.NUM_SEGMENTS_PRUNED_BY_VALUE, Integer.parseInt(entry.getValue()));
+            break;
+          case EXPLAIN_PLAN_NUM_EMPTY_FILTER_SEGMENTS:
+            LOGGER.debug("Skipping empty filter segments: {}", entry.getValue());
+            break;
+          case EXPLAIN_PLAN_NUM_MATCH_ALL_FILTER_SEGMENTS:
+            LOGGER.debug("Skipping match all filter segments: {}", entry.getValue());
+            break;
+          case NUM_CONSUMING_SEGMENTS_PROCESSED:
+            _statMap.merge(StatKey.NUM_CONSUMING_SEGMENTS_PROCESSED, Integer.parseInt(entry.getValue()));
+            break;
+          case NUM_CONSUMING_SEGMENTS_MATCHED:
+            _statMap.merge(StatKey.NUM_CONSUMING_SEGMENTS_MATCHED, Integer.parseInt(entry.getValue()));
+            break;
+          case NUM_BLOCKS:
+            _statMap.merge(StatKey.NUM_BLOCKS, Integer.parseInt(entry.getValue()));
+            break;
+          case NUM_ROWS:
+            _statMap.merge(StatKey.EMITTED_ROWS, Integer.parseInt(entry.getValue()));
+            break;
+          case OPERATOR_EXECUTION_TIME_MS:
+            _statMap.merge(StatKey.OPERATOR_EXECUTION_TIME_MS, Long.parseLong(entry.getValue()));
+            break;
+          case OPERATOR_EXEC_START_TIME_MS:
+            _statMap.merge(StatKey.OPERATOR_EXEC_START_TIME_MS, Long.parseLong(entry.getValue()));
+            break;
+          case OPERATOR_EXEC_END_TIME_MS:
+            _statMap.merge(StatKey.OPERATOR_EXEC_END_TIME_MS, Long.parseLong(entry.getValue()));
+            break;
+          default: {
+            throw new IllegalArgumentException("Unhandled V1 execution stat: " + entry.getKey());
+          }
+        }
+      }
     }
-    return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+  }
+
+  private TransferableBlock constructMetadataBlock() {
+    MultiStageQueryStats multiStageQueryStats = MultiStageQueryStats.createLeaf(_context.getStageId(), _statMap);
+    return TransferableBlockUtils.getEndOfStreamTransferableBlock(multiStageQueryStats);
   }
 
   private Future<Void> startExecution() {
@@ -170,11 +307,14 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
               addResultsBlock(resultsBlock);
             }
             // Collect the execution stats
-            _executionStats = instanceResponseBlock.getResponseMetadata();
+            mergeExecutionStats(instanceResponseBlock.getResponseMetadata());
           }
         } else {
           assert _requests.size() == 2;
-          Future<?>[] futures = new Future[2];
+          Future<Map<String, String>>[] futures = new Future[2];
+          // TODO: this latch mechanism is not the most elegant. We should change it to use a CompletionService.
+          //  In order to interrupt the execution in case of error, we could different mechanisms like throwing in the
+          //  future, or using a shared volatile variable.
           CountDownLatch latch = new CountDownLatch(2);
           for (int i = 0; i < 2; i++) {
             ServerQueryRequest request = _requests.get(i);
@@ -190,6 +330,7 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
                   // Drain the latch when receiving exception block and not wait for the other thread to finish
                   _exceptions = exceptions;
                   latch.countDown();
+                  return Collections.emptyMap();
                 } else {
                   // NOTE: Instance response block might contain data (not metadata only) when all the segments are
                   //       pruned. Add the results block if it contains data.
@@ -198,16 +339,8 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
                     addResultsBlock(resultsBlock);
                   }
                   // Collect the execution stats
-                  Map<String, String> executionStats = instanceResponseBlock.getResponseMetadata();
-                  synchronized (LeafStageTransferableBlockOperator.this) {
-                    if (_executionStats == null) {
-                      _executionStats = executionStats;
-                    } else {
-                      aggregateExecutionStats(_executionStats, executionStats);
-                    }
-                  }
+                  return instanceResponseBlock.getResponseMetadata();
                 }
-                return null;
               } finally {
                 latch.countDown();
               }
@@ -218,9 +351,17 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
               throw new TimeoutException("Timed out waiting for leaf stage to finish");
             }
             // Propagate the exception thrown by the leaf stage
-            for (Future<?> future : futures) {
-              future.get();
+            for (Future<Map<String, String>> future : futures) {
+              Map<String, String> stats =
+                  future.get(_context.getDeadlineMs() - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+              mergeExecutionStats(stats);
             }
+          } catch (TimeoutException e) {
+            // Cancel all the futures and throw the exception
+            for (Future<?> future : futures) {
+              future.cancel(true);
+            }
+            throw new TimeoutException("Timed out waiting for leaf stage to finish");
           } finally {
             for (Future<?> future : futures) {
               future.cancel(true);
@@ -249,26 +390,14 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
     for (Map.Entry<String, String> entry : stats2.entrySet()) {
       String k2 = entry.getKey();
       String v2 = entry.getValue();
-      stats1.compute(k2, (k1, v1) -> {
-        if (v1 == null) {
-          return v2;
-        }
+      stats1.merge(k2, v2, (val1, val2) -> {
         try {
-          return Long.toString(Long.parseLong(v1) + Long.parseLong(v2));
+          return Long.toString(Long.parseLong(val1) + Long.parseLong(val2));
         } catch (Exception e) {
-          return v1 + "\n" + v2;
+          return val1 + "\n" + val2;
         }
       });
     }
-  }
-
-  /**
-   * Leaf stage operators should always collect stats for the tables used in queries
-   * Otherwise the Broker response will just contain zeros for every stat value
-   */
-  @Override
-  protected boolean shouldCollectStats() {
-    return true;
   }
 
   @Override
@@ -417,6 +546,112 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
     public void send(BaseResultsBlock block)
         throws InterruptedException, TimeoutException {
       addResultsBlock(block);
+    }
+  }
+
+  public enum StatKey implements StatMap.Key {
+    TABLE(StatMap.Type.STRING, null),
+    EXECUTION_TIME_MS(StatMap.Type.LONG, BrokerResponseNativeV2.StatKey.TIME_USED_MS) {
+      @Override
+      public boolean includeDefaultInJson() {
+        return true;
+      }
+    },
+    EMITTED_ROWS(StatMap.Type.LONG, null) {
+      @Override
+      public boolean includeDefaultInJson() {
+        return true;
+      }
+    },
+    NUM_DOCS_SCANNED(StatMap.Type.LONG),
+    NUM_ENTRIES_SCANNED_IN_FILTER(StatMap.Type.LONG),
+    NUM_ENTRIES_SCANNED_POST_FILTER(StatMap.Type.LONG),
+    NUM_SEGMENTS_QUERIED(StatMap.Type.INT),
+    NUM_SEGMENTS_PROCESSED(StatMap.Type.INT),
+    NUM_SEGMENTS_MATCHED(StatMap.Type.INT),
+    NUM_CONSUMING_SEGMENTS_QUERIED(StatMap.Type.INT),
+    // the timestamp indicating the freshness of the data queried in consuming segments.
+    // This can be ingestion timestamp if provided by the stream, or the last index time
+    MIN_CONSUMING_FRESHNESS_TIME_MS(StatMap.Type.LONG) {
+      @Override
+      public long merge(long value1, long value2) {
+        return StatMap.Key.minPositive(value1, value2);
+      }
+    },
+    TOTAL_DOCS(StatMap.Type.LONG),
+    NUM_GROUPS_LIMIT_REACHED(StatMap.Type.BOOLEAN),
+    NUM_RESIZES(StatMap.Type.INT, null),
+    RESIZE_TIME_MS(StatMap.Type.LONG, null),
+    THREAD_CPU_TIME_NS(StatMap.Type.LONG, null),
+    SYSTEM_ACTIVITIES_CPU_TIME_NS(StatMap.Type.LONG, null),
+    RESPONSE_SER_CPU_TIME_NS(StatMap.Type.LONG, null) {
+      @Override
+      public String getStatName() {
+        return "responseSerializationCpuTimeNs";
+      }
+    },
+    NUM_SEGMENTS_PRUNED_BY_SERVER(StatMap.Type.INT),
+    NUM_SEGMENTS_PRUNED_INVALID(StatMap.Type.INT),
+    NUM_SEGMENTS_PRUNED_BY_LIMIT(StatMap.Type.INT),
+    NUM_SEGMENTS_PRUNED_BY_VALUE(StatMap.Type.INT),
+    NUM_CONSUMING_SEGMENTS_PROCESSED(StatMap.Type.INT),
+    NUM_CONSUMING_SEGMENTS_MATCHED(StatMap.Type.INT),
+    NUM_BLOCKS(StatMap.Type.INT, null),
+    OPERATOR_EXECUTION_TIME_MS(StatMap.Type.LONG, null),
+    OPERATOR_EXEC_START_TIME_MS(StatMap.Type.LONG, null) {
+      @Override
+      public long merge(long value1, long value2) {
+        return StatMap.Key.minPositive(value1, value2);
+      }
+    },
+    OPERATOR_EXEC_END_TIME_MS(StatMap.Type.LONG, null) {
+      @Override
+      public long merge(long value1, long value2) {
+        return Math.max(value1, value2);
+      }
+    },;
+    private final StatMap.Type _type;
+    @Nullable
+    private final BrokerResponseNativeV2.StatKey _brokerKey;
+
+    StatKey(StatMap.Type type) {
+      _type = type;
+      _brokerKey = BrokerResponseNativeV2.StatKey.valueOf(name());
+    }
+
+    StatKey(StatMap.Type type, @Nullable BrokerResponseNativeV2.StatKey brokerKey) {
+      _type = type;
+      _brokerKey = brokerKey;
+    }
+
+    @Override
+    public StatMap.Type getType() {
+      return _type;
+    }
+
+    public void updateBrokerMetadata(StatMap<BrokerResponseNativeV2.StatKey> oldMetadata, StatMap<StatKey> stats) {
+      if (_brokerKey != null) {
+        switch (_type) {
+          case LONG:
+            if (_brokerKey.getType() == StatMap.Type.INT) {
+              oldMetadata.merge(_brokerKey, (int) stats.getLong(this));
+            } else {
+              oldMetadata.merge(_brokerKey, stats.getLong(this));
+            }
+            break;
+          case INT:
+            oldMetadata.merge(_brokerKey, stats.getInt(this));
+            break;
+          case BOOLEAN:
+            oldMetadata.merge(_brokerKey, stats.getBoolean(this));
+            break;
+          case STRING:
+            oldMetadata.merge(_brokerKey, stats.getString(this));
+            break;
+          default:
+            throw new IllegalStateException("Unsupported type: " + _type);
+        }
+      }
     }
   }
 }

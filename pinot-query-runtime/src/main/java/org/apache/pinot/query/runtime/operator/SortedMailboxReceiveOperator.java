@@ -33,6 +33,8 @@ import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.operator.utils.SortUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -43,6 +45,8 @@ import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
  *        resorting via the PriorityQueue.
  */
 public class SortedMailboxReceiveOperator extends BaseMailboxReceiveOperator {
+  private static final Logger LOGGER = LoggerFactory.getLogger(SortedMailboxReceiveOperator.class);
+
   private static final String EXPLAIN_NAME = "SORTED_MAILBOX_RECEIVE";
 
   private final DataSchema _dataSchema;
@@ -66,6 +70,11 @@ public class SortedMailboxReceiveOperator extends BaseMailboxReceiveOperator {
     _isSortOnSender = isSortOnSender;
   }
 
+  @Override
+  protected Logger logger() {
+    return LOGGER;
+  }
+
   @Nullable
   @Override
   public String toExplainString() {
@@ -86,8 +95,10 @@ public class SortedMailboxReceiveOperator extends BaseMailboxReceiveOperator {
         return block;
       } else {
         assert block.isSuccessfulEndOfStreamBlock();
+        // the multiConsumer has already merged stages from upstream, but doesn't know about this operator
+        // specific stats.
+        _eosBlock = updateEosBlock(block, _statMap);
         if (!_rows.isEmpty()) {
-          _eosBlock = block;
           // TODO: This might not be efficient because we are sorting all the received rows. We should use a k-way merge
           //       when sender side is sorted.
           _rows.sort(

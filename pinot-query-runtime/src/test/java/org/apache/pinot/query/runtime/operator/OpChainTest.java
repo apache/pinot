@@ -22,15 +22,14 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.Stack;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
-import org.apache.calcite.rel.RelDistribution;
-import org.apache.pinot.common.datatable.DataTable;
+import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
@@ -50,12 +49,15 @@ import org.apache.pinot.query.routing.SharedMailboxInfos;
 import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.blocks.TransferableBlockTestUtils;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
+import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
@@ -65,9 +67,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertTrue;
-import static org.testng.Assert.fail;
+import static org.testng.Assert.*;
 
 
 public class OpChainTest {
@@ -111,7 +111,7 @@ public class OpChainTest {
       }).when(_exchange).send(any(TransferableBlock.class));
       when(_mailbox2.poll()).then(x -> {
         if (_blockList.isEmpty()) {
-          return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+          return TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0);
         }
         return _blockList.remove(0);
       });
@@ -133,133 +133,41 @@ public class OpChainTest {
   }
 
   @Test
-  public void testExecutionTimerStats() {
-    when(_sourceOperator.nextBlock()).then(x -> {
-      Thread.sleep(100);
-      return TransferableBlockUtils.getEndOfStreamTransferableBlock();
-    });
-    OpChain opChain = new OpChain(OperatorTestUtil.getDefaultContext(), _sourceOperator);
-    opChain.getStats().executing();
-    opChain.getRoot().nextBlock();
-    opChain.getStats().queued();
-    assertTrue(opChain.getStats().getExecutionTime() >= 100);
-
-    when(_sourceOperator.nextBlock()).then(x -> {
-      Thread.sleep(20);
-      return TransferableBlockUtils.getEndOfStreamTransferableBlock();
-    });
-    opChain = new OpChain(OperatorTestUtil.getDefaultContext(), _sourceOperator);
-    opChain.getStats().executing();
-    opChain.getRoot().nextBlock();
-    opChain.getStats().queued();
-    assertTrue(opChain.getStats().getExecutionTime() >= 20);
-    assertTrue(opChain.getStats().getExecutionTime() < 100);
-  }
-
-  @Test
   public void testStatsCollectionTracingEnabled() {
-    OpChainExecutionContext context = OperatorTestUtil.getDefaultContext();
+    OpChainExecutionContext context = OperatorTestUtil.getTracingContext();
     DummyMultiStageOperator dummyMultiStageOperator = new DummyMultiStageOperator(context);
 
     OpChain opChain = new OpChain(context, dummyMultiStageOperator);
-    opChain.getStats().executing();
-    opChain.getRoot().nextBlock();
-    opChain.getStats().queued();
+    TransferableBlock eosBlock = drainOpChain(opChain);
 
-    assertTrue(opChain.getStats().getExecutionTime() >= 1000);
-    assertEquals(opChain.getStats().getOperatorStatsMap().size(), 1);
-    assertTrue(opChain.getStats().getOperatorStatsMap().containsKey(dummyMultiStageOperator.getOperatorId()));
+    assertTrue(eosBlock.isSuccessfulEndOfStreamBlock(), "Expected end of stream block to be successful");
+    MultiStageQueryStats queryStats = eosBlock.getQueryStats();
+    assertNotNull(queryStats, "Expected query stats to be non-null");
 
-    Map<String, String> executionStats =
-        opChain.getStats().getOperatorStatsMap().get(dummyMultiStageOperator.getOperatorId()).getExecutionStats();
-
-    long time = Long.parseLong(executionStats.get(DataTable.MetadataKey.OPERATOR_EXECUTION_TIME_MS.getName()));
-    assertTrue(time >= 1000 && time <= 2000,
-        "Expected " + DataTable.MetadataKey.OPERATOR_EXECUTION_TIME_MS + " to be in [1000, 2000] but found " + time);
+    @SuppressWarnings("unchecked")
+    StatMap<LiteralValueOperator.StatKey> lastOperatorStats =
+        (StatMap<LiteralValueOperator.StatKey>) queryStats.getCurrentStats().getLastOperatorStats();
+    assertNotEquals(lastOperatorStats.getLong(LiteralValueOperator.StatKey.EXECUTION_TIME_MS), 0L,
+        "Expected execution time to be non-zero");
   }
 
   @Test
   public void testStatsCollectionTracingDisabled() {
-    OpChainExecutionContext context = OperatorTestUtil.getDefaultContextWithTracingDisabled();
+    OpChainExecutionContext context = OperatorTestUtil.getNoTracingContext();
     DummyMultiStageOperator dummyMultiStageOperator = new DummyMultiStageOperator(context);
 
     OpChain opChain = new OpChain(context, dummyMultiStageOperator);
-    opChain.getStats().executing();
-    opChain.getRoot().nextBlock();
-    opChain.getStats().queued();
+    TransferableBlock eosBlock = drainOpChain(opChain);
 
-    assertTrue(opChain.getStats().getExecutionTime() >= 1000);
-    assertEquals(opChain.getStats().getOperatorStatsMap().size(), 0);
-  }
+    assertTrue(eosBlock.isSuccessfulEndOfStreamBlock(), "Expected end of stream block to be successful");
+    MultiStageQueryStats queryStats = eosBlock.getQueryStats();
+    assertNotNull(queryStats, "Expected query stats to be non-null");
 
-  @Test
-  public void testStatsCollectionTracingEnabledMultipleOperators() {
-    long dummyOperatorWaitTime = 1000L;
-
-    OpChainExecutionContext context = new OpChainExecutionContext(_mailboxService1, 123L, Long.MAX_VALUE,
-        ImmutableMap.of(CommonConstants.Broker.Request.TRACE, "true"), _stageMetadata, _workerMetadata, null);
-    Stack<MultiStageOperator> operators = getFullOpChain(context, dummyOperatorWaitTime);
-
-    OpChain opChain = new OpChain(context, operators.peek());
-    opChain.getStats().executing();
-    while (!opChain.getRoot().nextBlock().isEndOfStreamBlock()) {
-      // Drain the opchain
-    }
-    opChain.getStats().queued();
-
-    OpChainExecutionContext secondStageContext = new OpChainExecutionContext(_mailboxService2, 123L, Long.MAX_VALUE,
-        ImmutableMap.of(CommonConstants.Broker.Request.TRACE, "true"), _stageMetadata, _workerMetadata, null);
-    MailboxReceiveOperator secondStageReceiveOp =
-        new MailboxReceiveOperator(secondStageContext, RelDistribution.Type.BROADCAST_DISTRIBUTED, 1);
-
-    assertTrue(opChain.getStats().getExecutionTime() >= dummyOperatorWaitTime);
-    int numOperators = operators.size();
-    assertEquals(opChain.getStats().getOperatorStatsMap().size(), numOperators);
-    while (!operators.isEmpty()) {
-      assertTrue(opChain.getStats().getOperatorStatsMap().containsKey(operators.pop().getOperatorId()));
-    }
-
-    while (!secondStageReceiveOp.nextBlock().isEndOfStreamBlock()) {
-      // Drain the mailbox
-    }
-    assertEquals(secondStageContext.getStats().getOperatorStatsMap().size(), numOperators + 1);
-  }
-
-  @Test
-  public void testStatsCollectionTracingDisableMultipleOperators() {
-    long dummyOperatorWaitTime = 1000L;
-
-    OpChainExecutionContext context =
-        new OpChainExecutionContext(_mailboxService1, 123L, Long.MAX_VALUE, ImmutableMap.of(), _stageMetadata,
-            _workerMetadata, null);
-    Stack<MultiStageOperator> operators = getFullOpChain(context, dummyOperatorWaitTime);
-
-    OpChain opChain = new OpChain(context, operators.peek());
-    opChain.getStats().executing();
-    opChain.getRoot().nextBlock();
-    opChain.getStats().queued();
-
-    OpChainExecutionContext secondStageContext =
-        new OpChainExecutionContext(_mailboxService2, 123L, Long.MAX_VALUE, ImmutableMap.of(), _stageMetadata,
-            _workerMetadata, null);
-    MailboxReceiveOperator secondStageReceiveOp =
-        new MailboxReceiveOperator(secondStageContext, RelDistribution.Type.BROADCAST_DISTRIBUTED, 1);
-
-    assertTrue(opChain.getStats().getExecutionTime() >= dummyOperatorWaitTime);
-    assertEquals(opChain.getStats().getOperatorStatsMap().size(), 2);
-    assertTrue(opChain.getStats().getOperatorStatsMap().containsKey(operators.pop().getOperatorId()));
-
-    while (!secondStageReceiveOp.nextBlock().isEndOfStreamBlock()) {
-      // Drain the mailbox
-    }
-
-    while (!operators.isEmpty()) {
-      MultiStageOperator operator = operators.pop();
-      if (operator.toExplainString().contains("SEND") || operator.toExplainString().contains("LEAF")) {
-        assertTrue(opChain.getStats().getOperatorStatsMap().containsKey(operator.getOperatorId()));
-      }
-    }
-    assertEquals(secondStageContext.getStats().getOperatorStatsMap().size(), 2);
+    @SuppressWarnings("unchecked")
+    StatMap<LiteralValueOperator.StatKey> lastOperatorStats =
+        (StatMap<LiteralValueOperator.StatKey>) queryStats.getCurrentStats().getLastOperatorStats();
+    assertNotEquals(lastOperatorStats.getLong(LiteralValueOperator.StatKey.EXECUTION_TIME_MS), 0L,
+        "Expected execution time to be collected");
   }
 
   private Stack<MultiStageOperator> getFullOpChain(OpChainExecutionContext context, long waitTimeInMillis) {
@@ -268,7 +176,7 @@ public class OpChainTest {
     //Mailbox Receive Operator
     try {
       when(_mailbox1.poll()).thenReturn(OperatorTestUtil.block(upStreamSchema, new Object[]{1}),
-          TransferableBlockUtils.getEndOfStreamTransferableBlock());
+          TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
     } catch (Exception e) {
       fail("Exception while mocking mailbox receive: " + e.getMessage());
     }
@@ -297,7 +205,7 @@ public class OpChainTest {
 
     //Mailbox Send operator
     MailboxSendOperator sendOperator =
-        new MailboxSendOperator(context, dummyWaitOperator, _exchange, null, null, false);
+        new MailboxSendOperator(context, dummyWaitOperator, ignore -> _exchange, null, null, false);
 
     operators.push(leafOp);
     operators.push(transformOp);
@@ -319,10 +227,31 @@ public class OpChainTest {
     return queryExecutor;
   }
 
+  private TransferableBlock drainOpChain(OpChain opChain) {
+    TransferableBlock resultBlock = opChain.getRoot().nextBlock();
+    while (!resultBlock.isEndOfStreamBlock()) {
+      resultBlock = opChain.getRoot().nextBlock();
+    }
+    return resultBlock;
+  }
+
   static class DummyMultiStageOperator extends MultiStageOperator {
+    private static final Logger LOGGER = LoggerFactory.getLogger(DummyMultiStageOperator.class);
+    private final StatMap<LiteralValueOperator.StatKey> _statMap = new StatMap<>(LiteralValueOperator.StatKey.class);
 
     public DummyMultiStageOperator(OpChainExecutionContext context) {
       super(context);
+    }
+
+    @Override
+    public void registerExecution(long time, int numRows) {
+      _statMap.merge(LiteralValueOperator.StatKey.EXECUTION_TIME_MS, time);
+      _statMap.merge(LiteralValueOperator.StatKey.EMITTED_ROWS, numRows);
+    }
+
+    @Override
+    protected Logger logger() {
+      return LOGGER;
     }
 
     @Override
@@ -332,7 +261,17 @@ public class OpChainTest {
       } catch (InterruptedException e) {
         // IGNORE
       }
-      return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+      return TransferableBlockUtils.getEndOfStreamTransferableBlock(MultiStageQueryStats.createLiteral(0, _statMap));
+    }
+
+    @Override
+    public Type getOperatorType() {
+      return Type.LITERAL;
+    }
+
+    @Override
+    public List<MultiStageOperator> getChildOperators() {
+      return Collections.emptyList();
     }
 
     @Nullable
@@ -343,8 +282,10 @@ public class OpChainTest {
   }
 
   static class DummyMultiStageCallableOperator extends MultiStageOperator {
+    private static final Logger LOGGER = LoggerFactory.getLogger(DummyMultiStageCallableOperator.class);
     private final MultiStageOperator _upstream;
     private final long _sleepTimeInMillis;
+    private final StatMap<TransformOperator.StatKey> _statMap = new StatMap<>(TransformOperator.StatKey.class);
 
     public DummyMultiStageCallableOperator(OpChainExecutionContext context, MultiStageOperator upstream,
         long sleepTimeInMillis) {
@@ -354,19 +295,43 @@ public class OpChainTest {
     }
 
     @Override
+    public void registerExecution(long time, int numRows) {
+      _statMap.merge(TransformOperator.StatKey.EXECUTION_TIME_MS, time);
+      _statMap.merge(TransformOperator.StatKey.EMITTED_ROWS, numRows);
+    }
+
+    @Override
+    protected Logger logger() {
+      return LOGGER;
+    }
+
+    @Override
     public List<MultiStageOperator> getChildOperators() {
       return ImmutableList.of(_upstream);
     }
 
     @Override
     protected TransferableBlock getNextBlock() {
+      TransferableBlock block;
+
       try {
         Thread.sleep(_sleepTimeInMillis);
-        _upstream.nextBlock();
+        do {
+          block = _upstream.nextBlock();
+        } while (block.isEndOfStreamBlock());
+
+        MultiStageQueryStats queryStats = block.getQueryStats();
+        assert queryStats != null;
+        queryStats.getCurrentStats().addLastOperator(getOperatorType(), _statMap);
+        return TransferableBlockUtils.getEndOfStreamTransferableBlock(queryStats);
       } catch (InterruptedException e) {
-        // IGNORE
+        throw new RuntimeException(e);
       }
-      return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+    }
+
+    @Override
+    public Type getOperatorType() {
+      return Type.TRANSFORM;
     }
 
     @Override

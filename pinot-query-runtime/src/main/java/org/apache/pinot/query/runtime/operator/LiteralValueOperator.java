@@ -23,10 +23,12 @@ import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datablock.DataBlock;
+import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,6 +41,7 @@ public class LiteralValueOperator extends MultiStageOperator {
   private final DataSchema _dataSchema;
   private final TransferableBlock _rexLiteralBlock;
   private boolean _isLiteralBlockReturned;
+  private final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
 
   public LiteralValueOperator(OpChainExecutionContext context, DataSchema dataSchema,
       List<List<RexExpression>> rexLiteralRows) {
@@ -47,6 +50,17 @@ public class LiteralValueOperator extends MultiStageOperator {
     _rexLiteralBlock = constructBlock(rexLiteralRows);
     // only return a single literal block when it is the 1st virtual server. otherwise, result will be duplicated.
     _isLiteralBlockReturned = context.getId().getVirtualServerId() != 0;
+  }
+
+  @Override
+  public void registerExecution(long time, int numRows) {
+    _statMap.merge(StatKey.EXECUTION_TIME_MS, time);
+    _statMap.merge(StatKey.EMITTED_ROWS, numRows);
+  }
+
+  @Override
+  protected Logger logger() {
+    return LOGGER;
   }
 
   @Override
@@ -66,8 +80,18 @@ public class LiteralValueOperator extends MultiStageOperator {
       _isLiteralBlockReturned = true;
       return _rexLiteralBlock;
     } else {
-      return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+      return createEosBlock();
     }
+  }
+
+  protected TransferableBlock createEosBlock() {
+    return TransferableBlockUtils.getEndOfStreamTransferableBlock(
+        MultiStageQueryStats.createLiteral(_context.getStageId(), _statMap));
+  }
+
+  @Override
+  public Type getOperatorType() {
+    return Type.LITERAL;
   }
 
   private TransferableBlock constructBlock(List<List<RexExpression>> rexLiteralRows) {
@@ -80,5 +104,20 @@ public class LiteralValueOperator extends MultiStageOperator {
       blockContent.add(row);
     }
     return new TransferableBlock(blockContent, _dataSchema, DataBlock.Type.ROW);
+  }
+
+  public enum StatKey implements StatMap.Key {
+    EXECUTION_TIME_MS(StatMap.Type.LONG),
+    EMITTED_ROWS(StatMap.Type.LONG);
+    private final StatMap.Type _type;
+
+    StatKey(StatMap.Type type) {
+      _type = type;
+    }
+
+    @Override
+    public StatMap.Type getType() {
+      return _type;
+    }
   }
 }
