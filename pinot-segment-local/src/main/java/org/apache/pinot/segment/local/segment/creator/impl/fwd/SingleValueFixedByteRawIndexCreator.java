@@ -33,8 +33,6 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
  * FLOAT, DOUBLE).
  */
 public class SingleValueFixedByteRawIndexCreator implements ForwardIndexCreator {
-  private static final int NUM_DOCS_PER_CHUNK = 1000; // TODO: Auto-derive this based on metadata.
-
   private final FixedByteChunkForwardIndexWriter _indexWriter;
   private final DataType _valueType;
 
@@ -51,7 +49,8 @@ public class SingleValueFixedByteRawIndexCreator implements ForwardIndexCreator 
   public SingleValueFixedByteRawIndexCreator(File baseIndexDir, ChunkCompressionType compressionType, String column,
       int totalDocs, DataType valueType)
       throws IOException {
-    this(baseIndexDir, compressionType, column, totalDocs, valueType, ForwardIndexConfig.DEFAULT_RAW_WRITER_VERSION);
+    this(baseIndexDir, compressionType, column, totalDocs, valueType, ForwardIndexConfig.DEFAULT_RAW_WRITER_VERSION,
+        ForwardIndexConfig.DEFAULT_TARGET_DOCS_PER_CHUNK);
   }
 
   /**
@@ -66,11 +65,11 @@ public class SingleValueFixedByteRawIndexCreator implements ForwardIndexCreator 
    * @throws IOException
    */
   public SingleValueFixedByteRawIndexCreator(File baseIndexDir, ChunkCompressionType compressionType, String column,
-      int totalDocs, DataType valueType, int writerVersion)
+      int totalDocs, DataType valueType, int writerVersion, int targetDocsPerChunk)
       throws IOException {
     File file = new File(baseIndexDir, column + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
     _indexWriter =
-        new FixedByteChunkForwardIndexWriter(file, compressionType, totalDocs, NUM_DOCS_PER_CHUNK, valueType.size(),
+        new FixedByteChunkForwardIndexWriter(file, compressionType, totalDocs, targetDocsPerChunk, valueType.size(),
             writerVersion);
     _valueType = valueType;
   }

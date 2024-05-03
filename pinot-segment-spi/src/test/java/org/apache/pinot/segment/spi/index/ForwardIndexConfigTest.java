@@ -81,12 +81,23 @@ public class ForwardIndexConfigTest {
   }
 
   @Test
+  public void withNegativeTargetDocsPerChunk()
+      throws JsonProcessingException {
+    String confStr = "{\"targetDocsPerChunk\": \"-1\"}";
+    ForwardIndexConfig config = JsonUtils.stringToObject(confStr, ForwardIndexConfig.class);
+
+    assertEquals(config.getTargetDocsPerChunk(), -1, "Unexpected defaultTargetDocsPerChunk");
+  }
+
+  @Test
   public void withSomeData()
       throws JsonProcessingException {
     String confStr = "{\n"
         + "        \"chunkCompressionType\": \"SNAPPY\",\n"
         + "        \"deriveNumDocsPerChunk\": true,\n"
-        + "        \"rawIndexWriterVersion\": 10\n"
+        + "        \"rawIndexWriterVersion\": 10,\n"
+        + "        \"targetMaxChunkSize\": \"512K\",\n"
+        + "        \"targetDocsPerChunk\": \"2000\"\n"
         + "}";
     ForwardIndexConfig config = JsonUtils.stringToObject(confStr, ForwardIndexConfig.class);
 
@@ -94,5 +105,7 @@ public class ForwardIndexConfigTest {
     assertEquals(config.getChunkCompressionType(), ChunkCompressionType.SNAPPY, "Unexpected chunkCompressionType");
     assertTrue(config.isDeriveNumDocsPerChunk(), "Unexpected deriveNumDocsPerChunk");
     assertEquals(config.getRawIndexWriterVersion(), 10, "Unexpected rawIndexWriterVersion");
+    assertEquals(config.getTargetMaxChunkSizeBytes(), 512 * 1024, "Unexpected targetMaxChunkSizeBytes");
+    assertEquals(config.getTargetDocsPerChunk(), 2000, "Unexpected defaultTargetDocsPerChunk");
   }
 }
