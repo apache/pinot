@@ -45,31 +45,30 @@ public class MetadataBlock extends BaseDataBlock {
   @Nullable
   private List<ByteBuffer> _statsByStage;
 
-  private final MetadataBlockType _type;
-
-  public MetadataBlock(MetadataBlockType type) {
-    this(type, Collections.emptyList());
+  private MetadataBlock() {
+    this(Collections.emptyList());
   }
 
-  public MetadataBlock(MetadataBlockType type, List<ByteBuffer> statsByStage) {
-    super(0, null, new String[0], new byte[]{(byte) (type.ordinal() & 0xFF)}, new byte[0]);
-    _type = type;
+  public static MetadataBlock newEos() {
+    return new MetadataBlock();
+  }
+
+  public static MetadataBlock newError(Map<Integer, String> exceptions) {
+    MetadataBlock errorBlock = new MetadataBlock();
+    for (Map.Entry<Integer, String> exception : exceptions.entrySet()) {
+      errorBlock.addException(exception.getKey(), exception.getValue());
+    }
+    return errorBlock;
+  }
+
+  public MetadataBlock(List<ByteBuffer> statsByStage) {
+    super(0, null, new String[0], new byte[0], new byte[0]);
     _statsByStage = statsByStage;
   }
 
   MetadataBlock(ByteBuffer byteBuffer)
       throws IOException {
     super(byteBuffer);
-    // Remember: At this point deserializeMetadata is already being called.
-    if (_fixedSizeDataBytes == null) {
-       if (_errCodeToExceptionMap.isEmpty()) {
-         _type = MetadataBlockType.EOS;
-       } else {
-         _type = MetadataBlockType.ERROR;
-       }
-    } else {
-      _type = MetadataBlockType.values()[_fixedSizeDataBytes[0]];
-    }
   }
 
   @Override
@@ -103,19 +102,7 @@ public class MetadataBlock extends BaseDataBlock {
   public static MetadataBlock deserialize(ByteBuffer byteBuffer, int version)
       throws IOException {
     switch (version) {
-      case 1: {
-        V1MetadataBlock decoded = new V1MetadataBlock(byteBuffer);
-        if (decoded.getType() == MetadataBlockType.ERROR) {
-          MetadataBlock metadataBlock = new MetadataBlock(MetadataBlockType.ERROR);
-          for (Map.Entry<Integer, String> entry : decoded.getExceptions().entrySet()) {
-            metadataBlock.addException(entry.getKey(), entry.getValue());
-          }
-          return metadataBlock;
-        } else {
-          // We just ignore the stats in this case
-          return new MetadataBlock(MetadataBlockType.EOS);
-        }
-      }
+      case 1:
       case 2:
         return new MetadataBlock(byteBuffer);
       default:
@@ -151,7 +138,7 @@ public class MetadataBlock extends BaseDataBlock {
   }
 
   public MetadataBlockType getType() {
-    return _type;
+    return _errCodeToExceptionMap.isEmpty() ? MetadataBlockType.EOS : MetadataBlockType.ERROR;
   }
 
   /**
@@ -188,12 +175,13 @@ public class MetadataBlock extends BaseDataBlock {
       return false;
     }
     MetadataBlock that = (MetadataBlock) o;
-    return Objects.equals(_statsByStage, that._statsByStage) && _type == that._type;
+    return Objects.equals(_statsByStage, that._statsByStage)
+        && _errCodeToExceptionMap.equals(that._errCodeToExceptionMap);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(_statsByStage, _type);
+    return Objects.hash(_statsByStage, _errCodeToExceptionMap);
   }
 
   public enum MetadataBlockType {

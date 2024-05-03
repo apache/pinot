@@ -56,15 +56,7 @@ public final class DataBlockUtils {
   }
 
   public static MetadataBlock getErrorDataBlock(Map<Integer, String> exceptions) {
-    MetadataBlock errorBlock = new MetadataBlock(MetadataBlock.MetadataBlockType.ERROR);
-    for (Map.Entry<Integer, String> exception : exceptions.entrySet()) {
-      errorBlock.addException(exception.getKey(), exception.getValue());
-    }
-    return errorBlock;
-  }
-
-  public static MetadataBlock getEndOfStreamDataBlock() {
-    return new MetadataBlock(MetadataBlock.MetadataBlockType.EOS);
+    return MetadataBlock.newError(exceptions);
   }
 
   /**

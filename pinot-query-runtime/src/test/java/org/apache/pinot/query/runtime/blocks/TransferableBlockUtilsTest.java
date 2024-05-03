@@ -89,7 +89,7 @@ public class TransferableBlockUtilsTest {
     validateNonSplittableBlock(columnarBlock);
 
     // METADATA
-    MetadataBlock metadataBlock = new MetadataBlock(MetadataBlock.MetadataBlockType.EOS);
+    MetadataBlock metadataBlock = MetadataBlock.newEos();
     validateNonSplittableBlock(metadataBlock);
   }
 

@@ -166,7 +166,7 @@ public class TransferableBlock implements Block {
             _dataBlock = DataBlockBuilder.buildFromColumns(_container, _dataSchema);
             break;
           case METADATA:
-            _dataBlock = new MetadataBlock(MetadataBlock.MetadataBlockType.EOS, getSerializedStatsByStage());
+            _dataBlock = new MetadataBlock(getSerializedStatsByStage());
             break;
           default:
             throw new UnsupportedOperationException("Unable to construct block with type: " + _type);
