@@ -142,7 +142,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       Preconditions.checkNotNull(columnIndexCreationInfo, "Missing index creation info for column: %s", columnName);
       boolean dictEnabledColumn = createDictionaryForColumn(columnIndexCreationInfo, segmentCreationSpec, fieldSpec);
       if (originalConfig.getConfig(StandardIndexes.inverted()).isEnabled()) {
-        Preconditions.checkState(!dictEnabledColumn,
+        Preconditions.checkState(dictEnabledColumn,
             "Cannot create inverted index for raw index column: %s", columnName);
       }
 

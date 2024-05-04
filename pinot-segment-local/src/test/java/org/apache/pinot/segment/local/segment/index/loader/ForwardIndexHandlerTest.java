@@ -26,6 +26,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -2374,6 +2375,30 @@ public class ForwardIndexHandlerTest {
     fieldSpec.setName("test");
     fieldSpec.setDataType(FieldSpec.DataType.JSON);
     result = DictionaryIndexType.ignoreDictionaryOverride(true, true, 5, fieldSpec, fieldIndexConfigs, 5, 20);
+    Assert.assertEquals(result, true);
+  }
+
+  @Test
+  public void testInvertedIndexWithDictionaryHeuristics() {
+    FieldSpec fieldSpec = new MetricFieldSpec();
+    fieldSpec.setName("test");
+    fieldSpec.setDataType(FieldSpec.DataType.STRING);
+    IndexType index1 = Mockito.mock(IndexType.class);
+    Mockito.when(index1.getId()).thenReturn("index1");
+    IndexConfig indexConf = new IndexConfig(true);
+    FieldIndexConfigs fieldIndexConfigs = new FieldIndexConfigs.Builder().add(index1, indexConf).build();
+    Map<String, FieldIndexConfigs> indexConfigs = new HashMap<>();
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(_tableConfig, _schema);
+    config.setOutDir(INDEX_DIR.getPath());
+    config.setTableName(TABLE_NAME);
+    config.setSegmentName(SEGMENT_NAME);
+    config.setIndexOn(StandardIndexes.inverted(), IndexConfig.ENABLED, _invertedIndexColumns);
+    config.setOptimizeDictionary(true);
+    config.setOptimizeDictionaryForMetrics(true);
+    indexConfigs.put("Column1", fieldIndexConfigs);
+    FieldIndexConfigs fieldIndexConfig = config.getIndexConfigsByColName().get("Column1");
+    boolean result = DictionaryIndexType.ignoreDictionaryOverride(config.isOptimizeDictionary(),
+        config.isOptimizeDictionaryForMetrics(), 2, fieldSpec, fieldIndexConfigs, 5, 20);
     Assert.assertEquals(result, true);
   }
 
