@@ -43,6 +43,7 @@ data: {
     keywords: [
       "FILE"
       "ARCHIVE"
+      "TABLES"
     ]
 
     # List of non-reserved keywords to add;
@@ -552,6 +553,7 @@ data: {
     statementParserMethods: [
       "SqlInsertFromFile()"
       "SqlPhysicalExplain()"
+      "SqlShowTables()"
     ]
 
     # List of methods for parsing custom literals.
