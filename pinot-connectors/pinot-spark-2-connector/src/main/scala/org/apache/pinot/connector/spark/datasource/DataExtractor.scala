@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.connector.spark.v3.datasource
+package org.apache.pinot.connector.spark.datasource
 
 import org.apache.pinot.common.datatable.DataTable
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType
@@ -31,9 +31,9 @@ import scala.collection.JavaConverters._
 import scala.util.Try
 
 /**
- * Helper methods for spark-pinot conversions
+ * Helper class for extracting Spark rows from Pinot DataTable.
  */
-private[pinot] object TypeConverter {
+private[datasource] object DataExtractor {
 
   /** Convert a Pinot schema to Spark schema. */
   def pinotSchemaToSparkSchema(schema: Schema): StructType = {
@@ -76,10 +76,8 @@ private[pinot] object TypeConverter {
     if (Try(numSegmentsPrunedInvalid.toInt).getOrElse(0) > 0) {
       if (failOnInvalidSegments) {
         throw PinotException(s"${numSegmentsPrunedInvalid} segments were pruned as invalid." +
-          s" Failing read operation.")
-      }
+          s" Failing read operation.")      }
     }
-
     (0 until dataTable.getNumberOfRows).map { rowIndex =>
       // spark schema is used to ensure columns order
       val columns = sparkSchema.fields.map { field =>
@@ -101,10 +99,10 @@ private[pinot] object TypeConverter {
   }
 
   private def readPinotColumnData(
-     dataTable: DataTable,
-     columnDataType: ColumnDataType,
-     rowIndex: Int,
-     colIndex: Int): Any = columnDataType match {
+      dataTable: DataTable,
+      columnDataType: ColumnDataType,
+      rowIndex: Int,
+      colIndex: Int): Any = columnDataType match {
     // single column types
     case ColumnDataType.STRING =>
       UTF8String.fromString(dataTable.getString(rowIndex, colIndex))
@@ -146,4 +144,5 @@ private[pinot] object TypeConverter {
     case _ =>
       throw PinotException(s"'$columnDataType' is not supported")
   }
+
 }

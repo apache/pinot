@@ -86,8 +86,8 @@ class PinotScan(
             override def _partitionId: Int = p.partitionId
             override def _pinotSplit: PinotSplit = p.pinotSplit
             override def _dataSourceOptions: PinotDataSourceReadOptions = p.dataSourceOptions
-            override def _translator: DataTable => Seq[InternalRow] =
-              TypeConverter.pinotDataTableToInternalRows(_, _schema, p.dataSourceOptions.failOnInvalidSegments)
+            override def _dataExtractor: DataTable => Seq[InternalRow] =
+              DataExtractor.pinotDataTableToInternalRows(_, _schema, p.dataSourceOptions.failOnInvalidSegments)
           }
         case _ =>
           throw new Exception("Unknown InputPartition type. Expecting PinotInputPartition")

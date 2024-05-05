@@ -38,8 +38,8 @@ class PinotInputPartition(
       override def _partitionId: Int = partitionId
       override def _pinotSplit: PinotSplit = pinotSplit
       override def _dataSourceOptions: PinotDataSourceReadOptions = dataSourceOptions
-      override def _translator: DataTable => Seq[InternalRow] =
-        TypeConverter.pinotDataTableToInternalRows(_, schema, failOnInvalidSegments = false)
+      override def _dataExtractor: DataTable => Seq[InternalRow] =
+        DataExtractor.pinotDataTableToInternalRows(_, schema, failOnInvalidSegments = false)
     }
   }
 }
