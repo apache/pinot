@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.connector.spark.v3.datasource
 
-import org.apache.pinot.common.datatable.DataTableFactory
+import org.apache.pinot.common.datatable.{DataTable, DataTableFactory}
 import org.apache.pinot.common.utils.DataSchema
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType
 import org.apache.pinot.connector.spark.common.PinotException
@@ -115,7 +115,7 @@ class TypeConverterTest extends BaseTest {
       )
     )
 
-    val result = TypeConverter.pinotDataTableToInternalRows(dataTable, schema).head
+    val result = TypeConverter.pinotDataTableToInternalRows(dataTable, schema, failOnInvalidSegments = false).head
     result.getArray(0) shouldEqual ArrayData.toArrayData(Seq(1, 2, 0))
     result.getInt(1) shouldEqual 5
     result.getArray(2) shouldEqual ArrayData.toArrayData(Seq(0d, 10.3d))
@@ -156,7 +156,7 @@ class TypeConverterTest extends BaseTest {
     )
 
     val exception = intercept[PinotException] {
-      TypeConverter.pinotDataTableToInternalRows(dataTable, schema)
+      TypeConverter.pinotDataTableToInternalRows(dataTable, schema, failOnInvalidSegments = false)
     }
 
     exception.getMessage shouldEqual s"'longCol' not found in Pinot server response"
@@ -189,7 +189,7 @@ class TypeConverterTest extends BaseTest {
       )
     )
 
-    val result = TypeConverter.pinotDataTableToInternalRows(dataTable, schema).head
+    val result = TypeConverter.pinotDataTableToInternalRows(dataTable, schema, failOnInvalidSegments = false).head
     result.get(0, StringType) shouldEqual null
   }
 
@@ -199,5 +199,39 @@ class TypeConverterTest extends BaseTest {
     val sparkSchemaAsString = Source.fromResource("schema/spark-schema.json").mkString
     val sparkSchema = DataType.fromJson(sparkSchemaAsString).asInstanceOf[StructType]
     resultSchema.fields should contain theSameElementsAs sparkSchema.fields
+  }
+
+  test("Should fail if configured when metadata indicates invalid segments") {
+    val columnNames = Array(
+      "strCol"
+    )
+    val columnTypes = Array(
+      ColumnDataType.STRING,
+    )
+    val dataSchema = new DataSchema(columnNames, columnTypes)
+
+    val dataTableBuilder = DataTableBuilderFactory.getDataTableBuilder(dataSchema)
+    dataTableBuilder.startRow()
+    dataTableBuilder.setColumn(0, "strValue")
+    dataTableBuilder.finishRow()
+    val dataTable = dataTableBuilder.build()
+
+    val schema = StructType(
+      Seq(
+        StructField("strCol", StringType),
+      )
+    )
+
+    // Simulate invalid segments and expect exception
+    dataTable.getMetadata.put(DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_INVALID.getName, "1")
+    val exception = intercept[PinotException] {
+      TypeConverter.pinotDataTableToInternalRows(dataTable, schema, failOnInvalidSegments = true)
+    }
+    exception.getMessage shouldEqual "1 segments were pruned as invalid. Failing read operation."
+
+    // don't fail if configured not to
+    val result =
+      TypeConverter.pinotDataTableToInternalRows(dataTable, schema, failOnInvalidSegments = false).head
+    result.getString(0) shouldEqual "strValue"
   }
 }

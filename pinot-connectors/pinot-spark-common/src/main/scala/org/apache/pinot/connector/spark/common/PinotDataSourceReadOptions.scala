@@ -37,12 +37,14 @@ object PinotDataSourceReadOptions {
   val CONFIG_PINOT_SERVER_TIMEOUT_MS = "pinotServerTimeoutMs"
   var CONFIG_USE_GRPC_SERVER = "useGrpcServer"
   val CONFIG_QUERY_OPTIONS = "queryOptions"
+  val CONFIG_FAIL_ON_INVALID_SEGMENTS = "failOnInvalidSegments"
   val QUERY_OPTIONS_DELIMITER = ","
   private[pinot] val DEFAULT_CONTROLLER: String = "localhost:9000"
   private[pinot] val DEFAULT_USE_PUSH_DOWN_FILTERS: Boolean = true
   private[pinot] val DEFAULT_SEGMENTS_PER_SPLIT: Int = 3
   private[pinot] val DEFAULT_PINOT_SERVER_TIMEOUT_MS: Long = 10000
   private[pinot] val DEFAULT_USE_GRPC_SERVER: Boolean = false
+  private[pinot] val DEFAULT_FAIL_ON_INVALID_SEGMENTS = false
 
   private[pinot] val tableTypes = Seq("OFFLINE", "REALTIME", "HYBRID")
 
@@ -87,6 +89,8 @@ object PinotDataSourceReadOptions {
     val useGrpcServer = options.getBoolean(CONFIG_USE_GRPC_SERVER, DEFAULT_USE_GRPC_SERVER)
     val queryOptions = options.getOrDefault(CONFIG_QUERY_OPTIONS, "")
       .split(QUERY_OPTIONS_DELIMITER).filter(_.nonEmpty).toSet
+    val failOnInvalidSegments = options.getBoolean(CONFIG_FAIL_ON_INVALID_SEGMENTS,
+      DEFAULT_FAIL_ON_INVALID_SEGMENTS)
 
     PinotDataSourceReadOptions(
       tableName,
@@ -97,7 +101,8 @@ object PinotDataSourceReadOptions {
       segmentsPerSplit,
       pinotServerTimeoutMs,
       useGrpcServer,
-      queryOptions
+      queryOptions,
+      failOnInvalidSegments,
     )
   }
 }
@@ -112,5 +117,5 @@ private[pinot] case class PinotDataSourceReadOptions(
     segmentsPerSplit: Int,
     pinotServerTimeoutMs: Long,
     useGrpcServer: Boolean,
-    queryOptions: Set[String])
-
+    queryOptions: Set[String],
+    failOnInvalidSegments: Boolean)
