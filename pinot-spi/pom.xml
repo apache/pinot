@@ -90,32 +90,6 @@
       <artifactId>commons-math</artifactId>
     </dependency>
 
-    <!-- Jakarta Libraries -->
-    <dependency>
-      <groupId>jakarta.servlet</groupId>
-      <artifactId>jakarta.servlet-api</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>jakarta.ws.rs</groupId>
-      <artifactId>jakarta.ws.rs-api</artifactId>
-    </dependency>
-    <!-- Legacy Javax Libraries -->
-    <!-- TODO: Move all usage to jakarta.servlet-api -->
-    <dependency>
-      <groupId>javax.servlet</groupId>
-      <artifactId>javax.servlet-api</artifactId>
-    </dependency>
-    <!-- TODO: Move all usage to jakarta.ws.rs-api -->
-    <dependency>
-      <groupId>javax.ws.rs</groupId>
-      <artifactId>javax.ws.rs-api</artifactId>
-    </dependency>
-    <!-- Required by jersey-common -->
-    <dependency>
-      <groupId>javax.annotation</groupId>
-      <artifactId>javax.annotation-api</artifactId>
-    </dependency>
-
     <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>jcl-over-slf4j</artifactId>
@@ -185,33 +159,9 @@
       <activation>
         <activeByDefault>false</activeByDefault>
       </activation>
-      <build>
-        <plugins>
-          <plugin>
-            <artifactId>maven-shade-plugin</artifactId>
-            <executions>
-              <execution>
-                <phase>package</phase>
-                <goals>
-                  <goal>shade</goal>
-                </goals>
-                <configuration>
-                  <relocations>
-                    <relocation>
-                      <pattern>com.google.common.base</pattern>
-                      <shadedPattern>${shade.prefix}.com.google.common.base</shadedPattern>
-                    </relocation>
-                    <relocation>
-                      <pattern>com.fasterxml.jackson</pattern>
-                      <shadedPattern>${shade.prefix}.com.fasterxml.jackson</shadedPattern>
-                    </relocation>
-                  </relocations>
-                </configuration>
-              </execution>
-            </executions>
-          </plugin>
-        </plugins>
-      </build>
+      <properties>
+        <shade.phase.prop>package</shade.phase.prop>
+      </properties>
     </profile>
   </profiles>
 </project>

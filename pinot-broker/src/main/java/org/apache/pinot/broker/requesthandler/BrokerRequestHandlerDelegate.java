@@ -26,13 +26,12 @@ import javax.ws.rs.core.HttpHeaders;
 import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.pinot.broker.api.RequesterIdentity;
 import org.apache.pinot.common.exception.QueryException;
-import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.spi.trace.RequestContext;
-import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -85,24 +84,22 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
       @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext, @Nullable HttpHeaders httpHeaders)
       throws Exception {
     requestContext.setBrokerId(_brokerId);
+
+    // Parse the query if needed
     if (sqlNodeAndOptions == null) {
       try {
-        sqlNodeAndOptions = RequestUtils.parseQuery(request.get(CommonConstants.Broker.Request.SQL).asText(), request);
+        sqlNodeAndOptions = RequestUtils.parseQuery(request.get(Request.SQL).asText(), request);
       } catch (Exception e) {
-        LOGGER.info("Caught exception while compiling SQL: {}, {}", request, e.getMessage());
-        _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS, 1);
+        // Do not log or emit metric here because it is pure user error
         requestContext.setErrorCode(QueryException.SQL_PARSING_ERROR_CODE);
         return new BrokerResponseNative(QueryException.getException(QueryException.SQL_PARSING_ERROR, e));
       }
     }
-    if (request.has(CommonConstants.Broker.Request.QUERY_OPTIONS)) {
-      sqlNodeAndOptions.setExtraOptions(
-          RequestUtils.getOptionsFromJson(request, CommonConstants.Broker.Request.QUERY_OPTIONS));
-    }
 
     if (_multiStageBrokerRequestHandler != null && Boolean.parseBoolean(
-        sqlNodeAndOptions.getOptions().get(CommonConstants.Broker.Request.QueryOptionKey.USE_MULTISTAGE_ENGINE))) {
-      return _multiStageBrokerRequestHandler.handleRequest(request, requesterIdentity, requestContext, httpHeaders);
+        sqlNodeAndOptions.getOptions().get(Request.QueryOptionKey.USE_MULTISTAGE_ENGINE))) {
+      return _multiStageBrokerRequestHandler.handleRequest(request, sqlNodeAndOptions, requesterIdentity,
+          requestContext, httpHeaders);
     } else {
       return _singleStageBrokerRequestHandler.handleRequest(request, sqlNodeAndOptions, requesterIdentity,
           requestContext, httpHeaders);

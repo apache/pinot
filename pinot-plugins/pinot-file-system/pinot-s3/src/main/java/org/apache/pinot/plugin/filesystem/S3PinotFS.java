@@ -26,7 +26,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URLEncoder;
@@ -325,12 +324,7 @@ public class S3PinotFS extends BasePinotFS {
   private boolean copyFile(URI srcUri, URI dstUri)
       throws IOException {
     try {
-      String encodedUrl = null;
-      try {
-        encodedUrl = URLEncoder.encode(srcUri.getHost() + srcUri.getPath(), StandardCharsets.UTF_8.toString());
-      } catch (UnsupportedEncodingException e) {
-        throw new RuntimeException(e);
-      }
+      String encodedUrl = URLEncoder.encode(srcUri.getHost() + srcUri.getPath(), StandardCharsets.UTF_8);
 
       String dstPath = sanitizePath(dstUri.getPath());
       CopyObjectRequest copyReq = generateCopyObjectRequest(encodedUrl, dstUri, dstPath, null);
@@ -674,12 +668,7 @@ public class S3PinotFS extends BasePinotFS {
       throws IOException {
     try {
       HeadObjectResponse s3ObjectMetadata = getS3ObjectMetadata(uri);
-      String encodedUrl = null;
-      try {
-        encodedUrl = URLEncoder.encode(uri.getHost() + uri.getPath(), StandardCharsets.UTF_8.toString());
-      } catch (UnsupportedEncodingException e) {
-        throw new RuntimeException(e);
-      }
+      String encodedUrl = URLEncoder.encode(uri.getHost() + uri.getPath(), StandardCharsets.UTF_8);
 
       String path = sanitizePath(uri.getPath());
       CopyObjectRequest request = generateCopyObjectRequest(encodedUrl, uri, path,

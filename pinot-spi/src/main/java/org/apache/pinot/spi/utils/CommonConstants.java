@@ -51,7 +51,7 @@ public class CommonConstants {
       "org.apache.pinot.spi.eventlistener.query.NoOpBrokerQueryEventListener";
 
   public static final String SWAGGER_AUTHORIZATION_KEY = "oauth";
-  public static final String CONFIG_OF_SWAGGER_RESOURCES_PATH = "META-INF/resources/webjars/swagger-ui/5.15.0/";
+  public static final String CONFIG_OF_SWAGGER_RESOURCES_PATH = "META-INF/resources/webjars/swagger-ui/5.17.0/";
   public static final String CONFIG_OF_TIMEZONE = "pinot.timezone";
 
   public static final String DATABASE = "database";
@@ -107,7 +107,9 @@ public class CommonConstants {
     // https://datasketches.apache.org/docs/Theta/ThetaErrorTable.html
     public static final int DEFAULT_THETA_SKETCH_NOMINAL_ENTRIES = 16384;
 
-    public static final int DEFAULT_TUPLE_SKETCH_LGK = 16;
+    // 2 to the power of 14, for tradeoffs see datasketches library documentation:
+    // https://datasketches.apache.org/docs/Theta/ThetaErrorTable.html
+    public static final int DEFAULT_TUPLE_SKETCH_LGK = 14;
 
     public static final int DEFAULT_CPC_SKETCH_LGK = 12;
     public static final int DEFAULT_ULTRALOGLOG_P = 12;
@@ -345,7 +347,6 @@ public class CommonConstants {
     public static class Request {
       public static final String SQL = "sql";
       public static final String TRACE = "trace";
-      public static final String DEBUG_OPTIONS = "debugOptions";
       public static final String QUERY_OPTIONS = "queryOptions";
 
       public static class QueryOptionKey {
@@ -395,14 +396,6 @@ public class CommonConstants {
         // Indicates the maximum length of serialized response across all servers for a query. This value is equally
         // divided across all servers processing the query.
         public static final String MAX_QUERY_RESPONSE_SIZE_BYTES = "maxQueryResponseSizeBytes";
-
-        // TODO: Remove these keys (only apply to PQL) after releasing 0.11.0
-        @Deprecated
-        public static final String PRESERVE_TYPE = "preserveType";
-        @Deprecated
-        public static final String RESPONSE_FORMAT = "responseFormat";
-        @Deprecated
-        public static final String GROUP_BY_MODE = "groupByMode";
       }
 
       public static class QueryOptionValue {

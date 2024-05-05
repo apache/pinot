@@ -20,7 +20,6 @@ package org.apache.pinot.core.operator.filter;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.core.common.BlockDocIdSet;
@@ -90,10 +89,7 @@ public class SortedIndexBasedFilterOperator extends BaseColumnFilterOperator {
           return new SortedDocIdSet(Collections.singletonList(docIdRange));
         }
       } else {
-        // Sort the dictIds in ascending order so that their respective docIdRanges are adjacent if they are adjacent
-        Arrays.sort(dictIds);
-
-        // Merge adjacent docIdRanges
+        // Merge adjacent docIdRanges (dictIds are already sorted)
         List<IntPair> docIdRanges = new ArrayList<>();
         IntPair lastDocIdRange = _sortedIndexReader.getDocIds(dictIds[0]);
         for (int i = 1; i < numDictIds; i++) {

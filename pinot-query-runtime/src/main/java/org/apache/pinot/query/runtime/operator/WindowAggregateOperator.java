@@ -35,6 +35,7 @@ import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.pinot.common.datablock.DataBlock;
+import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.data.table.Key;
@@ -101,6 +102,9 @@ public class WindowAggregateOperator extends MultiStageOperator {
 
   private int _numRows;
   private boolean _hasReturnedWindowAggregateBlock;
+  @Nullable
+  private TransferableBlock _eosBlock = null;
+  private final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
 
   public WindowAggregateOperator(OpChainExecutionContext context, MultiStageOperator inputOperator,
       List<RexExpression> groupSet, List<RexExpression> orderSet, List<RelFieldCollation.Direction> orderSetDirection,
@@ -152,8 +156,24 @@ public class WindowAggregateOperator extends MultiStageOperator {
   }
 
   @Override
+  public void registerExecution(long time, int numRows) {
+    _statMap.merge(StatKey.EXECUTION_TIME_MS, time);
+    _statMap.merge(StatKey.EMITTED_ROWS, numRows);
+  }
+
+  @Override
+  protected Logger logger() {
+    return LOGGER;
+  }
+
+  @Override
   public List<MultiStageOperator> getChildOperators() {
     return ImmutableList.of(_inputOperator);
+  }
+
+  @Override
+  public Type getOperatorType() {
+    return Type.WINDOW;
   }
 
   @Nullable
@@ -165,12 +185,13 @@ public class WindowAggregateOperator extends MultiStageOperator {
   @Override
   protected TransferableBlock getNextBlock() {
     if (_hasReturnedWindowAggregateBlock) {
-      return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+      return _eosBlock;
     }
     TransferableBlock finalBlock = consumeInputBlocks();
     if (finalBlock.isErrorBlock()) {
       return finalBlock;
     }
+    _eosBlock = updateEosBlock(finalBlock, _statMap);
     return produceWindowAggregatedBlock();
   }
 
@@ -270,8 +291,8 @@ public class WindowAggregateOperator extends MultiStageOperator {
       }
     }
     _hasReturnedWindowAggregateBlock = true;
-    if (rows.size() == 0) {
-      return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+    if (rows.isEmpty()) {
+      return _eosBlock;
     } else {
       return new TransferableBlock(rows, _resultSchema, DataBlock.Type.ROW);
     }
@@ -573,6 +594,31 @@ public class WindowAggregateOperator extends MultiStageOperator {
       public long getCountOfDuplicateOrderByKeys() {
         return _countOfDuplicateOrderByKeys;
       }
+    }
+  }
+
+  public enum StatKey implements StatMap.Key {
+    EXECUTION_TIME_MS(StatMap.Type.LONG) {
+      @Override
+      public boolean includeDefaultInJson() {
+        return true;
+      }
+    },
+    EMITTED_ROWS(StatMap.Type.LONG) {
+      @Override
+      public boolean includeDefaultInJson() {
+        return true;
+      }
+    };
+    private final StatMap.Type _type;
+
+    StatKey(StatMap.Type type) {
+      _type = type;
+    }
+
+    @Override
+    public StatMap.Type getType() {
+      return _type;
     }
   }
 }

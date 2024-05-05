@@ -23,10 +23,8 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import java.io.StringReader;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -164,14 +162,10 @@ public class CalciteSqlParser {
   }
 
   public static PinotQuery compileToPinotQuery(SqlNodeAndOptions sqlNodeAndOptions) {
-    // Compile Sql without OPTION statements.
+    // Compile SqlNode into PinotQuery
     PinotQuery pinotQuery = compileSqlNodeToPinotQuery(sqlNodeAndOptions.getSqlNode());
-
-    // Set Option statements to PinotQuery.
-    Map<String, String> options = sqlNodeAndOptions.getOptions();
-    if (!options.isEmpty()) {
-      pinotQuery.setQueryOptions(options);
-    }
+    // Set query options into PinotQuery
+    pinotQuery.setQueryOptions(sqlNodeAndOptions.getOptions());
     return pinotQuery;
   }
 
@@ -379,8 +373,7 @@ public class CalciteSqlParser {
       Function function = expression.getFunctionCall();
       if (function != null) {
         if (excludeAs && function.getOperator().equals("as")) {
-          identifiers.addAll(
-              extractIdentifiers(new ArrayList<>(Collections.singletonList(function.getOperands().get(0))), true));
+          identifiers.addAll(extractIdentifiers(List.of(function.getOperands().get(0)), true));
         } else {
           identifiers.addAll(extractIdentifiers(function.getOperands(), excludeAs));
         }
@@ -589,25 +582,22 @@ public class CalciteSqlParser {
   }
 
   private static List<Expression> convertDistinctSelectList(SqlNodeList selectList) {
-    List<Expression> selectExpr = new ArrayList<>();
+    // NOTE: Create an ArrayList because we might need to modify the list later
+    List<Expression> selectExpr = new ArrayList<>(1);
     selectExpr.add(convertDistinctAndSelectListToFunctionExpression(selectList));
     return selectExpr;
   }
 
   private static List<Expression> convertSelectList(SqlNodeList selectList) {
-    List<Expression> selectExpr = new ArrayList<>();
-
-    final Iterator<SqlNode> iterator = selectList.iterator();
-    while (iterator.hasNext()) {
-      final SqlNode next = iterator.next();
-      selectExpr.add(toExpression(next));
+    List<Expression> selectExpr = new ArrayList<>(selectList.size());
+    for (SqlNode sqlNode : selectList) {
+      selectExpr.add(toExpression(sqlNode));
     }
-
     return selectExpr;
   }
 
   private static List<Expression> convertOrderByList(SqlNodeList orderList) {
-    List<Expression> orderByExpr = new ArrayList<>();
+    List<Expression> orderByExpr = new ArrayList<>(orderList.size());
     for (SqlNode sqlNode : orderList) {
       orderByExpr.add(convertOrderBy(sqlNode, true));
     }
@@ -621,19 +611,17 @@ public class CalciteSqlParser {
     Expression expression;
     if (node.getKind() == SqlKind.NULLS_LAST) {
       SqlBasicCall basicCall = (SqlBasicCall) node;
-      expression = RequestUtils.getFunctionExpression(NULLS_LAST);
-      expression.getFunctionCall().addToOperands(convertOrderBy(basicCall.getOperandList().get(0), true));
+      expression =
+          RequestUtils.getFunctionExpression(NULLS_LAST, convertOrderBy(basicCall.getOperandList().get(0), true));
     } else if (node.getKind() == SqlKind.NULLS_FIRST) {
       SqlBasicCall basicCall = (SqlBasicCall) node;
-      expression = RequestUtils.getFunctionExpression(NULLS_FIRST);
-      expression.getFunctionCall().addToOperands(convertOrderBy(basicCall.getOperandList().get(0), true));
+      expression =
+          RequestUtils.getFunctionExpression(NULLS_FIRST, convertOrderBy(basicCall.getOperandList().get(0), true));
     } else if (node.getKind() == SqlKind.DESCENDING) {
       SqlBasicCall basicCall = (SqlBasicCall) node;
-      expression = RequestUtils.getFunctionExpression(DESC);
-      expression.getFunctionCall().addToOperands(convertOrderBy(basicCall.getOperandList().get(0), false));
+      expression = RequestUtils.getFunctionExpression(DESC, convertOrderBy(basicCall.getOperandList().get(0), false));
     } else if (createAscExpression) {
-      expression = RequestUtils.getFunctionExpression(ASC);
-      expression.getFunctionCall().addToOperands(toExpression(node));
+      expression = RequestUtils.getFunctionExpression(ASC, toExpression(node));
     } else {
       return toExpression(node);
     }
@@ -648,7 +636,7 @@ public class CalciteSqlParser {
    * @return DISTINCT function expression
    */
   private static Expression convertDistinctAndSelectListToFunctionExpression(SqlNodeList selectList) {
-    Expression functionExpression = RequestUtils.getFunctionExpression("distinct");
+    List<Expression> operands = new ArrayList<>(selectList.size());
     for (SqlNode node : selectList) {
       Expression columnExpression = toExpression(node);
       if (columnExpression.getType() == ExpressionType.IDENTIFIER && columnExpression.getIdentifier().getName()
@@ -662,9 +650,9 @@ public class CalciteSqlParser {
               "Syntax error: Use of DISTINCT with aggregation functions is not supported");
         }
       }
-      functionExpression.getFunctionCall().addToOperands(columnExpression);
+      operands.add(columnExpression);
     }
-    return functionExpression;
+    return RequestUtils.getFunctionExpression("distinct", operands);
   }
 
   private static Expression toExpression(SqlNode node) {
@@ -705,10 +693,7 @@ public class CalciteSqlParser {
             return leftExpr;
           }
         }
-        Expression asFuncExpr = RequestUtils.getFunctionExpression("as");
-        asFuncExpr.getFunctionCall().addToOperands(leftExpr);
-        asFuncExpr.getFunctionCall().addToOperands(rightExpr);
-        return asFuncExpr;
+        return RequestUtils.getFunctionExpression("as", leftExpr, rightExpr);
       case CASE:
         // CASE WHEN Statement is model as a function with variable length parameters.
         // Assume N is number of WHEN Statements, total number of parameters is (2 * N + 1).
@@ -717,26 +702,22 @@ public class CalciteSqlParser {
         // - 1: Convert ELSE Statement into an Expression.
         SqlCase caseSqlNode = (SqlCase) node;
         SqlNodeList whenOperands = caseSqlNode.getWhenOperands();
+        int numWhenOperands = whenOperands.size();
         SqlNodeList thenOperands = caseSqlNode.getThenOperands();
+        Preconditions.checkState(numWhenOperands == thenOperands.size());
         SqlNode elseOperand = caseSqlNode.getElseOperand();
-        Expression caseFuncExpr = RequestUtils.getFunctionExpression("case");
-        Preconditions.checkState(whenOperands.size() == thenOperands.size());
-        for (int i = 0; i < whenOperands.size(); i++) {
-          SqlNode whenSqlNode = whenOperands.get(i);
-          Expression whenExpression = toExpression(whenSqlNode);
-          caseFuncExpr.getFunctionCall().addToOperands(whenExpression);
-
-          SqlNode thenSqlNode = thenOperands.get(i);
-          Expression thenExpression = toExpression(thenSqlNode);
-          caseFuncExpr.getFunctionCall().addToOperands(thenExpression);
+        List<Expression> caseOperands = new ArrayList<>(2 * numWhenOperands + 1);
+        for (int i = 0; i < numWhenOperands; i++) {
+          caseOperands.add(toExpression(whenOperands.get(i)));
+          caseOperands.add(toExpression(thenOperands.get(i)));
         }
         Expression elseExpression = toExpression(elseOperand);
         if (isAggregateExpression(elseExpression)) {
           throw new SqlCompilationException(
               "Aggregation functions inside ELSE Clause is not supported - " + elseExpression);
         }
-        caseFuncExpr.getFunctionCall().addToOperands(elseExpression);
-        return caseFuncExpr;
+        caseOperands.add(elseExpression);
+        return RequestUtils.getFunctionExpression("case", caseOperands);
       default:
         if (node instanceof SqlDataTypeSpec) {
           // This is to handle expression like: CAST(col AS INT)
@@ -808,15 +789,9 @@ public class CalciteSqlParser {
       }
     }
     ParserUtils.validateFunction(canonicalName, operands);
-    Expression functionExpression = RequestUtils.getFunctionExpression(canonicalName);
-    functionExpression.getFunctionCall().setOperands(operands);
+    Expression functionExpression = RequestUtils.getFunctionExpression(canonicalName, operands);
     if (negated) {
-      Expression negatedFunctionExpression = RequestUtils.getFunctionExpression(FilterKind.NOT.name());
-      // Do not use `Collections.singletonList()` because we might modify the operand later
-      List<Expression> negatedFunctionOperands = new ArrayList<>(1);
-      negatedFunctionOperands.add(functionExpression);
-      negatedFunctionExpression.getFunctionCall().setOperands(negatedFunctionOperands);
-      return negatedFunctionExpression;
+      return RequestUtils.getFunctionExpression(FilterKind.NOT.name(), functionExpression);
     } else {
       return functionExpression;
     }
@@ -886,9 +861,7 @@ public class CalciteSqlParser {
         operands.add(toExpression(childNode));
       }
     }
-    Expression andExpression = RequestUtils.getFunctionExpression(FilterKind.AND.name());
-    andExpression.getFunctionCall().setOperands(operands);
-    return andExpression;
+    return RequestUtils.getFunctionExpression(FilterKind.AND.name(), operands);
   }
 
   /**
@@ -904,9 +877,7 @@ public class CalciteSqlParser {
         operands.add(toExpression(childNode));
       }
     }
-    Expression andExpression = RequestUtils.getFunctionExpression(FilterKind.OR.name());
-    andExpression.getFunctionCall().setOperands(operands);
-    return andExpression;
+    return RequestUtils.getFunctionExpression(FilterKind.OR.name(), operands);
   }
 
   public static boolean isLiteralOnlyExpression(Expression e) {

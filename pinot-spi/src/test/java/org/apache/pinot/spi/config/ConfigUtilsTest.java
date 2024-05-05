@@ -39,6 +39,25 @@ public class ConfigUtilsTest {
 
   @Test
   public void testIndexing() {
+    Map<String, String> environment =
+        ImmutableMap.of("LOAD_MODE", "MMAP", "AWS_ACCESS_KEY", "default_aws_access_key", "AWS_SECRET_KEY",
+            "default_aws_secret_key");
+    testIndexingWithConfig(environment);
+  }
+
+  @Test
+  public void testIndexingWithSystemProperties() {
+    // Use default System properties
+    System.setProperty("LOAD_MODE", "MMAP");
+    System.setProperty("AWS_ACCESS_KEY", "default_aws_access_key");
+    System.setProperty("AWS_SECRET_KEY", "default_aws_secret_key");
+    testIndexingWithConfig(null);
+    System.clearProperty("LOAD_MODE");
+    System.clearProperty("AWS_ACCESS_KEY");
+    System.clearProperty("AWS_SECRET_KEY");
+  }
+
+  private void testIndexingWithConfig(Map<String, String> configOverride) {
     IndexingConfig indexingConfig = new IndexingConfig();
     indexingConfig.setLoadMode("${LOAD_MODE}");
     indexingConfig.setAggregateMetrics(true);
@@ -80,12 +99,11 @@ public class ConfigUtilsTest {
     streamConfigMap.put(StreamConfigProperties.constructStreamProperty(streamType, "aws.secretKey"),
         "${AWS_SECRET_KEY}");
     indexingConfig.setStreamConfigs(streamConfigMap);
-
-    Map<String, String> environment =
-        ImmutableMap.of("LOAD_MODE", "MMAP", "AWS_ACCESS_KEY", "default_aws_access_key", "AWS_SECRET_KEY",
-            "default_aws_secret_key");
-
-    indexingConfig = ConfigUtils.applyConfigWithEnvVariables(environment, indexingConfig);
+    if (configOverride != null) {
+      indexingConfig = ConfigUtils.applyConfigWithEnvVariablesAndSystemProperties(configOverride, indexingConfig);
+    } else {
+      indexingConfig = ConfigUtils.applyConfigWithEnvVariablesAndSystemProperties(indexingConfig);
+    }
     assertEquals(indexingConfig.getLoadMode(), "MMAP");
     assertTrue(indexingConfig.isAggregateMetrics());
     assertEquals(indexingConfig.getInvertedIndexColumns(), invertedIndexColumns);

@@ -65,7 +65,8 @@ public class FstIndexType extends AbstractIndexType<FstIndexConfig, TextIndexRea
   public static final String INDEX_DISPLAY_NAME = "fst";
   private static final List<String> EXTENSIONS =
       ImmutableList.of(V1Constants.Indexes.LUCENE_FST_INDEX_FILE_EXTENSION,
-          V1Constants.Indexes.LUCENE_V9_FST_INDEX_FILE_EXTENSION);
+          V1Constants.Indexes.LUCENE_V9_FST_INDEX_FILE_EXTENSION,
+          V1Constants.Indexes.LUCENE_V99_FST_INDEX_FILE_EXTENSION);
 
   protected FstIndexType() {
     super(StandardIndexes.FST_ID);

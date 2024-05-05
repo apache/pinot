@@ -19,8 +19,10 @@
 package org.apache.pinot.query.mailbox;
 
 import java.util.concurrent.TimeoutException;
+import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.spi.exception.QueryCancelledException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,11 +38,14 @@ public class InMemorySendingMailbox implements SendingMailbox {
   private ReceivingMailbox _receivingMailbox;
   private volatile boolean _isTerminated;
   private volatile boolean _isEarlyTerminated;
+  private final StatMap<MailboxSendOperator.StatKey> _statMap;
 
-  public InMemorySendingMailbox(String id, MailboxService mailboxService, long deadlineMs) {
+  public InMemorySendingMailbox(String id, MailboxService mailboxService, long deadlineMs,
+      StatMap<MailboxSendOperator.StatKey> statMap) {
     _id = id;
     _mailboxService = mailboxService;
     _deadlineMs = deadlineMs;
+    _statMap = statMap;
   }
 
   @Override
@@ -52,8 +57,10 @@ public class InMemorySendingMailbox implements SendingMailbox {
     if (_receivingMailbox == null) {
       _receivingMailbox = _mailboxService.getReceivingMailbox(_id);
     }
+    _statMap.merge(MailboxSendOperator.StatKey.IN_MEMORY_MESSAGES, 1);
     long timeoutMs = _deadlineMs - System.currentTimeMillis();
     ReceivingMailbox.ReceivingMailboxStatus status = _receivingMailbox.offer(block, timeoutMs);
+
     switch (status) {
       case SUCCESS:
         break;

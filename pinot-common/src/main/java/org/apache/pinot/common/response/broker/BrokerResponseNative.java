@@ -22,6 +22,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
+import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -37,7 +38,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
 /**
  * This class implements pinot-broker's response format for any given query.
  * All fields either primitive data types, or native objects (as opposed to JSONObjects).
- *
+ * <p>
  * Supports serialization via JSON.
  */
 @JsonPropertyOrder({
@@ -78,8 +79,6 @@ public class BrokerResponseNative implements BrokerResponse {
 
   private long _totalDocs = 0L;
   private boolean _numGroupsLimitReached = false;
-  private boolean _maxRowsInJoinReached = false;
-  private boolean _partialResult = false;
   private long _timeUsedMs = 0L;
   private long _offlineThreadCpuTimeNs = 0L;
   private long _realtimeThreadCpuTimeNs = 0L;
@@ -131,6 +130,7 @@ public class BrokerResponseNative implements BrokerResponse {
     return new BrokerResponseNative();
   }
 
+  @VisibleForTesting
   public static BrokerResponseNative fromJsonString(String jsonString)
       throws IOException {
     return JsonUtils.stringToObject(jsonString, BrokerResponseNative.class);
@@ -143,7 +143,6 @@ public class BrokerResponseNative implements BrokerResponse {
   }
 
   @JsonProperty("offlineSystemActivitiesCpuTimeNs")
-  @Override
   public void setOfflineSystemActivitiesCpuTimeNs(long offlineSystemActivitiesCpuTimeNs) {
     _offlineSystemActivitiesCpuTimeNs = offlineSystemActivitiesCpuTimeNs;
   }
@@ -155,7 +154,6 @@ public class BrokerResponseNative implements BrokerResponse {
   }
 
   @JsonProperty("realtimeSystemActivitiesCpuTimeNs")
-  @Override
   public void setRealtimeSystemActivitiesCpuTimeNs(long realtimeSystemActivitiesCpuTimeNs) {
     _realtimeSystemActivitiesCpuTimeNs = realtimeSystemActivitiesCpuTimeNs;
   }
@@ -167,7 +165,6 @@ public class BrokerResponseNative implements BrokerResponse {
   }
 
   @JsonProperty("offlineThreadCpuTimeNs")
-  @Override
   public void setOfflineThreadCpuTimeNs(long timeUsedMs) {
     _offlineThreadCpuTimeNs = timeUsedMs;
   }
@@ -179,7 +176,6 @@ public class BrokerResponseNative implements BrokerResponse {
   }
 
   @JsonProperty("realtimeThreadCpuTimeNs")
-  @Override
   public void setRealtimeThreadCpuTimeNs(long timeUsedMs) {
     _realtimeThreadCpuTimeNs = timeUsedMs;
   }
@@ -191,7 +187,6 @@ public class BrokerResponseNative implements BrokerResponse {
   }
 
   @JsonProperty("offlineResponseSerializationCpuTimeNs")
-  @Override
   public void setOfflineResponseSerializationCpuTimeNs(long offlineResponseSerializationCpuTimeNs) {
     _offlineResponseSerializationCpuTimeNs = offlineResponseSerializationCpuTimeNs;
   }
@@ -203,7 +198,6 @@ public class BrokerResponseNative implements BrokerResponse {
   }
 
   @JsonProperty("realtimeResponseSerializationCpuTimeNs")
-  @Override
   public void setRealtimeResponseSerializationCpuTimeNs(long realtimeResponseSerializationCpuTimeNs) {
     _realtimeResponseSerializationCpuTimeNs = realtimeResponseSerializationCpuTimeNs;
   }
@@ -215,7 +209,6 @@ public class BrokerResponseNative implements BrokerResponse {
   }
 
   @JsonProperty("offlineTotalCpuTimeNs")
-  @Override
   public void setOfflineTotalCpuTimeNs(long offlineTotalCpuTimeNs) {
     _offlineTotalCpuTimeNs = offlineTotalCpuTimeNs;
   }
@@ -227,7 +220,6 @@ public class BrokerResponseNative implements BrokerResponse {
   }
 
   @JsonProperty("realtimeTotalCpuTimeNs")
-  @Override
   public void setRealtimeTotalCpuTimeNs(long realtimeTotalCpuTimeNs) {
     _realtimeTotalCpuTimeNs = realtimeTotalCpuTimeNs;
   }
@@ -251,7 +243,6 @@ public class BrokerResponseNative implements BrokerResponse {
   }
 
   @JsonProperty("numSegmentsPrunedByServer")
-  @Override
   public void setNumSegmentsPrunedByServer(long numSegmentsPrunedByServer) {
     _numSegmentsPrunedByServer = numSegmentsPrunedByServer;
   }
@@ -263,7 +254,6 @@ public class BrokerResponseNative implements BrokerResponse {
   }
 
   @JsonProperty("numSegmentsPrunedInvalid")
-  @Override
   public void setNumSegmentsPrunedInvalid(long numSegmentsPrunedInvalid) {
     _numSegmentsPrunedInvalid = numSegmentsPrunedInvalid;
   }
@@ -275,7 +265,6 @@ public class BrokerResponseNative implements BrokerResponse {
   }
 
   @JsonProperty("numSegmentsPrunedByLimit")
-  @Override
   public void setNumSegmentsPrunedByLimit(long numSegmentsPrunedByLimit) {
     _numSegmentsPrunedByLimit = numSegmentsPrunedByLimit;
   }
@@ -287,7 +276,6 @@ public class BrokerResponseNative implements BrokerResponse {
   }
 
   @JsonProperty("numSegmentsPrunedByValue")
-  @Override
   public void setNumSegmentsPrunedByValue(long numSegmentsPrunedByValue) {
     _numSegmentsPrunedByValue = numSegmentsPrunedByValue;
   }
@@ -299,7 +287,6 @@ public class BrokerResponseNative implements BrokerResponse {
   }
 
   @JsonProperty("explainPlanNumEmptyFilterSegments")
-  @Override
   public void setExplainPlanNumEmptyFilterSegments(long explainPlanNumEmptyFilterSegments) {
     _explainPlanNumEmptyFilterSegments = explainPlanNumEmptyFilterSegments;
   }
@@ -311,7 +298,6 @@ public class BrokerResponseNative implements BrokerResponse {
   }
 
   @JsonProperty("explainPlanNumMatchAllFilterSegments")
-  @Override
   public void setExplainPlanNumMatchAllFilterSegments(long explainPlanNumMatchAllFilterSegments) {
     _explainPlanNumMatchAllFilterSegments = explainPlanNumMatchAllFilterSegments;
   }
@@ -350,7 +336,6 @@ public class BrokerResponseNative implements BrokerResponse {
   }
 
   @JsonProperty("numServersQueried")
-  @Override
   public void setNumServersQueried(int numServersQueried) {
     _numServersQueried = numServersQueried;
   }
@@ -448,6 +433,7 @@ public class BrokerResponseNative implements BrokerResponse {
   public long getNumConsumingSegmentsProcessed() {
     return _numConsumingSegmentsProcessed;
   }
+
   @JsonProperty("numConsumingSegmentsProcessed")
   public void setNumConsumingSegmentsProcessed(long numConsumingSegmentsProcessed) {
     _numConsumingSegmentsProcessed = numConsumingSegmentsProcessed;
@@ -497,27 +483,18 @@ public class BrokerResponseNative implements BrokerResponse {
     _numGroupsLimitReached = numGroupsLimitReached;
   }
 
-  @JsonProperty("maxRowsInJoinReached")
+  @JsonProperty(access = JsonProperty.Access.READ_ONLY)
   public boolean isMaxRowsInJoinReached() {
-    return _maxRowsInJoinReached;
+    return false;
   }
 
-  @JsonProperty("maxRowsInJoinReached")
-  public void setMaxRowsInJoinReached(boolean maxRowsInJoinReached) {
-    _maxRowsInJoinReached = maxRowsInJoinReached;
-  }
-
-  @JsonProperty("partialResult")
+  @JsonProperty(access = JsonProperty.Access.READ_ONLY)
   public boolean isPartialResult() {
-    return _partialResult;
-  }
-
-  @JsonProperty("partialResult")
-  public void setPartialResult(boolean partialResult) {
-    _partialResult = partialResult;
+    return isNumGroupsLimitReached() || getExceptionsSize() > 0 || isMaxRowsInJoinReached();
   }
 
   @JsonProperty("timeUsedMs")
+  @Override
   public long getTimeUsedMs() {
     return _timeUsedMs;
   }
@@ -528,16 +505,10 @@ public class BrokerResponseNative implements BrokerResponse {
     _timeUsedMs = timeUsedMs;
   }
 
-  @JsonProperty("numRowsResultSet")
+  @JsonProperty(access = JsonProperty.Access.READ_ONLY)
   @Override
   public int getNumRowsResultSet() {
-    return _numRowsResultSet;
-  }
-
-  @JsonProperty("numRowsResultSet")
-  @Override
-  public void setNumRowsResultSet(int numRowsResultSet) {
-    _numRowsResultSet = numRowsResultSet;
+    return BrokerResponse.super.getNumRowsResultSet();
   }
 
   @JsonProperty("segmentStatistics")
@@ -560,15 +531,11 @@ public class BrokerResponseNative implements BrokerResponse {
     _traceInfo = traceInfo;
   }
 
-  @Override
-  public String toJsonString()
-      throws IOException {
-    return JsonUtils.objectToString(this);
-  }
-
   @JsonIgnore
   @Override
   public void setExceptions(List<ProcessingException> exceptions) {
+    // TODO: This is incorrect. It is adding and not setting the exceptions
+    //   But there is some code that seems to depend on this.
     for (ProcessingException exception : exceptions) {
       _processingExceptions.add(new QueryProcessingException(exception.getErrorCode(), exception.getMessage()));
     }

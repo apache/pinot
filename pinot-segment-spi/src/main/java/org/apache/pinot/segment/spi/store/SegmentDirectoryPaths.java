@@ -79,8 +79,14 @@ public class SegmentDirectoryPaths {
    */
   @Nullable
   public static File findTextIndexIndexFile(File indexDir, String column) {
-    String luceneIndexDirectory = column + V1Constants.Indexes.LUCENE_V9_TEXT_INDEX_FILE_EXTENSION;
+    String luceneIndexDirectory = column + V1Constants.Indexes.LUCENE_V99_TEXT_INDEX_FILE_EXTENSION;
     File indexFormatFile = findFormatFile(indexDir, luceneIndexDirectory);
+    // check for V9 version, if null
+    if (indexFormatFile == null) {
+      luceneIndexDirectory = column + V1Constants.Indexes.LUCENE_V9_TEXT_INDEX_FILE_EXTENSION;
+      indexFormatFile = findFormatFile(indexDir, luceneIndexDirectory);
+    }
+    // check for old version, if null
     if (indexFormatFile == null) {
       luceneIndexDirectory = column + V1Constants.Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION;
       indexFormatFile = findFormatFile(indexDir, luceneIndexDirectory);
@@ -101,8 +107,14 @@ public class SegmentDirectoryPaths {
   }
 
   public static File findFSTIndexIndexFile(File indexDir, String column) {
-    String luceneIndexDirectory = column + V1Constants.Indexes.LUCENE_V9_FST_INDEX_FILE_EXTENSION;
+    String luceneIndexDirectory = column + V1Constants.Indexes.LUCENE_V99_FST_INDEX_FILE_EXTENSION;
     File formatFile = findFormatFile(indexDir, luceneIndexDirectory);
+    // check for V9 version, if null
+    if (formatFile == null) {
+      luceneIndexDirectory = column + V1Constants.Indexes.LUCENE_V9_FST_INDEX_FILE_EXTENSION;
+      formatFile = findFormatFile(indexDir, luceneIndexDirectory);
+    }
+   // check for old version, if null
     if (formatFile == null) {
       luceneIndexDirectory = column + V1Constants.Indexes.LUCENE_FST_INDEX_FILE_EXTENSION;
       formatFile = findFormatFile(indexDir, luceneIndexDirectory);
@@ -120,8 +132,14 @@ public class SegmentDirectoryPaths {
   @Nullable
   @VisibleForTesting
   public static File findVectorIndexIndexFile(File segmentIndexDir, String column) {
-    String vectorIndexDirectory = column + V1Constants.Indexes.VECTOR_HNSW_INDEX_FILE_EXTENSION;
-    return findFormatFile(segmentIndexDir, vectorIndexDirectory);
+    String vectorIndexDirectory = column + V1Constants.Indexes.VECTOR_V99_HNSW_INDEX_FILE_EXTENSION;
+    File formatFile = findFormatFile(segmentIndexDir, vectorIndexDirectory);
+
+    if (formatFile == null) {
+      vectorIndexDirectory = column + V1Constants.Indexes.VECTOR_HNSW_INDEX_FILE_EXTENSION;
+      formatFile = findFormatFile(segmentIndexDir, vectorIndexDirectory);
+    }
+    return formatFile;
   }
 
   /**

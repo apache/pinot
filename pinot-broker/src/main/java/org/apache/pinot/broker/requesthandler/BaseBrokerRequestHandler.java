@@ -24,7 +24,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.net.URI;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -315,13 +314,21 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     Tracing.ThreadAccountantOps.setupRunner(String.valueOf(requestId));
 
     try {
-      long compilationStartTimeNs;
+      // Parse the query if needed
+      if (sqlNodeAndOptions == null) {
+        try {
+          sqlNodeAndOptions = RequestUtils.parseQuery(query, request);
+        } catch (Exception e) {
+          // Do not log or emit metric here because it is pure user error
+          requestContext.setErrorCode(QueryException.SQL_PARSING_ERROR_CODE);
+          return new BrokerResponseNative(QueryException.getException(QueryException.SQL_PARSING_ERROR, e));
+        }
+      }
+
+      // Compile the request into PinotQuery
+      long compilationStartTimeNs = System.nanoTime();
       PinotQuery pinotQuery;
       try {
-        // Parse the request
-        sqlNodeAndOptions = sqlNodeAndOptions != null ? sqlNodeAndOptions : RequestUtils.parseQuery(query, request);
-        // Compile the request into PinotQuery
-        compilationStartTimeNs = System.nanoTime();
         pinotQuery = CalciteSqlParser.compileToPinotQuery(sqlNodeAndOptions);
       } catch (Exception e) {
         LOGGER.info("Caught exception while compiling SQL request {}: {}, {}", requestId, query, e.getMessage());
@@ -761,7 +768,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
           realtimeRoutingTable = null;
         }
       }
-      BrokerResponseNative brokerResponse;
+      BrokerResponse brokerResponse;
       if (_queriesById != null) {
         // Start to track the running query for cancellation just before sending it out to servers to avoid any
         // potential failures that could happen before sending it out, like failures to calculate the routing table etc.
@@ -798,7 +805,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_NUM_GROUPS_LIMIT_REACHED,
             1);
       }
-      brokerResponse.setPartialResult(isPartialResult(brokerResponse));
 
       // Set total query processing time
       long totalTimeMs = TimeUnit.NANOSECONDS.toMillis(executionEndTimeNs - compilationStartTimeNs);
@@ -1361,8 +1367,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         try {
           int percentile = Integer.parseInt(remainingFunctionName);
           function.setOperator("percentilesmarttdigest");
-          function.setOperands(
-              Arrays.asList(function.getOperands().get(0), RequestUtils.getLiteralExpression(percentile)));
+          function.addToOperands(RequestUtils.getLiteralExpression(percentile));
         } catch (Exception e) {
           throw new BadQueryRequestException("Illegal function name: " + functionName);
         }
@@ -1370,8 +1375,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         try {
           int percentile = Integer.parseInt(remainingFunctionName.substring(0, remainingFunctionName.length() - 2));
           function.setOperator("percentilesmarttdigest");
-          function.setOperands(
-              Arrays.asList(function.getOperands().get(0), RequestUtils.getLiteralExpression(percentile)));
+          function.addToOperands(RequestUtils.getLiteralExpression(percentile));
         } catch (Exception e) {
           throw new BadQueryRequestException("Illegal function name: " + functionName);
         }
@@ -1849,18 +1853,17 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    */
   private static void attachTimeBoundary(PinotQuery pinotQuery, TimeBoundaryInfo timeBoundaryInfo,
       boolean isOfflineRequest) {
+    String functionName = isOfflineRequest ? FilterKind.LESS_THAN_OR_EQUAL.name() : FilterKind.GREATER_THAN.name();
     String timeColumn = timeBoundaryInfo.getTimeColumn();
     String timeValue = timeBoundaryInfo.getTimeValue();
-    Expression timeFilterExpression = RequestUtils.getFunctionExpression(
-        isOfflineRequest ? FilterKind.LESS_THAN_OR_EQUAL.name() : FilterKind.GREATER_THAN.name());
-    timeFilterExpression.getFunctionCall().setOperands(
-        Arrays.asList(RequestUtils.getIdentifierExpression(timeColumn), RequestUtils.getLiteralExpression(timeValue)));
+    Expression timeFilterExpression =
+        RequestUtils.getFunctionExpression(functionName, RequestUtils.getIdentifierExpression(timeColumn),
+            RequestUtils.getLiteralExpression(timeValue));
 
     Expression filterExpression = pinotQuery.getFilterExpression();
     if (filterExpression != null) {
-      Expression andFilterExpression = RequestUtils.getFunctionExpression(FilterKind.AND.name());
-      andFilterExpression.getFunctionCall().setOperands(Arrays.asList(filterExpression, timeFilterExpression));
-      pinotQuery.setFilterExpression(andFilterExpression);
+      pinotQuery.setFilterExpression(
+          RequestUtils.getFunctionExpression(FilterKind.AND.name(), filterExpression, timeFilterExpression));
     } else {
       pinotQuery.setFilterExpression(timeFilterExpression);
     }
@@ -1870,18 +1873,13 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    * Processes the optimized broker requests for both OFFLINE and REALTIME table.
    * TODO: Directly take PinotQuery
    */
-  protected abstract BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
+  protected abstract BrokerResponse processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
       BrokerRequest serverBrokerRequest, @Nullable BrokerRequest offlineBrokerRequest,
       @Nullable Map<ServerInstance, Pair<List<String>, List<String>>> offlineRoutingTable,
       @Nullable BrokerRequest realtimeBrokerRequest,
       @Nullable Map<ServerInstance, Pair<List<String>, List<String>>> realtimeRoutingTable, long timeoutMs,
       ServerStats serverStats, RequestContext requestContext)
       throws Exception;
-
-  protected static boolean isPartialResult(BrokerResponse brokerResponse) {
-    return brokerResponse.isNumGroupsLimitReached() || brokerResponse.isMaxRowsInJoinReached()
-        || brokerResponse.getExceptionsSize() > 0;
-  }
 
   protected static void augmentStatistics(RequestContext statistics, BrokerResponse response) {
     statistics.setTotalDocs(response.getTotalDocs());

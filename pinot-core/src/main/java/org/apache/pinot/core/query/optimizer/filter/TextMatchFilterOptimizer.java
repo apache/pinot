@@ -19,8 +19,6 @@
 package org.apache.pinot.core.query.optimizer.filter;
 
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -161,26 +159,20 @@ public class TextMatchFilterOptimizer implements FilterOptimizer {
       } else {
         mergedTextMatchFilter = String.join(SPACE + operator + SPACE, literals);
       }
-      Expression mergedTextMatchExpression = RequestUtils.getFunctionExpression(FilterKind.TEXT_MATCH.name());
-      Expression mergedTextMatchFilterExpression = RequestUtils.getLiteralExpression(mergedTextMatchFilter);
-      mergedTextMatchExpression.getFunctionCall()
-          .setOperands(Arrays.asList(entry.getKey(), mergedTextMatchFilterExpression));
-
+      Expression mergedTextMatchExpression =
+          RequestUtils.getFunctionExpression(FilterKind.TEXT_MATCH.name(), entry.getKey(),
+              RequestUtils.getLiteralExpression("(" + mergedTextMatchFilter + ")"));
       if (allNot) {
-        Expression notExpression = RequestUtils.getFunctionExpression(FilterKind.NOT.name());
-        notExpression.getFunctionCall().setOperands(Collections.singletonList(mergedTextMatchExpression));
-        newChildren.add(notExpression);
-        continue;
+        newChildren.add(RequestUtils.getFunctionExpression(FilterKind.NOT.name(), mergedTextMatchExpression));
+      } else {
+        newChildren.add(mergedTextMatchExpression);
       }
-      newChildren.add(mergedTextMatchExpression);
     }
 
     if (newChildren.size() == 1) {
       return newChildren.get(0);
     }
     assert operator.equals(FilterKind.OR.name()) || operator.equals(FilterKind.AND.name());
-    Expression newExpression = RequestUtils.getFunctionExpression(operator);
-    newExpression.getFunctionCall().setOperands(newChildren);
-    return newExpression;
+    return RequestUtils.getFunctionExpression(operator, newChildren);
   }
 }

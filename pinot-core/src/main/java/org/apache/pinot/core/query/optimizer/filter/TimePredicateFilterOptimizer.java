@@ -20,7 +20,7 @@ package org.apache.pinot.core.query.optimizer.filter;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
@@ -234,9 +234,7 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
 
       // Step 3: Rewrite the filter function
       String rangeString = new Range(lowerValue, lowerInclusive, upperValue, upperInclusive).getRangeString();
-      filterFunction.setOperator(FilterKind.RANGE.name());
-      filterFunction.setOperands(
-          Arrays.asList(timeConvertOperands.get(0), RequestUtils.getLiteralExpression(rangeString)));
+      rewriteToRange(filterFunction, timeConvertOperands.get(0), rangeString);
     } catch (Exception e) {
       LOGGER.warn("Caught exception while optimizing TIME_CONVERT predicate: {}, skipping the optimization",
           filterFunction, e);
@@ -400,9 +398,7 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
 
       // Step 3: Rewrite the filter function
       String rangeString = new Range(lowerValue, lowerInclusive, upperValue, upperInclusive).getRangeString();
-      filterFunction.setOperator(FilterKind.RANGE.name());
-      filterFunction.setOperands(
-          Arrays.asList(dateTimeConvertOperands.get(0), RequestUtils.getLiteralExpression(rangeString)));
+      rewriteToRange(filterFunction, dateTimeConvertOperands.get(0), rangeString);
     } catch (Exception e) {
       LOGGER.warn("Caught exception while optimizing DATE_TIME_CONVERT predicate: {}, skipping the optimization",
           filterFunction, e);
@@ -418,5 +414,14 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
    */
   private long ceil(long millisValue, long granularityMillis) {
     return (millisValue + granularityMillis - 1) / granularityMillis * granularityMillis;
+  }
+
+  private static void rewriteToRange(Function filterFunction, Expression expression, String rangeString) {
+    filterFunction.setOperator(FilterKind.RANGE.name());
+    // NOTE: Create an ArrayList because we might need to modify the list later
+    List<Expression> newOperands = new ArrayList<>(2);
+    newOperands.add(expression);
+    newOperands.add(RequestUtils.getLiteralExpression(rangeString));
+    filterFunction.setOperands(newOperands);
   }
 }

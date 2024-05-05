@@ -20,6 +20,8 @@ package org.apache.pinot.common.datablock;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
+import java.util.Objects;
 import org.apache.pinot.common.utils.DataSchema;
 
 
@@ -27,7 +29,7 @@ import org.apache.pinot.common.utils.DataSchema;
  * Column-wise data table. It stores data in columnar-major format.
  */
 public class ColumnarDataBlock extends BaseDataBlock {
-  private static final int VERSION = 1;
+  private static final int VERSION = 2;
   protected int[] _cumulativeColumnOffsetSizeInBytes;
   protected int[] _columnSizeInBytes;
 
@@ -80,17 +82,21 @@ public class ColumnarDataBlock extends BaseDataBlock {
   }
 
   @Override
-  public ColumnarDataBlock toMetadataOnlyDataTable() {
-    ColumnarDataBlock metadataOnlyDataTable = new ColumnarDataBlock();
-    metadataOnlyDataTable._metadata.putAll(_metadata);
-    metadataOnlyDataTable._errCodeToExceptionMap.putAll(_errCodeToExceptionMap);
-    return metadataOnlyDataTable;
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (!(o instanceof ColumnarDataBlock)) {
+      return false;
+    }
+    ColumnarDataBlock that = (ColumnarDataBlock) o;
+    return Objects.deepEquals(_cumulativeColumnOffsetSizeInBytes, that._cumulativeColumnOffsetSizeInBytes)
+        && Objects.deepEquals(_columnSizeInBytes, that._columnSizeInBytes);
   }
 
   @Override
-  public ColumnarDataBlock toDataOnlyDataTable() {
-    return new ColumnarDataBlock(_numRows, _dataSchema, _stringDictionary, _fixedSizeDataBytes, _variableSizeDataBytes);
+  public int hashCode() {
+    return Objects.hash(Arrays.hashCode(_cumulativeColumnOffsetSizeInBytes), Arrays.hashCode(_columnSizeInBytes));
   }
-
-  // TODO: add whole-column access methods.
+// TODO: add whole-column access methods.
 }

@@ -36,6 +36,7 @@ import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
+import org.apache.lucene.index.NoMergeScheduler;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
@@ -130,6 +131,15 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
       indexWriterConfig.setRAMBufferSizeMB(config.getLuceneMaxBufferSizeMB());
       indexWriterConfig.setCommitOnClose(commit);
       indexWriterConfig.setUseCompoundFile(config.isLuceneUseCompoundFile());
+
+      // For the realtime segment, prevent background merging. The realtime segment will call .commit()
+      // on the IndexWriter when segment conversion occurs. By default, Lucene will sometimes choose to
+      // merge segments in the background, which is problematic because the lucene index directory's
+      // contents is copied to create the immutable segment. If a background merge occurs during this
+      // copy, a FileNotFoundException will be triggered and segment build will fail.
+      if (!_commitOnClose) {
+        indexWriterConfig.setMergeScheduler(NoMergeScheduler.INSTANCE);
+      }
 
       if (_reuseMutableIndex) {
         LOGGER.info("Reusing the realtime lucene index for segment {} and column {}", segmentIndexDir, column);
@@ -330,7 +340,7 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
   }
 
   private File getV1TextIndexFile(File indexDir) {
-    String luceneIndexDirectory = _textColumn + V1Constants.Indexes.LUCENE_V9_TEXT_INDEX_FILE_EXTENSION;
+    String luceneIndexDirectory = _textColumn + V1Constants.Indexes.LUCENE_V99_TEXT_INDEX_FILE_EXTENSION;
     return new File(indexDir, luceneIndexDirectory);
   }
 
@@ -339,7 +349,7 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
     String tmpSegmentName = indexDir.getParentFile().getName();
     String segmentName = tmpSegmentName.substring(tmpSegmentName.indexOf("tmp-") + 4, tmpSegmentName.lastIndexOf('-'));
     String mutableDir = indexDir.getParentFile().getParentFile().getParent() + "/consumers/" + segmentName + "/"
-        + _textColumn + V1Constants.Indexes.LUCENE_V9_TEXT_INDEX_FILE_EXTENSION;
+        + _textColumn + V1Constants.Indexes.LUCENE_V99_TEXT_INDEX_FILE_EXTENSION;
     return new File(mutableDir);
   }
 }

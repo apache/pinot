@@ -22,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
 import java.nio.ByteBuffer;
 import java.util.Base64;
+import java.util.BitSet;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
@@ -31,12 +32,11 @@ import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
 import org.apache.pulsar.client.api.Message;
 import org.apache.pulsar.client.api.MessageId;
+import org.apache.pulsar.client.api.MessageIdAdv;
 import org.apache.pulsar.client.api.Reader;
 import org.apache.pulsar.client.api.SubscriptionInitialPosition;
-import org.apache.pulsar.client.impl.BatchMessageAcker;
 import org.apache.pulsar.client.impl.BatchMessageIdImpl;
 import org.apache.pulsar.client.impl.MessageIdImpl;
-import org.apache.pulsar.client.internal.DefaultImplementation;
 
 
 public class PulsarUtils {
@@ -119,22 +119,21 @@ public class PulsarUtils {
    * record in the new ledger.
    */
   public static MessageId getNextMessageId(MessageId messageId) {
-    MessageIdImpl messageIdImpl = MessageIdImpl.convertToMessageIdImpl(messageId);
-    long ledgerId = messageIdImpl.getLedgerId();
-    long entryId = messageIdImpl.getEntryId();
-    int partitionIndex = messageIdImpl.getPartitionIndex();
-    if (messageIdImpl instanceof BatchMessageIdImpl) {
-      BatchMessageIdImpl batchMessageIdImpl = (BatchMessageIdImpl) messageIdImpl;
-      int batchIndex = batchMessageIdImpl.getBatchIndex();
-      int batchSize = batchMessageIdImpl.getBatchSize();
-      BatchMessageAcker acker = batchMessageIdImpl.getAcker();
+    MessageIdAdv messageIdAdv = (MessageIdAdv) messageId;
+    long ledgerId = messageIdAdv.getLedgerId();
+    long entryId = messageIdAdv.getEntryId();
+    int partitionIndex = messageIdAdv.getPartitionIndex();
+    int batchSize = messageIdAdv.getBatchSize();
+    if (batchSize > 0) {
+      int batchIndex = messageIdAdv.getBatchIndex();
+      BitSet ackSet = messageIdAdv.getAckSet();
       if (batchIndex < batchSize - 1) {
-        return new BatchMessageIdImpl(ledgerId, entryId, partitionIndex, batchIndex + 1, batchSize, acker);
+        return new BatchMessageIdImpl(ledgerId, entryId, partitionIndex, batchIndex + 1, batchSize, ackSet);
       } else {
-        return new BatchMessageIdImpl(ledgerId, entryId + 1, partitionIndex, 0, batchSize, acker);
+        return new BatchMessageIdImpl(ledgerId, entryId + 1, partitionIndex, 0, batchSize, ackSet);
       }
     } else {
-      return DefaultImplementation.getDefaultImplementation().newMessageId(ledgerId, entryId + 1, partitionIndex);
+      return new MessageIdImpl(ledgerId, entryId + 1, partitionIndex);
     }
   }
 

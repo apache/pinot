@@ -119,7 +119,7 @@ public class MultiValueVarByteRawIndexCreatorTest {
       inputs.add(values);
     }
     try (MultiValueVarByteRawIndexCreator creator = new MultiValueVarByteRawIndexCreator(OUTPUT_DIR, compressionType,
-        column, numDocs, DataType.STRING, maxTotalLength, maxElements, writerVersion)) {
+        column, numDocs, DataType.STRING, maxTotalLength, maxElements, writerVersion, 1024 * 1024, 1000)) {
       for (String[] input : inputs) {
         creator.putStringMV(input);
       }
@@ -171,7 +171,7 @@ public class MultiValueVarByteRawIndexCreatorTest {
       inputs.add(values);
     }
     try (MultiValueVarByteRawIndexCreator creator = new MultiValueVarByteRawIndexCreator(OUTPUT_DIR, compressionType,
-        column, numDocs, DataType.BYTES, writerVersion, maxTotalLength, maxElements)) {
+        column, numDocs, DataType.BYTES, writerVersion, maxTotalLength, maxElements, 1024 * 1024, 1000)) {
       for (byte[][] input : inputs) {
         creator.putBytesMV(input);
       }

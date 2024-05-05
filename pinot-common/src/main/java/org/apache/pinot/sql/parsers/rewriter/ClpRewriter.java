@@ -23,6 +23,7 @@ import com.yscope.clp.compressorfrontend.BuiltInVariableHandlingRuleVersions;
 import com.yscope.clp.compressorfrontend.ByteSegment;
 import com.yscope.clp.compressorfrontend.EightByteClpEncodedSubquery;
 import com.yscope.clp.compressorfrontend.EightByteClpWildcardQueryEncoder;
+import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.calcite.sql.SqlKind;
@@ -403,58 +404,39 @@ public class ClpRewriter implements QueryRewriter {
   private ClpSqlSubqueryGenerationResult convertSubqueryToSql(String logtypeColumnName, String dictionaryVarsColumnName,
       String encodedVarsColumnName, String wildcardQuery, int subqueryIdx, EightByteClpEncodedSubquery[] subqueries) {
     EightByteClpEncodedSubquery subquery = subqueries[subqueryIdx];
-
+    Function logtypeMatchFunction = createLogtypeMatchFunction(logtypeColumnName, subquery.getLogtypeQueryAsString(),
+        subquery.logtypeQueryContainsWildcards());
     if (!subquery.containsVariables()) {
-      Function f = createLogtypeMatchFunction(logtypeColumnName, subquery.getLogtypeQueryAsString(),
-          subquery.logtypeQueryContainsWildcards());
-      return new ClpSqlSubqueryGenerationResult(false, f);
+      return new ClpSqlSubqueryGenerationResult(false, logtypeMatchFunction);
     }
 
-    Function subqueryFunc = new Function(SqlKind.AND.name());
-
-    Expression e;
+    List<Expression> subqueryFunctionOperands = new ArrayList<>();
 
     // Add logtype query
-    Function f = createLogtypeMatchFunction(logtypeColumnName, subquery.getLogtypeQueryAsString(),
-        subquery.logtypeQueryContainsWildcards());
-    e = new Expression(ExpressionType.FUNCTION);
-    e.setFunctionCall(f);
-    subqueryFunc.addToOperands(e);
+    subqueryFunctionOperands.add(RequestUtils.getFunctionExpression(logtypeMatchFunction));
 
     // Add any dictionary variables
     int numDictVars = 0;
     for (ByteSegment dictVar : subquery.getDictVars()) {
-      f = createStringColumnMatchFunction(SqlKind.EQUALS.name(), dictionaryVarsColumnName, dictVar.toString());
-      e = new Expression(ExpressionType.FUNCTION);
-      e.setFunctionCall(f);
-      subqueryFunc.addToOperands(e);
-
-      ++numDictVars;
+      subqueryFunctionOperands.add(RequestUtils.getFunctionExpression(
+          createStringColumnMatchFunction(SqlKind.EQUALS.name(), dictionaryVarsColumnName, dictVar.toString())));
+      numDictVars++;
     }
 
     // Add any encoded variables
     int numEncodedVars = 0;
     for (long encodedVar : subquery.getEncodedVars()) {
-      f = new Function(SqlKind.EQUALS.name());
-      f.addToOperands(RequestUtils.getIdentifierExpression(encodedVarsColumnName));
-      f.addToOperands(RequestUtils.getLiteralExpression(encodedVar));
-
-      e = new Expression(ExpressionType.FUNCTION);
-      e.setFunctionCall(f);
-      subqueryFunc.addToOperands(e);
-
-      ++numEncodedVars;
+      subqueryFunctionOperands.add(RequestUtils.getFunctionExpression(SqlKind.EQUALS.name(),
+          RequestUtils.getIdentifierExpression(encodedVarsColumnName), RequestUtils.getLiteralExpression(encodedVar)));
+      numEncodedVars++;
     }
 
     // Add any wildcard dictionary variables
     for (VariableWildcardQuery varWildcardQuery : subquery.getDictVarWildcardQueries()) {
-      f = createStringColumnMatchFunction(_REGEXP_LIKE_LOWERCASE_FUNCTION_NAME, dictionaryVarsColumnName,
-          wildcardQueryToRegex(varWildcardQuery.getQuery().toString()));
-      e = new Expression(ExpressionType.FUNCTION);
-      e.setFunctionCall(f);
-      subqueryFunc.addToOperands(e);
-
-      ++numDictVars;
+      subqueryFunctionOperands.add(RequestUtils.getFunctionExpression(
+          createStringColumnMatchFunction(_REGEXP_LIKE_LOWERCASE_FUNCTION_NAME, dictionaryVarsColumnName,
+              wildcardQueryToRegex(varWildcardQuery.getQuery().toString()))));
+      numDictVars++;
     }
 
     // Add any wildcard encoded variables
@@ -464,20 +446,14 @@ public class ClpRewriter implements QueryRewriter {
       // Create call to clpEncodedVarsMatch
       Expression clpEncodedVarsExp = RequestUtils.getFunctionExpression(
           RequestUtils.canonicalizeFunctionNamePreservingSpecialKey(
-              TransformFunctionType.CLP_ENCODED_VARS_MATCH.getName()));
-      f = clpEncodedVarsExp.getFunctionCall();
-      f.addToOperands(RequestUtils.getIdentifierExpression(logtypeColumnName));
-      f.addToOperands(RequestUtils.getIdentifierExpression(encodedVarsColumnName));
-      f.addToOperands(RequestUtils.getLiteralExpression(wildcardQuery));
-      f.addToOperands(RequestUtils.getLiteralExpression(subqueryIdx));
+              TransformFunctionType.CLP_ENCODED_VARS_MATCH.getName()),
+          RequestUtils.getIdentifierExpression(logtypeColumnName),
+          RequestUtils.getIdentifierExpression(encodedVarsColumnName), RequestUtils.getLiteralExpression(wildcardQuery),
+          RequestUtils.getLiteralExpression(subqueryIdx));
 
       // Create `clpEncodedVarsMatch(...) = true`
-      e = RequestUtils.getFunctionExpression(SqlKind.EQUALS.name());
-      f = e.getFunctionCall();
-      f.addToOperands(clpEncodedVarsExp);
-      f.addToOperands(RequestUtils.getLiteralExpression(true));
-
-      subqueryFunc.addToOperands(e);
+      subqueryFunctionOperands.add(RequestUtils.getFunctionExpression(SqlKind.EQUALS.name(), clpEncodedVarsExp,
+          RequestUtils.getLiteralExpression(true)));
     }
 
     // We require a decompress and match in the following cases:
@@ -494,7 +470,8 @@ public class ClpRewriter implements QueryRewriter {
     //    value "user dv123 joined" but it could also match "user dv456 joined dv123".
     boolean requiresDecompAndMatch =
         !(numDictVars < 2 && numEncodedVars < 2 && !subquery.logtypeQueryContainsWildcards());
-    return new ClpSqlSubqueryGenerationResult(requiresDecompAndMatch, subqueryFunc);
+    return new ClpSqlSubqueryGenerationResult(requiresDecompAndMatch,
+        RequestUtils.getFunction(SqlKind.AND.name(), subqueryFunctionOperands));
   }
 
   private Function createLogtypeMatchFunction(String columnName, String query, boolean containsWildcards) {
@@ -511,10 +488,8 @@ public class ClpRewriter implements QueryRewriter {
   }
 
   private Function createStringColumnMatchFunction(String canonicalName, String columnName, String query) {
-    Function func = new Function(canonicalName);
-    func.addToOperands(RequestUtils.getIdentifierExpression(columnName));
-    func.addToOperands(RequestUtils.getLiteralExpression(query));
-    return func;
+    return RequestUtils.getFunction(canonicalName, RequestUtils.getIdentifierExpression(columnName),
+        RequestUtils.getLiteralExpression(query));
   }
 
   /**

@@ -36,6 +36,12 @@ import org.apache.pinot.spi.exception.QueryCancelledException;
 import org.apache.pinot.spi.trace.Tracing;
 
 
+/**
+ * Like {@link InstanceResponseOperator}, but instead of sending all the data to the broker at once, it streams the data
+ * to a given {@link ResultsBlockStreamer}.
+ *
+ * This is used in multi-stage to stream data to the receiving mailboxes.
+ */
 public class StreamingInstanceResponseOperator extends InstanceResponseOperator {
   private static final String EXPLAIN_NAME = "STREAMING_INSTANCE_RESPONSE";
 
@@ -58,7 +64,7 @@ public class StreamingInstanceResponseOperator extends InstanceResponseOperator 
       prefetchAll();
       if (_streamingCombineOperator != null) {
         _streamingCombineOperator.start();
-        BaseResultsBlock resultsBlock = _streamingCombineOperator.nextBlock();
+        BaseResultsBlock resultsBlock = getBaseBlock();
         while (!(resultsBlock instanceof MetadataResultsBlock)) {
           if (resultsBlock instanceof ExceptionResultsBlock) {
             return new InstanceResponseBlock(resultsBlock);
@@ -66,20 +72,20 @@ public class StreamingInstanceResponseOperator extends InstanceResponseOperator 
           if (resultsBlock.getNumRows() > 0) {
             _streamer.send(resultsBlock);
           }
-          resultsBlock = _streamingCombineOperator.nextBlock();
+          resultsBlock = getBaseBlock();
         }
         // Return a metadata-only block in the end
-        return new InstanceResponseBlock(resultsBlock);
+        return buildInstanceResponseBlock(resultsBlock);
       } else {
         // Handle single block combine operator in streaming fashion
-        BaseResultsBlock resultsBlock = _combineOperator.nextBlock();
+        BaseResultsBlock resultsBlock = getBaseBlock();
         if (resultsBlock instanceof ExceptionResultsBlock) {
           return new InstanceResponseBlock(resultsBlock);
         }
         if (resultsBlock.getNumRows() > 0) {
           _streamer.send(resultsBlock);
         }
-        return new InstanceResponseBlock(resultsBlock).toMetadataOnlyResponseBlock();
+        return buildInstanceResponseBlock(resultsBlock).toMetadataOnlyResponseBlock();
       }
     } catch (EarlyTerminationException e) {
       Exception killedErrorMsg = Tracing.getThreadAccountant().getErrorStatus();
@@ -94,6 +100,10 @@ public class StreamingInstanceResponseOperator extends InstanceResponseOperator 
       }
       releaseAll();
     }
+  }
+
+  protected BaseResultsBlock getCombinedResults() {
+    return _combineOperator.nextBlock();
   }
 
   @Override

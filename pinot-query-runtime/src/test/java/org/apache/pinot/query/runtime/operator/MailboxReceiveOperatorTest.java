@@ -35,6 +35,7 @@ import org.apache.pinot.query.routing.SharedMailboxInfos;
 import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.blocks.TransferableBlockTestUtils;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.mockito.Mock;
@@ -120,7 +121,7 @@ public class MailboxReceiveOperatorTest {
   @Test
   public void shouldReceiveEosDirectlyFromSender() {
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
-    when(_mailbox1.poll()).thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
+    when(_mailbox1.poll()).thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
 
     OpChainExecutionContext context =
         OperatorTestUtil.getOpChainContext(_mailboxService, Long.MAX_VALUE, _stageMetadata1);
@@ -134,7 +135,7 @@ public class MailboxReceiveOperatorTest {
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
     Object[] row = new Object[]{1, 1};
     when(_mailbox1.poll()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row),
-        TransferableBlockUtils.getEndOfStreamTransferableBlock());
+        TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
 
     OpChainExecutionContext context =
         OperatorTestUtil.getOpChainContext(_mailboxService, Long.MAX_VALUE, _stageMetadata1);
@@ -165,11 +166,11 @@ public class MailboxReceiveOperatorTest {
   @Test
   public void shouldReceiveMailboxFromTwoServersOneNull() {
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
-    when(_mailbox1.poll()).thenReturn(null, TransferableBlockUtils.getEndOfStreamTransferableBlock());
+    when(_mailbox1.poll()).thenReturn(null, TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_2))).thenReturn(_mailbox2);
     Object[] row = new Object[]{1, 1};
     when(_mailbox2.poll()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row),
-        TransferableBlockUtils.getEndOfStreamTransferableBlock());
+        TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
 
     OpChainExecutionContext context =
         OperatorTestUtil.getOpChainContext(_mailboxService, Long.MAX_VALUE, _stageMetadataBoth);
@@ -189,10 +190,10 @@ public class MailboxReceiveOperatorTest {
     Object[] row3 = new Object[]{3, 3};
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
     when(_mailbox1.poll()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row1),
-        OperatorTestUtil.block(DATA_SCHEMA, row3), TransferableBlockUtils.getEndOfStreamTransferableBlock());
+        OperatorTestUtil.block(DATA_SCHEMA, row3), TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_2))).thenReturn(_mailbox2);
     when(_mailbox2.poll()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row2),
-        TransferableBlockUtils.getEndOfStreamTransferableBlock());
+        TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
 
     OpChainExecutionContext context =
         OperatorTestUtil.getOpChainContext(_mailboxService, Long.MAX_VALUE, _stageMetadataBoth);
@@ -217,7 +218,7 @@ public class MailboxReceiveOperatorTest {
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_2))).thenReturn(_mailbox2);
     Object[] row = new Object[]{3, 3};
     when(_mailbox2.poll()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row),
-        TransferableBlockUtils.getEndOfStreamTransferableBlock());
+        TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
 
     OpChainExecutionContext context =
         OperatorTestUtil.getOpChainContext(_mailboxService, Long.MAX_VALUE, _stageMetadataBoth);
@@ -236,10 +237,10 @@ public class MailboxReceiveOperatorTest {
     Object[] row3 = new Object[]{3, 3};
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
     when(_mailbox1.poll()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row1),
-        OperatorTestUtil.block(DATA_SCHEMA, row3), TransferableBlockUtils.getEndOfStreamTransferableBlock());
+        OperatorTestUtil.block(DATA_SCHEMA, row3), TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_2))).thenReturn(_mailbox2);
     when(_mailbox2.poll()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row2),
-        TransferableBlockUtils.getEndOfStreamTransferableBlock());
+        TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
 
     OpChainExecutionContext context =
         OperatorTestUtil.getOpChainContext(_mailboxService, Long.MAX_VALUE, _stageMetadataBoth);

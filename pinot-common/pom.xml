@@ -62,6 +62,19 @@
         <artifactId>protobuf-maven-plugin</artifactId>
       </plugin>
 
+      <plugin>
+        <groupId>com.diffplug.spotless</groupId>
+        <artifactId>spotless-maven-plugin</artifactId>
+        <configuration>
+          <java>
+            <excludes>
+              <exclude>src/main/java/org/apache/pinot/common/request/*.java</exclude>
+              <exclude>src/main/java/org/apache/pinot/common/response/ProcessingException.java</exclude>
+            </excludes>
+          </java>
+        </configuration>
+      </plugin>
+
       <!-- Following plugins and their configurations are used to generate the custom Calcite's SQL parser -->
       <!-- Copy the templates present in the codegen directory to ${project.build.directory}/codegen -->
       <plugin>
@@ -129,31 +142,6 @@
         </executions>
       </plugin>
     </plugins>
-
-    <pluginManagement>
-      <plugins>
-        <plugin>
-          <groupId>com.diffplug.spotless</groupId>
-          <artifactId>spotless-maven-plugin</artifactId>
-          <configuration>
-            <java>
-              <includes>
-                <include>src/main/java/**/*.java</include>
-                <include>src/test/java/**/*.java</include>
-              </includes>
-              <excludes>
-                <exclude>src/main/java/org/apache/pinot/common/request/*.java</exclude>
-                <exclude>src/main/java/org/apache/pinot/common/response/ProcessingException.java</exclude>
-              </excludes>
-              <importOrder>
-                <order>,\#</order>
-              </importOrder>
-              <removeUnusedImports/>
-            </java>
-          </configuration>
-        </plugin>
-      </plugins>
-    </pluginManagement>
   </build>
   <dependencies>
     <dependency>
@@ -189,6 +177,8 @@
       <groupId>org.apache.calcite</groupId>
       <artifactId>calcite-babel</artifactId>
     </dependency>
+
+    <!-- Jersey Libraries -->
     <dependency>
       <groupId>org.glassfish.jersey.core</groupId>
       <artifactId>jersey-server</artifactId>
@@ -218,10 +208,14 @@
       <artifactId>swagger-jersey2-jaxrs</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.testng</groupId>
-      <artifactId>testng</artifactId>
-      <scope>test</scope>
+      <groupId>org.webjars</groupId>
+      <artifactId>swagger-ui</artifactId>
     </dependency>
+    <dependency>
+      <groupId>jakarta.servlet</groupId>
+      <artifactId>jakarta.servlet-api</artifactId>
+    </dependency>
+
     <dependency>
       <groupId>com.google.guava</groupId>
       <artifactId>guava</artifactId>
@@ -275,15 +269,6 @@
       <artifactId>jopt-simple</artifactId>
     </dependency>
     <dependency>
-      <groupId>nl.jqno.equalsverifier</groupId>
-      <artifactId>equalsverifier</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.webjars</groupId>
-      <artifactId>swagger-ui</artifactId>
-    </dependency>
-    <dependency>
       <groupId>com.google.code.findbugs</groupId>
       <artifactId>jsr305</artifactId>
     </dependency>
@@ -298,11 +283,6 @@
     <dependency>
       <groupId>com.jayway.jsonpath</groupId>
       <artifactId>json-path</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.mockito</groupId>
-      <artifactId>mockito-core</artifactId>
-      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.slf4j</groupId>
@@ -353,45 +333,25 @@
       <groupId>io.github.hakky54</groupId>
       <artifactId>sslcontext-kickstart-for-netty</artifactId>
     </dependency>
+
+    <!-- Test -->
+    <dependency>
+      <groupId>org.testng</groupId>
+      <artifactId>testng</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.mockito</groupId>
+      <artifactId>mockito-core</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>nl.jqno.equalsverifier</groupId>
+      <artifactId>equalsverifier</artifactId>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
   <profiles>
-    <profile>
-      <id>build-shaded-jar</id>
-      <activation>
-        <activeByDefault>true</activeByDefault>
-      </activation>
-      <build>
-        <plugins>
-          <plugin>
-            <artifactId>maven-shade-plugin</artifactId>
-            <executions>
-              <execution>
-                <phase>package</phase>
-                <goals>
-                  <goal>shade</goal>
-                </goals>
-                <configuration>
-                  <relocations>
-                    <relocation>
-                      <pattern>com.google.common.base</pattern>
-                      <shadedPattern>${shade.prefix}.com.google.common.base</shadedPattern>
-                    </relocation>
-                    <relocation>
-                      <pattern>com.google.common.cache</pattern>
-                      <shadedPattern>${shade.prefix}.com.google.common.cache</shadedPattern>
-                    </relocation>
-                    <relocation>
-                      <pattern>org.apache.http</pattern>
-                      <shadedPattern>${shade.prefix}.org.apache.http</shadedPattern>
-                    </relocation>
-                  </relocations>
-                </configuration>
-              </execution>
-            </executions>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
     <profile>
       <id>profile-buildthrift</id>
       <activation>
@@ -412,7 +372,7 @@
                 <id>generate-sources</id>
                 <phase>generate-sources</phase>
                 <configuration>
-                  <tasks>
+                  <target>
                     <delete dir="target/generated-sources/gen-javabean"/>
                     <mkdir dir="target/generated-sources"/>
                     <exec executable="/usr/local/bin/thrift">
@@ -436,10 +396,11 @@
                       <arg value="target/generated-sources"/>
                       <arg value="src/thrift/response.thrift"/>
                     </exec>
-                    <copy todir="src/main/java/">
+                    <move todir="src/main/java/">
                       <fileset dir="target/generated-sources/gen-javabean"/>
-                    </copy>
-                  </tasks>
+                    </move>
+                    <delete dir="target/generated-sources/gen-javabean"/>
+                  </target>
                 </configuration>
                 <goals>
                   <goal>run</goal>
@@ -449,6 +410,16 @@
           </plugin>
         </plugins>
       </build>
+    </profile>
+
+    <profile>
+      <id>build-shaded-jar</id>
+      <activation>
+        <activeByDefault>true</activeByDefault>
+      </activation>
+      <properties>
+        <shade.phase.prop>package</shade.phase.prop>
+      </properties>
     </profile>
   </profiles>
 </project>

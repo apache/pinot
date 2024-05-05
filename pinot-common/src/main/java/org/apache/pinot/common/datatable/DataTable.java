@@ -110,6 +110,8 @@ public interface DataTable {
     NUM_SEGMENTS_PROCESSED(6, "numSegmentsProcessed", MetadataValueType.INT),
     NUM_SEGMENTS_MATCHED(7, "numSegmentsMatched", MetadataValueType.INT),
     NUM_CONSUMING_SEGMENTS_QUERIED(8, "numConsumingSegmentsQueried", MetadataValueType.INT),
+    // the timestamp indicating the freshness of the data queried in consuming segments.
+    // This can be ingestion timestamp if provided by the stream, or the last index time
     MIN_CONSUMING_FRESHNESS_TIME_MS(9, "minConsumingFreshnessTimeMs", MetadataValueType.LONG),
     TOTAL_DOCS(10, "totalDocs", MetadataValueType.LONG),
     NUM_GROUPS_LIMIT_REACHED(11, "numGroupsLimitReached", MetadataValueType.STRING),
@@ -135,6 +137,7 @@ public interface DataTable {
     OPERATOR_ID(31, "operatorId", MetadataValueType.STRING),
     OPERATOR_EXEC_START_TIME_MS(32, "operatorExecStartTimeMs", MetadataValueType.LONG),
     OPERATOR_EXEC_END_TIME_MS(33, "operatorExecEndTimeMs", MetadataValueType.LONG),
+    // Not actually used
     MAX_ROWS_IN_JOIN_REACHED(34, "maxRowsInJoinReached", MetadataValueType.STRING);
 
     // We keep this constant to track the max id added so far for backward compatibility.

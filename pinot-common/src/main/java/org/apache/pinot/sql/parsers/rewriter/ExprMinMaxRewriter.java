@@ -101,14 +101,12 @@ public class ExprMinMaxRewriter implements QueryRewriter {
     for (Map.Entry<List<Expression>, Set<Expression>> entry : exprMinMaxFunctionMap.entrySet()) {
       List<Expression> measuringColumns = entry.getKey();
       Set<Expression> projectionColumns = entry.getValue();
-      Expression functionExpression = RequestUtils.getFunctionExpression(isMax ? EXPR_MAX_PARENT : EXPR_MIN_PARENT);
       List<Expression> operands = new ArrayList<>(2 + measuringColumns.size() + projectionColumns.size());
       operands.add(RequestUtils.getLiteralExpression((int) exprMinMaxFunctionIDMap.get(measuringColumns)));
       operands.add(RequestUtils.getLiteralExpression(measuringColumns.size()));
       operands.addAll(measuringColumns);
       operands.addAll(projectionColumns);
-      functionExpression.getFunctionCall().setOperands(operands);
-      selectList.add(functionExpression);
+      selectList.add(RequestUtils.getFunctionExpression(isMax ? EXPR_MAX_PARENT : EXPR_MIN_PARENT, operands));
     }
   }
 

@@ -103,20 +103,25 @@ abstract class BaseStarTreeV2Test<R, A> {
   private static final String QUERY_FILTER_AND = " WHERE d1__COLUMN_NAME = 0 AND __d2 < 10";
   // StarTree supports OR predicates only on a single dimension
   private static final String QUERY_FILTER_OR = " WHERE d1__COLUMN_NAME > 10 OR d1__COLUMN_NAME < 50";
+  private static final String QUERY_FILTER_NOT = " WHERE NOT d1__COLUMN_NAME > 10";
+  private static final String QUERY_FILTER_AND_NOT = " WHERE d1__COLUMN_NAME > 10 AND NOT __d2 < 10";
+  private static final String QUERY_FILTER_OR_NOT = " WHERE d1__COLUMN_NAME > 50 OR NOT d1__COLUMN_NAME > 10";
+  private static final String QUERY_NOT_NOT = " WHERE NOT NOT d1__COLUMN_NAME > 10";
   private static final String QUERY_FILTER_COMPLEX_OR_MULTIPLE_DIMENSIONS =
-      " WHERE __d2 < 95 AND (d1__COLUMN_NAME > 10 OR d1__COLUMN_NAME < 50)";
+      " WHERE __d2 < 95 AND (NOT d1__COLUMN_NAME > 10 OR d1__COLUMN_NAME > 50)";
   private static final String QUERY_FILTER_COMPLEX_AND_MULTIPLE_DIMENSIONS_THREE_PREDICATES =
-      " WHERE __d2 < 95 AND __d2 > 25 AND (d1__COLUMN_NAME > 10 OR d1__COLUMN_NAME < 50)";
+      " WHERE __d2 < 95 AND NOT __d2 < 25 AND (d1__COLUMN_NAME > 10 OR d1__COLUMN_NAME < 50)";
   private static final String QUERY_FILTER_COMPLEX_OR_MULTIPLE_DIMENSIONS_THREE_PREDICATES =
       " WHERE (__d2 > 95 OR __d2 < 25) AND (d1__COLUMN_NAME > 10 OR d1__COLUMN_NAME < 50)";
   private static final String QUERY_FILTER_COMPLEX_OR_SINGLE_DIMENSION =
-      " WHERE d1__COLUMN_NAME = 95 AND (d1__COLUMN_NAME > 90 OR d1__COLUMN_NAME < 100)";
+      " WHERE NOT d1__COLUMN_NAME = 95 AND (d1__COLUMN_NAME > 90 OR d1__COLUMN_NAME < 100)";
 
   // Unsupported filters
   private static final String QUERY_FILTER_OR_MULTIPLE_DIMENSIONS = " WHERE d1__COLUMN_NAME > 10 OR __d2 < 50";
   private static final String QUERY_FILTER_OR_ON_AND =
       " WHERE (d1__COLUMN_NAME > 10 AND d1__COLUMN_NAME < 50) OR d1__COLUMN_NAME < 50";
-  private static final String QUERY_FILTER_OR_ON_NOT = " WHERE (NOT d1__COLUMN_NAME > 10) OR d1__COLUMN_NAME < 50";
+  private static final String QUERY_FILTER_NOT_ON_AND = " WHERE NOT (d1__COLUMN_NAME > 10 AND d1__COLUMN_NAME < 50)";
+  private static final String QUERY_FILTER_NOT_ON_OR = " WHERE NOT (d1__COLUMN_NAME < 10 OR d1__COLUMN_NAME > 50)";
   // Always false filters
   private static final String QUERY_FILTER_ALWAYS_FALSE = " WHERE d1__COLUMN_NAME > 100";
   private static final String QUERY_FILTER_OR_ALWAYS_FALSE = " WHERE d1__COLUMN_NAME > 100 OR d1__COLUMN_NAME < 0";
@@ -199,7 +204,8 @@ abstract class BaseStarTreeV2Test<R, A> {
     String query = String.format("SELECT %s FROM %s", _aggregation, TABLE_NAME);
     testUnsupportedFilter(query + QUERY_FILTER_OR_MULTIPLE_DIMENSIONS);
     testUnsupportedFilter(query + QUERY_FILTER_OR_ON_AND);
-    testUnsupportedFilter(query + QUERY_FILTER_OR_ON_NOT);
+    testUnsupportedFilter(query + QUERY_FILTER_NOT_ON_AND);
+    testUnsupportedFilter(query + QUERY_FILTER_NOT_ON_OR);
     testUnsupportedFilter(query + QUERY_FILTER_ALWAYS_FALSE);
     testUnsupportedFilter(query + QUERY_FILTER_OR_ALWAYS_FALSE);
   }
@@ -213,6 +219,10 @@ abstract class BaseStarTreeV2Test<R, A> {
       testQuery(query);
       testQuery(query + QUERY_FILTER_AND);
       testQuery(query + QUERY_FILTER_OR);
+      testQuery(query + QUERY_FILTER_NOT);
+      testQuery(query + QUERY_FILTER_AND_NOT);
+      testQuery(query + QUERY_FILTER_OR_NOT);
+      testQuery(query + QUERY_NOT_NOT);
       testQuery(query + QUERY_FILTER_COMPLEX_OR_MULTIPLE_DIMENSIONS);
       testQuery(query + QUERY_FILTER_COMPLEX_AND_MULTIPLE_DIMENSIONS_THREE_PREDICATES);
       testQuery(query + QUERY_FILTER_COMPLEX_OR_MULTIPLE_DIMENSIONS_THREE_PREDICATES);

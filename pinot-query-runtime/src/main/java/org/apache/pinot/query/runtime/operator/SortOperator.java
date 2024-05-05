@@ -19,19 +19,20 @@
 package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
-import java.util.LinkedList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.PriorityQueue;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.common.datablock.DataBlock;
+import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.utils.SortUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -50,8 +51,11 @@ public class SortOperator extends MultiStageOperator {
   private final PriorityQueue<Object[]> _priorityQueue;
   private final ArrayList<Object[]> _rows;
   private final int _numRowsToKeep;
+  private final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
 
   private boolean _hasConstructedSortedBlock;
+  @Nullable
+  private TransferableBlock _eosBlock = null;
 
   public SortOperator(OpChainExecutionContext context, MultiStageOperator upstreamOperator,
       List<RexExpression> collationKeys, List<RelFieldCollation.Direction> collationDirections,
@@ -63,8 +67,8 @@ public class SortOperator extends MultiStageOperator {
   }
 
   @VisibleForTesting
-  SortOperator(OpChainExecutionContext context, MultiStageOperator upstreamOperator, List<RexExpression> collationKeys,
-      List<RelFieldCollation.Direction> collationDirections,
+  SortOperator(OpChainExecutionContext context, MultiStageOperator upstreamOperator,
+      List<RexExpression> collationKeys, List<RelFieldCollation.Direction> collationDirections,
       List<RelFieldCollation.NullDirection> collationNullDirections, int fetch, int offset, DataSchema dataSchema,
       boolean isInputSorted, int defaultHolderCapacity, int defaultResponseLimit) {
     super(context);
@@ -92,6 +96,22 @@ public class SortOperator extends MultiStageOperator {
   }
 
   @Override
+  public void registerExecution(long time, int numRows) {
+    _statMap.merge(StatKey.EXECUTION_TIME_MS, time);
+    _statMap.merge(StatKey.EMITTED_ROWS, numRows);
+  }
+
+  @Override
+  public Type getOperatorType() {
+    return Type.SORT_OR_LIMIT;
+  }
+
+  @Override
+  protected Logger logger() {
+    return LOGGER;
+  }
+
+  @Override
   public List<MultiStageOperator> getChildOperators() {
     return ImmutableList.of(_upstreamOperator);
   }
@@ -109,13 +129,16 @@ public class SortOperator extends MultiStageOperator {
   @Override
   protected TransferableBlock getNextBlock() {
     if (_hasConstructedSortedBlock) {
-      return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+      assert _eosBlock != null;
+      return _eosBlock;
     }
     TransferableBlock finalBlock = consumeInputBlocks();
     // returning upstream error block if finalBlock contains error.
     if (finalBlock.isErrorBlock()) {
       return finalBlock;
     }
+    _statMap.merge(StatKey.REQUIRE_SORT, _priorityQueue != null);
+    _eosBlock = updateEosBlock(finalBlock, _statMap);
     return produceSortedBlock();
   }
 
@@ -126,19 +149,19 @@ public class SortOperator extends MultiStageOperator {
         List<Object[]> row = _rows.subList(_offset, _rows.size());
         return new TransferableBlock(row, _dataSchema, DataBlock.Type.ROW);
       } else {
-        return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+        return _eosBlock;
       }
     } else {
-      LinkedList<Object[]> rows = new LinkedList<>();
-      while (_priorityQueue.size() > _offset) {
+      int resultSize = _priorityQueue.size() - _offset;
+      if (resultSize <= 0) {
+        return _eosBlock;
+      }
+      Object[][] rowsArr = new Object[resultSize][];
+      for (int i = resultSize - 1; i >= 0; i--) {
         Object[] row = _priorityQueue.poll();
-        rows.addFirst(row);
+        rowsArr[i] = row;
       }
-      if (rows.size() == 0) {
-        return TransferableBlockUtils.getEndOfStreamTransferableBlock();
-      } else {
-        return new TransferableBlock(rows, _dataSchema, DataBlock.Type.ROW);
-      }
+      return new TransferableBlock(Arrays.asList(rowsArr), _dataSchema, DataBlock.Type.ROW);
     }
   }
 
@@ -154,8 +177,13 @@ public class SortOperator extends MultiStageOperator {
             _rows.addAll(container);
           } else {
             _rows.addAll(container.subList(0, _numRowsToKeep - numRows));
-            LOGGER.debug("Early terminate at SortOperator - operatorId={}, opChainId={}", _operatorId,
-                _context.getId());
+            if (LOGGER.isDebugEnabled()) {
+              // this operatorId is an old name. It is being kept to avoid breaking changes on the log message.
+              String operatorId = Joiner.on("_")
+                  .join(getClass().getSimpleName(), _context.getStageId(), _context.getServer());
+              LOGGER.debug("Early terminate at SortOperator - operatorId={}, opChainId={}", operatorId,
+                  _context.getId());
+            }
             // setting operator to be early terminated and awaits EOS block next.
             earlyTerminate();
           }
@@ -168,5 +196,31 @@ public class SortOperator extends MultiStageOperator {
       block = _upstreamOperator.nextBlock();
     }
     return block;
+  }
+
+  public enum StatKey implements StatMap.Key {
+    EXECUTION_TIME_MS(StatMap.Type.LONG) {
+      @Override
+      public boolean includeDefaultInJson() {
+        return true;
+      }
+    },
+    EMITTED_ROWS(StatMap.Type.LONG),
+    REQUIRE_SORT(StatMap.Type.BOOLEAN) {
+      @Override
+      public boolean includeDefaultInJson() {
+        return true;
+      }
+    };
+    private final StatMap.Type _type;
+
+    StatKey(StatMap.Type type) {
+      _type = type;
+    }
+
+    @Override
+    public StatMap.Type getType() {
+      return _type;
+    }
   }
 }

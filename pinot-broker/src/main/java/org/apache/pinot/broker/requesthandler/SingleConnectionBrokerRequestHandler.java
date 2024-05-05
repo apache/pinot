@@ -40,6 +40,7 @@ import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.BrokerQueryPhase;
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.utils.HashUtil;
@@ -100,7 +101,7 @@ public class SingleConnectionBrokerRequestHandler extends BaseBrokerRequestHandl
   }
 
   @Override
-  protected BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
+  protected BrokerResponse processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
       BrokerRequest serverBrokerRequest, @Nullable BrokerRequest offlineBrokerRequest,
       @Nullable Map<ServerInstance, Pair<List<String>, List<String>>> offlineRoutingTable,
       @Nullable BrokerRequest realtimeBrokerRequest,

@@ -20,16 +20,12 @@ package org.apache.pinot.query.mailbox.channel;
 
 import io.grpc.Context;
 import io.grpc.stub.StreamObserver;
-import java.util.Map;
+import java.nio.ByteBuffer;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.common.datablock.DataBlock;
-import org.apache.pinot.common.datablock.DataBlockUtils;
-import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.proto.Mailbox.MailboxContent;
 import org.apache.pinot.common.proto.Mailbox.MailboxStatus;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -62,22 +58,9 @@ public class MailboxContentObserver implements StreamObserver<MailboxContent> {
       _mailbox = _mailboxService.getReceivingMailbox(mailboxId);
     }
     try {
-      TransferableBlock block;
-      DataBlock dataBlock = DataBlockUtils.getDataBlock(mailboxContent.getPayload().asReadOnlyByteBuffer());
-      if (dataBlock instanceof MetadataBlock) {
-        Map<Integer, String> exceptions = dataBlock.getExceptions();
-        if (exceptions.isEmpty()) {
-          block = TransferableBlockUtils.getEndOfStreamTransferableBlock(((MetadataBlock) dataBlock).getStats());
-        } else {
-          _mailbox.setErrorBlock(TransferableBlockUtils.getErrorTransferableBlock(exceptions));
-          return;
-        }
-      } else {
-        block = new TransferableBlock(dataBlock);
-      }
-
       long timeoutMs = Context.current().getDeadline().timeRemaining(TimeUnit.MILLISECONDS);
-      ReceivingMailbox.ReceivingMailboxStatus status = _mailbox.offer(block, timeoutMs);
+      ByteBuffer buffer = mailboxContent.getPayload().asReadOnlyByteBuffer();
+      ReceivingMailbox.ReceivingMailboxStatus status = _mailbox.offerRaw(buffer, timeoutMs);
       switch (status) {
         case SUCCESS:
           _responseObserver.onNext(MailboxStatus.newBuilder().setMailboxId(mailboxId)
@@ -88,6 +71,8 @@ public class MailboxContentObserver implements StreamObserver<MailboxContent> {
           LOGGER.warn("Mailbox: {} already cancelled from upstream", mailboxId);
           cancelStream();
           break;
+        case FIRST_ERROR:
+          return;
         case ERROR:
           LOGGER.warn("Mailbox: {} already errored out (received error block before)", mailboxId);
           cancelStream();

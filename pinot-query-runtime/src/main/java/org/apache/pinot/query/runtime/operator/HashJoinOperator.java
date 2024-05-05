@@ -31,7 +31,7 @@ import javax.annotation.Nullable;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.common.datablock.DataBlock;
-import org.apache.pinot.common.datatable.DataTable;
+import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
@@ -45,9 +45,12 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperandFactory;
+import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.JoinOverFlowMode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -65,6 +68,8 @@ import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.JoinOver
 // TODO: Move inequi out of hashjoin. (https://github.com/apache/pinot/issues/9728)
 // TODO: Support memory size based resource limit.
 public class HashJoinOperator extends MultiStageOperator {
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(HashJoinOperator.class);
   private static final String EXPLAIN_NAME = "HASH_JOIN";
   private static final int INITIAL_HEURISTIC_SIZE = 16;
   private static final int DEFAULT_MAX_ROWS_IN_JOIN = 1024 * 1024; // 2^20, around 1MM rows
@@ -88,6 +93,7 @@ public class HashJoinOperator extends MultiStageOperator {
   private final int _resultColumnSize;
   private final List<TransformOperand> _joinClauseEvaluators;
   private boolean _isHashTableBuilt;
+  private final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
 
   // Used by non-inner join.
   // Needed to indicate we have finished processing all results after returning last block.
@@ -111,6 +117,11 @@ public class HashJoinOperator extends MultiStageOperator {
   private final JoinOverFlowMode _joinOverflowMode;
 
   private int _currentRowsInHashTable = 0;
+
+  @Nullable
+  private MultiStageQueryStats _rightSideStats = null;
+  @Nullable
+  private MultiStageQueryStats _leftSideStats = null;
 
   public HashJoinOperator(OpChainExecutionContext context, MultiStageOperator leftTableOperator,
       MultiStageOperator rightTableOperator, DataSchema leftSchema, JoinNode node) {
@@ -144,6 +155,22 @@ public class HashJoinOperator extends MultiStageOperator {
     Map<String, String> metadata = context.getOpChainMetadata();
     _maxRowsInHashTable = getMaxRowInJoin(metadata, node.getJoinHints());
     _joinOverflowMode = getJoinOverflowMode(metadata, node.getJoinHints());
+  }
+
+  @Override
+  public void registerExecution(long time, int numRows) {
+    _statMap.merge(StatKey.EXECUTION_TIME_MS, time);
+    _statMap.merge(StatKey.EMITTED_ROWS, numRows);
+  }
+
+  @Override
+  public Type getOperatorType() {
+    return Type.HASH_JOIN;
+  }
+
+  @Override
+  protected Logger logger() {
+    return LOGGER;
   }
 
   private int getMaxRowInJoin(Map<String, String> opChainMetadata, @Nullable AbstractPlanNode.NodeHint nodeHint) {
@@ -191,7 +218,8 @@ public class HashJoinOperator extends MultiStageOperator {
   protected TransferableBlock getNextBlock()
       throws ProcessingException {
     if (_isTerminated) {
-      return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+      assert _leftSideStats != null;
+      return TransferableBlockUtils.getEndOfStreamTransferableBlock(_leftSideStats);
     }
     if (!_isHashTableBuilt) {
       // Build JOIN hash table
@@ -207,6 +235,7 @@ public class HashJoinOperator extends MultiStageOperator {
 
   private void buildBroadcastHashTable()
       throws ProcessingException {
+    long startTime = System.currentTimeMillis();
     TransferableBlock rightBlock = _rightTableOperator.nextBlock();
     while (!TransferableBlockUtils.isEndOfStream(rightBlock)) {
       List<Object[]> container = rightBlock.getContainer();
@@ -223,8 +252,7 @@ public class HashJoinOperator extends MultiStageOperator {
           // Just fill up the buffer.
           int remainingRows = _maxRowsInHashTable - _currentRowsInHashTable;
           container = container.subList(0, remainingRows);
-          OperatorStats operatorStats = _opChainStats.getOperatorStats(_context, _operatorId);
-          operatorStats.recordSingleStat(DataTable.MetadataKey.MAX_ROWS_IN_JOIN_REACHED.getName(), "true");
+          _statMap.merge(StatKey.MAX_ROWS_IN_JOIN_REACHED, true);
           // setting only the rightTableOperator to be early terminated and awaits EOS block next.
           _rightTableOperator.earlyTerminate();
         }
@@ -246,7 +274,10 @@ public class HashJoinOperator extends MultiStageOperator {
       _upstreamErrorBlock = rightBlock;
     } else {
       _isHashTableBuilt = true;
+      _rightSideStats = rightBlock.getQueryStats();
+      assert _rightSideStats != null;
     }
+    _statMap.merge(StatKey.TIME_BUILDING_HASH_TABLE_MS, System.currentTimeMillis() - startTime);
   }
 
   private TransferableBlock buildJoinedDataBlock(TransferableBlock leftBlock) {
@@ -255,8 +286,13 @@ public class HashJoinOperator extends MultiStageOperator {
       return _upstreamErrorBlock;
     }
     if (leftBlock.isSuccessfulEndOfStreamBlock()) {
+      assert _rightSideStats != null;
+      _leftSideStats = leftBlock.getQueryStats();
+      assert _leftSideStats != null;
+      _leftSideStats.mergeInOrder(_rightSideStats, getOperatorType(), _statMap);
+
       if (!needUnmatchedRightRows()) {
-        return leftBlock;
+        return TransferableBlockUtils.getEndOfStreamTransferableBlock(_leftSideStats);
       }
       // TODO: Moved to a different function.
       // Return remaining non-matched rows for non-inner join.
@@ -389,5 +425,36 @@ public class HashJoinOperator extends MultiStageOperator {
 
   private boolean needUnmatchedLeftRows() {
     return _joinType == JoinRelType.LEFT || _joinType == JoinRelType.FULL;
+  }
+
+  public enum StatKey implements StatMap.Key {
+    EXECUTION_TIME_MS(StatMap.Type.LONG) {
+      @Override
+      public boolean includeDefaultInJson() {
+        return true;
+      }
+    },
+    EMITTED_ROWS(StatMap.Type.LONG) {
+      @Override
+      public boolean includeDefaultInJson() {
+        return true;
+      }
+    },
+    MAX_ROWS_IN_JOIN_REACHED(StatMap.Type.BOOLEAN),
+    /**
+     * How long (CPU time) has been spent on building the hash table.
+     */
+    TIME_BUILDING_HASH_TABLE_MS(StatMap.Type.LONG);
+
+    private final StatMap.Type _type;
+
+    StatKey(StatMap.Type type) {
+      _type = type;
+    }
+
+    @Override
+    public StatMap.Type getType() {
+      return _type;
+    }
   }
 }

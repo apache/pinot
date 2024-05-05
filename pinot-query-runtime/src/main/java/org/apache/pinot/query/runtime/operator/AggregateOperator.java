@@ -29,7 +29,7 @@ import javax.annotation.Nullable;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.common.datablock.DataBlock;
-import org.apache.pinot.common.datatable.DataTable;
+import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
@@ -48,9 +48,10 @@ import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.AbstractPlanNode;
 import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.roaringbitmap.RoaringBitmap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -59,6 +60,7 @@ import org.roaringbitmap.RoaringBitmap;
  * When the list of aggregation calls is empty, this class is used to calculate distinct result based on group by keys.
  */
 public class AggregateOperator extends MultiStageOperator {
+  private static final Logger LOGGER = LoggerFactory.getLogger(AggregateOperator.class);
   private static final String EXPLAIN_NAME = "AGGREGATE_OPERATOR";
   private static final CountAggregationFunction COUNT_STAR_AGG_FUNCTION =
       new CountAggregationFunction(Collections.singletonList(ExpressionContext.forIdentifier("*")), false);
@@ -69,12 +71,15 @@ public class AggregateOperator extends MultiStageOperator {
   private final AggType _aggType;
   private final MultistageAggregationExecutor _aggregationExecutor;
   private final MultistageGroupByExecutor _groupByExecutor;
+  @Nullable
+  private TransferableBlock _eosBlock;
+  private final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
 
   private boolean _hasConstructedAggregateBlock;
 
-  public AggregateOperator(OpChainExecutionContext context, MultiStageOperator inputOperator, DataSchema resultSchema,
-      List<RexExpression> aggCalls, List<RexExpression> groupSet, AggType aggType, List<Integer> filterArgIndices,
-      @Nullable AbstractPlanNode.NodeHint nodeHint) {
+  public AggregateOperator(OpChainExecutionContext context, MultiStageOperator inputOperator,
+      DataSchema resultSchema, List<RexExpression> aggCalls, List<RexExpression> groupSet, AggType aggType,
+      List<Integer> filterArgIndices, @Nullable AbstractPlanNode.NodeHint nodeHint) {
     super(context);
     _inputOperator = inputOperator;
     _resultSchema = resultSchema;
@@ -119,6 +124,22 @@ public class AggregateOperator extends MultiStageOperator {
   }
 
   @Override
+  public void registerExecution(long time, int numRows) {
+    _statMap.merge(StatKey.EXECUTION_TIME_MS, time);
+    _statMap.merge(StatKey.EMITTED_ROWS, numRows);
+  }
+
+  @Override
+  public Type getOperatorType() {
+    return Type.AGGREGATE;
+  }
+
+  @Override
+  protected Logger logger() {
+    return LOGGER;
+  }
+
+  @Override
   public List<MultiStageOperator> getChildOperators() {
     return ImmutableList.of(_inputOperator);
   }
@@ -132,29 +153,31 @@ public class AggregateOperator extends MultiStageOperator {
   @Override
   protected TransferableBlock getNextBlock() {
     if (_hasConstructedAggregateBlock) {
-      return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+      assert _eosBlock != null;
+      return _eosBlock;
     }
     TransferableBlock finalBlock = _aggregationExecutor != null ? consumeAggregation() : consumeGroupBy();
     // returning upstream error block if finalBlock contains error.
     if (finalBlock.isErrorBlock()) {
       return finalBlock;
     }
-    return produceAggregatedBlock();
+    assert finalBlock.isSuccessfulEndOfStreamBlock() : "Final block must be EOS block";
+    _eosBlock = updateEosBlock(finalBlock, _statMap);
+    return produceAggregatedBlock(finalBlock);
   }
 
-  private TransferableBlock produceAggregatedBlock() {
+  private TransferableBlock produceAggregatedBlock(TransferableBlock finalBlock) {
     _hasConstructedAggregateBlock = true;
     if (_aggregationExecutor != null) {
       return new TransferableBlock(_aggregationExecutor.getResult(), _resultSchema, DataBlock.Type.ROW);
     } else {
       List<Object[]> rows = _groupByExecutor.getResult();
       if (rows.isEmpty()) {
-        return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+        return _eosBlock;
       } else {
         TransferableBlock dataBlock = new TransferableBlock(rows, _resultSchema, DataBlock.Type.ROW);
         if (_groupByExecutor.isNumGroupsLimitReached()) {
-          OperatorStats operatorStats = _opChainStats.getOperatorStats(_context, _operatorId);
-          operatorStats.recordSingleStat(DataTable.MetadataKey.NUM_GROUPS_LIMIT_REACHED.getName(), "true");
+          _statMap.merge(StatKey.NUM_GROUPS_LIMIT_REACHED, true);
           _inputOperator.earlyTerminate();
         }
         return dataBlock;
@@ -405,6 +428,33 @@ public class AggregateOperator extends MultiStageOperator {
       return values;
     } else {
       return DataBlockExtractUtils.extractColumn(block.getDataBlock(), colId);
+    }
+  }
+
+  public enum StatKey implements StatMap.Key {
+    EXECUTION_TIME_MS(StatMap.Type.LONG) {
+      @Override
+      public boolean includeDefaultInJson() {
+        return true;
+      }
+    },
+    EMITTED_ROWS(StatMap.Type.LONG) {
+      @Override
+      public boolean includeDefaultInJson() {
+        return true;
+      }
+    },
+    NUM_GROUPS_LIMIT_REACHED(StatMap.Type.BOOLEAN);
+
+    private final StatMap.Type _type;
+
+    StatKey(StatMap.Type type) {
+      _type = type;
+    }
+
+    @Override
+    public StatMap.Type getType() {
+      return _type;
     }
   }
 }

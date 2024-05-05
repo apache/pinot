@@ -54,8 +54,12 @@ public class V1Constants {
     public static final String LUCENE_TEXT_INDEX_FILE_EXTENSION = ".lucene.index";
     public static final String LUCENE_V9_FST_INDEX_FILE_EXTENSION = ".lucene.v9.fst";
     public static final String LUCENE_V9_TEXT_INDEX_FILE_EXTENSION = ".lucene.v9.index";
+    public static final String LUCENE_V99_FST_INDEX_FILE_EXTENSION = ".lucene.v99.fst";
+    public static final String LUCENE_V99_TEXT_INDEX_FILE_EXTENSION = ".lucene.v99.index";
     public static final String VECTOR_INDEX_FILE_EXTENSION = ".vector.index";
     public static final String VECTOR_HNSW_INDEX_FILE_EXTENSION = ".vector.hnsw.index";
+    public static final String VECTOR_V99_INDEX_FILE_EXTENSION = ".vector.v99.index";
+    public static final String VECTOR_V99_HNSW_INDEX_FILE_EXTENSION = ".vector.v99.hnsw.index";
     public static final String VECTOR_HNSW_INDEX_DOCID_MAPPING_FILE_EXTENSION = ".vector.hnsw.mapping";
   }
 

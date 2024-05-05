@@ -23,17 +23,31 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
  * Intersect operator.
  */
 public class IntersectOperator extends SetOperator {
+  private static final Logger LOGGER = LoggerFactory.getLogger(IntersectOperator.class);
   private static final String EXPLAIN_NAME = "INTERSECT";
 
-  public IntersectOperator(OpChainExecutionContext opChainExecutionContext, List<MultiStageOperator> upstreamOperators,
+  public IntersectOperator(OpChainExecutionContext opChainExecutionContext,
+      List<MultiStageOperator> upstreamOperators,
       DataSchema dataSchema) {
     super(opChainExecutionContext, upstreamOperators, dataSchema);
+  }
+
+  @Override
+  public Type getOperatorType() {
+    return Type.INTERSECT;
+  }
+
+  @Override
+  protected Logger logger() {
+    return LOGGER;
   }
 
   @Nullable
