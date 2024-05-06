@@ -31,7 +31,7 @@ public abstract class StreamConsumerFactory {
    * Initializes the stream consumer factory with the stream metadata for the table
    * @param streamConfig the stream config object from the table config
    */
-  void init(StreamConfig streamConfig) {
+  protected void init(StreamConfig streamConfig) {
     _streamConfig = streamConfig;
   }
 
