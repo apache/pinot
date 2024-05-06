@@ -35,11 +35,13 @@ public class KafkaConfigBackwardCompatibleUtils {
    */
   public static void handleStreamConfig(StreamConfig streamConfig) {
     Map<String, String> streamConfigMap = streamConfig.getStreamConfigsMap();
+    //FIXME: This needs to be done because maven shade plugin also overwrites the constants in the classes
+    String prefixToReplace = KAFKA_COMMON_PACKAGE_PREFIX.replace(PINOT_SHADED_PACKAGE_PREFIX, "");
     for (Map.Entry<String, String> entry : streamConfigMap.entrySet()) {
       String[] valueParts = StringUtils.split(entry.getValue(), ' ');
       boolean updated = false;
       for (int i = 0; i < valueParts.length; i++) {
-        if (valueParts[i].startsWith(KAFKA_COMMON_PACKAGE_PREFIX)) {
+        if (valueParts[i].startsWith(prefixToReplace)) {
           try {
             Class.forName(valueParts[i]);
           } catch (ClassNotFoundException e1) {
