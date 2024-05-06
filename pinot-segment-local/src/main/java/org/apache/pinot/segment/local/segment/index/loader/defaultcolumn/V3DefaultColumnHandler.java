@@ -87,7 +87,6 @@ public class V3DefaultColumnHandler extends BaseDefaultColumnHandler {
       }
     }
 
-
     if (forwardIndexFile != null) {
       LoaderUtils.writeIndexToV3Format(_segmentWriter, column, forwardIndexFile, StandardIndexes.forward());
     }
@@ -97,7 +96,7 @@ public class V3DefaultColumnHandler extends BaseDefaultColumnHandler {
 
     File dictionaryFile = new File(_indexDir, column + V1Constants.Dict.FILE_EXTENSION);
     if (dictionaryFile.exists()) {
-    LoaderUtils.writeIndexToV3Format(_segmentWriter, column, dictionaryFile, StandardIndexes.dictionary());
+      LoaderUtils.writeIndexToV3Format(_segmentWriter, column, dictionaryFile, StandardIndexes.dictionary());
     }
 
     File nullValueVectorFile = new File(_indexDir, column + V1Constants.Indexes.NULLVALUE_VECTOR_FILE_EXTENSION);

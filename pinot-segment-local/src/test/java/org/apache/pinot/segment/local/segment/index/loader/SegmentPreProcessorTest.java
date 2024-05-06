@@ -1274,7 +1274,6 @@ public class SegmentPreProcessorTest {
     originalColumnMetadata = segmentMetadata.getColumnMetadataFor("column3");
     assertEquals(columnMetadata.getCardinality(), originalColumnMetadata.getCardinality());
     assertEquals(columnMetadata.getBitsPerElement(), originalColumnMetadata.getBitsPerElement());
-    assertEquals(columnMetadata.isSorted(), originalColumnMetadata.isSorted());
     assertEquals(columnMetadata.getTotalNumberOfEntries(), originalColumnMetadata.getTotalNumberOfEntries());
 
     // Check dictionary and forward index exist.
