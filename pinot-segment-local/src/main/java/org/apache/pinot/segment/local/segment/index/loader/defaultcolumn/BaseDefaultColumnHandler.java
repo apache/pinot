@@ -37,14 +37,8 @@ import org.apache.pinot.segment.local.function.FunctionEvaluator;
 import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentColumnarIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentDictionaryCreator;
-import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueEntryDictForwardIndexCreator;
-import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueFixedByteRawIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueUnsortedForwardIndexCreator;
-import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueVarByteRawIndexCreator;
-import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueFixedByteRawIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueSortedForwardIndexCreator;
-import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueUnsortedForwardIndexCreator;
-import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueVarByteRawIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.OffHeapBitmapInvertedIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.nullvalue.NullValueVectorCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.BytesColumnPredIndexStatsCollector;
@@ -54,6 +48,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.stats.IntColumnPreInd
 import org.apache.pinot.segment.local.segment.creator.impl.stats.LongColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.StringColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
+import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexCreatorFactory;
 import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexPlugin;
 import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
@@ -62,9 +57,8 @@ import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
-import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
-import org.apache.pinot.segment.spi.compression.DictIdCompressionType;
 import org.apache.pinot.segment.spi.creator.ColumnIndexCreationInfo;
+import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
@@ -790,40 +784,42 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         indexCreationInfo.isUseVarLengthDictionary())) {
       dictionaryCreator.build(indexCreationInfo.getSortedUniqueElementsArray());
 
-      // Create forward index
-      int cardinality = indexCreationInfo.getDistinctValueCount();
       int numDocs = outputValues.length;
+      IndexCreationContext indexCreationContext = IndexCreationContext.builder()
+          .withIndexDir(_indexDir)
+          .withFieldSpec(fieldSpec)
+          .withColumnIndexCreationInfo(indexCreationInfo)
+          .withTotalDocs(numDocs)
+          .withDictionary(true)
+          .build();
+
+      ForwardIndexConfig forwardIndexConfig = null;
+      FieldIndexConfigs fieldIndexConfig = _indexLoadingConfig.getFieldIndexConfig(column);
+      if (fieldIndexConfig != null) {
+        forwardIndexConfig = fieldIndexConfig.getConfig(new ForwardIndexPlugin().getIndexType());
+      }
+      if (forwardIndexConfig == null) {
+        forwardIndexConfig = new ForwardIndexConfig(false, null, null, null, null, null);
+      }
+
+      // Create forward index
       boolean isSingleValue = fieldSpec.isSingleValueField();
-      if (isSingleValue) {
-        try (ForwardIndexCreator forwardIndexCreator = indexCreationInfo.isSorted()
-            ? new SingleValueSortedForwardIndexCreator(_indexDir, column, cardinality)
-            : new SingleValueUnsortedForwardIndexCreator(_indexDir, column, cardinality, numDocs)) {
+
+      try (ForwardIndexCreator forwardIndexCreator
+          = ForwardIndexCreatorFactory.createIndexCreator(indexCreationContext, forwardIndexConfig)) {
+        if (isSingleValue) {
           for (Object outputValue : outputValues) {
             forwardIndexCreator.putDictId(dictionaryCreator.indexOfSV(outputValue));
           }
-        }
-      } else {
-        DictIdCompressionType dictIdCompressionType = null;
-        FieldIndexConfigs fieldIndexConfig = _indexLoadingConfig.getFieldIndexConfig(column);
-        if (fieldIndexConfig != null) {
-          ForwardIndexConfig forwardIndexConfig = fieldIndexConfig.getConfig(new ForwardIndexPlugin().getIndexType());
-          if (forwardIndexConfig != null) {
-            dictIdCompressionType = forwardIndexConfig.getDictIdCompressionType();
-          }
-        }
-        try (ForwardIndexCreator forwardIndexCreator = dictIdCompressionType == DictIdCompressionType.MV_ENTRY_DICT
-            ? new MultiValueEntryDictForwardIndexCreator(_indexDir, column, cardinality, numDocs)
-            : new MultiValueUnsortedForwardIndexCreator(_indexDir, column, cardinality, numDocs,
-                indexCreationInfo.getTotalNumberOfEntries())) {
+        } else {
           for (Object outputValue : outputValues) {
             forwardIndexCreator.putDictIdMV(dictionaryCreator.indexOfMV(outputValue));
           }
         }
+        // Add the column metadata
+        SegmentColumnarIndexCreator.addColumnMetadataInfo(_segmentProperties, column, indexCreationInfo, numDocs,
+            fieldSpec, true, dictionaryCreator.getNumBytesPerEntry());
       }
-
-      // Add the column metadata
-      SegmentColumnarIndexCreator.addColumnMetadataInfo(_segmentProperties, column, indexCreationInfo, numDocs,
-          fieldSpec, true, dictionaryCreator.getNumBytesPerEntry());
     }
   }
 
@@ -837,34 +833,27 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     // Create forward index
     int numDocs = outputValues.length;
     boolean isSingleValue = fieldSpec.isSingleValueField();
-    ChunkCompressionType chunkCompressionType = null;
-    int rawIndexWriterVersion = ForwardIndexConfig.DEFAULT_RAW_WRITER_VERSION;
-    boolean deriveNumDocsPerChunk = false;
-    int targetMaxChunkSizeBytes = ForwardIndexConfig.DEFAULT_TARGET_MAX_CHUNK_SIZE_BYTES;
-    int targetDocsPerChunk = ForwardIndexConfig.DEFAULT_TARGET_DOCS_PER_CHUNK;
 
     FieldIndexConfigs fieldIndexConfig = _indexLoadingConfig.getFieldIndexConfig(column);
+    ForwardIndexConfig forwardIndexConfig = null;
     if (fieldIndexConfig != null) {
-      ForwardIndexConfig forwardIndexConfig = fieldIndexConfig.getConfig(new ForwardIndexPlugin().getIndexType());
-      if (forwardIndexConfig != null) {
-        chunkCompressionType = forwardIndexConfig.getChunkCompressionType();
-        rawIndexWriterVersion = forwardIndexConfig.getRawIndexWriterVersion();
-        deriveNumDocsPerChunk = forwardIndexConfig.isDeriveNumDocsPerChunk();
-        targetMaxChunkSizeBytes = forwardIndexConfig.getTargetMaxChunkSizeBytes();
-        targetDocsPerChunk = forwardIndexConfig.getTargetDocsPerChunk();
-      }
+      forwardIndexConfig = fieldIndexConfig.getConfig(new ForwardIndexPlugin().getIndexType());
     }
-    if (chunkCompressionType == null) {
-      chunkCompressionType = ForwardIndexType.getDefaultCompressionType(fieldSpec.getFieldType());
+    if (forwardIndexConfig == null) {
+      forwardIndexConfig = new ForwardIndexConfig(false, null, null, null, null, null);
     }
 
-    if (isSingleValue) {
-      try (ForwardIndexCreator forwardIndexCreator = fieldSpec.getDataType().getStoredType().isFixedWidth()
-          ? new SingleValueFixedByteRawIndexCreator(_indexDir, chunkCompressionType, column, numDocs,
-              fieldSpec.getDataType().getStoredType(), rawIndexWriterVersion, targetDocsPerChunk)
-          : new SingleValueVarByteRawIndexCreator(_indexDir, chunkCompressionType, column, numDocs,
-              fieldSpec.getDataType().getStoredType(), indexCreationInfo.getMaxRowLengthInBytes(),
-              deriveNumDocsPerChunk, rawIndexWriterVersion, targetMaxChunkSizeBytes, targetDocsPerChunk)) {
+    IndexCreationContext indexCreationContext = IndexCreationContext.builder()
+        .withIndexDir(_indexDir)
+        .withFieldSpec(fieldSpec)
+        .withColumnIndexCreationInfo(indexCreationInfo)
+        .withTotalDocs(numDocs)
+        .withDictionary(false)
+        .build();
+
+    try (ForwardIndexCreator forwardIndexCreator
+        = ForwardIndexCreatorFactory.createIndexCreator(indexCreationContext, forwardIndexConfig)) {
+      if (isSingleValue) {
         for (Object outputValue : outputValues) {
           switch (fieldSpec.getDataType().getStoredType()) {
             // Casts are safe here because we've already done the conversion in createDerivedColumnV1Indices
@@ -893,16 +882,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
               throw new IllegalStateException();
           }
         }
-      }
-    } else {
-      try (ForwardIndexCreator forwardIndexCreator = fieldSpec.getDataType().getStoredType().isFixedWidth()
-          ? new MultiValueFixedByteRawIndexCreator(_indexDir, chunkCompressionType, column, numDocs,
-              fieldSpec.getDataType().getStoredType(), indexCreationInfo.getMaxNumberOfMultiValueElements(),
-              deriveNumDocsPerChunk, rawIndexWriterVersion, targetMaxChunkSizeBytes, targetDocsPerChunk)
-          : new MultiValueVarByteRawIndexCreator(_indexDir, chunkCompressionType, column, numDocs,
-              fieldSpec.getDataType().getStoredType(), rawIndexWriterVersion,
-              indexCreationInfo.getMaxRowLengthInBytes(), indexCreationInfo.getMaxNumberOfMultiValueElements(),
-              targetMaxChunkSizeBytes, targetDocsPerChunk)) {
+      } else {
         for (Object outputValue : outputValues) {
           switch (fieldSpec.getDataType().getStoredType()) {
             // Casts are safe here because we've already done the conversion in createDerivedColumnV1Indices
