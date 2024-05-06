@@ -21,9 +21,9 @@ package org.apache.pinot.plugin.record.enricher.function;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.auto.service.AutoService;
 import java.io.IOException;
-import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
 import org.apache.pinot.plugin.record.enricher.RecordEnricherFactory;
 import org.apache.pinot.plugin.record.enricher.RecordEnricherValidationConfig;
+import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
 import org.apache.pinot.segment.local.recordtransformer.RecordTransformer;
 import org.apache.pinot.spi.utils.JsonUtils;
 
