@@ -785,28 +785,12 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
       dictionaryCreator.build(indexCreationInfo.getSortedUniqueElementsArray());
 
       int numDocs = outputValues.length;
-      IndexCreationContext indexCreationContext = IndexCreationContext.builder()
-          .withIndexDir(_indexDir)
-          .withFieldSpec(fieldSpec)
-          .withColumnIndexCreationInfo(indexCreationInfo)
-          .withTotalDocs(numDocs)
-          .withDictionary(true)
-          .build();
-
-      ForwardIndexConfig forwardIndexConfig = null;
-      FieldIndexConfigs fieldIndexConfig = _indexLoadingConfig.getFieldIndexConfig(column);
-      if (fieldIndexConfig != null) {
-        forwardIndexConfig = fieldIndexConfig.getConfig(new ForwardIndexPlugin().getIndexType());
-      }
-      if (forwardIndexConfig == null) {
-        forwardIndexConfig = new ForwardIndexConfig(false, null, null, null, null, null);
-      }
 
       // Create forward index
       boolean isSingleValue = fieldSpec.isSingleValueField();
 
       try (ForwardIndexCreator forwardIndexCreator
-          = ForwardIndexCreatorFactory.createIndexCreator(indexCreationContext, forwardIndexConfig)) {
+          = getForwardIndexCreator(fieldSpec, indexCreationInfo, numDocs, column, true)) {
         if (isSingleValue) {
           for (Object outputValue : outputValues) {
             forwardIndexCreator.putDictId(dictionaryCreator.indexOfSV(outputValue));
@@ -834,25 +818,8 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     int numDocs = outputValues.length;
     boolean isSingleValue = fieldSpec.isSingleValueField();
 
-    FieldIndexConfigs fieldIndexConfig = _indexLoadingConfig.getFieldIndexConfig(column);
-    ForwardIndexConfig forwardIndexConfig = null;
-    if (fieldIndexConfig != null) {
-      forwardIndexConfig = fieldIndexConfig.getConfig(new ForwardIndexPlugin().getIndexType());
-    }
-    if (forwardIndexConfig == null) {
-      forwardIndexConfig = new ForwardIndexConfig(false, null, null, null, null, null);
-    }
-
-    IndexCreationContext indexCreationContext = IndexCreationContext.builder()
-        .withIndexDir(_indexDir)
-        .withFieldSpec(fieldSpec)
-        .withColumnIndexCreationInfo(indexCreationInfo)
-        .withTotalDocs(numDocs)
-        .withDictionary(false)
-        .build();
-
     try (ForwardIndexCreator forwardIndexCreator
-        = ForwardIndexCreatorFactory.createIndexCreator(indexCreationContext, forwardIndexConfig)) {
+        = getForwardIndexCreator(fieldSpec, indexCreationInfo, numDocs, column, false)) {
       if (isSingleValue) {
         for (Object outputValue : outputValues) {
           switch (fieldSpec.getDataType().getStoredType()) {
@@ -914,6 +881,29 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     // Add the column metadata
     SegmentColumnarIndexCreator.addColumnMetadataInfo(_segmentProperties, column, indexCreationInfo, numDocs,
         fieldSpec, false, 0);
+  }
+
+  private ForwardIndexCreator getForwardIndexCreator(FieldSpec fieldSpec, ColumnIndexCreationInfo indexCreationInfo,
+      int numDocs, String column, boolean hasDictionary) throws Exception {
+
+    IndexCreationContext indexCreationContext = IndexCreationContext.builder()
+        .withIndexDir(_indexDir)
+        .withFieldSpec(fieldSpec)
+        .withColumnIndexCreationInfo(indexCreationInfo)
+        .withTotalDocs(numDocs)
+        .withDictionary(hasDictionary)
+        .build();
+
+    ForwardIndexConfig forwardIndexConfig = null;
+    FieldIndexConfigs fieldIndexConfig = _indexLoadingConfig.getFieldIndexConfig(column);
+    if (fieldIndexConfig != null) {
+      forwardIndexConfig = fieldIndexConfig.getConfig(new ForwardIndexPlugin().getIndexType());
+    }
+    if (forwardIndexConfig == null) {
+      forwardIndexConfig = new ForwardIndexConfig(false, null, null, null, null, null);
+    }
+
+    return ForwardIndexCreatorFactory.createIndexCreator(indexCreationContext, forwardIndexConfig);
   }
 
   @SuppressWarnings("rawtypes")
