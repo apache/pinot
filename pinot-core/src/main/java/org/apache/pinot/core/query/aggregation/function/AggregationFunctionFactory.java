@@ -19,10 +19,12 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
 import java.util.List;
 import org.apache.datasketches.tuple.aninteger.IntegerSummary;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
+import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.core.query.aggregation.function.array.ArrayAggDistinctDoubleFunction;
 import org.apache.pinot.core.query.aggregation.function.array.ArrayAggDistinctFloatFunction;
 import org.apache.pinot.core.query.aggregation.function.array.ArrayAggDistinctIntFunction;
@@ -34,6 +36,10 @@ import org.apache.pinot.core.query.aggregation.function.array.ArrayAggIntFunctio
 import org.apache.pinot.core.query.aggregation.function.array.ArrayAggLongFunction;
 import org.apache.pinot.core.query.aggregation.function.array.ArrayAggStringFunction;
 import org.apache.pinot.core.query.aggregation.function.funnel.FunnelCountAggregationFunctionFactory;
+import org.apache.pinot.core.query.aggregation.function.string.StringJoinAllFunction;
+import org.apache.pinot.core.query.aggregation.function.string.StringJoinDistinctFunction;
+import org.apache.pinot.core.query.aggregation.function.string.StringJoinOrderByDistinctFunction;
+import org.apache.pinot.core.query.aggregation.function.string.StringJoinOrderByFunction;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
@@ -244,6 +250,56 @@ public class AggregationFunctionFactory {
               default:
                 throw new IllegalArgumentException("Unsupported data type for FIRST_WITH_TIME: " + dataType);
             }
+          }
+          case STRINGJOIN: {
+            Preconditions.checkArgument(numArguments >= 2,
+                "STRING_JOIN expects 2 or 3 arguments, got: %s. The function can be used as "
+                    + "stringJoin(dataColumn, 'delimiter', ['isDistinct'])", numArguments);
+            boolean isDistinct = false;
+            String separator = arguments.get(1).getLiteral().getStringValue();
+            if (numArguments >= 3) {
+              ExpressionContext isDistinctExp = arguments.get(2);
+              Preconditions.checkArgument(isDistinctExp.getType() == ExpressionContext.Type.LITERAL,
+                  "STRING_JOIN expects the 3rd argument to be literal, got: %s. The function can be used as "
+                      + "stringJoin(dataColumn, 'dataType', ['isDistinct'])", isDistinctExp.getType());
+              isDistinct = isDistinctExp.getLiteral().getBooleanValue();
+            }
+            if (numArguments <= 3) {
+              if (isDistinct) {
+                return new StringJoinDistinctFunction(firstArgument, separator, nullHandlingEnabled);
+              } else {
+                return new StringJoinAllFunction(firstArgument, separator, nullHandlingEnabled);
+              }
+            }
+            Preconditions.checkArgument(numArguments % 3 == 0,
+                "STRING_JOIN with ORDER_BY expects 3 + N * 3 arguments, got: %s. The function can be used as "
+                    + "stringJoinOrderBy(dataColumn, 'delimiter', 'isDistinct', [orderByColumn, 'dataType', "
+                    + "'isAscending'])",
+                numArguments);
+            List<OrderByExpressionContext> orderByExpressionContext = new ArrayList<>(numArguments / 3 - 1);
+            List<DataType> orderByDataTypes = new ArrayList<>(numArguments / 3 - 1);
+            for (int i = 3; i < numArguments; i += 3) {
+              ExpressionContext orderByExpression = arguments.get(i);
+              ExpressionContext dataTypeExp = arguments.get(i + 1);
+              Preconditions.checkArgument(dataTypeExp.getType() == ExpressionContext.Type.LITERAL,
+                  "STRING_JOIN expects the %dth argument to be literal, got: %s. The function can be used as "
+                      + "stringJoin(dataColumn, 'dataType', ['isDistinct'])", i + 1, dataTypeExp.getType());
+              DataType dataType = DataType.valueOf(dataTypeExp.getLiteral().getStringValue().toUpperCase());
+              orderByDataTypes.add(dataType);
+              ExpressionContext isAscExp = arguments.get(i + 2);
+              Preconditions.checkArgument(isAscExp.getType() == ExpressionContext.Type.LITERAL,
+                  "STRING_JOIN expects the %dth argument to be literal, got: %s. The function can be used as "
+                      + "stringJoin(dataColumn, 'dataType', ['isDistinct'])", i + 2, isAscExp.getType());
+              boolean isAsc = isAscExp.getLiteral().getBooleanValue();
+              orderByExpressionContext.add(new OrderByExpressionContext(orderByExpression, isAsc));
+            }
+            if (isDistinct) {
+              return new StringJoinOrderByDistinctFunction(firstArgument,
+                  arguments.get(1).getLiteral().getStringValue(),
+                  orderByExpressionContext, orderByDataTypes, nullHandlingEnabled);
+            }
+            return new StringJoinOrderByFunction(firstArgument, arguments.get(1).getLiteral().getStringValue(),
+                orderByExpressionContext, orderByDataTypes, nullHandlingEnabled);
           }
           case ARRAYAGG: {
             Preconditions.checkArgument(numArguments >= 2,

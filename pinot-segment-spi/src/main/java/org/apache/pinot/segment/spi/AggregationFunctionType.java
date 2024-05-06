@@ -322,7 +322,7 @@ public enum AggregationFunctionType {
   ARRAYAGG("arrayAgg", null, SqlKind.ARRAY_AGG, SqlFunctionCategory.USER_DEFINED_FUNCTION,
       OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.STRING, SqlTypeFamily.BOOLEAN),
           ordinal -> ordinal > 1), ReturnTypes.TO_ARRAY, ReturnTypes.explicit(SqlTypeName.OTHER)),
-
+  STRINGJOIN("stringJoin"),
   // funnel aggregate functions
   // TODO: revisit support for funnel count in V2
   FUNNELCOUNT("funnelCount");

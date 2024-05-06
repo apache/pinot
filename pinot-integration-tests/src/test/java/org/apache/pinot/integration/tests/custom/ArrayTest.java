@@ -23,7 +23,10 @@ import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.ImmutableList;
 import java.io.File;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
+import java.util.TreeSet;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
@@ -33,6 +36,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 @Test(suiteName = "CustomClusterIntegrationTest")
@@ -285,6 +289,75 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
       assertEquals(row.get(0).get(0).asDouble(), 0.1);
       assertEquals(row.get(0).get(1).asDouble(), 0.2);
       assertEquals(row.get(0).get(2).asDouble(), 0.3);
+    }
+  }
+
+  @Test(dataProvider = "useV1QueryEngine")
+  public void testStringJoinQueries(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query =
+        String.format("SELECT "
+            + "stringJoin(stringCol, ' ! '), "
+            + "stringJoin(stringCol, ' | '), "
+            + "stringJoin(stringCol, ' | ', true), "
+            + "groupKey "
+            + "FROM %s GROUP BY groupKey ORDER BY groupKey LIMIT %d", getTableName(), getCountStarResult());
+    JsonNode jsonNode = postQuery(query);
+    JsonNode rows = jsonNode.get("resultTable").get("rows");
+    assertEquals(rows.size(), 10);
+    for (int rowId = 0; rowId < 10; rowId++) {
+      JsonNode row = rows.get(rowId);
+      String entry1 = row.get(0).asText();
+      String entry2 = row.get(1).asText();
+      String entry3 = row.get(2).asText();
+      assertEquals(entry1.replace(" ! ", " | "), entry2);
+      Set<String> entry2Set = new TreeSet<>(Arrays.asList(entry2.split(" \\| ")));
+      Set<String> entry3Set = new TreeSet<>(Arrays.asList(entry3.split(" \\| ", 10)));
+      assertEquals(entry2Set.size(), entry3Set.size());
+      assertTrue(entry2Set.containsAll(entry3Set));
+      assertTrue(entry3Set.containsAll(entry2Set));
+    }
+  }
+
+  @Test(dataProvider = "useV1QueryEngine")
+  public void testStringJoinOrderByQueries(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query =
+        String.format("SELECT "
+            + "stringJoin(stringCol, ' | ', true, stringCol, 'STRING', true), "
+            + "stringJoin(stringCol, ' | ', true, stringCol, 'STRING', false), "
+            + "stringJoin(stringCol, ' | ', false, stringCol, 'STRING', true), "
+            + "stringJoin(stringCol, ' | ', false, stringCol, 'STRING', false), "
+            + "groupKey "
+            + "FROM %s GROUP BY groupKey ORDER BY groupKey LIMIT %d", getTableName(), getCountStarResult());
+    JsonNode jsonNode = postQuery(query);
+    JsonNode rows = jsonNode.get("resultTable").get("rows");
+    assertEquals(rows.size(), 10);
+    for (int rowId = 0; rowId < 10; rowId++) {
+      JsonNode row = rows.get(rowId);
+      String entry1 = row.get(0).asText();
+      String entry2 = row.get(1).asText();
+      String entry3 = row.get(2).asText();
+      String entry4 = row.get(3).asText();
+      List<String> entry1List = Arrays.asList(entry1.split(" \\| ", 10));
+      List<String> entry2List = Arrays.asList(entry2.split(" \\| ", 10));
+      for (int i = 0; i < 10; i++) {
+        assertEquals(entry1List.get(i), entry2List.get(9 - i));
+      }
+      List<String> entry3List = Arrays.asList(entry3.split(" \\| ", 100));
+      List<String> entry4List = Arrays.asList(entry4.split(" \\| ", 100));
+      for (int i = 0; i < 100; i++) {
+        assertEquals(entry3List.get(i), entry4List.get(99 - i));
+      }
+
+      Set<String> entry2Set = new TreeSet<>(Arrays.asList(entry2.split(" \\| ", 10)));
+      Set<String> entry3Set = new TreeSet<>(Arrays.asList(entry3.split(" \\| ", 100)));
+
+      assertEquals(entry2Set.size(), entry3Set.size());
+      assertTrue(entry2Set.containsAll(entry3Set));
+      assertTrue(entry3Set.containsAll(entry2Set));
     }
   }
 
