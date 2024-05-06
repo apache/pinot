@@ -838,8 +838,10 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     int numDocs = outputValues.length;
     boolean isSingleValue = fieldSpec.isSingleValueField();
     ChunkCompressionType chunkCompressionType = null;
-    boolean deriveNumDocsPerChunk = false;
     int rawIndexWriterVersion = ForwardIndexConfig.DEFAULT_RAW_WRITER_VERSION;
+    boolean deriveNumDocsPerChunk = false;
+    int targetMaxChunkSizeBytes = ForwardIndexConfig.DEFAULT_TARGET_MAX_CHUNK_SIZE_BYTES;
+    int targetDocsPerChunk = ForwardIndexConfig.DEFAULT_TARGET_DOCS_PER_CHUNK;
 
     FieldIndexConfigs fieldIndexConfig = _indexLoadingConfig.getFieldIndexConfig(column);
     if (fieldIndexConfig != null) {
@@ -848,6 +850,8 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         chunkCompressionType = forwardIndexConfig.getChunkCompressionType();
         rawIndexWriterVersion = forwardIndexConfig.getRawIndexWriterVersion();
         deriveNumDocsPerChunk = forwardIndexConfig.isDeriveNumDocsPerChunk();
+        targetMaxChunkSizeBytes = forwardIndexConfig.getTargetMaxChunkSizeBytes();
+        targetDocsPerChunk = forwardIndexConfig.getTargetDocsPerChunk();
       }
     }
     if (chunkCompressionType == null) {
@@ -857,10 +861,10 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     if (isSingleValue) {
       try (ForwardIndexCreator forwardIndexCreator = fieldSpec.getDataType().getStoredType().isFixedWidth()
           ? new SingleValueFixedByteRawIndexCreator(_indexDir, chunkCompressionType, column, numDocs,
-              fieldSpec.getDataType().getStoredType(), rawIndexWriterVersion)
+              fieldSpec.getDataType().getStoredType(), rawIndexWriterVersion, targetDocsPerChunk)
           : new SingleValueVarByteRawIndexCreator(_indexDir, chunkCompressionType, column, numDocs,
               fieldSpec.getDataType().getStoredType(), indexCreationInfo.getMaxRowLengthInBytes(),
-              deriveNumDocsPerChunk, rawIndexWriterVersion)) {
+              deriveNumDocsPerChunk, rawIndexWriterVersion, targetMaxChunkSizeBytes, targetDocsPerChunk)) {
         for (Object outputValue : outputValues) {
           switch (fieldSpec.getDataType().getStoredType()) {
             // Casts are safe here because we've already done the conversion in createDerivedColumnV1Indices
@@ -894,10 +898,11 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
       try (ForwardIndexCreator forwardIndexCreator = fieldSpec.getDataType().getStoredType().isFixedWidth()
           ? new MultiValueFixedByteRawIndexCreator(_indexDir, chunkCompressionType, column, numDocs,
               fieldSpec.getDataType().getStoredType(), indexCreationInfo.getMaxNumberOfMultiValueElements(),
-              deriveNumDocsPerChunk, rawIndexWriterVersion)
+              deriveNumDocsPerChunk, rawIndexWriterVersion, targetMaxChunkSizeBytes, targetDocsPerChunk)
           : new MultiValueVarByteRawIndexCreator(_indexDir, chunkCompressionType, column, numDocs,
               fieldSpec.getDataType().getStoredType(), rawIndexWriterVersion,
-              indexCreationInfo.getMaxRowLengthInBytes(), indexCreationInfo.getMaxNumberOfMultiValueElements())) {
+              indexCreationInfo.getMaxRowLengthInBytes(), indexCreationInfo.getMaxNumberOfMultiValueElements(),
+              targetMaxChunkSizeBytes, targetDocsPerChunk)) {
         for (Object outputValue : outputValues) {
           switch (fieldSpec.getDataType().getStoredType()) {
             // Casts are safe here because we've already done the conversion in createDerivedColumnV1Indices
