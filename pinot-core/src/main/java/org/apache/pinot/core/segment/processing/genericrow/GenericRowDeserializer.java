@@ -172,9 +172,9 @@ public class GenericRowDeserializer {
     }
   }
 
-  public List<Object> getSortedColumnValueList(long offset, int numFieldsToCompare) {
+  public List<Object> getSortedColumnValueList(long offset, int numSortedColumnValueList) {
     List<Object> sortedColumnList = new ArrayList<>();
-    for (int i = 0; i < numFieldsToCompare; i++) {
+    for (int i = 0; i < numSortedColumnValueList; i++) {
       switch (_storedTypes[i]) {
         case INT:
           sortedColumnList.add(_dataBuffer.getInt(offset));

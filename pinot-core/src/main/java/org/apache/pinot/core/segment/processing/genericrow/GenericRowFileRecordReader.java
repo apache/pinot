@@ -20,15 +20,15 @@ package org.apache.pinot.core.segment.processing.genericrow;
 
 import it.unimi.dsi.fastutil.Arrays;
 import java.io.File;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
-import java.util.TreeMap;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
+import org.apache.pinot.spi.utils.ByteArray;
 
 
 /**
@@ -45,47 +45,80 @@ public class GenericRowFileRecordReader implements RecordReader {
   public GenericRowFileRecordReader(GenericRowFileReader fileReader) {
     _fileReader = fileReader;
     int numRows = fileReader.getNumRows();
+    int numSortedFields = fileReader.getNumSortFields();
     _startRowId = 0;
     _endRowId = numRows;
     if (fileReader.getNumSortFields() > 0) {
-//      _sortedRowIds = new int[numRows];
-//      for (int i = 0; i < numRows; i++) {
-//        _sortedRowIds[i] = i;
-//      }
-//      Arrays
-//          .quickSort(0, _endRowId, (i1, i2) -> _fileReader.compare(_sortedRowIds[i1], _sortedRowIds[i2]), (i1, i2) -> {
-//            int temp = _sortedRowIds[i1];
-//            _sortedRowIds[i1] = _sortedRowIds[i2];
-//            _sortedRowIds[i2] = temp;
-//          });
-      doExternalSort();
+      List<List<Object>> valueLists = new ArrayList<>();
+
+      // Initialize sorted row ids.
+      _sortedRowIds = new int[numRows];
+      for (int i = 0; i < _fileReader.getNumRows(); i++) {
+        _sortedRowIds[i] = i;
+      }
+
+      // Get the list of sorted columns.
+      for (int i = 0; i < numRows; i++) {
+        valueLists.add(_fileReader.getSortedColumnValueList(i));
+      }
+
+      // Sort the row ids based on the sorted columns.
+      Arrays.quickSort(_startRowId, _endRowId,
+          (i1, i2) -> compareFromSortedColumn(valueLists, numSortedFields, _sortedRowIds[i1],
+              _sortedRowIds[i2]), (i1, i2) -> {
+            int temp = _sortedRowIds[i1];
+            _sortedRowIds[i1] = _sortedRowIds[i2];
+            _sortedRowIds[i2] = temp;
+          });
     } else {
       _sortedRowIds = null;
     }
   }
 
-  private void doExternalSort() {
-    List<List<Object>> sortColumnList = new ArrayList<>();
-    for (int i = _startRowId; i < _endRowId; i++) {
-      List<Object> sortedColumnValueList = _fileReader.getSortedColumnValueList(i);
-      sortColumnList.add(sortedColumnValueList);
-    }
-
-    _sortedRowIds = new int[_fileReader.getNumRows()];
-    for (int i = 0; i < _fileReader.getNumRows(); i++) {
-      _sortedRowIds[i] = i;
-    }
-
-    for (int i = 0; i < _fileReader.getNumSortFields(); i++) {
-      Map<Object,Integer> m = new TreeMap<>();
-      for (int j = 0; j < _fileReader.getNumRows(); j++) {
-        m.put(sortColumnList.get(j).get(i), _sortedRowIds[j]);
+  int compareFromSortedColumn(List<List<Object>> valueList, int numSortedFields, int index1, int index2) {
+    for (int i = 0; i < numSortedFields; i++) {
+      Object value1 = valueList.get(index1).get(i);
+      Object value2 = valueList.get(index2).get(i);
+      if (value1 instanceof String) {
+        int result = ((String) value1).compareTo((String) value2);
+        if (result != 0) {
+          return result;
+        }
+      } else if (value1 instanceof Integer) {
+        int result = ((Integer) value1).compareTo((Integer) value2);
+        if (result != 0) {
+          return result;
+        }
+      } else if (value1 instanceof Long) {
+        int result = ((Long) value1).compareTo((Long) value2);
+        if (result != 0) {
+          return result;
+        }
+      } else if (value1 instanceof Float) {
+        int result = ((Float) value1).compareTo((Float) value2);
+        if (result != 0) {
+          return result;
+        }
+      } else if (value1 instanceof Double) {
+        int result = ((Double) value1).compareTo((Double) value2);
+        if (result != 0) {
+          return result;
+        }
+      } else if (value1 instanceof BigDecimal) {
+        int result = ((BigDecimal) value1).compareTo((BigDecimal) value2);
+        if (result != 0) {
+          return result;
+        }
+      } else if (value1 instanceof ByteArray) {
+        int result = ((ByteArray) value1).compareTo((ByteArray) value2);
+        if (result != 0) {
+          return result;
+        }
+      } else {
+        throw new IllegalStateException("Unsupported data type: " + value1.getClass());
       }
-      int k = 0;
-      for (Map.Entry<Object,Integer> entry : m.entrySet()) {
-        _sortedRowIds[k++] = entry.getValue();
-      }
     }
+    return 0;
   }
 
   private GenericRowFileRecordReader(GenericRowFileReader fileReader, int startRowId, int endRowId,
