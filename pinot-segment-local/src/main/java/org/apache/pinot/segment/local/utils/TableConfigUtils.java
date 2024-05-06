@@ -106,9 +106,11 @@ import static org.apache.pinot.segment.spi.AggregationFunctionType.*;
  * FIXME: Merge this TableConfigUtils with the TableConfigUtils from pinot-common when merging of modules is done
  */
 public final class TableConfigUtils {
-  private TableConfigUtils() {
-  }
-
+  public final static EnumSet<AggregationFunctionType> AVAILABLE_CORE_VALUE_AGGREGATORS =
+      EnumSet.of(MIN, MAX, SUM, DISTINCTCOUNTHLL, DISTINCTCOUNTRAWHLL, DISTINCTCOUNTTHETASKETCH,
+          DISTINCTCOUNTRAWTHETASKETCH, DISTINCTCOUNTTUPLESKETCH, DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH,
+          SUMVALUESINTEGERSUMTUPLESKETCH, AVGVALUEINTEGERSUMTUPLESKETCH, DISTINCTCOUNTHLLPLUS, DISTINCTCOUNTRAWHLLPLUS,
+          DISTINCTCOUNTCPCSKETCH, DISTINCTCOUNTRAWCPCSKETCH, DISTINCTCOUNTULL, DISTINCTCOUNTRAWULL);
   private static final Logger LOGGER = LoggerFactory.getLogger(TableConfigUtils.class);
   private static final String SCHEDULE_KEY = "schedule";
   private static final String STAR_TREE_CONFIG_NAME = "StarTreeIndex Config";
@@ -126,6 +128,9 @@ public final class TableConfigUtils {
   private static final Set<String> UPSERT_DEDUP_ALLOWED_ROUTING_STRATEGIES =
       ImmutableSet.of(RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE,
           RoutingConfig.MULTI_STAGE_REPLICA_GROUP_SELECTOR_TYPE);
+
+  private TableConfigUtils() {
+  }
 
   /**
    * @see TableConfigUtils#validate(TableConfig, Schema, String, boolean)
@@ -512,7 +517,6 @@ public final class TableConfigUtils {
         }
       }
 
-
       // Transform configs
       List<TransformConfig> transformConfigs = ingestionConfig.getTransformConfigs();
       if (transformConfigs != null) {
@@ -625,12 +629,6 @@ public final class TableConfigUtils {
       }
     }
   }
-
-  public final static EnumSet<AggregationFunctionType> AVAILABLE_CORE_VALUE_AGGREGATORS =
-      EnumSet.of(MIN, MAX, SUM, DISTINCTCOUNTHLL, DISTINCTCOUNTRAWHLL, DISTINCTCOUNTTHETASKETCH,
-          DISTINCTCOUNTRAWTHETASKETCH, DISTINCTCOUNTTUPLESKETCH, DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH,
-          SUMVALUESINTEGERSUMTUPLESKETCH, AVGVALUEINTEGERSUMTUPLESKETCH, DISTINCTCOUNTHLLPLUS, DISTINCTCOUNTRAWHLLPLUS,
-          DISTINCTCOUNTCPCSKETCH, DISTINCTCOUNTRAWCPCSKETCH, DISTINCTCOUNTULL, DISTINCTCOUNTRAWULL);
 
   @VisibleForTesting
   static void validateTaskConfigs(TableConfig tableConfig, Schema schema) {
@@ -764,9 +762,9 @@ public final class TableConfigUtils {
         tableConfig.getRoutingConfig() != null && isRoutingStrategyAllowedForUpsert(tableConfig.getRoutingConfig()),
         "Upsert/Dedup table must use strict replica-group (i.e. strictReplicaGroup) based routing");
     Preconditions.checkState(tableConfig.getTenantConfig().getTagOverrideConfig() == null || (
-        tableConfig.getTenantConfig().getTagOverrideConfig().getRealtimeConsuming() == null
-            && tableConfig.getTenantConfig().getTagOverrideConfig().getRealtimeCompleted()
-            == null), "Invalid tenant tag override used for Upsert/Dedup table");
+            tableConfig.getTenantConfig().getTagOverrideConfig().getRealtimeConsuming() == null
+                && tableConfig.getTenantConfig().getTagOverrideConfig().getRealtimeCompleted() == null),
+        "Invalid tenant tag override used for Upsert/Dedup table");
 
     // specifically for upsert
     UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
@@ -793,15 +791,13 @@ public final class TableConfigUtils {
         Preconditions.checkState(fieldSpec.isSingleValueField(),
             String.format("The deleteRecordColumn - %s must be a single-valued column", deleteRecordColumn));
         DataType dataType = fieldSpec.getDataType();
-        Preconditions.checkState(
-            dataType == DataType.BOOLEAN || dataType == DataType.STRING || dataType.isNumeric(),
+        Preconditions.checkState(dataType == DataType.BOOLEAN || dataType == DataType.STRING || dataType.isNumeric(),
             String.format("The deleteRecordColumn - %s must be of type: String / Boolean / Numeric",
                 deleteRecordColumn));
       }
 
       String outOfOrderRecordColumn = upsertConfig.getOutOfOrderRecordColumn();
-      Preconditions.checkState(
-          outOfOrderRecordColumn == null || !upsertConfig.isDropOutOfOrderRecord(),
+      Preconditions.checkState(outOfOrderRecordColumn == null || !upsertConfig.isDropOutOfOrderRecord(),
           "outOfOrderRecordColumn and dropOutOfOrderRecord shouldn't exist together for upsert table");
 
       if (outOfOrderRecordColumn != null) {
@@ -837,8 +833,8 @@ public final class TableConfigUtils {
       String comparisonColumn = comparisonColumns.get(0);
       DataType comparisonColumnDataType = schema.getFieldSpecFor(comparisonColumn).getDataType();
       Preconditions.checkState(comparisonColumnDataType.isNumeric(),
-          "MetadataTTL / DeletedKeysTTL must have comparison column: %s in numeric type, found: %s",
-          comparisonColumn, comparisonColumnDataType);
+          "MetadataTTL / DeletedKeysTTL must have comparison column: %s in numeric type, found: %s", comparisonColumn,
+          comparisonColumnDataType);
     }
 
     if (upsertConfig.getMetadataTTL() > 0) {
@@ -869,14 +865,11 @@ public final class TableConfigUtils {
             tableConfig.getInstanceAssignmentConfigMap().get(instancePartitionsType.toString());
         if (instanceAssignmentConfig.getPartitionSelector()
             == InstanceAssignmentConfig.PartitionSelector.MIRROR_SERVER_SET_PARTITION_SELECTOR) {
-          Preconditions.checkState(
-              tableConfig.getInstancePartitionsMap().containsKey(instancePartitionsType),
+          Preconditions.checkState(tableConfig.getInstancePartitionsMap().containsKey(instancePartitionsType),
               String.format("Both InstanceAssignmentConfigMap and InstancePartitionsMap needed for %s, as "
-                      + "MIRROR_SERVER_SET_PARTITION_SELECTOR is used",
-                  instancePartitionsType));
+                  + "MIRROR_SERVER_SET_PARTITION_SELECTOR is used", instancePartitionsType));
         } else {
-          Preconditions.checkState(
-              !tableConfig.getInstancePartitionsMap().containsKey(instancePartitionsType),
+          Preconditions.checkState(!tableConfig.getInstancePartitionsMap().containsKey(instancePartitionsType),
               String.format("Both InstanceAssignmentConfigMap and InstancePartitionsMap set for %s",
                   instancePartitionsType));
         }
@@ -1332,9 +1325,8 @@ public final class TableConfigUtils {
     }
 
     Preconditions.checkState(!indexingConfig.isOptimizeDictionaryForMetrics() && !indexingConfig.isOptimizeDictionary(),
-        String.format(
-            "Dictionary override optimization options (OptimizeDictionary, optimizeDictionaryForMetrics)"
-                + " not supported with forward index for column: %s, disabled", columnName));
+        String.format("Dictionary override optimization options (OptimizeDictionary, optimizeDictionaryForMetrics)"
+            + " not supported with forward index for column: %s, disabled", columnName));
 
     boolean hasDictionary = fieldConfig.getEncodingType() == EncodingType.DICTIONARY;
     boolean hasInvertedIndex =
@@ -1458,11 +1450,6 @@ public final class TableConfigUtils {
     }
   }
 
-  // enum of all the skip-able validation types.
-  public enum ValidationType {
-    ALL, TASK, UPSERT
-  }
-
   /**
    * needsEmptySegmentPruner checks if EmptySegmentPruner is needed for a TableConfig.
    * @param tableConfig Input table config.
@@ -1538,5 +1525,10 @@ public final class TableConfigUtils {
       clone.setFieldConfigList(cleanFieldConfigList);
     }
     return clone;
+  }
+
+  // enum of all the skip-able validation types.
+  public enum ValidationType {
+    ALL, TASK, UPSERT
   }
 }

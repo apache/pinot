@@ -27,9 +27,11 @@ import org.apache.pinot.plugin.record.enricher.RecordEnricherValidationConfig;
 import org.apache.pinot.segment.local.recordtransformer.RecordTransformer;
 import org.apache.pinot.spi.utils.JsonUtils;
 
+
 @AutoService(RecordEnricherFactory.class)
 public class CustomFunctionEnricherFactory implements RecordEnricherFactory {
   private static final String TYPE = "generateColumn";
+
   @Override
   public String getEnricherType() {
     return TYPE;

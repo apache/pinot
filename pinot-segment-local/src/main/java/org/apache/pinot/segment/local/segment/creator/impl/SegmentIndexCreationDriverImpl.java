@@ -113,6 +113,29 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   private long _totalStatsCollectorTime = 0;
   private boolean _continueOnError;
 
+  public static void persistCreationMeta(File indexDir, long crc, long creationTime)
+      throws IOException {
+    File segmentDir = SegmentDirectoryPaths.findSegmentDirectory(indexDir);
+    File creationMetaFile = new File(segmentDir, V1Constants.SEGMENT_CREATION_META);
+    try (DataOutputStream output = new DataOutputStream(new FileOutputStream(creationMetaFile))) {
+      output.writeLong(crc);
+      output.writeLong(creationTime);
+    }
+  }
+
+  /**
+   * Uses config and column properties like storedType and length of elements to determine if
+   * varLengthDictionary should be used for a column
+   * @deprecated Use
+   * {@link DictionaryIndexType#shouldUseVarLengthDictionary(String, Set, DataType, ColumnStatistics)} instead.
+   */
+  @Deprecated
+  public static boolean shouldUseVarLengthDictionary(String columnName, Set<String> varLengthDictColumns,
+      DataType columnStoredType, ColumnStatistics columnProfile) {
+    return DictionaryIndexType.shouldUseVarLengthDictionary(columnName, varLengthDictColumns, columnStoredType,
+        columnProfile);
+  }
+
   @Override
   public void init(SegmentGeneratorConfig config)
       throws Exception {
@@ -173,8 +196,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   }
 
   public void init(SegmentGeneratorConfig config, SegmentCreationDataSource dataSource,
-      RecordEnricherPipeline enricherPipeline,
-      TransformPipeline transformPipeline)
+      RecordEnricherPipeline enricherPipeline, TransformPipeline transformPipeline)
       throws Exception {
     _config = config;
     _recordReader = dataSource.getRecordReader();
@@ -520,16 +542,6 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     return _segmentStats.getColumnProfileFor(columnName);
   }
 
-  public static void persistCreationMeta(File indexDir, long crc, long creationTime)
-      throws IOException {
-    File segmentDir = SegmentDirectoryPaths.findSegmentDirectory(indexDir);
-    File creationMetaFile = new File(segmentDir, V1Constants.SEGMENT_CREATION_META);
-    try (DataOutputStream output = new DataOutputStream(new FileOutputStream(creationMetaFile))) {
-      output.writeLong(crc);
-      output.writeLong(creationTime);
-    }
-  }
-
   /**
    * Complete the stats gathering process and store the stats information in indexCreationInfoMap.
    */
@@ -560,19 +572,6 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
               defaultNullValue));
     }
     _segmentIndexCreationInfo.setTotalDocs(_totalDocs);
-  }
-
-  /**
-   * Uses config and column properties like storedType and length of elements to determine if
-   * varLengthDictionary should be used for a column
-   * @deprecated Use
-   * {@link DictionaryIndexType#shouldUseVarLengthDictionary(String, Set, DataType, ColumnStatistics)} instead.
-   */
-  @Deprecated
-  public static boolean shouldUseVarLengthDictionary(String columnName, Set<String> varLengthDictColumns,
-      DataType columnStoredType, ColumnStatistics columnProfile) {
-    return DictionaryIndexType.shouldUseVarLengthDictionary(columnName, varLengthDictColumns, columnStoredType,
-        columnProfile);
   }
 
   /**

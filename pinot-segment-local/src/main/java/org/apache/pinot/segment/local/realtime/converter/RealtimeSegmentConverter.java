@@ -74,11 +74,25 @@ public class RealtimeSegmentConverter {
     _nullHandlingEnabled = nullHandlingEnabled;
     if (_tableConfig.getIngestionConfig() != null
         && _tableConfig.getIngestionConfig().getStreamIngestionConfig() != null) {
-      _enableColumnMajor = _tableConfig.getIngestionConfig()
-          .getStreamIngestionConfig().getColumnMajorSegmentBuilderEnabled();
+      _enableColumnMajor =
+          _tableConfig.getIngestionConfig().getStreamIngestionConfig().getColumnMajorSegmentBuilderEnabled();
     } else {
       _enableColumnMajor = _tableConfig.getIndexingConfig().isColumnMajorSegmentBuilderEnabled();
     }
+  }
+
+  /**
+   * Returns a new schema containing only physical columns
+   */
+  @VisibleForTesting
+  public static Schema getUpdatedSchema(Schema original) {
+    Schema newSchema = new Schema();
+    for (FieldSpec fieldSpec : original.getAllFieldSpecs()) {
+      if (!fieldSpec.isVirtualColumn()) {
+        newSchema.addField(fieldSpec);
+      }
+    }
+    return newSchema;
   }
 
   public void build(@Nullable SegmentVersion segmentVersion, ServerMetrics serverMetrics)
@@ -157,20 +171,6 @@ public class RealtimeSegmentConverter {
         genConfig.setIndexOn(indexType, colConf == null ? defaultConfig : colConf, column);
       }
     }
-  }
-
-  /**
-   * Returns a new schema containing only physical columns
-   */
-  @VisibleForTesting
-  public static Schema getUpdatedSchema(Schema original) {
-    Schema newSchema = new Schema();
-    for (FieldSpec fieldSpec : original.getAllFieldSpecs()) {
-      if (!fieldSpec.isVirtualColumn()) {
-        newSchema.addField(fieldSpec);
-      }
-    }
-    return newSchema;
   }
 
   public boolean isColumnMajorEnabled() {
