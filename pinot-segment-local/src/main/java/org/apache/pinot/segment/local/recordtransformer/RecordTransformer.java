@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.recordtransformer;
 
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -49,5 +50,7 @@ public interface RecordTransformer extends Serializable {
    * Returns the list of input columns required for enriching the record.
    * This is used to make sure the required input fields are extracted.
    */
-  List<String> getInputColumns();
+  default List<String> getInputColumns() {
+    return new ArrayList<>();
+  }
 }
