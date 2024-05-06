@@ -48,7 +48,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderFileConfig;
-import org.apache.pinot.spi.recordenricher.RecordEnricherPipeline;
+import org.apache.pinot.plugin.record.enricher.RecordEnricherPipeline;
 import org.apache.pinot.spi.utils.StringUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

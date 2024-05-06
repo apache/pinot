@@ -24,8 +24,8 @@ import com.yscope.clp.compressorfrontend.EncodedMessage;
 import com.yscope.clp.compressorfrontend.MessageEncoder;
 import java.io.IOException;
 import java.util.List;
+import org.apache.pinot.segment.local.recordtransformer.RecordTransformer;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.recordenricher.RecordEnricher;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.sql.parsers.rewriter.ClpRewriter;
 import org.slf4j.Logger;
@@ -39,7 +39,7 @@ import org.slf4j.LoggerFactory;
  * 2. 'x_dictVars' - The dictionary variables of the encoded message
  * 3. 'x_encodedVars' - The encoded variables of the encoded message
  */
-public class CLPEncodingEnricher implements RecordEnricher {
+public class CLPEncodingEnricher implements RecordTransformer {
   private static final Logger LOGGER = LoggerFactory.getLogger(CLPEncodingEnricher.class);
   private final ClpEnricherConfig _config;
   private final EncodedMessage _clpEncodedMessage;
@@ -58,7 +58,7 @@ public class CLPEncodingEnricher implements RecordEnricher {
   }
 
   @Override
-  public void enrich(GenericRow record) {
+  public GenericRow transform(GenericRow record) {
     try {
       for (String field : _config.getFields()) {
         Object value = record.getValue(field);
@@ -69,6 +69,7 @@ public class CLPEncodingEnricher implements RecordEnricher {
     } catch (Exception e) {
       LOGGER.error("Failed to enrich record: {}", record);
     }
+    return record;
   }
 
   private void enrichWithClpEncodedFields(String key, Object value, GenericRow to) {

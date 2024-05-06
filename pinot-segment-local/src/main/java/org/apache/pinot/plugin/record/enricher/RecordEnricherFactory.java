@@ -16,14 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.recordenricher;
+package org.apache.pinot.plugin.record.enricher;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
+import org.apache.pinot.segment.local.recordtransformer.RecordTransformer;
 
 
 public interface RecordEnricherFactory {
   String getEnricherType();
-  RecordEnricher createEnricher(JsonNode enricherProps) throws IOException;
+  RecordTransformer createEnricher(JsonNode enricherProps) throws IOException;
   void validateEnrichmentConfig(JsonNode enricherProps, RecordEnricherValidationConfig validationConfig);
 }

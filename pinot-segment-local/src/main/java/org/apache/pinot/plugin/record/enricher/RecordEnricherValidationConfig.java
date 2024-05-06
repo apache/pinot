@@ -1,4 +1,4 @@
-package org.apache.pinot.spi.recordenricher;
+package org.apache.pinot.plugin.record.enricher;
 
 /**
  * Licensed to the Apache Software Foundation (ASF) under one

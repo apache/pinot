@@ -80,7 +80,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.recordenricher.RecordEnricherPipeline;
+import org.apache.pinot.plugin.record.enricher.RecordEnricherPipeline;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.slf4j.Logger;

@@ -16,12 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.recordenricher;
+package org.apache.pinot.plugin.record.enricher;
 
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.ServiceLoader;
+import org.apache.pinot.segment.local.recordtransformer.RecordTransformer;
 import org.apache.pinot.spi.config.table.ingestion.EnrichmentConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,7 +45,7 @@ public class RecordEnricherRegistry {
         .validateEnrichmentConfig(enrichmentConfig.getProperties(), config);
   }
 
-  public static RecordEnricher createRecordEnricher(EnrichmentConfig enrichmentConfig)
+  public static RecordTransformer createRecordEnricher(EnrichmentConfig enrichmentConfig)
       throws IOException {
     if (!RECORD_ENRICHER_FACTORY_MAP.containsKey(enrichmentConfig.getEnricherType())) {
       throw new IllegalArgumentException("No record enricher found for type: " + enrichmentConfig.getEnricherType());

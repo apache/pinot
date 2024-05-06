@@ -25,7 +25,7 @@ import org.apache.pinot.segment.spi.creator.SegmentPreIndexStatsCollector;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
-import org.apache.pinot.spi.recordenricher.RecordEnricherPipeline;
+import org.apache.pinot.plugin.record.enricher.RecordEnricherPipeline;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

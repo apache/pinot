@@ -53,7 +53,7 @@ import org.apache.pinot.spi.ingestion.batch.BatchConfig;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.ingestion.batch.spec.Constants;
 import org.apache.pinot.spi.ingestion.segment.writer.SegmentWriter;
-import org.apache.pinot.spi.recordenricher.RecordEnricherPipeline;
+import org.apache.pinot.plugin.record.enricher.RecordEnricherPipeline;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

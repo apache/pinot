@@ -21,9 +21,9 @@ package org.apache.pinot.plugin.record.enricher.clp;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.auto.service.AutoService;
 import java.io.IOException;
-import org.apache.pinot.spi.recordenricher.RecordEnricher;
-import org.apache.pinot.spi.recordenricher.RecordEnricherFactory;
-import org.apache.pinot.spi.recordenricher.RecordEnricherValidationConfig;
+import org.apache.pinot.plugin.record.enricher.RecordEnricherFactory;
+import org.apache.pinot.plugin.record.enricher.RecordEnricherValidationConfig;
+import org.apache.pinot.segment.local.recordtransformer.RecordTransformer;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 @AutoService(RecordEnricherFactory.class)
@@ -35,7 +35,7 @@ public class CLPEncodingEnricherFactory implements RecordEnricherFactory {
   }
 
   @Override
-  public RecordEnricher createEnricher(JsonNode enricherProps)
+  public RecordTransformer createEnricher(JsonNode enricherProps)
       throws IOException {
     return new CLPEncodingEnricher(enricherProps);
   }
