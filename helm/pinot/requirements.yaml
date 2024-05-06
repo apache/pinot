@@ -19,6 +19,6 @@
 
 dependencies:
   - name: zookeeper
-    version: 9.x.x
+    version: 13.x.x
     repository: https://charts.bitnami.com/bitnami
     condition: pinot.zookeeper.enabled,zookeeper.enabled
