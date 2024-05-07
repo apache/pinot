@@ -119,7 +119,8 @@ public class ZKMetadataUtils {
       }
     });
     segmentZKMetadata.setPartitionMetadata(
-        !columnPartitionMap.isEmpty() ? new SegmentPartitionMetadata(columnPartitionMap) : null);
+        !columnPartitionMap.isEmpty() || segmentMetadata.getUploadedSegmentPartitionId() != -1
+            ? new SegmentPartitionMetadata(columnPartitionMap, segmentMetadata.getUploadedSegmentPartitionId()) : null);
 
     // Update custom metadata
     // NOTE: Do not remove existing keys because they can be set by the HTTP header from the segment upload request

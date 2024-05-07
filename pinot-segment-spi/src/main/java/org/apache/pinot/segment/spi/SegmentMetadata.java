@@ -125,4 +125,7 @@ public interface SegmentMetadata {
   default boolean isMutableSegment() {
     return false;
   }
+
+  // get uploadedSegmentPartitionId
+  int getUploadedSegmentPartitionId();
 }

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.metadata.segment;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
@@ -39,6 +40,10 @@ public class SegmentPartitionMetadata {
   public static final int INVALID_NUM_PARTITIONS = -1;
   private final Map<String, ColumnPartitionMetadata> _columnPartitionMap;
 
+  // partitionId if segment is externally partitioned and needs to be uploaded to a specific partition
+  // -1 means segment is not externally partitioned
+  private final int _uploadedSegmentPartitionId;
+
   /**
    * Constructor for the class.
    *
@@ -48,6 +53,21 @@ public class SegmentPartitionMetadata {
       @Nonnull @JsonProperty("columnPartitionMap") Map<String, ColumnPartitionMetadata> columnPartitionMap) {
     Preconditions.checkNotNull(columnPartitionMap);
     _columnPartitionMap = columnPartitionMap;
+    _uploadedSegmentPartitionId = -1;
+  }
+
+  /**
+   * Constructor for the class.
+   *
+   * @param columnPartitionMap Column name to ColumnPartitionMetadata map.
+   */
+  @JsonCreator
+  public SegmentPartitionMetadata(
+      @Nullable @JsonProperty("columnPartitionMap") Map<String, ColumnPartitionMetadata> columnPartitionMap,
+      @Nullable @JsonProperty(value = "uploadedSegmentPartitionId", defaultValue = "-1")
+      int uploadedSegmentPartitionId) {
+    _columnPartitionMap = columnPartitionMap;
+    _uploadedSegmentPartitionId = uploadedSegmentPartitionId;
   }
 
   /**
@@ -69,6 +89,13 @@ public class SegmentPartitionMetadata {
   public String getFunctionName(@Nonnull String column) {
     ColumnPartitionMetadata columnPartitionMetadata = _columnPartitionMap.get(column);
     return (columnPartitionMetadata != null) ? columnPartitionMetadata.getFunctionName() : null;
+  }
+
+  /**
+   * Get partitionId for uploaded segment. -1 means segment is not externally partitioned.
+   */
+  public int getUploadedSegmentPartitionId() {
+    return _uploadedSegmentPartitionId;
   }
 
   /**

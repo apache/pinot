@@ -478,6 +478,10 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     String timeColumnName = _config.getTimeColumnName();
     properties.setProperty(TIME_COLUMN_NAME, timeColumnName);
     properties.setProperty(SEGMENT_TOTAL_DOCS, String.valueOf(_totalDocs));
+    if (_config.getUploadedSegmentPartitionId() != -1) {
+      properties.setProperty(SEGMENT_PARTITION_METADATA_UPLOADED_SEGMENT_PARTITIONID,
+          _config.getUploadedSegmentPartitionId());
+    }
 
     // Write time related metadata (start time, end time, time unit)
     if (timeColumnName != null) {

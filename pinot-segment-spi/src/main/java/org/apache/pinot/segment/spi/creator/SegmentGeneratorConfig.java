@@ -107,6 +107,8 @@ public class SegmentGeneratorConfig implements Serializable {
   private String _creatorVersion = null;
   private SegmentNameGenerator _segmentNameGenerator = null;
   private SegmentPartitionConfig _segmentPartitionConfig = null;
+
+  private int _uploadedSegmentPartitionId = -1;
   private int _sequenceId = -1;
   private TimeColumnType _timeColumnType = TimeColumnType.EPOCH;
   private DateTimeFormatSpec _dateTimeFormatSpec = null;
@@ -463,6 +465,9 @@ public class SegmentGeneratorConfig implements Serializable {
     _segmentTimeColumnName = timeColumnName;
   }
 
+  public int getUploadedSegmentPartitionId() {
+    return _uploadedSegmentPartitionId;
+  }
   public int getSequenceId() {
     return _sequenceId;
   }
@@ -473,6 +478,13 @@ public class SegmentGeneratorConfig implements Serializable {
 
   public FSTType getFSTIndexType() {
     return _fstTypeForFSTIndex;
+  }
+
+  /**
+   * Use this method to add partitionId if it is generated externally during segment upload
+   */
+  public void setUploadedSegmentPartitionId(int partitionId) {
+    _uploadedSegmentPartitionId = partitionId;
   }
 
   /**

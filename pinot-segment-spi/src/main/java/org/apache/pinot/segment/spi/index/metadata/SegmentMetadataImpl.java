@@ -96,6 +96,10 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private String _startOffset;
   private String _endOffset;
 
+  // set uploadedSegmentPartitionId for segments of {@link Realtime.Status.UPLOADED} status if segment is externally
+  // partitioned
+  private int _uploadedSegmentPartitionId = -1;
+
   @Deprecated
   private String _rawTableName;
 
@@ -271,6 +275,11 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     // Set start/end offset if available
     _startOffset = segmentMetadataPropertiesConfiguration.getString(Segment.Realtime.START_OFFSET, null);
     _endOffset = segmentMetadataPropertiesConfiguration.getString(Segment.Realtime.END_OFFSET, null);
+
+    // Set partitionId if externally partitioned.
+    _uploadedSegmentPartitionId =
+        segmentMetadataPropertiesConfiguration.getInt(Segment.SEGMENT_PARTITION_METADATA_UPLOADED_SEGMENT_PARTITIONID,
+            -1);
 
     // Set custom configs from metadata properties
     setCustomConfigs(segmentMetadataPropertiesConfiguration, _customMap);
@@ -470,7 +479,16 @@ public class SegmentMetadataImpl implements SegmentMetadata {
       segmentMetadata.set("columns", columnsMetadata);
     }
 
+    if (_uploadedSegmentPartitionId != -1) {
+      segmentMetadata.put("uploadedSegmentPartitionId", _uploadedSegmentPartitionId);
+    }
+
     return segmentMetadata;
+  }
+
+  @Override
+  public int getUploadedSegmentPartitionId() {
+    return _uploadedSegmentPartitionId;
   }
 
   @Override

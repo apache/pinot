@@ -57,6 +57,7 @@ public class SegmentMetadataImplTest {
             "testTable");
     config.setSegmentNamePostfix("1");
     config.setCustomProperties(ImmutableMap.of("custom.k1", "v1", "custom.k2", "v2"));
+    config.setUploadedSegmentPartitionId(1);
     final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
     driver.init(config);
     driver.build();
@@ -86,6 +87,7 @@ public class SegmentMetadataImplTest {
     assertEquals(jsonMeta.get("totalDocs").asInt(), metadata.getTotalDocs());
     assertEquals(jsonMeta.get("custom").get("k1").asText(), metadata.getCustomMap().get("k1"));
     assertEquals(jsonMeta.get("custom").get("k2").asText(), metadata.getCustomMap().get("k2"));
+    assertEquals(jsonMeta.get("uploadedSegmentPartitionId").asInt(), metadata.getUploadedSegmentPartitionId());
 
     JsonNode jsonColumnsMeta = jsonMeta.get("columns");
     int numColumns = jsonColumnsMeta.size();
