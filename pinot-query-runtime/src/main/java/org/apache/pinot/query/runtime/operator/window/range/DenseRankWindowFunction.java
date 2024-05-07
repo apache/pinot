@@ -16,32 +16,37 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.runtime.operator.window;
+package org.apache.pinot.query.runtime.operator.window.range;
 
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.query.runtime.operator.WindowAggregateOperator;
 
 
-public class LagValueWindowFunction extends ValueWindowFunction {
+public class DenseRankWindowFunction extends RangeWindowFunction {
 
-  @Override
-  public Object[] processRow(int rowId, List<Object[]> partitionedRows) {
-    if (rowId == 0) {
-      return null;
-    } else {
-      return partitionedRows.get(rowId - 1);
-    }
+  public DenseRankWindowFunction(RexExpression.FunctionCall aggCall, String functionName, DataSchema inputSchema,
+      WindowAggregateOperator.OrderSetInfo orderSetInfo) {
+    super(aggCall, functionName, inputSchema, orderSetInfo);
   }
 
   @Override
-  public List<Object[]> processRows(List<Object[]> rows) {
-    List<Object[]> result = new ArrayList<>();
-    for (int i = 0; i < rows.size(); i++) {
-      if (i == 0) {
-        result.add(null);
+  public List<Object> processRows(List<Object[]> rows) {
+    List<Object> result = new ArrayList<>();
+    int rank = 1;
+    Object[] lastRow = null;
+    for (Object[] row : rows) {
+      if (lastRow == null) {
+        result.add(rank);
       } else {
-        result.add(rows.get(i - 1));
+        if (compareRows(row, lastRow) != 0) {
+          rank++;
+        }
+        result.add(rank);
       }
+      lastRow = row;
     }
     return result;
   }

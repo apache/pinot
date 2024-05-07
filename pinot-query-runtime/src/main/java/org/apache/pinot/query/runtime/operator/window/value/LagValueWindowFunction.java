@@ -16,24 +16,32 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.runtime.operator.window;
+package org.apache.pinot.query.runtime.operator.window.value;
 
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.query.runtime.operator.WindowAggregateOperator;
 
 
-public class LastValueWindowFunction extends ValueWindowFunction {
+public class LagValueWindowFunction extends ValueWindowFunction {
 
-  @Override
-  public Object[] processRow(int rowId, List<Object[]> partitionedRows) {
-    return partitionedRows.get(partitionedRows.size() - 1);
+  public LagValueWindowFunction(RexExpression.FunctionCall aggCall,
+      String functionName, DataSchema inputSchema,
+      WindowAggregateOperator.OrderSetInfo orderSetInfo) {
+    super(aggCall, functionName, inputSchema, orderSetInfo);
   }
 
   @Override
-  public List<Object[]> processRows(List<Object[]> rows) {
-    List<Object[]> result = new ArrayList<>();
+  public List<Object> processRows(List<Object[]> rows) {
+    List<Object> result = new ArrayList<>();
     for (int i = 0; i < rows.size(); i++) {
-      result.add(rows.get(rows.size() - 1));
+      if (i == 0) {
+        result.add(null);
+      } else {
+        result.add(extractValueFromRow(rows.get(i - 1)));
+      }
     }
     return result;
   }

@@ -16,32 +16,28 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.runtime.operator.window;
+package org.apache.pinot.query.runtime.operator.window.value;
 
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.query.runtime.operator.WindowAggregateOperator;
 
 
-public class LeadValueWindowFunction extends ValueWindowFunction {
+public class FirstValueWindowFunction extends ValueWindowFunction {
 
-  @Override
-  public Object[] processRow(int rowId, List<Object[]> partitionedRows) {
-    if (rowId == partitionedRows.size() - 1) {
-      return null;
-    } else {
-      return partitionedRows.get(rowId + 1);
-    }
+  public FirstValueWindowFunction(RexExpression.FunctionCall aggCall,
+      String functionName, DataSchema inputSchema,
+      WindowAggregateOperator.OrderSetInfo orderSetInfo) {
+    super(aggCall, functionName, inputSchema, orderSetInfo);
   }
 
   @Override
-  public List<Object[]> processRows(List<Object[]> rows) {
-    List<Object[]> result = new ArrayList<>();
+  public List<Object> processRows(List<Object[]> rows) {
+    List<Object> result = new ArrayList<>();
     for (int i = 0; i < rows.size(); i++) {
-      if (i == rows.size() - 1) {
-        result.add(null);
-      } else {
-        result.add(rows.get(i + 1));
-      }
+      result.add(extractValueFromRow(rows.get(0)));
     }
     return result;
   }

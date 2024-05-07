@@ -19,7 +19,6 @@
 package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -36,7 +35,6 @@ import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockTestUtils;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
-import org.apache.pinot.query.runtime.operator.utils.AggregationUtils;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
@@ -231,44 +229,6 @@ public class WindowAggregateOperatorTest {
   }
 
   @Test
-  public void testShouldCallMergerWhenWindowAggregatingMultipleRows() {
-    // Given:
-    List<RexExpression> calls = ImmutableList.of(getSum(new RexExpression.InputRef(1)));
-    List<RexExpression> group = ImmutableList.of(new RexExpression.InputRef(0));
-
-    DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, INT});
-    Mockito.when(_input.nextBlock())
-        .thenReturn(OperatorTestUtil.block(inSchema, new Object[]{1, 1}, new Object[]{1, 2}))
-        .thenReturn(OperatorTestUtil.block(inSchema, new Object[]{1, 3}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
-
-    AggregationUtils.Merger merger = Mockito.mock(AggregationUtils.Merger.class);
-    Mockito.when(merger.merge(Mockito.any(), Mockito.any())).thenReturn(12d);
-    Mockito.when(merger.init(Mockito.any(), Mockito.any())).thenReturn(1d);
-    DataSchema outSchema = new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{INT, INT, DOUBLE});
-    WindowAggregateOperator operator =
-        new WindowAggregateOperator(OperatorTestUtil.getTracingContext(), _input, group, Collections.emptyList(),
-            Collections.emptyList(), Collections.emptyList(), calls, Integer.MIN_VALUE, Integer.MAX_VALUE,
-            WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema,
-            ImmutableMap.of("SUM", cdt -> merger));
-
-    // When:
-    TransferableBlock resultBlock = operator.nextBlock(); // (output result)
-
-    // Then:
-    // should call merger twice, one from second row in first block and two from the first row
-    // in second block
-    Mockito.verify(merger, Mockito.times(1)).init(Mockito.any(), Mockito.any());
-    Mockito.verify(merger, Mockito.times(2)).merge(Mockito.any(), Mockito.any());
-    Assert.assertEquals(resultBlock.getContainer().get(0), new Object[]{1, 1, 12d},
-        "Expected three columns (original two columns, agg literal value)");
-    Assert.assertEquals(resultBlock.getContainer().get(1), new Object[]{1, 2, 12d},
-        "Expected three columns (original two columns, agg literal value)");
-    Assert.assertEquals(resultBlock.getContainer().get(2), new Object[]{1, 3, 12d},
-        "Expected three columns (original two columns, agg literal value)");
-  }
-
-  @Test
   public void testPartitionByWindowAggregateWithHashCollision() {
     MultiStageOperator upstreamOperator = OperatorTestUtil.getOperator(OperatorTestUtil.OP_1);
     // Create an aggregation call with sum for first column and group by second column.
@@ -292,8 +252,8 @@ public class WindowAggregateOperatorTest {
     Assert.assertEquals(resultRows.get(2), expectedRows.get(2));
   }
 
-  @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*Unexpected aggregation "
-      + "function name: AVERAGE.*")
+  @Test(expectedExceptions = RuntimeException.class, expectedExceptionsMessageRegExp = ".*Failed to instantiate "
+      + "WindowFunction for function name: AVERAGE.*")
   public void testShouldThrowOnUnknownAggFunction() {
     // Given:
     List<RexExpression> calls = ImmutableList.of(
@@ -309,8 +269,8 @@ public class WindowAggregateOperatorTest {
             WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema);
   }
 
-  @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*Unexpected aggregation "
-      + "function name: NTILE.*")
+  @Test(expectedExceptions = RuntimeException.class, expectedExceptionsMessageRegExp = ".*Failed to instantiate "
+      + "WindowFunction for function name: NTILE.*")
   public void testShouldThrowOnUnknownRankAggFunction() {
     // TODO: Remove this test when support is added for NTILE function
     // Given:
