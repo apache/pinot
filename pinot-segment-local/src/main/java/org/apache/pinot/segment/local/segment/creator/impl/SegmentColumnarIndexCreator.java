@@ -141,8 +141,10 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       ColumnIndexCreationInfo columnIndexCreationInfo = indexCreationInfoMap.get(columnName);
       Preconditions.checkNotNull(columnIndexCreationInfo, "Missing index creation info for column: %s", columnName);
       boolean dictEnabledColumn = createDictionaryForColumn(columnIndexCreationInfo, segmentCreationSpec, fieldSpec);
-      Preconditions.checkState(dictEnabledColumn || !originalConfig.getConfig(StandardIndexes.inverted()).isEnabled(),
-          "Cannot create inverted index for raw index column: %s", columnName);
+      if (originalConfig.getConfig(StandardIndexes.inverted()).isEnabled()) {
+        Preconditions.checkState(dictEnabledColumn,
+            "Cannot create inverted index for raw index column: %s", columnName);
+      }
 
       IndexType<ForwardIndexConfig, ?, ForwardIndexCreator> forwardIdx = StandardIndexes.forward();
       boolean forwardIndexDisabled = !originalConfig.getConfig(forwardIdx).isEnabled();

@@ -224,6 +224,10 @@ public class DictionaryIndexType
       boolean optimizeDictionaryForMetrics, double noDictionarySizeRatioThreshold,
       FieldSpec fieldSpec, FieldIndexConfigs fieldIndexConfigs, int cardinality,
       int totalNumberOfEntries) {
+    // For an inverted index dictionary is required
+    if (fieldIndexConfigs.getConfig(StandardIndexes.inverted()).isEnabled()) {
+      return true;
+    }
     if (optimizeDictionary) {
       // Do not create dictionaries for json or text index columns as they are high-cardinality values almost always
       if ((fieldIndexConfigs.getConfig(StandardIndexes.json()).isEnabled() || fieldIndexConfigs.getConfig(
