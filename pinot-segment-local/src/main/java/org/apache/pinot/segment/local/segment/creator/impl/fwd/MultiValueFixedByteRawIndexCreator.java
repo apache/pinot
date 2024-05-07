@@ -77,16 +77,17 @@ public class MultiValueFixedByteRawIndexCreator implements ForwardIndexCreator {
       throws IOException {
     // Store the length followed by the values
     int totalMaxLength = Integer.BYTES + (maxNumberOfMultiValueElements * valueType.getStoredType().size());
-    int numDocsPerChunk = deriveNumDocsPerChunk ? Math.max(
-        targetMaxChunkSizeBytes / (totalMaxLength + VarByteChunkForwardIndexWriter.CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE),
-        1) : targetDocsPerChunk;
-    // For columns with very small max value, target chunk size should also be capped to reduce memory during read
-    int dynamicTargetChunkSize =
-        ForwardIndexUtils.getDynamicTargetChunkSize(totalMaxLength, targetDocsPerChunk, targetMaxChunkSizeBytes);
-    _indexWriter =
-        writerVersion < VarByteChunkForwardIndexWriterV4.VERSION ? new VarByteChunkForwardIndexWriter(indexFile,
-            compressionType, totalDocs, numDocsPerChunk, totalMaxLength, writerVersion)
-            : new VarByteChunkForwardIndexWriterV4(indexFile, compressionType, dynamicTargetChunkSize);
+    if (writerVersion < VarByteChunkForwardIndexWriterV4.VERSION) {
+      int numDocsPerChunk = deriveNumDocsPerChunk ? Math.max(targetMaxChunkSizeBytes / (totalMaxLength
+          + VarByteChunkForwardIndexWriter.CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE), 1) : targetDocsPerChunk;
+      _indexWriter =
+          new VarByteChunkForwardIndexWriter(indexFile, compressionType, totalDocs, numDocsPerChunk, totalMaxLength,
+              writerVersion);
+    } else {
+      int chunkSize =
+          ForwardIndexUtils.getDynamicTargetChunkSize(totalMaxLength, targetDocsPerChunk, targetMaxChunkSizeBytes);
+      _indexWriter = new VarByteChunkForwardIndexWriterV4(indexFile, compressionType, chunkSize);
+    }
     _valueType = valueType;
   }
 
