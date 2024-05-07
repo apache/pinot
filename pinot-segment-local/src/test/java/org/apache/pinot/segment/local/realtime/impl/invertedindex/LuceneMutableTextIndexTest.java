@@ -96,7 +96,7 @@ public class LuceneMutableTextIndexTest {
   }
 
   @Test(expectedExceptions = ExecutionException.class,
-      expectedExceptionsMessageRegExp = ".*TEXT_MATCH query timeout on realtime consuming segment.*")
+      expectedExceptionsMessageRegExp = ".*TEXT_MATCH query interrupted while querying the consuming segment.*")
   public void testQueryCancellationIsSuccessful()
       throws InterruptedException, ExecutionException {
     ExecutorService executor = Executors.newSingleThreadExecutor();
