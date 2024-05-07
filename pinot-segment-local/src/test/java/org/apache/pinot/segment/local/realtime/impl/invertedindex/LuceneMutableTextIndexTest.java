@@ -99,7 +99,8 @@ public class LuceneMutableTextIndexTest {
       expectedExceptionsMessageRegExp = ".*TEXT_MATCH query timeout on realtime consuming segment.*")
   public void testQueryCancellationIsSuccessful()
       throws InterruptedException, ExecutionException {
-    ExecutorService executor = Executors.newSingleThreadExecutor();
+    // Avoid early finalization by not using Executors.newSingleThreadExecutor (java <= 20, JDK-8145304)
+    ExecutorService executor = Executors.newFixedThreadPool(1);
     Future<MutableRoaringBitmap> res = executor.submit(() -> _realtimeLuceneTextIndex.getDocIds("/.*read.*/"));
     executor.shutdownNow();
     res.get();

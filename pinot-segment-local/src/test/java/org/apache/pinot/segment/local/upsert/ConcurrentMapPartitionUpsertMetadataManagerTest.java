@@ -114,7 +114,8 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     // Stop and close the metadata manager
     AtomicBoolean stopped = new AtomicBoolean();
     AtomicBoolean closed = new AtomicBoolean();
-    ExecutorService executor = Executors.newSingleThreadExecutor();
+    // Avoid early finalization by not using Executors.newSingleThreadExecutor (java <= 20, JDK-8145304)
+    ExecutorService executor = Executors.newFixedThreadPool(1);
     executor.submit(() -> {
       upsertMetadataManager.stop();
       stopped.set(true);

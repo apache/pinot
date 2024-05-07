@@ -174,7 +174,8 @@ public class CombineSlowOperatorsTest {
 
   private void testCancelCombineOperator(BaseCombineOperator combineOperator, CountDownLatch ready) {
     AtomicReference<Exception> exp = new AtomicReference<>();
-    ExecutorService combineExecutor = Executors.newSingleThreadExecutor();
+    // Avoid early finalization by not using Executors.newSingleThreadExecutor (java <= 20, JDK-8145304)
+    ExecutorService combineExecutor = Executors.newFixedThreadPool(1);
     try {
       Future<?> future = combineExecutor.submit(() -> {
         try {

@@ -182,8 +182,9 @@ public class TlsUtilsTest {
     Certificate certForPrivateKey = x509ExtendedKeyManager.getCertificateChain(KEY_NAME_ALIAS)[0];
     X509Certificate acceptedIssuerForCert = x509ExtendedTrustManager.getAcceptedIssuers()[0];
 
-    // start a new thread to reload the ssl factory when the tls files change
-    ExecutorService executorService = Executors.newSingleThreadExecutor();
+    // Start a new thread to reload the ssl factory when the tls files change
+    // Avoid early finalization by not using Executors.newSingleThreadExecutor (java <= 20, JDK-8145304)
+    ExecutorService executorService = Executors.newFixedThreadPool(1);
     executorService.execute(
         () -> {
           try {
