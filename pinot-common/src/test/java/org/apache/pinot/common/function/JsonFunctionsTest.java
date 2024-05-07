@@ -90,6 +90,24 @@ public class JsonFunctionsTest {
   }
 
   @Test
+  public void testJsonFormat() throws Exception {
+    Map<Object, Object> jsonMap = Map.of("data", Map.of("name", Map.of("full.name", "Peter1", "nick.name", "Pete1"),
+        "alias", "student1", "age", 24));
+
+    // Don't compare strings directly because JSON objects are unordered
+    assertEquals(
+        JsonUtils.stringToJsonNode(JsonFunctions.jsonFormat(jsonMap)),
+        JsonUtils.objectToJsonNode(jsonMap)
+    );
+
+    // Ensure that string values aren't "re-stringified"
+    assertEquals(
+        JsonUtils.stringToJsonNode(JsonFunctions.jsonFormat(JsonFunctions.jsonFormat(jsonMap))),
+        JsonUtils.objectToJsonNode(jsonMap)
+    );
+  }
+
+  @Test
   public void testJsonPathStringWithDefaultValue()
       throws JsonProcessingException {
     String jsonString = "{\"name\": \"Pete\", \"age\": 24}";

@@ -79,6 +79,9 @@ public class JsonFunctions {
   @ScalarFunction(names = {"jsonFormat", "json_format"})
   public static String jsonFormat(Object object)
       throws JsonProcessingException {
+    if (object instanceof String) {
+      return (String) object;
+    }
     return JsonUtils.objectToString(object);
   }
 
