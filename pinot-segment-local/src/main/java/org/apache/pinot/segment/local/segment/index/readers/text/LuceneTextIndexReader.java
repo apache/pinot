@@ -188,6 +188,7 @@ public class LuceneTextIndexReader implements TextIndexReader {
     _indexReader.close();
     _indexDirectory.close();
     _docIdTranslator.close();
+    _analyzer.close();
   }
 
   /**

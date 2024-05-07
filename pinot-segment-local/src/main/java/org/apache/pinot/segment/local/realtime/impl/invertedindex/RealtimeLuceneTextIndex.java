@@ -198,6 +198,7 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
       _searcherManager.close();
       _searcherManager = null;
       _indexCreator.close();
+      _analyzer.close();
     } catch (Exception e) {
       LOGGER.error("Failed while closing the realtime text index for column {}, exception {}", _column, e.getMessage());
       throw new RuntimeException(e);
