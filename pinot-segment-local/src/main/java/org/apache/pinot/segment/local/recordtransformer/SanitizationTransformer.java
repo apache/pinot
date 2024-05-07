@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.recordtransformer;
 
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -40,6 +41,7 @@ import org.apache.pinot.spi.utils.StringUtil;
  * {@link FieldSpec}.
  */
 public class SanitizationTransformer implements RecordTransformer {
+  private static final String NULL_CHARACTER = "\0";
   private final Map<String, Integer> _stringColumnMaxLengthMap = new HashMap<>();
   private final boolean _failOnTrimmedStringLength;
 
@@ -70,41 +72,48 @@ public class SanitizationTransformer implements RecordTransformer {
       Object value = record.getValue(stringColumn);
       if (value instanceof String) {
         // Single-valued column
-        String stringValue = (String) value;
-        String sanitizedValue = StringUtil.sanitizeStringValue(stringValue, maxLength);
-        // NOTE: reference comparison
-        //noinspection StringEquality
-        if (sanitizedValue != stringValue) {
-          if (!_failOnTrimmedStringLength) {
-            record.putValue(stringColumn, sanitizedValue);
-            record.putValue(GenericRow.INCOMPLETE_RECORD_KEY, true);
-          } else {
-            String errorMessage =
-                String.format("Throwing exception as value: %s for column %s exceeds configured max length %d.",
-                    value, stringColumn, maxLength);
-            throw new IllegalStateException(errorMessage);
-          }
+        Pair<String, Boolean> result = sanitizeValue(stringColumn, (String) value, maxLength);
+        record.putValue(stringColumn, result.getLeft());
+        if (result.getRight()) {
+          record.putValue(GenericRow.INCOMPLETE_RECORD_KEY, true);
         }
       } else {
         // Multi-valued column
         Object[] values = (Object[]) value;
-        int numValues = values.length;
-        for (int i = 0; i < numValues; i++) {
-          String sanitizedValue = StringUtil.sanitizeStringValue(values[i].toString(), maxLength);
-          if (sanitizedValue != values[i]) {
-            if (!_failOnTrimmedStringLength) {
-              values[i] = sanitizedValue;
-              record.putValue(GenericRow.INCOMPLETE_RECORD_KEY, true);
-            } else {
-              String errorMessage =
-                  String.format("Throwing exception as value: %s for column %s exceeds configured max length %d.",
-                      values[i], stringColumn, maxLength);
-              throw new IllegalStateException(errorMessage);
-            }
+        for (int i = 0; i < values.length; i++) {
+          Pair<String, Boolean> result = sanitizeValue(stringColumn, values[i].toString(), maxLength);
+          values[i] = result.getLeft();
+          if (result.getRight()) {
+            record.putValue(GenericRow.INCOMPLETE_RECORD_KEY, true);
           }
         }
       }
     }
     return record;
+  }
+
+  private Pair<String, Boolean> sanitizeValue(String stringColumn, String value, int maxLength) {
+    String sanitizedValue = StringUtil.sanitizeStringValue(value, maxLength);
+    // NOTE: reference comparison
+    // noinspection StringEquality
+    if (sanitizedValue != value) {
+      if (!_failOnTrimmedStringLength) {
+        return Pair.of(sanitizedValue, true);
+      } else {
+        int index = value.indexOf(NULL_CHARACTER);
+        String errorMessage;
+        if (index < 0 || index > maxLength) {
+          errorMessage =
+              String.format("Throwing exception as value: %s for column %s exceeds configured max length %d.",
+                  value, stringColumn, maxLength);
+        } else {
+          errorMessage =
+              String.format("Throwing exception as value: %s for column %s contains null character.", value,
+                  stringColumn);
+        }
+        throw new IllegalStateException(errorMessage);
+      }
+    }
+    return Pair.of(sanitizedValue, false);
   }
 }

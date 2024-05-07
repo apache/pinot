@@ -261,6 +261,7 @@ public class RecordTransformerTest {
 
   @Test
   public void testSanitationTransformer() {
+    // scenario with no failure required in case of trimmed string
     RecordTransformer transformer = new SanitizationTransformer(TABLE_CONFIG, SCHEMA);
     GenericRow record = getRecord();
     for (int i = 0; i < NUM_ROUNDS; i++) {
@@ -275,6 +276,7 @@ public class RecordTransformerTest {
       assertTrue(record.getFieldToValueMap().containsKey(GenericRow.INCOMPLETE_RECORD_KEY));
     }
 
+    // scenario where string contains null
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setFailOnTrimmedStringLength(true);
     TableConfig tableConfig =
@@ -285,8 +287,27 @@ public class RecordTransformerTest {
       try {
         record = transformer.transform(record);
       } catch (Exception e) {
-        assertEquals(e.getMessage(), "Throwing exception as value: 123 for column "
-            + "svStringWithLengthLimit exceeds configured max length 2.");
+        assertEquals(e.getMessage(), "Throwing exception as value: 1\0002\0003 for column "
+            + "svStringWithNullCharacters contains null character.");
+      }
+    }
+
+    // scenario where string length exceeds max length
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("svInt", DataType.INT)
+        .addSingleValueDimension("svDouble", DataType.DOUBLE)
+        .addSingleValueDimension("svStringWithLengthLimit", DataType.STRING).build();
+    schema.getFieldSpecFor("svStringWithLengthLimit").setMaxLength(2);
+    transformer = new SanitizationTransformer(tableConfig, schema);
+    record = new GenericRow();
+    record.putValue("svInt", (byte) 123);
+    record.putValue("svLong", (char) 123);
+    record.putValue("svStringWithLengthLimit", "123");
+    for (int i = 0; i < NUM_ROUNDS; i++) {
+      try {
+        record = transformer.transform(record);
+      } catch (Exception e) {
+        assertEquals(e.getMessage(), "Throwing exception as value: 123 for column svStringWithLengthLimit "
+            + "exceeds configured max length 2.");
       }
     }
   }
