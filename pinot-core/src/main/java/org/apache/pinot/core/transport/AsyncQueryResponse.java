@@ -88,15 +88,16 @@ public class AsyncQueryResponse implements QueryResponse {
       _status.compareAndSet(Status.IN_PROGRESS, finish ? Status.COMPLETED : Status.TIMED_OUT);
       return _responseMap;
     } finally {
-      // Update ServerRoutingStats.
+      // Update ServerRoutingStats for query completion. This is done here to ensure that the stats are updated for
+      // servers even if the query times out or if servers have not responded.
       for (Map.Entry<ServerRoutingInstance, ServerResponse> entry : _responseMap.entrySet()) {
         ServerResponse response = entry.getValue();
-        if (response == null || response.getDataTable() == null) {
-          // These are servers from which a response was not received. So update query response stats for such
-          // servers with maximum latency i.e timeout value.
-          _serverRoutingStatsManager.recordStatsUponResponseArrival(_requestId, entry.getKey().getInstanceId(),
-              _timeoutMs);
-        }
+
+        // ServerResponse returns -1 if responseDelayMs is not set. This indicates that a response was not received
+        // from the server. Hence we set the latency to the timeout value.
+        long latency =
+            (response != null && response.getResponseDelayMs() >= 0) ? response.getResponseDelayMs() : _timeoutMs;
+        _serverRoutingStatsManager.recordStatsUponResponseArrival(_requestId, entry.getKey().getInstanceId(), latency);
       }
 
       _queryRouter.markQueryDone(_requestId);
@@ -151,12 +152,6 @@ public class AsyncQueryResponse implements QueryResponse {
       int deserializationTimeMs) {
     ServerResponse response = _responseMap.get(serverRoutingInstance);
     response.receiveDataTable(dataTable, responseSize, deserializationTimeMs);
-
-    // Record query completion stats immediately after receiving the response from the server instead of waiting
-    // for all servers to respond. This helps to keep the stats up-to-date.
-    long latencyMs = response.getResponseDelayMs();
-    _serverRoutingStatsManager.recordStatsUponResponseArrival(_requestId, serverRoutingInstance.getInstanceId(),
-        latencyMs);
 
     _numServersResponded.getAndIncrement();
     _countDownLatch.countDown();
