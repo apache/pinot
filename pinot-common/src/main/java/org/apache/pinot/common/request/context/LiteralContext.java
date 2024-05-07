@@ -69,18 +69,8 @@ public class LiteralContext {
         _value = literal.getIntValue();
         break;
       case LONG_VALUE:
-        // TODO: Remove this special handling after broker uses INT type for integer literals.
-        //       https://github.com/apache/pinot/pull/11751
-//        _type = DataType.LONG;
-//        _value = literal.getLongValue();
-        long longValue = literal.getLongValue();
-        if (longValue >= Integer.MIN_VALUE && longValue <= Integer.MAX_VALUE) {
-          _type = DataType.INT;
-          _value = (int) longValue;
-        } else {
-          _type = DataType.LONG;
-          _value = longValue;
-        }
+        _type = DataType.LONG;
+        _value = literal.getLongValue();
         break;
       case FLOAT_VALUE:
         _type = DataType.FLOAT;
@@ -102,6 +92,7 @@ public class LiteralContext {
         _type = DataType.BYTES;
         _value = literal.getBinaryValue();
         break;
+      // TODO: Revisit the type handling and whether we should convert value to primitive array for ARRAY types
       case INT_ARRAY_VALUE:
         _type = DataType.INT;
         _value = literal.getIntArrayValue();
@@ -110,6 +101,7 @@ public class LiteralContext {
         _type = DataType.LONG;
         _value = literal.getLongArrayValue();
         break;
+      // TODO: Revisit the FLOAT_ARRAY handling. Currently the values are stored as int bits.
       case FLOAT_ARRAY_VALUE:
         _type = DataType.FLOAT;
         _value = literal.getFloatArrayValue();
@@ -132,6 +124,7 @@ public class LiteralContext {
     _pinotDataType = getPinotDataType(_type);
   }
 
+  @Nullable
   private static PinotDataType getPinotDataType(DataType type) {
     switch (type) {
       case BOOLEAN:

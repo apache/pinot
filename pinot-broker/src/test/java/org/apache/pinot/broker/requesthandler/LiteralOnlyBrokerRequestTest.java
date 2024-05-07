@@ -197,7 +197,8 @@ public class LiteralOnlyBrokerRequestTest {
     Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnName(0), String.format("%d", randNum));
     Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnDataType(0),
         DataSchema.ColumnDataType.LONG);
-    Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnName(1), ranStr);
+    Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnName(1),
+        String.format("'%s'", ranStr));
     Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnDataType(1),
         DataSchema.ColumnDataType.STRING);
     Assert.assertEquals(brokerResponse.getResultTable().getRows().size(), 1);

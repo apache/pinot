@@ -313,6 +313,19 @@ public class DateTimeFormatSpec {
     }
   }
 
+  public long fromFormatToMillis(long dateTimeValue) {
+    switch (_patternSpec.getTimeFormat()) {
+      case EPOCH:
+        return TimeUnit.MILLISECONDS.convert(dateTimeValue * _size, _unitSpec.getTimeUnit());
+      case TIMESTAMP:
+        return dateTimeValue;
+      case SIMPLE_DATE_FORMAT:
+        return _patternSpec.getDateTimeFormatter().parseMillis(Long.toString(dateTimeValue));
+      default:
+        throw new IllegalStateException("Unsupported time format: " + _patternSpec.getTimeFormat());
+    }
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
