@@ -121,6 +121,7 @@ public class SegmentGeneratorConfig implements Serializable {
   private boolean _optimizeDictionaryForMetrics = false;
   private double _noDictionarySizeRatioThreshold = IndexingConfig.DEFAULT_NO_DICTIONARY_SIZE_RATIO_THRESHOLD;
   private boolean _realtimeConversion = false;
+  // consumerDir contains data from the consuming segment, and is used during _realtimeConversion optimization
   private File _consumerDir;
   private final Map<String, FieldIndexConfigs> _indexConfigsByColName;
 

@@ -89,6 +89,8 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
    * @param segmentIndexDir segment index directory
    * @param commit true if the index should be committed (at the end after all documents have
    *               been added), false if index should not be committed
+   * @param realtimeConversion index creator should create an index using the realtime segment
+   * @param consumerDir consumer directory containing the realtime index
    * @param immutableToMutableIdMap immutableToMutableIdMap from segment conversion
    * Note on commit:
    *               Once {@link SegmentColumnarIndexCreator}
@@ -106,7 +108,7 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
    * @param config the text index config
    */
   public LuceneTextIndexCreator(String column, File segmentIndexDir, boolean commit, boolean realtimeConversion,
-      File consumerDir, @Nullable int[] immutableToMutableIdMap, TextIndexConfig config) {
+      @Nullable File consumerDir, @Nullable int[] immutableToMutableIdMap, TextIndexConfig config) {
     _textColumn = column;
     _commitOnClose = commit;
 
