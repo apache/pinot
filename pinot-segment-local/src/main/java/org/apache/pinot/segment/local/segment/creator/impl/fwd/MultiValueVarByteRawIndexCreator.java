@@ -75,19 +75,20 @@ public class MultiValueVarByteRawIndexCreator implements ForwardIndexCreator {
       int totalDocs, DataType valueType, int writerVersion, int maxRowLengthInBytes, int maxNumberOfElements,
       int targetMaxChunkSizeBytes, int targetDocsPerChunk)
       throws IOException {
-    //we will prepend the actual content with numElements and length array containing length of each element
-    int totalMaxLength = getTotalRowStorageBytes(maxNumberOfElements, maxRowLengthInBytes);
-
     File file = new File(baseIndexDir, column + Indexes.RAW_MV_FORWARD_INDEX_FILE_EXTENSION);
-    int numDocsPerChunk = Math.max(
-        targetMaxChunkSizeBytes / (totalMaxLength + VarByteChunkForwardIndexWriter.CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE),
-        1);
-    // For columns with very small max value, target chunk size should also be capped to reduce memory during read
-    int dynamicTargetChunkSize =
-        ForwardIndexUtils.getDynamicTargetChunkSize(totalMaxLength, targetDocsPerChunk, targetMaxChunkSizeBytes);
-    _indexWriter = writerVersion < VarByteChunkForwardIndexWriterV4.VERSION ? new VarByteChunkForwardIndexWriter(file,
-        compressionType, totalDocs, numDocsPerChunk, totalMaxLength, writerVersion)
-        : new VarByteChunkForwardIndexWriterV4(file, compressionType, dynamicTargetChunkSize);
+    // We will prepend the actual content with numElements and length array containing length of each element
+    int totalMaxLength = getTotalRowStorageBytes(maxNumberOfElements, maxRowLengthInBytes);
+    if (writerVersion < VarByteChunkForwardIndexWriterV4.VERSION) {
+      int numDocsPerChunk = Math.max(targetMaxChunkSizeBytes / (totalMaxLength
+          + VarByteChunkForwardIndexWriter.CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE), 1);
+      _indexWriter =
+          new VarByteChunkForwardIndexWriter(file, compressionType, totalDocs, numDocsPerChunk, totalMaxLength,
+              writerVersion);
+    } else {
+      int chunkSize =
+          ForwardIndexUtils.getDynamicTargetChunkSize(totalMaxLength, targetDocsPerChunk, targetMaxChunkSizeBytes);
+      _indexWriter = new VarByteChunkForwardIndexWriterV4(file, compressionType, chunkSize);
+    }
     _valueType = valueType;
   }
 
