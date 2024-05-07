@@ -261,7 +261,7 @@ public class RecordTransformerTest {
 
   @Test
   public void testSanitationTransformer() {
-    RecordTransformer transformer = new SanitizationTransformer(SCHEMA);
+    RecordTransformer transformer = new SanitizationTransformer(TABLE_CONFIG, SCHEMA);
     GenericRow record = getRecord();
     for (int i = 0; i < NUM_ROUNDS; i++) {
       record = transformer.transform(record);
@@ -272,6 +272,22 @@ public class RecordTransformerTest {
       assertEquals(record.getValue("mvString2"), new Object[]{"123", "123", "123.0", "123.0", "123"});
       assertNull(record.getValue("$virtual"));
       assertTrue(record.getNullValueFields().isEmpty());
+      assertTrue(record.getFieldToValueMap().containsKey(GenericRow.INCOMPLETE_RECORD_KEY));
+    }
+
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setFailOnTrimmedStringLength(true);
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setIngestionConfig(ingestionConfig).build();
+    transformer = new SanitizationTransformer(tableConfig, SCHEMA);
+    record = getRecord();
+    for (int i = 0; i < NUM_ROUNDS; i++) {
+      try {
+        record = transformer.transform(record);
+      } catch (Exception e) {
+        assertEquals(e.getMessage(), "Throwing exception as value: 123 for column "
+            + "svStringWithLengthLimit exceeds configured max length 2.");
+      }
     }
   }
 
@@ -331,7 +347,7 @@ public class RecordTransformerTest {
         List.of(new ExpressionTransformer(tableConfig, schema), new FilterTransformer(tableConfig),
             new SchemaConformingTransformer(tableConfig, schema), new DataTypeTransformer(tableConfig, schema),
             new TimeValidationTransformer(tableConfig, schema), new SpecialValueTransformer(schema),
-            new NullValueTransformer(tableConfig, schema), new SanitizationTransformer(schema));
+            new NullValueTransformer(tableConfig, schema), new SanitizationTransformer(tableConfig, schema));
 
     // Check that the number of current transformers match the expected number of transformers.
     assertEquals(currentListOfTransformers.size(), NUMBER_OF_TRANSFORMERS);

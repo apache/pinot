@@ -20,6 +20,8 @@ package org.apache.pinot.segment.local.recordtransformer;
 
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
@@ -39,12 +41,19 @@ import org.apache.pinot.spi.utils.StringUtil;
  */
 public class SanitizationTransformer implements RecordTransformer {
   private final Map<String, Integer> _stringColumnMaxLengthMap = new HashMap<>();
+  private final boolean _failOnTrimmedStringLength;
 
-  public SanitizationTransformer(Schema schema) {
+  public SanitizationTransformer(TableConfig tableConfig, Schema schema) {
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
       if (!fieldSpec.isVirtualColumn() && fieldSpec.getDataType() == DataType.STRING) {
         _stringColumnMaxLengthMap.put(fieldSpec.getName(), fieldSpec.getMaxLength());
       }
+    }
+    IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
+    if (ingestionConfig != null) {
+      _failOnTrimmedStringLength = ingestionConfig.isFailOnTrimmedStringLength();
+    } else {
+      _failOnTrimmedStringLength = false;
     }
   }
 
@@ -66,14 +75,33 @@ public class SanitizationTransformer implements RecordTransformer {
         // NOTE: reference comparison
         //noinspection StringEquality
         if (sanitizedValue != stringValue) {
-          record.putValue(stringColumn, sanitizedValue);
+          if (!_failOnTrimmedStringLength) {
+            record.putValue(stringColumn, sanitizedValue);
+            record.putValue(GenericRow.INCOMPLETE_RECORD_KEY, true);
+          } else {
+            String errorMessage =
+                String.format("Throwing exception as value: %s for column %s exceeds configured max length %d.",
+                    value, stringColumn, maxLength);
+            throw new IllegalStateException(errorMessage);
+          }
         }
       } else {
         // Multi-valued column
         Object[] values = (Object[]) value;
         int numValues = values.length;
         for (int i = 0; i < numValues; i++) {
-          values[i] = StringUtil.sanitizeStringValue(values[i].toString(), maxLength);
+          String sanitizedValue = StringUtil.sanitizeStringValue(values[i].toString(), maxLength);
+          if (sanitizedValue != values[i]) {
+            if (!_failOnTrimmedStringLength) {
+              values[i] = sanitizedValue;
+              record.putValue(GenericRow.INCOMPLETE_RECORD_KEY, true);
+            } else {
+              String errorMessage =
+                  String.format("Throwing exception as value: %s for column %s exceeds configured max length %d.",
+                      values[i], stringColumn, maxLength);
+              throw new IllegalStateException(errorMessage);
+            }
+          }
         }
       }
     }
