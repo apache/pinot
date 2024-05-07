@@ -484,7 +484,7 @@ public class RealtimeSegmentConverterTest {
             .setFieldConfigList(fieldConfigList).setSegmentZKMetadata(getSegmentZKMetadata(segmentName))
             .setOffHeap(true).setMemoryManager(new DirectMemoryManager(segmentName))
             .setStatsHistory(RealtimeSegmentStatsHistory.deserialzeFrom(new File(tmpDir, "stats")))
-            .setConsumerDir(new File(tmpDir, "consumers").getAbsolutePath());
+            .setConsumerDir(new File(tmpDir, "consumerDir").getAbsolutePath());
 
     // create mutable segment impl
     RealtimeLuceneTextIndexSearcherPool.init(1);

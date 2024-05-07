@@ -161,6 +161,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
           .withTextCommitOnClose(true)
           .withImmutableToMutableIdMap(immutableToMutableIdMap)
           .withRealtimeConversion(segmentCreationSpec.isRealtimeConversion())
+          .withConsumerDir(segmentCreationSpec.getConsumerDir())
           .build();
       //@formatter:on
 
