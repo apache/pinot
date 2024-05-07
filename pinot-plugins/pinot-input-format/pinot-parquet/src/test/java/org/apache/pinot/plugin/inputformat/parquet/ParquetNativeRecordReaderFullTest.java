@@ -143,7 +143,6 @@ public class ParquetNativeRecordReaderFullTest {
         }
         recordReader.close();
         Assert.assertEquals(numDocsForFirstPass, numDocsForSecondPass);
-    } catch (AssertionError e) {
     }
   }
 }
