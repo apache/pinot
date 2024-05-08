@@ -119,7 +119,7 @@ public class RealtimeSegmentDataManagerTest {
   }
 
   private FakeRealtimeSegmentDataManager createFakeSegmentManager()
-    throws Exception {
+      throws Exception {
     return createFakeSegmentManager(false, new TimeSupplier(), null, null, null);
   }
 
