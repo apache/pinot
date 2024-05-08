@@ -40,10 +40,20 @@ import org.apache.pinot.spi.utils.JsonUtils;
 public class KinesisPartitionGroupOffset implements StreamPartitionMsgOffset {
   private final String _shardId;
   private final String _sequenceNumber;
+  private final OffsetStartStatus _startStatus;
+
+  public static final String STATUS_SEPARATOR = "::";
 
   public KinesisPartitionGroupOffset(String shardId, String sequenceNumber) {
     _shardId = shardId;
     _sequenceNumber = sequenceNumber;
+    _startStatus = OffsetStartStatus.RESUME;
+  }
+
+  public KinesisPartitionGroupOffset(String shardId, String sequenceNumber, String startStatus) {
+    _shardId = shardId;
+    _sequenceNumber = sequenceNumber;
+    _startStatus = OffsetStartStatus.valueOf(startStatus);
   }
 
   public KinesisPartitionGroupOffset(String offsetStr) {
@@ -52,7 +62,16 @@ public class KinesisPartitionGroupOffset implements StreamPartitionMsgOffset {
       Preconditions.checkArgument(objectNode.size() == 1);
       Map.Entry<String, JsonNode> entry = objectNode.fields().next();
       _shardId = entry.getKey();
-      _sequenceNumber = entry.getValue().asText();
+      String value = entry.getValue().asText();
+      // Handling it in a single string with a seperator instead of multiple key value pairs to maintain backward compatibility
+      if (value.contains(STATUS_SEPARATOR)) {
+        String[] parts = value.split(STATUS_SEPARATOR);
+        _sequenceNumber = parts[0];
+        _startStatus = OffsetStartStatus.valueOf(parts[1]);
+      } else {
+        _sequenceNumber = value;
+        _startStatus = OffsetStartStatus.RESUME;
+      }
     } catch (Exception e) {
       throw new IllegalArgumentException("Invalid Kinesis offset: " + offsetStr);
     }
@@ -64,6 +83,10 @@ public class KinesisPartitionGroupOffset implements StreamPartitionMsgOffset {
 
   public String getSequenceNumber() {
     return _sequenceNumber;
+  }
+
+  public OffsetStartStatus getStartStatus() {
+    return _startStatus;
   }
 
   @Override

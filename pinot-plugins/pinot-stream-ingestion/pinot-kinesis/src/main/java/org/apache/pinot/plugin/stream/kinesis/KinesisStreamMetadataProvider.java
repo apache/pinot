@@ -156,8 +156,20 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
           parentShardId)) {
         // TODO: Revisit this. Kinesis starts consuming AFTER the start sequence number, and we might miss the first
         //       message.
-        StreamPartitionMsgOffset newStartOffset =
-            new KinesisPartitionGroupOffset(newShardId, newShard.sequenceNumberRange().startingSequenceNumber());
+
+        StreamPartitionMsgOffset newStartOffset;
+        if (parentShardId == null) {
+          // In root shards it makes more sense to honour the offset start config provided
+          newStartOffset =
+              new KinesisPartitionGroupOffset(newShardId, newShard.sequenceNumberRange().startingSequenceNumber(),
+                  OffsetStartStatus.INITIALIZE.toString());
+        } else {
+          //In children shards it makes more sense to simply continue from start
+          newStartOffset =
+              new KinesisPartitionGroupOffset(newShardId, newShard.sequenceNumberRange().startingSequenceNumber(),
+                  OffsetStartStatus.RESUME.toString());
+        }
+
         int partitionGroupId = getPartitionGroupIdFromShardId(newShardId);
         newPartitionGroupMetadataList.add(new PartitionGroupMetadata(partitionGroupId, newStartOffset));
       }
