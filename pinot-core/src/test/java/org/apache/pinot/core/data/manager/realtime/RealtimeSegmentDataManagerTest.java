@@ -106,6 +106,7 @@ public class RealtimeSegmentDataManagerTest {
     when(statsHistory.getEstimatedCardinality(anyString())).thenReturn(200);
     when(statsHistory.getEstimatedAvgColSize(anyString())).thenReturn(32);
     when(tableDataManager.getStatsHistory()).thenReturn(statsHistory);
+    when(tableDataManager.getConsumerDir()).thenReturn(TEMP_DIR.getAbsolutePath() + "/consumerDir");
     return tableDataManager;
   }
 
@@ -118,7 +119,7 @@ public class RealtimeSegmentDataManagerTest {
   }
 
   private FakeRealtimeSegmentDataManager createFakeSegmentManager()
-      throws Exception {
+    throws Exception {
     return createFakeSegmentManager(false, new TimeSupplier(), null, null, null);
   }
 

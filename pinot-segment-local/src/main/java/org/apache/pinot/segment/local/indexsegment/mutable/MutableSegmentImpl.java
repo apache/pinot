@@ -217,7 +217,7 @@ public class MutableSegmentImpl implements MutableSegment {
     _partitionFunction = config.getPartitionFunction();
     _mainPartitionId = config.getPartitionId();
     _nullHandlingEnabled = config.isNullHandlingEnabled();
-    _consumerDir = config.getConsumerDir() != null ? new File(config.getConsumerDir()) : null;
+    _consumerDir = new File(config.getConsumerDir());
 
     Collection<FieldSpec> allFieldSpecs = _schema.getAllFieldSpecs();
     List<FieldSpec> physicalFieldSpecs = new ArrayList<>(allFieldSpecs.size());

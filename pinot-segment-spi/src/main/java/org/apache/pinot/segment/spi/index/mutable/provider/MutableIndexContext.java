@@ -20,7 +20,6 @@ package org.apache.pinot.segment.spi.index.mutable.provider;
 
 import java.io.File;
 import java.util.Objects;
-import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 import org.apache.pinot.spi.data.FieldSpec;
 
@@ -94,7 +93,6 @@ public class MutableIndexContext {
     return _avgNumMultiValues;
   }
 
-  @Nullable
   public File getConsumerDir() {
     return _consumerDir;
   }
@@ -114,7 +112,6 @@ public class MutableIndexContext {
     private int _estimatedColSize;
     private int _estimatedCardinality;
     private int _avgNumMultiValues;
-    @Nullable
     private File _consumerDir;
 
     public Builder withMemoryManager(PinotDataBufferMemoryManager memoryManager) {

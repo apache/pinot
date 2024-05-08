@@ -108,7 +108,7 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
    * @param config the text index config
    */
   public LuceneTextIndexCreator(String column, File segmentIndexDir, boolean commit, boolean realtimeConversion,
-      @Nullable File consumerDir, @Nullable int[] immutableToMutableIdMap, TextIndexConfig config) {
+      File consumerDir, @Nullable int[] immutableToMutableIdMap, TextIndexConfig config) {
     _textColumn = column;
     _commitOnClose = commit;
 
