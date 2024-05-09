@@ -72,7 +72,7 @@ public class KinesisConsumerTest {
         "org.apache.pinot.plugin.inputformat.json.JSONMessageDecoder");
     props.put(KinesisConfig.REGION, AWS_REGION);
     props.put(KinesisConfig.MAX_RECORDS_TO_FETCH, String.valueOf(MAX_RECORDS_TO_FETCH));
-    props.put(KinesisConfig.SHARD_ITERATOR_TYPE, ShardIteratorType.AT_SEQUENCE_NUMBER.toString());
+    props.put(KinesisConfig.INIT_SHARD_ITERATOR_TYPE, ShardIteratorType.AT_SEQUENCE_NUMBER.toString());
     return new KinesisConfig(new StreamConfig(TABLE_NAME_WITH_TYPE, props));
   }
 

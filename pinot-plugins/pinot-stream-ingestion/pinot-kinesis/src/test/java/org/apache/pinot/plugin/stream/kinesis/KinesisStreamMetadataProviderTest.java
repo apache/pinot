@@ -59,7 +59,7 @@ public class KinesisStreamMetadataProviderTest {
     Map<String, String> props = new HashMap<>();
     props.put(KinesisConfig.REGION, AWS_REGION);
     props.put(KinesisConfig.MAX_RECORDS_TO_FETCH, "10");
-    props.put(KinesisConfig.SHARD_ITERATOR_TYPE, ShardIteratorType.AT_SEQUENCE_NUMBER.toString());
+    props.put(KinesisConfig.INIT_SHARD_ITERATOR_TYPE, ShardIteratorType.AT_SEQUENCE_NUMBER.toString());
     props.put(StreamConfigProperties.STREAM_TYPE, "kinesis");
     props.put("stream.kinesis.consumer.type", "lowLevel");
     props.put("stream.kinesis.topic.name", STREAM_NAME);
