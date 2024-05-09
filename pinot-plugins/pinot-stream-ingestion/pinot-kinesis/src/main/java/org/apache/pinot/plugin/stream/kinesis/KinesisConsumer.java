@@ -149,8 +149,10 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
       }
       case INITIALIZE: {
         requestBuilder = requestBuilder.shardIteratorType(_config.getShardIteratorType());
+        break;
       }
 
+      default: // do nothin
     }
 
     return _kinesisClient.getShardIterator(requestBuilder.build()).shardIterator();
@@ -161,7 +163,8 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
     byte[] value = record.data().asByteArray();
     long timestamp = record.approximateArrivalTimestamp().toEpochMilli();
     String sequenceNumber = record.sequenceNumber();
-    KinesisPartitionGroupOffset offset = new KinesisPartitionGroupOffset(shardId, sequenceNumber, OffsetStartStatus.RESUME.toString());
+    KinesisPartitionGroupOffset offset =
+        new KinesisPartitionGroupOffset(shardId, sequenceNumber, OffsetStartStatus.RESUME.toString());
     // NOTE: Use the same offset as next offset because the consumer starts consuming AFTER the start sequence number.
     StreamMessageMetadata.Builder builder =
         new StreamMessageMetadata.Builder().setRecordIngestionTimeMs(timestamp).setOffset(offset, offset);
