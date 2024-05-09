@@ -1501,6 +1501,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
    *   <li>"NewAddedDerivedMVStringDimension", DIMENSION, STRING, multi-value, split(DestCityName, ', ')</li>
    *   <li>"NewAddedDerivedDivAirportSeqIDs", DIMENSION, INT, multi-value, DivAirportSeqIDs</li>
    *   <li>"NewAddedDerivedDivAirportSeqIDsString", DIMENSION, STRING, multi-value, DivAirportSeqIDs</li>
+   *   <li>"NewAddedRawDerivedStringDimension", DIMENSION, STRING, single-value, "null"</li>
    * </ul>
    */
   @Test(dependsOnMethods = "testAggregateMetadataAPI", dataProvider = "useBothQueryEngines")
@@ -1513,7 +1514,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     reloadWithExtraColumns();
     JsonNode queryResponse = postQuery(SELECT_STAR_QUERY);
     assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
-    assertEquals(queryResponse.get("resultTable").get("dataSchema").get("columnNames").size(), 100);
+    assertEquals(queryResponse.get("resultTable").get("dataSchema").get("columnNames").size(), 101);
 
     testNewAddedColumns();
     testExpressionOverride();
@@ -1593,6 +1594,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     schema.addField(new DimensionFieldSpec("NewAddedDerivedMVStringDimension", DataType.STRING, false));
     schema.addField(new DimensionFieldSpec("NewAddedDerivedDivAirportSeqIDs", DataType.INT, false));
     schema.addField(new DimensionFieldSpec("NewAddedDerivedDivAirportSeqIDsString", DataType.STRING, false));
+    schema.addField(new DimensionFieldSpec("NewAddedRawDerivedStringDimension", DataType.STRING, true));
     addSchema(schema);
 
     TableConfig tableConfig = getOfflineTableConfig();
@@ -1602,10 +1604,13 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
             new TransformConfig("NewAddedDerivedSVBooleanDimension", "ActualElapsedTime > 0"),
             new TransformConfig("NewAddedDerivedMVStringDimension", "split(DestCityName, ', ')"),
             new TransformConfig("NewAddedDerivedDivAirportSeqIDs", "DivAirportSeqIDs"),
-            new TransformConfig("NewAddedDerivedDivAirportSeqIDsString", "DivAirportSeqIDs"));
+            new TransformConfig("NewAddedDerivedDivAirportSeqIDsString", "DivAirportSeqIDs"),
+            new TransformConfig("NewAddedRawDerivedStringDimension", "reverse(DestCityName)"));
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setTransformConfigs(transformConfigs);
     tableConfig.setIngestionConfig(ingestionConfig);
+    // Ensure that we can reload segments with a new raw derived column
+    tableConfig.getIndexingConfig().getNoDictionaryColumns().add("NewAddedRawDerivedStringDimension");
     List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
     assertNotNull(fieldConfigList);
     fieldConfigList.add(
@@ -1623,12 +1628,14 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // Verify the index sizes
     JsonNode columnIndexSizeMap = JsonUtils.stringToJsonNode(sendGetRequest(
             getControllerBaseApiUrl() + "/tables/mytable/metadata?columns=DivAirportSeqIDs"
-                + "&columns=NewAddedDerivedDivAirportSeqIDs&columns=NewAddedDerivedDivAirportSeqIDsString"))
+                + "&columns=NewAddedDerivedDivAirportSeqIDs&columns=NewAddedDerivedDivAirportSeqIDsString"
+                + "&columns=NewAddedRawDerivedStringDimension"))
         .get("columnIndexSizeMap");
-    assertEquals(columnIndexSizeMap.size(), 3);
+    assertEquals(columnIndexSizeMap.size(), 4);
     JsonNode originalColumnIndexSizes = columnIndexSizeMap.get("DivAirportSeqIDs");
     JsonNode derivedColumnIndexSizes = columnIndexSizeMap.get("NewAddedDerivedDivAirportSeqIDs");
     JsonNode derivedStringColumnIndexSizes = columnIndexSizeMap.get("NewAddedDerivedDivAirportSeqIDsString");
+    JsonNode derivedRawStringColumnIndex = columnIndexSizeMap.get("NewAddedRawDerivedStringDimension");
 
     // Derived int column should have the same dictionary size as the original column
     double originalColumnDictionarySize = originalColumnIndexSizes.get("dictionary").asDouble();
@@ -1639,6 +1646,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     double derivedColumnForwardIndexSize = derivedColumnIndexSizes.get("forward_index").asDouble();
     assertTrue(derivedColumnForwardIndexSize < originalColumnIndexSizes.get("forward_index").asDouble());
     assertEquals(derivedStringColumnIndexSizes.get("forward_index").asDouble(), derivedColumnForwardIndexSize);
+
+    assertTrue(derivedRawStringColumnIndex.has("forward_index"));
+    assertFalse(derivedRawStringColumnIndex.has("dictionary"));
   }
 
   private void reloadWithMissingColumns()
@@ -1647,6 +1657,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     TableConfig tableConfig = getOfflineTableConfig();
     tableConfig.setIngestionConfig(null);
     tableConfig.setFieldConfigList(getFieldConfigs());
+    tableConfig.getIndexingConfig().getNoDictionaryColumns().remove("NewAddedRawDerivedStringDimension");
     updateTableConfig(tableConfig);
 
     // Need to first delete then add the schema because removing columns is backward-incompatible change
