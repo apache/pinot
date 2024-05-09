@@ -658,6 +658,11 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
       int numTasks = pinotTaskConfigs.size();
       try {
         if (numTasks > 0) {
+          if (_pinotHelixResourceManager.getInstancesWithTag(minionInstanceTag).isEmpty()) {
+            LOGGER.error("Skipping {} tasks for task type: {} with task configs: {} to invalid minionInstanceTag: {}",
+                numTasks, taskType, pinotTaskConfigs, minionInstanceTag);
+            throw new IllegalArgumentException("No valid minion instance found for tag: " + minionInstanceTag);
+          }
           // This might lead to lot of logs, maybe sum it up and move outside the loop
           LOGGER.info("Submitting {} tasks for task type: {} to minionInstance: {} with task configs: {}", numTasks,
               taskType, minionInstanceTag, pinotTaskConfigs);
