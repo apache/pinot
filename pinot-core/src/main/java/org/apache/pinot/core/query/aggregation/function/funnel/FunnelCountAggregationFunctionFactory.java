@@ -57,6 +57,7 @@ public class FunnelCountAggregationFunctionFactory implements Supplier<Aggregati
   final List<ExpressionContext> _expressions;
   final List<ExpressionContext> _stepExpressions;
   final List<ExpressionContext> _correlateByExpressions;
+  final List<ExpressionContext> _windowExpressions;
   final ExpressionContext _primaryCorrelationCol;
   final int _numSteps;
   final int _nominalEntries;
@@ -70,6 +71,7 @@ public class FunnelCountAggregationFunctionFactory implements Supplier<Aggregati
     Option.validate(expressions);
     _correlateByExpressions = Option.CORRELATE_BY.getInputExpressions(expressions);
     _primaryCorrelationCol = _correlateByExpressions.get(0);
+    _windowExpressions = Option.WINDOW.getInputExpressions(expressions);
     _stepExpressions = Option.STEPS.getInputExpressions(expressions);
     _numSteps = _stepExpressions.size();
 
@@ -115,7 +117,7 @@ public class FunnelCountAggregationFunctionFactory implements Supplier<Aggregati
       AggregationStrategy<A> aggregationStrategy, ResultExtractionStrategy<A, I> resultExtractionStrategy,
       MergeStrategy<I> mergeStrategy) {
     return new FunnelCountAggregationFunction<>(_expressions, _stepExpressions, _correlateByExpressions,
-        aggregationStrategy, resultExtractionStrategy, mergeStrategy);
+        _windowExpressions, aggregationStrategy, resultExtractionStrategy, mergeStrategy);
   }
 
   private <A> FunnelCountAggregationFunction<A, List<Long>> createPartionedFunnelCountAggregationFunction(
@@ -123,10 +125,10 @@ public class FunnelCountAggregationFunctionFactory implements Supplier<Aggregati
       MergeStrategy<List<Long>> mergeStrategy) {
     if (_sortingSetting) {
       return new FunnelCountSortedAggregationFunction<>(_expressions, _stepExpressions, _correlateByExpressions,
-          aggregationStrategy, resultExtractionStrategy, mergeStrategy);
+          _windowExpressions, aggregationStrategy, resultExtractionStrategy, mergeStrategy);
     } else {
       return new FunnelCountAggregationFunction<>(_expressions, _stepExpressions, _correlateByExpressions,
-          aggregationStrategy, resultExtractionStrategy, mergeStrategy);
+          _windowExpressions, aggregationStrategy, resultExtractionStrategy, mergeStrategy);
     }
   }
 
@@ -177,7 +179,7 @@ public class FunnelCountAggregationFunctionFactory implements Supplier<Aggregati
   }
 
   enum Option {
-    STEPS("steps"), CORRELATE_BY("correlateby"), SETTINGS("settings");
+    STEPS("steps"), CORRELATE_BY("correlateby"), SETTINGS("settings"), WINDOW("window");
 
     final String _name;
 

@@ -54,10 +54,10 @@ public class FunnelCountSortedAggregationFunction<A> extends FunnelCountAggregat
 
   public FunnelCountSortedAggregationFunction(List<ExpressionContext> expressions,
       List<ExpressionContext> stepExpressions, List<ExpressionContext> correlateByExpressions,
-      AggregationStrategy<A> aggregationStrategy, ResultExtractionStrategy<A, List<Long>> resultExtractionStrategy,
-      MergeStrategy<List<Long>> mergeStrategy) {
-    super(expressions, stepExpressions, correlateByExpressions, aggregationStrategy, resultExtractionStrategy,
-        mergeStrategy);
+      List<ExpressionContext> windowExpressions, AggregationStrategy<A> aggregationStrategy,
+      ResultExtractionStrategy<A, List<Long>> resultExtractionStrategy, MergeStrategy<List<Long>> mergeStrategy) {
+    super(expressions, stepExpressions, correlateByExpressions, windowExpressions, aggregationStrategy,
+        resultExtractionStrategy, mergeStrategy);
     _sortedAggregationStrategy = new SortedAggregationStrategy(stepExpressions, correlateByExpressions);
     _sortedResultExtractionStrategy = SortedAggregationResult::extractResult;;
     _primaryCorrelationCol = correlateByExpressions.get(0);
