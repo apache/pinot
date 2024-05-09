@@ -243,7 +243,7 @@
     <wildfly.version>1.7.0.Final</wildfly.version>
     <jettison.version>1.5.4</jettison.version>
     <eclipse.jetty.version>9.4.54.v20240208</eclipse.jetty.version>
-    <nimbus-jose-jwt.version>9.37.3</nimbus-jose-jwt.version>
+    <nimbus-jose-jwt.version>9.38</nimbus-jose-jwt.version>
     <bouncycastle.version>1.78</bouncycastle.version>
     <aircompressor.version>0.26</aircompressor.version>
     <jna.version>5.14.0</jna.version>
