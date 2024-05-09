@@ -89,8 +89,9 @@ public class BrokerAdminApiApplication extends ResourceConfig {
     _executorService =
         Executors.newCachedThreadPool(new ThreadFactoryBuilder().setNameFormat("async-task-thread-%d").build());
     PoolingHttpClientConnectionManager connMgr = new PoolingHttpClientConnectionManager();
-    int timeoutMs = (int) brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_TIMEOUT_MS,
-        CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS);
+    int timeoutMs = (int) brokerConf
+        .getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_TIMEOUT_MS,
+            CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS);
     connMgr.setDefaultSocketConfig(SocketConfig.custom().setSoTimeout(timeoutMs).build());
     Instant startTime = Instant.now();
     register(new AbstractBinder() {
@@ -115,8 +116,8 @@ public class BrokerAdminApiApplication extends ResourceConfig {
         bind(startTime).named(BrokerAdminApiApplication.START_TIME);
       }
     });
-    boolean enableBoundedJerseyThreadPoolExecutor =
-        brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_ENABLE_BOUNDED_JERSEY_THREADPOOL_EXECUTOR,
+    boolean enableBoundedJerseyThreadPoolExecutor = brokerConf
+        .getProperty(CommonConstants.Broker.CONFIG_OF_ENABLE_BOUNDED_JERSEY_THREADPOOL_EXECUTOR,
             CommonConstants.Broker.DEFAULT_ENABLE_BOUNDED_JERSEY_THREADPOOL_EXECUTOR);
     if (enableBoundedJerseyThreadPoolExecutor) {
       register(buildBrokerManagedAsyncExecutorProvider(brokerConf, brokerMetrics));
@@ -138,6 +139,9 @@ public class BrokerAdminApiApplication extends ResourceConfig {
 
     if (_swaggerBrokerEnabled) {
       PinotReflectionUtils.runWithLock(this::setupSwagger);
+      PinotReflectionUtils.runWithLock(() ->
+          SwaggerSetupUtil.setupSwagger("broker", _brokerResourcePackages, _useHttps, false,
+              "/", BrokerAdminApiApplication.class.getClassLoader(), _httpServer));
     } else {
       LOGGER.info("Hiding Swagger UI for Broker, by {}", CommonConstants.Broker.CONFIG_OF_SWAGGER_BROKER_ENABLED);
     }

@@ -23,6 +23,7 @@ import io.swagger.jaxrs.config.BeanConfig;
 import java.net.URI;
 import java.net.URL;
 import java.net.URLClassLoader;
+import org.apache.pinot.common.swagger.SwaggerSetupUtil;
 import org.apache.pinot.common.utils.PinotStaticHttpHandler;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.PinotReflectionUtils;
@@ -59,6 +60,9 @@ public class PinotServiceManagerAdminApiApplication extends ResourceConfig {
     _baseUri = URI.create("http://0.0.0.0:" + httpPort + "/");
     _httpServer = GrizzlyHttpServerFactory.createHttpServer(_baseUri, this);
     PinotReflectionUtils.runWithLock(this::setupSwagger);
+    PinotReflectionUtils.runWithLock(() ->
+        SwaggerSetupUtil.setupSwagger("Starter", RESOURCE_PACKAGE, false, false,
+            _baseUri.getPath(), PinotServiceManagerAdminApiApplication.class.getClassLoader(), _httpServer));
   }
 
   private void setupSwagger() {

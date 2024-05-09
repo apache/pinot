@@ -87,8 +87,10 @@ public class ControllerAdminApiApplication extends ResourceConfig {
       throw new RuntimeException("Failed to start http server", e);
     }
     PinotReflectionUtils.runWithLock(this::setupSwagger);
-
     ClassLoader classLoader = ControllerAdminApiApplication.class.getClassLoader();
+    PinotReflectionUtils.runWithLock(() ->
+        SwaggerSetupUtil.setupSwagger("Controller", _controllerResourcePackages, _useHttps, false,
+           "/", classLoader, _httpServer));
 
     // This is ugly from typical patterns to setup static resources but all our APIs are
     // at path "/". So, configuring static handler for path "/" does not work well.

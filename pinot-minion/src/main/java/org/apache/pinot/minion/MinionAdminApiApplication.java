@@ -24,6 +24,7 @@ import java.net.URL;
 import java.net.URLClassLoader;
 import java.time.Instant;
 import java.util.List;
+import org.apache.pinot.common.swagger.SwaggerSetupUtil;
 import org.apache.pinot.common.utils.PinotStaticHttpHandler;
 import org.apache.pinot.common.utils.log.DummyLogFileServer;
 import org.apache.pinot.common.utils.log.LocalLogFileServer;
@@ -77,7 +78,7 @@ public class MinionAdminApiApplication extends ResourceConfig {
       }
     });
 
-    registerClasses(io.swagger.jaxrs.listing.ApiListingResource.class);
+    registerClasses(SwaggerApiListingResource.class);
     registerClasses(io.swagger.jaxrs.listing.SwaggerSerializers.class);
   }
 
@@ -90,6 +91,9 @@ public class MinionAdminApiApplication extends ResourceConfig {
       throw new RuntimeException("Failed to start http server", e);
     }
     PinotReflectionUtils.runWithLock(this::setupSwagger);
+    PinotReflectionUtils.runWithLock(() ->
+        SwaggerSetupUtil.setupSwagger("Minion", RESOURCE_PACKAGE, _useHttps, false,
+            "/", MinionAdminApiApplication.class.getClassLoader(), _httpServer));
   }
 
   private void setupSwagger() {
@@ -116,6 +120,9 @@ public class MinionAdminApiApplication extends ResourceConfig {
         MinionAdminApiApplication.class.getClassLoader().getResource(CommonConstants.CONFIG_OF_SWAGGER_RESOURCES_PATH);
     CLStaticHttpHandler swaggerDist = new PinotStaticHttpHandler(new URLClassLoader(new URL[]{swaggerDistLocation}));
     _httpServer.getServerConfiguration().addHttpHandler(swaggerDist, "/swaggerui-dist/");
+    PinotReflectionUtils.runWithLock(() ->
+        SwaggerSetupUtil.setupSwagger("Minion", RESOURCE_PACKAGE, _useHttps, false,
+            "/", MinionAdminApiApplication.class.getClassLoader(), _httpServer));
   }
 
   public void stop() {

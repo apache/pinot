@@ -64,6 +64,7 @@ public class AdminApiApplication extends ResourceConfig {
   private HttpServer _httpServer;
   private final String _adminApiResourcePackages;
 
+
   public AdminApiApplication(ServerInstance instance, AccessControlFactory accessControlFactory,
       PinotConfiguration serverConf) {
     _serverInstance = instance;
@@ -124,6 +125,11 @@ public class AdminApiApplication extends ResourceConfig {
         CommonConstants.Server.DEFAULT_SWAGGER_SERVER_ENABLED)) {
       LOGGER.info("Starting swagger for the Pinot server.");
       PinotReflectionUtils.runWithLock(() -> setupSwagger(pinotConfiguration));
+      boolean useHttps = Boolean.parseBoolean(
+          pinotConfiguration.getProperty(CommonConstants.Server.CONFIG_OF_SWAGGER_USE_HTTPS));
+      PinotReflectionUtils.runWithLock(() ->
+          SwaggerSetupUtil.setupSwagger("server", _adminApiResourcePackages, useHttps, true,
+              "/", AdminApiApplication.class.getClassLoader(), _httpServer));
     }
     return true;
   }
@@ -157,7 +163,7 @@ public class AdminApiApplication extends ResourceConfig {
 
     URL swaggerDistLocation =
         AdminApiApplication.class.getClassLoader().getResource(CommonConstants.CONFIG_OF_SWAGGER_RESOURCES_PATH);
-    CLStaticHttpHandler swaggerDist = new PinotStaticHttpHandler(new URLClassLoader(new URL[]{swaggerDistLocation}));
+    CLStaticHttpHandler swaggerDist = new CLStaticHttpHandler(new URLClassLoader(new URL[]{swaggerDistLocation}));
     _httpServer.getServerConfiguration().addHttpHandler(swaggerDist, "/swaggerui-dist/");
   }
 
