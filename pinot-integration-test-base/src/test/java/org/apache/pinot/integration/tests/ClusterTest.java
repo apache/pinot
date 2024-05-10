@@ -103,6 +103,7 @@ public abstract class ClusterTest extends ControllerTest {
   protected BaseMinionStarter _minionStarter;
 
   private String _brokerBaseApiUrl;
+  private String _minionBaseApiUrl;
 
   private boolean _useMultiStageQueryEngine = false;
 
@@ -127,6 +128,10 @@ public abstract class ClusterTest extends ControllerTest {
 
   protected String getBrokerBaseApiUrl() {
     return _brokerBaseApiUrl;
+  }
+
+  public String getMinionBaseApiUrl() {
+    return _minionBaseApiUrl;
   }
 
   protected boolean useMultiStageQueryEngine() {
@@ -321,9 +326,10 @@ public abstract class ClusterTest extends ControllerTest {
     PinotConfiguration minionConf = getDefaultMinionConfiguration();
     minionConf.setProperty(Helix.CONFIG_OF_CLUSTER_NAME, getHelixClusterName());
     minionConf.setProperty(Helix.CONFIG_OF_ZOOKEEPR_SERVER, getZkUrl());
-    minionConf.setProperty(CommonConstants.Helix.KEY_OF_MINION_PORT,
-        NetUtils.findOpenPort(CommonConstants.Minion.DEFAULT_HELIX_PORT));
+    int minionPort = NetUtils.findOpenPort(CommonConstants.Minion.DEFAULT_HELIX_PORT);
+    minionConf.setProperty(CommonConstants.Helix.KEY_OF_MINION_PORT, minionPort);
     minionConf.setProperty(CommonConstants.CONFIG_OF_TIMEZONE, "UTC");
+    _minionBaseApiUrl = "http://localhost:" + minionPort;
     _minionStarter = new MinionStarter();
     _minionStarter.init(minionConf);
     _minionStarter.start();

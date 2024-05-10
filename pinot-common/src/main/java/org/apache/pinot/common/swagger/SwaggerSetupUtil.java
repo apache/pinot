@@ -62,7 +62,8 @@ public class SwaggerSetupUtil {
     httpServer.getServerConfiguration().addHttpHandler(staticHttpHandler, "/help/");
 
     URL swaggerDistLocation = classLoader.getResource(CommonConstants.CONFIG_OF_SWAGGER_RESOURCES_PATH);
-    CLStaticHttpHandler swaggerDist = new CLStaticHttpHandler(new URLClassLoader(new URL[]{swaggerDistLocation}));
+    CLStaticHttpHandler swaggerDist =
+        new CLStaticHttpHandler(new URLClassLoader(new URL[]{swaggerDistLocation}), "swagger-ui/");
     httpServer.getServerConfiguration().addHttpHandler(swaggerDist, "/swaggerui-dist/");
   }
 }
