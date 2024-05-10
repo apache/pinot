@@ -202,7 +202,7 @@ public class FilePerIndexDirectoryTest {
   public void testRemoveTextIndices()
       throws IOException {
     TextIndexConfig config =
-            new TextIndexConfig(false, null, null, false, false, null, null, true, 500, null, false);
+            new TextIndexConfig(false, null, null, false, false, null, null, true, 500, null, null, null, null, false);
     try (FilePerIndexDirectory fpi = new FilePerIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap);
         LuceneTextIndexCreator fooCreator = new LuceneTextIndexCreator("foo", TEMP_DIR, true, false, null, config);
         LuceneTextIndexCreator barCreator = new LuceneTextIndexCreator("bar", TEMP_DIR, true, false, null, config)) {
@@ -264,7 +264,7 @@ public class FilePerIndexDirectoryTest {
   public void testGetColumnIndices()
       throws IOException {
     TextIndexConfig config =
-            new TextIndexConfig(false, null, null, false, false, null, null, true, 500, null, false);
+            new TextIndexConfig(false, null, null, false, false, null, null, true, 500, null, null, null, null, false);
     // Write sth to buffers and flush them to index files on disk
     try (FilePerIndexDirectory fpi = new FilePerIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap);
         LuceneTextIndexCreator fooCreator = new LuceneTextIndexCreator("foo", TEMP_DIR, true, false, null, config);
