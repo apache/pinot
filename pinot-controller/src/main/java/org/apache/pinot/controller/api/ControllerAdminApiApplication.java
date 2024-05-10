@@ -28,6 +28,7 @@ import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerResponseContext;
 import javax.ws.rs.container.ContainerResponseFilter;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.PinotCLStaticHttpHandler;
 import org.apache.pinot.controller.api.access.AuthenticationFilter;
 import org.apache.pinot.core.api.ServiceAutoDiscoveryFeature;
 import org.apache.pinot.core.transport.ListenerConfig;
@@ -125,7 +126,7 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     _httpServer.getServerConfiguration().addHttpHandler(apiStaticHttpHandler, "/help/");
 
     URL swaggerDistLocation = loader.getResource(CommonConstants.CONFIG_OF_SWAGGER_RESOURCES_PATH);
-    CLStaticHttpHandler swaggerDist = new CLStaticHttpHandler(new URLClassLoader(new URL[]{swaggerDistLocation}));
+    PinotCLStaticHttpHandler swaggerDist = new PinotCLStaticHttpHandler(new URLClassLoader(new URL[]{swaggerDistLocation}));
     _httpServer.getServerConfiguration().addHttpHandler(swaggerDist, "/swaggerui-dist/");
   }
 
