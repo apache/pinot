@@ -16,7 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.pinot.tools.service;
 
 import com.google.common.base.Preconditions;
@@ -24,6 +23,7 @@ import io.swagger.jaxrs.config.BeanConfig;
 import java.net.URI;
 import java.net.URL;
 import java.net.URLClassLoader;
+import org.apache.pinot.common.utils.PinotStaticHttpHandler;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.PinotReflectionUtils;
 import org.glassfish.grizzly.http.server.CLStaticHttpHandler;
@@ -79,7 +79,7 @@ public class PinotServiceManagerAdminApiApplication extends ResourceConfig {
 
     URL swaggerDistLocation = PinotServiceManagerAdminApiApplication.class.getClassLoader()
         .getResource(CommonConstants.CONFIG_OF_SWAGGER_RESOURCES_PATH);
-    CLStaticHttpHandler swaggerDist = new CLStaticHttpHandler(new URLClassLoader(new URL[]{swaggerDistLocation}));
+    CLStaticHttpHandler swaggerDist = new PinotStaticHttpHandler(new URLClassLoader(new URL[]{swaggerDistLocation}));
     _httpServer.getServerConfiguration().addHttpHandler(swaggerDist, "/swaggerui-dist/");
   }
 
