@@ -82,7 +82,7 @@ public class UpsertConfig extends BaseJsonConfig {
   private boolean _enableUpsertViewBatchRefresh;
 
   @JsonPropertyDescription("Refresh interval if using batch refresh mode to keep consistent view for upsert table")
-  private long _upsertViewRefreshIntervalMs;
+  private long _upsertViewRefreshIntervalMs = 3000;
 
   @JsonPropertyDescription("Custom class for upsert metadata manager")
   private String _metadataManagerClass;

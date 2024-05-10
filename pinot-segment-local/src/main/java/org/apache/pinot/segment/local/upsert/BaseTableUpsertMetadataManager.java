@@ -83,11 +83,11 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
     LOGGER.info(
         "Initialized {} for table: {} with primary key columns: {}, comparison columns: {}, delete record column: {},"
             + " hash function: {}, upsert mode: {}, enable snapshot: {}, enable preload: {}, metadata TTL: {},"
-            + " deleted Keys TTL: {}, enable upsertView: {}, enable upsertView batchRefresh: {}, "
-            + "upsertView refresh interval: {} ms, table index dir: {}", getClass().getSimpleName(), _tableNameWithType,
-        primaryKeyColumns, comparisonColumns, deleteRecordColumn, hashFunction, upsertConfig.getMode(), enableSnapshot,
-        enablePreload, metadataTTL, deletedKeysTTL, enableUpsertView, enableUpsertViewBatchRefresh,
-        upsertViewRefreshIntervalMs, tableIndexDir);
+            + " deleted Keys TTL: {}, enable upsertView: {}, enable upsertView batchRefresh: {},"
+            + " upsertView refresh interval: {} ms, table index dir: {}", getClass().getSimpleName(),
+        _tableNameWithType, primaryKeyColumns, comparisonColumns, deleteRecordColumn, hashFunction,
+        upsertConfig.getMode(), enableSnapshot, enablePreload, metadataTTL, deletedKeysTTL, enableUpsertView,
+        enableUpsertViewBatchRefresh, upsertViewRefreshIntervalMs, tableIndexDir);
 
     initCustomVariables();
   }

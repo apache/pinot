@@ -135,7 +135,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   private final ReadWriteLock _upsertViewLock = new ReentrantReadWriteLock();
   private final Set<IndexSegment> _updatedSegmentsSinceLastRefresh = ConcurrentHashMap.newKeySet();
   private volatile long _lastUpsertViewRefreshTimeMs = 0;
-  private volatile Map<IndexSegment, MutableRoaringBitmap> _segmentQueryableDocIdsMap = new HashMap<>();
+  private volatile Map<IndexSegment, MutableRoaringBitmap> _segmentQueryableDocIdsMap;
 
   protected BasePartitionUpsertMetadataManager(String tableNameWithType, int partitionId, UpsertContext context) {
     _tableNameWithType = tableNameWithType;
@@ -1102,7 +1102,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       if (_enableUpsertViewBatchRefresh) {
         _updatedSegmentsSinceLastRefresh.add(segment);
         _upsertViewLock.readLock().unlock();
-        // Do batch refresh outside the RLock block.
+        // Batch refresh takes WLock, so do it outside RLock for clarity. The R/W lock ensures that only one thread
+        // can refresh the bitmaps. The other threads that are about to update the bitmaps will be blocked until
+        // refreshing is done.
         doBatchRefreshUpsertView(_upsertViewRefreshIntervalMs);
       }
     }
@@ -1126,7 +1128,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       if (_enableUpsertViewBatchRefresh) {
         _updatedSegmentsSinceLastRefresh.add(segment);
         _upsertViewLock.readLock().unlock();
-        // Do batch refresh outside the RLock block.
+        // Batch refresh takes WLock, so do it outside RLock for clarity.
         doBatchRefreshUpsertView(_upsertViewRefreshIntervalMs);
       }
     }
@@ -1206,20 +1208,24 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   }
 
   private void doBatchRefreshUpsertView(long upsertViewFreshnessMs) {
-    if (skipUpsertViewRefresh(upsertViewFreshnessMs)) {
+    // Always refresh if the current view is still empty.
+    if (skipUpsertViewRefresh(upsertViewFreshnessMs) && _segmentQueryableDocIdsMap != null) {
       return;
     }
     _upsertViewLock.writeLock().lock();
     try {
-      if (skipUpsertViewRefresh(upsertViewFreshnessMs)) {
+      // Check again with lock, and always refresh if the current view is still empty.
+      Map<IndexSegment, MutableRoaringBitmap> current = _segmentQueryableDocIdsMap;
+      if (skipUpsertViewRefresh(upsertViewFreshnessMs) && current != null) {
         return;
       }
       Map<IndexSegment, MutableRoaringBitmap> updated = new HashMap<>();
       for (IndexSegment segment : _trackedSegments) {
-        if (!_updatedSegmentsSinceLastRefresh.contains(segment)) {
-          continue;
+        if (current == null || _updatedSegmentsSinceLastRefresh.contains(segment)) {
+          updated.put(segment, getQueryableDocIdsSnapshotFromSegment(segment));
+        } else {
+          updated.put(segment, current.get(segment));
         }
-        updated.put(segment, getQueryableDocIdsSnapshotFromSegment(segment));
       }
       // Swap in the new consistent set of bitmaps.
       _segmentQueryableDocIdsMap = updated;
