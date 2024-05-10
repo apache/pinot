@@ -232,19 +232,6 @@ public class PinotHelixResourceManager {
   private TableCache _tableCache;
   private final LineageManager _lineageManager;
 
-  private HelixConfigScope getClusterConfigScope() {
-    return new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(_helixClusterName).build();
-  }
-
-  public String getClusterConfig(String configName) {
-    Map<String, String> configMap = _helixAdmin.getConfig(getClusterConfigScope(), Collections.singletonList(configName));
-    return configMap != null ? configMap.get(configName) : null;
-  }
-
-  public void setClusterConfig(String key, String value) {
-    _helixAdmin.setConfig(getClusterConfigScope(), Map.of(key, value));
-  }
-
   public PinotHelixResourceManager(String zkURL, String helixClusterName, @Nullable String dataDir,
       boolean isSingleTenantCluster, boolean enableBatchMessageMode, int deletedSegmentsRetentionInDays,
       boolean enableTieredSegmentAssignment, LineageManager lineageManager) {
@@ -4213,4 +4200,19 @@ public class PinotHelixResourceManager {
     System.out.println(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(record));
   }
    */
+
+  private HelixConfigScope getClusterConfigScope() {
+    return new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(_helixClusterName)
+        .build();
+  }
+
+  public String getClusterConfig(String configName) {
+    Map<String, String> configMap =
+        _helixAdmin.getConfig(getClusterConfigScope(), Collections.singletonList(configName));
+    return configMap != null ? configMap.get(configName) : null;
+  }
+
+  public void setClusterConfig(String key, String value) {
+    _helixAdmin.setConfig(getClusterConfigScope(), Map.of(key, value));
+  }
 }
