@@ -35,7 +35,10 @@ import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.PinotReflectionUtils;
 import org.glassfish.grizzly.http.server.CLStaticHttpHandler;
+import org.glassfish.grizzly.http.server.HttpHandler;
 import org.glassfish.grizzly.http.server.HttpServer;
+import org.glassfish.grizzly.http.server.Request;
+import org.glassfish.grizzly.http.server.Response;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.jackson.JacksonFeature;
 import org.glassfish.jersey.media.multipart.MultiPartFeature;
@@ -43,17 +46,13 @@ import org.glassfish.jersey.server.ResourceConfig;
 
 
 public class ControllerAdminApiApplication extends ResourceConfig {
-  public static final String PINOT_CONFIGURATION = "pinotConfiguration";
-
-  public static final String START_TIME = "controllerStartTime";
-
   private final String _controllerResourcePackages;
   private final boolean _useHttps;
   private HttpServer _httpServer;
 
   public ControllerAdminApiApplication(ControllerConf conf) {
     super();
-    property(PINOT_CONFIGURATION, conf);
+    property("pinotConfiguration", conf);
 
     _controllerResourcePackages = conf.getControllerResourcePackages();
     packages(_controllerResourcePackages);
@@ -65,8 +64,7 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     }
     register(JacksonFeature.class);
     register(MultiPartFeature.class);
-    registerClasses(io.swagger.jaxrs.listing.ApiListingResource.class);
-    registerClasses(io.swagger.jaxrs.listing.SwaggerSerializers.class);
+    registerClasses(io.swagger.jaxrs.listing.ApiListingResource.class, io.swagger.jaxrs.listing.SwaggerSerializers.class);
     register(new CorsFilter());
     register(AuthenticationFilter.class);
     // property("jersey.config.server.tracing.type", "ALL");
@@ -85,7 +83,7 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     } catch (IOException e) {
       throw new RuntimeException("Failed to start http server", e);
     }
-    PinotReflectionUtils.runWithLock(this::setupSwagger);
+    setupSwagger();
 
     ClassLoader classLoader = ControllerAdminApiApplication.class.getClassLoader();
 
@@ -94,12 +92,12 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     // Configuring this as a default servlet is an option but that is still ugly if we evolve
     // So, we setup specific handlers for static resource directory. index.html is served directly
     // by a jersey handler
-
-    _httpServer.getServerConfiguration()
-        .addHttpHandler(new CLStaticHttpHandler(classLoader, "/webapp/"), "/index.html");
-    _httpServer.getServerConfiguration()
-        .addHttpHandler(new CLStaticHttpHandler(classLoader, "/webapp/images/"), "/images/");
-    _httpServer.getServerConfiguration().addHttpHandler(new CLStaticHttpHandler(classLoader, "/webapp/js/"), "/js/");
+    _httpServer.getServerConfiguration().addHttpHandler(
+            new SafeStaticHttpHandler(classLoader, "/webapp/"), "/index.html");
+    _httpServer.getServerConfiguration().addHttpHandler(
+            new SafeStaticHttpHandler(classLoader, "/webapp/images/"), "/images/");
+    _httpServer.getServerConfiguration().addHttpHandler(
+            new SafeStaticHttpHandler(classLoader, "/webapp/js/"), "/js/");
   }
 
   private void setupSwagger() {
@@ -108,24 +106,17 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     beanConfig.setDescription("APIs for accessing Pinot Controller information");
     beanConfig.setContact("https://github.com/apache/pinot");
     beanConfig.setVersion("1.0");
-    beanConfig.setExpandSuperTypes(false);
-    if (_useHttps) {
-      beanConfig.setSchemes(new String[]{CommonConstants.HTTPS_PROTOCOL});
-    } else {
-      beanConfig.setSchemes(new String[]{CommonConstants.HTTP_PROTOCOL, CommonConstants.HTTPS_PROTOCOL});
-    }
+    beanConfig.setSchemes(new String[]{_useHttps ? CommonConstants.HTTPS_PROTOCOL : CommonConstants.HTTP_PROTOCOL});
     beanConfig.setBasePath("/");
     beanConfig.setResourcePackage(_controllerResourcePackages);
     beanConfig.setScan(true);
 
     ClassLoader loader = this.getClass().getClassLoader();
-    CLStaticHttpHandler apiStaticHttpHandler = new CLStaticHttpHandler(loader, "/api/");
+    URL swaggerDistLocation = loader.getResource("swaggerui-dist/");
+    HttpHandler swaggerUiHandler = new SafeStaticHttpHandler(new URLClassLoader(new URL[]{swaggerDistLocation}), "swaggerui-dist/");
     // map both /api and /help to swagger docs. /api because it looks nice. /help for backward compatibility
     _httpServer.getServerConfiguration().addHttpHandler(apiStaticHttpHandler, "/api/");
     _httpServer.getServerConfiguration().addHttpHandler(apiStaticHttpHandler, "/help/");
-
-    URL swaggerDistLocation = loader.getResource(CommonConstants.CONFIG_OF_SWAGGER_RESOURCES_PATH);
-    CLStaticHttpHandler swaggerDist = new CLStaticHttpHandler(new URLClassLoader(new URL[]{swaggerDistLocation}));
     _httpServer.getServerConfiguration().addHttpHandler(swaggerDist, "/swaggerui-dist/");
   }
 
@@ -149,4 +140,20 @@ public class ControllerAdminApiApplication extends ResourceConfig {
       }
     }
   }
+  public class SafeStaticHttpHandler extends CLStaticHttpHandler {
+        public SafeStaticHttpHandler(ClassLoader classLoader, String... docRoots) {
+            super(classLoader, docRoots);
+        }
+
+        @Override
+        public void service(Request request, Response response) throws Exception {
+            String uri = request.getRequestURI();
+            if (uri.contains("../") || uri.contains("://") || uri.contains("%")) {
+                response.setStatus(400);
+                response.getWriter().write("Invalid request");
+                return;
+            }
+            super.service(request, response);
+        }
+    }
 }
