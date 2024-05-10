@@ -128,10 +128,10 @@ public final class TableConfigUtils {
           RoutingConfig.MULTI_STAGE_REPLICA_GROUP_SELECTOR_TYPE);
 
   /**
-   * @see TableConfigUtils#validate(TableConfig, Schema, String, boolean)
+   * @see TableConfigUtils#validate(TableConfig, Schema, String, boolean, boolean)
    */
   public static void validate(TableConfig tableConfig, @Nullable Schema schema) {
-    validate(tableConfig, schema, null, false);
+    validate(tableConfig, schema, null, false, false);
   }
 
   /**
@@ -141,11 +141,12 @@ public final class TableConfigUtils {
    * 3. TierConfigs
    * 4. Indexing config
    * 5. Field Config List
+   * 6. Instance pool and replica group, if enabled
    *
    * TODO: Add more validations for each section (e.g. validate conditions are met for aggregateMetrics)
    */
   public static void validate(TableConfig tableConfig, @Nullable Schema schema, @Nullable String typesToSkip,
-      boolean disableGroovy) {
+      boolean disableGroovy, boolean validateIPnRG) {
     Set<ValidationType> skipTypes = parseTypesToSkipString(typesToSkip);
     if (tableConfig.getTableType() == TableType.REALTIME) {
       Preconditions.checkState(schema != null, "Schema should not be null for REALTIME table");
@@ -183,7 +184,40 @@ public final class TableConfigUtils {
       if (!skipTypes.contains(ValidationType.TASK)) {
         validateTaskConfigs(tableConfig, schema);
       }
+
+      if (validateIPnRG) {
+        validateInstancePoolsNReplicaGroups(tableConfig);
+      }
     }
+  }
+
+  /**
+   * Validates the table config is using instance pool and replica group configuration.
+   * @param tableConfig Table config to validate
+   * @return true if the table config is using instance pool and replica group configuration, false otherwise
+   */
+  static boolean isTableUsingInstancePoolAndReplicaGroup(@Nonnull TableConfig tableConfig) {
+    boolean status = true;
+    Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = tableConfig.getInstanceAssignmentConfigMap();
+    if (instanceAssignmentConfigMap != null) {
+      for (InstanceAssignmentConfig instanceAssignmentConfig : instanceAssignmentConfigMap.values()) {
+        if (instanceAssignmentConfig != null) {
+          status &= (instanceAssignmentConfig.getTagPoolConfig().isPoolBased()
+              && instanceAssignmentConfig.getReplicaGroupPartitionConfig().isReplicaGroupBased());
+        } else {
+          status = false;
+        }
+      }
+    } else {
+      status = false;
+    }
+
+    return status;
+  }
+
+  public static void validateInstancePoolsNReplicaGroups(TableConfig tableConfig) {
+    Preconditions.checkState(isTableUsingInstancePoolAndReplicaGroup(tableConfig),
+        "Instance pool and replica group configurations must be enabled");
   }
 
   private static Set<ValidationType> parseTypesToSkipString(@Nullable String typesToSkip) {

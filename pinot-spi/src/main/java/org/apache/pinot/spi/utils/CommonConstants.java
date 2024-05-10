@@ -103,6 +103,8 @@ public class CommonConstants {
     public static final int DEFAULT_HYPERLOGLOG_PLUS_P = 14;
     public static final int DEFAULT_HYPERLOGLOG_PLUS_SP = 0;
 
+    public static final String INSTANCE_POOL_AND_REPLICA_GROUP_CHECK_KEY = "instance.pool.and.replica.group.check";
+
     // 2 to the power of 14, for tradeoffs see datasketches library documentation:
     // https://datasketches.apache.org/docs/Theta/ThetaErrorTable.html
     public static final int DEFAULT_THETA_SKETCH_NOMINAL_ENTRIES = 16384;

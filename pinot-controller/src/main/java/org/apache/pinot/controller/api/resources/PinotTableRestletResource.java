@@ -229,7 +229,9 @@ public class PinotTableRestletResource {
       TableConfigTunerUtils.applyTunerConfigs(_pinotHelixResourceManager, tableConfig, schema, Collections.emptyMap());
 
       // TableConfigUtils.validate(...) is used across table create/update.
-      TableConfigUtils.validate(tableConfig, schema, typesToSkip, _controllerConf.isDisableIngestionGroovy());
+      TableConfigUtils.validate(tableConfig, schema, typesToSkip, _controllerConf.isDisableIngestionGroovy(),
+          "true".equalsIgnoreCase(_pinotHelixResourceManager.getClusterConfig(
+              CommonConstants.Helix.INSTANCE_POOL_AND_REPLICA_GROUP_CHECK_KEY)));
       TableConfigUtils.validateTableName(tableConfig);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);
@@ -498,7 +500,9 @@ public class PinotTableRestletResource {
       }
 
       Schema schema = _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
-      TableConfigUtils.validate(tableConfig, schema, typesToSkip, _controllerConf.isDisableIngestionGroovy());
+      TableConfigUtils.validate(tableConfig, schema, typesToSkip, _controllerConf.isDisableIngestionGroovy(),
+          "true".equalsIgnoreCase(_pinotHelixResourceManager.getClusterConfig(
+              CommonConstants.Helix.INSTANCE_POOL_AND_REPLICA_GROUP_CHECK_KEY)));
     } catch (Exception e) {
       String msg = String.format("Invalid table config: %s with error: %s", tableName, e.getMessage());
       throw new ControllerApplicationException(LOGGER, msg, Response.Status.BAD_REQUEST, e);
@@ -568,18 +572,22 @@ public class PinotTableRestletResource {
     }
 
     ObjectNode validationResponse =
-        validateConfig(tableConfig, _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig), typesToSkip);
+        validateConfig(tableConfig, _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig), typesToSkip,
+            "true".equalsIgnoreCase(_pinotHelixResourceManager.getClusterConfig(
+                CommonConstants.Helix.INSTANCE_POOL_AND_REPLICA_GROUP_CHECK_KEY)));
     validationResponse.set("unrecognizedProperties",
         JsonUtils.objectToJsonNode(tableConfigAndUnrecognizedProperties.getRight()));
     return validationResponse;
   }
 
-  private ObjectNode validateConfig(TableConfig tableConfig, Schema schema, @Nullable String typesToSkip) {
+  private ObjectNode validateConfig(TableConfig tableConfig, Schema schema, @Nullable String typesToSkip,
+      boolean validateIPnRG) {
     try {
       if (schema == null) {
         throw new SchemaNotFoundException("Got empty schema");
       }
-      TableConfigUtils.validate(tableConfig, schema, typesToSkip, _controllerConf.isDisableIngestionGroovy());
+      TableConfigUtils.validate(tableConfig, schema, typesToSkip, _controllerConf.isDisableIngestionGroovy(),
+          validateIPnRG);
       ObjectNode tableConfigValidateStr = JsonUtils.newObjectNode();
       if (tableConfig.getTableType() == TableType.OFFLINE) {
         tableConfigValidateStr.set(TableType.OFFLINE.name(), tableConfig.toJsonNode());
