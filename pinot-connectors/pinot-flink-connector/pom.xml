@@ -43,7 +43,11 @@
     </dependency>
     <dependency>
       <groupId>org.apache.flink</groupId>
-      <artifactId>flink-streaming-java_${scala.compat.version}</artifactId>
+      <artifactId>flink-streaming-java</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.flink</groupId>
+      <artifactId>flink-java</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
@@ -74,7 +78,7 @@
     </dependency>
     <dependency>
       <groupId>org.apache.flink</groupId>
-      <artifactId>flink-clients_${scala.compat.version}</artifactId>
+      <artifactId>flink-clients</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
@@ -83,16 +87,6 @@
       <version>${project.parent.version}</version>
       <type>test-jar</type>
       <scope>test</scope>
-      <exclusions>
-        <exclusion>
-          <groupId>org.scala-lang</groupId>
-          <artifactId>scala-library</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.scala-lang.modules</groupId>
-          <artifactId>scala-java8-compat_2.12</artifactId>
-        </exclusion>
-      </exclusions>
     </dependency>
   </dependencies>
   <build>
