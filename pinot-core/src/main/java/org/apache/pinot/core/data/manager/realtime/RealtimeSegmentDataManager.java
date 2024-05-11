@@ -34,6 +34,7 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.Lock;
 import java.util.function.BooleanSupplier;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
@@ -722,7 +723,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           _state = State.HOLDING;
           SegmentCompletionProtocol.Response response = postSegmentConsumedMsg();
           SegmentCompletionProtocol.ControllerResponseStatus status = response.getStatus();
-          boolean success;
           switch (status) {
             case NOT_LEADER:
               // Retain the same state
@@ -757,14 +757,20 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
                   _state = State.DISCARDED;
                   break;
                 case DEFAULT:
-                  success = buildSegmentAndReplace();
-                  if (success) {
-                    _state = State.RETAINED;
-                  } else {
-                    // Could not build segment for some reason. We can only download it.
-                    _state = State.ERROR;
-                    _segmentLogger.error("Could not build segment for {}", _segmentNameStr);
+                  // Lock the segment to avoid multiple threads touching the same segment.
+                  Lock segmentLock = _realtimeTableDataManager.getSegmentLock(_segmentNameStr);
+                  segmentLock.lock();
+                  try {
+                    if (buildSegmentAndReplace()) {
+                      _state = State.RETAINED;
+                      break;
+                    }
+                  } finally {
+                    segmentLock.unlock();
                   }
+                  // Could not build segment for some reason. We can only download it.
+                  _state = State.ERROR;
+                  _segmentLogger.error("Could not build segment for {}", _segmentNameStr);
                   break;
                 default:
                   break;
@@ -773,24 +779,30 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
             case COMMIT:
               _state = State.COMMITTING;
               _currentOffset = _partitionGroupConsumer.checkpoint(_currentOffset);
-              long buildTimeSeconds = response.getBuildTimeSeconds();
-              buildSegmentForCommit(buildTimeSeconds * 1000L);
-              if (_segmentBuildDescriptor == null) {
-                // We could not build the segment. Go into error state.
-                _state = State.ERROR;
-                _segmentLogger.error("Could not build segment for {}", _segmentNameStr);
-              } else {
-                success = commitSegment(response.getControllerVipUrl());
-                if (success) {
-                  _state = State.COMMITTED;
-                } else {
-                  // If for any reason commit failed, we don't want to be in COMMITTING state when we hold.
-                  // Change the state to HOLDING before looping around.
-                  _state = State.HOLDING;
-                  _segmentLogger.info("Could not commit segment. Retrying after hold");
-                  hold();
+              // Lock the segment to avoid multiple threads touching the same segment.
+              Lock segmentLock = _realtimeTableDataManager.getSegmentLock(_segmentNameStr);
+              segmentLock.lock();
+              try {
+                long buildTimeSeconds = response.getBuildTimeSeconds();
+                buildSegmentForCommit(buildTimeSeconds * 1000L);
+                if (_segmentBuildDescriptor == null) {
+                  // We could not build the segment. Go into error state.
+                  _state = State.ERROR;
+                  _segmentLogger.error("Could not build segment for {}", _segmentNameStr);
+                  break;
                 }
+                if (commitSegment(response.getControllerVipUrl())) {
+                  _state = State.COMMITTED;
+                  break;
+                }
+              } finally {
+                segmentLock.unlock();
               }
+              // If for any reason commit failed, we don't want to be in COMMITTING state when we hold.
+              // Change the state to HOLDING before looping around.
+              _state = State.HOLDING;
+              _segmentLogger.info("Could not commit segment. Retrying after hold");
+              hold();
               break;
             default:
               _segmentLogger.error("Holding after response from Controller: {}", response.toJsonString());
@@ -1066,7 +1078,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   }
 
   @VisibleForTesting
-  boolean commitSegment(String controllerVipUrl) {
+  boolean commitSegment(String controllerVipUrl)
+      throws Exception {
     File segmentTarFile = _segmentBuildDescriptor.getSegmentTarFile();
     Preconditions.checkState(segmentTarFile != null && segmentTarFile.exists(), "Segment tar file: %s does not exist",
         segmentTarFile);
@@ -1076,7 +1089,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS);
       return false;
     }
-    _realtimeTableDataManager.replaceLLSegment(_segmentNameStr, _indexLoadingConfig);
+    _realtimeTableDataManager.replaceConsumingSegment(_segmentNameStr);
     removeSegmentFile();
     return true;
   }
@@ -1104,12 +1117,13 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     return segmentCommitter.commit(_segmentBuildDescriptor);
   }
 
-  protected boolean buildSegmentAndReplace() {
+  protected boolean buildSegmentAndReplace()
+      throws Exception {
     SegmentBuildDescriptor descriptor = buildSegmentInternal(false);
     if (descriptor == null) {
       return false;
     }
-    _realtimeTableDataManager.replaceLLSegment(_segmentNameStr, _indexLoadingConfig);
+    _realtimeTableDataManager.replaceConsumingSegment(_segmentNameStr);
     return true;
   }
 
@@ -1298,10 +1312,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     }
   }
 
-  protected void downloadSegmentAndReplace(SegmentZKMetadata segmentZKMetadata) {
+  protected void downloadSegmentAndReplace(SegmentZKMetadata segmentZKMetadata)
+      throws Exception {
     closeStreamConsumers();
-    _realtimeTableDataManager
-        .downloadAndReplaceSegment(_segmentNameStr, segmentZKMetadata, _indexLoadingConfig, _tableConfig);
+    _realtimeTableDataManager.downloadAndReplaceConsumingSegment(segmentZKMetadata);
   }
 
   protected long now() {
@@ -1331,15 +1345,21 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     return true;
   }
 
-  protected void doDestroy() {
+  @Override
+  public void doOffload() {
     try {
       stop();
     } catch (InterruptedException e) {
       _segmentLogger.error("Could not stop consumer thread");
     }
-    _realtimeSegment.destroy();
     closeStreamConsumers();
     cleanupMetrics();
+    _realtimeSegment.offload();
+  }
+
+  @Override
+  protected void doDestroy() {
+    _realtimeSegment.destroy();
   }
 
   public void startConsumption() {
