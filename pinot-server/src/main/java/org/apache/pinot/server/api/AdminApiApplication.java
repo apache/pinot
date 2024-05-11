@@ -32,6 +32,7 @@ import javax.ws.rs.container.ContainerResponseContext;
 import javax.ws.rs.container.ContainerResponseFilter;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.utils.PinotStaticHttpHandler;
 import org.apache.pinot.common.utils.log.DummyLogFileServer;
 import org.apache.pinot.common.utils.log.LocalLogFileServer;
 import org.apache.pinot.common.utils.log.LogFileServer;
@@ -62,7 +63,6 @@ public class AdminApiApplication extends ResourceConfig {
   private final ServerInstance _serverInstance;
   private HttpServer _httpServer;
   private final String _adminApiResourcePackages;
-
 
   public AdminApiApplication(ServerInstance instance, AccessControlFactory accessControlFactory,
       PinotConfiguration serverConf) {
@@ -157,7 +157,7 @@ public class AdminApiApplication extends ResourceConfig {
 
     URL swaggerDistLocation =
         AdminApiApplication.class.getClassLoader().getResource(CommonConstants.CONFIG_OF_SWAGGER_RESOURCES_PATH);
-    CLStaticHttpHandler swaggerDist = new CLStaticHttpHandler(new URLClassLoader(new URL[]{swaggerDistLocation}));
+    CLStaticHttpHandler swaggerDist = new PinotStaticHttpHandler(new URLClassLoader(new URL[]{swaggerDistLocation}));
     _httpServer.getServerConfiguration().addHttpHandler(swaggerDist, "/swaggerui-dist/");
   }
 
