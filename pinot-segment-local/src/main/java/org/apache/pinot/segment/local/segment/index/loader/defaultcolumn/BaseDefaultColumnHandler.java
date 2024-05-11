@@ -30,7 +30,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.configuration2.PropertiesConfiguration;
-import org.apache.commons.lang.ArrayUtils;
 import org.apache.pinot.common.function.FunctionUtils;
 import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.segment.local.function.FunctionEvaluator;
@@ -598,11 +597,21 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
             if (isSingleValue) {
               outputValues[i] = outputValueType.toInt(outputValue);
             } else {
-              Integer[] values = outputValueType.toIntegerArray(outputValue);
-              if (values.length == 0) {
-                values = new Integer[]{(Integer) fieldSpec.getDefaultNullValue()};
+              if (createDictionary) {
+                // Use array of primitive wrapper class for dictionary
+                Integer[] values = outputValueType.toIntegerArray(outputValue);
+                if (values.length == 0) {
+                  values = new Integer[]{(Integer) fieldSpec.getDefaultNullValue()};
+                }
+                outputValues[i] = values;
+              } else {
+                // Use primitive array for raw encoded
+                int[] values = outputValueType.toPrimitiveIntArray(outputValue);
+                if (values.length == 0) {
+                  values = new int[]{(int) fieldSpec.getDefaultNullValue()};
+                }
+                outputValues[i] = values;
               }
-              outputValues[i] = values;
             }
           }
           IntColumnPreIndexStatsCollector statsCollector =
@@ -622,11 +631,21 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
             if (isSingleValue) {
               outputValues[i] = outputValueType.toLong(outputValue);
             } else {
-              Long[] values = outputValueType.toLongArray(outputValue);
-              if (values.length == 0) {
-                values = new Long[]{(Long) fieldSpec.getDefaultNullValue()};
+              if (createDictionary) {
+                // Use array of primitive wrapper class for dictionary
+                Long[] values = outputValueType.toLongArray(outputValue);
+                if (values.length == 0) {
+                  values = new Long[]{(Long) fieldSpec.getDefaultNullValue()};
+                }
+                outputValues[i] = values;
+              } else {
+                // Use primitive array for raw encoded
+                long[] values = outputValueType.toPrimitiveLongArray(outputValue);
+                if (values.length == 0) {
+                  values = new long[]{(long) fieldSpec.getDefaultNullValue()};
+                }
+                outputValues[i] = values;
               }
-              outputValues[i] = values;
             }
           }
           LongColumnPreIndexStatsCollector statsCollector =
@@ -646,11 +665,21 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
             if (isSingleValue) {
               outputValues[i] = outputValueType.toFloat(outputValue);
             } else {
-              Float[] values = outputValueType.toFloatArray(outputValue);
-              if (values.length == 0) {
-                values = new Float[]{(Float) fieldSpec.getDefaultNullValue()};
+              if (createDictionary) {
+                // Use array of primitive wrapper class for dictionary
+                Float[] values = outputValueType.toFloatArray(outputValue);
+                if (values.length == 0) {
+                  values = new Float[]{(Float) fieldSpec.getDefaultNullValue()};
+                }
+                outputValues[i] = values;
+              } else {
+                // Use primitive array for raw encoded
+                float[] values = outputValueType.toPrimitiveFloatArray(outputValue);
+                if (values.length == 0) {
+                  values = new float[]{(float) fieldSpec.getDefaultNullValue()};
+                }
+                outputValues[i] = values;
               }
-              outputValues[i] = values;
             }
           }
           FloatColumnPreIndexStatsCollector statsCollector =
@@ -670,11 +699,21 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
             if (isSingleValue) {
               outputValues[i] = outputValueType.toDouble(outputValue);
             } else {
-              Double[] values = outputValueType.toDoubleArray(outputValue);
-              if (values.length == 0) {
-                values = new Double[]{(Double) fieldSpec.getDefaultNullValue()};
+              if (createDictionary) {
+                // Use array of primitive wrapper class for dictionary
+                Double[] values = outputValueType.toDoubleArray(outputValue);
+                if (values.length == 0) {
+                  values = new Double[]{(Double) fieldSpec.getDefaultNullValue()};
+                }
+                outputValues[i] = values;
+              } else {
+                // Use primitive array for raw encoded
+                double[] values = outputValueType.toPrimitiveDoubleArray(outputValue);
+                if (values.length == 0) {
+                  values = new double[]{(double) fieldSpec.getDefaultNullValue()};
+                }
+                outputValues[i] = values;
               }
-              outputValues[i] = values;
             }
           }
           DoubleColumnPreIndexStatsCollector statsCollector =
@@ -854,16 +893,16 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
           switch (fieldSpec.getDataType().getStoredType()) {
             // Casts are safe here because we've already done the conversion in createDerivedColumnV1Indices
             case INT:
-              forwardIndexCreator.putIntMV(ArrayUtils.toPrimitive((Integer[]) outputValue));
+              forwardIndexCreator.putIntMV((int[]) outputValue);
               break;
             case LONG:
-              forwardIndexCreator.putLongMV(ArrayUtils.toPrimitive((Long[]) outputValue));
+              forwardIndexCreator.putLongMV((long[]) outputValue);
               break;
             case FLOAT:
-              forwardIndexCreator.putFloatMV(ArrayUtils.toPrimitive((Float[]) outputValue));
+              forwardIndexCreator.putFloatMV((float[]) outputValue);
               break;
             case DOUBLE:
-              forwardIndexCreator.putDoubleMV(ArrayUtils.toPrimitive((Double[]) outputValue));
+              forwardIndexCreator.putDoubleMV((double[]) outputValue);
               break;
             case STRING:
               forwardIndexCreator.putStringMV((String[]) outputValue);

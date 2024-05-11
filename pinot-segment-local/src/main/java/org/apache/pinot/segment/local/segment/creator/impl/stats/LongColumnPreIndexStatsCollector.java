@@ -47,6 +47,14 @@ public class LongColumnPreIndexStatsCollector extends AbstractColumnStatisticsCo
 
       _maxNumberOfMultiValues = Math.max(_maxNumberOfMultiValues, values.length);
       updateTotalNumberOfEntries(values);
+    } else if (entry instanceof long[]) {
+      long[] values = (long[]) entry;
+      for (long value : values) {
+        _values.add(value);
+      }
+
+      _maxNumberOfMultiValues = Math.max(_maxNumberOfMultiValues, values.length);
+      updateTotalNumberOfEntries(values.length);
     } else {
       long value = (long) entry;
       addressSorted(value);
