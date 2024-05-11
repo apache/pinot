@@ -72,7 +72,6 @@ public class JsonIndexTest {
     FileUtils.deleteDirectory(INDEX_DIR);
   }
 
-
   @Test
   public void testSmallIndex()
       throws Exception {
@@ -155,10 +154,19 @@ public class JsonIndexTest {
         Assert.assertEquals(matchingDocIds.toArray(), new int[]{1, 2, 3});
 
         matchingDocIds = getMatchingDocIds(indexReader, "\"addresses[*].street\" NOT IN ('street-10', 'street-22')");
-        Assert.assertEquals(matchingDocIds.toArray(), new int[]{0, 3});
+        Assert.assertEquals(matchingDocIds.toArray(), new int[]{0, 1, 2, 3});
+
+        matchingDocIds = getMatchingDocIds(indexReader, "\"addresses[*].country\" != 'ca'");
+        Assert.assertEquals(matchingDocIds.toArray(), new int[]{0, 1, 2});
+
+        matchingDocIds = getMatchingDocIds(indexReader, "\"skills[*]\" NOT IN ('english', 'japanese')");
+        Assert.assertEquals(matchingDocIds.toArray(), new int[]{0, 2});
 
         matchingDocIds = getMatchingDocIds(indexReader, "\"addresses[0].country\" IN ('ca', 'us')");
         Assert.assertEquals(matchingDocIds.toArray(), new int[]{0, 1, 3});
+
+        matchingDocIds = getMatchingDocIds(indexReader, "\"addresses[0].country\" NOT IN ('ca', 'us')");
+        Assert.assertEquals(matchingDocIds.toArray(), new int[]{2});
 
         matchingDocIds = getMatchingDocIds(indexReader, "\"addresses[*].types[1]\" = 'office'");
         Assert.assertEquals(matchingDocIds.toArray(), new int[]{3});
@@ -170,10 +178,16 @@ public class JsonIndexTest {
         Assert.assertEquals(matchingDocIds.toArray(), new int[0]);
 
         matchingDocIds = getMatchingDocIds(indexReader, "\"addresses[*].types[*]\" IS NULL");
-        Assert.assertEquals(matchingDocIds.toArray(), new int[]{0, 1, 2});
+        Assert.assertEquals(matchingDocIds.toArray(), new int[]{0, 1, 2, 3});
+
+        matchingDocIds = getMatchingDocIds(indexReader, "\"addresses[*].types[*]\" IS NOT NULL");
+        Assert.assertEquals(matchingDocIds.toArray(), new int[]{3});
 
         matchingDocIds = getMatchingDocIds(indexReader, "\"addresses[1].types[*]\" IS NULL");
         Assert.assertEquals(matchingDocIds.toArray(), new int[]{0, 1, 2, 3});
+
+        matchingDocIds = getMatchingDocIds(indexReader, "\"addresses[1].types[*]\" IS NOT NULL");
+        Assert.assertEquals(matchingDocIds.toArray(), new int[0]);
 
         matchingDocIds = getMatchingDocIds(indexReader, "abc IS NULL");
         Assert.assertEquals(matchingDocIds.toArray(), new int[]{0, 1, 2, 3});
@@ -187,6 +201,45 @@ public class JsonIndexTest {
 
         matchingDocIds = getMatchingDocIds(indexReader, "\"addresses[*].country\" = 'us' OR \"skills[*]\" IS NOT NULL");
         Assert.assertEquals(matchingDocIds.toArray(), new int[]{0, 1, 2});
+
+        // Nested exclusive predicates
+
+        matchingDocIds = getMatchingDocIds(indexReader,
+            "\"addresses[0].street\" = 'street-00' AND \"addresses[0].country\" != 'ca'");
+        Assert.assertEquals(matchingDocIds.toArray(), new int[]{0});
+
+        matchingDocIds = getMatchingDocIds(indexReader,
+            "\"age\" = '20' AND \"addresses[*].country\" NOT IN ('us')");
+        Assert.assertEquals(matchingDocIds.toArray(), new int[]{0});
+
+        matchingDocIds = getMatchingDocIds(indexReader,
+            "\"age\" = '20' AND \"addresses[*].country\" NOT IN ('us', 'ca')");
+        Assert.assertEquals(matchingDocIds.toArray(), new int[0]);
+
+        matchingDocIds = getMatchingDocIds(indexReader,
+            "\"addresses[*].street\" = 'street-21' AND \"addresses[*].country\" != 'kr'");
+        Assert.assertEquals(matchingDocIds.toArray(), new int[0]);
+
+        matchingDocIds = getMatchingDocIds(indexReader,
+            "\"addresses[*].street\" = 'street-21' AND \"addresses[*].country\" != 'us'");
+        Assert.assertEquals(matchingDocIds.toArray(), new int[]{2});
+
+        matchingDocIds = getMatchingDocIds(indexReader,
+            "\"addresses[*].street\" = 'street-30' AND \"addresses[*].country\" NOT IN ('us', 'kr')");
+        Assert.assertEquals(matchingDocIds.toArray(), new int[]{3});
+
+        matchingDocIds = getMatchingDocIds(indexReader,
+            "REGEXP_LIKE(\"addresses[*].street\", 'street-0.*') AND \"addresses[*].country\" NOT IN ('us', 'ca')");
+        Assert.assertEquals(matchingDocIds.toArray(), new int[0]);
+
+        matchingDocIds = getMatchingDocIds(indexReader,
+            "REGEXP_LIKE(\"addresses[*].street\", 'street-3.*') AND \"addresses[*].country\" != 'us'");
+        Assert.assertEquals(matchingDocIds.toArray(), new int[]{3});
+
+        // A single matching flattened doc ID will result in the overall doc being matched
+        matchingDocIds = getMatchingDocIds(indexReader,
+            "\"addresses[*].street\" = 'street-21' AND \"skills[*]\" != 'japanese'");
+        Assert.assertEquals(matchingDocIds.toArray(), new int[]{2});
       }
     }
   }
@@ -308,8 +361,8 @@ public class JsonIndexTest {
   /**
    * Creates a JSON index with the given config and adds the given records
    * @param createOnHeap Whether to create an on-heap index
-   * @param jsonIndexConfig
-   * @param records
+   * @param jsonIndexConfig the JSON index config
+   * @param records the records to be added to the index
    * @throws IOException on error
    */
   private void createIndex(boolean createOnHeap, JsonIndexConfig jsonIndexConfig, String[] records)
@@ -500,7 +553,7 @@ public class JsonIndexTest {
         Assert.assertEquals(values, new String[]{"value2", "value1"});
 
         // Mutable index, context is reused for the second method call
-        context = mutableJsonIndex.getMatchingFlattenedDocsMap("$.field1", null);;
+        context = mutableJsonIndex.getMatchingFlattenedDocsMap("$.field1", null);
         docMask = new int[]{0};
         values = mutableJsonIndex.getValuesSV(docMask, docMask.length, context, true);
         Assert.assertEquals(values, new String[]{"value1"});

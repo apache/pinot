@@ -135,33 +135,14 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
 
     _readLock.lock();
     try {
-      if (filter.getType() == FilterContext.Type.PREDICATE && isExclusive(filter.getPredicate().getType())) {
-        // Handle exclusive predicate separately because the flip can only be applied to the unflattened doc ids in
-        // order to get the correct result, and it cannot be nested
-        RoaringBitmap matchingFlattenedDocIds = getMatchingFlattenedDocIds(filter.getPredicate());
-        MutableRoaringBitmap matchingDocIds = new MutableRoaringBitmap();
-        matchingFlattenedDocIds.forEach(
-            (IntConsumer) flattenedDocId -> matchingDocIds.add(_docIdMapping.getInt(flattenedDocId)));
-        matchingDocIds.flip(0, (long) _nextDocId);
-        return matchingDocIds;
-      } else {
-        RoaringBitmap matchingFlattenedDocIds = getMatchingFlattenedDocIds(filter);
-        MutableRoaringBitmap matchingDocIds = new MutableRoaringBitmap();
-        matchingFlattenedDocIds.forEach(
-            (IntConsumer) flattenedDocId -> matchingDocIds.add(_docIdMapping.getInt(flattenedDocId)));
-        return matchingDocIds;
-      }
+      RoaringBitmap matchingFlattenedDocIds = getMatchingFlattenedDocIds(filter);
+      MutableRoaringBitmap matchingDocIds = new MutableRoaringBitmap();
+      matchingFlattenedDocIds.forEach(
+          (IntConsumer) flattenedDocId -> matchingDocIds.add(_docIdMapping.getInt(flattenedDocId)));
+      return matchingDocIds;
     } finally {
       _readLock.unlock();
     }
-  }
-
-  /**
-   * Returns {@code true} if the given predicate type is exclusive for json_match calculation, {@code false} otherwise.
-   */
-  private boolean isExclusive(Predicate.Type predicateType) {
-    return predicateType == Predicate.Type.NOT_EQ || predicateType == Predicate.Type.NOT_IN
-        || predicateType == Predicate.Type.IS_NULL;
   }
 
   /**
@@ -188,10 +169,7 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
         return matchingDocIds;
       }
       case PREDICATE: {
-        Predicate predicate = filter.getPredicate();
-        Preconditions.checkArgument(!isExclusive(predicate.getType()), "Exclusive predicate: %s cannot be nested",
-            predicate);
-        return getMatchingFlattenedDocIds(predicate);
+        return getMatchingFlattenedDocIds(filter.getPredicate());
       }
       default:
         throw new IllegalStateException();
@@ -200,8 +178,6 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
 
   /**
    * Returns the matching flattened doc ids for the given predicate.
-   * <p>Exclusive predicate is handled as the inclusive predicate, and the caller should flip the unflattened doc ids in
-   * order to get the correct exclusive predicate result.
    */
   private RoaringBitmap getMatchingFlattenedDocIds(Predicate predicate) {
     ExpressionContext lhs = predicate.getLhs();
@@ -226,131 +202,225 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
     }
 
     Predicate.Type predicateType = predicate.getType();
-    if (predicateType == Predicate.Type.EQ || predicateType == Predicate.Type.NOT_EQ) {
-      String value = predicateType == Predicate.Type.EQ ? ((EqPredicate) predicate).getValue()
-          : ((NotEqPredicate) predicate).getValue();
-      String keyValuePair = key + JsonIndexCreator.KEY_VALUE_SEPARATOR + value;
-      RoaringBitmap matchingDocIdsForKeyValuePair = _postingListMap.get(keyValuePair);
-      if (matchingDocIdsForKeyValuePair != null) {
-        if (matchingDocIds == null) {
-          return matchingDocIdsForKeyValuePair.clone();
-        } else {
-          matchingDocIds.and(matchingDocIdsForKeyValuePair);
-          return matchingDocIds;
-        }
-      } else {
-        return new RoaringBitmap();
-      }
-    } else if (predicateType == Predicate.Type.IN || predicateType == Predicate.Type.NOT_IN) {
-      List<String> values = predicateType == Predicate.Type.IN ? ((InPredicate) predicate).getValues()
-          : ((NotInPredicate) predicate).getValues();
-      RoaringBitmap matchingDocIdsForKeyValuePairs = new RoaringBitmap();
-      for (String value : values) {
+    switch (predicateType) {
+      case EQ: {
+        String value = ((EqPredicate) predicate).getValue();
         String keyValuePair = key + JsonIndexCreator.KEY_VALUE_SEPARATOR + value;
         RoaringBitmap matchingDocIdsForKeyValuePair = _postingListMap.get(keyValuePair);
         if (matchingDocIdsForKeyValuePair != null) {
-          matchingDocIdsForKeyValuePairs.or(matchingDocIdsForKeyValuePair);
-        }
-      }
-      if (matchingDocIds == null) {
-        return matchingDocIdsForKeyValuePairs;
-      } else {
-        matchingDocIds.and(matchingDocIdsForKeyValuePairs);
-        return matchingDocIds;
-      }
-    } else if (predicateType == Predicate.Type.IS_NOT_NULL || predicateType == Predicate.Type.IS_NULL) {
-      RoaringBitmap matchingDocIdsForKey = _postingListMap.get(key);
-      if (matchingDocIdsForKey != null) {
-        if (matchingDocIds == null) {
-          return matchingDocIdsForKey.clone();
+          if (matchingDocIds == null) {
+            return matchingDocIdsForKeyValuePair.clone();
+          } else {
+            matchingDocIds.and(matchingDocIdsForKeyValuePair);
+            return matchingDocIds;
+          }
         } else {
-          matchingDocIds.and(matchingDocIdsForKey);
-          return matchingDocIds;
-        }
-      } else {
-        return new RoaringBitmap();
-      }
-    } else if (predicateType == Predicate.Type.REGEXP_LIKE) {
-      Map<String, RoaringBitmap> subMap = getMatchingKeysMap(key);
-      if (subMap.isEmpty()) {
-        return new RoaringBitmap();
-      }
-      Pattern pattern = ((RegexpLikePredicate) predicate).getPattern();
-      RoaringBitmap result = null;
-
-      for (Map.Entry<String, RoaringBitmap> entry : subMap.entrySet()) {
-        if (!pattern.matcher(entry.getKey().substring(key.length() + 1)).matches()) {
-          continue;
-        }
-        if (result == null) {
-          result = entry.getValue().clone();
-        } else {
-          result.or(entry.getValue());
+          return new RoaringBitmap();
         }
       }
 
-      if (result == null) {
-        return new RoaringBitmap();
-      } else {
-        if (matchingDocIds == null) {
-          return result;
-        } else {
-          matchingDocIds.and(result);
-          return matchingDocIds;
+      case NOT_EQ: {
+        Map<String, RoaringBitmap> subMap = getMatchingKeysMap(key);
+        if (subMap.isEmpty()) {
+          return new RoaringBitmap();
         }
-      }
-    } else if (predicateType == Predicate.Type.RANGE) {
-      Map<String, RoaringBitmap> subMap = getMatchingKeysMap(key);
-      if (subMap.isEmpty()) {
-        return new RoaringBitmap();
-      }
-      RoaringBitmap result = null;
+        String notEqualValue = ((NotEqPredicate) predicate).getValue();
+        RoaringBitmap result = null;
 
-      RangePredicate rangePredicate = (RangePredicate) predicate;
-      FieldSpec.DataType rangeDataType = rangePredicate.getRangeDataType();
-      // Simplify to only support numeric and string types
-      if (rangeDataType.isNumeric()) {
-        rangeDataType = FieldSpec.DataType.DOUBLE;
-      } else {
-        rangeDataType = FieldSpec.DataType.STRING;
-      }
-
-      boolean lowerUnbounded = rangePredicate.getLowerBound().equals(RangePredicate.UNBOUNDED);
-      boolean upperUnbounded = rangePredicate.getUpperBound().equals(RangePredicate.UNBOUNDED);
-      boolean lowerInclusive = lowerUnbounded || rangePredicate.isLowerInclusive();
-      boolean upperInclusive = upperUnbounded || rangePredicate.isUpperInclusive();
-      Object lowerBound = lowerUnbounded ? null : rangeDataType.convert(rangePredicate.getLowerBound());
-      Object upperBound = upperUnbounded ? null : rangeDataType.convert(rangePredicate.getUpperBound());
-
-      for (Map.Entry<String, RoaringBitmap> entry : subMap.entrySet()) {
-        Object valueObj = rangeDataType.convert(entry.getKey().substring(key.length() + 1));
-        boolean lowerCompareResult =
-            lowerUnbounded || (lowerInclusive ? rangeDataType.compare(valueObj, lowerBound) >= 0
-                : rangeDataType.compare(valueObj, lowerBound) > 0);
-        boolean upperCompareResult =
-            upperUnbounded || (upperInclusive ? rangeDataType.compare(valueObj, upperBound) <= 0
-                : rangeDataType.compare(valueObj, upperBound) < 0);
-        if (lowerCompareResult && upperCompareResult) {
+        for (Map.Entry<String, RoaringBitmap> entry : subMap.entrySet()) {
+          if (notEqualValue.equals(entry.getKey().substring(key.length() + 1))) {
+            continue;
+          }
           if (result == null) {
             result = entry.getValue().clone();
           } else {
             result.or(entry.getValue());
           }
         }
+
+        if (result == null) {
+          return new RoaringBitmap();
+        } else {
+          if (matchingDocIds == null) {
+            return result;
+          } else {
+            matchingDocIds.and(result);
+            return matchingDocIds;
+          }
+        }
       }
 
-      if (result == null) {
-        return new RoaringBitmap();
-      } else {
+      case IN: {
+        List<String> values = ((InPredicate) predicate).getValues();
+        RoaringBitmap matchingDocIdsForKeyValuePairs = new RoaringBitmap();
+        for (String value : values) {
+          String keyValuePair = key + JsonIndexCreator.KEY_VALUE_SEPARATOR + value;
+          RoaringBitmap matchingDocIdsForKeyValuePair = _postingListMap.get(keyValuePair);
+          if (matchingDocIdsForKeyValuePair != null) {
+            matchingDocIdsForKeyValuePairs.or(matchingDocIdsForKeyValuePair);
+          }
+        }
         if (matchingDocIds == null) {
-          return result;
+          return matchingDocIdsForKeyValuePairs;
         } else {
-          matchingDocIds.and(result);
+          matchingDocIds.and(matchingDocIdsForKeyValuePairs);
           return matchingDocIds;
         }
       }
-    } else {
-      throw new IllegalStateException("Unsupported json_match predicate type: " + predicate);
+
+      case NOT_IN: {
+        Map<String, RoaringBitmap> subMap = getMatchingKeysMap(key);
+        if (subMap.isEmpty()) {
+          return new RoaringBitmap();
+        }
+        List<String> notInValues = ((NotInPredicate) predicate).getValues();
+        RoaringBitmap result = null;
+
+        for (Map.Entry<String, RoaringBitmap> entry : subMap.entrySet()) {
+          if (notInValues.contains(entry.getKey().substring(key.length() + 1))) {
+            continue;
+          }
+          if (result == null) {
+            result = entry.getValue().clone();
+          } else {
+            result.or(entry.getValue());
+          }
+        }
+
+        if (result == null) {
+          return new RoaringBitmap();
+        } else {
+          if (matchingDocIds == null) {
+            return result;
+          } else {
+            matchingDocIds.and(result);
+            return matchingDocIds;
+          }
+        }
+      }
+
+      case IS_NOT_NULL: {
+        RoaringBitmap matchingDocIdsForKey = _postingListMap.get(key);
+        if (matchingDocIdsForKey != null) {
+          if (matchingDocIds == null) {
+            return matchingDocIdsForKey.clone();
+          } else {
+            matchingDocIds.and(matchingDocIdsForKey);
+            return matchingDocIds;
+          }
+        } else {
+          return new RoaringBitmap();
+        }
+      }
+
+      case IS_NULL: {
+        RoaringBitmap matchingDocIdsForKey = _postingListMap.get(key);
+
+        if (matchingDocIdsForKey != null) {
+          MutableRoaringBitmap result = matchingDocIdsForKey.toMutableRoaringBitmap();
+          result.flip(0, (long) _nextFlattenedDocId);
+          if (matchingDocIds == null) {
+            return result.toRoaringBitmap();
+          } else {
+            matchingDocIds.and(result.toRoaringBitmap());
+            return matchingDocIds;
+          }
+        } else {
+          if (matchingDocIds != null) {
+            return matchingDocIds;
+          } else {
+            MutableRoaringBitmap result = new MutableRoaringBitmap();
+            result.flip(0, (long) _nextFlattenedDocId);
+            return result.toRoaringBitmap();
+          }
+        }
+      }
+
+      case REGEXP_LIKE: {
+        Map<String, RoaringBitmap> subMap = getMatchingKeysMap(key);
+        if (subMap.isEmpty()) {
+          return new RoaringBitmap();
+        }
+        Pattern pattern = ((RegexpLikePredicate) predicate).getPattern();
+        RoaringBitmap result = null;
+
+        for (Map.Entry<String, RoaringBitmap> entry : subMap.entrySet()) {
+          if (!pattern.matcher(entry.getKey().substring(key.length() + 1)).matches()) {
+            continue;
+          }
+          if (result == null) {
+            result = entry.getValue().clone();
+          } else {
+            result.or(entry.getValue());
+          }
+        }
+
+        if (result == null) {
+          return new RoaringBitmap();
+        } else {
+          if (matchingDocIds == null) {
+            return result;
+          } else {
+            matchingDocIds.and(result);
+            return matchingDocIds;
+          }
+        }
+      }
+
+      case RANGE: {
+        Map<String, RoaringBitmap> subMap = getMatchingKeysMap(key);
+        if (subMap.isEmpty()) {
+          return new RoaringBitmap();
+        }
+        RoaringBitmap result = null;
+
+        RangePredicate rangePredicate = (RangePredicate) predicate;
+        FieldSpec.DataType rangeDataType = rangePredicate.getRangeDataType();
+        // Simplify to only support numeric and string types
+        if (rangeDataType.isNumeric()) {
+          rangeDataType = FieldSpec.DataType.DOUBLE;
+        } else {
+          rangeDataType = FieldSpec.DataType.STRING;
+        }
+
+        boolean lowerUnbounded = rangePredicate.getLowerBound().equals(RangePredicate.UNBOUNDED);
+        boolean upperUnbounded = rangePredicate.getUpperBound().equals(RangePredicate.UNBOUNDED);
+        boolean lowerInclusive = lowerUnbounded || rangePredicate.isLowerInclusive();
+        boolean upperInclusive = upperUnbounded || rangePredicate.isUpperInclusive();
+        Object lowerBound = lowerUnbounded ? null : rangeDataType.convert(rangePredicate.getLowerBound());
+        Object upperBound = upperUnbounded ? null : rangeDataType.convert(rangePredicate.getUpperBound());
+
+        for (Map.Entry<String, RoaringBitmap> entry : subMap.entrySet()) {
+          Object valueObj = rangeDataType.convert(entry.getKey().substring(key.length() + 1));
+          boolean lowerCompareResult =
+              lowerUnbounded || (lowerInclusive ? rangeDataType.compare(valueObj, lowerBound) >= 0
+                  : rangeDataType.compare(valueObj, lowerBound) > 0);
+          boolean upperCompareResult =
+              upperUnbounded || (upperInclusive ? rangeDataType.compare(valueObj, upperBound) <= 0
+                  : rangeDataType.compare(valueObj, upperBound) < 0);
+          if (lowerCompareResult && upperCompareResult) {
+            if (result == null) {
+              result = entry.getValue().clone();
+            } else {
+              result.or(entry.getValue());
+            }
+          }
+        }
+
+        if (result == null) {
+          return new RoaringBitmap();
+        } else {
+          if (matchingDocIds == null) {
+            return result;
+          } else {
+            matchingDocIds.and(result);
+            return matchingDocIds;
+          }
+        }
+      }
+
+      default:
+        throw new IllegalStateException("Unsupported json_match predicate type: " + predicate);
     }
   }
 
@@ -377,14 +447,7 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
       if (filterString != null) {
         filter = RequestContextUtils.getFilter(CalciteSqlParser.compileToExpression(filterString));
         Preconditions.checkArgument(!filter.isConstant(), "Invalid json match filter: " + filterString);
-        if (filter.getType() == FilterContext.Type.PREDICATE && isExclusive(filter.getPredicate().getType())) {
-          // Handle exclusive predicate separately because the flip can only be applied to the
-          // unflattened doc ids in order to get the correct result, and it cannot be nested
-          filteredFlattenedDocIds = getMatchingFlattenedDocIds(filter.getPredicate());
-          filteredFlattenedDocIds.flip(0, (long) _nextFlattenedDocId);
-        } else {
-          filteredFlattenedDocIds = getMatchingFlattenedDocIds(filter);
-        }
+        filteredFlattenedDocIds = getMatchingFlattenedDocIds(filter);
       }
       // Support 2 formats:
       // - JSONPath format (e.g. "$.a[1].b"='abc', "$[0]"=1, "$"='abc')
