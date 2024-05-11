@@ -195,6 +195,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     // Optimization for realtime segment conversion
     if (dataSource instanceof RealtimeSegmentSegmentCreationDataSource) {
       _config.setRealtimeConversion(true);
+      _config.setConsumerDir(((RealtimeSegmentSegmentCreationDataSource) dataSource).getConsumerDir());
     }
 
     // Initialize stats collection

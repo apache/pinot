@@ -106,6 +106,7 @@ public class RealtimeSegmentDataManagerTest {
     when(statsHistory.getEstimatedCardinality(anyString())).thenReturn(200);
     when(statsHistory.getEstimatedAvgColSize(anyString())).thenReturn(32);
     when(tableDataManager.getStatsHistory()).thenReturn(statsHistory);
+    when(tableDataManager.getConsumerDir()).thenReturn(TEMP_DIR.getAbsolutePath() + "/consumerDir");
     return tableDataManager;
   }
 

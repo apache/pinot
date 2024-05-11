@@ -89,6 +89,8 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
    * @param segmentIndexDir segment index directory
    * @param commit true if the index should be committed (at the end after all documents have
    *               been added), false if index should not be committed
+   * @param realtimeConversion index creator should create an index using the realtime segment
+   * @param consumerDir consumer dir containing the realtime index, used when realtimeConversion and commit is true
    * @param immutableToMutableIdMap immutableToMutableIdMap from segment conversion
    * Note on commit:
    *               Once {@link SegmentColumnarIndexCreator}
@@ -106,7 +108,7 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
    * @param config the text index config
    */
   public LuceneTextIndexCreator(String column, File segmentIndexDir, boolean commit, boolean realtimeConversion,
-      @Nullable int[] immutableToMutableIdMap, TextIndexConfig config) {
+      @Nullable File consumerDir, @Nullable int[] immutableToMutableIdMap, TextIndexConfig config) {
     _textColumn = column;
     _commitOnClose = commit;
 
@@ -144,7 +146,7 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
       if (_reuseMutableIndex) {
         LOGGER.info("Reusing the realtime lucene index for segment {} and column {}", segmentIndexDir, column);
         indexWriterConfig.setOpenMode(IndexWriterConfig.OpenMode.CREATE_OR_APPEND);
-        convertMutableSegment(segmentIndexDir, immutableToMutableIdMap, indexWriterConfig);
+        convertMutableSegment(segmentIndexDir, consumerDir, immutableToMutableIdMap, indexWriterConfig);
         return;
       }
 
@@ -161,7 +163,7 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
 
   public LuceneTextIndexCreator(IndexCreationContext context, TextIndexConfig indexConfig) {
     this(context.getFieldSpec().getName(), context.getIndexDir(), context.isTextCommitOnClose(),
-        context.isRealtimeConversion(), context.getImmutableToMutableIdMap(), indexConfig);
+        context.isRealtimeConversion(), context.getConsumerDir(), context.getImmutableToMutableIdMap(), indexConfig);
   }
 
   public IndexWriter getIndexWriter() {
@@ -174,12 +176,12 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
    * @param immutableToMutableIdMap immutableToMutableIdMap from segment conversion
    * @param indexWriterConfig indexWriterConfig
    */
-  private void convertMutableSegment(File segmentIndexDir, @Nullable int[] immutableToMutableIdMap,
+  private void convertMutableSegment(File segmentIndexDir, File consumerDir, @Nullable int[] immutableToMutableIdMap,
       IndexWriterConfig indexWriterConfig) {
     try {
       // Copy the mutable index to the v1 index location
       File dest = getV1TextIndexFile(segmentIndexDir);
-      File mutableDir = getMutableIndexDir(segmentIndexDir);
+      File mutableDir = getMutableIndexDir(segmentIndexDir, consumerDir);
       FileUtils.copyDirectory(mutableDir, dest);
 
       // Remove the copied write.lock file
@@ -344,12 +346,15 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
     return new File(indexDir, luceneIndexDirectory);
   }
 
-  private File getMutableIndexDir(File indexDir) {
+  private File getMutableIndexDir(File indexDir, File consumerDir) {
+    String segmentName = getSegmentName(indexDir);
+    return new File(new File(consumerDir, segmentName),
+        _textColumn + V1Constants.Indexes.LUCENE_V99_TEXT_INDEX_FILE_EXTENSION);
+  }
+
+  private String getSegmentName(File indexDir) {
     // tmpSegmentName format: tmp-tableName__9__1__20240227T0254Z-1709002522086
     String tmpSegmentName = indexDir.getParentFile().getName();
-    String segmentName = tmpSegmentName.substring(tmpSegmentName.indexOf("tmp-") + 4, tmpSegmentName.lastIndexOf('-'));
-    String mutableDir = indexDir.getParentFile().getParentFile().getParent() + "/consumers/" + segmentName + "/"
-        + _textColumn + V1Constants.Indexes.LUCENE_V99_TEXT_INDEX_FILE_EXTENSION;
-    return new File(mutableDir);
+    return tmpSegmentName.substring(tmpSegmentName.indexOf("tmp-") + 4, tmpSegmentName.lastIndexOf('-'));
   }
 }
