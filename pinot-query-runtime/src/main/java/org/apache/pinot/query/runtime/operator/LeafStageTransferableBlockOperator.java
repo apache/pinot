@@ -551,7 +551,7 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
 
   public enum StatKey implements StatMap.Key {
     TABLE(StatMap.Type.STRING, null),
-    EXECUTION_TIME_MS(StatMap.Type.LONG, BrokerResponseNativeV2.StatKey.TIME_USED_MS) {
+    EXECUTION_TIME_MS(StatMap.Type.LONG, null) {
       @Override
       public boolean includeDefaultInJson() {
         return true;
