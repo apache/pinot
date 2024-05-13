@@ -385,10 +385,11 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
   protected void doAddOnlineSegment(String segmentName)
       throws Exception {
-    SegmentZKMetadata zkMetadata = getZKMetadata(segmentName);
+    SegmentZKMetadata zkMetadata = fetchZKMetadata(segmentName);
     Preconditions.checkState(zkMetadata.getStatus() != Status.IN_PROGRESS,
         "Segment: %s of table: %s is not committed, cannot make it ONLINE", segmentName, _tableNameWithType);
-    IndexLoadingConfig indexLoadingConfig = getIndexLoadingConfig(zkMetadata);
+    IndexLoadingConfig indexLoadingConfig = fetchIndexLoadingConfig();
+    indexLoadingConfig.setSegmentTier(zkMetadata.getTier());
     handleUpsertPreload(zkMetadata, indexLoadingConfig);
     SegmentDataManager segmentDataManager = _segmentDataManagerMap.get(segmentName);
     if (segmentDataManager == null) {
@@ -424,7 +425,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   }
 
   private void doAddConsumingSegment(String segmentName) {
-    SegmentZKMetadata zkMetadata = getZKMetadata(segmentName);
+    SegmentZKMetadata zkMetadata = fetchZKMetadata(segmentName);
     if (zkMetadata.getStatus() != Status.IN_PROGRESS) {
       // NOTE: We do not throw exception here because the segment might have just been committed before the state
       //       transition is processed. We can skip adding this segment, and the segment will enter CONSUMING state in
@@ -432,7 +433,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       _logger.warn("Segment: {} is already committed, skipping adding it as CONSUMING segment", segmentName);
       return;
     }
-    IndexLoadingConfig indexLoadingConfig = getIndexLoadingConfig(zkMetadata);
+    IndexLoadingConfig indexLoadingConfig = fetchIndexLoadingConfig();
     handleUpsertPreload(zkMetadata, indexLoadingConfig);
     SegmentDataManager segmentDataManager = _segmentDataManagerMap.get(segmentName);
     if (segmentDataManager != null) {
@@ -599,7 +600,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     _logger.info("Downloading and replacing CONSUMING segment: {} with committed one", segmentName);
     File indexDir = downloadSegment(zkMetadata);
     // Get a new index loading config with latest table config and schema to load the segment
-    IndexLoadingConfig indexLoadingConfig = getIndexLoadingConfig(zkMetadata);
+    IndexLoadingConfig indexLoadingConfig = fetchIndexLoadingConfig();
+    indexLoadingConfig.setSegmentTier(zkMetadata.getTier());
     addSegment(ImmutableSegmentLoader.load(indexDir, indexLoadingConfig));
     _logger.info("Downloaded and replaced CONSUMING segment: {}", segmentName);
   }
@@ -612,7 +614,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     _logger.info("Replacing CONSUMING segment: {} with the one sealed locally", segmentName);
     File indexDir = new File(_indexDir, segmentName);
     // Get a new index loading config with latest table config and schema to load the segment
-    IndexLoadingConfig indexLoadingConfig = getIndexLoadingConfig(null);
+    IndexLoadingConfig indexLoadingConfig = fetchIndexLoadingConfig();
     addSegment(ImmutableSegmentLoader.load(indexDir, indexLoadingConfig));
     _logger.info("Replaced CONSUMING segment: {}", segmentName);
   }

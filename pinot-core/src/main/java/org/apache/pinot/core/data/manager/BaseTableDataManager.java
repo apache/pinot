@@ -323,7 +323,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
   protected abstract void doAddOnlineSegment(String segmentName)
       throws Exception;
 
-  protected SegmentZKMetadata getZKMetadata(String segmentName) {
+  @Override
+  public SegmentZKMetadata fetchZKMetadata(String segmentName) {
     SegmentZKMetadata zkMetadata =
         ZKMetadataProvider.getSegmentZKMetadata(_propertyStore, _tableNameWithType, segmentName);
     Preconditions.checkState(zkMetadata != null, "Failed to find ZK metadata for segment: %s of table: %s", segmentName,
@@ -331,42 +332,31 @@ public abstract class BaseTableDataManager implements TableDataManager {
     return zkMetadata;
   }
 
-  protected TableConfig getTableConfig() {
+  @Override
+  public Pair<TableConfig, Schema> fetchTableConfigAndSchema() {
     TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, _tableNameWithType);
     Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", _tableNameWithType);
-    return tableConfig;
-  }
-
-  @Nullable
-  protected Schema getSchema(TableConfig tableConfig) {
     Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, tableConfig);
     // NOTE: Schema is mandatory for REALTIME table.
     if (tableConfig.getTableType() == TableType.REALTIME) {
       Preconditions.checkState(schema != null, "Failed to find schema for table: %s", _tableNameWithType);
     }
-    return schema;
+    return Pair.of(tableConfig, schema);
   }
 
-  protected IndexLoadingConfig getIndexLoadingConfig(@Nullable SegmentZKMetadata zkMetadata) {
-    TableConfig tableConfig = getTableConfig();
-    Schema schema = getSchema(tableConfig);
+  @Override
+  public IndexLoadingConfig getIndexLoadingConfig(TableConfig tableConfig, @Nullable Schema schema) {
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig, schema);
     indexLoadingConfig.setTableDataDir(_tableDataDir);
     indexLoadingConfig.setInstanceTierConfigs(_instanceDataManagerConfig.getTierConfigs());
-    if (zkMetadata != null) {
-      indexLoadingConfig.setSegmentTier(zkMetadata.getTier());
-    }
     return indexLoadingConfig;
   }
 
-  /**
-   * Adds a new ONLINE segment that is not already loaded.
-   */
-  protected void addNewOnlineSegment(SegmentZKMetadata zkMetadata, IndexLoadingConfig indexLoadingConfig)
+  @Override
+  public void addNewOnlineSegment(SegmentZKMetadata zkMetadata, IndexLoadingConfig indexLoadingConfig)
       throws Exception {
-    String segmentName = zkMetadata.getSegmentName();
-    _logger.info("Adding new ONLINE segment: {}", segmentName);
-    if (!tryLoadExistingSegment(segmentName, indexLoadingConfig, zkMetadata)) {
+    _logger.info("Adding new ONLINE segment: {}", zkMetadata.getSegmentName());
+    if (!tryLoadExistingSegment(zkMetadata, indexLoadingConfig)) {
       downloadAndLoadSegment(zkMetadata, indexLoadingConfig);
     }
   }
@@ -391,10 +381,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
     _logger.info("Replaced segment: {} with new CRC: {}", segmentName, zkMetadata.getCrc());
   }
 
-  /**
-   * Downloads a segment and loads it into the table.
-   */
-  protected void downloadAndLoadSegment(SegmentZKMetadata zkMetadata, IndexLoadingConfig indexLoadingConfig)
+  @Override
+  public void downloadAndLoadSegment(SegmentZKMetadata zkMetadata, IndexLoadingConfig indexLoadingConfig)
       throws Exception {
     String segmentName = zkMetadata.getSegmentName();
     _logger.info("Downloading and loading segment: {}", segmentName);
@@ -428,8 +416,9 @@ public abstract class BaseTableDataManager implements TableDataManager {
       throws Exception {
     SegmentDataManager segmentDataManager = _segmentDataManagerMap.get(segmentName);
     if (segmentDataManager != null) {
-      SegmentZKMetadata zkMetadata = getZKMetadata(segmentName);
-      IndexLoadingConfig indexLoadingConfig = getIndexLoadingConfig(zkMetadata);
+      SegmentZKMetadata zkMetadata = fetchZKMetadata(segmentName);
+      IndexLoadingConfig indexLoadingConfig = fetchIndexLoadingConfig();
+      indexLoadingConfig.setSegmentTier(zkMetadata.getTier());
       replaceSegmentIfCrcMismatch(segmentDataManager, zkMetadata, indexLoadingConfig);
     } else {
       _logger.warn("Failed to find segment: {}, skipping replacing it", segmentName);
@@ -949,18 +938,9 @@ public abstract class BaseTableDataManager implements TableDataManager {
     FileUtils.deleteDirectory(segmentTempDir);
   }
 
-  /**
-   * Try to load the segment potentially still existing on the server.
-   *
-   * @return true if the segment still exists on server, its CRC is still same with the
-   * one in SegmentZKMetadata and is loaded into memory successfully; false if it doesn't
-   * exist on the server, its CRC has changed, or it fails to be loaded. SegmentDirectory
-   * object may be created when trying to load the segment, but it's closed if the method
-   * returns false; otherwise it's opened and to be referred by ImmutableSegment object.
-   */
   @Override
-  public boolean tryLoadExistingSegment(String segmentName, IndexLoadingConfig indexLoadingConfig,
-      SegmentZKMetadata zkMetadata) {
+  public boolean tryLoadExistingSegment(SegmentZKMetadata zkMetadata, IndexLoadingConfig indexLoadingConfig) {
+    String segmentName = zkMetadata.getSegmentName();
     Preconditions.checkState(!_shutDown,
         "Table data manager is already shut down, cannot load existing segment: %s of table: %s", segmentName,
         _tableNameWithType);
