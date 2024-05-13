@@ -23,6 +23,7 @@ import java.net.InetAddress;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.net.UnknownHostException;
+import org.apache.pinot.common.utils.PinotStaticHttpHandler;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.glassfish.grizzly.http.server.CLStaticHttpHandler;
 import org.glassfish.grizzly.http.server.HttpServer;
@@ -58,12 +59,11 @@ public class SwaggerSetupUtil {
 
     CLStaticHttpHandler staticHttpHandler = new CLStaticHttpHandler(classLoader, "/api/");
     // map both /api and /help to swagger docs. /api because it looks nice. /help for backward compatibility
-    httpServer.getServerConfiguration().addHttpHandler(staticHttpHandler, "/api/");
-    httpServer.getServerConfiguration().addHttpHandler(staticHttpHandler, "/help/");
+    httpServer.getServerConfiguration().addHttpHandler(staticHttpHandler, "/api/", "/help/");
 
     URL swaggerDistLocation = classLoader.getResource(CommonConstants.CONFIG_OF_SWAGGER_RESOURCES_PATH);
     CLStaticHttpHandler swaggerDist =
-        new CLStaticHttpHandler(new URLClassLoader(new URL[]{swaggerDistLocation}), "swagger-ui/");
+        new PinotStaticHttpHandler(new URLClassLoader(new URL[]{swaggerDistLocation}));
     httpServer.getServerConfiguration().addHttpHandler(swaggerDist, "/swaggerui-dist/");
   }
 }
