@@ -116,6 +116,69 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
     }
   }
 
+  @Test(dataProvider = "useV2QueryEngine")
+  public void testListAggQueries(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query =
+        String.format("SELECT "
+            + "listAgg(stringCol, ' | ') "
+            + "FROM %s LIMIT %d", getTableName(), getCountStarResult());
+    JsonNode jsonNode = postQuery(query);
+    JsonNode rows = jsonNode.get("resultTable").get("rows");
+    assertEquals(rows.size(), 1);
+    JsonNode row = rows.get(0);
+    assertEquals(row.size(), 1);
+    assertEquals(row.get(0).asText().split(" \\| ").length, getCountStarResult());
+
+    query =
+        String.format("SELECT "
+            + "listAgg(stringCol, ' | ') WITHIN GROUP (ORDER BY stringCol) "
+            + "FROM %s LIMIT %d", getTableName(), getCountStarResult());
+    jsonNode = postQuery(query);
+    rows = jsonNode.get("resultTable").get("rows");
+    assertEquals(rows.size(), 1);
+    row = rows.get(0);
+    assertEquals(row.size(), 1);
+    assertEquals(row.get(0).asText().split(" \\| ").length, getCountStarResult());
+  }
+
+  @Test(dataProvider = "useV2QueryEngine")
+  public void testListAggGroupByQueries(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query =
+        String.format("SELECT "
+            + "listAgg(stringCol, ' | '), "
+            + "groupKey "
+            + "FROM %s "
+            + "GROUP BY groupKey "
+            + "LIMIT %d", getTableName(), getCountStarResult());
+    JsonNode jsonNode = postQuery(query);
+    JsonNode rows = jsonNode.get("resultTable").get("rows");
+    assertEquals(rows.size(), 10);
+    for (int i = 0; i < 10; i++) {
+      JsonNode row = rows.get(i);
+      assertEquals(row.size(), 2);
+      assertEquals(row.get(0).asText().split(" \\| ").length, getCountStarResult() / 10);
+    }
+    query =
+        String.format("SELECT "
+            + "listAgg(stringCol, ' | ') WITHIN GROUP (ORDER BY stringCol), "
+            + "groupKey "
+            + "FROM %s "
+            + "GROUP BY groupKey "
+            + "LIMIT %d", getTableName(), getCountStarResult());
+    jsonNode = postQuery(query);
+    rows = jsonNode.get("resultTable").get("rows");
+    assertEquals(rows.size(), 10);
+    for (int i = 0; i < 10; i++) {
+      JsonNode row = rows.get(i);
+      assertEquals(row.size(), 2);
+      assertEquals(row.get(0).asText().split(" \\| ").length, getCountStarResult() / 10);
+    }
+  }
+
   @Test(dataProvider = "useBothQueryEngines")
   public void testArrayAggDistinctQueries(boolean useMultiStageQueryEngine)
       throws Exception {

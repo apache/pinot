@@ -139,19 +139,19 @@ public class QueryOverrideWithHintsTest {
 
     expressionContext1 = ExpressionContext.forFunction(new FunctionContext(FunctionContext.Type.TRANSFORM, "func1",
         ImmutableList.of(ExpressionContext.forIdentifier("abc"),
-            ExpressionContext.forLiteralContext(FieldSpec.DataType.STRING, "abc"))));
+            ExpressionContext.forLiteralContext(FieldSpec.DataType.STRING, "abc")), false));
     expressionContext2 = ExpressionContext.forFunction(new FunctionContext(FunctionContext.Type.TRANSFORM, "func1",
         ImmutableList.of(ExpressionContext.forIdentifier("abc"),
-            ExpressionContext.forLiteralContext(FieldSpec.DataType.STRING, "abc"))));
+            ExpressionContext.forLiteralContext(FieldSpec.DataType.STRING, "abc")), false));
     assertEquals(expressionContext1, expressionContext2);
     assertEquals(expressionContext1.hashCode(), expressionContext2.hashCode());
 
     expressionContext1 = ExpressionContext.forFunction(new FunctionContext(FunctionContext.Type.TRANSFORM, "datetrunc",
         ImmutableList.of(ExpressionContext.forLiteralContext(FieldSpec.DataType.STRING, "DAY"),
-            ExpressionContext.forLiteralContext(FieldSpec.DataType.STRING, "event_time_ts"))));
+            ExpressionContext.forLiteralContext(FieldSpec.DataType.STRING, "event_time_ts")), false));
     expressionContext2 = ExpressionContext.forFunction(new FunctionContext(FunctionContext.Type.TRANSFORM, "datetrunc",
         ImmutableList.of(ExpressionContext.forLiteralContext(FieldSpec.DataType.STRING, "DAY"),
-            ExpressionContext.forLiteralContext(FieldSpec.DataType.STRING, "event_time_ts"))));
+            ExpressionContext.forLiteralContext(FieldSpec.DataType.STRING, "event_time_ts")), false));
     assertEquals(expressionContext1, expressionContext2);
     assertEquals(expressionContext1.hashCode(), expressionContext2.hashCode());
   }
@@ -161,12 +161,12 @@ public class QueryOverrideWithHintsTest {
     ExpressionContext dateTruncFunctionExpr = ExpressionContext.forFunction(
         new FunctionContext(FunctionContext.Type.TRANSFORM, "dateTrunc", new ArrayList<>(new ArrayList<>(
             ImmutableList.of(ExpressionContext.forLiteralContext(FieldSpec.DataType.STRING, "MONTH"),
-                ExpressionContext.forIdentifier("ts"))))));
+                ExpressionContext.forIdentifier("ts")))), false));
     ExpressionContext timestampIndexColumn = ExpressionContext.forIdentifier("$ts$MONTH");
     ExpressionContext equalsExpression = ExpressionContext.forFunction(
         new FunctionContext(FunctionContext.Type.TRANSFORM, "EQUALS", new ArrayList<>(
             ImmutableList.of(dateTruncFunctionExpr,
-                ExpressionContext.forLiteralContext(FieldSpec.DataType.INT, 1000)))));
+                ExpressionContext.forLiteralContext(FieldSpec.DataType.INT, 1000))), false));
     FilterContext filter = RequestContextUtils.getFilter(equalsExpression);
     Map<ExpressionContext, ExpressionContext> hints = ImmutableMap.of(dateTruncFunctionExpr, timestampIndexColumn);
     InstancePlanMakerImplV2.overrideWithExpressionHints(filter, _indexSegment, hints);
@@ -176,7 +176,7 @@ public class QueryOverrideWithHintsTest {
 
     FilterContext andFilter = RequestContextUtils.getFilter(ExpressionContext.forFunction(
         new FunctionContext(FunctionContext.Type.TRANSFORM, "AND",
-            new ArrayList<>(ImmutableList.of(equalsExpression, equalsExpression)))));
+            new ArrayList<>(ImmutableList.of(equalsExpression, equalsExpression)), false)));
     InstancePlanMakerImplV2.overrideWithExpressionHints(andFilter, _indexSegment, hints);
     assertEquals(andFilter.getChildren().get(0).getPredicate().getLhs(), timestampIndexColumn);
     assertEquals(andFilter.getChildren().get(1).getPredicate().getLhs(), timestampIndexColumn);
@@ -187,12 +187,12 @@ public class QueryOverrideWithHintsTest {
     ExpressionContext dateTruncFunctionExpr = ExpressionContext.forFunction(
         new FunctionContext(FunctionContext.Type.TRANSFORM, "dateTrunc", new ArrayList<>(
             ImmutableList.of(ExpressionContext.forLiteralContext(FieldSpec.DataType.STRING, "MONTH"),
-                ExpressionContext.forIdentifier("ts")))));
+                ExpressionContext.forIdentifier("ts"))), false));
     ExpressionContext timestampIndexColumn = ExpressionContext.forIdentifier("$ts$MONTH");
     ExpressionContext equalsExpression = ExpressionContext.forFunction(
         new FunctionContext(FunctionContext.Type.TRANSFORM, "EQUALS", new ArrayList<>(
             ImmutableList.of(dateTruncFunctionExpr,
-                ExpressionContext.forLiteralContext(FieldSpec.DataType.INT, 1000)))));
+                ExpressionContext.forLiteralContext(FieldSpec.DataType.INT, 1000))), false));
     Map<ExpressionContext, ExpressionContext> hints = ImmutableMap.of(dateTruncFunctionExpr, timestampIndexColumn);
     ExpressionContext newEqualsExpression =
         InstancePlanMakerImplV2.overrideWithExpressionHints(equalsExpression, _indexSegment, hints);
@@ -207,12 +207,12 @@ public class QueryOverrideWithHintsTest {
     ExpressionContext dateTruncFunctionExpr = ExpressionContext.forFunction(
         new FunctionContext(FunctionContext.Type.TRANSFORM, "dateTrunc", new ArrayList<>(
             ImmutableList.of(ExpressionContext.forLiteralContext(FieldSpec.DataType.STRING, "DAY"),
-                ExpressionContext.forIdentifier("ts")))));
+                ExpressionContext.forIdentifier("ts"))), false));
     ExpressionContext timestampIndexColumn = ExpressionContext.forIdentifier("$ts$DAY");
     ExpressionContext equalsExpression = ExpressionContext.forFunction(
         new FunctionContext(FunctionContext.Type.TRANSFORM, "EQUALS", new ArrayList<>(
             ImmutableList.of(dateTruncFunctionExpr,
-                ExpressionContext.forLiteralContext(FieldSpec.DataType.INT, 1000)))));
+                ExpressionContext.forLiteralContext(FieldSpec.DataType.INT, 1000))), false));
     Map<ExpressionContext, ExpressionContext> hints = ImmutableMap.of(dateTruncFunctionExpr, timestampIndexColumn);
     ExpressionContext newEqualsExpression =
         InstancePlanMakerImplV2.overrideWithExpressionHints(equalsExpression, _indexSegment, hints);

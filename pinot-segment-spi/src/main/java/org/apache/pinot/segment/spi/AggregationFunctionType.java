@@ -322,6 +322,9 @@ public enum AggregationFunctionType {
   ARRAYAGG("arrayAgg", null, SqlKind.ARRAY_AGG, SqlFunctionCategory.USER_DEFINED_FUNCTION,
       OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.STRING, SqlTypeFamily.BOOLEAN),
           ordinal -> ordinal > 1), ReturnTypes.TO_ARRAY, ReturnTypes.explicit(SqlTypeName.OTHER)),
+  LISTAGG("listAgg", null, SqlKind.LISTAGG, SqlFunctionCategory.USER_DEFINED_FUNCTION,
+      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.STRING, SqlTypeFamily.BOOLEAN),
+          ordinal -> ordinal > 1), ReturnTypes.VARCHAR, ReturnTypes.explicit(SqlTypeName.OTHER)),
 
   // funnel aggregate functions
   // TODO: revisit support for funnel count in V2

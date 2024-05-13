@@ -114,16 +114,25 @@ public interface RexExpression {
     // the list of RexExpressions that represents the operands to the function.
     @ProtoProperties
     private List<RexExpression> _functionOperands;
+    // whether the function is a distinct function.
+    @ProtoProperties
+    private boolean _isDistinct;
 
     public FunctionCall() {
     }
 
     public FunctionCall(SqlKind sqlKind, ColumnDataType dataType, String functionName,
         List<RexExpression> functionOperands) {
+      this(sqlKind, dataType, functionName, functionOperands, false);
+    }
+
+    public FunctionCall(SqlKind sqlKind, ColumnDataType dataType, String functionName,
+        List<RexExpression> functionOperands, boolean isDistinct) {
       _sqlKind = sqlKind;
       _dataType = dataType;
       _functionName = functionName;
       _functionOperands = functionOperands;
+      _isDistinct = isDistinct;
     }
 
     public String getFunctionName() {
@@ -132,6 +141,10 @@ public interface RexExpression {
 
     public List<RexExpression> getFunctionOperands() {
       return _functionOperands;
+    }
+
+    public boolean isDistinct() {
+      return _isDistinct;
     }
 
     @Override

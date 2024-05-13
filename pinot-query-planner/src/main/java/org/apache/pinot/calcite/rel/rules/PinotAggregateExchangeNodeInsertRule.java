@@ -112,7 +112,13 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
   public void onMatch(RelOptRuleCall call) {
     Aggregate oldAggRel = call.rel(0);
     ImmutableList<RelHint> oldHints = oldAggRel.getHints();
-
+    boolean hasCollation = false;
+    for (AggregateCall aggCall : oldAggRel.getAggCallList()) {
+      if (!aggCall.getCollation().getKeys().isEmpty()) {
+        hasCollation = true;
+        break;
+      }
+    }
     Aggregate newAgg;
     if (!oldAggRel.getGroupSet().isEmpty() && PinotHintStrategyTable.isHintOptionTrue(oldHints,
         PinotHintOptions.AGGREGATE_HINT_OPTIONS, PinotHintOptions.AggregateOptions.IS_PARTITIONED_BY_GROUP_BY_KEYS)) {
@@ -130,7 +136,9 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
         PinotHintOptions.AggregateOptions.SKIP_LEAF_STAGE_GROUP_BY_AGGREGATION)) {
       // ------------------------------------------------------------------------
       // If "is_skip_leaf_stage_group_by" SQLHint option is passed, the leaf stage aggregation is skipped.
-      newAgg = (Aggregate) createPlanWithExchangeDirectAggregation(call);
+      newAgg = (Aggregate) createPlanWithExchangeDirectAggregation(call, false);
+    } else if (hasCollation) {
+      newAgg = (Aggregate) createPlanWithExchangeDirectAggregation(call, true);
     } else {
       // ------------------------------------------------------------------------
       newAgg = (Aggregate) createPlanWithLeafExchangeFinalAggregate(call);
@@ -163,7 +171,7 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
    * Use this group by optimization to skip leaf stage aggregation when aggregating at leaf level is not desired.
    * Many situation could be wasted effort to do group-by on leaf, eg: when cardinality of group by column is very high.
    */
-  private RelNode createPlanWithExchangeDirectAggregation(RelOptRuleCall call) {
+  private RelNode createPlanWithExchangeDirectAggregation(RelOptRuleCall call, boolean hasCollation) {
     Aggregate oldAggRel = call.rel(0);
     List<RelHint> newHints = PinotHintStrategyTable.replaceHintOptions(oldAggRel.getHints(),
         PinotHintOptions.INTERNAL_AGG_OPTIONS, PinotHintOptions.InternalAggregateOptions.AGG_TYPE,
@@ -172,12 +180,15 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
     // create project when there's none below the aggregate to reduce exchange overhead
     RelNode childRel = ((HepRelVertex) oldAggRel.getInput()).getCurrentRel();
     if (!(childRel instanceof Project)) {
-      return convertAggForExchangeDirectAggregate(call, newHints);
+      return convertAggForExchangeDirectAggregate(call, newHints, hasCollation);
     } else {
       // create normal exchange
       List<Integer> groupSetIndices = new ArrayList<>();
       oldAggRel.getGroupSet().forEach(groupSetIndices::add);
-      PinotLogicalExchange exchange = PinotLogicalExchange.create(childRel, RelDistributions.hash(groupSetIndices));
+      PinotLogicalExchange exchange =
+          (hasCollation && groupSetIndices.isEmpty()) ? PinotLogicalExchange.create(childRel,
+              RelDistributions.SINGLETON)
+              : PinotLogicalExchange.create(childRel, RelDistributions.hash(groupSetIndices));
       return new LogicalAggregate(oldAggRel.getCluster(), oldAggRel.getTraitSet(), newHints, exchange,
           oldAggRel.getGroupSet(), oldAggRel.getGroupSets(), oldAggRel.getAggCallList());
     }
@@ -187,7 +198,8 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
    * The following is copied from {@link AggregateExtractProjectRule#onMatch(RelOptRuleCall)}
    * with modification to insert an exchange in between the Aggregate and Project
    */
-  private RelNode convertAggForExchangeDirectAggregate(RelOptRuleCall call, List<RelHint> newHints) {
+  private RelNode convertAggForExchangeDirectAggregate(RelOptRuleCall call, List<RelHint> newHints,
+      boolean hasCollation) {
     final Aggregate aggregate = call.rel(0);
     final RelNode input = aggregate.getInput();
     // Compute which input fields are used.
@@ -220,7 +232,9 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
     Project project = (Project) relBuilder1.build();
 
     // ------------------------------------------------------------------------
-    PinotLogicalExchange exchange = PinotLogicalExchange.create(project, RelDistributions.hash(newGroupSet.asList()));
+    PinotLogicalExchange exchange =
+        (hasCollation && newGroupSet.isEmpty()) ? PinotLogicalExchange.create(project, RelDistributions.SINGLETON)
+            : PinotLogicalExchange.create(project, RelDistributions.hash(newGroupSet.asList()));
     // ------------------------------------------------------------------------
 
     final RelBuilder relBuilder2 = call.builder().push(exchange);

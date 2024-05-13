@@ -22,10 +22,12 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.common.datablock.DataBlock;
@@ -48,6 +50,7 @@ import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.AbstractPlanNode;
 import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.operator.utils.SortUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.roaringbitmap.RoaringBitmap;
 import org.slf4j.Logger;
@@ -69,6 +72,11 @@ public class AggregateOperator extends MultiStageOperator {
   private final MultiStageOperator _inputOperator;
   private final DataSchema _resultSchema;
   private final AggType _aggType;
+  private final boolean _hasWithInGroup;
+  private final List<Object[]> _allRowContainer = new ArrayList<>();
+  @Nullable
+  private final Comparator<Object[]> _comparator;
+
   private final MultistageAggregationExecutor _aggregationExecutor;
   private final MultistageGroupByExecutor _groupByExecutor;
   @Nullable
@@ -79,11 +87,18 @@ public class AggregateOperator extends MultiStageOperator {
 
   public AggregateOperator(OpChainExecutionContext context, MultiStageOperator inputOperator,
       DataSchema resultSchema, List<RexExpression> aggCalls, List<RexExpression> groupSet, AggType aggType,
-      List<Integer> filterArgIndices, @Nullable AbstractPlanNode.NodeHint nodeHint) {
+      List<Integer> filterArgIndices, @Nullable AbstractPlanNode.NodeHint nodeHint,
+      List<RexExpression> collationKeys,
+      List<RelFieldCollation.Direction> collationDirections,
+      List<RelFieldCollation.NullDirection> collationNullDirections) {
     super(context);
     _inputOperator = inputOperator;
     _resultSchema = resultSchema;
     _aggType = aggType;
+    _hasWithInGroup = !collationKeys.isEmpty();
+    _comparator =
+        _hasWithInGroup ? new SortUtils.SortComparator(collationKeys, collationDirections, collationNullDirections,
+            _resultSchema, false) : null;
 
     // Process literal hints
     Map<Integer, Map<Integer, Literal>> literalArgumentsMap = null;
@@ -187,28 +202,60 @@ public class AggregateOperator extends MultiStageOperator {
 
   /**
    * Consumes the input blocks as a group by
+   *
    * @return the last block, which must always be either an error or the end of the stream
    */
   private TransferableBlock consumeGroupBy() {
-    TransferableBlock block = _inputOperator.nextBlock();
-    while (block.isDataBlock()) {
-      _groupByExecutor.processBlock(block);
-      block = _inputOperator.nextBlock();
+    if (_hasWithInGroup) {
+      TransferableBlock block = _inputOperator.nextBlock();
+      while (block.isDataBlock()) {
+        List<Object[]> rows = block.getContainer();
+        _allRowContainer.addAll(rows);
+        block = _inputOperator.nextBlock();
+      }
+      if (block.isSuccessfulEndOfStreamBlock()) {
+        _allRowContainer.sort(_comparator);
+        _groupByExecutor.processBlock(
+            new TransferableBlock(_allRowContainer, _resultSchema, DataBlock.Type.ROW));
+      }
+      return block;
+    } else {
+      TransferableBlock block = _inputOperator.nextBlock();
+      while (block.isDataBlock()) {
+        _groupByExecutor.processBlock(block);
+        block = _inputOperator.nextBlock();
+      }
+      return block;
     }
-    return block;
   }
 
   /**
    * Consumes the input blocks as an aggregation
+   *
    * @return the last block, which must always be either an error or the end of the stream
    */
   private TransferableBlock consumeAggregation() {
-    TransferableBlock block = _inputOperator.nextBlock();
-    while (block.isDataBlock()) {
-      _aggregationExecutor.processBlock(block);
-      block = _inputOperator.nextBlock();
+    if (_hasWithInGroup) {
+      TransferableBlock block = _inputOperator.nextBlock();
+      while (block.isDataBlock()) {
+        List<Object[]> rows = block.getContainer();
+        _allRowContainer.addAll(rows);
+        block = _inputOperator.nextBlock();
+      }
+      if (block.isSuccessfulEndOfStreamBlock()) {
+        _allRowContainer.sort(_comparator);
+        _aggregationExecutor.processBlock(
+            new TransferableBlock(_allRowContainer, _resultSchema, DataBlock.Type.ROW));
+      }
+      return block;
+    } else {
+      TransferableBlock block = _inputOperator.nextBlock();
+      while (block.isDataBlock()) {
+        _aggregationExecutor.processBlock(block);
+        block = _inputOperator.nextBlock();
+      }
+      return block;
     }
-    return block;
   }
 
   private AggregationFunction<?, ?>[] getAggFunctions(List<RexExpression> aggCalls,
@@ -264,7 +311,8 @@ public class AggregateOperator extends MultiStageOperator {
     }
 
     return AggregationFunctionFactory.getAggregationFunction(
-        new FunctionContext(FunctionContext.Type.AGGREGATION, functionName, arguments), true);
+        new FunctionContext(FunctionContext.Type.AGGREGATION, functionName, arguments, functionCall.isDistinct()),
+        true);
   }
 
   private static AggregationFunction<?, ?> getAggFunctionForIntermediateInput(RexExpression.FunctionCall functionCall,
@@ -281,8 +329,8 @@ public class AggregateOperator extends MultiStageOperator {
     if (numArgumentsLiteral == null) {
       return AggregationFunctionFactory.getAggregationFunction(
           new FunctionContext(FunctionContext.Type.AGGREGATION, functionName, Collections.singletonList(
-              ExpressionContext.forIdentifier(fromColIdToIdentifier(((RexExpression.InputRef) operand).getIndex())))),
-          true);
+              ExpressionContext.forIdentifier(fromColIdToIdentifier(((RexExpression.InputRef) operand).getIndex()))),
+              functionCall.isDistinct()), true);
     } else {
       int numExpectedArguments = numArgumentsLiteral.getIntValue();
       List<ExpressionContext> arguments = new ArrayList<>(numExpectedArguments);
@@ -297,7 +345,8 @@ public class AggregateOperator extends MultiStageOperator {
         }
       }
       return AggregationFunctionFactory.getAggregationFunction(
-          new FunctionContext(FunctionContext.Type.AGGREGATION, functionName, arguments), true);
+          new FunctionContext(FunctionContext.Type.AGGREGATION, functionName, arguments, functionCall.isDistinct()),
+          true);
     }
   }
 

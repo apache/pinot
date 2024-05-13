@@ -33,6 +33,7 @@ import org.apache.pinot.core.query.aggregation.function.array.ArrayAggFloatFunct
 import org.apache.pinot.core.query.aggregation.function.array.ArrayAggIntFunction;
 import org.apache.pinot.core.query.aggregation.function.array.ArrayAggLongFunction;
 import org.apache.pinot.core.query.aggregation.function.array.ArrayAggStringFunction;
+import org.apache.pinot.core.query.aggregation.function.array.ListAggFunction;
 import org.apache.pinot.core.query.aggregation.function.funnel.FunnelCountAggregationFunctionFactory;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -55,6 +56,7 @@ public class AggregationFunctionFactory {
     try {
       String upperCaseFunctionName =
           AggregationFunctionType.getNormalizedAggregationFunctionName(function.getFunctionName());
+      boolean isDistinct = function.isDistinct();
       List<ExpressionContext> arguments = function.getArguments();
       int numArguments = arguments.size();
       ExpressionContext firstArgument = arguments.get(0);
@@ -245,6 +247,16 @@ public class AggregationFunctionFactory {
                 throw new IllegalArgumentException("Unsupported data type for FIRST_WITH_TIME: " + dataType);
             }
           }
+          case LISTAGG:
+            Preconditions.checkArgument(numArguments == 2,
+                "LISTAGG expects 2 arguments, got: %s. The function can be used as "
+                    + "listAgg(['distinct'] expression, 'separator')", numArguments);
+            ExpressionContext separatorExpression = arguments.get(1);
+            Preconditions.checkArgument(separatorExpression.getType() == ExpressionContext.Type.LITERAL,
+                "LISTAGG expects the 2nd argument to be literal, got: %s. The function can be used as "
+                    + "listAgg(['distinct'] expression, 'separator')", separatorExpression.getType());
+            String separator = separatorExpression.getLiteral().getStringValue();
+            return new ListAggFunction(arguments.get(0), separator, isDistinct, nullHandlingEnabled);
           case ARRAYAGG: {
             Preconditions.checkArgument(numArguments >= 2,
                 "ARRAY_AGG expects 2 or 3 arguments, got: %s. The function can be used as "
@@ -254,15 +266,15 @@ public class AggregationFunctionFactory {
                 "ARRAY_AGG expects the 2nd argument to be literal, got: %s. The function can be used as "
                     + "arrayAgg(dataColumn, 'dataType', ['isDistinct'])", dataTypeExp.getType());
             DataType dataType = DataType.valueOf(dataTypeExp.getLiteral().getStringValue().toUpperCase());
-            boolean isDistinct = false;
+            boolean isDistinctArrayAgg = isDistinct;
             if (numArguments == 3) {
               ExpressionContext isDistinctExp = arguments.get(2);
               Preconditions.checkArgument(isDistinctExp.getType() == ExpressionContext.Type.LITERAL,
                   "ARRAY_AGG expects the 3rd argument to be literal, got: %s. The function can be used as "
                       + "arrayAgg(dataColumn, 'dataType', ['isDistinct'])", isDistinctExp.getType());
-              isDistinct = isDistinctExp.getLiteral().getBooleanValue();
+              isDistinctArrayAgg = isDistinctExp.getLiteral().getBooleanValue();
             }
-            if (isDistinct) {
+            if (isDistinctArrayAgg) {
               switch (dataType) {
                 case BOOLEAN:
                 case INT:

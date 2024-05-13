@@ -104,7 +104,8 @@ public class PhysicalPlanVisitor implements PlanNodeVisitor<MultiStageOperator, 
   public MultiStageOperator visitAggregate(AggregateNode node, OpChainExecutionContext context) {
     MultiStageOperator nextOperator = visit(node.getInputs().get(0), context);
     return new AggregateOperator(context, nextOperator, node.getDataSchema(), node.getAggCalls(),
-        node.getGroupSet(), node.getAggType(), node.getFilterArgIndices(), node.getNodeHint());
+        node.getGroupSet(), node.getAggType(), node.getFilterArgIndices(), node.getNodeHint(), node.getCollationKeys(),
+        node.getCollationDirections(), node.getCollationNullDirections());
   }
 
   @Override

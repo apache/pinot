@@ -35,12 +35,14 @@ public class FunctionContext {
   private final Type _type;
   private String _functionName;
   private final List<ExpressionContext> _arguments;
+  private final boolean _isDistinct;
 
-  public FunctionContext(Type type, String functionName, List<ExpressionContext> arguments) {
+  public FunctionContext(Type type, String functionName, List<ExpressionContext> arguments, boolean isDistinct) {
     _type = type;
     // NOTE: Standardize the function name to lower case
     _functionName = functionName.toLowerCase();
     _arguments = arguments;
+    _isDistinct = isDistinct;
   }
 
   public Type getType() {
@@ -67,6 +69,10 @@ public class FunctionContext {
     for (ExpressionContext argument : _arguments) {
       argument.getColumns(columns);
     }
+  }
+
+  public boolean isDistinct() {
+    return _isDistinct;
   }
 
   @Override
