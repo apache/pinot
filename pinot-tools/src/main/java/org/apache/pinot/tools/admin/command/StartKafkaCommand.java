@@ -85,7 +85,7 @@ public class StartKafkaCommand extends AbstractBaseAdminCommand implements Comma
       throw new RuntimeException("Failed to start " + KafkaStarterUtils.KAFKA_SERVER_STARTABLE_CLASS_NAME, e);
     }
     _kafkaStarter.start();
-    LOGGER.info("Start kafka at localhost:" + _port + " in thread " + Thread.currentThread().getName());
+    LOGGER.info("Start kafka at localhost:{} in thread {}", _port, Thread.currentThread().getName());
     savePID(System.getProperty("java.io.tmpdir") + File.separator + ".kafka.pid");
     return true;
   }

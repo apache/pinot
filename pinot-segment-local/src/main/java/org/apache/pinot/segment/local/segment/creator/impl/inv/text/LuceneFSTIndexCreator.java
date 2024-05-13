@@ -90,7 +90,7 @@ public class LuceneFSTIndexCreator implements FSTIndexCreator {
   @Override
   public void seal()
       throws IOException {
-    LOGGER.info("Sealing FST index: " + _fstIndexFile.getAbsolutePath());
+    LOGGER.info("Sealing FST index: {}", _fstIndexFile.getAbsolutePath());
     FileOutputStream fileOutputStream = null;
     try {
       fileOutputStream = new FileOutputStream(_fstIndexFile);

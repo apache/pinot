@@ -256,7 +256,7 @@ public class MultiStageQueryStats {
           myStats.merge(otherStatsForStage);
         }
       } catch (IllegalArgumentException | IllegalStateException ex) {
-        LOGGER.warn("Error merging stats on stage " + i + ". Ignoring the new stats", ex);
+        LOGGER.warn("Error merging stats on stage {}. Ignoring the new stats", i, ex);
       }
     }
   }
@@ -284,9 +284,9 @@ public class MultiStageQueryStats {
             myStats.merge(dis);
           }
         } catch (IOException ex) {
-          LOGGER.warn("Error deserializing stats on stage " + i + ". Considering the new stats empty", ex);
+          LOGGER.warn("Error deserializing stats on stage {}. Considering the new stats empty", i, ex);
         } catch (IllegalArgumentException | IllegalStateException ex) {
-          LOGGER.warn("Error merging stats on stage " + i + ". Ignoring the new stats", ex);
+          LOGGER.warn("Error merging stats on stage {}. Ignoring the new stats", i, ex);
         }
       }
     }

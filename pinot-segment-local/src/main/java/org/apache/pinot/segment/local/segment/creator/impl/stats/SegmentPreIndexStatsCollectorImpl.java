@@ -119,16 +119,16 @@ public class SegmentPreIndexStatsCollectorImpl implements SegmentPreIndexStatsCo
       for (final String column : _columnStatsCollectorMap.keySet()) {
         AbstractColumnStatisticsCollector statisticsCollector = _columnStatsCollectorMap.get(column);
 
-        LOGGER.info("********** logging for column : " + column + " ********************* ");
-        LOGGER.info("min value : " + statisticsCollector.getMinValue());
-        LOGGER.info("max value : " + statisticsCollector.getMaxValue());
-        LOGGER.info("cardinality : " + statisticsCollector.getCardinality());
-        LOGGER.info("length of largest column : " + statisticsCollector.getLengthOfLargestElement());
-        LOGGER.info("is sorted : " + statisticsCollector.isSorted());
-        LOGGER.info("column type : " + _statsCollectorConfig.getSchema().getFieldSpecFor(column).getDataType());
+        LOGGER.info("********** logging for column : {} ********************* ", column);
+        LOGGER.info("min value : {}", statisticsCollector.getMinValue());
+        LOGGER.info("max value : {}", statisticsCollector.getMaxValue());
+        LOGGER.info("cardinality : {}", statisticsCollector.getCardinality());
+        LOGGER.info("length of largest column : {}", statisticsCollector.getLengthOfLargestElement());
+        LOGGER.info("is sorted : {}", statisticsCollector.isSorted());
+        LOGGER.info("column type : {}", _statsCollectorConfig.getSchema().getFieldSpecFor(column).getDataType());
 
         if (statisticsCollector.getPartitionFunction() != null) {
-          LOGGER.info("partitions: " + statisticsCollector.getPartitions().toString());
+          LOGGER.info("partitions: {}", statisticsCollector.getPartitions().toString());
         }
         LOGGER.info("***********************************************");
       }

@@ -162,13 +162,13 @@ public class AddSchemaCommand extends AbstractBaseAdminCommand implements Comman
     }
 
     if (!_exec) {
-      LOGGER.warn("Dry Running Command: " + toString());
+      LOGGER.warn("Dry Running Command: {}", toString());
       LOGGER.warn("Use the -exec option to actually execute the command.");
       return true;
     }
 
     File schemaFile = new File(_schemaFile);
-    LOGGER.info("Executing command: " + toString());
+    LOGGER.info("Executing command: {}", toString());
     if (!schemaFile.exists()) {
       throw new FileNotFoundException("file does not exist, + " + _schemaFile);
     }
@@ -183,7 +183,7 @@ public class AddSchemaCommand extends AbstractBaseAdminCommand implements Comman
               AuthProviderUtils.makeAuthProvider(_authProvider, _authTokenUrl, _authToken,
               _user, _password)), Collections.emptyList());
     } catch (Exception e) {
-      LOGGER.error("Got Exception to upload Pinot Schema: " + schema.getSchemaName(), e);
+      LOGGER.error("Got Exception to upload Pinot Schema: {}", schema.getSchemaName(), e);
       return false;
     }
     return true;

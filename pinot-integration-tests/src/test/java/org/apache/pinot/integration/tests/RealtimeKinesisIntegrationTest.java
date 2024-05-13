@@ -166,7 +166,7 @@ public class RealtimeKinesisIntegrationTest extends BaseClusterIntegrationTestSe
         try {
           return getCurrentCountStarResult() >= _totalRecordsPushedInStream;
         } catch (Exception e) {
-          LOGGER.warn("Could not fetch current number of rows in pinot table " + getTableName(), e);
+          LOGGER.warn("Could not fetch current number of rows in pinot table {}", getTableName(), e);
           return null;
         }
       }

@@ -128,9 +128,9 @@ public class KafkaDataServerStartable implements StreamDataServerStartable {
         }
         Thread.sleep(checkIntervalMs);
       } catch (Exception e) {
-        LOGGER.error("Caught exception while checking the condition" + errorMessageSuffix, e);
+        LOGGER.error("Caught exception while checking the condition{}", errorMessageSuffix, e);
       }
     }
-    LOGGER.error("Failed to meet condition in " + timeoutMs + "ms" + errorMessageSuffix);
+    LOGGER.error("Failed to meet condition in {}ms{}", timeoutMs, errorMessageSuffix);
   }
 }

@@ -410,7 +410,7 @@ public class ResourceManagerAccountingTest {
               Tracing.ThreadAccountantOps.sample();
               if (Thread.interrupted() || thread.isInterrupted()) {
                 Tracing.ThreadAccountantOps.clear();
-                LOGGER.error("KilledWorker " + queryId + " " + finalJ);
+                LOGGER.error("KilledWorker {} {}", queryId, finalJ);
                 return;
               }
               a[i] = new long[200000];
@@ -429,7 +429,7 @@ public class ResourceManagerAccountingTest {
           for (int i = 0; i < 10; i++) {
             futuresThread[i].cancel(true);
           }
-          LOGGER.error("Killed " + queryId);
+          LOGGER.error("Killed {}", queryId);
         }
         Tracing.ThreadAccountantOps.clear();
       });

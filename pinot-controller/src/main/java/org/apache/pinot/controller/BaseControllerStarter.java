@@ -368,7 +368,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         setUpHelixController();
         break;
       default:
-        LOGGER.error("Invalid mode: " + _controllerMode);
+        LOGGER.error("Invalid mode: {}", _controllerMode);
         break;
     }
 

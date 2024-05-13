@@ -164,19 +164,19 @@ public class DeleteTableCommand extends AbstractBaseAdminCommand implements Comm
     }
 
     if (!_exec) {
-      LOGGER.warn("Dry Running Command: " + toString());
+      LOGGER.warn("Dry Running Command: {}", toString());
       LOGGER.warn("Use the -exec option to actually execute the command.");
       return true;
     }
 
-    LOGGER.info("Executing command: " + toString());
+    LOGGER.info("Executing command: {}", toString());
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
       fileUploadDownloadClient.getHttpClient().sendDeleteRequest(FileUploadDownloadClient
           .getDeleteTableURI(_controllerProtocol, _controllerHost, Integer.parseInt(_controllerPort),
               _tableName, _type, _retention), Collections.emptyMap(), AuthProviderUtils.makeAuthProvider(_authProvider,
           _authTokenUrl, _authToken, _user, _password));
     } catch (Exception e) {
-      LOGGER.error("Got Exception while deleting Pinot Table: " + _tableName, e);
+      LOGGER.error("Got Exception while deleting Pinot Table: {}", _tableName, e);
       return false;
     }
     return true;

@@ -332,7 +332,7 @@ public abstract class BaseMinionStarter implements ServiceStartable {
     LOGGER.info("Shutting down admin application");
     _minionAdminApplication.stop();
 
-    LOGGER.info("Stopping Pinot minion: " + _instanceId);
+    LOGGER.info("Stopping Pinot minion: {}", _instanceId);
     _helixManager.disconnect();
     LOGGER.info("Deregistering service status handler");
     ServiceStatus.removeServiceStatusCallback(_instanceId);

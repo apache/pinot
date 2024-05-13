@@ -141,19 +141,19 @@ public class DeleteSchemaCommand extends AbstractBaseAdminCommand implements Com
     }
 
     if (!_exec) {
-      LOGGER.warn("Dry Running Command: " + toString());
+      LOGGER.warn("Dry Running Command: {}", toString());
       LOGGER.warn("Use the -exec option to actually execute the command.");
       return true;
     }
 
-    LOGGER.info("Executing command: " + toString());
+    LOGGER.info("Executing command: {}", toString());
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
       fileUploadDownloadClient.getHttpClient().sendDeleteRequest(
           FileUploadDownloadClient.getDeleteSchemaURI(_controllerProtocol, _controllerHost,
               Integer.parseInt(_controllerPort), _schemaName), Collections.emptyMap(),
           AuthProviderUtils.makeAuthProvider(_authProvider, _authTokenUrl, _authToken, _user, _password));
     } catch (Exception e) {
-      LOGGER.error("Got Exception while deleting Pinot Schema: " + _schemaName, e);
+      LOGGER.error("Got Exception while deleting Pinot Schema: {}", _schemaName, e);
       return false;
     }
     return true;

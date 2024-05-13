@@ -139,7 +139,7 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
     testCountStarQuery(3, false);
     assertEquals(getCurrentCountStarResult(), expectedCountStarResult);
 
-    LOGGER.warn("Shutting down server " + _serverStarters.get(NUM_SERVERS - 1).getInstanceId());
+    LOGGER.warn("Shutting down server {}", _serverStarters.get(NUM_SERVERS - 1).getInstanceId());
     // Take a server and shut down its query server to mimic a hard failure
     BaseServerStarter serverStarter = _serverStarters.get(NUM_SERVERS - 1);
     try {

@@ -405,7 +405,7 @@ public class PinotQueryResource {
         LOGGER.debug("The request is - " + requestStr);
       }*/
 
-      LOGGER.info("url string passed is : " + urlStr);
+      LOGGER.info("url string passed is : {}", urlStr);
       final URL url = new URL(urlStr);
       conn = (HttpURLConnection) url.openConnection();
       conn.setDoOutput(true);
@@ -484,7 +484,7 @@ public class PinotQueryResource {
       final String pinotResultString = sendPostRaw(url, requestJson.toString(), headers);
 
       final long queryTime = System.currentTimeMillis() - startTime;
-      LOGGER.info("Query: " + query + " Time: " + queryTime);
+      LOGGER.info("Query: {} Time: {}", query, queryTime);
 
       return pinotResultString;
     } catch (final Exception ex) {
