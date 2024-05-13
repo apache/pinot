@@ -287,6 +287,7 @@ public class RecordTransformerTest {
       try {
         record = transformer.transform(record);
       } catch (Exception e) {
+        assertTrue(e instanceof IllegalStateException);
         assertEquals(e.getMessage(), "Throwing exception as value: 1\0002\0003 for column "
             + "svStringWithNullCharacters contains null character.");
       }
@@ -306,6 +307,7 @@ public class RecordTransformerTest {
       try {
         record = transformer.transform(record);
       } catch (Exception e) {
+        assertTrue(e instanceof IllegalStateException);
         assertEquals(e.getMessage(), "Throwing exception as value: 123 for column svStringWithLengthLimit "
             + "exceeds configured max length 2.");
       }
