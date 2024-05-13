@@ -254,7 +254,8 @@ public class BasePartitionUpsertMetadataManagerTest {
     }
     // Resolve comparison ties
     Iterator<RecordInfo> deDuplicatedRecords =
-        BasePartitionUpsertMetadataManager.resolveComparisonTies(recordInfoList.iterator(), HashFunction.NONE);
+        BasePartitionUpsertMetadataManager.resolveComparisonTies(recordInfoList.iterator(), HashFunction.NONE,
+            Collections.emptyList());
     // Ensure we have only 1 record for each unique primary key
     Map<PrimaryKey, RecordInfo> recordsByPrimaryKeys = new HashMap<>();
     while (deDuplicatedRecords.hasNext()) {

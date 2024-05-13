@@ -19,8 +19,10 @@
 package org.apache.pinot.segment.local.upsert;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
@@ -72,8 +74,10 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
     String segmentName = segment.getSegmentName();
     segment.enableUpsert(this, validDocIds, queryableDocIds);
 
+    List<Integer> originalDocIDPositions = oldSegment != null
+        ? oldSegment.getOriginalDocIDPositionMapping() : Collections.emptyList();
     if (_partialUpsertHandler != null) {
-      recordInfoIterator = resolveComparisonTies(recordInfoIterator, _hashFunction);
+      recordInfoIterator = resolveComparisonTies(recordInfoIterator, _hashFunction, originalDocIDPositions);
     }
     AtomicInteger numKeysInWrongSegment = new AtomicInteger();
     while (recordInfoIterator.hasNext()) {

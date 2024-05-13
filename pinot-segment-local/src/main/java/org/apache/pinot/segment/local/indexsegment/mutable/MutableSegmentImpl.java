@@ -178,6 +178,7 @@ public class MutableSegmentImpl implements MutableSegment {
   //        the valid doc ids won't be updated.
   private final ThreadSafeMutableRoaringBitmap _validDocIds;
   private final ThreadSafeMutableRoaringBitmap _queryableDocIds;
+  private final List<Integer> _originalDocIDPositionMapping = new ArrayList<>();
 
   public MutableSegmentImpl(RealtimeSegmentConfig config, @Nullable ServerMetrics serverMetrics) {
     _serverMetrics = serverMetrics;
@@ -556,6 +557,10 @@ public class MutableSegmentImpl implements MutableSegment {
 
   private boolean isDedupEnabled() {
     return _partitionDedupMetadataManager != null;
+  }
+
+  public List<Integer> getOriginalDocIDPositionMapping() {
+    return _originalDocIDPositionMapping;
   }
 
   private RecordInfo getRecordInfo(GenericRow row, int docId) {
@@ -1051,6 +1056,7 @@ public class MutableSegmentImpl implements MutableSegment {
         ((MutableInvertedIndex) indexContainer._mutableIndexes.get(StandardIndexes.inverted()));
     int[] docIds = new int[numDocsIndexed];
     int[] batch = new int[256];
+    int[] newIdToOldIdMap = new int[numDocsIndexed];
     int docIdIndex = 0;
     for (int dictId : dictIds) {
       MutableRoaringBitmap bitmap = invertedIndex.getDocIds(dictId);
@@ -1058,8 +1064,15 @@ public class MutableSegmentImpl implements MutableSegment {
       while (iterator.hasNext()) {
         int limit = iterator.nextBatch(batch);
         System.arraycopy(batch, 0, docIds, docIdIndex, limit);
+        for (int i = 0; i < limit; i++) {
+          newIdToOldIdMap[docIdIndex + i] = batch[i]; // Map new position (docIdIndex + i) to old ID (batch[i])
+        }
         docIdIndex += limit;
       }
+    }
+
+    for (int id : newIdToOldIdMap) {
+      _originalDocIDPositionMapping.add(id);
     }
 
     // Sanity check
