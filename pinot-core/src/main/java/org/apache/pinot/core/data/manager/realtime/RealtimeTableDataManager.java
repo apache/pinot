@@ -77,6 +77,8 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.spi.utils.TimeUtils;
+import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
+import org.apache.pinot.spi.utils.retry.RetriableOperationException;
 
 
 @ThreadSafe
@@ -406,7 +408,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   }
 
   @Override
-  public void addConsumingSegment(String segmentName) {
+  public void addConsumingSegment(String segmentName)
+      throws AttemptsExceededException, RetriableOperationException {
     Preconditions.checkState(!_shutDown,
         "Table data manager is already shut down, cannot add CONSUMING segment: %s to table: %s", segmentName,
         _tableNameWithType);
@@ -424,7 +427,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     }
   }
 
-  private void doAddConsumingSegment(String segmentName) {
+  private void doAddConsumingSegment(String segmentName)
+      throws AttemptsExceededException, RetriableOperationException {
     SegmentZKMetadata zkMetadata = fetchZKMetadata(segmentName);
     if (zkMetadata.getStatus() != Status.IN_PROGRESS) {
       // NOTE: We do not throw exception here because the segment might have just been committed before the state
