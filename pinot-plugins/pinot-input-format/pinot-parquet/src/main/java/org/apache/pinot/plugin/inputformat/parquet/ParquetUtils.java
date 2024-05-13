@@ -26,12 +26,16 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.parquet.avro.AvroParquetReader;
+import org.apache.parquet.avro.AvroParquetWriter;
 import org.apache.parquet.avro.AvroReadSupport;
 import org.apache.parquet.avro.AvroSchemaConverter;
 import org.apache.parquet.hadoop.ParquetFileReader;
 import org.apache.parquet.hadoop.ParquetReader;
+import org.apache.parquet.hadoop.ParquetWriter;
 import org.apache.parquet.hadoop.util.HadoopInputFile;
+import org.apache.parquet.hadoop.util.HadoopOutputFile;
 import org.apache.parquet.io.InputFile;
+import org.apache.parquet.io.OutputFile;
 import org.apache.parquet.schema.MessageType;
 
 
@@ -82,6 +86,14 @@ public class ParquetUtils {
       Map<String, String> metaData = reader.getFileMetaData().getKeyValueMetaData();
       return metaData.containsKey(AVRO_SCHEMA_METADATA_KEY) || metaData.containsKey(OLD_AVRO_SCHEMA_METADATA_KEY);
     }
+  }
+
+  public static ParquetWriter<GenericRecord> getParquetAvroWriter(Path path, Schema schema)
+      throws IOException {
+    OutputFile outputFile = HadoopOutputFile.fromPath(path, ParquetUtils.getParquetHadoopConfiguration());
+    return AvroParquetWriter.<GenericRecord>builder(outputFile).withSchema(schema)
+        .withConf(ParquetUtils.getParquetHadoopConfiguration())
+        .build();
   }
 
   public static Configuration getParquetHadoopConfiguration() {
