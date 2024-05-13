@@ -325,7 +325,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       // In fact, taking segmentLock during segment preloading phase could cause deadlock when HelixTaskExecutor
       // threads processing other tables have taken the same segmentLock as decided by the hash of table name and
       // segment name, i.e. due to hash collision.
-      tableDataManager.tryLoadExistingSegment(segmentName, indexLoadingConfig, segmentZKMetadata);
+      tableDataManager.tryLoadExistingSegment(segmentZKMetadata, indexLoadingConfig);
       _logger.info("Preloaded segment: {} from partition: {} of table: {}", segmentName, _partitionId,
           _tableNameWithType);
     } catch (Exception e) {

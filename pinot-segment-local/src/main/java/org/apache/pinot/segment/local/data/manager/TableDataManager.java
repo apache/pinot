@@ -107,6 +107,29 @@ public interface TableDataManager {
       throws Exception;
 
   /**
+   * Adds a new ONLINE segment that is not already loaded.
+   * NOTE: This method is part of the implementation detail of {@link #addOnlineSegment(String)}.
+   */
+  void addNewOnlineSegment(SegmentZKMetadata zkMetadata, IndexLoadingConfig indexLoadingConfig)
+      throws Exception;
+
+  /**
+   * Tries to load a segment from local disk. Segment load might fail for various reasons: segment doesn't exist on
+   * local disk; local segment contains different CRC with ZK metadata; local data got corrupted; etc.
+   * NOTE: This method is part of the implementation detail of {@link #addOnlineSegment(String)}.
+   *
+   * @return true if the segment is loaded successfully from local disk; false otherwise.
+   */
+  boolean tryLoadExistingSegment(SegmentZKMetadata zkMetadata, IndexLoadingConfig indexLoadingConfig);
+
+  /**
+   * Downloads a segment and loads it into the table.
+   * NOTE: This method is part of the implementation detail of {@link #addOnlineSegment(String)}.
+   */
+  void downloadAndLoadSegment(SegmentZKMetadata zkMetadata, IndexLoadingConfig indexLoadingConfig)
+      throws Exception;
+
+  /**
    * Adds an CONSUMING segment into a REALTIME table.
    * This method is triggered by state transition to CONSUMING state.
    */
@@ -148,16 +171,6 @@ public interface TableDataManager {
   void reloadSegment(String segmentName, IndexLoadingConfig indexLoadingConfig, SegmentZKMetadata zkMetadata,
       SegmentMetadata localMetadata, @Nullable Schema schema, boolean forceDownload)
       throws Exception;
-
-  /**
-   * Try to load a segment from an existing segment directory managed by the server. The segment loading may fail
-   * because the directory may not exist any more, or the segment data has a different crc now, or the existing segment
-   * data got corrupted etc.
-   *
-   * @return true if the segment is loaded successfully from the existing segment directory; false otherwise.
-   */
-  boolean tryLoadExistingSegment(String segmentName, IndexLoadingConfig indexLoadingConfig,
-      SegmentZKMetadata zkMetadata);
 
   /**
    * Get the segment data directory, considering the segment tier if provided.
@@ -257,6 +270,29 @@ public interface TableDataManager {
    * ensure data consistency across those segments if needed.
    */
   List<SegmentContext> getSegmentContexts(List<IndexSegment> selectedSegments, Map<String, String> queryOptions);
+
+  /**
+   * Fetches the segment ZK metadata for the given segment.
+   */
+  SegmentZKMetadata fetchZKMetadata(String segmentName);
+
+  /**
+   * Fetches the table config and schema for the table from ZK.
+   */
+  Pair<TableConfig, Schema> fetchTableConfigAndSchema();
+
+  /**
+   * Fetches the table config and schema for the table from ZK, then construct the index loading config with them.
+   */
+  default IndexLoadingConfig fetchIndexLoadingConfig() {
+    Pair<TableConfig, Schema> tableConfigSchemaPair = fetchTableConfigAndSchema();
+    return getIndexLoadingConfig(tableConfigSchemaPair.getLeft(), tableConfigSchemaPair.getRight());
+  }
+
+  /**
+   * Constructs the index loading config for the table with the given table config and schema.
+   */
+  IndexLoadingConfig getIndexLoadingConfig(TableConfig tableConfig, @Nullable Schema schema);
 
   /**
    * Interface to handle segment state transitions from CONSUMING to DROPPED
