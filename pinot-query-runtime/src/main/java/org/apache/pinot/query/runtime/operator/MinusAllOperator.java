@@ -28,13 +28,13 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Minus/Except operator.
+ * EXCEPT ALL operator.
  */
-public class MinusOperator extends SetOperator {
-  private static final Logger LOGGER = LoggerFactory.getLogger(MinusOperator.class);
-  private static final String EXPLAIN_NAME = "MINUS";
+public class MinusAllOperator extends SetOperator {
+  private static final Logger LOGGER = LoggerFactory.getLogger(MinusAllOperator.class);
+  private static final String EXPLAIN_NAME = "MINUS ALL";
 
-  public MinusOperator(OpChainExecutionContext opChainExecutionContext, List<MultiStageOperator> upstreamOperators,
+  public MinusAllOperator(OpChainExecutionContext opChainExecutionContext, List<MultiStageOperator> upstreamOperators,
       DataSchema dataSchema) {
     super(opChainExecutionContext, upstreamOperators, dataSchema);
   }
@@ -57,12 +57,6 @@ public class MinusOperator extends SetOperator {
 
   @Override
   protected boolean handleRowMatched(Object[] row) {
-    Record record = new Record(row);
-    if (_rightRowSet.contains(record)) {
-      return false;
-    } else {
-      _rightRowSet.add(record);
-      return true;
-    }
+    return !_rightRowSet.remove(new Record(row));
   }
 }
