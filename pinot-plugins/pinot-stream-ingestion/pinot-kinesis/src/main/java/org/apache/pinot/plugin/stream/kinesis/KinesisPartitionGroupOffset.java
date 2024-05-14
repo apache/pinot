@@ -92,7 +92,7 @@ public class KinesisPartitionGroupOffset implements StreamPartitionMsgOffset {
 
   @Override
   public String toString() {
-    return JsonUtils.newObjectNode().put(_shardId, _sequenceNumber).toString();
+    return JsonUtils.newObjectNode().put(_shardId, _sequenceNumber + STATUS_SEPARATOR + _startStatus).toString();
   }
 
   @Override
