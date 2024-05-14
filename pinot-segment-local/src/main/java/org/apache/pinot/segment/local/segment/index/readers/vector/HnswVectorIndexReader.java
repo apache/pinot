@@ -61,19 +61,11 @@ public class HnswVectorIndexReader implements VectorIndexReader {
       _indexReader = DirectoryReader.open(_indexDirectory);
       _indexSearcher = new IndexSearcher(_indexReader);
 
-//      if (!config.isEnableQueryCache()) {
-//        // Disable Lucene query result cache. While it helps a lot with performance for
-//        // repeated queries, on the downside it cause heap issues.
-//        _indexSearcher.setQueryCache(null);
-//      }
-//      if (config.isUseANDForMultiTermQueries()) {
-//        _useANDForMultiTermQueries = true;
-//      }
       // TODO: consider using a threshold of num docs per segment to decide between building
       // mapping file upfront on segment load v/s on-the-fly during query processing
       _docIdTranslator = new HnswVectorIndexReader.DocIdTranslator(indexDir, _column, numDocs, _indexSearcher);
     } catch (Exception e) {
-      LOGGER.error("Failed to instantiate Lucene text index reader for column {}, exception {}", column,
+      LOGGER.error("Failed to instantiate Lucene HNSW index reader for column {}, exception {}", column,
           e.getMessage());
       throw new RuntimeException(e);
     }
@@ -83,20 +75,20 @@ public class HnswVectorIndexReader implements VectorIndexReader {
    * CASE 1: If IndexLoadingConfig specifies a segment version to load and if it is different then
    * the on-disk version of the segment, then {@link ImmutableSegmentLoader}
    * will take care of up-converting the on-disk segment to v3 before load. The converter
-   * already has support for converting v1 text index to v3. So the text index can be
+   * already has support for converting v1 vector index to v3. So the vector index can be
    * loaded from segmentIndexDir/v3/ since v3 sub-directory would have already been created
    *
    * CASE 2: However, if IndexLoadingConfig doesn't specify the segment version to load or if the specified
    * version is same as the on-disk version of the segment, then ImmutableSegmentLoader will load
    * whatever the version of segment is on disk.
    * @param segmentIndexDir top-level segment index directory
-   * @return text index file
+   * @return vector index file
    */
   private File getVectorIndexFile(File segmentIndexDir) {
     // will return null if file does not exist
     File file = SegmentDirectoryPaths.findVectorIndexIndexFile(segmentIndexDir, _column);
     if (file == null) {
-      throw new IllegalStateException("Failed to find text index file for column: " + _column);
+      throw new IllegalStateException("Failed to find HNSW index file for column: " + _column);
     }
     return file;
   }
@@ -119,7 +111,7 @@ public class HnswVectorIndexReader implements VectorIndexReader {
       return docIds;
     } catch (Exception e) {
       String msg =
-          "Caught excepttion while searching the text index for column:" + _column + " search query:" + searchQuery;
+          "Caught exception while searching the HNSW index for column:" + _column + ", search query:" + searchQuery;
       throw new RuntimeException(msg, e);
     }
   }
@@ -127,7 +119,7 @@ public class HnswVectorIndexReader implements VectorIndexReader {
   /**
    * When we destroy the loaded ImmutableSegment, all the indexes
    * (for each column) are destroyed and as part of that
-   * we release the text index
+   * we release the vector index
    * @throws IOException
    */
   @Override
@@ -157,7 +149,7 @@ public class HnswVectorIndexReader implements VectorIndexReader {
       // The mapping is local to a segment. It is created on the server during segment load.
       // Unless we are running Pinot on Solaris/SPARC, the underlying architecture is
       // LITTLE_ENDIAN (Linux/x86). So use that as byte order.
-      String desc = "Text index docId mapping buffer: " + column;
+      String desc = "Vector index docId mapping buffer: " + column;
       if (docIdMappingFile.exists()) {
         // we will be here for segment reload and server restart
         // for refresh, we will not be here since segment is deleted/replaced
@@ -174,7 +166,7 @@ public class HnswVectorIndexReader implements VectorIndexReader {
             _buffer.putInt(i * Integer.BYTES, pinotDocId);
           } catch (Exception e) {
             throw new RuntimeException(
-                "Caught exception while building doc id mapping for text index column: " + column, e);
+                "Caught exception while building doc id mapping for HNSW index column: " + column, e);
           }
         }
       }
