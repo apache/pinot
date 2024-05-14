@@ -268,6 +268,25 @@ public class BasePartitionUpsertMetadataManagerTest {
     assertEquals(recordsByPrimaryKeys.get(makePrimaryKey(0)).getDocId(), 5);
     assertEquals(recordsByPrimaryKeys.get(makePrimaryKey(1)).getDocId(), 4);
     assertEquals(recordsByPrimaryKeys.get(makePrimaryKey(2)).getDocId(), 2);
+
+    // test for scenario where we are passing sorted-index
+    List<Integer> originalDocIDPositionMappings = Arrays.asList(5, 4, 3, 2, 1, 0);
+    // Resolve comparison ties
+    deDuplicatedRecords =
+        BasePartitionUpsertMetadataManager.resolveComparisonTies(recordInfoList.iterator(), HashFunction.NONE,
+            originalDocIDPositionMappings);
+    // Ensure we have only 1 record for each unique primary key
+    recordsByPrimaryKeys = new HashMap<>();
+    while (deDuplicatedRecords.hasNext()) {
+      RecordInfo recordInfo = deDuplicatedRecords.next();
+      assertFalse(recordsByPrimaryKeys.containsKey(recordInfo.getPrimaryKey()));
+      recordsByPrimaryKeys.put(recordInfo.getPrimaryKey(), recordInfo);
+    }
+    assertEquals(recordsByPrimaryKeys.size(), 3);
+    // Ensure that to resolve ties, we pick the docId corresponding to the max docId of the old mapping
+    assertEquals(recordsByPrimaryKeys.get(makePrimaryKey(0)).getDocId(), 0);
+    assertEquals(recordsByPrimaryKeys.get(makePrimaryKey(1)).getDocId(), 1);
+    assertEquals(recordsByPrimaryKeys.get(makePrimaryKey(2)).getDocId(), 2);
   }
 
   private static ThreadSafeMutableRoaringBitmap createValidDocIds(int... docIds) {
