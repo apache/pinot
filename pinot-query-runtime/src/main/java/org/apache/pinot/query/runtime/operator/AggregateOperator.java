@@ -74,8 +74,9 @@ public class AggregateOperator extends MultiStageOperator {
   private final AggType _aggType;
   private final boolean _hasWithInGroup;
   private final List<Object[]> _allRowContainer = new ArrayList<>();
-  @Nullable
-  private final Comparator<Object[]> _comparator;
+  private final List<RexExpression> _collationKeys;
+  private final List<RelFieldCollation.Direction> _collationDirections;
+  private final List<RelFieldCollation.NullDirection> _collationNullDirections;
 
   private final MultistageAggregationExecutor _aggregationExecutor;
   private final MultistageGroupByExecutor _groupByExecutor;
@@ -96,10 +97,9 @@ public class AggregateOperator extends MultiStageOperator {
     _resultSchema = resultSchema;
     _aggType = aggType;
     _hasWithInGroup = !collationKeys.isEmpty();
-    _comparator =
-        _hasWithInGroup ? new SortUtils.SortComparator(collationKeys, collationDirections, collationNullDirections,
-            _resultSchema, false) : null;
-
+    _collationKeys = ImmutableList.copyOf(collationKeys);
+    _collationDirections = ImmutableList.copyOf(collationDirections);
+    _collationNullDirections = ImmutableList.copyOf(collationNullDirections);
     // Process literal hints
     Map<Integer, Map<Integer, Literal>> literalArgumentsMap = null;
     if (nodeHint != null) {
@@ -208,13 +208,15 @@ public class AggregateOperator extends MultiStageOperator {
   private TransferableBlock consumeGroupBy() {
     if (_hasWithInGroup) {
       TransferableBlock block = _inputOperator.nextBlock();
+      Comparator<Object[]> inputRowComparator = new SortUtils.SortComparator(_collationKeys, _collationDirections,
+          _collationNullDirections, block.getDataSchema(), false);
       while (block.isDataBlock()) {
         List<Object[]> rows = block.getContainer();
         _allRowContainer.addAll(rows);
         block = _inputOperator.nextBlock();
       }
       if (block.isSuccessfulEndOfStreamBlock()) {
-        _allRowContainer.sort(_comparator);
+        _allRowContainer.sort(inputRowComparator);
         _groupByExecutor.processBlock(
             new TransferableBlock(_allRowContainer, _resultSchema, DataBlock.Type.ROW));
       }
@@ -237,13 +239,15 @@ public class AggregateOperator extends MultiStageOperator {
   private TransferableBlock consumeAggregation() {
     if (_hasWithInGroup) {
       TransferableBlock block = _inputOperator.nextBlock();
+      Comparator<Object[]> inputRowComparator = new SortUtils.SortComparator(_collationKeys, _collationDirections,
+          _collationNullDirections, block.getDataSchema(), false);
       while (block.isDataBlock()) {
         List<Object[]> rows = block.getContainer();
         _allRowContainer.addAll(rows);
         block = _inputOperator.nextBlock();
       }
       if (block.isSuccessfulEndOfStreamBlock()) {
-        _allRowContainer.sort(_comparator);
+        _allRowContainer.sort(inputRowComparator);
         _aggregationExecutor.processBlock(
             new TransferableBlock(_allRowContainer, _resultSchema, DataBlock.Type.ROW));
       }

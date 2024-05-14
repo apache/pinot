@@ -19,6 +19,7 @@
 package org.apache.pinot.core.query.aggregation.function.array;
 
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -84,10 +85,15 @@ public class ListAggFunction
   }
 
   private void aggregateArray(int length, ObjectArrayList<String> valueSet, String[] values) {
+    ObjectOpenHashSet<String> distinctValueSet = new ObjectOpenHashSet<>();
     for (int i = 0; i < length; i++) {
       String value = values[i];
-      if (_isDistinct && valueSet.contains(value)) {
-        continue;
+      if (_isDistinct) {
+        if (distinctValueSet.contains(value)) {
+          continue;
+        } else {
+          distinctValueSet.add(value);
+        }
       }
       valueSet.add(value);
     }
@@ -95,11 +101,16 @@ public class ListAggFunction
 
   private void aggregateArrayWithNull(int length, ObjectArrayList<String> valueSet, String[] values,
       RoaringBitmap nullBitmap) {
+    ObjectOpenHashSet<String> distinctValueSet = new ObjectOpenHashSet<>();
     for (int i = 0; i < length; i++) {
       if (!nullBitmap.contains(i)) {
         String value = values[i];
-        if (_isDistinct && valueSet.contains(value)) {
-          continue;
+        if (_isDistinct) {
+          if (distinctValueSet.contains(value)) {
+            continue;
+          } else {
+            distinctValueSet.add(value);
+          }
         }
         valueSet.add(value);
       }

@@ -141,6 +141,17 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
     row = rows.get(0);
     assertEquals(row.size(), 1);
     assertEquals(row.get(0).asText().split(" \\| ").length, getCountStarResult());
+
+    query =
+        String.format("SELECT "
+            + "listAgg(cast(doubleCol AS VARCHAR), ' | ') WITHIN GROUP (ORDER BY doubleCol) "
+            + "FROM %s LIMIT %d", getTableName(), getCountStarResult());
+    jsonNode = postQuery(query);
+    rows = jsonNode.get("resultTable").get("rows");
+    assertEquals(rows.size(), 1);
+    row = rows.get(0);
+    assertEquals(row.size(), 1);
+    assertEquals(row.get(0).asText().split(" \\| ").length, getCountStarResult());
   }
 
   @Test(dataProvider = "useV2QueryEngine")
@@ -162,9 +173,26 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
       assertEquals(row.size(), 2);
       assertEquals(row.get(0).asText().split(" \\| ").length, getCountStarResult() / 10);
     }
+
     query =
         String.format("SELECT "
             + "listAgg(stringCol, ' | ') WITHIN GROUP (ORDER BY stringCol), "
+            + "groupKey "
+            + "FROM %s "
+            + "GROUP BY groupKey "
+            + "LIMIT %d", getTableName(), getCountStarResult());
+    jsonNode = postQuery(query);
+    rows = jsonNode.get("resultTable").get("rows");
+    assertEquals(rows.size(), 10);
+    for (int i = 0; i < 10; i++) {
+      JsonNode row = rows.get(i);
+      assertEquals(row.size(), 2);
+      assertEquals(row.get(0).asText().split(" \\| ").length, getCountStarResult() / 10);
+    }
+
+    query =
+        String.format("SELECT "
+            + "listAgg(cast(doubleCol AS VARCHAR), ' | ') WITHIN GROUP (ORDER BY doubleCol), "
             + "groupKey "
             + "FROM %s "
             + "GROUP BY groupKey "

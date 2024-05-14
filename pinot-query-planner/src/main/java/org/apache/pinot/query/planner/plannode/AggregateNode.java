@@ -45,6 +45,7 @@ public class AggregateNode extends AbstractPlanNode {
   private List<RexExpression> _groupSet;
   @ProtoProperties
   private AggType _aggType;
+  // RelFieldCollation is not serializable, so extract it to below three fields.
   @ProtoProperties
   private List<RexExpression> _collationKey = ImmutableList.of();
   @ProtoProperties
