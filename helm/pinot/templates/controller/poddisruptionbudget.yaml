@@ -17,11 +17,13 @@
 # under the License.
 #
 
+{{- if .Values.controller.disruptionBudget.enabled -}}
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
   name: {{ include "pinot.controller.fullname" . }}
 spec:
-  minAvailable: {{ .Values.controller.minAvailable }}
+  minAvailable: {{ .Values.controller.disruptionBudget.minAvailable }}
   selector:
     {{- include "pinot.controllerMatchLabels" . | nindent 4 }}
+{{- end }}
