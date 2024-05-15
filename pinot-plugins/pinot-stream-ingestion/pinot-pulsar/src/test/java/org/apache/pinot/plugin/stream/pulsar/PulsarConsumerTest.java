@@ -31,6 +31,7 @@ import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pulsar.client.admin.PulsarAdmin;
 import org.apache.pulsar.client.admin.Topics;
 import org.apache.pulsar.client.api.Message;
@@ -212,8 +213,8 @@ public class PulsarConsumerTest {
     MessageId startMessageId = startIndex == 0 ? MessageId.earliest : messageIds.get(startIndex);
     int numMessagesFetched = startIndex;
     while (numMessagesFetched < NUM_RECORDS_PER_PARTITION) {
-      PulsarMessageBatch messageBatch =
-          consumer.fetchMessages(new MessageIdStreamOffset(startMessageId), CONSUMER_FETCH_TIMEOUT_MILLIS);
+      PulsarMessageBatch messageBatch = consumer.fetchMessages(new MessageIdStreamOffset(startMessageId),
+          CommonConstants.Segment.Realtime.StreamContinuationMode.RESUME, CONSUMER_FETCH_TIMEOUT_MILLIS);
       int messageCount = messageBatch.getMessageCount();
       assertFalse(messageBatch.isEndOfPartitionGroup());
       for (int i = 0; i < messageCount; i++) {

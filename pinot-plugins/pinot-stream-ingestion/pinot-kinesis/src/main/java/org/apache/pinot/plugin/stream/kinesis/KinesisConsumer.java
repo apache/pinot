@@ -28,6 +28,7 @@ import org.apache.pinot.spi.stream.BytesStreamMessage;
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.services.kinesis.KinesisClient;
@@ -133,15 +134,25 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
     }
   }
 
-  private String getShardIterator(String shardId, String sequenceNumber) {
+  private String getShardIterator(String shardId, String sequenceNumber,
+      CommonConstants.Segment.Realtime.StreamContinuationMode continuationMode) {
     GetShardIteratorRequest.Builder requestBuilder =
         GetShardIteratorRequest.builder().streamName(_config.getStreamTopicName()).shardId(shardId);
 
-    if (sequenceNumber != null) {
-      requestBuilder = requestBuilder.startingSequenceNumber(sequenceNumber)
-          .shardIteratorType(ShardIteratorType.AFTER_SEQUENCE_NUMBER);
-    } else {
-      requestBuilder = requestBuilder.shardIteratorType(_config.getShardIteratorType());
+    switch (continuationMode) {
+      case RESUME: {
+        if (sequenceNumber != null) {
+          requestBuilder = requestBuilder.startingSequenceNumber(sequenceNumber).shardIteratorType(ShardIteratorType.AFTER_SEQUENCE_NUMBER);
+        } else {
+          requestBuilder = requestBuilder.shardIteratorType(_config.getShardIteratorType());
+        }
+        break;
+      }
+      case INITIALIZE: {
+        requestBuilder = requestBuilder.shardIteratorType(_config.getShardIteratorType());
+        break;
+      }
+      default: //
     }
 
     return _kinesisClient.getShardIterator(requestBuilder.build()).shardIterator();

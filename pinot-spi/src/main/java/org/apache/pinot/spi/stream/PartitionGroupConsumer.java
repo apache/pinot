@@ -21,6 +21,7 @@ package org.apache.pinot.spi.stream;
 import java.io.Closeable;
 import java.util.concurrent.TimeoutException;
 import javax.annotation.Nullable;
+import org.apache.pinot.spi.utils.CommonConstants;
 
 
 /**
@@ -55,15 +56,15 @@ public interface PartitionGroupConsumer extends Closeable {
    * @throws TimeoutException If the operation could not be completed within timeout
    * @return A batch of messages from the stream partition group
    */
-  default MessageBatch fetchMessages(StreamPartitionMsgOffset startOffset, int timeoutMs)
+  default MessageBatch fetchMessages(StreamPartitionMsgOffset startOffset, CommonConstants.Segment.Realtime.StreamContinuationMode continuationMode, int timeoutMs)
       throws TimeoutException {
-    return fetchMessages(startOffset, null, timeoutMs);
+    return fetchMessages(startOffset, null, continuationMode, timeoutMs);
   }
 
   // Deprecated because the offset is not always monotonically increasing
   @Deprecated
   default MessageBatch fetchMessages(StreamPartitionMsgOffset startOffset, @Nullable StreamPartitionMsgOffset endOffset,
-      int timeoutMs)
+      CommonConstants.Segment.Realtime.StreamContinuationMode continuationMode, int timeoutMs)
       throws TimeoutException {
     throw new UnsupportedOperationException();
   }

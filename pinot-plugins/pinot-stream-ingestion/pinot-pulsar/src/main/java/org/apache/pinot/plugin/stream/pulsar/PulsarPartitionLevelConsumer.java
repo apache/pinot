@@ -27,6 +27,7 @@ import org.apache.pinot.spi.stream.PartitionGroupConsumer;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pulsar.client.api.MessageId;
 import org.apache.pulsar.client.api.PulsarClientException;
 import org.apache.pulsar.client.api.Reader;
@@ -59,7 +60,8 @@ public class PulsarPartitionLevelConsumer extends PulsarPartitionLevelConnection
   }
 
   @Override
-  public synchronized PulsarMessageBatch fetchMessages(StreamPartitionMsgOffset startOffset, int timeoutMs) {
+  public synchronized PulsarMessageBatch fetchMessages(StreamPartitionMsgOffset startOffset,
+      CommonConstants.Segment.Realtime.StreamContinuationMode continuationMode, int timeoutMs) {
     MessageId startMessageId = ((MessageIdStreamOffset) startOffset).getMessageId();
     long endTimeMs = System.currentTimeMillis() + timeoutMs;
     List<BytesStreamMessage> messages = new ArrayList<>();
