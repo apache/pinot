@@ -1412,9 +1412,9 @@ public final class TableConfigUtils {
               tableConfig.getTableName());
         } else {
           if (quotaConfig.getStorageInBytes() > maxAllowedSizeInBytes) {
-            throw new IllegalStateException(
-                String.format("Invalid storage quota: %d, max allowed size: %d", quotaConfig.getStorageInBytes(),
-                    maxAllowedSizeInBytes));
+            throw new IllegalStateException(String.format(
+                "Exceeded storage size for dimension table. Requested size: %d, Max allowed size: %d",
+                quotaConfig.getStorageInBytes(), maxAllowedSizeInBytes));
           }
         }
       }
