@@ -56,7 +56,7 @@ public class PinotServiceManagerLogger {
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get all the loggers", notes = "Return all the logger names")
   public List<String> getLoggers() {
-    return LoggerUtils.getAllLoggers();
+    return LoggerUtils.getAllConfiguredLoggers();
   }
 
   @GET
