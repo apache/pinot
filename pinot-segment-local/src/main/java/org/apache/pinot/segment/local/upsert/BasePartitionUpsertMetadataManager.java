@@ -72,6 +72,7 @@ import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -123,14 +124,14 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   private final Lock _preloadLock = new ReentrantLock();
   private volatile boolean _isPreloading;
 
-  // Below are configs to enable consistent upsert view.
-  // If enabling upsert view, the upsert threads take the WLock when the upsert involves two segments' bitmaps; and
+  // There are two consistency modes:
+  // If using LOCK mode, the upsert threads take the WLock when the upsert involves two segments' bitmaps; and
   // the query threads take the RLock when getting bitmaps for all its selected segments.
-  // If enabling block refresh, the query threads don't need to take lock when getting bitmaps for all its selected
+  // If using SNAPSHOT mode, the query threads don't need to take lock when getting bitmaps for all its selected
   // segments, as the query threads access a copy of bitmaps that are kept updated by upsert thread periodically. But
   // the query thread can specify a freshness threshold query option to refresh the bitmap copies if not fresh enough.
-  private final boolean _enableUpsertView;
-  private final boolean _enableUpsertViewBatchRefresh;
+  // By default, the mode is NONE to disable the support for data consistency.
+  private final UpsertConfig.ConsistencyMode _consistencyMode;
   private final long _upsertViewRefreshIntervalMs;
   private final ReadWriteLock _upsertViewLock = new ReentrantReadWriteLock();
   private final Set<IndexSegment> _updatedSegmentsSinceLastRefresh = ConcurrentHashMap.newKeySet();
@@ -152,8 +153,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     _metadataTTL = context.getMetadataTTL();
     _deletedKeysTTL = context.getDeletedKeysTTL();
     _tableIndexDir = context.getTableIndexDir();
-    _enableUpsertView = context.isUpsertViewEnabled();
-    _enableUpsertViewBatchRefresh = _enableUpsertView && context.isUpsertViewBatchRefreshEnabled();
+    UpsertConfig.ConsistencyMode cmode = context.getConsistencyMode();
+    _consistencyMode = cmode != null ? cmode : UpsertConfig.ConsistencyMode.NONE;
     _upsertViewRefreshIntervalMs = context.getUpsertViewRefreshIntervalMs();
     _serverMetrics = ServerMetrics.get();
     _logger = LoggerFactory.getLogger(tableNameWithType + "-" + partitionId + "-" + getClass().getSimpleName());
@@ -1043,19 +1044,21 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   protected void replaceDocId(IndexSegment newSegment, ThreadSafeMutableRoaringBitmap validDocIds,
       @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, IndexSegment oldSegment, int oldDocId, int newDocId,
       RecordInfo recordInfo) {
-    if (_enableUpsertView) {
+    // For SNAPSHOT consistency mode, we can use RLock here. But for simplicity and considering there is only one
+    // thread doing upsert most of the time, we just use WLock, as required by LOCK mode.
+    if (_consistencyMode != UpsertConfig.ConsistencyMode.NONE) {
       _upsertViewLock.writeLock().lock();
     }
     try {
       doRemoveDocId(oldSegment, oldDocId);
       doAddDocId(validDocIds, queryableDocIds, newDocId, recordInfo);
-      if (_enableUpsertViewBatchRefresh) {
+      if (_consistencyMode == UpsertConfig.ConsistencyMode.SNAPSHOT) {
         _updatedSegmentsSinceLastRefresh.add(newSegment);
         _updatedSegmentsSinceLastRefresh.add(oldSegment);
         doBatchRefreshUpsertView(_upsertViewRefreshIntervalMs);
       }
     } finally {
-      if (_enableUpsertView) {
+      if (_consistencyMode != UpsertConfig.ConsistencyMode.NONE) {
         _upsertViewLock.writeLock().unlock();
       }
     }
@@ -1069,7 +1072,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
    */
   protected void replaceDocId(IndexSegment segment, ThreadSafeMutableRoaringBitmap validDocIds,
       @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, int oldDocId, int newDocId, RecordInfo recordInfo) {
-    if (_enableUpsertViewBatchRefresh) {
+    if (_consistencyMode == UpsertConfig.ConsistencyMode.SNAPSHOT) {
       _upsertViewLock.readLock().lock();
     }
     try {
@@ -1082,10 +1085,12 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         }
       }
     } finally {
-      if (_enableUpsertViewBatchRefresh) {
+      if (_consistencyMode == UpsertConfig.ConsistencyMode.SNAPSHOT) {
         _updatedSegmentsSinceLastRefresh.add(segment);
         _upsertViewLock.readLock().unlock();
-        // Do batch refresh outside the RLock block.
+        // Batch refresh takes WLock. Do it outside RLock for clarity. The R/W lock ensures that only one thread
+        // can refresh the bitmaps. The other threads that are about to update the bitmaps will be blocked until
+        // refreshing is done.
         doBatchRefreshUpsertView(_upsertViewRefreshIntervalMs);
       }
     }
@@ -1093,18 +1098,16 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
 
   protected void addDocId(IndexSegment segment, ThreadSafeMutableRoaringBitmap validDocIds,
       @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, int docId, RecordInfo recordInfo) {
-    if (_enableUpsertViewBatchRefresh) {
+    if (_consistencyMode == UpsertConfig.ConsistencyMode.SNAPSHOT) {
       _upsertViewLock.readLock().lock();
     }
     try {
       doAddDocId(validDocIds, queryableDocIds, docId, recordInfo);
     } finally {
-      if (_enableUpsertViewBatchRefresh) {
+      if (_consistencyMode == UpsertConfig.ConsistencyMode.SNAPSHOT) {
         _updatedSegmentsSinceLastRefresh.add(segment);
         _upsertViewLock.readLock().unlock();
-        // Batch refresh takes WLock, so do it outside RLock for clarity. The R/W lock ensures that only one thread
-        // can refresh the bitmaps. The other threads that are about to update the bitmaps will be blocked until
-        // refreshing is done.
+        // Batch refresh takes WLock. Do it outside RLock for clarity.
         doBatchRefreshUpsertView(_upsertViewRefreshIntervalMs);
       }
     }
@@ -1119,16 +1122,16 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   }
 
   protected void removeDocId(IndexSegment segment, int docId) {
-    if (_enableUpsertViewBatchRefresh) {
+    if (_consistencyMode == UpsertConfig.ConsistencyMode.SNAPSHOT) {
       _upsertViewLock.readLock().lock();
     }
     try {
       doRemoveDocId(segment, docId);
     } finally {
-      if (_enableUpsertViewBatchRefresh) {
+      if (_consistencyMode == UpsertConfig.ConsistencyMode.SNAPSHOT) {
         _updatedSegmentsSinceLastRefresh.add(segment);
         _upsertViewLock.readLock().unlock();
-        // Batch refresh takes WLock, so do it outside RLock for clarity.
+        // Batch refresh takes WLock. Do it outside RLock for clarity.
         doBatchRefreshUpsertView(_upsertViewRefreshIntervalMs);
       }
     }
@@ -1147,12 +1150,11 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
    * present, to avoid overwriting the contexts specified at the others places.
    */
   public void setSegmentContexts(List<SegmentContext> segmentContexts, Map<String, String> queryOptions) {
-    if (!_enableUpsertView) {
+    if (_consistencyMode == UpsertConfig.ConsistencyMode.NONE) {
       setSegmentContexts(segmentContexts);
       return;
     }
-    // If not using batch refresh, get the bitmaps from segments directly but with RLock for consistency.
-    if (!_enableUpsertViewBatchRefresh) {
+    if (_consistencyMode == UpsertConfig.ConsistencyMode.LOCK) {
       _upsertViewLock.readLock().lock();
       try {
         setSegmentContexts(segmentContexts);
@@ -1201,10 +1203,10 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
 
   private boolean skipUpsertViewRefresh(long upsertViewFreshnessMs) {
     long nowMs = System.currentTimeMillis();
-    if (upsertViewFreshnessMs >= 0) {
-      return _lastUpsertViewRefreshTimeMs + upsertViewFreshnessMs > nowMs;
+    if (upsertViewFreshnessMs < 0) {
+      return true;
     }
-    return _lastUpsertViewRefreshTimeMs + _upsertViewRefreshIntervalMs > nowMs;
+    return _lastUpsertViewRefreshTimeMs + upsertViewFreshnessMs > nowMs;
   }
 
   private void doBatchRefreshUpsertView(long upsertViewFreshnessMs) {

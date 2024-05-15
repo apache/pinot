@@ -39,6 +39,10 @@ public class UpsertConfig extends BaseJsonConfig {
     APPEND, IGNORE, INCREMENT, MAX, MIN, OVERWRITE, UNION
   }
 
+  public enum ConsistencyMode {
+    LOCK, SNAPSHOT, NONE
+  }
+
   @JsonPropertyDescription("Upsert mode.")
   private Mode _mode;
 
@@ -75,13 +79,10 @@ public class UpsertConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Whether to preload segments for fast upsert metadata recovery")
   private boolean _enablePreload;
 
-  @JsonPropertyDescription("Whether to enable consistent view for upsert table")
-  private boolean _enableUpsertView;
+  @JsonPropertyDescription("Configure the way to provide consistent view for upsert table")
+  private ConsistencyMode _consistencyMode = ConsistencyMode.NONE;
 
-  @JsonPropertyDescription("Whether to enable batch refresh mode to keep consistent view for upsert table")
-  private boolean _enableUpsertViewBatchRefresh;
-
-  @JsonPropertyDescription("Refresh interval if using batch refresh mode to keep consistent view for upsert table")
+  @JsonPropertyDescription("Refresh interval when using the snapshot consistency mode")
   private long _upsertViewRefreshIntervalMs = 3000;
 
   @JsonPropertyDescription("Custom class for upsert metadata manager")
@@ -156,12 +157,8 @@ public class UpsertConfig extends BaseJsonConfig {
     return _enablePreload;
   }
 
-  public boolean isEnableUpsertView() {
-    return _enableUpsertView;
-  }
-
-  public boolean isEnableUpsertViewBatchRefresh() {
-    return _enableUpsertViewBatchRefresh;
+  public ConsistencyMode getConsistencyMode() {
+    return _consistencyMode;
   }
 
   public long getUpsertViewRefreshIntervalMs() {
@@ -258,12 +255,8 @@ public class UpsertConfig extends BaseJsonConfig {
     _enablePreload = enablePreload;
   }
 
-  public void setEnableUpsertView(boolean enableUpsertView) {
-    _enableUpsertView = enableUpsertView;
-  }
-
-  public void setEnableUpsertViewBatchRefresh(boolean enableUpsertViewBatchRefresh) {
-    _enableUpsertViewBatchRefresh = enableUpsertViewBatchRefresh;
+  public void setConsistencyMode(ConsistencyMode consistencyMode) {
+    _consistencyMode = consistencyMode;
   }
 
   public void setUpsertViewRefreshIntervalMs(long upsertViewRefreshIntervalMs) {

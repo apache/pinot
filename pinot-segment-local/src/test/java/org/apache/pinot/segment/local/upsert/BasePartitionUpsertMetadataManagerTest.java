@@ -244,10 +244,10 @@ public class BasePartitionUpsertMetadataManagerTest {
   }
 
   @Test
-  public void testEnableUpsertView()
+  public void testConsistencyModeLock()
       throws Exception {
     UpsertContext upsertContext = mock(UpsertContext.class);
-    when(upsertContext.isUpsertViewEnabled()).thenReturn(true);
+    when(upsertContext.getConsistencyMode()).thenReturn(UpsertConfig.ConsistencyMode.LOCK);
     DummyPartitionUpsertMetadataManager upsertMetadataManager =
         new DummyPartitionUpsertMetadataManager("myTable", 0, upsertContext);
 
@@ -323,11 +323,10 @@ public class BasePartitionUpsertMetadataManagerTest {
   }
 
   @Test
-  public void testEnableUpsertViewBatchRefresh()
+  public void testConsistencyModeSnapshot()
       throws Exception {
     UpsertContext upsertContext = mock(UpsertContext.class);
-    when(upsertContext.isUpsertViewEnabled()).thenReturn(true);
-    when(upsertContext.isUpsertViewBatchRefreshEnabled()).thenReturn(true);
+    when(upsertContext.getConsistencyMode()).thenReturn(UpsertConfig.ConsistencyMode.SNAPSHOT);
     when(upsertContext.getUpsertViewRefreshIntervalMs()).thenReturn(3000L);
     DummyPartitionUpsertMetadataManager upsertMetadataManager =
         new DummyPartitionUpsertMetadataManager("myTable", 0, upsertContext);

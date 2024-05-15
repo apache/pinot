@@ -26,6 +26,7 @@ import org.apache.commons.collections.CollectionUtils;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.Schema;
 
 
@@ -41,8 +42,7 @@ public class UpsertContext {
   private final boolean _enablePreload;
   private final double _metadataTTL;
   private final double _deletedKeysTTL;
-  private final boolean _enableUpsertView;
-  private final boolean _enableUpsertViewBatchRefresh;
+  private final UpsertConfig.ConsistencyMode _consistencyMode;
   private final long _upsertViewRefreshIntervalMs;
   private final File _tableIndexDir;
   private final TableDataManager _tableDataManager;
@@ -50,7 +50,7 @@ public class UpsertContext {
   private UpsertContext(TableConfig tableConfig, Schema schema, List<String> primaryKeyColumns,
       List<String> comparisonColumns, @Nullable String deleteRecordColumn, HashFunction hashFunction,
       @Nullable PartialUpsertHandler partialUpsertHandler, boolean enableSnapshot, boolean enablePreload,
-      double metadataTTL, double deletedKeysTTL, boolean enableUpsertView, boolean enableUpsertViewBatchRefresh,
+      double metadataTTL, double deletedKeysTTL, UpsertConfig.ConsistencyMode consistencyMode,
       long upsertViewRefreshIntervalMs, File tableIndexDir, @Nullable TableDataManager tableDataManager) {
     _tableConfig = tableConfig;
     _schema = schema;
@@ -63,8 +63,7 @@ public class UpsertContext {
     _enablePreload = enablePreload;
     _metadataTTL = metadataTTL;
     _deletedKeysTTL = deletedKeysTTL;
-    _enableUpsertView = enableUpsertView;
-    _enableUpsertViewBatchRefresh = enableUpsertViewBatchRefresh;
+    _consistencyMode = consistencyMode;
     _upsertViewRefreshIntervalMs = upsertViewRefreshIntervalMs;
     _tableIndexDir = tableIndexDir;
     _tableDataManager = tableDataManager;
@@ -114,12 +113,8 @@ public class UpsertContext {
     return _deletedKeysTTL;
   }
 
-  public boolean isUpsertViewEnabled() {
-    return _enableUpsertView;
-  }
-
-  public boolean isUpsertViewBatchRefreshEnabled() {
-    return _enableUpsertViewBatchRefresh;
+  public UpsertConfig.ConsistencyMode getConsistencyMode() {
+    return _consistencyMode;
   }
 
   public long getUpsertViewRefreshIntervalMs() {
@@ -146,8 +141,7 @@ public class UpsertContext {
     private boolean _enablePreload;
     private double _metadataTTL;
     private double _deletedKeysTTL;
-    private boolean _enableUpsertView;
-    private boolean _enableUpsertViewBatchRefresh;
+    private UpsertConfig.ConsistencyMode _consistencyMode;
     private long _upsertViewRefreshIntervalMs;
     private File _tableIndexDir;
     private TableDataManager _tableDataManager;
@@ -207,13 +201,8 @@ public class UpsertContext {
       return this;
     }
 
-    public Builder setEnableUpsertView(boolean enableUpsertView) {
-      _enableUpsertView = enableUpsertView;
-      return this;
-    }
-
-    public Builder setEnableUpsertViewBatchRefresh(boolean enableUpsertViewBatchRefresh) {
-      _enableUpsertViewBatchRefresh = enableUpsertViewBatchRefresh;
+    public Builder setConsistencyMode(UpsertConfig.ConsistencyMode consistencyMode) {
+      _consistencyMode = consistencyMode;
       return this;
     }
 
@@ -241,8 +230,7 @@ public class UpsertContext {
       Preconditions.checkState(_tableIndexDir != null, "Table index directory must be set");
       return new UpsertContext(_tableConfig, _schema, _primaryKeyColumns, _comparisonColumns, _deleteRecordColumn,
           _hashFunction, _partialUpsertHandler, _enableSnapshot, _enablePreload, _metadataTTL, _deletedKeysTTL,
-          _enableUpsertView, _enableUpsertViewBatchRefresh, _upsertViewRefreshIntervalMs, _tableIndexDir,
-          _tableDataManager);
+          _consistencyMode, _upsertViewRefreshIntervalMs, _tableIndexDir, _tableDataManager);
     }
   }
 }
