@@ -40,7 +40,7 @@ public enum PropertyIOFactoryKind {
       return new VersionedIOFactory();
     }
   },
-  DefaultPropertyConfigurationIOFactory {
+  DefaultIOFactory {
     public String toString() {
       return "Default";
     }

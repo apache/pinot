@@ -100,7 +100,7 @@ public class CommonsConfigurationUtils {
    */
   public static PropertiesConfiguration fromInputStream(InputStream stream)
       throws ConfigurationException {
-    return fromInputStream(stream, true, PropertyIOFactoryKind.DefaultPropertyConfigurationIOFactory);
+    return fromInputStream(stream, true, PropertyIOFactoryKind.DefaultIOFactory);
   }
 
   /**
@@ -127,7 +127,7 @@ public class CommonsConfigurationUtils {
    */
   public static PropertiesConfiguration getSegmentMetadataFromFile(File file, boolean setDefaultDelimiter)
       throws ConfigurationException {
-    PropertyIOFactoryKind ioFactoryKind = PropertyIOFactoryKind.DefaultPropertyConfigurationIOFactory;
+    PropertyIOFactoryKind ioFactoryKind = PropertyIOFactoryKind.DefaultIOFactory;
 
     // if segment metadata contains version header with value '2', set SegmentMetadataIOFactory as IO factory.
     if (PROPERTIES_CONFIGURATION_HEADER_VERSION_2.equals(getConfigurationHeaderVersion(file))) {
@@ -144,7 +144,7 @@ public class CommonsConfigurationUtils {
    */
   public static PropertiesConfiguration fromFile(File file)
       throws ConfigurationException {
-    return fromFile(file, true, PropertyIOFactoryKind.DefaultPropertyConfigurationIOFactory);
+    return fromFile(file, true, PropertyIOFactoryKind.DefaultIOFactory);
   }
 
   /**
