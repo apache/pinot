@@ -31,13 +31,13 @@ public enum PropertyIOFactoryKind {
       return new ConfigFilePropertyIOFactory();
     }
   },
-  SegmentMetadataIOFactory {
+  VersionedIOFactory {
     public String toString() {
       return "SegmentMetadata";
     }
     @Override
-    public SegmentMetadataPropertyIOFactory getInstance() {
-      return new SegmentMetadataPropertyIOFactory();
+    public VersionedIOFactory getInstance() {
+      return new VersionedIOFactory();
     }
   },
   DefaultPropertyConfigurationIOFactory {

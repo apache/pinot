@@ -27,11 +27,11 @@ import org.apache.commons.configuration2.convert.ListDelimiterHandler;
 
 
 /**
- * SegmentMetadataPropertyIOFactory extends the DefaultIOFactory
+ * VersionedIOFactory extends the DefaultIOFactory
  * <p>
  * Purpose: factory class for creating the custom segment metadata property reader and writer.
  */
-class SegmentMetadataPropertyIOFactory extends DefaultIOFactory {
+class VersionedIOFactory extends DefaultIOFactory {
   @Override
   public PropertiesReader createPropertiesReader(Reader reader) {
     return new SegmentMetadataPropertyReader(reader);

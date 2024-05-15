@@ -36,8 +36,8 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 
 
-public class SegmentMetadataPropertyConfigTest {
-  private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "SegmentMetadataPropertyConfigTest");
+public class VersionedPropertyConfigTest {
+  private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "VersionedPropertyConfigTest");
   private static final File CONFIG_FILE = new File(TEMP_DIR, "config");
   private static final String[] TEST_PROPERTY_KEY = { "test1", "test2_key", "test3_key_",
       "test4_key_1234", "test-1", "test.1" };
@@ -123,7 +123,7 @@ public class SegmentMetadataPropertyConfigTest {
     assertEquals(configuration.getHeader(), "# version=2");
 
     // assert that configuration has SegmentMetadataPropertyIOFactory
-    assertEquals(configuration.getIOFactory().getClass(), SegmentMetadataPropertyIOFactory.class);
+    assertEquals(configuration.getIOFactory().getClass(), VersionedIOFactory.class);
 
     testSegmentMetadataContent(configuration);
   }

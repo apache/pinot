@@ -51,7 +51,7 @@ public class CommonsConfigurationUtils {
   // if properties configuration doesn't contain header version, it will be considered as 1
   public static final String DEFAULT_PROPERTIES_CONFIGURATION_HEADER_VERSION = "1";
 
-  // usage: used in reading segment metadata with 'SegmentMetadataIOFactory' IO Factory.
+  // usage: used in reading segment metadata or other properties configurations with 'VersionedIOFactory' IO Factory.
   // version signifies that segment metadata or other properties configurations contains keys with no special character.
   public static final String PROPERTIES_CONFIGURATION_HEADER_VERSION_2 = "2";
 
@@ -66,7 +66,6 @@ public class CommonsConfigurationUtils {
   public static PropertiesConfiguration fromPath(String path)
       throws ConfigurationException {
     return fromPath(path, true, null);
-    return fromPath(path, false, true, PropertyIOFactoryKind.DefaultPropertyConfigurationIOFactory);
   }
 
   /**
@@ -113,20 +112,10 @@ public class CommonsConfigurationUtils {
    */
   public static PropertiesConfiguration fromInputStream(InputStream stream,
       boolean setDefaultDelimiter, @Nullable PropertyIOFactoryKind ioFactoryKind)
-      boolean setDefaultDelimiter, PropertyIOFactoryKind ioFactoryKind)
-      boolean setDefaultDelimiter, PropertyReaderKind ioFactoryKind)
-  public static PropertiesConfiguration fromInputStream(@Nullable InputStream stream, boolean setIOFactory,
-      boolean setDefaultDelimiter)
       throws ConfigurationException {
     PropertiesConfiguration config = createPropertiesConfiguration(setDefaultDelimiter, ioFactoryKind);
     FileHandler fileHandler = new FileHandler(config);
     fileHandler.load(stream);
-    PropertiesConfiguration config = createPropertiesConfiguration(setIOFactory, setDefaultDelimiter);
-    // if provided stream is not null, load the existing properties from provided input stream.
-    if (stream != null) {
-      FileHandler fileHandler = new FileHandler(config);
-      fileHandler.load(stream);
-    }
     return config;
   }
 
@@ -167,19 +156,14 @@ public class CommonsConfigurationUtils {
    */
   public static PropertiesConfiguration fromFile(File file,
       boolean setDefaultDelimiter, @Nullable PropertyIOFactoryKind ioFactoryKind)
-  public static PropertiesConfiguration fromFile(@Nullable File file, boolean setIOFactory, boolean setDefaultDelimiter)
-  public static PropertiesConfiguration fromFile(File file, boolean setIOFactory,
-      boolean setDefaultDelimiter, PropertyIOFactoryKind ioFactoryKind)
       throws ConfigurationException {
     PropertiesConfiguration config = createPropertiesConfiguration(setDefaultDelimiter, ioFactoryKind);
     FileHandler fileHandler = new FileHandler(config);
     // check if file exists, load the properties otherwise set the file.
     if (file.exists()) {
-    PropertiesConfiguration config = createPropertiesConfiguration(setIOFactory, setDefaultDelimiter);
-    // check if file exists, load the existing properties.
-    if (file != null && file.exists()) {
-      FileHandler fileHandler = new FileHandler(config);
       fileHandler.load(file);
+    } else {
+      fileHandler.setFile(file);
     }
     return config;
   }
@@ -188,10 +172,10 @@ public class CommonsConfigurationUtils {
    * save the segment metadata configuration content into the provided file based on the version header.
    * @param propertiesConfiguration a {@link PropertiesConfiguration} instance.
    * @param file a {@link File} instance.
-   * @param versionHeader a {@link String} instance.
+   * @param versionHeader a Nullable {@link String} instance.
    */
   public static void saveSegmentMetadataToFile(PropertiesConfiguration propertiesConfiguration, File file,
-      String versionHeader) {
+      @Nullable String versionHeader) {
     if (StringUtils.isNotEmpty(versionHeader)) {
       String header = String.format("%s=%s", VERSION_HEADER_IDENTIFIER, versionHeader);
       propertiesConfiguration.setHeader(header);
@@ -200,7 +184,7 @@ public class CommonsConfigurationUtils {
       // if true, set IO factory as SegmentMetadataIOFactory
       if (PROPERTIES_CONFIGURATION_HEADER_VERSION_2.equals(versionHeader)) {
         // set segment metadata IOFactory
-        propertiesConfiguration.setIOFactory(createPropertyIOFactory(PropertyIOFactoryKind.SegmentMetadataIOFactory));
+        propertiesConfiguration.setIOFactory(PropertyIOFactoryKind.SegmentMetadataIOFactory.getInstance());
       }
     }
     saveToFile(propertiesConfiguration, file);
@@ -354,15 +338,17 @@ public class CommonsConfigurationUtils {
    * and legacy list delimiter {@link org.apache.commons.configuration2.convert.LegacyListDelimiterHandler}
    *
    * @param setDefaultDelimiter sets the default list delimiter.
-   * @param ioFactoryKind IOFactory kind
+   * @param ioFactoryKind IOFactory kind, can be null.
    * @return PropertiesConfiguration
    */
   private static PropertiesConfiguration createPropertiesConfiguration(boolean setDefaultDelimiter,
-      PropertyIOFactoryKind ioFactoryKind) {
+     @Nullable PropertyIOFactoryKind ioFactoryKind) {
     PropertiesConfiguration config = new PropertiesConfiguration();
 
     // setting IO Reader Factory of the configuration.
-    config.setIOFactory(createPropertyIOFactory(ioFactoryKind));
+    if (ioFactoryKind != null) {
+      config.setIOFactory(ioFactoryKind.getInstance());
+    }
 
     // setting the DEFAULT_LIST_DELIMITER
     if (setDefaultDelimiter) {
@@ -373,22 +359,6 @@ public class CommonsConfigurationUtils {
   }
 
   /**
-   * Creates the IOFactory based on the provided kind.
-   * @param ioFactoryKind IOFactory kind
-   * @return IOFactory
-   */
-  private static IOFactory createPropertyIOFactory(PropertyIOFactoryKind ioFactoryKind) {
-    switch (ioFactoryKind) {
-      case ConfigFileIOFactory:
-        return new ConfigFilePropertyIOFactory();
-      case SegmentMetadataIOFactory:
-        return new SegmentMetadataPropertyIOFactory();
-      default:
-        return new PropertiesConfiguration.DefaultIOFactory();
-    }
-  }
-
-  /**
    * checks whether the configuration file first line is version header or not.
    * @param file configuration file
    * @return String
@@ -396,7 +366,7 @@ public class CommonsConfigurationUtils {
    */
   private static String getConfigurationHeaderVersion(File file)
       throws ConfigurationException {
-    String versionValue = PROPERTIES_CONFIGURATION_HEADER_VERSION_1;
+    String versionValue = DEFAULT_PROPERTIES_CONFIGURATION_HEADER_VERSION;
     if (file.exists()) {
       try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
         String fileFirstLine = reader.readLine();
