@@ -34,6 +34,11 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriInfo;
 import org.apache.commons.lang3.StringUtils;
 
+/*
+ This class is required to avoid the jersey2 warning messages regarding servlet config constructor missing while
+ injecting the config. Please refer to Pinot issue 13047 & 5306 for more context.
+ In this implementation, we added the ServletConfig as the class level member instead of injecting it.
+*/
 @Path("/swagger.{type:json|yaml}")
 public class SwaggerApiListingResource extends BaseApiListingResource {
   @Context
