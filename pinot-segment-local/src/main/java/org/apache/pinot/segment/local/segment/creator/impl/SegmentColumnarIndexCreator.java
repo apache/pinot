@@ -133,7 +133,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       FieldSpec fieldSpec = schema.getFieldSpecFor(columnName);
       Preconditions.checkState(fieldSpec != null, "Failed to find column: %s in the schema", columnName);
       if (fieldSpec.isVirtualColumn()) {
-        LOGGER.warn("Ignoring index creation for virtual column " + columnName);
+        LOGGER.warn("Ignoring index creation for virtual column {}", columnName);
         continue;
       }
 

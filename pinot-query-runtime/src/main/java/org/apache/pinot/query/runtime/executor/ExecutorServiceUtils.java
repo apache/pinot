@@ -69,7 +69,7 @@ public class ExecutorServiceUtils {
     try {
       if (!executorService.awaitTermination(terminationMillis, TimeUnit.SECONDS)) {
         List<Runnable> runnables = executorService.shutdownNow();
-        LOGGER.warn("Around " + runnables.size() + " didn't finish in time after a shutdown");
+        LOGGER.warn("Around {} didn't finish in time after a shutdown", runnables.size());
       }
     } catch (InterruptedException e) {
       throw new RuntimeException(e);

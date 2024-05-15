@@ -82,7 +82,7 @@ public class PinotToolLauncher {
     LOGGER.info("Usage: pinot-tools.sh <subCommand>");
     LOGGER.info("Valid subCommands are:");
     for (Map.Entry<String, Command> subCommand : this.getSubCommands().entrySet()) {
-      LOGGER.info("\t" + subCommand.getKey() + "\t<" + subCommand.getValue().description() + ">");
+      LOGGER.info("\t{}\t<{}>", subCommand.getKey(), subCommand.getValue().description());
     }
   }
 }

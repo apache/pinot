@@ -1069,7 +1069,7 @@ public class PinotHelixResourceManager {
           "Failed to fetch broker tag for table " + tableNameWithType + " due to exception: " + e.getMessage());
     }
     if (tableConfig == null) {
-      LOGGER.warn("Table " + tableNameWithType + " does not exist");
+      LOGGER.warn("Table {} does not exist", tableNameWithType);
       throw new InvalidConfigException(
           "Invalid table configuration for table " + tableNameWithType + ". Table does not exist");
     }

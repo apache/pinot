@@ -92,7 +92,7 @@ public class StartZookeeperCommand extends AbstractBaseAdminCommand implements C
   @Override
   public boolean execute()
       throws IOException {
-    LOGGER.info("Executing command: " + toString());
+    LOGGER.info("Executing command: {}", toString());
 
     IDefaultNameSpace defaultNameSpace = new IDefaultNameSpace() {
       @Override
@@ -103,7 +103,7 @@ public class StartZookeeperCommand extends AbstractBaseAdminCommand implements C
 
     _zookeeperInstance = ZkStarter.startLocalZkServer(_zkPort, _dataDir);
 
-    LOGGER.info("Start zookeeper at localhost:" + _zkPort + " in thread " + Thread.currentThread().getName());
+    LOGGER.info("Start zookeeper at localhost:{} in thread {}", _zkPort, Thread.currentThread().getName());
 
     savePID(System.getProperty("java.io.tmpdir") + File.separator + ".zooKeeper.pid");
     return true;

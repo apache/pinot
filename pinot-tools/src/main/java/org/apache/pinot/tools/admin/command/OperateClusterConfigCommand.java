@@ -149,7 +149,7 @@ public class OperateClusterConfigCommand extends AbstractBaseAdminCommand implem
     if (_controllerHost == null) {
       _controllerHost = NetUtils.getHostAddress();
     }
-    LOGGER.info("Executing command: " + toString());
+    LOGGER.info("Executing command: {}", toString());
     if (StringUtils.isEmpty(_config) && !_operation.equalsIgnoreCase("GET")) {
       throw new UnsupportedOperationException("Empty config: " + _config);
     }

@@ -283,8 +283,8 @@ public class HttpClient implements AutoCloseable {
       if (response.containsHeader(CommonConstants.Controller.HOST_HTTP_HEADER)) {
         String controllerHost = response.getFirstHeader(CommonConstants.Controller.HOST_HTTP_HEADER).getValue();
         String controllerVersion = response.getFirstHeader(CommonConstants.Controller.VERSION_HTTP_HEADER).getValue();
-        LOGGER.info("Sending request: " + request.getURI() + " to controller: " + controllerHost + ", version: "
-            + controllerVersion);
+        LOGGER.info("Sending request: {} to controller: {}, version: {}", request.getURI(), controllerHost,
+            controllerVersion);
       }
       int statusCode = response.getStatusLine().getStatusCode();
       if (statusCode >= 300) {

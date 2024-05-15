@@ -170,7 +170,7 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
     if (LOGGER.isDebugEnabled()) {
       LOGGER.debug(message, throwable);
     } else {
-      LOGGER.warn(message + ": " + throwable.getMessage());
+      LOGGER.warn("{}: {}", message, throwable.getMessage());
     }
   }
 

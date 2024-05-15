@@ -80,7 +80,7 @@ public class DeleteClusterCommand extends AbstractBaseAdminCommand implements Co
     ZkClient zkClient = new ZkClient(_zkAddress, 5000);
     String helixClusterName = "/" + _clusterName;
 
-    LOGGER.info("Executing command: " + toString());
+    LOGGER.info("Executing command: {}", toString());
     if (!zkClient.exists(helixClusterName)) {
       LOGGER.error("Cluster {} does not exist.", _clusterName);
       return false;

@@ -173,7 +173,7 @@ public class StartServiceManagerCommand extends AbstractBaseAdminCommand impleme
   public boolean execute()
       throws Exception {
     try {
-      LOGGER.info("Executing command: " + toString());
+      LOGGER.info("Executing command: {}", toString());
       if (!startPinotService("SERVICE_MANAGER", this::startServiceManager)) {
         return false;
       }

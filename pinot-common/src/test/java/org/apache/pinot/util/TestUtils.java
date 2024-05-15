@@ -50,7 +50,7 @@ public class TestUtils {
         String extension = resourceUrlStr.substring(resourceUrlStr.lastIndexOf('.'));
         File tempFile = File.createTempFile("pinot-test-temp", extension);
         String tempFilePath = tempFile.getAbsolutePath();
-        LOGGER.info("Extracting from " + resourceUrlStr + " to " + tempFilePath);
+        LOGGER.info("Extracting from {} to {}", resourceUrlStr, tempFilePath);
         FileUtils.copyURLToFile(resourceUrl, tempFile);
         return tempFilePath;
       } catch (IOException e) {

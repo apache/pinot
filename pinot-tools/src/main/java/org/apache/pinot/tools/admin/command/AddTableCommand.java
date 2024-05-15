@@ -227,7 +227,7 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
   public boolean execute()
       throws Exception {
     if (!_exec) {
-      LOGGER.warn("Dry Running Command: " + toString());
+      LOGGER.warn("Dry Running Command: {}", toString());
       LOGGER.warn("Use the -exec option to actually execute the command.");
       return true;
     }
@@ -237,7 +237,7 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
     }
     _controllerAddress = _controllerProtocol + "://" + _controllerHost + ":" + _controllerPort;
 
-    LOGGER.info("Executing command: " + toString());
+    LOGGER.info("Executing command: {}", toString());
 
     String rawTableName = null;
     TableConfig offlineTableConfig = null;

@@ -282,7 +282,7 @@ public class StreamOp extends BaseOp {
       JsonNode errorCode = exceptions.get(ERROR_CODE);
       if (String.valueOf(QueryException.BROKER_INSTANCE_MISSING_ERROR).equals(String.valueOf(errorCode))
           && errorCode != null) {
-        LOGGER.warn(errorMsg + ".Trying again");
+        LOGGER.warn("{}.Trying again", errorMsg);
         return 0;
       }
       LOGGER.error(errorMsg);
