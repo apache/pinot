@@ -26,6 +26,7 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metadata.ZKMetadata;
 import org.apache.pinot.spi.utils.CommonConstants.Segment;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.StreamContinuationMode;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -321,6 +322,15 @@ public class SegmentZKMetadata implements ZKMetadata {
 
   public void setEndOffset(String endOffset) {
     setValue(Segment.Realtime.END_OFFSET, endOffset);
+  }
+
+  public StreamContinuationMode getContinuationMode() {
+    return _znRecord.getEnumField(Segment.Realtime.CONTINUATION_MODE, StreamContinuationMode.class,
+        StreamContinuationMode.RESUME);
+  }
+
+  public void setContinuationMode(StreamContinuationMode startOffsetStatus) {
+    setValue(Segment.Realtime.CONTINUATION_MODE, startOffsetStatus);
   }
 
   public int getNumReplicas() {

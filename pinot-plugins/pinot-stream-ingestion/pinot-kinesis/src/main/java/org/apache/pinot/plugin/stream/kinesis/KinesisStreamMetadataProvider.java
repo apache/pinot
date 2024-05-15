@@ -161,13 +161,11 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
         if (parentShardId == null) {
           // In root shards it makes more sense to honour the offset start config provided
           newStartOffset =
-              new KinesisPartitionGroupOffset(newShardId, newShard.sequenceNumberRange().startingSequenceNumber(),
-                  OffsetStartStatus.INITIALIZE.toString());
+              new KinesisPartitionGroupOffset(newShardId, newShard.sequenceNumberRange().startingSequenceNumber());
         } else {
           //In children shards it makes more sense to simply continue from start
           newStartOffset =
-              new KinesisPartitionGroupOffset(newShardId, newShard.sequenceNumberRange().startingSequenceNumber(),
-                  OffsetStartStatus.RESUME.toString());
+              new KinesisPartitionGroupOffset(newShardId, newShard.sequenceNumberRange().startingSequenceNumber());
         }
 
         int partitionGroupId = getPartitionGroupIdFromShardId(newShardId);

@@ -559,6 +559,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     if (segmentZKPropsConfig != null) {
       properties.setProperty(Realtime.START_OFFSET, segmentZKPropsConfig.getStartOffset());
       properties.setProperty(Realtime.END_OFFSET, segmentZKPropsConfig.getEndOffset());
+      properties.setProperty(Realtime.CONTINUATION_MODE, segmentZKPropsConfig.getStreamContinuationMode().name());
     }
 
     CommonsConfigurationUtils.saveToFile(properties, metadataFile);

@@ -133,26 +133,15 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
     }
   }
 
-  private String getShardIterator(String shardId, String sequenceNumber, OffsetStartStatus offsetStartStatus) {
+  private String getShardIterator(String shardId, String sequenceNumber) {
     GetShardIteratorRequest.Builder requestBuilder =
         GetShardIteratorRequest.builder().streamName(_config.getStreamTopicName()).shardId(shardId);
 
-    switch (offsetStartStatus) {
-      case RESUME: {
-        if (sequenceNumber != null) {
-          requestBuilder = requestBuilder.startingSequenceNumber(sequenceNumber)
-              .shardIteratorType(ShardIteratorType.AFTER_SEQUENCE_NUMBER);
-        } else {
-          requestBuilder = requestBuilder.shardIteratorType(_config.getShardIteratorType());
-        }
-        break;
-      }
-      case INITIALIZE: {
-        requestBuilder = requestBuilder.shardIteratorType(_config.getShardIteratorType());
-        break;
-      }
-
-      default: // do nothin
+    if (sequenceNumber != null) {
+      requestBuilder = requestBuilder.startingSequenceNumber(sequenceNumber)
+          .shardIteratorType(ShardIteratorType.AFTER_SEQUENCE_NUMBER);
+    } else {
+      requestBuilder = requestBuilder.shardIteratorType(_config.getShardIteratorType());
     }
 
     return _kinesisClient.getShardIterator(requestBuilder.build()).shardIterator();
@@ -164,7 +153,7 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
     long timestamp = record.approximateArrivalTimestamp().toEpochMilli();
     String sequenceNumber = record.sequenceNumber();
     KinesisPartitionGroupOffset offset =
-        new KinesisPartitionGroupOffset(shardId, sequenceNumber, OffsetStartStatus.RESUME.toString());
+        new KinesisPartitionGroupOffset(shardId, sequenceNumber);
     // NOTE: Use the same offset as next offset because the consumer starts consuming AFTER the start sequence number.
     StreamMessageMetadata.Builder builder =
         new StreamMessageMetadata.Builder().setRecordIngestionTimeMs(timestamp).setOffset(offset, offset);

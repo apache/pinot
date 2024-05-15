@@ -40,20 +40,17 @@ import org.apache.pinot.spi.utils.JsonUtils;
 public class KinesisPartitionGroupOffset implements StreamPartitionMsgOffset {
   private final String _shardId;
   private final String _sequenceNumber;
-  private final OffsetStartStatus _startStatus;
 
   public static final String STATUS_SEPARATOR = "::";
 
   public KinesisPartitionGroupOffset(String shardId, String sequenceNumber) {
     _shardId = shardId;
     _sequenceNumber = sequenceNumber;
-    _startStatus = OffsetStartStatus.RESUME;
   }
 
   public KinesisPartitionGroupOffset(String shardId, String sequenceNumber, String startStatus) {
     _shardId = shardId;
     _sequenceNumber = sequenceNumber;
-    _startStatus = OffsetStartStatus.valueOf(startStatus);
   }
 
   public KinesisPartitionGroupOffset(String offsetStr) {
@@ -62,17 +59,7 @@ public class KinesisPartitionGroupOffset implements StreamPartitionMsgOffset {
       Preconditions.checkArgument(objectNode.size() == 1);
       Map.Entry<String, JsonNode> entry = objectNode.fields().next();
       _shardId = entry.getKey();
-      String value = entry.getValue().asText();
-      // Handling it in a single string with a separator instead of multiple key value pairs
-      // to maintain backward compatibility
-      if (value.contains(STATUS_SEPARATOR)) {
-        String[] parts = value.split(STATUS_SEPARATOR);
-        _sequenceNumber = parts[0];
-        _startStatus = OffsetStartStatus.valueOf(parts[1]);
-      } else {
-        _sequenceNumber = value;
-        _startStatus = OffsetStartStatus.RESUME;
-      }
+      _sequenceNumber= entry.getValue().asText();
     } catch (Exception e) {
       throw new IllegalArgumentException("Invalid Kinesis offset: " + offsetStr);
     }
@@ -86,13 +73,9 @@ public class KinesisPartitionGroupOffset implements StreamPartitionMsgOffset {
     return _sequenceNumber;
   }
 
-  public OffsetStartStatus getStartStatus() {
-    return _startStatus;
-  }
-
   @Override
   public String toString() {
-    return JsonUtils.newObjectNode().put(_shardId, _sequenceNumber + STATUS_SEPARATOR + _startStatus).toString();
+    return JsonUtils.newObjectNode().put(_shardId, _sequenceNumber).toString();
   }
 
   @Override
