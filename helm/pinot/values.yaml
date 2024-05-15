@@ -464,6 +464,9 @@ minion:
 
   podAnnotations: {}
 
+  automaticReload:
+    enabled: false
+
   updateStrategy:
     type: RollingUpdate
 

@@ -38,7 +38,10 @@ spec:
       labels:
         {{- include "pinot.minionLabels" . | nindent 8 }}
       annotations:
-{{ toYaml .Values.minion.podAnnotations | indent 8 }}
+        {{- if .Values.minion.automaticReload.enabled }}
+        checksum/config: {{ include (print $.Template.BasePath "/minion/configmap.yaml") . | sha256sum}}
+        {{- end }}
+{{ toYaml .Values.minion.podAnnotations | nindent 8 }}
     spec:
       terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
       serviceAccountName: {{ include "pinot.serviceAccountName" . }}
