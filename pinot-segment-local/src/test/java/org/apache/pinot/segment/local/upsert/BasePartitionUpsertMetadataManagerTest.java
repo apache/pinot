@@ -244,10 +244,10 @@ public class BasePartitionUpsertMetadataManagerTest {
   }
 
   @Test
-  public void testConsistencyModeLock()
+  public void testConsistencyModeSync()
       throws Exception {
     UpsertContext upsertContext = mock(UpsertContext.class);
-    when(upsertContext.getConsistencyMode()).thenReturn(UpsertConfig.ConsistencyMode.LOCK);
+    when(upsertContext.getConsistencyMode()).thenReturn(UpsertConfig.ConsistencyMode.SYNC);
     DummyPartitionUpsertMetadataManager upsertMetadataManager =
         new DummyPartitionUpsertMetadataManager("myTable", 0, upsertContext);
 

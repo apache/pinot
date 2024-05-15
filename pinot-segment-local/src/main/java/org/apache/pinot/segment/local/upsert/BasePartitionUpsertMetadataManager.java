@@ -125,7 +125,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   private volatile boolean _isPreloading;
 
   // There are two consistency modes:
-  // If using LOCK mode, the upsert threads take the WLock when the upsert involves two segments' bitmaps; and
+  // If using SYNC mode, the upsert threads take the WLock when the upsert involves two segments' bitmaps; and
   // the query threads take the RLock when getting bitmaps for all its selected segments.
   // If using SNAPSHOT mode, the query threads don't need to take lock when getting bitmaps for all its selected
   // segments, as the query threads access a copy of bitmaps that are kept updated by upsert thread periodically. But
@@ -1045,7 +1045,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, IndexSegment oldSegment, int oldDocId, int newDocId,
       RecordInfo recordInfo) {
     // For SNAPSHOT consistency mode, we can use RLock here. But for simplicity and considering there is only one
-    // thread doing upsert most of the time, we just use WLock, as required by LOCK mode.
+    // thread doing upsert most of the time, we just use WLock, as required by SYNC mode.
     if (_consistencyMode != UpsertConfig.ConsistencyMode.NONE) {
       _upsertViewLock.writeLock().lock();
     }
@@ -1154,7 +1154,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       setSegmentContexts(segmentContexts);
       return;
     }
-    if (_consistencyMode == UpsertConfig.ConsistencyMode.LOCK) {
+    if (_consistencyMode == UpsertConfig.ConsistencyMode.SYNC) {
       _upsertViewLock.readLock().lock();
       try {
         setSegmentContexts(segmentContexts);

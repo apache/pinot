@@ -40,7 +40,7 @@ public class UpsertConfig extends BaseJsonConfig {
   }
 
   public enum ConsistencyMode {
-    LOCK, SNAPSHOT, NONE
+    NONE, SYNC, SNAPSHOT
   }
 
   @JsonPropertyDescription("Upsert mode.")
