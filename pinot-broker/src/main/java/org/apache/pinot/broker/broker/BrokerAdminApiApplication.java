@@ -119,8 +119,8 @@ public class BrokerAdminApiApplication extends ResourceConfig {
       register(buildBrokerManagedAsyncExecutorProvider(brokerConf, brokerMetrics));
     }
     register(JacksonFeature.class);
-    registerClasses(SwaggerApiListingResource.class);
-    registerClasses(io.swagger.jaxrs.listing.SwaggerSerializers.class);
+    register(SwaggerApiListingResource.class);
+    register(io.swagger.jaxrs.listing.SwaggerSerializers.class);
     register(AuthenticationFilter.class);
   }
 

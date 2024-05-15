@@ -64,8 +64,8 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     }
     register(JacksonFeature.class);
     register(MultiPartFeature.class);
-    registerClasses(SwaggerApiListingResource.class);
-    registerClasses(io.swagger.jaxrs.listing.SwaggerSerializers.class);
+    register(SwaggerApiListingResource.class);
+    register(io.swagger.jaxrs.listing.SwaggerSerializers.class);
     register(new CorsFilter());
     register(AuthenticationFilter.class);
     // property("jersey.config.server.tracing.type", "ALL");

@@ -73,8 +73,8 @@ public class MinionAdminApiApplication extends ResourceConfig {
       }
     });
 
-    registerClasses(SwaggerApiListingResource.class);
-    registerClasses(io.swagger.jaxrs.listing.SwaggerSerializers.class);
+    register(SwaggerApiListingResource.class);
+    register(io.swagger.jaxrs.listing.SwaggerSerializers.class);
   }
 
   public void start(List<ListenerConfig> listenerConfigs) {

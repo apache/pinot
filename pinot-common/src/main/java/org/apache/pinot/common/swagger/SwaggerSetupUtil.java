@@ -23,6 +23,7 @@ import java.net.InetAddress;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.net.UnknownHostException;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.utils.PinotStaticHttpHandler;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.glassfish.grizzly.http.server.CLStaticHttpHandler;
@@ -36,8 +37,9 @@ public class SwaggerSetupUtil {
   public static void setupSwagger(String componentType, String resourcePackage,
       boolean useHttps, boolean setHost, String basePath, ClassLoader classLoader, HttpServer httpServer) {
     BeanConfig beanConfig = new BeanConfig();
-    beanConfig.setTitle("Pinot Server API");
-    beanConfig.setDescription(String.format("APIs for accessing Pinot %s information", componentType));
+    String capitalizeComponentType = StringUtils.capitalize(componentType);
+    beanConfig.setTitle(String.format("Pinot %s API", capitalizeComponentType));
+    beanConfig.setDescription(String.format("APIs for accessing Pinot %s information", capitalizeComponentType));
     beanConfig.setContact("https://github.com/apache/pinot");
     beanConfig.setVersion("1.0");
     beanConfig.setExpandSuperTypes(false);

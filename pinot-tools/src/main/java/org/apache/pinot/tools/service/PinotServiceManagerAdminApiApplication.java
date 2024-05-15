@@ -45,8 +45,8 @@ public class PinotServiceManagerAdminApiApplication extends ResourceConfig {
       }
     });
     register(JacksonFeature.class);
-    registerClasses(SwaggerApiListingResource.class);
-    registerClasses(io.swagger.jaxrs.listing.SwaggerSerializers.class);
+    register(SwaggerApiListingResource.class);
+    register(io.swagger.jaxrs.listing.SwaggerSerializers.class);
   }
 
   public void start(int httpPort) {
