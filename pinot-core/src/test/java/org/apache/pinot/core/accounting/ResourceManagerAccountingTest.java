@@ -427,7 +427,7 @@ public class ResourceManagerAccountingTest {
     try (JsonIndexCreator offHeapIndexCreator = new OffHeapJsonIndexCreator(indexDir, colName, new JsonIndexConfig());
         MutableJsonIndexImpl mutableJsonIndex = new MutableJsonIndexImpl(new JsonIndexConfig())) {
       // build json indexes
-      for (int i = 0; i < 100000; i++) {
+      for (int i = 0; i < 1000000; i++) {
         String val = randomJsonValue.get();
         offHeapIndexCreator.add(val);
         mutableJsonIndex.add(val);
