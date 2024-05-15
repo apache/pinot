@@ -32,7 +32,7 @@ import org.slf4j.LoggerFactory;
  */
 public class IntersectAllOperator extends SetOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(IntersectAllOperator.class);
-  private static final String EXPLAIN_NAME = "INTERSECT ALL";
+  private static final String EXPLAIN_NAME = "INTERSECT_ALL";
 
   public IntersectAllOperator(OpChainExecutionContext opChainExecutionContext,
       List<MultiStageOperator> upstreamOperators,

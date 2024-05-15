@@ -32,7 +32,7 @@ import org.slf4j.LoggerFactory;
  */
 public class MinusAllOperator extends SetOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(MinusAllOperator.class);
-  private static final String EXPLAIN_NAME = "MINUS ALL";
+  private static final String EXPLAIN_NAME = "MINUS_ALL";
 
   public MinusAllOperator(OpChainExecutionContext opChainExecutionContext, List<MultiStageOperator> upstreamOperators,
       DataSchema dataSchema) {
