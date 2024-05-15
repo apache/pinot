@@ -94,6 +94,25 @@ public class LoggerUtilsTest {
   }
 
   @Test
+  public void testChangeNonConfiguredAncestorLoggerLevel() {
+    String loggerName = getClass().getPackageName();
+    // The logger for this package is not explicitly configured and inherits the root logger's config
+    assertNull(LoggerUtils.getLoggerInfo(loggerName));
+
+    Map<String, String> loggerInfo = LoggerUtils.setLoggerLevel(loggerName, "DEBUG");
+    assertNotNull(loggerInfo);
+    assertEquals(loggerInfo.get("level"), "DEBUG");
+
+    // Verify that the logger for this package now shows up in the configured loggers
+    loggerInfo = LoggerUtils.getLoggerInfo(loggerName);
+    assertNotNull(loggerInfo);
+    assertEquals(loggerInfo.get("level"), "DEBUG");
+
+    // Remove the logger configuration so that other tests aren't affected
+    ((LoggerContext) LogManager.getContext(false)).getConfiguration().removeLogger(loggerName);
+  }
+
+  @Test
   public void testChangeLoggerLevelWithExceptions() {
     try {
       LoggerUtils.setLoggerLevel("notExistLogger", "INFO");

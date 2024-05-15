@@ -64,7 +64,17 @@ public class LoggerUtils {
       loggerConfig = getLoggerConfig(config, loggerName);
       loggerConfig.setLevel(level);
     } else {
-      if (!getAllLoggers().contains(loggerName)) {
+      // Check if the loggerName exists by comparing it to all known loggers in the context
+      if (getAllLoggers().stream().noneMatch(logger -> {
+        if (!logger.startsWith(loggerName)) {
+          return false;
+        }
+        if (logger.equals(loggerName)) {
+          return true;
+        }
+        // Check if loggerName is a valid parent / descendant logger for any known logger
+        return logger.substring(loggerName.length()).startsWith(".");
+      })) {
         throw new RuntimeException("Logger - " + loggerName + " not found");
       }
       loggerConfig = new LoggerConfig(loggerName, level, true);
