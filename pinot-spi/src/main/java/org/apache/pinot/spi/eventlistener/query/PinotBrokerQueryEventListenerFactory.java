@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -91,9 +92,11 @@ public class PinotBrokerQueryEventListenerFactory {
    * @param eventListenerConfiguration The subset of the configuration containing the event-listener-related keys
    */
   private static void initializeAllowlistQueryRequestHeaders(PinotConfiguration eventListenerConfiguration) {
+    // As HttpHeaders are case-insensitive, we will convert the configured list to all lower case while registering
     List<String> allowlistQueryRequestHeaders =
         Splitter.on(",").omitEmptyStrings().trimResults()
-            .splitToList(eventListenerConfiguration.getProperty(CONFIG_OF_REQUEST_CONTEXT_TRACKED_HEADER_KEYS, ""));
+            .splitToList(eventListenerConfiguration.getProperty(CONFIG_OF_REQUEST_CONTEXT_TRACKED_HEADER_KEYS, ""))
+            .stream().map(String::toLowerCase).collect(Collectors.toList());
 
     LOGGER.info("{}: allowlist headers will be used for PinotBrokerQueryEventListener", allowlistQueryRequestHeaders);
     registerAllowlistQueryRequestHeaders(allowlistQueryRequestHeaders);
@@ -133,6 +136,10 @@ public class PinotBrokerQueryEventListenerFactory {
     return getBrokerQueryEventListener(new PinotConfiguration(Collections.emptyMap()));
   }
 
+  /**
+   * @return the list of allowlisted headers passed as comma-separated string for "request.context.tracked.header.keys"
+   * The values are all in lower-case.
+   */
   @VisibleForTesting
   public static List<String> getAllowlistQueryRequestHeaders() {
     return _allowlistQueryRequestHeaders;
