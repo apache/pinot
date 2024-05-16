@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -93,7 +94,8 @@ public class PinotBrokerQueryEventListenerFactory {
   private static void initializeAllowlistQueryRequestHeaders(PinotConfiguration eventListenerConfiguration) {
     List<String> allowlistQueryRequestHeaders =
         Splitter.on(",").omitEmptyStrings().trimResults()
-            .splitToList(eventListenerConfiguration.getProperty(CONFIG_OF_REQUEST_CONTEXT_TRACKED_HEADER_KEYS, ""));
+            .splitToList(eventListenerConfiguration.getProperty(CONFIG_OF_REQUEST_CONTEXT_TRACKED_HEADER_KEYS, ""))
+            .stream().map(String::toLowerCase).collect(Collectors.toList());
 
     LOGGER.info("{}: allowlist headers will be used for PinotBrokerQueryEventListener", allowlistQueryRequestHeaders);
     registerAllowlistQueryRequestHeaders(allowlistQueryRequestHeaders);

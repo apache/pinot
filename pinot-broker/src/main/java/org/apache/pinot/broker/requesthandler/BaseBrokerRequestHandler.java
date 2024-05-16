@@ -264,8 +264,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     requestContext.setRequestId(requestId);
     if (httpHeaders != null) {
       requestContext.setRequestHttpHeaders(httpHeaders.getRequestHeaders().entrySet().stream().filter(
-              entry -> PinotBrokerQueryEventListenerFactory.getAllowlistQueryRequestHeaders().contains(entry.getKey()))
-          .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)));
+              entry -> PinotBrokerQueryEventListenerFactory.getAllowlistQueryRequestHeaders()
+                  .contains(entry.getKey().toLowerCase()))
+          .collect(Collectors.toMap(entry -> entry.getKey().toLowerCase(), Map.Entry::getValue)));
     }
 
     // First-stage access control to prevent unauthenticated requests from using up resources. Secondary table-level
