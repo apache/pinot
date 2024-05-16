@@ -178,13 +178,10 @@ public class JsonIndexTest {
         Assert.assertEquals(matchingDocIds.toArray(), new int[0]);
 
         matchingDocIds = getMatchingDocIds(indexReader, "\"addresses[*].types[*]\" IS NULL");
-        Assert.assertEquals(matchingDocIds.toArray(), new int[]{0, 1, 2, 3});
+        Assert.assertEquals(matchingDocIds.toArray(), new int[]{0, 1, 2});
 
         matchingDocIds = getMatchingDocIds(indexReader, "\"addresses[*].types[*]\" IS NOT NULL");
         Assert.assertEquals(matchingDocIds.toArray(), new int[]{3});
-
-        matchingDocIds = getMatchingDocIds(indexReader, "\"addresses[1].types[*]\" IS NULL");
-        Assert.assertEquals(matchingDocIds.toArray(), new int[]{0, 1, 2, 3});
 
         matchingDocIds = getMatchingDocIds(indexReader, "\"addresses[1].types[*]\" IS NOT NULL");
         Assert.assertEquals(matchingDocIds.toArray(), new int[0]);

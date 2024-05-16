@@ -103,10 +103,27 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
       throw new BadQueryRequestException("Invalid json match filter: " + filterString);
     }
 
-    MutableRoaringBitmap matchingFlattenedDocIds = getMatchingFlattenedDocIds(filter);
-    MutableRoaringBitmap matchingDocIds = new MutableRoaringBitmap();
-    matchingFlattenedDocIds.forEach((IntConsumer) flattenedDocId -> matchingDocIds.add(getDocId(flattenedDocId)));
-    return matchingDocIds;
+    if (filter.getType() == FilterContext.Type.PREDICATE && isExclusive(filter.getPredicate().getType())) {
+      // Handle exclusive predicate separately because the flip can only be applied to the unflattened doc ids in order
+      // to get the correct result, and it cannot be nested
+      MutableRoaringBitmap matchingFlattenedDocIds = getMatchingFlattenedDocIds(filter.getPredicate());
+      MutableRoaringBitmap matchingDocIds = new MutableRoaringBitmap();
+      matchingFlattenedDocIds.forEach((IntConsumer) flattenedDocId -> matchingDocIds.add(getDocId(flattenedDocId)));
+      matchingDocIds.flip(0, _numDocs);
+      return matchingDocIds;
+    } else {
+      MutableRoaringBitmap matchingFlattenedDocIds = getMatchingFlattenedDocIds(filter);
+      MutableRoaringBitmap matchingDocIds = new MutableRoaringBitmap();
+      matchingFlattenedDocIds.forEach((IntConsumer) flattenedDocId -> matchingDocIds.add(getDocId(flattenedDocId)));
+      return matchingDocIds;
+    }
+  }
+
+  /**
+   * Returns {@code true} if the given predicate type is exclusive for json_match calculation, {@code false} otherwise.
+   */
+  private boolean isExclusive(Predicate.Type predicateType) {
+    return predicateType == Predicate.Type.IS_NULL;
   }
 
   /**
@@ -135,7 +152,10 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
         return matchingDocIds;
       }
       case PREDICATE: {
-        return getMatchingFlattenedDocIds(filter.getPredicate());
+        Predicate predicate = filter.getPredicate();
+        Preconditions
+            .checkArgument(!isExclusive(predicate.getType()), "Exclusive predicate: %s cannot be nested", predicate);
+        return getMatchingFlattenedDocIds(predicate);
       }
       default:
         throw new IllegalStateException();
@@ -144,6 +164,8 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
 
   /**
    * Returns the matching flattened doc ids for the given predicate.
+   * <p>Exclusive predicate is handled as the inclusive predicate, and the caller should flip the unflattened doc ids in
+   * order to get the correct exclusive predicate result.
    */
   private MutableRoaringBitmap getMatchingFlattenedDocIds(Predicate predicate) {
     ExpressionContext lhs = predicate.getLhs();
@@ -266,7 +288,8 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
         }
       }
 
-      case IS_NOT_NULL: {
+      case IS_NOT_NULL:
+      case IS_NULL: {
         int dictId = _dictionary.indexOf(key);
         if (dictId >= 0) {
           ImmutableRoaringBitmap matchingDocIdsForKey = _invertedIndex.getDocIds(dictId);
@@ -278,29 +301,6 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
           return matchingDocIds;
         } else {
           return new MutableRoaringBitmap();
-        }
-      }
-
-      case IS_NULL: {
-        int dictId = _dictionary.indexOf(key);
-        if (dictId >= 0) {
-          MutableRoaringBitmap matchingDocIdsForKey = _invertedIndex.getDocIds(dictId).toMutableRoaringBitmap();
-          matchingDocIdsForKey.flip(0, _numFlattenedDocs);
-
-          if (matchingDocIds == null) {
-            matchingDocIds = matchingDocIdsForKey;
-          } else {
-            matchingDocIds.and(matchingDocIdsForKey);
-          }
-          return matchingDocIds;
-        } else {
-          if (matchingDocIds != null) {
-            return matchingDocIds;
-          } else {
-            MutableRoaringBitmap result = new MutableRoaringBitmap();
-            result.flip(0, _numFlattenedDocs);
-            return result;
-          }
         }
       }
 
@@ -409,7 +409,14 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
       } catch (Exception e) {
         throw new BadQueryRequestException("Invalid json match filter: " + filterString);
       }
-      filteredFlattenedDocIds = getMatchingFlattenedDocIds(filter).toRoaringBitmap();
+      if (filter.getType() == FilterContext.Type.PREDICATE && isExclusive(filter.getPredicate().getType())) {
+        // Handle exclusive predicate separately because the flip can only be applied to the
+        // unflattened doc ids in order to get the correct result, and it cannot be nested
+        filteredFlattenedDocIds = getMatchingFlattenedDocIds(filter.getPredicate()).toRoaringBitmap();
+        filteredFlattenedDocIds.flip(0, _numFlattenedDocs);
+      } else {
+        filteredFlattenedDocIds = getMatchingFlattenedDocIds(filter).toRoaringBitmap();
+      }
     }
     // Support 2 formats:
     // - JSONPath format (e.g. "$.a[1].b"='abc', "$[0]"=1, "$"='abc')
