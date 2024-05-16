@@ -82,6 +82,9 @@ spec:
         livenessProbe:
           initialDelaySeconds: {{ .Values.probes.initialDelaySeconds }}
           periodSeconds: {{ .Values.probes.periodSeconds }}
+          failureThreshold: {{ .Values.probes.failureThreshold }}
+          successThreshold: {{ .Values.probes.successThreshold }}
+          timeoutSeconds: {{ .Values.probes.timeoutSeconds }}
           httpGet:
             path: {{ .Values.controller.probes.endpoint }}
             port: {{ .Values.controller.service.port }}
@@ -90,6 +93,19 @@ spec:
         readinessProbe:
           initialDelaySeconds: {{ .Values.probes.initialDelaySeconds }}
           periodSeconds: {{ .Values.probes.periodSeconds }}
+          failureThreshold: {{ .Values.probes.failureThreshold }}
+          successThreshold: {{ .Values.probes.successThreshold }}
+          timeoutSeconds: {{ .Values.probes.timeoutSeconds }}
+          httpGet:
+            path: {{ .Values.controller.probes.endpoint }}
+            port: {{ .Values.controller.service.port }}
+        {{- end }}
+        {{- if .Values.controller.probes.startupEnabled }}
+          initialDelaySeconds: {{ .Values.probes.initialDelaySeconds }}
+          periodSeconds: {{ .Values.probes.periodSeconds }}
+          failureThreshold: {{ .Values.probes.failureThreshold }}
+          successThreshold: {{ .Values.probes.successThreshold }}
+          timeoutSeconds: {{ .Values.probes.timeoutSeconds }}
           httpGet:
             path: {{ .Values.controller.probes.endpoint }}
             port: {{ .Values.controller.service.port }}

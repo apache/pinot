@@ -52,6 +52,9 @@ securityContext: {}
 probes:
   initialDelaySeconds: 60
   periodSeconds: 10
+  failureThreshold: 1
+  successThreshold: 1
+  timeoutSeconds: 1
 
 serviceAccount:
   # Specifies whether a service account should be created
@@ -92,6 +95,7 @@ controller:
     endpoint: "/health"
     livenessEnabled: false
     readinessEnabled: false
+    startupEnabled: false
 
   persistence:
     enabled: true
@@ -218,6 +222,7 @@ broker:
     endpoint: "/health"
     livenessEnabled: true
     readinessEnabled: true
+    startupEnabled: false
 
   persistence:
     extraVolumes: []
@@ -320,6 +325,7 @@ server:
     endpoint: "/health"
     livenessEnabled: false
     readinessEnabled: false
+    startupEnabled: false
 
   dataDir: /var/pinot/server/data/index
   segmentTarDir: /var/pinot/server/data/segment
@@ -419,6 +425,7 @@ minion:
     endpoint: "/health"
     livenessEnabled: true
     readinessEnabled: true
+    startupEnabled: false
 
   dataDir: /var/pinot/minion/data
   jvmOpts: "-XX:ActiveProcessorCount=2 -Xms256M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-minion.log"
