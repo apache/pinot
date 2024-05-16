@@ -24,8 +24,9 @@ import java.util.Collections;
 import java.util.List;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.pinot.common.upsert.hash.UpsertHashFunction;
+import org.apache.pinot.common.upsert.hash.UpsertHashFunctionFactory;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
-import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -63,7 +64,8 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
     }
 
     String deleteRecordColumn = upsertConfig.getDeleteRecordColumn();
-    HashFunction hashFunction = upsertConfig.getHashFunction();
+    String hashFunction = upsertConfig.getHashFunction();
+    UpsertHashFunction upsertHashFunction = UpsertHashFunctionFactory.create(hashFunction);
     boolean enableSnapshot = upsertConfig.isEnableSnapshot();
     boolean enablePreload = upsertConfig.isEnablePreload();
     double metadataTTL = upsertConfig.getMetadataTTL();
@@ -71,7 +73,7 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
     File tableIndexDir = tableDataManager.getTableDataDir();
     _context = new UpsertContext.Builder().setTableConfig(tableConfig).setSchema(schema)
         .setPrimaryKeyColumns(primaryKeyColumns).setComparisonColumns(comparisonColumns)
-        .setDeleteRecordColumn(deleteRecordColumn).setHashFunction(hashFunction)
+        .setDeleteRecordColumn(deleteRecordColumn).setHashFunction(upsertHashFunction)
         .setPartialUpsertHandler(partialUpsertHandler).setEnableSnapshot(enableSnapshot).setEnablePreload(enablePreload)
         .setMetadataTTL(metadataTTL).setDeletedKeysTTL(deletedKeysTTL).setTableIndexDir(tableIndexDir)
         .setTableDataManager(tableDataManager).build();

@@ -43,7 +43,7 @@ public class UpsertConfig extends BaseJsonConfig {
   private Mode _mode;
 
   @JsonPropertyDescription("Function to hash the primary key.")
-  private HashFunction _hashFunction = HashFunction.NONE;
+  private String _hashFunction = HashFunction.NONE.name();
 
   @JsonPropertyDescription("Partial update strategies.")
   private Map<String, Strategy> _partialUpsertStrategies;
@@ -100,7 +100,7 @@ public class UpsertConfig extends BaseJsonConfig {
     _mode = mode;
   }
 
-  public HashFunction getHashFunction() {
+  public String getHashFunction() {
     return _hashFunction;
   }
 
@@ -161,7 +161,7 @@ public class UpsertConfig extends BaseJsonConfig {
     return _metadataManagerConfigs;
   }
 
-  public void setHashFunction(HashFunction hashFunction) {
+  public void setHashFunction(String hashFunction) {
     _hashFunction = hashFunction;
   }
 

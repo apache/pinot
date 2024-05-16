@@ -1589,7 +1589,7 @@ public class TableConfigUtilsTest {
         new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
             .build();
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setDedupConfig(new DedupConfig(true, HashFunction.NONE)).build();
+        .setDedupConfig(new DedupConfig(true, HashFunction.NONE.name())).build();
     try {
       TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
       Assert.fail();
@@ -1598,7 +1598,7 @@ public class TableConfigUtilsTest {
     }
 
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
-        .setDedupConfig(new DedupConfig(true, HashFunction.NONE)).build();
+        .setDedupConfig(new DedupConfig(true, HashFunction.NONE.name())).build();
     try {
       TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
       Assert.fail();
@@ -1611,7 +1611,7 @@ public class TableConfigUtilsTest {
             .setPrimaryKeyColumns(Lists.newArrayList("myCol")).build();
     Map<String, String> streamConfigs = getStreamConfigs();
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
-        .setDedupConfig(new DedupConfig(true, HashFunction.NONE)).setStreamConfigs(streamConfigs).build();
+        .setDedupConfig(new DedupConfig(true, HashFunction.NONE.name())).setStreamConfigs(streamConfigs).build();
     try {
       TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
       Assert.fail();
@@ -1623,14 +1623,14 @@ public class TableConfigUtilsTest {
         Collections.singletonList(
             new AggregationFunctionColumnPair(AggregationFunctionType.COUNT, "myCol").toColumnName()), null, 10);
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
-        .setDedupConfig(new DedupConfig(true, HashFunction.NONE)).setRoutingConfig(
+        .setDedupConfig(new DedupConfig(true, HashFunction.NONE.name())).setRoutingConfig(
             new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
         .setStarTreeIndexConfigs(Lists.newArrayList(starTreeIndexConfig)).setStreamConfigs(streamConfigs).build();
     TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
 
     // Dedup and upsert can't be enabled simultaneously
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
-        .setDedupConfig(new DedupConfig(true, HashFunction.NONE)).setRoutingConfig(
+        .setDedupConfig(new DedupConfig(true, HashFunction.NONE.name())).setRoutingConfig(
             new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
         .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL)).setStreamConfigs(streamConfigs).build();
     try {

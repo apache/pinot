@@ -38,6 +38,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.pinot.common.upsert.hash.NoOpHashFunction;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
@@ -51,7 +52,6 @@ import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
-import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -254,7 +254,7 @@ public class BasePartitionUpsertMetadataManagerTest {
     }
     // Resolve comparison ties
     Iterator<RecordInfo> deDuplicatedRecords =
-        BasePartitionUpsertMetadataManager.resolveComparisonTies(recordInfoList.iterator(), HashFunction.NONE);
+        BasePartitionUpsertMetadataManager.resolveComparisonTies(recordInfoList.iterator(), NoOpHashFunction.INSTANCE);
     // Ensure we have only 1 record for each unique primary key
     Map<PrimaryKey, RecordInfo> recordsByPrimaryKeys = new HashMap<>();
     while (deDuplicatedRecords.hasNext()) {

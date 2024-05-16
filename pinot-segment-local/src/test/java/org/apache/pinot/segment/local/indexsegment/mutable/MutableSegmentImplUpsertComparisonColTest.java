@@ -68,7 +68,7 @@ public class MutableSegmentImplUpsertComparisonColTest {
     when(_tableDataManager.getTableDataDir()).thenReturn(new File(REALTIME_TABLE_NAME));
   }
 
-  private UpsertConfig createFullUpsertConfig(HashFunction hashFunction) {
+  private UpsertConfig createFullUpsertConfig(String hashFunction) {
     UpsertConfig upsertConfigWithHash = new UpsertConfig(UpsertConfig.Mode.FULL);
     upsertConfigWithHash.setHashFunction(hashFunction);
     upsertConfigWithHash.setComparisonColumn("offset");
@@ -107,25 +107,25 @@ public class MutableSegmentImplUpsertComparisonColTest {
   @Test
   public void testHashFunctions()
       throws Exception {
-    testUpsertIngestion(createFullUpsertConfig(HashFunction.NONE));
-    testUpsertIngestion(createFullUpsertConfig(HashFunction.MD5));
-    testUpsertIngestion(createFullUpsertConfig(HashFunction.MURMUR3));
+    testUpsertIngestion(createFullUpsertConfig(HashFunction.NONE.name()));
+    testUpsertIngestion(createFullUpsertConfig(HashFunction.MD5.name()));
+    testUpsertIngestion(createFullUpsertConfig(HashFunction.MURMUR3.name()));
   }
 
   @Test
   public void testUpsertDropOutOfOrderRecord()
       throws Exception {
-    testUpsertDropOfOrderRecordIngestion(createFullUpsertConfig(HashFunction.NONE));
-    testUpsertDropOfOrderRecordIngestion(createFullUpsertConfig(HashFunction.MD5));
-    testUpsertDropOfOrderRecordIngestion(createFullUpsertConfig(HashFunction.MURMUR3));
+    testUpsertDropOfOrderRecordIngestion(createFullUpsertConfig(HashFunction.NONE.name()));
+    testUpsertDropOfOrderRecordIngestion(createFullUpsertConfig(HashFunction.MD5.name()));
+    testUpsertDropOfOrderRecordIngestion(createFullUpsertConfig(HashFunction.MURMUR3.name()));
   }
 
   @Test
   public void testUpsertOutOfOrderRecordColumn()
       throws Exception {
-    testUpsertOutOfOrderRecordColumnIngestion(createFullUpsertConfig(HashFunction.NONE));
-    testUpsertOutOfOrderRecordColumnIngestion(createFullUpsertConfig(HashFunction.MD5));
-    testUpsertOutOfOrderRecordColumnIngestion(createFullUpsertConfig(HashFunction.MURMUR3));
+    testUpsertOutOfOrderRecordColumnIngestion(createFullUpsertConfig(HashFunction.NONE.name()));
+    testUpsertOutOfOrderRecordColumnIngestion(createFullUpsertConfig(HashFunction.MD5.name()));
+    testUpsertOutOfOrderRecordColumnIngestion(createFullUpsertConfig(HashFunction.MURMUR3.name()));
   }
 
   public void testUpsertIngestion(UpsertConfig upsertConfig)

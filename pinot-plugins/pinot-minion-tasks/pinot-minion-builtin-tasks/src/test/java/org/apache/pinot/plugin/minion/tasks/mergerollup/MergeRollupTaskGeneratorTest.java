@@ -109,7 +109,7 @@ public class MergeRollupTaskGeneratorTest {
 
     tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setTimeColumnName(TIME_COLUMN_NAME)
-            .setDedupConfig(new DedupConfig(true, HashFunction.MD5)).build();
+            .setDedupConfig(new DedupConfig(true, HashFunction.MD5.name())).build();
     assertFalse(MergeRollupTaskGenerator.validate(tableConfig, MinionConstants.MergeRollupTask.TASK_TYPE));
   }
 

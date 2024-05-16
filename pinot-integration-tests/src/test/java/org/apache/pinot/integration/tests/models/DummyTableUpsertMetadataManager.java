@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.Map;
+import org.apache.pinot.common.upsert.hash.NoOpHashFunction;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.local.upsert.BasePartitionUpsertMetadataManager;
@@ -33,7 +34,6 @@ import org.apache.pinot.segment.local.upsert.UpsertContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
-import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -61,7 +61,7 @@ public class DummyTableUpsertMetadataManager extends BaseTableUpsertMetadataMana
     UpsertContext context = new UpsertContext.Builder().setTableConfig(_tableConfig).setSchema(_schema)
         .setPrimaryKeyColumns(_schema.getPrimaryKeyColumns())
         .setComparisonColumns(Collections.singletonList(_tableConfig.getValidationConfig().getTimeColumnName()))
-        .setHashFunction(HashFunction.NONE).setTableIndexDir(new File("/tmp/tableIndexDirDummy")).build();
+        .setHashFunction(NoOpHashFunction.INSTANCE).setTableIndexDir(new File("/tmp/tableIndexDirDummy")).build();
 
     return new DummyPartitionUpsertMetadataManager("dummy", partitionId, context);
   }

@@ -24,24 +24,24 @@ import org.apache.pinot.spi.config.BaseJsonConfig;
 
 public class DedupConfig extends BaseJsonConfig {
   private final boolean _dedupEnabled;
-  private final HashFunction _hashFunction;
+  private final String _hashFunction;
   private final String _metadataManagerClass;
 
   public DedupConfig(@JsonProperty(value = "dedupEnabled", required = true) boolean dedupEnabled,
-      @JsonProperty(value = "hashFunction") HashFunction hashFunction) {
+      @JsonProperty(value = "hashFunction") String hashFunction) {
     this(dedupEnabled, hashFunction, null);
   }
   @JsonCreator
   public DedupConfig(@JsonProperty(value = "dedupEnabled", required = true) boolean dedupEnabled,
-      @JsonProperty(value = "hashFunction") HashFunction hashFunction,
+      @JsonProperty(value = "hashFunction") String hashFunction,
       @JsonProperty(value = "metadataManagerClass") String metadataManagerClass
   ) {
     _dedupEnabled = dedupEnabled;
-    _hashFunction = hashFunction == null ? HashFunction.NONE : hashFunction;
+    _hashFunction = hashFunction == null ? HashFunction.NONE.name() : hashFunction;
     _metadataManagerClass = metadataManagerClass;
   }
 
-  public HashFunction getHashFunction() {
+  public String getHashFunction() {
     return _hashFunction;
   }
 

@@ -23,10 +23,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.pinot.common.upsert.hash.UpsertHashFunction;
+import org.apache.pinot.common.upsert.hash.UpsertHashFunctionFactory;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.spi.config.table.DedupConfig;
-import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 
@@ -36,7 +37,7 @@ abstract class BaseTableDedupMetadataManager implements TableDedupMetadataManage
   protected String _tableNameWithType;
   protected List<String> _primaryKeyColumns;
   protected ServerMetrics _serverMetrics;
-  protected HashFunction _hashFunction;
+  protected UpsertHashFunction _upsertHashFunction;
 
   @Override
   public void init(TableConfig tableConfig, Schema schema, TableDataManager tableDataManager,
@@ -51,7 +52,7 @@ abstract class BaseTableDedupMetadataManager implements TableDedupMetadataManage
 
     DedupConfig dedupConfig = tableConfig.getDedupConfig();
     Preconditions.checkArgument(dedupConfig != null, "Dedup must be enabled for table: %s", _tableNameWithType);
-    _hashFunction = dedupConfig.getHashFunction();
+    _upsertHashFunction = UpsertHashFunctionFactory.create(dedupConfig.getHashFunction());
   }
 
   public PartitionDedupMetadataManager getOrCreatePartitionManager(int partitionId) {

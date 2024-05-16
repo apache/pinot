@@ -23,8 +23,9 @@ import java.io.File;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.pinot.common.upsert.hash.NoOpHashFunction;
+import org.apache.pinot.common.upsert.hash.UpsertHashFunction;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
-import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 
@@ -35,7 +36,7 @@ public class UpsertContext {
   private final List<String> _primaryKeyColumns;
   private final List<String> _comparisonColumns;
   private final String _deleteRecordColumn;
-  private final HashFunction _hashFunction;
+  private final UpsertHashFunction _hashFunction;
   private final PartialUpsertHandler _partialUpsertHandler;
   private final boolean _enableSnapshot;
   private final boolean _enablePreload;
@@ -45,7 +46,7 @@ public class UpsertContext {
   private final TableDataManager _tableDataManager;
 
   private UpsertContext(TableConfig tableConfig, Schema schema, List<String> primaryKeyColumns,
-      List<String> comparisonColumns, @Nullable String deleteRecordColumn, HashFunction hashFunction,
+      List<String> comparisonColumns, @Nullable String deleteRecordColumn, UpsertHashFunction hashFunction,
       @Nullable PartialUpsertHandler partialUpsertHandler, boolean enableSnapshot, boolean enablePreload,
       double metadataTTL, double deletedKeysTTL, File tableIndexDir, @Nullable TableDataManager tableDataManager) {
     _tableConfig = tableConfig;
@@ -83,7 +84,7 @@ public class UpsertContext {
     return _deleteRecordColumn;
   }
 
-  public HashFunction getHashFunction() {
+  public UpsertHashFunction getHashFunction() {
     return _hashFunction;
   }
 
@@ -121,7 +122,7 @@ public class UpsertContext {
     private List<String> _primaryKeyColumns;
     private List<String> _comparisonColumns;
     private String _deleteRecordColumn;
-    private HashFunction _hashFunction = HashFunction.NONE;
+    private UpsertHashFunction _hashFunction = NoOpHashFunction.INSTANCE;
     private PartialUpsertHandler _partialUpsertHandler;
     private boolean _enableSnapshot;
     private boolean _enablePreload;
@@ -155,7 +156,7 @@ public class UpsertContext {
       return this;
     }
 
-    public Builder setHashFunction(HashFunction hashFunction) {
+    public Builder setHashFunction(UpsertHashFunction hashFunction) {
       _hashFunction = hashFunction;
       return this;
     }

@@ -260,7 +260,7 @@ public class TableConfigSerDeTest {
     }
     {
       // with dedup config
-      DedupConfig dedupConfig = new DedupConfig(true, HashFunction.MD5);
+      DedupConfig dedupConfig = new DedupConfig(true, HashFunction.MD5.name());
       TableConfig tableConfig = tableConfigBuilder.setDedupConfig(dedupConfig).build();
       // Serialize then de-serialize
       checkTableConfigWithDedupConfig(JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class));

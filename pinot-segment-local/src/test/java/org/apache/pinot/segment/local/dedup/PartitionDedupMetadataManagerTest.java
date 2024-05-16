@@ -22,12 +22,12 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.upsert.hash.UpsertHashFunction;
+import org.apache.pinot.common.upsert.hash.UpsertHashFunctionFactory;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
-import org.apache.pinot.segment.local.utils.HashUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
-import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.Assert;
@@ -45,9 +45,11 @@ public class PartitionDedupMetadataManagerTest {
 
   @Test
   public void verifyAddRemoveSegment() {
-    HashFunction hashFunction = HashFunction.NONE;
+    String hashFunction = "NONE";
+    UpsertHashFunction upsertHashFunction = UpsertHashFunctionFactory.create(hashFunction);
     TestMetadataManager metadataManager =
-        new TestMetadataManager(REALTIME_TABLE_NAME, null, 0, mock(ServerMetrics.class), hashFunction);
+        new TestMetadataManager(REALTIME_TABLE_NAME, null, 0, mock(ServerMetrics.class),
+            upsertHashFunction);
     Map<Object, IndexSegment> recordLocationMap = metadataManager._primaryKeyToSegmentMap;
 
     // Add the first segment
@@ -61,9 +63,9 @@ public class PartitionDedupMetadataManagerTest {
     metadataManager._primaryKeyIterator = pkList1.iterator();
     ImmutableSegmentImpl segment1 = mockSegment(1);
     metadataManager.addSegment(segment1);
-    checkRecordLocation(recordLocationMap, 0, segment1, hashFunction);
-    checkRecordLocation(recordLocationMap, 1, segment1, hashFunction);
-    checkRecordLocation(recordLocationMap, 2, segment1, hashFunction);
+    checkRecordLocation(recordLocationMap, 0, segment1, upsertHashFunction);
+    checkRecordLocation(recordLocationMap, 1, segment1, upsertHashFunction);
+    checkRecordLocation(recordLocationMap, 2, segment1, upsertHashFunction);
 
     metadataManager._primaryKeyIterator = pkList1.iterator();
     metadataManager.removeSegment(segment1);
@@ -72,9 +74,11 @@ public class PartitionDedupMetadataManagerTest {
 
   @Test
   public void verifyReloadSegment() {
-    HashFunction hashFunction = HashFunction.NONE;
+    String hashFunction = "NONE";
+    UpsertHashFunction upsertHashFunction = UpsertHashFunctionFactory.create(hashFunction);
     TestMetadataManager metadataManager =
-        new TestMetadataManager(REALTIME_TABLE_NAME, null, 0, mock(ServerMetrics.class), hashFunction);
+        new TestMetadataManager(REALTIME_TABLE_NAME, null, 0, mock(ServerMetrics.class),
+            upsertHashFunction);
     Map<Object, IndexSegment> recordLocationMap = metadataManager._primaryKeyToSegmentMap;
 
     // Add the first segment
@@ -96,16 +100,18 @@ public class PartitionDedupMetadataManagerTest {
     Assert.assertEquals(recordLocationMap.size(), 3);
 
     // Keys should still exist
-    checkRecordLocation(recordLocationMap, 0, segment1, hashFunction);
-    checkRecordLocation(recordLocationMap, 1, segment1, hashFunction);
-    checkRecordLocation(recordLocationMap, 2, segment1, hashFunction);
+    checkRecordLocation(recordLocationMap, 0, segment1, upsertHashFunction);
+    checkRecordLocation(recordLocationMap, 1, segment1, upsertHashFunction);
+    checkRecordLocation(recordLocationMap, 2, segment1, upsertHashFunction);
   }
 
   @Test
   public void verifyAddRow() {
-    HashFunction hashFunction = HashFunction.NONE;
+    String hashFunction = "NONE";
+    UpsertHashFunction upsertHashFunction = UpsertHashFunctionFactory.create(hashFunction);
     TestMetadataManager metadataManager =
-        new TestMetadataManager(REALTIME_TABLE_NAME, null, 0, mock(ServerMetrics.class), hashFunction);
+        new TestMetadataManager(REALTIME_TABLE_NAME, null, 0, mock(ServerMetrics.class),
+            upsertHashFunction);
     Map<Object, IndexSegment> recordLocationMap = metadataManager._primaryKeyToSegmentMap;
 
     // Add the first segment
@@ -123,11 +129,11 @@ public class PartitionDedupMetadataManagerTest {
     // Same PK exists
     ImmutableSegmentImpl segment2 = mockSegment(2);
     Assert.assertTrue(metadataManager.checkRecordPresentOrUpdate(getPrimaryKey(0), segment2));
-    checkRecordLocation(recordLocationMap, 0, segment1, hashFunction);
+    checkRecordLocation(recordLocationMap, 0, segment1, upsertHashFunction);
 
     // New PK
     Assert.assertFalse(metadataManager.checkRecordPresentOrUpdate(getPrimaryKey(3), segment2));
-    checkRecordLocation(recordLocationMap, 3, segment2, hashFunction);
+    checkRecordLocation(recordLocationMap, 3, segment2, upsertHashFunction);
 
     // Same PK as the one recently ingested
     Assert.assertTrue(metadataManager.checkRecordPresentOrUpdate(getPrimaryKey(3), segment2));
@@ -149,8 +155,8 @@ public class PartitionDedupMetadataManagerTest {
   }
 
   private static void checkRecordLocation(Map<Object, IndexSegment> recordLocationMap, int keyValue,
-      IndexSegment segment, HashFunction hashFunction) {
-    IndexSegment indexSegment = recordLocationMap.get(HashUtils.hashPrimaryKey(getPrimaryKey(keyValue), hashFunction));
+      IndexSegment segment, UpsertHashFunction upsertHashFunction) {
+    IndexSegment indexSegment = recordLocationMap.get(upsertHashFunction.hash(getPrimaryKey(keyValue)));
     assertNotNull(indexSegment);
     assertSame(indexSegment, segment);
   }
@@ -159,8 +165,8 @@ public class PartitionDedupMetadataManagerTest {
     Iterator<PrimaryKey> _primaryKeyIterator;
 
     TestMetadataManager(String tableNameWithType, List<String> primaryKeyColumns, int partitionId,
-        ServerMetrics serverMetrics, HashFunction hashFunction) {
-      super(tableNameWithType, primaryKeyColumns, partitionId, serverMetrics, hashFunction);
+        ServerMetrics serverMetrics, UpsertHashFunction upsertHashFunction) {
+      super(tableNameWithType, primaryKeyColumns, partitionId, serverMetrics, upsertHashFunction);
     }
 
     @Override

@@ -445,7 +445,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
             new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
         .setSegmentPartitionConfig(new SegmentPartitionConfig(columnPartitionConfigMap))
         .setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig(primaryKeyColumn, 1))
-        .setDedupConfig(new DedupConfig(true, HashFunction.NONE)).build();
+        .setDedupConfig(new DedupConfig(true, HashFunction.NONE.name())).build();
   }
 
   /**
