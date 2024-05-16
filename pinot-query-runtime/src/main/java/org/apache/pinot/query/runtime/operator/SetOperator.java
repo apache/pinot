@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
+import com.google.common.collect.HashMultiset;
+import com.google.common.collect.Multiset;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datatable.StatMap;
@@ -44,7 +44,7 @@ import org.apache.pinot.segment.spi.IndexSegment;
  * UnionOperator: The right child operator is consumed in a blocking manner.
  */
 public abstract class SetOperator extends MultiStageOperator {
-  protected final Set<Record> _rightRowSet;
+  protected final Multiset<Record> _rightRowSet;
 
   private final List<MultiStageOperator> _upstreamOperators;
   private final MultiStageOperator _leftChildOperator;
@@ -65,7 +65,7 @@ public abstract class SetOperator extends MultiStageOperator {
     _upstreamOperators = upstreamOperators;
     _leftChildOperator = getChildOperators().get(0);
     _rightChildOperator = getChildOperators().get(1);
-    _rightRowSet = new HashSet<>();
+    _rightRowSet = HashMultiset.create();
     _isRightSetBuilt = false;
   }
 

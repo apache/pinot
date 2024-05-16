@@ -58,6 +58,6 @@ public class IntersectOperator extends SetOperator {
 
   @Override
   protected boolean handleRowMatched(Object[] row) {
-    return _rightRowSet.remove(new Record(row));
+    return _rightRowSet.setCount(new Record(row), 0) != 0;
   }
 }

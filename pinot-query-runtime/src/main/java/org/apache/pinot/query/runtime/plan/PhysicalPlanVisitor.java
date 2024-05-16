@@ -37,11 +37,13 @@ import org.apache.pinot.query.planner.plannode.WindowNode;
 import org.apache.pinot.query.runtime.operator.AggregateOperator;
 import org.apache.pinot.query.runtime.operator.FilterOperator;
 import org.apache.pinot.query.runtime.operator.HashJoinOperator;
+import org.apache.pinot.query.runtime.operator.IntersectAllOperator;
 import org.apache.pinot.query.runtime.operator.IntersectOperator;
 import org.apache.pinot.query.runtime.operator.LeafStageTransferableBlockOperator;
 import org.apache.pinot.query.runtime.operator.LiteralValueOperator;
 import org.apache.pinot.query.runtime.operator.MailboxReceiveOperator;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
+import org.apache.pinot.query.runtime.operator.MinusAllOperator;
 import org.apache.pinot.query.runtime.operator.MinusOperator;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
@@ -125,9 +127,13 @@ public class PhysicalPlanVisitor implements PlanNodeVisitor<MultiStageOperator, 
       case UNION:
         return new UnionOperator(context, inputs, setOpNode.getInputs().get(0).getDataSchema());
       case INTERSECT:
-        return new IntersectOperator(context, inputs, setOpNode.getInputs().get(0).getDataSchema());
+        return setOpNode.isAll()
+            ? new IntersectAllOperator(context, inputs, setOpNode.getInputs().get(0).getDataSchema())
+            : new IntersectOperator(context, inputs, setOpNode.getInputs().get(0).getDataSchema());
       case MINUS:
-        return new MinusOperator(context, inputs, setOpNode.getInputs().get(0).getDataSchema());
+        return setOpNode.isAll()
+            ? new MinusAllOperator(context, inputs, setOpNode.getInputs().get(0).getDataSchema())
+            : new MinusOperator(context, inputs, setOpNode.getInputs().get(0).getDataSchema());
       default:
         throw new IllegalStateException();
     }
