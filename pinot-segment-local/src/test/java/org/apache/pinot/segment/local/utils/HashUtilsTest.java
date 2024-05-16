@@ -18,55 +18,49 @@
  */
 package org.apache.pinot.segment.local.utils;
 
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.utils.BytesUtils;
-import org.testng.Assert;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.*;
 
 
 public class HashUtilsTest {
   @Test
   public void testHashPlainValues() {
-    Assert.assertEquals(BytesUtils.toHexString(HashUtils.hashMD5("hello world".getBytes())),
+    assertEquals(BytesUtils.toHexString(HashUtils.hashMD5("hello world".getBytes())),
         "5eb63bbbe01eeed093cb22bb8f5acdc3");
-    Assert.assertEquals(BytesUtils.toHexString(HashUtils.hashMurmur3("hello world".getBytes())),
+    assertEquals(BytesUtils.toHexString(HashUtils.hashMurmur3("hello world".getBytes())),
         "0e617feb46603f53b163eb607d4697ab");
   }
 
   @Test
   public void testHashUUID() {
+    // Test happy cases: when all UUID values are valid
     testHashUUID(new UUID[]{UUID.randomUUID()});
     testHashUUID(new UUID[]{UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID()});
 
     // Test failure scenario when there's a non-null invalid uuid value
-    String[] invalidUUIDs = new String[]{"some-random-string"};
-    byte[] hashResult = HashUtils.hashUUID(new PrimaryKey(invalidUUIDs));
+    PrimaryKey invalidUUIDs = new PrimaryKey(new String[]{"some-random-string"});
+    byte[] hashResult = HashUtils.hashUUID(invalidUUIDs);
     // In case of failures, each element is prepended with length
-    byte[] expectedResult = new byte[invalidUUIDs[0].length() + 4];
-    ByteBuffer tempByteBuffer = ByteBuffer.wrap(expectedResult).order(ByteOrder.BIG_ENDIAN);
-    tempByteBuffer.putInt(invalidUUIDs[0].length());
-    tempByteBuffer.put(invalidUUIDs[0].getBytes(StandardCharsets.UTF_8));
-    Assert.assertEquals(hashResult, expectedResult);
+    byte[] expectedResult = invalidUUIDs.asBytes();
+    assertEquals(hashResult, expectedResult);
     // Test failure scenario when one of the values is null
-    invalidUUIDs = new String[]{UUID.randomUUID().toString(), null};
-    hashResult = HashUtils.hashUUID(new PrimaryKey(invalidUUIDs));
-    expectedResult = new byte[invalidUUIDs[0].length() + "null".length() + 8];
-    tempByteBuffer = ByteBuffer.wrap(expectedResult).order(ByteOrder.BIG_ENDIAN);
-    tempByteBuffer.putInt(invalidUUIDs[0].length());
-    tempByteBuffer.put(invalidUUIDs[0].getBytes(StandardCharsets.UTF_8));
-    tempByteBuffer.putInt(4);
-    tempByteBuffer.put("null".getBytes(StandardCharsets.UTF_8));
-    Assert.assertEquals(hashResult, expectedResult);
+    try {
+      PrimaryKey pKeyWithNull = new PrimaryKey(new String[]{UUID.randomUUID().toString(), null});
+      HashUtils.hashUUID(pKeyWithNull);
+      fail("Should have thrown an exception");
+    } catch (IllegalArgumentException e) {
+      assertTrue(e.getMessage().contains("Found null value"));
+    }
   }
 
   private void testHashUUID(UUID[] uuids) {
     byte[] convertedBytes = HashUtils.hashUUID(new PrimaryKey(uuids));
     // After hashing, each UUID should take 16 bytes.
-    Assert.assertEquals(convertedBytes.length, 16 * uuids.length);
+    assertEquals(convertedBytes.length, 16 * uuids.length);
     // Below we reconstruct each UUID from the reduced 16-byte representation, and ensure it is the same as the input.
     int convertedByteIndex = 0;
     int uuidIndex = 0;
@@ -80,7 +74,7 @@ public class HashUtilsTest {
         lsb = (lsb << 8) | (convertedBytes[convertedByteIndex] & 0xFF);
       }
       UUID reconstructedUUID = new UUID(msb, lsb);
-      Assert.assertEquals(reconstructedUUID, uuids[uuidIndex]);
+      assertEquals(reconstructedUUID, uuids[uuidIndex]);
       uuidIndex++;
     }
   }
