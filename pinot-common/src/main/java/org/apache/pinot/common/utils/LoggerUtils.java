@@ -29,6 +29,7 @@ import org.apache.logging.log4j.core.Filter;
 import org.apache.logging.log4j.core.LoggerContext;
 import org.apache.logging.log4j.core.config.Configuration;
 import org.apache.logging.log4j.core.config.LoggerConfig;
+import org.apache.logging.log4j.spi.AbstractLogger;
 
 
 /**
@@ -45,21 +46,39 @@ public class LoggerUtils {
 
   /**
    * Set logger level at runtime.
-   * @param loggerName
-   * @param logLevel
+   * @param loggerName name of the logger whose level is to be changed
+   * @param logLevel the new log level
    * @return logger info
    */
   public static Map<String, String> setLoggerLevel(String loggerName, String logLevel) {
-    LoggerContext context = (LoggerContext) LogManager.getContext(false);
-    Configuration config = context.getConfiguration();
-    if (!getAllLoggers().contains(loggerName)) {
-      throw new RuntimeException("Logger - " + loggerName + " not found");
-    }
-    LoggerConfig loggerConfig = getLoggerConfig(config, loggerName);
+    Level level;
     try {
-      loggerConfig.setLevel(Level.valueOf(logLevel));
+      level = Level.valueOf(logLevel);
     } catch (Exception e) {
       throw new RuntimeException("Unrecognized logger level - " + logLevel, e);
+    }
+    LoggerContext context = (LoggerContext) LogManager.getContext(false);
+    Configuration config = context.getConfiguration();
+    LoggerConfig loggerConfig;
+    if (getAllConfiguredLoggers().contains(loggerName)) {
+      loggerConfig = getLoggerConfig(config, loggerName);
+      loggerConfig.setLevel(level);
+    } else {
+      // Check if the loggerName exists by comparing it to all known loggers in the context
+      if (getAllLoggers().stream().noneMatch(logger -> {
+        if (!logger.startsWith(loggerName)) {
+          return false;
+        }
+        if (logger.equals(loggerName)) {
+          return true;
+        }
+        // Check if loggerName is a valid parent / descendant logger for any known logger
+        return logger.substring(loggerName.length()).startsWith(".");
+      })) {
+        throw new RuntimeException("Logger - " + loggerName + " not found");
+      }
+      loggerConfig = new LoggerConfig(loggerName, level, true);
+      config.addLogger(loggerName, loggerConfig);
     }
     // This causes all Loggers to re-fetch information from their LoggerConfig.
     context.updateLoggers();
@@ -75,7 +94,7 @@ public class LoggerUtils {
   public static Map<String, String> getLoggerInfo(String loggerName) {
     LoggerContext context = (LoggerContext) LogManager.getContext(false);
     Configuration config = context.getConfiguration();
-    if (!getAllLoggers().contains(loggerName)) {
+    if (!getAllConfiguredLoggers().contains(loggerName)) {
       return null;
     }
     LoggerConfig loggerConfig = getLoggerConfig(config, loggerName);
@@ -83,12 +102,20 @@ public class LoggerUtils {
   }
 
   /**
+   * @return a list of all the configured logger names
+   */
+  public static List<String> getAllConfiguredLoggers() {
+    LoggerContext context = (LoggerContext) LogManager.getContext(false);
+    Configuration config = context.getConfiguration();
+    return config.getLoggers().values().stream().map(LoggerConfig::toString).collect(Collectors.toList());
+  }
+
+  /**
    * @return a list of all the logger names
    */
   public static List<String> getAllLoggers() {
     LoggerContext context = (LoggerContext) LogManager.getContext(false);
-    Configuration config = context.getConfiguration();
-    return config.getLoggers().values().stream().map(LoggerConfig::toString).collect(Collectors.toList());
+    return context.getLoggers().stream().map(AbstractLogger::getName).collect(Collectors.toList());
   }
 
   private static LoggerConfig getLoggerConfig(Configuration config, String loggerName) {

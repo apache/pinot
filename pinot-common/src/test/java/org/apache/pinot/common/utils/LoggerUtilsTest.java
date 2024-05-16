@@ -21,6 +21,8 @@ package org.apache.pinot.common.utils;
 import com.google.common.collect.ImmutableList;
 import java.util.List;
 import java.util.Map;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.core.LoggerContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.annotations.Test;
@@ -34,8 +36,8 @@ public class LoggerUtilsTest {
   private static final String PINOT = "org.apache.pinot";
 
   @Test
-  public void testGetAllLoggers() {
-    List<String> allLoggers = LoggerUtils.getAllLoggers();
+  public void testGetAllConfiguredLoggers() {
+    List<String> allLoggers = LoggerUtils.getAllConfiguredLoggers();
     assertEquals(allLoggers.size(), 2);
     assertTrue(allLoggers.contains(ROOT));
     assertTrue(allLoggers.contains(PINOT));
@@ -59,7 +61,7 @@ public class LoggerUtilsTest {
   }
 
   @Test
-  public void testChangeLoggerLevel() {
+  public void testChangeConfiguredLoggerLevel() {
     Map<String, String> pinotLoggerInfo = LoggerUtils.getLoggerInfo(PINOT);
     assertNotNull(pinotLoggerInfo);
     assertEquals(pinotLoggerInfo.get("level"), "WARN");
@@ -70,6 +72,44 @@ public class LoggerUtilsTest {
       assertNotNull(pinotLoggerInfo);
       assertEquals(pinotLoggerInfo.get("level"), level);
     }
+  }
+
+  @Test
+  public void testChangeNonConfiguredLoggerLevel() {
+    String loggerName = getClass().getCanonicalName();
+    // The logger for this test class is not explicitly configured and inherits the root logger's config
+    assertNull(LoggerUtils.getLoggerInfo(loggerName));
+
+    Map<String, String> loggerInfo = LoggerUtils.setLoggerLevel(loggerName, "DEBUG");
+    assertNotNull(loggerInfo);
+    assertEquals(loggerInfo.get("level"), "DEBUG");
+
+    // Verify that the logger for this test class now shows up in the configured loggers
+    loggerInfo = LoggerUtils.getLoggerInfo(loggerName);
+    assertNotNull(loggerInfo);
+    assertEquals(loggerInfo.get("level"), "DEBUG");
+
+    // Remove the logger configuration so that other tests aren't affected
+    ((LoggerContext) LogManager.getContext(false)).getConfiguration().removeLogger(loggerName);
+  }
+
+  @Test
+  public void testChangeNonConfiguredAncestorLoggerLevel() {
+    String loggerName = getClass().getPackageName();
+    // The logger for this package is not explicitly configured and inherits the root logger's config
+    assertNull(LoggerUtils.getLoggerInfo(loggerName));
+
+    Map<String, String> loggerInfo = LoggerUtils.setLoggerLevel(loggerName, "DEBUG");
+    assertNotNull(loggerInfo);
+    assertEquals(loggerInfo.get("level"), "DEBUG");
+
+    // Verify that the logger for this package now shows up in the configured loggers
+    loggerInfo = LoggerUtils.getLoggerInfo(loggerName);
+    assertNotNull(loggerInfo);
+    assertEquals(loggerInfo.get("level"), "DEBUG");
+
+    // Remove the logger configuration so that other tests aren't affected
+    ((LoggerContext) LogManager.getContext(false)).getConfiguration().removeLogger(loggerName);
   }
 
   @Test
