@@ -22,6 +22,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
+import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -43,7 +44,7 @@ public class HashUtilsTest {
 
     // Test failure scenario when there's a non-null invalid uuid value
     String[] invalidUUIDs = new String[]{"some-random-string"};
-    byte[] hashResult = HashUtils.hashUUID(invalidUUIDs);
+    byte[] hashResult = HashUtils.hashUUID(new PrimaryKey(invalidUUIDs));
     // In case of failures, each element is prepended with length
     byte[] expectedResult = new byte[invalidUUIDs[0].length() + 4];
     ByteBuffer tempByteBuffer = ByteBuffer.wrap(expectedResult).order(ByteOrder.BIG_ENDIAN);
@@ -52,7 +53,7 @@ public class HashUtilsTest {
     Assert.assertEquals(hashResult, expectedResult);
     // Test failure scenario when one of the values is null
     invalidUUIDs = new String[]{UUID.randomUUID().toString(), null};
-    hashResult = HashUtils.hashUUID(invalidUUIDs);
+    hashResult = HashUtils.hashUUID(new PrimaryKey(invalidUUIDs));
     expectedResult = new byte[invalidUUIDs[0].length() + "null".length() + 8];
     tempByteBuffer = ByteBuffer.wrap(expectedResult).order(ByteOrder.BIG_ENDIAN);
     tempByteBuffer.putInt(invalidUUIDs[0].length());
@@ -63,7 +64,7 @@ public class HashUtilsTest {
   }
 
   private void testHashUUID(UUID[] uuids) {
-    byte[] convertedBytes = HashUtils.hashUUID(uuids);
+    byte[] convertedBytes = HashUtils.hashUUID(new PrimaryKey(uuids));
     // After hashing, each UUID should take 16 bytes.
     Assert.assertEquals(convertedBytes.length, 16 * uuids.length);
     // Below we reconstruct each UUID from the reduced 16-byte representation, and ensure it is the same as the input.
