@@ -164,6 +164,10 @@ controller:
 
   podAnnotations: {}
 
+  # set enabled as true, to automatically roll controller stateful set for configmap change
+  automaticReload:
+    enabled: false
+
   updateStrategy:
     type: RollingUpdate
 
@@ -269,6 +273,10 @@ broker:
 
   podAnnotations: {}
 
+  # set enabled as true, to automatically roll broker stateful set for configmap change
+  automaticReload:
+    enabled: false
+
   updateStrategy:
     type: RollingUpdate
 
@@ -362,6 +370,10 @@ server:
 
   podAnnotations: {}
 
+  # set enabled as true, to automatically roll server stateful set for configmap change
+  automaticReload:
+    enabled: false
+
   updateStrategy:
     type: RollingUpdate
 
@@ -451,6 +463,9 @@ minion:
   tolerations: []
 
   podAnnotations: {}
+
+  automaticReload:
+    enabled: false
 
   updateStrategy:
     type: RollingUpdate

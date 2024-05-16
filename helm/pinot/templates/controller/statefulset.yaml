@@ -37,7 +37,10 @@ spec:
       labels:
         {{- include "pinot.controllerLabels" . | nindent 8 }}
       annotations:
-{{ toYaml .Values.controller.podAnnotations | indent 8 }}
+        {{- if .Values.controller.automaticReload.enabled }}
+        checksum/config: {{- include (print $.Template.BasePath "/controller/configmap.yaml") . | sha256sum }}
+        {{- end }}
+{{ toYaml .Values.controller.podAnnotations | nindent 8 }}
     spec:
       terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
       serviceAccountName: {{ include "pinot.serviceAccountName" . }}
