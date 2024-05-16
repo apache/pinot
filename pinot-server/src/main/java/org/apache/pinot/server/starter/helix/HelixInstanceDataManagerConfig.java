@@ -34,10 +34,7 @@ import org.apache.pinot.spi.utils.ReadMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.spi.utils.CommonConstants.Server.CONFIG_OF_SEGMENT_STORE_URI;
-import static org.apache.pinot.spi.utils.CommonConstants.Server.DEFAULT_INSTANCE_DATA_DIR;
-import static org.apache.pinot.spi.utils.CommonConstants.Server.DEFAULT_INSTANCE_SEGMENT_TAR_DIR;
-import static org.apache.pinot.spi.utils.CommonConstants.Server.DEFAULT_READ_MODE;
+import static org.apache.pinot.spi.utils.CommonConstants.Server.*;
 
 
 /**
@@ -208,6 +205,12 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   @Override
   public String getInstanceSegmentTarDir() {
     return _serverConfig.getProperty(INSTANCE_SEGMENT_TAR_DIR, DEFAULT_INSTANCE_SEGMENT_TAR_DIR);
+  }
+
+  @Override
+  public String getRealtimeSegmentConsumerClientIdSuffix() {
+    return _serverConfig.getProperty(CONFIG_OF_REALTIME_SEGMENT_CONSUMER_CLIENT_ID_SUFFIX,
+        DEFAULT_REALTIME_SEGMENT_CONSUMER_CLIENT_ID_SUFFIX);
   }
 
   @Override
