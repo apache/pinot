@@ -22,8 +22,11 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import org.reflections.Reflections;
 import org.reflections.scanners.MethodAnnotationsScanner;
 import org.reflections.util.ClasspathHelper;
@@ -82,6 +85,28 @@ public class PinotReflectionUtils {
       // not be properly handled
       LOGGER.error("Error scanning classes within packages: {} with regex pattern: '{}', annotation: {}", packages,
           regexPattern, annotation.getSimpleName(), t);
+      throw t;
+    }
+  }
+
+  public static Set<Class<?>> getImplementationsOfInterface(Class<?> interfaceClass, String regexPattern) {
+    try {
+      synchronized (REFLECTION_LOCK) {
+        Pattern pattern = Pattern.compile(regexPattern);
+        List<String> packages = Arrays.stream(interfaceClass.getClassLoader().getDefinedPackages())
+            .map(Package::getName)
+            .filter(x -> pattern.matcher(x).matches())
+            .collect(Collectors.toList());
+        List<URL> urls = new ArrayList<>();
+        for (String packageName : packages) {
+          urls.addAll(ClasspathHelper.forPackage(packageName));
+        }
+        // we use deprecated method include here to avoid the compatibility issue with reflections 0.9.11 -> 0.10.2
+        return (Set<Class<?>>) new Reflections(new ConfigurationBuilder().setUrls(urls)
+            .filterInputsBy(new FilterBuilder().include(regexPattern)))
+            .getSubTypesOf(interfaceClass);
+      }
+    } catch (Throwable t) {
       throw t;
     }
   }

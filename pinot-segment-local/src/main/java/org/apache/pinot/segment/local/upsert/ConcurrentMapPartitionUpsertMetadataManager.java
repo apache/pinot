@@ -32,7 +32,6 @@ import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.local.segment.readers.LazyRow;
-import org.apache.pinot.segment.local.utils.HashUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
@@ -73,14 +72,14 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
     segment.enableUpsert(this, validDocIds, queryableDocIds);
 
     if (_partialUpsertHandler != null) {
-      recordInfoIterator = resolveComparisonTies(recordInfoIterator, _hashFunction);
+      recordInfoIterator = resolveComparisonTies(recordInfoIterator, _context.getHashFunction());
     }
     AtomicInteger numKeysInWrongSegment = new AtomicInteger();
     while (recordInfoIterator.hasNext()) {
       RecordInfo recordInfo = recordInfoIterator.next();
       int newDocId = recordInfo.getDocId();
       Comparable newComparisonValue = recordInfo.getComparisonValue();
-      _primaryKeyToRecordLocationMap.compute(HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), _hashFunction),
+      _primaryKeyToRecordLocationMap.compute(_context.getHashFunction().hash(recordInfo.getPrimaryKey()),
           (primaryKey, currentRecordLocation) -> {
             if (currentRecordLocation != null) {
               // Existing primary key
@@ -167,7 +166,7 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
       int newDocId = recordInfo.getDocId();
       Comparable newComparisonValue = recordInfo.getComparisonValue();
       addDocId(validDocIds, queryableDocIds, newDocId, recordInfo);
-      _primaryKeyToRecordLocationMap.put(HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), _hashFunction),
+      _primaryKeyToRecordLocationMap.put(_context.getHashFunction().hash(recordInfo.getPrimaryKey()),
           new RecordLocation(segment, newDocId, newComparisonValue));
     }
   }
@@ -182,7 +181,7 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
         UpsertUtils.PrimaryKeyReader primaryKeyReader = new UpsertUtils.PrimaryKeyReader(segment, _primaryKeyColumns)) {
       while (iterator.hasNext()) {
         primaryKeyReader.getPrimaryKey(iterator.next(), primaryKey);
-        _primaryKeyToRecordLocationMap.computeIfPresent(HashUtils.hashPrimaryKey(primaryKey, _hashFunction),
+        _primaryKeyToRecordLocationMap.computeIfPresent(_context.getHashFunction().hash(primaryKey),
             (pk, recordLocation) -> {
               if (recordLocation.getSegment() == segment) {
                 return null;
@@ -264,7 +263,7 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
       _largestSeenComparisonValue.getAndUpdate(v -> Math.max(v, comparisonValue));
     }
 
-    _primaryKeyToRecordLocationMap.compute(HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), _hashFunction),
+    _primaryKeyToRecordLocationMap.compute(_context.getHashFunction().hash(recordInfo.getPrimaryKey()),
         (primaryKey, currentRecordLocation) -> {
           if (currentRecordLocation != null) {
             // Existing primary key
@@ -300,7 +299,7 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
   @Override
   protected GenericRow doUpdateRecord(GenericRow record, RecordInfo recordInfo) {
     assert _partialUpsertHandler != null;
-    _primaryKeyToRecordLocationMap.computeIfPresent(HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), _hashFunction),
+    _primaryKeyToRecordLocationMap.computeIfPresent(_context.getHashFunction().hash(recordInfo.getPrimaryKey()),
         (pk, recordLocation) -> {
           // Read the previous record if the following conditions are met:
           // - New record is not a DELETE record

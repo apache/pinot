@@ -32,6 +32,10 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.upsert.hash.MD5UpsertHashFunction;
+import org.apache.pinot.common.upsert.hash.Murmur3UpsertHashFunction;
+import org.apache.pinot.common.upsert.hash.NoOpHashFunction;
+import org.apache.pinot.common.upsert.hash.UpsertHashFunction;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.segment.local.indexsegment.immutable.EmptyIndexSegment;
@@ -153,12 +157,12 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
   @Test
   public void testAddReplaceRemoveSegment()
       throws IOException {
-    verifyAddReplaceRemoveSegment(HashFunction.NONE, false);
-    verifyAddReplaceRemoveSegment(HashFunction.MD5, false);
-    verifyAddReplaceRemoveSegment(HashFunction.MURMUR3, false);
-    verifyAddReplaceRemoveSegment(HashFunction.NONE, true);
-    verifyAddReplaceRemoveSegment(HashFunction.MD5, true);
-    verifyAddReplaceRemoveSegment(HashFunction.MURMUR3, true);
+    verifyAddReplaceRemoveSegment(NoOpHashFunction.INSTANCE, false);
+    verifyAddReplaceRemoveSegment(MD5UpsertHashFunction.INSTANCE, false);
+    verifyAddReplaceRemoveSegment(Murmur3UpsertHashFunction.INSTANCE, false);
+    verifyAddReplaceRemoveSegment(NoOpHashFunction.INSTANCE, true);
+    verifyAddReplaceRemoveSegment(MD5UpsertHashFunction.INSTANCE, true);
+    verifyAddReplaceRemoveSegment(Murmur3UpsertHashFunction.INSTANCE, true);
   }
 
   @Test
@@ -217,7 +221,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     verifyGetQueryableDocIds(false, deleteFlags4, validDocIdsSnapshot4, queryableDocIds4);
   }
 
-  private void verifyAddReplaceRemoveSegment(HashFunction hashFunction, boolean enableSnapshot)
+  private void verifyAddReplaceRemoveSegment(UpsertHashFunction hashFunction, boolean enableSnapshot)
       throws IOException {
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
         new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0,
@@ -370,15 +374,15 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
   public void testAddReplaceRemoveSegmentWithRecordDelete()
       throws IOException {
     _contextBuilder.setDeleteRecordColumn(DELETE_RECORD_COLUMN);
-    verifyAddReplaceRemoveSegmentWithRecordDelete(HashFunction.NONE, false);
-    verifyAddReplaceRemoveSegmentWithRecordDelete(HashFunction.MD5, false);
-    verifyAddReplaceRemoveSegmentWithRecordDelete(HashFunction.MURMUR3, false);
-    verifyAddReplaceRemoveSegmentWithRecordDelete(HashFunction.NONE, true);
-    verifyAddReplaceRemoveSegmentWithRecordDelete(HashFunction.MD5, true);
-    verifyAddReplaceRemoveSegmentWithRecordDelete(HashFunction.MURMUR3, true);
+    verifyAddReplaceRemoveSegmentWithRecordDelete(NoOpHashFunction.INSTANCE, false);
+    verifyAddReplaceRemoveSegmentWithRecordDelete(MD5UpsertHashFunction.INSTANCE, false);
+    verifyAddReplaceRemoveSegmentWithRecordDelete(Murmur3UpsertHashFunction.INSTANCE, false);
+    verifyAddReplaceRemoveSegmentWithRecordDelete(NoOpHashFunction.INSTANCE, true);
+    verifyAddReplaceRemoveSegmentWithRecordDelete(MD5UpsertHashFunction.INSTANCE, true);
+    verifyAddReplaceRemoveSegmentWithRecordDelete(Murmur3UpsertHashFunction.INSTANCE, true);
   }
 
-  private void verifyAddReplaceRemoveSegmentWithRecordDelete(HashFunction hashFunction, boolean enableSnapshot)
+  private void verifyAddReplaceRemoveSegmentWithRecordDelete(UpsertHashFunction hashFunction, boolean enableSnapshot)
       throws IOException {
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
         new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0,
@@ -661,9 +665,8 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
   }
 
   private static void checkRecordLocation(Map<Object, RecordLocation> recordLocationMap, int keyValue,
-      IndexSegment segment, int docId, int comparisonValue, HashFunction hashFunction) {
-    RecordLocation recordLocation =
-        recordLocationMap.get(HashUtils.hashPrimaryKey(makePrimaryKey(keyValue), hashFunction));
+      IndexSegment segment, int docId, int comparisonValue, UpsertHashFunction hashFunction) {
+    RecordLocation recordLocation = recordLocationMap.get(hashFunction.hash(makePrimaryKey(keyValue)));
     assertNotNull(recordLocation);
     assertSame(recordLocation.getSegment(), segment);
     assertEquals(recordLocation.getDocId(), docId);
@@ -673,12 +676,12 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
   @Test
   public void testAddRecord()
       throws IOException {
-    verifyAddRecord(HashFunction.NONE);
-    verifyAddRecord(HashFunction.MD5);
-    verifyAddRecord(HashFunction.MURMUR3);
+    verifyAddRecord(NoOpHashFunction.INSTANCE);
+    verifyAddRecord(MD5UpsertHashFunction.INSTANCE);
+    verifyAddRecord(Murmur3UpsertHashFunction.INSTANCE);
   }
 
-  private void verifyAddRecord(HashFunction hashFunction)
+  private void verifyAddRecord(UpsertHashFunction hashFunction)
       throws IOException {
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
         new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0,
@@ -764,12 +767,12 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
   @Test
   public void testAddOutOfOrderRecord()
       throws IOException {
-    verifyAddOutOfOrderRecord(HashFunction.NONE);
-    verifyAddOutOfOrderRecord(HashFunction.MD5);
-    verifyAddOutOfOrderRecord(HashFunction.MURMUR3);
+    verifyAddOutOfOrderRecord(NoOpHashFunction.INSTANCE);
+    verifyAddOutOfOrderRecord(MD5UpsertHashFunction.INSTANCE);
+    verifyAddOutOfOrderRecord(Murmur3UpsertHashFunction.INSTANCE);
   }
 
-  private void verifyAddOutOfOrderRecord(HashFunction hashFunction)
+  private void verifyAddOutOfOrderRecord(UpsertHashFunction hashFunction)
       throws IOException {
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
         new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0,
@@ -831,12 +834,12 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
 
   @Test
   public void testPreloadSegment() {
-    verifyPreloadSegment(HashFunction.NONE);
-    verifyPreloadSegment(HashFunction.MD5);
-    verifyPreloadSegment(HashFunction.MURMUR3);
+    verifyPreloadSegment(NoOpHashFunction.INSTANCE);
+    verifyPreloadSegment(MD5UpsertHashFunction.INSTANCE);
+    verifyPreloadSegment(Murmur3UpsertHashFunction.INSTANCE);
   }
 
-  private void verifyPreloadSegment(HashFunction hashFunction) {
+  private void verifyPreloadSegment(UpsertHashFunction hashFunction) {
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
         new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0,
             _contextBuilder.setHashFunction(hashFunction).build());
@@ -884,12 +887,12 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
   public void testAddRecordWithDeleteColumn()
       throws IOException {
     _contextBuilder.setDeleteRecordColumn(DELETE_RECORD_COLUMN);
-    verifyAddRecordWithDeleteColumn(HashFunction.NONE);
-    verifyAddRecordWithDeleteColumn(HashFunction.MD5);
-    verifyAddRecordWithDeleteColumn(HashFunction.MURMUR3);
+    verifyAddRecordWithDeleteColumn(NoOpHashFunction.INSTANCE);
+    verifyAddRecordWithDeleteColumn(MD5UpsertHashFunction.INSTANCE);
+    verifyAddRecordWithDeleteColumn(Murmur3UpsertHashFunction.INSTANCE);
   }
 
-  private void verifyAddRecordWithDeleteColumn(HashFunction hashFunction)
+  private void verifyAddRecordWithDeleteColumn(UpsertHashFunction hashFunction)
       throws IOException {
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
         new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0,
@@ -992,12 +995,12 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
   public void testRemoveExpiredDeletedKeys()
       throws IOException {
     _contextBuilder.setDeleteRecordColumn(DELETE_RECORD_COLUMN).setDeletedKeysTTL(20);
-    verifyRemoveExpiredDeletedKeys(HashFunction.NONE);
-    verifyRemoveExpiredDeletedKeys(HashFunction.MD5);
-    verifyRemoveExpiredDeletedKeys(HashFunction.MURMUR3);
+    verifyRemoveExpiredDeletedKeys(NoOpHashFunction.INSTANCE);
+    verifyRemoveExpiredDeletedKeys(MD5UpsertHashFunction.INSTANCE);
+    verifyRemoveExpiredDeletedKeys(Murmur3UpsertHashFunction.INSTANCE);
   }
 
-  private void verifyRemoveExpiredDeletedKeys(HashFunction hashFunction)
+  private void verifyRemoveExpiredDeletedKeys(UpsertHashFunction hashFunction)
       throws IOException {
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
         new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0,
@@ -1090,7 +1093,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     ThreadSafeMutableRoaringBitmap validDocIds0 = new ThreadSafeMutableRoaringBitmap();
     MutableSegment segment0 = mockMutableSegment(1, validDocIds0, null);
     upsertMetadataManager.addRecord(segment0, new RecordInfo(makePrimaryKey(10), 1, earlierComparisonValue, false));
-    checkRecordLocationForTTL(recordLocationMap, 10, segment0, 1, 80, HashFunction.NONE);
+    checkRecordLocationForTTL(recordLocationMap, 10, segment0, 1, 80, NoOpHashFunction.INSTANCE);
 
     // Add a segment with segmentEndTime = earlierComparisonValue, so it will not be skipped
     int numRecords = 4;
@@ -1110,28 +1113,28 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     upsertMetadataManager.addSegment(segment1, validDocIds1, null,
         getRecordInfoListForTTL(numRecords, primaryKeys, timestamps).iterator());
     assertEquals(recordLocationMap.size(), 5);
-    checkRecordLocationForTTL(recordLocationMap, 0, segment1, 0, 100, HashFunction.NONE);
-    checkRecordLocationForTTL(recordLocationMap, 1, segment1, 1, 100, HashFunction.NONE);
-    checkRecordLocationForTTL(recordLocationMap, 2, segment1, 2, 120, HashFunction.NONE);
-    checkRecordLocationForTTL(recordLocationMap, 3, segment1, 3, 80, HashFunction.NONE);
-    checkRecordLocationForTTL(recordLocationMap, 10, segment0, 1, 80, HashFunction.NONE);
+    checkRecordLocationForTTL(recordLocationMap, 0, segment1, 0, 100, NoOpHashFunction.INSTANCE);
+    checkRecordLocationForTTL(recordLocationMap, 1, segment1, 1, 100, NoOpHashFunction.INSTANCE);
+    checkRecordLocationForTTL(recordLocationMap, 2, segment1, 2, 120, NoOpHashFunction.INSTANCE);
+    checkRecordLocationForTTL(recordLocationMap, 3, segment1, 3, 80, NoOpHashFunction.INSTANCE);
+    checkRecordLocationForTTL(recordLocationMap, 10, segment0, 1, 80, NoOpHashFunction.INSTANCE);
 
     // Add record to update largestSeenTimestamp, largest seen timestamp: largerComparisonValue
     upsertMetadataManager.addRecord(segment0, new RecordInfo(makePrimaryKey(10), 0, largerComparisonValue, false));
     assertEquals(recordLocationMap.size(), 5);
-    checkRecordLocationForTTL(recordLocationMap, 0, segment1, 0, 100, HashFunction.NONE);
-    checkRecordLocationForTTL(recordLocationMap, 1, segment1, 1, 100, HashFunction.NONE);
-    checkRecordLocationForTTL(recordLocationMap, 2, segment1, 2, 120, HashFunction.NONE);
-    checkRecordLocationForTTL(recordLocationMap, 3, segment1, 3, 80, HashFunction.NONE);
-    checkRecordLocationForTTL(recordLocationMap, 10, segment0, 0, 120, HashFunction.NONE);
+    checkRecordLocationForTTL(recordLocationMap, 0, segment1, 0, 100, NoOpHashFunction.INSTANCE);
+    checkRecordLocationForTTL(recordLocationMap, 1, segment1, 1, 100, NoOpHashFunction.INSTANCE);
+    checkRecordLocationForTTL(recordLocationMap, 2, segment1, 2, 120, NoOpHashFunction.INSTANCE);
+    checkRecordLocationForTTL(recordLocationMap, 3, segment1, 3, 80, NoOpHashFunction.INSTANCE);
+    checkRecordLocationForTTL(recordLocationMap, 10, segment0, 0, 120, NoOpHashFunction.INSTANCE);
 
     // records before (largest seen timestamp - TTL) are expired and removed from upsertMetadata.
     upsertMetadataManager.removeExpiredPrimaryKeys();
     assertEquals(recordLocationMap.size(), 4);
-    checkRecordLocationForTTL(recordLocationMap, 0, segment1, 0, 100, HashFunction.NONE);
-    checkRecordLocationForTTL(recordLocationMap, 1, segment1, 1, 100, HashFunction.NONE);
-    checkRecordLocationForTTL(recordLocationMap, 2, segment1, 2, 120, HashFunction.NONE);
-    checkRecordLocationForTTL(recordLocationMap, 10, segment0, 0, 120, HashFunction.NONE);
+    checkRecordLocationForTTL(recordLocationMap, 0, segment1, 0, 100, NoOpHashFunction.INSTANCE);
+    checkRecordLocationForTTL(recordLocationMap, 1, segment1, 1, 100, NoOpHashFunction.INSTANCE);
+    checkRecordLocationForTTL(recordLocationMap, 2, segment1, 2, 120, NoOpHashFunction.INSTANCE);
+    checkRecordLocationForTTL(recordLocationMap, 10, segment0, 0, 120, NoOpHashFunction.INSTANCE);
 
     // ValidDocIds for out-of-ttl records should not be removed.
     assertEquals(validDocIds1.getMutableRoaringBitmap().toArray(), new int[]{0, 1, 2, 3});
@@ -1154,7 +1157,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     ThreadSafeMutableRoaringBitmap validDocIds0 = new ThreadSafeMutableRoaringBitmap();
     MutableSegment segment0 = mockMutableSegment(1, validDocIds0, null);
     upsertMetadataManager.addRecord(segment0, new RecordInfo(makePrimaryKey(10), 1, new Double(80), false));
-    checkRecordLocationForTTL(recordLocationMap, 10, segment0, 1, 80, HashFunction.NONE);
+    checkRecordLocationForTTL(recordLocationMap, 10, segment0, 1, 80, NoOpHashFunction.INSTANCE);
 
     // Add a segment with segmentEndTime = 80, so it will not be skipped
     int numRecords = 4;
@@ -1173,22 +1176,22 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     upsertMetadataManager.addSegment(segment1, validDocIds1, null,
         getRecordInfoListForTTL(numRecords, primaryKeys, timestamps).iterator());
     assertEquals(recordLocationMap.size(), 5);
-    checkRecordLocationForTTL(recordLocationMap, 0, segment1, 0, 100, HashFunction.NONE);
-    checkRecordLocationForTTL(recordLocationMap, 1, segment1, 1, 100, HashFunction.NONE);
-    checkRecordLocationForTTL(recordLocationMap, 2, segment1, 2, 120, HashFunction.NONE);
-    checkRecordLocationForTTL(recordLocationMap, 3, segment1, 3, 80, HashFunction.NONE);
-    checkRecordLocationForTTL(recordLocationMap, 10, segment0, 1, 80, HashFunction.NONE);
+    checkRecordLocationForTTL(recordLocationMap, 0, segment1, 0, 100, NoOpHashFunction.INSTANCE);
+    checkRecordLocationForTTL(recordLocationMap, 1, segment1, 1, 100, NoOpHashFunction.INSTANCE);
+    checkRecordLocationForTTL(recordLocationMap, 2, segment1, 2, 120, NoOpHashFunction.INSTANCE);
+    checkRecordLocationForTTL(recordLocationMap, 3, segment1, 3, 80, NoOpHashFunction.INSTANCE);
+    checkRecordLocationForTTL(recordLocationMap, 10, segment0, 1, 80, NoOpHashFunction.INSTANCE);
     assertEquals(validDocIds1.getMutableRoaringBitmap().toArray(), new int[]{0, 1, 2, 3});
 
     // Add record to update largestSeenTimestamp, largest seen timestamp: 120
     upsertMetadataManager.addRecord(segment0, new RecordInfo(makePrimaryKey(0), 0, new Double(120), false));
     assertEquals(validDocIds1.getMutableRoaringBitmap().toArray(), new int[]{1, 2, 3});
     assertEquals(recordLocationMap.size(), 5);
-    checkRecordLocationForTTL(recordLocationMap, 0, segment0, 0, 120, HashFunction.NONE);
-    checkRecordLocationForTTL(recordLocationMap, 1, segment1, 1, 100, HashFunction.NONE);
-    checkRecordLocationForTTL(recordLocationMap, 2, segment1, 2, 120, HashFunction.NONE);
-    checkRecordLocationForTTL(recordLocationMap, 3, segment1, 3, 80, HashFunction.NONE);
-    checkRecordLocationForTTL(recordLocationMap, 10, segment0, 1, 80, HashFunction.NONE);
+    checkRecordLocationForTTL(recordLocationMap, 0, segment0, 0, 120, NoOpHashFunction.INSTANCE);
+    checkRecordLocationForTTL(recordLocationMap, 1, segment1, 1, 100, NoOpHashFunction.INSTANCE);
+    checkRecordLocationForTTL(recordLocationMap, 2, segment1, 2, 120, NoOpHashFunction.INSTANCE);
+    checkRecordLocationForTTL(recordLocationMap, 3, segment1, 3, 80, NoOpHashFunction.INSTANCE);
+    checkRecordLocationForTTL(recordLocationMap, 10, segment0, 1, 80, NoOpHashFunction.INSTANCE);
 
     // Add an out-of-ttl segment, verify all the invalid docs should not show up again.
     // Add a segment with segmentEndTime: 80, largest seen timestamp: 120. the segment will be skipped.
@@ -1243,9 +1246,9 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     trackedSegments.add(segment1);
     // segment1: 0 -> {5, 100}, 1 -> {4, 120}, 2 -> {2, 100}
     assertEquals(recordLocationMap.size(), 3);
-    checkRecordLocation(recordLocationMap, 0, segment1, 5, 100, HashFunction.NONE);
-    checkRecordLocation(recordLocationMap, 1, segment1, 4, 120, HashFunction.NONE);
-    checkRecordLocation(recordLocationMap, 2, segment1, 2, 100, HashFunction.NONE);
+    checkRecordLocation(recordLocationMap, 0, segment1, 5, 100, NoOpHashFunction.INSTANCE);
+    checkRecordLocation(recordLocationMap, 1, segment1, 4, 120, NoOpHashFunction.INSTANCE);
+    checkRecordLocation(recordLocationMap, 2, segment1, 2, 100, NoOpHashFunction.INSTANCE);
     assertEquals(validDocIds1.getMutableRoaringBitmap().toArray(), new int[]{2, 4, 5});
     assertEquals(queryableDocIds1.getMutableRoaringBitmap().toArray(), new int[]{2, 5});
 
@@ -1276,11 +1279,11 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     // segment1: 0 -> {5, 100}, 1 -> {4, 120}, 2 -> {2, 100}
     // segment2: 3 -> {3, 40}, 4 -> {4, 40}
     assertEquals(recordLocationMap.size(), 5);
-    checkRecordLocation(recordLocationMap, 0, segment1, 5, 100, HashFunction.NONE);
-    checkRecordLocation(recordLocationMap, 1, segment1, 4, 120, HashFunction.NONE);
-    checkRecordLocation(recordLocationMap, 2, segment1, 2, 100, HashFunction.NONE);
-    checkRecordLocation(recordLocationMap, 3, segment2, 3, 40, HashFunction.NONE);
-    checkRecordLocation(recordLocationMap, 4, segment2, 4, 40, HashFunction.NONE);
+    checkRecordLocation(recordLocationMap, 0, segment1, 5, 100, NoOpHashFunction.INSTANCE);
+    checkRecordLocation(recordLocationMap, 1, segment1, 4, 120, NoOpHashFunction.INSTANCE);
+    checkRecordLocation(recordLocationMap, 2, segment1, 2, 100, NoOpHashFunction.INSTANCE);
+    checkRecordLocation(recordLocationMap, 3, segment2, 3, 40, NoOpHashFunction.INSTANCE);
+    checkRecordLocation(recordLocationMap, 4, segment2, 4, 40, NoOpHashFunction.INSTANCE);
     assertEquals(validDocIds1.getMutableRoaringBitmap().toArray(), new int[]{2, 4, 5});
     assertEquals(validDocIds2.getMutableRoaringBitmap().toArray(), new int[]{3, 4});
     assertEquals(queryableDocIds1.getMutableRoaringBitmap().toArray(), new int[]{2, 5});
@@ -1331,7 +1334,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     ThreadSafeMutableRoaringBitmap validDocIds0 = new ThreadSafeMutableRoaringBitmap();
     MutableSegment segment0 = mockMutableSegment(1, validDocIds0, null);
     upsertMetadataManager.addRecord(segment0, new RecordInfo(makePrimaryKey(10), 1, comparisonValue, false));
-    checkRecordLocationForTTL(recordLocationMap, 10, segment0, 1, 80, HashFunction.NONE);
+    checkRecordLocationForTTL(recordLocationMap, 10, segment0, 1, 80, NoOpHashFunction.INSTANCE);
 
     // add a segment with segmentEndTime = -1 so it will be skipped since it out-of-TTL
     int numRecords = 4;
@@ -1348,7 +1351,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     // load segment1.
     upsertMetadataManager.addSegment(segment1);
     assertEquals(recordLocationMap.size(), 1);
-    checkRecordLocationForTTL(recordLocationMap, 10, segment0, 1, 80, HashFunction.NONE);
+    checkRecordLocationForTTL(recordLocationMap, 10, segment0, 1, 80, NoOpHashFunction.INSTANCE);
 
     // Stop the metadata manager
     upsertMetadataManager.stop();
@@ -1369,9 +1372,8 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
 
   // Add the following utils function since the Comparison column is a long value for TTL enabled upsert table.
   private static void checkRecordLocationForTTL(Map<Object, RecordLocation> recordLocationMap, int keyValue,
-      IndexSegment segment, int docId, Number comparisonValue, HashFunction hashFunction) {
-    RecordLocation recordLocation =
-        recordLocationMap.get(HashUtils.hashPrimaryKey(makePrimaryKey(keyValue), hashFunction));
+      IndexSegment segment, int docId, Number comparisonValue, UpsertHashFunction hashFunction) {
+    RecordLocation recordLocation = recordLocationMap.get(hashFunction.hash(makePrimaryKey(keyValue)));
     assertNotNull(recordLocation);
     assertSame(recordLocation.getSegment(), segment);
     assertEquals(recordLocation.getDocId(), docId);

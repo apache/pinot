@@ -54,7 +54,7 @@ public class MutableSegmentDedupeTest {
     URL dataResourceUrl = this.getClass().getClassLoader().getResource(DATA_FILE_PATH);
     Schema schema = Schema.fromFile(new File(schemaResourceUrl.getFile()));
     TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("testTable")
-        .setDedupConfig(new DedupConfig(dedupEnabled, HashFunction.NONE)).build();
+        .setDedupConfig(new DedupConfig(dedupEnabled, HashFunction.NONE.name())).build();
     CompositeTransformer recordTransformer = CompositeTransformer.getDefaultTransformer(tableConfig, schema);
     File jsonFile = new File(dataResourceUrl.getFile());
     PartitionDedupMetadataManager partitionDedupMetadataManager =
@@ -77,7 +77,7 @@ public class MutableSegmentDedupeTest {
   private static TableDedupMetadataManager getTableDedupMetadataManager(Schema schema) {
     TableConfig tableConfig = Mockito.mock(TableConfig.class);
     Mockito.when(tableConfig.getTableName()).thenReturn("testTable_REALTIME");
-    Mockito.when(tableConfig.getDedupConfig()).thenReturn(new DedupConfig(true, HashFunction.NONE));
+    Mockito.when(tableConfig.getDedupConfig()).thenReturn(new DedupConfig(true, HashFunction.NONE.name()));
     return TableDedupMetadataManagerFactory.create(tableConfig, schema, Mockito.mock(TableDataManager.class),
         Mockito.mock(ServerMetrics.class));
   }

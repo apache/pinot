@@ -48,6 +48,7 @@ import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
 import org.apache.helix.model.IdealState;
+import org.apache.pinot.common.upsert.hash.UpsertHashFunction;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerGauge;
@@ -61,7 +62,6 @@ import org.apache.pinot.segment.local.indexsegment.immutable.EmptyIndexSegment;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
-import org.apache.pinot.segment.local.utils.HashUtils;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.MutableSegment;
@@ -69,7 +69,6 @@ import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
-import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.BooleanUtils;
@@ -90,7 +89,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   protected final List<String> _primaryKeyColumns;
   protected final List<String> _comparisonColumns;
   protected final String _deleteRecordColumn;
-  protected final HashFunction _hashFunction;
   protected final PartialUpsertHandler _partialUpsertHandler;
   protected final boolean _enableSnapshot;
   protected final double _metadataTTL;
@@ -129,7 +127,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     _primaryKeyColumns = context.getPrimaryKeyColumns();
     _comparisonColumns = context.getComparisonColumns();
     _deleteRecordColumn = context.getDeleteRecordColumn();
-    _hashFunction = context.getHashFunction();
     _partialUpsertHandler = context.getPartialUpsertHandler();
     _enableSnapshot = context.isSnapshotEnabled();
     _snapshotLock = _enableSnapshot ? new ReentrantReadWriteLock() : null;
@@ -782,18 +779,18 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
    * </p>
    *
    * @param recordInfoIterator iterator over the new segment
-   * @param hashFunction       hash function configured for Upsert's primary keys
+   * @param upsertHashFunction hash function configured for Upsert's primary keys
    * @return iterator that returns de-duplicated records. To resolve ties for comparison column values, we prefer to
    *         return the latest record.
    */
   @SuppressWarnings({"rawtypes", "unchecked"})
   protected static Iterator<RecordInfo> resolveComparisonTies(Iterator<RecordInfo> recordInfoIterator,
-      HashFunction hashFunction) {
+      UpsertHashFunction upsertHashFunction) {
     Map<Object, RecordInfo> deDuplicatedRecordInfo = new HashMap<>();
     while (recordInfoIterator.hasNext()) {
       RecordInfo recordInfo = recordInfoIterator.next();
       Comparable newComparisonValue = recordInfo.getComparisonValue();
-      deDuplicatedRecordInfo.compute(HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), hashFunction),
+      deDuplicatedRecordInfo.compute(upsertHashFunction.hash(recordInfo.getPrimaryKey()),
           (key, maxComparisonValueRecordInfo) -> {
             if (maxComparisonValueRecordInfo == null) {
               return recordInfo;

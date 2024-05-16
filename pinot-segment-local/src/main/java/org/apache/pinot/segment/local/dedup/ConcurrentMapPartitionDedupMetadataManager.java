@@ -24,12 +24,11 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import org.apache.pinot.common.upsert.hash.UpsertHashFunction;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
-import org.apache.pinot.segment.local.utils.HashUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
-import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.utils.ByteArray;
 
@@ -38,18 +37,18 @@ class ConcurrentMapPartitionDedupMetadataManager implements PartitionDedupMetada
   private final List<String> _primaryKeyColumns;
   private final int _partitionId;
   private final ServerMetrics _serverMetrics;
-  private final HashFunction _hashFunction;
+  private final UpsertHashFunction _upsertHashFunction;
 
   @VisibleForTesting
   final ConcurrentHashMap<Object, IndexSegment> _primaryKeyToSegmentMap = new ConcurrentHashMap<>();
 
   public ConcurrentMapPartitionDedupMetadataManager(String tableNameWithType, List<String> primaryKeyColumns,
-      int partitionId, ServerMetrics serverMetrics, HashFunction hashFunction) {
+      int partitionId, ServerMetrics serverMetrics, UpsertHashFunction upsertHashFunction) {
     _tableNameWithType = tableNameWithType;
     _primaryKeyColumns = primaryKeyColumns;
     _partitionId = partitionId;
     _serverMetrics = serverMetrics;
-    _hashFunction = hashFunction;
+    _upsertHashFunction = upsertHashFunction;
   }
 
   public void addSegment(IndexSegment segment) {
@@ -57,7 +56,7 @@ class ConcurrentMapPartitionDedupMetadataManager implements PartitionDedupMetada
     Iterator<PrimaryKey> primaryKeyIterator = getPrimaryKeyIterator(segment);
     while (primaryKeyIterator.hasNext()) {
       PrimaryKey pk = primaryKeyIterator.next();
-      _primaryKeyToSegmentMap.put(HashUtils.hashPrimaryKey(pk, _hashFunction), segment);
+      _primaryKeyToSegmentMap.put(_upsertHashFunction.hash(pk), segment);
     }
     _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.DEDUP_PRIMARY_KEYS_COUNT,
         _primaryKeyToSegmentMap.size());
@@ -68,7 +67,7 @@ class ConcurrentMapPartitionDedupMetadataManager implements PartitionDedupMetada
     Iterator<PrimaryKey> primaryKeyIterator = getPrimaryKeyIterator(segment);
     while (primaryKeyIterator.hasNext()) {
       PrimaryKey pk = primaryKeyIterator.next();
-      _primaryKeyToSegmentMap.compute(HashUtils.hashPrimaryKey(pk, _hashFunction), (primaryKey, currentSegment) -> {
+      _primaryKeyToSegmentMap.compute(_upsertHashFunction.hash(pk), (primaryKey, currentSegment) -> {
         if (currentSegment == segment) {
           return null;
         } else {
@@ -114,7 +113,7 @@ class ConcurrentMapPartitionDedupMetadataManager implements PartitionDedupMetada
 
   public boolean checkRecordPresentOrUpdate(PrimaryKey pk, IndexSegment indexSegment) {
     boolean present =
-        _primaryKeyToSegmentMap.putIfAbsent(HashUtils.hashPrimaryKey(pk, _hashFunction), indexSegment) != null;
+        _primaryKeyToSegmentMap.putIfAbsent(_upsertHashFunction.hash(pk), indexSegment) != null;
     if (!present) {
       _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.DEDUP_PRIMARY_KEYS_COUNT,
           _primaryKeyToSegmentMap.size());

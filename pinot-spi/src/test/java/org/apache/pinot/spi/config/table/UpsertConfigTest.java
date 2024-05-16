@@ -36,8 +36,8 @@ public class UpsertConfigTest {
     upsertConfig1.setComparisonColumn("comparison");
     assertEquals(upsertConfig1.getComparisonColumns(), Collections.singletonList("comparison"));
 
-    upsertConfig1.setHashFunction(HashFunction.MURMUR3);
-    assertEquals(upsertConfig1.getHashFunction(), HashFunction.MURMUR3);
+    upsertConfig1.setHashFunction(HashFunction.MURMUR3.name());
+    assertEquals(upsertConfig1.getHashFunction(), HashFunction.MURMUR3.name());
 
     UpsertConfig upsertConfig2 = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
     Map<String, UpsertConfig.Strategy> partialUpsertStratgies = new HashMap<>();

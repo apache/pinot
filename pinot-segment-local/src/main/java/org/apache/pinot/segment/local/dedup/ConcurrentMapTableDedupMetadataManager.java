@@ -22,6 +22,6 @@ class ConcurrentMapTableDedupMetadataManager extends BaseTableDedupMetadataManag
 
   protected PartitionDedupMetadataManager createPartitionDedupMetadataManager(Integer partitionId) {
     return new ConcurrentMapPartitionDedupMetadataManager(_tableNameWithType, _primaryKeyColumns, partitionId,
-        _serverMetrics, _hashFunction);
+        _serverMetrics, _upsertHashFunction);
   }
 }

@@ -18,6 +18,11 @@
  */
 package org.apache.pinot.spi.config.table;
 
+/**
+ * These HashFunctions are available for hashing Upsert primary keys out of the
+ * box in Pinot. You can also plug in custom hash functions by implementing
+ * the UpsertHashFunction interface in pinot-common.
+ */
 public enum HashFunction {
   NONE, MD5, MURMUR3
 }

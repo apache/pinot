@@ -69,7 +69,7 @@ public class MutableSegmentImplUpsertTest {
     when(_tableDataManager.getTableDataDir()).thenReturn(new File(REALTIME_TABLE_NAME));
   }
 
-  private UpsertConfig createPartialUpsertConfig(HashFunction hashFunction) {
+  private UpsertConfig createPartialUpsertConfig(String hashFunction) {
     UpsertConfig upsertConfigWithHash = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
     upsertConfigWithHash.setPartialUpsertStrategies(new HashMap<>());
     upsertConfigWithHash.setDefaultPartialUpsertStrategy(UpsertConfig.Strategy.OVERWRITE);
@@ -78,7 +78,7 @@ public class MutableSegmentImplUpsertTest {
     return upsertConfigWithHash;
   }
 
-  private UpsertConfig createFullUpsertConfig(HashFunction hashFunction) {
+  private UpsertConfig createFullUpsertConfig(String hashFunction) {
     UpsertConfig upsertConfigWithHash = new UpsertConfig(UpsertConfig.Mode.FULL);
     upsertConfigWithHash.setHashFunction(hashFunction);
     return upsertConfigWithHash;
@@ -118,17 +118,17 @@ public class MutableSegmentImplUpsertTest {
   @Test
   public void testHashFunctions()
       throws Exception {
-    testUpsertIngestion(createFullUpsertConfig(HashFunction.NONE));
-    testUpsertIngestion(createFullUpsertConfig(HashFunction.MD5));
-    testUpsertIngestion(createFullUpsertConfig(HashFunction.MURMUR3));
+    testUpsertIngestion(createFullUpsertConfig(HashFunction.NONE.name()));
+    testUpsertIngestion(createFullUpsertConfig(HashFunction.MD5.name()));
+    testUpsertIngestion(createFullUpsertConfig(HashFunction.MURMUR3.name()));
   }
 
   @Test
   public void testMultipleComparisonColumns()
       throws Exception {
-    testUpsertIngestion(createPartialUpsertConfig(HashFunction.NONE));
-    testUpsertIngestion(createPartialUpsertConfig(HashFunction.MD5));
-    testUpsertIngestion(createPartialUpsertConfig(HashFunction.MURMUR3));
+    testUpsertIngestion(createPartialUpsertConfig(HashFunction.NONE.name()));
+    testUpsertIngestion(createPartialUpsertConfig(HashFunction.MD5.name()));
+    testUpsertIngestion(createPartialUpsertConfig(HashFunction.MURMUR3.name()));
   }
 
   private void testUpsertIngestion(UpsertConfig upsertConfig)
