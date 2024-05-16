@@ -47,7 +47,7 @@ public class UpsertHashFunctionFactory {
     long startTime = System.currentTimeMillis();
     try {
       Set<Class<?>> implementations = PinotReflectionUtils.getImplementationsOfInterface(
-          UpsertHashFunction.class, ".*function.hash.*");
+          UpsertHashFunction.class, ".*upsert.hash.*");
       for (Class<?> implementation : implementations) {
         if (UpsertHashFunction.class.isAssignableFrom(implementation)) {
           UpsertHashFunction upsertHashFunction = createInstance((Class<UpsertHashFunction>) implementation);

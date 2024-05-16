@@ -43,7 +43,7 @@ public class UpsertConfig extends BaseJsonConfig {
   private Mode _mode;
 
   @JsonPropertyDescription("Function to hash the primary key.")
-  private String _hashFunction = "NONE";
+  private String _hashFunction = HashFunction.NONE.name();
 
   @JsonPropertyDescription("Partial update strategies.")
   private Map<String, Strategy> _partialUpsertStrategies;

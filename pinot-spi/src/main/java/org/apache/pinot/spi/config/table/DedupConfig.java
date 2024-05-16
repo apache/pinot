@@ -37,7 +37,7 @@ public class DedupConfig extends BaseJsonConfig {
       @JsonProperty(value = "metadataManagerClass") String metadataManagerClass
   ) {
     _dedupEnabled = dedupEnabled;
-    _hashFunction = hashFunction == null ? "NONE" : hashFunction;
+    _hashFunction = hashFunction == null ? HashFunction.NONE.name() : hashFunction;
     _metadataManagerClass = metadataManagerClass;
   }
 
