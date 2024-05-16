@@ -38,6 +38,7 @@ import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.filter.BitmapBasedFilterOperator;
 import org.apache.pinot.core.operator.filter.EmptyFilterOperator;
 import org.apache.pinot.core.operator.filter.ExpressionFilterOperator;
+import org.apache.pinot.core.operator.filter.FilterOperatorRewriter;
 import org.apache.pinot.core.operator.filter.FilterOperatorUtils;
 import org.apache.pinot.core.operator.filter.H3InclusionIndexFilterOperator;
 import org.apache.pinot.core.operator.filter.H3IndexFilterOperator;
@@ -93,11 +94,14 @@ public class FilterPlanNode implements PlanNode {
       BaseFilterOperator filterOperator = constructPhysicalOperator(_filter, numDocs);
       if (queryableDocIdsSnapshot != null) {
         BaseFilterOperator validDocFilter = new BitmapBasedFilterOperator(queryableDocIdsSnapshot, false, numDocs);
-        return FilterOperatorUtils.getAndFilterOperator(_queryContext, Arrays.asList(filterOperator, validDocFilter),
-            numDocs);
-      } else {
+        filterOperator = FilterOperatorUtils.getAndFilterOperator(_queryContext, Arrays.asList(filterOperator,
+                        validDocFilter), numDocs);
+      }
+      if (filterOperator instanceof EmptyFilterOperator || filterOperator instanceof MatchAllFilterOperator) {
         return filterOperator;
       }
+      FilterOperatorRewriter.reorder(_queryContext, filterOperator);
+      return filterOperator;
     } else if (queryableDocIdsSnapshot != null) {
       return new BitmapBasedFilterOperator(queryableDocIdsSnapshot, false, numDocs);
     } else {
