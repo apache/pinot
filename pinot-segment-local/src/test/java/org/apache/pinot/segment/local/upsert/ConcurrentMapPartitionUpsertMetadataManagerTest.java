@@ -42,7 +42,6 @@ import org.apache.pinot.segment.local.indexsegment.immutable.EmptyIndexSegment;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.upsert.ConcurrentMapPartitionUpsertMetadataManager.RecordLocation;
-import org.apache.pinot.segment.local.utils.HashUtils;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.MutableSegment;
@@ -1402,15 +1401,15 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
   @Test
   public void testHashPrimaryKey() {
     PrimaryKey pk = new PrimaryKey(new Object[]{"uuid-1", "uuid-2", "uuid-3"});
-    assertEquals(BytesUtils.toHexString(((ByteArray) HashUtils.hashPrimaryKey(pk, HashFunction.MD5)).getBytes()),
+    assertEquals(BytesUtils.toHexString(((ByteArray) MD5UpsertHashFunction.INSTANCE.hash(pk)).getBytes()),
         "6ca926be8c2d1d980acf48ba48418e24");
-    assertEquals(BytesUtils.toHexString(((ByteArray) HashUtils.hashPrimaryKey(pk, HashFunction.MURMUR3)).getBytes()),
+    assertEquals(BytesUtils.toHexString(((ByteArray) Murmur3UpsertHashFunction.INSTANCE.hash(pk)).getBytes()),
         "e4540494e43b27e312d01f33208c6a4e");
     // reorder
     pk = new PrimaryKey(new Object[]{"uuid-3", "uuid-2", "uuid-1"});
-    assertEquals(BytesUtils.toHexString(((ByteArray) HashUtils.hashPrimaryKey(pk, HashFunction.MD5)).getBytes()),
+    assertEquals(BytesUtils.toHexString(((ByteArray) MD5UpsertHashFunction.INSTANCE.hash(pk)).getBytes()),
         "fc2159b78d07f803fdfb0b727315a445");
-    assertEquals(BytesUtils.toHexString(((ByteArray) HashUtils.hashPrimaryKey(pk, HashFunction.MURMUR3)).getBytes()),
+    assertEquals(BytesUtils.toHexString(((ByteArray) Murmur3UpsertHashFunction.INSTANCE.hash(pk)).getBytes()),
         "37fab5ef0ea39711feabcdc623cb8a4e");
   }
 
