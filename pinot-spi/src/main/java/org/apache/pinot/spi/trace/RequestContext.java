@@ -217,8 +217,16 @@ public interface RequestContext {
 
   void setProcessingExceptions(List<String> processingExceptions);
 
+  /**
+   * @return Map of allowlisted request header keys (in lowercase) to list of header values
+   */
   Map<String, List<String>> getRequestHttpHeaders();
 
+  /**
+   * While setting the http request headers here, we send the keys in lower-case to be in parity with the
+   * case-insensitive nature of Http.
+   * @param requestHttpHeaders Map of request header keys (in lowercase) to list of header values
+   */
   void setRequestHttpHeaders(Map<String, List<String>> requestHttpHeaders);
 
   enum FanoutType {
