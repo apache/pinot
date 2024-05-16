@@ -105,7 +105,8 @@ public class FieldSpecTest {
     fieldSpec1.setName("svDimension");
     fieldSpec1.setDataType(STRING);
     fieldSpec1.setMaxLength(20000);
-    fieldSpec2 = new DimensionFieldSpec("svDimension", STRING, true, 20000, null);
+    fieldSpec2 = new DimensionFieldSpec("svDimension", STRING, true, 20000, null,
+        FieldSpec.MaxLengthExceedStrategy.TRIM_LENGTH);
     Assert.assertEquals(fieldSpec1, fieldSpec2);
     Assert.assertEquals(fieldSpec1.toString(), fieldSpec2.toString());
     Assert.assertEquals(fieldSpec1.hashCode(), fieldSpec2.hashCode());
@@ -116,7 +117,8 @@ public class FieldSpecTest {
     fieldSpec1.setName("svDimension");
     fieldSpec1.setDataType(JSON);
     fieldSpec1.setMaxLength(20000);
-    fieldSpec2 = new DimensionFieldSpec("svDimension", JSON, true, 20000, null);
+    fieldSpec2 = new DimensionFieldSpec("svDimension", JSON, true, 20000, null,
+        FieldSpec.MaxLengthExceedStrategy.TRIM_LENGTH);
     Assert.assertEquals(fieldSpec1, fieldSpec2);
     Assert.assertEquals(fieldSpec1.toString(), fieldSpec2.toString());
     Assert.assertEquals(fieldSpec1.hashCode(), fieldSpec2.hashCode());
@@ -151,7 +153,8 @@ public class FieldSpecTest {
     fieldSpec1.setDataType(STRING);
     fieldSpec1.setSingleValueField(false);
     fieldSpec1.setMaxLength(20000);
-    fieldSpec2 = new DimensionFieldSpec("mvDimension", STRING, false, 20000, null);
+    fieldSpec2 = new DimensionFieldSpec("mvDimension", STRING, false, 20000, null,
+        FieldSpec.MaxLengthExceedStrategy.TRIM_LENGTH);
     Assert.assertEquals(fieldSpec1, fieldSpec2);
     Assert.assertEquals(fieldSpec1.toString(), fieldSpec2.toString());
     Assert.assertEquals(fieldSpec1.hashCode(), fieldSpec2.hashCode());

@@ -21,8 +21,6 @@ package org.apache.pinot.segment.local.recordtransformer;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
@@ -39,40 +37,39 @@ import org.apache.pinot.spi.utils.StringUtil;
  * </ul>
  * <p>NOTE: should put this after the {@link DataTypeTransformer} so that all values follow the data types in
  * {@link FieldSpec}.
+ * This uses the MaxLengthExceedStrategy in the {@link FieldSpec} to decide what to do when the value exceeds the max.
+ * For TRIM_LENGTH, the value is trimmed to the max length.
+ * For SUBSTITUTE_DEFAULT_VALUE, the value is replaced with the default null value string.
+ * For FAIL_INGESTION, an exception is thrown and the record is skipped.
+ * In the first 2 scenarios, this metric INCOMPLETE_REALTIME_ROWS_CONSUMED can be tracked to know if a trimmed /
+ * default record was persisted.
+ * In the last scenario, this metric ROWS_WITH_ERRORS can be tracked  to know if a record was skipped.
  */
 public class SanitizationTransformer implements RecordTransformer {
   private static final String NULL_CHARACTER = "\0";
-  private final Map<String, Integer> _stringColumnMaxLengthMap = new HashMap<>();
-  private final boolean _failOnTrimmedStringLength;
+  private final Map<String, FieldSpec> _stringColumnToFieldSpecMap = new HashMap<>();
 
-  public SanitizationTransformer(TableConfig tableConfig, Schema schema) {
+  public SanitizationTransformer(Schema schema) {
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
       if (!fieldSpec.isVirtualColumn() && fieldSpec.getDataType() == DataType.STRING) {
-        _stringColumnMaxLengthMap.put(fieldSpec.getName(), fieldSpec.getMaxLength());
+        _stringColumnToFieldSpecMap.put(fieldSpec.getName(), fieldSpec);
       }
-    }
-    IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
-    if (ingestionConfig != null) {
-      _failOnTrimmedStringLength = ingestionConfig.isFailOnTrimmedStringLength();
-    } else {
-      _failOnTrimmedStringLength = false;
     }
   }
 
   @Override
   public boolean isNoOp() {
-    return _stringColumnMaxLengthMap.isEmpty();
+    return _stringColumnToFieldSpecMap.isEmpty();
   }
 
   @Override
   public GenericRow transform(GenericRow record) {
-    for (Map.Entry<String, Integer> entry : _stringColumnMaxLengthMap.entrySet()) {
+    for (Map.Entry<String, FieldSpec> entry : _stringColumnToFieldSpecMap.entrySet()) {
       String stringColumn = entry.getKey();
-      int maxLength = entry.getValue();
       Object value = record.getValue(stringColumn);
       if (value instanceof String) {
         // Single-valued column
-        Pair<String, Boolean> result = sanitizeValue(stringColumn, (String) value, maxLength);
+        Pair<String, Boolean> result = sanitizeValue(stringColumn, (String) value, entry.getValue());
         record.putValue(stringColumn, result.getLeft());
         if (result.getRight()) {
           record.putValue(GenericRow.INCOMPLETE_RECORD_KEY, true);
@@ -81,7 +78,7 @@ public class SanitizationTransformer implements RecordTransformer {
         // Multi-valued column
         Object[] values = (Object[]) value;
         for (int i = 0; i < values.length; i++) {
-          Pair<String, Boolean> result = sanitizeValue(stringColumn, values[i].toString(), maxLength);
+          Pair<String, Boolean> result = sanitizeValue(stringColumn, values[i].toString(), entry.getValue());
           values[i] = result.getLeft();
           if (result.getRight()) {
             record.putValue(GenericRow.INCOMPLETE_RECORD_KEY, true);
@@ -92,26 +89,30 @@ public class SanitizationTransformer implements RecordTransformer {
     return record;
   }
 
-  private Pair<String, Boolean> sanitizeValue(String stringColumn, String value, int maxLength) {
-    String sanitizedValue = StringUtil.sanitizeStringValue(value, maxLength);
+  private Pair<String, Boolean> sanitizeValue(String stringColumn, String value, FieldSpec columnFieldSpec) {
+    String sanitizedValue = StringUtil.sanitizeStringValue(value, columnFieldSpec.getMaxLength());
     // NOTE: reference comparison
     // noinspection StringEquality
     if (sanitizedValue != value) {
-      if (!_failOnTrimmedStringLength) {
-        return Pair.of(sanitizedValue, true);
-      } else {
-        int index = value.indexOf(NULL_CHARACTER);
-        String errorMessage;
-        if (index < 0 || index > maxLength) {
-          errorMessage =
-              String.format("Throwing exception as value: %s for column %s exceeds configured max length %d.",
-                  value, stringColumn, maxLength);
-        } else {
-          errorMessage =
-              String.format("Throwing exception as value: %s for column %s contains null character.", value,
-                  stringColumn);
-        }
-        throw new IllegalStateException(errorMessage);
+      switch (columnFieldSpec.getMaxLengthExceedStrategy()) {
+        case TRIM_LENGTH:
+          return Pair.of(sanitizedValue, true);
+        case SUBSTITUTE_DEFAULT_VALUE:
+          return Pair.of(columnFieldSpec.getDefaultNullValueString(), true);
+        case FAIL_INGESTION:
+          int index = value.indexOf(NULL_CHARACTER);
+          if (index < 0) {
+            throw new IllegalStateException(
+                String.format("Throwing exception as value: %s for column %s exceeds configured max length %d.", value,
+                    stringColumn, columnFieldSpec.getMaxLength()));
+          } else {
+            throw new IllegalStateException(
+                String.format("Throwing exception as value: %s for column %s contains null character.", value,
+                    stringColumn));
+          }
+        default:
+          throw new IllegalStateException(
+              "Unsupported max length exceed strategy: " + columnFieldSpec.getMaxLengthExceedStrategy());
       }
     }
     return Pair.of(sanitizedValue, false);

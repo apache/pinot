@@ -66,9 +66,6 @@ public class IngestionConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Configs related to check time value for segment")
   private boolean _segmentTimeValueCheck = true;
 
-  @JsonPropertyDescription("Configs related to failing if string column length exceeds schema max length")
-  private boolean _failOnTrimmedStringLength = false;
-
   @Deprecated
   public IngestionConfig(@Nullable BatchIngestionConfig batchIngestionConfig,
       @Nullable StreamIngestionConfig streamIngestionConfig, @Nullable FilterConfig filterConfig,
@@ -196,13 +193,5 @@ public class IngestionConfig extends BaseJsonConfig {
 
   public void setSegmentTimeValueCheck(boolean segmentTimeValueCheck) {
     _segmentTimeValueCheck = segmentTimeValueCheck;
-  }
-
-  public boolean isFailOnTrimmedStringLength() {
-    return _failOnTrimmedStringLength;
-  }
-
-  public void setFailOnTrimmedStringLength(boolean failOnTrimmedStringLength) {
-    _failOnTrimmedStringLength = failOnTrimmedStringLength;
   }
 }

@@ -98,6 +98,10 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     }
   }
 
+  public enum MaxLengthExceedStrategy {
+    TRIM_LENGTH, FAIL_INGESTION, SUBSTITUTE_DEFAULT_VALUE
+  }
+
   protected String _name;
   protected DataType _dataType;
   protected boolean _isSingleValueField = true;
@@ -115,6 +119,9 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
 
   protected String _virtualColumnProvider;
 
+  // NOTE: This only applies to STRING column during {@link SanitizationTransformer}
+  protected MaxLengthExceedStrategy _maxLengthExceedStrategy = MaxLengthExceedStrategy.TRIM_LENGTH;
+
   // Default constructor required by JSON de-serializer. DO NOT REMOVE.
   public FieldSpec() {
   }
@@ -129,11 +136,18 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
 
   public FieldSpec(String name, DataType dataType, boolean isSingleValueField, int maxLength,
       @Nullable Object defaultNullValue) {
+    this(name, dataType, isSingleValueField, maxLength, defaultNullValue,
+        MaxLengthExceedStrategy.TRIM_LENGTH);
+  }
+
+  public FieldSpec(String name, DataType dataType, boolean isSingleValueField, int maxLength,
+      @Nullable Object defaultNullValue, MaxLengthExceedStrategy maxLengthExceedStrategy) {
     _name = name;
     _dataType = dataType;
     _isSingleValueField = isSingleValueField;
     _maxLength = maxLength;
     setDefaultNullValue(defaultNullValue);
+    _maxLengthExceedStrategy = maxLengthExceedStrategy;
   }
 
   public abstract FieldType getFieldType();
@@ -173,6 +187,15 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   // Required by JSON de-serializer. DO NOT REMOVE.
   public void setMaxLength(int maxLength) {
     _maxLength = maxLength;
+  }
+
+  public MaxLengthExceedStrategy getMaxLengthExceedStrategy() {
+    return _maxLengthExceedStrategy;
+  }
+
+  // Required by JSON de-serializer. DO NOT REMOVE.
+  public void setMaxLengthExceedStrategy(MaxLengthExceedStrategy maxLengthExceedStrategy) {
+    _maxLengthExceedStrategy = maxLengthExceedStrategy;
   }
 
   public String getVirtualColumnProvider() {
@@ -411,6 +434,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
         .isEqual(_isSingleValueField, that._isSingleValueField) && EqualityUtils
         .isEqual(getStringValue(_defaultNullValue), getStringValue(that._defaultNullValue)) && EqualityUtils
         .isEqual(_maxLength, that._maxLength) && EqualityUtils.isEqual(_transformFunction, that._transformFunction)
+        && EqualityUtils.isEqual(_maxLengthExceedStrategy, that._maxLengthExceedStrategy)
         && EqualityUtils.isEqual(_virtualColumnProvider, that._virtualColumnProvider)
         && EqualityUtils.isEqual(_notNull, that._notNull);
   }
@@ -422,6 +446,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     result = EqualityUtils.hashCodeOf(result, _isSingleValueField);
     result = EqualityUtils.hashCodeOf(result, getStringValue(_defaultNullValue));
     result = EqualityUtils.hashCodeOf(result, _maxLength);
+    result = EqualityUtils.hashCodeOf(result, _maxLengthExceedStrategy);
     result = EqualityUtils.hashCodeOf(result, _transformFunction);
     result = EqualityUtils.hashCodeOf(result, _virtualColumnProvider);
     result = EqualityUtils.hashCodeOf(result, _notNull);

@@ -260,9 +260,10 @@ public class RecordTransformerTest {
   }
 
   @Test
-  public void testSanitationTransformer() {
-    // scenario with no failure required in case of trimmed string
-    RecordTransformer transformer = new SanitizationTransformer(TABLE_CONFIG, SCHEMA);
+  public void testSanitizationTransformer() {
+    // scenario where string contains null and exceeds max length
+    // and fieldspec maxLengthExceedtrategy is default (TRIM_LENGTH)
+    RecordTransformer transformer = new SanitizationTransformer(SCHEMA);
     GenericRow record = getRecord();
     for (int i = 0; i < NUM_ROUNDS; i++) {
       record = transformer.transform(record);
@@ -276,12 +277,11 @@ public class RecordTransformerTest {
       assertTrue(record.getFieldToValueMap().containsKey(GenericRow.INCOMPLETE_RECORD_KEY));
     }
 
-    // scenario where string contains null
-    IngestionConfig ingestionConfig = new IngestionConfig();
-    ingestionConfig.setFailOnTrimmedStringLength(true);
-    TableConfig tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setIngestionConfig(ingestionConfig).build();
-    transformer = new SanitizationTransformer(tableConfig, SCHEMA);
+    // scenario where string contains null and fieldspec maxLengthExceedtrategy is to FAIL_INGESTION
+    Schema schema = SCHEMA;
+    schema.getFieldSpecFor("svStringWithNullCharacters")
+        .setMaxLengthExceedStrategy(FieldSpec.MaxLengthExceedStrategy.FAIL_INGESTION);
+    transformer = new SanitizationTransformer(schema);
     record = getRecord();
     for (int i = 0; i < NUM_ROUNDS; i++) {
       try {
@@ -293,16 +293,25 @@ public class RecordTransformerTest {
       }
     }
 
-    // scenario where string length exceeds max length
-    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("svInt", DataType.INT)
-        .addSingleValueDimension("svDouble", DataType.DOUBLE)
-        .addSingleValueDimension("svStringWithLengthLimit", DataType.STRING).build();
-    schema.getFieldSpecFor("svStringWithLengthLimit").setMaxLength(2);
-    transformer = new SanitizationTransformer(tableConfig, schema);
-    record = new GenericRow();
-    record.putValue("svInt", (byte) 123);
-    record.putValue("svLong", (char) 123);
-    record.putValue("svStringWithLengthLimit", "123");
+    // scenario where string contains null and fieldspec maxLengthExceedtrategy is to SUBSTITUTE_DEFAULT_VALUE
+    schema = SCHEMA;
+    schema.getFieldSpecFor("svStringWithNullCharacters")
+        .setMaxLengthExceedStrategy(FieldSpec.MaxLengthExceedStrategy.SUBSTITUTE_DEFAULT_VALUE);
+    transformer = new SanitizationTransformer(schema);
+    record = getRecord();
+    for (int i = 0; i < NUM_ROUNDS; i++) {
+      record = transformer.transform(record);
+      assertNotNull(record);
+      assertEquals(record.getValue("svStringWithNullCharacters"), "null");
+      assertTrue(record.getFieldToValueMap().containsKey(GenericRow.INCOMPLETE_RECORD_KEY));
+    }
+
+    // scenario where string exceeds max length and fieldspec maxLengthExceedtrategy is to FAIL_INGESTION
+    schema = SCHEMA;
+    schema.getFieldSpecFor("svStringWithLengthLimit")
+        .setMaxLengthExceedStrategy(FieldSpec.MaxLengthExceedStrategy.FAIL_INGESTION);
+    transformer = new SanitizationTransformer(schema);
+    record = getRecord();
     for (int i = 0; i < NUM_ROUNDS; i++) {
       try {
         record = transformer.transform(record);
@@ -311,6 +320,19 @@ public class RecordTransformerTest {
         assertEquals(e.getMessage(), "Throwing exception as value: 123 for column svStringWithLengthLimit "
             + "exceeds configured max length 2.");
       }
+    }
+
+    // scenario where string exceeds max length and fieldspec maxLengthExceedtrategy is to SUBSTITUTE_DEFAULT_VALUE
+    schema = SCHEMA;
+    schema.getFieldSpecFor("svStringWithLengthLimit")
+        .setMaxLengthExceedStrategy(FieldSpec.MaxLengthExceedStrategy.SUBSTITUTE_DEFAULT_VALUE);
+    transformer = new SanitizationTransformer(schema);
+    record = getRecord();
+    for (int i = 0; i < NUM_ROUNDS; i++) {
+      record = transformer.transform(record);
+      assertNotNull(record);
+      assertEquals(record.getValue("svStringWithLengthLimit"), "null");
+      assertTrue(record.getFieldToValueMap().containsKey(GenericRow.INCOMPLETE_RECORD_KEY));
     }
   }
 
@@ -370,7 +392,7 @@ public class RecordTransformerTest {
         List.of(new ExpressionTransformer(tableConfig, schema), new FilterTransformer(tableConfig),
             new SchemaConformingTransformer(tableConfig, schema), new DataTypeTransformer(tableConfig, schema),
             new TimeValidationTransformer(tableConfig, schema), new SpecialValueTransformer(schema),
-            new NullValueTransformer(tableConfig, schema), new SanitizationTransformer(tableConfig, schema));
+            new NullValueTransformer(tableConfig, schema), new SanitizationTransformer(schema));
 
     // Check that the number of current transformers match the expected number of transformers.
     assertEquals(currentListOfTransformers.size(), NUMBER_OF_TRANSFORMERS);
