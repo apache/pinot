@@ -53,6 +53,8 @@ public enum ServerTimer implements AbstractMetrics.Timer {
       "Total time taken to preload a table partition of an upsert table with upsert snapshot"),
   UPSERT_REMOVE_EXPIRED_PRIMARY_KEYS_TIME_MS("milliseconds", false,
       "Total time taken to delete expired primary keys based on metadataTTL or deletedKeysTTL"),
+  GRPC_QUERY_EXECUTION_MS("milliseconds", true, "Total execution time of a successful query over gRPC"),
+  GRPC_FAILED_QUERY_EXECUTION_MS("milliseconds", true, "Total execution time of a failing query over gRPC"),
   UPSERT_SNAPSHOT_TIME_MS("milliseconds", false, "Total time taken to take upsert table snapshot");
 
   private final String _timerName;

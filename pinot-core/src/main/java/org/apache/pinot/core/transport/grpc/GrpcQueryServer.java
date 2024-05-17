@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.core.transport.grpc;
 
+import io.grpc.Attributes;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
+import io.grpc.ServerTransportFilter;
 import io.grpc.Status;
 import io.grpc.netty.shaded.io.grpc.netty.GrpcSslContexts;
 import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder;
@@ -33,12 +35,14 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import nl.altindag.ssl.SSLFactory;
 import org.apache.pinot.common.config.GrpcConfig;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.common.proto.PinotQueryServerGrpc;
 import org.apache.pinot.common.proto.Server.ServerRequest;
 import org.apache.pinot.common.proto.Server.ServerResponse;
@@ -72,6 +76,20 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
   private final AccessControl _accessControl;
   private final ServerQueryLogger _queryLogger = ServerQueryLogger.getInstance();
 
+  // Filter to keep track of gRPC connections.
+  private class GrpcQueryTransportFilter extends ServerTransportFilter {
+    @Override
+    public Attributes transportReady(Attributes transportAttrs) {
+      _serverMetrics.addMeteredGlobalValue(ServerMeter.GRPC_TRANSPORT_READY, 1);
+      return super.transportReady(transportAttrs);
+    }
+
+    @Override
+    public void transportTerminated(Attributes transportAttrs) {
+      _serverMetrics.addMeteredGlobalValue(ServerMeter.GRPC_TRANSPORT_TERMINATED, 1);
+    }
+  }
+
   public GrpcQueryServer(int port, GrpcConfig config, TlsConfig tlsConfig, QueryExecutor queryExecutor,
       ServerMetrics serverMetrics, AccessControl accessControl) {
     _queryExecutor = queryExecutor;
@@ -79,12 +97,13 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
     if (tlsConfig != null) {
       try {
         _server = NettyServerBuilder.forPort(port).sslContext(buildGRpcSslContext(tlsConfig))
-            .maxInboundMessageSize(config.getMaxInboundMessageSizeBytes()).addService(this).build();
+            .maxInboundMessageSize(config.getMaxInboundMessageSizeBytes()).addService(this)
+            .addTransportFilter(new GrpcQueryTransportFilter()).build();
       } catch (Exception e) {
         throw new RuntimeException("Failed to start secure grpcQueryServer", e);
       }
     } else {
-      _server = ServerBuilder.forPort(port).addService(this).build();
+      _server = ServerBuilder.forPort(port).addService(this).addTransportFilter(new GrpcQueryTransportFilter()).build();
     }
     _accessControl = accessControl;
     LOGGER.info("Initialized GrpcQueryServer on port: {} with numWorkerThreads: {}", port,
@@ -136,6 +155,7 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
 
   @Override
   public void submit(ServerRequest request, StreamObserver<ServerResponse> responseObserver) {
+    long startTime = System.nanoTime();
     _serverMetrics.addMeteredGlobalValue(ServerMeter.GRPC_QUERIES, 1);
     _serverMetrics.addMeteredGlobalValue(ServerMeter.GRPC_BYTES_RECEIVED, request.getSerializedSize());
 
@@ -147,6 +167,8 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
       LOGGER.error("Caught exception while deserializing the request: {}", request, e);
       _serverMetrics.addMeteredGlobalValue(ServerMeter.REQUEST_DESERIALIZATION_EXCEPTIONS, 1);
       responseObserver.onError(Status.INVALID_ARGUMENT.withDescription("Bad request").withCause(e).asException());
+      _serverMetrics.addTimedValue(ServerTimer.GRPC_FAILED_QUERY_EXECUTION_MS, System.nanoTime() - startTime,
+          TimeUnit.NANOSECONDS);
       return;
     }
 
@@ -162,18 +184,23 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
       _serverMetrics.addMeteredGlobalValue(ServerMeter.NO_TABLE_ACCESS, 1);
       responseObserver.onError(
           Status.NOT_FOUND.withDescription(exceptionMsg).withCause(unsupportedOperationException).asException());
+      _serverMetrics.addTimedValue(ServerTimer.GRPC_FAILED_QUERY_EXECUTION_MS, System.nanoTime() - startTime,
+          TimeUnit.NANOSECONDS);
+      return;
     }
 
     // Process the query
     InstanceResponseBlock instanceResponse;
     try {
-      instanceResponse =
-          _queryExecutor.execute(queryRequest, _executorService, new GrpcResultsBlockStreamer(responseObserver));
+      instanceResponse = _queryExecutor.execute(queryRequest, _executorService,
+          new GrpcResultsBlockStreamer(responseObserver, _serverMetrics));
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing request {}: {} from broker: {}", queryRequest.getRequestId(),
           queryRequest.getQueryContext(), queryRequest.getBrokerId(), e);
       _serverMetrics.addMeteredGlobalValue(ServerMeter.UNCAUGHT_EXCEPTIONS, 1);
       responseObserver.onError(Status.INTERNAL.withCause(e).asException());
+      _serverMetrics.addTimedValue(ServerTimer.GRPC_FAILED_QUERY_EXECUTION_MS, System.nanoTime() - startTime,
+          TimeUnit.NANOSECONDS);
       return;
     }
 
@@ -187,11 +214,15 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
           queryRequest.getRequestId(), queryRequest.getQueryContext(), queryRequest.getBrokerId(), e);
       _serverMetrics.addMeteredGlobalValue(ServerMeter.RESPONSE_SERIALIZATION_EXCEPTIONS, 1);
       responseObserver.onError(Status.INTERNAL.withCause(e).asException());
+      _serverMetrics.addTimedValue(ServerTimer.GRPC_FAILED_QUERY_EXECUTION_MS, System.nanoTime() - startTime,
+          TimeUnit.NANOSECONDS);
       return;
     }
     responseObserver.onNext(serverResponse);
     _serverMetrics.addMeteredGlobalValue(ServerMeter.GRPC_BYTES_SENT, serverResponse.getSerializedSize());
     responseObserver.onCompleted();
+    _serverMetrics.addTimedValue(ServerTimer.GRPC_QUERY_EXECUTION_MS, System.nanoTime() - startTime,
+        TimeUnit.NANOSECONDS);
 
     // Log the query
     if (_queryLogger != null) {
