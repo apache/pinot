@@ -19,7 +19,7 @@
 
   <profiles>
     <profile>
-      <id>jdk22</id>
+      <id>jdk-greater-than-21</id>
       <activation>
         <jdk>[22,)</jdk>
       </activation>
@@ -31,7 +31,7 @@
               <artifactId>maven-compiler-plugin</artifactId>
               <executions>
                 <execution>
-                  <id>jdk22</id>
+                  <id>jdk-greater-than-21</id>
                   <goals>
                     <goal>compile</goal>
                     <goal>testCompile</goal>
