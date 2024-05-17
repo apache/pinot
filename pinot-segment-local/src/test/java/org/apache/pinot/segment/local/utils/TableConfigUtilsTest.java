@@ -2074,6 +2074,20 @@ public class TableConfigUtilsTest {
       Assert.assertTrue(e.getMessage().contains("contains an invalid cron schedule"));
     }
 
+    // invalid allowDownloadFromServer config
+    HashMap<String, String> invalidAllowDownloadFromServerConfig = new HashMap<>(segmentGenerationAndPushTaskConfig);
+    invalidAllowDownloadFromServerConfig.put("allowDownloadFromServer", "true");
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTaskConfig(new TableTaskConfig(
+        ImmutableMap.of("RealtimeToOfflineSegmentsTask", realtimeToOfflineTaskConfig, "SegmentGenerationAndPushTask",
+            invalidAllowDownloadFromServerConfig))).build();
+    try {
+      TableConfigUtils.validateTaskConfigs(tableConfig, schema);
+      Assert.fail();
+    } catch (IllegalStateException e) {
+      Assert.assertTrue(e.getMessage().contains("allowDownloadFromServer set to true, but "
+          + "peerSegmentDownloadScheme is not set in the table config"));
+    }
+
     // invalid Upsert config with RealtimeToOfflineTask
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setTimeColumnName(TIME_COLUMN)
         .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL)).setStreamConfigs(getStreamConfigs()).setTaskConfig(

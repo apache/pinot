@@ -147,7 +147,6 @@ public abstract class BaseTaskGenerator implements PinotTaskGenerator {
   }
 
   public List<URI> getSegmentServerURIs(TableConfig tableConfig, String segmentName) {
-    // TODO add validation check if allowDownloadFromServer is enabled then peer segment download scheme should be set
     String peerDownloadScheme = tableConfig.getValidationConfig().getPeerSegmentDownloadScheme();
     List<URI> segmentServerURIs = PeerServerSegmentFinder.getPeerServerURIs(
         _clusterInfoAccessor.getPinotHelixResourceManager().getHelixZkManager(),

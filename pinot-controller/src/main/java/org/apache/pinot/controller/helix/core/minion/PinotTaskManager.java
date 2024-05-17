@@ -88,8 +88,6 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
   public final static String LEAD_CONTROLLER_MANAGER_KEY = "LeadControllerManager";
   public final static String SCHEDULE_KEY = "schedule";
   public final static String MINION_INSTANCE_TAG_CONFIG = "minionInstanceTag";
-  public final static String MINION_ALLOW_DOWNLOAD_FROM_SERVER = "allowDownloadFromServer";
-  public final static boolean DEFAULT_MINION_ALLOW_DOWNLOAD_FROM_SERVER = false;
 
   private static final String TABLE_CONFIG_PARENT_PATH = "/CONFIGS/TABLE";
   private static final String TABLE_CONFIG_PATH_PREFIX = "/CONFIGS/TABLE/";

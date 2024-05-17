@@ -38,14 +38,12 @@ import org.apache.http.Header;
 import org.apache.http.NameValuePair;
 import org.apache.http.message.BasicHeader;
 import org.apache.http.message.BasicNameValuePair;
-import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import org.apache.pinot.common.metrics.MinionMeter;
 import org.apache.pinot.common.restlet.resources.StartReplaceSegmentsRequest;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
-import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.minion.MinionConf;
@@ -204,8 +202,15 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
         _eventObserver.notifyProgress(_pinotTaskConfig, String
             .format("Downloading segment from: %s (%d out of %d)", downloadURLs[i], (i + 1), downloadURLs.length));
         File tarredSegmentFile = new File(tempDataDir, "tarredSegmentFile_" + i);
-        downloadSegmentToLocal(tableNameWithType, segmentName, downloadURLs[i],
-            MinionTaskUtils.getSegmentServerUrisList(configs), tarredSegmentFile, crypterName);
+        try {
+          downloadSegmentToLocal(tableNameWithType, segmentName, downloadURLs[i],
+              MinionTaskUtils.getSegmentServerUrisList(configs), tarredSegmentFile, crypterName);
+        } catch (Exception e) {
+          LOGGER.error("Failed to download segment from download url: {}", downloadURLs[i], e);
+          _minionMetrics.addMeteredTableValue(tableNameWithType, MinionMeter.SEGMENT_DOWNLOAD_FAIL_COUNT, 1L);
+          _eventObserver.notifyTaskError(_pinotTaskConfig, e);
+          throw e;
+        }
 
         // Un-tar the segment file
         _eventObserver.notifyProgress(_pinotTaskConfig, String
@@ -382,35 +387,6 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
         break;
       default:
         throw new UnsupportedOperationException("Unrecognized push mode - " + pushMode);
-    }
-  }
-
-  private void downloadSegmentToLocal(String tableNameWithType, String segmentName, String deepstoreURL,
-      Map<String, List<String>> segmentServiceUrisList, File tarredSegmentFile, String crypterName) {
-    LOGGER.info("Downloading segment from {} to {}", deepstoreURL, tarredSegmentFile.getAbsolutePath());
-    try {
-      // download from deepstore first
-      SegmentFetcherFactory.fetchAndDecryptSegmentToLocal(deepstoreURL, tarredSegmentFile, crypterName);
-    } catch (Exception e) {
-      _minionMetrics.addMeteredTableValue(tableNameWithType, MinionMeter.SEGMENT_DOWNLOAD_FAIL_COUNT, 1L);
-      LOGGER.error("Segment download failed from deepstore for {}, crypter:{}", deepstoreURL, crypterName, e);
-      if (!segmentServiceUrisList.isEmpty()) {
-        try {
-          LOGGER.info("Trying to download form servers for segment {} post deepstore download failed", segmentName);
-          SegmentFetcherFactory.getSegmentFetcher(
-                  getTableConfig(tableNameWithType).getValidationConfig().getPeerSegmentDownloadScheme())
-              .fetchSegmentToLocal(segmentName, () ->
-                      segmentServiceUrisList.get(segmentName).stream().map(URI::create).collect(Collectors.toList()),
-                  tarredSegmentFile);
-        } catch (Exception c) {
-          LOGGER.error("Segment download failed from servers for {}, crypter:{}", segmentName, crypterName, e);
-          _eventObserver.notifyTaskError(_pinotTaskConfig, c);
-          Utils.rethrowException(c);
-        }
-      } else {
-        _eventObserver.notifyTaskError(_pinotTaskConfig, e);
-        Utils.rethrowException(e);
-      }
     }
   }
 

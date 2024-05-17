@@ -22,10 +22,10 @@ import java.util.List;
 import java.util.Map;
 import org.apache.helix.task.JobConfig;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
-import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
@@ -100,6 +100,6 @@ public interface PinotTaskGenerator {
    * @return true or false based on config present or not. Default false.
    */
   default boolean isAllowDownloadFromServer(TableConfig tableConfig) {
-    return PinotTaskManager.DEFAULT_MINION_ALLOW_DOWNLOAD_FROM_SERVER;
+    return TableTaskConfig.DEFAULT_MINION_ALLOW_DOWNLOAD_FROM_SERVER;
   }
 }

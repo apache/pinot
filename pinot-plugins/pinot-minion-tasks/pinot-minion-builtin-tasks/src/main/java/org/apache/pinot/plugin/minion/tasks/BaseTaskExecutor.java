@@ -20,20 +20,28 @@ package org.apache.pinot.plugin.minion.tasks;
 
 import com.google.common.base.Preconditions;
 import java.io.File;
+import java.net.URI;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import org.apache.pinot.common.metrics.MinionMeter;
 import org.apache.pinot.common.metrics.MinionMetrics;
+import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.minion.MinionContext;
 import org.apache.pinot.minion.executor.PinotTaskExecutor;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public abstract class BaseTaskExecutor implements PinotTaskExecutor {
+  protected static final Logger LOGGER = LoggerFactory.getLogger(BaseTaskExecutor.class);
   protected static final MinionContext MINION_CONTEXT = MinionContext.getInstance();
 
   protected boolean _cancelled = false;
@@ -100,5 +108,27 @@ public abstract class BaseTaskExecutor implements PinotTaskExecutor {
     _minionMetrics.addMeteredGlobalValue(meter, unitCount);
     _minionMetrics.addMeteredTableValue(tableName, meter, unitCount);
     _minionMetrics.addMeteredTableValue(tableName, taskType, meter, unitCount);
+  }
+
+  protected void downloadSegmentToLocal(String tableNameWithType, String segmentName, String deepstoreURL,
+      Map<String, List<String>> segmentServiceUrisList, File tarredSegmentFile, String crypterName)
+      throws Exception {
+    LOGGER.info("Downloading segment from {} to {}", deepstoreURL, tarredSegmentFile.getAbsolutePath());
+    try {
+      // download from deepstore first
+      SegmentFetcherFactory.fetchAndDecryptSegmentToLocal(deepstoreURL, tarredSegmentFile, crypterName);
+    } catch (Exception e) {
+      LOGGER.error("Segment download failed from deepstore for {}, crypter:{}", deepstoreURL, crypterName, e);
+      if (!segmentServiceUrisList.isEmpty()) {
+        LOGGER.info("Trying to download form servers for segment {} post deepstore download failed", segmentName);
+        SegmentFetcherFactory.getSegmentFetcher(
+                getTableConfig(tableNameWithType).getValidationConfig().getPeerSegmentDownloadScheme())
+            .fetchSegmentToLocal(segmentName, () ->
+                    segmentServiceUrisList.get(segmentName).stream().map(URI::create).collect(Collectors.toList()),
+                tarredSegmentFile);
+      } else {
+        throw e;
+      }
+    }
   }
 }

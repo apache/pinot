@@ -134,10 +134,10 @@ public class TaskGeneratorUtils {
     if (tableTaskConfig != null) {
       Map<String, String> configs = tableTaskConfig.getConfigsForTaskType(taskType);
       if (configs != null && !configs.isEmpty()) {
-        return Boolean.parseBoolean(configs.getOrDefault(PinotTaskManager.MINION_ALLOW_DOWNLOAD_FROM_SERVER,
-            String.valueOf(PinotTaskManager.DEFAULT_MINION_ALLOW_DOWNLOAD_FROM_SERVER)));
+        return Boolean.parseBoolean(configs.getOrDefault(TableTaskConfig.MINION_ALLOW_DOWNLOAD_FROM_SERVER,
+            String.valueOf(TableTaskConfig.DEFAULT_MINION_ALLOW_DOWNLOAD_FROM_SERVER)));
       }
     }
-    return PinotTaskManager.DEFAULT_MINION_ALLOW_DOWNLOAD_FROM_SERVER;
+    return TableTaskConfig.DEFAULT_MINION_ALLOW_DOWNLOAD_FROM_SERVER;
   }
 }

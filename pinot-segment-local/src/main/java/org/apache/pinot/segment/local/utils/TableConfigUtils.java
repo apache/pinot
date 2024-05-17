@@ -652,6 +652,15 @@ public final class TableConfigUtils {
                 String.format("Task %s contains an invalid cron schedule: %s", taskTypeConfigName, cronExprStr), e);
           }
         }
+        boolean isAllowDownloadFromServer =
+              Boolean.parseBoolean(taskTypeConfig.getOrDefault(TableTaskConfig.MINION_ALLOW_DOWNLOAD_FROM_SERVER,
+                  String.valueOf(TableTaskConfig.DEFAULT_MINION_ALLOW_DOWNLOAD_FROM_SERVER)));
+        if (isAllowDownloadFromServer) {
+          Preconditions.checkState(tableConfig.getValidationConfig().getPeerSegmentDownloadScheme() != null,
+              String.format("Table %s has task %s with allowDownloadFromServer set to true, but "
+                  + "peerSegmentDownloadScheme is not set in the table config", tableConfig.getTableName(),
+                  taskTypeConfigName));
+        }
         // Task Specific validation for REALTIME_TO_OFFLINE_TASK_TYPE
         // TODO task specific validate logic should directly call to PinotTaskGenerator API
         if (taskTypeConfigName.equals(REALTIME_TO_OFFLINE_TASK_TYPE)) {
