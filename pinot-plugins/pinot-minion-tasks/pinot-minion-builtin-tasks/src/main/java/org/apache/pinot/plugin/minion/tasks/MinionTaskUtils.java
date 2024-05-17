@@ -31,6 +31,8 @@ import org.apache.pinot.common.utils.config.InstanceUtils;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
 import org.apache.pinot.controller.util.ServerSegmentMetadataReader;
 import org.apache.pinot.minion.MinionContext;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.LocalPinotFS;
 import org.apache.pinot.spi.filesystem.PinotFS;
@@ -184,5 +186,20 @@ public class MinionTaskUtils {
       throw new IllegalStateException("Failed to find any ONLINE servers for segment: " + segmentName);
     }
     return servers;
+  }
+
+  /**
+   * Extract allowDownloadFromServer config from table task config
+   */
+  public static boolean extractMinionAllowDownloadFromServer(TableConfig tableConfig, String taskType) {
+    TableTaskConfig tableTaskConfig = tableConfig.getTaskConfig();
+    if (tableTaskConfig != null) {
+      Map<String, String> configs = tableTaskConfig.getConfigsForTaskType(taskType);
+      if (configs != null && !configs.isEmpty()) {
+        return Boolean.parseBoolean(configs.getOrDefault(TableTaskConfig.MINION_ALLOW_DOWNLOAD_FROM_SERVER,
+            String.valueOf(TableTaskConfig.DEFAULT_MINION_ALLOW_DOWNLOAD_FROM_SERVER)));
+      }
+    }
+    return TableTaskConfig.DEFAULT_MINION_ALLOW_DOWNLOAD_FROM_SERVER;
   }
 }

@@ -189,9 +189,8 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
           LOGGER.warn("Skipping segment {} for task {} as download url is empty", segment.getSegmentName(), taskType);
           continue;
         }
-        Map<String, String> configs = new HashMap<>();
-        configs.put(MinionConstants.TABLE_NAME_KEY, tableNameWithType);
-        configs.put(MinionConstants.SEGMENT_NAME_KEY, segment.getSegmentName());
+        Map<String, String> configs = new HashMap<>(getBaseTaskConfigs(tableConfig,
+            List.of(segment.getSegmentName())));
         configs.put(MinionConstants.DOWNLOAD_URL_KEY, segment.getDownloadUrl());
         configs.put(MinionConstants.UPLOAD_URL_KEY, _clusterInfoAccessor.getVipUrl() + "/segments");
         configs.put(MinionConstants.ORIGINAL_SEGMENT_CRC_KEY, String.valueOf(segment.getCrc()));

@@ -32,13 +32,11 @@ import org.apache.http.HttpHeaders;
 import org.apache.http.NameValuePair;
 import org.apache.http.message.BasicHeader;
 import org.apache.http.message.BasicNameValuePair;
-import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import org.apache.pinot.common.metrics.MinionMeter;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
-import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.minion.event.MinionEventObserver;
@@ -106,12 +104,12 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
       File tarredSegmentFile = new File(tempDataDir, "tarredSegment");
       LOGGER.info("Downloading segment from {} to {}", downloadURL, tarredSegmentFile.getAbsolutePath());
       try {
-        SegmentFetcherFactory.fetchAndDecryptSegmentToLocal(downloadURL, tarredSegmentFile, crypterName);
+        downloadSegmentToLocal(tableNameWithType, segmentName, downloadURL, taskType, tarredSegmentFile, crypterName);
       } catch (Exception e) {
+        LOGGER.error("Failed to download segment from download url: {}", downloadURL, e);
         _minionMetrics.addMeteredTableValue(tableNameWithType, MinionMeter.SEGMENT_DOWNLOAD_FAIL_COUNT, 1L);
-        LOGGER.error("Segment download failed for {}, crypter:{}", downloadURL, crypterName, e);
         _eventObserver.notifyTaskError(_pinotTaskConfig, e);
-        Utils.rethrowException(e);
+        throw e;
       }
 
       // Un-tar the segment file
