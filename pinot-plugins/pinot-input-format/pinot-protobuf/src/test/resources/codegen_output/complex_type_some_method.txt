@@ -1,0 +1,27 @@
+  public static Map<String, Object> decodeorg_apache_pinot_plugin_inputformat_protobuf_ComplexTypes_TestMessageMessage(org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage msg) {
+    Map<String, Object> msgMap = new HashMap<>();
+    Map<Object, Map<String, Object>> map2 = new HashMap<>();
+    for (Map.Entry<String, Map<String,org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage>> entry: msg.getComplexMapMap().entrySet()) {
+      map2.put(entry.getKey(), decodeorg_apache_pinot_plugin_inputformat_protobuf_ComplexTypes_TestMessage_NestedMessageMessage( (org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage) entry.getValue()));
+    }
+    msgMap.put("complex_map", map2);
+    if (msg.hasNullableDoubleField()) {
+      msgMap.put("nullable_double_field", msg.getNullableDoubleField());
+    }
+    List<Object> list3 = new ArrayList<>();
+    for (com.google.protobuf.ByteString row: msg.getRepeatedBytesList()) {
+      list3.add(row.toByteArray());
+    }
+    if (!list3.isEmpty()) {
+      msgMap.put("repeated_bytes", list3.toArray());
+    }
+    List<Object> list4 = new ArrayList<>();
+    for (org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage row: msg.getRepeatedNestedMessagesList()) {
+      list4.add(decodeorg_apache_pinot_plugin_inputformat_protobuf_ComplexTypes_TestMessage_NestedMessageMessage(row));
+    }
+    if (!list4.isEmpty()) {
+      msgMap.put("repeated_nested_messages", list4.toArray());
+    }
+    msgMap.put("string_field", msg.getStringField());
+    return msgMap;
+  }
