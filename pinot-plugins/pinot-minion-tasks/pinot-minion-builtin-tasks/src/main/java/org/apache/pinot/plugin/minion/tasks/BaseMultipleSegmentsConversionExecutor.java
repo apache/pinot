@@ -203,8 +203,8 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
             .format("Downloading segment from: %s (%d out of %d)", downloadURLs[i], (i + 1), downloadURLs.length));
         File tarredSegmentFile = new File(tempDataDir, "tarredSegmentFile_" + i);
         try {
-          downloadSegmentToLocal(tableNameWithType, segmentName, downloadURLs[i],
-              MinionTaskUtils.getSegmentServerUrisList(configs), tarredSegmentFile, crypterName);
+          downloadSegmentToLocal(tableNameWithType, segmentName, downloadURLs[i], taskType, tarredSegmentFile,
+              crypterName);
         } catch (Exception e) {
           LOGGER.error("Failed to download segment from download url: {}", downloadURLs[i], e);
           _minionMetrics.addMeteredTableValue(tableNameWithType, MinionMeter.SEGMENT_DOWNLOAD_FAIL_COUNT, 1L);

@@ -19,13 +19,16 @@
 package org.apache.pinot.plugin.minion.tasks;
 
 import java.net.URI;
+import java.util.Collections;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.common.MinionConstants;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableTaskConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.filesystem.LocalPinotFS;
 import org.apache.pinot.spi.filesystem.PinotFS;
-import org.testng.Assert;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -75,31 +78,31 @@ public class MinionTaskUtilsTest {
   }
 
   @Test
-  public void testGetSegmentServerUrisList() throws Exception {
-    // empty list test
+  public void testExtractMinionAllowDownloadFromServer() {
     Map<String, String> configs = new HashMap<>();
-    Map<String, List<String>> result = MinionTaskUtils.getSegmentServerUrisList(configs);
-    assertTrue(result.isEmpty());
+    TableTaskConfig tableTaskConfig = new TableTaskConfig(
+        Collections.singletonMap(MinionConstants.MergeRollupTask.TASK_TYPE, configs));
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("sampleTable")
+        .setTaskConfig(tableTaskConfig).build();
 
-    configs = new HashMap<>();
-    configs.put(MinionConstants.SEGMENT_SERVER_URIS_LIST_KEY, "{\"segment1\": [\"http://localhost:8080\", "
-        + "\"http://localhost:8081\"], \"segment2\": [\"http://localhost:8082\"]}");
-    result = MinionTaskUtils.getSegmentServerUrisList(configs);
-    assertEquals(2, result.size());
-    assertTrue(result.containsKey("segment1"));
-    assertTrue(result.containsKey("segment2"));
-    assertEquals(List.of("http://localhost:8080", "http://localhost:8081"), result.get("segment1"));
-    assertEquals(List.of("http://localhost:8082"), result.get("segment2"));
+    // Test when the configuration is not set, should return the default value which is false
+    assertFalse(MinionTaskUtils.extractMinionAllowDownloadFromServer(tableConfig,
+        MinionConstants.MergeRollupTask.TASK_TYPE));
 
-    // wrong json
-    try {
-      configs = new HashMap<>();
-      configs.put(MinionConstants.SEGMENT_SERVER_URIS_LIST_KEY, "{\"segment1\": [\"http://localhost:8080\", "
-          + "\"http://localhost:8081\"], \"segment2\": [\"http://localhost:8082\"]");
-      MinionTaskUtils.getSegmentServerUrisList(configs);
-      Assert.fail("Should have failed due to invalid json");
-    } catch (Exception e) {
-      // expected
-    }
+    // Test when the configuration is set to true
+    configs.put(TableTaskConfig.MINION_ALLOW_DOWNLOAD_FROM_SERVER, "true");
+    tableTaskConfig = new TableTaskConfig(Collections.singletonMap(MinionConstants.MergeRollupTask.TASK_TYPE, configs));
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("sampleTable")
+        .setTaskConfig(tableTaskConfig).build();
+    assertTrue(MinionTaskUtils.extractMinionAllowDownloadFromServer(tableConfig,
+        MinionConstants.MergeRollupTask.TASK_TYPE));
+
+    // Test when the configuration is set to false
+    configs.put(TableTaskConfig.MINION_ALLOW_DOWNLOAD_FROM_SERVER, "false");
+    tableTaskConfig = new TableTaskConfig(Collections.singletonMap(MinionConstants.MergeRollupTask.TASK_TYPE, configs));
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("sampleTable")
+        .setTaskConfig(tableTaskConfig).build();
+    assertFalse(MinionTaskUtils.extractMinionAllowDownloadFromServer(tableConfig,
+        MinionConstants.MergeRollupTask.TASK_TYPE));
   }
 }

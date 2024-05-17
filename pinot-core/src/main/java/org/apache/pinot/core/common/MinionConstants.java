@@ -28,7 +28,6 @@ public class MinionConstants {
   public static final String SEGMENT_NAME_KEY = "segmentName";
   public static final String DOWNLOAD_URL_KEY = "downloadURL";
   public static final String UPLOAD_URL_KEY = "uploadURL";
-  public static final String SEGMENT_SERVER_URIS_LIST_KEY = "segmentServerUrisList";
   public static final String DOT_SEPARATOR = ".";
   public static final String URL_SEPARATOR = ",";
   public static final String SEGMENT_NAME_SEPARATOR = ",";

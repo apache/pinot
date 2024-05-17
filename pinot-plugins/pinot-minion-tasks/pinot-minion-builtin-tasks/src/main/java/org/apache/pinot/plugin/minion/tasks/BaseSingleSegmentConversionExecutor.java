@@ -104,8 +104,7 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
       File tarredSegmentFile = new File(tempDataDir, "tarredSegment");
       LOGGER.info("Downloading segment from {} to {}", downloadURL, tarredSegmentFile.getAbsolutePath());
       try {
-        downloadSegmentToLocal(tableNameWithType, segmentName, downloadURL,
-            MinionTaskUtils.getSegmentServerUrisList(configs), tarredSegmentFile, crypterName);
+        downloadSegmentToLocal(tableNameWithType, segmentName, downloadURL, taskType, tarredSegmentFile, crypterName);
       } catch (Exception e) {
         LOGGER.error("Failed to download segment from download url: {}", downloadURL, e);
         _minionMetrics.addMeteredTableValue(tableNameWithType, MinionMeter.SEGMENT_DOWNLOAD_FAIL_COUNT, 1L);

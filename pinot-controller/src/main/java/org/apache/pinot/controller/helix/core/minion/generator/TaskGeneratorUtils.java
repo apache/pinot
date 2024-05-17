@@ -125,19 +125,4 @@ public class TaskGeneratorUtils {
     }
     return CommonConstants.Helix.UNTAGGED_MINION_INSTANCE;
   }
-
-  /**
-   * Extract allowDownloadFromServer config from table task config
-   */
-  public static boolean extractMinionAllowDownloadFromServer(TableConfig tableConfig, String taskType) {
-    TableTaskConfig tableTaskConfig = tableConfig.getTaskConfig();
-    if (tableTaskConfig != null) {
-      Map<String, String> configs = tableTaskConfig.getConfigsForTaskType(taskType);
-      if (configs != null && !configs.isEmpty()) {
-        return Boolean.parseBoolean(configs.getOrDefault(TableTaskConfig.MINION_ALLOW_DOWNLOAD_FROM_SERVER,
-            String.valueOf(TableTaskConfig.DEFAULT_MINION_ALLOW_DOWNLOAD_FROM_SERVER)));
-      }
-    }
-    return TableTaskConfig.DEFAULT_MINION_ALLOW_DOWNLOAD_FROM_SERVER;
-  }
 }

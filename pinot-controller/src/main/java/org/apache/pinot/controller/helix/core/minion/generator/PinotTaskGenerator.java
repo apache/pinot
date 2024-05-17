@@ -25,7 +25,6 @@ import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
@@ -92,14 +91,5 @@ public interface PinotTaskGenerator {
    */
   default String getMinionInstanceTag(TableConfig tableConfig) {
     return CommonConstants.Helix.UNTAGGED_MINION_INSTANCE;
-  }
-
-  /**
-   * Checks whether it is allowed to download segments from server. Default value to false.
-   * @param tableConfig config of the table
-   * @return true or false based on config present or not. Default false.
-   */
-  default boolean isAllowDownloadFromServer(TableConfig tableConfig) {
-    return TableTaskConfig.DEFAULT_MINION_ALLOW_DOWNLOAD_FROM_SERVER;
   }
 }

@@ -40,8 +40,6 @@ import org.testng.annotations.Test;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
 
@@ -127,29 +125,6 @@ public class TaskGeneratorUtilsTest {
         .setTaskConfig(tableTaskConfig).build();
     assertEquals(TaskGeneratorUtils.extractMinionInstanceTag(tableConfig,
         MinionConstants.MergeRollupTask.TASK_TYPE), CommonConstants.Helix.UNTAGGED_MINION_INSTANCE);
-  }
-
-  @Test
-  public void testExtractMinionAllowDownloadFromServer() {
-    Map<String, String> tableTaskConfigs = getDummyTaskConfig();
-    tableTaskConfigs.put(TableTaskConfig.MINION_ALLOW_DOWNLOAD_FROM_SERVER, "true");
-    TableTaskConfig tableTaskConfig =
-        new TableTaskConfig(Collections.singletonMap(MinionConstants.MergeRollupTask.TASK_TYPE, tableTaskConfigs));
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("sampleTable")
-        .setTaskConfig(tableTaskConfig).build();
-    boolean allowDownloadFromServer = TaskGeneratorUtils.extractMinionAllowDownloadFromServer(tableConfig,
-        MinionConstants.MergeRollupTask.TASK_TYPE);
-    assertTrue(allowDownloadFromServer);
-
-    // default value
-    tableTaskConfigs = getDummyTaskConfig();
-    tableTaskConfig =
-        new TableTaskConfig(Collections.singletonMap(MinionConstants.MergeRollupTask.TASK_TYPE, tableTaskConfigs));
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("sampleTable")
-        .setTaskConfig(tableTaskConfig).build();
-    allowDownloadFromServer = TaskGeneratorUtils.extractMinionAllowDownloadFromServer(tableConfig,
-        MinionConstants.MergeRollupTask.TASK_TYPE);
-    assertFalse(allowDownloadFromServer);
   }
 
   private Map<String, String> getDummyTaskConfig() {
