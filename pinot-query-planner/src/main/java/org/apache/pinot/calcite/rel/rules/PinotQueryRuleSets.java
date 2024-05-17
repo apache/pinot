@@ -129,6 +129,18 @@ public class PinotQueryRuleSets {
       // Expand all SEARCH nodes to simplified filter nodes. SEARCH nodes get created for queries with range
       // predicates, in-clauses, etc.
       PinotFilterExpandSearchRule.INSTANCE,
+      // TODO: Here we apply these two rules twice. This is because in some strange situations,
+      //  PinotFilterExpandSearchRule may generate tautologies (like 'a' = 'a') that are not just inefficient, but
+      //  they also produce failures if the tautology reaches the leaf stage.
+      //  We cannot trivially get rid of them using PinotEvaluateLiteralRule or CompileTimeFunctionsInvoker because
+      //  then we find the issue of trying to compare two strings when `=` only supports numbers in V1.
+      //  By applying FILTER_REDUCE_EXPRESSIONS again, we get rid of the tautologies (using Calcite semantics, which
+      //  may produce its own issues, but most of the times it works fine).
+      //  The problem with that is that FILTER_REDUCE_EXPRESSIONS may produce new SEARCH nodes.
+      //  So we apply PinotFilterExpandSearchRule again to expand them. Could this second expansion produce tautologies?
+      //  Yes, but that should only happen in very strange complex queries, so it is at least an improvement.
+      CoreRules.FILTER_REDUCE_EXPRESSIONS,
+      PinotFilterExpandSearchRule.INSTANCE,
       // add an extra exchange for sort
       PinotSortExchangeNodeInsertRule.INSTANCE,
       // copy exchanges down, this must be done after SortExchangeNodeInsertRule

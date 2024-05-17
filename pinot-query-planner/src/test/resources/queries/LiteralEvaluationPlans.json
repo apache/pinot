@@ -259,5 +259,49 @@
         "expectedException": ".*No match found for function signature nonExistFun.*"
       }
     ]
+  },
+  "literal_planning_cte_test": {
+    "comment": "Tests for CTEs in literal planning. The SQL parser cannot get rid of expressions that cross CTE, so this is useful to check that the expressions are simplified in the logical plan.",
+    "queries": [
+      {
+        "description": "Simple filter on constants is simplified",
+        "sql": "EXPLAIN PLAN FOR WITH CTE_B AS (SELECT 1692057600000 AS __ts FROM a GROUP BY __ts) SELECT 1692057600000 AS __ts FROM CTE_B WHERE __ts >= 1692057600000 GROUP BY __ts",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(__ts=[1692057600000:BIGINT])",
+          "\n  LogicalAggregate(group=[{0}])",
+          "\n    PinotLogicalExchange(distribution=[hash[0]])",
+          "\n      LogicalAggregate(group=[{0}])",
+          "\n        LogicalProject(__ts=[1692057600000:BIGINT])",
+          "\n          LogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "And filter on constants is simplified",
+        "sql": "EXPLAIN PLAN FOR WITH CTE_B AS (SELECT 1692057600000 AS __ts FROM a GROUP BY __ts) SELECT 1692057600000 AS __ts FROM CTE_B WHERE __ts >= 1692057600000 AND __ts < 1693267200000 GROUP BY __ts",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(__ts=[1692057600000:BIGINT])",
+          "\n  LogicalAggregate(group=[{0}])",
+          "\n    PinotLogicalExchange(distribution=[hash[0]])",
+          "\n      LogicalAggregate(group=[{0}])",
+          "\n        LogicalProject(__ts=[1692057600000:BIGINT])",
+          "\n          LogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Search + OR filter on constants is simplified",
+        "sql": "EXPLAIN PLAN FOR WITH tmp2 AS (SELECT CASE WHEN col2 = 'VAL1' THEN 'A' ELSE col2 END AS cased FROM a) SELECT 1 FROM tmp2 WHERE ((cased = 'B') OR (cased = 'A'))",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[1])",
+          "\n  LogicalFilter(condition=[SEARCH($1, Sarg[_UTF-8'A':VARCHAR CHARACTER SET \"UTF-8\", _UTF-8'B':VARCHAR CHARACTER SET \"UTF-8\", _UTF-8'VAL1':VARCHAR CHARACTER SET \"UTF-8\"]:VARCHAR CHARACTER SET \"UTF-8\")])",
+          "\n    LogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      }
+    ]
   }
 }
