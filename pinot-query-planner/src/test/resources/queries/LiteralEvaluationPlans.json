@@ -297,7 +297,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[1])",
-          "\n  LogicalFilter(condition=[SEARCH($1, Sarg[_UTF-8'A':VARCHAR CHARACTER SET \"UTF-8\", _UTF-8'B':VARCHAR CHARACTER SET \"UTF-8\", _UTF-8'VAL1':VARCHAR CHARACTER SET \"UTF-8\"]:VARCHAR CHARACTER SET \"UTF-8\")])",
+          "\n  LogicalFilter(condition=[OR(=($1, _UTF-8'A'), =($1, _UTF-8'B'), =($1, _UTF-8'VAL1'))])",
           "\n    LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
