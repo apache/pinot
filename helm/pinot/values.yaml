@@ -52,9 +52,10 @@ securityContext: {}
 probes:
   initialDelaySeconds: 60
   periodSeconds: 10
-  failureThreshold: 1
+  failureThreshold: 10
+  # should be 1 for liveness and startup probe
   successThreshold: 1
-  timeoutSeconds: 1
+  timeoutSeconds: 10
 
 serviceAccount:
   # Specifies whether a service account should be created
@@ -96,6 +97,20 @@ controller:
     livenessEnabled: false
     readinessEnabled: false
     startupEnabled: false
+    liveness:
+      initialDelaySeconds:
+      failureThreshold:
+      timeoutSeconds:
+
+    readiness:
+      initialDelaySeconds:
+      failureThreshold:
+      timeoutSeconds:
+
+    startup:
+      initialDelaySeconds:
+      failureThreshold:
+      timeoutSeconds:
 
   persistence:
     enabled: true
@@ -223,6 +238,20 @@ broker:
     livenessEnabled: true
     readinessEnabled: true
     startupEnabled: false
+    liveness:
+      initialDelaySeconds:
+      failureThreshold:
+      timeoutSeconds:
+
+    readiness:
+      initialDelaySeconds:
+      failureThreshold:
+      timeoutSeconds:
+
+    startup:
+      initialDelaySeconds:
+      failureThreshold:
+      timeoutSeconds:
 
   persistence:
     extraVolumes: []
@@ -326,6 +355,20 @@ server:
     livenessEnabled: false
     readinessEnabled: false
     startupEnabled: false
+    liveness:
+      initialDelaySeconds:
+      failureThreshold:
+      timeoutSeconds:
+
+    readiness:
+      initialDelaySeconds:
+      failureThreshold:
+      timeoutSeconds:
+
+    startup:
+      initialDelaySeconds:
+      failureThreshold:
+      timeoutSeconds:
 
   dataDir: /var/pinot/server/data/index
   segmentTarDir: /var/pinot/server/data/segment
@@ -426,6 +469,20 @@ minion:
     livenessEnabled: true
     readinessEnabled: true
     startupEnabled: false
+    liveness:
+      initialDelaySeconds:
+      failureThreshold:
+      timeoutSeconds:
+
+    readiness:
+      initialDelaySeconds:
+      failureThreshold:
+      timeoutSeconds:
+
+    startup:
+      initialDelaySeconds:
+      failureThreshold:
+      timeoutSeconds:
 
   dataDir: /var/pinot/minion/data
   jvmOpts: "-XX:ActiveProcessorCount=2 -Xms256M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-minion.log"
@@ -516,6 +573,21 @@ minionStateless:
     endpoint: "/health"
     livenessEnabled: true
     readinessEnabled: true
+    startupEnabled: true
+    liveness:
+      initialDelaySeconds:
+      failureThreshold:
+      timeoutSeconds:
+
+    readiness:
+      initialDelaySeconds:
+      failureThreshold:
+      timeoutSeconds:
+
+    startup:
+      initialDelaySeconds:
+      failureThreshold:
+      timeoutSeconds:
 
   dataDir: /var/pinot/minion/data
   jvmOpts: "-XX:ActiveProcessorCount=2 -Xms256M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-minion.log"
