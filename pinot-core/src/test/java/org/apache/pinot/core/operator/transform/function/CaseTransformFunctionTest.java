@@ -36,7 +36,6 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotEquals;
 
 
 public class CaseTransformFunctionTest extends BaseTransformFunctionTest {
@@ -107,41 +106,13 @@ public class CaseTransformFunctionTest extends BaseTransformFunctionTest {
       testCaseQueries(String.format("%s(%s, %s)", functionType.getName(), LONG_SV_COLUMN,
           String.format("%d", _longSVValues[INDEX_TO_COMPARE])), getPredicateResults(LONG_SV_COLUMN, functionType));
       testCaseQueries(String.format("%s(%s, %s)", functionType.getName(), FLOAT_SV_COLUMN,
-              "CAST(" + String.format("%f", _floatSVValues[INDEX_TO_COMPARE]) + " AS FLOAT)"),
-          getPredicateResults(FLOAT_SV_COLUMN, functionType));
+          String.format("%f", _floatSVValues[INDEX_TO_COMPARE])), getPredicateResults(FLOAT_SV_COLUMN, functionType));
       testCaseQueries(String.format("%s(%s, %s)", functionType.getName(), DOUBLE_SV_COLUMN,
               String.format("%.20f", _doubleSVValues[INDEX_TO_COMPARE])),
           getPredicateResults(DOUBLE_SV_COLUMN, functionType));
       testCaseQueries(String.format("%s(%s, %s)", functionType.getName(), STRING_SV_COLUMN,
               String.format("'%s'", _stringSVValues[INDEX_TO_COMPARE])),
           getPredicateResults(STRING_SV_COLUMN, functionType));
-    }
-  }
-
-  @Test
-  public void testCaseTransformFunctionWithoutCastForFloatValues() {
-    boolean[] predicateResults = new boolean[1];
-    Arrays.fill(predicateResults, true);
-    int[] expectedValues = new int[1];
-    int index = -1;
-    for (int i = 0; i < NUM_ROWS; i++) {
-      if (Double.compare(_floatSVValues[i], Double.parseDouble(String.format("%f", _floatSVValues[i]))) != 0) {
-        index = i;
-        expectedValues[0] = predicateResults[0] ? _intSVValues[i] : 10;
-        break;
-      }
-    }
-
-    if (index != -1) {
-      String predicate = String.format("%s(%s, %s)", TransformFunctionType.EQUALS, FLOAT_SV_COLUMN,
-          String.format("%f", _floatSVValues[index]));
-      String expression = String.format("CASE WHEN %s THEN %s ELSE 10 END", predicate, INT_SV_COLUMN);
-      ExpressionContext expressionContext = RequestContextUtils.getExpression(expression);
-      TransformFunction transformFunction = TransformFunctionFactory.get(expressionContext, _dataSourceMap);
-      Assert.assertTrue(transformFunction instanceof CaseTransformFunction);
-      assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.INT);
-      int[] intValues = transformFunction.transformToIntValuesSV(_projectionBlock);
-      assertNotEquals(intValues[index], expectedValues[0]);
     }
   }
 
