@@ -120,7 +120,7 @@ public abstract class BaseTaskExecutor implements PinotTaskExecutor {
     } catch (Exception e) {
       LOGGER.error("Segment download failed from deepstore for {}, crypter:{}", deepstoreURL, crypterName, e);
       if (!segmentServiceUrisList.isEmpty()) {
-        LOGGER.info("Trying to download form servers for segment {} post deepstore download failed", segmentName);
+        LOGGER.info("Trying to download from servers for segment {} post deepstore download failed", segmentName);
         SegmentFetcherFactory.getSegmentFetcher(
                 getTableConfig(tableNameWithType).getValidationConfig().getPeerSegmentDownloadScheme())
             .fetchSegmentToLocal(segmentName, () ->
