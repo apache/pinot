@@ -63,6 +63,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.PriorityQueue;
 import java.util.Set;
 import org.apache.datasketches.common.ArrayOfStringsSerDe;
 import org.apache.datasketches.cpc.CpcSketch;
@@ -75,6 +76,7 @@ import org.apache.datasketches.tuple.aninteger.IntegerSummary;
 import org.apache.datasketches.tuple.aninteger.IntegerSummaryDeserializer;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.utils.HashUtil;
+import org.apache.pinot.core.query.aggregation.function.funnel.FunnelStepEvent;
 import org.apache.pinot.core.query.aggregation.utils.exprminmax.ExprMinMaxObject;
 import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.apache.pinot.core.query.utils.idset.IdSet;
@@ -162,7 +164,8 @@ public class ObjectSerDeUtils {
     ThetaSketchAccumulator(47),
     TupleIntSketchAccumulator(48),
     CpcSketchAccumulator(49),
-    OrderedStringSet(50);
+    OrderedStringSet(50),
+    FunnelStepEventAccumulator(51);
 
     private final int _value;
 
@@ -294,6 +297,13 @@ public class ObjectSerDeUtils {
         return ObjectType.TupleIntSketchAccumulator;
       } else if (value instanceof CpcSketchAccumulator) {
         return ObjectType.CpcSketchAccumulator;
+      } else if (value instanceof PriorityQueue) {
+        PriorityQueue priorityQueue = (PriorityQueue) value;
+        if (priorityQueue.isEmpty() || priorityQueue.peek() instanceof FunnelStepEvent) {
+          return ObjectType.FunnelStepEventAccumulator;
+        }
+        throw new IllegalArgumentException(
+            "Unsupported type of value: " + priorityQueue.peek().getClass().getSimpleName());
       } else {
         throw new IllegalArgumentException("Unsupported type of value: " + value.getClass().getSimpleName());
       }
@@ -1690,47 +1700,81 @@ public class ObjectSerDeUtils {
   public static final ObjectSerDe<ObjectLinkedOpenHashSet<String>> ORDERED_STRING_SET_SER_DE =
       new ObjectSerDe<ObjectLinkedOpenHashSet<String>>() {
 
-    @Override
-    public byte[] serialize(ObjectLinkedOpenHashSet<String> stringSet) {
-      int size = stringSet.size();
-      // Besides the value bytes, we store: size, length for each value
-      long bufferSize = (1 + (long) size) * Integer.BYTES;
-      byte[][] valueBytesArray = new byte[size][];
-      int index = 0;
-      for (String value : stringSet) {
-        byte[] valueBytes = value.getBytes(UTF_8);
-        bufferSize += valueBytes.length;
-        valueBytesArray[index++] = valueBytes;
-      }
-      Preconditions.checkState(bufferSize <= Integer.MAX_VALUE, "Buffer size exceeds 2GB");
-      byte[] bytes = new byte[(int) bufferSize];
-      ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
-      byteBuffer.putInt(size);
-      for (byte[] valueBytes : valueBytesArray) {
-        byteBuffer.putInt(valueBytes.length);
-        byteBuffer.put(valueBytes);
-      }
-      return bytes;
-    }
+        @Override
+        public byte[] serialize(ObjectLinkedOpenHashSet<String> stringSet) {
+          int size = stringSet.size();
+          // Besides the value bytes, we store: size, length for each value
+          long bufferSize = (1 + (long) size) * Integer.BYTES;
+          byte[][] valueBytesArray = new byte[size][];
+          int index = 0;
+          for (String value : stringSet) {
+            byte[] valueBytes = value.getBytes(UTF_8);
+            bufferSize += valueBytes.length;
+            valueBytesArray[index++] = valueBytes;
+          }
+          Preconditions.checkState(bufferSize <= Integer.MAX_VALUE, "Buffer size exceeds 2GB");
+          byte[] bytes = new byte[(int) bufferSize];
+          ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
+          byteBuffer.putInt(size);
+          for (byte[] valueBytes : valueBytesArray) {
+            byteBuffer.putInt(valueBytes.length);
+            byteBuffer.put(valueBytes);
+          }
+          return bytes;
+        }
 
-    @Override
-    public ObjectLinkedOpenHashSet<String> deserialize(byte[] bytes) {
-      return deserialize(ByteBuffer.wrap(bytes));
-    }
+        @Override
+        public ObjectLinkedOpenHashSet<String> deserialize(byte[] bytes) {
+          return deserialize(ByteBuffer.wrap(bytes));
+        }
 
-    @Override
-    public ObjectLinkedOpenHashSet<String> deserialize(ByteBuffer byteBuffer) {
-      int size = byteBuffer.getInt();
-      ObjectLinkedOpenHashSet<String> stringSet = new ObjectLinkedOpenHashSet<>(size);
-      for (int i = 0; i < size; i++) {
-        int length = byteBuffer.getInt();
-        byte[] bytes = new byte[length];
-        byteBuffer.get(bytes);
-        stringSet.add(new String(bytes, UTF_8));
-      }
-      return stringSet;
-    }
-  };
+        @Override
+        public ObjectLinkedOpenHashSet<String> deserialize(ByteBuffer byteBuffer) {
+          int size = byteBuffer.getInt();
+          ObjectLinkedOpenHashSet<String> stringSet = new ObjectLinkedOpenHashSet<>(size);
+          for (int i = 0; i < size; i++) {
+            int length = byteBuffer.getInt();
+            byte[] bytes = new byte[length];
+            byteBuffer.get(bytes);
+            stringSet.add(new String(bytes, UTF_8));
+          }
+          return stringSet;
+        }
+      };
+
+  public static final ObjectSerDe<PriorityQueue<FunnelStepEvent>> FUNNEL_STEP_EVENT_ACCUMULATOR_SER_DE =
+      new ObjectSerDe<PriorityQueue<FunnelStepEvent>>() {
+
+        @Override
+        public byte[] serialize(PriorityQueue<FunnelStepEvent> funnelStepEvents) {
+          long bufferSize = Integer.BYTES + funnelStepEvents.size() * FunnelStepEvent.SIZE_IN_BYTES;
+          Preconditions.checkState(bufferSize <= Integer.MAX_VALUE, "Buffer size exceeds 2GB");
+          byte[] bytes = new byte[(int) bufferSize];
+          ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
+          byteBuffer.putInt(funnelStepEvents.size());
+          for (FunnelStepEvent funnelStepEvent : funnelStepEvents) {
+            byteBuffer.put(funnelStepEvent.getBytes());
+          }
+          return bytes;
+        }
+
+        @Override
+        public PriorityQueue<FunnelStepEvent> deserialize(byte[] bytes) {
+          return deserialize(ByteBuffer.wrap(bytes));
+        }
+
+        @Override
+        public PriorityQueue<FunnelStepEvent> deserialize(ByteBuffer byteBuffer) {
+          int size = byteBuffer.getInt();
+          PriorityQueue<FunnelStepEvent> funnelStepEvents = new PriorityQueue<>(size);
+          for (int i = 0; i < size; i++) {
+            byte[] bytes = new byte[FunnelStepEvent.SIZE_IN_BYTES];
+            byteBuffer.get(bytes);
+            funnelStepEvents.add(new FunnelStepEvent(bytes));
+          }
+          return funnelStepEvents;
+        }
+      };
 
   // NOTE: DO NOT change the order, it has to be the same order as the ObjectType
   //@formatter:off
@@ -1786,6 +1830,7 @@ public class ObjectSerDeUtils {
       DATA_SKETCH_INT_TUPLE_ACCUMULATOR_SER_DE,
       DATA_SKETCH_CPC_ACCUMULATOR_SER_DE,
       ORDERED_STRING_SET_SER_DE,
+      FUNNEL_STEP_EVENT_ACCUMULATOR_SER_DE,
   };
   //@formatter:on
 
