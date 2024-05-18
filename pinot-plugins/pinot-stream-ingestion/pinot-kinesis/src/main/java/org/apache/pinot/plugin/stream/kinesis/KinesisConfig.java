@@ -36,7 +36,7 @@ public class KinesisConfig {
   private static final Logger LOGGER = LoggerFactory.getLogger(KinesisConfig.class);
 
   public static final String STREAM_TYPE = "kinesis";
-  public static final String SHARD_ITERATOR_TYPE = "shardIteratorType";
+  public static final String INIT_SHARD_ITERATOR_TYPE = "initShardIteratorType";
   public static final String REGION = "region";
   public static final String ACCESS_KEY = "accessKey";
   public static final String SECRET_KEY = "secretKey";
@@ -67,7 +67,7 @@ public class KinesisConfig {
 
   // TODO: this is a starting point, until a better default is figured out
   public static final String DEFAULT_MAX_RECORDS = "20";
-  public static final String DEFAULT_SHARD_ITERATOR_TYPE = ShardIteratorType.LATEST.toString();
+  public static final String DEFAULT_INIT_SHARD_ITERATOR_TYPE = ShardIteratorType.TRIM_HORIZON.toString();
   public static final String DEFAULT_IAM_ROLE_BASED_ACCESS_ENABLED = "false";
   public static final String DEFAULT_SESSION_DURATION_SECONDS = "900";
   public static final String DEFAULT_ASYNC_SESSION_UPDATED_ENABLED = "true";
@@ -76,7 +76,7 @@ public class KinesisConfig {
   private final String _streamTopicName;
   private final String _awsRegion;
   private final int _numMaxRecordsToFetch;
-  private final ShardIteratorType _shardIteratorType;
+  private final ShardIteratorType _initShardIteratorType;
   private final String _accessKey;
   private final String _secretKey;
   private final String _endpoint;
@@ -106,8 +106,8 @@ public class KinesisConfig {
       _rpsLimit = Integer.parseInt(DEFAULT_RPS_LIMIT);
     }
 
-    _shardIteratorType =
-        ShardIteratorType.fromValue(props.getOrDefault(SHARD_ITERATOR_TYPE, DEFAULT_SHARD_ITERATOR_TYPE));
+    _initShardIteratorType =
+        ShardIteratorType.fromValue(props.getOrDefault(INIT_SHARD_ITERATOR_TYPE, DEFAULT_INIT_SHARD_ITERATOR_TYPE));
     _accessKey = props.get(ACCESS_KEY);
     _secretKey = props.get(SECRET_KEY);
     _endpoint = props.get(ENDPOINT);
@@ -148,8 +148,8 @@ public class KinesisConfig {
     return _rpsLimit;
   }
 
-  public ShardIteratorType getShardIteratorType() {
-    return _shardIteratorType;
+  public ShardIteratorType getInitShardIteratorType() {
+    return _initShardIteratorType;
   }
 
   public String getAccessKey() {
