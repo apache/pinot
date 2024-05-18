@@ -254,21 +254,6 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
           case NUM_CONSUMING_SEGMENTS_MATCHED:
             _statMap.merge(StatKey.NUM_CONSUMING_SEGMENTS_MATCHED, Integer.parseInt(entry.getValue()));
             break;
-          case NUM_BLOCKS:
-            _statMap.merge(StatKey.NUM_BLOCKS, Integer.parseInt(entry.getValue()));
-            break;
-          case NUM_ROWS:
-            _statMap.merge(StatKey.EMITTED_ROWS, Integer.parseInt(entry.getValue()));
-            break;
-          case OPERATOR_EXECUTION_TIME_MS:
-            _statMap.merge(StatKey.OPERATOR_EXECUTION_TIME_MS, Long.parseLong(entry.getValue()));
-            break;
-          case OPERATOR_EXEC_START_TIME_MS:
-            _statMap.merge(StatKey.OPERATOR_EXEC_START_TIME_MS, Long.parseLong(entry.getValue()));
-            break;
-          case OPERATOR_EXEC_END_TIME_MS:
-            _statMap.merge(StatKey.OPERATOR_EXEC_END_TIME_MS, Long.parseLong(entry.getValue()));
-            break;
           default: {
             throw new IllegalArgumentException("Unhandled V1 execution stat: " + entry.getKey());
           }
@@ -564,21 +549,25 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
       }
     },
     NUM_DOCS_SCANNED(StatMap.Type.LONG),
+    TOTAL_DOCS(StatMap.Type.LONG),
     NUM_ENTRIES_SCANNED_IN_FILTER(StatMap.Type.LONG),
     NUM_ENTRIES_SCANNED_POST_FILTER(StatMap.Type.LONG),
     NUM_SEGMENTS_QUERIED(StatMap.Type.INT),
     NUM_SEGMENTS_PROCESSED(StatMap.Type.INT),
     NUM_SEGMENTS_MATCHED(StatMap.Type.INT),
     NUM_CONSUMING_SEGMENTS_QUERIED(StatMap.Type.INT),
-    // the timestamp indicating the freshness of the data queried in consuming segments.
-    // This can be ingestion timestamp if provided by the stream, or the last index time
+    NUM_CONSUMING_SEGMENTS_PROCESSED(StatMap.Type.INT),
+    NUM_CONSUMING_SEGMENTS_MATCHED(StatMap.Type.INT),
     MIN_CONSUMING_FRESHNESS_TIME_MS(StatMap.Type.LONG) {
       @Override
       public long merge(long value1, long value2) {
         return StatMap.Key.minPositive(value1, value2);
       }
     },
-    TOTAL_DOCS(StatMap.Type.LONG),
+    NUM_SEGMENTS_PRUNED_BY_SERVER(StatMap.Type.INT),
+    NUM_SEGMENTS_PRUNED_INVALID(StatMap.Type.INT),
+    NUM_SEGMENTS_PRUNED_BY_LIMIT(StatMap.Type.INT),
+    NUM_SEGMENTS_PRUNED_BY_VALUE(StatMap.Type.INT),
     NUM_GROUPS_LIMIT_REACHED(StatMap.Type.BOOLEAN),
     NUM_RESIZES(StatMap.Type.INT, null),
     RESIZE_TIME_MS(StatMap.Type.LONG, null),
@@ -589,27 +578,8 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
       public String getStatName() {
         return "responseSerializationCpuTimeNs";
       }
-    },
-    NUM_SEGMENTS_PRUNED_BY_SERVER(StatMap.Type.INT),
-    NUM_SEGMENTS_PRUNED_INVALID(StatMap.Type.INT),
-    NUM_SEGMENTS_PRUNED_BY_LIMIT(StatMap.Type.INT),
-    NUM_SEGMENTS_PRUNED_BY_VALUE(StatMap.Type.INT),
-    NUM_CONSUMING_SEGMENTS_PROCESSED(StatMap.Type.INT),
-    NUM_CONSUMING_SEGMENTS_MATCHED(StatMap.Type.INT),
-    NUM_BLOCKS(StatMap.Type.INT, null),
-    OPERATOR_EXECUTION_TIME_MS(StatMap.Type.LONG, null),
-    OPERATOR_EXEC_START_TIME_MS(StatMap.Type.LONG, null) {
-      @Override
-      public long merge(long value1, long value2) {
-        return StatMap.Key.minPositive(value1, value2);
-      }
-    },
-    OPERATOR_EXEC_END_TIME_MS(StatMap.Type.LONG, null) {
-      @Override
-      public long merge(long value1, long value2) {
-        return Math.max(value1, value2);
-      }
-    },;
+    };
+
     private final StatMap.Type _type;
     @Nullable
     private final BrokerResponseNativeV2.StatKey _brokerKey;

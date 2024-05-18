@@ -25,14 +25,10 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 import org.apache.pinot.broker.api.RequesterIdentity;
-import org.apache.pinot.broker.requesthandler.BaseBrokerRequestHandler;
+import org.apache.pinot.broker.requesthandler.BaseSingleStageBrokerRequestHandler.ServerStats;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
-import org.apache.pinot.spi.trace.DefaultRequestContext;
-import org.apache.pinot.spi.trace.RequestContext;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.slf4j.Logger;
@@ -78,7 +74,8 @@ public class QueryLoggerTest {
   }
 
   @AfterMethod
-  public void tearDown() throws Exception {
+  public void tearDown()
+      throws Exception {
     _closeMocks.close();
   }
 
@@ -94,23 +91,25 @@ public class QueryLoggerTest {
 
     // Then:
     Assert.assertEquals(_infoLog.size(), 1);
+    //@formatter:off
     Assert.assertEquals(_infoLog.get(0), "requestId=123,"
         + "table=table,"
         + "timeMs=456,"
         + "docs=1/2,"
         + "entries=3/4,"
         + "segments(queried/processed/matched/consumingQueried/consumingProcessed/consumingMatched/unavailable)"
-        + ":5/6/7/8/9/10/24,"
+        + ":5/6/7/8/9/10/21,"
         + "consumingFreshnessTimeMs=11,"
         + "servers=12/13,"
         + "groupLimitReached=false,"
-        + "brokerReduceTimeMs=22,"
+        + "brokerReduceTimeMs=20,"
         + "exceptions=0,"
         + "serverStats=serverStats,"
-        + "offlineThreadCpuTimeNs(total/thread/sysActivity/resSer):14/15/16/17,"
-        + "realtimeThreadCpuTimeNs(total/thread/sysActivity/resSer):18/19/20/21,"
+        + "offlineThreadCpuTimeNs(total/thread/sysActivity/resSer):45/14/15/16,"
+        + "realtimeThreadCpuTimeNs(total/thread/sysActivity/resSer):54/17/18/19,"
         + "clientIp=ip,"
         + "query=SELECT * FROM foo");
+    //@formatter:on
   }
 
   @Test
@@ -125,8 +124,7 @@ public class QueryLoggerTest {
 
     // Then:
     Assert.assertEquals(_infoLog.size(), 1);
-    Assert.assertFalse(
-        _infoLog.get(0).contains("clientId"),
+    Assert.assertFalse(_infoLog.get(0).contains("clientId"),
         "did not expect to see clientId Logs. Got: " + _infoLog.get(0));
   }
 
@@ -191,8 +189,7 @@ public class QueryLoggerTest {
       throws InterruptedException {
     // Given:
     final CountDownLatch logLatch = new CountDownLatch(1);
-    Mockito.when(_logRateLimiter.tryAcquire())
-        .thenReturn(false)
+    Mockito.when(_logRateLimiter.tryAcquire()).thenReturn(false)
         .thenReturn(true)   // this one will block when it hits tryAcquire()
         .thenReturn(false)  // this one just increments the dropped logs
         .thenAnswer(invocation -> {
@@ -205,12 +202,11 @@ public class QueryLoggerTest {
     // ensure that the tryAcquire only succeeds after three other
     // logs have went through (see logAndDecrement)
     final CountDownLatch dropLogLatch = new CountDownLatch(3);
-    Mockito.when(_droppedRateLimiter.tryAcquire())
-        .thenAnswer(invocation -> {
-          logLatch.countDown();
-          dropLogLatch.await();
-          return true;
-        }).thenReturn(true);
+    Mockito.when(_droppedRateLimiter.tryAcquire()).thenAnswer(invocation -> {
+      logLatch.countDown();
+      dropLogLatch.await();
+      return true;
+    }).thenReturn(true);
 
     QueryLogger.QueryLogParams params = generateParams(false, 0, 456);
     QueryLogger queryLogger = new QueryLogger(_logRateLimiter, 100, true, _logger, _droppedRateLimiter);
@@ -240,8 +236,14 @@ public class QueryLoggerTest {
     Assert.assertEquals((long) _numDropped.get(0), 2L);
   }
 
-  private QueryLogger.QueryLogParams generateParams(boolean isGroupLimitHit, int numExceptions, long timeUsed) {
+  private QueryLogger.QueryLogParams generateParams(boolean numGroupsLimitReached, int numExceptions, long timeUsedMs) {
     BrokerResponseNative response = new BrokerResponseNative();
+    response.setNumGroupsLimitReached(numGroupsLimitReached);
+    for (int i = 0; i < numExceptions; i++) {
+      response.addException(new ProcessingException());
+    }
+    response.setTimeUsedMs(timeUsedMs);
+    response.setRequestId("123");
     response.setNumDocsScanned(1);
     response.setTotalDocs(2);
     response.setNumEntriesScannedInFilter(3);
@@ -255,40 +257,23 @@ public class QueryLoggerTest {
     response.setMinConsumingFreshnessTimeMs(11);
     response.setNumServersResponded(12);
     response.setNumServersQueried(13);
-    response.setNumGroupsLimitReached(isGroupLimitHit);
-    response.setExceptions(
-        IntStream.range(0, numExceptions)
-            .mapToObj(i -> new ProcessingException()).collect(Collectors.toList()));
-    response.setOfflineTotalCpuTimeNs(14);
-    response.setOfflineThreadCpuTimeNs(15);
-    response.setOfflineSystemActivitiesCpuTimeNs(16);
-    response.setOfflineResponseSerializationCpuTimeNs(17);
-    response.setRealtimeTotalCpuTimeNs(18);
-    response.setRealtimeThreadCpuTimeNs(19);
-    response.setRealtimeSystemActivitiesCpuTimeNs(20);
-    response.setRealtimeResponseSerializationCpuTimeNs(21);
+    response.setOfflineThreadCpuTimeNs(14);
+    response.setOfflineSystemActivitiesCpuTimeNs(15);
+    response.setOfflineResponseSerializationCpuTimeNs(16);
+    response.setRealtimeThreadCpuTimeNs(17);
+    response.setRealtimeSystemActivitiesCpuTimeNs(18);
+    response.setRealtimeResponseSerializationCpuTimeNs(19);
+    response.setBrokerReduceTimeMs(20);
 
-    RequestContext request = new DefaultRequestContext();
-    request.setReduceTimeMillis(22);
-
-    BaseBrokerRequestHandler.ServerStats serverStats = new BaseBrokerRequestHandler.ServerStats();
+    ServerStats serverStats = new ServerStats();
     serverStats.setServerStats("serverStats");
     RequesterIdentity identity = new RequesterIdentity() {
-      @Override public String getClientIp() {
+      @Override
+      public String getClientIp() {
         return "ip";
       }
     };
 
-    return new QueryLogger.QueryLogParams(
-        123,
-        "SELECT * FROM foo",
-        request,
-        "table",
-        24,
-        serverStats,
-        response,
-        timeUsed,
-        identity
-    );
+    return new QueryLogger.QueryLogParams("SELECT * FROM foo", "table", 21, serverStats, response, identity);
   }
 }
