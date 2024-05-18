@@ -191,7 +191,6 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
         tableNameWithType, inputSegmentNames, downloadURLString, uploadURL);
     File tempDataDir = new File(new File(MINION_CONTEXT.getDataDir(), taskType), "tmp-" + UUID.randomUUID());
     Preconditions.checkState(tempDataDir.mkdirs());
-    String crypterName = getTableConfig(tableNameWithType).getValidationConfig().getCrypterClassName();
     try {
       List<File> inputSegmentDirs = new ArrayList<>();
       int numRecords = 0;
@@ -203,8 +202,7 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
             .format("Downloading segment from: %s (%d out of %d)", downloadURLs[i], (i + 1), downloadURLs.length));
         File tarredSegmentFile = new File(tempDataDir, "tarredSegmentFile_" + i);
         try {
-          downloadSegmentToLocal(tableNameWithType, segmentName, downloadURLs[i], taskType, tarredSegmentFile,
-              crypterName);
+          downloadSegmentToLocal(tableNameWithType, segmentName, downloadURLs[i], taskType, tarredSegmentFile);
         } catch (Exception e) {
           LOGGER.error("Failed to download segment from download url: {}", downloadURLs[i], e);
           _minionMetrics.addMeteredTableValue(tableNameWithType, MinionMeter.SEGMENT_DOWNLOAD_FAIL_COUNT, 1L);

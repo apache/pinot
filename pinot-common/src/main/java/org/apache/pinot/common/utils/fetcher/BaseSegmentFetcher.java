@@ -20,7 +20,6 @@ package org.apache.pinot.common.utils.fetcher;
 
 import java.io.File;
 import java.net.URI;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
@@ -125,7 +124,6 @@ public abstract class BaseSegmentFetcher implements SegmentFetcher {
       int attempt =
           RetryPolicies.exponentialBackoffRetryPolicy(_retryCount, _retryWaitMs, _retryDelayScaleFactor).attempt(() -> {
             List<URI> suppliedURIs = uriSupplier.get();
-            Collections.shuffle(suppliedURIs);
             // Go through the list of URIs to fetch the segment until success.
             for (URI uri : suppliedURIs) {
               try {

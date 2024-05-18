@@ -27,6 +27,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -808,6 +809,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
         List<URI> peerServerURIs =
             PeerServerSegmentFinder.getPeerServerURIs(_helixManager, _tableNameWithType, segmentName,
                 _peerDownloadScheme);
+        Collections.shuffle(peerServerURIs);
         return peerServerURIs;
       }, segmentTarFile, zkMetadata.getCrypterName());
       _logger.info("Downloaded tarred segment: {} from peers to: {}, file length: {}", segmentName, segmentTarFile,
