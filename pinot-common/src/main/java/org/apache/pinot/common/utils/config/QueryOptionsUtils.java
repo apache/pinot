@@ -32,6 +32,7 @@ import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.JoinOverFlowMode;
+import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.WindowOverFlowMode;
 
 
 /**
@@ -279,5 +280,17 @@ public class QueryOptionsUtils {
   public static JoinOverFlowMode getJoinOverflowMode(Map<String, String> queryOptions) {
     String joinOverflowModeStr = queryOptions.get(QueryOptionKey.JOIN_OVERFLOW_MODE);
     return joinOverflowModeStr != null ? JoinOverFlowMode.valueOf(joinOverflowModeStr) : null;
+  }
+
+  @Nullable
+  public static Integer getMaxRowsInWindow(Map<String, String> queryOptions) {
+    String maxRowsInWindow = queryOptions.get(QueryOptionKey.MAX_ROWS_IN_WINDOW);
+    return maxRowsInWindow != null ? Integer.parseInt(maxRowsInWindow) : null;
+  }
+
+  @Nullable
+  public static WindowOverFlowMode getWindowOverflowMode(Map<String, String> queryOptions) {
+    String windowOverflowModeStr = queryOptions.get(QueryOptionKey.WINDOW_OVERFLOW_MODE);
+    return windowOverflowModeStr != null ? WindowOverFlowMode.valueOf(windowOverflowModeStr) : null;
   }
 }

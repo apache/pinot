@@ -32,12 +32,15 @@ import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.query.planner.plannode.AbstractPlanNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
@@ -46,6 +49,7 @@ import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
 import org.apache.pinot.query.runtime.operator.window.WindowFunction;
 import org.apache.pinot.query.runtime.operator.window.WindowFunctionFactory;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.WindowOverFlowMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -82,6 +86,8 @@ import org.slf4j.LoggerFactory;
 public class WindowAggregateOperator extends MultiStageOperator {
   private static final String EXPLAIN_NAME = "WINDOW";
   private static final Logger LOGGER = LoggerFactory.getLogger(WindowAggregateOperator.class);
+  private static final int DEFAULT_MAX_ROWS_IN_WINDOW = 1024 * 1024; // 2^20, around 1MM rows
+  private static final WindowOverFlowMode DEFAULT_WINDOW_OVERFLOW_MODE = WindowOverFlowMode.THROW;
 
   // List of window functions which can only be applied as ROWS window frame type
   public static final Set<String> ROWS_ONLY_FUNCTION_NAMES = ImmutableSet.of("ROW_NUMBER");
@@ -99,6 +105,19 @@ public class WindowAggregateOperator extends MultiStageOperator {
   private final Map<Key, List<Object[]>> _partitionRows;
   private final boolean _isPartitionByOnly;
 
+  // Below are specific parameters to protect the window cache from growing too large.
+  // Once the window cache reaches the limit, we will throw exception or break the cache build process.
+  /**
+   * Max rows allowed to build the right table hash collection.
+   */
+  private final int _maxRowsInWindowCache;
+  /**
+   * Mode when window overflow happens, supported values: THROW or BREAK.
+   * THROW(default): Break window cache build process, and throw exception, no WINDOW operation performed.
+   * BREAK: Break window cache build process, continue to perform WINDOW operation, results might be partial or wrong.
+   */
+  private final WindowOverFlowMode _windowOverflowMode;
+
   private int _numRows;
   private boolean _hasReturnedWindowAggregateBlock;
   @Nullable
@@ -110,7 +129,7 @@ public class WindowAggregateOperator extends MultiStageOperator {
       List<RexExpression> groupSet, List<RexExpression> orderSet, List<RelFieldCollation.Direction> orderSetDirection,
       List<RelFieldCollation.NullDirection> orderSetNullDirection, List<RexExpression> aggCalls, int lowerBound,
       int upperBound, WindowNode.WindowFrameType windowFrameType, List<RexExpression> constants,
-      DataSchema resultSchema, DataSchema inputSchema) {
+      DataSchema resultSchema, DataSchema inputSchema, AbstractPlanNode.NodeHint hints) {
     super(context);
 
     _inputOperator = inputOperator;
@@ -142,6 +161,9 @@ public class WindowAggregateOperator extends MultiStageOperator {
 
     _numRows = 0;
     _hasReturnedWindowAggregateBlock = false;
+    Map<String, String> metadata = context.getOpChainMetadata();
+    _maxRowsInWindowCache = getMaxRowInWindow(metadata, hints);
+    _windowOverflowMode = getWindowOverflowMode(metadata, hints);
   }
 
   @Override
@@ -153,6 +175,36 @@ public class WindowAggregateOperator extends MultiStageOperator {
   @Override
   protected Logger logger() {
     return LOGGER;
+  }
+
+  private int getMaxRowInWindow(Map<String, String> opChainMetadata, @Nullable AbstractPlanNode.NodeHint nodeHint) {
+    if (nodeHint != null) {
+      Map<String, String> windowOptions = nodeHint._hintOptions.get(PinotHintOptions.WINDOW_HINT_OPTIONS);
+      if (windowOptions != null) {
+        String maxRowsInWindowStr = windowOptions.get(PinotHintOptions.WindowHintOptions.MAX_ROWS_IN_WINDOW);
+        if (maxRowsInWindowStr != null) {
+          return Integer.parseInt(maxRowsInWindowStr);
+        }
+      }
+    }
+    Integer maxRowsInWindow = QueryOptionsUtils.getMaxRowsInWindow(opChainMetadata);
+    return maxRowsInWindow != null ? maxRowsInWindow : DEFAULT_MAX_ROWS_IN_WINDOW;
+  }
+
+  private WindowOverFlowMode getWindowOverflowMode(Map<String, String> contextMetadata,
+      @Nullable AbstractPlanNode.NodeHint nodeHint) {
+    if (nodeHint != null) {
+      Map<String, String> windowOptions = nodeHint._hintOptions.get(PinotHintOptions.WINDOW_HINT_OPTIONS);
+      if (windowOptions != null) {
+        String windowOverflowModeStr = windowOptions.get(PinotHintOptions.WindowHintOptions.WINDOW_OVERFLOW_MODE);
+        if (windowOverflowModeStr != null) {
+          return WindowOverFlowMode.valueOf(windowOverflowModeStr);
+        }
+      }
+    }
+    WindowOverFlowMode windowOverflowMode =
+        QueryOptionsUtils.getWindowOverflowMode(contextMetadata);
+    return windowOverflowMode != null ? windowOverflowMode : DEFAULT_WINDOW_OVERFLOW_MODE;
   }
 
   @Override
@@ -217,12 +269,35 @@ public class WindowAggregateOperator extends MultiStageOperator {
     TransferableBlock block = _inputOperator.nextBlock();
     while (!TransferableBlockUtils.isEndOfStream(block)) {
       List<Object[]> container = block.getContainer();
+      int containerSize = container.size();
+      if (_numRows + containerSize > _maxRowsInWindowCache) {
+        if (_windowOverflowMode == WindowOverFlowMode.THROW) {
+          throw new IllegalStateException(
+              String.format("Window cache size exceeded the limit of %d rows", _maxRowsInWindowCache));
+        } else {
+          int remainingRows = _maxRowsInWindowCache - _numRows;
+          for (int i = 0; i < remainingRows; i++) {
+            Object[] row = container.get(i);
+            // TODO: Revisit null direction handling for all query types
+            Key key = AggregationUtils.extractRowKey(row, _groupSet);
+            _partitionRows.computeIfAbsent(key, k -> new ArrayList<>()).add(row);
+          }
+          _numRows = _maxRowsInWindowCache;
+          LOGGER.warn("Window cache size exceeded the limit of {} rows, breaking the cache build process",
+              _maxRowsInWindowCache);
+          // Still get to the last row of the block for statMap update
+          while (!TransferableBlockUtils.isEndOfStream(block)) {
+            block = _inputOperator.nextBlock();
+          }
+          break;
+        }
+      }
       for (Object[] row : container) {
-        _numRows++;
         // TODO: Revisit null direction handling for all query types
         Key key = AggregationUtils.extractRowKey(row, _groupSet);
         _partitionRows.computeIfAbsent(key, k -> new ArrayList<>()).add(row);
       }
+      _numRows += containerSize;
       block = _inputOperator.nextBlock();
     }
     // Early termination if the block is an error block

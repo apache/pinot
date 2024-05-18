@@ -113,7 +113,7 @@ public class PhysicalPlanVisitor implements PlanNodeVisitor<MultiStageOperator, 
     return new WindowAggregateOperator(context, nextOperator, node.getGroupSet(), node.getOrderSet(),
         node.getOrderSetDirection(), node.getOrderSetNullDirection(), node.getAggCalls(), node.getLowerBound(),
         node.getUpperBound(), node.getWindowFrameType(), node.getConstants(), node.getDataSchema(),
-        node.getInputs().get(0).getDataSchema());
+        node.getInputs().get(0).getDataSchema(), node.getWindowHints());
   }
 
   @Override

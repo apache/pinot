@@ -19,6 +19,7 @@
 package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -26,10 +27,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.calcite.rel.RelFieldCollation;
+import org.apache.calcite.rel.hint.RelHint;
 import org.apache.calcite.sql.SqlKind;
+import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.query.planner.plannode.AbstractPlanNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
@@ -85,7 +89,8 @@ public class WindowAggregateOperatorTest {
     WindowAggregateOperator operator =
         new WindowAggregateOperator(OperatorTestUtil.getTracingContext(), _input, group, Collections.emptyList(),
             Collections.emptyList(), Collections.emptyList(), calls, Integer.MIN_VALUE, Integer.MAX_VALUE,
-            WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema);
+            WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema,
+            getWindowHints(ImmutableMap.of()));
 
     // When:
     TransferableBlock block1 = operator.nextBlock(); // build
@@ -108,7 +113,8 @@ public class WindowAggregateOperatorTest {
     WindowAggregateOperator operator =
         new WindowAggregateOperator(OperatorTestUtil.getTracingContext(), _input, group, Collections.emptyList(),
             Collections.emptyList(), Collections.emptyList(), calls, Integer.MIN_VALUE, Integer.MAX_VALUE,
-            WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema);
+            WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema,
+            getWindowHints(ImmutableMap.of()));
 
     // When:
     TransferableBlock block = operator.nextBlock();
@@ -132,7 +138,8 @@ public class WindowAggregateOperatorTest {
     WindowAggregateOperator operator =
         new WindowAggregateOperator(OperatorTestUtil.getTracingContext(), _input, group, Collections.emptyList(),
             Collections.emptyList(), Collections.emptyList(), calls, Integer.MIN_VALUE, Integer.MAX_VALUE,
-            WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema);
+            WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema,
+            getWindowHints(ImmutableMap.of()));
 
     // When:
     TransferableBlock block1 = operator.nextBlock();
@@ -161,7 +168,7 @@ public class WindowAggregateOperatorTest {
         new WindowAggregateOperator(OperatorTestUtil.getTracingContext(), _input, group, order,
             Arrays.asList(RelFieldCollation.Direction.ASCENDING), Arrays.asList(RelFieldCollation.NullDirection.LAST),
             calls, Integer.MIN_VALUE, Integer.MAX_VALUE, WindowNode.WindowFrameType.RANGE, Collections.emptyList(),
-            outSchema, inSchema);
+            outSchema, inSchema, getWindowHints(ImmutableMap.of()));
 
     // When:
     TransferableBlock block1 = operator.nextBlock();
@@ -187,7 +194,8 @@ public class WindowAggregateOperatorTest {
     WindowAggregateOperator operator =
         new WindowAggregateOperator(OperatorTestUtil.getTracingContext(), _input, Collections.emptyList(),
             Collections.emptyList(), Collections.emptyList(), Collections.emptyList(), calls, Integer.MIN_VALUE,
-            Integer.MAX_VALUE, WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema);
+            Integer.MAX_VALUE, WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema,
+            getWindowHints(ImmutableMap.of()));
 
     // When:
     TransferableBlock block1 = operator.nextBlock();
@@ -214,7 +222,8 @@ public class WindowAggregateOperatorTest {
     WindowAggregateOperator operator =
         new WindowAggregateOperator(OperatorTestUtil.getTracingContext(), _input, group, Collections.emptyList(),
             Collections.emptyList(), Collections.emptyList(), calls, Integer.MIN_VALUE, Integer.MAX_VALUE,
-            WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema);
+            WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema,
+            getWindowHints(ImmutableMap.of()));
 
     // When:
     TransferableBlock block1 = operator.nextBlock();
@@ -240,7 +249,8 @@ public class WindowAggregateOperatorTest {
     WindowAggregateOperator sum0PartitionBy1 =
         new WindowAggregateOperator(OperatorTestUtil.getTracingContext(), upstreamOperator, group,
             Collections.emptyList(), Collections.emptyList(), Collections.emptyList(), calls, Integer.MIN_VALUE,
-            Integer.MAX_VALUE, WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema);
+            Integer.MAX_VALUE, WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema,
+            getWindowHints(ImmutableMap.of()));
 
     TransferableBlock result = sum0PartitionBy1.getNextBlock();
     List<Object[]> resultRows = result.getContainer();
@@ -266,7 +276,8 @@ public class WindowAggregateOperatorTest {
     WindowAggregateOperator operator =
         new WindowAggregateOperator(OperatorTestUtil.getTracingContext(), _input, group, Collections.emptyList(),
             Collections.emptyList(), Collections.emptyList(), calls, Integer.MIN_VALUE, Integer.MAX_VALUE,
-            WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema);
+            WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema,
+            getWindowHints(ImmutableMap.of()));
   }
 
   @Test(expectedExceptions = RuntimeException.class, expectedExceptionsMessageRegExp = ".*Failed to instantiate "
@@ -284,7 +295,8 @@ public class WindowAggregateOperatorTest {
     WindowAggregateOperator operator =
         new WindowAggregateOperator(OperatorTestUtil.getTracingContext(), _input, group, Collections.emptyList(),
             Collections.emptyList(), Collections.emptyList(), calls, Integer.MIN_VALUE, Integer.MAX_VALUE,
-            WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema);
+            WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema,
+            getWindowHints(ImmutableMap.of()));
   }
 
   @Test
@@ -312,7 +324,7 @@ public class WindowAggregateOperatorTest {
     WindowAggregateOperator operator =
         new WindowAggregateOperator(OperatorTestUtil.getTracingContext(), _input, group, order, Collections.emptyList(),
             Collections.emptyList(), calls, Integer.MIN_VALUE, 0, WindowNode.WindowFrameType.RANGE,
-            Collections.emptyList(), outSchema, inSchema);
+            Collections.emptyList(), outSchema, inSchema, getWindowHints(ImmutableMap.of()));
 
     TransferableBlock result = operator.getNextBlock();
     TransferableBlock eosBlock = operator.getNextBlock();
@@ -369,7 +381,7 @@ public class WindowAggregateOperatorTest {
     WindowAggregateOperator operator =
         new WindowAggregateOperator(OperatorTestUtil.getTracingContext(), _input, group, order, Collections.emptyList(),
             Collections.emptyList(), calls, Integer.MIN_VALUE, 0, WindowNode.WindowFrameType.ROWS,
-            Collections.emptyList(), outSchema, inSchema);
+            Collections.emptyList(), outSchema, inSchema, getWindowHints(ImmutableMap.of()));
 
     TransferableBlock result = operator.getNextBlock();
     TransferableBlock eosBlock = operator.getNextBlock();
@@ -423,7 +435,7 @@ public class WindowAggregateOperatorTest {
         new WindowAggregateOperator(OperatorTestUtil.getTracingContext(), _input, group, order,
             Arrays.asList(RelFieldCollation.Direction.ASCENDING), Arrays.asList(RelFieldCollation.NullDirection.LAST),
             calls, Integer.MIN_VALUE, Integer.MAX_VALUE, WindowNode.WindowFrameType.RANGE, Collections.emptyList(),
-            outSchema, inSchema);
+            outSchema, inSchema, getWindowHints(ImmutableMap.of()));
 
     TransferableBlock result = operator.getNextBlock();
     TransferableBlock eosBlock = operator.getNextBlock();
@@ -463,7 +475,7 @@ public class WindowAggregateOperatorTest {
         new WindowAggregateOperator(OperatorTestUtil.getTracingContext(), _input, group, order,
             Arrays.asList(RelFieldCollation.Direction.DESCENDING), Arrays.asList(RelFieldCollation.NullDirection.LAST),
             calls, Integer.MIN_VALUE, Integer.MAX_VALUE, WindowNode.WindowFrameType.RANGE, Collections.emptyList(),
-            outSchema, inSchema);
+            outSchema, inSchema, getWindowHints(ImmutableMap.of()));
 
     // When:
     TransferableBlock resultBlock = operator.nextBlock(); // (output result)
@@ -494,7 +506,8 @@ public class WindowAggregateOperatorTest {
     WindowAggregateOperator operator =
         new WindowAggregateOperator(OperatorTestUtil.getTracingContext(), _input, group, Collections.emptyList(),
             Collections.emptyList(), Collections.emptyList(), calls, Integer.MIN_VALUE, Integer.MAX_VALUE,
-            WindowNode.WindowFrameType.ROWS, Collections.emptyList(), outSchema, inSchema);
+            WindowNode.WindowFrameType.ROWS, Collections.emptyList(), outSchema, inSchema,
+            getWindowHints(ImmutableMap.of()));
   }
 
   @Test
@@ -514,7 +527,7 @@ public class WindowAggregateOperatorTest {
         new WindowAggregateOperator(OperatorTestUtil.getTracingContext(), _input, group, order,
             Arrays.asList(RelFieldCollation.Direction.ASCENDING), Arrays.asList(RelFieldCollation.NullDirection.LAST),
             calls, Integer.MIN_VALUE, 0, WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema,
-            inSchema);
+            inSchema, getWindowHints(ImmutableMap.of()));
 
     // When:
     TransferableBlock block1 = operator.nextBlock();
@@ -544,7 +557,8 @@ public class WindowAggregateOperatorTest {
     WindowAggregateOperator operator =
         new WindowAggregateOperator(OperatorTestUtil.getTracingContext(), _input, group, Collections.emptyList(),
             Collections.emptyList(), Collections.emptyList(), calls, 5, Integer.MAX_VALUE,
-            WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema);
+            WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema,
+            getWindowHints(ImmutableMap.of()));
   }
 
   @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = "Only default frame is "
@@ -564,7 +578,8 @@ public class WindowAggregateOperatorTest {
     WindowAggregateOperator operator =
         new WindowAggregateOperator(OperatorTestUtil.getTracingContext(), _input, group, Collections.emptyList(),
             Collections.emptyList(), Collections.emptyList(), calls, Integer.MIN_VALUE, 5,
-            WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema);
+            WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema,
+            getWindowHints(ImmutableMap.of()));
   }
 
   @Test
@@ -585,7 +600,8 @@ public class WindowAggregateOperatorTest {
     WindowAggregateOperator operator =
         new WindowAggregateOperator(OperatorTestUtil.getTracingContext(), _input, group, Collections.emptyList(),
             Collections.emptyList(), Collections.emptyList(), calls, Integer.MIN_VALUE, Integer.MAX_VALUE,
-            WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema);
+            WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema,
+            getWindowHints(ImmutableMap.of()));
 
     // When:
     TransferableBlock block = operator.nextBlock();
@@ -596,7 +612,70 @@ public class WindowAggregateOperatorTest {
         "expected it to fail with class cast exception");
   }
 
+  @Test
+  public void testShouldPropagateWindowLimitError() {
+    // Given:
+    List<RexExpression> calls = ImmutableList.of(getSum(new RexExpression.InputRef(1)));
+    List<RexExpression> group = ImmutableList.of(new RexExpression.InputRef(0));
+    Map<String, String> hintsMap = ImmutableMap.of(PinotHintOptions.WindowHintOptions.WINDOW_OVERFLOW_MODE, "THROW",
+        PinotHintOptions.WindowHintOptions.MAX_ROWS_IN_WINDOW, "1");
+
+    DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, INT});
+    Mockito.when(_input.nextBlock())
+        .thenReturn(OperatorTestUtil.block(inSchema, new Object[]{2, 1}, new Object[]{3, 4}))
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+
+    DataSchema outSchema = new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{INT, INT, DOUBLE});
+    WindowAggregateOperator operator =
+        new WindowAggregateOperator(OperatorTestUtil.getTracingContext(), _input, group, Collections.emptyList(),
+            Collections.emptyList(), Collections.emptyList(), calls, Integer.MIN_VALUE, Integer.MAX_VALUE,
+            WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema,
+            getWindowHints(hintsMap));
+
+    // When:
+    TransferableBlock block = operator.nextBlock();
+
+    // Then:
+    Assert.assertTrue(block.isErrorBlock(), "expected ERROR block from window overflow");
+    Assert.assertTrue(block.getExceptions().get(1000).contains("Window cache size exceeded the limit of 1 rows"),
+        "expected it to fail with window cache overflow");
+  }
+
+  @Test
+  public void testShouldHandleWindowWithPartialResultsWhenHitDataRowsLimit() {
+    // Given:
+    List<RexExpression> calls = ImmutableList.of(getSum(new RexExpression.InputRef(1)));
+    List<RexExpression> group = ImmutableList.of(new RexExpression.InputRef(0));
+    Map<String, String> hintsMap = ImmutableMap.of(PinotHintOptions.WindowHintOptions.WINDOW_OVERFLOW_MODE, "BREAK",
+        PinotHintOptions.WindowHintOptions.MAX_ROWS_IN_WINDOW, "1");
+
+    DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, INT});
+    Mockito.when(_input.nextBlock())
+        .thenReturn(OperatorTestUtil.block(inSchema, new Object[]{2, 1}, new Object[]{3, 4}))
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+
+    DataSchema outSchema = new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{INT, INT, DOUBLE});
+    WindowAggregateOperator operator =
+        new WindowAggregateOperator(OperatorTestUtil.getTracingContext(), _input, group, Collections.emptyList(),
+            Collections.emptyList(), Collections.emptyList(), calls, Integer.MIN_VALUE, Integer.MAX_VALUE,
+            WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema,
+            getWindowHints(hintsMap));
+
+    // When:
+    TransferableBlock block = operator.nextBlock();
+
+    // Then:
+    Assert.assertFalse(block.isErrorBlock(), "expected no ERROR from window overflow");
+    Assert.assertEquals(block.getContainer().size(), 1, "expected one row from the window operation");
+  }
+
   private static RexExpression.FunctionCall getSum(RexExpression arg) {
     return new RexExpression.FunctionCall(SqlKind.SUM, ColumnDataType.INT, "SUM", ImmutableList.of(arg));
+  }
+
+  private static AbstractPlanNode.NodeHint getWindowHints(Map<String, String> hintsMap) {
+    RelHint.Builder relHintBuilder = RelHint.builder(PinotHintOptions.WINDOW_HINT_OPTIONS);
+    hintsMap.forEach(relHintBuilder::hintOption);
+    return new AbstractPlanNode.NodeHint(ImmutableList.of(relHintBuilder.build()));
   }
 }
