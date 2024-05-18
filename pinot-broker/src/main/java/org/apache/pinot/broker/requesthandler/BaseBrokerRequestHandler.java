@@ -40,6 +40,7 @@ import javax.annotation.concurrent.ThreadSafe;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
+import org.apache.calcite.sql.SqlDescribeTable;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -109,6 +110,7 @@ import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
+import org.apache.pinot.sql.parsers.parser.SqlShowTables;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -328,6 +330,17 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
       // Compile the request into PinotQuery
       long compilationStartTimeNs = System.nanoTime();
+
+      if (sqlNodeAndOptions.getSqlNode() instanceof SqlShowTables) {
+        return processShowTablesQuery(compilationStartTimeNs, requestContext);
+      }
+
+      if (sqlNodeAndOptions.getSqlNode() instanceof SqlDescribeTable) {
+        SqlDescribeTable node = (SqlDescribeTable) sqlNodeAndOptions.getSqlNode();
+        String tableName = node.getTable().toString();
+        return processDescribeTableQuery(tableName, compilationStartTimeNs, requestContext);
+      }
+
       PinotQuery pinotQuery;
       try {
         pinotQuery = CalciteSqlParser.compileToPinotQuery(sqlNodeAndOptions);
@@ -1557,6 +1570,60 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       default:
         throw new IllegalStateException("Unsupported literal: " + literal);
     }
+  }
+
+  private BrokerResponseNative processShowTablesQuery(long compilationStartTimeNs,
+      RequestContext requestContext) {
+    BrokerResponseNative brokerResponse = new BrokerResponseNative();
+    String[] columnNames = {"Tables"};
+    DataSchema.ColumnDataType[] columnTypes = {DataSchema.ColumnDataType.STRING};
+
+
+    DataSchema dataSchema = new DataSchema(columnNames, columnTypes);
+    List<Object[]> rows = new ArrayList<>();
+    _tableCache.getTableConfigs().stream().map(TableConfig::getTableName).sorted().forEach(a -> {
+      a = a.replace("_OFFLINE", "").replace("_REALTIME", "");
+      rows.add(new String[] {a});
+    });
+    ResultTable resultTable = new ResultTable(dataSchema, rows);
+    brokerResponse.setResultTable(resultTable);
+
+    long totalTimeMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - compilationStartTimeNs);
+    brokerResponse.setTimeUsedMs(totalTimeMs);
+    requestContext.setQueryProcessingTime(totalTimeMs);
+    augmentStatistics(requestContext, brokerResponse);
+    return brokerResponse;
+  }
+
+  private BrokerResponseNative processDescribeTableQuery(String tableName, long compilationStartTimeNs,
+      RequestContext requestContext) {
+    BrokerResponseNative brokerResponse = new BrokerResponseNative();
+    String[] columnNames = {"Field", "Type", "Nullable", "Default"};
+    DataSchema.ColumnDataType[] columnTypes = {DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING};
+
+    DataSchema dataSchema = new DataSchema(columnNames, columnTypes);
+    List<Object[]> rows = new ArrayList<>();
+    _tableCache.getSchema(tableName).getAllFieldSpecs()
+        .stream()
+        .filter(a -> !a.getName().startsWith("$"))
+        .forEach(fieldSpec -> {
+          String[] row = new String[] {
+              fieldSpec.getName(),
+              fieldSpec.getDataType().toString(),
+              String.valueOf(fieldSpec.isNullable()),
+              fieldSpec.getDefaultNullValueString()
+          };
+          rows.add(row);
+        }
+        );
+    ResultTable resultTable = new ResultTable(dataSchema, rows);
+    brokerResponse.setResultTable(resultTable);
+
+    long totalTimeMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - compilationStartTimeNs);
+    brokerResponse.setTimeUsedMs(totalTimeMs);
+    requestContext.setQueryProcessingTime(totalTimeMs);
+    augmentStatistics(requestContext, brokerResponse);
+    return brokerResponse;
   }
 
   /**

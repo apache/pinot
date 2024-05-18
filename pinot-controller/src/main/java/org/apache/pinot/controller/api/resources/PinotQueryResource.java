@@ -49,6 +49,7 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
+import org.apache.calcite.sql.SqlDescribeTable;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -83,6 +84,7 @@ import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.PinotSqlType;
 import org.apache.pinot.sql.parsers.SqlCompilationException;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
+import org.apache.pinot.sql.parsers.parser.SqlShowTables;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -261,9 +263,19 @@ public class PinotQueryResource {
       return QueryException.getException(QueryException.QUERY_VALIDATION_ERROR, e).toString();
     }
     try {
-      String inputTableName =
-          sqlNode != null ? RequestUtils.getTableNames(CalciteSqlParser.compileSqlNodeToPinotQuery(sqlNode)).iterator()
-              .next() : CalciteSqlCompiler.compileToBrokerRequest(query).getQuerySource().getTableName();
+      String inputTableName;
+      if (sqlNode != null) {
+        if (sqlNode instanceof SqlShowTables) {
+          inputTableName = "*";
+        } else if (sqlNode instanceof SqlDescribeTable) {
+          inputTableName = ((SqlDescribeTable) sqlNode).getTable().toString();
+        } else {
+          inputTableName = RequestUtils.getTableNames(CalciteSqlParser.compileSqlNodeToPinotQuery(sqlNode)).iterator()
+              .next();
+        }
+      } else {
+        inputTableName = CalciteSqlCompiler.compileToBrokerRequest(query).getQuerySource().getTableName();
+      }
       tableName = _pinotHelixResourceManager.getActualTableName(inputTableName, database);
     } catch (Exception e) {
       LOGGER.error("Caught exception while compiling query: {}", query, e);

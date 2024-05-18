@@ -109,3 +109,14 @@ SqlNode SqlPhysicalExplain() :
             nDynamicParams);
     }
 }
+SqlNode SqlShowTables() :
+{
+    SqlParserPos pos;
+}
+{
+    <SHOW> { pos = getPos(); }
+    <TABLES>
+    {
+        return new SqlShowTables(pos);
+    }
+}
