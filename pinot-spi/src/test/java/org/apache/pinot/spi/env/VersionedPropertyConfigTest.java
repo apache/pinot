@@ -64,7 +64,14 @@ public class VersionedPropertyConfigTest {
   }
 
   @Test
-  public void testSegmentMetadataPropertyConfigurationWithHeader()
+  public void testSegmentMetadataPropertyConfigurationWithDefaultHeaderVersion()
+      throws ConfigurationException {
+    testSegmentMetadataPropertiesConfiguration(
+        CommonsConfigurationUtils.DEFAULT_PROPERTIES_CONFIGURATION_HEADER_VERSION, TEST_PROPERTY_KEY);
+  }
+
+  @Test
+  public void testSegmentMetadataPropertyConfigurationWithHeaderVersion2()
       throws ConfigurationException {
     testSegmentMetadataPropertiesConfiguration(CommonsConfigurationUtils.PROPERTIES_CONFIGURATION_HEADER_VERSION_2,
         TEST_PROPERTY_KEY);
@@ -182,7 +189,7 @@ public class VersionedPropertyConfigTest {
 
   private static void testPropertyKeys(List<String> recoveredKeys, String[] actualKeys) {
     assertEquals(recoveredKeys.size(), actualKeys.length);
-    for (int i = 1; i < recoveredKeys.size(); i++) {
+    for (int i = 0; i < recoveredKeys.size(); i++) {
       String recoveredValue = recoveredKeys.get(i);
       assertEquals(recoveredValue, actualKeys[i]);
     }

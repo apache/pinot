@@ -30,9 +30,9 @@ import org.apache.commons.configuration2.PropertiesConfiguration.PropertiesReade
  *  - by skipping the unescaping of key and
  *  - parsing the line by splitting based on first occurrence of separator
  */
-class SegmentMetadataPropertyReader extends PropertiesReader {
+class VersionedPropertyReader extends PropertiesReader {
 
-  public SegmentMetadataPropertyReader(Reader reader) {
+  public VersionedPropertyReader(Reader reader) {
     super(reader);
   }
 

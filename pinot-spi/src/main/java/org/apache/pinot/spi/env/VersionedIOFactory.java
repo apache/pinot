@@ -34,11 +34,11 @@ import org.apache.commons.configuration2.convert.ListDelimiterHandler;
 class VersionedIOFactory extends DefaultIOFactory {
   @Override
   public PropertiesReader createPropertiesReader(Reader reader) {
-    return new SegmentMetadataPropertyReader(reader);
+    return new VersionedPropertyReader(reader);
   }
 
   @Override
   public PropertiesWriter createPropertiesWriter(Writer out, ListDelimiterHandler handler) {
-    return new SegmentMetadataPropertyWriter(out, handler);
+    return new VersionedPropertyWriter(out, handler);
   }
 }

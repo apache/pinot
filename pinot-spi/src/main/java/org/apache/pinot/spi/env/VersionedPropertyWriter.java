@@ -28,9 +28,9 @@ import org.apache.commons.configuration2.convert.ListDelimiterHandler;
  * <p>
  * Purpose: custom property writer for writing the segment metadata faster by skipping the escaping of key.
  */
-public class SegmentMetadataPropertyWriter extends PropertiesWriter {
+public class VersionedPropertyWriter extends PropertiesWriter {
 
-  public SegmentMetadataPropertyWriter(final Writer writer, ListDelimiterHandler handler) {
+  public VersionedPropertyWriter(final Writer writer, ListDelimiterHandler handler) {
     super(writer, handler);
   }
 
