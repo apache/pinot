@@ -49,11 +49,13 @@ securityContext: {}
   # runAsNonRoot: true
   # runAsUser: 1000
 
+# default values of the probes i.e. liveness and readiness.
+# customization of values is present at the component level.
 probes:
   initialDelaySeconds: 60
   periodSeconds: 10
   failureThreshold: 10
-  # should be 1 for liveness and startup probe
+  # should be 1 for liveness and startup probe, as per K8s doc.
   successThreshold: 1
   timeoutSeconds: 10
 
@@ -98,19 +100,25 @@ controller:
     readinessEnabled: false
     startupEnabled: false
     liveness:
-      initialDelaySeconds:
-      failureThreshold:
-      timeoutSeconds:
+      initialDelaySeconds: 60
+      failureThreshold: 10
+      timeoutSeconds: 10
+      successThreshold: 1
+      periodSeconds: 10
 
     readiness:
-      initialDelaySeconds:
-      failureThreshold:
-      timeoutSeconds:
+      initialDelaySeconds: 60
+      failureThreshold: 10
+      timeoutSeconds: 10
+      successThreshold: 1
+      periodSeconds: 10
 
     startup:
-      initialDelaySeconds:
-      failureThreshold:
-      timeoutSeconds:
+      initialDelaySeconds: 60
+      failureThreshold: 10
+      timeoutSeconds: 10
+      successThreshold: 1
+      periodSeconds: 10
 
   persistence:
     enabled: true
@@ -239,19 +247,25 @@ broker:
     readinessEnabled: true
     startupEnabled: false
     liveness:
-      initialDelaySeconds:
-      failureThreshold:
-      timeoutSeconds:
+      initialDelaySeconds: 60
+      failureThreshold: 10
+      timeoutSeconds: 10
+      successThreshold: 1
+      periodSeconds: 10
 
     readiness:
-      initialDelaySeconds:
-      failureThreshold:
-      timeoutSeconds:
+      initialDelaySeconds: 60
+      failureThreshold: 10
+      timeoutSeconds: 10
+      successThreshold: 1
+      periodSeconds: 10
 
     startup:
-      initialDelaySeconds:
-      failureThreshold:
-      timeoutSeconds:
+      initialDelaySeconds: 60
+      failureThreshold: 10
+      timeoutSeconds: 10
+      successThreshold: 1
+      periodSeconds: 10
 
   persistence:
     extraVolumes: []
@@ -356,19 +370,25 @@ server:
     readinessEnabled: false
     startupEnabled: false
     liveness:
-      initialDelaySeconds:
-      failureThreshold:
-      timeoutSeconds:
+      initialDelaySeconds: 60
+      failureThreshold: 10
+      timeoutSeconds: 10
+      successThreshold: 1
+      periodSeconds: 10
 
     readiness:
-      initialDelaySeconds:
-      failureThreshold:
-      timeoutSeconds:
+      initialDelaySeconds: 60
+      failureThreshold: 10
+      timeoutSeconds: 10
+      successThreshold: 1
+      periodSeconds: 10
 
     startup:
-      initialDelaySeconds:
-      failureThreshold:
-      timeoutSeconds:
+      initialDelaySeconds: 60
+      failureThreshold: 10
+      timeoutSeconds: 10
+      successThreshold: 1
+      periodSeconds: 10
 
   dataDir: /var/pinot/server/data/index
   segmentTarDir: /var/pinot/server/data/segment
@@ -470,19 +490,25 @@ minion:
     readinessEnabled: true
     startupEnabled: false
     liveness:
-      initialDelaySeconds:
-      failureThreshold:
-      timeoutSeconds:
+      initialDelaySeconds: 60
+      failureThreshold: 10
+      timeoutSeconds: 10
+      successThreshold: 1
+      periodSeconds: 10
 
     readiness:
-      initialDelaySeconds:
-      failureThreshold:
-      timeoutSeconds:
+      initialDelaySeconds: 60
+      failureThreshold: 10
+      timeoutSeconds: 10
+      successThreshold: 1
+      periodSeconds: 10
 
     startup:
-      initialDelaySeconds:
-      failureThreshold:
-      timeoutSeconds:
+      initialDelaySeconds: 60
+      failureThreshold: 10
+      timeoutSeconds: 10
+      successThreshold: 1
+      periodSeconds: 10
 
   dataDir: /var/pinot/minion/data
   jvmOpts: "-XX:ActiveProcessorCount=2 -Xms256M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-minion.log"
@@ -575,19 +601,25 @@ minionStateless:
     readinessEnabled: true
     startupEnabled: true
     liveness:
-      initialDelaySeconds:
-      failureThreshold:
-      timeoutSeconds:
+      initialDelaySeconds: 60
+      failureThreshold: 10
+      timeoutSeconds: 10
+      successThreshold: 1
+      periodSeconds: 10
 
     readiness:
-      initialDelaySeconds:
-      failureThreshold:
-      timeoutSeconds:
+      initialDelaySeconds: 60
+      failureThreshold: 10
+      timeoutSeconds: 10
+      successThreshold: 1
+      periodSeconds: 10
 
     startup:
-      initialDelaySeconds:
-      failureThreshold:
-      timeoutSeconds:
+      initialDelaySeconds: 60
+      failureThreshold: 10
+      timeoutSeconds: 10
+      successThreshold: 1
+      periodSeconds: 10
 
   dataDir: /var/pinot/minion/data
   jvmOpts: "-XX:ActiveProcessorCount=2 -Xms256M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-minion.log"

@@ -92,9 +92,9 @@ spec:
         {{- if .Values.broker.probes.livenessEnabled }}
         livenessProbe:
           initialDelaySeconds: {{ .Values.broker.probes.liveness.initialDelaySeconds | default .Values.probes.initialDelaySeconds }}
-          periodSeconds: {{ .Values.probes.periodSeconds }}
+          periodSeconds: {{ .Values.broker.probes.liveness.periodSeconds | default .Values.probes.periodSeconds }}
           failureThreshold: {{ .Values.broker.probes.liveness.failureThreshold | default .Values.probes.failureThreshold }}
-          successThreshold: {{ .Values.probes.successThreshold }}
+          successThreshold: {{ .Values.broker.probes.liveness.successThreshold | default .Values.probes.successThreshold }}
           timeoutSeconds: {{ .Values.broker.probes.liveness.timeoutSeconds | default .Values.probes.timeoutSeconds }}
           httpGet:
             path: {{ .Values.broker.probes.endpoint }}
@@ -103,9 +103,9 @@ spec:
         {{- if .Values.broker.probes.readinessEnabled }}
         readinessProbe:
           initialDelaySeconds: {{ .Values.broker.probes.readiness.initialDelaySeconds | default .Values.probes.initialDelaySeconds }}
-          periodSeconds: {{ .Values.probes.periodSeconds }}
+          periodSeconds: {{ .Values.broker.probes.readiness.periodSeconds | default .Values.probes.periodSeconds }}
           failureThreshold: {{ .Values.broker.probes.readiness.failureThreshold | default .Values.probes.failureThreshold }}
-          successThreshold: {{ .Values.probes.successThreshold }}
+          successThreshold: {{ .Values.broker.probes.readiness.successThreshold | default .Values.probes.successThreshold }}
           timeoutSeconds: {{ .Values.broker.probes.readiness.timeoutSeconds | default .Values.probes.timeoutSeconds }}
           httpGet:
             path: {{ .Values.broker.probes.endpoint }}
@@ -114,9 +114,9 @@ spec:
         {{- if .Values.broker.probes.startupEnabled }}
         startupProbe:
           initialDelaySeconds: {{ .Values.broker.probes.startup.initialDelaySeconds | default .Values.probes.initialDelaySeconds }}
-          periodSeconds: {{ .Values.probes.periodSeconds }}
+          periodSeconds: {{ .Values.broker.probes.startup.periodSeconds | default .Values.probes.periodSeconds }}
           failureThreshold: {{ .Values.broker.probes.startup.failureThreshold | default .Values.probes.failureThreshold }}
-          successThreshold: {{ .Values.probes.successThreshold }}
+          successThreshold:{{ .Values.broker.probes.startup.successThreshold | default .Values.probes.successThreshold }}
           timeoutSeconds: {{ .Values.broker.probes.startup.timeoutSeconds | default .Values.probes.timeoutSeconds }}
           httpGet:
             path: {{ .Values.broker.probes.endpoint }}
