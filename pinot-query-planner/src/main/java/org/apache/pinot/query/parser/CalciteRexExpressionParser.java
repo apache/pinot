@@ -198,19 +198,13 @@ public class CalciteRexExpressionParser {
 
   /**
    * Copy and modify from {@link RequestUtils#getLiteralExpression(Object)}.
-   *
+   * TODO: Revisit whether we should use internal value type (e.g. 0/1 for BOOLEAN, ByteArray for BYTES) here.
    */
   private static Expression compileLiteralExpression(Object object) {
     if (object instanceof ByteArray) {
-      return getLiteralExpression((ByteArray) object);
+      return RequestUtils.getLiteralExpression(((ByteArray) object).getBytes());
     }
     return RequestUtils.getLiteralExpression(object);
-  }
-
-  private static Expression getLiteralExpression(ByteArray object) {
-    Expression expression = RequestUtils.createNewLiteralExpression();
-    expression.getLiteral().setBinaryValue(object.getBytes());
-    return expression;
   }
 
   private static Expression inputRefToIdentifier(RexExpression.InputRef inputRef, PinotQuery pinotQuery) {

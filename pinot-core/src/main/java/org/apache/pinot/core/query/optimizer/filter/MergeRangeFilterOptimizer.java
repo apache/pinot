@@ -146,7 +146,7 @@ public class MergeRangeFilterOptimizer implements FilterOptimizer {
    */
   @SuppressWarnings("rawtypes")
   private static Comparable getComparable(Expression literalExpression, DataType dataType) {
-    return dataType.convertInternal(literalExpression.getLiteral().getFieldValue().toString());
+    return dataType.convertInternal(RequestUtils.getLiteralString(literalExpression));
   }
 
   /**

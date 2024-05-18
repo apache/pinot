@@ -44,12 +44,14 @@ import org.apache.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rel.type.RelRecordType;
+import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalExchange;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalSortExchange;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DatabaseUtils;
+import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
@@ -259,7 +261,11 @@ public final class RelToPlanNodeConverter {
   /**
    * Calcite uses DEMICAL type to infer data type hoisting and infer arithmetic result types. down casting this back to
    * the proper primitive type for Pinot.
+   * TODO: Revisit this method:
+   *  - Currently we are converting exact value to approximate value
+   *  - Integer can only cover all values with precision 9; Long can only cover all values with precision 18
    *
+   * {@link RequestUtils#getLiteralExpression(SqlLiteral)}
    * @param relDataType the DECIMAL rel data type.
    * @param isArray
    * @return proper {@link ColumnDataType}.
@@ -277,9 +283,9 @@ public final class RelToPlanNodeConverter {
         return isArray ? ColumnDataType.DOUBLE_ARRAY : ColumnDataType.BIG_DECIMAL;
       }
     } else {
-      if (precision <= 14) {
-        return isArray ? ColumnDataType.FLOAT_ARRAY : ColumnDataType.FLOAT;
-      } else if (precision <= 30) {
+      // NOTE: Do not use FLOAT to represent DECIMAL to be consistent with single-stage engine behavior.
+      //       See {@link RequestUtils#getLiteralExpression(SqlLiteral)}.
+      if (precision <= 30) {
         return isArray ? ColumnDataType.DOUBLE_ARRAY : ColumnDataType.DOUBLE;
       } else {
         return isArray ? ColumnDataType.DOUBLE_ARRAY : ColumnDataType.BIG_DECIMAL;

@@ -1487,20 +1487,15 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
   private void computeResultsForLiteral(Literal literal, List<String> columnNames,
       List<DataSchema.ColumnDataType> columnTypes, List<Object> row) {
-    Object fieldValue = literal.getFieldValue();
-    columnNames.add(fieldValue.toString());
+    columnNames.add(RequestUtils.prettyPrint(literal));
     switch (literal.getSetField()) {
+      case NULL_VALUE:
+        columnTypes.add(DataSchema.ColumnDataType.UNKNOWN);
+        row.add(null);
+        break;
       case BOOL_VALUE:
         columnTypes.add(DataSchema.ColumnDataType.BOOLEAN);
         row.add(literal.getBoolValue());
-        break;
-      case BYTE_VALUE:
-        columnTypes.add(DataSchema.ColumnDataType.INT);
-        row.add((int) literal.getByteValue());
-        break;
-      case SHORT_VALUE:
-        columnTypes.add(DataSchema.ColumnDataType.INT);
-        row.add((int) literal.getShortValue());
         break;
       case INT_VALUE:
         columnTypes.add(DataSchema.ColumnDataType.INT);
@@ -1530,10 +1525,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         columnTypes.add(DataSchema.ColumnDataType.BYTES);
         row.add(BytesUtils.toHexString(literal.getBinaryValue()));
         break;
-      case NULL_VALUE:
-        columnTypes.add(DataSchema.ColumnDataType.UNKNOWN);
-        row.add(null);
-        break;
+      // TODO: Revisit the array handling. Currently we are setting List into the row.
       case INT_ARRAY_VALUE:
         columnTypes.add(DataSchema.ColumnDataType.INT_ARRAY);
         row.add(literal.getIntArrayValue());

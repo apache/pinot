@@ -1188,7 +1188,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(columnNames.get(0).asText(), "1");
     assertEquals(columnNames.get(1).asText(), "currentTs");
     assertEquals(columnNames.get(2).asText(), "oneHourAgoTs");
-    assertEquals(columnNames.get(3).asText(), "abc");
+    assertEquals(columnNames.get(3).asText(), "'abc'");
     assertEquals(columnNames.get(4).asText(), "today");
     String nowColumnName = columnNames.get(5).asText();
     String oneHourAgoColumnName = columnNames.get(6).asText();
@@ -1198,7 +1198,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(columnNames.get(10).asText(), "fromBase64");
 
     JsonNode columnDataTypes = dataSchema.get("columnDataTypes");
-    assertEquals(columnDataTypes.get(0).asText(), "LONG");
+    assertEquals(columnDataTypes.get(0).asText(), "INT");
     assertEquals(columnDataTypes.get(1).asText(), "LONG");
     assertEquals(columnDataTypes.get(2).asText(), "LONG");
     assertEquals(columnDataTypes.get(3).asText(), "STRING");
