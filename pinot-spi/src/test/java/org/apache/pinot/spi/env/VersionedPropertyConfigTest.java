@@ -37,6 +37,8 @@ import static org.testng.Assert.assertNull;
 
 
 public class VersionedPropertyConfigTest {
+
+  private static final String COLON_SEPARATOR = ":";
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "VersionedPropertyConfigTest");
   private static final File CONFIG_FILE = new File(TEMP_DIR, "config");
   private static final String[] TEST_PROPERTY_KEY = { "test1", "test2_key", "test3_key_",
@@ -58,36 +60,49 @@ public class VersionedPropertyConfigTest {
   }
 
   @Test
-  public void testSegmentMetadataPropertyConfiguration()
+  public void testVersionedPropertyConfiguration()
       throws ConfigurationException {
-    testSegmentMetadataPropertiesConfiguration(null, TEST_PROPERTY_KEY);
+    testVersionedPropertiesConfiguration(null, TEST_PROPERTY_KEY, false);
   }
 
   @Test
-  public void testSegmentMetadataPropertyConfigurationWithDefaultHeaderVersion()
+  public void testVersionedPropertyConfigurationWithDefaultHeaderVersion()
       throws ConfigurationException {
-    testSegmentMetadataPropertiesConfiguration(
-        CommonsConfigurationUtils.DEFAULT_PROPERTIES_CONFIGURATION_HEADER_VERSION, TEST_PROPERTY_KEY);
+    testVersionedPropertiesConfiguration(
+        CommonsConfigurationUtils.DEFAULT_PROPERTIES_CONFIGURATION_HEADER_VERSION, TEST_PROPERTY_KEY, false);
   }
 
   @Test
-  public void testSegmentMetadataPropertyConfigurationWithHeaderVersion2()
+  public void testVersionedPropertyConfigurationWithHeaderVersion2()
       throws ConfigurationException {
-    testSegmentMetadataPropertiesConfiguration(CommonsConfigurationUtils.PROPERTIES_CONFIGURATION_HEADER_VERSION_2,
-        TEST_PROPERTY_KEY);
+    testVersionedPropertiesConfiguration(CommonsConfigurationUtils.PROPERTIES_CONFIGURATION_HEADER_VERSION_2,
+        TEST_PROPERTY_KEY, false);
   }
 
   @Test
-  public void testSegmentMetadataReaderWithSpecialCharsPropertyKeys()
+  public void testVersionedReaderWithSpecialCharsPropertyKeys()
       throws ConfigurationException {
-    testSegmentMetadataPropertiesConfiguration(null, TEST_PROPERTY_KEY_WITH_SPECIAL_CHAR);
+    testVersionedPropertiesConfiguration(null, TEST_PROPERTY_KEY_WITH_SPECIAL_CHAR, false);
   }
 
   @Test
-  public void testSegmentMetadataReaderWithSpecialCharsPropertyKeysWithHeader()
+  public void testVersionedReaderWithSpecialCharsPropertyKeysWithDefaultHeader()
       throws ConfigurationException {
-    testSegmentMetadataPropertiesConfiguration(CommonsConfigurationUtils.PROPERTIES_CONFIGURATION_HEADER_VERSION_2,
-        TEST_PROPERTY_KEY_WITH_SPECIAL_CHAR);
+    testVersionedPropertiesConfiguration(CommonsConfigurationUtils.DEFAULT_PROPERTIES_CONFIGURATION_HEADER_VERSION,
+        TEST_PROPERTY_KEY_WITH_SPECIAL_CHAR, false);
+  }
+
+  @Test
+  public void testVersionedReaderWithSpecialCharsPropertyKeysWithHeaderVersion2()
+      throws ConfigurationException {
+    testVersionedPropertiesConfiguration(CommonsConfigurationUtils.PROPERTIES_CONFIGURATION_HEADER_VERSION_2,
+        TEST_PROPERTY_KEY_WITH_SPECIAL_CHAR, false);
+  }
+
+  @Test
+  public void testVersionedReaderWithDifferentSeparator() throws ConfigurationException {
+    testVersionedPropertiesConfiguration(CommonsConfigurationUtils.PROPERTIES_CONFIGURATION_HEADER_VERSION_2,
+        TEST_PROPERTY_KEY, true);
   }
 
   @Test
@@ -159,7 +174,8 @@ public class VersionedPropertyConfigTest {
     assertEquals(segmentIndexVersion, "v3");
   }
 
-  private static void testSegmentMetadataPropertiesConfiguration(String versionHeader, String[] keysArray)
+  private static void testVersionedPropertiesConfiguration(String versionHeader, String[] keysArray,
+      boolean setDifferentSeparator)
       throws ConfigurationException {
     PropertiesConfiguration configuration =
         CommonsConfigurationUtils.getSegmentMetadataFromFile(CONFIG_FILE, true);
@@ -167,7 +183,18 @@ public class VersionedPropertyConfigTest {
     // setting the random value of the test keys
     for (String key: keysArray) {
       configuration.setProperty(key, RandomStringUtils.randomAscii(5));
+
+      // setting it at the key level as well for testing
+      if (setDifferentSeparator) {
+        configuration.getLayout().setSeparator(key, COLON_SEPARATOR);
+      }
     }
+
+    // set the different separator, other than '='
+    if (setDifferentSeparator) {
+      configuration.getLayout().setGlobalSeparator(COLON_SEPARATOR);
+    }
+
     // recovered keys from the configuration.
     List<String> recoveredKeys = CommonsConfigurationUtils.getKeys(configuration);
     testPropertyKeys(recoveredKeys, keysArray);

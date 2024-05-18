@@ -44,6 +44,8 @@ import org.apache.commons.lang3.StringUtils;
  * Provide utility functions to manipulate Apache Commons {@link Configuration} instances.
  */
 public class CommonsConfigurationUtils {
+
+  private static final String VERSIONED_CONFIG_SEPARATOR = " = ";
   private static final Character DEFAULT_LIST_DELIMITER = ',';
   public static final String VERSION_HEADER_IDENTIFIER = "version";
 
@@ -77,19 +79,10 @@ public class CommonsConfigurationUtils {
    */
   public static PropertiesConfiguration fromPath(String path, boolean setDefaultDelimiter,
       @Nullable PropertyIOFactoryKind ioFactoryKind)
-      PropertyIOFactoryKind ioFactoryKind)
-  public static PropertiesConfiguration fromPath(@Nullable String path, boolean setIOFactory,
-      boolean setDefaultDelimiter, PropertyIOFactoryKind ioFactoryKind)
       throws ConfigurationException {
     PropertiesConfiguration config = createPropertiesConfiguration(setDefaultDelimiter, ioFactoryKind);
     FileHandler fileHandler = new FileHandler(config);
     fileHandler.load(path);
-    PropertiesConfiguration config = createPropertiesConfiguration(setIOFactory, setDefaultDelimiter);
-    // if provided path is non-empty, load the existing properties from provided file path
-    if (StringUtils.isNotEmpty(path)) {
-      FileHandler fileHandler = new FileHandler(config);
-      fileHandler.load(path);
-    }
     return config;
   }
 
@@ -129,9 +122,9 @@ public class CommonsConfigurationUtils {
       throws ConfigurationException {
     PropertyIOFactoryKind ioFactoryKind = PropertyIOFactoryKind.DefaultIOFactory;
 
-    // if segment metadata contains version header with value '2', set SegmentMetadataIOFactory as IO factory.
+    // if segment metadata contains version header with value '2', set VersionedIOFactory as IO factory.
     if (PROPERTIES_CONFIGURATION_HEADER_VERSION_2.equals(getConfigurationHeaderVersion(file))) {
-      ioFactoryKind = PropertyIOFactoryKind.SegmentMetadataIOFactory;
+      ioFactoryKind = PropertyIOFactoryKind.VersionedIOFactory;
     }
 
     return fromFile(file, setDefaultDelimiter, ioFactoryKind);
@@ -180,11 +173,14 @@ public class CommonsConfigurationUtils {
       String header = String.format("%s=%s", VERSION_HEADER_IDENTIFIER, versionHeader);
       propertiesConfiguration.setHeader(header);
 
-      // checks whether the provided versionHeader equals to SegmentMetadataIOFactory kind.
-      // if true, set IO factory as SegmentMetadataIOFactory
+      // checks whether the provided versionHeader equals to VersionedIOFactory kind.
+      // if true, set IO factory as VersionedIOFactory
       if (PROPERTIES_CONFIGURATION_HEADER_VERSION_2.equals(versionHeader)) {
-        // set segment metadata IOFactory
-        propertiesConfiguration.setIOFactory(PropertyIOFactoryKind.SegmentMetadataIOFactory.getInstance());
+        // set versioned IOFactory
+        propertiesConfiguration.setIOFactory(PropertyIOFactoryKind.VersionedIOFactory.getInstance());
+        // setting the global separator makes sure the configurations gets written with ' = ' separator.
+        // global separator overrides the separator set at the key level as well.
+        propertiesConfiguration.getLayout().setGlobalSeparator(VERSIONED_CONFIG_SEPARATOR);
       }
     }
     saveToFile(propertiesConfiguration, file);
