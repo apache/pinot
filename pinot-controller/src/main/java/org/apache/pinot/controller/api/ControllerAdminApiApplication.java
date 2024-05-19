@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.api;
 
+import io.swagger.jaxrs.listing.SwaggerSerializers;
 import java.io.IOException;
 import java.util.List;
 import javax.servlet.http.HttpServletResponse;
@@ -65,7 +66,7 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     register(JacksonFeature.class);
     register(MultiPartFeature.class);
     register(SwaggerApiListingResource.class);
-    register(io.swagger.jaxrs.listing.SwaggerSerializers.class);
+    register(SwaggerSerializers.class);
     register(new CorsFilter());
     register(AuthenticationFilter.class);
     // property("jersey.config.server.tracing.type", "ALL");
@@ -86,8 +87,7 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     }
     ClassLoader classLoader = ControllerAdminApiApplication.class.getClassLoader();
     PinotReflectionUtils.runWithLock(() ->
-        SwaggerSetupUtil.setupSwagger("Controller", _controllerResourcePackages, _useHttps, false,
-           "/", classLoader, _httpServer));
+        SwaggerSetupUtil.setupSwagger("Controller", _controllerResourcePackages, _useHttps, "/", _httpServer));
 
     // This is ugly from typical patterns to setup static resources but all our APIs are
     // at path "/". So, configuring static handler for path "/" does not work well.

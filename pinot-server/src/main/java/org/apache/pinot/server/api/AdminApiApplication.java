@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.server.api;
 
+import io.swagger.jaxrs.listing.SwaggerSerializers;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
@@ -92,7 +93,7 @@ public class AdminApiApplication extends ResourceConfig {
     register(JacksonFeature.class);
 
     register(SwaggerApiListingResource.class);
-    register(io.swagger.jaxrs.listing.SwaggerSerializers.class);
+    register(SwaggerSerializers.class);
     register(new ContainerResponseFilter() {
       @Override
       public void filter(ContainerRequestContext containerRequestContext,
@@ -122,8 +123,7 @@ public class AdminApiApplication extends ResourceConfig {
       boolean useHttps = Boolean.parseBoolean(
           pinotConfiguration.getProperty(CommonConstants.Server.CONFIG_OF_SWAGGER_USE_HTTPS));
       PinotReflectionUtils.runWithLock(() ->
-          SwaggerSetupUtil.setupSwagger("server", _adminApiResourcePackages, useHttps, true,
-              "/", AdminApiApplication.class.getClassLoader(), _httpServer));
+          SwaggerSetupUtil.setupSwagger("Server", _adminApiResourcePackages, useHttps, "/", _httpServer));
     }
     return true;
   }

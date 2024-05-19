@@ -19,6 +19,7 @@
 package org.apache.pinot.tools.service;
 
 import com.google.common.base.Preconditions;
+import io.swagger.jaxrs.listing.SwaggerSerializers;
 import java.net.URI;
 import org.apache.pinot.common.swagger.SwaggerApiListingResource;
 import org.apache.pinot.common.swagger.SwaggerSetupUtil;
@@ -46,7 +47,7 @@ public class PinotServiceManagerAdminApiApplication extends ResourceConfig {
     });
     register(JacksonFeature.class);
     register(SwaggerApiListingResource.class);
-    register(io.swagger.jaxrs.listing.SwaggerSerializers.class);
+    register(SwaggerSerializers.class);
   }
 
   public void start(int httpPort) {
@@ -54,8 +55,7 @@ public class PinotServiceManagerAdminApiApplication extends ResourceConfig {
     _baseUri = URI.create("http://0.0.0.0:" + httpPort + "/");
     _httpServer = GrizzlyHttpServerFactory.createHttpServer(_baseUri, this);
     PinotReflectionUtils.runWithLock(() ->
-        SwaggerSetupUtil.setupSwagger("Starter", RESOURCE_PACKAGE, false, false,
-            _baseUri.getPath(), PinotServiceManagerAdminApiApplication.class.getClassLoader(), _httpServer));
+        SwaggerSetupUtil.setupSwagger("Starter", RESOURCE_PACKAGE, false, _baseUri.getPath(), _httpServer));
   }
 
   public void stop() {

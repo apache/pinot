@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.minion;
 
+import io.swagger.jaxrs.listing.SwaggerSerializers;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
@@ -74,7 +75,7 @@ public class MinionAdminApiApplication extends ResourceConfig {
     });
 
     register(SwaggerApiListingResource.class);
-    register(io.swagger.jaxrs.listing.SwaggerSerializers.class);
+    register(SwaggerSerializers.class);
   }
 
   public void start(List<ListenerConfig> listenerConfigs) {
@@ -86,8 +87,7 @@ public class MinionAdminApiApplication extends ResourceConfig {
       throw new RuntimeException("Failed to start http server", e);
     }
     PinotReflectionUtils.runWithLock(() ->
-        SwaggerSetupUtil.setupSwagger("Minion", RESOURCE_PACKAGE, _useHttps, false,
-            "/", MinionAdminApiApplication.class.getClassLoader(), _httpServer));
+        SwaggerSetupUtil.setupSwagger("Minion", RESOURCE_PACKAGE, _useHttps, "/", _httpServer));
   }
 
   public void stop() {

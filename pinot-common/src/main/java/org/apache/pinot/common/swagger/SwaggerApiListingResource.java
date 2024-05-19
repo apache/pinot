@@ -34,6 +34,7 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriInfo;
 import org.apache.commons.lang3.StringUtils;
 
+
 /*
  This class is required to avoid the jersey2 warning messages regarding servlet config constructor missing while
  injecting the config. Please refer to Pinot issue 13047 & 5306 for more context.
@@ -50,10 +51,7 @@ public class SwaggerApiListingResource extends BaseApiListingResource {
   @GET
   @Produces({MediaType.APPLICATION_JSON, "application/yaml"})
   @ApiOperation(value = "The swagger definition in either JSON or YAML", hidden = true)
-  public Response getListing(
-      @Context Application app,
-      @Context HttpHeaders headers,
-      @Context UriInfo uriInfo,
+  public Response getListing(@Context Application app, @Context HttpHeaders headers, @Context UriInfo uriInfo,
       @PathParam("type") String type) {
     if (StringUtils.isNotBlank(type) && type.trim().equalsIgnoreCase("yaml")) {
       return getListingYamlResponse(app, _context, _servletConfig, headers, uriInfo);
