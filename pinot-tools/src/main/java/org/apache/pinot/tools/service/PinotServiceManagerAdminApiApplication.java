@@ -22,7 +22,7 @@ import com.google.common.base.Preconditions;
 import io.swagger.jaxrs.listing.SwaggerSerializers;
 import java.net.URI;
 import org.apache.pinot.common.swagger.SwaggerApiListingResource;
-import org.apache.pinot.common.swagger.SwaggerSetupUtil;
+import org.apache.pinot.common.swagger.SwaggerSetupUtils;
 import org.apache.pinot.spi.utils.PinotReflectionUtils;
 import org.glassfish.grizzly.http.server.HttpServer;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
@@ -55,7 +55,7 @@ public class PinotServiceManagerAdminApiApplication extends ResourceConfig {
     _baseUri = URI.create("http://0.0.0.0:" + httpPort + "/");
     _httpServer = GrizzlyHttpServerFactory.createHttpServer(_baseUri, this);
     PinotReflectionUtils.runWithLock(() ->
-        SwaggerSetupUtil.setupSwagger("Starter", RESOURCE_PACKAGE, false, _baseUri.getPath(), _httpServer));
+        SwaggerSetupUtils.setupSwagger("Starter", RESOURCE_PACKAGE, false, _baseUri.getPath(), _httpServer));
   }
 
   public void stop() {

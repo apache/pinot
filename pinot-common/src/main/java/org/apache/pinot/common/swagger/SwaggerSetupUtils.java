@@ -29,8 +29,8 @@ import org.glassfish.grizzly.http.server.CLStaticHttpHandler;
 import org.glassfish.grizzly.http.server.HttpServer;
 
 
-public class SwaggerSetupUtil {
-  private SwaggerSetupUtil() {
+public class SwaggerSetupUtils {
+  private SwaggerSetupUtils() {
   }
 
   public static void setupSwagger(String componentType, String resourcePackage, boolean useHttps, String basePath,
@@ -56,7 +56,7 @@ public class SwaggerSetupUtil {
       throw new RuntimeException("Cannot get localhost name");
     }
 
-    ClassLoader classLoader = SwaggerSetupUtil.class.getClassLoader();
+    ClassLoader classLoader = SwaggerSetupUtils.class.getClassLoader();
     CLStaticHttpHandler staticHttpHandler = new CLStaticHttpHandler(classLoader, "/api/");
     // map both /api and /help to swagger docs. /api because it looks nice. /help for backward compatibility
     httpServer.getServerConfiguration().addHttpHandler(staticHttpHandler, "/api/", "/help/");

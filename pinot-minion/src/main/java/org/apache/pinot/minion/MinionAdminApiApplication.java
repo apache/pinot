@@ -23,7 +23,7 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 import org.apache.pinot.common.swagger.SwaggerApiListingResource;
-import org.apache.pinot.common.swagger.SwaggerSetupUtil;
+import org.apache.pinot.common.swagger.SwaggerSetupUtils;
 import org.apache.pinot.common.utils.log.DummyLogFileServer;
 import org.apache.pinot.common.utils.log.LocalLogFileServer;
 import org.apache.pinot.common.utils.log.LogFileServer;
@@ -87,7 +87,7 @@ public class MinionAdminApiApplication extends ResourceConfig {
       throw new RuntimeException("Failed to start http server", e);
     }
     PinotReflectionUtils.runWithLock(() ->
-        SwaggerSetupUtil.setupSwagger("Minion", RESOURCE_PACKAGE, _useHttps, "/", _httpServer));
+        SwaggerSetupUtils.setupSwagger("Minion", RESOURCE_PACKAGE, _useHttps, "/", _httpServer));
   }
 
   public void stop() {

@@ -29,7 +29,7 @@ import javax.ws.rs.container.ContainerResponseFilter;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.swagger.SwaggerApiListingResource;
-import org.apache.pinot.common.swagger.SwaggerSetupUtil;
+import org.apache.pinot.common.swagger.SwaggerSetupUtils;
 import org.apache.pinot.common.utils.log.DummyLogFileServer;
 import org.apache.pinot.common.utils.log.LocalLogFileServer;
 import org.apache.pinot.common.utils.log.LogFileServer;
@@ -123,7 +123,7 @@ public class AdminApiApplication extends ResourceConfig {
       boolean useHttps = Boolean.parseBoolean(
           pinotConfiguration.getProperty(CommonConstants.Server.CONFIG_OF_SWAGGER_USE_HTTPS));
       PinotReflectionUtils.runWithLock(() ->
-          SwaggerSetupUtil.setupSwagger("Server", _adminApiResourcePackages, useHttps, "/", _httpServer));
+          SwaggerSetupUtils.setupSwagger("Server", _adminApiResourcePackages, useHttps, "/", _httpServer));
     }
     return true;
   }

@@ -26,7 +26,7 @@ import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerResponseContext;
 import javax.ws.rs.container.ContainerResponseFilter;
 import org.apache.pinot.common.swagger.SwaggerApiListingResource;
-import org.apache.pinot.common.swagger.SwaggerSetupUtil;
+import org.apache.pinot.common.swagger.SwaggerSetupUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AuthenticationFilter;
 import org.apache.pinot.core.api.ServiceAutoDiscoveryFeature;
@@ -87,7 +87,7 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     }
     ClassLoader classLoader = ControllerAdminApiApplication.class.getClassLoader();
     PinotReflectionUtils.runWithLock(() ->
-        SwaggerSetupUtil.setupSwagger("Controller", _controllerResourcePackages, _useHttps, "/", _httpServer));
+        SwaggerSetupUtils.setupSwagger("Controller", _controllerResourcePackages, _useHttps, "/", _httpServer));
 
     // This is ugly from typical patterns to setup static resources but all our APIs are
     // at path "/". So, configuring static handler for path "/" does not work well.

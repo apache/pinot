@@ -34,7 +34,7 @@ import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
 import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.swagger.SwaggerApiListingResource;
-import org.apache.pinot.common.swagger.SwaggerSetupUtil;
+import org.apache.pinot.common.swagger.SwaggerSetupUtils;
 import org.apache.pinot.common.utils.log.DummyLogFileServer;
 import org.apache.pinot.common.utils.log.LocalLogFileServer;
 import org.apache.pinot.common.utils.log.LogFileServer;
@@ -135,7 +135,7 @@ public class BrokerAdminApiApplication extends ResourceConfig {
 
     if (_swaggerBrokerEnabled) {
       PinotReflectionUtils.runWithLock(() ->
-          SwaggerSetupUtil.setupSwagger("Broker", _brokerResourcePackages, _useHttps, "/", _httpServer));
+          SwaggerSetupUtils.setupSwagger("Broker", _brokerResourcePackages, _useHttps, "/", _httpServer));
     } else {
       LOGGER.info("Hiding Swagger UI for Broker, by {}", CommonConstants.Broker.CONFIG_OF_SWAGGER_BROKER_ENABLED);
     }
@@ -143,11 +143,11 @@ public class BrokerAdminApiApplication extends ResourceConfig {
 
   private BrokerManagedAsyncExecutorProvider buildBrokerManagedAsyncExecutorProvider(PinotConfiguration brokerConf,
       BrokerMetrics brokerMetrics) {
-    int corePoolSize = brokerConf
-        .getProperty(CommonConstants.Broker.CONFIG_OF_JERSEY_THREADPOOL_EXECUTOR_CORE_POOL_SIZE,
+    int corePoolSize =
+        brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_JERSEY_THREADPOOL_EXECUTOR_CORE_POOL_SIZE,
             CommonConstants.Broker.DEFAULT_JERSEY_THREADPOOL_EXECUTOR_CORE_POOL_SIZE);
-    int maximumPoolSize = brokerConf
-        .getProperty(CommonConstants.Broker.CONFIG_OF_JERSEY_THREADPOOL_EXECUTOR_MAX_POOL_SIZE,
+    int maximumPoolSize =
+        brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_JERSEY_THREADPOOL_EXECUTOR_MAX_POOL_SIZE,
             CommonConstants.Broker.DEFAULT_JERSEY_THREADPOOL_EXECUTOR_MAX_POOL_SIZE);
     int queueSize = brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_JERSEY_THREADPOOL_EXECUTOR_QUEUE_SIZE,
         CommonConstants.Broker.DEFAULT_JERSEY_THREADPOOL_EXECUTOR_QUEUE_SIZE);
