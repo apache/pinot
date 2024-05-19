@@ -111,28 +111,26 @@ public abstract class BaseTaskExecutor implements PinotTaskExecutor {
   }
 
   protected void downloadSegmentToLocal(String tableNameWithType, String segmentName, String deepstoreURL,
-      String taskType, File tarredSegmentFile, String crypterName)
+      String taskType, File tarredSegmentFile)
       throws Exception {
-    LOGGER.info("Downloading segment from {} to {}", deepstoreURL, tarredSegmentFile.getAbsolutePath());
+    LOGGER.info("Downloading segment {} from {} to {}", segmentName, deepstoreURL, tarredSegmentFile.getAbsolutePath());
+    TableConfig tableConfig = getTableConfig(tableNameWithType);
+    String crypterName = tableConfig.getValidationConfig().getCrypterClassName();
     try {
       // download from deepstore first
       SegmentFetcherFactory.fetchAndDecryptSegmentToLocal(deepstoreURL, tarredSegmentFile, crypterName);
     } catch (Exception e) {
       LOGGER.error("Segment download failed from deepstore for {}, crypter:{}", deepstoreURL, crypterName, e);
-      TableConfig tableConfig = getTableConfig(tableNameWithType);
       String peerDownloadScheme = tableConfig.getValidationConfig().getPeerSegmentDownloadScheme();
       if (MinionTaskUtils.extractMinionAllowDownloadFromServer(tableConfig, taskType) && peerDownloadScheme != null) {
         LOGGER.info("Trying to download from servers for segment {} post deepstore download failed", segmentName);
-        SegmentFetcherFactory.getSegmentFetcher(
-                getTableConfig(tableNameWithType).getValidationConfig().getPeerSegmentDownloadScheme())
-            .fetchSegmentToLocal(segmentName, () -> {
-                  List<URI> uris =
-                      PeerServerSegmentFinder.getPeerServerURIs(MINION_CONTEXT.getHelixManager(), tableNameWithType,
-                          segmentName, peerDownloadScheme);
-                  Collections.shuffle(uris);
-                  return uris;
-                },
-                tarredSegmentFile);
+        SegmentFetcherFactory.fetchAndDecryptSegmentToLocal(segmentName, peerDownloadScheme, () -> {
+          List<URI> uris =
+              PeerServerSegmentFinder.getPeerServerURIs(MINION_CONTEXT.getHelixManager(), tableNameWithType,
+                  segmentName, peerDownloadScheme);
+          Collections.shuffle(uris);
+          return uris;
+          }, tarredSegmentFile, crypterName);
       } else {
         throw e;
       }
