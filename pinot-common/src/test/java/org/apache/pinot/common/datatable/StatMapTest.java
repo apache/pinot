@@ -180,7 +180,6 @@ public class StatMapTest {
         .merge(BrokerResponseNativeV2.StatKey.NUM_DOCS_SCANNED, 10)
         .merge(BrokerResponseNativeV2.StatKey.NUM_ENTRIES_SCANNED_POST_FILTER, 5)
         .merge(BrokerResponseNativeV2.StatKey.TOTAL_DOCS, 5)
-        .merge(BrokerResponseNativeV2.StatKey.TIME_USED_MS, 95)
     };
   }
 

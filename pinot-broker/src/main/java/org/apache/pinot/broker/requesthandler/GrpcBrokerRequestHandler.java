@@ -23,6 +23,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.lang3.tuple.Pair;
@@ -30,9 +31,7 @@ import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.common.config.GrpcConfig;
-import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.config.provider.TableCache;
-import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
@@ -43,37 +42,23 @@ import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListener;
 import org.apache.pinot.spi.trace.RequestContext;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
  * The <code>GrpcBrokerRequestHandler</code> class communicates query request via GRPC.
  */
 @ThreadSafe
-public class GrpcBrokerRequestHandler extends BaseBrokerRequestHandler {
-  private static final Logger LOGGER = LoggerFactory.getLogger(GrpcBrokerRequestHandler.class);
-
-  private final GrpcConfig _grpcConfig;
+public class GrpcBrokerRequestHandler extends BaseSingleStageBrokerRequestHandler {
   private final StreamingReduceService _streamingReduceService;
   private final PinotStreamingQueryClient _streamingQueryClient;
 
   // TODO: Support TLS
   public GrpcBrokerRequestHandler(PinotConfiguration config, String brokerId, BrokerRoutingManager routingManager,
-      AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
-      BrokerMetrics brokerMetrics, TlsConfig tlsConfig, BrokerQueryEventListener brokerQueryEventListener) {
-    super(config, brokerId, routingManager, accessControlFactory, queryQuotaManager, tableCache, brokerMetrics,
-        brokerQueryEventListener);
-    LOGGER.info("Using Grpc BrokerRequestHandler.");
-    _grpcConfig = GrpcConfig.buildGrpcQueryConfig(config);
-
-    // create streaming query client
-    _streamingQueryClient = new PinotStreamingQueryClient(_grpcConfig);
-
-    // create streaming reduce service
+      AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache) {
+    super(config, brokerId, routingManager, accessControlFactory, queryQuotaManager, tableCache);
     _streamingReduceService = new StreamingReduceService(config);
+    _streamingQueryClient = new PinotStreamingQueryClient(GrpcConfig.buildGrpcQueryConfig(config));
   }
 
   @Override
@@ -81,7 +66,7 @@ public class GrpcBrokerRequestHandler extends BaseBrokerRequestHandler {
   }
 
   @Override
-  public synchronized void shutDown() {
+  public void shutDown() {
     _streamingQueryClient.shutdown();
     _streamingReduceService.shutDown();
   }
@@ -95,6 +80,7 @@ public class GrpcBrokerRequestHandler extends BaseBrokerRequestHandler {
       ServerStats serverStats, RequestContext requestContext)
       throws Exception {
     // TODO: Support failure detection
+    // TODO: Add servers queried/responded stats
     assert offlineBrokerRequest != null || realtimeBrokerRequest != null;
     Map<ServerRoutingInstance, Iterator<Server.ServerResponse>> responseMap = new HashMap<>();
     if (offlineBrokerRequest != null) {
@@ -107,10 +93,10 @@ public class GrpcBrokerRequestHandler extends BaseBrokerRequestHandler {
       sendRequest(requestId, TableType.REALTIME, realtimeBrokerRequest, realtimeRoutingTable, responseMap,
           requestContext.isSampledRequest());
     }
-    final long startReduceTimeNanos = System.nanoTime();
+    long reduceStartTimeNs = System.nanoTime();
     BrokerResponseNative brokerResponse =
         _streamingReduceService.reduceOnStreamResponse(originalBrokerRequest, responseMap, timeoutMs, _brokerMetrics);
-    requestContext.setReduceTimeNanos(System.nanoTime() - startReduceTimeNanos);
+    brokerResponse.setBrokerReduceTimeMs(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - reduceStartTimeNs));
     return brokerResponse;
   }
 

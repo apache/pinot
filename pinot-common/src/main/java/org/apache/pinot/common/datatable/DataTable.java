@@ -131,13 +131,13 @@ public interface DataTable {
     EXPLAIN_PLAN_NUM_MATCH_ALL_FILTER_SEGMENTS(25, "explainPlanNumMatchAllFilterSegments", MetadataValueType.INT),
     NUM_CONSUMING_SEGMENTS_PROCESSED(26, "numConsumingSegmentsProcessed", MetadataValueType.INT),
     NUM_CONSUMING_SEGMENTS_MATCHED(27, "numConsumingSegmentsMatched", MetadataValueType.INT),
+    // The following keys (28 - 34) are deprecated keys for multi-stage query engine.
     NUM_BLOCKS(28, "numBlocks", MetadataValueType.INT),
     NUM_ROWS(29, "numRows", MetadataValueType.INT),
     OPERATOR_EXECUTION_TIME_MS(30, "operatorExecutionTimeMs", MetadataValueType.LONG),
     OPERATOR_ID(31, "operatorId", MetadataValueType.STRING),
     OPERATOR_EXEC_START_TIME_MS(32, "operatorExecStartTimeMs", MetadataValueType.LONG),
     OPERATOR_EXEC_END_TIME_MS(33, "operatorExecEndTimeMs", MetadataValueType.LONG),
-    // Not actually used
     MAX_ROWS_IN_JOIN_REACHED(34, "maxRowsInJoinReached", MetadataValueType.STRING);
 
     // We keep this constant to track the max id added so far for backward compatibility.

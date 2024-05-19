@@ -25,10 +25,9 @@ import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.broker.api.RequesterIdentity;
-import org.apache.pinot.broker.requesthandler.BaseBrokerRequestHandler;
+import org.apache.pinot.broker.requesthandler.BaseSingleStageBrokerRequestHandler.ServerStats;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -112,35 +111,27 @@ public class QueryLogger {
   }
 
   private boolean shouldForceLog(QueryLogParams params) {
-    return params._response.isNumGroupsLimitReached() || params._response.getExceptionsSize() > 0
-        || params._timeUsedMs > TimeUnit.SECONDS.toMillis(1);
+    return params._response.isPartialResult() || params._response.getTimeUsedMs() > TimeUnit.SECONDS.toMillis(1);
   }
 
   public static class QueryLogParams {
-    final long _requestId;
     final String _query;
-    final RequestContext _requestContext;
     final String _table;
     final int _numUnavailableSegments;
     @Nullable
-    final BaseBrokerRequestHandler.ServerStats _serverStats;
+    final ServerStats _serverStats;
     final BrokerResponse _response;
-    final long _timeUsedMs;
     @Nullable
     final RequesterIdentity _requester;
 
-    public QueryLogParams(long requestId, String query, RequestContext requestContext, String table,
-        int numUnavailableSegments, @Nullable BaseBrokerRequestHandler.ServerStats serverStats, BrokerResponse response,
-        long timeUsedMs, @Nullable RequesterIdentity requester) {
-      _requestId = requestId;
+    public QueryLogParams(String query, String table, int numUnavailableSegments, @Nullable ServerStats serverStats,
+        BrokerResponse response, @Nullable RequesterIdentity requester) {
       _query = query;
       _table = table;
-      _timeUsedMs = timeUsedMs;
-      _requestContext = requestContext;
-      _requester = requester;
-      _response = response;
-      _serverStats = serverStats;
       _numUnavailableSegments = numUnavailableSegments;
+      _serverStats = serverStats;
+      _response = response;
+      _requester = requester;
     }
   }
 
@@ -152,7 +143,7 @@ public class QueryLogger {
     REQUEST_ID("requestId") {
       @Override
       void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
-        builder.append(params._requestId);
+        builder.append(params._response.getRequestId());
       }
     },
     TABLE("table") {
@@ -164,7 +155,7 @@ public class QueryLogger {
     TIME_MS("timeMs") {
       @Override
       void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
-        builder.append(params._timeUsedMs);
+        builder.append(params._response.getTimeUsedMs());
       }
     },
     DOCS("docs") {
@@ -215,7 +206,7 @@ public class QueryLogger {
     BROKER_REDUCE_TIME_MS("brokerReduceTimeMs") {
       @Override
       void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
-        builder.append(params._requestContext.getReduceTimeMillis());
+        builder.append(params._response.getBrokerReduceTimeMs());
       }
     },
     EXCEPTIONS("exceptions") {

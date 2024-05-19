@@ -212,7 +212,7 @@ public abstract class MultiStageOperator
         for (LeafStageTransferableBlockOperator.StatKey statKey : stats.keySet()) {
           statKey.updateBrokerMetadata(brokerStats, stats);
         }
-        response.addServerStats(brokerStats);
+        response.addBrokerStats(brokerStats);
       }
     },
     LITERAL(LiteralValueOperator.StatKey.class) {

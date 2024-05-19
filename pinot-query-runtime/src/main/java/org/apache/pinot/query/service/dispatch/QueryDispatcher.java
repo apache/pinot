@@ -84,17 +84,17 @@ public class QueryDispatcher {
         new TracedThreadFactory(Thread.NORM_PRIORITY, false, PINOT_BROKER_QUERY_DISPATCHER_FORMAT));
   }
 
+  public void start() {
+    _mailboxService.start();
+  }
+
   public QueryResult submitAndReduce(RequestContext context, DispatchableSubPlan dispatchableSubPlan, long timeoutMs,
       Map<String, String> queryOptions)
       throws Exception {
     long requestId = context.getRequestId();
     try {
       submit(requestId, dispatchableSubPlan, timeoutMs, queryOptions);
-      long reduceStartTimeNs = System.nanoTime();
-      QueryResult queryResult =
-          runReducer(requestId, dispatchableSubPlan, timeoutMs, queryOptions, _mailboxService);
-      context.setReduceTimeNanos(System.nanoTime() - reduceStartTimeNs);
-      return queryResult;
+      return runReducer(requestId, dispatchableSubPlan, timeoutMs, queryOptions, _mailboxService);
     } catch (Throwable e) {
       // TODO: Consider always cancel when it returns (early terminate)
       cancel(requestId, dispatchableSubPlan);
@@ -248,6 +248,9 @@ public class QueryDispatcher {
   @VisibleForTesting
   public static QueryResult runReducer(long requestId, DispatchableSubPlan dispatchableSubPlan, long timeoutMs,
       Map<String, String> queryOptions, MailboxService mailboxService) {
+    long startTimeMs = System.currentTimeMillis();
+    long deadlineMs = startTimeMs + timeoutMs;
+
     // NOTE: Reduce stage is always stage 0
     DispatchablePlanFragment dispatchableStagePlan = dispatchableSubPlan.getQueryStageList().get(0);
     PlanFragment planFragment = dispatchableStagePlan.getPlanFragment();
@@ -260,16 +263,11 @@ public class QueryDispatcher {
         workerMetadataList.size());
     StageMetadata stageMetadata = new StageMetadata(0, workerMetadataList, dispatchableStagePlan.getCustomProperties());
     OpChainExecutionContext opChainExecutionContext =
-        new OpChainExecutionContext(mailboxService, requestId, System.currentTimeMillis() + timeoutMs, queryOptions,
-            stageMetadata, workerMetadataList.get(0), null);
-    MailboxReceiveOperator receiveOperator =
-        new MailboxReceiveOperator(opChainExecutionContext, receiveNode.getDistributionType(),
-            receiveNode.getSenderStageId());
-    return getQueryResult(receiveOperator, receiveNode.getDataSchema(), dispatchableSubPlan.getQueryResultFields());
-  }
+        new OpChainExecutionContext(mailboxService, requestId, deadlineMs, queryOptions, stageMetadata,
+            workerMetadataList.get(0), null);
 
-  private static QueryResult getQueryResult(MailboxReceiveOperator receiveOperator, DataSchema sourceDataSchema,
-      PairList<Integer, String> resultFields) {
+    PairList<Integer, String> resultFields = dispatchableSubPlan.getQueryResultFields();
+    DataSchema sourceDataSchema = receiveNode.getDataSchema();
     int numColumns = resultFields.size();
     String[] columnNames = new String[numColumns];
     ColumnDataType[] columnTypes = new ColumnDataType[numColumns];
@@ -281,38 +279,40 @@ public class QueryDispatcher {
     DataSchema resultDataSchema = new DataSchema(columnNames, columnTypes);
 
     ArrayList<Object[]> resultRows = new ArrayList<>();
-    TransferableBlock block = receiveOperator.nextBlock();
-
-    while (!TransferableBlockUtils.isEndOfStream(block)) {
-      DataBlock dataBlock = block.getDataBlock();
-      int numRows = dataBlock.getNumberOfRows();
-      if (numRows > 0) {
-        resultRows.ensureCapacity(resultRows.size() + numRows);
-        List<Object[]> rawRows = DataBlockExtractUtils.extractRows(dataBlock);
-        for (Object[] rawRow : rawRows) {
-          Object[] row = new Object[numColumns];
-          for (int i = 0; i < numColumns; i++) {
-            Object rawValue = rawRow[resultFields.get(i).getKey()];
-            if (rawValue != null) {
-              ColumnDataType dataType = columnTypes[i];
-              row[i] = dataType.format(dataType.toExternal(rawValue));
-            }
-          }
-          resultRows.add(row);
-        }
-      }
+    TransferableBlock block;
+    try (MailboxReceiveOperator receiveOperator = new MailboxReceiveOperator(opChainExecutionContext,
+        receiveNode.getDistributionType(), receiveNode.getSenderStageId())) {
       block = receiveOperator.nextBlock();
+      while (!TransferableBlockUtils.isEndOfStream(block)) {
+        DataBlock dataBlock = block.getDataBlock();
+        int numRows = dataBlock.getNumberOfRows();
+        if (numRows > 0) {
+          resultRows.ensureCapacity(resultRows.size() + numRows);
+          List<Object[]> rawRows = DataBlockExtractUtils.extractRows(dataBlock);
+          for (Object[] rawRow : rawRows) {
+            Object[] row = new Object[numColumns];
+            for (int i = 0; i < numColumns; i++) {
+              Object rawValue = rawRow[resultFields.get(i).getKey()];
+              if (rawValue != null) {
+                ColumnDataType dataType = columnTypes[i];
+                row[i] = dataType.format(dataType.toExternal(rawValue));
+              }
+            }
+            resultRows.add(row);
+          }
+        }
+        block = receiveOperator.nextBlock();
+      }
     }
-    MultiStageQueryStats queryStats;
+    // TODO: Improve the error handling, e.g. return partial response
     if (block.isErrorBlock()) {
       throw new RuntimeException("Received error query execution result block: " + block.getExceptions());
-    } else {
-      assert block.isSuccessfulEndOfStreamBlock();
-      queryStats = block.getQueryStats();
-      assert queryStats != null;
     }
-
-    return new QueryResult(new ResultTable(resultDataSchema, resultRows), queryStats);
+    assert block.isSuccessfulEndOfStreamBlock();
+    MultiStageQueryStats queryStats = block.getQueryStats();
+    assert queryStats != null;
+    return new QueryResult(new ResultTable(resultDataSchema, resultRows), queryStats,
+        System.currentTimeMillis() - startTimeMs);
   }
 
   public void shutdown() {
@@ -320,22 +320,26 @@ public class QueryDispatcher {
       dispatchClient.getChannel().shutdown();
     }
     _dispatchClientMap.clear();
+    _mailboxService.shutdown();
+    _executorService.shutdown();
   }
 
   public static class QueryResult {
     private final ResultTable _resultTable;
     private final List<MultiStageQueryStats.StageStats.Closed> _queryStats;
+    private final long _brokerReduceTimeMs;
 
-    public QueryResult(ResultTable resultTable, MultiStageQueryStats queryStats) {
+    public QueryResult(ResultTable resultTable, MultiStageQueryStats queryStats, long brokerReduceTimeMs) {
       _resultTable = resultTable;
-
-      Preconditions.checkArgument(queryStats.getCurrentStageId() == 0,
-          "Expecting query stats for stage 0, got: %s", queryStats.getCurrentStageId());
-      _queryStats = new ArrayList<>(queryStats.getMaxStageId());
+      Preconditions.checkArgument(queryStats.getCurrentStageId() == 0, "Expecting query stats for stage 0, got: %s",
+          queryStats.getCurrentStageId());
+      int numStages = queryStats.getMaxStageId() + 1;
+      _queryStats = new ArrayList<>(numStages);
       _queryStats.add(queryStats.getCurrentStats().close());
-      for (int i = 1; i <= queryStats.getMaxStageId(); i++) {
+      for (int i = 1; i < numStages; i++) {
         _queryStats.add(queryStats.getUpstreamStageStats(i));
       }
+      _brokerReduceTimeMs = brokerReduceTimeMs;
     }
 
     public ResultTable getResultTable() {
@@ -344,6 +348,10 @@ public class QueryDispatcher {
 
     public List<MultiStageQueryStats.StageStats.Closed> getQueryStats() {
       return _queryStats;
+    }
+
+    public long getBrokerReduceTimeMs() {
+      return _brokerReduceTimeMs;
     }
   }
 }

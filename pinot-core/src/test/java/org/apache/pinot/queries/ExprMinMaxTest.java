@@ -195,13 +195,13 @@ public class ExprMinMaxTest extends BaseQueriesTest {
 
     query = "SELECT expr_max(mvDoubleColumn, mvDoubleColumn) FROM testTable";
     BrokerResponse brokerResponse = getBrokerResponse(query);
-    Assert.assertTrue(brokerResponse.getProcessingExceptions().get(0).getMessage().contains(
+    Assert.assertTrue(brokerResponse.getExceptions().get(0).getMessage().contains(
         "java.lang.IllegalStateException: ExprMinMax only supports single-valued measuring columns"
     ));
 
     query = "SELECT expr_max(mvDoubleColumn, jsonColumn) FROM testTable";
     brokerResponse = getBrokerResponse(query);
-    Assert.assertTrue(brokerResponse.getProcessingExceptions().get(0).getMessage().contains(
+    Assert.assertTrue(brokerResponse.getExceptions().get(0).getMessage().contains(
         "Cannot compute exprminMax measuring on non-comparable type: JSON"
     ));
   }

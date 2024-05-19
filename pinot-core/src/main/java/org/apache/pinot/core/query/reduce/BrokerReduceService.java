@@ -23,7 +23,6 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.exception.QueryException;
@@ -60,7 +59,7 @@ public class BrokerReduceService extends BaseReduceService {
   }
 
   public BrokerResponseNative reduceOnDataTable(BrokerRequest brokerRequest, BrokerRequest serverBrokerRequest,
-      Map<ServerRoutingInstance, DataTable> dataTableMap, long reduceTimeOutMs, @Nullable BrokerMetrics brokerMetrics) {
+      Map<ServerRoutingInstance, DataTable> dataTableMap, long reduceTimeOutMs, BrokerMetrics brokerMetrics) {
     if (dataTableMap.isEmpty()) {
       // Empty response.
       return BrokerResponseNative.empty();
@@ -126,10 +125,8 @@ public class BrokerReduceService extends BaseReduceService {
           String.format("%s: responses for table: %s from servers: %s got dropped due to data schema inconsistency.",
               QueryException.MERGE_RESPONSE_ERROR.getMessage(), tableName, serversWithConflictingDataSchema);
       LOGGER.warn(errorMessage);
-      if (brokerMetrics != null) {
-        brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.RESPONSE_MERGE_EXCEPTIONS, 1L);
-      }
-      brokerResponseNative.addToExceptions(
+      brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.RESPONSE_MERGE_EXCEPTIONS, 1);
+      brokerResponseNative.addException(
           new QueryProcessingException(QueryException.MERGE_RESPONSE_ERROR_CODE, errorMessage));
     }
 
@@ -159,7 +156,7 @@ public class BrokerReduceService extends BaseReduceService {
           new DataTableReducerContext(_reduceExecutorService, _maxReduceThreadsPerQuery, reduceTimeOutMs,
               groupTrimThreshold, minGroupTrimSize), brokerMetrics);
     } catch (EarlyTerminationException e) {
-      brokerResponseNative.addToExceptions(
+      brokerResponseNative.addException(
           new QueryProcessingException(QueryException.QUERY_CANCELLATION_ERROR_CODE, e.toString()));
     }
     QueryContext queryContext;
