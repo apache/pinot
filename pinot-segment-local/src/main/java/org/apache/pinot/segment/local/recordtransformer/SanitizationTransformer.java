@@ -20,10 +20,14 @@ package org.apache.pinot.segment.local.recordtransformer;
 
 import java.util.HashMap;
 import java.util.Map;
+import javax.xml.crypto.Data;
+import org.apache.pinot.common.metrics.ServerMeter;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.StringUtil;
 
 
@@ -39,22 +43,34 @@ import org.apache.pinot.spi.utils.StringUtil;
  */
 public class SanitizationTransformer implements RecordTransformer {
   private final Map<String, Integer> _stringColumnMaxLengthMap = new HashMap<>();
+  private final Map<String, Integer> _jsonColumnMaxLengthMap = new HashMap<>();
 
   public SanitizationTransformer(Schema schema) {
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
-      if (!fieldSpec.isVirtualColumn() && fieldSpec.getDataType() == DataType.STRING) {
-        _stringColumnMaxLengthMap.put(fieldSpec.getName(), fieldSpec.getMaxLength());
+      if (!fieldSpec.isVirtualColumn()) {
+        if (fieldSpec.getDataType() == DataType.STRING) {
+          _stringColumnMaxLengthMap.put(fieldSpec.getName(), fieldSpec.getMaxLength());
+        }
+        if (fieldSpec.getDataType() == DataType.JSON) {
+          _jsonColumnMaxLengthMap.put(fieldSpec.getName(), fieldSpec.getMaxLength());
+        }
       }
     }
   }
 
   @Override
   public boolean isNoOp() {
-    return _stringColumnMaxLengthMap.isEmpty();
+    return _stringColumnMaxLengthMap.isEmpty() && _jsonColumnMaxLengthMap.isEmpty();
   }
 
   @Override
   public GenericRow transform(GenericRow record) {
+    sanitizeStringColumns(record);
+    sanitizeJsonColumns(record);
+    return record;
+  }
+
+  private void sanitizeStringColumns(GenericRow record) {
     for (Map.Entry<String, Integer> entry : _stringColumnMaxLengthMap.entrySet()) {
       String stringColumn = entry.getKey();
       int maxLength = entry.getValue();
@@ -77,6 +93,30 @@ public class SanitizationTransformer implements RecordTransformer {
         }
       }
     }
-    return record;
+  }
+
+  private void sanitizeJsonColumns(GenericRow record) {
+    for (Map.Entry<String, Integer> entry : _jsonColumnMaxLengthMap.entrySet()) {
+      String stringColumn = entry.getKey();
+      int maxLength = entry.getValue();
+      Object value = record.getValue(stringColumn);
+      if (value instanceof String) {
+        // Single-valued json column
+        String stringValue = (String) value;
+        String sanitizedValue = JsonUtils.getSanitizedString(maxLength, stringValue);
+        // NOTE: reference comparison
+        //noinspection StringEquality
+        if (sanitizedValue != stringValue) {
+          record.putValue(stringColumn, sanitizedValue);
+        }
+      } else {
+        // Multi-valued column json col
+        Object[] values = (Object[]) value;
+        int numValues = values.length;
+        for (int i = 0; i < numValues; i++) {
+          values[i] = JsonUtils.getSanitizedString(maxLength, values[i].toString());
+        }
+      }
+    }
   }
 }
