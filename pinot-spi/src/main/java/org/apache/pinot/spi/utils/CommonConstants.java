@@ -699,9 +699,7 @@ public class CommonConstants {
     public static final String CONFIG_OF_SEGMENT_STORE_URI = "segment.store.uri";
     public static final String CONFIG_OF_LOGGER_ROOT_DIR = "pinot.server.logger.root.dir";
 
-    public static final String CONFIG_OF_REALTIME_SEGMENT_CONSUMER_CLIENT_ID_SUFFIX =
-        "realtime.consumer.client.id.suffix";
-    public static final String DEFAULT_REALTIME_SEGMENT_CONSUMER_CLIENT_ID_SUFFIX = "";
+    public static final String CONFIG_OF_REALTIME_SEGMENT_CONSUMER_CLIENT_ID_SUFFIX = "consumer.client.id.suffix";
 
     public static class SegmentCompletionProtocol {
       public static final String PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER = "pinot.server.segment.uploader";

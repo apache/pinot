@@ -39,7 +39,7 @@ public interface InstanceDataManagerConfig {
 
   String getSegmentStoreUri();
 
-  String getRealtimeSegmentConsumerClientIdSuffix();
+  String getConsumerClientIdSuffix();
 
   ReadMode getReadMode();
 

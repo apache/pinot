@@ -1434,7 +1434,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     _acquiredConsumerSemaphore = new AtomicBoolean(false);
     InstanceDataManagerConfig instanceDataManagerConfig = _indexLoadingConfig.getInstanceDataManagerConfig();
     String clientIdSuffix =
-        instanceDataManagerConfig != null ? instanceDataManagerConfig.getRealtimeSegmentConsumerClientIdSuffix() : "";
+        instanceDataManagerConfig != null ? instanceDataManagerConfig.getConsumerClientIdSuffix() : "";
     if (StringUtils.isNotBlank(clientIdSuffix)) {
       clientIdSuffix = "-" + clientIdSuffix;
     }
