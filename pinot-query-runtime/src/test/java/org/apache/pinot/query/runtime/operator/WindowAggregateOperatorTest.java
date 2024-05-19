@@ -30,6 +30,9 @@ import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.hint.RelHint;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
+import org.apache.pinot.common.datatable.StatMap;
+import org.apache.pinot.common.exception.QueryException;
+import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
@@ -238,7 +241,8 @@ public class WindowAggregateOperatorTest {
   }
 
   @Test
-  public void testPartitionByWindowAggregateWithHashCollision() {
+  public void testPartitionByWindowAggregateWithHashCollision()
+      throws ProcessingException {
     MultiStageOperator upstreamOperator = OperatorTestUtil.getOperator(OperatorTestUtil.OP_1);
     // Create an aggregation call with sum for first column and group by second column.
     List<RexExpression> calls = ImmutableList.of(getSum(new RexExpression.InputRef(0)));
@@ -300,7 +304,8 @@ public class WindowAggregateOperatorTest {
   }
 
   @Test
-  public void testRankDenseRankRankingFunctions() {
+  public void testRankDenseRankRankingFunctions()
+      throws ProcessingException {
     // Given:
     List<RexExpression> calls =
         ImmutableList.of(new RexExpression.FunctionCall(SqlKind.RANK, ColumnDataType.INT, "RANK", ImmutableList.of()),
@@ -359,7 +364,8 @@ public class WindowAggregateOperatorTest {
   }
 
   @Test
-  public void testRowNumberRankingFunction() {
+  public void testRowNumberRankingFunction()
+      throws ProcessingException {
     // Given:
     List<RexExpression> calls = ImmutableList.of(
         new RexExpression.FunctionCall(SqlKind.ROW_NUMBER, ColumnDataType.INT, "ROW_NUMBER", ImmutableList.of()));
@@ -415,7 +421,8 @@ public class WindowAggregateOperatorTest {
   }
 
   @Test
-  public void testNonEmptyOrderByKeysNotMatchingPartitionByKeys() {
+  public void testNonEmptyOrderByKeysNotMatchingPartitionByKeys()
+      throws ProcessingException {
     // Given:
     List<RexExpression> calls = ImmutableList.of(getSum(new RexExpression.InputRef(0)));
     List<RexExpression> group = ImmutableList.of(new RexExpression.InputRef(0));
@@ -637,8 +644,8 @@ public class WindowAggregateOperatorTest {
 
     // Then:
     Assert.assertTrue(block.isErrorBlock(), "expected ERROR block from window overflow");
-    Assert.assertTrue(block.getExceptions().get(1000).contains("Window cache size exceeded the limit of 1 rows"),
-        "expected it to fail with window cache overflow");
+    Assert.assertTrue(block.getExceptions().get(QueryException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE)
+        .contains("reach number of rows limit"));
   }
 
   @Test
@@ -662,11 +669,16 @@ public class WindowAggregateOperatorTest {
             getWindowHints(hintsMap));
 
     // When:
-    TransferableBlock block = operator.nextBlock();
+    TransferableBlock firstBlock = operator.nextBlock();
+    Mockito.verify(_input).earlyTerminate();
+    Assert.assertTrue(firstBlock.isDataBlock(), "First block should be a data block but is " + firstBlock.getClass());
+    Assert.assertEquals(firstBlock.getNumRows(), 1);
 
-    // Then:
-    Assert.assertFalse(block.isErrorBlock(), "expected no ERROR from window overflow");
-    Assert.assertEquals(block.getContainer().size(), 1, "expected one row from the window operation");
+    TransferableBlock secondBlock = operator.nextBlock();
+    StatMap<WindowAggregateOperator.StatKey> windowStats =
+        OperatorTestUtil.getStatMap(WindowAggregateOperator.StatKey.class, secondBlock);
+    Assert.assertTrue(windowStats.getBoolean(WindowAggregateOperator.StatKey.MAX_ROWS_IN_WINDOW_REACHED),
+        "Max rows in window should be reached");
   }
 
   private static RexExpression.FunctionCall getSum(RexExpression arg) {

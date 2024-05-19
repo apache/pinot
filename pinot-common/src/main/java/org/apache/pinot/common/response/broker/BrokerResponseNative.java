@@ -182,6 +182,12 @@ public class BrokerResponseNative implements BrokerResponse {
     return false;
   }
 
+  @JsonIgnore
+  @Override
+  public boolean isMaxRowsInWindowReached() {
+    return false;
+  }
+
   @Override
   public long getTimeUsedMs() {
     return _timeUsedMs;

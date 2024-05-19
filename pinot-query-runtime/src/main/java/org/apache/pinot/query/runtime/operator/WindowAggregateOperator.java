@@ -35,6 +35,8 @@ import org.apache.commons.collections.CollectionUtils;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datatable.StatMap;
+import org.apache.pinot.common.exception.QueryException;
+import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
@@ -224,7 +226,8 @@ public class WindowAggregateOperator extends MultiStageOperator {
   }
 
   @Override
-  protected TransferableBlock getNextBlock() {
+  protected TransferableBlock getNextBlock()
+      throws ProcessingException {
     if (_hasReturnedWindowAggregateBlock) {
       return _eosBlock;
     }
@@ -265,31 +268,26 @@ public class WindowAggregateOperator extends MultiStageOperator {
   /**
    * @return the final block, which must be either an end of stream or an error.
    */
-  private TransferableBlock computeBlocks() {
+  private TransferableBlock computeBlocks() throws ProcessingException {
     TransferableBlock block = _inputOperator.nextBlock();
     while (!TransferableBlockUtils.isEndOfStream(block)) {
       List<Object[]> container = block.getContainer();
       int containerSize = container.size();
       if (_numRows + containerSize > _maxRowsInWindowCache) {
         if (_windowOverflowMode == WindowOverFlowMode.THROW) {
-          throw new IllegalStateException(
-              String.format("Window cache size exceeded the limit of %d rows", _maxRowsInWindowCache));
+          ProcessingException resourceLimitExceededException =
+              new ProcessingException(QueryException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE);
+          resourceLimitExceededException.setMessage(
+              "Cannot build in memory window cache for WINDOW operator, reach number of rows limit: "
+                  + _maxRowsInWindowCache);
+          throw resourceLimitExceededException;
         } else {
+          // Just fill up the buffer.
           int remainingRows = _maxRowsInWindowCache - _numRows;
-          for (int i = 0; i < remainingRows; i++) {
-            Object[] row = container.get(i);
-            // TODO: Revisit null direction handling for all query types
-            Key key = AggregationUtils.extractRowKey(row, _groupSet);
-            _partitionRows.computeIfAbsent(key, k -> new ArrayList<>()).add(row);
-          }
-          _numRows = _maxRowsInWindowCache;
-          LOGGER.warn("Window cache size exceeded the limit of {} rows, breaking the cache build process",
-              _maxRowsInWindowCache);
-          // Still get to the last row of the block for statMap update
-          while (!TransferableBlockUtils.isEndOfStream(block)) {
-            block = _inputOperator.nextBlock();
-          }
-          break;
+          container = container.subList(0, remainingRows);
+          _statMap.merge(StatKey.MAX_ROWS_IN_WINDOW_REACHED, true);
+          // setting the inputOperator to be early terminated and awaits EOS block next.
+          _inputOperator.earlyTerminate();
         }
       }
       for (Object[] row : container) {
@@ -315,8 +313,7 @@ public class WindowAggregateOperator extends MultiStageOperator {
       List<List<Object>> windowFunctionResults = new ArrayList<>();
       for (WindowFunction windowFunction : _windowFunctions) {
         List<Object> processRows = windowFunction.processRows(rowList);
-        Preconditions.checkState(processRows.size() == rowList.size(),
-            "Number of rows in the result set must match the number of rows in the input set");
+        assert processRows.size() == rowList.size();
         windowFunctionResults.add(processRows);
       }
 
@@ -434,7 +431,8 @@ public class WindowAggregateOperator extends MultiStageOperator {
       public boolean includeDefaultInJson() {
         return true;
       }
-    };
+    },
+    MAX_ROWS_IN_WINDOW_REACHED(StatMap.Type.BOOLEAN);
     private final StatMap.Type _type;
 
     StatKey(StatMap.Type type) {
