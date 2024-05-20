@@ -28,7 +28,6 @@ import org.apache.pinot.spi.stream.BytesStreamMessage;
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.services.kinesis.KinesisClient;
@@ -63,7 +62,7 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
   }
 
   @Override
-  public synchronized KinesisMessageBatch fetchMessages(StreamPartitionMsgOffset startMsgOffset, int timeoutMs) {
+  public synchronized KinesisMessageBatch fetchMessages(StreamPartitionMsgOffset startMsgOffset, boolean isStartOffsetInclusive, int timeoutMs) {
     KinesisPartitionGroupOffset startOffset = (KinesisPartitionGroupOffset) startMsgOffset;
     String shardId = startOffset.getShardId();
     String startSequenceNumber = startOffset.getSequenceNumber();
@@ -74,11 +73,7 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
     } else {
       // TODO: Revisit the offset handling logic. Reading after the start sequence number can lose the first message
       //       when consuming from a new partition because the initial start sequence number is inclusive.
-      GetShardIteratorRequest getShardIteratorRequest =
-          GetShardIteratorRequest.builder().streamName(_config.getStreamTopicName()).shardId(shardId)
-              .startingSequenceNumber(startSequenceNumber).shardIteratorType(ShardIteratorType.AFTER_SEQUENCE_NUMBER)
-              .build();
-      shardIterator = _kinesisClient.getShardIterator(getShardIteratorRequest).shardIterator();
+      shardIterator = getShardIterator(shardId, startSequenceNumber, isStartOffsetInclusive);
     }
     if (shardIterator == null) {
       return new KinesisMessageBatch(List.of(), startOffset, true);
@@ -134,25 +129,15 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
     }
   }
 
-  private String getShardIterator(String shardId, String sequenceNumber,
-      CommonConstants.Segment.Realtime.StreamContinuationMode continuationMode) {
+  private String getShardIterator(String shardId, String sequenceNumber, boolean isStartOffsetInclusive) {
     GetShardIteratorRequest.Builder requestBuilder =
         GetShardIteratorRequest.builder().streamName(_config.getStreamTopicName()).shardId(shardId);
 
-    switch (continuationMode) {
-      case RESUME: {
-        if (sequenceNumber != null) {
-          requestBuilder = requestBuilder.startingSequenceNumber(sequenceNumber).shardIteratorType(ShardIteratorType.AFTER_SEQUENCE_NUMBER);
-        } else {
-          requestBuilder = requestBuilder.shardIteratorType(_config.getShardIteratorType());
-        }
-        break;
-      }
-      case INITIALIZE: {
-        requestBuilder = requestBuilder.shardIteratorType(_config.getShardIteratorType());
-        break;
-      }
-      default: //
+    if (isStartOffsetInclusive) {
+      requestBuilder = requestBuilder.startingSequenceNumber(sequenceNumber)
+          .shardIteratorType(ShardIteratorType.AFTER_SEQUENCE_NUMBER);
+    } else {
+      requestBuilder = requestBuilder.shardIteratorType(_config.getShardIteratorType());
     }
 
     return _kinesisClient.getShardIterator(requestBuilder.build()).shardIterator();

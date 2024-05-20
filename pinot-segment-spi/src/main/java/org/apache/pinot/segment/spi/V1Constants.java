@@ -91,7 +91,7 @@ public class V1Constants {
       public static class Realtime {
         public static final String START_OFFSET = "segment.realtime.startOffset";
         public static final String END_OFFSET = "segment.realtime.endOffset";
-        public static final String CONTINUATION_MODE = "segment.realtime.continuationMode";
+        public static final String START_OFFSET_INCLUSIVE = "segment.realtime.startOffsetInclusive";
       }
     }
 

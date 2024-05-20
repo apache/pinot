@@ -20,16 +20,13 @@ package org.apache.pinot.spi.config.table;
 
 // TODO Possibly redundant class. Use SegmentZKMetadata throughout?
 
-import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.StreamContinuationMode;
-
-
 /**
  * ZK properties that are to be logged into segment's metadata.properties
  */
 public class SegmentZKPropsConfig {
   private String _startOffset;
   private String _endOffset;
-  private StreamContinuationMode _streamContinuationMode;
+  private boolean _isStartOffsetInclusive;
 
   public String getStartOffset() {
     return _startOffset;
@@ -47,11 +44,11 @@ public class SegmentZKPropsConfig {
     _endOffset = endOffset;
   }
 
-  public StreamContinuationMode getStreamContinuationMode() {
-    return _streamContinuationMode;
+  public boolean isStartOffsetInclusive() {
+    return _isStartOffsetInclusive;
   }
 
-  public void setStreamContinuationMode(StreamContinuationMode streamContinuationMode) {
-    _streamContinuationMode = streamContinuationMode;
+  public void setIsStartOffsetInclusive(boolean isStartOffsetInclusive) {
+    _isStartOffsetInclusive = isStartOffsetInclusive;
   }
 }

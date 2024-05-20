@@ -41,7 +41,6 @@ import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.services.kinesis.model.Shard;
@@ -192,7 +191,7 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
       throws IOException, TimeoutException {
     try (PartitionGroupConsumer partitionGroupConsumer = _kinesisStreamConsumerFactory.createPartitionGroupConsumer(
         _clientId, partitionGroupConsumptionStatus)) {
-      MessageBatch<?> messageBatch = partitionGroupConsumer.fetchMessages(startCheckpoint, _fetchTimeoutMs);
+      MessageBatch<?> messageBatch =  partitionGroupConsumer.fetchMessages(startCheckpoint, true, _fetchTimeoutMs);
       return messageBatch.getMessageCount() == 0 && messageBatch.isEndOfPartitionGroup();
     }
   }

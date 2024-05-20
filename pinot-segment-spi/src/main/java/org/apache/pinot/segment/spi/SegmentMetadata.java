@@ -33,7 +33,6 @@ import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.data.Schema;
 import org.joda.time.Duration;
 import org.joda.time.Interval;
-import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.StreamContinuationMode;
 
 
 /**
@@ -101,7 +100,7 @@ public interface SegmentMetadata {
 
   String getEndOffset();
 
-  StreamContinuationMode getStreamContinuationMode();
+  boolean isStartOffsetInclusive();
 
   default NavigableSet<String> getAllColumns() {
     return getSchema().getColumnNames();

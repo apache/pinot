@@ -41,14 +41,7 @@ public class KinesisPartitionGroupOffset implements StreamPartitionMsgOffset {
   private final String _shardId;
   private final String _sequenceNumber;
 
-  public static final String STATUS_SEPARATOR = "::";
-
   public KinesisPartitionGroupOffset(String shardId, String sequenceNumber) {
-    _shardId = shardId;
-    _sequenceNumber = sequenceNumber;
-  }
-
-  public KinesisPartitionGroupOffset(String shardId, String sequenceNumber, String startStatus) {
     _shardId = shardId;
     _sequenceNumber = sequenceNumber;
   }
@@ -59,7 +52,7 @@ public class KinesisPartitionGroupOffset implements StreamPartitionMsgOffset {
       Preconditions.checkArgument(objectNode.size() == 1);
       Map.Entry<String, JsonNode> entry = objectNode.fields().next();
       _shardId = entry.getKey();
-      _sequenceNumber= entry.getValue().asText();
+      _sequenceNumber = entry.getValue().asText();
     } catch (Exception e) {
       throw new IllegalArgumentException("Invalid Kinesis offset: " + offsetStr);
     }

@@ -695,9 +695,9 @@ public class PinotLLCRealtimeSegmentManager {
     newSegmentZKMetadata.setStatus(Status.IN_PROGRESS);
 
     if (isNewPartitionGroup) {
-      newSegmentZKMetadata.setContinuationMode(CommonConstants.Segment.Realtime.StreamContinuationMode.INITIALIZE);
+      newSegmentZKMetadata.setStartOffsetInclusive(false);
     } else {
-      newSegmentZKMetadata.setContinuationMode(CommonConstants.Segment.Realtime.StreamContinuationMode.RESUME);
+      newSegmentZKMetadata.setStartOffsetInclusive(true);
     }
 
     // Add the partition metadata if available
@@ -1186,7 +1186,8 @@ public class PinotLLCRealtimeSegmentManager {
                   new CommittingSegmentDescriptor(latestSegmentName,
                       (offsetFactory.create(latestSegmentZKMetadata.getEndOffset()).toString()), 0);
               createNewSegmentZKMetadata(tableConfig, streamConfig, newLLCSegmentName, currentTimeMs,
-                  committingSegmentDescriptor, latestSegmentZKMetadata, instancePartitions, numPartitions, numReplicas, false);
+                  committingSegmentDescriptor, latestSegmentZKMetadata, instancePartitions, numPartitions, numReplicas,
+                  false);
               updateInstanceStatesForNewConsumingSegment(instanceStatesMap, latestSegmentName, newSegmentName,
                   segmentAssignment, instancePartitionsMap);
             } else { // partition group reached end of life

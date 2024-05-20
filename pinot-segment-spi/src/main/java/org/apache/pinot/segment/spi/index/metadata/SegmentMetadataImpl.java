@@ -68,8 +68,6 @@ import org.joda.time.Duration;
 import org.joda.time.Interval;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.StreamContinuationMode;
-
 
 public class SegmentMetadataImpl implements SegmentMetadata {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentMetadataImpl.class);
@@ -96,7 +94,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   // Fields specific to realtime table
   private String _startOffset;
   private String _endOffset;
-  private StreamContinuationMode _streamContinuationMode;
+  private boolean _isStartOffsetInclusive;
 
 
   @Deprecated
@@ -274,9 +272,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     // Set start/end offset if available
     _startOffset = segmentMetadataPropertiesConfiguration.getString(Segment.Realtime.START_OFFSET, null);
     _endOffset = segmentMetadataPropertiesConfiguration.getString(Segment.Realtime.END_OFFSET, null);
-    _streamContinuationMode = StreamContinuationMode
-        .valueOf(segmentMetadataPropertiesConfiguration.getString(Segment.Realtime.CONTINUATION_MODE,
-            StreamContinuationMode.RESUME.toString()));
+    _isStartOffsetInclusive = false;
 
     // Set custom configs from metadata properties
     setCustomConfigs(segmentMetadataPropertiesConfiguration, _customMap);
@@ -415,8 +411,8 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   }
 
   @Override
-  public StreamContinuationMode getStreamContinuationMode() {
-    return _streamContinuationMode;
+  public boolean isStartOffsetInclusive() {
+    return _isStartOffsetInclusive;
   }
 
   @Override
@@ -470,7 +466,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
     segmentMetadata.put("startOffset", _startOffset);
     segmentMetadata.put("endOffset", _endOffset);
-    segmentMetadata.put("streamContinuationMode", _streamContinuationMode.toString());
+    segmentMetadata.put("startOffsetInclusive", String.valueOf(_isStartOffsetInclusive));
 
     if (_columnMetadataMap != null) {
       ArrayNode columnsMetadata = JsonUtils.newArrayNode();

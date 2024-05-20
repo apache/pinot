@@ -21,7 +21,6 @@ package org.apache.pinot.spi.stream;
 import java.io.Closeable;
 import java.util.concurrent.TimeoutException;
 import javax.annotation.Nullable;
-import org.apache.pinot.spi.utils.CommonConstants;
 
 
 /**
@@ -38,7 +37,7 @@ public interface PartitionGroupConsumer extends Closeable {
    * Poll-based consumers can optionally use this to prefetch metadata from the source.
    *
    * This method should be invoked by the caller before trying to invoke
-   * {@link #fetchMessages(StreamPartitionMsgOffset, int)}.
+   * {@link #fetchMessages(StreamPartitionMsgOffset, boolean, int)}.
    *
    * @param startOffset Offset (inclusive) at which the consumption should begin
    */
@@ -51,20 +50,22 @@ public interface PartitionGroupConsumer extends Closeable {
    * This method should return within the timeout. If there is no message available before time runs out, an empty
    * message batch should be returned.
    *
-   * @param startOffset The offset of the first message desired, inclusive
-   * @param timeoutMs Timeout in milliseconds
-   * @throws TimeoutException If the operation could not be completed within timeout
+   * @param startOffset            The offset of the first message desired, inclusive
+   * @param isStartOffsetInclusive Whether the start offset is inclusive or should not be honored
+   * @param timeoutMs              Timeout in milliseconds
    * @return A batch of messages from the stream partition group
+   * @throws TimeoutException If the operation could not be completed within timeout
    */
-  default MessageBatch fetchMessages(StreamPartitionMsgOffset startOffset, CommonConstants.Segment.Realtime.StreamContinuationMode continuationMode, int timeoutMs)
+  default MessageBatch fetchMessages(StreamPartitionMsgOffset startOffset, boolean isStartOffsetInclusive,
+      int timeoutMs)
       throws TimeoutException {
-    return fetchMessages(startOffset, null, continuationMode, timeoutMs);
+    return fetchMessages(startOffset, null, isStartOffsetInclusive, timeoutMs);
   }
 
   // Deprecated because the offset is not always monotonically increasing
   @Deprecated
-  default MessageBatch fetchMessages(StreamPartitionMsgOffset startOffset, @Nullable StreamPartitionMsgOffset endOffset,
-      CommonConstants.Segment.Realtime.StreamContinuationMode continuationMode, int timeoutMs)
+  default MessageBatch fetchMessages(StreamPartitionMsgOffset startOffset,
+      @Nullable StreamPartitionMsgOffset endOffset, boolean isStartOffsetInclusive, int timeoutMs)
       throws TimeoutException {
     throw new UnsupportedOperationException();
   }
