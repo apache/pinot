@@ -39,6 +39,8 @@ public interface InstanceDataManagerConfig {
 
   String getSegmentStoreUri();
 
+  String getConsumerClientIdSuffix();
+
   ReadMode getReadMode();
 
   String getSegmentFormatVersion();
