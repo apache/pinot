@@ -127,6 +127,7 @@ public class MessageCodeGenTest {
                 + "    msgMap.put(\"nullable_float_field\", msg.getNullableFloatField());\n" + "  }\n"},
             new Object[] {REPEATED_FLOATS, "  if (msg.getRepeatedFloatsCount() > 0) {\n"
                 + "    msgMap.put(\"repeated_floats\", msg.getRepeatedFloatsList().toArray());\n" + "  }\n"},
+            new Object[] {"does_not_exist_in_desc", ""},
         };
     }
 
@@ -345,6 +346,14 @@ public class MessageCodeGenTest {
         expectedCodeOutput = new String(Files.readAllBytes(Paths.get(resource.toURI())));
         assertEquals(messageCodeGen.codegen(ComplexTypes.TestMessage.getDescriptor(),
             Set.of(STRING_FIELD, COMPLEX_MAP, REPEATED_NESTED_MESSAGES, REPEATED_BYTES, NULLABLE_DOUBLE_FIELD)),
+            expectedCodeOutput);
+
+        resource = getClass().getClassLoader()
+            .getResource("codegen_output/complex_types_some_fields_record_extractor.txt");
+        expectedCodeOutput = new String(Files.readAllBytes(Paths.get(resource.toURI())));
+        assertEquals(messageCodeGen.codegen(ComplexTypes.TestMessage.getDescriptor(),
+                Set.of(STRING_FIELD, COMPLEX_MAP, REPEATED_NESTED_MESSAGES, REPEATED_BYTES, NULLABLE_DOUBLE_FIELD,
+                    "does_not_exist_in_desc")),
             expectedCodeOutput);
     }
 }
