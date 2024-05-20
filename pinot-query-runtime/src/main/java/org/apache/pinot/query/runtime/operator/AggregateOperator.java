@@ -22,12 +22,10 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.common.datablock.DataBlock;
@@ -50,7 +48,6 @@ import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.AbstractPlanNode;
 import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.operator.utils.SortUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.roaringbitmap.RoaringBitmap;
 import org.slf4j.Logger;
@@ -72,12 +69,6 @@ public class AggregateOperator extends MultiStageOperator {
   private final MultiStageOperator _inputOperator;
   private final DataSchema _resultSchema;
   private final AggType _aggType;
-  private final boolean _hasWithInGroup;
-  private final List<Object[]> _allRowContainer = new ArrayList<>();
-  private final List<RexExpression> _collationKeys;
-  private final List<RelFieldCollation.Direction> _collationDirections;
-  private final List<RelFieldCollation.NullDirection> _collationNullDirections;
-
   private final MultistageAggregationExecutor _aggregationExecutor;
   private final MultistageGroupByExecutor _groupByExecutor;
   @Nullable
@@ -88,18 +79,12 @@ public class AggregateOperator extends MultiStageOperator {
 
   public AggregateOperator(OpChainExecutionContext context, MultiStageOperator inputOperator,
       DataSchema resultSchema, List<RexExpression> aggCalls, List<RexExpression> groupSet, AggType aggType,
-      List<Integer> filterArgIndices, @Nullable AbstractPlanNode.NodeHint nodeHint,
-      List<RexExpression> collationKeys,
-      List<RelFieldCollation.Direction> collationDirections,
-      List<RelFieldCollation.NullDirection> collationNullDirections) {
+      List<Integer> filterArgIndices, @Nullable AbstractPlanNode.NodeHint nodeHint) {
     super(context);
     _inputOperator = inputOperator;
     _resultSchema = resultSchema;
     _aggType = aggType;
-    _hasWithInGroup = !collationKeys.isEmpty();
-    _collationKeys = ImmutableList.copyOf(collationKeys);
-    _collationDirections = ImmutableList.copyOf(collationDirections);
-    _collationNullDirections = ImmutableList.copyOf(collationNullDirections);
+
     // Process literal hints
     Map<Integer, Map<Integer, Literal>> literalArgumentsMap = null;
     if (nodeHint != null) {
@@ -206,29 +191,12 @@ public class AggregateOperator extends MultiStageOperator {
    * @return the last block, which must always be either an error or the end of the stream
    */
   private TransferableBlock consumeGroupBy() {
-    if (_hasWithInGroup) {
-      TransferableBlock block = _inputOperator.nextBlock();
-      Comparator<Object[]> inputRowComparator = new SortUtils.SortComparator(_collationKeys, _collationDirections,
-          _collationNullDirections, block.getDataSchema(), false);
-      while (block.isDataBlock()) {
-        List<Object[]> rows = block.getContainer();
-        _allRowContainer.addAll(rows);
-        block = _inputOperator.nextBlock();
-      }
-      if (block.isSuccessfulEndOfStreamBlock()) {
-        _allRowContainer.sort(inputRowComparator);
-        _groupByExecutor.processBlock(
-            new TransferableBlock(_allRowContainer, _resultSchema, DataBlock.Type.ROW));
-      }
-      return block;
-    } else {
-      TransferableBlock block = _inputOperator.nextBlock();
-      while (block.isDataBlock()) {
-        _groupByExecutor.processBlock(block);
-        block = _inputOperator.nextBlock();
-      }
-      return block;
+    TransferableBlock block = _inputOperator.nextBlock();
+    while (block.isDataBlock()) {
+      _groupByExecutor.processBlock(block);
+      block = _inputOperator.nextBlock();
     }
+    return block;
   }
 
   /**
@@ -237,29 +205,12 @@ public class AggregateOperator extends MultiStageOperator {
    * @return the last block, which must always be either an error or the end of the stream
    */
   private TransferableBlock consumeAggregation() {
-    if (_hasWithInGroup) {
-      TransferableBlock block = _inputOperator.nextBlock();
-      Comparator<Object[]> inputRowComparator = new SortUtils.SortComparator(_collationKeys, _collationDirections,
-          _collationNullDirections, block.getDataSchema(), false);
-      while (block.isDataBlock()) {
-        List<Object[]> rows = block.getContainer();
-        _allRowContainer.addAll(rows);
-        block = _inputOperator.nextBlock();
-      }
-      if (block.isSuccessfulEndOfStreamBlock()) {
-        _allRowContainer.sort(inputRowComparator);
-        _aggregationExecutor.processBlock(
-            new TransferableBlock(_allRowContainer, _resultSchema, DataBlock.Type.ROW));
-      }
-      return block;
-    } else {
-      TransferableBlock block = _inputOperator.nextBlock();
-      while (block.isDataBlock()) {
-        _aggregationExecutor.processBlock(block);
-        block = _inputOperator.nextBlock();
-      }
-      return block;
+    TransferableBlock block = _inputOperator.nextBlock();
+    while (block.isDataBlock()) {
+      _aggregationExecutor.processBlock(block);
+      block = _inputOperator.nextBlock();
     }
+    return block;
   }
 
   private AggregationFunction<?, ?>[] getAggFunctions(List<RexExpression> aggCalls,

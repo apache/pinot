@@ -91,8 +91,7 @@ public class AggregateOperatorTest {
     DataSchema outSchema = new DataSchema(new String[]{"group", "sum"}, new ColumnDataType[]{INT, DOUBLE});
     AggregateOperator operator =
         new AggregateOperator(OperatorTestUtil.getTracingContext(), _input, outSchema, calls, group, AggType.DIRECT,
-            Collections.singletonList(-1), null, Collections.emptyList(), Collections.emptyList(),
-            Collections.emptyList());
+            Collections.singletonList(-1), null);
 
     // When:
     TransferableBlock block1 = operator.nextBlock(); // build
@@ -113,8 +112,7 @@ public class AggregateOperatorTest {
     DataSchema outSchema = new DataSchema(new String[]{"group", "sum"}, new ColumnDataType[]{INT, DOUBLE});
     AggregateOperator operator =
         new AggregateOperator(OperatorTestUtil.getTracingContext(), _input, outSchema, calls, group, AggType.DIRECT,
-            Collections.singletonList(-1), null, Collections.emptyList(), Collections.emptyList(),
-            Collections.emptyList());
+            Collections.singletonList(-1), null);
 
     // When:
     TransferableBlock block = operator.nextBlock();
@@ -137,8 +135,7 @@ public class AggregateOperatorTest {
     DataSchema outSchema = new DataSchema(new String[]{"group", "sum"}, new ColumnDataType[]{INT, DOUBLE});
     AggregateOperator operator =
         new AggregateOperator(OperatorTestUtil.getTracingContext(), _input, outSchema, calls, group, AggType.DIRECT,
-            Collections.singletonList(-1), null, Collections.emptyList(), Collections.emptyList(),
-            Collections.emptyList());
+            Collections.singletonList(-1), null);
 
     // When:
     TransferableBlock block1 = operator.nextBlock();
@@ -166,8 +163,7 @@ public class AggregateOperatorTest {
     DataSchema outSchema = new DataSchema(new String[]{"group", "sum"}, new ColumnDataType[]{INT, DOUBLE});
     AggregateOperator operator =
         new AggregateOperator(OperatorTestUtil.getTracingContext(), _input, outSchema, calls, group, AggType.DIRECT,
-            Collections.singletonList(-1), null, Collections.emptyList(), Collections.emptyList(),
-            Collections.emptyList());
+            Collections.singletonList(-1), null);
 
     // When:
     TransferableBlock block1 = operator.nextBlock();
@@ -199,7 +195,7 @@ public class AggregateOperatorTest {
         new DataSchema(new String[]{"group", "sum", "sumWithFilter"}, new ColumnDataType[]{INT, DOUBLE, DOUBLE});
     AggregateOperator operator =
         new AggregateOperator(OperatorTestUtil.getTracingContext(), _input, outSchema, calls, group, AggType.DIRECT,
-            filterArgIds, null, Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
+            filterArgIds, null);
 
     // When:
     TransferableBlock block1 = operator.nextBlock();
@@ -221,8 +217,7 @@ public class AggregateOperatorTest {
     AggregateOperator sum0GroupBy1 =
         new AggregateOperator(OperatorTestUtil.getTracingContext(), upstreamOperator, outSchema,
             Collections.singletonList(agg), Collections.singletonList(new RexExpression.InputRef(1)), AggType.DIRECT,
-            Collections.singletonList(-1), null, Collections.emptyList(), Collections.emptyList(),
-            Collections.emptyList());
+            Collections.singletonList(-1), null);
     TransferableBlock result = sum0GroupBy1.getNextBlock();
     List<Object[]> resultRows = result.getContainer();
     Assert.assertEquals(resultRows.size(), 2);
@@ -245,7 +240,7 @@ public class AggregateOperatorTest {
 
     // When:
     new AggregateOperator(OperatorTestUtil.getTracingContext(), _input, outSchema, calls, group, AggType.DIRECT,
-        Collections.singletonList(-1), null, Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
+        Collections.singletonList(-1), null);
   }
 
   @Test
@@ -264,8 +259,7 @@ public class AggregateOperatorTest {
     DataSchema outSchema = new DataSchema(new String[]{"sum"}, new ColumnDataType[]{DOUBLE});
     AggregateOperator operator =
         new AggregateOperator(OperatorTestUtil.getTracingContext(), _input, outSchema, calls, group,
-            AggType.INTERMEDIATE, Collections.singletonList(-1), null, Collections.emptyList(), Collections.emptyList(),
-            Collections.emptyList());
+            AggType.INTERMEDIATE, Collections.singletonList(-1), null);
 
     // When:
     TransferableBlock block = operator.nextBlock();
@@ -293,7 +287,7 @@ public class AggregateOperatorTest {
     Map<String, String> hintsMap = ImmutableMap.of(PinotHintOptions.AggregateOptions.NUM_GROUPS_LIMIT, "1");
     AggregateOperator operator =
         new AggregateOperator(context, _input, outSchema, calls, group, AggType.DIRECT, Collections.singletonList(-1),
-            getAggHints(hintsMap), Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
+            getAggHints(hintsMap));
 
     // When:
     TransferableBlock block1 = operator.nextBlock();
