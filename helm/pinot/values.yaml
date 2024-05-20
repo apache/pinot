@@ -115,9 +115,10 @@ controller:
   log4j2ConfFile: /opt/pinot/etc/conf/pinot-controller-log4j2.xml
   pluginsDir: /opt/pinot/plugins
 
-  disruptionBudget:
-    enabled: false
-    minAvailable: 50%
+  pdb:
+    enabled: false 
+    minAvailable: ""
+    maxUnavailable: 50%
 
   service:
     annotations: {}
@@ -223,9 +224,10 @@ broker:
     extraVolumes: []
     extraVolumeMounts: []
 
-  disruptionBudget:
+  pdb:
     enabled: false
-    minAvailable: 50%
+    minAvailable: ""
+    maxUnavailable: 50%
 
   service:
     annotations: {}
@@ -339,9 +341,10 @@ server:
   log4j2ConfFile: /opt/pinot/etc/conf/pinot-server-log4j2.xml
   pluginsDir: /opt/pinot/plugins
 
-  disruptionBudget:
-    enabled: false
-    minAvailable: 50%
+  pdb:
+    enabled: false 
+    minAvailable: ""
+    maxUnavailable: 1
 
   service:
     annotations: {}
