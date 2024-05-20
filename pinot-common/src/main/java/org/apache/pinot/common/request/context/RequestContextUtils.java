@@ -93,9 +93,9 @@ public class RequestContextUtils {
       for (Expression operand : operands) {
         arguments.add(getExpression(operand));
       }
-      return new FunctionContext(functionType, functionName, arguments, false);
+      return new FunctionContext(functionType, functionName, arguments);
     } else {
-      return new FunctionContext(functionType, functionName, Collections.emptyList(), false);
+      return new FunctionContext(functionType, functionName, Collections.emptyList());
     }
   }
 

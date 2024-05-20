@@ -49,6 +49,7 @@ import org.apache.pinot.query.planner.plannode.AbstractPlanNode;
 import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.roaringbitmap.RoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -264,10 +265,9 @@ public class AggregateOperator extends MultiStageOperator {
         }
       }
     }
-
+    handleListAggDistinctArg(functionName, functionCall, arguments);
     return AggregationFunctionFactory.getAggregationFunction(
-        new FunctionContext(FunctionContext.Type.AGGREGATION, functionName, arguments, functionCall.isDistinct()),
-        true);
+        new FunctionContext(FunctionContext.Type.AGGREGATION, functionName, arguments), true);
   }
 
   private static AggregationFunction<?, ?> getAggFunctionForIntermediateInput(RexExpression.FunctionCall functionCall,
@@ -284,8 +284,8 @@ public class AggregateOperator extends MultiStageOperator {
     if (numArgumentsLiteral == null) {
       return AggregationFunctionFactory.getAggregationFunction(
           new FunctionContext(FunctionContext.Type.AGGREGATION, functionName, Collections.singletonList(
-              ExpressionContext.forIdentifier(fromColIdToIdentifier(((RexExpression.InputRef) operand).getIndex()))),
-              functionCall.isDistinct()), true);
+              ExpressionContext.forIdentifier(fromColIdToIdentifier(((RexExpression.InputRef) operand).getIndex())))),
+          true);
     } else {
       int numExpectedArguments = numArgumentsLiteral.getIntValue();
       List<ExpressionContext> arguments = new ArrayList<>(numExpectedArguments);
@@ -299,9 +299,22 @@ public class AggregateOperator extends MultiStageOperator {
           arguments.add(PLACEHOLDER_IDENTIFIER);
         }
       }
+      handleListAggDistinctArg(functionName, functionCall, arguments);
       return AggregationFunctionFactory.getAggregationFunction(
-          new FunctionContext(FunctionContext.Type.AGGREGATION, functionName, arguments, functionCall.isDistinct()),
-          true);
+          new FunctionContext(FunctionContext.Type.AGGREGATION, functionName, arguments), true);
+    }
+  }
+
+  private static void handleListAggDistinctArg(String functionName, RexExpression.FunctionCall functionCall,
+      List<ExpressionContext> arguments) {
+    String upperCaseFunctionName =
+        AggregationFunctionType.getNormalizedAggregationFunctionName(functionName);
+    if (upperCaseFunctionName.equals("LISTAGG")) {
+      if (functionCall.isDistinct()) {
+        arguments.add(ExpressionContext.forLiteralContext(Literal.boolValue(true)));
+      } else {
+        arguments.add(ExpressionContext.forLiteralContext(Literal.boolValue(false)));
+      }
     }
   }
 

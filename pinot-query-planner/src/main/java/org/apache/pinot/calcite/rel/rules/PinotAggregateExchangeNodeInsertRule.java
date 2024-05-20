@@ -19,15 +19,19 @@
 package org.apache.pinot.calcite.rel.rules;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.hep.HepRelVertex;
+import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelCollations;
 import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelFieldCollation;
@@ -37,7 +41,6 @@ import org.apache.calcite.rel.core.AggregateCall;
 import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rel.hint.RelHint;
 import org.apache.calcite.rel.logical.LogicalAggregate;
-import org.apache.calcite.rel.logical.LogicalSort;
 import org.apache.calcite.rel.rules.AggregateExtractProjectRule;
 import org.apache.calcite.rel.rules.AggregateReduceFunctionsRule;
 import org.apache.calcite.rex.RexBuilder;
@@ -57,6 +60,7 @@ import org.apache.calcite.util.mapping.Mappings;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.calcite.rel.hint.PinotHintStrategyTable;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalExchange;
+import org.apache.pinot.calcite.rel.logical.PinotLogicalSortExchange;
 import org.apache.pinot.calcite.sql.PinotSqlAggFunction;
 import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
@@ -84,6 +88,8 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
   public static final PinotAggregateExchangeNodeInsertRule INSTANCE =
       new PinotAggregateExchangeNodeInsertRule(PinotRuleUtils.PINOT_REL_FACTORY);
+  public static final Set<String> LIST_AGG_FUNCTION_NAMES =
+      ImmutableSet.of("LISTAGG", "LIST_AGG", "ARRAYsAGG", "ARRAY_AGG");
 
   public PinotAggregateExchangeNodeInsertRule(RelBuilderFactory factory) {
     super(operand(LogicalAggregate.class, any()), factory, null);
@@ -107,21 +113,17 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
    * Split the AGG into 3 plan fragments, all with the same AGG type (in some cases the final agg name may be different)
    * Pinot internal plan fragment optimization can use the info of the input data type to infer whether it should
    * generate the "final-stage AGG operator" or "intermediate-stage AGG operator" or "leaf-stage AGG operator"
-   * @see org.apache.pinot.core.query.aggregation.function.AggregationFunction
    *
    * @param call the {@link RelOptRuleCall} on match.
+   * @see org.apache.pinot.core.query.aggregation.function.AggregationFunction
    */
   @Override
   public void onMatch(RelOptRuleCall call) {
     Aggregate oldAggRel = call.rel(0);
     ImmutableList<RelHint> oldHints = oldAggRel.getHints();
-    boolean hasCollation = false;
-    for (AggregateCall aggCall : oldAggRel.getAggCallList()) {
-      if (!aggCall.getCollation().getKeys().isEmpty()) {
-        hasCollation = true;
-        break;
-      }
-    }
+    // Both collation and distinct are not supported in leaf stage aggregation.
+    boolean hasCollation = hasCollation(oldAggRel);
+    boolean hasDistinct = hasDistinct(oldAggRel);
     Aggregate newAgg;
     if (!oldAggRel.getGroupSet().isEmpty() && PinotHintStrategyTable.isHintOptionTrue(oldHints,
         PinotHintOptions.AGGREGATE_HINT_OPTIONS, PinotHintOptions.AggregateOptions.IS_PARTITIONED_BY_GROUP_BY_KEYS)) {
@@ -134,19 +136,37 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
       newAgg =
           new LogicalAggregate(oldAggRel.getCluster(), oldAggRel.getTraitSet(), newHints, oldAggRel.getInput(),
               oldAggRel.getGroupSet(), oldAggRel.getGroupSets(), oldAggRel.getAggCallList());
-    } else if (!oldAggRel.getGroupSet().isEmpty() && PinotHintStrategyTable.isHintOptionTrue(oldHints,
-        PinotHintOptions.AGGREGATE_HINT_OPTIONS,
-        PinotHintOptions.AggregateOptions.SKIP_LEAF_STAGE_GROUP_BY_AGGREGATION)) {
+    } else if (hasCollation || hasDistinct || (!oldAggRel.getGroupSet().isEmpty()
+        && PinotHintStrategyTable.isHintOptionTrue(oldHints, PinotHintOptions.AGGREGATE_HINT_OPTIONS,
+        PinotHintOptions.AggregateOptions.SKIP_LEAF_STAGE_GROUP_BY_AGGREGATION))) {
       // ------------------------------------------------------------------------
       // If "is_skip_leaf_stage_group_by" SQLHint option is passed, the leaf stage aggregation is skipped.
-      newAgg = (Aggregate) createPlanWithExchangeDirectAggregation(call, false);
-    } else if (hasCollation) {
-      newAgg = (Aggregate) createPlanWithExchangeDirectAggregation(call, true);
+      newAgg = (Aggregate) createPlanWithExchangeDirectAggregation(call);
     } else {
       // ------------------------------------------------------------------------
       newAgg = (Aggregate) createPlanWithLeafExchangeFinalAggregate(call);
     }
     call.transformTo(newAgg);
+  }
+
+  private boolean hasDistinct(Aggregate aggRel) {
+    for (AggregateCall aggCall : aggRel.getAggCallList()) {
+      // If the aggregation function is a list aggregation function and it is distinct, we can skip leaf stage.
+      // For COUNT(DISTINCT), there could be more leaf stage optimization.
+      if (aggCall.isDistinct() && LIST_AGG_FUNCTION_NAMES.contains(aggCall.getAggregation().getName().toUpperCase())) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private boolean hasCollation(Aggregate aggRel) {
+    for (AggregateCall aggCall : aggRel.getAggCallList()) {
+      if (!aggCall.getCollation().getKeys().isEmpty()) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**
@@ -174,28 +194,32 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
    * Use this group by optimization to skip leaf stage aggregation when aggregating at leaf level is not desired.
    * Many situation could be wasted effort to do group-by on leaf, eg: when cardinality of group by column is very high.
    */
-  private RelNode createPlanWithExchangeDirectAggregation(RelOptRuleCall call, boolean hasCollation) {
+  private RelNode createPlanWithExchangeDirectAggregation(RelOptRuleCall call) {
     Aggregate oldAggRel = call.rel(0);
     List<RelHint> newHints = PinotHintStrategyTable.replaceHintOptions(oldAggRel.getHints(),
         PinotHintOptions.INTERNAL_AGG_OPTIONS, PinotHintOptions.InternalAggregateOptions.AGG_TYPE,
         AggType.DIRECT.name());
 
     // Convert Aggregate WithGroup Collation into a Sort
-    LogicalSort withInGroupSort = hasCollation ? extractWithInGroupSort(oldAggRel) : null;
+    RelCollation relCollation = extractWithInGroupCollation(oldAggRel);
 
     // create project when there's none below the aggregate to reduce exchange overhead
     RelNode childRel = ((HepRelVertex) oldAggRel.getInput()).getCurrentRel();
     if (!(childRel instanceof Project)) {
-      return convertAggForExchangeDirectAggregate(call, newHints, withInGroupSort);
+      return convertAggForExchangeDirectAggregate(call, newHints, relCollation);
     } else {
       // create normal exchange
       List<Integer> groupSetIndices = new ArrayList<>();
       oldAggRel.getGroupSet().forEach(groupSetIndices::add);
-      RelNode newAggChild =
-          (groupSetIndices.isEmpty()) ? PinotLogicalExchange.create(childRel, RelDistributions.SINGLETON)
-              : PinotLogicalExchange.create(childRel, RelDistributions.hash(groupSetIndices));
-      if (withInGroupSort != null) {
-        newAggChild = LogicalSort.create(newAggChild, withInGroupSort.getCollation(), null, null);
+      RelNode newAggChild;
+      if (relCollation != null) {
+        newAggChild =
+            (groupSetIndices.isEmpty()) ? PinotLogicalSortExchange.create(childRel, RelDistributions.SINGLETON,
+                relCollation, false, true)
+                : PinotLogicalSortExchange.create(childRel, RelDistributions.hash(groupSetIndices),
+                    relCollation, false, true);
+      } else {
+        newAggChild = PinotLogicalExchange.create(childRel, RelDistributions.hash(groupSetIndices));
       }
       return new LogicalAggregate(oldAggRel.getCluster(), oldAggRel.getTraitSet(), newHints, newAggChild,
           oldAggRel.getGroupSet(), oldAggRel.getGroupSets(), oldAggRel.getAggCallList());
@@ -203,14 +227,15 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
   }
 
   // Extract the first collation in the AggregateCall list
-  private LogicalSort extractWithInGroupSort(Aggregate aggRel) {
+  @Nullable
+  private RelCollation extractWithInGroupCollation(Aggregate aggRel) {
     for (AggregateCall aggCall : aggRel.getAggCallList()) {
       List<RelFieldCollation> fieldCollations = aggCall.getCollation().getFieldCollations();
       if (!fieldCollations.isEmpty()) {
-        return LogicalSort.create(aggRel.getInput(), RelCollations.of(fieldCollations), null, null);
+        return RelCollations.of(fieldCollations);
       }
     }
-    throw new IllegalStateException("No collation found in the AggregateCall list");
+    return null;
   }
 
   /**
@@ -218,7 +243,7 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
    * with modification to insert an exchange in between the Aggregate and Project
    */
   private RelNode convertAggForExchangeDirectAggregate(RelOptRuleCall call, List<RelHint> newHints,
-      LogicalSort withGroupSort) {
+      @Nullable RelCollation collation) {
     final Aggregate aggregate = call.rel(0);
     final RelNode input = aggregate.getInput();
     // Compute which input fields are used.
@@ -251,12 +276,15 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
     Project project = (Project) relBuilder1.build();
 
     // ------------------------------------------------------------------------
-    RelNode newAggChild =
-        (withGroupSort != null && newGroupSet.isEmpty()) ? PinotLogicalExchange.create(project,
-            RelDistributions.SINGLETON)
-            : PinotLogicalExchange.create(project, RelDistributions.hash(newGroupSet.asList()));
-    if (withGroupSort != null) {
-      newAggChild = LogicalSort.create(newAggChild, withGroupSort.getCollation(), null, null);
+    RelNode newAggChild;
+    if (collation != null) {
+      // Insert a LogicalSort node between the exchange and the aggregate
+      newAggChild = newGroupSet.isEmpty() ? PinotLogicalSortExchange.create(project, RelDistributions.SINGLETON,
+          collation, false, true)
+          : PinotLogicalSortExchange.create(project, RelDistributions.hash(newGroupSet.asList()),
+              collation, false, true);
+    } else {
+      newAggChild = PinotLogicalExchange.create(project, RelDistributions.hash(newGroupSet.asList()));
     }
     // ------------------------------------------------------------------------
 

@@ -18,8 +18,9 @@
  */
 package org.apache.pinot.core.query.aggregation.function.array;
 
+import it.unimi.dsi.fastutil.objects.AbstractObjectCollection;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
-import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
+import java.util.Arrays;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -27,26 +28,20 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
-import org.apache.pinot.core.query.aggregation.function.BaseSingleInputAggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.NullableSingleInputAggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
-import org.roaringbitmap.RoaringBitmap;
 
 
 public class ListAggFunction
-    extends BaseSingleInputAggregationFunction<ObjectArrayList<String>, String> {
+    extends NullableSingleInputAggregationFunction<AbstractObjectCollection<String>, String> {
 
   private final String _separator;
-  private final boolean _nullHandlingEnabled;
-  private final boolean _isDistinct;
 
-  public ListAggFunction(ExpressionContext expression, String separator, boolean isDistinct,
-      boolean nullHandlingEnabled) {
-    super(expression);
+  public ListAggFunction(ExpressionContext expression, String separator, boolean nullHandlingEnabled) {
+    super(expression, nullHandlingEnabled);
     _separator = separator;
-    _isDistinct = isDistinct;
-    _nullHandlingEnabled = nullHandlingEnabled;
   }
 
   @Override
@@ -67,98 +62,44 @@ public class ListAggFunction
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
+    AbstractObjectCollection<String> valueSet = getObjectCollection(aggregationResultHolder);
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
+    String[] values = blockValSet.getStringValuesSV();
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      valueSet.addAll(Arrays.asList(values).subList(from, to));
+    });
+  }
+
+  protected AbstractObjectCollection<String> getObjectCollection(AggregationResultHolder aggregationResultHolder) {
     ObjectArrayList<String> valueSet = aggregationResultHolder.getResult();
     if (valueSet == null) {
       valueSet = new ObjectArrayList<>();
       aggregationResultHolder.setValue(valueSet);
     }
-    BlockValSet blockValSet = blockValSetMap.get(_expression);
-    String[] values = blockValSet.getStringValuesSV();
-    if (_nullHandlingEnabled) {
-      RoaringBitmap nullBitmap = blockValSet.getNullBitmap();
-      if (nullBitmap != null && !nullBitmap.isEmpty()) {
-        aggregateArrayWithNull(length, valueSet, values, nullBitmap);
-        return;
-      }
-    }
-    aggregateArray(length, valueSet, values);
+    return valueSet;
   }
 
-  private void aggregateArray(int length, ObjectArrayList<String> valueSet, String[] values) {
-    ObjectOpenHashSet<String> distinctValueSet = new ObjectOpenHashSet<>();
-    for (int i = 0; i < length; i++) {
-      String value = values[i];
-      if (_isDistinct) {
-        if (distinctValueSet.contains(value)) {
-          continue;
-        } else {
-          distinctValueSet.add(value);
-        }
-      }
-      valueSet.add(value);
+  protected AbstractObjectCollection<String> getObjectCollection(GroupByResultHolder groupByResultHolder,
+      int groupKey) {
+    ObjectArrayList<String> valueSet = groupByResultHolder.getResult(groupKey);
+    if (valueSet == null) {
+      valueSet = new ObjectArrayList<>();
+      groupByResultHolder.setValueForKey(groupKey, valueSet);
     }
-  }
-
-  private void aggregateArrayWithNull(int length, ObjectArrayList<String> valueSet, String[] values,
-      RoaringBitmap nullBitmap) {
-    ObjectOpenHashSet<String> distinctValueSet = new ObjectOpenHashSet<>();
-    for (int i = 0; i < length; i++) {
-      if (!nullBitmap.contains(i)) {
-        String value = values[i];
-        if (_isDistinct) {
-          if (distinctValueSet.contains(value)) {
-            continue;
-          } else {
-            distinctValueSet.add(value);
-          }
-        }
-        valueSet.add(value);
-      }
-    }
+    return valueSet;
   }
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    if (_nullHandlingEnabled) {
-      RoaringBitmap nullBitmap = blockValSet.getNullBitmap();
-      if (nullBitmap != null && !nullBitmap.isEmpty()) {
-        aggregateArrayGroupBySVWithNull(length, groupKeyArray, groupByResultHolder, blockValSet, nullBitmap);
-        return;
-      }
-    }
-    aggregateArrayGroupBySV(length, groupKeyArray, groupByResultHolder, blockValSet);
-  }
-
-  protected void aggregateArrayGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
-      BlockValSet blockValSet) {
     String[] values = blockValSet.getStringValuesSV();
-    for (int i = 0; i < length; i++) {
-      setGroupByResult(groupByResultHolder, groupKeyArray[i], values[i]);
-    }
-  }
-
-  protected void aggregateArrayGroupBySVWithNull(int length, int[] groupKeyArray,
-      GroupByResultHolder groupByResultHolder, BlockValSet blockValSet, RoaringBitmap nullBitmap) {
-    String[] values = blockValSet.getStringValuesSV();
-    for (int i = 0; i < length; i++) {
-      if (!nullBitmap.contains(i)) {
-        setGroupByResult(groupByResultHolder, groupKeyArray[i], values[i]);
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        AbstractObjectCollection<String> groupValueList = getObjectCollection(groupByResultHolder, groupKeyArray[i]);
+        groupValueList.add(values[i]);
       }
-    }
-  }
-
-  protected void setGroupByResult(GroupByResultHolder resultHolder, int groupKey, String value) {
-    ObjectArrayList<String> valueArray = resultHolder.getResult(groupKey);
-    if (valueArray == null) {
-      valueArray = new ObjectArrayList<>();
-      resultHolder.setValueForKey(groupKey, valueArray);
-    }
-    if (_isDistinct && valueArray.contains(value)) {
-      return;
-    }
-    valueArray.add(value);
+    });
   }
 
   @Override
@@ -166,38 +107,29 @@ public class ListAggFunction
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     String[] values = blockValSet.getStringValuesSV();
-    for (int i = 0; i < length; i++) {
-      for (int groupKey : groupKeysArray[i]) {
-        ObjectArrayList<String> valueSet = groupByResultHolder.getResult(groupKey);
-        if (valueSet == null) {
-          valueSet = new ObjectArrayList<>();
-          groupByResultHolder.setValueForKey(groupKey, valueSet);
-        }
-        if (_nullHandlingEnabled) {
-          String value = values[i];
-          if (value != null) {
-            valueSet.add(value);
-          }
-        } else {
-          valueSet.add(values[i]);
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        for (int groupKey : groupKeysArray[i]) {
+          AbstractObjectCollection<String> groupValueList = getObjectCollection(groupByResultHolder, groupKey);
+          groupValueList.add(values[i]);
         }
       }
-    }
+    });
   }
 
   @Override
-  public ObjectArrayList<String> extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
+  public AbstractObjectCollection<String> extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     return aggregationResultHolder.getResult();
   }
 
   @Override
-  public ObjectArrayList<String> extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
+  public AbstractObjectCollection<String> extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     return groupByResultHolder.getResult(groupKey);
   }
 
   @Override
-  public ObjectArrayList<String> merge(ObjectArrayList<String> intermediateResult1,
-      ObjectArrayList<String> intermediateResult2) {
+  public AbstractObjectCollection<String> merge(AbstractObjectCollection<String> intermediateResult1,
+      AbstractObjectCollection<String> intermediateResult2) {
     if (intermediateResult1 == null) {
       return intermediateResult2;
     }
@@ -219,7 +151,7 @@ public class ListAggFunction
   }
 
   @Override
-  public String extractFinalResult(ObjectArrayList<String> strings) {
+  public String extractFinalResult(AbstractObjectCollection<String> strings) {
     return StringUtils.join(strings, _separator);
   }
 }

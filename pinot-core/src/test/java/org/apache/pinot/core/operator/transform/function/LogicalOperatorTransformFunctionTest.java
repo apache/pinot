@@ -57,7 +57,7 @@ public abstract class LogicalOperatorTransformFunctionTest extends BaseTransform
     String functionName = getFunctionName();
     ExpressionContext expression = ExpressionContext.forFunction(
         new FunctionContext(FunctionContext.Type.TRANSFORM, functionName,
-            Arrays.asList(intEqualsExpr, longEqualsExpr), false));
+            Arrays.asList(intEqualsExpr, longEqualsExpr)));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     assertEquals(transformFunction.getName(), functionName);
     TransformResultMetadata resultMetadata = transformFunction.getResultMetadata();
@@ -78,8 +78,7 @@ public abstract class LogicalOperatorTransformFunctionTest extends BaseTransform
       expressionContextList.add(RequestContextUtils.getExpression(expression));
     }
     TransformFunctionFactory.get(ExpressionContext.forFunction(
-            new FunctionContext(FunctionContext.Type.TRANSFORM, getFunctionName(), expressionContextList, false)),
-        _dataSourceMap);
+        new FunctionContext(FunctionContext.Type.TRANSFORM, getFunctionName(), expressionContextList)), _dataSourceMap);
   }
 
   @DataProvider(name = "testIllegalArguments")
@@ -97,7 +96,7 @@ public abstract class LogicalOperatorTransformFunctionTest extends BaseTransform
     String functionName = getFunctionName();
     ExpressionContext expression = ExpressionContext.forFunction(
         new FunctionContext(FunctionContext.Type.TRANSFORM, functionName,
-            Arrays.asList(intEqualsExpr, longEqualsExpr), false));
+            Arrays.asList(intEqualsExpr, longEqualsExpr)));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     assertEquals(transformFunction.getName(), functionName);
     TransformResultMetadata resultMetadata = transformFunction.getResultMetadata();
@@ -116,8 +115,7 @@ public abstract class LogicalOperatorTransformFunctionTest extends BaseTransform
         RequestContextUtils.getExpression(String.format("EQUALS(%s, %s)", INT_SV_COLUMN, INT_SV_NULL_COLUMN));
     String functionName = getFunctionName();
     ExpressionContext expression = ExpressionContext.forFunction(
-        new FunctionContext(FunctionContext.Type.TRANSFORM, functionName, Arrays.asList(intEqualsExpr, intEqualsExpr),
-            false));
+        new FunctionContext(FunctionContext.Type.TRANSFORM, functionName, Arrays.asList(intEqualsExpr, intEqualsExpr)));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     assertEquals(transformFunction.getName(), functionName);
     TransformResultMetadata resultMetadata = transformFunction.getResultMetadata();
