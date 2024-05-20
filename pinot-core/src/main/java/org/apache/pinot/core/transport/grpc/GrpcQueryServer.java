@@ -19,6 +19,7 @@
 package org.apache.pinot.core.transport.grpc;
 
 import io.grpc.Attributes;
+import io.grpc.Grpc;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.grpc.ServerTransportFilter;
@@ -80,12 +81,14 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
   private class GrpcQueryTransportFilter extends ServerTransportFilter {
     @Override
     public Attributes transportReady(Attributes transportAttrs) {
+      LOGGER.info("gRPC transportReady: REMOTE_ADDR {}", transportAttrs.get(Grpc.TRANSPORT_ATTR_REMOTE_ADDR));
       _serverMetrics.addMeteredGlobalValue(ServerMeter.GRPC_TRANSPORT_READY, 1);
       return super.transportReady(transportAttrs);
     }
 
     @Override
     public void transportTerminated(Attributes transportAttrs) {
+      LOGGER.info("gRPC transportTerminated: REMOTE_ADDR {}", transportAttrs.get(Grpc.TRANSPORT_ATTR_REMOTE_ADDR));
       _serverMetrics.addMeteredGlobalValue(ServerMeter.GRPC_TRANSPORT_TERMINATED, 1);
     }
   }
