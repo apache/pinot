@@ -233,7 +233,8 @@ public class ColumnMetadataImpl implements ColumnMetadata {
     switch (fieldType) {
       case DIMENSION:
         boolean isSingleValue = config.getBoolean(Column.getKeyFor(column, Column.IS_SINGLE_VALUED));
-        fieldSpec = new DimensionFieldSpec(column, dataType, isSingleValue, defaultNullValueString);
+        int maxLength = config.getInt(Column.getKeyFor(column, Column.SCHEMA_MAX_LENGTH), FieldSpec.DEFAULT_MAX_LENGTH);
+        fieldSpec = new DimensionFieldSpec(column, dataType, isSingleValue, maxLength, defaultNullValueString);
         break;
       case METRIC:
         fieldSpec = new MetricFieldSpec(column, dataType, defaultNullValueString);
