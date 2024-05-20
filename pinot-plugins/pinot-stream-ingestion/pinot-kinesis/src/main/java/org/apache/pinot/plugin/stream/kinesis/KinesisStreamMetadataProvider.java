@@ -29,6 +29,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.stream.ConsumerPartitionState;
+import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;
 import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
@@ -153,7 +154,7 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
       // 3. Parent reached EOL and completely consumed.
       if (parentShardId == null || !shardIdToShardMap.containsKey(parentShardId) || shardsEnded.contains(
           parentShardId)) {
-        // TODO: Revisit this. Kinesis starts consuming after the start sequence number, and we might miss the first
+        // TODO: Revisit this. Kinesis starts consuming AFTER the start sequence number, and we might miss the first
         //       message.
         StreamPartitionMsgOffset newStartOffset =
             new KinesisPartitionGroupOffset(newShardId, newShard.sequenceNumberRange().startingSequenceNumber());
@@ -180,7 +181,8 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
       throws IOException, TimeoutException {
     try (PartitionGroupConsumer partitionGroupConsumer = _kinesisStreamConsumerFactory.createPartitionGroupConsumer(
         _clientId, partitionGroupConsumptionStatus)) {
-      return partitionGroupConsumer.fetchMessages(startCheckpoint, _fetchTimeoutMs).isEndOfPartitionGroup();
+      MessageBatch<?> messageBatch = partitionGroupConsumer.fetchMessages(startCheckpoint, _fetchTimeoutMs);
+      return messageBatch.getMessageCount() == 0 && messageBatch.isEndOfPartitionGroup();
     }
   }
 
