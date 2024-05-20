@@ -191,7 +191,7 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
       throws IOException, TimeoutException {
     try (PartitionGroupConsumer partitionGroupConsumer = _kinesisStreamConsumerFactory.createPartitionGroupConsumer(
         _clientId, partitionGroupConsumptionStatus)) {
-      MessageBatch<?> messageBatch =  partitionGroupConsumer.fetchMessages(startCheckpoint, true, _fetchTimeoutMs);
+      MessageBatch<?> messageBatch = partitionGroupConsumer.fetchMessages(startCheckpoint, true, _fetchTimeoutMs);
       return messageBatch.getMessageCount() == 0 && messageBatch.isEndOfPartitionGroup();
     }
   }

@@ -94,7 +94,8 @@ public class FakePartitionLevelConsumer implements PartitionGroupConsumer {
   }
 
   @Override
-  public MessageBatch fetchMessages(StreamPartitionMsgOffset startOffset, int timeoutMs) {
+  public MessageBatch fetchMessages(StreamPartitionMsgOffset startOffset, boolean isStartOffsetInclusive,
+      int timeoutMs) {
     int startOffsetInt = (int) ((LongMsgOffset) startOffset).getOffset();
     if (startOffsetInt >= _messageOffsets.size()) {
       return new FakeStreamMessageBatch(Collections.emptyList(), Collections.emptyList(), startOffsetInt);

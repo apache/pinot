@@ -62,7 +62,8 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
   }
 
   @Override
-  public synchronized KinesisMessageBatch fetchMessages(StreamPartitionMsgOffset startMsgOffset, boolean isStartOffsetInclusive, int timeoutMs) {
+  public synchronized KinesisMessageBatch fetchMessages(StreamPartitionMsgOffset startMsgOffset,
+      boolean isStartOffsetInclusive, int timeoutMs) {
     KinesisPartitionGroupOffset startOffset = (KinesisPartitionGroupOffset) startMsgOffset;
     String shardId = startOffset.getShardId();
     String startSequenceNumber = startOffset.getSequenceNumber();
