@@ -89,6 +89,13 @@ public class SanitizationTransformer implements RecordTransformer {
     return record;
   }
 
+  /**
+   * Sanitize the value for the given column. Usually a STRING column can be extended for JSON / BYTES in future.
+   * @param stringColumn column name
+   * @param value value of the column
+   * @param columnFieldSpec field spec of the column defined in schema
+   * @return the sanitized value and a boolean indicating if the value was sanitized
+   */
   private Pair<String, Boolean> sanitizeValue(String stringColumn, String value, FieldSpec columnFieldSpec) {
     String sanitizedValue = StringUtil.sanitizeStringValue(value, columnFieldSpec.getMaxLength());
     // NOTE: reference comparison
