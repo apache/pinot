@@ -172,8 +172,6 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
       LOGGER.error("Caught exception while deserializing the request: {}", request, e);
       _serverMetrics.addMeteredGlobalValue(ServerMeter.REQUEST_DESERIALIZATION_EXCEPTIONS, 1);
       responseObserver.onError(Status.INVALID_ARGUMENT.withDescription("Bad request").withCause(e).asException());
-      _serverMetrics.addTimedValue(ServerTimer.GRPC_FAILED_QUERY_EXECUTION_MS, System.nanoTime() - startTime,
-          TimeUnit.NANOSECONDS);
       return;
     }
 
@@ -189,14 +187,14 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
       _serverMetrics.addMeteredGlobalValue(ServerMeter.NO_TABLE_ACCESS, 1);
       responseObserver.onError(
           Status.NOT_FOUND.withDescription(exceptionMsg).withCause(unsupportedOperationException).asException());
-      _serverMetrics.addTimedValue(ServerTimer.GRPC_FAILED_QUERY_EXECUTION_MS, System.nanoTime() - startTime,
-          TimeUnit.NANOSECONDS);
       return;
     }
 
     // Process the query
     InstanceResponseBlock instanceResponse;
     try {
+      LOGGER.info("Executing gRPC query request {}: {} received from broker: {}", queryRequest.getRequestId(),
+          queryRequest.getQueryContext(), queryRequest.getBrokerId());
       instanceResponse = _queryExecutor.execute(queryRequest, _executorService,
           new GrpcResultsBlockStreamer(responseObserver, _serverMetrics));
     } catch (Exception e) {
@@ -204,8 +202,6 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
           queryRequest.getQueryContext(), queryRequest.getBrokerId(), e);
       _serverMetrics.addMeteredGlobalValue(ServerMeter.UNCAUGHT_EXCEPTIONS, 1);
       responseObserver.onError(Status.INTERNAL.withCause(e).asException());
-      _serverMetrics.addTimedValue(ServerTimer.GRPC_FAILED_QUERY_EXECUTION_MS, System.nanoTime() - startTime,
-          TimeUnit.NANOSECONDS);
       return;
     }
 
@@ -219,15 +215,13 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
           queryRequest.getRequestId(), queryRequest.getQueryContext(), queryRequest.getBrokerId(), e);
       _serverMetrics.addMeteredGlobalValue(ServerMeter.RESPONSE_SERIALIZATION_EXCEPTIONS, 1);
       responseObserver.onError(Status.INTERNAL.withCause(e).asException());
-      _serverMetrics.addTimedValue(ServerTimer.GRPC_FAILED_QUERY_EXECUTION_MS, System.nanoTime() - startTime,
-          TimeUnit.NANOSECONDS);
       return;
     }
     responseObserver.onNext(serverResponse);
     _serverMetrics.addMeteredGlobalValue(ServerMeter.GRPC_BYTES_SENT, serverResponse.getSerializedSize());
     responseObserver.onCompleted();
-    _serverMetrics.addTimedValue(ServerTimer.GRPC_QUERY_EXECUTION_MS, System.nanoTime() - startTime,
-        TimeUnit.NANOSECONDS);
+    _serverMetrics.addTimedTableValue(queryRequest.getTableNameWithType(), ServerTimer.GRPC_QUERY_EXECUTION_MS,
+        System.nanoTime() - startTime, TimeUnit.NANOSECONDS);
 
     // Log the query
     if (_queryLogger != null) {
