@@ -1175,7 +1175,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     // When refreshing the copy of map, we need to take the WLock so only one thread is refreshing view.
     long upsertViewFreshnessMs =
         Math.min(QueryOptionsUtils.getUpsertViewFreshnessMs(queryOptions), _upsertViewRefreshIntervalMs);
-    if (upsertViewFreshnessMs == -1) {
+    if (upsertViewFreshnessMs < 0) {
       upsertViewFreshnessMs = _upsertViewRefreshIntervalMs;
     }
     doBatchRefreshUpsertView(upsertViewFreshnessMs);
