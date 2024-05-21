@@ -34,6 +34,7 @@ public class PinotHintOptions {
   public static final String AGGREGATE_HINT_OPTIONS = "aggOptions";
   public static final String JOIN_HINT_OPTIONS = "joinOptions";
   public static final String TABLE_HINT_OPTIONS = "tableOptions";
+  public static final String WINDOW_HINT_OPTIONS = "windowOptions";
 
   /**
    * Hint to denote that the aggregation node is the final aggregation stage which extracts the final result.
@@ -66,6 +67,19 @@ public class PinotHintOptions {
 
     public static final String NUM_GROUPS_LIMIT = "num_groups_limit";
     public static final String MAX_INITIAL_RESULT_HOLDER_CAPACITY = "max_initial_result_holder_capacity";
+  }
+
+  public static class WindowHintOptions {
+    /**
+     * Max rows allowed to cache the rows in window for further processing.
+     */
+    public static final String MAX_ROWS_IN_WINDOW = "max_rows_in_window";
+    /**
+     * Mode when window overflow happens, supported values: THROW or BREAK.
+     *   THROW(default): Break window cache build process, and throw exception, no further WINDOW operation performed.
+     *   BREAK: Break window cache build process, continue to perform WINDOW operation, results might be partial.
+     */
+    public static final String WINDOW_OVERFLOW_MODE = "window_overflow_mode";
   }
 
   public static class JoinHintOptions {

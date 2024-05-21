@@ -390,6 +390,10 @@ public class CommonConstants {
         public static final String MAX_ROWS_IN_JOIN = "maxRowsInJoin";
         public static final String JOIN_OVERFLOW_MODE = "joinOverflowMode";
 
+        // Handle WINDOW Overflow
+        public static final String MAX_ROWS_IN_WINDOW = "maxRowsInWindow";
+        public static final String WINDOW_OVERFLOW_MODE = "windowOverflowMode";
+
         // Indicates the maximum length of the serialized response per server for a query.
         public static final String MAX_SERVER_RESPONSE_SIZE_BYTES = "maxServerResponseSizeBytes";
 
@@ -1118,6 +1122,16 @@ public class CommonConstants {
     public static final String KEY_OF_JOIN_OVERFLOW_MODE = "pinot.query.join.overflow.mode";
 
     public enum JoinOverFlowMode {
+      THROW, BREAK
+    }
+
+    /**
+     * Configuration for window overflow.
+     */
+    public static final String KEY_OF_MAX_ROWS_IN_WINDOW = "pinot.query.window.max.rows";
+    public static final String KEY_OF_WINDOW_OVERFLOW_MODE = "pinot.query.window.overflow.mode";
+
+    public enum WindowOverFlowMode {
       THROW, BREAK
     }
   }

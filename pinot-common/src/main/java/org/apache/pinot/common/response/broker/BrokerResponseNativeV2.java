@@ -36,16 +36,16 @@ import org.apache.pinot.common.response.ProcessingException;
  * TODO: Currently this class cannot be used to deserialize the JSON response.
  */
 @JsonPropertyOrder({
-    "resultTable", "partialResult", "exceptions", "numGroupsLimitReached", "maxRowsInJoinReached", "timeUsedMs",
-    "stageStats", "maxRowsInOperator", "requestId", "brokerId", "numDocsScanned", "totalDocs",
-    "numEntriesScannedInFilter", "numEntriesScannedPostFilter", "numServersQueried", "numServersResponded",
-    "numSegmentsQueried", "numSegmentsProcessed", "numSegmentsMatched", "numConsumingSegmentsQueried",
-    "numConsumingSegmentsProcessed", "numConsumingSegmentsMatched", "minConsumingFreshnessTimeMs",
-    "numSegmentsPrunedByBroker", "numSegmentsPrunedByServer", "numSegmentsPrunedInvalid", "numSegmentsPrunedByLimit",
-    "numSegmentsPrunedByValue", "brokerReduceTimeMs", "offlineThreadCpuTimeNs", "realtimeThreadCpuTimeNs",
-    "offlineSystemActivitiesCpuTimeNs", "realtimeSystemActivitiesCpuTimeNs", "offlineResponseSerializationCpuTimeNs",
-    "realtimeResponseSerializationCpuTimeNs", "offlineTotalCpuTimeNs", "realtimeTotalCpuTimeNs",
-    "explainPlanNumEmptyFilterSegments", "explainPlanNumMatchAllFilterSegments", "traceInfo"
+    "resultTable", "partialResult", "exceptions", "numGroupsLimitReached", "maxRowsInJoinReached",
+    "maxRowsInWindowReached", "timeUsedMs", "stageStats", "maxRowsInOperator", "requestId", "brokerId",
+    "numDocsScanned", "totalDocs", "numEntriesScannedInFilter", "numEntriesScannedPostFilter", "numServersQueried",
+    "numServersResponded", "numSegmentsQueried", "numSegmentsProcessed", "numSegmentsMatched",
+    "numConsumingSegmentsQueried", "numConsumingSegmentsProcessed", "numConsumingSegmentsMatched",
+    "minConsumingFreshnessTimeMs", "numSegmentsPrunedByBroker", "numSegmentsPrunedByServer", "numSegmentsPrunedInvalid",
+    "numSegmentsPrunedByLimit", "numSegmentsPrunedByValue", "brokerReduceTimeMs", "offlineThreadCpuTimeNs",
+    "realtimeThreadCpuTimeNs", "offlineSystemActivitiesCpuTimeNs", "realtimeSystemActivitiesCpuTimeNs",
+    "offlineResponseSerializationCpuTimeNs", "realtimeResponseSerializationCpuTimeNs", "offlineTotalCpuTimeNs",
+    "realtimeTotalCpuTimeNs", "explainPlanNumEmptyFilterSegments", "explainPlanNumMatchAllFilterSegments", "traceInfo"
 })
 public class BrokerResponseNativeV2 implements BrokerResponse {
   private final StatMap<StatKey> _brokerStats = new StatMap<>(StatKey.class);
@@ -53,6 +53,7 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
 
   private ResultTable _resultTable;
   private boolean _maxRowsInJoinReached;
+  private boolean _maxRowsInWindowReached;
   private long _timeUsedMs;
   /**
    * Statistics for each stage of the query execution.
@@ -119,6 +120,15 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
 
   public void mergeMaxRowsInJoinReached(boolean maxRowsInJoinReached) {
     _maxRowsInJoinReached |= maxRowsInJoinReached;
+  }
+
+  @Override
+  public boolean isMaxRowsInWindowReached() {
+    return _maxRowsInWindowReached;
+  }
+
+  public void mergeMaxRowsInWindowReached(boolean maxRowsInWindowReached) {
+    _maxRowsInWindowReached |= maxRowsInWindowReached;
   }
 
   /**

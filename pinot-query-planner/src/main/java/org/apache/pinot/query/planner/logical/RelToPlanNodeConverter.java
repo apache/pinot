@@ -152,7 +152,8 @@ public final class RelToPlanNodeConverter {
   }
 
   private static PlanNode convertLogicalWindow(LogicalWindow node, int currentStageId) {
-    return new WindowNode(currentStageId, node.groups, node.constants, toDataSchema(node.getRowType()));
+    return new WindowNode(currentStageId, node.groups, node.constants, toDataSchema(node.getRowType()),
+        node.getHints());
   }
 
   private static PlanNode convertLogicalSort(LogicalSort node, int currentStageId) {
