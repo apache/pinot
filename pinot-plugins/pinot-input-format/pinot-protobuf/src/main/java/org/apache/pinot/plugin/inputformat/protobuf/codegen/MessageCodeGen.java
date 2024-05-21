@@ -85,9 +85,10 @@ public class MessageCodeGen {
     if (fieldsToRead != null && !fieldsToRead.isEmpty()) {
       for (String fieldName: fieldsToRead.stream().sorted().collect(Collectors.toList())) {
         if (descriptor.findFieldByName(fieldName) == null) {
-          throw new IllegalArgumentException("Field " + fieldName + " not found in the descriptor");
+          LOGGER.debug("Field " + fieldName + " not found in the descriptor");
+        } else {
+          allDesc.add(descriptor.findFieldByName(fieldName));
         }
-        allDesc.add(descriptor.findFieldByName(fieldName));
       }
     } else {
       allDesc = descriptor.getFields();
@@ -148,7 +149,11 @@ public class MessageCodeGen {
     List<Descriptors.FieldDescriptor> descriptorsToDerive = new ArrayList<>();
     if (fieldsToRead != null && !fieldsToRead.isEmpty()) {
       for (String fieldName: fieldsToRead.stream().sorted().collect(Collectors.toList())) {
-        descriptorsToDerive.add(descriptor.findFieldByName(fieldName));
+        if (null == descriptor.findFieldByName(fieldName)) {
+          LOGGER.debug("Field " + fieldName + " not found in the descriptor");
+        } else {
+          descriptorsToDerive.add(descriptor.findFieldByName(fieldName));
+        }
       }
     } else {
       descriptorsToDerive = descriptor.getFields();
