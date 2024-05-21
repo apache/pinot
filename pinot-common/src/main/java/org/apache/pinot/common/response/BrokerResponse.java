@@ -53,11 +53,10 @@ public interface BrokerResponse {
    */
   void setResultTable(@Nullable ResultTable resultTable);
 
-  @JsonIgnore
-  default int getNumRowsResultSet() {
-    ResultTable resultTable = getResultTable();
-    return resultTable != null ? resultTable.getRows().size() : 0;
-  }
+  /**
+   * Returns the number of rows in the result table.
+   */
+  int getNumRowsResultSet();
 
   /**
    * Returns whether the query doesn't guarantee to have the complete result due to exceptions or limits.

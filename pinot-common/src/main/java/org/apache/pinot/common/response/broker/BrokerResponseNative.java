@@ -42,9 +42,9 @@ import org.apache.pinot.spi.utils.JsonUtils;
  * This class can be used to serialize/deserialize the broker response.
  */
 @JsonPropertyOrder({
-    "resultTable", "partialResult", "exceptions", "numGroupsLimitReached", "timeUsedMs", "requestId", "brokerId",
-    "numDocsScanned", "totalDocs", "numEntriesScannedInFilter", "numEntriesScannedPostFilter", "numServersQueried",
-    "numServersResponded", "numSegmentsQueried", "numSegmentsProcessed", "numSegmentsMatched",
+    "resultTable", "numRowsResultSet", "partialResult", "exceptions", "numGroupsLimitReached", "timeUsedMs",
+    "requestId", "brokerId", "numDocsScanned", "totalDocs", "numEntriesScannedInFilter", "numEntriesScannedPostFilter",
+    "numServersQueried", "numServersResponded", "numSegmentsQueried", "numSegmentsProcessed", "numSegmentsMatched",
     "numConsumingSegmentsQueried", "numConsumingSegmentsProcessed", "numConsumingSegmentsMatched",
     "minConsumingFreshnessTimeMs", "numSegmentsPrunedByBroker", "numSegmentsPrunedByServer",
     "numSegmentsPrunedInvalid", "numSegmentsPrunedByLimit", "numSegmentsPrunedByValue", "brokerReduceTimeMs",
@@ -63,6 +63,7 @@ public class BrokerResponseNative implements BrokerResponse {
   public static final BrokerResponseNative BROKER_ONLY_EXPLAIN_PLAN_OUTPUT = getBrokerResponseExplainPlanOutput();
 
   private ResultTable _resultTable;
+  private int _numRowsResultSet = 0;
   private List<QueryProcessingException> _exceptions = new ArrayList<>();
   private boolean _numGroupsLimitReached = false;
   private long _timeUsedMs = 0L;
@@ -142,6 +143,20 @@ public class BrokerResponseNative implements BrokerResponse {
   @Override
   public void setResultTable(@Nullable ResultTable resultTable) {
     _resultTable = resultTable;
+    // NOTE: Update _numRowsResultSet when setting non-null result table. We might set null result table when user wants
+    //       to hide the result but only show the stats, in which case we should not update _numRowsResultSet.
+    if (resultTable != null) {
+      _numRowsResultSet = resultTable.getRows().size();
+    }
+  }
+
+  @Override
+  public int getNumRowsResultSet() {
+    return _numRowsResultSet;
+  }
+
+  public void setNumRowsResultSet(int numRowsResultSet) {
+    _numRowsResultSet = numRowsResultSet;
   }
 
   @JsonProperty(access = JsonProperty.Access.READ_ONLY)
