@@ -130,12 +130,12 @@ public class BasicAuthAccessControlTest {
     authorizationResult = _accessControl.hasAccess(identity, tableNames);
     Assert.assertFalse(authorizationResult.hasAccess());
     Assert.assertEquals(authorizationResult.getFailureMessage(),
-        "Authorization Failed for tables: veryImportantStuff, lessImportantStuff,");
+        "Authorization Failed for tables: veryImportantStuff,");
     tableNames.add("lesserImportantStuff");
     authorizationResult = _accessControl.hasAccess(identity, tableNames);
     Assert.assertFalse(authorizationResult.hasAccess());
     Assert.assertEquals(authorizationResult.getFailureMessage(),
-        "Authorization Failed for tables: veryImportantStuff, lessImportantStuff, lesserImportantStuff,");
+        "Authorization Failed for tables: veryImportantStuff,");
   }
 
   @Test

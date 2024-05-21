@@ -18,7 +18,10 @@
  */
 package org.apache.pinot.spi.auth;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import org.apache.commons.lang.StringUtils;
 
@@ -63,7 +66,12 @@ public class TableAuthorizationResult implements AuthorizationResult {
     }
     StringBuilder sb = new StringBuilder();
     sb.append("Authorization Failed for tables: ");
-    for (String table : _failedTables) {
+    // sort _failedTables into a list
+
+    List<String> failedTablesList = new ArrayList<>(_failedTables);
+    Collections.sort(failedTablesList); // Sort to make output deterministic
+
+    for (String table : failedTablesList) {
       sb.append(table);
       sb.append(", ");
     }
