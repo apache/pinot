@@ -528,7 +528,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       }
 
       if (offlineBrokerRequest == null && realtimeBrokerRequest == null) {
-        return getEmptyBrokerOnlyResponse(requestId, query, requesterIdentity, requestContext, pinotQuery, tableName);
+        return getEmptyBrokerOnlyResponse(pinotQuery, requestContext, tableName, requesterIdentity);
       }
 
       if (offlineBrokerRequest != null && isFilterAlwaysTrue(offlineBrokerRequest.getPinotQuery())) {
@@ -605,7 +605,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
           return new BrokerResponseNative(exceptions);
         } else {
           // When all segments have been pruned, we can just return an empty response.
-          return getEmptyBrokerOnlyResponse(requestId, query, requesterIdentity, requestContext, pinotQuery, tableName);
+          return getEmptyBrokerOnlyResponse(pinotQuery, requestContext, tableName, requesterIdentity);
         }
       }
       long routingEndTimeNs = System.nanoTime();
@@ -716,7 +716,6 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
             offlineRoutingTable, realtimeBrokerRequest, realtimeRoutingTable, remainingTimeMs, serverStats,
             requestContext);
       }
-      attachBrokerIdAndRequestId(brokerResponse, requestId);
 
       for (ProcessingException exception : exceptions) {
         brokerResponse.addException(exception);
@@ -744,8 +743,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
       // Log query and stats
       _queryLogger.log(
-          new QueryLogger.QueryLogParams(query, tableName, numUnavailableSegments, serverStats, brokerResponse,
-              requesterIdentity));
+          new QueryLogger.QueryLogParams(requestContext, tableName, brokerResponse, requesterIdentity, serverStats));
 
       return brokerResponse;
     } finally {
@@ -753,13 +751,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
   }
 
-  private void attachBrokerIdAndRequestId(BrokerResponseNative brokerResponse, long requestId) {
-    brokerResponse.setBrokerId(_brokerId);
-    brokerResponse.setRequestId(Long.toString(requestId));
-  }
-
-  private BrokerResponseNative getEmptyBrokerOnlyResponse(long requestId, String query,
-      RequesterIdentity requesterIdentity, RequestContext requestContext, PinotQuery pinotQuery, String tableName) {
+  private BrokerResponseNative getEmptyBrokerOnlyResponse(PinotQuery pinotQuery, RequestContext requestContext,
+      String tableName, @Nullable RequesterIdentity requesterIdentity) {
     if (pinotQuery.isExplain()) {
       // EXPLAIN PLAN results to show that query is evaluated exclusively by Broker.
       return BrokerResponseNative.BROKER_ONLY_EXPLAIN_PLAN_OUTPUT;
@@ -767,9 +760,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
     // Send empty response since we don't need to evaluate either offline or realtime request.
     BrokerResponseNative brokerResponse = BrokerResponseNative.empty();
-    attachBrokerIdAndRequestId(brokerResponse, requestId);
     brokerResponse.setTimeUsedMs(System.currentTimeMillis() - requestContext.getRequestArrivalTimeMillis());
-    _queryLogger.log(new QueryLogger.QueryLogParams(query, tableName, 0, null, brokerResponse, requesterIdentity));
+    _queryLogger.log(
+        new QueryLogger.QueryLogParams(requestContext, tableName, brokerResponse, requesterIdentity, null));
     return brokerResponse;
   }
 
@@ -1394,7 +1387,6 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     rows.add(row.toArray());
     ResultTable resultTable = new ResultTable(dataSchema, rows);
     brokerResponse.setResultTable(resultTable);
-    attachBrokerIdAndRequestId(brokerResponse, requestId);
     brokerResponse.setTimeUsedMs(System.currentTimeMillis() - requestContext.getRequestArrivalTimeMillis());
     augmentStatistics(requestContext, brokerResponse);
     if (QueryOptionsUtils.shouldDropResults(pinotQuery.getQueryOptions())) {

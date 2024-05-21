@@ -105,9 +105,19 @@ public interface BrokerResponse {
   String getRequestId();
 
   /**
+   * Sets the request ID of the query.
+   */
+  void setRequestId(String requestId);
+
+  /**
    * Returns the broker ID that handled the query.
    */
   String getBrokerId();
+
+  /**
+   * Sets the broker ID that handled the query.
+   */
+  void setBrokerId(String brokerId);
 
   /**
    * Returns the number of documents selected (matching the filter) for the query.
