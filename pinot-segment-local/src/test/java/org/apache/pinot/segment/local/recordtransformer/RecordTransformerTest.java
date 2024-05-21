@@ -276,7 +276,7 @@ public class RecordTransformerTest {
       assertEquals(record.getValue("mvString2"), new Object[]{"123", "123", "123.0", "123.0", "123"});
       assertNull(record.getValue("$virtual"));
       assertTrue(record.getNullValueFields().isEmpty());
-      assertEquals(transformer.getSanitizedColsCount(), 3L);
+      assertEquals(transformer.getSanitizedColValuesCount(), 3L);
     }
   }
 

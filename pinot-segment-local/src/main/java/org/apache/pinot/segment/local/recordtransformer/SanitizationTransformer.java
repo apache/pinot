@@ -20,9 +20,6 @@ package org.apache.pinot.segment.local.recordtransformer;
 
 import java.util.HashMap;
 import java.util.Map;
-import javax.xml.crypto.Data;
-import org.apache.pinot.common.metrics.ServerMeter;
-import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
@@ -45,7 +42,7 @@ public class SanitizationTransformer implements RecordTransformer {
   private final Map<String, Integer> _stringColumnMaxLengthMap = new HashMap<>();
   private final Map<String, Integer> _jsonColumnMaxLengthMap = new HashMap<>();
 
-  private Long sanitizedColsCount;
+  private Long _sanitizedColValuesCount;
 
   public SanitizationTransformer(Schema schema) {
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
@@ -57,12 +54,12 @@ public class SanitizationTransformer implements RecordTransformer {
           _jsonColumnMaxLengthMap.put(fieldSpec.getName(), fieldSpec.getMaxLength());
         }
       }
-      this.sanitizedColsCount = 0L;
+      this._sanitizedColValuesCount = 0L;
     }
   }
 
-  public Long getSanitizedColsCount() {
-    return sanitizedColsCount;
+  public Long getSanitizedColValuesCount() {
+    return _sanitizedColValuesCount;
   }
 
   @Override
@@ -87,7 +84,7 @@ public class SanitizationTransformer implements RecordTransformer {
         String stringValue = (String) value;
         String sanitizedValue = StringUtil.sanitizeStringValue(stringValue, maxLength);
         if (!sanitizedValue.equals(stringValue)) {
-          sanitizedColsCount++;
+          _sanitizedColValuesCount++;
         }
         // NOTE: reference comparison
         //noinspection StringEquality
@@ -101,7 +98,7 @@ public class SanitizationTransformer implements RecordTransformer {
         for (int i = 0; i < numValues; i++) {
           String sanitizedValue = StringUtil.sanitizeStringValue(values[i].toString(), maxLength);
           if (!sanitizedValue.equals(values[i].toString())) {
-            sanitizedColsCount++;
+            _sanitizedColValuesCount++;
           }
           values[i] = sanitizedValue;
         }
@@ -120,7 +117,7 @@ public class SanitizationTransformer implements RecordTransformer {
         String sanitizedValue = JsonUtils.getSanitizedString(maxLength, stringValue);
         if (!sanitizedValue.equals(stringValue)) {
           record.putValue(stringColumn, sanitizedValue);
-          sanitizedColsCount++;
+          _sanitizedColValuesCount++;
         }
       } else {
         // Multi-valued column json col
@@ -130,7 +127,7 @@ public class SanitizationTransformer implements RecordTransformer {
           String sanitizedValue = StringUtil.sanitizeStringValue(values[i].toString(), maxLength);
           if (!sanitizedValue.equals(values[i].toString())) {
             values[i] = sanitizedValue;
-            sanitizedColsCount++;
+            _sanitizedColValuesCount++;
           }
         }
       }
