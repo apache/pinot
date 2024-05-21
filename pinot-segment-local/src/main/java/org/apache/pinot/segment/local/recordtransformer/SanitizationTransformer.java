@@ -45,6 +45,8 @@ public class SanitizationTransformer implements RecordTransformer {
   private final Map<String, Integer> _stringColumnMaxLengthMap = new HashMap<>();
   private final Map<String, Integer> _jsonColumnMaxLengthMap = new HashMap<>();
 
+  private Long sanitizedColsCount;
+
   public SanitizationTransformer(Schema schema) {
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
       if (!fieldSpec.isVirtualColumn()) {
@@ -55,7 +57,12 @@ public class SanitizationTransformer implements RecordTransformer {
           _jsonColumnMaxLengthMap.put(fieldSpec.getName(), fieldSpec.getMaxLength());
         }
       }
+      this.sanitizedColsCount = 0L;
     }
+  }
+
+  public Long getSanitizedColsCount() {
+    return sanitizedColsCount;
   }
 
   @Override
@@ -79,6 +86,9 @@ public class SanitizationTransformer implements RecordTransformer {
         // Single-valued column
         String stringValue = (String) value;
         String sanitizedValue = StringUtil.sanitizeStringValue(stringValue, maxLength);
+        if (!sanitizedValue.equals(stringValue)) {
+          sanitizedColsCount++;
+        }
         // NOTE: reference comparison
         //noinspection StringEquality
         if (sanitizedValue != stringValue) {
@@ -89,7 +99,11 @@ public class SanitizationTransformer implements RecordTransformer {
         Object[] values = (Object[]) value;
         int numValues = values.length;
         for (int i = 0; i < numValues; i++) {
-          values[i] = StringUtil.sanitizeStringValue(values[i].toString(), maxLength);
+          String sanitizedValue = StringUtil.sanitizeStringValue(values[i].toString(), maxLength);
+          if (!sanitizedValue.equals(values[i].toString())) {
+            sanitizedColsCount++;
+          }
+          values[i] = sanitizedValue;
         }
       }
     }
@@ -104,17 +118,20 @@ public class SanitizationTransformer implements RecordTransformer {
         // Single-valued json column
         String stringValue = (String) value;
         String sanitizedValue = JsonUtils.getSanitizedString(maxLength, stringValue);
-        // NOTE: reference comparison
-        //noinspection StringEquality
-        if (sanitizedValue != stringValue) {
+        if (!sanitizedValue.equals(stringValue)) {
           record.putValue(stringColumn, sanitizedValue);
+          sanitizedColsCount++;
         }
       } else {
         // Multi-valued column json col
         Object[] values = (Object[]) value;
         int numValues = values.length;
         for (int i = 0; i < numValues; i++) {
-          values[i] = JsonUtils.getSanitizedString(maxLength, values[i].toString());
+          String sanitizedValue = StringUtil.sanitizeStringValue(values[i].toString(), maxLength);
+          if (!sanitizedValue.equals(values[i].toString())) {
+            values[i] = sanitizedValue;
+            sanitizedColsCount++;
+          }
         }
       }
     }
