@@ -36,7 +36,7 @@ import org.apache.pinot.common.response.ProcessingException;
  * TODO: Currently this class cannot be used to deserialize the JSON response.
  */
 @JsonPropertyOrder({
-    "resultTable", "partialResult", "exceptions", "numGroupsLimitReached", "maxRowsInJoinReached",
+    "resultTable", "numRowsResultSet", "partialResult", "exceptions", "numGroupsLimitReached", "maxRowsInJoinReached",
     "maxRowsInWindowReached", "timeUsedMs", "stageStats", "maxRowsInOperator", "requestId", "brokerId",
     "numDocsScanned", "totalDocs", "numEntriesScannedInFilter", "numEntriesScannedPostFilter", "numServersQueried",
     "numServersResponded", "numSegmentsQueried", "numSegmentsProcessed", "numSegmentsMatched",
@@ -52,6 +52,7 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
   private final List<QueryProcessingException> _exceptions = new ArrayList<>();
 
   private ResultTable _resultTable;
+  private int _numRowsResultSet;
   private boolean _maxRowsInJoinReached;
   private boolean _maxRowsInWindowReached;
   private long _timeUsedMs;
@@ -83,6 +84,16 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
   @Override
   public void setResultTable(@Nullable ResultTable resultTable) {
     _resultTable = resultTable;
+    // NOTE: Update _numRowsResultSet when setting non-null result table. We might set null result table when user wants
+    //       to hide the result but only show the stats, in which case we should not update _numRowsResultSet.
+    if (resultTable != null) {
+      _numRowsResultSet = resultTable.getRows().size();
+    }
+  }
+
+  @Override
+  public int getNumRowsResultSet() {
+    return _numRowsResultSet;
   }
 
   @JsonProperty(access = JsonProperty.Access.READ_ONLY)
