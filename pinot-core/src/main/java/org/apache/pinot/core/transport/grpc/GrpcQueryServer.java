@@ -89,9 +89,12 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
 
     @Override
     public void transportTerminated(Attributes transportAttrs) {
-      LOGGER.info("gRPC transportTerminated: REMOTE_ADDR {}",
-          transportAttrs != null ? transportAttrs.get(Grpc.TRANSPORT_ATTR_REMOTE_ADDR) : "null");
-      _serverMetrics.addMeteredGlobalValue(ServerMeter.GRPC_TRANSPORT_TERMINATED, 1);
+      // transportTerminated can be called without transportReady before it, e.g. handshake fails
+      // So, don't emit metrics if transportAttrs is null
+      if (transportAttrs != null) {
+        LOGGER.info("gRPC transportTerminated: REMOTE_ADDR {}", transportAttrs.get(Grpc.TRANSPORT_ATTR_REMOTE_ADDR));
+        _serverMetrics.addMeteredGlobalValue(ServerMeter.GRPC_TRANSPORT_TERMINATED, 1);
+      }
     }
   }
 
