@@ -20,6 +20,7 @@ package org.apache.pinot.common.utils;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -72,6 +73,9 @@ public class SqlResultComparator {
   private static final String FIELD_NUM_ENTRIES_SCANNED_IN_FILTER = "numEntriesScannedInFilter";
   private static final String FIELD_NUM_ENTRIES_SCANNED_POST_FILTER = "numEntriesScannedPostFilter";
   private static final String FIELD_NUM_GROUPS_LIMIT_REACHED = "numGroupsLimitReached";
+  private static final String FIELD_MULTI_STAGE_STATS = "stageStats";
+  private static final String FIELD_MULTI_STAGE_STATS_TYPE = "type";
+  private static final String FIELD_MULTI_STAGE_STATS_CHILDREN = "children";
 
   private static final String FIELD_TYPE_INT = "INT";
   private static final String FIELD_TYPE_LONG = "LONG";
@@ -161,6 +165,97 @@ public class SqlResultComparator {
       }
     }
     return areResultsEqual;
+  }
+
+  public static boolean areMultiStageQueriesEqual(JsonNode actual, JsonNode expected, String query)
+      throws IOException {
+    if (hasExceptions(actual)) {
+      return false;
+    }
+
+    if (areEmpty(actual, expected)) {
+      return true;
+    }
+
+    if (!areDataSchemaEqual(actual, expected)) {
+      return false;
+    }
+
+    ArrayNode actualRows = (ArrayNode) actual.get(FIELD_RESULT_TABLE).get(FIELD_ROWS);
+    ArrayNode expectedRows = (ArrayNode) expected.get(FIELD_RESULT_TABLE).get(FIELD_ROWS);
+    ArrayNode columnDataTypes = (ArrayNode) expected.get(FIELD_RESULT_TABLE).get(FIELD_DATA_SCHEMA).
+        get(FIELD_COLUMN_DATA_TYPES);
+
+    convertNumbersToString(expectedRows, columnDataTypes);
+    convertNumbersToString(actualRows, columnDataTypes);
+
+    List<String> actualElementsSerialized = new ArrayList<>();
+    List<String> expectedElementsSerialized = new ArrayList<>();
+    for (int i = 0; i < actualRows.size(); i++) {
+      actualElementsSerialized.add(actualRows.get(i).toString());
+    }
+    for (int i = 0; i < expectedRows.size(); i++) {
+      expectedElementsSerialized.add(expectedRows.get(i).toString());
+    }
+
+    if (!areLengthsEqual(actual, expected)) {
+      return false;
+    }
+
+    // For now, just directly compare elements in result set
+    if (!areNonOrderByQueryElementsEqual(actualElementsSerialized, expectedElementsSerialized)) {
+      return false;
+    }
+
+    // Compare stage stats
+    ObjectNode actualStageStats = (ObjectNode) actual.get(FIELD_MULTI_STAGE_STATS);
+    ObjectNode expectedStageStats = (ObjectNode) expected.get(FIELD_MULTI_STAGE_STATS);
+    return areMultiStageStatsEqual(actualStageStats, expectedStageStats);
+  }
+
+  private static boolean areMultiStageStatsEqual(ObjectNode actualStageStats, ObjectNode expectedStageStats) {
+    String actualType = actualStageStats.get(FIELD_MULTI_STAGE_STATS_TYPE) != null
+        ? actualStageStats.get(FIELD_MULTI_STAGE_STATS_TYPE).asText()
+        : null;
+    String expectedType = expectedStageStats.get(FIELD_MULTI_STAGE_STATS_TYPE) != null
+        ? expectedStageStats.get(FIELD_MULTI_STAGE_STATS_TYPE).asText()
+        : null;
+
+    if (actualType != null && !actualType.equals(expectedType)) {
+      LOGGER.error("Mismatch in stage stats type. Actual: {}, Expected: {}", actualType, expectedType);
+      return false;
+    }
+
+    ArrayNode actualChildren = (ArrayNode) actualStageStats.get(FIELD_MULTI_STAGE_STATS_CHILDREN);
+    ArrayNode expectedChildren = (ArrayNode) expectedStageStats.get(FIELD_MULTI_STAGE_STATS_CHILDREN);
+
+    if (actualChildren == null && expectedChildren == null) {
+      return true;
+    }
+    if (actualChildren == null) {
+      LOGGER.error("No children found in stage stats for type: {}. Expected {} children.",
+          actualType, expectedChildren.size());
+      return false;
+    }
+    if (expectedChildren == null) {
+      LOGGER.error("Found unexpected children in stage stats for type: {}. Expected no children.", actualType);
+      return false;
+    }
+    if (actualChildren.size() != expectedChildren.size()) {
+      LOGGER.error("Mismatch in number of children for stage stats for type: {}. Actual: {}, Expected: {}",
+          actualType, actualChildren.size(), expectedChildren.size());
+      return false;
+    }
+
+    for (int i = 0; i < actualChildren.size(); i++) {
+      if (!areMultiStageStatsEqual((ObjectNode) actualChildren.get(i), (ObjectNode) expectedChildren.get(i))) {
+        return false;
+      }
+    }
+
+    // TODO: Verify other stats like emittedRows, fanIn, fanOut, inMemoryMessages, rawMessages etc.?
+
+    return true;
   }
 
   private static boolean areOrderByQueryElementsEqual(ArrayNode actualElements, ArrayNode expectedElements,

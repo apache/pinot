@@ -59,4 +59,13 @@ public class Utils {
     return JsonUtils.stringToJsonNode(
         ControllerTest.sendPostRequest(brokerBaseApiUrl + "/query/sql", payload.toString()));
   }
+
+  public static JsonNode postMultiStageSqlQuery(String query, String brokerBaseApiUrl) throws Exception {
+    ObjectNode payload = JsonUtils.newObjectNode();
+    payload.put("sql", query);
+    payload.put("queryOptions", "useMultistageEngine=true");
+
+    return JsonUtils.stringToJsonNode(
+        ControllerTest.sendPostRequest(brokerBaseApiUrl + "/query/sql", payload.toString()));
+  }
 }
