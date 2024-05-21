@@ -215,8 +215,6 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     updatePhaseTimingForTables(tableNames, BrokerQueryPhase.QUERY_EXECUTION, executionEndTimeNs - executionStartTimeNs);
 
     BrokerResponseNativeV2 brokerResponse = new BrokerResponseNativeV2();
-    brokerResponse.setBrokerId(_brokerId);
-    brokerResponse.setRequestId(Long.toString(requestId));
     brokerResponse.setResultTable(queryResults.getResultTable());
     // TODO: Add servers queried/responded stats
     brokerResponse.setBrokerReduceTimeMs(queryResults.getBrokerReduceTimeMs());
@@ -230,6 +228,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       brokerResponse.addException(QueryException.getException(QueryException.SERVER_SEGMENT_MISSING_ERROR,
           String.format("Find unavailable segments: %s for table: %s", unavailableSegments, tableName)));
     }
+    requestContext.setNumUnavailableSegments(numUnavailableSegments);
 
     fillOldBrokerResponseStats(brokerResponse, queryResults.getQueryStats(), dispatchableSubPlan);
 
@@ -244,8 +243,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     // Log query and stats
     _queryLogger.log(
-        new QueryLogger.QueryLogParams(query, tableNames.toString(), numUnavailableSegments, null, brokerResponse,
-            requesterIdentity));
+        new QueryLogger.QueryLogParams(requestContext, tableNames.toString(), brokerResponse, requesterIdentity, null));
 
     return brokerResponse;
   }

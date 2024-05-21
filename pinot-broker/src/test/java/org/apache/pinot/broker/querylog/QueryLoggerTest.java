@@ -29,6 +29,8 @@ import org.apache.pinot.broker.api.RequesterIdentity;
 import org.apache.pinot.broker.requesthandler.BaseSingleStageBrokerRequestHandler.ServerStats;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.spi.trace.DefaultRequestContext;
+import org.apache.pinot.spi.trace.RequestContext;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.slf4j.Logger;
@@ -237,13 +239,17 @@ public class QueryLoggerTest {
   }
 
   private QueryLogger.QueryLogParams generateParams(boolean numGroupsLimitReached, int numExceptions, long timeUsedMs) {
+    RequestContext requestContext = new DefaultRequestContext();
+    requestContext.setRequestId(123);
+    requestContext.setQuery("SELECT * FROM foo");
+    requestContext.setNumUnavailableSegments(21);
+
     BrokerResponseNative response = new BrokerResponseNative();
     response.setNumGroupsLimitReached(numGroupsLimitReached);
     for (int i = 0; i < numExceptions; i++) {
       response.addException(new ProcessingException());
     }
     response.setTimeUsedMs(timeUsedMs);
-    response.setRequestId("123");
     response.setNumDocsScanned(1);
     response.setTotalDocs(2);
     response.setNumEntriesScannedInFilter(3);
@@ -265,8 +271,6 @@ public class QueryLoggerTest {
     response.setRealtimeResponseSerializationCpuTimeNs(19);
     response.setBrokerReduceTimeMs(20);
 
-    ServerStats serverStats = new ServerStats();
-    serverStats.setServerStats("serverStats");
     RequesterIdentity identity = new RequesterIdentity() {
       @Override
       public String getClientIp() {
@@ -274,6 +278,9 @@ public class QueryLoggerTest {
       }
     };
 
-    return new QueryLogger.QueryLogParams("SELECT * FROM foo", "table", 21, serverStats, response, identity);
+    ServerStats serverStats = new ServerStats();
+    serverStats.setServerStats("serverStats");
+
+    return new QueryLogger.QueryLogParams(requestContext, "table", response, identity, serverStats);
   }
 }

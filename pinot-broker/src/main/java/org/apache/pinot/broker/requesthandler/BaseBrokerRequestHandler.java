@@ -124,6 +124,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     BrokerResponse brokerResponse =
         handleRequest(requestId, query, sqlNodeAndOptions, request, requesterIdentity, requestContext, httpHeaders,
             accessControl);
+    brokerResponse.setBrokerId(_brokerId);
+    brokerResponse.setRequestId(Long.toString(requestId));
     _brokerQueryEventListener.onQueryCompletion(requestContext);
 
     return brokerResponse;

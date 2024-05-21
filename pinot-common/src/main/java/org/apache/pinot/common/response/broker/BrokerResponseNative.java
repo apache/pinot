@@ -217,6 +217,7 @@ public class BrokerResponseNative implements BrokerResponse {
     return _requestId;
   }
 
+  @Override
   public void setRequestId(String requestId) {
     _requestId = requestId;
   }
@@ -226,6 +227,7 @@ public class BrokerResponseNative implements BrokerResponse {
     return _brokerId;
   }
 
+  @Override
   public void setBrokerId(String brokerId) {
     _brokerId = brokerId;
   }
