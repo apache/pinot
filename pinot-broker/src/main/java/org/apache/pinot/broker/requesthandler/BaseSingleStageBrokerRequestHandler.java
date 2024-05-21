@@ -367,7 +367,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       BrokerRequest serverBrokerRequest =
           serverPinotQuery == pinotQuery ? brokerRequest : CalciteSqlCompiler.convertToBrokerRequest(serverPinotQuery);
       boolean hasTableAccess =
-          accessControl.hasAccess(requesterIdentity, serverBrokerRequest) && accessControl.hasAccess(httpHeaders,
+          accessControl.hasAccess(requesterIdentity, serverBrokerRequest).hasAccess() && accessControl.hasAccess(
+              httpHeaders,
               TargetType.TABLE, tableName, Actions.Table.QUERY);
 
       _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.AUTHORIZATION,

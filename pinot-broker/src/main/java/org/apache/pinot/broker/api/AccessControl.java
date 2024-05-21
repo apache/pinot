@@ -23,6 +23,8 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.auth.FineGrainedAccessControl;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
+import org.apache.pinot.spi.auth.AuthorizationResult;
+import org.apache.pinot.spi.auth.TableAuthorizationResult;
 
 
 @InterfaceAudience.Public
@@ -48,7 +50,7 @@ public interface AccessControl extends FineGrainedAccessControl {
    *
    * @return {@code true} if authorized, {@code false} otherwise
    */
-  boolean hasAccess(RequesterIdentity requesterIdentity, BrokerRequest brokerRequest);
+  AuthorizationResult hasAccess(RequesterIdentity requesterIdentity, BrokerRequest brokerRequest);
 
   /**
    * Fine-grained access control on pinot tables.
@@ -58,5 +60,5 @@ public interface AccessControl extends FineGrainedAccessControl {
    *
    * @return {@code true} if authorized, {@code false} otherwise
    */
-  boolean hasAccess(RequesterIdentity requesterIdentity, Set<String> tables);
+  TableAuthorizationResult hasAccess(RequesterIdentity requesterIdentity, Set<String> tables);
 }

@@ -38,6 +38,8 @@ import org.apache.pinot.common.utils.BcryptUtils;
 import org.apache.pinot.core.auth.BasicAuthPrincipal;
 import org.apache.pinot.core.auth.BasicAuthUtils;
 import org.apache.pinot.core.auth.ZkBasicAuthPrincipal;
+import org.apache.pinot.spi.auth.AuthorizationResult;
+import org.apache.pinot.spi.auth.TableAuthorizationResult;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
@@ -83,38 +85,39 @@ public class ZkBasicAuthAccessControlFactory extends AccessControlFactory {
 
     @Override
     public boolean hasAccess(RequesterIdentity requesterIdentity) {
-      return hasAccess(requesterIdentity, (BrokerRequest) null);
+      return hasAccess(requesterIdentity, (BrokerRequest) null).hasAccess();
     }
 
     @Override
-    public boolean hasAccess(RequesterIdentity requesterIdentity, BrokerRequest brokerRequest) {
+    public AuthorizationResult hasAccess(RequesterIdentity requesterIdentity, BrokerRequest brokerRequest) {
       if (brokerRequest == null || !brokerRequest.isSetQuerySource() || !brokerRequest.getQuerySource()
           .isSetTableName()) {
         // no table restrictions? accept
-        return true;
+        return TableAuthorizationResult.noFailureResult();
       }
 
       return hasAccess(requesterIdentity, Collections.singleton(brokerRequest.getQuerySource().getTableName()));
     }
 
     @Override
-    public boolean hasAccess(RequesterIdentity requesterIdentity, Set<String> tables) {
+    public TableAuthorizationResult hasAccess(RequesterIdentity requesterIdentity, Set<String> tables) {
       Optional<ZkBasicAuthPrincipal> principalOpt = getPrincipalAuth(requesterIdentity);
       if (!principalOpt.isPresent()) {
         throw new NotAuthorizedException("Basic");
       }
       if (tables == null || tables.isEmpty()) {
-        return true;
+        return TableAuthorizationResult.noFailureResult();
       }
 
+      TableAuthorizationResult tableAuthorizationResult = new TableAuthorizationResult();
       ZkBasicAuthPrincipal principal = principalOpt.get();
       for (String table : tables) {
         if (!principal.hasTable(TableNameBuilder.extractRawTableName(table))) {
-          return false;
+          tableAuthorizationResult.addFailedTable(table);
         }
       }
 
-      return true;
+      return tableAuthorizationResult;
     }
 
     private Optional<ZkBasicAuthPrincipal> getPrincipalAuth(RequesterIdentity requesterIdentity) {

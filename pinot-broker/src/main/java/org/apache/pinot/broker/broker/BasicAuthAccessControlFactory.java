@@ -32,6 +32,8 @@ import org.apache.pinot.broker.api.RequesterIdentity;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.auth.BasicAuthPrincipal;
 import org.apache.pinot.core.auth.BasicAuthUtils;
+import org.apache.pinot.spi.auth.AuthorizationResult;
+import org.apache.pinot.spi.auth.TableAuthorizationResult;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 
@@ -79,11 +81,11 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
 
     @Override
     public boolean hasAccess(RequesterIdentity requesterIdentity) {
-      return hasAccess(requesterIdentity, (BrokerRequest) null);
+      return hasAccess(requesterIdentity, (BrokerRequest) null).hasAccess();
     }
 
     @Override
-    public boolean hasAccess(RequesterIdentity requesterIdentity, BrokerRequest brokerRequest) {
+    public AuthorizationResult hasAccess(RequesterIdentity requesterIdentity, BrokerRequest brokerRequest) {
       Optional<BasicAuthPrincipal> principalOpt = getPrincipalOpt(requesterIdentity);
 
       if (!principalOpt.isPresent()) {
@@ -94,14 +96,17 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
       if (brokerRequest == null || !brokerRequest.isSetQuerySource() || !brokerRequest.getQuerySource()
           .isSetTableName()) {
         // no table restrictions? accept
-        return true;
+        return TableAuthorizationResult.noFailureResult();
       }
-
-      return principal.hasTable(brokerRequest.getQuerySource().getTableName());
+      TableAuthorizationResult tableAuthorizationResult = new TableAuthorizationResult();
+      if (!principal.hasTable(brokerRequest.getQuerySource().getTableName())) {
+        tableAuthorizationResult.addFailedTable(brokerRequest.getQuerySource().getTableName());
+      }
+      return tableAuthorizationResult;
     }
 
     @Override
-    public boolean hasAccess(RequesterIdentity requesterIdentity, Set<String> tables) {
+    public TableAuthorizationResult hasAccess(RequesterIdentity requesterIdentity, Set<String> tables) {
       Optional<BasicAuthPrincipal> principalOpt = getPrincipalOpt(requesterIdentity);
 
       if (!principalOpt.isPresent()) {
@@ -109,17 +114,17 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
       }
 
       if (tables == null || tables.isEmpty()) {
-        return true;
+        return TableAuthorizationResult.noFailureResult();
       }
-
+      TableAuthorizationResult tableAuthorizationResult = new TableAuthorizationResult();
       BasicAuthPrincipal principal = principalOpt.get();
       for (String table : tables) {
         if (!principal.hasTable(table)) {
-          return false;
+          tableAuthorizationResult.addFailedTable(table);
         }
       }
 
-      return true;
+      return tableAuthorizationResult;
     }
 
     private Optional<BasicAuthPrincipal> getPrincipalOpt(RequesterIdentity requesterIdentity) {
