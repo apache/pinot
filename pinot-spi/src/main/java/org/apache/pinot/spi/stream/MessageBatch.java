@@ -96,7 +96,7 @@ public interface MessageBatch<T> {
     return false;
   }
 
-  default boolean hasMissingOffsets() {
+  default boolean hasDataLoss() {
     return false;
   }
 

@@ -31,22 +31,12 @@ public class KinesisMessageBatch implements MessageBatch<byte[]> {
   private final List<BytesStreamMessage> _messages;
   private final KinesisPartitionGroupOffset _offsetOfNextBatch;
   private final boolean _endOfShard;
-  private final boolean _isMissingOffsets;
 
   public KinesisMessageBatch(List<BytesStreamMessage> messages, KinesisPartitionGroupOffset offsetOfNextBatch,
       boolean endOfShard) {
     _messages = messages;
     _offsetOfNextBatch = offsetOfNextBatch;
     _endOfShard = endOfShard;
-    _isMissingOffsets = false;
-  }
-
-  public KinesisMessageBatch(List<BytesStreamMessage> messages, KinesisPartitionGroupOffset offsetOfNextBatch,
-      boolean endOfShard, boolean isMissingOffsets) {
-    _messages = messages;
-    _offsetOfNextBatch = offsetOfNextBatch;
-    _endOfShard = endOfShard;
-    _isMissingOffsets = isMissingOffsets;
   }
 
   @Override
@@ -67,10 +57,5 @@ public class KinesisMessageBatch implements MessageBatch<byte[]> {
   @Override
   public boolean isEndOfPartitionGroup() {
     return _endOfShard;
-  }
-
-  @Override
-  public boolean hasMissingOffsets() {
-    return MessageBatch.super.hasMissingOffsets();
   }
 }

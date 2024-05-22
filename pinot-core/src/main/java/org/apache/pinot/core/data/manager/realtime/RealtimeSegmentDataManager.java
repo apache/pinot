@@ -468,10 +468,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         throw t;
       }
 
-      StreamPartitionMsgOffset batchFirstOffset = messageBatch.getFirstMessageOffset();
-      if (batchFirstOffset != null) {
-        validateStartOffset(messageBatch);
-      }
+      reportDataLoss(messageBatch);
 
       boolean endCriteriaReached = processStreamEvents(messageBatch, idlePipeSleepTimeMillis);
 
@@ -928,8 +925,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
    *
    * @param messageBatch Message batch to validate
    */
-  private void validateStartOffset(MessageBatch messageBatch) {
-    if (messageBatch.hasMissingOffsets()) {
+  private void reportDataLoss(MessageBatch messageBatch) {
+    if (messageBatch.hasDataLoss()) {
       _serverMetrics.addMeteredTableValue(_tableStreamName, ServerMeter.STREAM_DATA_LOSS, 1L);
       String message =
           "Message loss detected in stream partition: " + _partitionGroupId + " for table: " + _tableNameWithType

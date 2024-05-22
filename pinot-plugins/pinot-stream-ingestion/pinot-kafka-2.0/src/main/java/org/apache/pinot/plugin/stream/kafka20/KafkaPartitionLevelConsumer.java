@@ -62,7 +62,6 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
       _consumer.seek(_topicPartition, startOffset);
     }
 
-    boolean isMissingMessages = false;
     ConsumerRecords<String, Bytes> consumerRecords = _consumer.poll(Duration.ofMillis(timeoutMs));
     List<ConsumerRecord<String, Bytes>> records = consumerRecords.records(_topicPartition);
     List<BytesStreamMessage> filteredRecords = new ArrayList<>(records.size());
@@ -87,9 +86,8 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
       }
     }
 
-    isMissingMessages = firstOffset > startOffset;
     return new KafkaMessageBatch(filteredRecords, records.size(), offsetOfNextBatch, firstOffset, lastMessageMetadata,
-        isMissingMessages);
+        firstOffset > startOffset);
   }
 
   private StreamMessageMetadata extractMessageMetadata(ConsumerRecord<String, Bytes> record) {
