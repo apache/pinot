@@ -247,24 +247,25 @@ public class AggregationFunctionFactory {
                 throw new IllegalArgumentException("Unsupported data type for FIRST_WITH_TIME: " + dataType);
             }
           }
-          case LISTAGG:
+          case LISTAGG: {
             Preconditions.checkArgument(numArguments == 2 || numArguments == 3,
                 "LISTAGG expects 2 arguments, got: %s. The function can be used as "
-                    + "listAgg(['distinct'] expression, 'separator')", numArguments);
+                    + "listAgg([distinct] expression, 'separator')", numArguments);
             ExpressionContext separatorExpression = arguments.get(1);
             Preconditions.checkArgument(separatorExpression.getType() == ExpressionContext.Type.LITERAL,
                 "LISTAGG expects the 2nd argument to be literal, got: %s. The function can be used as "
-                    + "listAgg(['distinct'] expression, 'separator')", separatorExpression.getType());
+                    + "listAgg([distinct] expression, 'separator')", separatorExpression.getType());
             String separator = separatorExpression.getLiteral().getStringValue();
-            boolean isDistinctListAgg = false;
+            boolean isDistinct = false;
             if (numArguments == 3) {
               ExpressionContext isDistinctListAggExp = arguments.get(2);
-              isDistinctListAgg = isDistinctListAggExp.getLiteral().getBooleanValue();
+              isDistinct = isDistinctListAggExp.getLiteral().getBooleanValue();
             }
-            if (isDistinctListAgg) {
+            if (isDistinct) {
               return new ListAggDistinctFunction(arguments.get(0), separator, nullHandlingEnabled);
             }
             return new ListAggFunction(arguments.get(0), separator, nullHandlingEnabled);
+          }
           case ARRAYAGG: {
             Preconditions.checkArgument(numArguments >= 2,
                 "ARRAY_AGG expects 2 or 3 arguments, got: %s. The function can be used as "
@@ -274,15 +275,15 @@ public class AggregationFunctionFactory {
                 "ARRAY_AGG expects the 2nd argument to be literal, got: %s. The function can be used as "
                     + "arrayAgg(dataColumn, 'dataType', ['isDistinct'])", dataTypeExp.getType());
             DataType dataType = DataType.valueOf(dataTypeExp.getLiteral().getStringValue().toUpperCase());
-            boolean isDistinctArrayAgg = false;
+            boolean isDistinct = false;
             if (numArguments == 3) {
               ExpressionContext isDistinctExp = arguments.get(2);
               Preconditions.checkArgument(isDistinctExp.getType() == ExpressionContext.Type.LITERAL,
                   "ARRAY_AGG expects the 3rd argument to be literal, got: %s. The function can be used as "
                       + "arrayAgg(dataColumn, 'dataType', ['isDistinct'])", isDistinctExp.getType());
-              isDistinctArrayAgg = isDistinctExp.getLiteral().getBooleanValue();
+              isDistinct = isDistinctExp.getLiteral().getBooleanValue();
             }
-            if (isDistinctArrayAgg) {
+            if (isDistinct) {
               switch (dataType) {
                 case BOOLEAN:
                 case INT:

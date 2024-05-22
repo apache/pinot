@@ -312,8 +312,6 @@ public class AggregateOperator extends MultiStageOperator {
     if (upperCaseFunctionName.equals("LISTAGG")) {
       if (functionCall.isDistinct()) {
         arguments.add(ExpressionContext.forLiteralContext(Literal.boolValue(true)));
-      } else {
-        arguments.add(ExpressionContext.forLiteralContext(Literal.boolValue(false)));
       }
     }
   }
