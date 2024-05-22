@@ -487,6 +487,12 @@ public class CommonConstants {
       public static final String CONFIG_OF_ENABLE_STATS_COLLECTION = CONFIG_PREFIX + ".enable.stats.collection";
       public static final boolean DEFAULT_ENABLE_STATS_COLLECTION = false;
 
+      // Determines whether the broker routing manager should reset stats when it sees a newly enabled server.
+      // When servers are restarted or replaced but keep the same instance id, it may not make sense to keep
+      // reusing the old stats. This config allows the broker to reset the stats for such servers.
+      public static final String CONFIG_OF_RESET_STATS_FOR_NEW_SERVERS = CONFIG_PREFIX + ".reset.stats.newServer";
+      public static final boolean DEFAULT_RESET_STATS_FOR_NEW_SERVERS = false;
+
       // Parameters to tune exponential moving average.
 
       // The weightage to be given for a new incoming value. For example, alpha=0.30 will give 30% weightage to the

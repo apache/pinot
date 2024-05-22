@@ -303,6 +303,14 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
       return;
     }
 
+    if (_serverRoutingStatsManager.shouldResetStatsForNewServers()) {
+      // If a server is newly enabled but already has stats, that likely means it was
+      // restarted or replaced, so the old stats are no longer relevant.
+      for (String instance: newEnabledServers) {
+        _serverRoutingStatsManager.resetServerStats(instance);
+      }
+    }
+
     // Update routing entry for all tables
     for (RoutingEntry routingEntry : _routingEntryMap.values()) {
       try {

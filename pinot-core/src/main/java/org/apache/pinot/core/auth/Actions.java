@@ -72,6 +72,7 @@ public class Actions {
     public static final String INGEST_FILE = "IngestFile";
     public static final String RECOMMEND_CONFIG = "RecommendConfig";
     public static final String RESET_SEGMENT = "ResetSegment";
+    public static final String RESET_SERVER_ROUTING_STATS = "ResetServerRoutingStats";
     public static final String RESUME_TASK = "ResumeTask";
     public static final String STOP_TASK = "StopTask";
     public static final String UPDATE_BROKER_RESOURCE = "UpdateBrokerResource";
