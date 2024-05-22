@@ -20,8 +20,13 @@ package org.apache.pinot.query.planner.serde;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
+import org.apache.calcite.rel.RelDistribution;
+import org.apache.calcite.rel.RelFieldCollation;
+import org.apache.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.AbstractPlanNode;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
@@ -40,15 +45,19 @@ public class DeserializationVisitor {
   public AbstractPlanNode process(Plan.PlanNode protoNode) {
     switch (protoNode.getNodeTypeCase()) {
       case OBJECTFIELD:
-        return processUnknownNodeType(protoNode);
+        return visitUnknownNode(protoNode);
       case TABLESCANNODE:
         return visitTableScanNode(protoNode);
+      case RECEIVENODE:
+        return visitMailboxReceiveNode(protoNode);
+      case SENDNODE:
+        return visitMailboxSendNode(protoNode);
       default:
         throw new RuntimeException(String.format("Unknown Node Type %s", protoNode.getNodeTypeCase()));
     }
   }
 
-  private AbstractPlanNode processUnknownNodeType(Plan.PlanNode protoNode) {
+  private AbstractPlanNode visitUnknownNode(Plan.PlanNode protoNode) {
     AbstractPlanNode planNode = newNodeInstance(protoNode.getNodeName(), protoNode.getStageId());
     planNode.setDataSchema(extractDataSchema(protoNode));
     planNode.fromObjectField(protoNode.getObjectField());
@@ -63,6 +72,31 @@ public class DeserializationVisitor {
     List<String> list = new ArrayList<>(protoTableNode.getTableScanColumnsList());
     return new TableScanNode(protoNode.getStageId(), extractDataSchema(protoNode),
         extractNodeHint(protoTableNode.getNodeHint()), protoTableNode.getTableName(), list);
+  }
+
+  private AbstractPlanNode visitMailboxReceiveNode(Plan.PlanNode protoNode) {
+    Plan.MailboxReceiveNode protoReceiveNode = protoNode.getReceiveNode();
+    return new MailboxReceiveNode(protoNode.getStageId(), extractDataSchema(protoNode), protoReceiveNode.getSenderStageId(), convertDistributionType(protoReceiveNode.getDistributionType()),
+        convertExchangeType(protoReceiveNode.getExchangeType()), protoReceiveNode.getDistributionKeysList(),
+        protoReceiveNode.getCollationKeysList().stream().map(RexExpression.InputRef::new).collect(Collectors.toList()),
+        protoReceiveNode.getCollationDirectionsList().stream().map(DeserializationVisitor::convertDirection).collect(
+            Collectors.toList()),
+        protoReceiveNode.getCollationNullDirectionsList().stream().map(DeserializationVisitor::convertNullDirection).collect(
+            Collectors.toList()), protoReceiveNode.getSortOnSender(), protoReceiveNode.getSortOnReceiver(),
+        (MailboxSendNode) visitMailboxSendNode(protoReceiveNode.getSender()));
+  }
+
+  private AbstractPlanNode visitMailboxSendNode(Plan.PlanNode protoNode) {
+    Plan.MailboxSendNode protoSendNode = protoNode.getSendNode();
+    MailboxSendNode sendNode = new MailboxSendNode(protoNode.getStageId(), extractDataSchema(protoNode), protoSendNode.getReceiverStageId(), convertDistributionType(protoSendNode.getDistributionType()),
+        convertExchangeType(protoSendNode.getExchangeType()), protoSendNode.getDistributionKeysList(),
+        protoSendNode.getCollationKeysList().stream().map(RexExpression.InputRef::new).collect(Collectors.toList()),
+        protoSendNode.getCollationDirectionsList().stream().map(DeserializationVisitor::convertDirection).collect(
+            Collectors.toList()),
+        protoSendNode.getSortOnSender(), protoSendNode.getPrePartitioned());
+
+    protoNode.getInputsList().forEach((i) -> sendNode.addInput(process(i)));
+    return sendNode;
   }
 
   private static AbstractPlanNode.NodeHint extractNodeHint(Plan.NodeHint protoNodeHint) {
@@ -82,6 +116,66 @@ public class DeserializationVisitor {
     return new DataSchema(columnNames, columnDataTypes);
   }
 
+  private static RelDistribution.Type convertDistributionType(Plan.RelDistributionType type) {
+    switch (type) {
+      case SINGLETON:
+        return RelDistribution.Type.SINGLETON;
+      case HASH_DISTRIBUTED:
+        return RelDistribution.Type.HASH_DISTRIBUTED;
+      case RANGE_DISTRIBUTED:
+        return RelDistribution.Type.RANGE_DISTRIBUTED;
+      case RANDOM_DISTRIBUTED:
+        return RelDistribution.Type.RANDOM_DISTRIBUTED;
+      case ROUND_ROBIN_DISTRIBUTED:
+        return RelDistribution.Type.ROUND_ROBIN_DISTRIBUTED;
+      case BROADCAST_DISTRIBUTED:
+        return RelDistribution.Type.BROADCAST_DISTRIBUTED;
+      case ANY:
+        return RelDistribution.Type.ANY;
+    }
+    throw new RuntimeException(String.format("Unknown RelDistribution.Type %s", type));
+  }
+
+  private static PinotRelExchangeType convertExchangeType(Plan.PinotRelExchangeType exchangeType) {
+    switch (exchangeType) {
+      case SUB_PLAN:
+        return PinotRelExchangeType.SUB_PLAN;
+      case STREAMING:
+        return PinotRelExchangeType.STREAMING;
+      case PIPELINE_BREAKER:
+        return PinotRelExchangeType.PIPELINE_BREAKER;
+    }
+
+    throw new RuntimeException(String.format("Unknown PinotRelExchangeType %s", exchangeType));
+  }
+
+  private static RelFieldCollation.Direction convertDirection(Plan.Direction direction) {
+    switch (direction) {
+      case ASCENDING:
+        return RelFieldCollation.Direction.ASCENDING;
+      case STRICTLY_ASCENDING:
+        return RelFieldCollation.Direction.STRICTLY_ASCENDING;
+      case DESCENDING:
+        return RelFieldCollation.Direction.DESCENDING;
+      case STRICTLY_DESCENDING:
+        return RelFieldCollation.Direction.STRICTLY_DESCENDING;
+      case CLUSTERED:
+        return RelFieldCollation.Direction.CLUSTERED;
+    }
+    throw new RuntimeException(String.format("Unknown Direction %s", direction));
+  }
+
+  private static RelFieldCollation.NullDirection convertNullDirection(Plan.NullDirection nullDirection) {
+    switch (nullDirection) {
+      case FIRST:
+        return RelFieldCollation.NullDirection.FIRST;
+      case LAST:
+        return RelFieldCollation.NullDirection.LAST;
+    }
+
+    return RelFieldCollation.NullDirection.UNSPECIFIED;
+  }
+
   private static AbstractPlanNode newNodeInstance(String nodeName, int planFragmentId) {
     switch (nodeName) {
       case "JoinNode":
@@ -94,10 +188,6 @@ public class DeserializationVisitor {
         return new AggregateNode(planFragmentId);
       case "SortNode":
         return new SortNode(planFragmentId);
-      case "MailboxSendNode":
-        return new MailboxSendNode(planFragmentId);
-      case "MailboxReceiveNode":
-        return new MailboxReceiveNode(planFragmentId);
       case "ValueNode":
         return new ValueNode(planFragmentId);
       case "WindowNode":

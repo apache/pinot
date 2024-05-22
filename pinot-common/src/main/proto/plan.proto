@@ -94,8 +94,10 @@ message PlanNode {
   repeated string columnNames = 4;
   repeated string columnDataTypes = 5;
   oneof nodeType {
-    ObjectField objectField = 6;
-    TableScanNode tableScanNode = 7;
+    ObjectField objectField = 101;
+    TableScanNode tableScanNode = 102;
+    MailboxReceiveNode receiveNode = 103;
+    MailboxSendNode sendNode = 104;
   }
 }
 
@@ -111,4 +113,58 @@ message TableScanNode {
   NodeHint nodeHint = 1;
   string tableName = 2;
   repeated string tableScanColumns = 3;
+}
+
+enum PinotRelExchangeType {
+  STREAMING = 0;
+  SUB_PLAN = 1;
+  PIPELINE_BREAKER = 2;
+}
+
+enum RelDistributionType {
+  SINGLETON = 0;
+  HASH_DISTRIBUTED = 1;
+  RANGE_DISTRIBUTED = 2;
+  RANDOM_DISTRIBUTED = 3;
+  ROUND_ROBIN_DISTRIBUTED = 4;
+  BROADCAST_DISTRIBUTED = 5;
+  ANY = 6;
+}
+
+enum Direction {
+  ASCENDING = 0;
+  STRICTLY_ASCENDING = 1;
+  DESCENDING = 2;
+  STRICTLY_DESCENDING = 3;
+  CLUSTERED = 4;
+}
+
+enum NullDirection {
+  FIRST = 0;
+  LAST = 1;
+  UNSPECIFIED = 2;
+}
+
+message MailboxReceiveNode {
+  int32 senderStageId = 1;
+  PinotRelExchangeType exchangeType = 2;
+  RelDistributionType distributionType = 3;
+  repeated int32 distributionKeys = 4;
+  repeated int32 collationKeys = 5;
+  repeated Direction collationDirections = 6;
+  repeated NullDirection collationNullDirections = 7;
+  bool sortOnSender = 8;
+  bool sortOnReceiver = 9;
+  PlanNode sender = 10;
+}
+
+message MailboxSendNode {
+  int32 receiverStageId = 1;
+  RelDistributionType distributionType = 2;
+  PinotRelExchangeType exchangeType = 3;
+  repeated int32 distributionKeys = 4;
+  repeated int32 collationKeys = 5;
+  repeated Direction collationDirections = 6;
+  bool sortOnSender = 7;
+  bool prePartitioned = 8;
 }
