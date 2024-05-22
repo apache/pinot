@@ -46,7 +46,7 @@ public interface AccessControl extends FineGrainedAccessControl {
 
   /**
    * Fine-grained access control on parsed broker request. May check table, column, permissions, etc.
-   *
+   * The default implementation is kept to have backward compatibility with the existing implementations
    * @param requesterIdentity requester identity
    * @param brokerRequest broker request (incl query)
    *
@@ -57,12 +57,23 @@ public interface AccessControl extends FineGrainedAccessControl {
     return true;
   }
 
+  /**
+   * Verify access control on parsed broker request. May check table, column, permissions, etc.
+   * The default implementation returns a {@link BasicAuthorizationResultImpl} with the result of the hasAccess() of
+   * the implementation
+   *
+   * @param requesterIdentity requester identity
+   * @param brokerRequest broker request (incl query)
+   *
+   * @return {@code AuthorizationResult} with the result of the access control check
+   */
   default AuthorizationResult verifyAccess(RequesterIdentity requesterIdentity, BrokerRequest brokerRequest) {
     return new BasicAuthorizationResultImpl(hasAccess(requesterIdentity, brokerRequest));
   }
 
   /**
    * Fine-grained access control on pinot tables.
+   * The default implementation is kept to have backward compatibility with the existing implementations
    *
    * @param requesterIdentity requester identity
    * @param tables Set of pinot tables used in the query. Table name can be with or without tableType.
@@ -74,6 +85,16 @@ public interface AccessControl extends FineGrainedAccessControl {
     return true;
   }
 
+  /**
+   * Verify access control on pinot tables.
+   * The default implementation returns a {@link TableAuthorizationResult} with the result of the hasAccess() of the
+   * implementation
+   *
+   * @param requesterIdentity requester identity
+   * @param tables Set of pinot tables used in the query. Table name can be with or without tableType.
+   *
+   * @return {@code TableAuthorizationResult} with the result of the access control check
+   */
   default TableAuthorizationResult verifyAccess(RequesterIdentity requesterIdentity, Set<String> tables) {
     // Taking all tables when hasAccess Failed , to not break existing implementations
     // It will say all tables names failed AuthZ even only some failed AuthZ - which is same as just boolean output

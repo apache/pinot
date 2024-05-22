@@ -18,8 +18,24 @@
  */
 package org.apache.pinot.spi.auth;
 
+/**
+ * The AuthorizationResult interface defines the contract for authorization results in the Pinot system.
+ * Implementations of this interface provide the access status and an optional failure message indicating
+ * the reason for denied access.
+ */
 public interface AuthorizationResult {
+
+  /**
+   * Indicates whether the access is granted.
+   *
+   * @return true if access is granted, false otherwise.
+   */
   boolean hasAccess();
 
+  /**
+   * Provides the failure message if access is denied.
+   *
+   * @return A string containing the failure message if access is denied, otherwise an empty string or null.
+   */
   String getFailureMessage();
 }

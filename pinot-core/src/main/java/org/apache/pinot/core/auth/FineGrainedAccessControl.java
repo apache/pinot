@@ -40,6 +40,17 @@ public interface FineGrainedAccessControl {
     return true;
   }
 
+  /**
+   * Verifies if the user has access to perform a specific action on a particular resource.
+   * The default implementation returns a {@link BasicAuthorizationResultImpl} with the result of the hasAccess() of
+   * the implementation
+   *
+   * @param httpHeaders HTTP headers
+   * @param targetType type of resource being accessed
+   * @param targetId id of the resource
+   * @param action type to validate
+   * @return An AuthorizationResult object, encapsulating whether the access is granted or not.
+   */
   default AuthorizationResult verifyAccess(HttpHeaders httpHeaders, TargetType targetType, String targetId,
       String action) {
     return new BasicAuthorizationResultImpl(hasAccess(httpHeaders, targetType, targetId, action));

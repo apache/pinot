@@ -26,6 +26,10 @@ import java.util.Set;
 import org.apache.commons.lang.StringUtils;
 
 
+/**
+ * Implementation of the AuthorizationResult interface that provides authorization results
+ * at the table level, including which tables failed authorization.
+ */
 public class TableAuthorizationResult implements AuthorizationResult {
   private Set<String> _failedTables;
 
@@ -37,6 +41,11 @@ public class TableAuthorizationResult implements AuthorizationResult {
     setFailedTables(failedTables);
   }
 
+  /**
+   * Creates a TableAuthorizationResult with no failed tables.
+   *
+   * @return a TableAuthorizationResult with no failed tables.
+   */
   public static TableAuthorizationResult noFailureResult() {
     return new TableAuthorizationResult();
   }
@@ -59,6 +68,11 @@ public class TableAuthorizationResult implements AuthorizationResult {
     _failedTables.add(failedTable);
   }
 
+  /**
+   * Provides the failure message indicating which tables failed authorization.
+   *
+   * @return a string containing the failure message if there are failed tables, otherwise an empty string.
+   */
   @Override
   public String getFailureMessage() {
     if (hasAccess()) {
