@@ -64,6 +64,7 @@ public class DateTimeFieldSpecUtilsTest {
     expectedDateTimeFieldSpec =
         new DateTimeFieldSpec("incoming", DataType.STRING, "1:DAYS:SIMPLE_DATE_FORMAT:yyyy-MM-dd hh-mm-ss", "1:DAYS");
     actualDateTimeFieldSpec = Schema.convertToDateTimeFieldSpec(timeFieldSpec);
+    actualDateTimeFieldSpec.setMaxLengthExceedStrategy(FieldSpec.MaxLengthExceedStrategy.TRIM_LENGTH);
     Assert.assertEquals(actualDateTimeFieldSpec, expectedDateTimeFieldSpec);
 
     // time unit size

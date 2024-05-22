@@ -334,6 +334,31 @@ public class RecordTransformerTest {
       assertEquals(record.getValue("svStringWithLengthLimit"), "null");
       assertTrue(record.getFieldToValueMap().containsKey(GenericRow.INCOMPLETE_RECORD_KEY));
     }
+
+    // scenario where string exceeds max length and fieldspec maxLengthExceedtrategy is to NO_ACTION
+    schema = SCHEMA;
+    schema.getFieldSpecFor("svStringWithLengthLimit")
+        .setMaxLengthExceedStrategy(FieldSpec.MaxLengthExceedStrategy.NO_ACTION);
+    transformer = new SanitizationTransformer(schema);
+    record = getRecord();
+    for (int i = 0; i < NUM_ROUNDS; i++) {
+      record = transformer.transform(record);
+      assertNotNull(record);
+      assertEquals(record.getValue("svStringWithLengthLimit"), "123");
+    }
+
+    // scenario where string contains null and fieldspec maxLengthExceedtrategy is to NO_ACTION
+    schema = SCHEMA;
+    schema.getFieldSpecFor("svStringWithNullCharacters")
+        .setMaxLengthExceedStrategy(FieldSpec.MaxLengthExceedStrategy.NO_ACTION);
+    transformer = new SanitizationTransformer(schema);
+    record = getRecord();
+    for (int i = 0; i < NUM_ROUNDS; i++) {
+      record = transformer.transform(record);
+      assertNotNull(record);
+      assertEquals(record.getValue("svStringWithNullCharacters"), "1");
+      assertTrue(record.getFieldToValueMap().containsKey(GenericRow.INCOMPLETE_RECORD_KEY));
+    }
   }
 
   @Test

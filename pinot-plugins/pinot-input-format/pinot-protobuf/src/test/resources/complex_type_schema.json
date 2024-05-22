@@ -4,7 +4,8 @@
   "dimensionFieldSpecs" : [ {
     "name" : "test_message.string_field",
     "dataType" : "STRING",
-    "notNull" : false
+    "notNull" : false,
+    "maxLengthExceedStrategy": "TRIM_LENGTH"
   }, {
     "name" : "test_message.int_field",
     "dataType" : "INT",
@@ -24,11 +25,13 @@
   }, {
     "name" : "test_message.bytes_field",
     "dataType" : "BYTES",
-    "notNull" : false
+    "notNull" : false,
+    "maxLengthExceedStrategy": "NO_ACTION"
   }, {
     "name" : "test_message.nested_message.nested_string_field",
     "dataType" : "STRING",
-    "notNull" : false
+    "notNull" : false,
+    "maxLengthExceedStrategy": "TRIM_LENGTH"
   }, {
     "name" : "test_message.nested_message.nested_int_field",
     "dataType" : "INT",
@@ -36,15 +39,18 @@
   }, {
     "name" : "test_message.repeated_nested_messages",
     "dataType" : "STRING",
-    "notNull" : false
+    "notNull" : false,
+    "maxLengthExceedStrategy": "TRIM_LENGTH"
   }, {
     "name" : "test_message.enum_field",
     "dataType" : "STRING",
-    "notNull" : false
+    "notNull" : false,
+    "maxLengthExceedStrategy": "TRIM_LENGTH"
   }, {
     "name" : "test_message.nullable_string_field",
     "dataType" : "STRING",
-    "notNull" : false
+    "notNull" : false,
+    "maxLengthExceedStrategy": "TRIM_LENGTH"
   }, {
     "name" : "test_message.nullable_int_field",
     "dataType" : "INT",
@@ -68,12 +74,14 @@
   }, {
     "name" : "test_message.nullable_bytes_field",
     "dataType" : "BYTES",
-    "notNull" : false
+    "notNull" : false,
+    "maxLengthExceedStrategy": "NO_ACTION"
   }, {
     "name" : "test_message.repeated_strings",
     "dataType" : "STRING",
     "singleValueField" : false,
-    "notNull" : false
+    "notNull" : false,
+    "maxLengthExceedStrategy": "TRIM_LENGTH"
   }, {
     "name" : "test_message.repeated_ints",
     "dataType" : "INT",
@@ -103,16 +111,19 @@
     "name" : "test_message.repeated_bytes",
     "dataType" : "BYTES",
     "singleValueField" : false,
-    "notNull" : false
+    "notNull" : false,
+    "maxLengthExceedStrategy": "NO_ACTION"
   }, {
     "name" : "test_message.repeated_enums",
     "dataType" : "STRING",
     "singleValueField" : false,
-    "notNull" : false
+    "notNull" : false,
+    "maxLengthExceedStrategy": "TRIM_LENGTH"
   }, {
     "name" : "sample_record.name",
     "dataType" : "STRING",
-    "notNull" : false
+    "notNull" : false,
+    "maxLengthExceedStrategy": "TRIM_LENGTH"
   }, {
     "name" : "sample_record.id",
     "dataType" : "INT",
@@ -120,16 +131,19 @@
   }, {
     "name" : "sample_record.email",
     "dataType" : "STRING",
-    "notNull" : false
+    "notNull" : false,
+    "maxLengthExceedStrategy": "TRIM_LENGTH"
   }, {
     "name" : "sample_record.friends",
     "dataType" : "STRING",
     "singleValueField" : false,
-    "notNull" : false
+    "notNull" : false,
+    "maxLengthExceedStrategy": "TRIM_LENGTH"
   }, {
     "name" : "sample_record.optionalField",
     "dataType" : "STRING",
-    "notNull" : false
+    "notNull" : false,
+    "maxLengthExceedStrategy": "TRIM_LENGTH"
   } ],
   "dateTimeFieldSpecs" : [ {
     "name" : "test_message.long_field",

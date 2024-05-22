@@ -353,6 +353,7 @@ public class SchemaTest {
         .addTime(incomingTimeGranularitySpec, outgoingTimeGranularitySpec).build();
     String jsonSchema = schema.toSingleLineJsonString();
     Schema schemaFromJson = Schema.fromString(jsonSchema);
+    schemaFromJson.getFieldSpecFor("Date").setMaxLengthExceedStrategy(FieldSpec.MaxLengthExceedStrategy.TRIM_LENGTH);
     Assert.assertEquals(schemaFromJson, schema);
     Assert.assertEquals(schemaFromJson.hashCode(), schema.hashCode());
   }
@@ -383,6 +384,12 @@ public class SchemaTest {
     // Ensure that schema can be serialized and de-serialized (ie byte[] converted to String and back).
     String jsonSchema = expectedSchema.toSingleLineJsonString();
     Schema actualSchema = Schema.fromString(jsonSchema);
+    actualSchema.getFieldSpecFor("noDefault")
+        .setMaxLengthExceedStrategy(FieldSpec.MaxLengthExceedStrategy.NO_ACTION);
+    actualSchema.getFieldSpecFor("emptyDefault")
+        .setMaxLengthExceedStrategy(FieldSpec.MaxLengthExceedStrategy.NO_ACTION);
+    actualSchema.getFieldSpecFor("nonEmptyDefault")
+        .setMaxLengthExceedStrategy(FieldSpec.MaxLengthExceedStrategy.NO_ACTION);
 
     Assert.assertEquals(actualSchema.getFieldSpecFor("noDefault").getDefaultNullValue(), expectedEmptyDefault);
     Assert.assertEquals(actualSchema.getFieldSpecFor("emptyDefault").getDefaultNullValue(), expectedEmptyDefault);
@@ -484,6 +491,7 @@ public class SchemaTest {
         .addSingleValueDimension("svString", FieldSpec.DataType.BOOLEAN)
         .addSingleValueDimension("svStringWithDefault", FieldSpec.DataType.STRING, "false").build();
     newSchema.updateBooleanFieldsIfNeeded(oldSchema);
+    newSchema.getFieldSpecFor("svString").setMaxLengthExceedStrategy(FieldSpec.MaxLengthExceedStrategy.TRIM_LENGTH);
     Assert.assertTrue(newSchema.isBackwardCompatibleWith(oldSchema));
     Assert.assertEquals(newSchema, oldSchema);
 
@@ -492,6 +500,8 @@ public class SchemaTest {
         .addSingleValueDimension("svString", FieldSpec.DataType.STRING)
         .addSingleValueDimension("svStringWithDefault", FieldSpec.DataType.BOOLEAN, "false").build();
     newSchema.updateBooleanFieldsIfNeeded(oldSchema);
+    newSchema.getFieldSpecFor("svStringWithDefault")
+        .setMaxLengthExceedStrategy(FieldSpec.MaxLengthExceedStrategy.TRIM_LENGTH);
     Assert.assertTrue(newSchema.isBackwardCompatibleWith(oldSchema));
     Assert.assertEquals(newSchema, oldSchema);
 

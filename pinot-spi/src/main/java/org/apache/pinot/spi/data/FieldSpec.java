@@ -46,6 +46,8 @@ import org.apache.pinot.spi.utils.TimestampUtils;
  * <p>- <code>DefaultNullValue</code>: when no value found for this field, use this value. Stored in string format.
  * <p>- <code>VirtualColumnProvider</code>: the virtual column provider to use for this field.
  * <p>- <code>NotNull</code>: whether the column accepts nulls or not. Defaults to false.
+ * <p>- <code>MaxLength</code>: the maximum length of the string column. Defaults to 512.
+ * <p>- <code>MaxLengthExceedStrategy</code>: the strategy to handle the case when the string column exceeds the max
  */
 @SuppressWarnings("unused")
 public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
@@ -99,7 +101,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   }
 
   public enum MaxLengthExceedStrategy {
-    TRIM_LENGTH, FAIL_INGESTION, SUBSTITUTE_DEFAULT_VALUE
+    TRIM_LENGTH, FAIL_INGESTION, SUBSTITUTE_DEFAULT_VALUE, NO_ACTION
   }
 
   protected String _name;
@@ -120,7 +122,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   protected String _virtualColumnProvider;
 
   // NOTE: This only applies to STRING column during {@link SanitizationTransformer}
-  protected MaxLengthExceedStrategy _maxLengthExceedStrategy = MaxLengthExceedStrategy.TRIM_LENGTH;
+  protected MaxLengthExceedStrategy _maxLengthExceedStrategy;
 
   // Default constructor required by JSON de-serializer. DO NOT REMOVE.
   public FieldSpec() {
@@ -136,18 +138,30 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
 
   public FieldSpec(String name, DataType dataType, boolean isSingleValueField, int maxLength,
       @Nullable Object defaultNullValue) {
-    this(name, dataType, isSingleValueField, maxLength, defaultNullValue,
-        MaxLengthExceedStrategy.TRIM_LENGTH);
+    this(name, dataType, isSingleValueField, maxLength, defaultNullValue, null);
   }
 
   public FieldSpec(String name, DataType dataType, boolean isSingleValueField, int maxLength,
-      @Nullable Object defaultNullValue, MaxLengthExceedStrategy maxLengthExceedStrategy) {
+      @Nullable Object defaultNullValue, @Nullable MaxLengthExceedStrategy maxLengthExceedStrategy) {
     _name = name;
     _dataType = dataType;
     _isSingleValueField = isSingleValueField;
     _maxLength = maxLength;
     setDefaultNullValue(defaultNullValue);
-    _maxLengthExceedStrategy = maxLengthExceedStrategy;
+    switch (_dataType) {
+      case STRING:
+        _maxLengthExceedStrategy = _maxLengthExceedStrategy == null ? MaxLengthExceedStrategy.TRIM_LENGTH
+            : maxLengthExceedStrategy;
+        break;
+      case JSON:
+      case BYTES:
+        _maxLengthExceedStrategy = _maxLengthExceedStrategy == null ? MaxLengthExceedStrategy.NO_ACTION
+            : maxLengthExceedStrategy;
+        break;
+      default:
+        _maxLengthExceedStrategy = maxLengthExceedStrategy;
+        break;
+    }
   }
 
   public abstract FieldType getFieldType();

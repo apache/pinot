@@ -46,7 +46,7 @@ public final class DimensionFieldSpec extends FieldSpec {
   }
 
   public DimensionFieldSpec(String name, DataType dataType, boolean isSingleValueField, int maxLength,
-      @Nullable Object defaultNullValue, MaxLengthExceedStrategy maxLengthExceedStrategy) {
+      @Nullable Object defaultNullValue, @Nullable MaxLengthExceedStrategy maxLengthExceedStrategy) {
     super(name, dataType, isSingleValueField, maxLength, defaultNullValue, maxLengthExceedStrategy);
   }
 

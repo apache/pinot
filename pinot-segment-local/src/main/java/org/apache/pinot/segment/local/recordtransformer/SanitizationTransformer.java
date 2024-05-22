@@ -41,6 +41,7 @@ import org.apache.pinot.spi.utils.StringUtil;
  * For TRIM_LENGTH, the value is trimmed to the max length.
  * For SUBSTITUTE_DEFAULT_VALUE, the value is replaced with the default null value string.
  * For FAIL_INGESTION, an exception is thrown and the record is skipped.
+ * For NO_ACTION, the value is kept as is if no NULL_CHARACTER present else trimmed till NULL.
  * In the first 2 scenarios, this metric INCOMPLETE_REALTIME_ROWS_CONSUMED can be tracked to know if a trimmed /
  * default record was persisted.
  * In the last scenario, this metric ROWS_WITH_ERRORS can be tracked  to know if a record was skipped.
@@ -98,10 +99,17 @@ public class SanitizationTransformer implements RecordTransformer {
    */
   private Pair<String, Boolean> sanitizeValue(String stringColumn, String value, FieldSpec columnFieldSpec) {
     String sanitizedValue = StringUtil.sanitizeStringValue(value, columnFieldSpec.getMaxLength());
+    FieldSpec.MaxLengthExceedStrategy maxLengthExceedStrategy;
+    if (columnFieldSpec.getMaxLengthExceedStrategy() == null) {
+      maxLengthExceedStrategy = columnFieldSpec.getDataType() == DataType.STRING
+          ? FieldSpec.MaxLengthExceedStrategy.TRIM_LENGTH : FieldSpec.MaxLengthExceedStrategy.NO_ACTION;
+    } else {
+      maxLengthExceedStrategy = columnFieldSpec.getMaxLengthExceedStrategy();
+    }
     // NOTE: reference comparison
     // noinspection StringEquality
     if (sanitizedValue != value) {
-      switch (columnFieldSpec.getMaxLengthExceedStrategy()) {
+      switch (maxLengthExceedStrategy) {
         case TRIM_LENGTH:
           return Pair.of(sanitizedValue, true);
         case SUBSTITUTE_DEFAULT_VALUE:
@@ -116,6 +124,13 @@ public class SanitizationTransformer implements RecordTransformer {
             throw new IllegalStateException(
                 String.format("Throwing exception as value: %s for column %s contains null character.", value,
                     stringColumn));
+          }
+        case NO_ACTION:
+          index = value.indexOf(NULL_CHARACTER);
+          if (index < 0) {
+            return Pair.of(value, false);
+          } else {
+            return Pair.of(sanitizedValue, true);
           }
         default:
           throw new IllegalStateException(
