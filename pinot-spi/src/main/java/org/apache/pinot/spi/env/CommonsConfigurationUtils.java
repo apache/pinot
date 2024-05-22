@@ -122,8 +122,6 @@ public class CommonsConfigurationUtils {
     // check if file exists, load the properties otherwise set the file.
     if (file.exists()) {
       fileHandler.load(file);
-    } else {
-      fileHandler.setFile(file);
     }
     return config;
   }
