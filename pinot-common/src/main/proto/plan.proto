@@ -21,6 +21,13 @@ syntax = "proto3";
 
 package org.apache.pinot.common.proto;
 
+message PlanOrStageNode {
+  oneof node {
+    StageNode stageNode = 1;
+    PlanNode planNode = 2;
+  }
+}
+
 message StageNode {
   int32 stageId = 1;
   string nodeName = 2;
@@ -78,4 +85,30 @@ message ListField {
 // The key of the map is a string and the value of the map is a MemberVariableField.
 message MapField {
   map<string, MemberVariableField> content = 1;
+}
+
+message PlanNode {
+  int32 stageId = 1;
+  string nodeName = 2;
+  repeated PlanNode inputs = 3;
+  repeated string columnNames = 4;
+  repeated string columnDataTypes = 5;
+  oneof nodeType {
+    ObjectField objectField = 6;
+    TableScanNode tableScanNode = 7;
+  }
+}
+
+message StrStrMap {
+  map<string, string> options = 1;
+}
+
+message NodeHint {
+  map<string, StrStrMap> hintOptions = 1;
+}
+
+message TableScanNode {
+  NodeHint nodeHint = 1;
+  string tableName = 2;
+  repeated string tableScanColumns = 3;
 }

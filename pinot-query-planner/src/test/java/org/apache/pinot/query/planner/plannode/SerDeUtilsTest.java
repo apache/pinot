@@ -39,8 +39,8 @@ public class SerDeUtilsTest extends QueryEnvironmentTestBase {
     DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(query);
     for (DispatchablePlanFragment dispatchablePlanFragment : dispatchableSubPlan.getQueryStageList()) {
       PlanNode stageNode = dispatchablePlanFragment.getPlanFragment().getFragmentRoot();
-      Plan.StageNode serializedStageNode = StageNodeSerDeUtils.serializeStageNode((AbstractPlanNode) stageNode);
-      PlanNode deserializedStageNode = StageNodeSerDeUtils.deserializeStageNode(serializedStageNode);
+      Plan.PlanOrStageNode serializedStageNode = StageNodeSerDeUtils.serializeStageNode((AbstractPlanNode) stageNode, 1);
+      PlanNode deserializedStageNode = StageNodeSerDeUtils.deserializeStageNode(serializedStageNode, 1);
       Assert.assertTrue(isObjectEqual(stageNode, deserializedStageNode));
       Assert.assertEquals(deserializedStageNode.getPlanFragmentId(), stageNode.getPlanFragmentId());
       Assert.assertEquals(deserializedStageNode.getDataSchema(), stageNode.getDataSchema());

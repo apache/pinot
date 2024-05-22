@@ -41,7 +41,7 @@ public class QueryPlanSerDeUtils {
   public static StagePlan fromProtoStagePlan(Worker.StagePlan protoStagePlan)
       throws InvalidProtocolBufferException {
     AbstractPlanNode rootNode =
-        StageNodeSerDeUtils.deserializeStageNode(Plan.StageNode.parseFrom(protoStagePlan.getRootNode()));
+        StageNodeSerDeUtils.deserializeStageNode(Plan.PlanOrStageNode.parseFrom(protoStagePlan.getRootNode()), 0);
     StageMetadata stageMetadata = fromProtoStageMetadata(protoStagePlan.getStageMetadata());
     return new StagePlan(rootNode, stageMetadata);
   }

@@ -44,6 +44,14 @@ public class TableScanNode extends AbstractPlanNode {
     _tableScanColumns = tableScanColumns;
   }
 
+  public TableScanNode(int planFragmentId, DataSchema dataSchema, NodeHint nodeHint, String tableName,
+      List<String> tableScanColumns) {
+    super(planFragmentId, dataSchema);
+    _tableName = tableName;
+    _nodeHint = nodeHint;
+    _tableScanColumns = tableScanColumns;
+  }
+
   public String getTableName() {
     return _tableName;
   }

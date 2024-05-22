@@ -16,78 +16,63 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.planner.plannode;
+package org.apache.pinot.query.planner.serde;
 
 import java.util.ArrayList;
+import java.util.List;
 import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.query.planner.serde.DeserializationVisitor;
-import org.apache.pinot.query.planner.serde.SerializationVisitor;
+import org.apache.pinot.query.planner.plannode.AbstractPlanNode;
+import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.FilterNode;
+import org.apache.pinot.query.planner.plannode.JoinNode;
+import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
+import org.apache.pinot.query.planner.plannode.MailboxSendNode;
+import org.apache.pinot.query.planner.plannode.ProjectNode;
+import org.apache.pinot.query.planner.plannode.SetOpNode;
+import org.apache.pinot.query.planner.plannode.SortNode;
+import org.apache.pinot.query.planner.plannode.TableScanNode;
+import org.apache.pinot.query.planner.plannode.ValueNode;
+import org.apache.pinot.query.planner.plannode.WindowNode;
 
 
-public final class StageNodeSerDeUtils {
-  private StageNodeSerDeUtils() {
-    // do not instantiate.
-  }
-
-  public static AbstractPlanNode deserializeStageNode(Plan.PlanOrStageNode protoNode, int version) {
-    switch (version) {
-      case 1:
-        return deserializeStageNodeV1(protoNode.getPlanNode());
-      case 0:
+public class DeserializationVisitor {
+  public AbstractPlanNode process(Plan.PlanNode protoNode) {
+    switch (protoNode.getNodeTypeCase()) {
+      case OBJECTFIELD:
+        return processUnknownNodeType(protoNode);
+      case TABLESCANNODE:
+        return visitTableScanNode(protoNode);
       default:
-        return deserializeStageNodeV0(protoNode.getStageNode());
+        throw new RuntimeException(String.format("Unknown Node Type %s", protoNode.getNodeTypeCase()));
     }
   }
 
-  public static AbstractPlanNode deserializeStageNodeV1(Plan.PlanNode protoNode) {
-    DeserializationVisitor visitor = new DeserializationVisitor();
-    return visitor.process(protoNode);
-  }
-
-  public static AbstractPlanNode deserializeStageNodeV0(Plan.StageNode protoNode) {
+  private AbstractPlanNode processUnknownNodeType(Plan.PlanNode protoNode) {
     AbstractPlanNode planNode = newNodeInstance(protoNode.getNodeName(), protoNode.getStageId());
     planNode.setDataSchema(extractDataSchema(protoNode));
     planNode.fromObjectField(protoNode.getObjectField());
-    for (Plan.StageNode protoChild : protoNode.getInputsList()) {
-      planNode.addInput(deserializeStageNodeV0(protoChild));
+    for (Plan.PlanNode protoChild : protoNode.getInputsList()) {
+      planNode.addInput(process(protoChild));
     }
     return planNode;
   }
 
-  public static Plan.PlanOrStageNode serializeStageNode(AbstractPlanNode planNode, int version) {
-    switch (version) {
-      case 1:
-        return serializeStageNodeV1(planNode);
-      case 0:
-      default:
-        return serializeStageNodeV0(planNode);
-    }
+  private AbstractPlanNode visitTableScanNode(Plan.PlanNode protoNode) {
+    Plan.TableScanNode protoTableNode = protoNode.getTableScanNode();
+    List<String> list = new ArrayList<>(protoTableNode.getTableScanColumnsList());
+    return new TableScanNode(protoNode.getStageId(), extractDataSchema(protoNode),
+        extractNodeHint(protoTableNode.getNodeHint()), protoTableNode.getTableName(), list);
   }
 
-  public static Plan.PlanOrStageNode serializeStageNodeV1(AbstractPlanNode planNode) {
-    SerializationVisitor visitor = new SerializationVisitor();
-    Plan.PlanNode node = planNode.visit(visitor, new ArrayList<>());
-    return Plan.PlanOrStageNode.newBuilder().setPlanNode(node).build();
+  private static AbstractPlanNode.NodeHint extractNodeHint(Plan.NodeHint protoNodeHint) {
+    AbstractPlanNode.NodeHint nodeHint = new AbstractPlanNode.NodeHint();
+    protoNodeHint.getHintOptionsMap().forEach((key, value) -> nodeHint._hintOptions.put(key, value.getOptionsMap()));
+
+    return nodeHint;
   }
 
-  public static Plan.PlanOrStageNode serializeStageNodeV0(AbstractPlanNode planNode) {
-    Plan.StageNode.Builder builder = Plan.StageNode.newBuilder()
-        .setStageId(planNode.getPlanFragmentId())
-        .setNodeName(planNode.getClass().getSimpleName())
-        .setObjectField(planNode.toObjectField());
-    DataSchema dataSchema = planNode.getDataSchema();
-    for (int i = 0; i < dataSchema.getColumnNames().length; i++) {
-      builder.addColumnNames(dataSchema.getColumnName(i));
-      builder.addColumnDataTypes(dataSchema.getColumnDataType(i).name());
-    }
-    for (PlanNode childNode : planNode.getInputs()) {
-      builder.addInputs(serializeStageNodeV0((AbstractPlanNode) childNode).getStageNode());
-    }
-    return Plan.PlanOrStageNode.newBuilder().setStageNode(builder).build();
-  }
-
-  private static DataSchema extractDataSchema(Plan.StageNode protoNode) {
+  private static DataSchema extractDataSchema(Plan.PlanNode protoNode) {
     String[] columnDataTypesList = protoNode.getColumnDataTypesList().toArray(new String[]{});
     String[] columnNames = protoNode.getColumnNamesList().toArray(new String[]{});
     DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[columnNames.length];
@@ -99,8 +84,6 @@ public final class StageNodeSerDeUtils {
 
   private static AbstractPlanNode newNodeInstance(String nodeName, int planFragmentId) {
     switch (nodeName) {
-      case "TableScanNode":
-        return new TableScanNode(planFragmentId);
       case "JoinNode":
         return new JoinNode(planFragmentId);
       case "ProjectNode":
