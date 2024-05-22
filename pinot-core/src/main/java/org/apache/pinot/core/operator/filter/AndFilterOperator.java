@@ -61,13 +61,11 @@ public class AndFilterOperator extends BaseFilterOperator {
   @Override
   protected BlockDocIdSet getFalses() {
     List<BlockDocIdSet> blockDocIdSets = new ArrayList<>(_filterOperators.size());
-    boolean matchedAll = false;
     for (BaseFilterOperator filterOperator : _filterOperators) {
       if (filterOperator.isResultEmpty()) {
         return new MatchAllDocIdSet(_numDocs);
       }
       if (filterOperator.isResultMatchingAll()) {
-        matchedAll = true;
         continue;
       }
       if (_nullHandlingEnabled) {
@@ -77,7 +75,7 @@ public class AndFilterOperator extends BaseFilterOperator {
       }
       blockDocIdSets.add(filterOperator.getTrues());
     }
-    if (blockDocIdSets.isEmpty() && matchedAll) {
+    if (blockDocIdSets.isEmpty()) {
       return EmptyDocIdSet.getInstance();
     }
     return new NotDocIdSet(new AndDocIdSet(blockDocIdSets, _queryOptions), _numDocs);
