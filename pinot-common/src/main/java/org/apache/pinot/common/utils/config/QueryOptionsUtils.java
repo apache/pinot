@@ -139,6 +139,11 @@ public class QueryOptionsUtils {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.SKIP_UPSERT));
   }
 
+  public static long getUpsertViewFreshnessMs(Map<String, String> queryOptions) {
+    String freshnessMsString = queryOptions.get(QueryOptionKey.UPSERT_VIEW_FRESHNESS_MS);
+    return freshnessMsString != null ? Long.parseLong(freshnessMsString) : -1;
+  }
+
   public static boolean isScanStarTreeNodes(Map<String, String> queryOptions) {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.SCAN_STAR_TREE_NODES));
   }

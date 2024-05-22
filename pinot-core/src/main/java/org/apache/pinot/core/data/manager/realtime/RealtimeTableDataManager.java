@@ -302,7 +302,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     List<SegmentContext> segmentContexts = new ArrayList<>(selectedSegments.size());
     selectedSegments.forEach(s -> segmentContexts.add(new SegmentContext(s)));
     if (isUpsertEnabled() && !QueryOptionsUtils.isSkipUpsert(queryOptions)) {
-      _tableUpsertMetadataManager.setSegmentContexts(segmentContexts);
+      _tableUpsertMetadataManager.setSegmentContexts(segmentContexts, queryOptions);
     }
     return segmentContexts;
   }
