@@ -108,6 +108,8 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   GRPC_QUERIES("grpcQueries", true),
   GRPC_BYTES_RECEIVED("grpcBytesReceived", true),
   GRPC_BYTES_SENT("grpcBytesSent", true),
+  GRPC_TRANSPORT_READY("grpcTransport", true),
+  GRPC_TRANSPORT_TERMINATED("grpcTransport", true),
 
   NUM_SEGMENTS_PRUNED_INVALID("numSegmentsPrunedInvalid", false),
   NUM_SEGMENTS_PRUNED_BY_LIMIT("numSegmentsPrunedByLimit", false),
