@@ -26,6 +26,8 @@ import javax.annotation.Nullable;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.docidsets.AndDocIdSet;
+import org.apache.pinot.core.operator.docidsets.EmptyDocIdSet;
+import org.apache.pinot.core.operator.docidsets.MatchAllDocIdSet;
 import org.apache.pinot.core.operator.docidsets.NotDocIdSet;
 import org.apache.pinot.core.operator.docidsets.OrDocIdSet;
 import org.apache.pinot.spi.trace.Tracing;
@@ -60,12 +62,20 @@ public class AndFilterOperator extends BaseFilterOperator {
   protected BlockDocIdSet getFalses() {
     List<BlockDocIdSet> blockDocIdSets = new ArrayList<>(_filterOperators.size());
     for (BaseFilterOperator filterOperator : _filterOperators) {
+      if (filterOperator.isResultEmpty()) {
+        blockDocIdSets.add(EmptyDocIdSet.getInstance());
+        continue;
+      }
+      if (filterOperator.isResultMatchingAll()) {
+        blockDocIdSets.add(new MatchAllDocIdSet(_numDocs));
+        continue;
+      }
       if (_nullHandlingEnabled) {
         blockDocIdSets.add(
             new OrDocIdSet(Arrays.asList(filterOperator.getTrues(), filterOperator.getNulls()), _numDocs));
-      } else {
-        blockDocIdSets.add(filterOperator.getTrues());
+        continue;
       }
+      blockDocIdSets.add(filterOperator.getTrues());
     }
     return new NotDocIdSet(new AndDocIdSet(blockDocIdSets, _queryOptions), _numDocs);
   }

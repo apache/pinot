@@ -208,4 +208,19 @@ public class AndFilterOperatorTest {
     Assert.assertEquals(TestUtils.getDocIds(andFilterOperator.getFalses()),
         ImmutableList.of(0, 1, 2, 3, 4, 5, 6, 7, 8, 9));
   }
+
+  @Test
+  public void testAndWithNullOneFilterMatchesAll() {
+    int numDocs = 10;
+    int[] docIds1 = new int[]{1, 2, 3};
+    int[] nullDocIds1 = new int[]{4, 5, 6};
+
+    AndFilterOperator andFilterOperator = new AndFilterOperator(
+        Arrays.asList(new TestFilterOperator(docIds1, nullDocIds1, numDocs), new MatchAllFilterOperator(numDocs)), null,
+        numDocs, true);
+
+    Assert.assertEquals(TestUtils.getDocIds(andFilterOperator.getTrues()), ImmutableList.of(1, 2, 3));
+    Assert.assertEquals(TestUtils.getDocIds(andFilterOperator.getFalses()),
+        ImmutableList.of(0, 7, 8, 9));
+  }
 }

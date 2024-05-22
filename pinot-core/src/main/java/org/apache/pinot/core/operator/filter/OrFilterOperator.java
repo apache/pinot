@@ -19,13 +19,15 @@
 package org.apache.pinot.core.operator.filter;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.operator.docidsets.AndDocIdSet;
+import org.apache.pinot.core.operator.docidsets.EmptyDocIdSet;
 import org.apache.pinot.core.operator.docidsets.MatchAllDocIdSet;
+import org.apache.pinot.core.operator.docidsets.NotDocIdSet;
 import org.apache.pinot.core.operator.docidsets.OrDocIdSet;
 import org.apache.pinot.spi.trace.Tracing;
 import org.roaringbitmap.buffer.BufferFastAggregation;
@@ -60,13 +62,21 @@ public class OrFilterOperator extends BaseFilterOperator {
     List<BlockDocIdSet> blockDocIdSets = new ArrayList<>(_filterOperators.size());
     for (BaseFilterOperator filterOperator : _filterOperators) {
       if (filterOperator.isResultEmpty()) {
-        blockDocIdSets.add(new MatchAllDocIdSet(_numDocs));
-      } else {
-        blockDocIdSets.add(filterOperator.getFalses());
+        blockDocIdSets.add(EmptyDocIdSet.getInstance());
+        continue;
       }
+      if (filterOperator.isResultMatchingAll()) {
+        blockDocIdSets.add(new MatchAllDocIdSet(_numDocs));
+        continue;
+      }
+      if (_nullHandlingEnabled) {
+        blockDocIdSets.add(
+            new OrDocIdSet(Arrays.asList(filterOperator.getTrues(), filterOperator.getNulls()), _numDocs));
+        continue;
+      }
+      blockDocIdSets.add(filterOperator.getTrues());
     }
-    // Consider handling this as the query is written, with OrDocIdSet, so that the explain plan reflects the execution
-    return new AndDocIdSet(blockDocIdSets, _queryOptions);
+    return new NotDocIdSet(new OrDocIdSet(blockDocIdSets, _numDocs), _numDocs);
   }
 
   @Override

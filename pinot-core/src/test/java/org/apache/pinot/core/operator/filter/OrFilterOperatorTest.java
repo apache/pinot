@@ -21,6 +21,7 @@ package org.apache.pinot.core.operator.filter;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.TreeSet;
@@ -126,6 +127,22 @@ public class OrFilterOperatorTest {
   }
 
   @Test
+  public void testOrWithNullHandlingDisabled() {
+    int numDocs = 10;
+    int[] docIds1 = new int[]{1, 2, 3};
+    int[] docIds2 = new int[]{0, 1, 2};
+    int[] nullDocIds1 = new int[]{};
+    int[] nullDocIds2 = new int[]{};
+
+    OrFilterOperator orFilterOperator = new OrFilterOperator(
+        Arrays.asList(new TestFilterOperator(docIds1, nullDocIds1, numDocs),
+            new TestFilterOperator(docIds2, nullDocIds2, numDocs)), null, numDocs, false);
+
+    Assert.assertEquals(TestUtils.getDocIds(orFilterOperator.getTrues()), ImmutableList.of(0, 1, 2, 3));
+    Assert.assertEquals(TestUtils.getDocIds(orFilterOperator.getFalses()), ImmutableList.of(4, 5, 6, 7, 8, 9));
+  }
+
+  @Test
   public void testOrWithNullOneFilterIsEmpty() {
     int numDocs = 10;
     int[] docIds1 = new int[]{1, 2, 3};
@@ -137,5 +154,19 @@ public class OrFilterOperatorTest {
 
     Assert.assertEquals(TestUtils.getDocIds(orFilterOperator.getTrues()), Arrays.asList(1, 2, 3));
     Assert.assertEquals(TestUtils.getDocIds(orFilterOperator.getFalses()), Arrays.asList(0, 7, 8, 9));
+  }
+
+  @Test
+  public void testOrWithNullOneFilterMatchesAll() {
+    int numDocs = 10;
+    int[] docIds1 = new int[]{1, 2, 3};
+    int[] nullDocIds1 = new int[]{4, 5, 6};
+
+    OrFilterOperator orFilterOperator = new OrFilterOperator(
+        Arrays.asList(new TestFilterOperator(docIds1, nullDocIds1, numDocs), new MatchAllFilterOperator(numDocs)), null,
+        numDocs, true);
+
+    Assert.assertEquals(TestUtils.getDocIds(orFilterOperator.getTrues()), Arrays.asList(0, 1, 2, 3, 4, 5, 6, 7, 8, 9));
+    Assert.assertEquals(TestUtils.getDocIds(orFilterOperator.getFalses()), Collections.emptyList());
   }
 }
