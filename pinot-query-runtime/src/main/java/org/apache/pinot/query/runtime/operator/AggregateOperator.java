@@ -49,6 +49,7 @@ import org.apache.pinot.query.planner.plannode.AbstractPlanNode;
 import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.roaringbitmap.RoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -187,6 +188,7 @@ public class AggregateOperator extends MultiStageOperator {
 
   /**
    * Consumes the input blocks as a group by
+   *
    * @return the last block, which must always be either an error or the end of the stream
    */
   private TransferableBlock consumeGroupBy() {
@@ -200,6 +202,7 @@ public class AggregateOperator extends MultiStageOperator {
 
   /**
    * Consumes the input blocks as an aggregation
+   *
    * @return the last block, which must always be either an error or the end of the stream
    */
   private TransferableBlock consumeAggregation() {
@@ -262,7 +265,7 @@ public class AggregateOperator extends MultiStageOperator {
         }
       }
     }
-
+    handleListAggDistinctArg(functionName, functionCall, arguments);
     return AggregationFunctionFactory.getAggregationFunction(
         new FunctionContext(FunctionContext.Type.AGGREGATION, functionName, arguments), true);
   }
@@ -296,8 +299,20 @@ public class AggregateOperator extends MultiStageOperator {
           arguments.add(PLACEHOLDER_IDENTIFIER);
         }
       }
+      handleListAggDistinctArg(functionName, functionCall, arguments);
       return AggregationFunctionFactory.getAggregationFunction(
           new FunctionContext(FunctionContext.Type.AGGREGATION, functionName, arguments), true);
+    }
+  }
+
+  private static void handleListAggDistinctArg(String functionName, RexExpression.FunctionCall functionCall,
+      List<ExpressionContext> arguments) {
+    String upperCaseFunctionName =
+        AggregationFunctionType.getNormalizedAggregationFunctionName(functionName);
+    if (upperCaseFunctionName.equals("LISTAGG")) {
+      if (functionCall.isDistinct()) {
+        arguments.add(ExpressionContext.forLiteralContext(Literal.boolValue(true)));
+      }
     }
   }
 

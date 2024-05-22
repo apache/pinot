@@ -52,6 +52,7 @@ import it.unimi.dsi.fastutil.longs.LongIterator;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
 import java.io.IOException;
@@ -160,7 +161,8 @@ public class ObjectSerDeUtils {
     UltraLogLog(46),
     ThetaSketchAccumulator(47),
     TupleIntSketchAccumulator(48),
-    CpcSketchAccumulator(49);
+    CpcSketchAccumulator(49),
+    OrderedStringSet(50);
 
     private final int _value;
 
@@ -238,6 +240,13 @@ public class ObjectSerDeUtils {
         return ObjectType.FloatSet;
       } else if (value instanceof DoubleSet) {
         return ObjectType.DoubleSet;
+      } else if (value instanceof ObjectLinkedOpenHashSet) {
+        ObjectLinkedOpenHashSet objectSet = (ObjectLinkedOpenHashSet) value;
+        if (objectSet.isEmpty() || objectSet.first() instanceof String) {
+          return ObjectType.OrderedStringSet;
+        }
+        throw new IllegalArgumentException(
+            "Unsupported type of value: " + objectSet.first().getClass().getSimpleName());
       } else if (value instanceof ObjectSet) {
         ObjectSet objectSet = (ObjectSet) value;
         if (objectSet.isEmpty() || objectSet.iterator().next() instanceof String) {
@@ -1678,6 +1687,51 @@ public class ObjectSerDeUtils {
         }
       };
 
+  public static final ObjectSerDe<ObjectLinkedOpenHashSet<String>> ORDERED_STRING_SET_SER_DE =
+      new ObjectSerDe<ObjectLinkedOpenHashSet<String>>() {
+
+    @Override
+    public byte[] serialize(ObjectLinkedOpenHashSet<String> stringSet) {
+      int size = stringSet.size();
+      // Besides the value bytes, we store: size, length for each value
+      long bufferSize = (1 + (long) size) * Integer.BYTES;
+      byte[][] valueBytesArray = new byte[size][];
+      int index = 0;
+      for (String value : stringSet) {
+        byte[] valueBytes = value.getBytes(UTF_8);
+        bufferSize += valueBytes.length;
+        valueBytesArray[index++] = valueBytes;
+      }
+      Preconditions.checkState(bufferSize <= Integer.MAX_VALUE, "Buffer size exceeds 2GB");
+      byte[] bytes = new byte[(int) bufferSize];
+      ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
+      byteBuffer.putInt(size);
+      for (byte[] valueBytes : valueBytesArray) {
+        byteBuffer.putInt(valueBytes.length);
+        byteBuffer.put(valueBytes);
+      }
+      return bytes;
+    }
+
+    @Override
+    public ObjectLinkedOpenHashSet<String> deserialize(byte[] bytes) {
+      return deserialize(ByteBuffer.wrap(bytes));
+    }
+
+    @Override
+    public ObjectLinkedOpenHashSet<String> deserialize(ByteBuffer byteBuffer) {
+      int size = byteBuffer.getInt();
+      ObjectLinkedOpenHashSet<String> stringSet = new ObjectLinkedOpenHashSet<>(size);
+      for (int i = 0; i < size; i++) {
+        int length = byteBuffer.getInt();
+        byte[] bytes = new byte[length];
+        byteBuffer.get(bytes);
+        stringSet.add(new String(bytes, UTF_8));
+      }
+      return stringSet;
+    }
+  };
+
   // NOTE: DO NOT change the order, it has to be the same order as the ObjectType
   //@formatter:off
   private static final ObjectSerDe[] SER_DES = {
@@ -1731,6 +1785,7 @@ public class ObjectSerDeUtils {
       DATA_SKETCH_THETA_ACCUMULATOR_SER_DE,
       DATA_SKETCH_INT_TUPLE_ACCUMULATOR_SER_DE,
       DATA_SKETCH_CPC_ACCUMULATOR_SER_DE,
+      ORDERED_STRING_SET_SER_DE,
   };
   //@formatter:on
 

@@ -32,6 +32,7 @@ import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -574,6 +575,23 @@ public class ObjectSerDeUtilsTest {
 
       assertEquals(actual.getResult().getEstimate(), sketch.getEstimate(), ERROR_MESSAGE);
       assertEquals(actual.getResult().toByteArray(), sketch.toByteArray(), ERROR_MESSAGE);
+    }
+  }
+
+  @Test
+  public void testOrderedStringSet() {
+    for (int i = 0; i < NUM_ITERATIONS; i++) {
+      int size = RANDOM.nextInt(100);
+      ObjectLinkedOpenHashSet<String> expected = new ObjectLinkedOpenHashSet<>(size);
+      for (int j = 0; j < size; j++) {
+        expected.add(RandomStringUtils.random(RANDOM.nextInt(20)));
+      }
+      byte[] bytes = ObjectSerDeUtils.serialize(expected);
+      ObjectLinkedOpenHashSet<String> actual =
+          ObjectSerDeUtils.deserialize(bytes, ObjectSerDeUtils.ObjectType.OrderedStringSet);
+      for (int j = 0; j < size; j++) {
+        assertEquals(actual.get(j), expected.get(j), ERROR_MESSAGE);
+      }
     }
   }
 }

@@ -250,7 +250,7 @@ public class RexExpressionUtils {
         aggregateCall.getArgList().stream().map(RexExpression.InputRef::new).collect(Collectors.toList());
     return new RexExpression.FunctionCall(aggregateCall.getAggregation().getKind(),
         RelToPlanNodeConverter.convertToColumnDataType(aggregateCall.getType()),
-        aggregateCall.getAggregation().getName(), operands);
+        aggregateCall.getAggregation().getName(), operands, aggregateCall.isDistinct());
   }
 
   public static List<RexExpression> fromInputRefs(Iterable<Integer> inputRefs) {
