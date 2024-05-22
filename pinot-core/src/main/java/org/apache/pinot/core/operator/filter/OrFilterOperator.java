@@ -65,6 +65,7 @@ public class OrFilterOperator extends BaseFilterOperator {
         blockDocIdSets.add(filterOperator.getFalses());
       }
     }
+    // Consider handling this as the query is written, with OrDocIdSet, so that the explain plan reflects the execution
     return new AndDocIdSet(blockDocIdSets, _queryOptions);
   }
 

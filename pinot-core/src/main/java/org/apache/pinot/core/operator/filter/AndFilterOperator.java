@@ -60,7 +60,12 @@ public class AndFilterOperator extends BaseFilterOperator {
   protected BlockDocIdSet getFalses() {
     List<BlockDocIdSet> blockDocIdSets = new ArrayList<>(_filterOperators.size());
     for (BaseFilterOperator filterOperator : _filterOperators) {
-      blockDocIdSets.add(new OrDocIdSet(Arrays.asList(filterOperator.getTrues(), filterOperator.getNulls()), _numDocs));
+      if (_nullHandlingEnabled) {
+        blockDocIdSets.add(
+            new OrDocIdSet(Arrays.asList(filterOperator.getTrues(), filterOperator.getNulls()), _numDocs));
+      } else {
+        blockDocIdSets.add(filterOperator.getTrues());
+      }
     }
     return new NotDocIdSet(new AndDocIdSet(blockDocIdSets, _queryOptions), _numDocs);
   }
