@@ -80,7 +80,6 @@ public class TableAuthorizationResult implements AuthorizationResult {
     }
     StringBuilder sb = new StringBuilder();
     sb.append("Authorization Failed for tables: ");
-    // sort _failedTables into a list
 
     List<String> failedTablesList = new ArrayList<>(_failedTables);
     Collections.sort(failedTablesList); // Sort to make output deterministic
