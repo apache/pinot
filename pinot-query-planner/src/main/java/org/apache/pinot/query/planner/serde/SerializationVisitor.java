@@ -170,7 +170,17 @@ public class SerializationVisitor implements PlanNodeVisitor<Plan.PlanNode, List
   @Override
   public Plan.PlanNode visitSetOp(SetOpNode node, List<Plan.PlanNode> context) {
     node.getInputs().forEach(input -> input.visit(this, context));
-    return process(node, context);
+    Plan.PlanNode.Builder builder = getBuilder(node, context);
+    Plan.SetOpNode.Builder setOpBuilder = Plan.SetOpNode.newBuilder()
+        .setSetOpType(convertSetOpType(node.getSetOpType()))
+        .setAll(node.isAll());
+    builder.setSetNode(setOpBuilder);
+
+    context.clear();
+    Plan.PlanNode protoPlanNode = builder.build();
+    context.add(protoPlanNode);
+
+    return protoPlanNode;
   }
 
   @Override
@@ -261,5 +271,17 @@ public class SerializationVisitor implements PlanNodeVisitor<Plan.PlanNode, List
     }
 
     return Plan.NullDirection.UNSPECIFIED;
+  }
+
+  private static Plan.SetOpType convertSetOpType(SetOpNode.SetOpType type) {
+    switch (type) {
+      case INTERSECT:
+        return Plan.SetOpType.INTERSECT;
+      case UNION:
+        return Plan.SetOpType.UNION;
+      case MINUS:
+        return Plan.SetOpType.MINUS;
+    }
+    throw new RuntimeException(String.format("Unknown SetOpType %s", type));
   }
 }

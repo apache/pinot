@@ -98,6 +98,7 @@ message PlanNode {
     TableScanNode tableScanNode = 102;
     MailboxReceiveNode receiveNode = 103;
     MailboxSendNode sendNode = 104;
+    SetOpNode setNode = 105;
   }
 }
 
@@ -167,4 +168,15 @@ message MailboxSendNode {
   repeated Direction collationDirections = 6;
   bool sortOnSender = 7;
   bool prePartitioned = 8;
+}
+
+enum SetOpType {
+  UNION = 0;
+  INTERSECT = 1;
+  MINUS = 2;
+}
+
+message SetOpNode {
+  SetOpType setOpType = 1;
+  bool all = 2;
 }

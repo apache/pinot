@@ -52,6 +52,8 @@ public class DeserializationVisitor {
         return visitMailboxReceiveNode(protoNode);
       case SENDNODE:
         return visitMailboxSendNode(protoNode);
+      case SETNODE:
+        return visitSetNode(protoNode);
       default:
         throw new RuntimeException(String.format("Unknown Node Type %s", protoNode.getNodeTypeCase()));
     }
@@ -76,27 +78,37 @@ public class DeserializationVisitor {
 
   private AbstractPlanNode visitMailboxReceiveNode(Plan.PlanNode protoNode) {
     Plan.MailboxReceiveNode protoReceiveNode = protoNode.getReceiveNode();
-    return new MailboxReceiveNode(protoNode.getStageId(), extractDataSchema(protoNode), protoReceiveNode.getSenderStageId(), convertDistributionType(protoReceiveNode.getDistributionType()),
+    return new MailboxReceiveNode(protoNode.getStageId(), extractDataSchema(protoNode),
+        protoReceiveNode.getSenderStageId(), convertDistributionType(protoReceiveNode.getDistributionType()),
         convertExchangeType(protoReceiveNode.getExchangeType()), protoReceiveNode.getDistributionKeysList(),
         protoReceiveNode.getCollationKeysList().stream().map(RexExpression.InputRef::new).collect(Collectors.toList()),
-        protoReceiveNode.getCollationDirectionsList().stream().map(DeserializationVisitor::convertDirection).collect(
-            Collectors.toList()),
-        protoReceiveNode.getCollationNullDirectionsList().stream().map(DeserializationVisitor::convertNullDirection).collect(
-            Collectors.toList()), protoReceiveNode.getSortOnSender(), protoReceiveNode.getSortOnReceiver(),
+        protoReceiveNode.getCollationDirectionsList().stream().map(DeserializationVisitor::convertDirection)
+            .collect(Collectors.toList()),
+        protoReceiveNode.getCollationNullDirectionsList().stream().map(DeserializationVisitor::convertNullDirection)
+            .collect(Collectors.toList()), protoReceiveNode.getSortOnSender(), protoReceiveNode.getSortOnReceiver(),
         (MailboxSendNode) visitMailboxSendNode(protoReceiveNode.getSender()));
   }
 
   private AbstractPlanNode visitMailboxSendNode(Plan.PlanNode protoNode) {
     Plan.MailboxSendNode protoSendNode = protoNode.getSendNode();
-    MailboxSendNode sendNode = new MailboxSendNode(protoNode.getStageId(), extractDataSchema(protoNode), protoSendNode.getReceiverStageId(), convertDistributionType(protoSendNode.getDistributionType()),
-        convertExchangeType(protoSendNode.getExchangeType()), protoSendNode.getDistributionKeysList(),
-        protoSendNode.getCollationKeysList().stream().map(RexExpression.InputRef::new).collect(Collectors.toList()),
-        protoSendNode.getCollationDirectionsList().stream().map(DeserializationVisitor::convertDirection).collect(
-            Collectors.toList()),
-        protoSendNode.getSortOnSender(), protoSendNode.getPrePartitioned());
+    MailboxSendNode sendNode =
+        new MailboxSendNode(protoNode.getStageId(), extractDataSchema(protoNode), protoSendNode.getReceiverStageId(),
+            convertDistributionType(protoSendNode.getDistributionType()),
+            convertExchangeType(protoSendNode.getExchangeType()), protoSendNode.getDistributionKeysList(),
+            protoSendNode.getCollationKeysList().stream().map(RexExpression.InputRef::new).collect(Collectors.toList()),
+            protoSendNode.getCollationDirectionsList().stream().map(DeserializationVisitor::convertDirection)
+                .collect(Collectors.toList()), protoSendNode.getSortOnSender(), protoSendNode.getPrePartitioned());
 
     protoNode.getInputsList().forEach((i) -> sendNode.addInput(process(i)));
     return sendNode;
+  }
+
+  private AbstractPlanNode visitSetNode(Plan.PlanNode protoNode) {
+    Plan.SetOpNode protoSetOpNode = protoNode.getSetNode();
+    SetOpNode setOpNode = new SetOpNode(convertSetOpType(protoSetOpNode.getSetOpType()), protoNode.getStageId(),
+        extractDataSchema(protoNode), protoSetOpNode.getAll());
+    protoNode.getInputsList().forEach((i) -> setOpNode.addInput(process(i)));
+    return setOpNode;
   }
 
   private static AbstractPlanNode.NodeHint extractNodeHint(Plan.NodeHint protoNodeHint) {
@@ -200,5 +212,17 @@ public class DeserializationVisitor {
       default:
         throw new IllegalArgumentException("Unknown node name: " + nodeName);
     }
+  }
+
+  private static SetOpNode.SetOpType convertSetOpType(Plan.SetOpType type) {
+    switch (type) {
+      case INTERSECT:
+        return SetOpNode.SetOpType.INTERSECT;
+      case UNION:
+        return SetOpNode.SetOpType.UNION;
+      case MINUS:
+        return SetOpNode.SetOpType.MINUS;
+    }
+    throw new RuntimeException(String.format("Unknown SetOpType %s", type));
   }
 }
