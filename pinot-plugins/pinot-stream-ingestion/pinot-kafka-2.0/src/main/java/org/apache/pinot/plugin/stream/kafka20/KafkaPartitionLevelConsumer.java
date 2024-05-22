@@ -111,10 +111,4 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
     }
     return builder.build();
   }
-
-  @Override
-  public boolean isOffsetMismatchAcceptable(StreamPartitionMsgOffset startOffset,
-      StreamPartitionMsgOffset batchFirstOffset) {
-    return batchFirstOffset.compareTo(startOffset) == 0;
-  }
 }
