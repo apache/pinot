@@ -97,7 +97,8 @@ public class PulsarPartitionLevelConsumer extends PulsarPartitionLevelConnection
   }
 
   @Override
-  public boolean isOffsetMismatchAcceptable(StreamPartitionMsgOffset startOffset, StreamPartitionMsgOffset batchFirstOffset) {
+  public boolean isOffsetMismatchAcceptable(StreamPartitionMsgOffset startOffset,
+      StreamPartitionMsgOffset batchFirstOffset) {
     return batchFirstOffset.compareTo(startOffset) >= 0;
   }
 

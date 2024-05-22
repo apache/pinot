@@ -152,7 +152,8 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
   }
 
   @Override
-  public boolean isOffsetMismatchAcceptable(StreamPartitionMsgOffset startOffset, StreamPartitionMsgOffset batchFirstOffset) {
+  public boolean isOffsetMismatchAcceptable(StreamPartitionMsgOffset startOffset,
+      StreamPartitionMsgOffset batchFirstOffset) {
     // In Kinesis, we return the offset of the last message in the batch as nextOffset
     // So when the consumer starts again, it starts AFTER this offset. Hence, the  offset of the first message in
     // batch should be greater than or
