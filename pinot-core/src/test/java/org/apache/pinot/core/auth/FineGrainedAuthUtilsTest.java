@@ -1,14 +1,13 @@
 package org.apache.pinot.core.auth;
 
-import org.mockito.Mockito;
-import org.testng.Assert;
-import org.testng.annotations.Test;
-
+import java.lang.reflect.Method;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriInfo;
-import java.lang.reflect.Method;
+import org.mockito.Mockito;
+import org.testng.Assert;
+import org.testng.annotations.Test;
 
 public class FineGrainedAuthUtilsTest {
 

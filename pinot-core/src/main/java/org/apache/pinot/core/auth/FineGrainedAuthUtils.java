@@ -37,7 +37,7 @@ import org.slf4j.LoggerFactory;
  */
 public class FineGrainedAuthUtils {
 
-  public static final Logger LOGGER = LoggerFactory.getLogger(FineGrainedAuthUtils.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(FineGrainedAuthUtils.class);
 
   private FineGrainedAuthUtils() {
   }
@@ -117,8 +117,10 @@ public class FineGrainedAuthUtils {
       } catch (Throwable t) {
         // catch and log Throwable for NoSuchMethodError which can happen when there are classpath conflicts
         // otherwise, grizzly will return a 500 without any logs or indication of what failed
-        LOGGER.error("Failed to check for access", t);
-        throw new WebApplicationException("Failed to check for access", t, Response.Status.INTERNAL_SERVER_ERROR);
+        String errorMsg = String.format("Failed to check for access for target type %s and target ID %s with action %s",
+            auth.targetType(), targetId, auth.action());
+        LOGGER.error(errorMsg, t);
+        throw new WebApplicationException(errorMsg, t, Response.Status.INTERNAL_SERVER_ERROR);
       }
 
       // Check for access now
