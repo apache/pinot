@@ -18,12 +18,14 @@
  */
 package org.apache.pinot.broker.api;
 
+import java.util.HashSet;
 import java.util.Set;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.auth.FineGrainedAccessControl;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
 import org.apache.pinot.spi.auth.AuthorizationResult;
+import org.apache.pinot.spi.auth.BasicAuthorizationResultImpl;
 import org.apache.pinot.spi.auth.TableAuthorizationResult;
 
 
@@ -50,7 +52,14 @@ public interface AccessControl extends FineGrainedAccessControl {
    *
    * @return {@code true} if authorized, {@code false} otherwise
    */
-  AuthorizationResult hasAccess(RequesterIdentity requesterIdentity, BrokerRequest brokerRequest);
+
+  default boolean hasAccess(RequesterIdentity requesterIdentity, BrokerRequest brokerRequest) {
+    return true;
+  }
+
+  default AuthorizationResult verifyAccess(RequesterIdentity requesterIdentity, BrokerRequest brokerRequest) {
+    return new BasicAuthorizationResultImpl(hasAccess(requesterIdentity, brokerRequest));
+  }
 
   /**
    * Fine-grained access control on pinot tables.
@@ -60,5 +69,14 @@ public interface AccessControl extends FineGrainedAccessControl {
    *
    * @return {@code true} if authorized, {@code false} otherwise
    */
-  TableAuthorizationResult hasAccess(RequesterIdentity requesterIdentity, Set<String> tables);
+
+  default boolean hasAccess(RequesterIdentity requesterIdentity, Set<String> tables) {
+    return true;
+  }
+
+  default TableAuthorizationResult verifyAccess(RequesterIdentity requesterIdentity, Set<String> tables) {
+    // Taking all tables when hasAccess Failed , to not break existing implementations
+    // It will say all tables names failed AuthZ even only some failed AuthZ - which is same as just boolean output
+    return new TableAuthorizationResult(hasAccess(requesterIdentity, tables) ? new HashSet<>() : tables);
+  }
 }

@@ -81,11 +81,11 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
 
     @Override
     public boolean hasAccess(RequesterIdentity requesterIdentity) {
-      return hasAccess(requesterIdentity, (BrokerRequest) null).hasAccess();
+      return verifyAccess(requesterIdentity, (BrokerRequest) null).hasAccess();
     }
 
     @Override
-    public AuthorizationResult hasAccess(RequesterIdentity requesterIdentity, BrokerRequest brokerRequest) {
+    public AuthorizationResult verifyAccess(RequesterIdentity requesterIdentity, BrokerRequest brokerRequest) {
       Optional<BasicAuthPrincipal> principalOpt = getPrincipalOpt(requesterIdentity);
 
       if (!principalOpt.isPresent()) {
@@ -106,7 +106,7 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
     }
 
     @Override
-    public TableAuthorizationResult hasAccess(RequesterIdentity requesterIdentity, Set<String> tables) {
+    public TableAuthorizationResult verifyAccess(RequesterIdentity requesterIdentity, Set<String> tables) {
       Optional<BasicAuthPrincipal> principalOpt = getPrincipalOpt(requesterIdentity);
 
       if (!principalOpt.isPresent()) {

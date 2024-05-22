@@ -19,6 +19,8 @@
 package org.apache.pinot.core.auth;
 
 import javax.ws.rs.core.HttpHeaders;
+import org.apache.pinot.spi.auth.AuthorizationResult;
+import org.apache.pinot.spi.auth.BasicAuthorizationResultImpl;
 
 
 /**
@@ -36,6 +38,11 @@ public interface FineGrainedAccessControl {
    */
   default boolean hasAccess(HttpHeaders httpHeaders, TargetType targetType, String targetId, String action) {
     return true;
+  }
+
+  default AuthorizationResult verifyAccess(HttpHeaders httpHeaders, TargetType targetType, String targetId,
+      String action) {
+    return new BasicAuthorizationResultImpl(hasAccess(httpHeaders, targetType, targetId, action));
   }
 
   /**

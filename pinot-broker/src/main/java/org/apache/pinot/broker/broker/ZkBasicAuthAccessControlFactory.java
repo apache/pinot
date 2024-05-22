@@ -85,22 +85,22 @@ public class ZkBasicAuthAccessControlFactory extends AccessControlFactory {
 
     @Override
     public boolean hasAccess(RequesterIdentity requesterIdentity) {
-      return hasAccess(requesterIdentity, (BrokerRequest) null).hasAccess();
+      return verifyAccess(requesterIdentity, (BrokerRequest) null).hasAccess();
     }
 
     @Override
-    public AuthorizationResult hasAccess(RequesterIdentity requesterIdentity, BrokerRequest brokerRequest) {
+    public AuthorizationResult verifyAccess(RequesterIdentity requesterIdentity, BrokerRequest brokerRequest) {
       if (brokerRequest == null || !brokerRequest.isSetQuerySource() || !brokerRequest.getQuerySource()
           .isSetTableName()) {
         // no table restrictions? accept
         return TableAuthorizationResult.noFailureResult();
       }
 
-      return hasAccess(requesterIdentity, Collections.singleton(brokerRequest.getQuerySource().getTableName()));
+      return verifyAccess(requesterIdentity, Collections.singleton(brokerRequest.getQuerySource().getTableName()));
     }
 
     @Override
-    public TableAuthorizationResult hasAccess(RequesterIdentity requesterIdentity, Set<String> tables) {
+    public TableAuthorizationResult verifyAccess(RequesterIdentity requesterIdentity, Set<String> tables) {
       Optional<ZkBasicAuthPrincipal> principalOpt = getPrincipalAuth(requesterIdentity);
       if (!principalOpt.isPresent()) {
         throw new NotAuthorizedException("Basic");
