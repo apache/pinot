@@ -316,6 +316,9 @@ public class ControllerConf extends PinotConfiguration {
   public static final String DISABLE_GROOVY = "controller.disable.ingestion.groovy";
   public static final boolean DEFAULT_DISABLE_GROOVY = true;
 
+  public static final String INSTANCE_POOL_AND_REPLICA_GROUP_CHECK_KEY = "instance.pool.and.replica.group.check";
+  public static final boolean DEFAULT_INSTANCE_POOL_AND_REPLICA_GROUP_CHECK = false;
+
   public ControllerConf() {
     super(new HashMap<>());
   }
@@ -1064,5 +1067,9 @@ public class ControllerConf extends PinotConfiguration {
     String value = getProperty(property, CommonConstants.HTTP_PROTOCOL);
     Preconditions.checkArgument(SUPPORTED_PROTOCOLS.contains(value), "Unsupported %s protocol '%s'", property, value);
     return value;
+  }
+
+  public boolean isInstancePoolAndReplicaGroupCheckEnabled() {
+    return getProperty(INSTANCE_POOL_AND_REPLICA_GROUP_CHECK_KEY, DEFAULT_INSTANCE_POOL_AND_REPLICA_GROUP_CHECK);
   }
 }
