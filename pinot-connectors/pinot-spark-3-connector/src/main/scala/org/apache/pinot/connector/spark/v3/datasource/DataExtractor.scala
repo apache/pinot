@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.connector.spark.datasource
+package org.apache.pinot.connector.spark.v3.datasource
 
 import org.apache.pinot.common.datatable.DataTable
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType
@@ -28,11 +28,12 @@ import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.types.UTF8String
 
 import scala.collection.JavaConverters._
+import scala.util.Try
 
 /**
- * Helper methods for spark-pinot conversions
+ * Helper class for extracting Spark rows from Pinot DataTable.
  */
-private[datasource] object TypeConverter {
+private[pinot] object DataExtractor {
 
   /** Convert a Pinot schema to Spark schema. */
   def pinotSchemaToSparkSchema(schema: Schema): StructType = {
@@ -64,11 +65,21 @@ private[datasource] object TypeConverter {
   /** Convert Pinot DataTable to Seq of InternalRow */
   def pinotDataTableToInternalRows(
       dataTable: DataTable,
-      sparkSchema: StructType): Seq[InternalRow] = {
+      sparkSchema: StructType,
+      failOnInvalidSegments: Boolean): Seq[InternalRow] = {
     val dataTableColumnNames = dataTable.getDataSchema.getColumnNames
     val nullRowIdsByColumn = (0 until dataTable.getDataSchema.size()).map{ col =>
       dataTable.getNullRowIds(col)
     }
+    val numSegmentsPrunedInvalid = dataTable.getMetadata.getOrDefault(
+      DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_INVALID.getName, "0")
+    if (Try(numSegmentsPrunedInvalid.toInt).getOrElse(0) > 0) {
+      if (failOnInvalidSegments) {
+        throw PinotException(s"${numSegmentsPrunedInvalid} segments were pruned as invalid." +
+          s" Failing read operation.")
+      }
+    }
+
     (0 until dataTable.getNumberOfRows).map { rowIndex =>
       // spark schema is used to ensure columns order
       val columns = sparkSchema.fields.map { field =>
@@ -90,10 +101,10 @@ private[datasource] object TypeConverter {
   }
 
   private def readPinotColumnData(
-      dataTable: DataTable,
-      columnDataType: ColumnDataType,
-      rowIndex: Int,
-      colIndex: Int): Any = columnDataType match {
+     dataTable: DataTable,
+     columnDataType: ColumnDataType,
+     rowIndex: Int,
+     colIndex: Int): Any = columnDataType match {
     // single column types
     case ColumnDataType.STRING =>
       UTF8String.fromString(dataTable.getString(rowIndex, colIndex))
@@ -135,5 +146,4 @@ private[datasource] object TypeConverter {
     case _ =>
       throw PinotException(s"'$columnDataType' is not supported")
   }
-
 }
