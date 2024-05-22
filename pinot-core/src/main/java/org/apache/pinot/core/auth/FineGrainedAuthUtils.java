@@ -28,12 +28,17 @@ import javax.ws.rs.core.UriInfo;
 import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
  * Utility methods to share in Broker and Controller request filters related to fine grain authorization.
  */
 public class FineGrainedAuthUtils {
+
+  public static final Logger LOGGER = LoggerFactory.getLogger(FineGrainedAuthUtils.class);
+
   private FineGrainedAuthUtils() {
   }
 
@@ -90,8 +95,8 @@ public class FineGrainedAuthUtils {
 
         if (StringUtils.isEmpty(targetId)) {
           throw new WebApplicationException(
-              "Could not find paramName " + auth.paramName() + " in path or query params of the API: "
-                  + uriInfo.getRequestUri(), Response.Status.INTERNAL_SERVER_ERROR);
+                  "Could not find paramName " + auth.paramName() + " in path or query params of the API: "
+                          + uriInfo.getRequestUri(), Response.Status.INTERNAL_SERVER_ERROR);
         }
 
         // Table name may contain type, hence get raw table name for checking access
@@ -102,12 +107,22 @@ public class FineGrainedAuthUtils {
         accessDeniedMsg = "Access denied to " + auth.action() + " in the cluster";
       } else {
         throw new WebApplicationException(
-            "Unsupported targetType: " + auth.targetType() + " in API: " + uriInfo.getRequestUri(),
-            Response.Status.INTERNAL_SERVER_ERROR);
+                "Unsupported targetType: " + auth.targetType() + " in API: " + uriInfo.getRequestUri(),
+                Response.Status.INTERNAL_SERVER_ERROR);
+      }
+
+      boolean hasAccess;
+      try {
+        hasAccess = accessControl.hasAccess(httpHeaders, auth.targetType(), targetId, auth.action());
+      } catch (Throwable t) {
+        // catch and log Throwable for NoSuchMethodError which can happen when there are classpath conflicts
+        // otherwise, grizzly will return a 500 without any logs or indication of what failed
+        LOGGER.error("Failed to check for access", t);
+        throw new WebApplicationException("Failed to check for access", t, Response.Status.INTERNAL_SERVER_ERROR);
       }
 
       // Check for access now
-      if (!accessControl.hasAccess(httpHeaders, auth.targetType(), targetId, auth.action())) {
+      if (!hasAccess) {
         throw new WebApplicationException(accessDeniedMsg, Response.Status.FORBIDDEN);
       }
     } else if (!accessControl.defaultAccess(httpHeaders)) {
