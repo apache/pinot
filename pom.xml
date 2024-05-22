@@ -164,7 +164,7 @@
     <libthrift.verion>0.18.1</libthrift.verion>
     <log4j.version>2.23.1</log4j.version>
     <slf4j.version>2.0.13</slf4j.version>
-    <netty.version>4.1.109.Final</netty.version>
+    <netty.version>4.1.110.Final</netty.version>
     <reactivestreams.version>1.0.4</reactivestreams.version>
     <jts.version>1.19.0</jts.version>
     <h3.version>4.1.1</h3.version>
