@@ -55,7 +55,7 @@ public class AccessControlBackwardCompatibleTest {
     }
 
     @Override
-    public boolean hasAccess(RequesterIdentity requesterIdentity) {
+    public boolean hasAccess(RequesterIdentity requesterIdentity, Set<String> tables) {
       return false;
     }
   }
