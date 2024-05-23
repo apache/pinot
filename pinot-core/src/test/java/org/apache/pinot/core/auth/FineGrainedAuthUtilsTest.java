@@ -54,7 +54,7 @@ public class FineGrainedAuthUtilsTest {
             FineGrainedAuthUtils.validateFineGrainedAuth(getAnnotatedMethod(), mockUriInfo, mockHttpHeaders, ac);
             Assert.fail("Expected WebApplicationException");
         } catch (WebApplicationException e) {
-            Assert.assertTrue(e.getMessage().contains("Access denied to getCluster in the cluster"), "Unexpected message: " + e.getMessage());
+            Assert.assertTrue(e.getMessage().contains("Access denied to getCluster in the cluster"));
             Assert.assertEquals(e.getResponse().getStatus(), Response.Status.FORBIDDEN.getStatusCode());
         }
     }
