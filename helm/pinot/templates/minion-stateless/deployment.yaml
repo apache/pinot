@@ -79,20 +79,37 @@ spec:
 {{- end }}  
         {{- if .Values.minionStateless.probes.livenessEnabled }}
         livenessProbe:
-          initialDelaySeconds: {{ .Values.probes.initialDelaySeconds }}
-          periodSeconds: {{ .Values.probes.periodSeconds }}
+          initialDelaySeconds: {{ .Values.minionStateless.probes.liveness.initialDelaySeconds | default .Values.probes.initialDelaySeconds }}
+          periodSeconds: {{ .Values.minionStateless.probes.liveness.periodSeconds | default .Values.probes.periodSeconds }}
+          failureThreshold: {{ .Values.minionStateless.probes.liveness.failureThreshold | default .Values.probes.failureThreshold }}
+          successThreshold: {{ .Values.minionStateless.probes.liveness.successThreshold | default .Values.probes.successThreshold }}
+          timeoutSeconds: {{ .Values.minionStateless.probes.liveness.timeoutSeconds | default .Values.probes.timeoutSeconds }}
           httpGet:
             path: {{ .Values.minionStateless.probes.endpoint }}
             port: {{ .Values.minionStateless.service.port }}
         {{- end }}
         {{- if .Values.minionStateless.probes.readinessEnabled }}
         readinessProbe:
-          initialDelaySeconds: {{ .Values.probes.initialDelaySeconds }}
-          periodSeconds: {{ .Values.probes.periodSeconds }}
+          initialDelaySeconds: {{ .Values.minionStateless.probes.readiness.initialDelaySeconds | default .Values.probes.initialDelaySeconds }}
+          periodSeconds: {{ .Values.minionStateless.probes.readiness.periodSeconds | default .Values.probes.periodSeconds }}
+          failureThreshold: {{ .Values.minionStateless.probes.readiness.failureThreshold | default .Values.probes.failureThreshold }}
+          successThreshold: {{ .Values.minionStateless.probes.readiness.successThreshold | default .Values.probes.successThreshold }}
+          timeoutSeconds: {{ .Values.minionStateless.probes.readiness.timeoutSeconds | default .Values.probes.timeoutSeconds }}
           httpGet:
             path: {{ .Values.minionStateless.probes.endpoint }}
             port: {{ .Values.minionStateless.service.port }}
         {{- end }}
+        {{- if .Values.minionStateless.probes.startupEnabled }}
+        startupProbe:
+          initialDelaySeconds: {{ .Values.minionStateless.probes.startup.initialDelaySeconds | default .Values.probes.initialDelaySeconds }}
+          periodSeconds: {{ .Values.minionStateless.probes.startup.periodSeconds | default .Values.probes.periodSeconds }}
+          failureThreshold: {{ .Values.minionStateless.probes.startup.failureThreshold | default .Values.probes.failureThreshold }}
+          successThreshold: {{ .Values.minionStateless.probes.startup.successThreshold | default .Values.probes.successThreshold }}
+          timeoutSeconds: {{ .Values.minionStateless.probes.startup.timeoutSeconds | default .Values.probes.timeoutSeconds }}
+          httpGet:
+            path: {{ .Values.minionStateless.probes.endpoint }}
+            port: {{ .Values.minionStateless.service.port }}
+          {{- end }}
         volumeMounts:
           - name: config
             mountPath: /var/pinot/minion/config
