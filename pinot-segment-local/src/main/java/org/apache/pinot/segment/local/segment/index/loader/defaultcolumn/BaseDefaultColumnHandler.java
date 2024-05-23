@@ -695,22 +695,8 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         }
         case STRING: {
           for (int i = 0; i < numDocs; i++) {
-            Object outputValue = outputValues[i];
-            if (isSingleValue) {
-              if (outputValueType != null && !(outputValue instanceof String)) {
-                outputValues[i] = outputValueType.toString(outputValue);
-              }
-            } else {
-              if (outputValueType == null || outputValue instanceof String) {
-                outputValues[i] = new String[]{(String) outputValue};
-              } else {
-                String[] values = outputValueType.toStringArray(outputValue);
-                if (values.length == 0) {
-                  values = new String[]{(String) fieldSpec.getDefaultNullValue()};
-                }
-                outputValues[i] = values;
-              }
-            }
+            outputValues[i] = getStringOutputValue(outputValues[i], isSingleValue, outputValueType,
+                (String) fieldSpec.getDefaultNullValue());
           }
           StringColumnPreIndexStatsCollector statsCollector =
               new StringColumnPreIndexStatsCollector(column, statsCollectorConfig);
@@ -725,22 +711,8 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         }
         case BYTES: {
           for (int i = 0; i < numDocs; i++) {
-            Object outputValue = outputValues[i];
-            if (isSingleValue) {
-              if (outputValueType != null && !(outputValue instanceof byte[])) {
-                outputValues[i] = outputValueType.toBytes(outputValue);
-              }
-            } else {
-              if (outputValueType == null || outputValue instanceof byte[]) {
-                outputValues[i] = new byte[][]{(byte[]) outputValue};
-              } else {
-                byte[][] values = outputValueType.toBytesArray(outputValue);
-                if (values.length == 0) {
-                  values = new byte[][]{(byte[]) fieldSpec.getDefaultNullValue()};
-                }
-                outputValues[i] = values;
-              }
-            }
+            outputValues[i] = getBytesOutputValue(outputValues[i], isSingleValue, outputValueType,
+                (byte[]) fieldSpec.getDefaultNullValue());
           }
           BytesColumnPredIndexStatsCollector statsCollector =
               new BytesColumnPredIndexStatsCollector(column, statsCollectorConfig);
@@ -974,6 +946,76 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
           }
           return values;
         }
+      }
+    }
+  }
+
+  /**
+   * Helper method to convert the output of a transform function to the appropriate type for an SV or MV
+   * {@link FieldSpec.DataType#STRING} field
+   *
+   * @param outputValue the output of the transform function
+   * @param isSingleValue true if the field (column) is single-valued
+   * @param outputValueType the output value type for the transform function; can be null (in which case,
+   *                        the {@code outputValue} should be the field's default null value)
+   * @param defaultNullValue the default null value for the field
+   * @return the converted output value (either a String or a String[])
+   */
+  private Object getStringOutputValue(Object outputValue, boolean isSingleValue, PinotDataType outputValueType,
+      String defaultNullValue) {
+    if (isSingleValue) {
+      // Skip type conversion if output value is already the required type. If outputValueType is null, that
+      // means the transform function returned null for all docs and in that case outputValue will be the
+      // default null value for the field type
+      if (outputValueType != null && !(outputValue instanceof String)) {
+        return outputValueType.toString(outputValue);
+      } else {
+        return outputValue;
+      }
+    } else {
+      if (outputValueType == null || outputValue instanceof String) {
+        return new String[]{(String) outputValue};
+      } else {
+        String[] values = outputValueType.toStringArray(outputValue);
+        if (values.length == 0) {
+          values = new String[]{defaultNullValue};
+        }
+        return values;
+      }
+    }
+  }
+
+  /**
+   * Helper method to convert the output of a transform function to the appropriate type for an SV or MV
+   * {@link FieldSpec.DataType#BYTES} field
+   *
+   * @param outputValue the output of the transform function
+   * @param isSingleValue true if the field (column) is single-valued
+   * @param outputValueType the output value type for the transform function; can be null (in which case,
+   *                        the {@code outputValue} should be the field's default null value)
+   * @param defaultNullValue the default null value for the field
+   * @return the converted output value (either a byte[] or a byte[][])
+   */
+  private Object getBytesOutputValue(Object outputValue, boolean isSingleValue, PinotDataType outputValueType,
+      byte[] defaultNullValue) {
+    if (isSingleValue) {
+      // Skip type conversion if output value is already the required type. If outputValueType is null, that
+      // means the transform function returned null for all docs and in that case outputValue will be the
+      // default null value for the field type
+      if (outputValueType != null && !(outputValue instanceof byte[])) {
+        return outputValueType.toBytes(outputValue);
+      } else {
+        return outputValue;
+      }
+    } else {
+      if (outputValueType == null || outputValue instanceof byte[]) {
+        return new byte[][]{(byte[]) outputValue};
+      } else {
+        byte[][] values = outputValueType.toBytesArray(outputValue);
+        if (values.length == 0) {
+          values = new byte[][]{defaultNullValue};
+        }
+        return values;
       }
     }
   }
