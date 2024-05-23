@@ -695,22 +695,8 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         }
         case STRING: {
           for (int i = 0; i < numDocs; i++) {
-            Object outputValue = outputValues[i];
-            if (isSingleValue) {
-              if (outputValueType != null && !(outputValue instanceof String)) {
-                outputValues[i] = outputValueType.toString(outputValue);
-              }
-            } else {
-              if (outputValueType == null || outputValue instanceof String) {
-                outputValues[i] = new String[]{(String) outputValue};
-              } else {
-                String[] values = outputValueType.toStringArray(outputValue);
-                if (values.length == 0) {
-                  values = new String[]{(String) fieldSpec.getDefaultNullValue()};
-                }
-                outputValues[i] = values;
-              }
-            }
+            outputValues[i] = getStringOutputValue(outputValues[i], isSingleValue, outputValueType,
+                (String) fieldSpec.getDefaultNullValue());
           }
           StringColumnPreIndexStatsCollector statsCollector =
               new StringColumnPreIndexStatsCollector(column, statsCollectorConfig);
@@ -725,22 +711,8 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         }
         case BYTES: {
           for (int i = 0; i < numDocs; i++) {
-            Object outputValue = outputValues[i];
-            if (isSingleValue) {
-              if (outputValueType != null && !(outputValue instanceof byte[])) {
-                outputValues[i] = outputValueType.toBytes(outputValue);
-              }
-            } else {
-              if (outputValueType == null || outputValue instanceof byte[]) {
-                outputValues[i] = new byte[][]{(byte[]) outputValue};
-              } else {
-                byte[][] values = outputValueType.toBytesArray(outputValue);
-                if (values.length == 0) {
-                  values = new byte[][]{(byte[]) fieldSpec.getDefaultNullValue()};
-                }
-                outputValues[i] = values;
-              }
-            }
+            outputValues[i] = getBytesOutputValue(outputValues[i], isSingleValue, outputValueType,
+                (byte[]) fieldSpec.getDefaultNullValue());
           }
           BytesColumnPredIndexStatsCollector statsCollector =
               new BytesColumnPredIndexStatsCollector(column, statsCollectorConfig);
@@ -790,18 +762,17 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
   private Object getIntOutputValue(Object outputValue, boolean isSingleValue, PinotDataType outputValueType,
       Integer defaultNullValue, boolean dictionary) {
     if (isSingleValue) {
-      // Skip type conversion if output value is already the required type. If outputValueType is null, that
-      // means the transform function returned null for all docs and in that case outputValue will be the
-      // default null value for the field type
-      if (outputValueType != null && !(outputValue instanceof Integer)) {
-        return outputValueType.toInt(outputValue);
-      } else {
+      // Skip type conversion if output value is already the required type. The outputValueType is guaranteed to be
+      // non-null if outputValue is not the default null value
+      if (outputValue instanceof Integer) {
         return outputValue;
+      } else {
+        return outputValueType.toInt(outputValue);
       }
     } else {
       if (dictionary) {
         // Use array of primitive wrapper class for dictionary
-        if (outputValueType == null || outputValue instanceof Integer) {
+        if (outputValue instanceof Integer) {
           return new Integer[]{(Integer) outputValue};
         } else {
           Integer[] values = outputValueType.toIntegerArray(outputValue);
@@ -812,7 +783,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         }
       } else {
         // Use primitive array for raw encoded
-        if (outputValueType == null || outputValue instanceof Integer) {
+        if (outputValue instanceof Integer) {
           return new int[]{(Integer) outputValue};
         } else {
           int[] values = outputValueType.toPrimitiveIntArray(outputValue);
@@ -841,18 +812,17 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
   private Object getLongOutputValue(Object outputValue, boolean isSingleValue, PinotDataType outputValueType,
       Long defaultNullValue, boolean dictionary) {
     if (isSingleValue) {
-      // Skip type conversion if output value is already the required type. If outputValueType is null, that
-      // means the transform function returned null for all docs and in that case outputValue will be the
-      // default null value for the field type
-      if (outputValueType != null && !(outputValue instanceof Long)) {
-        return outputValueType.toLong(outputValue);
-      } else {
+      // Skip type conversion if output value is already the required type. The outputValueType is guaranteed to be
+      // non-null if outputValue is not the default null value
+      if (outputValue instanceof Long) {
         return outputValue;
+      } else {
+        return outputValueType.toLong(outputValue);
       }
     } else {
       if (dictionary) {
         // Use array of primitive wrapper class for dictionary
-        if (outputValueType == null || outputValue instanceof Long) {
+        if (outputValue instanceof Long) {
           return new Long[]{(Long) outputValue};
         } else {
           Long[] values = outputValueType.toLongArray(outputValue);
@@ -863,7 +833,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         }
       } else {
         // Use primitive array for raw encoded
-        if (outputValueType == null || outputValue instanceof Long) {
+        if (outputValue instanceof Long) {
           return new long[]{(Long) outputValue};
         } else {
           long[] values = outputValueType.toPrimitiveLongArray(outputValue);
@@ -892,18 +862,17 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
   private Object getFloatOutputValue(Object outputValue, boolean isSingleValue, PinotDataType outputValueType,
       Float defaultNullValue, boolean dictionary) {
     if (isSingleValue) {
-      // Skip type conversion if output value is already the required type. If outputValueType is null, that
-      // means the transform function returned null for all docs and in that case outputValue will be the
-      // default null value for the field type
-      if (outputValueType != null && !(outputValue instanceof Float)) {
-        return outputValueType.toFloat(outputValue);
-      } else {
+      // Skip type conversion if output value is already the required type. The outputValueType is guaranteed to be
+      // non-null if outputValue is not the default null value
+      if (outputValue instanceof Float) {
         return outputValue;
+      } else {
+        return outputValueType.toFloat(outputValue);
       }
     } else {
       if (dictionary) {
         // Use array of primitive wrapper class for dictionary
-        if (outputValueType == null || outputValue instanceof Float) {
+        if (outputValue instanceof Float) {
           return new Float[]{(Float) outputValue};
         } else {
           Float[] values = outputValueType.toFloatArray(outputValue);
@@ -914,7 +883,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         }
       } else {
         // Use primitive array for raw encoded
-        if (outputValueType == null || outputValue instanceof Float) {
+        if (outputValue instanceof Float) {
           return new float[]{(Float) outputValue};
         } else {
           float[] values = outputValueType.toPrimitiveFloatArray(outputValue);
@@ -938,23 +907,22 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
    * @param defaultNullValue the default null value for the field
    * @param dictionary true if the column has a dictionary. For an MV field, this results in a primitive array being
    *                   returned rather than an array of the primitive wrapper class
-   * @return the converted output value (either a Float, a Float[] or a float[])
+   * @return the converted output value (either a Double, a Double[] or a double[])
    */
   private Object getDoubleOutputValue(Object outputValue, boolean isSingleValue, PinotDataType outputValueType,
       Double defaultNullValue, boolean dictionary) {
     if (isSingleValue) {
-      // Skip type conversion if output value is already the required type. If outputValueType is null, that
-      // means the transform function returned null for all docs and in that case outputValue will be the
-      // default null value for the field type
-      if (outputValueType != null && !(outputValue instanceof Double)) {
-        return outputValueType.toDouble(outputValue);
-      } else {
+      // Skip type conversion if output value is already the required type. The outputValueType is guaranteed to be
+      // non-null if outputValue is not the default null value
+      if (outputValue instanceof Double) {
         return outputValue;
+      } else {
+        return outputValueType.toDouble(outputValue);
       }
     } else {
       if (dictionary) {
         // Use array of primitive wrapper class for dictionary
-        if (outputValueType == null || outputValue instanceof Double) {
+        if (outputValue instanceof Double) {
           return new Double[]{(Double) outputValue};
         } else {
           Double[] values = outputValueType.toDoubleArray(outputValue);
@@ -965,7 +933,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         }
       } else {
         // Use primitive array for raw encoded
-        if (outputValueType == null || outputValue instanceof Double) {
+        if (outputValue instanceof Double) {
           return new double[]{(double) outputValue};
         } else {
           double[] values = outputValueType.toPrimitiveDoubleArray(outputValue);
@@ -974,6 +942,74 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
           }
           return values;
         }
+      }
+    }
+  }
+
+  /**
+   * Helper method to convert the output of a transform function to the appropriate type for an SV or MV
+   * {@link FieldSpec.DataType#STRING} field
+   *
+   * @param outputValue the output of the transform function
+   * @param isSingleValue true if the field (column) is single-valued
+   * @param outputValueType the output value type for the transform function; can be null (in which case,
+   *                        the {@code outputValue} should be the field's default null value)
+   * @param defaultNullValue the default null value for the field
+   * @return the converted output value (either a String or a String[])
+   */
+  private Object getStringOutputValue(Object outputValue, boolean isSingleValue, PinotDataType outputValueType,
+      String defaultNullValue) {
+    if (isSingleValue) {
+      // Skip type conversion if output value is already the required type. The outputValueType is guaranteed to be
+      // non-null if outputValue is not the default null value
+      if (outputValue instanceof String) {
+        return outputValue;
+      } else {
+        return outputValueType.toString(outputValue);
+      }
+    } else {
+      if (outputValue instanceof String) {
+        return new String[]{(String) outputValue};
+      } else {
+        String[] values = outputValueType.toStringArray(outputValue);
+        if (values.length == 0) {
+          values = new String[]{defaultNullValue};
+        }
+        return values;
+      }
+    }
+  }
+
+  /**
+   * Helper method to convert the output of a transform function to the appropriate type for an SV or MV
+   * {@link FieldSpec.DataType#BYTES} field
+   *
+   * @param outputValue the output of the transform function
+   * @param isSingleValue true if the field (column) is single-valued
+   * @param outputValueType the output value type for the transform function; can be null (in which case,
+   *                        the {@code outputValue} should be the field's default null value)
+   * @param defaultNullValue the default null value for the field
+   * @return the converted output value (either a byte[] or a byte[][])
+   */
+  private Object getBytesOutputValue(Object outputValue, boolean isSingleValue, PinotDataType outputValueType,
+      byte[] defaultNullValue) {
+    if (isSingleValue) {
+      // Skip type conversion if output value is already the required type. The outputValueType is guaranteed to be
+      // non-null if outputValue is not the default null value
+      if (outputValue instanceof byte[]) {
+        return outputValue;
+      } else {
+        return outputValueType.toBytes(outputValue);
+      }
+    } else {
+      if (outputValue instanceof byte[]) {
+        return new byte[][]{(byte[]) outputValue};
+      } else {
+        byte[][] values = outputValueType.toBytesArray(outputValue);
+        if (values.length == 0) {
+          values = new byte[][]{defaultNullValue};
+        }
+        return values;
       }
     }
   }
