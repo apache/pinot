@@ -143,6 +143,7 @@ public class SegmentPreProcessorTest {
   private static final String NEW_INT_SV_DIMENSION_COLUMN_NAME = "newIntSVDimension";
   private static final String NEW_STRING_MV_DIMENSION_COLUMN_NAME = "newStringMVDimension";
   private static final String NEW_RAW_STRING_SV_DIMENSION_COLUMN_NAME = "newRawStringSVDimension";
+  private static final String NEW_NULLABLE_STRING_SV_DIMENSION_COLUMN_NAME = "newNullableStringSVDimension";
   private static final String NEW_HLL_BYTE_METRIC_COLUMN_NAME = "newHLLByteMetric";
   private static final String NEW_TDIGEST_BYTE_METRIC_COLUMN_NAME = "newTDigestByteMetric";
 
@@ -1105,7 +1106,10 @@ public class SegmentPreProcessorTest {
     ingestionConfig.setTransformConfigs(
         ImmutableList.of(
             new TransformConfig(NEW_INT_SV_DIMENSION_COLUMN_NAME, "plus(column1, 1)"),
-            new TransformConfig(NEW_RAW_STRING_SV_DIMENSION_COLUMN_NAME, "reverse(column3)")
+            new TransformConfig(NEW_RAW_STRING_SV_DIMENSION_COLUMN_NAME, "reverse(column3)"),
+            // Ensure that null values for derived columns are handled appropriately during segment reload
+            new TransformConfig(NEW_NULLABLE_STRING_SV_DIMENSION_COLUMN_NAME,
+                "json_path_string(column21, 'non-existent-path', null)")
         ));
     _tableConfig.setIngestionConfig(ingestionConfig);
     _indexLoadingConfig.addInvertedIndexColumns(NEW_COLUMN_INVERTED_INDEX);
@@ -1156,7 +1160,10 @@ public class SegmentPreProcessorTest {
     ingestionConfig.setTransformConfigs(
         ImmutableList.of(
             new TransformConfig(NEW_INT_SV_DIMENSION_COLUMN_NAME, "plus(column1, 1)"),
-            new TransformConfig(NEW_RAW_STRING_SV_DIMENSION_COLUMN_NAME, "reverse(column3)")
+            new TransformConfig(NEW_RAW_STRING_SV_DIMENSION_COLUMN_NAME, "reverse(column3)"),
+            // Ensure that null values for derived columns are handled appropriately during segment reload
+            new TransformConfig(NEW_NULLABLE_STRING_SV_DIMENSION_COLUMN_NAME,
+                "json_path_string(column21, 'non-existent-path', null)")
         ));
     _tableConfig.setIngestionConfig(ingestionConfig);
     _indexLoadingConfig.addInvertedIndexColumns(NEW_COLUMN_INVERTED_INDEX);
@@ -1276,6 +1283,10 @@ public class SegmentPreProcessorTest {
     assertEquals(columnMetadata.getBitsPerElement(), originalColumnMetadata.getBitsPerElement());
     assertEquals(columnMetadata.getTotalNumberOfEntries(), originalColumnMetadata.getTotalNumberOfEntries());
 
+    columnMetadata = segmentMetadata.getColumnMetadataFor(NEW_NULLABLE_STRING_SV_DIMENSION_COLUMN_NAME);
+    // All the values should be the default null value
+    assertEquals(columnMetadata.getCardinality(), 1);
+
     // Check dictionary and forward index exist.
     try (SegmentDirectory segmentDirectory = SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader()
         .load(_indexDir.toURI(),
@@ -1298,6 +1309,10 @@ public class SegmentPreProcessorTest {
       // Dictionary shouldn't be created for raw derived column
       assertFalse(reader.hasIndexFor(NEW_RAW_STRING_SV_DIMENSION_COLUMN_NAME, StandardIndexes.dictionary()));
       assertTrue(reader.hasIndexFor(NEW_RAW_STRING_SV_DIMENSION_COLUMN_NAME, StandardIndexes.forward()));
+      // Null vector index should be created for derived column with null values
+      assertTrue(reader.hasIndexFor(NEW_NULLABLE_STRING_SV_DIMENSION_COLUMN_NAME, StandardIndexes.nullValueVector()));
+      assertTrue(reader.hasIndexFor(NEW_NULLABLE_STRING_SV_DIMENSION_COLUMN_NAME, StandardIndexes.forward()));
+      assertTrue(reader.hasIndexFor(NEW_NULLABLE_STRING_SV_DIMENSION_COLUMN_NAME, StandardIndexes.dictionary()));
 
       assertTrue(reader.hasIndexFor(NEW_INT_METRIC_COLUMN_NAME, StandardIndexes.nullValueVector()));
       assertTrue(reader.hasIndexFor(NEW_LONG_METRIC_COLUMN_NAME, StandardIndexes.nullValueVector()));
