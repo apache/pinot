@@ -38,7 +38,7 @@ public class FineGrainedAuthUtilsTest {
         UriInfo mockUriInfo = Mockito.mock(UriInfo.class);
         HttpHeaders mockHttpHeaders = Mockito.mock(HttpHeaders.class);
 
-        FineGrainedAuthUtils.validateFineGrainedAuth(getClusterMethod(), mockUriInfo, mockHttpHeaders, ac);
+        FineGrainedAuthUtils.validateFineGrainedAuth(getAnnotatedMethod(), mockUriInfo, mockHttpHeaders, ac);
     }
 
     @Test
@@ -51,10 +51,10 @@ public class FineGrainedAuthUtilsTest {
         HttpHeaders mockHttpHeaders = Mockito.mock(HttpHeaders.class);
 
         try {
-            FineGrainedAuthUtils.validateFineGrainedAuth(getClusterMethod(), mockUriInfo, mockHttpHeaders, ac);
+            FineGrainedAuthUtils.validateFineGrainedAuth(getAnnotatedMethod(), mockUriInfo, mockHttpHeaders, ac);
             Assert.fail("Expected WebApplicationException");
         } catch (WebApplicationException e) {
-            Assert.assertTrue(e.getMessage().contains("Access denied to testAction in the cluster"));
+            Assert.assertTrue(e.getMessage().contains("Access denied to getCluster in the cluster"), "Unexpected message: " + e.getMessage());
             Assert.assertEquals(e.getResponse().getStatus(), Response.Status.FORBIDDEN.getStatusCode());
         }
     }
@@ -69,7 +69,7 @@ public class FineGrainedAuthUtilsTest {
         HttpHeaders mockHttpHeaders = Mockito.mock(HttpHeaders.class);
 
         try {
-            FineGrainedAuthUtils.validateFineGrainedAuth(getClusterMethod(), mockUriInfo, mockHttpHeaders, ac);
+            FineGrainedAuthUtils.validateFineGrainedAuth(getAnnotatedMethod(), mockUriInfo, mockHttpHeaders, ac);
             Assert.fail("Expected WebApplicationException");
         } catch (WebApplicationException e) {
             Assert.assertTrue(e.getMessage().contains("Failed to check for access"));
@@ -77,10 +77,16 @@ public class FineGrainedAuthUtilsTest {
         }
     }
 
-    private Method getClusterMethod() {
-        return new Object() {
-            @Authorize(targetType = TargetType.CLUSTER, action = "testAction")
-            void getClusterMethod() { }
-        }.getClass().getDeclaredMethods()[0];
+    static class TestResource {
+        @Authorize(targetType = TargetType.CLUSTER, action = "getCluster")
+        void getCluster() { }
+    }
+
+    private Method getAnnotatedMethod() {
+        try {
+            return TestResource.class.getDeclaredMethod("getCluster");
+        } catch (NoSuchMethodException e) {
+            throw new RuntimeException(e);
+        }
     }
 }
