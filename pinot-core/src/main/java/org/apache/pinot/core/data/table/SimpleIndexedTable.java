@@ -32,7 +32,12 @@ public class SimpleIndexedTable extends IndexedTable {
 
   public SimpleIndexedTable(DataSchema dataSchema, QueryContext queryContext, int resultSize, int trimSize,
       int trimThreshold) {
-    super(dataSchema, queryContext, resultSize, trimSize, trimThreshold, new HashMap<>());
+    this(dataSchema, false, queryContext, resultSize, trimSize, trimThreshold);
+  }
+
+  public SimpleIndexedTable(DataSchema dataSchema, boolean hasFinalInput, QueryContext queryContext, int resultSize,
+      int trimSize, int trimThreshold) {
+    super(dataSchema, hasFinalInput, queryContext, resultSize, trimSize, trimThreshold, new HashMap<>());
   }
 
   /**

@@ -239,10 +239,12 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
     }
 
     IndexedTable indexedTable = _indexedTable;
-    if (!_queryContext.isServerReturnFinalResult()) {
-      indexedTable.finish(false);
-    } else {
+    if (_queryContext.isServerReturnFinalResult()) {
       indexedTable.finish(true, true);
+    } else if (_queryContext.isServerReturnFinalResultKeyUnpartitioned()) {
+      indexedTable.finish(false, true);
+    } else {
+      indexedTable.finish(false);
     }
     GroupByResultsBlock mergedBlock = new GroupByResultsBlock(indexedTable, _queryContext);
     mergedBlock.setNumGroupsLimitReached(_numGroupsLimitReached);

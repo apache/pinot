@@ -292,6 +292,11 @@ public class FunnelMaxStepAggregationFunction
   }
 
   @Override
+  public Long mergeFinalResult(Long finalResult1, Long finalResult2) {
+    return Math.max(finalResult1, finalResult2);
+  }
+
+  @Override
   public String toExplainString() {
     return "WindowFunnelAggregationFunction{"
         + "_timestampExpression=" + _timestampExpression
