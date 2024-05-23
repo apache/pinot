@@ -325,7 +325,7 @@ public class IngestionDelayTracker {
     // Not protected as this will only be invoked when metric is installed which happens after server ready
     IngestionTimestamps currentMeasure = _partitionToIngestionTimestampsMap.get(partitionGroupId);
     if (currentMeasure == null) { // Guard just in case we read the metric without initializing it
-      return 0;
+      return Long.MIN_VALUE;
     }
     return currentMeasure._ingestionTimeMs;
   }

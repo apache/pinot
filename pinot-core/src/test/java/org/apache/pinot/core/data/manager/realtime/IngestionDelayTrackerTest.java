@@ -55,13 +55,13 @@ public class IngestionDelayTrackerTest {
     ingestionDelayTracker.setClock(clock);
 
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionDelayMs(0), 0);
-    Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionTimeMs(0), 0);
+    Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionTimeMs(0), Long.MIN_VALUE);
     ingestionDelayTracker.shutdown();
     // Test constructor with timer arguments
     ingestionDelayTracker = new IngestionDelayTracker(_serverMetrics, REALTIME_TABLE_NAME, _realtimeTableDataManager,
         TIMER_THREAD_TICK_INTERVAL_MS, () -> true);
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionDelayMs(0), 0);
-    Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionTimeMs(0), 0);
+    Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionTimeMs(0), Long.MIN_VALUE);
     // Test bad timer args to the constructor
     try {
       new IngestionDelayTracker(_serverMetrics, REALTIME_TABLE_NAME, _realtimeTableDataManager,
@@ -224,7 +224,7 @@ public class IngestionDelayTrackerTest {
       Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionDelayMs(partitionGroupId), 0);
       Assert.assertEquals(ingestionDelayTracker.getPartitionEndToEndIngestionDelayMs(partitionGroupId), 0);
       Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionTimeMs(
-          partitionGroupId), 0);
+          partitionGroupId), Long.MIN_VALUE);
     }
   }
 
