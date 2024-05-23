@@ -919,18 +919,16 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   }
 
   /**
-   * Checks if the begin offset of the stream partition has been fast-forwarded.
-   * batchFirstOffset should be less than or equal to startOffset.
-   * If batchFirstOffset is greater, then some messages were not received.
+   * Checks and reports if the consumer is going through data loss.
    *
    * @param messageBatch Message batch to validate
    */
   private void reportDataLoss(MessageBatch messageBatch) {
     if (messageBatch.hasDataLoss()) {
       _serverMetrics.addMeteredTableValue(_tableStreamName, ServerMeter.STREAM_DATA_LOSS, 1L);
-      String message =
-          "Message loss detected in stream partition: " + _partitionGroupId + " for table: " + _tableNameWithType
-              + " startOffset: " + _startOffset + " batchFirstOffset: " + messageBatch.getFirstMessageOffset();
+      String message = String.format("Message loss detected in stream partition: %s for table: %s startOffset: %s "
+              + "batchFirstOffset: %s", _partitionGroupId, _tableNameWithType, _startOffset,
+          messageBatch.getFirstMessageOffset());
       _segmentLogger.error(message);
       _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(), message, null));
     }
