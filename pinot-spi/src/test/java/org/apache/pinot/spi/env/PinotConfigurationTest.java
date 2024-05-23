@@ -187,6 +187,39 @@ public class PinotConfigurationTest {
     Assert.assertEquals(configuration.getProperty("pinot.controller.host"), "test-host");
   }
 
+  @Test
+  public void assertHandlesDuplicateRelaxedKeys()
+      throws IOException {
+    Map<String, Object> baseProperties = new HashMap<>();
+    Map<String, String> mockedEnvironmentVariables = new HashMap<>();
+
+    String configFile = File.createTempFile("pinot-configuration-test-4", ".properties").getAbsolutePath();
+
+    baseProperties.put("server.host", "ENV_SERVER_HOST");
+    baseProperties.put("dynamic.env.config", "server.host");
+
+    mockedEnvironmentVariables.put("ENV_SERVER_HOST", "test-server-host-1");
+    mockedEnvironmentVariables.put("ENV.SERVER.HOST", "test-server-host-2");
+    mockedEnvironmentVariables.put("ENV.SERVER_HOST", "test-server-host-3");
+    mockedEnvironmentVariables.put("ENV_SERVER.HOST", "test-server-host-4");
+
+    mockedEnvironmentVariables.put("ENV_VAR_HOST", "test-host-1");
+    mockedEnvironmentVariables.put("ENV.VAR_HOST", "test-host-2");
+    mockedEnvironmentVariables.put("env_var_host", "test-host-3");
+    mockedEnvironmentVariables.put("env_var.host", "test-host-4");
+
+    // config.paths sorts before config_paths, so we should get the right config
+    mockedEnvironmentVariables.put("config.paths", "classpath:/pinot-configuration-4.properties");
+    mockedEnvironmentVariables.put("config_paths", "classpath:/does-not-exist-configuration.properties");
+    copyClasspathResource("/pinot-configuration-4.properties", configFile);
+
+    PinotConfiguration configuration = new PinotConfiguration(baseProperties, mockedEnvironmentVariables);
+
+    // These are taken from raw and not relaxed values
+    Assert.assertEquals(configuration.getProperty("server.host"), "test-server-host-1");
+    Assert.assertEquals(configuration.getProperty("pinot.controller.host"), "test-host-1");
+  }
+
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void assertInvalidConfigPathBehavior() {
     Map<String, Object> baseProperties = new HashMap<>();

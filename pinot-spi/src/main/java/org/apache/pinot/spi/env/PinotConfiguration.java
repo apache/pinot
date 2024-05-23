@@ -231,7 +231,15 @@ public class PinotConfiguration {
 
   private static Map<String, String> relaxEnvironmentVariables(Map<String, String> environmentVariables) {
     return environmentVariables.entrySet().stream()
-        .collect(Collectors.toMap(PinotConfiguration::relaxEnvVarName, Entry::getValue));
+        // Sort by key to ensure choosing a consistent env var if there are collisions
+        .sorted(Entry.comparingByKey())
+        .collect(Collectors.toMap(
+            PinotConfiguration::relaxEnvVarName,
+            Entry::getValue,
+            // Nothing prevents users from setting env variables like foo_bar and foo.bar
+            // This should not prevent Pinot from starting.
+            (existingValue, newValue) -> existingValue
+        ));
   }
 
   private static String relaxEnvVarName(Entry<String, String> envVarEntry) {
