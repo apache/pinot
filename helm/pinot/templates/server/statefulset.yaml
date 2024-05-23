@@ -94,11 +94,7 @@ spec:
           successThreshold: {{ .Values.server.probes.liveness.successThreshold | default .Values.probes.successThreshold }}
           timeoutSeconds: {{ .Values.server.probes.liveness.timeoutSeconds | default .Values.probes.timeoutSeconds }}
           httpGet:
-            {{- if and .Values.server.probes.livenessProbe .Values.server.probes.livenessProbe.endpoint}}
-            path: {{ .Values.server.probes.livenessProbe.endpoint }}
-            {{- else }}
-            path: {{ .Values.server.probes.endpoint }}
-            {{- end }}
+            path: {{ .Values.server.probes.liveness.endpoint | default .Values.server.probes.endpoint }}
             port: {{ .Values.server.service.adminPort }}
         {{- end }}
         {{- if .Values.server.probes.readinessEnabled }}
@@ -109,11 +105,7 @@ spec:
           successThreshold: {{ .Values.server.probes.readiness.successThreshold | default .Values.probes.successThreshold }}
           timeoutSeconds: {{ .Values.server.probes.readiness.timeoutSeconds | default .Values.probes.timeoutSeconds }}
           httpGet:
-            {{- if and .Values.server.probes.readinessProbe .Values.server.probes.readinessProbe.endpoint}}
-            path: {{ .Values.server.probes.readinessProbe.endpoint }}
-            {{- else }}
-            path: {{ .Values.server.probes.endpoint }}
-            {{- end }}
+            path: {{ .Values.server.probes.readiness.endpoint | default .Values.server.probes.endpoint }}
             port: {{ .Values.server.service.adminPort }}
         {{- end }}
         {{- if .Values.server.probes.startupEnabled }}
@@ -124,11 +116,7 @@ spec:
           successThreshold: {{ .Values.server.probes.startup.successThreshold | default .Values.probes.successThreshold }}
           timeoutSeconds: {{ .Values.server.probes.startup.timeoutSeconds | default .Values.probes.timeoutSeconds }}
           httpGet:
-            {{- if and .Values.server.probes.livenessProbe .Values.server.probes.livenessProbe.endpoint}}
-            path: {{ .Values.server.probes.livenessProbe.endpoint }}
-            {{- else }}
-            path: {{ .Values.server.probes.endpoint }}
-            {{- end }}
+            path: {{ .Values.server.probes.liveness.endpoint | default .Values.server.probes.endpoint }}
             port: {{ .Values.server.service.adminPort }}
         {{- end }}
         volumeMounts:

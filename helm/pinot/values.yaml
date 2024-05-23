@@ -370,6 +370,7 @@ server:
     readinessEnabled: false
     startupEnabled: false
     liveness:
+      endpoint: "/health/liveness"
       initialDelaySeconds: 60
       failureThreshold: 10
       timeoutSeconds: 10
@@ -377,6 +378,7 @@ server:
       periodSeconds: 10
 
     readiness:
+      endpoint: "/health/readiness"
       initialDelaySeconds: 60
       failureThreshold: 10
       timeoutSeconds: 10
@@ -384,6 +386,7 @@ server:
       periodSeconds: 10
 
     startup:
+      endpoint: "/health/liveness"
       initialDelaySeconds: 60
       failureThreshold: 10
       timeoutSeconds: 10
