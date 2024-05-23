@@ -19,8 +19,11 @@
 package org.apache.pinot.spi.env;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import org.apache.commons.configuration2.PropertiesConfiguration;
+import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -29,6 +32,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
@@ -118,5 +122,45 @@ public class CommonsConfigurationUtilsTest {
     recoveredValue = CommonsConfigurationUtils.recoverSpecialCharacterInPropertyValue(
         (String) configuration.getProperty(PROPERTY_KEY));
     assertEquals(recoveredValue, value);
+  }
+
+  @Test
+  public void testPropertiesConfigurationFromFile()
+      throws ConfigurationException {
+    PropertiesConfiguration configuration = CommonsConfigurationUtils.fromFile(null, false, true);
+    assertNotNull(configuration);
+    configuration.setProperty("Test Key", "Test Value");
+    CommonsConfigurationUtils.saveToFile(configuration, CONFIG_FILE);
+
+    configuration = CommonsConfigurationUtils.fromFile(CONFIG_FILE, false, true);
+    assertNotNull(configuration);
+    assertEquals(configuration.getProperty("Test Key"), "Test Value");
+  }
+
+  @Test
+  public void testPropertiesConfigurationFromPath()
+      throws ConfigurationException {
+    PropertiesConfiguration configuration = CommonsConfigurationUtils.fromPath(null, false, true);
+    assertNotNull(configuration);
+    configuration.setProperty("Test Key", "Test Value");
+    CommonsConfigurationUtils.saveToFile(configuration, CONFIG_FILE);
+
+    configuration = CommonsConfigurationUtils.fromPath(CONFIG_FILE.getPath(), false, true);
+    assertNotNull(configuration);
+    assertEquals(configuration.getProperty("Test Key"), "Test Value");
+  }
+
+  @Test
+  public void testPropertiesConfigurationFromInputStream()
+      throws ConfigurationException, FileNotFoundException {
+    PropertiesConfiguration configuration = CommonsConfigurationUtils.fromInputStream(null, false, true);
+    assertNotNull(configuration);
+    configuration.setProperty("Test Key", "Test Value");
+    CommonsConfigurationUtils.saveToFile(configuration, CONFIG_FILE);
+
+    FileInputStream inputStream = new FileInputStream(CONFIG_FILE);
+    configuration = CommonsConfigurationUtils.fromInputStream(inputStream, false, true);
+    assertNotNull(configuration);
+    assertEquals(configuration.getProperty("Test Key"), "Test Value");
   }
 }
