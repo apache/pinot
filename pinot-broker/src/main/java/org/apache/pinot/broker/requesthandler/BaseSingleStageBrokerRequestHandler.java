@@ -368,10 +368,10 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       BrokerRequest brokerRequest = CalciteSqlCompiler.convertToBrokerRequest(pinotQuery);
       BrokerRequest serverBrokerRequest =
           serverPinotQuery == pinotQuery ? brokerRequest : CalciteSqlCompiler.convertToBrokerRequest(serverPinotQuery);
-      AuthorizationResult authorizationResult = accessControl.verifyAccess(requesterIdentity, serverBrokerRequest);
+      AuthorizationResult authorizationResult = accessControl.authorize(requesterIdentity, serverBrokerRequest);
       if (authorizationResult.hasAccess()) {
         authorizationResult = BasicAuthorizationResultImpl.joinResults(authorizationResult,
-            accessControl.verifyAccess(httpHeaders, TargetType.TABLE, tableName, Actions.Table.QUERY));
+            accessControl.authorize(httpHeaders, TargetType.TABLE, tableName, Actions.Table.QUERY));
       }
 
       _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.AUTHORIZATION,

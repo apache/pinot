@@ -52,7 +52,6 @@ public interface AccessControl extends FineGrainedAccessControl {
    *
    * @return {@code true} if authorized, {@code false} otherwise
    */
-
   default boolean hasAccess(RequesterIdentity requesterIdentity, BrokerRequest brokerRequest) {
     return true;
   }
@@ -67,7 +66,7 @@ public interface AccessControl extends FineGrainedAccessControl {
    *
    * @return {@code AuthorizationResult} with the result of the access control check
    */
-  default AuthorizationResult verifyAccess(RequesterIdentity requesterIdentity, BrokerRequest brokerRequest) {
+  default AuthorizationResult authorize(RequesterIdentity requesterIdentity, BrokerRequest brokerRequest) {
     return new BasicAuthorizationResultImpl(hasAccess(requesterIdentity, brokerRequest));
   }
 
@@ -80,7 +79,6 @@ public interface AccessControl extends FineGrainedAccessControl {
    *
    * @return {@code true} if authorized, {@code false} otherwise
    */
-
   default boolean hasAccess(RequesterIdentity requesterIdentity, Set<String> tables) {
     return true;
   }
@@ -95,7 +93,7 @@ public interface AccessControl extends FineGrainedAccessControl {
    *
    * @return {@code TableAuthorizationResult} with the result of the access control check
    */
-  default TableAuthorizationResult verifyAccess(RequesterIdentity requesterIdentity, Set<String> tables) {
+  default TableAuthorizationResult authorize(RequesterIdentity requesterIdentity, Set<String> tables) {
     // Taking all tables when hasAccess Failed , to not break existing implementations
     // It will say all tables names failed AuthZ even only some failed AuthZ - which is same as just boolean output
     return new TableAuthorizationResult(hasAccess(requesterIdentity, tables) ? new HashSet<>() : tables);

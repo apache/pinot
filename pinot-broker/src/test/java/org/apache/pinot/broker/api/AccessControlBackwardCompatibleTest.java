@@ -34,7 +34,7 @@ public class AccessControlBackwardCompatibleTest {
     AccessControl accessControl = new AllFalseAccessControlImpl();
     HttpRequesterIdentity identity = new HttpRequesterIdentity();
     BrokerRequest request = new BrokerRequest();
-    assertFalse(accessControl.verifyAccess(identity, request).hasAccess());
+    assertFalse(accessControl.authorize(identity, request).hasAccess());
   }
 
   @Test
@@ -42,7 +42,7 @@ public class AccessControlBackwardCompatibleTest {
     AccessControl accessControl = new AllFalseAccessControlImpl();
     HttpRequesterIdentity identity = new HttpRequesterIdentity();
     Set<String> tables = Set.of("table1", "table2");
-    AuthorizationResult result = accessControl.verifyAccess(identity, tables);
+    AuthorizationResult result = accessControl.authorize(identity, tables);
     assertFalse(result.hasAccess());
     assertEquals(result.getFailureMessage(), "Authorization Failed for tables: table1, table2,");
   }

@@ -51,7 +51,7 @@ public interface FineGrainedAccessControl {
    * @param action type to validate
    * @return An AuthorizationResult object, encapsulating whether the access is granted or not.
    */
-  default AuthorizationResult verifyAccess(HttpHeaders httpHeaders, TargetType targetType, String targetId,
+  default AuthorizationResult authorize(HttpHeaders httpHeaders, TargetType targetType, String targetId,
       String action) {
     return new BasicAuthorizationResultImpl(hasAccess(httpHeaders, targetType, targetId, action));
   }

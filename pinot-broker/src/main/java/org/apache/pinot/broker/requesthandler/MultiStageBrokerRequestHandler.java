@@ -282,7 +282,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     final long startTimeNs = System.nanoTime();
     AccessControl accessControl = _accessControlFactory.create();
 
-    TableAuthorizationResult tableAuthorizationResult = accessControl.verifyAccess(requesterIdentity, tableNames);
+    TableAuthorizationResult tableAuthorizationResult = accessControl.authorize(requesterIdentity, tableNames);
 
     tableNames.stream()
         .filter(table -> !accessControl.hasAccess(httpHeaders, TargetType.TABLE, table, Actions.Table.QUERY))
