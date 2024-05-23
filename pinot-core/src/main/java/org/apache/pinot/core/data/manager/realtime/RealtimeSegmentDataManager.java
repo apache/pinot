@@ -468,10 +468,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         throw t;
       }
 
-      StreamPartitionMsgOffset batchFirstOffset = messageBatch.getFirstMessageOffset();
-      if (batchFirstOffset != null) {
-        validateStartOffset(_currentOffset, batchFirstOffset);
-      }
+      reportDataLoss(messageBatch);
 
       boolean endCriteriaReached = processStreamEvents(messageBatch, idlePipeSleepTimeMillis);
 
@@ -922,18 +919,16 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   }
 
   /**
-   * Checks if the begin offset of the stream partition has been fast-forwarded.
-   * batchFirstOffset should be less than or equal to startOffset.
-   * If batchFirstOffset is greater, then some messages were not received.
+   * Checks and reports if the consumer is going through data loss.
    *
-   * @param startOffset The offset of the first message desired, inclusive.
-   * @param batchFirstOffset The offset of the first message in the batch.
+   * @param messageBatch Message batch to validate
    */
-  private void validateStartOffset(StreamPartitionMsgOffset startOffset, StreamPartitionMsgOffset batchFirstOffset) {
-    if (batchFirstOffset.compareTo(startOffset) > 0) {
+  private void reportDataLoss(MessageBatch messageBatch) {
+    if (messageBatch.hasDataLoss()) {
       _serverMetrics.addMeteredTableValue(_tableStreamName, ServerMeter.STREAM_DATA_LOSS, 1L);
-      String message =
-          "startOffset(" + startOffset + ") is older than topic's beginning offset(" + batchFirstOffset + ")";
+      String message = String.format("Message loss detected in stream partition: %s for table: %s startOffset: %s "
+              + "batchFirstOffset: %s", _partitionGroupId, _tableNameWithType, _startOffset,
+          messageBatch.getFirstMessageOffset());
       _segmentLogger.error(message);
       _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(), message, null));
     }

@@ -66,7 +66,6 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
     KinesisPartitionGroupOffset startOffset = (KinesisPartitionGroupOffset) startMsgOffset;
     String shardId = startOffset.getShardId();
     String startSequenceNumber = startOffset.getSequenceNumber();
-
     // Get the shard iterator
     String shardIterator;
     if (startSequenceNumber.equals(_nextStartSequenceNumber)) {
