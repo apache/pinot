@@ -52,6 +52,7 @@ public interface AccessControl extends FineGrainedAccessControl {
    *
    * @return {@code true} if authorized, {@code false} otherwise
    */
+  @Deprecated
   default boolean hasAccess(RequesterIdentity requesterIdentity, BrokerRequest brokerRequest) {
     return true;
   }
@@ -79,6 +80,7 @@ public interface AccessControl extends FineGrainedAccessControl {
    *
    * @return {@code true} if authorized, {@code false} otherwise
    */
+  @Deprecated
   default boolean hasAccess(RequesterIdentity requesterIdentity, Set<String> tables) {
     return true;
   }
