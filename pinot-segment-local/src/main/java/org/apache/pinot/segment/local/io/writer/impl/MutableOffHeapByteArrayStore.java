@@ -178,7 +178,9 @@ public class MutableOffHeapByteArrayStore implements Closeable {
       int numArrays, int avgArrayLen) {
     _memoryManager = memoryManager;
     _allocationContext = allocationContext;
-    _startSize = numArrays * (avgArrayLen + 4); // For each array, we store the array and its startoffset (4 bytes)
+    int estimatedSize =
+        numArrays * (avgArrayLen + 4); // For each array, we store the array and its startoffset (4 bytes)
+    _startSize = estimatedSize > 0 ? estimatedSize : Integer.MAX_VALUE;
     expand(_startSize);
   }
 

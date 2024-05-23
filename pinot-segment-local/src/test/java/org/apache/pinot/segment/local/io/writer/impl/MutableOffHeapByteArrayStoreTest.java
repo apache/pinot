@@ -57,6 +57,14 @@ public class MutableOffHeapByteArrayStoreTest {
   }
 
   @Test
+  public void startSizeOverflowTest()
+      throws Exception {
+    MutableOffHeapByteArrayStore store =
+        new MutableOffHeapByteArrayStore(_memoryManager, "stringColumn", 3, 1024 * 1024 * 1024);
+    store.close();
+  }
+
+  @Test
   public void overflowTest()
       throws Exception {
     MutableOffHeapByteArrayStore store = new MutableOffHeapByteArrayStore(_memoryManager, "stringColumn", 1024, 32);
