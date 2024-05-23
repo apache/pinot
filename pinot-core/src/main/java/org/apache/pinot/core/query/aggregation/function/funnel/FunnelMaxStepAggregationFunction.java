@@ -226,6 +226,13 @@ public class FunnelMaxStepAggregationFunction
     return finalMaxStep;
   }
 
+  /**
+   * Fill the sliding window with the events that fall into the window.
+   * Note that the events from stepEvents are dequeued and added to the sliding window.
+   * This method ensure the first event from the sliding window is the first step event.
+   * @param stepEvents The priority queue of step events
+   * @param slidingWindow The sliding window with events that fall into the window
+   */
   private void fillWindow(PriorityQueue<FunnelStepEvent> stepEvents, ArrayDeque<FunnelStepEvent> slidingWindow) {
     // Ensure for the sliding window, the first event is the first step
     while ((!slidingWindow.isEmpty()) && slidingWindow.peek().getStep() != 0) {
@@ -241,8 +248,8 @@ public class FunnelMaxStepAggregationFunction
       slidingWindow.addLast(stepEvents.poll());
     }
     // SlidingWindow is not empty
-    final long windowStart = slidingWindow.peek().getTimestamp();
-    final long windowEnd = windowStart + _windowSize;
+    long windowStart = slidingWindow.peek().getTimestamp();
+    long windowEnd = windowStart + _windowSize;
     while (!stepEvents.isEmpty() && (stepEvents.peek().getTimestamp() < windowEnd)) {
       slidingWindow.addLast(stepEvents.poll());
     }
