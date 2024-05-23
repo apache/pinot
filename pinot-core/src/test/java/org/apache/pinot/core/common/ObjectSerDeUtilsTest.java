@@ -37,6 +37,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.PriorityQueue;
 import java.util.Random;
 import org.apache.commons.lang.RandomStringUtils;
 import org.apache.datasketches.cpc.CpcSketch;
@@ -49,6 +50,7 @@ import org.apache.datasketches.tuple.aninteger.IntegerSummary;
 import org.apache.datasketches.tuple.aninteger.IntegerSummarySetOperations;
 import org.apache.pinot.core.query.aggregation.function.PercentileEstAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.PercentileTDigestAggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.funnel.FunnelStepEvent;
 import org.apache.pinot.segment.local.customobject.AvgPair;
 import org.apache.pinot.segment.local.customobject.CpcSketchAccumulator;
 import org.apache.pinot.segment.local.customobject.DoubleLongPair;
@@ -591,6 +593,23 @@ public class ObjectSerDeUtilsTest {
           ObjectSerDeUtils.deserialize(bytes, ObjectSerDeUtils.ObjectType.OrderedStringSet);
       for (int j = 0; j < size; j++) {
         assertEquals(actual.get(j), expected.get(j), ERROR_MESSAGE);
+      }
+    }
+  }
+
+  @Test
+  public void testFunnelStepEventAccumulator() {
+    for (int i = 0; i < NUM_ITERATIONS; i++) {
+      int size = RANDOM.nextInt(1000);
+      PriorityQueue<FunnelStepEvent> expected = new PriorityQueue<FunnelStepEvent>();
+      for (int j = 0; j < size; j++) {
+        expected.add(new FunnelStepEvent(RANDOM.nextLong(), RANDOM.nextInt()));
+      }
+      byte[] bytes = ObjectSerDeUtils.serialize(expected);
+      PriorityQueue<FunnelStepEvent> actual =
+          ObjectSerDeUtils.deserialize(bytes, ObjectSerDeUtils.ObjectType.FunnelStepEventAccumulator);
+      while (!actual.isEmpty()) {
+        assertEquals(actual.poll(), expected.poll(), ERROR_MESSAGE);
       }
     }
   }

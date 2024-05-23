@@ -327,6 +327,8 @@ public enum AggregationFunctionType {
           ordinal -> ordinal > 1), ReturnTypes.VARCHAR, ReturnTypes.explicit(SqlTypeName.OTHER)),
 
   // funnel aggregate functions
+  FUNNELMAXSTEP("funnelMaxStep", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
+      OperandTypes.VARIADIC, ReturnTypes.BIGINT, ReturnTypes.explicit(SqlTypeName.OTHER)),
   // TODO: revisit support for funnel count in V2
   FUNNELCOUNT("funnelCount");
 
