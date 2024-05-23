@@ -652,15 +652,15 @@ public class TablesResource {
       segmentDataManagers = tableDataManager.acquireAllSegments();
     } else {
       segmentDataManagers = tableDataManager.acquireSegments(segments, missingSegments);
+    }
+    try {
       if (!missingSegments.isEmpty()) {
         throw new WebApplicationException(
             String.format("Table %s has missing segments: %s)", tableNameWithType, segments),
             Response.Status.NOT_FOUND);
       }
-    }
-    List<Map<String, Object>> allValidDocIdsMetadata = new ArrayList<>();
-    for (SegmentDataManager segmentDataManager : segmentDataManagers) {
-      try {
+      List<Map<String, Object>> allValidDocIdsMetadata = new ArrayList<>(segmentDataManagers.size());
+      for (SegmentDataManager segmentDataManager : segmentDataManagers) {
         IndexSegment indexSegment = segmentDataManager.getSegment();
         if (indexSegment == null) {
           LOGGER.warn("Table {} segment {} does not exist", tableNameWithType, segmentDataManager.getSegmentName());
@@ -681,8 +681,8 @@ public class TablesResource {
         if (validDocIdsSnapshot == null) {
           String msg = String.format(
               "Found that validDocIds is missing while processing validDocIdsMetadata for table %s segment %s while "
-                  + "reading the validDocIds with validDocIdType %s",
-              tableNameWithType, segmentDataManager.getSegmentName(), validDocIdsType);
+                  + "reading the validDocIds with validDocIdType %s", tableNameWithType,
+              segmentDataManager.getSegmentName(), validDocIdsType);
           LOGGER.warn(msg);
           continue;
         }
@@ -698,11 +698,13 @@ public class TablesResource {
         validDocIdsMetadata.put("segmentCrc", indexSegment.getSegmentMetadata().getCrc());
         validDocIdsMetadata.put("validDocIdsType", finalValidDocIdsType);
         allValidDocIdsMetadata.add(validDocIdsMetadata);
-      } finally {
+      }
+      return allValidDocIdsMetadata;
+    } finally {
+      for (SegmentDataManager segmentDataManager : segmentDataManagers) {
         tableDataManager.releaseSegment(segmentDataManager);
       }
     }
-    return allValidDocIdsMetadata;
   }
 
   private Pair<ValidDocIdsType, MutableRoaringBitmap> getValidDocIds(IndexSegment indexSegment,
