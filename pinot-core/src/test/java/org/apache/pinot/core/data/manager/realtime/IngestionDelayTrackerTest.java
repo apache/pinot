@@ -50,6 +50,10 @@ public class IngestionDelayTrackerTest {
     // Test regular constructor
     IngestionDelayTracker ingestionDelayTracker =
         new IngestionDelayTracker(_serverMetrics, REALTIME_TABLE_NAME, _realtimeTableDataManager, () -> true);
+
+    Clock clock = Clock.systemUTC();
+    ingestionDelayTracker.setClock(clock);
+
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionDelayMs(0), 0);
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionTimeMs(0), 0);
     ingestionDelayTracker.shutdown();
@@ -60,7 +64,8 @@ public class IngestionDelayTrackerTest {
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionTimeMs(0), 0);
     // Test bad timer args to the constructor
     try {
-      new IngestionDelayTracker(_serverMetrics, REALTIME_TABLE_NAME, _realtimeTableDataManager, 0, () -> true);
+      new IngestionDelayTracker(_serverMetrics, REALTIME_TABLE_NAME, _realtimeTableDataManager,
+          0, () -> true);
       Assert.fail("Must have asserted due to invalid arguments"); // Constructor must assert
     } catch (Exception e) {
       if ((e instanceof NullPointerException) || !(e instanceof RuntimeException)) {
@@ -218,7 +223,8 @@ public class IngestionDelayTrackerTest {
       // Untracked partitions must return 0
       Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionDelayMs(partitionGroupId), 0);
       Assert.assertEquals(ingestionDelayTracker.getPartitionEndToEndIngestionDelayMs(partitionGroupId), 0);
-      Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionTimeMs(partitionGroupId), 0);
+      Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionTimeMs(
+          partitionGroupId), 0);
     }
   }
 
