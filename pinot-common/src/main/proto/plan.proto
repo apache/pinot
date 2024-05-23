@@ -99,6 +99,8 @@ message PlanNode {
     MailboxReceiveNode receiveNode = 103;
     MailboxSendNode sendNode = 104;
     SetOpNode setNode = 105;
+    ExchangeNode exchangeNode = 106;
+    SortNode sortNode = 107;
   }
 }
 
@@ -179,4 +181,33 @@ enum SetOpType {
 message SetOpNode {
   SetOpType setOpType = 1;
   bool all = 2;
+}
+
+message RelFieldCollation {
+  int32 fieldIndex = 1;
+  Direction direction = 2;
+  NullDirection nullDirection = 3;
+}
+
+message ExchangeNode {
+  PinotRelExchangeType exchangeType = 1;
+  RelDistributionType distributionType = 2;
+  repeated int32 keys = 3;
+  bool isSortOnSender = 4;
+  bool isSortOnReceiver = 5;
+  bool isPrePartitioned = 6;
+  repeated RelFieldCollation collations = 7;
+  repeated string tableNames = 8;
+}
+
+message InputRef {
+  int32 index = 1;
+}
+
+message SortNode {
+  repeated InputRef collationKeys = 1;
+  repeated Direction collationDirections = 2;
+  repeated NullDirection collationNullDirections = 3;
+  int32 fetch = 4;
+  int32 offset = 5;
 }

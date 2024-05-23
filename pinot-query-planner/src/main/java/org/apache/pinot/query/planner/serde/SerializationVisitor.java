@@ -79,14 +79,18 @@ public class SerializationVisitor implements PlanNodeVisitor<Plan.PlanNode, List
   @Override
   public Plan.PlanNode visitMailboxReceive(MailboxReceiveNode node, List<Plan.PlanNode> context) {
     Plan.PlanNode.Builder builder = getBuilder(node, context);
-    Plan.MailboxReceiveNode.Builder receiveNodeBuilder = Plan.MailboxReceiveNode.newBuilder()
-        .setSenderStageId(node.getSenderStageId())
-        .setDistributionType(convertDistributionType(node.getDistributionType()))
-        .setExchangeType(convertExchangeType(node.getExchangeType()))
-        .addAllCollationKeys(node.getCollationKeys().stream().map((e) -> ((RexExpression.InputRef) e).getIndex()).collect(Collectors.toList()))
-        .addAllCollationDirections(node.getCollationDirections().stream().map(SerializationVisitor::convertDirection).collect(Collectors.toList()))
-        .addAllCollationNullDirections(node.getCollationNullDirections().stream().map(SerializationVisitor::convertNullDirection).collect(Collectors.toList()))
-        .setSortOnSender(node.isSortOnSender()).setSortOnReceiver(node.isSortOnReceiver()).setSender(visitMailboxSend(node.getSender(), new ArrayList<>()));
+    Plan.MailboxReceiveNode.Builder receiveNodeBuilder =
+        Plan.MailboxReceiveNode.newBuilder().setSenderStageId(node.getSenderStageId())
+            .setDistributionType(convertDistributionType(node.getDistributionType()))
+            .setExchangeType(convertExchangeType(node.getExchangeType())).addAllCollationKeys(
+                node.getCollationKeys().stream().map((e) -> ((RexExpression.InputRef) e).getIndex())
+                    .collect(Collectors.toList())).addAllCollationDirections(
+                node.getCollationDirections().stream().map(SerializationVisitor::convertDirection)
+                    .collect(Collectors.toList())).addAllCollationNullDirections(
+                node.getCollationNullDirections().stream().map(SerializationVisitor::convertNullDirection)
+                    .collect(Collectors.toList())).setSortOnSender(node.isSortOnSender())
+            .setSortOnReceiver(node.isSortOnReceiver())
+            .setSender(visitMailboxSend(node.getSender(), new ArrayList<>()));
     if (node.getDistributionKeys() != null) {
       receiveNodeBuilder.addAllDistributionKeys(node.getDistributionKeys());
     }
@@ -114,13 +118,15 @@ public class SerializationVisitor implements PlanNodeVisitor<Plan.PlanNode, List
   }
 
   private static Plan.MailboxSendNode.Builder getSendNodeBuilder(MailboxSendNode node) {
-    Plan.MailboxSendNode.Builder builder = Plan.MailboxSendNode.newBuilder()
-        .setReceiverStageId(node.getReceiverStageId())
-        .setExchangeType(convertExchangeType(node.getExchangeType()))
-        .setDistributionType(convertDistributionType(node.getDistributionType()))
-        .addAllCollationKeys(node.getCollationKeys().stream().map((e) -> ((RexExpression.InputRef) e).getIndex()).collect(Collectors.toList()))
-        .addAllCollationDirections(node.getCollationDirections().stream().map(SerializationVisitor::convertDirection).collect(Collectors.toList()))
-        .setSortOnSender(node.isSortOnSender()).setPrePartitioned(node.isPrePartitioned());
+    Plan.MailboxSendNode.Builder builder =
+        Plan.MailboxSendNode.newBuilder().setReceiverStageId(node.getReceiverStageId())
+            .setExchangeType(convertExchangeType(node.getExchangeType()))
+            .setDistributionType(convertDistributionType(node.getDistributionType())).addAllCollationKeys(
+                node.getCollationKeys().stream().map((e) -> ((RexExpression.InputRef) e).getIndex())
+                    .collect(Collectors.toList())).addAllCollationDirections(
+                node.getCollationDirections().stream().map(SerializationVisitor::convertDirection)
+                    .collect(Collectors.toList())).setSortOnSender(node.isSortOnSender())
+            .setPrePartitioned(node.isPrePartitioned());
     if (node.getDistributionKeys() != null) {
       builder.addAllDistributionKeys(node.getDistributionKeys());
     }
@@ -137,16 +143,31 @@ public class SerializationVisitor implements PlanNodeVisitor<Plan.PlanNode, List
   @Override
   public Plan.PlanNode visitSort(SortNode node, List<Plan.PlanNode> context) {
     node.getInputs().get(0).visit(this, context);
-    return process(node, context);
+    Plan.PlanNode.Builder builder = getBuilder(node, context);
+
+    List<Plan.InputRef> inputRefList = node.getCollationKeys().stream()
+        .map(expr -> Plan.InputRef.newBuilder().setIndex(((RexExpression.InputRef) expr).getIndex()).build())
+        .collect(Collectors.toList());
+    Plan.SortNode.Builder sortNodeBuilder = Plan.SortNode.newBuilder().addAllCollationKeys(inputRefList)
+        .addAllCollationDirections(node.getCollationDirections().stream().map(SerializationVisitor::convertDirection)
+            .collect(Collectors.toList())).addAllCollationNullDirections(
+            node.getCollationNullDirections().stream().map(SerializationVisitor::convertNullDirection)
+                .collect(Collectors.toList())).setFetch(node.getFetch()).setOffset(node.getOffset());
+
+    builder.setSortNode(sortNodeBuilder);
+
+    context.clear();
+    Plan.PlanNode protoPlanNode = builder.build();
+    context.add(protoPlanNode);
+
+    return protoPlanNode;
   }
 
   @Override
   public Plan.PlanNode visitTableScan(TableScanNode node, List<Plan.PlanNode> context) {
     Plan.PlanNode.Builder builder = getBuilder(node, context);
-    Plan.TableScanNode.Builder tableScanNodeBuilder = Plan.TableScanNode.newBuilder()
-        .setTableName(node.getTableName())
-        .addAllTableScanColumns(node.getTableScanColumns())
-        .setNodeHint(getNodeHintBuilder(node.getNodeHint()));
+    Plan.TableScanNode.Builder tableScanNodeBuilder = Plan.TableScanNode.newBuilder().setTableName(node.getTableName())
+        .addAllTableScanColumns(node.getTableScanColumns()).setNodeHint(getNodeHintBuilder(node.getNodeHint()));
     builder.setTableScanNode(tableScanNodeBuilder);
 
     context.clear();
@@ -171,9 +192,8 @@ public class SerializationVisitor implements PlanNodeVisitor<Plan.PlanNode, List
   public Plan.PlanNode visitSetOp(SetOpNode node, List<Plan.PlanNode> context) {
     node.getInputs().forEach(input -> input.visit(this, context));
     Plan.PlanNode.Builder builder = getBuilder(node, context);
-    Plan.SetOpNode.Builder setOpBuilder = Plan.SetOpNode.newBuilder()
-        .setSetOpType(convertSetOpType(node.getSetOpType()))
-        .setAll(node.isAll());
+    Plan.SetOpNode.Builder setOpBuilder =
+        Plan.SetOpNode.newBuilder().setSetOpType(convertSetOpType(node.getSetOpType())).setAll(node.isAll());
     builder.setSetNode(setOpBuilder);
 
     context.clear();
@@ -186,12 +206,27 @@ public class SerializationVisitor implements PlanNodeVisitor<Plan.PlanNode, List
   @Override
   public Plan.PlanNode visitExchange(ExchangeNode node, List<Plan.PlanNode> context) {
     node.getInputs().forEach(input -> input.visit(this, context));
-    return process(node, context);
+    Plan.PlanNode.Builder builder = getBuilder(node, context);
+    Plan.ExchangeNode.Builder exchangeNodeBuilder =
+        Plan.ExchangeNode.newBuilder().setExchangeType(convertExchangeType(node.getExchangeType()))
+            .setDistributionType(convertDistributionType(node.getDistributionType()))
+            .addAllKeys(node.getDistributionKeys()).setIsSortOnSender(node.isSortOnSender())
+            .setIsSortOnReceiver(node.isSortOnReceiver()).setIsPrePartitioned(node.isPrePartitioned()).addAllCollations(
+                node.getCollations().stream().map(c -> Plan.RelFieldCollation.newBuilder().setFieldIndex(c.getFieldIndex())
+                    .setDirection(convertDirection(c.getDirection()))
+                    .setNullDirection(convertNullDirection(c.nullDirection)).build()).collect(Collectors.toList()))
+            .addAllTableNames(node.getTableNames());
+    builder.setExchangeNode(exchangeNodeBuilder);
+
+    context.clear();
+    Plan.PlanNode protoPlanNode = builder.build();
+    context.add(protoPlanNode);
+
+    return protoPlanNode;
   }
 
   private static Plan.PlanNode.Builder getBuilder(AbstractPlanNode planNode, List<Plan.PlanNode> context) {
-    Plan.PlanNode.Builder builder = Plan.PlanNode.newBuilder()
-        .setStageId(planNode.getPlanFragmentId())
+    Plan.PlanNode.Builder builder = Plan.PlanNode.newBuilder().setStageId(planNode.getPlanFragmentId())
         .setNodeName(planNode.getClass().getSimpleName());
     DataSchema dataSchema = planNode.getDataSchema();
     for (int i = 0; i < dataSchema.getColumnNames().length; i++) {
