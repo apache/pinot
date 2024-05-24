@@ -31,14 +31,12 @@
     {
       "dataType": "STRING",
       "name": "newStringMVDimension",
-      "singleValueField": false,
-      "maxLengthExceedStrategy": "TRIM_LENGTH"
+      "singleValueField": false
     },
     {
       "dataType": "STRING",
       "name": "newRawStringSVDimension",
-      "defaultNullValue": "null",
-      "maxLengthExceedStrategy": "TRIM_LENGTH"
+      "defaultNullValue": "null"
     }
   ]
 }

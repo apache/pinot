@@ -44,7 +44,9 @@ import org.apache.pinot.spi.utils.StringUtil;
  * For NO_ACTION, the value is kept as is if no NULL_CHARACTER present else trimmed till NULL.
  * In the first 2 scenarios, this metric INCOMPLETE_REALTIME_ROWS_CONSUMED can be tracked to know if a trimmed /
  * default record was persisted.
- * In the last scenario, this metric ROWS_WITH_ERRORS can be tracked  to know if a record was skipped.
+ * In the third scenario, this metric ROWS_WITH_ERRORS can be tracked  to know if a record was skipped.
+ * In the last scenario, this metric INCOMPLETE_REALTIME_ROWS_CONSUMED can be tracked to know if a record was trimmed
+ * due to having a null character.
  */
 public class SanitizationTransformer implements RecordTransformer {
   private static final String NULL_CHARACTER = "\0";

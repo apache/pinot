@@ -22,7 +22,6 @@ import java.io.IOException;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.testng.annotations.AfterClass;
@@ -90,12 +89,6 @@ public class PinotSchemaRestletResourceTest {
     // Get the schema and verify the new column exists
     String getSchemaUrl = TEST_INSTANCE.getControllerRequestURLBuilder().forSchemaGet(schemaName);
     Schema remoteSchema = Schema.fromString(ControllerTest.sendGetRequest(getSchemaUrl));
-    remoteSchema.getFieldSpecFor("newColumn")
-        .setMaxLengthExceedStrategy(FieldSpec.MaxLengthExceedStrategy.TRIM_LENGTH);
-    remoteSchema.getFieldSpecFor("dimA")
-        .setMaxLengthExceedStrategy(FieldSpec.MaxLengthExceedStrategy.TRIM_LENGTH);
-    remoteSchema.getFieldSpecFor("dimB")
-        .setMaxLengthExceedStrategy(FieldSpec.MaxLengthExceedStrategy.TRIM_LENGTH);
     assertEquals(remoteSchema, schema);
     assertTrue(remoteSchema.hasColumn(newColumnFieldSpec.getName()));
 
@@ -110,15 +103,6 @@ public class PinotSchemaRestletResourceTest {
 
     // Get the schema and verify both the new columns exist
     remoteSchema = Schema.fromString(ControllerTest.sendGetRequest(getSchemaUrl));
-    remoteSchema.getFieldSpecFor("newColumn")
-        .setMaxLengthExceedStrategy(FieldSpec.MaxLengthExceedStrategy.TRIM_LENGTH);
-    remoteSchema.getFieldSpecFor("newColumn2")
-        .setMaxLengthExceedStrategy(FieldSpec.MaxLengthExceedStrategy.TRIM_LENGTH);
-    remoteSchema.getFieldSpecFor("dimA")
-        .setMaxLengthExceedStrategy(FieldSpec.MaxLengthExceedStrategy.TRIM_LENGTH);
-    remoteSchema.getFieldSpecFor("dimB")
-        .setMaxLengthExceedStrategy(FieldSpec.MaxLengthExceedStrategy.TRIM_LENGTH);
-
     assertEquals(remoteSchema, schema);
     assertTrue(remoteSchema.hasColumn(newColumnFieldSpec.getName()));
     assertTrue(remoteSchema.hasColumn(newColumnFieldSpec2.getName()));

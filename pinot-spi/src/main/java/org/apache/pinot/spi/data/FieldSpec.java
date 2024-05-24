@@ -112,6 +112,9 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   // NOTE: This only applies to STRING column, which is the max number of characters
   private int _maxLength = DEFAULT_MAX_LENGTH;
 
+  // NOTE: This only applies to STRING column during {@link SanitizationTransformer}
+  protected MaxLengthExceedStrategy _maxLengthExceedStrategy;
+
   protected Object _defaultNullValue;
   private transient String _stringDefaultNullValue;
 
@@ -120,9 +123,6 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   protected String _transformFunction;
 
   protected String _virtualColumnProvider;
-
-  // NOTE: This only applies to STRING column during {@link SanitizationTransformer}
-  protected MaxLengthExceedStrategy _maxLengthExceedStrategy;
 
   // Default constructor required by JSON de-serializer. DO NOT REMOVE.
   public FieldSpec() {
@@ -148,20 +148,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     _isSingleValueField = isSingleValueField;
     _maxLength = maxLength;
     setDefaultNullValue(defaultNullValue);
-    switch (_dataType) {
-      case STRING:
-        _maxLengthExceedStrategy = _maxLengthExceedStrategy == null ? MaxLengthExceedStrategy.TRIM_LENGTH
-            : maxLengthExceedStrategy;
-        break;
-      case JSON:
-      case BYTES:
-        _maxLengthExceedStrategy = _maxLengthExceedStrategy == null ? MaxLengthExceedStrategy.NO_ACTION
-            : maxLengthExceedStrategy;
-        break;
-      default:
-        _maxLengthExceedStrategy = maxLengthExceedStrategy;
-        break;
-    }
+    _maxLengthExceedStrategy = maxLengthExceedStrategy;
   }
 
   public abstract FieldType getFieldType();
@@ -203,12 +190,13 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     _maxLength = maxLength;
   }
 
+  @Nullable
   public MaxLengthExceedStrategy getMaxLengthExceedStrategy() {
     return _maxLengthExceedStrategy;
   }
 
   // Required by JSON de-serializer. DO NOT REMOVE.
-  public void setMaxLengthExceedStrategy(MaxLengthExceedStrategy maxLengthExceedStrategy) {
+  public void setMaxLengthExceedStrategy(@Nullable MaxLengthExceedStrategy maxLengthExceedStrategy) {
     _maxLengthExceedStrategy = maxLengthExceedStrategy;
   }
 

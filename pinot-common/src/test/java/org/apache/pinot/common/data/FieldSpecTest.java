@@ -105,7 +105,6 @@ public class FieldSpecTest {
     fieldSpec1.setName("svDimension");
     fieldSpec1.setDataType(STRING);
     fieldSpec1.setMaxLength(20000);
-    fieldSpec1.setMaxLengthExceedStrategy(FieldSpec.MaxLengthExceedStrategy.TRIM_LENGTH);
     fieldSpec2 = new DimensionFieldSpec("svDimension", STRING, true, 20000, null);
     Assert.assertEquals(fieldSpec1, fieldSpec2);
     Assert.assertEquals(fieldSpec1.toString(), fieldSpec2.toString());
@@ -117,7 +116,6 @@ public class FieldSpecTest {
     fieldSpec1.setName("svDimension");
     fieldSpec1.setDataType(JSON);
     fieldSpec1.setMaxLength(20000);
-    fieldSpec1.setMaxLengthExceedStrategy(FieldSpec.MaxLengthExceedStrategy.NO_ACTION);
     fieldSpec2 = new DimensionFieldSpec("svDimension", JSON, true, 20000, null);
     Assert.assertEquals(fieldSpec1, fieldSpec2);
     Assert.assertEquals(fieldSpec1.toString(), fieldSpec2.toString());
@@ -153,7 +151,6 @@ public class FieldSpecTest {
     fieldSpec1.setDataType(STRING);
     fieldSpec1.setSingleValueField(false);
     fieldSpec1.setMaxLength(20000);
-    fieldSpec1.setMaxLengthExceedStrategy(FieldSpec.MaxLengthExceedStrategy.TRIM_LENGTH);
     fieldSpec2 = new DimensionFieldSpec("mvDimension", STRING, false, 20000, null);
     Assert.assertEquals(fieldSpec1, fieldSpec2);
     Assert.assertEquals(fieldSpec1.toString(), fieldSpec2.toString());
@@ -187,7 +184,6 @@ public class FieldSpecTest {
     fieldSpec1.setName("byteMetric");
     fieldSpec1.setDataType(BYTES);
     fieldSpec1.setDefaultNullValue(new byte[]{0x10, 0x20});
-    fieldSpec1.setMaxLengthExceedStrategy(FieldSpec.MaxLengthExceedStrategy.NO_ACTION);
     fieldSpec2 = new MetricFieldSpec("byteMetric", BYTES, new byte[]{0x10, 0x20});
     Assert.assertEquals(fieldSpec1, fieldSpec2);
     Assert.assertEquals(fieldSpec1.toJsonObject(), fieldSpec2.toJsonObject());
@@ -316,11 +312,11 @@ public class FieldSpecTest {
     // Multi-value dimension field with default null value.
     dimensionFields = new String[]{
         "\"name\":\"dimension\"", "\"dataType\":\"STRING\"", "\"singleValueField\":false",
-        "\"defaultNullValue\":\"default\", \"max length exceed strategy\": \"TRIM_LENGTH\""
+        "\"defaultNullValue\":\"default\", \"maxLengthExceedStrategy\": \"TRIM_LENGTH\""
     };
     dimensionFieldSpec1 = JsonUtils.stringToObject(getRandomOrderJsonString(dimensionFields), DimensionFieldSpec.class);
-    dimensionFieldSpec1.setMaxLengthExceedStrategy(FieldSpec.MaxLengthExceedStrategy.TRIM_LENGTH);
     dimensionFieldSpec2 = new DimensionFieldSpec("dimension", STRING, false, "default");
+    dimensionFieldSpec2.setMaxLengthExceedStrategy(FieldSpec.MaxLengthExceedStrategy.TRIM_LENGTH);
     Assert.assertEquals(dimensionFieldSpec1, dimensionFieldSpec2, ERROR_MESSAGE);
     Assert.assertEquals(dimensionFieldSpec1.getDefaultNullValue(), "default", ERROR_MESSAGE);
 
