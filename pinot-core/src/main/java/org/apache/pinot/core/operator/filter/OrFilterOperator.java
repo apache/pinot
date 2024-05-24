@@ -68,10 +68,12 @@ public class OrFilterOperator extends BaseFilterOperator {
       if (trues instanceof EmptyDocIdSet) {
         continue;
       }
-      BlockDocIdSet nulls = filterOperator.getNulls();
-      if (_nullHandlingEnabled && !(nulls instanceof EmptyDocIdSet)) {
-        blockDocIdSets.add(new OrDocIdSet(Arrays.asList(trues, nulls), _numDocs));
-        continue;
+      if (_nullHandlingEnabled) {
+        BlockDocIdSet nulls = filterOperator.getNulls();
+        if (!(nulls instanceof EmptyDocIdSet)) {
+          blockDocIdSets.add(new OrDocIdSet(Arrays.asList(trues, nulls), _numDocs));
+          continue;
+        }
       }
       blockDocIdSets.add(trues);
     }
