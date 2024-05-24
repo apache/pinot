@@ -95,8 +95,8 @@ public class FineGrainedAuthUtils {
 
         if (StringUtils.isEmpty(targetId)) {
           throw new WebApplicationException(
-                  "Could not find paramName " + auth.paramName() + " in path or query params of the API: "
-                          + uriInfo.getRequestUri(), Response.Status.INTERNAL_SERVER_ERROR);
+              "Could not find paramName " + auth.paramName() + " in path or query params of the API: "
+                  + uriInfo.getRequestUri(), Response.Status.INTERNAL_SERVER_ERROR);
         }
 
         // Table name may contain type, hence get raw table name for checking access
@@ -107,8 +107,8 @@ public class FineGrainedAuthUtils {
         accessDeniedMsg = "Access denied to " + auth.action() + " in the cluster";
       } else {
         throw new WebApplicationException(
-                "Unsupported targetType: " + auth.targetType() + " in API: " + uriInfo.getRequestUri(),
-                Response.Status.INTERNAL_SERVER_ERROR);
+            "Unsupported targetType: " + auth.targetType() + " in API: " + uriInfo.getRequestUri(),
+            Response.Status.INTERNAL_SERVER_ERROR);
       }
 
       boolean hasAccess;

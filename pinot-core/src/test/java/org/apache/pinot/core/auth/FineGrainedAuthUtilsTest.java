@@ -27,66 +27,68 @@ import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+
 public class FineGrainedAuthUtilsTest {
 
-    @Test
-    public void testValidateFineGrainedAuthAllowed() {
-        FineGrainedAccessControl ac = Mockito.mock(FineGrainedAccessControl.class);
-        Mockito.when(ac.hasAccess(Mockito.any(HttpHeaders.class), Mockito.any(), Mockito.any(), Mockito.any()))
-                .thenReturn(true);
+  @Test
+  public void testValidateFineGrainedAuthAllowed() {
+    FineGrainedAccessControl ac = Mockito.mock(FineGrainedAccessControl.class);
+    Mockito.when(ac.hasAccess(Mockito.any(HttpHeaders.class), Mockito.any(), Mockito.any(), Mockito.any()))
+        .thenReturn(true);
 
-        UriInfo mockUriInfo = Mockito.mock(UriInfo.class);
-        HttpHeaders mockHttpHeaders = Mockito.mock(HttpHeaders.class);
+    UriInfo mockUriInfo = Mockito.mock(UriInfo.class);
+    HttpHeaders mockHttpHeaders = Mockito.mock(HttpHeaders.class);
 
-        FineGrainedAuthUtils.validateFineGrainedAuth(getAnnotatedMethod(), mockUriInfo, mockHttpHeaders, ac);
+    FineGrainedAuthUtils.validateFineGrainedAuth(getAnnotatedMethod(), mockUriInfo, mockHttpHeaders, ac);
+  }
+
+  @Test
+  public void testValidateFineGrainedAuthDenied() {
+    FineGrainedAccessControl ac = Mockito.mock(FineGrainedAccessControl.class);
+    Mockito.when(ac.hasAccess(Mockito.any(HttpHeaders.class), Mockito.any(), Mockito.any(), Mockito.any()))
+        .thenReturn(false);
+
+    UriInfo mockUriInfo = Mockito.mock(UriInfo.class);
+    HttpHeaders mockHttpHeaders = Mockito.mock(HttpHeaders.class);
+
+    try {
+      FineGrainedAuthUtils.validateFineGrainedAuth(getAnnotatedMethod(), mockUriInfo, mockHttpHeaders, ac);
+      Assert.fail("Expected WebApplicationException");
+    } catch (WebApplicationException e) {
+      Assert.assertTrue(e.getMessage().contains("Access denied to getCluster in the cluster"));
+      Assert.assertEquals(e.getResponse().getStatus(), Response.Status.FORBIDDEN.getStatusCode());
     }
+  }
 
-    @Test
-    public void testValidateFineGrainedAuthDenied() {
-        FineGrainedAccessControl ac = Mockito.mock(FineGrainedAccessControl.class);
-        Mockito.when(ac.hasAccess(Mockito.any(HttpHeaders.class), Mockito.any(), Mockito.any(), Mockito.any()))
-                .thenReturn(false);
+  @Test
+  public void testValidateFineGrainedAuthWithNoSuchMethodError() {
+    FineGrainedAccessControl ac = Mockito.mock(FineGrainedAccessControl.class);
+    Mockito.when(ac.hasAccess(Mockito.any(HttpHeaders.class), Mockito.any(), Mockito.any(), Mockito.any()))
+        .thenThrow(new NoSuchMethodError("Method not found"));
 
-        UriInfo mockUriInfo = Mockito.mock(UriInfo.class);
-        HttpHeaders mockHttpHeaders = Mockito.mock(HttpHeaders.class);
+    UriInfo mockUriInfo = Mockito.mock(UriInfo.class);
+    HttpHeaders mockHttpHeaders = Mockito.mock(HttpHeaders.class);
 
-        try {
-            FineGrainedAuthUtils.validateFineGrainedAuth(getAnnotatedMethod(), mockUriInfo, mockHttpHeaders, ac);
-            Assert.fail("Expected WebApplicationException");
-        } catch (WebApplicationException e) {
-            Assert.assertTrue(e.getMessage().contains("Access denied to getCluster in the cluster"));
-            Assert.assertEquals(e.getResponse().getStatus(), Response.Status.FORBIDDEN.getStatusCode());
-        }
+    try {
+      FineGrainedAuthUtils.validateFineGrainedAuth(getAnnotatedMethod(), mockUriInfo, mockHttpHeaders, ac);
+      Assert.fail("Expected WebApplicationException");
+    } catch (WebApplicationException e) {
+      Assert.assertTrue(e.getMessage().contains("Failed to check for access"));
+      Assert.assertEquals(e.getResponse().getStatus(), Response.Status.INTERNAL_SERVER_ERROR.getStatusCode());
     }
+  }
 
-    @Test
-    public void testValidateFineGrainedAuthWithNoSuchMethodError() {
-        FineGrainedAccessControl ac = Mockito.mock(FineGrainedAccessControl.class);
-        Mockito.when(ac.hasAccess(Mockito.any(HttpHeaders.class), Mockito.any(), Mockito.any(), Mockito.any()))
-                .thenThrow(new NoSuchMethodError("Method not found"));
-
-        UriInfo mockUriInfo = Mockito.mock(UriInfo.class);
-        HttpHeaders mockHttpHeaders = Mockito.mock(HttpHeaders.class);
-
-        try {
-            FineGrainedAuthUtils.validateFineGrainedAuth(getAnnotatedMethod(), mockUriInfo, mockHttpHeaders, ac);
-            Assert.fail("Expected WebApplicationException");
-        } catch (WebApplicationException e) {
-            Assert.assertTrue(e.getMessage().contains("Failed to check for access"));
-            Assert.assertEquals(e.getResponse().getStatus(), Response.Status.INTERNAL_SERVER_ERROR.getStatusCode());
-        }
+  static class TestResource {
+    @Authorize(targetType = TargetType.CLUSTER, action = "getCluster")
+    void getCluster() {
     }
+  }
 
-    static class TestResource {
-        @Authorize(targetType = TargetType.CLUSTER, action = "getCluster")
-        void getCluster() { }
+  private Method getAnnotatedMethod() {
+    try {
+      return TestResource.class.getDeclaredMethod("getCluster");
+    } catch (NoSuchMethodException e) {
+      throw new RuntimeException(e);
     }
-
-    private Method getAnnotatedMethod() {
-        try {
-            return TestResource.class.getDeclaredMethod("getCluster");
-        } catch (NoSuchMethodException e) {
-            throw new RuntimeException(e);
-        }
-    }
+  }
 }

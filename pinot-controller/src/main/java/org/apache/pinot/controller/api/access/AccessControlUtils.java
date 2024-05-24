@@ -70,9 +70,8 @@ public final class AccessControlUtils {
     } catch (Throwable t) {
       // catch and log Throwable for NoSuchMethodError which can happen when there are classpath conflicts
       // otherwise, grizzly will return a 500 without any logs or indication of what failed
-      LOGGER.error("Caught exception while validating permission for {}", userMessage, t);
-      throw new ControllerApplicationException(LOGGER, "Caught exception while validating permission for "
-          + userMessage, Response.Status.INTERNAL_SERVER_ERROR, t);
+      throw new ControllerApplicationException(LOGGER,
+          "Caught exception while validating permission for " + userMessage, Response.Status.INTERNAL_SERVER_ERROR, t);
     }
 
     throw new ControllerApplicationException(LOGGER, "Permission is denied for " + userMessage,
