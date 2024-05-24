@@ -62,21 +62,25 @@ public class AndFilterOperator extends BaseFilterOperator {
   protected BlockDocIdSet getFalses() {
     List<BlockDocIdSet> blockDocIdSets = new ArrayList<>(_filterOperators.size());
     for (BaseFilterOperator filterOperator : _filterOperators) {
-      if (filterOperator.isResultEmpty()) {
+      BlockDocIdSet trues = filterOperator.getTrues();
+      if (trues instanceof EmptyDocIdSet) {
         return new MatchAllDocIdSet(_numDocs);
       }
-      if (filterOperator.isResultMatchingAll()) {
+      if (trues instanceof MatchAllDocIdSet) {
         continue;
       }
-      if (_nullHandlingEnabled) {
-        blockDocIdSets.add(
-            new OrDocIdSet(Arrays.asList(filterOperator.getTrues(), filterOperator.getNulls()), _numDocs));
+      BlockDocIdSet nulls = filterOperator.getNulls();
+      if (_nullHandlingEnabled && !(nulls instanceof EmptyDocIdSet)) {
+        blockDocIdSets.add(new OrDocIdSet(Arrays.asList(trues, nulls), _numDocs));
         continue;
       }
-      blockDocIdSets.add(filterOperator.getTrues());
+      blockDocIdSets.add(trues);
     }
     if (blockDocIdSets.isEmpty()) {
       return EmptyDocIdSet.getInstance();
+    }
+    if (blockDocIdSets.size() == 1) {
+      return new NotDocIdSet(blockDocIdSets.get(0), _numDocs);
     }
     return new NotDocIdSet(new AndDocIdSet(blockDocIdSets, _queryOptions), _numDocs);
   }

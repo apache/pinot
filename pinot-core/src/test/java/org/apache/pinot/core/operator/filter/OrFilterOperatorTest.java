@@ -169,4 +169,16 @@ public class OrFilterOperatorTest {
     Assert.assertEquals(TestUtils.getDocIds(orFilterOperator.getTrues()), Arrays.asList(0, 1, 2, 3, 4, 5, 6, 7, 8, 9));
     Assert.assertEquals(TestUtils.getDocIds(orFilterOperator.getFalses()), Collections.emptyList());
   }
+
+  @Test
+  public void testOrWithAllEmpty() {
+    int numDocs = 10;
+
+    OrFilterOperator orFilterOperator =
+        new OrFilterOperator(Arrays.asList(EmptyFilterOperator.getInstance(), EmptyFilterOperator.getInstance()), null,
+            numDocs, true);
+
+    Assert.assertEquals(TestUtils.getDocIds(orFilterOperator.getTrues()), Collections.emptyList());
+    Assert.assertEquals(TestUtils.getDocIds(orFilterOperator.getFalses()), Arrays.asList(0, 1, 2, 3, 4, 5, 6, 7, 8, 9));
+  }
 }

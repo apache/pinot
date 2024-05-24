@@ -103,16 +103,18 @@ public abstract class BaseFilterOperator extends BaseOperator<FilterBlock> {
    * @return document IDs in which the predicate evaluates to false.
    */
   protected BlockDocIdSet getFalses() {
-    if (isResultMatchingAll()) {
+    BlockDocIdSet trues = getTrues();
+    if (trues instanceof MatchAllDocIdSet) {
       return EmptyDocIdSet.getInstance();
     }
-    if (isResultEmpty()) {
+    if (trues instanceof EmptyDocIdSet) {
       return new MatchAllDocIdSet(_numDocs);
     }
-    if (_nullHandlingEnabled) {
-      return new NotDocIdSet(new OrDocIdSet(Arrays.asList(getTrues(), getNulls()), _numDocs),
+    BlockDocIdSet nulls = getNulls();
+    if (_nullHandlingEnabled && !(nulls instanceof EmptyDocIdSet)) {
+      return new NotDocIdSet(new OrDocIdSet(Arrays.asList(trues, nulls), _numDocs),
           _numDocs);
     }
-    return new NotDocIdSet(getTrues(), _numDocs);
+    return new NotDocIdSet(trues, _numDocs);
   }
 }

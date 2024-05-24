@@ -23,6 +23,8 @@ import java.util.List;
 import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.operator.docidsets.EmptyDocIdSet;
+import org.apache.pinot.core.operator.docidsets.MatchAllDocIdSet;
 import org.apache.pinot.segment.spi.Constants;
 
 
@@ -56,11 +58,20 @@ public class TestFilterOperator extends BaseFilterOperator {
 
   @Override
   protected BlockDocIdSet getTrues() {
+    if (_trueDocIds.length == _numDocs) {
+      return new MatchAllDocIdSet(_numDocs);
+    }
+    if (_trueDocIds.length == 0) {
+      return EmptyDocIdSet.getInstance();
+    }
     return new TestBlockDocIdSet(_trueDocIds);
   }
 
   @Override
   protected BlockDocIdSet getNulls() {
+    if (_nullDocIds.length == 0) {
+      return EmptyDocIdSet.getInstance();
+    }
     return new TestBlockDocIdSet(_nullDocIds);
   }
 
