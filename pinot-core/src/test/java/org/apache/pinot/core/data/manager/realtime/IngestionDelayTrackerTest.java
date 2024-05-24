@@ -50,15 +50,22 @@ public class IngestionDelayTrackerTest {
     // Test regular constructor
     IngestionDelayTracker ingestionDelayTracker =
         new IngestionDelayTracker(_serverMetrics, REALTIME_TABLE_NAME, _realtimeTableDataManager, () -> true);
+
+    Clock clock = Clock.systemUTC();
+    ingestionDelayTracker.setClock(clock);
+
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionDelayMs(0), 0);
+    Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionTimeMs(0), Long.MIN_VALUE);
     ingestionDelayTracker.shutdown();
     // Test constructor with timer arguments
     ingestionDelayTracker = new IngestionDelayTracker(_serverMetrics, REALTIME_TABLE_NAME, _realtimeTableDataManager,
         TIMER_THREAD_TICK_INTERVAL_MS, () -> true);
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionDelayMs(0), 0);
+    Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionTimeMs(0), Long.MIN_VALUE);
     // Test bad timer args to the constructor
     try {
-      new IngestionDelayTracker(_serverMetrics, REALTIME_TABLE_NAME, _realtimeTableDataManager, 0, () -> true);
+      new IngestionDelayTracker(_serverMetrics, REALTIME_TABLE_NAME, _realtimeTableDataManager,
+          0, () -> true);
       Assert.fail("Must have asserted due to invalid arguments"); // Constructor must assert
     } catch (Exception e) {
       if ((e instanceof NullPointerException) || !(e instanceof RuntimeException)) {
@@ -82,10 +89,12 @@ public class IngestionDelayTrackerTest {
 
     // Test we follow a single partition up and down
     for (long i = 0; i <= maxTestDelay; i++) {
-      ingestionDelayTracker.updateIngestionDelay(i, (i + 1), partition0);
+      long firstStreamIngestionTimeMs = i + 1;
+      ingestionDelayTracker.updateIngestionDelay(i, firstStreamIngestionTimeMs, partition0);
       Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionDelayMs(partition0), clock.millis() - i);
       Assert.assertEquals(ingestionDelayTracker.getPartitionEndToEndIngestionDelayMs(partition0),
-          clock.millis() - (i + 1));
+          clock.millis() - firstStreamIngestionTimeMs);
+      Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionTimeMs(partition0), i);
     }
 
     // Test tracking down a measure for a given partition
@@ -94,6 +103,7 @@ public class IngestionDelayTrackerTest {
       Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionDelayMs(partition0), clock.millis() - i);
       Assert.assertEquals(ingestionDelayTracker.getPartitionEndToEndIngestionDelayMs(partition0),
           clock.millis() - (i + 1));
+      Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionTimeMs(partition0), i);
     }
 
     // Make the current partition maximum
@@ -105,6 +115,7 @@ public class IngestionDelayTrackerTest {
       Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionDelayMs(partition1), clock.millis() - i);
       Assert.assertEquals(ingestionDelayTracker.getPartitionEndToEndIngestionDelayMs(partition1),
           clock.millis() - (i + 1));
+      Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionTimeMs(partition1), i);
     }
 
     // Bring down values of partition1 and verify values
@@ -113,6 +124,7 @@ public class IngestionDelayTrackerTest {
       Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionDelayMs(partition1), clock.millis() - i);
       Assert.assertEquals(ingestionDelayTracker.getPartitionEndToEndIngestionDelayMs(partition1),
           clock.millis() - (i + 1));
+      Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionTimeMs(partition1), i);
     }
 
     ingestionDelayTracker.shutdown();
@@ -137,10 +149,14 @@ public class IngestionDelayTrackerTest {
     ZoneId zoneId = ZoneId.systemDefault();
     Clock clock = Clock.fixed(now, zoneId);
     ingestionDelayTracker.setClock(clock);
+    long ingestionTimeMs = (clock.millis() - partition0Delay0);
+    ingestionDelayTracker.updateIngestionDelay(ingestionTimeMs,
+        (clock.millis() - partition0Delay0), partition0);
     ingestionDelayTracker.updateIngestionDelay((clock.millis() - partition0Delay0), (clock.millis() - partition0Delay0),
         partition0);
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionDelayMs(partition0), partition0Delay0);
     Assert.assertEquals(ingestionDelayTracker.getPartitionEndToEndIngestionDelayMs(partition0), partition0Delay0);
+    Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionTimeMs(partition0), ingestionTimeMs);
     // Advance clock and test aging
     Clock offsetClock = Clock.offset(clock, Duration.ofMillis(partition0Offset0Ms));
     ingestionDelayTracker.setClock(offsetClock);
@@ -148,11 +164,14 @@ public class IngestionDelayTrackerTest {
         (partition0Delay0 + partition0Offset0Ms));
     Assert.assertEquals(ingestionDelayTracker.getPartitionEndToEndIngestionDelayMs(partition0),
         (partition0Delay0 + partition0Offset0Ms));
+    Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionTimeMs(partition0), ingestionTimeMs);
 
-    ingestionDelayTracker.updateIngestionDelay((offsetClock.millis() - partition0Delay1),
+    ingestionTimeMs = (offsetClock.millis() - partition0Delay1);
+    ingestionDelayTracker.updateIngestionDelay(ingestionTimeMs,
         (offsetClock.millis() - partition0Delay1), partition0);
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionDelayMs(partition0), partition0Delay1);
     Assert.assertEquals(ingestionDelayTracker.getPartitionEndToEndIngestionDelayMs(partition0), partition0Delay1);
+    Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionTimeMs(partition0), ingestionTimeMs);
 
     // Add some offset to the last sample and make sure we age that measure properly
     offsetClock = Clock.offset(offsetClock, Duration.ofMillis(partition0Offset1Ms));
@@ -160,10 +179,12 @@ public class IngestionDelayTrackerTest {
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionDelayMs(partition0),
         (partition0Delay1 + partition0Offset1Ms));
 
-    ingestionDelayTracker.updateIngestionDelay((offsetClock.millis() - partition1Delay0),
+    ingestionTimeMs = (offsetClock.millis() - partition1Delay0);
+    ingestionDelayTracker.updateIngestionDelay(ingestionTimeMs,
         (offsetClock.millis() - partition1Delay0), partition1);
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionDelayMs(partition1), partition1Delay0);
     Assert.assertEquals(ingestionDelayTracker.getPartitionEndToEndIngestionDelayMs(partition1), partition1Delay0);
+    Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionTimeMs(partition1), ingestionTimeMs);
 
     // Add some offset to the last sample and make sure we age that measure properly
     offsetClock = Clock.offset(offsetClock, Duration.ofMillis(partition1Offset0Ms));
@@ -188,11 +209,12 @@ public class IngestionDelayTrackerTest {
 
     // Record a number of partitions with delay equal to partition id
     for (int partitionGroupId = 0; partitionGroupId <= maxTestDelay; partitionGroupId++) {
-      ingestionDelayTracker.updateIngestionDelay((clock.millis() - partitionGroupId),
-          (clock.millis() - partitionGroupId), partitionGroupId);
+      long ingestionTimeMs = (clock.millis() - partitionGroupId);
+      ingestionDelayTracker.updateIngestionDelay(ingestionTimeMs, ingestionTimeMs, partitionGroupId);
       Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionDelayMs(partitionGroupId), partitionGroupId);
       Assert.assertEquals(ingestionDelayTracker.getPartitionEndToEndIngestionDelayMs(partitionGroupId),
           partitionGroupId);
+      Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionTimeMs(partitionGroupId), ingestionTimeMs);
     }
     for (int partitionGroupId = maxPartition; partitionGroupId >= 0; partitionGroupId--) {
       ingestionDelayTracker.stopTrackingPartitionIngestionDelay(partitionGroupId);
@@ -201,6 +223,8 @@ public class IngestionDelayTrackerTest {
       // Untracked partitions must return 0
       Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionDelayMs(partitionGroupId), 0);
       Assert.assertEquals(ingestionDelayTracker.getPartitionEndToEndIngestionDelayMs(partitionGroupId), 0);
+      Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionTimeMs(
+          partitionGroupId), Long.MIN_VALUE);
     }
   }
 

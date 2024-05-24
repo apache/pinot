@@ -272,6 +272,19 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   }
 
   /*
+   * Method used during query execution (ServerQueryExecutorV1Impl) to get the current timestamp for the ingestion
+   * delay for a partition
+   *
+   * @param segmentNameStr name of segment for which we want the ingestion delay timestamp.
+   * @return timestamp of the ingestion delay for the partition.
+   */
+  public long getPartitionIngestionTimeMs(String segmentNameStr) {
+    LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
+    int partitionGroupId = segmentName.getPartitionGroupId();
+    return _ingestionDelayTracker.getPartitionIngestionTimeMs(partitionGroupId);
+  }
+
+  /*
    * Method to handle CONSUMING -> DROPPED segment state transitions:
    * We stop tracking partitions whose segments are dropped.
    *

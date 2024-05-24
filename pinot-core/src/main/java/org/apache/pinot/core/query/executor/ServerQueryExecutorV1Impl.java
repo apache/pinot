@@ -236,7 +236,8 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
           if (indexTimeMs > 0) {
             minIndexTimeMs = Math.min(minIndexTimeMs, indexTimeMs);
           }
-          long ingestionTimeMs = segmentMetadata.getLatestIngestionTimestamp();
+          long ingestionTimeMs = ((RealtimeTableDataManager)
+              tableDataManager).getPartitionIngestionTimeMs(indexSegment.getSegmentName());
           if (ingestionTimeMs > 0) {
             minIngestionTimeMs = Math.min(minIngestionTimeMs, ingestionTimeMs);
           }
