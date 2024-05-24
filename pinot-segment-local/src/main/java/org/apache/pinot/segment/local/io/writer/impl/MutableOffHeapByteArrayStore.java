@@ -170,17 +170,20 @@ public class MutableOffHeapByteArrayStore implements Closeable {
   private final int _startSize;
 
   @VisibleForTesting
-  public int getStartSize() {
-    return _startSize;
+  public static int getStartSize(int numArrays, int avgArrayLen) {
+    // For each array, we store the array and its startoffset (4 bytes)
+    long estimatedSize = numArrays * ((long) avgArrayLen + 4);
+    if (estimatedSize > 0 && estimatedSize <= Integer.MAX_VALUE) {
+      return (int) estimatedSize;
+    }
+    return Integer.MAX_VALUE;
   }
 
   public MutableOffHeapByteArrayStore(PinotDataBufferMemoryManager memoryManager, String allocationContext,
       int numArrays, int avgArrayLen) {
     _memoryManager = memoryManager;
     _allocationContext = allocationContext;
-    int estimatedSize =
-        numArrays * (avgArrayLen + 4); // For each array, we store the array and its startoffset (4 bytes)
-    _startSize = estimatedSize > 0 ? estimatedSize : Integer.MAX_VALUE;
+    _startSize = getStartSize(numArrays, avgArrayLen);
     expand(_startSize);
   }
 
@@ -220,10 +223,10 @@ public class MutableOffHeapByteArrayStore implements Closeable {
     int index = buffer.add(value);
     if (index < 0) {
       // Need to expand the buffer
-      int currentBufferSize = buffer.getSize();
-      if ((currentBufferSize << 1) >= 0) {
+      long nextBufferSize = buffer.getSize() << 1;
+      if (nextBufferSize > 0 && nextBufferSize <= Integer.MAX_VALUE) {
         // The expanded buffer size should be enough for the current value
-        buffer = expand(Math.max(currentBufferSize << 1, valueLength + Integer.BYTES));
+        buffer = expand(Math.max((int) nextBufferSize, valueLength + Integer.BYTES));
       } else {
         // Int overflow
         buffer = expand(Integer.MAX_VALUE);

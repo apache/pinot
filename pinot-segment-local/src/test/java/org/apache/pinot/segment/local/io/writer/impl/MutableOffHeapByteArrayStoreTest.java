@@ -29,6 +29,7 @@ import org.testng.annotations.Test;
 public class MutableOffHeapByteArrayStoreTest {
 
   private PinotDataBufferMemoryManager _memoryManager;
+  private static final int ONE_GB = 1024 * 1024 * 1024;
 
   @BeforeClass
   public void setUp() {
@@ -44,8 +45,11 @@ public class MutableOffHeapByteArrayStoreTest {
   @Test
   public void maxValueTest()
       throws Exception {
-    MutableOffHeapByteArrayStore store = new MutableOffHeapByteArrayStore(_memoryManager, "stringColumn", 1024, 32);
-    final int arrSize = store.getStartSize();
+    int numArrays = 1024;
+    int avgArrayLen = 32;
+    MutableOffHeapByteArrayStore store =
+        new MutableOffHeapByteArrayStore(_memoryManager, "stringColumn", numArrays, avgArrayLen);
+    final int arrSize = MutableOffHeapByteArrayStore.getStartSize(numArrays, avgArrayLen);
     byte[] dataIn = new byte[arrSize - 4];
     for (int i = 0; i < dataIn.length; i++) {
       dataIn[i] = (byte) (i % Byte.MAX_VALUE);
@@ -57,18 +61,20 @@ public class MutableOffHeapByteArrayStoreTest {
   }
 
   @Test
-  public void startSizeOverflowTest()
-      throws Exception {
-    MutableOffHeapByteArrayStore store =
-        new MutableOffHeapByteArrayStore(_memoryManager, "stringColumn", 3, 1024 * 1024 * 1024);
-    store.close();
+  public void startSizeTest() {
+    Assert.assertEquals(MutableOffHeapByteArrayStore.getStartSize(1, ONE_GB), ONE_GB + 4);
+    Assert.assertEquals(MutableOffHeapByteArrayStore.getStartSize(3, ONE_GB), Integer.MAX_VALUE);
+    Assert.assertEquals(MutableOffHeapByteArrayStore.getStartSize(5, ONE_GB), Integer.MAX_VALUE);
   }
 
   @Test
   public void overflowTest()
       throws Exception {
-    MutableOffHeapByteArrayStore store = new MutableOffHeapByteArrayStore(_memoryManager, "stringColumn", 1024, 32);
-    final int maxSize = store.getStartSize() - 4;
+    int numArrays = 1024;
+    int avgArrayLen = 32;
+    MutableOffHeapByteArrayStore store =
+        new MutableOffHeapByteArrayStore(_memoryManager, "stringColumn", numArrays, avgArrayLen);
+    final int maxSize = MutableOffHeapByteArrayStore.getStartSize(numArrays, avgArrayLen) - 4;
 
     byte[] b1 = new byte[3];
     for (int i = 0; i < b1.length; i++) {
