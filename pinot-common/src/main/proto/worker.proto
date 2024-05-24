@@ -51,7 +51,6 @@ message QueryResponse {
 message StagePlan {
   bytes rootNode = 1; // Serialized StageNode
   StageMetadata stageMetadata = 2;
-  int32 serdeVersion = 3;
 }
 
 message StageMetadata {

@@ -30,61 +30,13 @@ public final class StageNodeSerDeUtils {
     // do not instantiate.
   }
 
-  public static AbstractPlanNode deserializeStageNode(Plan.PlanOrStageNode protoNode, int version) {
-    switch (version) {
-      case 1:
-        return deserializeStageNodeV1(protoNode.getPlanNode());
-      case 0:
-      default:
-        return deserializeStageNodeV0(protoNode.getStageNode());
-    }
+  public static AbstractPlanNode deserializeStageNode(Plan.StageNode protoNode) {
+    return new DeserializationVisitor().process(protoNode);
   }
 
-  public static AbstractPlanNode deserializeStageNodeV1(Plan.PlanNode protoNode) {
-    DeserializationVisitor visitor = new DeserializationVisitor();
-    return visitor.process(protoNode);
-  }
-
-  public static AbstractPlanNode deserializeStageNodeV0(Plan.StageNode protoNode) {
-    AbstractPlanNode planNode = newNodeInstance(protoNode.getNodeName(), protoNode.getStageId());
-    planNode.setDataSchema(extractDataSchema(protoNode));
-    planNode.fromObjectField(protoNode.getObjectField());
-    for (Plan.StageNode protoChild : protoNode.getInputsList()) {
-      planNode.addInput(deserializeStageNodeV0(protoChild));
-    }
-    return planNode;
-  }
-
-  public static Plan.PlanOrStageNode serializeStageNode(AbstractPlanNode planNode, int version) {
-    switch (version) {
-      case 1:
-        return serializeStageNodeV1(planNode);
-      case 0:
-      default:
-        return serializeStageNodeV0(planNode);
-    }
-  }
-
-  public static Plan.PlanOrStageNode serializeStageNodeV1(AbstractPlanNode planNode) {
+  public static Plan.StageNode serializeStageNode(AbstractPlanNode planNode) {
     SerializationVisitor visitor = new SerializationVisitor();
-    Plan.PlanNode node = planNode.visit(visitor, new ArrayList<>());
-    return Plan.PlanOrStageNode.newBuilder().setPlanNode(node).build();
-  }
-
-  public static Plan.PlanOrStageNode serializeStageNodeV0(AbstractPlanNode planNode) {
-    Plan.StageNode.Builder builder = Plan.StageNode.newBuilder()
-        .setStageId(planNode.getPlanFragmentId())
-        .setNodeName(planNode.getClass().getSimpleName())
-        .setObjectField(planNode.toObjectField());
-    DataSchema dataSchema = planNode.getDataSchema();
-    for (int i = 0; i < dataSchema.getColumnNames().length; i++) {
-      builder.addColumnNames(dataSchema.getColumnName(i));
-      builder.addColumnDataTypes(dataSchema.getColumnDataType(i).name());
-    }
-    for (PlanNode childNode : planNode.getInputs()) {
-      builder.addInputs(serializeStageNodeV0((AbstractPlanNode) childNode).getStageNode());
-    }
-    return Plan.PlanOrStageNode.newBuilder().setStageNode(builder).build();
+    return planNode.visit(visitor, new ArrayList<>());
   }
 
   private static DataSchema extractDataSchema(Plan.StageNode protoNode) {

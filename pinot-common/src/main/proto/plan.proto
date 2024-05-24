@@ -22,80 +22,12 @@ import "expressions.proto";
 
 package org.apache.pinot.common.proto;
 
-message PlanOrStageNode {
-  oneof node {
-    StageNode stageNode = 1;
-    PlanNode planNode = 2;
-  }
-}
-
 message StageNode {
   int32 stageId = 1;
-  string nodeName = 2;
   repeated StageNode inputs = 3;
   repeated string columnNames = 4;
   repeated string columnDataTypes = 5;
-  ObjectField objectField = 6;
-}
-
-// MemberVariableField defines the serialized format of the member variables of a class object.
-// MemberVariableField can be one of
-//   1. literal
-//   2. list
-//   3. map
-//   4. complex class object
-message MemberVariableField {
-  oneof member_variable_field {
-    LiteralField literalField = 1;
-    ListField listField = 2;
-    MapField mapField = 3;
-    ObjectField objectField = 4;
-  }
-}
-
-// ObjectField defines the serialized format of a complex class object.
-// it contains:
-//   1. its fully-qualified clazz name;
-//   2. its MemberVariableField map.
-message ObjectField {
-  string objectClassName = 1;
-  map<string, MemberVariableField> memberVariables = 2;
-}
-
-// LiteralField defines the serialized format of a literal field.
-message LiteralField {
-  oneof literal_field {
-    bool boolField = 1;
-    int32 intField = 2;
-    int64 longField = 3;
-    float floatField = 4;
-    double doubleField = 5;
-    string stringField = 6;
-    bytes bytesField = 7;
-    bytes bigDecimalField = 8;
-  }
-}
-
-// ListField defines the serialized format of a list field.
-// The content of the list is a MemberVariableField.
-message ListField {
-  repeated MemberVariableField content = 1;
-}
-
-// ListField defines the serialized format of a map field.
-// The key of the map is a string and the value of the map is a MemberVariableField.
-message MapField {
-  map<string, MemberVariableField> content = 1;
-}
-
-message PlanNode {
-  int32 stageId = 1;
-  string nodeName = 2;
-  repeated PlanNode inputs = 3;
-  repeated string columnNames = 4;
-  repeated string columnDataTypes = 5;
   oneof nodeType {
-    ObjectField objectField = 101;
     TableScanNode tableScanNode = 102;
     MailboxReceiveNode receiveNode = 103;
     MailboxSendNode sendNode = 104;
@@ -166,7 +98,7 @@ message MailboxReceiveNode {
   repeated NullDirection collationNullDirections = 7;
   bool sortOnSender = 8;
   bool sortOnReceiver = 9;
-  PlanNode sender = 10;
+  StageNode sender = 10;
 }
 
 message MailboxSendNode {

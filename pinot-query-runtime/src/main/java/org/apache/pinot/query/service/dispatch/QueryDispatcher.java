@@ -77,11 +77,9 @@ public class QueryDispatcher {
   private final MailboxService _mailboxService;
   private final ExecutorService _executorService;
   private final Map<String, DispatchClient> _dispatchClientMap = new ConcurrentHashMap<>();
-  private final int _planSerdeVersion;
 
-  public QueryDispatcher(MailboxService mailboxService, int planSerdeVersion) {
+  public QueryDispatcher(MailboxService mailboxService) {
     _mailboxService = mailboxService;
-    _planSerdeVersion = planSerdeVersion;
     _executorService = Executors.newFixedThreadPool(2 * Runtime.getRuntime().availableProcessors(),
         new TracedThreadFactory(Thread.NORM_PRIORITY, false, PINOT_BROKER_QUERY_DISPATCHER_FORMAT));
   }
@@ -120,8 +118,8 @@ public class QueryDispatcher {
       serverInstances.addAll(stagePlan.getServerInstanceToWorkerIdMap().keySet());
       stageInfoFutures.add(CompletableFuture.supplyAsync(() -> {
         ByteString rootNode =
-            StageNodeSerDeUtils.serializeStageNode((AbstractPlanNode) stagePlan.getPlanFragment().getFragmentRoot(),
-                _planSerdeVersion).toByteString();
+            StageNodeSerDeUtils.serializeStageNode((AbstractPlanNode) stagePlan.getPlanFragment().getFragmentRoot())
+                .toByteString();
         ByteString customProperty = QueryPlanSerDeUtils.toProtoProperties(stagePlan.getCustomProperties());
         return new StageInfo(rootNode, customProperty);
       }, _executorService));
@@ -171,7 +169,7 @@ public class QueryDispatcher {
                       .setCustomProperty(stageInfo._customProperty).build();
               requestBuilder.addStagePlan(
                   Worker.StagePlan.newBuilder().setRootNode(stageInfo._rootNode).setStageMetadata(stageMetadata)
-                      .setSerdeVersion(_planSerdeVersion).build());
+                      .build());
             }
           }
           requestBuilder.setMetadata(protoRequestMetadata);

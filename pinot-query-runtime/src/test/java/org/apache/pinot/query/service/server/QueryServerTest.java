@@ -227,8 +227,7 @@ public class QueryServerTest extends QueryTestSet {
   private Worker.QueryRequest getQueryRequest(DispatchableSubPlan queryPlan, int stageId) {
     DispatchablePlanFragment stagePlan = queryPlan.getQueryStageList().get(stageId);
     Plan.StageNode rootNode =
-        StageNodeSerDeUtils.serializeStageNode((AbstractPlanNode) stagePlan.getPlanFragment().getFragmentRoot(),
-            0).getStageNode();
+        StageNodeSerDeUtils.serializeStageNode((AbstractPlanNode) stagePlan.getPlanFragment().getFragmentRoot());
     List<Worker.WorkerMetadata> workerMetadataList =
         QueryPlanSerDeUtils.toProtoWorkerMetadataList(stagePlan.getWorkerMetadataList());
     ByteString customProperty = QueryPlanSerDeUtils.toProtoProperties(stagePlan.getCustomProperties());

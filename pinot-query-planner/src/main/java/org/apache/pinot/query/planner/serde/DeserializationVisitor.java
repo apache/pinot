@@ -46,10 +46,8 @@ import org.apache.pinot.query.planner.plannode.WindowNode;
 
 
 public class DeserializationVisitor {
-  public AbstractPlanNode process(Plan.PlanNode protoNode) {
+  public AbstractPlanNode process(Plan.StageNode protoNode) {
     switch (protoNode.getNodeTypeCase()) {
-      case OBJECTFIELD:
-        return visitUnknownNode(protoNode);
       case TABLESCANNODE:
         return visitTableScanNode(protoNode);
       case RECEIVENODE:
@@ -79,24 +77,14 @@ public class DeserializationVisitor {
     }
   }
 
-  private AbstractPlanNode visitUnknownNode(Plan.PlanNode protoNode) {
-    AbstractPlanNode planNode = newNodeInstance(protoNode.getNodeName(), protoNode.getStageId());
-    planNode.setDataSchema(extractDataSchema(protoNode));
-    planNode.fromObjectField(protoNode.getObjectField());
-    for (Plan.PlanNode protoChild : protoNode.getInputsList()) {
-      planNode.addInput(process(protoChild));
-    }
-    return planNode;
-  }
-
-  private AbstractPlanNode visitTableScanNode(Plan.PlanNode protoNode) {
+  private AbstractPlanNode visitTableScanNode(Plan.StageNode protoNode) {
     Plan.TableScanNode protoTableNode = protoNode.getTableScanNode();
     List<String> list = new ArrayList<>(protoTableNode.getTableScanColumnsList());
     return new TableScanNode(protoNode.getStageId(), extractDataSchema(protoNode),
         extractNodeHint(protoTableNode.getNodeHint()), protoTableNode.getTableName(), list);
   }
 
-  private AbstractPlanNode visitMailboxReceiveNode(Plan.PlanNode protoNode) {
+  private AbstractPlanNode visitMailboxReceiveNode(Plan.StageNode protoNode) {
     Plan.MailboxReceiveNode protoReceiveNode = protoNode.getReceiveNode();
     return new MailboxReceiveNode(protoNode.getStageId(), extractDataSchema(protoNode),
         protoReceiveNode.getSenderStageId(), convertDistributionType(protoReceiveNode.getDistributionType()),
@@ -110,7 +98,7 @@ public class DeserializationVisitor {
         (MailboxSendNode) visitMailboxSendNode(protoReceiveNode.getSender()));
   }
 
-  private AbstractPlanNode visitMailboxSendNode(Plan.PlanNode protoNode) {
+  private AbstractPlanNode visitMailboxSendNode(Plan.StageNode protoNode) {
     Plan.MailboxSendNode protoSendNode = protoNode.getSendNode();
     MailboxSendNode sendNode =
         new MailboxSendNode(protoNode.getStageId(), extractDataSchema(protoNode), protoSendNode.getReceiverStageId(),
@@ -125,7 +113,7 @@ public class DeserializationVisitor {
     return sendNode;
   }
 
-  private AbstractPlanNode visitSetNode(Plan.PlanNode protoNode) {
+  private AbstractPlanNode visitSetNode(Plan.StageNode protoNode) {
     Plan.SetOpNode protoSetOpNode = protoNode.getSetNode();
     SetOpNode setOpNode = new SetOpNode(convertSetOpType(protoSetOpNode.getSetOpType()), protoNode.getStageId(),
         extractDataSchema(protoNode), protoSetOpNode.getAll());
@@ -133,7 +121,7 @@ public class DeserializationVisitor {
     return setOpNode;
   }
 
-  private AbstractPlanNode visitExchangeNode(Plan.PlanNode protoNode) {
+  private AbstractPlanNode visitExchangeNode(Plan.StageNode protoNode) {
     Plan.ExchangeNode protoExchangeNode = protoNode.getExchangeNode();
 
     Set<String> tableNames = new HashSet<>(protoExchangeNode.getTableNamesList());
@@ -151,7 +139,7 @@ public class DeserializationVisitor {
     return exchangeNode;
   }
 
-  private AbstractPlanNode visitSortNode(Plan.PlanNode protoNode) {
+  private AbstractPlanNode visitSortNode(Plan.StageNode protoNode) {
     Plan.SortNode protoSortNode = protoNode.getSortNode();
 
     List<RexExpression> expressions =
@@ -170,7 +158,7 @@ public class DeserializationVisitor {
     return sortNode;
   }
 
-  private AbstractPlanNode visitWindowNode(Plan.PlanNode protoNode) {
+  private AbstractPlanNode visitWindowNode(Plan.StageNode protoNode) {
     Plan.WindowNode protoWindowNode = protoNode.getWindowNode();
 
     List<RexExpression> groupSet =
@@ -196,7 +184,7 @@ public class DeserializationVisitor {
     return windowNode;
   }
 
-  private AbstractPlanNode visitValueNode(Plan.PlanNode protoNode) {
+  private AbstractPlanNode visitValueNode(Plan.StageNode protoNode) {
     Plan.ValueNode protoSortNode = protoNode.getValueNode();
     List<List<RexExpression>> rows = new ArrayList<>();
 
@@ -209,7 +197,7 @@ public class DeserializationVisitor {
     return valueNode;
   }
 
-  private AbstractPlanNode visitProjectNode(Plan.PlanNode protoNode) {
+  private AbstractPlanNode visitProjectNode(Plan.StageNode protoNode) {
     Plan.ProjectNode protoProjectNode = protoNode.getProjectNode();
 
     List<RexExpression> projects =
@@ -220,7 +208,7 @@ public class DeserializationVisitor {
     return projectNode;
   }
 
-  private AbstractPlanNode visitFilterNode(Plan.PlanNode protoNode) {
+  private AbstractPlanNode visitFilterNode(Plan.StageNode protoNode) {
     Plan.FilterNode protoFilterNode = protoNode.getFilterNode();
 
     RexExpression condition = ProtoExpressionVisitor.process(protoFilterNode.getCondition());
@@ -230,7 +218,7 @@ public class DeserializationVisitor {
     return filterNode;
   }
 
-  private AbstractPlanNode visitAggregateNode(Plan.PlanNode protoNode) {
+  private AbstractPlanNode visitAggregateNode(Plan.StageNode protoNode) {
     Plan.AggregateNode protoAggregateNode = protoNode.getAggregateNode();
 
     List<RexExpression> aggCalls =
@@ -244,7 +232,7 @@ public class DeserializationVisitor {
     return aggregateNode;
   }
 
-  private AbstractPlanNode visitJoinNode(Plan.PlanNode protoNode) {
+  private AbstractPlanNode visitJoinNode(Plan.StageNode protoNode) {
     Plan.JoinNode protoJoinNode = protoNode.getJoinNode();
 
     JoinNode.JoinKeys joinKeys = new JoinNode.JoinKeys(protoJoinNode.getJoinKeys().getLeftKeysList(),
@@ -266,7 +254,7 @@ public class DeserializationVisitor {
     return nodeHint;
   }
 
-  private static DataSchema extractDataSchema(Plan.PlanNode protoNode) {
+  private static DataSchema extractDataSchema(Plan.StageNode protoNode) {
     String[] columnDataTypesList = protoNode.getColumnDataTypesList().toArray(new String[]{});
     String[] columnNames = protoNode.getColumnNamesList().toArray(new String[]{});
     DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[columnNames.length];

@@ -18,8 +18,6 @@
 //
 
 syntax = "proto3";
-import "google/protobuf/timestamp.proto";
-import "google/protobuf/struct.proto";
 
 package org.apache.pinot.common.proto;
 
@@ -46,76 +44,13 @@ enum ColumnDataType {
   UNKNOWN = 19;
 }
 
-message BigDecimal {
-  uint32 scale = 1;
-  uint32 precision = 2;
-  bytes value = 3;
-}
-
 message InputRef {
   int32 index = 1;
-}
-
-message IntArray {
-  repeated int32 array = 1;
-}
-
-message LongArray {
-  repeated int64 array = 1;
-}
-
-message FloatArray {
-  repeated float array = 1;
-}
-
-message DoubleArray {
-  repeated double array = 1;
-}
-
-message BoolArray {
-  repeated bool array = 1;
-}
-
-message TimestampArray {
-  repeated google.protobuf.Timestamp array = 1;
-}
-
-message StringArray {
-  repeated string array = 1;
-}
-
-message BytesArray {
-  repeated bytes array = 1;
 }
 
 message Literal {
   ColumnDataType dataType = 1;
   bytes serializedValue = 2;
-/*
-  oneof value {
-    int32 intValue = 2;
-    int64 longValue = 3;
-    float floatValue = 4;
-    double doubleValue = 5;
-    BigDecimal bigDecimalValue = 6;
-    bool boolValue = 7;
-    google.protobuf.Timestamp timestampValue = 8;
-    string stringValue = 9;
-    google.protobuf.Value jsonValue = 10;
-    bytes byteValue = 11;
-    // OBJECT = 10;
-    IntArray intArrayValue = 12;
-    LongArray longArrayValue = 13;
-    FloatArray floatArrayValue = 14;
-    DoubleArray doubleArrayValue = 15;
-    BoolArray boolArrayValue = 16;
-    TimestampArray timestampArrayValue = 17;
-    StringArray stringArrayValue = 18;
-    BytesArray bytesArrayValue = 19;
-    // UNKNOWN = 19;
-  }
-
- */
 }
 
 message FunctionCall {

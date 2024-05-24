@@ -23,14 +23,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.calcite.rel.hint.RelHint;
-import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.serde.ProtoProperties;
-import org.apache.pinot.query.planner.serde.ProtoSerializable;
-import org.apache.pinot.query.planner.serde.ProtoSerializationUtils;
 
 
-public abstract class AbstractPlanNode implements PlanNode, ProtoSerializable {
+public abstract class AbstractPlanNode implements PlanNode {
 
   protected int _planFragmentId;
   protected final List<PlanNode> _inputs;
@@ -74,16 +71,6 @@ public abstract class AbstractPlanNode implements PlanNode, ProtoSerializable {
   @Override
   public void setDataSchema(DataSchema dataSchema) {
     _dataSchema = dataSchema;
-  }
-
-  @Override
-  public void fromObjectField(Plan.ObjectField objectField) {
-    ProtoSerializationUtils.setObjectFieldToObject(this, objectField);
-  }
-
-  @Override
-  public Plan.ObjectField toObjectField() {
-    return ProtoSerializationUtils.convertObjectToObjectField(this);
   }
 
   public static class NodeHint {

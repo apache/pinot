@@ -46,11 +46,11 @@ import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 
 
-public class SerializationVisitor implements PlanNodeVisitor<Plan.PlanNode, List<Plan.PlanNode>> {
+public class SerializationVisitor implements PlanNodeVisitor<Plan.StageNode, List<Plan.StageNode>> {
   @Override
-  public Plan.PlanNode visitAggregate(AggregateNode node, List<Plan.PlanNode> context) {
+  public Plan.StageNode visitAggregate(AggregateNode node, List<Plan.StageNode> context) {
     node.getInputs().get(0).visit(this, context);
-    Plan.PlanNode.Builder builder = getBuilder(node, context);
+    Plan.StageNode.Builder builder = getBuilder(node, context);
 
     List<Expressions.RexExpression> aggCalls =
         node.getAggCalls().stream().map(RexExpressionVisitor::process).collect(Collectors.toList());
@@ -65,36 +65,36 @@ public class SerializationVisitor implements PlanNodeVisitor<Plan.PlanNode, List
     builder.setAggregateNode(aggregateNodeBuilder);
 
     context.clear();
-    Plan.PlanNode protoPlanNode = builder.build();
+    Plan.StageNode protoPlanNode = builder.build();
     context.add(protoPlanNode);
 
     return protoPlanNode;
   }
 
   @Override
-  public Plan.PlanNode visitFilter(FilterNode node, List<Plan.PlanNode> context) {
+  public Plan.StageNode visitFilter(FilterNode node, List<Plan.StageNode> context) {
     node.getInputs().get(0).visit(this, context);
 
-    Plan.PlanNode.Builder builder = getBuilder(node, context);
+    Plan.StageNode.Builder builder = getBuilder(node, context);
 
     Expressions.RexExpression condition = RexExpressionVisitor.process(node.getCondition());
     Plan.FilterNode.Builder filterNodeBuilder = Plan.FilterNode.newBuilder().setCondition(condition);
     builder.setFilterNode(filterNodeBuilder);
 
     context.clear();
-    Plan.PlanNode protoPlanNode = builder.build();
+    Plan.StageNode protoPlanNode = builder.build();
     context.add(protoPlanNode);
 
     return protoPlanNode;
   }
 
   @Override
-  public Plan.PlanNode visitJoin(JoinNode node, List<Plan.PlanNode> context) {
+  public Plan.StageNode visitJoin(JoinNode node, List<Plan.StageNode> context) {
     node.getInputs().get(0).visit(this, context);
     node.getInputs().get(1).visit(this, context);
     node.getInputs().get(0).visit(this, context);
 
-    Plan.PlanNode.Builder builder = getBuilder(node, context);
+    Plan.StageNode.Builder builder = getBuilder(node, context);
 
     Plan.JoinKeys.Builder joinKeyBuilder = Plan.JoinKeys.newBuilder().addAllLeftKeys(node.getJoinKeys().getLeftKeys())
         .addAllRightKeys(node.getJoinKeys().getRightKeys());
@@ -110,15 +110,15 @@ public class SerializationVisitor implements PlanNodeVisitor<Plan.PlanNode, List
     builder.setJoinNode(joinNodeBuilder);
 
     context.clear();
-    Plan.PlanNode protoPlanNode = builder.build();
+    Plan.StageNode protoPlanNode = builder.build();
     context.add(protoPlanNode);
 
     return protoPlanNode;
   }
 
   @Override
-  public Plan.PlanNode visitMailboxReceive(MailboxReceiveNode node, List<Plan.PlanNode> context) {
-    Plan.PlanNode.Builder builder = getBuilder(node, context);
+  public Plan.StageNode visitMailboxReceive(MailboxReceiveNode node, List<Plan.StageNode> context) {
+    Plan.StageNode.Builder builder = getBuilder(node, context);
     Plan.MailboxReceiveNode.Builder receiveNodeBuilder =
         Plan.MailboxReceiveNode.newBuilder().setSenderStageId(node.getSenderStageId())
             .setDistributionType(convertDistributionType(node.getDistributionType()))
@@ -137,21 +137,21 @@ public class SerializationVisitor implements PlanNodeVisitor<Plan.PlanNode, List
     builder.setReceiveNode(receiveNodeBuilder);
 
     context.clear();
-    Plan.PlanNode protoPlanNode = builder.build();
+    Plan.StageNode protoPlanNode = builder.build();
     context.add(protoPlanNode);
 
     return protoPlanNode;
   }
 
   @Override
-  public Plan.PlanNode visitMailboxSend(MailboxSendNode node, List<Plan.PlanNode> context) {
+  public Plan.StageNode visitMailboxSend(MailboxSendNode node, List<Plan.StageNode> context) {
     node.getInputs().get(0).visit(this, context);
-    Plan.PlanNode.Builder builder = getBuilder(node, context);
+    Plan.StageNode.Builder builder = getBuilder(node, context);
     Plan.MailboxSendNode.Builder sendNodeBuilder = getSendNodeBuilder(node);
     builder.setSendNode(sendNodeBuilder);
 
     context.clear();
-    Plan.PlanNode protoPlanNode = builder.build();
+    Plan.StageNode protoPlanNode = builder.build();
     context.add(protoPlanNode);
 
     return protoPlanNode;
@@ -175,9 +175,9 @@ public class SerializationVisitor implements PlanNodeVisitor<Plan.PlanNode, List
   }
 
   @Override
-  public Plan.PlanNode visitProject(ProjectNode node, List<Plan.PlanNode> context) {
+  public Plan.StageNode visitProject(ProjectNode node, List<Plan.StageNode> context) {
     node.getInputs().get(0).visit(this, context);
-    Plan.PlanNode.Builder builder = getBuilder(node, context);
+    Plan.StageNode.Builder builder = getBuilder(node, context);
 
     List<Expressions.RexExpression> expressions =
         node.getProjects().stream().map(RexExpressionVisitor::process).collect(Collectors.toList());
@@ -185,16 +185,16 @@ public class SerializationVisitor implements PlanNodeVisitor<Plan.PlanNode, List
     builder.setProjectNode(projectNodeBuilder);
 
     context.clear();
-    Plan.PlanNode protoPlanNode = builder.build();
+    Plan.StageNode protoPlanNode = builder.build();
     context.add(protoPlanNode);
 
     return protoPlanNode;
   }
 
   @Override
-  public Plan.PlanNode visitSort(SortNode node, List<Plan.PlanNode> context) {
+  public Plan.StageNode visitSort(SortNode node, List<Plan.StageNode> context) {
     node.getInputs().get(0).visit(this, context);
-    Plan.PlanNode.Builder builder = getBuilder(node, context);
+    Plan.StageNode.Builder builder = getBuilder(node, context);
 
     List<Expressions.RexExpression> inputRefList =
         node.getCollationKeys().stream().map(RexExpressionVisitor::process).collect(Collectors.toList());
@@ -207,29 +207,29 @@ public class SerializationVisitor implements PlanNodeVisitor<Plan.PlanNode, List
     builder.setSortNode(sortNodeBuilder);
 
     context.clear();
-    Plan.PlanNode protoPlanNode = builder.build();
+    Plan.StageNode protoPlanNode = builder.build();
     context.add(protoPlanNode);
 
     return protoPlanNode;
   }
 
   @Override
-  public Plan.PlanNode visitTableScan(TableScanNode node, List<Plan.PlanNode> context) {
-    Plan.PlanNode.Builder builder = getBuilder(node, context);
+  public Plan.StageNode visitTableScan(TableScanNode node, List<Plan.StageNode> context) {
+    Plan.StageNode.Builder builder = getBuilder(node, context);
     Plan.TableScanNode.Builder tableScanNodeBuilder = Plan.TableScanNode.newBuilder().setTableName(node.getTableName())
         .addAllTableScanColumns(node.getTableScanColumns()).setNodeHint(getNodeHintBuilder(node.getNodeHint()));
     builder.setTableScanNode(tableScanNodeBuilder);
 
     context.clear();
-    Plan.PlanNode protoPlanNode = builder.build();
+    Plan.StageNode protoPlanNode = builder.build();
     context.add(protoPlanNode);
 
     return protoPlanNode;
   }
 
   @Override
-  public Plan.PlanNode visitValue(ValueNode node, List<Plan.PlanNode> context) {
-    Plan.PlanNode.Builder builder = getBuilder(node, context);
+  public Plan.StageNode visitValue(ValueNode node, List<Plan.StageNode> context) {
+    Plan.StageNode.Builder builder = getBuilder(node, context);
     Plan.ValueNode.Builder valueNodeBuilder = Plan.ValueNode.newBuilder();
     for (List<RexExpression> row : node.getLiteralRows()) {
       Plan.RexExpressionList.Builder exprBuilder = Plan.RexExpressionList.newBuilder();
@@ -241,16 +241,16 @@ public class SerializationVisitor implements PlanNodeVisitor<Plan.PlanNode, List
     builder.setValueNode(valueNodeBuilder);
 
     context.clear();
-    Plan.PlanNode protoPlanNode = builder.build();
+    Plan.StageNode protoPlanNode = builder.build();
     context.add(protoPlanNode);
 
     return protoPlanNode;
   }
 
   @Override
-  public Plan.PlanNode visitWindow(WindowNode node, List<Plan.PlanNode> context) {
+  public Plan.StageNode visitWindow(WindowNode node, List<Plan.StageNode> context) {
     node.getInputs().get(0).visit(this, context);
-    Plan.PlanNode.Builder builder = getBuilder(node, context);
+    Plan.StageNode.Builder builder = getBuilder(node, context);
 
     List<Expressions.RexExpression> groupSet =
         node.getGroupSet().stream().map(RexExpressionVisitor::process).collect(Collectors.toList());
@@ -275,31 +275,31 @@ public class SerializationVisitor implements PlanNodeVisitor<Plan.PlanNode, List
     builder.setWindowNode(windowNodeBuilder);
 
     context.clear();
-    Plan.PlanNode protoPlanNode = builder.build();
+    Plan.StageNode protoPlanNode = builder.build();
     context.add(protoPlanNode);
 
     return protoPlanNode;
   }
 
   @Override
-  public Plan.PlanNode visitSetOp(SetOpNode node, List<Plan.PlanNode> context) {
+  public Plan.StageNode visitSetOp(SetOpNode node, List<Plan.StageNode> context) {
     node.getInputs().forEach(input -> input.visit(this, context));
-    Plan.PlanNode.Builder builder = getBuilder(node, context);
+    Plan.StageNode.Builder builder = getBuilder(node, context);
     Plan.SetOpNode.Builder setOpBuilder =
         Plan.SetOpNode.newBuilder().setSetOpType(convertSetOpType(node.getSetOpType())).setAll(node.isAll());
     builder.setSetNode(setOpBuilder);
 
     context.clear();
-    Plan.PlanNode protoPlanNode = builder.build();
+    Plan.StageNode protoPlanNode = builder.build();
     context.add(protoPlanNode);
 
     return protoPlanNode;
   }
 
   @Override
-  public Plan.PlanNode visitExchange(ExchangeNode node, List<Plan.PlanNode> context) {
+  public Plan.StageNode visitExchange(ExchangeNode node, List<Plan.StageNode> context) {
     node.getInputs().forEach(input -> input.visit(this, context));
-    Plan.PlanNode.Builder builder = getBuilder(node, context);
+    Plan.StageNode.Builder builder = getBuilder(node, context);
     Plan.ExchangeNode.Builder exchangeNodeBuilder =
         Plan.ExchangeNode.newBuilder().setExchangeType(convertExchangeType(node.getExchangeType()))
             .setDistributionType(convertDistributionType(node.getDistributionType()))
@@ -313,15 +313,14 @@ public class SerializationVisitor implements PlanNodeVisitor<Plan.PlanNode, List
     builder.setExchangeNode(exchangeNodeBuilder);
 
     context.clear();
-    Plan.PlanNode protoPlanNode = builder.build();
+    Plan.StageNode protoPlanNode = builder.build();
     context.add(protoPlanNode);
 
     return protoPlanNode;
   }
 
-  private static Plan.PlanNode.Builder getBuilder(AbstractPlanNode planNode, List<Plan.PlanNode> context) {
-    Plan.PlanNode.Builder builder = Plan.PlanNode.newBuilder().setStageId(planNode.getPlanFragmentId())
-        .setNodeName(planNode.getClass().getSimpleName());
+  private static Plan.StageNode.Builder getBuilder(AbstractPlanNode planNode, List<Plan.StageNode> context) {
+    Plan.StageNode.Builder builder = Plan.StageNode.newBuilder().setStageId(planNode.getPlanFragmentId());
     DataSchema dataSchema = planNode.getDataSchema();
     for (int i = 0; i < dataSchema.getColumnNames().length; i++) {
       builder.addColumnNames(dataSchema.getColumnName(i));
