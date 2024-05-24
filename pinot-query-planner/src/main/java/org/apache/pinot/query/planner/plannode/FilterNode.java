@@ -38,6 +38,11 @@ public class FilterNode extends AbstractPlanNode {
     _condition = RexExpressionUtils.fromRexNode(condition);
   }
 
+  public FilterNode(int stageId, DataSchema dataSchema, RexExpression condition) {
+    super(stageId, dataSchema);
+    _condition = condition;
+  }
+
   public RexExpression getCondition() {
     return _condition;
   }

@@ -25,6 +25,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelFieldCollation;
+import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.utils.DataSchema;
@@ -61,6 +62,18 @@ public class DeserializationVisitor {
         return visitExchangeNode(protoNode);
       case SORTNODE:
         return visitSortNode(protoNode);
+      case WINDOWNODE:
+        return visitWindowNode(protoNode);
+      case VALUENODE:
+        return visitValueNode(protoNode);
+      case PROJECTNODE:
+        return visitProjectNode(protoNode);
+      case FILTERNODE:
+        return visitFilterNode(protoNode);
+      case AGGREGATENODE:
+        return visitAggregateNode(protoNode);
+      case JOINNODE:
+        return visitJoinNode(protoNode);
       default:
         throw new RuntimeException(String.format("Unknown Node Type %s", protoNode.getNodeTypeCase()));
     }
@@ -141,16 +154,109 @@ public class DeserializationVisitor {
   private AbstractPlanNode visitSortNode(Plan.PlanNode protoNode) {
     Plan.SortNode protoSortNode = protoNode.getSortNode();
 
-    List<RexExpression> expressions = protoSortNode.getCollationKeysList().stream().map(i -> new RexExpression.InputRef(i.getIndex())).collect(
-        Collectors.toList());
-    List<RelFieldCollation.Direction> directions = protoSortNode.getCollationDirectionsList().stream().map(DeserializationVisitor::convertDirection).collect(
-        Collectors.toList());
-    List < RelFieldCollation.NullDirection> nullDirections = protoSortNode.getCollationNullDirectionsList().stream().map(DeserializationVisitor::convertNullDirection).collect(
-        Collectors.toList());
+    List<RexExpression> expressions =
+        protoSortNode.getCollationKeysList().stream().map(ProtoExpressionVisitor::process).collect(Collectors.toList());
+    List<RelFieldCollation.Direction> directions =
+        protoSortNode.getCollationDirectionsList().stream().map(DeserializationVisitor::convertDirection)
+            .collect(Collectors.toList());
+    List<RelFieldCollation.NullDirection> nullDirections =
+        protoSortNode.getCollationNullDirectionsList().stream().map(DeserializationVisitor::convertNullDirection)
+            .collect(Collectors.toList());
 
-    SortNode sortNode = new SortNode(protoNode.getStageId(), expressions, directions, nullDirections, protoSortNode.getFetch(), protoSortNode.getOffset(), extractDataSchema(protoNode));
+    SortNode sortNode =
+        new SortNode(protoNode.getStageId(), expressions, directions, nullDirections, protoSortNode.getFetch(),
+            protoSortNode.getOffset(), extractDataSchema(protoNode));
     protoNode.getInputsList().forEach((i) -> sortNode.addInput(process(i)));
     return sortNode;
+  }
+
+  private AbstractPlanNode visitWindowNode(Plan.PlanNode protoNode) {
+    Plan.WindowNode protoWindowNode = protoNode.getWindowNode();
+
+    List<RexExpression> groupSet =
+        protoWindowNode.getGroupSetList().stream().map(ProtoExpressionVisitor::process).collect(Collectors.toList());
+    List<RexExpression> orderSet =
+        protoWindowNode.getOrderSetList().stream().map(ProtoExpressionVisitor::process).collect(Collectors.toList());
+    List<RelFieldCollation.Direction> orderSetDirection =
+        protoWindowNode.getOrderSetDirectionList().stream().map(DeserializationVisitor::convertDirection)
+            .collect(Collectors.toList());
+    List<RelFieldCollation.NullDirection> orderSetNullDirection =
+        protoWindowNode.getOrderSetNullDirectionList().stream().map(DeserializationVisitor::convertNullDirection)
+            .collect(Collectors.toList());
+    List<RexExpression> aggCalls =
+        protoWindowNode.getAggCallsList().stream().map(ProtoExpressionVisitor::process).collect(Collectors.toList());
+    List<RexExpression> constants =
+        protoWindowNode.getConstantsList().stream().map(ProtoExpressionVisitor::process).collect(Collectors.toList());
+
+    WindowNode windowNode =
+        new WindowNode(protoNode.getStageId(), extractDataSchema(protoNode), groupSet, orderSet, orderSetDirection,
+            orderSetNullDirection, aggCalls, protoWindowNode.getLowerBound(), protoWindowNode.getUpperBound(),
+            constants, convertWindowFrameType(protoWindowNode.getWindowFrameType()));
+    protoNode.getInputsList().forEach((i) -> windowNode.addInput(process(i)));
+    return windowNode;
+  }
+
+  private AbstractPlanNode visitValueNode(Plan.PlanNode protoNode) {
+    Plan.ValueNode protoSortNode = protoNode.getValueNode();
+    List<List<RexExpression>> rows = new ArrayList<>();
+
+    for (Plan.RexExpressionList row : protoSortNode.getRowsList()) {
+      rows.add(row.getExpressionsList().stream().map(ProtoExpressionVisitor::process).collect(Collectors.toList()));
+    }
+
+    ValueNode valueNode = new ValueNode(protoNode.getStageId(), extractDataSchema(protoNode), rows);
+    protoNode.getInputsList().forEach((i) -> valueNode.addInput(process(i)));
+    return valueNode;
+  }
+
+  private AbstractPlanNode visitProjectNode(Plan.PlanNode protoNode) {
+    Plan.ProjectNode protoProjectNode = protoNode.getProjectNode();
+
+    List<RexExpression> projects =
+        protoProjectNode.getProjectsList().stream().map(ProtoExpressionVisitor::process).collect(Collectors.toList());
+
+    ProjectNode projectNode = new ProjectNode(protoNode.getStageId(), extractDataSchema(protoNode), projects);
+    protoNode.getInputsList().forEach((i) -> projectNode.addInput(process(i)));
+    return projectNode;
+  }
+
+  private AbstractPlanNode visitFilterNode(Plan.PlanNode protoNode) {
+    Plan.FilterNode protoFilterNode = protoNode.getFilterNode();
+
+    RexExpression condition = ProtoExpressionVisitor.process(protoFilterNode.getCondition());
+
+    FilterNode filterNode = new FilterNode(protoNode.getStageId(), extractDataSchema(protoNode), condition);
+    protoNode.getInputsList().forEach((i) -> filterNode.addInput(process(i)));
+    return filterNode;
+  }
+
+  private AbstractPlanNode visitAggregateNode(Plan.PlanNode protoNode) {
+    Plan.AggregateNode protoAggregateNode = protoNode.getAggregateNode();
+
+    List<RexExpression> aggCalls =
+        protoAggregateNode.getAggCallsList().stream().map(ProtoExpressionVisitor::process).collect(Collectors.toList());
+    List<RexExpression> groupSet =
+        protoAggregateNode.getGroupSetList().stream().map(ProtoExpressionVisitor::process).collect(Collectors.toList());
+    AggregateNode aggregateNode = new AggregateNode(protoNode.getStageId(), extractDataSchema(protoNode), aggCalls,
+        protoAggregateNode.getFilterArgIndicesList(), groupSet, extractNodeHint(protoAggregateNode.getNodeHint()),
+        convertAggType(protoAggregateNode.getAggType()));
+    protoNode.getInputsList().forEach((i) -> aggregateNode.addInput(process(i)));
+    return aggregateNode;
+  }
+
+  private AbstractPlanNode visitJoinNode(Plan.PlanNode protoNode) {
+    Plan.JoinNode protoJoinNode = protoNode.getJoinNode();
+
+    JoinNode.JoinKeys joinKeys = new JoinNode.JoinKeys(protoJoinNode.getJoinKeys().getLeftKeysList(),
+        protoJoinNode.getJoinKeys().getRightKeysList());
+    List<RexExpression> joinClauses =
+        protoJoinNode.getJoinClauseList().stream().map(ProtoExpressionVisitor::process).collect(Collectors.toList());
+    JoinNode joinNode =
+        new JoinNode(protoNode.getStageId(), extractDataSchema(protoNode), protoJoinNode.getLeftColumnNamesList(),
+            protoJoinNode.getRightColumnNamesList(), convertJoinRelType(protoJoinNode.getJoinRelType()), joinKeys,
+            joinClauses, extractNodeHint(protoJoinNode.getJoinHints()));
+    protoNode.getInputsList().forEach((i) -> joinNode.addInput(process(i)));
+    return joinNode;
   }
 
   private static AbstractPlanNode.NodeHint extractNodeHint(Plan.NodeHint protoNodeHint) {
@@ -186,6 +292,7 @@ public class DeserializationVisitor {
         return RelDistribution.Type.BROADCAST_DISTRIBUTED;
       case ANY:
         return RelDistribution.Type.ANY;
+      default:
     }
     throw new RuntimeException(String.format("Unknown RelDistribution.Type %s", type));
   }
@@ -198,6 +305,7 @@ public class DeserializationVisitor {
         return PinotRelExchangeType.STREAMING;
       case PIPELINE_BREAKER:
         return PinotRelExchangeType.PIPELINE_BREAKER;
+      default:
     }
 
     throw new RuntimeException(String.format("Unknown PinotRelExchangeType %s", exchangeType));
@@ -215,6 +323,7 @@ public class DeserializationVisitor {
         return RelFieldCollation.Direction.STRICTLY_DESCENDING;
       case CLUSTERED:
         return RelFieldCollation.Direction.CLUSTERED;
+      default:
     }
     throw new RuntimeException(String.format("Unknown Direction %s", direction));
   }
@@ -225,9 +334,9 @@ public class DeserializationVisitor {
         return RelFieldCollation.NullDirection.FIRST;
       case LAST:
         return RelFieldCollation.NullDirection.LAST;
+      default:
+        return RelFieldCollation.NullDirection.UNSPECIFIED;
     }
-
-    return RelFieldCollation.NullDirection.UNSPECIFIED;
   }
 
   private static AbstractPlanNode newNodeInstance(String nodeName, int planFragmentId) {
@@ -264,7 +373,54 @@ public class DeserializationVisitor {
         return SetOpNode.SetOpType.UNION;
       case MINUS:
         return SetOpNode.SetOpType.MINUS;
+      default:
     }
     throw new RuntimeException(String.format("Unknown SetOpType %s", type));
+  }
+
+  private static WindowNode.WindowFrameType convertWindowFrameType(Plan.WindowFrameType windowFrameType) {
+    switch (windowFrameType) {
+      case ROWS:
+        return WindowNode.WindowFrameType.ROWS;
+      case RANGE:
+        return WindowNode.WindowFrameType.RANGE;
+      default:
+    }
+
+    throw new RuntimeException(String.format("Unknown WindowFrameType %s", windowFrameType));
+  }
+
+  private static AggregateNode.AggType convertAggType(Plan.AggType type) {
+    switch (type) {
+      case DIRECT:
+        return AggregateNode.AggType.DIRECT;
+      case LEAF:
+        return AggregateNode.AggType.LEAF;
+      case INTERMEDIATE:
+        return AggregateNode.AggType.INTERMEDIATE;
+      case FINAL:
+        return AggregateNode.AggType.FINAL;
+      default:
+    }
+    throw new RuntimeException(String.format("Unknown AggType %s", type));
+  }
+
+  private static JoinRelType convertJoinRelType(Plan.JoinRelType joinRelType) {
+    switch (joinRelType) {
+      case ANTI:
+        return JoinRelType.ANTI;
+      case FULL:
+        return JoinRelType.FULL;
+      case LEFT:
+        return JoinRelType.LEFT;
+      case SEMI:
+        return JoinRelType.SEMI;
+      case INNER:
+        return JoinRelType.INNER;
+      case RIGHT:
+        return JoinRelType.RIGHT;
+      default:
+    }
+    throw new RuntimeException(String.format("Unknown JoinRelType %s", joinRelType));
   }
 }

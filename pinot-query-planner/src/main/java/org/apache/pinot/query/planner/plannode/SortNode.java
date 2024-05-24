@@ -68,7 +68,8 @@ public class SortNode extends AbstractPlanNode {
     _offset = offset;
   }
 
-  public SortNode(int stageId, List<RexExpression> expressions, List<Direction> directions, List<NullDirection> nullDirections, int fetch, int offset, DataSchema dataSchema) {
+  public SortNode(int stageId, List<RexExpression> expressions, List<Direction> directions,
+      List<NullDirection> nullDirections, int fetch, int offset, DataSchema dataSchema) {
     super(stageId, dataSchema);
     _collationKeys = expressions;
     _collationDirections = directions;

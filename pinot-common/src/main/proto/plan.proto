@@ -18,6 +18,7 @@
 //
 
 syntax = "proto3";
+import "expressions.proto";
 
 package org.apache.pinot.common.proto;
 
@@ -101,6 +102,13 @@ message PlanNode {
     SetOpNode setNode = 105;
     ExchangeNode exchangeNode = 106;
     SortNode sortNode = 107;
+    AggregateNode aggregateNode = 108;
+    JoinNode joinNode = 109;
+    LiteralValueNode literalValueNode = 110;
+    ProjectNode projectNode = 111;
+    ValueNode valueNode = 112;
+    WindowNode windowNode = 113;
+    FilterNode filterNode = 114;
   }
 }
 
@@ -200,14 +208,85 @@ message ExchangeNode {
   repeated string tableNames = 8;
 }
 
-message InputRef {
-  int32 index = 1;
-}
-
 message SortNode {
-  repeated InputRef collationKeys = 1;
+  repeated RexExpression collationKeys = 1;
   repeated Direction collationDirections = 2;
   repeated NullDirection collationNullDirections = 3;
   int32 fetch = 4;
   int32 offset = 5;
+}
+
+enum AggType {
+  DIRECT = 0;
+  LEAF = 1;
+  INTERMEDIATE = 2;
+  FINAL = 3;
+}
+
+message AggregateNode {
+  NodeHint nodeHint = 1;
+  repeated RexExpression aggCalls = 2;
+  repeated int32 filterArgIndices = 3;
+  repeated RexExpression groupSet = 4;
+  AggType aggType = 5;
+}
+
+message FilterNode {
+  RexExpression condition = 1;
+}
+
+enum JoinRelType {
+  INNER = 0;
+  LEFT = 1;
+  RIGHT = 2;
+  FULL = 3;
+  SEMI = 4;
+  ANTI = 5;
+}
+
+message JoinKeys {
+  repeated int32 leftKeys = 1;
+  repeated int32 rightKeys = 2;
+}
+
+message JoinNode {
+  JoinRelType joinRelType = 1;
+  JoinKeys joinKeys = 2;
+  repeated RexExpression joinClause = 3;
+  NodeHint joinHints = 4;
+  repeated string leftColumnNames = 5;
+  repeated string rightColumnNames = 6;
+}
+
+message LiteralValueNode {
+  bytes dataTable = 1;
+}
+
+message ProjectNode {
+  repeated RexExpression projects = 1;
+}
+
+message RexExpressionList {
+  repeated RexExpression expressions = 1;
+}
+
+message ValueNode {
+  repeated RexExpressionList rows = 1;
+}
+
+enum WindowFrameType {
+    ROWS = 0;
+    RANGE = 1;
+}
+
+message WindowNode {
+  repeated RexExpression groupSet = 1;
+  repeated RexExpression orderSet = 2;
+  repeated Direction orderSetDirection = 3;
+  repeated NullDirection orderSetNullDirection = 4;
+  repeated RexExpression aggCalls = 5;
+  int32 lowerBound = 6;
+  int32 upperBound = 7;
+  repeated RexExpression constants = 8;
+  WindowFrameType windowFrameType = 9;
 }

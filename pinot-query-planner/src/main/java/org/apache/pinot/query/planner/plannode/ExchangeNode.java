@@ -80,8 +80,8 @@ public class ExchangeNode extends AbstractPlanNode {
   }
 
   public ExchangeNode(int currentStageId, DataSchema dataSchema, PinotRelExchangeType exchangeType,
-      Set<String> tableNames, List<Integer> keys, RelDistribution.Type distributionType, List<RelFieldCollation> collations, boolean isSortOnSender,
-      boolean isSortOnReceiver, boolean isPrePartitioned) {
+      Set<String> tableNames, List<Integer> keys, RelDistribution.Type distributionType,
+      List<RelFieldCollation> collations, boolean isSortOnSender, boolean isSortOnReceiver, boolean isPrePartitioned) {
     super(currentStageId, dataSchema);
     _exchangeType = exchangeType;
     _keys = keys;

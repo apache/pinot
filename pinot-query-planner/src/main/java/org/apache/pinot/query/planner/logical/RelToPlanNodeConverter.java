@@ -130,9 +130,9 @@ public final class RelToPlanNodeConverter {
       }
     }
     RelDistribution inputDistributionTrait = node.getInputs().get(0).getTraitSet().getDistribution();
-    boolean isPrePartitioned = inputDistributionTrait != null
-        && inputDistributionTrait.getType() == RelDistribution.Type.HASH_DISTRIBUTED
-        && inputDistributionTrait == node.getDistribution();
+    boolean isPrePartitioned =
+        inputDistributionTrait != null && inputDistributionTrait.getType() == RelDistribution.Type.HASH_DISTRIBUTED
+            && inputDistributionTrait == node.getDistribution();
     List<RelFieldCollation> fieldCollations = (collation == null) ? null : collation.getFieldCollations();
 
     // Compute all the tables involved under this exchange node
@@ -169,7 +169,8 @@ public final class RelToPlanNodeConverter {
   }
 
   private static PlanNode convertLogicalProject(LogicalProject node, int currentStageId) {
-    return new ProjectNode(currentStageId, toDataSchema(node.getRowType()), node.getProjects());
+    return new ProjectNode(currentStageId, toDataSchema(node.getRowType()),
+        node.getProjects().stream().map(RexExpressionUtils::fromRexNode).collect(Collectors.toList()));
   }
 
   private static PlanNode convertLogicalFilter(LogicalFilter node, int currentStageId) {

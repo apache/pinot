@@ -24,7 +24,9 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelFieldCollation;
+import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.logical.PinotRelExchangeType;
+import org.apache.pinot.common.proto.Expressions;
 import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
@@ -35,7 +37,6 @@ import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
-import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
@@ -46,34 +47,73 @@ import org.apache.pinot.query.planner.plannode.WindowNode;
 
 
 public class SerializationVisitor implements PlanNodeVisitor<Plan.PlanNode, List<Plan.PlanNode>> {
-  public Plan.PlanNode process(PlanNode planNode, List<Plan.PlanNode> context) {
-    AbstractPlanNode abstractPlanNode = (AbstractPlanNode) planNode;
-    Plan.PlanNode.Builder builder = getBuilder(abstractPlanNode, context);
-    builder.setObjectField(abstractPlanNode.toObjectField());
+  @Override
+  public Plan.PlanNode visitAggregate(AggregateNode node, List<Plan.PlanNode> context) {
+    node.getInputs().get(0).visit(this, context);
+    Plan.PlanNode.Builder builder = getBuilder(node, context);
+
+    List<Expressions.RexExpression> aggCalls =
+        node.getAggCalls().stream().map(RexExpressionVisitor::process).collect(Collectors.toList());
+    List<Expressions.RexExpression> groupSet =
+        node.getGroupSet().stream().map(RexExpressionVisitor::process).collect(Collectors.toList());
+
+    Plan.AggregateNode.Builder aggregateNodeBuilder =
+        Plan.AggregateNode.newBuilder().setNodeHint(getNodeHintBuilder(node.getNodeHint())).addAllAggCalls(aggCalls)
+            .addAllFilterArgIndices(node.getFilterArgIndices()).addAllGroupSet(groupSet)
+            .setAggType(convertAggType(node.getAggType()));
+
+    builder.setAggregateNode(aggregateNodeBuilder);
 
     context.clear();
     Plan.PlanNode protoPlanNode = builder.build();
     context.add(protoPlanNode);
-    return protoPlanNode;
-  }
 
-  @Override
-  public Plan.PlanNode visitAggregate(AggregateNode node, List<Plan.PlanNode> context) {
-    node.getInputs().get(0).visit(this, context);
-    return process(node, context);
+    return protoPlanNode;
   }
 
   @Override
   public Plan.PlanNode visitFilter(FilterNode node, List<Plan.PlanNode> context) {
     node.getInputs().get(0).visit(this, context);
-    return process(node, context);
+
+    Plan.PlanNode.Builder builder = getBuilder(node, context);
+
+    Expressions.RexExpression condition = RexExpressionVisitor.process(node.getCondition());
+    Plan.FilterNode.Builder filterNodeBuilder = Plan.FilterNode.newBuilder().setCondition(condition);
+    builder.setFilterNode(filterNodeBuilder);
+
+    context.clear();
+    Plan.PlanNode protoPlanNode = builder.build();
+    context.add(protoPlanNode);
+
+    return protoPlanNode;
   }
 
   @Override
   public Plan.PlanNode visitJoin(JoinNode node, List<Plan.PlanNode> context) {
     node.getInputs().get(0).visit(this, context);
     node.getInputs().get(1).visit(this, context);
-    return process(node, context);
+    node.getInputs().get(0).visit(this, context);
+
+    Plan.PlanNode.Builder builder = getBuilder(node, context);
+
+    Plan.JoinKeys.Builder joinKeyBuilder = Plan.JoinKeys.newBuilder().addAllLeftKeys(node.getJoinKeys().getLeftKeys())
+        .addAllRightKeys(node.getJoinKeys().getRightKeys());
+
+    List<Expressions.RexExpression> joinClause =
+        node.getJoinClauses().stream().map(RexExpressionVisitor::process).collect(Collectors.toList());
+
+    Plan.JoinNode.Builder joinNodeBuilder =
+        Plan.JoinNode.newBuilder().setJoinRelType(convertJoinRelType(node.getJoinRelType())).setJoinKeys(joinKeyBuilder)
+            .addAllJoinClause(joinClause).setJoinHints(getNodeHintBuilder(node.getJoinHints()))
+            .addAllLeftColumnNames(node.getLeftColumnNames()).addAllRightColumnNames(node.getRightColumnNames());
+
+    builder.setJoinNode(joinNodeBuilder);
+
+    context.clear();
+    Plan.PlanNode protoPlanNode = builder.build();
+    context.add(protoPlanNode);
+
+    return protoPlanNode;
   }
 
   @Override
@@ -137,7 +177,18 @@ public class SerializationVisitor implements PlanNodeVisitor<Plan.PlanNode, List
   @Override
   public Plan.PlanNode visitProject(ProjectNode node, List<Plan.PlanNode> context) {
     node.getInputs().get(0).visit(this, context);
-    return process(node, context);
+    Plan.PlanNode.Builder builder = getBuilder(node, context);
+
+    List<Expressions.RexExpression> expressions =
+        node.getProjects().stream().map(RexExpressionVisitor::process).collect(Collectors.toList());
+    Plan.ProjectNode.Builder projectNodeBuilder = Plan.ProjectNode.newBuilder().addAllProjects(expressions);
+    builder.setProjectNode(projectNodeBuilder);
+
+    context.clear();
+    Plan.PlanNode protoPlanNode = builder.build();
+    context.add(protoPlanNode);
+
+    return protoPlanNode;
   }
 
   @Override
@@ -145,9 +196,8 @@ public class SerializationVisitor implements PlanNodeVisitor<Plan.PlanNode, List
     node.getInputs().get(0).visit(this, context);
     Plan.PlanNode.Builder builder = getBuilder(node, context);
 
-    List<Plan.InputRef> inputRefList = node.getCollationKeys().stream()
-        .map(expr -> Plan.InputRef.newBuilder().setIndex(((RexExpression.InputRef) expr).getIndex()).build())
-        .collect(Collectors.toList());
+    List<Expressions.RexExpression> inputRefList =
+        node.getCollationKeys().stream().map(RexExpressionVisitor::process).collect(Collectors.toList());
     Plan.SortNode.Builder sortNodeBuilder = Plan.SortNode.newBuilder().addAllCollationKeys(inputRefList)
         .addAllCollationDirections(node.getCollationDirections().stream().map(SerializationVisitor::convertDirection)
             .collect(Collectors.toList())).addAllCollationNullDirections(
@@ -179,13 +229,56 @@ public class SerializationVisitor implements PlanNodeVisitor<Plan.PlanNode, List
 
   @Override
   public Plan.PlanNode visitValue(ValueNode node, List<Plan.PlanNode> context) {
-    return process(node, context);
+    Plan.PlanNode.Builder builder = getBuilder(node, context);
+    Plan.ValueNode.Builder valueNodeBuilder = Plan.ValueNode.newBuilder();
+    for (List<RexExpression> row : node.getLiteralRows()) {
+      Plan.RexExpressionList.Builder exprBuilder = Plan.RexExpressionList.newBuilder();
+      List<Expressions.RexExpression> expressions =
+          row.stream().map(RexExpressionVisitor::process).collect(Collectors.toList());
+      exprBuilder.addAllExpressions(expressions);
+      valueNodeBuilder.addRows(exprBuilder);
+    }
+    builder.setValueNode(valueNodeBuilder);
+
+    context.clear();
+    Plan.PlanNode protoPlanNode = builder.build();
+    context.add(protoPlanNode);
+
+    return protoPlanNode;
   }
 
   @Override
   public Plan.PlanNode visitWindow(WindowNode node, List<Plan.PlanNode> context) {
     node.getInputs().get(0).visit(this, context);
-    return process(node, context);
+    Plan.PlanNode.Builder builder = getBuilder(node, context);
+
+    List<Expressions.RexExpression> groupSet =
+        node.getGroupSet().stream().map(RexExpressionVisitor::process).collect(Collectors.toList());
+    List<Expressions.RexExpression> orderSet =
+        node.getOrderSet().stream().map(RexExpressionVisitor::process).collect(Collectors.toList());
+    List<Plan.Direction> orderSetDirection =
+        node.getOrderSetDirection().stream().map(SerializationVisitor::convertDirection).collect(Collectors.toList());
+    List<Plan.NullDirection> orderSetNullDirection =
+        node.getOrderSetNullDirection().stream().map(SerializationVisitor::convertNullDirection)
+            .collect(Collectors.toList());
+    List<Expressions.RexExpression> aggCalls =
+        node.getAggCalls().stream().map(RexExpressionVisitor::process).collect(Collectors.toList());
+    List<Expressions.RexExpression> constants =
+        node.getConstants().stream().map(RexExpressionVisitor::process).collect(Collectors.toList());
+
+    Plan.WindowNode.Builder windowNodeBuilder =
+        Plan.WindowNode.newBuilder().addAllGroupSet(groupSet).addAllOrderSet(orderSet)
+            .addAllOrderSetDirection(orderSetDirection).addAllOrderSetNullDirection(orderSetNullDirection)
+            .addAllAggCalls(aggCalls).setLowerBound(node.getLowerBound()).setUpperBound(node.getUpperBound())
+            .addAllConstants(constants).setWindowFrameType(convertWindowFrameType(node.getWindowFrameType()));
+
+    builder.setWindowNode(windowNodeBuilder);
+
+    context.clear();
+    Plan.PlanNode protoPlanNode = builder.build();
+    context.add(protoPlanNode);
+
+    return protoPlanNode;
   }
 
   @Override
@@ -212,7 +305,8 @@ public class SerializationVisitor implements PlanNodeVisitor<Plan.PlanNode, List
             .setDistributionType(convertDistributionType(node.getDistributionType()))
             .addAllKeys(node.getDistributionKeys()).setIsSortOnSender(node.isSortOnSender())
             .setIsSortOnReceiver(node.isSortOnReceiver()).setIsPrePartitioned(node.isPrePartitioned()).addAllCollations(
-                node.getCollations().stream().map(c -> Plan.RelFieldCollation.newBuilder().setFieldIndex(c.getFieldIndex())
+                node.getCollations().stream().map(c -> Plan.RelFieldCollation.newBuilder()
+                    .setFieldIndex(c.getFieldIndex())
                     .setDirection(convertDirection(c.getDirection()))
                     .setNullDirection(convertNullDirection(c.nullDirection)).build()).collect(Collectors.toList()))
             .addAllTableNames(node.getTableNames());
@@ -264,6 +358,7 @@ public class SerializationVisitor implements PlanNodeVisitor<Plan.PlanNode, List
         return Plan.RelDistributionType.BROADCAST_DISTRIBUTED;
       case ANY:
         return Plan.RelDistributionType.ANY;
+      default:
     }
     throw new RuntimeException(String.format("Unknown RelDistribution.Type %s", type));
   }
@@ -276,6 +371,7 @@ public class SerializationVisitor implements PlanNodeVisitor<Plan.PlanNode, List
         return Plan.PinotRelExchangeType.STREAMING;
       case PIPELINE_BREAKER:
         return Plan.PinotRelExchangeType.PIPELINE_BREAKER;
+      default:
     }
 
     throw new RuntimeException(String.format("Unknown PinotRelExchangeType %s", exchangeType));
@@ -293,6 +389,7 @@ public class SerializationVisitor implements PlanNodeVisitor<Plan.PlanNode, List
         return Plan.Direction.STRICTLY_DESCENDING;
       case CLUSTERED:
         return Plan.Direction.CLUSTERED;
+      default:
     }
     throw new RuntimeException(String.format("Unknown Direction %s", direction));
   }
@@ -303,6 +400,7 @@ public class SerializationVisitor implements PlanNodeVisitor<Plan.PlanNode, List
         return Plan.NullDirection.FIRST;
       case LAST:
         return Plan.NullDirection.LAST;
+      default:
     }
 
     return Plan.NullDirection.UNSPECIFIED;
@@ -316,7 +414,54 @@ public class SerializationVisitor implements PlanNodeVisitor<Plan.PlanNode, List
         return Plan.SetOpType.UNION;
       case MINUS:
         return Plan.SetOpType.MINUS;
+      default:
     }
     throw new RuntimeException(String.format("Unknown SetOpType %s", type));
+  }
+
+  private static Plan.WindowFrameType convertWindowFrameType(WindowNode.WindowFrameType windowFrameType) {
+    switch (windowFrameType) {
+      case ROWS:
+        return Plan.WindowFrameType.ROWS;
+      case RANGE:
+        return Plan.WindowFrameType.RANGE;
+      default:
+    }
+
+    throw new RuntimeException(String.format("Unknown WindowFrameType %s", windowFrameType));
+  }
+
+  private static Plan.AggType convertAggType(AggregateNode.AggType type) {
+    switch (type) {
+      case DIRECT:
+        return Plan.AggType.DIRECT;
+      case LEAF:
+        return Plan.AggType.LEAF;
+      case INTERMEDIATE:
+        return Plan.AggType.INTERMEDIATE;
+      case FINAL:
+        return Plan.AggType.FINAL;
+      default:
+    }
+    throw new RuntimeException(String.format("Unknown AggType %s", type));
+  }
+
+  private static Plan.JoinRelType convertJoinRelType(JoinRelType joinRelType) {
+    switch (joinRelType) {
+      case ANTI:
+        return Plan.JoinRelType.ANTI;
+      case FULL:
+        return Plan.JoinRelType.FULL;
+      case LEFT:
+        return Plan.JoinRelType.LEFT;
+      case SEMI:
+        return Plan.JoinRelType.SEMI;
+      case INNER:
+        return Plan.JoinRelType.INNER;
+      case RIGHT:
+        return Plan.JoinRelType.RIGHT;
+      default:
+    }
+    throw new RuntimeException(String.format("Unknown JoinRelType %s", joinRelType));
   }
 }

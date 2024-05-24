@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.planner.plannode;
 
+import com.google.protobuf.ProtocolStringList;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.calcite.rel.core.JoinRelType;
@@ -54,6 +55,18 @@ public class JoinNode extends AbstractPlanNode {
     _joinKeys = joinKeys;
     _joinClause = joinClause;
     _joinHints = new NodeHint(joinHints);
+  }
+
+  public JoinNode(int stageId, DataSchema dataSchema, ProtocolStringList leftColumnNamesList,
+      ProtocolStringList rightColumnNamesList, JoinRelType joinRelType, JoinKeys joinKeys,
+      List<RexExpression> joinClause, NodeHint joinHint) {
+    super(stageId, dataSchema);
+    _leftColumnNames = leftColumnNamesList;
+    _rightColumnNames = rightColumnNamesList;
+    _joinRelType = joinRelType;
+    _joinKeys = joinKeys;
+    _joinClause = joinClause;
+    _joinHints = joinHint;
   }
 
   public JoinRelType getJoinRelType() {

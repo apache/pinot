@@ -59,6 +59,16 @@ public class AggregateNode extends AbstractPlanNode {
         PinotHintOptions.InternalAggregateOptions.AGG_TYPE));
   }
 
+  public AggregateNode(int stageId, DataSchema dataSchema, List<RexExpression> aggCalls, List<Integer> filterArgIndices,
+      List<RexExpression> groupSet, NodeHint nodeHint, AggType aggType) {
+    super(stageId, dataSchema);
+    _aggCalls = aggCalls;
+    _filterArgIndices = filterArgIndices;
+    _groupSet = groupSet;
+    _nodeHint = nodeHint;
+    _aggType = aggType;
+  }
+
   private boolean areHintsValid(List<RelHint> relHints) {
     return PinotHintStrategyTable.containsHint(relHints, PinotHintOptions.INTERNAL_AGG_OPTIONS);
   }
@@ -102,10 +112,7 @@ public class AggregateNode extends AbstractPlanNode {
    *   (2) extract result as final result format.
    */
   public enum AggType {
-    DIRECT(false, false),
-    LEAF(false, true),
-    INTERMEDIATE(true, true),
-    FINAL(true, false);
+    DIRECT(false, false), LEAF(false, true), INTERMEDIATE(true, true), FINAL(true, false);
 
     private final boolean _isInputIntermediateFormat;
     private final boolean _isOutputIntermediateFormat;

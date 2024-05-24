@@ -170,8 +170,8 @@ public class QueryDispatcher {
                   Worker.StageMetadata.newBuilder().setStageId(stageId).addAllWorkerMetadata(protoWorkerMetadataList)
                       .setCustomProperty(stageInfo._customProperty).build();
               requestBuilder.addStagePlan(
-                  Worker.StagePlan.newBuilder().setRootNode(stageInfo._rootNode).setStageMetadata(stageMetadata).setSerdeVersion(_planSerdeVersion)
-                      .build());
+                  Worker.StagePlan.newBuilder().setRootNode(stageInfo._rootNode).setStageMetadata(stageMetadata)
+                      .setSerdeVersion(_planSerdeVersion).build());
             }
           }
           requestBuilder.setMetadata(protoRequestMetadata);
