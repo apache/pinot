@@ -159,12 +159,12 @@ public class CommonsConfigurationUtilsTest {
   @Test
   public void testPropertiesConfigurationFromFile()
       throws ConfigurationException {
-    PropertiesConfiguration configuration = CommonsConfigurationUtils.fromFile(null, false, true);
+    PropertiesConfiguration configuration = CommonsConfigurationUtils.fromFile(null, false, null);
     assertNotNull(configuration);
     configuration.setProperty("Test Key", "Test Value");
     CommonsConfigurationUtils.saveToFile(configuration, CONFIG_FILE);
 
-    configuration = CommonsConfigurationUtils.fromFile(CONFIG_FILE, false, true);
+    configuration = CommonsConfigurationUtils.fromFile(CONFIG_FILE, false, null);
     assertNotNull(configuration);
     assertEquals(configuration.getProperty("Test Key"), "Test Value");
   }
@@ -172,12 +172,12 @@ public class CommonsConfigurationUtilsTest {
   @Test
   public void testPropertiesConfigurationFromPath()
       throws ConfigurationException {
-    PropertiesConfiguration configuration = CommonsConfigurationUtils.fromPath(null, false, true);
+    PropertiesConfiguration configuration = CommonsConfigurationUtils.fromPath(null, false, null);
     assertNotNull(configuration);
     configuration.setProperty("Test Key", "Test Value");
     CommonsConfigurationUtils.saveToFile(configuration, CONFIG_FILE);
 
-    configuration = CommonsConfigurationUtils.fromPath(CONFIG_FILE.getPath(), false, true);
+    configuration = CommonsConfigurationUtils.fromPath(CONFIG_FILE.getPath(), false, null);
     assertNotNull(configuration);
     assertEquals(configuration.getProperty("Test Key"), "Test Value");
   }
@@ -185,13 +185,13 @@ public class CommonsConfigurationUtilsTest {
   @Test
   public void testPropertiesConfigurationFromInputStream()
       throws ConfigurationException, FileNotFoundException {
-    PropertiesConfiguration configuration = CommonsConfigurationUtils.fromInputStream(null, false, true);
+    PropertiesConfiguration configuration = CommonsConfigurationUtils.fromInputStream(null, false, null);
     assertNotNull(configuration);
     configuration.setProperty("Test Key", "Test Value");
     CommonsConfigurationUtils.saveToFile(configuration, CONFIG_FILE);
 
     FileInputStream inputStream = new FileInputStream(CONFIG_FILE);
-    configuration = CommonsConfigurationUtils.fromInputStream(inputStream, false, true);
+    configuration = CommonsConfigurationUtils.fromInputStream(inputStream, false, null);
     assertNotNull(configuration);
     assertEquals(configuration.getProperty("Test Key"), "Test Value");
   }

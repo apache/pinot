@@ -77,12 +77,15 @@ public class CommonsConfigurationUtils {
    * @param ioFactoryKind representing to set IOFactory. It can be null.
    * @return a {@link PropertiesConfiguration} instance.
    */
-  public static PropertiesConfiguration fromPath(String path, boolean setDefaultDelimiter,
+  public static PropertiesConfiguration fromPath(@Nullable String path, boolean setDefaultDelimiter,
       @Nullable PropertyIOFactoryKind ioFactoryKind)
       throws ConfigurationException {
     PropertiesConfiguration config = createPropertiesConfiguration(setDefaultDelimiter, ioFactoryKind);
-    FileHandler fileHandler = new FileHandler(config);
-    fileHandler.load(path);
+    // if provided path is non-empty, load the existing properties from provided file path
+    if (StringUtils.isNotEmpty(path)) {
+      FileHandler fileHandler = new FileHandler(config);
+      fileHandler.load(path);
+    }
     return config;
   }
 
@@ -103,12 +106,15 @@ public class CommonsConfigurationUtils {
    * @param ioFactoryKind representing to set IOFactory. It can be null.
    * @return a {@link PropertiesConfiguration} instance.
    */
-  public static PropertiesConfiguration fromInputStream(InputStream stream,
+  public static PropertiesConfiguration fromInputStream(@Nullable InputStream stream,
       boolean setDefaultDelimiter, @Nullable PropertyIOFactoryKind ioFactoryKind)
       throws ConfigurationException {
     PropertiesConfiguration config = createPropertiesConfiguration(setDefaultDelimiter, ioFactoryKind);
-    FileHandler fileHandler = new FileHandler(config);
-    fileHandler.load(stream);
+    // if provided stream is not null, load the existing properties from provided input stream.
+    if (stream != null) {
+      FileHandler fileHandler = new FileHandler(config);
+      fileHandler.load(stream);
+    }
     return config;
   }
 
@@ -147,16 +153,14 @@ public class CommonsConfigurationUtils {
    * @param ioFactoryKind representing to set IOFactory. It can be null.
    * @return a {@link PropertiesConfiguration} instance.
    */
-  public static PropertiesConfiguration fromFile(File file,
+  public static PropertiesConfiguration fromFile(@Nullable File file,
       boolean setDefaultDelimiter, @Nullable PropertyIOFactoryKind ioFactoryKind)
       throws ConfigurationException {
     PropertiesConfiguration config = createPropertiesConfiguration(setDefaultDelimiter, ioFactoryKind);
-    FileHandler fileHandler = new FileHandler(config);
-    // check if file exists, load the properties otherwise set the file.
-    if (file.exists()) {
+    // check if file exists, load the existing properties.
+    if (file != null && file.exists()) {
+      FileHandler fileHandler = new FileHandler(config);
       fileHandler.load(file);
-    } else {
-      fileHandler.setFile(file);
     }
     return config;
   }
