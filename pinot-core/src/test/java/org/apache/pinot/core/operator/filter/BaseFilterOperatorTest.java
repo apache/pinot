@@ -74,7 +74,6 @@ public class BaseFilterOperatorTest {
     int[] nullDocIds = new int[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
     TestFilterOperator testFilterOperator = new TestFilterOperator(docIds, nullDocIds, numDocs);
     Assert.assertEquals(TestUtils.getDocIds(testFilterOperator.getTrues()), Collections.emptyList());
-    Assert.assertEquals(TestUtils.getDocIds(testFilterOperator.getFalses()),
-        ImmutableList.of(0, 1, 2, 3, 4, 5, 6, 7, 8, 9));
+    Assert.assertEquals(TestUtils.getDocIds(testFilterOperator.getFalses()), Collections.emptyList());
   }
 }

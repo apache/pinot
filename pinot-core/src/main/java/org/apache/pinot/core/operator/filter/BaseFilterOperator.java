@@ -107,13 +107,13 @@ public abstract class BaseFilterOperator extends BaseOperator<FilterBlock> {
     if (trues instanceof MatchAllDocIdSet) {
       return EmptyDocIdSet.getInstance();
     }
-    if (trues instanceof EmptyDocIdSet) {
-      return new MatchAllDocIdSet(_numDocs);
-    }
     BlockDocIdSet nulls = getNulls();
     if (_nullHandlingEnabled && !(nulls instanceof EmptyDocIdSet)) {
       return new NotDocIdSet(new OrDocIdSet(Arrays.asList(trues, nulls), _numDocs),
           _numDocs);
+    }
+    if (trues instanceof EmptyDocIdSet) {
+      return new MatchAllDocIdSet(_numDocs);
     }
     return new NotDocIdSet(trues, _numDocs);
   }
