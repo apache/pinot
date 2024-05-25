@@ -36,11 +36,9 @@ public class FunnelStepEvent implements Comparable<FunnelStepEvent> {
   }
 
   public FunnelStepEvent(byte[] bytes) {
-    try {
-      DataInputStream dataInputStream = new DataInputStream(new ByteArrayInputStream(bytes));
+    try (DataInputStream dataInputStream = new DataInputStream(new ByteArrayInputStream(bytes))) {
       _timestamp = dataInputStream.readLong();
       _step = dataInputStream.readInt();
-      dataInputStream.close();
     } catch (Exception e) {
       throw new RuntimeException("Caught exception while converting byte[] to FunnelStepEvent", e);
     }
@@ -56,10 +54,7 @@ public class FunnelStepEvent implements Comparable<FunnelStepEvent> {
 
   @Override
   public String toString() {
-    return "StepEvent{"
-        + "timestamp=" + _timestamp
-        + ", step=" + _step
-        + '}';
+    return "StepEvent{" + "timestamp=" + _timestamp + ", step=" + _step + '}';
   }
 
   @Override

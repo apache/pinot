@@ -37,8 +37,7 @@ import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
-public class FunnelMaxStepAggregationFunction
-    implements AggregationFunction<PriorityQueue<FunnelStepEvent>, Long> {
+public class FunnelMaxStepAggregationFunction implements AggregationFunction<PriorityQueue<FunnelStepEvent>, Long> {
   private final ExpressionContext _timestampExpression;
   private final long _windowSize;
   private final List<ExpressionContext> _stepExpressions;
@@ -77,8 +76,7 @@ public class FunnelMaxStepAggregationFunction
   @Override
   public String getResultColumnName() {
     return getType().getName().toLowerCase() + "(" + _windowSize + ")  (" + _timestampExpression.toString() + ", "
-        + _stepExpressions.stream().map(ExpressionContext::toString)
-        .collect(Collectors.joining(",")) + ")";
+        + _stepExpressions.stream().map(ExpressionContext::toString).collect(Collectors.joining(",")) + ")";
   }
 
   @Override
@@ -103,11 +101,15 @@ public class FunnelMaxStepAggregationFunction
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     long[] timestampBlock = blockValSetMap.get(_timestampExpression).getLongValuesSV();
-    List<int[]> stepBlocks = new ArrayList<>();
+    List<int[]> stepBlocks = new ArrayList<>(_numSteps);
     for (ExpressionContext stepExpression : _stepExpressions) {
       stepBlocks.add(blockValSetMap.get(stepExpression).getIntValuesSV());
     }
-    PriorityQueue<FunnelStepEvent> stepEvents = new PriorityQueue<>(length);
+    PriorityQueue<FunnelStepEvent> stepEvents = aggregationResultHolder.getResult();
+    if (stepEvents == null) {
+      stepEvents = new PriorityQueue<>();
+      aggregationResultHolder.setValue(stepEvents);
+    }
     for (int i = 0; i < length; i++) {
       for (int j = 0; j < _numSteps; j++) {
         if (stepBlocks.get(j)[i] == 1) {
@@ -116,14 +118,13 @@ public class FunnelMaxStepAggregationFunction
         }
       }
     }
-    aggregationResultHolder.setValue(stepEvents);
   }
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     long[] timestampBlock = blockValSetMap.get(_timestampExpression).getLongValuesSV();
-    List<int[]> stepBlocks = new ArrayList<>();
+    List<int[]> stepBlocks = new ArrayList<>(_numSteps);
     for (ExpressionContext stepExpression : _stepExpressions) {
       stepBlocks.add(blockValSetMap.get(stepExpression).getIntValuesSV());
     }
@@ -134,9 +135,9 @@ public class FunnelMaxStepAggregationFunction
           PriorityQueue<FunnelStepEvent> stepEvents = groupByResultHolder.getResult(groupKey);
           if (stepEvents == null) {
             stepEvents = new PriorityQueue<>();
+            groupByResultHolder.setValueForKey(groupKey, stepEvents);
           }
           stepEvents.add(new FunnelStepEvent(timestampBlock[i], j));
-          groupByResultHolder.setValueForKey(groupKey, stepEvents);
           break;
         }
       }
@@ -147,7 +148,7 @@ public class FunnelMaxStepAggregationFunction
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     long[] timestampBlock = blockValSetMap.get(_timestampExpression).getLongValuesSV();
-    List<int[]> stepBlocks = new ArrayList<>();
+    List<int[]> stepBlocks = new ArrayList<>(_numSteps);
     for (ExpressionContext stepExpression : _stepExpressions) {
       stepBlocks.add(blockValSetMap.get(stepExpression).getIntValuesSV());
     }
@@ -159,9 +160,9 @@ public class FunnelMaxStepAggregationFunction
             PriorityQueue<FunnelStepEvent> stepEvents = groupByResultHolder.getResult(groupKey);
             if (stepEvents == null) {
               stepEvents = new PriorityQueue<>();
+              groupByResultHolder.setValueForKey(groupKey, stepEvents);
             }
             stepEvents.add(new FunnelStepEvent(timestampBlock[i], j));
-            groupByResultHolder.setValueForKey(groupKey, stepEvents);
           }
           break;
         }
@@ -298,18 +299,17 @@ public class FunnelMaxStepAggregationFunction
 
   @Override
   public String toExplainString() {
+    //@formatter:off
     return "WindowFunnelAggregationFunction{"
-        + "_timestampExpression=" + _timestampExpression
-        + ", _windowSize=" + _windowSize
-        + ", _stepExpressions=" + _stepExpressions
-        + ", _numSteps=" + _numSteps
+        + "timestampExpression=" + _timestampExpression
+        + ", windowSize=" + _windowSize
+        + ", stepExpressions=" + _stepExpressions
         + '}';
+    //@formatter:on
   }
 
   enum Mode {
-    STRICT_DEDUPLICATION(1),
-    STRICT_ORDER(2),
-    STRICT_INCREASE(4);
+    STRICT_DEDUPLICATION(1), STRICT_ORDER(2), STRICT_INCREASE(4);
 
     private final int _value;
 

@@ -68,6 +68,7 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertThrows;
+import static org.testng.Assert.assertTrue;
 
 
 public class ObjectSerDeUtilsTest {
@@ -601,7 +602,7 @@ public class ObjectSerDeUtilsTest {
   public void testFunnelStepEventAccumulator() {
     for (int i = 0; i < NUM_ITERATIONS; i++) {
       int size = RANDOM.nextInt(1000);
-      PriorityQueue<FunnelStepEvent> expected = new PriorityQueue<FunnelStepEvent>();
+      PriorityQueue<FunnelStepEvent> expected = new PriorityQueue<>();
       for (int j = 0; j < size; j++) {
         expected.add(new FunnelStepEvent(RANDOM.nextLong(), RANDOM.nextInt()));
       }
@@ -612,5 +613,10 @@ public class ObjectSerDeUtilsTest {
         assertEquals(actual.poll(), expected.poll(), ERROR_MESSAGE);
       }
     }
+    // Test empty queue
+    PriorityQueue<FunnelStepEvent> empty = new PriorityQueue<>();
+    PriorityQueue<FunnelStepEvent> deserialized = ObjectSerDeUtils.deserialize(ObjectSerDeUtils.serialize(empty),
+        ObjectSerDeUtils.ObjectType.FunnelStepEventAccumulator);
+    assertTrue(deserialized.isEmpty());
   }
 }
