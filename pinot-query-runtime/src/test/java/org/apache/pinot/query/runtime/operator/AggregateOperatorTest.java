@@ -303,6 +303,8 @@ public class AggregateOperatorTest {
         OperatorTestUtil.getStatMap(AggregateOperator.StatKey.class, block2);
     Assert.assertTrue(aggrStats.getBoolean(AggregateOperator.StatKey.NUM_GROUPS_LIMIT_REACHED),
         "num groups limit should be reached");
+    Assert.assertFalse(aggrStats.getBoolean(AggregateOperator.StatKey.BROKER_RESIZED),
+        "broker resized should be false.");
   }
 
   private static RexExpression.FunctionCall getSum(RexExpression arg) {

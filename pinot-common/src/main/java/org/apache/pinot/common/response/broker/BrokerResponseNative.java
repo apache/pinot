@@ -66,6 +66,7 @@ public class BrokerResponseNative implements BrokerResponse {
   private int _numRowsResultSet = 0;
   private List<QueryProcessingException> _exceptions = new ArrayList<>();
   private boolean _numGroupsLimitReached = false;
+  private boolean _brokerResized = false;
   private long _timeUsedMs = 0L;
   private String _requestId;
   private String _brokerId;
@@ -162,7 +163,7 @@ public class BrokerResponseNative implements BrokerResponse {
   @JsonProperty(access = JsonProperty.Access.READ_ONLY)
   @Override
   public boolean isPartialResult() {
-    return getExceptionsSize() > 0 || isNumGroupsLimitReached();
+    return getExceptionsSize() > 0 || isNumGroupsLimitReached() || isBrokerResized();
   }
 
   @Override
@@ -189,6 +190,15 @@ public class BrokerResponseNative implements BrokerResponse {
 
   public void setNumGroupsLimitReached(boolean numGroupsLimitReached) {
     _numGroupsLimitReached = numGroupsLimitReached;
+  }
+
+  @Override
+  public boolean isBrokerResized() {
+    return _brokerResized;
+  }
+
+  public void setBrokerResized(boolean brokerResized) {
+    _brokerResized = brokerResized;
   }
 
   @JsonIgnore

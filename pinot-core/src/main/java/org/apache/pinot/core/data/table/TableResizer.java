@@ -174,10 +174,10 @@ public class TableResizer {
   /**
    * Resizes the recordsMap to the given size.
    */
-  public void resizeRecordsMap(Map<Key, Record> recordsMap, int size) {
+  public boolean resizeRecordsMap(Map<Key, Record> recordsMap, int size) {
     int numRecordsToEvict = recordsMap.size() - size;
     if (numRecordsToEvict <= 0) {
-      return;
+      return false;
     }
     if (numRecordsToEvict <= size) {
       // Fewer records to evict than retain, make a heap of records to evict
@@ -195,6 +195,7 @@ public class TableResizer {
         recordsMap.put(recordToRetain._key, recordToRetain._record);
       }
     }
+    return true;
   }
 
   /**

@@ -731,6 +731,11 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
             1);
       }
 
+      // Track number of queries with results being resized
+      if (brokerResponse.isBrokerResized()) {
+        _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_BROKER_RESIZED, 1);
+      }
+
       // Set total query processing time
       long totalTimeMs = System.currentTimeMillis() - requestContext.getRequestArrivalTimeMillis();
       brokerResponse.setTimeUsedMs(totalTimeMs);

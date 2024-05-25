@@ -83,14 +83,16 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
   BROKER_RESPONSES_WITH_PROCESSING_EXCEPTIONS("badResponses", false),
   // This metric tracks the number of broker responses with unavailable segments.
   BROKER_RESPONSES_WITH_UNAVAILABLE_SEGMENTS("badResponses", false),
-  // This metric track the number of broker responses with not all servers responded.
+  // This metric tracks the number of broker responses with not all servers responded.
   // (numServersQueried > numServersResponded)
   BROKER_RESPONSES_WITH_PARTIAL_SERVERS_RESPONDED("badResponses", false),
 
   BROKER_RESPONSES_WITH_TIMEOUTS("badResponses", false),
 
-  // This metric track the number of broker responses with number of groups limit reached (potential bad responses).
+  // This metric tracks the number of broker responses with number of groups limit reached (potential bad responses).
   BROKER_RESPONSES_WITH_NUM_GROUPS_LIMIT_REACHED("badResponses", false),
+  // This metric tracks the number of broker responses with response being resized (potential bad responses).
+  BROKER_RESPONSES_WITH_BROKER_RESIZED("badResponses", false),
 
   // These metrics track the cost of the query.
   DOCUMENTS_SCANNED("documents", false),

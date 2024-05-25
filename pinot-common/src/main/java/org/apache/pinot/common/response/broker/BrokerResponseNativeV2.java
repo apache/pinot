@@ -99,7 +99,7 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
   @JsonProperty(access = JsonProperty.Access.READ_ONLY)
   @Override
   public boolean isPartialResult() {
-    return getExceptionsSize() > 0 || isNumGroupsLimitReached() || isMaxRowsInJoinReached();
+    return getExceptionsSize() > 0 || isNumGroupsLimitReached() || isMaxRowsInJoinReached() || isBrokerResized();
   }
 
   @Override
@@ -122,6 +122,15 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
 
   public void mergeNumGroupsLimitReached(boolean numGroupsLimitReached) {
     _brokerStats.merge(StatKey.NUM_GROUPS_LIMIT_REACHED, numGroupsLimitReached);
+  }
+
+  @Override
+  public boolean isBrokerResized() {
+    return _brokerStats.getBoolean(StatKey.BROKER_RESIZED);
+  }
+
+  public void mergeBrokerResized(boolean brokerResized) {
+    _brokerStats.merge(StatKey.BROKER_RESIZED, brokerResized);
   }
 
   @Override
@@ -371,7 +380,8 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
     NUM_SEGMENTS_PRUNED_INVALID(StatMap.Type.INT),
     NUM_SEGMENTS_PRUNED_BY_LIMIT(StatMap.Type.INT),
     NUM_SEGMENTS_PRUNED_BY_VALUE(StatMap.Type.INT),
-    NUM_GROUPS_LIMIT_REACHED(StatMap.Type.BOOLEAN);
+    NUM_GROUPS_LIMIT_REACHED(StatMap.Type.BOOLEAN),
+    BROKER_RESIZED(StatMap.Type.BOOLEAN);
 
     private final StatMap.Type _type;
 
