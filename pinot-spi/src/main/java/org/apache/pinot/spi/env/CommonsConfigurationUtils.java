@@ -31,6 +31,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration2.Configuration;
 import org.apache.commons.configuration2.PropertiesConfiguration;
@@ -44,8 +45,9 @@ import org.apache.commons.lang3.StringUtils;
  * Provide utility functions to manipulate Apache Commons {@link Configuration} instances.
  */
 public class CommonsConfigurationUtils {
-
-  private static final String VERSIONED_CONFIG_SEPARATOR = " = ";
+  // value to be used to set the global separator for versioned properties configuration.
+  // the value is same of PropertiesConfiguration `DEFAULT_SEPARATOR` constant.
+  public static final String VERSIONED_CONFIG_SEPARATOR = " = ";
   private static final Character DEFAULT_LIST_DELIMITER = ',';
   public static final String VERSION_HEADER_IDENTIFIER = "version";
 
@@ -174,7 +176,7 @@ public class CommonsConfigurationUtils {
   public static void saveSegmentMetadataToFile(PropertiesConfiguration propertiesConfiguration, File file,
       @Nullable String versionHeader) {
     if (StringUtils.isNotEmpty(versionHeader)) {
-      String header = String.format("%s=%s", VERSION_HEADER_IDENTIFIER, versionHeader);
+      String header = getVersionHeaderString(versionHeader);
       propertiesConfiguration.setHeader(header);
 
       // checks whether the provided versionHeader equals to VersionedIOFactory kind.
@@ -374,7 +376,7 @@ public class CommonsConfigurationUtils {
         String versionHeaderCommentPrefix = String.format("# %s", VERSION_HEADER_IDENTIFIER);
         // check whether the file has the version header or not
         if (StringUtils.startsWith(fileFirstLine, versionHeaderCommentPrefix)) {
-          String[] headerKeyValue = fileFirstLine.split("=");
+          String[] headerKeyValue = fileFirstLine.split(VERSIONED_CONFIG_SEPARATOR);
           if (headerKeyValue.length == 2) {
             versionValue = headerKeyValue[1];
           }
@@ -386,5 +388,11 @@ public class CommonsConfigurationUtils {
       }
     }
     return versionValue;
+  }
+
+  // Returns the version header string based on the version header value provided.
+  // The return statement follow the pattern 'version = <value>'
+  static String getVersionHeaderString(@Nonnull String versionHeaderValue) {
+    return String.format("%s%s%s", VERSION_HEADER_IDENTIFIER, VERSIONED_CONFIG_SEPARATOR, versionHeaderValue);
   }
 }

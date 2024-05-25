@@ -24,7 +24,7 @@ import org.apache.commons.configuration2.PropertiesConfiguration.PropertiesReade
 
 
 /**
- * SegmentMetadataPropertyReader extends the PropertiesReader
+ * VersionedPropertyReader extends the PropertiesReader
  * <p>
  * Purpose: loads the segment metadata faster
  *  - by skipping the unescaping of key and
@@ -39,6 +39,7 @@ class VersionedPropertyReader extends PropertiesReader {
   @Override
   protected void parseProperty(final String line) {
     // skip the regex based parsing of the line content and splitting the content based on first occurrence of separator
+    // getPropertySeparator(), in general returns the PropertiesConfiguration `DEFAULT_SEPARATOR` value i.e. ' = '.
     String[] keyValue = line.split(getPropertySeparator());
     Preconditions.checkArgument(keyValue.length == 2, "property content split should result in key and value");
     initPropertyName(keyValue[0]);

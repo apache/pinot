@@ -29,7 +29,7 @@ import org.apache.commons.configuration2.convert.ListDelimiterHandler;
 /**
  * VersionedIOFactory extends the DefaultIOFactory
  * <p>
- * Purpose: factory class for creating the custom segment metadata property reader and writer.
+ * Purpose: factory class for creating the custom versioned property configuration reader and writer.
  */
 class VersionedIOFactory extends DefaultIOFactory {
   @Override

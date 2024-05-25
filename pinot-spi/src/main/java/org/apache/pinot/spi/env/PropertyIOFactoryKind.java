@@ -33,7 +33,7 @@ public enum PropertyIOFactoryKind {
   },
   VersionedIOFactory {
     public String toString() {
-      return "SegmentMetadata";
+      return "Versioned";
     }
     @Override
     public VersionedIOFactory getInstance() {

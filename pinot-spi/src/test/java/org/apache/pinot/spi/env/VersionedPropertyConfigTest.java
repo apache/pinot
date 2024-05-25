@@ -141,8 +141,8 @@ public class VersionedPropertyConfigTest {
     PropertiesConfiguration configuration =
         CommonsConfigurationUtils.getSegmentMetadataFromFile(oldSegmentProperties, true);
 
-    // assert that Header is equals to '# version=2'
-    assertEquals(configuration.getHeader(), "# version=2");
+    // assert that Header is equals to '# version = 2'
+    assertEquals(configuration.getHeader(), "# version = 2");
 
     // assert that configuration has SegmentMetadataPropertyIOFactory
     assertEquals(configuration.getIOFactory().getClass(), VersionedIOFactory.class);
@@ -203,8 +203,7 @@ public class VersionedPropertyConfigTest {
     CommonsConfigurationUtils.saveSegmentMetadataToFile(configuration, CONFIG_FILE, versionHeader);
 
     if (versionHeader != null) {
-      String expectedHeader =
-          String.format("%s=%s", CommonsConfigurationUtils.VERSION_HEADER_IDENTIFIER, versionHeader);
+      String expectedHeader = CommonsConfigurationUtils.getVersionHeaderString(versionHeader);
       assertEquals(configuration.getHeader(), expectedHeader);
     }
 
