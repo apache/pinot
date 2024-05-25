@@ -79,7 +79,7 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
   final ValueAggregator[] _valueAggregators;
   // Readers and data types for column in function-column pair
   final PinotSegmentColumnReader[] _metricReaders;
-  final ChunkCompressionType[] _compressionType;
+  final AggregationSpec[] _aggregationSpecs;
 
   final int _maxLeafRecords;
 
@@ -138,7 +138,7 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
     _metrics = new String[_numMetrics];
     _valueAggregators = new ValueAggregator[_numMetrics];
     _metricReaders = new PinotSegmentColumnReader[_numMetrics];
-    _compressionType = new ChunkCompressionType[_numMetrics];
+    _aggregationSpecs = new AggregationSpec[_numMetrics];
 
     int index = 0;
     for (Map.Entry<AggregationFunctionColumnPair, AggregationSpec> entry : aggregationSpecs.entrySet()) {
@@ -147,7 +147,7 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
       // TODO: Allow extra arguments in star-tree (e.g. log2m, precision)
       _valueAggregators[index] =
           ValueAggregatorFactory.getValueAggregator(functionColumnPair.getFunctionType(), Collections.emptyList());
-      _compressionType[index] = entry.getValue().getCompressionType();
+      _aggregationSpecs[index] = entry.getValue();
       // Ignore the column for COUNT aggregation function
       if (_valueAggregators[index].getAggregationType() != AggregationFunctionType.COUNT) {
         String column = functionColumnPair.getColumn();
@@ -474,14 +474,18 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
       String metric = _metrics[i];
       ValueAggregator valueAggregator = _valueAggregators[i];
       DataType valueType = valueAggregator.getAggregatedValueType();
-      ChunkCompressionType compressionType = _compressionType[i];
+      AggregationSpec aggregationSpec = _aggregationSpecs[i];
+      ChunkCompressionType compressionType = ChunkCompressionType.valueOf(aggregationSpec.getCompressionCodec().name());
       if (valueType == BYTES) {
         metricIndexCreators[i] =
             new SingleValueVarByteRawIndexCreator(_outputDir, compressionType, metric, _numDocs, BYTES,
-                valueAggregator.getMaxAggregatedValueByteSize());
+                valueAggregator.getMaxAggregatedValueByteSize(), aggregationSpec.isDeriveNumDocsPerChunk(),
+                aggregationSpec.getIndexVersion(), aggregationSpec.getTargetMaxChunkSizeBytes(),
+                aggregationSpec.getTargetDocsPerChunk());
       } else {
         metricIndexCreators[i] =
-            new SingleValueFixedByteRawIndexCreator(_outputDir, compressionType, metric, _numDocs, valueType);
+            new SingleValueFixedByteRawIndexCreator(_outputDir, compressionType, metric, _numDocs, valueType,
+                aggregationSpec.getIndexVersion(), aggregationSpec.getTargetDocsPerChunk());
       }
     }
 

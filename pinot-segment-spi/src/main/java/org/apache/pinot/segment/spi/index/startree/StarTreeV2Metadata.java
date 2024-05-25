@@ -21,12 +21,13 @@ package org.apache.pinot.segment.spi.index.startree;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import org.apache.commons.configuration2.Configuration;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
-import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants.MetadataKey;
+import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
 
 
 /**
@@ -56,10 +57,14 @@ public class StarTreeV2Metadata {
         // Lookup the stored aggregation type
         AggregationFunctionColumnPair storedType =
             AggregationFunctionColumnPair.resolveToStoredType(functionColumnPair);
-        ChunkCompressionType compressionType =
-            ChunkCompressionType.valueOf(aggregationConfig.getString(MetadataKey.COMPRESSION_CODEC));
+        AggregationSpec aggregationSpec =
+            new AggregationSpec(aggregationConfig.getEnum(MetadataKey.COMPRESSION_CODEC, CompressionCodec.class, null),
+                aggregationConfig.getBoolean(MetadataKey.DERIVE_NUM_DOCS_PER_CHUNK, null),
+                aggregationConfig.getInteger(MetadataKey.INDEX_VERSION, null),
+                aggregationConfig.getInteger(MetadataKey.TARGET_MAX_CHUNK_SIZE_BYTES, null),
+                aggregationConfig.getInteger(MetadataKey.TARGET_DOCS_PER_CHUNK, null));
         // If there is already an equivalent functionColumnPair in the map for the stored type, do not load another.
-        _aggregationSpecs.putIfAbsent(storedType, new AggregationSpec(compressionType));
+        _aggregationSpecs.putIfAbsent(storedType, aggregationSpec);
       }
     } else {
       // Backward compatibility with columnName format
@@ -104,5 +109,35 @@ public class StarTreeV2Metadata {
 
   public Set<String> getSkipStarNodeCreationForDimensions() {
     return _skipStarNodeCreationForDimensions;
+  }
+
+  public static void writeMetadata(Configuration metadataProperties, int totalDocs, List<String> dimensionsSplitOrder,
+      TreeMap<AggregationFunctionColumnPair, AggregationSpec> aggregationSpecs, int maxLeafRecords,
+      Set<String> skipStarNodeCreationForDimensions) {
+    metadataProperties.setProperty(MetadataKey.TOTAL_DOCS, totalDocs);
+    metadataProperties.setProperty(MetadataKey.DIMENSIONS_SPLIT_ORDER, dimensionsSplitOrder);
+    metadataProperties.setProperty(MetadataKey.FUNCTION_COLUMN_PAIRS, aggregationSpecs.keySet());
+    metadataProperties.setProperty(MetadataKey.AGGREGATION_COUNT, aggregationSpecs.size());
+    int index = 0;
+    for (Map.Entry<AggregationFunctionColumnPair, AggregationSpec> entry : aggregationSpecs.entrySet()) {
+      AggregationFunctionColumnPair functionColumnPair = entry.getKey();
+      AggregationSpec aggregationSpec = entry.getValue();
+      String prefix = MetadataKey.AGGREGATION_PREFIX + index + '.';
+      metadataProperties.setProperty(prefix + MetadataKey.FUNCTION_TYPE,
+          functionColumnPair.getFunctionType().getName());
+      metadataProperties.setProperty(prefix + MetadataKey.COLUMN_NAME, functionColumnPair.getColumn());
+      metadataProperties.setProperty(prefix + MetadataKey.COMPRESSION_CODEC, aggregationSpec.getCompressionCodec());
+      metadataProperties.setProperty(prefix + MetadataKey.DERIVE_NUM_DOCS_PER_CHUNK,
+          aggregationSpec.isDeriveNumDocsPerChunk());
+      metadataProperties.setProperty(prefix + MetadataKey.INDEX_VERSION, aggregationSpec.getIndexVersion());
+      metadataProperties.setProperty(prefix + MetadataKey.TARGET_MAX_CHUNK_SIZE_BYTES,
+          aggregationSpec.getTargetMaxChunkSizeBytes());
+      metadataProperties.setProperty(prefix + MetadataKey.TARGET_DOCS_PER_CHUNK,
+          aggregationSpec.getTargetDocsPerChunk());
+      index++;
+    }
+    metadataProperties.setProperty(MetadataKey.MAX_LEAF_RECORDS, maxLeafRecords);
+    metadataProperties.setProperty(MetadataKey.SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS,
+        skipStarNodeCreationForDimensions);
   }
 }

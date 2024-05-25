@@ -34,7 +34,7 @@ public class StarTreeIndexConfig extends BaseJsonConfig {
   private final List<String> _skipStarNodeCreationForDimensions;
   // Function column pairs with delimiter "__", e.g. SUM__col1, MAX__col2, COUNT__*
   private final List<String> _functionColumnPairs;
-  // Function column pairs config, currently only handling compression.
+  // Function column pairs config
   private final List<StarTreeAggregationConfig> _aggregationConfigs;
   // The upper bound of records to be scanned at the leaf node
   private final int _maxLeafRecords;
