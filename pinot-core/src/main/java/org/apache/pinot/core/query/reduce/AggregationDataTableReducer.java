@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.query.reduce;
 
-import com.google.common.base.Preconditions;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -69,11 +68,15 @@ public class AggregationDataTableReducer implements DataTableReducer {
       return;
     }
 
-    if (!_queryContext.isServerReturnFinalResult()) {
-      reduceWithIntermediateResult(dataSchema, dataTableMap.values(), brokerResponseNative);
+    Collection<DataTable> dataTables = dataTableMap.values();
+    if (_queryContext.isServerReturnFinalResult()) {
+      if (dataTables.size() == 1) {
+        processSingleFinalResult(dataSchema, dataTables.iterator().next(), brokerResponseNative);
+      } else {
+        reduceWithFinalResult(dataSchema, dataTables, brokerResponseNative);
+      }
     } else {
-      Preconditions.checkState(dataTableMap.size() == 1, "Cannot merge final results from multiple servers");
-      reduceWithFinalResult(dataSchema, dataTableMap.values().iterator().next(), brokerResponseNative);
+      reduceWithIntermediateResult(dataSchema, dataTables, brokerResponseNative);
     }
   }
 
@@ -82,6 +85,7 @@ public class AggregationDataTableReducer implements DataTableReducer {
     int numAggregationFunctions = _aggregationFunctions.length;
     Object[] intermediateResults = new Object[numAggregationFunctions];
     for (DataTable dataTable : dataTables) {
+      Tracing.ThreadAccountantOps.sampleAndCheckInterruption();
       for (int i = 0; i < numAggregationFunctions; i++) {
         Object intermediateResultToMerge;
         ColumnDataType columnDataType = dataSchema.getColumnDataType(i);
@@ -101,19 +105,18 @@ public class AggregationDataTableReducer implements DataTableReducer {
         } else {
           intermediateResults[i] = _aggregationFunctions[i].merge(mergedIntermediateResult, intermediateResultToMerge);
         }
-        Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(i);
       }
     }
     Object[] finalResults = new Object[numAggregationFunctions];
     for (int i = 0; i < numAggregationFunctions; i++) {
       AggregationFunction aggregationFunction = _aggregationFunctions[i];
       Comparable result = aggregationFunction.extractFinalResult(intermediateResults[i]);
-      finalResults[i] = result == null ? null : aggregationFunction.getFinalResultColumnType().convert(result);
+      finalResults[i] = result != null ? aggregationFunction.getFinalResultColumnType().convert(result) : null;
     }
     brokerResponseNative.setResultTable(reduceToResultTable(getPrePostAggregationDataSchema(dataSchema), finalResults));
   }
 
-  private void reduceWithFinalResult(DataSchema dataSchema, DataTable dataTable,
+  private void processSingleFinalResult(DataSchema dataSchema, DataTable dataTable,
       BrokerResponseNative brokerResponseNative) {
     int numAggregationFunctions = _aggregationFunctions.length;
     Object[] finalResults = new Object[numAggregationFunctions];
@@ -131,6 +134,43 @@ public class AggregationDataTableReducer implements DataTableReducer {
       }
     }
     brokerResponseNative.setResultTable(reduceToResultTable(dataSchema, finalResults));
+  }
+
+  private void reduceWithFinalResult(DataSchema dataSchema, Collection<DataTable> dataTables,
+      BrokerResponseNative brokerResponseNative) {
+    int numAggregationFunctions = _aggregationFunctions.length;
+    Comparable[] finalResults = new Comparable[numAggregationFunctions];
+    for (DataTable dataTable : dataTables) {
+      for (int i = 0; i < numAggregationFunctions; i++) {
+        Tracing.ThreadAccountantOps.sampleAndCheckInterruption();
+        Comparable finalResultToMerge;
+        ColumnDataType columnDataType = dataSchema.getColumnDataType(i);
+        if (_queryContext.isNullHandlingEnabled()) {
+          RoaringBitmap nullBitmap = dataTable.getNullRowIds(i);
+          if (nullBitmap != null && nullBitmap.contains(0)) {
+            finalResultToMerge = null;
+          } else {
+            finalResultToMerge = AggregationFunctionUtils.getFinalResult(dataTable, columnDataType, 0, i);
+          }
+        } else {
+          finalResultToMerge = AggregationFunctionUtils.getFinalResult(dataTable, columnDataType, 0, i);
+        }
+        Comparable mergedFinalResult = finalResults[i];
+        if (mergedFinalResult == null) {
+          finalResults[i] = finalResultToMerge;
+        } else {
+          finalResults[i] = _aggregationFunctions[i].mergeFinalResult(mergedFinalResult, finalResultToMerge);
+        }
+      }
+    }
+    Object[] convertedFinalResults = new Object[numAggregationFunctions];
+    for (int i = 0; i < numAggregationFunctions; i++) {
+      AggregationFunction aggregationFunction = _aggregationFunctions[i];
+      Comparable result = finalResults[i];
+      convertedFinalResults[i] = result != null ? aggregationFunction.getFinalResultColumnType().convert(result) : null;
+    }
+    brokerResponseNative.setResultTable(
+        reduceToResultTable(getPrePostAggregationDataSchema(dataSchema), convertedFinalResults));
   }
 
   /**

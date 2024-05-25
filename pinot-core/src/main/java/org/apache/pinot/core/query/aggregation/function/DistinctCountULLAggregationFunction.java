@@ -359,6 +359,11 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
     return Math.round(intermediateResult.getDistinctCountEstimate());
   }
 
+  @Override
+  public Comparable mergeFinalResult(Comparable finalResult1, Comparable finalResult2) {
+    return (Long) finalResult1 + (Long) finalResult2;
+  }
+
   /**
    * Returns the dictionary id bitmap from the result holder or creates a new one if it does not exist.
    */

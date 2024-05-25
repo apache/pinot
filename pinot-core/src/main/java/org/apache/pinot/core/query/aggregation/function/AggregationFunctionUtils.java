@@ -18,6 +18,11 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
+import it.unimi.dsi.fastutil.floats.FloatArrayList;
+import it.unimi.dsi.fastutil.ints.IntArrayList;
+import it.unimi.dsi.fastutil.longs.LongArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -141,7 +146,7 @@ public class AggregationFunctionUtils {
    * TODO: Move ser/de into AggregationFunction interface
    */
   public static Object getIntermediateResult(DataTable dataTable, ColumnDataType columnDataType, int rowId, int colId) {
-    switch (columnDataType) {
+    switch (columnDataType.getStoredType()) {
       case INT:
         return dataTable.getInt(rowId, colId);
       case LONG:
@@ -157,8 +162,42 @@ public class AggregationFunctionUtils {
   }
 
   /**
+   * Reads the final result from the {@link DataTable}.
+   */
+  public static Comparable getFinalResult(DataTable dataTable, ColumnDataType columnDataType, int rowId, int colId) {
+    switch (columnDataType.getStoredType()) {
+      case INT:
+        return dataTable.getInt(rowId, colId);
+      case LONG:
+        return dataTable.getLong(rowId, colId);
+      case FLOAT:
+        return dataTable.getFloat(rowId, colId);
+      case DOUBLE:
+        return dataTable.getDouble(rowId, colId);
+      case BIG_DECIMAL:
+        return dataTable.getBigDecimal(rowId, colId);
+      case STRING:
+        return dataTable.getString(rowId, colId);
+      case BYTES:
+        return dataTable.getBytes(rowId, colId);
+      case INT_ARRAY:
+        return IntArrayList.wrap(dataTable.getIntArray(rowId, colId));
+      case LONG_ARRAY:
+        return LongArrayList.wrap(dataTable.getLongArray(rowId, colId));
+      case FLOAT_ARRAY:
+        return FloatArrayList.wrap(dataTable.getFloatArray(rowId, colId));
+      case DOUBLE_ARRAY:
+        return DoubleArrayList.wrap(dataTable.getDoubleArray(rowId, colId));
+      case STRING_ARRAY:
+        return ObjectArrayList.wrap(dataTable.getStringArray(rowId, colId));
+      default:
+        throw new IllegalStateException("Illegal column data type in final result: " + columnDataType);
+    }
+  }
+
+  /**
    * Reads the converted final result from the {@link DataTable}. It should be equivalent to running
-   * {@link AggregationFunction#extractFinalResult(Object)} and {@link ColumnDataType#convert(Object)}.
+   * {@link #getFinalResult} and {@link ColumnDataType#convert}.
    */
   public static Object getConvertedFinalResult(DataTable dataTable, ColumnDataType columnDataType, int rowId,
       int colId) {

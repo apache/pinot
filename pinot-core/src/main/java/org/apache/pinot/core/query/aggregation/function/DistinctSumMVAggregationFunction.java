@@ -71,4 +71,9 @@ public class DistinctSumMVAggregationFunction extends BaseDistinctAggregateAggre
 
     return distinctSum;
   }
+
+  @Override
+  public Double mergeFinalResult(Double finalResult1, Double finalResult2) {
+    return finalResult1 + finalResult2;
+  }
 }

@@ -191,6 +191,101 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
     }
   }
 
+  @Test
+  public void testServerReturnFinalResult()
+      throws Exception {
+    // Data is segment partitioned on DaysSinceEpoch.
+    JsonNode result = postQuery("SELECT DISTINCT_COUNT(DaysSinceEpoch) FROM mytable");
+    assertEquals(result.get("resultTable").get("rows").get(0).get(0).intValue(), 364);
+    result = postQuery("SELECT SEGMENT_PARTITIONED_DISTINCT_COUNT(DaysSinceEpoch) FROM mytable");
+    assertEquals(result.get("resultTable").get("rows").get(0).get(0).intValue(), 364);
+    result = postQuery("SET serverReturnFinalResult = true; SELECT DISTINCT_COUNT(DaysSinceEpoch) FROM mytable");
+    assertEquals(result.get("resultTable").get("rows").get(0).get(0).intValue(), 364);
+
+    // Data is not partitioned on DayOfWeek. Each segment contains all 7 unique values.
+    result = postQuery("SELECT DISTINCT_COUNT(DayOfWeek) FROM mytable");
+    assertEquals(result.get("resultTable").get("rows").get(0).get(0).intValue(), 7);
+    result = postQuery("SELECT SEGMENT_PARTITIONED_DISTINCT_COUNT(DayOfWeek) FROM mytable");
+    assertEquals(result.get("resultTable").get("rows").get(0).get(0).intValue(), 84);
+    result = postQuery("SET serverReturnFinalResult = true; SELECT DISTINCT_COUNT(DayOfWeek) FROM mytable");
+    assertEquals(result.get("resultTable").get("rows").get(0).get(0).intValue(), 21);
+
+    // Data is segment partitioned on DaysSinceEpoch.
+    result =
+        postQuery("SELECT DaysSinceEpoch, DISTINCT_COUNT(CRSArrTime) FROM mytable GROUP BY 1 ORDER BY 2 DESC LIMIT 1");
+    JsonNode row = result.get("resultTable").get("rows").get(0);
+    assertEquals(row.get(0).intValue(), 16138);
+    assertEquals(row.get(1).intValue(), 398);
+    result = postQuery("SELECT DaysSinceEpoch, SEGMENT_PARTITIONED_DISTINCT_COUNT(CRSArrTime) FROM mytable GROUP BY 1 "
+        + "ORDER BY 2 DESC LIMIT 1");
+    row = result.get("resultTable").get("rows").get(0);
+    assertEquals(row.get(0).intValue(), 16138);
+    assertEquals(row.get(1).intValue(), 398);
+    result = postQuery("SET serverReturnFinalResult = true; "
+        + "SELECT DaysSinceEpoch, DISTINCT_COUNT(CRSArrTime) FROM mytable GROUP BY 1 ORDER BY 2 DESC LIMIT 1");
+    row = result.get("resultTable").get("rows").get(0);
+    assertEquals(row.get(0).intValue(), 16138);
+    assertEquals(row.get(1).intValue(), 398);
+    result = postQuery("SET serverReturnFinalResultKeyUnpartitioned = true; "
+        + "SELECT DaysSinceEpoch, DISTINCT_COUNT(CRSArrTime) FROM mytable GROUP BY 1 ORDER BY 2 DESC LIMIT 1");
+    row = result.get("resultTable").get("rows").get(0);
+    assertEquals(row.get(0).intValue(), 16138);
+    assertEquals(row.get(1).intValue(), 398);
+
+    // Data is segment partitioned on DaysSinceEpoch.
+    result =
+        postQuery("SELECT CRSArrTime, DISTINCT_COUNT(DaysSinceEpoch) FROM mytable GROUP BY 1 ORDER BY 2 DESC LIMIT 1");
+    row = result.get("resultTable").get("rows").get(0);
+    assertEquals(row.get(0).intValue(), 2100);
+    assertEquals(row.get(1).intValue(), 253);
+    result = postQuery("SELECT CRSArrTime, SEGMENT_PARTITIONED_DISTINCT_COUNT(DaysSinceEpoch) FROM mytable GROUP BY 1 "
+        + "ORDER BY 2 DESC LIMIT 1");
+    row = result.get("resultTable").get("rows").get(0);
+    assertEquals(row.get(0).intValue(), 2100);
+    assertEquals(row.get(1).intValue(), 253);
+    result = postQuery("SET serverReturnFinalResultKeyUnpartitioned = true; "
+        + "SELECT CRSArrTime, DISTINCT_COUNT(DaysSinceEpoch) FROM mytable GROUP BY 1 ORDER BY 2 DESC LIMIT 1");
+    row = result.get("resultTable").get("rows").get(0);
+    assertEquals(row.get(0).intValue(), 2100);
+    assertEquals(row.get(1).intValue(), 253);
+    // Data is not partitioned on CRSArrTime. Using serverReturnFinalResult will give wrong result.
+    result = postQuery("SET serverReturnFinalResult = true; "
+        + "SELECT CRSArrTime, DISTINCT_COUNT(DaysSinceEpoch) FROM mytable GROUP BY 1 ORDER BY 2 DESC LIMIT 1");
+    row = result.get("resultTable").get("rows").get(0);
+    assertTrue(row.get(1).intValue() < 253);
+
+    // Should fail when merging final results that cannot be merged.
+    try {
+      postQuery("SET serverReturnFinalResult = true; SELECT AVG(DaysSinceEpoch) FROM mytable");
+      fail();
+    } catch (Exception e) {
+      assertTrue(e.getMessage().contains("Cannot merge final results for function: AVG"));
+    }
+    try {
+      postQuery("SET serverReturnFinalResultKeyUnpartitioned = true; "
+          + "SELECT CRSArrTime, AVG(DaysSinceEpoch) FROM mytable GROUP BY 1 ORDER BY 2 DESC LIMIT 1");
+      fail();
+    } catch (Exception e) {
+      assertTrue(e.getMessage().contains("Cannot merge final results for function: AVG"));
+    }
+
+    // Should not fail when group keys are partitioned because there is no need to merge final results.
+    result = postQuery("SELECT DaysSinceEpoch, AVG(CRSArrTime) FROM mytable GROUP BY 1 ORDER BY 2 DESC LIMIT 1");
+    row = result.get("resultTable").get("rows").get(0);
+    assertEquals(row.get(0).intValue(), 16257);
+    assertEquals(row.get(1).doubleValue(), 725560.0 / 444);
+    result = postQuery("SET serverReturnFinalResult = true; "
+        + "SELECT DaysSinceEpoch, AVG(CRSArrTime) FROM mytable GROUP BY 1 ORDER BY 2 DESC LIMIT 1");
+    row = result.get("resultTable").get("rows").get(0);
+    assertEquals(row.get(0).intValue(), 16257);
+    assertEquals(row.get(1).doubleValue(), 725560.0 / 444);
+    result = postQuery("SET serverReturnFinalResultKeyUnpartitioned = true; "
+        + "SELECT DaysSinceEpoch, AVG(CRSArrTime) FROM mytable GROUP BY 1 ORDER BY 2 DESC LIMIT 1");
+    row = result.get("resultTable").get("rows").get(0);
+    assertEquals(row.get(0).intValue(), 16257);
+    assertEquals(row.get(1).doubleValue(), 725560.0 / 444);
+  }
+
   // Disabled because with multiple replicas, there is no guarantee that all replicas are reloaded
   @Test(enabled = false)
   public void testStarTreeTriggering(boolean useMultiStageQueryEngine) {

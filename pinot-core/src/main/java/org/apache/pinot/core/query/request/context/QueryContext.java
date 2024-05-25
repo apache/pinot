@@ -125,6 +125,8 @@ public class QueryContext {
   private boolean _nullHandlingEnabled;
   // Whether server returns the final result
   private boolean _serverReturnFinalResult;
+  // Whether server returns the final result with unpartitioned group key
+  private boolean _serverReturnFinalResultKeyUnpartitioned;
   // Collection of index types to skip per column
   private Map<String, Set<FieldConfig.IndexType>> _skipIndexes;
 
@@ -406,6 +408,14 @@ public class QueryContext {
     _serverReturnFinalResult = serverReturnFinalResult;
   }
 
+  public boolean isServerReturnFinalResultKeyUnpartitioned() {
+    return _serverReturnFinalResultKeyUnpartitioned;
+  }
+
+  public void setServerReturnFinalResultKeyUnpartitioned(boolean serverReturnFinalResultKeyUnpartitioned) {
+    _serverReturnFinalResultKeyUnpartitioned = serverReturnFinalResultKeyUnpartitioned;
+  }
+
   /**
    * Gets or computes a value of type {@code V} associated with a key of type {@code K} so that it can be shared
    * within the scope of a query.
@@ -545,6 +555,8 @@ public class QueryContext {
               _expressionOverrideHints, _explain);
       queryContext.setNullHandlingEnabled(QueryOptionsUtils.isNullHandlingEnabled(_queryOptions));
       queryContext.setServerReturnFinalResult(QueryOptionsUtils.isServerReturnFinalResult(_queryOptions));
+      queryContext.setServerReturnFinalResultKeyUnpartitioned(
+          QueryOptionsUtils.isServerReturnFinalResultKeyUnpartitioned(_queryOptions));
 
       // Pre-calculate the aggregation functions and columns for the query
       generateAggregationFunctions(queryContext);

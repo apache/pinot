@@ -205,6 +205,11 @@ public class CountAggregationFunction extends BaseSingleInputAggregationFunction
   }
 
   @Override
+  public Long mergeFinalResult(Long finalResult1, Long finalResult2) {
+    return finalResult1 + finalResult2;
+  }
+
+  @Override
   public String toExplainString() {
     StringBuilder stringBuilder = new StringBuilder(getType().getName()).append('(');
     int numArguments = getInputExpressions().size();

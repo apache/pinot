@@ -366,7 +366,17 @@ public class CommonConstants {
         public static final String EXPLAIN_PLAN_VERBOSE = "explainPlanVerbose";
         public static final String USE_MULTISTAGE_ENGINE = "useMultistageEngine";
         public static final String ENABLE_NULL_HANDLING = "enableNullHandling";
+
+        // Can be applied to aggregation and group-by queries to ask servers to directly return final results instead of
+        // intermediate results for aggregations.
         public static final String SERVER_RETURN_FINAL_RESULT = "serverReturnFinalResult";
+        // Can be applied to group-by queries to ask servers to directly return final results instead of intermediate
+        // results for aggregations. Different from SERVER_RETURN_FINAL_RESULT, this option should be used when the
+        // group key is not server partitioned, but the aggregated values are server partitioned. When this option is
+        // used, server will return final results, but won't directly trim the result to the query limit.
+        public static final String SERVER_RETURN_FINAL_RESULT_KEY_UNPARTITIONED =
+            "serverReturnFinalResultKeyUnpartitioned";
+
         // Reorder scan based predicates based on cardinality and number of selected values
         public static final String AND_SCAN_REORDERING = "AndScanReordering";
         public static final String SKIP_INDEXES = "skipIndexes";

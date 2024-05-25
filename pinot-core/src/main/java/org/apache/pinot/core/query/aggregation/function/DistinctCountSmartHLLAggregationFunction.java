@@ -734,6 +734,11 @@ public class DistinctCountSmartHLLAggregationFunction extends BaseSingleInputAgg
     }
   }
 
+  @Override
+  public Integer mergeFinalResult(Integer finalResult1, Integer finalResult2) {
+    return finalResult1 + finalResult2;
+  }
+
   /**
    * Returns the dictionary id bitmap from the result holder or creates a new one if it does not exist.
    */

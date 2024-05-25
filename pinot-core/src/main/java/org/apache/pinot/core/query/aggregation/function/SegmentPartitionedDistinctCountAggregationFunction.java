@@ -328,6 +328,11 @@ public class SegmentPartitionedDistinctCountAggregationFunction extends BaseSing
     return intermediateResult;
   }
 
+  @Override
+  public Long mergeFinalResult(Long finalResult1, Long finalResult2) {
+    return finalResult1 + finalResult2;
+  }
+
   /**
    * Helper method to set an INT value for the given group key into the result holder.
    */
