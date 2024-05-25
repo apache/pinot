@@ -19,6 +19,7 @@
 package org.apache.pinot.query.planner.serde;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -249,6 +250,7 @@ public class DeserializationVisitor {
 
   private static AbstractPlanNode.NodeHint extractNodeHint(Plan.NodeHint protoNodeHint) {
     AbstractPlanNode.NodeHint nodeHint = new AbstractPlanNode.NodeHint();
+    nodeHint._hintOptions = new HashMap<>();
     protoNodeHint.getHintOptionsMap().forEach((key, value) -> nodeHint._hintOptions.put(key, value.getOptionsMap()));
 
     return nodeHint;
@@ -326,33 +328,7 @@ public class DeserializationVisitor {
         return RelFieldCollation.NullDirection.UNSPECIFIED;
     }
   }
-
-  private static AbstractPlanNode newNodeInstance(String nodeName, int planFragmentId) {
-    switch (nodeName) {
-      case "JoinNode":
-        return new JoinNode(planFragmentId);
-      case "ProjectNode":
-        return new ProjectNode(planFragmentId);
-      case "FilterNode":
-        return new FilterNode(planFragmentId);
-      case "AggregateNode":
-        return new AggregateNode(planFragmentId);
-      case "SortNode":
-        return new SortNode(planFragmentId);
-      case "ValueNode":
-        return new ValueNode(planFragmentId);
-      case "WindowNode":
-        return new WindowNode(planFragmentId);
-      case "SetOpNode":
-        return new SetOpNode(planFragmentId);
-      case "ExchangeNode":
-        throw new IllegalArgumentException(
-            "ExchangeNode should be already split into MailboxSendNode and MailboxReceiveNode");
-      default:
-        throw new IllegalArgumentException("Unknown node name: " + nodeName);
-    }
-  }
-
+  
   private static SetOpNode.SetOpType convertSetOpType(Plan.SetOpType type) {
     switch (type) {
       case INTERSECT:
