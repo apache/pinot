@@ -1747,11 +1747,12 @@ public class ObjectSerDeUtils {
 
         @Override
         public byte[] serialize(PriorityQueue<FunnelStepEvent> funnelStepEvents) {
-          long bufferSize = Integer.BYTES + funnelStepEvents.size() * FunnelStepEvent.SIZE_IN_BYTES;
+          int numEvents = funnelStepEvents.size();
+          long bufferSize = Integer.BYTES + (long) numEvents * FunnelStepEvent.SIZE_IN_BYTES;
           Preconditions.checkState(bufferSize <= Integer.MAX_VALUE, "Buffer size exceeds 2GB");
           byte[] bytes = new byte[(int) bufferSize];
           ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
-          byteBuffer.putInt(funnelStepEvents.size());
+          byteBuffer.putInt(numEvents);
           for (FunnelStepEvent funnelStepEvent : funnelStepEvents) {
             byteBuffer.put(funnelStepEvent.getBytes());
           }
@@ -1766,9 +1767,12 @@ public class ObjectSerDeUtils {
         @Override
         public PriorityQueue<FunnelStepEvent> deserialize(ByteBuffer byteBuffer) {
           int size = byteBuffer.getInt();
+          if (size == 0) {
+            return new PriorityQueue<>();
+          }
           PriorityQueue<FunnelStepEvent> funnelStepEvents = new PriorityQueue<>(size);
+          byte[] bytes = new byte[FunnelStepEvent.SIZE_IN_BYTES];
           for (int i = 0; i < size; i++) {
-            byte[] bytes = new byte[FunnelStepEvent.SIZE_IN_BYTES];
             byteBuffer.get(bytes);
             funnelStepEvents.add(new FunnelStepEvent(bytes));
           }
