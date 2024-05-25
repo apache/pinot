@@ -47,6 +47,38 @@ public class AccessControlBackwardCompatibleTest {
     assertEquals(result.getFailureMessage(), "Authorization Failed for tables: table1, table2,");
   }
 
+  @Test(expectedExceptions = UnsupportedOperationException.class)
+  public void testExceptionForNoImplAccessControlMultiTable() {
+    AccessControl accessControl = new NoImplAccessControl();
+    HttpRequesterIdentity identity = new HttpRequesterIdentity();
+    Set<String> tables = Set.of("table1", "table2");
+    accessControl.hasAccess(identity, tables);
+  }
+
+  @Test(expectedExceptions = UnsupportedOperationException.class)
+  public void testExceptionForNoImplAccessControlBrokerRequest() {
+    AccessControl accessControl = new NoImplAccessControl();
+    HttpRequesterIdentity identity = new HttpRequesterIdentity();
+    BrokerRequest request = new BrokerRequest();
+    accessControl.hasAccess(identity, request);
+  }
+
+  @Test(expectedExceptions = UnsupportedOperationException.class)
+  public void testExceptionForNoImplAccessControlAuthorizeMultiTable() {
+    AccessControl accessControl = new NoImplAccessControl();
+    HttpRequesterIdentity identity = new HttpRequesterIdentity();
+    Set<String> tables = Set.of("table1", "table2");
+    accessControl.authorize(identity, tables);
+  }
+
+  @Test(expectedExceptions = UnsupportedOperationException.class)
+  public void testExceptionForNoImplAccessControlAuthorizeBrokerRequest() {
+    AccessControl accessControl = new NoImplAccessControl();
+    HttpRequesterIdentity identity = new HttpRequesterIdentity();
+    BrokerRequest request = new BrokerRequest();
+    accessControl.authorize(identity, request);
+  }
+
   class AllFalseAccessControlImpl implements AccessControl {
 
     @Override
@@ -58,5 +90,8 @@ public class AccessControlBackwardCompatibleTest {
     public boolean hasAccess(RequesterIdentity requesterIdentity, Set<String> tables) {
       return false;
     }
+  }
+
+  class NoImplAccessControl implements AccessControl {
   }
 }

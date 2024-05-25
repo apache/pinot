@@ -54,7 +54,9 @@ public interface AccessControl extends FineGrainedAccessControl {
    */
   @Deprecated
   default boolean hasAccess(RequesterIdentity requesterIdentity, BrokerRequest brokerRequest) {
-    return true;
+    throw new UnsupportedOperationException(
+        "Both hasAccess() and authorize() are not implemented . Do implement authorize() method for new "
+            + "implementations.");
   }
 
   /**
@@ -82,7 +84,9 @@ public interface AccessControl extends FineGrainedAccessControl {
    */
   @Deprecated
   default boolean hasAccess(RequesterIdentity requesterIdentity, Set<String> tables) {
-    return true;
+    throw new UnsupportedOperationException(
+        "Both hasAccess() and authorize() are not implemented . Do implement authorize() method for new "
+            + "implementations.");
   }
 
   /**
