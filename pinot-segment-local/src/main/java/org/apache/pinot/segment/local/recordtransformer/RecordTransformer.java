@@ -43,4 +43,8 @@ public interface RecordTransformer extends Serializable {
    */
   @Nullable
   GenericRow transform(GenericRow record);
+
+  default Long getSanitizedColValuesCount() {
+    return 0L;
+  }
 }

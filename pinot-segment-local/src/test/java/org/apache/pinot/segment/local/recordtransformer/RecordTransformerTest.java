@@ -50,8 +50,9 @@ public class RecordTransformerTest {
       .addSingleValueDimension("svFloat", DataType.FLOAT).addSingleValueDimension("svDouble", DataType.DOUBLE)
       .addSingleValueDimension("svBoolean", DataType.BOOLEAN).addSingleValueDimension("svTimestamp", DataType.TIMESTAMP)
       .addSingleValueDimension("svBytes", DataType.BYTES).addMultiValueDimension("mvInt", DataType.INT)
-      .addSingleValueDimension("svJson", DataType.JSON).addMultiValueDimension("mvLong", DataType.LONG)
-      .addMultiValueDimension("mvFloat", DataType.FLOAT).addMultiValueDimension("mvDouble", DataType.DOUBLE)
+      .addSingleValueDimension("svJson", DataType.JSON).addSingleValueDimension("svJsonWithLengthLimit", DataType.JSON)
+      .addMultiValueDimension("mvLong", DataType.LONG).addMultiValueDimension("mvFloat", DataType.FLOAT)
+      .addMultiValueDimension("mvDouble", DataType.DOUBLE)
       // For sanitation
       .addSingleValueDimension("svStringWithNullCharacters", DataType.STRING)
       .addSingleValueDimension("svStringWithLengthLimit", DataType.STRING)
@@ -69,6 +70,7 @@ public class RecordTransformerTest {
 
   static {
     SCHEMA.getFieldSpecFor("svStringWithLengthLimit").setMaxLength(2);
+    SCHEMA.getFieldSpecFor("svJsonWithLengthLimit").setMaxLength(5);
     SCHEMA.addField(new DimensionFieldSpec("$virtual", DataType.STRING, true, Object.class));
   }
 
@@ -86,6 +88,7 @@ public class RecordTransformerTest {
     record.putValue("svTimestamp", "2020-02-02 22:22:22.222");
     record.putValue("svBytes", "7b7b"/*new byte[]{123, 123}*/);
     record.putValue("svJson", "{\"first\": \"daffy\", \"last\": \"duck\"}");
+    record.putValue("svJsonWithLengthLimit", "{\"first\": \"daffy\", \"last\": \"duck\"}");
     record.putValue("mvInt", new Object[]{123L});
     record.putValue("mvLong", Collections.singletonList(123f));
     record.putValue("mvFloat", new Double[]{123d});
@@ -267,11 +270,13 @@ public class RecordTransformerTest {
       record = transformer.transform(record);
       assertNotNull(record);
       assertEquals(record.getValue("svStringWithNullCharacters"), "1");
+      assertEquals(record.getValue("svJsonWithLengthLimit"), "$SKIPPED$");
       assertEquals(record.getValue("svStringWithLengthLimit"), "12");
       assertEquals(record.getValue("mvString1"), new Object[]{"123", "123", "123", "123.0", "123.0"});
       assertEquals(record.getValue("mvString2"), new Object[]{"123", "123", "123.0", "123.0", "123"});
       assertNull(record.getValue("$virtual"));
       assertTrue(record.getNullValueFields().isEmpty());
+      assertEquals(transformer.getSanitizedColValuesCount(), 3L);
     }
   }
 
@@ -304,8 +309,8 @@ public class RecordTransformerTest {
     // Build Schema and ingestionConfig in such a way that all the transformers are loaded.
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("svInt", DataType.INT)
         .addSingleValueDimension("svDouble", DataType.DOUBLE)
-        .addSingleValueDimension("expressionTestColumn", DataType.INT)
-        .addSingleValueDimension("svNaN", DataType.FLOAT).addMultiValueDimension("mvNaN", DataType.FLOAT)
+        .addSingleValueDimension("expressionTestColumn", DataType.INT).addSingleValueDimension("svNaN", DataType.FLOAT)
+        .addMultiValueDimension("mvNaN", DataType.FLOAT)
         .addSingleValueDimension("emptyDimensionForNullValueTransformer", DataType.FLOAT)
         .addSingleValueDimension("svStringNull", DataType.STRING)
         .addSingleValueDimension("indexableExtras", DataType.JSON)
@@ -638,6 +643,7 @@ public class RecordTransformerTest {
       assertEquals(record.getValue("mvDouble"), new Object[]{123d});
       assertEquals(record.getValue("svStringWithNullCharacters"), "1");
       assertEquals(record.getValue("svStringWithLengthLimit"), "12");
+      assertEquals(record.getValue("svJsonWithLengthLimit"), "$SKIPPED$");
       assertEquals(record.getValue("mvString1"), new Object[]{"123", "123", "123", "123.0", "123.0"});
       assertEquals(record.getValue("mvString2"), new Object[]{"123", "123", "123.0", "123.0", "123"});
       assertNull(record.getValue("$virtual"));

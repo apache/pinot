@@ -64,6 +64,14 @@ public class TransformPipeline {
   }
 
   /**
+   * return the record transformer for this pipeline
+   * @return the record transformer
+   */
+  public RecordTransformer getRecordTransformer() {
+    return _recordTransformer;
+  }
+
+  /**
    * Returns a pass through pipeline that does not transform the record.
    */
   public static TransformPipeline getPassThroughPipeline() {
