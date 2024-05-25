@@ -162,7 +162,11 @@ public class LiteralContext {
   public boolean getBooleanValue() {
     Boolean booleanValue = _booleanValue;
     if (booleanValue == null) {
-      booleanValue = _pinotDataType != null && _pinotDataType.toBoolean(_value);
+      if (_value instanceof Number) {
+        booleanValue = ((Number) _value).intValue() != 0;
+      } else {
+        booleanValue = _pinotDataType != null && _pinotDataType.toBoolean(_value);
+      }
       _booleanValue = booleanValue;
     }
     return booleanValue;

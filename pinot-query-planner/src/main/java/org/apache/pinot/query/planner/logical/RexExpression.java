@@ -117,6 +117,9 @@ public interface RexExpression {
     // whether the function is a distinct function.
     @ProtoProperties
     private boolean _isDistinct;
+    // the list of RexExpressions that represents the pre-args to the function.
+    @ProtoProperties
+    private List<RexExpression> _functionPreArgs;
 
     public FunctionCall() {
     }
@@ -128,11 +131,17 @@ public interface RexExpression {
 
     public FunctionCall(SqlKind sqlKind, ColumnDataType dataType, String functionName,
         List<RexExpression> functionOperands, boolean isDistinct) {
+      this(sqlKind, dataType, functionName, functionOperands, isDistinct, List.of());
+    }
+
+    public FunctionCall(SqlKind sqlKind, ColumnDataType dataType, String functionName,
+        List<RexExpression> functionOperands, boolean isDistinct, List<RexExpression> functionPreArgs) {
       _sqlKind = sqlKind;
       _dataType = dataType;
       _functionName = functionName;
       _functionOperands = functionOperands;
       _isDistinct = isDistinct;
+      _functionPreArgs = functionPreArgs;
     }
 
     public String getFunctionName() {
@@ -145,6 +154,10 @@ public interface RexExpression {
 
     public boolean isDistinct() {
       return _isDistinct;
+    }
+
+    public List<RexExpression> getFunctionPreArgs() {
+      return _functionPreArgs;
     }
 
     @Override

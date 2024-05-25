@@ -25,9 +25,9 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.calcite.sql.SqlKind;
-import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.request.Literal;
@@ -43,7 +43,6 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionFactory;
 import org.apache.pinot.core.query.aggregation.function.CountAggregationFunction;
 import org.apache.pinot.core.util.DataBlockExtractUtils;
-import org.apache.pinot.query.planner.logical.LiteralHintUtils;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.AbstractPlanNode;
 import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
@@ -65,7 +64,6 @@ public class AggregateOperator extends MultiStageOperator {
   private static final String EXPLAIN_NAME = "AGGREGATE_OPERATOR";
   private static final CountAggregationFunction COUNT_STAR_AGG_FUNCTION =
       new CountAggregationFunction(Collections.singletonList(ExpressionContext.forIdentifier("*")), false);
-  private static final ExpressionContext PLACEHOLDER_IDENTIFIER = ExpressionContext.forIdentifier("__PLACEHOLDER__");
 
   private final MultiStageOperator _inputOperator;
   private final DataSchema _resultSchema;
@@ -86,21 +84,8 @@ public class AggregateOperator extends MultiStageOperator {
     _resultSchema = resultSchema;
     _aggType = aggType;
 
-    // Process literal hints
-    Map<Integer, Map<Integer, Literal>> literalArgumentsMap = null;
-    if (nodeHint != null) {
-      Map<String, String> aggOptions = nodeHint._hintOptions.get(PinotHintOptions.INTERNAL_AGG_OPTIONS);
-      if (aggOptions != null) {
-        literalArgumentsMap = LiteralHintUtils.hintStringToLiteralMap(
-            aggOptions.get(PinotHintOptions.InternalAggregateOptions.AGG_CALL_SIGNATURE));
-      }
-    }
-    if (literalArgumentsMap == null) {
-      literalArgumentsMap = Collections.emptyMap();
-    }
-
     // Initialize the aggregation functions
-    AggregationFunction<?, ?>[] aggFunctions = getAggFunctions(aggCalls, literalArgumentsMap);
+    AggregationFunction<?, ?>[] aggFunctions = getAggFunctions(aggCalls);
 
     // Process the filter argument indices
     int numFunctions = aggFunctions.length;
@@ -214,29 +199,25 @@ public class AggregateOperator extends MultiStageOperator {
     return block;
   }
 
-  private AggregationFunction<?, ?>[] getAggFunctions(List<RexExpression> aggCalls,
-      Map<Integer, Map<Integer, Literal>> literalArgumentsMap) {
+  private AggregationFunction<?, ?>[] getAggFunctions(List<RexExpression> aggCalls) {
     int numFunctions = aggCalls.size();
     AggregationFunction<?, ?>[] aggFunctions = new AggregationFunction[numFunctions];
     if (!_aggType.isInputIntermediateFormat()) {
       for (int i = 0; i < numFunctions; i++) {
-        Map<Integer, Literal> literalArguments = literalArgumentsMap.getOrDefault(i, Collections.emptyMap());
-        aggFunctions[i] = getAggFunctionForRawInput((RexExpression.FunctionCall) aggCalls.get(i), literalArguments);
+        aggFunctions[i] = getAggFunctionForRawInput((RexExpression.FunctionCall) aggCalls.get(i));
       }
     } else {
       for (int i = 0; i < numFunctions; i++) {
-        Map<Integer, Literal> literalArguments = literalArgumentsMap.getOrDefault(i, Collections.emptyMap());
-        aggFunctions[i] =
-            getAggFunctionForIntermediateInput((RexExpression.FunctionCall) aggCalls.get(i), literalArguments);
+        aggFunctions[i] = getAggFunctionForIntermediateInput((RexExpression.FunctionCall) aggCalls.get(i));
       }
     }
     return aggFunctions;
   }
 
-  private AggregationFunction<?, ?> getAggFunctionForRawInput(RexExpression.FunctionCall functionCall,
-      Map<Integer, Literal> literalArguments) {
+  private AggregationFunction<?, ?> getAggFunctionForRawInput(RexExpression.FunctionCall functionCall) {
     String functionName = functionCall.getFunctionName();
     List<RexExpression> operands = functionCall.getFunctionOperands();
+    List<RexExpression> functionPreArgs = functionCall.getFunctionPreArgs();
     int numArguments = operands.size();
     if (numArguments == 0) {
       Preconditions.checkState(functionName.equals("COUNT"),
@@ -245,24 +226,15 @@ public class AggregateOperator extends MultiStageOperator {
     }
     List<ExpressionContext> arguments = new ArrayList<>(numArguments);
     for (int i = 0; i < numArguments; i++) {
-      Literal literalArgument = literalArguments.get(i);
-      if (literalArgument != null) {
-        arguments.add(ExpressionContext.forLiteralContext(literalArgument));
+      if (functionPreArgs.size() > i && functionPreArgs.get(i) instanceof RexExpression.Literal) {
+        arguments.add(convertRexExpressionToExpressionContext(functionPreArgs.get(i)));
       } else {
         RexExpression operand = operands.get(i);
-        switch (operand.getKind()) {
-          case INPUT_REF:
-            RexExpression.InputRef inputRef = (RexExpression.InputRef) operand;
-            arguments.add(ExpressionContext.forIdentifier(fromColIdToIdentifier(inputRef.getIndex())));
-            break;
-          case LITERAL:
-            RexExpression.Literal literalRexExp = (RexExpression.Literal) operand;
-            arguments.add(ExpressionContext.forLiteralContext(literalRexExp.getDataType().toDataType(),
-                literalRexExp.getValue()));
-            break;
-          default:
-            throw new IllegalStateException("Illegal aggregation function operand type: " + operand.getKind());
+        SqlKind sqlKind = operand.getKind();
+        if (sqlKind != SqlKind.INPUT_REF && sqlKind != SqlKind.LITERAL) {
+          throw new IllegalStateException("Illegal aggregation function operand type: " + sqlKind);
         }
+        arguments.add(convertRexExpressionToExpressionContext(operand));
       }
     }
     handleListAggDistinctArg(functionName, functionCall, arguments);
@@ -270,8 +242,7 @@ public class AggregateOperator extends MultiStageOperator {
         new FunctionContext(FunctionContext.Type.AGGREGATION, functionName, arguments), true);
   }
 
-  private static AggregationFunction<?, ?> getAggFunctionForIntermediateInput(RexExpression.FunctionCall functionCall,
-      Map<Integer, Literal> literalArguments) {
+  private static AggregationFunction<?, ?> getAggFunctionForIntermediateInput(RexExpression.FunctionCall functionCall) {
     String functionName = functionCall.getFunctionName();
     List<RexExpression> operands = functionCall.getFunctionOperands();
     int numArguments = operands.size();
@@ -280,28 +251,46 @@ public class AggregateOperator extends MultiStageOperator {
     Preconditions.checkState(operand.getKind() == SqlKind.INPUT_REF,
         "Intermediate aggregate argument must be an input reference, got: %s", operand.getKind());
     // We might need to append extra arguments extracted from the hint to match the signature of the aggregation
-    Literal numArgumentsLiteral = literalArguments.get(-1);
-    if (numArgumentsLiteral == null) {
+    List<RexExpression> functionPreArgs = functionCall.getFunctionPreArgs();
+
+    if (functionPreArgs.size() == 1) {
       return AggregationFunctionFactory.getAggregationFunction(
           new FunctionContext(FunctionContext.Type.AGGREGATION, functionName, Collections.singletonList(
-              ExpressionContext.forIdentifier(fromColIdToIdentifier(((RexExpression.InputRef) operand).getIndex())))),
+              convertRexExpressionToExpressionContext(operand))),
           true);
     } else {
-      int numExpectedArguments = numArgumentsLiteral.getIntValue();
+      int numExpectedArguments = functionPreArgs.size();
       List<ExpressionContext> arguments = new ArrayList<>(numExpectedArguments);
-      arguments.add(
-          ExpressionContext.forIdentifier(fromColIdToIdentifier(((RexExpression.InputRef) operand).getIndex())));
+      arguments.add(convertRexExpressionToExpressionContext(operand));
       for (int i = 1; i < numExpectedArguments; i++) {
-        Literal literalArgument = literalArguments.get(i);
-        if (literalArgument != null) {
-          arguments.add(ExpressionContext.forLiteralContext(literalArgument));
-        } else {
-          arguments.add(PLACEHOLDER_IDENTIFIER);
-        }
+        RexExpression rexExpression = functionPreArgs.get(i);
+        arguments.add(convertRexExpressionToExpressionContext(rexExpression));
       }
       handleListAggDistinctArg(functionName, functionCall, arguments);
       return AggregationFunctionFactory.getAggregationFunction(
           new FunctionContext(FunctionContext.Type.AGGREGATION, functionName, arguments), true);
+    }
+  }
+
+  private static ExpressionContext convertRexExpressionToExpressionContext(RexExpression rexExpression) {
+    if (rexExpression instanceof RexExpression.Literal) {
+      RexExpression.Literal literal = (RexExpression.Literal) rexExpression;
+      return ExpressionContext.forLiteralContext(literal.getDataType().toDataType(), literal.getValue());
+    } else if (rexExpression instanceof RexExpression.FunctionCall) {
+      RexExpression.FunctionCall funcCall = (RexExpression.FunctionCall) rexExpression;
+      List<RexExpression> functionOperands = new ArrayList<>(funcCall.getFunctionPreArgs().size());
+      functionOperands.addAll(funcCall.getFunctionOperands());
+      if (funcCall.getFunctionOperands().size() < funcCall.getFunctionPreArgs().size()) {
+        functionOperands.addAll(funcCall.getFunctionPreArgs()
+            .subList(funcCall.getFunctionOperands().size(), funcCall.getFunctionPreArgs().size()));
+      }
+      FunctionContext functionContext = new FunctionContext(FunctionContext.Type.TRANSFORM, funcCall.getFunctionName(),
+          functionOperands.stream().map(AggregateOperator::convertRexExpressionToExpressionContext)
+              .collect(Collectors.toList()));
+      return ExpressionContext.forFunction(functionContext);
+    } else {
+      RexExpression.InputRef inputRef = (RexExpression.InputRef) rexExpression;
+      return ExpressionContext.forIdentifier(fromColIdToIdentifier(inputRef.getIndex()));
     }
   }
 

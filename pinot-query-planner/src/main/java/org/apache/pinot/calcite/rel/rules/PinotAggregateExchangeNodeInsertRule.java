@@ -44,6 +44,7 @@ import org.apache.calcite.rel.logical.LogicalAggregate;
 import org.apache.calcite.rel.rules.AggregateExtractProjectRule;
 import org.apache.calcite.rel.rules.AggregateReduceFunctionsRule;
 import org.apache.calcite.rex.RexBuilder;
+import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.SqlAggFunction;
 import org.apache.calcite.sql.SqlKind;
@@ -196,6 +197,8 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
    */
   private RelNode createPlanWithExchangeDirectAggregation(RelOptRuleCall call) {
     Aggregate oldAggRel = call.rel(0);
+    List<AggregateCall> oldCalls = oldAggRel.getAggCallList();
+    List<List<RexNode>> rexLists = extractRexLists(oldAggRel);
     List<RelHint> newHints = PinotHintStrategyTable.replaceHintOptions(oldAggRel.getHints(),
         PinotHintOptions.INTERNAL_AGG_OPTIONS, PinotHintOptions.InternalAggregateOptions.AGG_TYPE,
         AggType.DIRECT.name());
@@ -221,8 +224,16 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
       } else {
         newAggChild = PinotLogicalExchange.create(childRel, RelDistributions.hash(groupSetIndices));
       }
+
+      List<AggregateCall> newCalls = new ArrayList<>();
+      for (int i = 0; i < oldCalls.size(); i++) {
+        AggregateCall oldCall = oldCalls.get(i);
+        newCalls.add(buildAggregateCall(oldAggRel.getInput(), oldCall, rexLists.get(i), oldCall.getArgList(),
+            oldAggRel.getGroupCount(), AggType.FINAL));
+      }
+
       return new LogicalAggregate(oldAggRel.getCluster(), oldAggRel.getTraitSet(), newHints, newAggChild,
-          oldAggRel.getGroupSet(), oldAggRel.getGroupSets(), oldAggRel.getAggCallList());
+          oldAggRel.getGroupSet(), oldAggRel.getGroupSets(), newCalls);
     }
   }
 
@@ -305,10 +316,12 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
 
   private Aggregate convertAggForLeafInput(Aggregate oldAggRel) {
     List<AggregateCall> oldCalls = oldAggRel.getAggCallList();
+    List<List<RexNode>> rexLists = extractRexLists(oldAggRel);
     List<AggregateCall> newCalls = new ArrayList<>();
-    for (AggregateCall oldCall : oldCalls) {
-      newCalls.add(buildAggregateCall(oldAggRel.getInput(), oldCall, oldCall.getArgList(), oldAggRel.getGroupCount(),
-          AggType.LEAF));
+    for (int i = 0; i < oldCalls.size(); i++) {
+      AggregateCall oldCall = oldCalls.get(i);
+      newCalls.add(buildAggregateCall(oldAggRel.getInput(), oldCall, rexLists.get(i), oldCall.getArgList(),
+          oldAggRel.getGroupCount(), AggType.LEAF));
     }
     List<RelHint> newHints = PinotHintStrategyTable.replaceHintOptions(oldAggRel.getHints(),
         PinotHintOptions.INTERNAL_AGG_OPTIONS, PinotHintOptions.InternalAggregateOptions.AGG_TYPE, AggType.LEAF.name());
@@ -336,11 +349,13 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
     // b/c the exchange produces intermediate results, thus the input to the newCall will be indexed at
     // [nGroup + oldCallIndex]
     List<AggregateCall> oldCalls = oldAggRel.getAggCallList();
+    List<List<RexNode>> rexLists = extractRexLists(oldAggRel);
     for (int oldCallIndex = 0; oldCallIndex < oldCalls.size(); oldCallIndex++) {
       AggregateCall oldCall = oldCalls.get(oldCallIndex);
       // intermediate stage input only supports single argument inputs.
-      List<Integer> argList = Collections.singletonList(nGroups + oldCallIndex);
-      AggregateCall newCall = buildAggregateCall(exchange, oldCall, argList, nGroups, aggType);
+      List<Integer> argList = List.of(nGroups + oldCallIndex);
+      AggregateCall newCall =
+          buildAggregateCall(exchange, oldCall, rexLists.get(oldCallIndex), argList, nGroups, aggType);
       rexBuilder.addAggCall(newCall, nGroups, newCalls, aggCallMapping, oldAggRel.getInput()::fieldIsNullable);
     }
 
@@ -354,8 +369,33 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
     return relBuilder.build();
   }
 
-  private static AggregateCall buildAggregateCall(RelNode inputNode, AggregateCall orgAggCall, List<Integer> argList,
-      int numberGroups, AggType aggType) {
+  private static List<List<RexNode>> extractRexLists(Aggregate aggregate) {
+    RelNode input = PinotRuleUtils.unboxRel(aggregate.getInput());
+    List<RexNode> rexNodes = (input instanceof Project) ? ((Project) input).getProjects() : null;
+    List<AggregateCall> aggCallList = aggregate.getAggCallList();
+    final List<List<RexNode>> rexListList = new ArrayList<>();
+    for (int aggIdx = 0; aggIdx < aggCallList.size(); aggIdx++) {
+      AggregateCall aggCall = aggCallList.get(aggIdx);
+      int argSize = aggCall.getArgList().size();
+      List<RexNode> rexList = new ArrayList<>();
+      if (argSize > 1) {
+        // put the literals in to the map.
+        for (int argIdx = 0; argIdx < argSize; argIdx++) {
+          if (rexNodes != null) {
+            rexList.add(rexNodes.get(aggCall.getArgList().get(argIdx)));
+          } else {
+            // Still need to add null as placeholder for the argument.
+            rexList.add(RexInputRef.of(aggCall.getArgList().get(argIdx), input.getRowType()));
+          }
+        }
+      }
+      rexListList.add(rexList);
+    }
+    return rexListList;
+  }
+
+  private static AggregateCall buildAggregateCall(RelNode inputNode, AggregateCall orgAggCall, List<RexNode> rexList,
+      List<Integer> argList, int numberGroups, AggType aggType) {
     final SqlAggFunction oldAggFunction = orgAggCall.getAggregation();
     final SqlKind aggKind = oldAggFunction.getKind();
     String functionName = getFunctionNameFromAggregateCall(orgAggCall);
@@ -390,6 +430,7 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
         functionName.equals("distinctCount") || orgAggCall.isDistinct(),
         orgAggCall.isApproximate(),
         orgAggCall.ignoreNulls(),
+        rexList,
         argList,
         aggType.isInputIntermediateFormat() ? -1 : orgAggCall.filterArg,
         orgAggCall.distinctKeys,

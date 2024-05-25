@@ -248,9 +248,11 @@ public class RexExpressionUtils {
   public static RexExpression fromAggregateCall(AggregateCall aggregateCall) {
     List<RexExpression> operands =
         aggregateCall.getArgList().stream().map(RexExpression.InputRef::new).collect(Collectors.toList());
+    List<RexExpression> preArg =
+        aggregateCall.rexList.stream().map(RexExpressionUtils::fromRexNode).collect(Collectors.toList());
     return new RexExpression.FunctionCall(aggregateCall.getAggregation().getKind(),
         RelToPlanNodeConverter.convertToColumnDataType(aggregateCall.getType()),
-        aggregateCall.getAggregation().getName(), operands, aggregateCall.isDistinct());
+        aggregateCall.getAggregation().getName(), operands, aggregateCall.isDistinct(), preArg);
   }
 
   public static List<RexExpression> fromInputRefs(Iterable<Integer> inputRefs) {
