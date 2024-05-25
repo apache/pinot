@@ -88,14 +88,30 @@ enum NullDirection {
   UNSPECIFIED = 2;
 }
 
+message DirectionList {
+  repeated Direction item = 1;
+}
+
+message NullDirectionList {
+  repeated NullDirection item = 1;
+}
+
+message RexExpressionList {
+  repeated RexExpression item = 1;
+}
+
+message DistributionKeyList {
+  repeated int32 item = 1;
+}
+
 message MailboxReceiveNode {
   int32 senderStageId = 1;
   PinotRelExchangeType exchangeType = 2;
   RelDistributionType distributionType = 3;
-  repeated int32 distributionKeys = 4;
+  DistributionKeyList distributionKeys = 4;
   repeated int32 collationKeys = 5;
-  repeated Direction collationDirections = 6;
-  repeated NullDirection collationNullDirections = 7;
+  DirectionList collationDirections = 6;
+  NullDirectionList collationNullDirections = 7;
   bool sortOnSender = 8;
   bool sortOnReceiver = 9;
   StageNode sender = 10;
@@ -105,9 +121,9 @@ message MailboxSendNode {
   int32 receiverStageId = 1;
   RelDistributionType distributionType = 2;
   PinotRelExchangeType exchangeType = 3;
-  repeated int32 distributionKeys = 4;
+  DistributionKeyList distributionKeys = 4;
   repeated int32 collationKeys = 5;
-  repeated Direction collationDirections = 6;
+  DirectionList collationDirections = 6;
   bool sortOnSender = 7;
   bool prePartitioned = 8;
 }
@@ -141,9 +157,9 @@ message ExchangeNode {
 }
 
 message SortNode {
-  repeated RexExpression collationKeys = 1;
-  repeated Direction collationDirections = 2;
-  repeated NullDirection collationNullDirections = 3;
+  RexExpressionList collationKeys = 1;
+  DirectionList collationDirections = 2;
+  NullDirectionList collationNullDirections = 3;
   int32 fetch = 4;
   int32 offset = 5;
 }
@@ -157,9 +173,9 @@ enum AggType {
 
 message AggregateNode {
   NodeHint nodeHint = 1;
-  repeated RexExpression aggCalls = 2;
+  RexExpressionList aggCalls = 2;
   repeated int32 filterArgIndices = 3;
-  repeated RexExpression groupSet = 4;
+  RexExpressionList groupSet = 4;
   AggType aggType = 5;
 }
 
@@ -184,7 +200,7 @@ message JoinKeys {
 message JoinNode {
   JoinRelType joinRelType = 1;
   JoinKeys joinKeys = 2;
-  repeated RexExpression joinClause = 3;
+  RexExpressionList joinClause = 3;
   NodeHint joinHints = 4;
   repeated string leftColumnNames = 5;
   repeated string rightColumnNames = 6;
@@ -195,11 +211,7 @@ message LiteralValueNode {
 }
 
 message ProjectNode {
-  repeated RexExpression projects = 1;
-}
-
-message RexExpressionList {
-  repeated RexExpression expressions = 1;
+  RexExpressionList projects = 1;
 }
 
 message ValueNode {
@@ -212,13 +224,13 @@ enum WindowFrameType {
 }
 
 message WindowNode {
-  repeated RexExpression groupSet = 1;
-  repeated RexExpression orderSet = 2;
+  RexExpressionList groupSet = 1;
+  RexExpressionList orderSet = 2;
   repeated Direction orderSetDirection = 3;
   repeated NullDirection orderSetNullDirection = 4;
-  repeated RexExpression aggCalls = 5;
+  RexExpressionList aggCalls = 5;
   int32 lowerBound = 6;
   int32 upperBound = 7;
-  repeated RexExpression constants = 8;
+  RexExpressionList constants = 8;
   WindowFrameType windowFrameType = 9;
 }

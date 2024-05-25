@@ -52,15 +52,10 @@ public class SerializationVisitor implements PlanNodeVisitor<Plan.StageNode, Lis
     node.getInputs().get(0).visit(this, context);
     Plan.StageNode.Builder builder = getBuilder(node, context);
 
-    List<Expressions.RexExpression> aggCalls =
-        node.getAggCalls().stream().map(RexExpressionVisitor::process).collect(Collectors.toList());
-    List<Expressions.RexExpression> groupSet =
-        node.getGroupSet().stream().map(RexExpressionVisitor::process).collect(Collectors.toList());
-
     Plan.AggregateNode.Builder aggregateNodeBuilder =
-        Plan.AggregateNode.newBuilder().setNodeHint(getNodeHintBuilder(node.getNodeHint())).addAllAggCalls(aggCalls)
-            .addAllFilterArgIndices(node.getFilterArgIndices()).addAllGroupSet(groupSet)
-            .setAggType(convertAggType(node.getAggType()));
+        Plan.AggregateNode.newBuilder().setNodeHint(getNodeHintBuilder(node.getNodeHint()))
+            .setAggCalls(convertExpressions(node.getAggCalls())).addAllFilterArgIndices(node.getFilterArgIndices())
+            .setGroupSet(convertExpressions(node.getGroupSet())).setAggType(convertAggType(node.getAggType()));
 
     builder.setAggregateNode(aggregateNodeBuilder);
 
@@ -99,13 +94,11 @@ public class SerializationVisitor implements PlanNodeVisitor<Plan.StageNode, Lis
     Plan.JoinKeys.Builder joinKeyBuilder = Plan.JoinKeys.newBuilder().addAllLeftKeys(node.getJoinKeys().getLeftKeys())
         .addAllRightKeys(node.getJoinKeys().getRightKeys());
 
-    List<Expressions.RexExpression> joinClause =
-        node.getJoinClauses().stream().map(RexExpressionVisitor::process).collect(Collectors.toList());
-
     Plan.JoinNode.Builder joinNodeBuilder =
         Plan.JoinNode.newBuilder().setJoinRelType(convertJoinRelType(node.getJoinRelType())).setJoinKeys(joinKeyBuilder)
-            .addAllJoinClause(joinClause).setJoinHints(getNodeHintBuilder(node.getJoinHints()))
-            .addAllLeftColumnNames(node.getLeftColumnNames()).addAllRightColumnNames(node.getRightColumnNames());
+            .setJoinClause(convertExpressions(node.getJoinClauses()))
+            .setJoinHints(getNodeHintBuilder(node.getJoinHints())).addAllLeftColumnNames(node.getLeftColumnNames())
+            .addAllRightColumnNames(node.getRightColumnNames());
 
     builder.setJoinNode(joinNodeBuilder);
 
@@ -124,15 +117,14 @@ public class SerializationVisitor implements PlanNodeVisitor<Plan.StageNode, Lis
             .setDistributionType(convertDistributionType(node.getDistributionType()))
             .setExchangeType(convertExchangeType(node.getExchangeType())).addAllCollationKeys(
                 node.getCollationKeys().stream().map((e) -> ((RexExpression.InputRef) e).getIndex())
-                    .collect(Collectors.toList())).addAllCollationDirections(
-                node.getCollationDirections().stream().map(SerializationVisitor::convertDirection)
-                    .collect(Collectors.toList())).addAllCollationNullDirections(
-                node.getCollationNullDirections().stream().map(SerializationVisitor::convertNullDirection)
-                    .collect(Collectors.toList())).setSortOnSender(node.isSortOnSender())
-            .setSortOnReceiver(node.isSortOnReceiver())
+                    .collect(Collectors.toList()))
+            .setCollationDirections(convertDirectionsList(node.getCollationDirections()))
+            .setCollationNullDirections(convertNullDirectionsList(node.getCollationNullDirections()))
+            .setSortOnSender(node.isSortOnSender()).setSortOnReceiver(node.isSortOnReceiver())
             .setSender(visitMailboxSend(node.getSender(), new ArrayList<>()));
     if (node.getDistributionKeys() != null) {
-      receiveNodeBuilder.addAllDistributionKeys(node.getDistributionKeys());
+      receiveNodeBuilder.setDistributionKeys(
+          Plan.DistributionKeyList.newBuilder().addAllItem(node.getDistributionKeys()).build());
     }
     builder.setReceiveNode(receiveNodeBuilder);
 
@@ -163,12 +155,12 @@ public class SerializationVisitor implements PlanNodeVisitor<Plan.StageNode, Lis
             .setExchangeType(convertExchangeType(node.getExchangeType()))
             .setDistributionType(convertDistributionType(node.getDistributionType())).addAllCollationKeys(
                 node.getCollationKeys().stream().map((e) -> ((RexExpression.InputRef) e).getIndex())
-                    .collect(Collectors.toList())).addAllCollationDirections(
-                node.getCollationDirections().stream().map(SerializationVisitor::convertDirection)
-                    .collect(Collectors.toList())).setSortOnSender(node.isSortOnSender())
-            .setPrePartitioned(node.isPrePartitioned());
+                    .collect(Collectors.toList()))
+            .setCollationDirections(convertDirectionsList(node.getCollationDirections()))
+            .setSortOnSender(node.isSortOnSender()).setPrePartitioned(node.isPrePartitioned());
     if (node.getDistributionKeys() != null) {
-      builder.addAllDistributionKeys(node.getDistributionKeys());
+      builder.setDistributionKeys(
+          Plan.DistributionKeyList.newBuilder().addAllItem(node.getDistributionKeys()).build());
     }
 
     return builder;
@@ -179,9 +171,8 @@ public class SerializationVisitor implements PlanNodeVisitor<Plan.StageNode, Lis
     node.getInputs().get(0).visit(this, context);
     Plan.StageNode.Builder builder = getBuilder(node, context);
 
-    List<Expressions.RexExpression> expressions =
-        node.getProjects().stream().map(RexExpressionVisitor::process).collect(Collectors.toList());
-    Plan.ProjectNode.Builder projectNodeBuilder = Plan.ProjectNode.newBuilder().addAllProjects(expressions);
+    Plan.ProjectNode.Builder projectNodeBuilder =
+        Plan.ProjectNode.newBuilder().setProjects(convertExpressions(node.getProjects()));
     builder.setProjectNode(projectNodeBuilder);
 
     context.clear();
@@ -196,13 +187,11 @@ public class SerializationVisitor implements PlanNodeVisitor<Plan.StageNode, Lis
     node.getInputs().get(0).visit(this, context);
     Plan.StageNode.Builder builder = getBuilder(node, context);
 
-    List<Expressions.RexExpression> inputRefList =
-        node.getCollationKeys().stream().map(RexExpressionVisitor::process).collect(Collectors.toList());
-    Plan.SortNode.Builder sortNodeBuilder = Plan.SortNode.newBuilder().addAllCollationKeys(inputRefList)
-        .addAllCollationDirections(node.getCollationDirections().stream().map(SerializationVisitor::convertDirection)
-            .collect(Collectors.toList())).addAllCollationNullDirections(
-            node.getCollationNullDirections().stream().map(SerializationVisitor::convertNullDirection)
-                .collect(Collectors.toList())).setFetch(node.getFetch()).setOffset(node.getOffset());
+    Plan.SortNode.Builder sortNodeBuilder =
+        Plan.SortNode.newBuilder().setCollationKeys(convertExpressions(node.getCollationKeys()))
+            .setCollationDirections(convertDirectionsList(node.getCollationDirections()))
+            .setCollationNullDirections(convertNullDirectionsList(node.getCollationNullDirections()))
+            .setFetch(node.getFetch()).setOffset(node.getOffset());
 
     builder.setSortNode(sortNodeBuilder);
 
@@ -235,7 +224,7 @@ public class SerializationVisitor implements PlanNodeVisitor<Plan.StageNode, Lis
       Plan.RexExpressionList.Builder exprBuilder = Plan.RexExpressionList.newBuilder();
       List<Expressions.RexExpression> expressions =
           row.stream().map(RexExpressionVisitor::process).collect(Collectors.toList());
-      exprBuilder.addAllExpressions(expressions);
+      exprBuilder.addAllItem(expressions);
       valueNodeBuilder.addRows(exprBuilder);
     }
     builder.setValueNode(valueNodeBuilder);
@@ -252,25 +241,19 @@ public class SerializationVisitor implements PlanNodeVisitor<Plan.StageNode, Lis
     node.getInputs().get(0).visit(this, context);
     Plan.StageNode.Builder builder = getBuilder(node, context);
 
-    List<Expressions.RexExpression> groupSet =
-        node.getGroupSet().stream().map(RexExpressionVisitor::process).collect(Collectors.toList());
-    List<Expressions.RexExpression> orderSet =
-        node.getOrderSet().stream().map(RexExpressionVisitor::process).collect(Collectors.toList());
     List<Plan.Direction> orderSetDirection =
         node.getOrderSetDirection().stream().map(SerializationVisitor::convertDirection).collect(Collectors.toList());
     List<Plan.NullDirection> orderSetNullDirection =
         node.getOrderSetNullDirection().stream().map(SerializationVisitor::convertNullDirection)
             .collect(Collectors.toList());
-    List<Expressions.RexExpression> aggCalls =
-        node.getAggCalls().stream().map(RexExpressionVisitor::process).collect(Collectors.toList());
-    List<Expressions.RexExpression> constants =
-        node.getConstants().stream().map(RexExpressionVisitor::process).collect(Collectors.toList());
 
     Plan.WindowNode.Builder windowNodeBuilder =
-        Plan.WindowNode.newBuilder().addAllGroupSet(groupSet).addAllOrderSet(orderSet)
-            .addAllOrderSetDirection(orderSetDirection).addAllOrderSetNullDirection(orderSetNullDirection)
-            .addAllAggCalls(aggCalls).setLowerBound(node.getLowerBound()).setUpperBound(node.getUpperBound())
-            .addAllConstants(constants).setWindowFrameType(convertWindowFrameType(node.getWindowFrameType()));
+        Plan.WindowNode.newBuilder().setGroupSet(convertExpressions(node.getGroupSet()))
+            .setOrderSet(convertExpressions(node.getOrderSet())).addAllOrderSetDirection(orderSetDirection)
+            .addAllOrderSetNullDirection(orderSetNullDirection).setAggCalls(convertExpressions(node.getAggCalls()))
+            .setLowerBound(node.getLowerBound()).setUpperBound(node.getUpperBound())
+            .setConstants(convertExpressions(node.getConstants()))
+            .setWindowFrameType(convertWindowFrameType(node.getWindowFrameType()));
 
     builder.setWindowNode(windowNodeBuilder);
 
@@ -305,8 +288,8 @@ public class SerializationVisitor implements PlanNodeVisitor<Plan.StageNode, Lis
             .setDistributionType(convertDistributionType(node.getDistributionType()))
             .addAllKeys(node.getDistributionKeys()).setIsSortOnSender(node.isSortOnSender())
             .setIsSortOnReceiver(node.isSortOnReceiver()).setIsPrePartitioned(node.isPrePartitioned()).addAllCollations(
-                node.getCollations().stream().map(c -> Plan.RelFieldCollation.newBuilder()
-                    .setFieldIndex(c.getFieldIndex())
+                node.getCollations().stream().map(
+                    c -> Plan.RelFieldCollation.newBuilder().setFieldIndex(c.getFieldIndex())
                     .setDirection(convertDirection(c.getDirection()))
                     .setNullDirection(convertNullDirection(c.nullDirection)).build()).collect(Collectors.toList()))
             .addAllTableNames(node.getTableNames());
@@ -339,6 +322,22 @@ public class SerializationVisitor implements PlanNodeVisitor<Plan.StageNode, Lis
       builder.putHintOptions(entry.getKey(), strMapBuilder.build());
     }
     return builder;
+  }
+
+  private static Plan.RexExpressionList.Builder convertExpressions(List<RexExpression> expressions) {
+    return Plan.RexExpressionList.newBuilder()
+        .addAllItem(expressions.stream().map(RexExpressionVisitor::process).collect(Collectors.toList()));
+  }
+
+  private static Plan.DirectionList.Builder convertDirectionsList(List<RelFieldCollation.Direction> directions) {
+    return Plan.DirectionList.newBuilder()
+        .addAllItem(directions.stream().map(SerializationVisitor::convertDirection).collect(Collectors.toList()));
+  }
+
+  private static Plan.NullDirectionList.Builder convertNullDirectionsList(
+      List<RelFieldCollation.NullDirection> nullDirections) {
+    return Plan.NullDirectionList.newBuilder().addAllItem(
+        nullDirections.stream().map(SerializationVisitor::convertNullDirection).collect(Collectors.toList()));
   }
 
   private static Plan.RelDistributionType convertDistributionType(RelDistribution.Type type) {

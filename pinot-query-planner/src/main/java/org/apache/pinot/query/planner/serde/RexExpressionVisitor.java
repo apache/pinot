@@ -62,10 +62,16 @@ public class RexExpressionVisitor {
 
   private static Expressions.RexExpression visitLiteral(RexExpression.Literal literal) {
     Expressions.Literal.Builder literalBuilder = Expressions.Literal.newBuilder();
-    Serializable value = literal.getDataType().convert(literal.getValue());
-    byte[] data = SerializationUtils.serialize(value);
-    literalBuilder.setDataType(convertColumnDataType(literal.getDataType()))
-        .setSerializedValue(ByteString.copyFrom(data));
+    literalBuilder.setDataType(convertColumnDataType(literal.getDataType()));
+    if (literal.getValue() != null) {
+      Serializable value = literal.getDataType().convert(literal.getValue());
+      byte[] data = SerializationUtils.serialize(value);
+      literalBuilder.setSerializedValue(ByteString.copyFrom(data));
+      literalBuilder.setIsValueNull(false);
+    } else {
+      literalBuilder.setIsValueNull(true);
+    }
+
     return Expressions.RexExpression.newBuilder().setLiteral(literalBuilder).build();
   }
 

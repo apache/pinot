@@ -90,12 +90,12 @@ public class DeserializationVisitor {
     return new MailboxReceiveNode(protoNode.getStageId(), extractDataSchema(protoNode),
         protoReceiveNode.getSenderStageId(), convertDistributionType(protoReceiveNode.getDistributionType()),
         convertExchangeType(protoReceiveNode.getExchangeType()),
-        protoReceiveNode.getDistributionKeysCount() > 0 ? protoReceiveNode.getDistributionKeysList() : null,
+        protoReceiveNode.hasDistributionKeys() ? protoReceiveNode.getDistributionKeys().getItemList() : null,
         protoReceiveNode.getCollationKeysList().stream().map(RexExpression.InputRef::new).collect(Collectors.toList()),
-        protoReceiveNode.getCollationDirectionsList().stream().map(DeserializationVisitor::convertDirection)
-            .collect(Collectors.toList()),
-        protoReceiveNode.getCollationNullDirectionsList().stream().map(DeserializationVisitor::convertNullDirection)
-            .collect(Collectors.toList()), protoReceiveNode.getSortOnSender(), protoReceiveNode.getSortOnReceiver(),
+        protoReceiveNode.getCollationDirections().getItemList().stream().map(DeserializationVisitor::convertDirection)
+            .collect(Collectors.toList()), protoReceiveNode.getCollationNullDirections().getItemList().stream()
+        .map(DeserializationVisitor::convertNullDirection).collect(Collectors.toList()),
+        protoReceiveNode.getSortOnSender(), protoReceiveNode.getSortOnReceiver(),
         (MailboxSendNode) visitMailboxSendNode(protoReceiveNode.getSender()));
   }
 
@@ -105,9 +105,9 @@ public class DeserializationVisitor {
         new MailboxSendNode(protoNode.getStageId(), extractDataSchema(protoNode), protoSendNode.getReceiverStageId(),
             convertDistributionType(protoSendNode.getDistributionType()),
             convertExchangeType(protoSendNode.getExchangeType()),
-            protoSendNode.getDistributionKeysCount() > 0 ? protoSendNode.getDistributionKeysList() : null,
+            protoSendNode.hasDistributionKeys() ? protoSendNode.getDistributionKeys().getItemList() : null,
             protoSendNode.getCollationKeysList().stream().map(RexExpression.InputRef::new).collect(Collectors.toList()),
-            protoSendNode.getCollationDirectionsList().stream().map(DeserializationVisitor::convertDirection)
+            protoSendNode.getCollationDirections().getItemList().stream().map(DeserializationVisitor::convertDirection)
                 .collect(Collectors.toList()), protoSendNode.getSortOnSender(), protoSendNode.getPrePartitioned());
 
     protoNode.getInputsList().forEach((i) -> sendNode.addInput(process(i)));
@@ -144,13 +144,14 @@ public class DeserializationVisitor {
     Plan.SortNode protoSortNode = protoNode.getSortNode();
 
     List<RexExpression> expressions =
-        protoSortNode.getCollationKeysList().stream().map(ProtoExpressionVisitor::process).collect(Collectors.toList());
+        protoSortNode.getCollationKeys().getItemList().stream().map(ProtoExpressionVisitor::process)
+            .collect(Collectors.toList());
     List<RelFieldCollation.Direction> directions =
-        protoSortNode.getCollationDirectionsList().stream().map(DeserializationVisitor::convertDirection)
+        protoSortNode.getCollationDirections().getItemList().stream().map(DeserializationVisitor::convertDirection)
             .collect(Collectors.toList());
     List<RelFieldCollation.NullDirection> nullDirections =
-        protoSortNode.getCollationNullDirectionsList().stream().map(DeserializationVisitor::convertNullDirection)
-            .collect(Collectors.toList());
+        protoSortNode.getCollationNullDirections().getItemList().stream()
+            .map(DeserializationVisitor::convertNullDirection).collect(Collectors.toList());
 
     SortNode sortNode =
         new SortNode(protoNode.getStageId(), expressions, directions, nullDirections, protoSortNode.getFetch(),
@@ -162,25 +163,19 @@ public class DeserializationVisitor {
   private AbstractPlanNode visitWindowNode(Plan.StageNode protoNode) {
     Plan.WindowNode protoWindowNode = protoNode.getWindowNode();
 
-    List<RexExpression> groupSet =
-        protoWindowNode.getGroupSetList().stream().map(ProtoExpressionVisitor::process).collect(Collectors.toList());
-    List<RexExpression> orderSet =
-        protoWindowNode.getOrderSetList().stream().map(ProtoExpressionVisitor::process).collect(Collectors.toList());
     List<RelFieldCollation.Direction> orderSetDirection =
         protoWindowNode.getOrderSetDirectionList().stream().map(DeserializationVisitor::convertDirection)
             .collect(Collectors.toList());
     List<RelFieldCollation.NullDirection> orderSetNullDirection =
         protoWindowNode.getOrderSetNullDirectionList().stream().map(DeserializationVisitor::convertNullDirection)
             .collect(Collectors.toList());
-    List<RexExpression> aggCalls =
-        protoWindowNode.getAggCallsList().stream().map(ProtoExpressionVisitor::process).collect(Collectors.toList());
-    List<RexExpression> constants =
-        protoWindowNode.getConstantsList().stream().map(ProtoExpressionVisitor::process).collect(Collectors.toList());
 
-    WindowNode windowNode =
-        new WindowNode(protoNode.getStageId(), extractDataSchema(protoNode), groupSet, orderSet, orderSetDirection,
-            orderSetNullDirection, aggCalls, protoWindowNode.getLowerBound(), protoWindowNode.getUpperBound(),
-            constants, convertWindowFrameType(protoWindowNode.getWindowFrameType()));
+    WindowNode windowNode = new WindowNode(protoNode.getStageId(), extractDataSchema(protoNode),
+        convertExpressions(protoWindowNode.getGroupSet()), convertExpressions(protoWindowNode.getOrderSet()),
+        orderSetDirection, orderSetNullDirection, convertExpressions(protoWindowNode.getAggCalls()),
+        protoWindowNode.getLowerBound(), protoWindowNode.getUpperBound(),
+        convertExpressions(protoWindowNode.getConstants()),
+        convertWindowFrameType(protoWindowNode.getWindowFrameType()));
     protoNode.getInputsList().forEach((i) -> windowNode.addInput(process(i)));
     return windowNode;
   }
@@ -190,7 +185,7 @@ public class DeserializationVisitor {
     List<List<RexExpression>> rows = new ArrayList<>();
 
     for (Plan.RexExpressionList row : protoSortNode.getRowsList()) {
-      rows.add(row.getExpressionsList().stream().map(ProtoExpressionVisitor::process).collect(Collectors.toList()));
+      rows.add(row.getItemList().stream().map(ProtoExpressionVisitor::process).collect(Collectors.toList()));
     }
 
     ValueNode valueNode = new ValueNode(protoNode.getStageId(), extractDataSchema(protoNode), rows);
@@ -201,10 +196,8 @@ public class DeserializationVisitor {
   private AbstractPlanNode visitProjectNode(Plan.StageNode protoNode) {
     Plan.ProjectNode protoProjectNode = protoNode.getProjectNode();
 
-    List<RexExpression> projects =
-        protoProjectNode.getProjectsList().stream().map(ProtoExpressionVisitor::process).collect(Collectors.toList());
-
-    ProjectNode projectNode = new ProjectNode(protoNode.getStageId(), extractDataSchema(protoNode), projects);
+    ProjectNode projectNode = new ProjectNode(protoNode.getStageId(), extractDataSchema(protoNode),
+        convertExpressions(protoProjectNode.getProjects()));
     protoNode.getInputsList().forEach((i) -> projectNode.addInput(process(i)));
     return projectNode;
   }
@@ -222,12 +215,9 @@ public class DeserializationVisitor {
   private AbstractPlanNode visitAggregateNode(Plan.StageNode protoNode) {
     Plan.AggregateNode protoAggregateNode = protoNode.getAggregateNode();
 
-    List<RexExpression> aggCalls =
-        protoAggregateNode.getAggCallsList().stream().map(ProtoExpressionVisitor::process).collect(Collectors.toList());
-    List<RexExpression> groupSet =
-        protoAggregateNode.getGroupSetList().stream().map(ProtoExpressionVisitor::process).collect(Collectors.toList());
-    AggregateNode aggregateNode = new AggregateNode(protoNode.getStageId(), extractDataSchema(protoNode), aggCalls,
-        protoAggregateNode.getFilterArgIndicesList(), groupSet, extractNodeHint(protoAggregateNode.getNodeHint()),
+    AggregateNode aggregateNode = new AggregateNode(protoNode.getStageId(), extractDataSchema(protoNode),
+        convertExpressions(protoAggregateNode.getAggCalls()), protoAggregateNode.getFilterArgIndicesList(),
+        convertExpressions(protoAggregateNode.getGroupSet()), extractNodeHint(protoAggregateNode.getNodeHint()),
         convertAggType(protoAggregateNode.getAggType()));
     protoNode.getInputsList().forEach((i) -> aggregateNode.addInput(process(i)));
     return aggregateNode;
@@ -238,12 +228,10 @@ public class DeserializationVisitor {
 
     JoinNode.JoinKeys joinKeys = new JoinNode.JoinKeys(protoJoinNode.getJoinKeys().getLeftKeysList(),
         protoJoinNode.getJoinKeys().getRightKeysList());
-    List<RexExpression> joinClauses =
-        protoJoinNode.getJoinClauseList().stream().map(ProtoExpressionVisitor::process).collect(Collectors.toList());
     JoinNode joinNode =
         new JoinNode(protoNode.getStageId(), extractDataSchema(protoNode), protoJoinNode.getLeftColumnNamesList(),
             protoJoinNode.getRightColumnNamesList(), convertJoinRelType(protoJoinNode.getJoinRelType()), joinKeys,
-            joinClauses, extractNodeHint(protoJoinNode.getJoinHints()));
+            convertExpressions(protoJoinNode.getJoinClause()), extractNodeHint(protoJoinNode.getJoinHints()));
     protoNode.getInputsList().forEach((i) -> joinNode.addInput(process(i)));
     return joinNode;
   }
@@ -264,6 +252,10 @@ public class DeserializationVisitor {
       columnDataTypes[i] = DataSchema.ColumnDataType.valueOf(columnDataTypesList[i]);
     }
     return new DataSchema(columnNames, columnDataTypes);
+  }
+
+  private static List<RexExpression> convertExpressions(Plan.RexExpressionList expressionList) {
+    return expressionList.getItemList().stream().map(ProtoExpressionVisitor::process).collect(Collectors.toList());
   }
 
   private static RelDistribution.Type convertDistributionType(Plan.RelDistributionType type) {

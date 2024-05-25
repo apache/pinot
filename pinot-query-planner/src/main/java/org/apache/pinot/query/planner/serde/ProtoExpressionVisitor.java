@@ -58,8 +58,10 @@ public class ProtoExpressionVisitor {
   }
 
   private static RexExpression visitLiteral(Expressions.Literal literal) {
-    return new RexExpression.Literal(convertColumnDataType(literal.getDataType()),
-        SerializationUtils.deserialize(literal.getSerializedValue().toByteArray()));
+    DataSchema.ColumnDataType dataType = convertColumnDataType(literal.getDataType());
+    Object obj =
+        !literal.getIsValueNull() ? SerializationUtils.deserialize(literal.getSerializedValue().toByteArray()) : null;
+    return new RexExpression.Literal(dataType, obj);
   }
 
   private static DataSchema.ColumnDataType convertColumnDataType(Expressions.ColumnDataType dataType) {

@@ -51,6 +51,7 @@ message InputRef {
 message Literal {
   ColumnDataType dataType = 1;
   bytes serializedValue = 2;
+  bool isValueNull = 3;
 }
 
 message FunctionCall {
