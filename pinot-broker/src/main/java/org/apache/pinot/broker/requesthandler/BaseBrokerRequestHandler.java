@@ -42,6 +42,7 @@ import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
+import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListener;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListenerFactory;
@@ -105,11 +106,13 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     // First-stage access control to prevent unauthenticated requests from using up resources. Secondary table-level
     // check comes later.
     AccessControl accessControl = _accessControlFactory.create();
-    if (!accessControl.hasAccess(requesterIdentity)) {
+    AuthorizationResult authorizationResult = accessControl.authorize(requesterIdentity);
+    if (!authorizationResult.hasAccess()) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
       requestContext.setErrorCode(QueryException.ACCESS_DENIED_ERROR_CODE);
       _brokerQueryEventListener.onQueryCompletion(requestContext);
-      throw new WebApplicationException("Permission denied", Response.Status.FORBIDDEN);
+      throw new WebApplicationException("Permission denied. Reason: " + authorizationResult.getFailureMessage(),
+          Response.Status.FORBIDDEN);
     }
 
     JsonNode sql = request.get(Broker.Request.SQL);

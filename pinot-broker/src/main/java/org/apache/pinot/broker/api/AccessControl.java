@@ -35,13 +35,28 @@ public interface AccessControl extends FineGrainedAccessControl {
   /**
    * First-step access control when processing broker requests. Decides whether request is allowed to acquire resources
    * for further processing. Request may still be rejected at table-level later on.
-   *
+   * The default implementation is kept to have backward compatibility with the existing implementations
    * @param requesterIdentity requester identity
    *
    * @return {@code true} if authorized, {@code false} otherwise
    */
+  @Deprecated
   default boolean hasAccess(RequesterIdentity requesterIdentity) {
     return true;
+  }
+
+  /**
+   * First-step access control when processing broker requests. Decides whether request is allowed to acquire resources
+   * for further processing. Request may still be rejected at table-level later on.
+   * The default implementation returns a {@link BasicAuthorizationResultImpl} with the result of the hasAccess() of
+   * the implementation
+   *
+   * @param requesterIdentity requester identity
+   *
+   * @return {@code AuthorizationResult} with the result of the access control check
+   */
+  default AuthorizationResult authorize(RequesterIdentity requesterIdentity) {
+    return new BasicAuthorizationResultImpl(hasAccess(requesterIdentity));
   }
 
   /**

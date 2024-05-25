@@ -84,8 +84,8 @@ public class ZkBasicAuthAccessControlFactory extends AccessControlFactory {
     }
 
     @Override
-    public boolean hasAccess(RequesterIdentity requesterIdentity) {
-      return authorize(requesterIdentity, (BrokerRequest) null).hasAccess();
+    public AuthorizationResult authorize(RequesterIdentity requesterIdentity) {
+      return authorize(requesterIdentity, (BrokerRequest) null);
     }
 
     @Override
