@@ -54,7 +54,7 @@ public class SanitizationTransformer implements RecordTransformer {
           _jsonColumnMaxLengthMap.put(fieldSpec.getName(), fieldSpec.getMaxLength());
         }
       }
-      this._sanitizedColValuesCount = 0L;
+      _sanitizedColValuesCount = 0L;
     }
   }
 
