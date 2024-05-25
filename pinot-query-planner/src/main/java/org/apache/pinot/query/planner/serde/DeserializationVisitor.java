@@ -328,7 +328,7 @@ public class DeserializationVisitor {
         return RelFieldCollation.NullDirection.UNSPECIFIED;
     }
   }
-  
+
   private static SetOpNode.SetOpType convertSetOpType(Plan.SetOpType type) {
     switch (type) {
       case INTERSECT:
