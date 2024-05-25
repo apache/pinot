@@ -1411,19 +1411,18 @@ public class TableConfigUtilsTest {
 
     // Although this config makes no sense, it should pass the validation phase
     StarTreeIndexConfig starTreeIndexConfig =
-        new StarTreeIndexConfig(Arrays.asList("myCol"), Arrays.asList("myCol"), Arrays.asList("SUM__myCol"), null, 1);
+        new StarTreeIndexConfig(List.of("myCol"), List.of("myCol"), List.of("SUM__myCol"), null, 1);
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setStarTreeIndexConfigs(Arrays.asList(starTreeIndexConfig)).build();
+        .setStarTreeIndexConfigs(List.of(starTreeIndexConfig)).build();
     try {
       TableConfigUtils.validate(tableConfig, schema);
     } catch (Exception e) {
       Assert.fail("Should not fail for valid StarTreeIndex config column name");
     }
 
-    starTreeIndexConfig =
-        new StarTreeIndexConfig(Arrays.asList("myCol2"), Arrays.asList("myCol"), Arrays.asList("SUM__myCol"), null, 1);
+    starTreeIndexConfig = new StarTreeIndexConfig(List.of("myCol2"), List.of("myCol"), List.of("SUM__myCol"), null, 1);
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setStarTreeIndexConfigs(Arrays.asList(starTreeIndexConfig)).build();
+        .setStarTreeIndexConfigs(List.of(starTreeIndexConfig)).build();
     try {
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should fail for invalid StarTreeIndex config column name in dimension split order");
@@ -1431,10 +1430,9 @@ public class TableConfigUtilsTest {
       // expected
     }
 
-    starTreeIndexConfig =
-        new StarTreeIndexConfig(Arrays.asList("myCol"), Arrays.asList("myCol2"), Arrays.asList("SUM__myCol"), null, 1);
+    starTreeIndexConfig = new StarTreeIndexConfig(List.of("myCol"), List.of("myCol2"), List.of("SUM__myCol"), null, 1);
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setStarTreeIndexConfigs(Arrays.asList(starTreeIndexConfig)).build();
+        .setStarTreeIndexConfigs(List.of(starTreeIndexConfig)).build();
     try {
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should fail for invalid StarTreeIndex config column name in skip star node for dimension");
@@ -1442,32 +1440,43 @@ public class TableConfigUtilsTest {
       // expected
     }
 
+    starTreeIndexConfig = new StarTreeIndexConfig(List.of("myCol"), List.of("myCol"), List.of("SUM__myCol2"), null, 1);
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setStarTreeIndexConfigs(List.of(starTreeIndexConfig)).build();
+    try {
+      TableConfigUtils.validate(tableConfig, schema);
+      Assert.fail("Should fail for invalid StarTreeIndex config column name in function column pair");
+    } catch (Exception e) {
+      // expected
+    }
+
     starTreeIndexConfig =
-        new StarTreeIndexConfig(Arrays.asList("myCol"), Arrays.asList("myCol"), Arrays.asList("SUM__myCol2"), null, 1);
+        new StarTreeIndexConfig(List.of("myCol"), null, null, List.of(new StarTreeAggregationConfig("myCol2", "SUM")),
+            1);
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setStarTreeIndexConfigs(Arrays.asList(starTreeIndexConfig)).build();
+        .setStarTreeIndexConfigs(List.of(starTreeIndexConfig)).build();
     try {
       TableConfigUtils.validate(tableConfig, schema);
-      Assert.fail("Should fail for invalid StarTreeIndex config column name in function column pair");
+      Assert.fail("Should fail for invalid StarTreeIndex config column name in aggregation config");
     } catch (Exception e) {
       // expected
     }
 
-    starTreeIndexConfig = new StarTreeIndexConfig(Arrays.asList("myCol"), null, null,
-        Arrays.asList(new StarTreeAggregationConfig("myCol2", "SUM", CompressionCodec.LZ4)), 1);
+    starTreeIndexConfig = new StarTreeIndexConfig(List.of("myCol"), null, List.of("SUM__myCol"),
+        List.of(new StarTreeAggregationConfig("myCol", "SUM")), 1);
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setStarTreeIndexConfigs(Arrays.asList(starTreeIndexConfig)).build();
+        .setStarTreeIndexConfigs(List.of(starTreeIndexConfig)).build();
     try {
       TableConfigUtils.validate(tableConfig, schema);
-      Assert.fail("Should fail for invalid StarTreeIndex config column name in function column pair");
+      Assert.fail("Should fail for invalid StarTreeIndex config with both function column pair and aggregation config");
     } catch (Exception e) {
       // expected
     }
 
-    starTreeIndexConfig = new StarTreeIndexConfig(Arrays.asList("multiValCol"), Arrays.asList("multiValCol"),
-        Arrays.asList("SUM__multiValCol"), null, 1);
+    starTreeIndexConfig =
+        new StarTreeIndexConfig(List.of("multiValCol"), List.of("multiValCol"), List.of("SUM__multiValCol"), null, 1);
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setStarTreeIndexConfigs(Arrays.asList(starTreeIndexConfig)).build();
+        .setStarTreeIndexConfigs(List.of(starTreeIndexConfig)).build();
     try {
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should fail for multi-value column name in StarTreeIndex config");

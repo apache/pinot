@@ -35,10 +35,8 @@ import org.apache.commons.lang3.builder.ToStringStyle;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.SegmentMetadata;
-import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.segment.spi.index.startree.AggregationSpec;
-import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants.MetadataKey;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
 import org.apache.pinot.spi.config.table.StarTreeAggregationConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
@@ -91,11 +89,9 @@ public class StarTreeV2BuilderConfig {
             AggregationFunctionColumnPair.fromAggregationConfig(aggregationConfig);
         AggregationFunctionColumnPair storedType =
             AggregationFunctionColumnPair.resolveToStoredType(aggregationFunctionColumnPair);
-        ChunkCompressionType compressionType =
-            ChunkCompressionType.valueOf(aggregationConfig.getCompressionCodec().name());
         // If there is already an equivalent functionColumnPair in the map, do not load another.
         // This prevents the duplication of the aggregation when the StarTree is constructed.
-        aggregationSpecs.putIfAbsent(storedType, new AggregationSpec(compressionType));
+        aggregationSpecs.putIfAbsent(storedType, new AggregationSpec(aggregationConfig));
       }
     }
 
@@ -298,24 +294,8 @@ public class StarTreeV2BuilderConfig {
    * Writes the metadata which is used to initialize the {@link StarTreeV2Metadata} when loading the segment.
    */
   public void writeMetadata(Configuration metadataProperties, int totalDocs) {
-    metadataProperties.setProperty(MetadataKey.TOTAL_DOCS, totalDocs);
-    metadataProperties.setProperty(MetadataKey.DIMENSIONS_SPLIT_ORDER, _dimensionsSplitOrder);
-    metadataProperties.setProperty(MetadataKey.FUNCTION_COLUMN_PAIRS, _aggregationSpecs.keySet());
-    metadataProperties.setProperty(MetadataKey.AGGREGATION_COUNT, _aggregationSpecs.size());
-    int index = 0;
-    for (Map.Entry<AggregationFunctionColumnPair, AggregationSpec> entry : _aggregationSpecs.entrySet()) {
-      AggregationFunctionColumnPair functionColumnPair = entry.getKey();
-      AggregationSpec aggregationSpec = entry.getValue();
-      String prefix = MetadataKey.AGGREGATION_PREFIX + index + '.';
-      metadataProperties.setProperty(prefix + MetadataKey.FUNCTION_TYPE,
-          functionColumnPair.getFunctionType().getName());
-      metadataProperties.setProperty(prefix + MetadataKey.COLUMN_NAME, functionColumnPair.getColumn());
-      metadataProperties.setProperty(prefix + MetadataKey.COMPRESSION_CODEC, aggregationSpec.getCompressionType());
-      index++;
-    }
-    metadataProperties.setProperty(MetadataKey.MAX_LEAF_RECORDS, _maxLeafRecords);
-    metadataProperties.setProperty(MetadataKey.SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS,
-        _skipStarNodeCreationForDimensions);
+    StarTreeV2Metadata.writeMetadata(metadataProperties, totalDocs, _dimensionsSplitOrder, _aggregationSpecs,
+        _maxLeafRecords, _skipStarNodeCreationForDimensions);
   }
 
   @Override

@@ -29,7 +29,8 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.integration.tests.startree.SegmentInfoProvider;
 import org.apache.pinot.integration.tests.startree.StarTreeQueryGenerator;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
-import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
+import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
+import org.apache.pinot.spi.config.table.StarTreeAggregationConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -148,13 +149,19 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
 
   private static StarTreeIndexConfig getStarTreeIndexConfig(List<String> dimensions, List<String> metrics,
       int maxLeafRecords) {
-    List<String> functionColumnPairs = new ArrayList<>();
+    List<StarTreeAggregationConfig> aggregationConfigs = new ArrayList<>();
+    // Use default setting for COUNT(*) and custom setting for other aggregations for better coverage
+    aggregationConfigs.add(new StarTreeAggregationConfig("*", "COUNT"));
     for (AggregationFunctionType functionType : AGGREGATION_FUNCTION_TYPES) {
+      if (functionType == AggregationFunctionType.COUNT) {
+        continue;
+      }
       for (String metric : metrics) {
-        functionColumnPairs.add(new AggregationFunctionColumnPair(functionType, metric).toColumnName());
+        aggregationConfigs.add(
+            new StarTreeAggregationConfig(metric, functionType.name(), CompressionCodec.LZ4, false, 4, null, null));
       }
     }
-    return new StarTreeIndexConfig(dimensions, null, functionColumnPairs, null, maxLeafRecords);
+    return new StarTreeIndexConfig(dimensions, null, null, aggregationConfigs, maxLeafRecords);
   }
 
   @Test(dataProvider = "useBothQueryEngines")
@@ -184,17 +191,15 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String starQuery = "SELECT DepTimeBlk, COUNT(*), COUNT(*) FILTER (WHERE CRSDepTime = 35) FROM mytable "
-        + "WHERE CRSDepTime != 35 "
-        + "GROUP BY DepTimeBlk ORDER BY DepTimeBlk";
+        + "WHERE CRSDepTime != 35 GROUP BY DepTimeBlk ORDER BY DepTimeBlk";
     // Don't verify that the query plan uses StarTree index, as this query results in FILTER_EMPTY in the query plan.
     // This is still a valuable test, as it caught a bug where only the subFilterContext was being preserved through
-    // AggragationFunctionUtils#buildFilteredAggregateProjectOperators
+    // AggregationFunctionUtils#buildFilteredAggregationInfos
     testStarQuery(starQuery, false);
 
     // Ensure the filtered agg and unfiltered agg can co-exist in one query
     starQuery = "SELECT DepTimeBlk, COUNT(*), COUNT(*) FILTER (WHERE DivArrDelay > 20) FROM mytable "
-        + "WHERE CRSDepTime != 35 "
-        + "GROUP BY DepTimeBlk ORDER BY DepTimeBlk";
+        + "WHERE CRSDepTime != 35 GROUP BY DepTimeBlk ORDER BY DepTimeBlk";
     testStarQuery(starQuery, !useMultiStageQueryEngine);
 
     starQuery = "SELECT DepTimeBlk, COUNT(*) FILTER (WHERE CRSDepTime != 35) FROM mytable "
@@ -211,8 +216,7 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
     if (verifyPlan) {
       JsonNode starPlan = postQuery(explain + starQuery);
       JsonNode referencePlan = postQuery(disableStarTree + explain + starQuery);
-      assertTrue(starPlan.toString().contains(filterStartreeIndex)
-              || starPlan.toString().contains("FILTER_EMPTY")
+      assertTrue(starPlan.toString().contains(filterStartreeIndex) || starPlan.toString().contains("FILTER_EMPTY")
               || starPlan.toString().contains("ALL_SEGMENTS_PRUNED_ON_SERVER"),
           "StarTree query did not indicate use of StarTree index in query plan. Plan: " + starPlan);
       assertFalse(referencePlan.toString().contains(filterStartreeIndex),
