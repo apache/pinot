@@ -73,7 +73,7 @@ public class CommonsConfigurationUtilsTest {
       // reading the property with header.
       config = CommonsConfigurationUtils.getSegmentMetadataFromFile(CONFIG_FILE, true);
       assertNotNull(config);
-      assertEquals(config.getHeader(), "# version=2");
+      assertEquals(config.getHeader(), "# version = 2");
     } catch (Exception ex) {
       Assert.fail(String.format("should not throw ConfigurationException exception with valid file, %s",
           ex.getMessage()));
