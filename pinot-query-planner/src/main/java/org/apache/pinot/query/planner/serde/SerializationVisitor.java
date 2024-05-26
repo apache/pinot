@@ -219,7 +219,8 @@ public class SerializationVisitor implements PlanNodeVisitor<Void, Plan.StageNod
             .setDistributionType(convertDistributionType(node.getDistributionType()))
             .addAllKeys(node.getDistributionKeys()).setIsSortOnSender(node.isSortOnSender())
             .setIsSortOnReceiver(node.isSortOnReceiver()).setIsPrePartitioned(node.isPrePartitioned()).addAllCollations(
-                node.getCollations().stream().map(c -> Plan.RelFieldCollation.newBuilder().setFieldIndex(c.getFieldIndex())
+                node.getCollations().stream().map(
+                    c -> Plan.RelFieldCollation.newBuilder().setFieldIndex(c.getFieldIndex())
                     .setDirection(convertDirection(c.getDirection()))
                     .setNullDirection(convertNullDirection(c.nullDirection)).build()).collect(Collectors.toList()))
             .addAllTableNames(node.getTableNames());
