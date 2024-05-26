@@ -26,7 +26,7 @@ message StageNode {
   int32 stageId = 1;
   repeated StageNode inputs = 3;
   repeated string columnNames = 4;
-  repeated string columnDataTypes = 5;
+  repeated ColumnDataType columnDataTypes = 5;
   oneof nodeType {
     TableScanNode tableScanNode = 102;
     MailboxReceiveNode receiveNode = 103;

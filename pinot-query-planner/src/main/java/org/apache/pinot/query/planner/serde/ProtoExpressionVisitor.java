@@ -64,7 +64,7 @@ public class ProtoExpressionVisitor {
     return new RexExpression.Literal(dataType, obj);
   }
 
-  private static DataSchema.ColumnDataType convertColumnDataType(Expressions.ColumnDataType dataType) {
+  public static DataSchema.ColumnDataType convertColumnDataType(Expressions.ColumnDataType dataType) {
     switch (dataType) {
       case INT:
         return DataSchema.ColumnDataType.INT;
@@ -102,6 +102,8 @@ public class ProtoExpressionVisitor {
         return DataSchema.ColumnDataType.STRING_ARRAY;
       case BYTES_ARRAY:
         return DataSchema.ColumnDataType.BYTES_ARRAY;
+      case OBJECT:
+        return DataSchema.ColumnDataType.OBJECT;
       default:
         return DataSchema.ColumnDataType.UNKNOWN;
     }

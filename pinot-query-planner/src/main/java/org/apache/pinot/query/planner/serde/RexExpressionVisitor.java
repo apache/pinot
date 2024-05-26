@@ -75,7 +75,7 @@ public class RexExpressionVisitor {
     return Expressions.RexExpression.newBuilder().setLiteral(literalBuilder).build();
   }
 
-  private static Expressions.ColumnDataType convertColumnDataType(DataSchema.ColumnDataType dataType) {
+  public static Expressions.ColumnDataType convertColumnDataType(DataSchema.ColumnDataType dataType) {
     switch (dataType) {
       case INT:
         return Expressions.ColumnDataType.INT;
@@ -113,6 +113,8 @@ public class RexExpressionVisitor {
         return Expressions.ColumnDataType.STRING_ARRAY;
       case BYTES_ARRAY:
         return Expressions.ColumnDataType.BYTES_ARRAY;
+      case OBJECT:
+        return Expressions.ColumnDataType.OBJECT;
       default:
         return Expressions.ColumnDataType.UNKNOWN;
     }

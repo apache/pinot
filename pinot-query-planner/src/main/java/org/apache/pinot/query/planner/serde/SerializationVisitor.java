@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.query.planner.serde;
 
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -47,49 +45,43 @@ import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 
 
-public class SerializationVisitor implements PlanNodeVisitor<Plan.StageNode, List<Plan.StageNode>> {
-  @Override
-  public Plan.StageNode visitAggregate(AggregateNode node, List<Plan.StageNode> context) {
-    List<Plan.StageNode> children = new ArrayList<>(2);
-    node.getInputs().forEach(input -> input.visit(this, children));
-    Plan.StageNode.Builder builder = getBuilder(node, children);
+public class SerializationVisitor implements PlanNodeVisitor<Void, Plan.StageNode.Builder> {
+  public Plan.StageNode process(AbstractPlanNode planNode) {
+    Plan.StageNode.Builder builder = Plan.StageNode.newBuilder().setStageId(planNode.getPlanFragmentId());
+    DataSchema dataSchema = planNode.getDataSchema();
+    for (int i = 0; i < dataSchema.getColumnNames().length; i++) {
+      builder.addColumnNames(dataSchema.getColumnName(i));
+      builder.addColumnDataTypes(RexExpressionVisitor.convertColumnDataType(dataSchema.getColumnDataType(i)));
+    }
 
+    planNode.visit(this, builder);
+    planNode.getInputs().forEach(input -> builder.addInputs(process((AbstractPlanNode) input)));
+
+    return builder.build();
+  }
+
+  @Override
+  public Void visitAggregate(AggregateNode node, Plan.StageNode.Builder builder) {
     Plan.AggregateNode.Builder aggregateNodeBuilder =
         Plan.AggregateNode.newBuilder().setNodeHint(getNodeHintBuilder(node.getNodeHint()))
             .setAggCalls(convertExpressions(node.getAggCalls())).addAllFilterArgIndices(node.getFilterArgIndices())
             .setGroupSet(convertExpressions(node.getGroupSet())).setAggType(convertAggType(node.getAggType()));
 
     builder.setAggregateNode(aggregateNodeBuilder);
-
-    Plan.StageNode protoPlanNode = builder.build();
-    context.add(protoPlanNode);
-
-    return protoPlanNode;
+    return null;
   }
 
   @Override
-  public Plan.StageNode visitFilter(FilterNode node, List<Plan.StageNode> context) {
-    List<Plan.StageNode> children = new ArrayList<>(2);
-    node.getInputs().get(0).visit(this, children);
-    Plan.StageNode.Builder builder = getBuilder(node, children);
-
+  public Void visitFilter(FilterNode node, Plan.StageNode.Builder builder) {
     Expressions.RexExpression condition = RexExpressionVisitor.process(node.getCondition());
     Plan.FilterNode.Builder filterNodeBuilder = Plan.FilterNode.newBuilder().setCondition(condition);
     builder.setFilterNode(filterNodeBuilder);
 
-    Plan.StageNode protoPlanNode = builder.build();
-    context.add(protoPlanNode);
-
-    return protoPlanNode;
+    return null;
   }
 
   @Override
-  public Plan.StageNode visitJoin(JoinNode node, List<Plan.StageNode> context) {
-    List<Plan.StageNode> children = new ArrayList<>(2);
-    node.getInputs().get(0).visit(this, children);
-    node.getInputs().get(1).visit(this, children);
-    Plan.StageNode.Builder builder = getBuilder(node, children);
-
+  public Void visitJoin(JoinNode node, Plan.StageNode.Builder builder) {
     Plan.JoinKeys.Builder joinKeyBuilder = Plan.JoinKeys.newBuilder().addAllLeftKeys(node.getJoinKeys().getLeftKeys())
         .addAllRightKeys(node.getJoinKeys().getRightKeys());
 
@@ -101,15 +93,11 @@ public class SerializationVisitor implements PlanNodeVisitor<Plan.StageNode, Lis
 
     builder.setJoinNode(joinNodeBuilder);
 
-    Plan.StageNode protoPlanNode = builder.build();
-    context.add(protoPlanNode);
-
-    return protoPlanNode;
+    return null;
   }
 
   @Override
-  public Plan.StageNode visitMailboxReceive(MailboxReceiveNode node, List<Plan.StageNode> context) {
-    Plan.StageNode.Builder builder = getBuilder(node, Collections.emptyList());
+  public Void visitMailboxReceive(MailboxReceiveNode node, Plan.StageNode.Builder builder) {
     Plan.MailboxReceiveNode.Builder receiveNodeBuilder =
         Plan.MailboxReceiveNode.newBuilder().setSenderStageId(node.getSenderStageId())
             .setDistributionType(convertDistributionType(node.getDistributionType()))
@@ -119,36 +107,19 @@ public class SerializationVisitor implements PlanNodeVisitor<Plan.StageNode, Lis
             .setCollationDirections(convertDirectionsList(node.getCollationDirections()))
             .setCollationNullDirections(convertNullDirectionsList(node.getCollationNullDirections()))
             .setSortOnSender(node.isSortOnSender()).setSortOnReceiver(node.isSortOnReceiver())
-            .setSender(visitMailboxSend(node.getSender(), new ArrayList<>()));
+            .setSender(process(node.getSender()));
     if (node.getDistributionKeys() != null) {
       receiveNodeBuilder.setDistributionKeys(
           Plan.DistributionKeyList.newBuilder().addAllItem(node.getDistributionKeys()).build());
     }
     builder.setReceiveNode(receiveNodeBuilder);
 
-    Plan.StageNode protoPlanNode = builder.build();
-    context.add(protoPlanNode);
-
-    return protoPlanNode;
+    return null;
   }
 
   @Override
-  public Plan.StageNode visitMailboxSend(MailboxSendNode node, List<Plan.StageNode> context) {
-    List<Plan.StageNode> children = new ArrayList<>(2);
-    node.getInputs().get(0).visit(this, children);
-    Plan.StageNode.Builder builder = getBuilder(node, children);
-
-    Plan.MailboxSendNode.Builder sendNodeBuilder = getSendNodeBuilder(node);
-    builder.setSendNode(sendNodeBuilder);
-
-    Plan.StageNode protoPlanNode = builder.build();
-    context.add(protoPlanNode);
-
-    return protoPlanNode;
-  }
-
-  private static Plan.MailboxSendNode.Builder getSendNodeBuilder(MailboxSendNode node) {
-    Plan.MailboxSendNode.Builder builder =
+  public Void visitMailboxSend(MailboxSendNode node, Plan.StageNode.Builder builder) {
+    Plan.MailboxSendNode.Builder sendNodeBuilder =
         Plan.MailboxSendNode.newBuilder().setReceiverStageId(node.getReceiverStageId())
             .setExchangeType(convertExchangeType(node.getExchangeType()))
             .setDistributionType(convertDistributionType(node.getDistributionType())).addAllCollationKeys(
@@ -157,35 +128,25 @@ public class SerializationVisitor implements PlanNodeVisitor<Plan.StageNode, Lis
             .setCollationDirections(convertDirectionsList(node.getCollationDirections()))
             .setSortOnSender(node.isSortOnSender()).setPrePartitioned(node.isPrePartitioned());
     if (node.getDistributionKeys() != null) {
-      builder.setDistributionKeys(
+      sendNodeBuilder.setDistributionKeys(
           Plan.DistributionKeyList.newBuilder().addAllItem(node.getDistributionKeys()).build());
     }
 
-    return builder;
+    builder.setSendNode(sendNodeBuilder);
+    return null;
   }
 
   @Override
-  public Plan.StageNode visitProject(ProjectNode node, List<Plan.StageNode> context) {
-    List<Plan.StageNode> children = new ArrayList<>(2);
-    node.getInputs().get(0).visit(this, children);
-    Plan.StageNode.Builder builder = getBuilder(node, children);
-
+  public Void visitProject(ProjectNode node, Plan.StageNode.Builder builder) {
     Plan.ProjectNode.Builder projectNodeBuilder =
         Plan.ProjectNode.newBuilder().setProjects(convertExpressions(node.getProjects()));
     builder.setProjectNode(projectNodeBuilder);
 
-    Plan.StageNode protoPlanNode = builder.build();
-    context.add(protoPlanNode);
-
-    return protoPlanNode;
+    return null;
   }
 
   @Override
-  public Plan.StageNode visitSort(SortNode node, List<Plan.StageNode> context) {
-    List<Plan.StageNode> children = new ArrayList<>(2);
-    node.getInputs().get(0).visit(this, children);
-    Plan.StageNode.Builder builder = getBuilder(node, children);
-
+  public Void visitSort(SortNode node, Plan.StageNode.Builder builder) {
     Plan.SortNode.Builder sortNodeBuilder =
         Plan.SortNode.newBuilder().setCollationKeys(convertExpressions(node.getCollationKeys()))
             .setCollationDirections(convertDirectionsList(node.getCollationDirections()))
@@ -194,28 +155,20 @@ public class SerializationVisitor implements PlanNodeVisitor<Plan.StageNode, Lis
 
     builder.setSortNode(sortNodeBuilder);
 
-    Plan.StageNode protoPlanNode = builder.build();
-    context.add(protoPlanNode);
-
-    return protoPlanNode;
+    return null;
   }
 
   @Override
-  public Plan.StageNode visitTableScan(TableScanNode node, List<Plan.StageNode> context) {
-    Plan.StageNode.Builder builder = getBuilder(node, Collections.emptyList());
+  public Void visitTableScan(TableScanNode node, Plan.StageNode.Builder builder) {
     Plan.TableScanNode.Builder tableScanNodeBuilder = Plan.TableScanNode.newBuilder().setTableName(node.getTableName())
         .addAllTableScanColumns(node.getTableScanColumns()).setNodeHint(getNodeHintBuilder(node.getNodeHint()));
     builder.setTableScanNode(tableScanNodeBuilder);
 
-    Plan.StageNode protoPlanNode = builder.build();
-    context.add(protoPlanNode);
-
-    return protoPlanNode;
+    return null;
   }
 
   @Override
-  public Plan.StageNode visitValue(ValueNode node, List<Plan.StageNode> context) {
-    Plan.StageNode.Builder builder = getBuilder(node, Collections.emptyList());
+  public Void visitValue(ValueNode node, Plan.StageNode.Builder builder) {
     Plan.ValueNode.Builder valueNodeBuilder = Plan.ValueNode.newBuilder();
     for (List<RexExpression> row : node.getLiteralRows()) {
       Plan.RexExpressionList.Builder exprBuilder = Plan.RexExpressionList.newBuilder();
@@ -226,18 +179,11 @@ public class SerializationVisitor implements PlanNodeVisitor<Plan.StageNode, Lis
     }
     builder.setValueNode(valueNodeBuilder);
 
-    Plan.StageNode protoPlanNode = builder.build();
-    context.add(protoPlanNode);
-
-    return protoPlanNode;
+    return null;
   }
 
   @Override
-  public Plan.StageNode visitWindow(WindowNode node, List<Plan.StageNode> context) {
-    List<Plan.StageNode> children = new ArrayList<>(2);
-    node.getInputs().get(0).visit(this, children);
-    Plan.StageNode.Builder builder = getBuilder(node, children);
-
+  public Void visitWindow(WindowNode node, Plan.StageNode.Builder builder) {
     List<Plan.Direction> orderSetDirection =
         node.getOrderSetDirection().stream().map(SerializationVisitor::convertDirection).collect(Collectors.toList());
     List<Plan.NullDirection> orderSetNullDirection =
@@ -254,62 +200,32 @@ public class SerializationVisitor implements PlanNodeVisitor<Plan.StageNode, Lis
 
     builder.setWindowNode(windowNodeBuilder);
 
-    Plan.StageNode protoPlanNode = builder.build();
-    context.add(protoPlanNode);
-
-    return protoPlanNode;
+    return null;
   }
 
   @Override
-  public Plan.StageNode visitSetOp(SetOpNode node, List<Plan.StageNode> context) {
-    List<Plan.StageNode> children = new ArrayList<>(2);
-    node.getInputs().forEach(input -> input.visit(this, children));
-    Plan.StageNode.Builder builder = getBuilder(node, children);
-
+  public Void visitSetOp(SetOpNode node, Plan.StageNode.Builder builder) {
     Plan.SetOpNode.Builder setOpBuilder =
         Plan.SetOpNode.newBuilder().setSetOpType(convertSetOpType(node.getSetOpType())).setAll(node.isAll());
     builder.setSetNode(setOpBuilder);
 
-    Plan.StageNode protoPlanNode = builder.build();
-    context.add(protoPlanNode);
-
-    return protoPlanNode;
+    return null;
   }
 
   @Override
-  public Plan.StageNode visitExchange(ExchangeNode node, List<Plan.StageNode> context) {
-    List<Plan.StageNode> children = new ArrayList<>(2);
-    node.getInputs().forEach(input -> input.visit(this, children));
-    Plan.StageNode.Builder builder = getBuilder(node, children);
-
+  public Void visitExchange(ExchangeNode node, Plan.StageNode.Builder builder) {
     Plan.ExchangeNode.Builder exchangeNodeBuilder =
         Plan.ExchangeNode.newBuilder().setExchangeType(convertExchangeType(node.getExchangeType()))
             .setDistributionType(convertDistributionType(node.getDistributionType()))
             .addAllKeys(node.getDistributionKeys()).setIsSortOnSender(node.isSortOnSender())
             .setIsSortOnReceiver(node.isSortOnReceiver()).setIsPrePartitioned(node.isPrePartitioned()).addAllCollations(
-                node.getCollations().stream().map(
-                    c -> Plan.RelFieldCollation.newBuilder().setFieldIndex(c.getFieldIndex())
+                node.getCollations().stream().map(c -> Plan.RelFieldCollation.newBuilder().setFieldIndex(c.getFieldIndex())
                     .setDirection(convertDirection(c.getDirection()))
                     .setNullDirection(convertNullDirection(c.nullDirection)).build()).collect(Collectors.toList()))
             .addAllTableNames(node.getTableNames());
     builder.setExchangeNode(exchangeNodeBuilder);
 
-    Plan.StageNode protoPlanNode = builder.build();
-    context.add(protoPlanNode);
-
-    return protoPlanNode;
-  }
-
-  private static Plan.StageNode.Builder getBuilder(AbstractPlanNode planNode, List<Plan.StageNode> children) {
-    Plan.StageNode.Builder builder = Plan.StageNode.newBuilder().setStageId(planNode.getPlanFragmentId());
-    DataSchema dataSchema = planNode.getDataSchema();
-    for (int i = 0; i < dataSchema.getColumnNames().length; i++) {
-      builder.addColumnNames(dataSchema.getColumnName(i));
-      builder.addColumnDataTypes(dataSchema.getColumnDataType(i).name());
-    }
-
-    builder.addAllInputs(children);
-    return builder;
+    return null;
   }
 
   private static Plan.NodeHint.Builder getNodeHintBuilder(AbstractPlanNode.NodeHint nodeHint) {

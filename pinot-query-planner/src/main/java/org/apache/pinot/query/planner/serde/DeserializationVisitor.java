@@ -245,13 +245,11 @@ public class DeserializationVisitor {
   }
 
   private static DataSchema extractDataSchema(Plan.StageNode protoNode) {
-    String[] columnDataTypesList = protoNode.getColumnDataTypesList().toArray(new String[]{});
+    List<DataSchema.ColumnDataType> columnDataTypesList =
+        protoNode.getColumnDataTypesList().stream().map(ProtoExpressionVisitor::convertColumnDataType)
+            .collect(Collectors.toList());
     String[] columnNames = protoNode.getColumnNamesList().toArray(new String[]{});
-    DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[columnNames.length];
-    for (int i = 0; i < columnNames.length; i++) {
-      columnDataTypes[i] = DataSchema.ColumnDataType.valueOf(columnDataTypesList[i]);
-    }
-    return new DataSchema(columnNames, columnDataTypes);
+    return new DataSchema(columnNames, columnDataTypesList.toArray(new DataSchema.ColumnDataType[]{}));
   }
 
   private static List<RexExpression> convertExpressions(Plan.RexExpressionList expressionList) {
