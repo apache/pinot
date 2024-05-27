@@ -29,6 +29,9 @@ import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.spi.utils.ByteArray;
 
 
+/**
+ * Serialize RexExpressions to the Protobuf equivalent classes defined expressions.proto.
+ */
 public class RexExpressionVisitor {
   private RexExpressionVisitor() {
   }
