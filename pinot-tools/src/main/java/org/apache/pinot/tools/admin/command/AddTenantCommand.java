@@ -54,12 +54,13 @@ public class AddTenantCommand extends AbstractBaseAdminCommand implements Comman
   @CommandLine.Option(names = {"-instanceCount"}, required = true, description = "Number of instances.")
   private int _instanceCount;
 
-  @CommandLine.Option(names = {"-offlineInstanceCount"}, required = true, description = "Number of offline instances.")
-  private int _offlineInstanceCount;
+  @CommandLine.Option(names = {"-offlineInstanceCount"}, required = false,
+      description = "Number of offline instances.")
+  private Integer _offlineInstanceCount;
 
-  @CommandLine.Option(names = {"-realTimeInstanceCount"}, required = true,
+  @CommandLine.Option(names = {"-realTimeInstanceCount"}, required = false,
       description = "Number of realtime instances.")
-  private int _realtimeInstanceCount;
+  private Integer _realtimeInstanceCount;
 
   @CommandLine.Option(names = {"-exec"}, required = false, description = "Execute the command.")
   private boolean _exec;
@@ -151,6 +152,14 @@ public class AddTenantCommand extends AbstractBaseAdminCommand implements Comman
     }
 
     LOGGER.info("Executing command: {}", toString());
+
+    if (_role == TenantRole.SERVER) {
+      if (_offlineInstanceCount == null || _realtimeInstanceCount == null) {
+        throw new IllegalArgumentException("-offlineInstanceCount and -realTimeInstanceCount should be set when "
+            + "creating a server tenant.");
+      }
+    }
+
     Tenant tenant = new Tenant(_role, _name, _instanceCount, _offlineInstanceCount, _realtimeInstanceCount);
     String res = AbstractBaseAdminCommand
         .sendRequest("POST", ControllerRequestURLBuilder.baseUrl(_controllerAddress).forTenantCreate(),
