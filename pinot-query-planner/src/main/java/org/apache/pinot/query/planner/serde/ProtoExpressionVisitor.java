@@ -59,31 +59,37 @@ public class ProtoExpressionVisitor {
 
   private static RexExpression visitLiteral(Expressions.Literal literal) {
     DataSchema.ColumnDataType dataType = convertColumnDataType(literal.getDataType());
+    if (literal.getIsValueNull()) {
+      return new RexExpression.Literal(dataType, null);
+    }
+
     Object obj;
-    switch (dataType) {
-      case BOOLEAN:
+    switch (literal.getLiteralFieldCase()) {
+      case BOOLFIELD:
         obj = literal.getBoolField();
         break;
-      case INT:
+      case INTFIELD:
         obj = literal.getIntField();
         break;
-      case LONG:
+      case LONGFIELD:
         obj = literal.getLongField();
         break;
-      case FLOAT:
+      case FLOATFIELD:
         obj = literal.getFloatField();
         break;
-      case DOUBLE:
+      case DOUBLEFIELD:
         obj = literal.getDoubleField();
         break;
-      case STRING:
+      case STRINGFIELD:
         obj = literal.getStringField();
         break;
-      case BYTES:
+      case BYTESFIELD:
         obj = new ByteArray(literal.getBytesField().toByteArray());
         break;
       default:
-        throw new RuntimeException(String.format("Literal of type %s not supported", literal.getDataType()));
+        throw new RuntimeException(
+            String.format("Literal of type %s not supported. Serialization Type: %s", literal.getDataType(),
+                literal.getLiteralFieldCase()));
     }
     return new RexExpression.Literal(dataType, obj);
   }

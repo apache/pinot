@@ -62,31 +62,26 @@ public class RexExpressionVisitor {
   private static Expressions.RexExpression visitLiteral(RexExpression.Literal literal) {
     Expressions.Literal.Builder literalBuilder = Expressions.Literal.newBuilder();
     literalBuilder.setDataType(convertColumnDataType(literal.getDataType()));
-    if (literal.getValue() != null) {
-      switch (literal.getDataType()) {
-        case BOOLEAN:
-          literalBuilder.setBoolField((Boolean) literal.getValue());
-          break;
-        case INT:
-          literalBuilder.setIntField((Integer) literal.getValue());
-          break;
-        case LONG:
-          literalBuilder.setLongField((Long) literal.getValue());
-          break;
-        case FLOAT:
-          literalBuilder.setFloatField((Float) literal.getValue());
-          break;
-        case DOUBLE:
-          literalBuilder.setDoubleField((Double) literal.getValue());
-          break;
-        case STRING:
-          literalBuilder.setStringField((String) literal.getValue());
-          break;
-        case BYTES:
-          literalBuilder.setBytesField(ByteString.copyFrom(((ByteArray) literal.getValue()).getBytes()));
-          break;
-        default:
-          throw new RuntimeException(String.format("Literal of type %s not supported", literal.getDataType()));
+    Object literalValue = literal.getValue();
+    if (literalValue != null) {
+      if (literalValue instanceof Boolean) {
+        literalBuilder.setBoolField((Boolean) literalValue);
+      } else if (literalValue instanceof Integer) {
+        literalBuilder.setIntField((Integer) literalValue);
+      } else if (literalValue instanceof Long) {
+        literalBuilder.setLongField((Long) literalValue);
+      } else if (literalValue instanceof Float) {
+        literalBuilder.setFloatField((Float) literalValue);
+      } else if (literalValue instanceof Double) {
+        literalBuilder.setDoubleField((Double) literalValue);
+      } else if (literalValue instanceof String) {
+        literalBuilder.setStringField((String) literalValue);
+      } else if (literalValue instanceof ByteArray) {
+        literalBuilder.setBytesField(ByteString.copyFrom(((ByteArray) literalValue).getBytes()));
+      } else {
+        throw new RuntimeException(
+            String.format("Object of type %s not supported for literal of type %s", literalValue.getClass().getName(),
+                literal.getDataType()));
       }
       literalBuilder.setIsValueNull(false);
     } else {

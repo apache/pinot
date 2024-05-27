@@ -51,7 +51,7 @@ message InputRef {
 message Literal {
   ColumnDataType dataType = 1;
   bool isValueNull = 2;
-  oneof literal_field {
+  oneof literalField {
     bool boolField = 101;
     int32 intField = 102;
     int64 longField = 103;
