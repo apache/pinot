@@ -59,6 +59,7 @@ message Literal {
     double doubleField = 105;
     string stringField = 106;
     bytes bytesField = 107;
+    bytes serializedField = 108;
   }
 }
 

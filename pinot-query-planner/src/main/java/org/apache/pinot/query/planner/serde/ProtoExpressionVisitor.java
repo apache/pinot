@@ -21,6 +21,7 @@ package org.apache.pinot.query.planner.serde;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.calcite.sql.SqlKind;
+import org.apache.commons.lang3.SerializationUtils;
 import org.apache.pinot.common.proto.Expressions;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
@@ -85,6 +86,9 @@ public class ProtoExpressionVisitor {
         break;
       case BYTESFIELD:
         obj = new ByteArray(literal.getBytesField().toByteArray());
+        break;
+      case SERIALIZEDFIELD:
+        obj = SerializationUtils.deserialize(literal.getSerializedField().toByteArray());
         break;
       default:
         throw new RuntimeException(

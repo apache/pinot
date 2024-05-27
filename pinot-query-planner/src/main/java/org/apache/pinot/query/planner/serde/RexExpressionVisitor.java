@@ -19,8 +19,10 @@
 package org.apache.pinot.query.planner.serde;
 
 import com.google.protobuf.ByteString;
+import java.io.Serializable;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.SerializationUtils;
 import org.apache.pinot.common.proto.Expressions;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
@@ -79,9 +81,9 @@ public class RexExpressionVisitor {
       } else if (literalValue instanceof ByteArray) {
         literalBuilder.setBytesField(ByteString.copyFrom(((ByteArray) literalValue).getBytes()));
       } else {
-        throw new RuntimeException(
-            String.format("Object of type %s not supported for literal of type %s", literalValue.getClass().getName(),
-                literal.getDataType()));
+        Serializable value = literal.getDataType().convert(literal.getValue());
+        byte[] data = SerializationUtils.serialize(value);
+        literalBuilder.setSerializedField(ByteString.copyFrom(data));
       }
       literalBuilder.setIsValueNull(false);
     } else {
