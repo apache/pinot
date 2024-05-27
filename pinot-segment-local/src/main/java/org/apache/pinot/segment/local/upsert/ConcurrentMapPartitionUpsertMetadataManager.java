@@ -30,6 +30,7 @@ import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.utils.UploadedRealtimeSegmentName;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.local.segment.readers.LazyRow;
 import org.apache.pinot.segment.local.utils.HashUtils;
@@ -135,10 +136,9 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
               // Update the record location when getting a newer comparison value, or the value is the same as the
               // current value, but the segment has a larger sequence number (the segment is newer than the current
               // segment).
-              if (comparisonResult > 0 || (comparisonResult == 0 && LLCSegmentName.isLLCSegment(segmentName)
-                  && LLCSegmentName.isLLCSegment(currentSegmentName)
-                  && LLCSegmentName.getSequenceNumber(segmentName) > LLCSegmentName.getSequenceNumber(
-                  currentSegmentName))) {
+              if (comparisonResult > 0 || (comparisonResult == 0 && shouldReplaceOnComparisonTie(segmentName,
+                  currentSegmentName, segment.getSegmentMetadata().getIndexCreationTime(),
+                  currentSegment.getSegmentMetadata().getIndexCreationTime()))) {
                 replaceDocId(segment, validDocIds, queryableDocIds, currentSegment, currentDocId, newDocId, recordInfo);
                 return new RecordLocation(segment, newDocId, newComparisonValue);
               } else {
@@ -156,6 +156,44 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
       _logger.warn("Found {} primary keys in the wrong segment when adding segment: {}", numKeys, segmentName);
       _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.UPSERT_KEYS_IN_WRONG_SEGMENT, numKeys);
     }
+  }
+
+  /**
+   * <li> When the replacing segment and current segment are of {@link LLCSegmentName} then the PK should resolve to
+   * row in segment with higher sequence id.
+   * <li> When the replacing segment and current segment are of {@link UploadedRealtimeSegmentName} then the PK
+   * should resolve to row in segment with higher sequence id, creation time.
+   * <li> When either is of type {@link UploadedRealtimeSegmentName} then resolve on creation time, if same(rare
+   * scenario) then give preference to uploaded time
+   *
+   * @param segmentName replacing segment
+   * @param currentSegmentName current segment having the record for the given primary key
+   * @param segmentCreationTimeMs creation time of replacing segment
+   * @param currentSegmentCreationTimeMs creation time of current segment
+   * @return true if the record in replacing segment should replace the record in current segment
+   */
+  private boolean shouldReplaceOnComparisonTie(String segmentName, String currentSegmentName,
+      long segmentCreationTimeMs, long currentSegmentCreationTimeMs) {
+
+    if (LLCSegmentName.isLLCSegment(segmentName) && LLCSegmentName.isLLCSegment(currentSegmentName)
+        && LLCSegmentName.getSequenceNumber(segmentName) > LLCSegmentName.getSequenceNumber(currentSegmentName)) {
+      return true;
+    }
+
+    if (UploadedRealtimeSegmentName.isUploadedRealtimeSegmentName(segmentName)
+        && UploadedRealtimeSegmentName.isUploadedRealtimeSegmentName(currentSegmentName)) {
+      return new UploadedRealtimeSegmentName(segmentName).compareTo(new UploadedRealtimeSegmentName(currentSegmentName))
+          >= 0;
+    }
+    if (UploadedRealtimeSegmentName.isUploadedRealtimeSegmentName(segmentName)
+        || UploadedRealtimeSegmentName.isUploadedRealtimeSegmentName(currentSegmentName)) {
+      if (segmentCreationTimeMs == currentSegmentCreationTimeMs) {
+        return UploadedRealtimeSegmentName.isUploadedRealtimeSegmentName(segmentName);
+      } else {
+        return segmentCreationTimeMs > currentSegmentCreationTimeMs;
+      }
+    }
+    return false;
   }
 
   @Override

@@ -276,11 +276,6 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     _startOffset = segmentMetadataPropertiesConfiguration.getString(Segment.Realtime.START_OFFSET, null);
     _endOffset = segmentMetadataPropertiesConfiguration.getString(Segment.Realtime.END_OFFSET, null);
 
-    // Set partitionId if externally partitioned.
-    _uploadedSegmentPartitionId =
-        segmentMetadataPropertiesConfiguration.getInt(Segment.SEGMENT_PARTITION_METADATA_UPLOADED_SEGMENT_PARTITIONID,
-            -1);
-
     // Set custom configs from metadata properties
     setCustomConfigs(segmentMetadataPropertiesConfiguration, _customMap);
   }
@@ -484,11 +479,6 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     }
 
     return segmentMetadata;
-  }
-
-  @Override
-  public int getUploadedSegmentPartitionId() {
-    return _uploadedSegmentPartitionId;
   }
 
   @Override

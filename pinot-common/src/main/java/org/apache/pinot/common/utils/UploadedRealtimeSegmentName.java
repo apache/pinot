@@ -1,0 +1,140 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.pinot.common.utils;
+
+import com.google.common.base.Joiner;
+import com.google.common.base.Preconditions;
+import java.util.Objects;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import javax.annotation.Nullable;
+
+
+/**
+ * Class to represent segment names like: uploaded_{tableName}_{partitionId}_{sequenceId}_{creationTime}
+ *
+ * This naming convention is adopted to represent a batch generated segment uploaded to a realtime table. The naming
+ * convention has been kept different from {@LLCSegmentName} to differentiate between batch generated segments and
+ * low level consumer segments.
+ */
+public class UploadedRealtimeSegmentName implements Comparable<UploadedRealtimeSegmentName> {
+
+  public static final String UPLOADED_REALTIME_SEGMENT_NAME_REGEX = "^uploaded_(.+)_(\\d+)_(\\d+)_(\\d+)$";
+
+  private static final Pattern NAME_PATTERN = Pattern.compile(UPLOADED_REALTIME_SEGMENT_NAME_REGEX);
+  private static final String UPLOADED_PREFIX = "uploaded";
+  private static final String SEPARATOR = "_";
+  private final String _tableName;
+  private final int _partitionId;
+  private final int _sequenceId;
+  private final long _creationTime;
+  private final String _segmentName;
+
+  public UploadedRealtimeSegmentName(String segmentName) {
+
+    Matcher matcher = NAME_PATTERN.matcher(segmentName);
+
+    if (matcher.find()) {
+      _tableName = matcher.group(1);
+      _partitionId = Integer.parseInt(matcher.group(2));
+      _sequenceId = Integer.parseInt(matcher.group(3));
+      _creationTime = Long.parseLong(matcher.group(4));
+
+      _segmentName = segmentName;
+    } else {
+      throw new IllegalArgumentException("Invalid uploaded realtime segment name: " + segmentName);
+    }
+  }
+
+  public UploadedRealtimeSegmentName(String tableName, int partitionId, int sequenceId, long creationTime) {
+    _tableName = tableName;
+    _partitionId = partitionId;
+    _sequenceId = sequenceId;
+    _creationTime = creationTime;
+    _segmentName = Joiner.on(SEPARATOR).join(UPLOADED_PREFIX, tableName, partitionId, sequenceId, creationTime);
+  }
+
+  public static boolean isUploadedRealtimeSegmentName(String segmentName) {
+    Matcher matcher = NAME_PATTERN.matcher(segmentName);
+    return matcher.matches();
+  }
+
+  @Nullable
+  public static UploadedRealtimeSegmentName of(String segmentName) {
+    try {
+      return new UploadedRealtimeSegmentName(segmentName);
+    } catch (Exception e) {
+      return null;
+    }
+  }
+
+  public String getTableName() {
+    return _tableName;
+  }
+
+  public int getPartitionId() {
+    return _partitionId;
+  }
+
+  public int getSequenceId() {
+    return _sequenceId;
+  }
+
+  public long getCreationTime() {
+    return _creationTime;
+  }
+
+  public String getSegmentName() {
+    return _segmentName;
+  }
+
+  @Override
+  public int compareTo(UploadedRealtimeSegmentName other) {
+    Preconditions.checkState(_tableName.equals(other._tableName));
+    if (_partitionId != other._partitionId) {
+      return Integer.compare(_partitionId, other._partitionId);
+    }
+    if (_sequenceId != other._sequenceId) {
+      return Integer.compare(_sequenceId, other._sequenceId);
+    }
+    return Long.compare(_creationTime, other._creationTime);
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (!(o instanceof UploadedRealtimeSegmentName)) {
+      return false;
+    }
+    UploadedRealtimeSegmentName that = (UploadedRealtimeSegmentName) o;
+    return _segmentName.equals(that._segmentName);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(_segmentName);
+  }
+
+  @Override
+  public String toString() {
+    return _segmentName;
+  }
+}

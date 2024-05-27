@@ -26,7 +26,6 @@ import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
-import org.apache.pinot.spi.utils.CommonConstants;
 
 
 // Util functions related to segments.
@@ -45,6 +44,12 @@ public class SegmentUtils {
     if (llcSegmentName != null) {
       return llcSegmentName.getPartitionGroupId();
     }
+
+    UploadedRealtimeSegmentName uploadedRealtimeSegmentName = UploadedRealtimeSegmentName.of(segmentName);
+    if (uploadedRealtimeSegmentName != null) {
+      return uploadedRealtimeSegmentName.getPartitionId();
+    }
+
     // Otherwise, retrieve the partition id from the segment zk metadata.
     SegmentZKMetadata segmentZKMetadata =
         ZKMetadataProvider.getSegmentZKMetadata(helixManager.getHelixPropertyStore(), realtimeTableName, segmentName);
@@ -70,15 +75,6 @@ public class SegmentUtils {
       @Nullable String partitionColumn) {
     SegmentPartitionMetadata segmentPartitionMetadata = segmentZKMetadata.getPartitionMetadata();
     if (segmentPartitionMetadata != null) {
-
-      // if segment is externally uploaded then check for partition provided in metadata
-      if (segmentZKMetadata.getStatus() == CommonConstants.Segment.Realtime.Status.UPLOADED) {
-        int uploadedSegmentPartitionId = segmentPartitionMetadata.getUploadedSegmentPartitionId();
-        if (uploadedSegmentPartitionId != -1) {
-          return uploadedSegmentPartitionId;
-        }
-      }
-
       Map<String, ColumnPartitionMetadata> columnPartitionMap = segmentPartitionMetadata.getColumnPartitionMap();
       ColumnPartitionMetadata columnPartitionMetadata = null;
       if (partitionColumn != null) {

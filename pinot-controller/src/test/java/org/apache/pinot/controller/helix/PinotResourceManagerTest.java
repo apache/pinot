@@ -210,37 +210,6 @@ public class PinotResourceManagerTest {
     assertTrue(segments.contains(partition1Segment0));
 
     // Check the segments of the same partition is assigned to the same set of servers.
-    checkSamePartitionSegmentAssignmentToSameServers(segments, idealState);
-  }
-
-  @Test
-  public void testAddingRealtimeTableSegmentsWithExternalPartitionIdInZkMetadata() {
-    String partition0Segment0 = "p0s0";
-    String partition0Segment1 = "p0s1";
-    String partition1Segment0 = "p1s0";
-    _resourceManager.addNewSegment(REALTIME_TABLE_NAME,
-        SegmentMetadataMockUtils.mockSegmentMetadataWithExternalPartitionInfo(RAW_TABLE_NAME, partition0Segment0, 0),
-        "downloadUrl");
-    _resourceManager.addNewSegment(REALTIME_TABLE_NAME,
-        SegmentMetadataMockUtils.mockSegmentMetadataWithExternalPartitionInfo(RAW_TABLE_NAME, partition0Segment1, 0),
-        "downloadUrl");
-    _resourceManager.addNewSegment(REALTIME_TABLE_NAME,
-        SegmentMetadataMockUtils.mockSegmentMetadataWithExternalPartitionInfo(RAW_TABLE_NAME, partition1Segment0, 1),
-        "downloadUrl");
-
-    IdealState idealState = _resourceManager.getTableIdealState(REALTIME_TABLE_NAME);
-    assertNotNull(idealState);
-    Set<String> segments = idealState.getPartitionSet();
-
-    // 2 consuming segments, 1 uploaded segments
-    assertEquals(segments.size(), 5);
-    assertTrue(segments.contains(partition1Segment0));
-    Map<Integer, Set<String>> partitionIdToServersMap = new HashMap<>();
-
-    checkSamePartitionSegmentAssignmentToSameServers(segments, idealState);
-  }
-
-  private static void checkSamePartitionSegmentAssignmentToSameServers(Set<String> segments, IdealState idealState) {
     Map<Integer, Set<String>> partitionIdToServersMap = new HashMap<>();
     for (String segment : segments) {
       int partitionId;

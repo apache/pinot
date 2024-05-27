@@ -91,8 +91,6 @@ public class SegmentMetadataMockUtils {
     when(columnMetadata.getPartitionFunction()).thenReturn(new MurmurPartitionFunction(5));
 
     SegmentMetadataImpl segmentMetadata = mock(SegmentMetadataImpl.class);
-    // unmocked method returns 0 as default, set it to -1 to indicate not externally partitioned
-    when(segmentMetadata.getUploadedSegmentPartitionId()).thenReturn(-1);
     if (columnName != null) {
       when(segmentMetadata.getColumnMetadataFor(columnName)).thenReturn(columnMetadata);
     }
@@ -118,18 +116,6 @@ public class SegmentMetadataMockUtils {
         new Interval(TimeUnit.MILLISECONDS.convert(endTime - 10, TimeUnit.DAYS),
             TimeUnit.MILLISECONDS.convert(endTime, TimeUnit.DAYS)));
     Mockito.when(segmentMetadata.getTimeUnit()).thenReturn(TimeUnit.DAYS);
-    return segmentMetadata;
-  }
-
-  public static SegmentMetadata mockSegmentMetadataWithExternalPartitionInfo(String rawTableName, String segmentName,
-      int partitionId) {
-    SegmentMetadataImpl segmentMetadata = mock(SegmentMetadataImpl.class);
-    when(segmentMetadata.getUploadedSegmentPartitionId()).thenReturn(partitionId);
-
-    when(segmentMetadata.getTableName()).thenReturn(rawTableName);
-    when(segmentMetadata.getName()).thenReturn(segmentName);
-    when(segmentMetadata.getCrc()).thenReturn("0");
-
     return segmentMetadata;
   }
 }

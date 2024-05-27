@@ -18,12 +18,14 @@
  */
 package org.apache.pinot.common.utils;
 
+import java.util.HashMap;
+import java.util.HashSet;
 import org.apache.helix.HelixManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
-import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 import org.testng.annotations.Test;
@@ -32,6 +34,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.AssertJUnit.fail;
 
 
 public class SegmentUtilsTest {
@@ -49,14 +52,18 @@ public class SegmentUtilsTest {
   }
 
   @Test
-  public void testGetUploadedRealtimeSegmentPartitionId() {
+  public void testGetRealtimeSegmentPartitionIdFromZkMetadata() {
 
     // mocks
     SegmentZKMetadata segmentZKMetadata = mock(SegmentZKMetadata.class);
-    when(segmentZKMetadata.getStatus()).thenReturn(CommonConstants.Segment.Realtime.Status.UPLOADED);
-
     SegmentPartitionMetadata segmentPartitionMetadata = mock(SegmentPartitionMetadata.class);
-    when(segmentPartitionMetadata.getUploadedSegmentPartitionId()).thenReturn(1);
+    HashMap<String, ColumnPartitionMetadata> columnPartitionMetadataMap = new HashMap<>();
+    HashSet<Integer> partitions = new HashSet<>();
+    partitions.add(3);
+    columnPartitionMetadataMap.put(PARTITION_COLUMN,
+        new ColumnPartitionMetadata("modulo", 8, partitions, new HashMap<>()));
+
+    when(segmentPartitionMetadata.getColumnPartitionMap()).thenReturn(columnPartitionMetadataMap);
     when(segmentZKMetadata.getPartitionMetadata()).thenReturn(segmentPartitionMetadata);
 
     HelixManager helixManager = mock(HelixManager.class);
@@ -72,7 +79,20 @@ public class SegmentUtilsTest {
       Integer partitionId =
           SegmentUtils.getRealtimeSegmentPartitionId(SEGMENT, TABLE_NAME_WITH_TYPE, helixManager, PARTITION_COLUMN);
 
-      assertEquals(partitionId, 1);
+      assertEquals(partitionId, 3);
+    }
+  }
+
+  @Test
+  void testGetRealtimeSegmentPartitionIdForUploadedRealtimeSegment() {
+    String segmentName = "uploaded_table_name_3_100_1716185755000"; // replace with your segment name
+
+    try {
+      Integer partitionId =
+          SegmentUtils.getRealtimeSegmentPartitionId(segmentName, "realtimeTableName", null, "partitionColumn");
+      assertEquals(partitionId, 3);
+    } catch (Exception e) {
+      fail("Exception should not be thrown");
     }
   }
 }
