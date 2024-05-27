@@ -50,8 +50,16 @@ message InputRef {
 
 message Literal {
   ColumnDataType dataType = 1;
-  bytes serializedValue = 2;
-  bool isValueNull = 3;
+  bool isValueNull = 2;
+  oneof literal_field {
+    bool boolField = 101;
+    int32 intField = 102;
+    int64 longField = 103;
+    float floatField = 104;
+    double doubleField = 105;
+    string stringField = 106;
+    bytes bytesField = 107;
+  }
 }
 
 message FunctionCall {

@@ -19,13 +19,12 @@
 package org.apache.pinot.query.planner.serde;
 
 import com.google.protobuf.ByteString;
-import java.io.Serializable;
 import java.util.List;
 import java.util.stream.Collectors;
-import org.apache.commons.lang.SerializationUtils;
 import org.apache.pinot.common.proto.Expressions;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.spi.utils.ByteArray;
 
 
 public class RexExpressionVisitor {
@@ -64,9 +63,31 @@ public class RexExpressionVisitor {
     Expressions.Literal.Builder literalBuilder = Expressions.Literal.newBuilder();
     literalBuilder.setDataType(convertColumnDataType(literal.getDataType()));
     if (literal.getValue() != null) {
-      Serializable value = literal.getDataType().convert(literal.getValue());
-      byte[] data = SerializationUtils.serialize(value);
-      literalBuilder.setSerializedValue(ByteString.copyFrom(data));
+      switch (literal.getDataType()) {
+        case BOOLEAN:
+          literalBuilder.setBoolField((Boolean) literal.getValue());
+          break;
+        case INT:
+          literalBuilder.setIntField((Integer) literal.getValue());
+          break;
+        case LONG:
+          literalBuilder.setLongField((Long) literal.getValue());
+          break;
+        case FLOAT:
+          literalBuilder.setFloatField((Float) literal.getValue());
+          break;
+        case DOUBLE:
+          literalBuilder.setDoubleField((Double) literal.getValue());
+          break;
+        case STRING:
+          literalBuilder.setStringField((String) literal.getValue());
+          break;
+        case BYTES:
+          literalBuilder.setBytesField(ByteString.copyFrom(((ByteArray) literal.getValue()).getBytes()));
+          break;
+        default:
+          throw new RuntimeException(String.format("Literal of type %s not supported", literal.getDataType()));
+      }
       literalBuilder.setIsValueNull(false);
     } else {
       literalBuilder.setIsValueNull(true);

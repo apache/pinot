@@ -21,10 +21,10 @@ package org.apache.pinot.query.planner.serde;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.calcite.sql.SqlKind;
-import org.apache.commons.lang.SerializationUtils;
 import org.apache.pinot.common.proto.Expressions;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.spi.utils.ByteArray;
 
 
 public class ProtoExpressionVisitor {
@@ -59,8 +59,32 @@ public class ProtoExpressionVisitor {
 
   private static RexExpression visitLiteral(Expressions.Literal literal) {
     DataSchema.ColumnDataType dataType = convertColumnDataType(literal.getDataType());
-    Object obj =
-        !literal.getIsValueNull() ? SerializationUtils.deserialize(literal.getSerializedValue().toByteArray()) : null;
+    Object obj;
+    switch (dataType) {
+      case BOOLEAN:
+        obj = literal.getBoolField();
+        break;
+      case INT:
+        obj = literal.getIntField();
+        break;
+      case LONG:
+        obj = literal.getLongField();
+        break;
+      case FLOAT:
+        obj = literal.getFloatField();
+        break;
+      case DOUBLE:
+        obj = literal.getDoubleField();
+        break;
+      case STRING:
+        obj = literal.getStringField();
+        break;
+      case BYTES:
+        obj = new ByteArray(literal.getBytesField().toByteArray());
+        break;
+      default:
+        throw new RuntimeException(String.format("Literal of type %s not supported", literal.getDataType()));
+    }
     return new RexExpression.Literal(dataType, obj);
   }
 
