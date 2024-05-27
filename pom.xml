@@ -172,7 +172,7 @@
     <audienceannotations.version>0.15.0</audienceannotations.version>
     <clp-ffi.version>0.4.4</clp-ffi.version>
     <stax2-api.version>4.2.2</stax2-api.version>
-    <aws.sdk.version>2.25.57</aws.sdk.version>
+    <aws.sdk.version>2.25.60</aws.sdk.version>
     <joda-time.version>2.12.7</joda-time.version>
     <janino.version>3.1.12</janino.version>
     <testng.version>7.10.2</testng.version>
