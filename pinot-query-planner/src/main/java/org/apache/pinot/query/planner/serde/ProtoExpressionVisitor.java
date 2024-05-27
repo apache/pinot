@@ -58,7 +58,8 @@ public class ProtoExpressionVisitor {
         functionCall.getFunctionOperandsList().stream().map(ProtoExpressionVisitor::process)
             .collect(Collectors.toList());
     return new RexExpression.FunctionCall(SqlKind.values()[functionCall.getSqlKind()],
-        convertColumnDataType(functionCall.getDataType()), functionCall.getFunctionName(), functionOperands);
+        convertColumnDataType(functionCall.getDataType()), functionCall.getFunctionName(), functionOperands,
+        functionCall.getIsDistinct());
   }
 
   private static RexExpression visitLiteral(Expressions.Literal literal) {

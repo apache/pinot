@@ -59,7 +59,8 @@ public class RexExpressionVisitor {
     Expressions.FunctionCall.Builder protoFunctionCallBuilder =
         Expressions.FunctionCall.newBuilder().setSqlKind(functionCall.getKind().ordinal())
             .setDataType(convertColumnDataType(functionCall.getDataType()))
-            .setFunctionName(functionCall.getFunctionName()).addAllFunctionOperands(functionOperands);
+            .setFunctionName(functionCall.getFunctionName()).addAllFunctionOperands(functionOperands)
+            .setIsDistinct(functionCall.isDistinct());
 
     return Expressions.RexExpression.newBuilder().setFunctionCall(protoFunctionCallBuilder).build();
   }

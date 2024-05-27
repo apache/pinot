@@ -68,6 +68,7 @@ message FunctionCall {
   ColumnDataType dataType = 2;
   string functionName = 3;
   repeated RexExpression functionOperands = 4;
+  bool isDistinct = 5;
 }
 
 message RexExpression {
