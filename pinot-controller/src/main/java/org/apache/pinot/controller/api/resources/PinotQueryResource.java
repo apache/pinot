@@ -198,7 +198,7 @@ public class PinotQueryResource {
   }
 
   private String getMultiStageQueryResponse(String query, String queryOptions, HttpHeaders httpHeaders,
-      String endpointUrl, String traceEnabled) {
+      String endpointUrl, String traceEnabled) throws ProcessingException {
 
     // Validate data access
     // we don't have a cross table access control rule so only ADMIN can make request to multi-stage engine.
@@ -237,6 +237,14 @@ public class PinotQueryResource {
             String.format("Unable to dispatch multistage query for tables: [%s]", tableNames))).toString();
       }
       instanceIds = findCommonBrokerInstances(brokerTenantsUnion);
+      if (instanceIds.isEmpty()) {
+        // No common broker found for table tenants
+        LOGGER.error("Unable to find a common broker instance for table tenants. Tables: {}, Tenants: {}",
+            tableNames, brokerTenantsUnion);
+        throw QueryException.getException(QueryException.BROKER_RESOURCE_MISSING_ERROR,
+            new Exception("Unable to find a common broker instance for table tenants. Tables: "
+                + tableNames + ", Tenants: " + brokerTenantsUnion));
+      }
     } else {
       // TODO fail these queries going forward. Added this logic to take care of tautologies like BETWEEN 0 and -1.
       instanceIds = _pinotHelixResourceManager.getAllBrokerInstances();
@@ -247,7 +255,7 @@ public class PinotQueryResource {
   }
 
   private String getQueryResponse(String query, @Nullable SqlNode sqlNode, String traceEnabled, String queryOptions,
-      HttpHeaders httpHeaders) {
+      HttpHeaders httpHeaders) throws ProcessingException {
     // Get resource table name.
     String tableName;
     Map<String, String> queryOptionsMap = RequestUtils.parseQuery(query).getOptions();
@@ -317,14 +325,15 @@ public class PinotQueryResource {
     return allTableConfigList;
   }
 
-  private String selectRandomInstanceId(List<String> instanceIds) {
+  private String selectRandomInstanceId(List<String> instanceIds) throws ProcessingException {
     if (instanceIds.isEmpty()) {
-      return QueryException.BROKER_RESOURCE_MISSING_ERROR.toString();
+      throw QueryException.getException(QueryException.BROKER_RESOURCE_MISSING_ERROR, "No broker found for query");
     }
 
     instanceIds.retainAll(_pinotHelixResourceManager.getOnlineInstanceList());
     if (instanceIds.isEmpty()) {
-      return QueryException.BROKER_INSTANCE_MISSING_ERROR.toString();
+      throw QueryException.getException(QueryException.BROKER_INSTANCE_MISSING_ERROR,
+          "No online broker found for query");
     }
 
     // Send query to a random broker.
