@@ -88,6 +88,7 @@ public class SegmentProcessorFrameworkTest {
 
   private Schema _schema;
   private Schema _schemaMV;
+  private Schema _schemaWithComplexType;
 
   private final List<Object[]> _rawData =
       Arrays.asList(new Object[]{"abc", 1000, 1597719600000L}, new Object[]{null, 2000, 1597773600000L},
@@ -119,18 +120,27 @@ public class SegmentProcessorFrameworkTest {
     _tableConfigWithFixedSegmentName.getIndexingConfig().setSegmentNameGeneratorType("fixed");
 
     _schema =
-        new Schema.SchemaBuilder().setSchemaName("mySchema").addSingleValueDimension("campaign", DataType.STRING, "")
+        new Schema.SchemaBuilder().setSchemaName("mySchema")
+            .addSingleValueDimension("campaign", DataType.STRING, "")
             .addSingleValueDimension("campaign.inner1", DataType.STRING)
             .addSingleValueDimension("campaign.inner1.inner2", DataType.STRING)
             // NOTE: Intentionally put 1000 as default value to test skipping null values during rollup
             .addMetric("clicks", DataType.INT, 1000)
             .addDateTime("time", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS").build();
     _schemaMV =
-        new Schema.SchemaBuilder().setSchemaName("mySchema").addMultiValueDimension("campaign", DataType.STRING, "")
+        new Schema.SchemaBuilder().setSchemaName("mySchema")
+            .addMultiValueDimension("campaign", DataType.STRING, "")
             // NOTE: Intentionally put 1000 as default value to test skipping null values during rollup
             .addMetric("clicks", DataType.INT, 1000)
             .addDateTime("time", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS").build();
-
+    _schemaWithComplexType =
+        new Schema.SchemaBuilder().setSchemaName("mySchema")
+            .addSingleValueDimension("campaign", DataType.JSON)
+            .addSingleValueDimension("campaign.inner1", DataType.STRING)
+            .addSingleValueDimension("campaign.inner1.inner2", DataType.STRING)
+            // NOTE: Intentionally put 1000 as default value to test skipping null values during rollup
+            .addMetric("clicks", DataType.INT, 1000)
+            .addDateTime("time", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS").build();
     // create segments in many folders
     _singleSegment = createInputSegments(new File(TEMP_DIR, "single_segment"), _rawData, 1, _schema);
     _multipleSegments = createInputSegments(new File(TEMP_DIR, "multiple_segments"), _rawData, 3, _schema);
@@ -258,16 +268,19 @@ public class SegmentProcessorFrameworkTest {
     _tableConfig.setIngestionConfig(ingestionConfig);
     // Default configs
     SegmentProcessorConfig config =
-        new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schema).build();
+        new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schemaWithComplexType).build();
     SegmentProcessorFramework framework =
         new SegmentProcessorFramework(_recordReaderWithComplexType, config, workingDir);
     List<File> outputSegments = framework.process();
     ImmutableSegment segment = ImmutableSegmentLoader.load(outputSegments.get(0), ReadMode.mmap);
     SegmentMetadata segmentMetadata = segment.getSegmentMetadata();
     // Pick the column created from complex type
-    ColumnMetadata campaignMetadata = segmentMetadata.getColumnMetadataFor("campaign.inner1.inner2");
+    ColumnMetadata campaignInner2Metadata = segmentMetadata.getColumnMetadataFor("campaign.inner1.inner2");
     // Verify we see a specific value parsed from the complexType
-    Assert.assertEquals(campaignMetadata.getMinValue().compareTo("inner2v"), 0);
+    Assert.assertEquals(campaignInner2Metadata.getMinValue().compareTo("inner2v"), 0);
+    ColumnMetadata campaignMetadata = segmentMetadata.getColumnMetadataFor("campaign");
+    Assert.assertEquals(
+        campaignMetadata.getMinValue().compareTo("{\"inner1\":{\"inner2\":\"inner2v\"},\"inner\":\"innerv\"}"), 0);
   }
 
   @Test
