@@ -34,6 +34,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
@@ -285,8 +286,8 @@ public class BasePartitionUpsertMetadataManagerTest {
         upsertMetadataManager.replaceDocId(seg03, validDocIds03, null, seg01, 0, 12, recordInfo);
       });
       // This thread gets segment contexts, but it's blocked until the first thread finishes replaceDocId.
+      long startMs = System.currentTimeMillis();
       Future<Long> future = executor.submit(() -> {
-        long startMs = System.currentTimeMillis();
         // Check called flag to let the first thread do replaceDocId, thus get WLock, first.
         while (!called.get()) {
           Thread.sleep(10);
@@ -299,7 +300,7 @@ public class BasePartitionUpsertMetadataManagerTest {
       // So the 2nd thread getting segment contexts will be blocked for 2s+.
       Thread.sleep(2000);
       latch.countDown();
-      long duration = future.get();
+      long duration = future.get(3, TimeUnit.SECONDS);
       assertTrue(duration >= 2000, duration + " was less than expected");
     } finally {
       executor.shutdownNow();
@@ -365,8 +366,8 @@ public class BasePartitionUpsertMetadataManagerTest {
         upsertMetadataManager.replaceDocId(seg03, validDocIds03, null, seg01, 0, 12, recordInfo);
       });
       // This thread gets segment contexts, but it's blocked until the first thread finishes replaceDocId.
+      long startMs = System.currentTimeMillis();
       Future<Long> future = executor.submit(() -> {
-        long startMs = System.currentTimeMillis();
         // Check called flag to let the first thread do replaceDocId, thus get WLock, first.
         while (!called.get()) {
           Thread.sleep(10);
@@ -380,7 +381,7 @@ public class BasePartitionUpsertMetadataManagerTest {
       // So the 2nd thread getting segment contexts will be blocked for 2s+.
       Thread.sleep(2000);
       latch.countDown();
-      long duration = future.get();
+      long duration = future.get(3, TimeUnit.SECONDS);
       assertTrue(duration >= 2000, duration + " was less than expected");
     } finally {
       executor.shutdownNow();
