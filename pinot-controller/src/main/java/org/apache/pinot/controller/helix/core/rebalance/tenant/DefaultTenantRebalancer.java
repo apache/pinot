@@ -63,7 +63,7 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
             null, null, null));
       }
     });
-    if (config.isDryRun() || config.isDowntime()) {
+    if (config.isDryRun()) {
       return new TenantRebalanceResult(null, rebalanceResult, config.isVerboseResult());
     } else {
       for (String table : rebalanceResult.keySet()) {
