@@ -53,6 +53,7 @@ public class MinionContext {
   // For PurgeTask
   private SegmentPurger.RecordPurgerFactory _recordPurgerFactory;
   private SegmentPurger.RecordModifierFactory _recordModifierFactory;
+  private boolean _allowDownloadFromServer;
 
   public File getDataDir() {
     return _dataDir;
@@ -118,5 +119,13 @@ public class MinionContext {
 
   public HelixManager getHelixManager() {
     return _helixManager;
+  }
+
+  public void setAllowDownloadFromServer(boolean allowDownloadFromServer) {
+    _allowDownloadFromServer = allowDownloadFromServer;
+  }
+
+  public boolean isAllowDownloadFromServer() {
+    return _allowDownloadFromServer;
   }
 }

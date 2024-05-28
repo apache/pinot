@@ -87,7 +87,7 @@ public class MinionTaskUtilsTest {
 
     // Test when the configuration is not set, should return the default value which is false
     assertFalse(MinionTaskUtils.extractMinionAllowDownloadFromServer(tableConfig,
-        MinionConstants.MergeRollupTask.TASK_TYPE));
+        MinionConstants.MergeRollupTask.TASK_TYPE, false));
 
     // Test when the configuration is set to true
     configs.put(TableTaskConfig.MINION_ALLOW_DOWNLOAD_FROM_SERVER, "true");
@@ -95,7 +95,7 @@ public class MinionTaskUtilsTest {
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("sampleTable")
         .setTaskConfig(tableTaskConfig).build();
     assertTrue(MinionTaskUtils.extractMinionAllowDownloadFromServer(tableConfig,
-        MinionConstants.MergeRollupTask.TASK_TYPE));
+        MinionConstants.MergeRollupTask.TASK_TYPE, false));
 
     // Test when the configuration is set to false
     configs.put(TableTaskConfig.MINION_ALLOW_DOWNLOAD_FROM_SERVER, "false");
@@ -103,6 +103,6 @@ public class MinionTaskUtilsTest {
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("sampleTable")
         .setTaskConfig(tableTaskConfig).build();
     assertFalse(MinionTaskUtils.extractMinionAllowDownloadFromServer(tableConfig,
-        MinionConstants.MergeRollupTask.TASK_TYPE));
+        MinionConstants.MergeRollupTask.TASK_TYPE, false));
   }
 }
