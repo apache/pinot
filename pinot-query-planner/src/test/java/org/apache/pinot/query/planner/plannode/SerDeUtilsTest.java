@@ -25,7 +25,7 @@ import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
-import org.apache.pinot.query.planner.serde.PlanNodeSerializationVisitor;
+import org.apache.pinot.query.planner.serde.PlanNodeSerializer;
 import org.apache.pinot.query.planner.serde.ProtoProperties;
 import org.apache.pinot.query.planner.serde.StageNodeDeserializer;
 import org.testng.Assert;
@@ -41,7 +41,7 @@ public class SerDeUtilsTest extends QueryEnvironmentTestBase {
     DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(query);
     for (DispatchablePlanFragment dispatchablePlanFragment : dispatchableSubPlan.getQueryStageList()) {
       PlanNode stageNode = dispatchablePlanFragment.getPlanFragment().getFragmentRoot();
-      Plan.StageNode serializedStageNode = PlanNodeSerializationVisitor.INSTANCE.process((AbstractPlanNode) stageNode);
+      Plan.StageNode serializedStageNode = PlanNodeSerializer.process((AbstractPlanNode) stageNode);
       PlanNode deserializedStageNode = StageNodeDeserializer.process(serializedStageNode);
       Assert.assertTrue(isObjectEqual(stageNode, deserializedStageNode));
       Assert.assertEquals(deserializedStageNode.getPlanFragmentId(), stageNode.getPlanFragmentId());
