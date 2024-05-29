@@ -200,5 +200,21 @@ public class DataTypeTransformerTest {
       // Expected
     }
     assertEqualsNoOrder((Object[]) DataTypeTransformer.standardize(COLUMN, values, false), expectedValues);
+
+    // Tests for Map with multi-entries List as values.
+    Map<String, List<String>> testMapWithMultiValueList = new HashMap<>();
+    testMapWithMultiValueList.put("testKey1", Arrays.asList("testValue1", "testValue2"));
+    values = new Object[]{
+        new Object[0], testMapWithMultiValueList
+    };
+    assertEqualsNoOrder((Object[]) DataTypeTransformer.standardize(COLUMN, values, false), expectedValues);
+
+    // Tests for Map with multi-entries Object[] as values.
+    Map<String, Object[]> testMapWithObjectArray = new HashMap<>();
+    testMapWithObjectArray.put("testKey1", new Object[]{"testValue1", "testValue2"});
+    values = new Object[]{
+        new Object[0], testMapWithObjectArray
+    };
+    assertEqualsNoOrder((Object[]) DataTypeTransformer.standardize(COLUMN, values, false), expectedValues);
   }
 }

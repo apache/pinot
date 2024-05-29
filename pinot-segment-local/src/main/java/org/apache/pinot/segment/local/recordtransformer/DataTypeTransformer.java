@@ -151,7 +151,16 @@ public class DataTypeTransformer implements RecordTransformer {
       }
       List<Object> standardizedValues = new ArrayList<>(numValues);
       for (Object singleValue : values) {
-        Object standardizedValue = standardize(column, singleValue, true);
+        Object standardizedValue;
+
+        // Check if the value is a map and if the values of the map are single valued.
+        // Even if one of the values of the keys in the map are multivalued, we should treat
+        // the map as multivalued.
+        if (singleValue instanceof Map) {
+          standardizedValue = standardize(column, singleValue, areMapValuesSingleValued(((Map) singleValue).values()));
+        } else {
+          standardizedValue = standardize(column, singleValue, true);
+        }
         if (standardizedValue != null) {
           standardizedValues.add(standardizedValue);
         }
@@ -170,6 +179,21 @@ public class DataTypeTransformer implements RecordTransformer {
       return standardizedValues.toArray();
     }
     return value;
+  }
+
+  private static boolean areMapValuesSingleValued(Collection values) {
+    for (Object value : values) {
+      if (value instanceof List) {
+        if (((List<?>) value).size() > 1) {
+          return false;
+        }
+      } else if (value instanceof Object[]) {
+        if (((Object[]) value).length > 1) {
+          return false;
+        }
+      }
+    }
+    return true;
   }
 
   private static Object standardizeCollection(String column, Collection collection, boolean isSingleValue) {
