@@ -847,6 +847,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       long duration = System.currentTimeMillis() - startTime;
       _serverMetrics.addTimedTableValue(_tableNameWithType, ServerTimer.UPSERT_SNAPSHOT_TIME_MS, duration,
           TimeUnit.MILLISECONDS);
+    } catch (Exception e) {
+      _logger.warn("Caught exception while taking snapshot", e);
     } finally {
       _snapshotLock.writeLock().unlock();
       finishOperation();
