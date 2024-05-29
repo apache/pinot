@@ -37,6 +37,9 @@ public class TableUpsertMetadataManagerFactory {
   public static final String UPSERT_DEFAULT_ENABLE_SNAPSHOT = "default.enable.snapshot";
   public static final String UPSERT_DEFAULT_ENABLE_PRELOAD = "default.enable.preload";
 
+  public static final String UPSERT_DEFAULT_ALLOW_PARTIAL_UPSERT_CONSUMPTION_DURING_COMMIT =
+      "default.allow.partial.upsert.consumption.during.commit";
+
   public static TableUpsertMetadataManager create(TableConfig tableConfig,
       @Nullable PinotConfiguration instanceUpsertConfig) {
     String tableNameWithType = tableConfig.getTableName();
@@ -60,6 +63,12 @@ public class TableUpsertMetadataManagerFactory {
       if (!upsertConfig.isEnablePreload()) {
         upsertConfig.setEnablePreload(
             Boolean.parseBoolean(instanceUpsertConfig.getProperty(UPSERT_DEFAULT_ENABLE_PRELOAD, "false")));
+      }
+
+      // server level config honoured only when table level config is not set to true
+      if (!upsertConfig.isAllowPartialUpsertConsumptionDuringCommit()) {
+        upsertConfig.setAllowPartialUpsertConsumptionDuringCommit(Boolean.parseBoolean(
+            instanceUpsertConfig.getProperty(UPSERT_DEFAULT_ALLOW_PARTIAL_UPSERT_CONSUMPTION_DURING_COMMIT, "false")));
       }
     }
 

@@ -316,6 +316,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private final StreamPartitionMsgOffset _latestStreamOffsetAtStartupTime;
   private final CompletionMode _segmentCompletionMode;
   private final List<String> _filteredMessageOffsets = new ArrayList<>();
+  private final boolean _allowPartialUpsertConsumptionDuringCommit;
   private boolean _trackFilteredMessageOffsets = false;
 
   // TODO each time this method is called, we print reason for stop. Good to print only once.
@@ -978,7 +979,12 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
   @VisibleForTesting
   SegmentBuildDescriptor buildSegmentInternal(boolean forCommit) {
-    closeStreamConsumers();
+    // for partial upsert tables, do not release _partitionGroupConsumerSemaphore proactively and rely on offload()
+    // to release the semaphore. This ensures new consuming segment is not consuming until the segment replacement is
+    // complete.
+    if (_allowPartialUpsertConsumptionDuringCommit) {
+      closeStreamConsumers();
+    }
     // Do not allow building segment when table data manager is already shut down
     if (_realtimeTableDataManager.isShutDown()) {
       _segmentLogger.warn("Table data manager is already shut down");
@@ -1335,7 +1341,12 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
   protected void downloadSegmentAndReplace(SegmentZKMetadata segmentZKMetadata)
       throws Exception {
-    closeStreamConsumers();
+    // for partial upsert tables, do not release _partitionGroupConsumerSemaphore proactively and rely on offload()
+    // to release the semaphore. This ensures new consuming segment is not consuming until the segment replacement is
+    // complete.
+    if (_allowPartialUpsertConsumptionDuringCommit) {
+      closeStreamConsumers();
+    }
     _realtimeTableDataManager.downloadAndReplaceConsumingSegment(segmentZKMetadata);
   }
 
@@ -1611,6 +1622,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       _segmentLogger
           .info("Starting consumption on realtime consuming segment {} maxRowCount {} maxEndTime {}", llcSegmentName,
               _segmentMaxRowCount, new DateTime(_consumeEndTime, DateTimeZone.UTC));
+      _allowPartialUpsertConsumptionDuringCommit =
+          _realtimeTableDataManager.isPartialUpsertEnabled() ? _tableConfig.getUpsertConfig() != null
+              && _tableConfig.getUpsertConfig()
+          .isAllowPartialUpsertConsumptionDuringCommit() : true;
     } catch (Exception e) {
       // In case of exception thrown here, segment goes to ERROR state. Then any attempt to reset the segment from
       // ERROR -> OFFLINE -> CONSUMING via Helix Admin fails because the semaphore is acquired, but not released.
