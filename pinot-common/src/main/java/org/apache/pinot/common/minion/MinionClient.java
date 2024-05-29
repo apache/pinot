@@ -24,14 +24,14 @@ import java.nio.charset.Charset;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.io.IOUtils;
-import org.apache.http.HttpException;
-import org.apache.http.HttpResponse;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.entity.StringEntity;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClientBuilder;
-import org.apache.http.util.EntityUtils;
+import org.apache.hc.client5.http.classic.methods.HttpGet;
+import org.apache.hc.client5.http.classic.methods.HttpPost;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
+import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
+import org.apache.hc.core5.http.HttpException;
+import org.apache.hc.core5.http.io.entity.EntityUtils;
+import org.apache.hc.core5.http.io.entity.StringEntity;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
@@ -72,8 +72,8 @@ public class MinionClient {
       throws IOException, HttpException {
     HttpPost httpPost = createHttpPostRequest(
         MinionRequestURLBuilder.baseUrl(_controllerUrl).forTaskSchedule(taskType, tableNameWithType));
-    HttpResponse response = HTTP_CLIENT.execute(httpPost);
-    int statusCode = response.getStatusLine().getStatusCode();
+    CloseableHttpResponse response = HTTP_CLIENT.execute(httpPost);
+    int statusCode = response.getCode();
     final String responseString = EntityUtils.toString(response.getEntity());
     if (statusCode >= 400) {
       throw new HttpException(
@@ -86,8 +86,8 @@ public class MinionClient {
   public Map<String, String> getTasksStates(String taskType)
       throws IOException, HttpException {
     HttpGet httpGet = createHttpGetRequest(MinionRequestURLBuilder.baseUrl(_controllerUrl).forTasksStates(taskType));
-    HttpResponse response = HTTP_CLIENT.execute(httpGet);
-    int statusCode = response.getStatusLine().getStatusCode();
+    CloseableHttpResponse response = HTTP_CLIENT.execute(httpGet);
+    int statusCode = response.getCode();
     final String responseString = IOUtils.toString(response.getEntity().getContent());
     if (statusCode >= 400) {
       throw new HttpException(
@@ -100,8 +100,8 @@ public class MinionClient {
   public String getTaskState(String taskName)
       throws IOException, HttpException {
     HttpGet httpGet = createHttpGetRequest(MinionRequestURLBuilder.baseUrl(_controllerUrl).forTaskState(taskName));
-    HttpResponse response = HTTP_CLIENT.execute(httpGet);
-    int statusCode = response.getStatusLine().getStatusCode();
+    CloseableHttpResponse response = HTTP_CLIENT.execute(httpGet);
+    int statusCode = response.getCode();
     String responseString = EntityUtils.toString(response.getEntity());
     if (statusCode >= 400) {
       throw new HttpException(
@@ -119,8 +119,8 @@ public class MinionClient {
       headers.remove("content-length");
       headers.entrySet().forEach(entry -> httpPost.setHeader(entry.getKey(), entry.getValue()));
     }
-    HttpResponse response = HTTP_CLIENT.execute(httpPost);
-    int statusCode = response.getStatusLine().getStatusCode();
+    CloseableHttpResponse response = HTTP_CLIENT.execute(httpPost);
+    int statusCode = response.getCode();
     final String responseString = IOUtils.toString(response.getEntity().getContent(), Charset.defaultCharset());
     if (statusCode >= 400) {
       throw new HttpException(
