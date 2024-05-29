@@ -138,6 +138,7 @@ public class SegmentProcessorFrameworkTest {
             .addSingleValueDimension("campaign", DataType.JSON)
             .addSingleValueDimension("campaign.inner1", DataType.STRING)
             .addSingleValueDimension("campaign.inner1.inner2", DataType.STRING)
+            .addSingleValueDimension("targetusers.user", DataType.STRING)
             // NOTE: Intentionally put 1000 as default value to test skipping null values during rollup
             .addMetric("clicks", DataType.INT, 1000)
             .addDateTime("time", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS").build();
@@ -201,6 +202,17 @@ public class SegmentProcessorFrameworkTest {
     Map<String, Object> map2 = new HashMap<>();
     map2.put("c", 3);
     genericRow.putValue("map2", map2);
+
+
+    //list with two map entries inside
+    List<Map<String, Object>> list = new ArrayList<>();
+    Map<String, Object> map3 = new HashMap<>();
+    map3.put("user", "foobar");
+    list.add(map3);
+    Map<String, Object> map4 = new HashMap<>();
+    map4.put("user", "barfoo");
+    list.add(map4);
+    genericRow.putValue("targetusers", list);
     return List.of(new GenericRowRecordReader(List.of(genericRow)));
   }
 
@@ -263,8 +275,11 @@ public class SegmentProcessorFrameworkTest {
     File workingDir = new File(TEMP_DIR, "single_segment_complex_type_output");
     FileUtils.forceMkdir(workingDir);
     IngestionConfig ingestionConfig = new IngestionConfig();
+    List<String> fieldsToUnnest = new ArrayList<>();
+    fieldsToUnnest.add("targetusers");
+
     ingestionConfig.setComplexTypeConfig(
-        new ComplexTypeConfig(null, ".", null, null));
+        new ComplexTypeConfig(fieldsToUnnest, ".", null, null));
     _tableConfig.setIngestionConfig(ingestionConfig);
     // Default configs
     SegmentProcessorConfig config =
@@ -281,6 +296,9 @@ public class SegmentProcessorFrameworkTest {
     ColumnMetadata campaignMetadata = segmentMetadata.getColumnMetadataFor("campaign");
     Assert.assertEquals(
         campaignMetadata.getMinValue().compareTo("{\"inner1\":{\"inner2\":\"inner2v\"},\"inner\":\"innerv\"}"), 0);
+
+    ColumnMetadata listMetadata = segmentMetadata.getColumnMetadataFor("targetusers.user");
+    Assert.assertEquals(listMetadata.getMinValue().compareTo("barfoo"), 0);
   }
 
   @Test
