@@ -112,7 +112,10 @@ public class AggregateNode extends AbstractPlanNode {
    *   (2) extract result as final result format.
    */
   public enum AggType {
-    DIRECT(false, false), LEAF(false, true), INTERMEDIATE(true, true), FINAL(true, false);
+    DIRECT(false, false),
+    LEAF(false, true),
+    INTERMEDIATE(true, true),
+    FINAL(true, false);
 
     private final boolean _isInputIntermediateFormat;
     private final boolean _isOutputIntermediateFormat;
