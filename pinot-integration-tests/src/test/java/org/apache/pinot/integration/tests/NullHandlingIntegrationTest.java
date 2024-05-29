@@ -30,6 +30,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.AssertJUnit.assertEquals;
+import static org.testng.AssertJUnit.assertFalse;
 import static org.testng.AssertJUnit.assertTrue;
 
 
@@ -130,11 +131,6 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
   }
 
   @Override
-  protected boolean getNullHandlingEnabled() {
-    return true;
-  }
-
-  @Override
   protected long getCountStarResult() {
     return 100;
   }
@@ -151,7 +147,6 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
   public void testCountWithNullDescription(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    notSupportedInV2();
     String query = "SELECT COUNT(*) FROM " + getTableName() + " WHERE description IS NOT NULL";
     testQuery(query);
   }
@@ -160,7 +155,6 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
   public void testCountWithNullDescriptionAndSalary(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    notSupportedInV2();
     String query = "SELECT COUNT(*) FROM " + getTableName() + " WHERE description IS NOT NULL AND salary IS NOT NULL";
     testQuery(query);
   }
@@ -219,88 +213,93 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
   public void testNullLiteralSelectionOnlyBroker(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    // V2 handles such queries in the servers where all rows in the table are matched and hence the number of rows
+    // returned in the result set is equal to the total number of rows in the table (instead of a single row like in
+    // V1 where it is handled in the broker). The V2 way is more standard though and matches behavior in other
+    // databases like Postgres.
     notSupportedInV2();
+
     // Null literal only
     String sqlQuery = "SELECT null FROM mytable OPTION(enableNullHandling=true)";
     JsonNode response = postQuery(sqlQuery);
     JsonNode rows = response.get("resultTable").get("rows");
     assertTrue(response.get("exceptions").isEmpty());
-    assertEquals(rows.size(), 1);
-    assertEquals(rows.get(0).get(0).asText(), "null");
+    assertEquals(1, rows.size());
+    assertEquals("null", rows.get(0).get(0).asText());
 
     // Null related functions
     sqlQuery = "SELECT isNull(null) FROM " + getTableName() + "  OPTION (enableNullHandling=true);";
     response = postQuery(sqlQuery);
     rows = response.get("resultTable").get("rows");
     assertTrue(response.get("exceptions").isEmpty());
-    assertEquals(rows.size(), 1);
-    assertEquals(rows.get(0).get(0).asBoolean(), true);
+    assertEquals(1, rows.size());
+    assertTrue(rows.get(0).get(0).asBoolean());
 
     sqlQuery = "SELECT isNotNull(null) FROM " + getTableName() + "  OPTION (enableNullHandling=true);";
     response = postQuery(sqlQuery);
     rows = response.get("resultTable").get("rows");
     assertTrue(response.get("exceptions").isEmpty());
-    assertEquals(rows.size(), 1);
-    assertEquals(rows.get(0).get(0).asBoolean(), false);
+    assertEquals(1, rows.size());
+    assertFalse(rows.get(0).get(0).asBoolean());
 
 
     sqlQuery = "SELECT coalesce(null, 1) FROM " + getTableName() + "  OPTION (enableNullHandling=true);";
     response = postQuery(sqlQuery);
     rows = response.get("resultTable").get("rows");
     assertTrue(response.get("exceptions").isEmpty());
-    assertEquals(rows.size(), 1);
-    assertEquals(rows.get(0).get(0).asInt(), 1);
+    assertEquals(1, rows.size());
+    assertEquals(1, rows.get(0).get(0).asInt());
 
     sqlQuery = "SELECT coalesce(null, null) FROM " + getTableName() + "  OPTION (enableNullHandling=true);";
     response = postQuery(sqlQuery);
     rows = response.get("resultTable").get("rows");
     assertTrue(response.get("exceptions").isEmpty());
-    assertEquals(rows.size(), 1);
-    assertEquals(rows.get(0).get(0).asText(), "null");
+    assertEquals(1, rows.size());
+    assertEquals("null", rows.get(0).get(0).asText());
 
     sqlQuery = "SELECT isDistinctFrom(null, null) FROM " + getTableName() + "  OPTION (enableNullHandling=true);";
     response = postQuery(sqlQuery);
     rows = response.get("resultTable").get("rows");
     assertTrue(response.get("exceptions").isEmpty());
-    assertEquals(rows.size(), 1);
-    assertEquals(rows.get(0).get(0).asBoolean(), false);
+    assertEquals(1, rows.size());
+    assertFalse(rows.get(0).get(0).asBoolean());
 
     sqlQuery = "SELECT isNotDistinctFrom(null, null) FROM " + getTableName() + "  OPTION (enableNullHandling=true);";
     response = postQuery(sqlQuery);
     rows = response.get("resultTable").get("rows");
     assertTrue(response.get("exceptions").isEmpty());
-    assertEquals(rows.size(), 1);
-    assertEquals(rows.get(0).get(0).asBoolean(), true);
+    assertEquals(1, rows.size());
+    assertTrue(rows.get(0).get(0).asBoolean());
 
 
     sqlQuery = "SELECT isDistinctFrom(null, 1) FROM " + getTableName() + "  OPTION (enableNullHandling=true);";
     response = postQuery(sqlQuery);
     rows = response.get("resultTable").get("rows");
     assertTrue(response.get("exceptions").isEmpty());
-    assertEquals(rows.size(), 1);
-    assertEquals(rows.get(0).get(0).asBoolean(), true);
+    assertEquals(1, rows.size());
+    assertTrue(rows.get(0).get(0).asBoolean());
 
     sqlQuery = "SELECT isNotDistinctFrom(null, 1) FROM " + getTableName() + "  OPTION (enableNullHandling=true);";
     response = postQuery(sqlQuery);
     rows = response.get("resultTable").get("rows");
     assertTrue(response.get("exceptions").isEmpty());
-    assertEquals(rows.size(), 1);
-    assertEquals(rows.get(0).get(0).asBoolean(), false);
+    assertEquals(1, rows.size());
+    assertFalse(rows.get(0).get(0).asBoolean());
 
     sqlQuery = "SELECT case when true then null end FROM " + getTableName() + "  OPTION (enableNullHandling=true);";
     response = postQuery(sqlQuery);
     rows = response.get("resultTable").get("rows");
     assertTrue(response.get("exceptions").isEmpty());
-    assertEquals(rows.size(), 1);
-    assertEquals(rows.get(0).get(0).asText(), "null");
+    assertEquals(1, rows.size());
+    assertEquals("null", rows.get(0).get(0).asText());
 
 
     sqlQuery = "SELECT case when false then 1 end FROM " + getTableName() + "  OPTION (enableNullHandling=true);";
     response = postQuery(sqlQuery);
     rows = response.get("resultTable").get("rows");
     assertTrue(response.get("exceptions").isEmpty());
-    assertEquals(rows.size(), 1);
-    assertEquals(rows.get(0).get(0).asText(), "null");
+    assertEquals(1, rows.size());
+    assertEquals("null", rows.get(0).get(0).asText());
 
 
     // Null intolerant functions
@@ -308,8 +307,93 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
     response = postQuery(sqlQuery);
     rows = response.get("resultTable").get("rows");
     assertTrue(response.get("exceptions").isEmpty());
-    assertEquals(rows.size(), 1);
-    assertEquals(rows.get(0).get(0).asText(), "null");
+    assertEquals(1, rows.size());
+    assertEquals("null", rows.get(0).get(0).asText());
+  }
+
+  @Test
+  public void testNullLiteralSelectionInV2() throws Exception {
+    setUseMultiStageQueryEngine(true);
+
+    // Null literal only
+    String sqlQuery = "SELECT null FROM mytable";
+    JsonNode response = postQuery(sqlQuery);
+    JsonNode rows = response.get("resultTable").get("rows");
+    assertTrue(response.get("exceptions").isEmpty());
+    assertEquals(getCountStarResult(), rows.size());
+    assertEquals("null", rows.get(0).get(0).asText());
+
+    // Null related functions
+    sqlQuery = "SELECT isNull(null) FROM " + getTableName();
+    response = postQuery(sqlQuery);
+    rows = response.get("resultTable").get("rows");
+    assertTrue(response.get("exceptions").isEmpty());
+    assertEquals(getCountStarResult(), rows.size());
+    assertTrue(rows.get(0).get(0).asBoolean());
+
+    sqlQuery = "SELECT coalesce(null, 1) FROM " + getTableName();
+    response = postQuery(sqlQuery);
+    rows = response.get("resultTable").get("rows");
+    assertTrue(response.get("exceptions").isEmpty());
+    assertEquals(getCountStarResult(), rows.size());
+    assertEquals(1, rows.get(0).get(0).asInt());
+
+    sqlQuery = "SELECT isNotDistinctFrom(null, null) FROM " + getTableName();
+    response = postQuery(sqlQuery);
+    rows = response.get("resultTable").get("rows");
+    assertTrue(response.get("exceptions").isEmpty());
+    assertEquals(getCountStarResult(), rows.size());
+    assertTrue(rows.get(0).get(0).asBoolean());
+
+    sqlQuery = "SELECT isDistinctFrom(null, 1) FROM " + getTableName();
+    response = postQuery(sqlQuery);
+    rows = response.get("resultTable").get("rows");
+    assertTrue(response.get("exceptions").isEmpty());
+    assertEquals(getCountStarResult(), rows.size());
+    assertTrue(rows.get(0).get(0).asBoolean());
+
+    sqlQuery = "SELECT case when true then null end FROM " + getTableName();
+    response = postQuery(sqlQuery);
+    rows = response.get("resultTable").get("rows");
+    assertTrue(response.get("exceptions").isEmpty());
+    assertEquals(getCountStarResult(), rows.size());
+    assertEquals("null", rows.get(0).get(0).asText());
+
+    // Null intolerant functions
+    sqlQuery = "SELECT add(null, 1) FROM " + getTableName();
+    response = postQuery(sqlQuery);
+    rows = response.get("resultTable").get("rows");
+    assertTrue(response.get("exceptions").isEmpty());
+    assertEquals(getCountStarResult(), rows.size());
+    assertEquals("null", rows.get(0).get(0).asText());
+
+    sqlQuery = "SELECT greater_than(null, 1) FROM " + getTableName();
+    response = postQuery(sqlQuery);
+    rows = response.get("resultTable").get("rows");
+    assertTrue(response.get("exceptions").isEmpty());
+    assertEquals(getCountStarResult(), rows.size());
+    assertEquals("null", rows.get(0).get(0).asText());
+
+    sqlQuery = "SELECT to_epoch_seconds(null) FROM " + getTableName();
+    response = postQuery(sqlQuery);
+    rows = response.get("resultTable").get("rows");
+    assertTrue(response.get("exceptions").isEmpty());
+    assertEquals(getCountStarResult(), rows.size());
+    assertEquals("null", rows.get(0).get(0).asText());
+
+    sqlQuery = "SELECT not(null) FROM " + getTableName();
+    response = postQuery(sqlQuery);
+    rows = response.get("resultTable").get("rows");
+    assertTrue(response.get("exceptions").isEmpty());
+    assertEquals(getCountStarResult(), rows.size());
+    assertEquals("null", rows.get(0).get(0).asText());
+
+    sqlQuery = "SELECT tan(null) FROM " + getTableName();
+    response = postQuery(sqlQuery);
+    rows = response.get("resultTable").get("rows");
+    assertTrue(response.get("exceptions").isEmpty());
+    assertEquals(getCountStarResult(), rows.size());
+    assertEquals("null", rows.get(0).get(0).asText());
   }
 
   @Test
