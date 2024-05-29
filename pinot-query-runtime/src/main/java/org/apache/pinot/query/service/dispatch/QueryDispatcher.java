@@ -51,7 +51,7 @@ import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
 import org.apache.pinot.query.planner.plannode.AbstractPlanNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
-import org.apache.pinot.query.planner.plannode.StageNodeSerDeUtils;
+import org.apache.pinot.query.planner.serde.PlanNodeSerializationVisitor;
 import org.apache.pinot.query.routing.QueryPlanSerDeUtils;
 import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.routing.StageMetadata;
@@ -117,9 +117,8 @@ public class QueryDispatcher {
       DispatchablePlanFragment stagePlan = stagePlans.get(i + 1);
       serverInstances.addAll(stagePlan.getServerInstanceToWorkerIdMap().keySet());
       stageInfoFutures.add(CompletableFuture.supplyAsync(() -> {
-        ByteString rootNode =
-            StageNodeSerDeUtils.serializeStageNode((AbstractPlanNode) stagePlan.getPlanFragment().getFragmentRoot())
-                .toByteString();
+        ByteString rootNode = PlanNodeSerializationVisitor.INSTANCE.process(
+            (AbstractPlanNode) stagePlan.getPlanFragment().getFragmentRoot()).toByteString();
         ByteString customProperty = QueryPlanSerDeUtils.toProtoProperties(stagePlan.getCustomProperties());
         return new StageInfo(rootNode, customProperty);
       }, _executorService));
