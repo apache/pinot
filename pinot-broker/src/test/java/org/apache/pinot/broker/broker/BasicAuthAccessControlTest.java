@@ -118,24 +118,24 @@ public class BasicAuthAccessControlTest {
     AuthorizationResult authorizationResult = _accessControl.authorize(identity, request);
     Assert.assertFalse(authorizationResult.hasAccess());
     Assert.assertEquals(authorizationResult.getFailureMessage(),
-        "Authorization Failed for tables: veryImportantStuff,");
+        "Authorization Failed for tables: [veryImportantStuff]");
 
     Set<String> tableNames = new HashSet<>();
     tableNames.add("veryImportantStuff");
     authorizationResult = _accessControl.authorize(identity, tableNames);
     Assert.assertFalse(authorizationResult.hasAccess());
     Assert.assertEquals(authorizationResult.getFailureMessage(),
-        "Authorization Failed for tables: veryImportantStuff,");
+        "Authorization Failed for tables: [veryImportantStuff]");
     tableNames.add("lessImportantStuff");
     authorizationResult = _accessControl.authorize(identity, tableNames);
     Assert.assertFalse(authorizationResult.hasAccess());
     Assert.assertEquals(authorizationResult.getFailureMessage(),
-        "Authorization Failed for tables: veryImportantStuff,");
+        "Authorization Failed for tables: [veryImportantStuff]");
     tableNames.add("lesserImportantStuff");
     authorizationResult = _accessControl.authorize(identity, tableNames);
     Assert.assertFalse(authorizationResult.hasAccess());
     Assert.assertEquals(authorizationResult.getFailureMessage(),
-        "Authorization Failed for tables: veryImportantStuff,");
+        "Authorization Failed for tables: [veryImportantStuff]");
   }
 
   @Test

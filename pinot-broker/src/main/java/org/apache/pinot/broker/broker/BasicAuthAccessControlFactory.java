@@ -20,6 +20,7 @@ package org.apache.pinot.broker.broker;
 
 import com.google.common.base.Preconditions;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -96,13 +97,18 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
       if (brokerRequest == null || !brokerRequest.isSetQuerySource() || !brokerRequest.getQuerySource()
           .isSetTableName()) {
         // no table restrictions? accept
-        return TableAuthorizationResult.noFailureResult();
+        return TableAuthorizationResult.success();
       }
-      TableAuthorizationResult tableAuthorizationResult = new TableAuthorizationResult();
+
+      Set<String> failedTables = new HashSet<>();
+
       if (!principal.hasTable(brokerRequest.getQuerySource().getTableName())) {
-        tableAuthorizationResult.addFailedTable(brokerRequest.getQuerySource().getTableName());
+        failedTables.add(brokerRequest.getQuerySource().getTableName());
       }
-      return tableAuthorizationResult;
+      if (failedTables.isEmpty()) {
+        return TableAuthorizationResult.success();
+      }
+      return new TableAuthorizationResult(failedTables);
     }
 
     @Override
@@ -114,17 +120,21 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
       }
 
       if (tables == null || tables.isEmpty()) {
-        return TableAuthorizationResult.noFailureResult();
+        return TableAuthorizationResult.success();
       }
       TableAuthorizationResult tableAuthorizationResult = new TableAuthorizationResult();
       BasicAuthPrincipal principal = principalOpt.get();
+      Set<String> failedTables = new HashSet<>();
       for (String table : tables) {
         if (!principal.hasTable(table)) {
-          tableAuthorizationResult.addFailedTable(table);
+          failedTables.add(table);
         }
       }
+      if (failedTables.isEmpty()) {
+        return TableAuthorizationResult.success();
+      }
+      return new TableAuthorizationResult(failedTables);
 
-      return tableAuthorizationResult;
     }
 
     private Optional<BasicAuthPrincipal> getPrincipalOpt(RequesterIdentity requesterIdentity) {

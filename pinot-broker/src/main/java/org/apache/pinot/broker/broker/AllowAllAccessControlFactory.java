@@ -45,12 +45,12 @@ public class AllowAllAccessControlFactory extends AccessControlFactory {
   private static class AllowAllAccessControl implements AccessControl {
     @Override
     public AuthorizationResult authorize(RequesterIdentity requesterIdentity, BrokerRequest brokerRequest) {
-      return BasicAuthorizationResultImpl.noFailureResult();
+      return BasicAuthorizationResultImpl.success();
     }
 
     @Override
     public TableAuthorizationResult authorize(RequesterIdentity requesterIdentity, Set<String> tables) {
-      return TableAuthorizationResult.noFailureResult();
+      return TableAuthorizationResult.success();
     }
   }
 }

@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.broker.api;
 
-import java.util.HashSet;
 import java.util.Set;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.auth.FineGrainedAccessControl;
@@ -117,6 +116,7 @@ public interface AccessControl extends FineGrainedAccessControl {
   default TableAuthorizationResult authorize(RequesterIdentity requesterIdentity, Set<String> tables) {
     // Taking all tables when hasAccess Failed , to not break existing implementations
     // It will say all tables names failed AuthZ even only some failed AuthZ - which is same as just boolean output
-    return new TableAuthorizationResult(hasAccess(requesterIdentity, tables) ? new HashSet<>() : tables);
+    return hasAccess(requesterIdentity, tables) ? TableAuthorizationResult.success()
+        : new TableAuthorizationResult(tables);
   }
 }

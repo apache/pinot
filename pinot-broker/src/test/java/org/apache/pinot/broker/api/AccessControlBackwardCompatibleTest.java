@@ -44,7 +44,7 @@ public class AccessControlBackwardCompatibleTest {
     Set<String> tables = Set.of("table1", "table2");
     AuthorizationResult result = accessControl.authorize(identity, tables);
     assertFalse(result.hasAccess());
-    assertEquals(result.getFailureMessage(), "Authorization Failed for tables: table1, table2,");
+    assertEquals(result.getFailureMessage(), "Authorization Failed for tables: [table1, table2]");
   }
 
   @Test(expectedExceptions = UnsupportedOperationException.class)

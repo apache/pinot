@@ -31,14 +31,16 @@ import org.apache.commons.lang.StringUtils;
  * at the table level, including which tables failed authorization.
  */
 public class TableAuthorizationResult implements AuthorizationResult {
-  private Set<String> _failedTables;
+
+  private static final TableAuthorizationResult SUCCESS = new TableAuthorizationResult(Set.of());
+  private final Set<String> _failedTables;
 
   public TableAuthorizationResult() {
     _failedTables = new HashSet<>();
   }
 
   public TableAuthorizationResult(Set<String> failedTables) {
-    setFailedTables(failedTables);
+    _failedTables = new HashSet<>(failedTables);
   }
 
   /**
@@ -46,8 +48,8 @@ public class TableAuthorizationResult implements AuthorizationResult {
    *
    * @return a TableAuthorizationResult with no failed tables.
    */
-  public static TableAuthorizationResult noFailureResult() {
-    return new TableAuthorizationResult();
+  public static TableAuthorizationResult success() {
+    return SUCCESS;
   }
 
   @Override
@@ -57,15 +59,6 @@ public class TableAuthorizationResult implements AuthorizationResult {
 
   public Set<String> getFailedTables() {
     return _failedTables;
-  }
-
-  public void setFailedTables(Set<String> failedTables) {
-    _failedTables = new HashSet<>(failedTables);
-    ;
-  }
-
-  public void addFailedTable(String failedTable) {
-    _failedTables.add(failedTable);
   }
 
   /**
@@ -78,16 +71,9 @@ public class TableAuthorizationResult implements AuthorizationResult {
     if (hasAccess()) {
       return StringUtils.EMPTY;
     }
-    StringBuilder sb = new StringBuilder();
-    sb.append("Authorization Failed for tables: ");
 
     List<String> failedTablesList = new ArrayList<>(_failedTables);
     Collections.sort(failedTablesList); // Sort to make output deterministic
-
-    for (String table : failedTablesList) {
-      sb.append(table);
-      sb.append(", ");
-    }
-    return sb.toString().trim();
+    return "Authorization Failed for tables: " + failedTablesList;
   }
 }

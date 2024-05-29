@@ -45,19 +45,17 @@ public class TableAuthorizationResultTest {
 
   @Test
   public void testAddFailedTable() {
-    TableAuthorizationResult result = new TableAuthorizationResult();
-    result.addFailedTable("table1");
+    TableAuthorizationResult result = new TableAuthorizationResult(Set.of("table1"));
     Assert.assertFalse(result.hasAccess());
-    Assert.assertEquals(result.getFailureMessage(), "Authorization Failed for tables: table1,");
+    Assert.assertEquals(result.getFailureMessage(), "Authorization Failed for tables: [table1]");
   }
 
   @Test
   public void testSetGetFailedTables() {
-    TableAuthorizationResult result = new TableAuthorizationResult();
     Set<String> failedTables = new HashSet<>();
     failedTables.add("table1");
     failedTables.add("table2");
-    result.setFailedTables(failedTables);
+    TableAuthorizationResult result = new TableAuthorizationResult(failedTables);
     Assert.assertFalse(result.hasAccess());
     Assert.assertEquals(result.getFailedTables(), failedTables);
   }
@@ -66,15 +64,13 @@ public class TableAuthorizationResultTest {
   public void testGetFailureMessage() {
     TableAuthorizationResult result = new TableAuthorizationResult();
     Assert.assertEquals("", result.getFailureMessage());
-
-    result.addFailedTable("table1");
-    result.addFailedTable("table2");
-    Assert.assertEquals(result.getFailureMessage(), "Authorization Failed for tables: table1, table2,");
+    result = new TableAuthorizationResult(Set.of("table1", "table2"));
+    Assert.assertEquals(result.getFailureMessage(), "Authorization Failed for tables: [table1, table2]");
   }
 
   @Test
   public void testNoFailureResult() {
-    TableAuthorizationResult result = TableAuthorizationResult.noFailureResult();
+    TableAuthorizationResult result = TableAuthorizationResult.success();
     Assert.assertTrue(result.hasAccess());
     Assert.assertEquals("", result.getFailureMessage());
   }

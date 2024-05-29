@@ -21,6 +21,7 @@ package org.apache.pinot.broker.broker;
 import com.google.common.base.Preconditions;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -93,7 +94,7 @@ public class ZkBasicAuthAccessControlFactory extends AccessControlFactory {
       if (brokerRequest == null || !brokerRequest.isSetQuerySource() || !brokerRequest.getQuerySource()
           .isSetTableName()) {
         // no table restrictions? accept
-        return TableAuthorizationResult.noFailureResult();
+        return TableAuthorizationResult.success();
       }
 
       return authorize(requesterIdentity, Collections.singleton(brokerRequest.getQuerySource().getTableName()));
@@ -106,18 +107,20 @@ public class ZkBasicAuthAccessControlFactory extends AccessControlFactory {
         throw new NotAuthorizedException("Basic");
       }
       if (tables == null || tables.isEmpty()) {
-        return TableAuthorizationResult.noFailureResult();
+        return TableAuthorizationResult.success();
       }
 
-      TableAuthorizationResult tableAuthorizationResult = new TableAuthorizationResult();
       ZkBasicAuthPrincipal principal = principalOpt.get();
+      Set<String> failedTables = new HashSet<>();
       for (String table : tables) {
         if (!principal.hasTable(TableNameBuilder.extractRawTableName(table))) {
-          tableAuthorizationResult.addFailedTable(table);
+          failedTables.add(table);
         }
       }
-
-      return tableAuthorizationResult;
+      if (failedTables.isEmpty()) {
+        return TableAuthorizationResult.success();
+      }
+      return new TableAuthorizationResult(failedTables);
     }
 
     private Optional<ZkBasicAuthPrincipal> getPrincipalAuth(RequesterIdentity requesterIdentity) {

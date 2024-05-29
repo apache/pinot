@@ -26,8 +26,10 @@ import org.apache.commons.lang3.StringUtils;
  * authorization results including access status and failure messages.
  */
 public class BasicAuthorizationResultImpl implements AuthorizationResult {
-  private boolean _hasAccess;
-  private String _failureMessage;
+
+  private static final BasicAuthorizationResultImpl SUCCESS = new BasicAuthorizationResultImpl(true);
+  private final boolean _hasAccess;
+  private final String _failureMessage;
 
   /**
    * Constructs a BasicAuthorizationResultImpl with the specified access status and failure message.
@@ -55,8 +57,8 @@ public class BasicAuthorizationResultImpl implements AuthorizationResult {
    *
    * @return a BasicAuthorizationResultImpl with access granted and an empty failure message.
    */
-  public static BasicAuthorizationResultImpl noFailureResult() {
-    return new BasicAuthorizationResultImpl(true);
+  public static BasicAuthorizationResultImpl success() {
+    return SUCCESS;
   }
 
   /**
@@ -71,21 +73,13 @@ public class BasicAuthorizationResultImpl implements AuthorizationResult {
   public static BasicAuthorizationResultImpl joinResults(AuthorizationResult result1, AuthorizationResult result2) {
     boolean hasAccess = result1.hasAccess() && result2.hasAccess();
     if (hasAccess) {
-      return BasicAuthorizationResultImpl.noFailureResult();
+      return BasicAuthorizationResultImpl.success();
     }
     String failureMessage = result1.getFailureMessage() + " ; " + result2.getFailureMessage();
     failureMessage = failureMessage.trim();
     return new BasicAuthorizationResultImpl(hasAccess, failureMessage);
   }
 
-  /**
-   * Sets the access status of this result.
-   *
-   * @param hasAccess true to grant access, false to deny access.
-   */
-  public void setHasAccess(boolean hasAccess) {
-    _hasAccess = hasAccess;
-  }
 
   /**
    * Indicates whether access is granted.
@@ -105,14 +99,5 @@ public class BasicAuthorizationResultImpl implements AuthorizationResult {
   @Override
   public String getFailureMessage() {
     return _failureMessage;
-  }
-
-  /**
-   * Sets the failure message for this result.
-   *
-   * @param failureMessage the failure message to set.
-   */
-  public void setFailureMessage(String failureMessage) {
-    _failureMessage = failureMessage;
   }
 }

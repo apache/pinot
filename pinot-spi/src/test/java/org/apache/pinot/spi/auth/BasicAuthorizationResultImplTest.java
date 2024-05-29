@@ -44,7 +44,7 @@ public class BasicAuthorizationResultImplTest {
 
   @Test
   public void testNoFailureResult() {
-    BasicAuthorizationResultImpl result = BasicAuthorizationResultImpl.noFailureResult();
+    BasicAuthorizationResultImpl result = BasicAuthorizationResultImpl.success();
     assertTrue(result.hasAccess());
     assertEquals("", result.getFailureMessage());
   }
@@ -73,7 +73,7 @@ public class BasicAuthorizationResultImplTest {
     AuthorizationResult result2 = new TableAuthorizationResult(new HashSet<>(Arrays.asList("table1", "table2")));
     BasicAuthorizationResultImpl result = BasicAuthorizationResultImpl.joinResults(result1, result2);
     assertFalse(result.hasAccess());
-    assertEquals("; Authorization Failed for tables: table1, table2,", result.getFailureMessage());
+    assertEquals("; Authorization Failed for tables: [table1, table2]", result.getFailureMessage());
   }
 
   @Test
@@ -87,15 +87,13 @@ public class BasicAuthorizationResultImplTest {
 
   @Test
   public void testSetHasAccess() {
-    BasicAuthorizationResultImpl result = new BasicAuthorizationResultImpl(true);
-    result.setHasAccess(false);
+    BasicAuthorizationResultImpl result = new BasicAuthorizationResultImpl(false);
     assertFalse(result.hasAccess());
   }
 
   @Test
   public void testSetFailureMessage() {
-    BasicAuthorizationResultImpl result = new BasicAuthorizationResultImpl(true);
-    result.setFailureMessage("New Failure Message");
+    BasicAuthorizationResultImpl result = new BasicAuthorizationResultImpl(true, "New Failure Message");
     assertEquals("New Failure Message", result.getFailureMessage());
   }
 }
