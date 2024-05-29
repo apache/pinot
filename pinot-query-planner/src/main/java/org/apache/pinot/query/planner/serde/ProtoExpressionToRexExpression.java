@@ -38,22 +38,22 @@ public class ProtoExpressionToRexExpression {
   public static RexExpression process(Expressions.RexExpression expression) {
     switch (expression.getExpressionCase()) {
       case INPUTREF:
-        return visitInputRef(expression.getInputRef());
+        return deserializeInputRef(expression.getInputRef());
       case LITERAL:
-        return visitLiteral(expression.getLiteral());
+        return deserializeLiteral(expression.getLiteral());
       case FUNCTIONCALL:
-        return visitFunctionCall(expression.getFunctionCall());
+        return deserializeFunctionCall(expression.getFunctionCall());
       default:
     }
 
     throw new RuntimeException(String.format("Unknown Type Expression Type: %s", expression.getExpressionCase()));
   }
 
-  private static RexExpression visitInputRef(Expressions.InputRef inputRef) {
+  private static RexExpression deserializeInputRef(Expressions.InputRef inputRef) {
     return new RexExpression.InputRef(inputRef.getIndex());
   }
 
-  private static RexExpression visitFunctionCall(Expressions.FunctionCall functionCall) {
+  private static RexExpression deserializeFunctionCall(Expressions.FunctionCall functionCall) {
     List<RexExpression> functionOperands =
         functionCall.getFunctionOperandsList().stream().map(ProtoExpressionToRexExpression::process)
             .collect(Collectors.toList());
@@ -62,7 +62,7 @@ public class ProtoExpressionToRexExpression {
         functionCall.getIsDistinct());
   }
 
-  private static RexExpression visitLiteral(Expressions.Literal literal) {
+  private static RexExpression deserializeLiteral(Expressions.Literal literal) {
     DataSchema.ColumnDataType dataType = convertColumnDataType(literal.getDataType());
     if (literal.getIsValueNull()) {
       return new RexExpression.Literal(dataType, null);

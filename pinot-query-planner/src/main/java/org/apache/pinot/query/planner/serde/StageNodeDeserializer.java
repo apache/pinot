@@ -53,42 +53,42 @@ public class StageNodeDeserializer {
   public static AbstractPlanNode process(Plan.StageNode protoNode) {
     switch (protoNode.getNodeTypeCase()) {
       case TABLESCANNODE:
-        return visitTableScanNode(protoNode);
+        return deserializeTableScanNode(protoNode);
       case RECEIVENODE:
-        return visitMailboxReceiveNode(protoNode);
+        return deserializeMailboxReceiveNode(protoNode);
       case SENDNODE:
-        return visitMailboxSendNode(protoNode);
+        return deserializeMailboxSendNode(protoNode);
       case SETNODE:
-        return visitSetNode(protoNode);
+        return deserializeSetNode(protoNode);
       case EXCHANGENODE:
-        return visitExchangeNode(protoNode);
+        return deserializeExchangeNode(protoNode);
       case SORTNODE:
-        return visitSortNode(protoNode);
+        return deserializeSortNode(protoNode);
       case WINDOWNODE:
-        return visitWindowNode(protoNode);
+        return deserializeWindowNode(protoNode);
       case VALUENODE:
-        return visitValueNode(protoNode);
+        return deserializeValueNode(protoNode);
       case PROJECTNODE:
-        return visitProjectNode(protoNode);
+        return deserializeProjectNode(protoNode);
       case FILTERNODE:
-        return visitFilterNode(protoNode);
+        return deserializeFilterNode(protoNode);
       case AGGREGATENODE:
-        return visitAggregateNode(protoNode);
+        return deserializeAggregateNode(protoNode);
       case JOINNODE:
-        return visitJoinNode(protoNode);
+        return deserializeJoinNode(protoNode);
       default:
         throw new RuntimeException(String.format("Unknown Node Type %s", protoNode.getNodeTypeCase()));
     }
   }
 
-  private static AbstractPlanNode visitTableScanNode(Plan.StageNode protoNode) {
+  private static AbstractPlanNode deserializeTableScanNode(Plan.StageNode protoNode) {
     Plan.TableScanNode protoTableNode = protoNode.getTableScanNode();
     List<String> list = new ArrayList<>(protoTableNode.getTableScanColumnsList());
     return new TableScanNode(protoNode.getStageId(), extractDataSchema(protoNode),
         extractNodeHint(protoTableNode.getNodeHint()), protoTableNode.getTableName(), list);
   }
 
-  private static AbstractPlanNode visitMailboxReceiveNode(Plan.StageNode protoNode) {
+  private static AbstractPlanNode deserializeMailboxReceiveNode(Plan.StageNode protoNode) {
     Plan.MailboxReceiveNode protoReceiveNode = protoNode.getReceiveNode();
     return new MailboxReceiveNode(protoNode.getStageId(), extractDataSchema(protoNode),
         protoReceiveNode.getSenderStageId(), convertDistributionType(protoReceiveNode.getDistributionType()),
@@ -99,10 +99,10 @@ public class StageNodeDeserializer {
             .collect(Collectors.toList()), protoReceiveNode.getCollationNullDirections().getItemList().stream()
         .map(StageNodeDeserializer::convertNullDirection).collect(Collectors.toList()),
         protoReceiveNode.getSortOnSender(), protoReceiveNode.getSortOnReceiver(),
-        (MailboxSendNode) visitMailboxSendNode(protoReceiveNode.getSender()));
+        (MailboxSendNode) deserializeMailboxSendNode(protoReceiveNode.getSender()));
   }
 
-  private static AbstractPlanNode visitMailboxSendNode(Plan.StageNode protoNode) {
+  private static AbstractPlanNode deserializeMailboxSendNode(Plan.StageNode protoNode) {
     Plan.MailboxSendNode protoSendNode = protoNode.getSendNode();
     MailboxSendNode sendNode =
         new MailboxSendNode(protoNode.getStageId(), extractDataSchema(protoNode), protoSendNode.getReceiverStageId(),
@@ -117,7 +117,7 @@ public class StageNodeDeserializer {
     return sendNode;
   }
 
-  private static AbstractPlanNode visitSetNode(Plan.StageNode protoNode) {
+  private static AbstractPlanNode deserializeSetNode(Plan.StageNode protoNode) {
     Plan.SetOpNode protoSetOpNode = protoNode.getSetNode();
     SetOpNode setOpNode = new SetOpNode(convertSetOpType(protoSetOpNode.getSetOpType()), protoNode.getStageId(),
         extractDataSchema(protoNode), protoSetOpNode.getAll());
@@ -125,7 +125,7 @@ public class StageNodeDeserializer {
     return setOpNode;
   }
 
-  private static AbstractPlanNode visitExchangeNode(Plan.StageNode protoNode) {
+  private static AbstractPlanNode deserializeExchangeNode(Plan.StageNode protoNode) {
     Plan.ExchangeNode protoExchangeNode = protoNode.getExchangeNode();
 
     Set<String> tableNames = new HashSet<>(protoExchangeNode.getTableNamesList());
@@ -143,7 +143,7 @@ public class StageNodeDeserializer {
     return exchangeNode;
   }
 
-  private static AbstractPlanNode visitSortNode(Plan.StageNode protoNode) {
+  private static AbstractPlanNode deserializeSortNode(Plan.StageNode protoNode) {
     Plan.SortNode protoSortNode = protoNode.getSortNode();
 
     List<RexExpression> expressions =
@@ -163,7 +163,7 @@ public class StageNodeDeserializer {
     return sortNode;
   }
 
-  private static AbstractPlanNode visitWindowNode(Plan.StageNode protoNode) {
+  private static AbstractPlanNode deserializeWindowNode(Plan.StageNode protoNode) {
     Plan.WindowNode protoWindowNode = protoNode.getWindowNode();
 
     List<RelFieldCollation.Direction> orderSetDirection =
@@ -183,7 +183,7 @@ public class StageNodeDeserializer {
     return windowNode;
   }
 
-  private static AbstractPlanNode visitValueNode(Plan.StageNode protoNode) {
+  private static AbstractPlanNode deserializeValueNode(Plan.StageNode protoNode) {
     Plan.ValueNode protoSortNode = protoNode.getValueNode();
     List<List<RexExpression>> rows = new ArrayList<>();
 
@@ -196,7 +196,7 @@ public class StageNodeDeserializer {
     return valueNode;
   }
 
-  private static AbstractPlanNode visitProjectNode(Plan.StageNode protoNode) {
+  private static AbstractPlanNode deserializeProjectNode(Plan.StageNode protoNode) {
     Plan.ProjectNode protoProjectNode = protoNode.getProjectNode();
 
     ProjectNode projectNode = new ProjectNode(protoNode.getStageId(), extractDataSchema(protoNode),
@@ -205,7 +205,7 @@ public class StageNodeDeserializer {
     return projectNode;
   }
 
-  private static AbstractPlanNode visitFilterNode(Plan.StageNode protoNode) {
+  private static AbstractPlanNode deserializeFilterNode(Plan.StageNode protoNode) {
     Plan.FilterNode protoFilterNode = protoNode.getFilterNode();
 
     RexExpression condition = ProtoExpressionToRexExpression.process(protoFilterNode.getCondition());
@@ -215,7 +215,7 @@ public class StageNodeDeserializer {
     return filterNode;
   }
 
-  private static AbstractPlanNode visitAggregateNode(Plan.StageNode protoNode) {
+  private static AbstractPlanNode deserializeAggregateNode(Plan.StageNode protoNode) {
     Plan.AggregateNode protoAggregateNode = protoNode.getAggregateNode();
 
     AggregateNode aggregateNode = new AggregateNode(protoNode.getStageId(), extractDataSchema(protoNode),
@@ -226,7 +226,7 @@ public class StageNodeDeserializer {
     return aggregateNode;
   }
 
-  private static AbstractPlanNode visitJoinNode(Plan.StageNode protoNode) {
+  private static AbstractPlanNode deserializeJoinNode(Plan.StageNode protoNode) {
     Plan.JoinNode protoJoinNode = protoNode.getJoinNode();
 
     JoinNode.JoinKeys joinKeys = new JoinNode.JoinKeys(protoJoinNode.getJoinKeys().getLeftKeysList(),
