@@ -134,7 +134,6 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
         return TableAuthorizationResult.success();
       }
       return new TableAuthorizationResult(failedTables);
-
     }
 
     private Optional<BasicAuthPrincipal> getPrincipalOpt(RequesterIdentity requesterIdentity) {
