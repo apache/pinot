@@ -46,8 +46,11 @@ import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 
 
-public class DeserializationVisitor {
-  public AbstractPlanNode process(Plan.StageNode protoNode) {
+public class StageNodeDeserializer {
+  private StageNodeDeserializer() {
+  }
+
+  public static AbstractPlanNode process(Plan.StageNode protoNode) {
     switch (protoNode.getNodeTypeCase()) {
       case TABLESCANNODE:
         return visitTableScanNode(protoNode);
@@ -78,28 +81,28 @@ public class DeserializationVisitor {
     }
   }
 
-  private AbstractPlanNode visitTableScanNode(Plan.StageNode protoNode) {
+  private static AbstractPlanNode visitTableScanNode(Plan.StageNode protoNode) {
     Plan.TableScanNode protoTableNode = protoNode.getTableScanNode();
     List<String> list = new ArrayList<>(protoTableNode.getTableScanColumnsList());
     return new TableScanNode(protoNode.getStageId(), extractDataSchema(protoNode),
         extractNodeHint(protoTableNode.getNodeHint()), protoTableNode.getTableName(), list);
   }
 
-  private AbstractPlanNode visitMailboxReceiveNode(Plan.StageNode protoNode) {
+  private static AbstractPlanNode visitMailboxReceiveNode(Plan.StageNode protoNode) {
     Plan.MailboxReceiveNode protoReceiveNode = protoNode.getReceiveNode();
     return new MailboxReceiveNode(protoNode.getStageId(), extractDataSchema(protoNode),
         protoReceiveNode.getSenderStageId(), convertDistributionType(protoReceiveNode.getDistributionType()),
         convertExchangeType(protoReceiveNode.getExchangeType()),
         protoReceiveNode.hasDistributionKeys() ? protoReceiveNode.getDistributionKeys().getItemList() : null,
         protoReceiveNode.getCollationKeysList().stream().map(RexExpression.InputRef::new).collect(Collectors.toList()),
-        protoReceiveNode.getCollationDirections().getItemList().stream().map(DeserializationVisitor::convertDirection)
+        protoReceiveNode.getCollationDirections().getItemList().stream().map(StageNodeDeserializer::convertDirection)
             .collect(Collectors.toList()), protoReceiveNode.getCollationNullDirections().getItemList().stream()
-        .map(DeserializationVisitor::convertNullDirection).collect(Collectors.toList()),
+        .map(StageNodeDeserializer::convertNullDirection).collect(Collectors.toList()),
         protoReceiveNode.getSortOnSender(), protoReceiveNode.getSortOnReceiver(),
         (MailboxSendNode) visitMailboxSendNode(protoReceiveNode.getSender()));
   }
 
-  private AbstractPlanNode visitMailboxSendNode(Plan.StageNode protoNode) {
+  private static AbstractPlanNode visitMailboxSendNode(Plan.StageNode protoNode) {
     Plan.MailboxSendNode protoSendNode = protoNode.getSendNode();
     MailboxSendNode sendNode =
         new MailboxSendNode(protoNode.getStageId(), extractDataSchema(protoNode), protoSendNode.getReceiverStageId(),
@@ -107,14 +110,14 @@ public class DeserializationVisitor {
             convertExchangeType(protoSendNode.getExchangeType()),
             protoSendNode.hasDistributionKeys() ? protoSendNode.getDistributionKeys().getItemList() : null,
             protoSendNode.getCollationKeysList().stream().map(RexExpression.InputRef::new).collect(Collectors.toList()),
-            protoSendNode.getCollationDirections().getItemList().stream().map(DeserializationVisitor::convertDirection)
+            protoSendNode.getCollationDirections().getItemList().stream().map(StageNodeDeserializer::convertDirection)
                 .collect(Collectors.toList()), protoSendNode.getSortOnSender(), protoSendNode.getPrePartitioned());
 
     protoNode.getInputsList().forEach((i) -> sendNode.addInput(process(i)));
     return sendNode;
   }
 
-  private AbstractPlanNode visitSetNode(Plan.StageNode protoNode) {
+  private static AbstractPlanNode visitSetNode(Plan.StageNode protoNode) {
     Plan.SetOpNode protoSetOpNode = protoNode.getSetNode();
     SetOpNode setOpNode = new SetOpNode(convertSetOpType(protoSetOpNode.getSetOpType()), protoNode.getStageId(),
         extractDataSchema(protoNode), protoSetOpNode.getAll());
@@ -122,7 +125,7 @@ public class DeserializationVisitor {
     return setOpNode;
   }
 
-  private AbstractPlanNode visitExchangeNode(Plan.StageNode protoNode) {
+  private static AbstractPlanNode visitExchangeNode(Plan.StageNode protoNode) {
     Plan.ExchangeNode protoExchangeNode = protoNode.getExchangeNode();
 
     Set<String> tableNames = new HashSet<>(protoExchangeNode.getTableNamesList());
@@ -140,18 +143,18 @@ public class DeserializationVisitor {
     return exchangeNode;
   }
 
-  private AbstractPlanNode visitSortNode(Plan.StageNode protoNode) {
+  private static AbstractPlanNode visitSortNode(Plan.StageNode protoNode) {
     Plan.SortNode protoSortNode = protoNode.getSortNode();
 
     List<RexExpression> expressions =
-        protoSortNode.getCollationKeys().getItemList().stream().map(ProtoExpressionVisitor::process)
+        protoSortNode.getCollationKeys().getItemList().stream().map(ProtoExpressionToRexExpression::process)
             .collect(Collectors.toList());
     List<RelFieldCollation.Direction> directions =
-        protoSortNode.getCollationDirections().getItemList().stream().map(DeserializationVisitor::convertDirection)
+        protoSortNode.getCollationDirections().getItemList().stream().map(StageNodeDeserializer::convertDirection)
             .collect(Collectors.toList());
     List<RelFieldCollation.NullDirection> nullDirections =
         protoSortNode.getCollationNullDirections().getItemList().stream()
-            .map(DeserializationVisitor::convertNullDirection).collect(Collectors.toList());
+            .map(StageNodeDeserializer::convertNullDirection).collect(Collectors.toList());
 
     SortNode sortNode =
         new SortNode(protoNode.getStageId(), expressions, directions, nullDirections, protoSortNode.getFetch(),
@@ -160,14 +163,14 @@ public class DeserializationVisitor {
     return sortNode;
   }
 
-  private AbstractPlanNode visitWindowNode(Plan.StageNode protoNode) {
+  private static AbstractPlanNode visitWindowNode(Plan.StageNode protoNode) {
     Plan.WindowNode protoWindowNode = protoNode.getWindowNode();
 
     List<RelFieldCollation.Direction> orderSetDirection =
-        protoWindowNode.getOrderSetDirectionList().stream().map(DeserializationVisitor::convertDirection)
+        protoWindowNode.getOrderSetDirectionList().stream().map(StageNodeDeserializer::convertDirection)
             .collect(Collectors.toList());
     List<RelFieldCollation.NullDirection> orderSetNullDirection =
-        protoWindowNode.getOrderSetNullDirectionList().stream().map(DeserializationVisitor::convertNullDirection)
+        protoWindowNode.getOrderSetNullDirectionList().stream().map(StageNodeDeserializer::convertNullDirection)
             .collect(Collectors.toList());
 
     WindowNode windowNode = new WindowNode(protoNode.getStageId(), extractDataSchema(protoNode),
@@ -180,12 +183,12 @@ public class DeserializationVisitor {
     return windowNode;
   }
 
-  private AbstractPlanNode visitValueNode(Plan.StageNode protoNode) {
+  private static AbstractPlanNode visitValueNode(Plan.StageNode protoNode) {
     Plan.ValueNode protoSortNode = protoNode.getValueNode();
     List<List<RexExpression>> rows = new ArrayList<>();
 
     for (Plan.RexExpressionList row : protoSortNode.getRowsList()) {
-      rows.add(row.getItemList().stream().map(ProtoExpressionVisitor::process).collect(Collectors.toList()));
+      rows.add(row.getItemList().stream().map(ProtoExpressionToRexExpression::process).collect(Collectors.toList()));
     }
 
     ValueNode valueNode = new ValueNode(protoNode.getStageId(), extractDataSchema(protoNode), rows);
@@ -193,7 +196,7 @@ public class DeserializationVisitor {
     return valueNode;
   }
 
-  private AbstractPlanNode visitProjectNode(Plan.StageNode protoNode) {
+  private static AbstractPlanNode visitProjectNode(Plan.StageNode protoNode) {
     Plan.ProjectNode protoProjectNode = protoNode.getProjectNode();
 
     ProjectNode projectNode = new ProjectNode(protoNode.getStageId(), extractDataSchema(protoNode),
@@ -202,17 +205,17 @@ public class DeserializationVisitor {
     return projectNode;
   }
 
-  private AbstractPlanNode visitFilterNode(Plan.StageNode protoNode) {
+  private static AbstractPlanNode visitFilterNode(Plan.StageNode protoNode) {
     Plan.FilterNode protoFilterNode = protoNode.getFilterNode();
 
-    RexExpression condition = ProtoExpressionVisitor.process(protoFilterNode.getCondition());
+    RexExpression condition = ProtoExpressionToRexExpression.process(protoFilterNode.getCondition());
 
     FilterNode filterNode = new FilterNode(protoNode.getStageId(), extractDataSchema(protoNode), condition);
     protoNode.getInputsList().forEach((i) -> filterNode.addInput(process(i)));
     return filterNode;
   }
 
-  private AbstractPlanNode visitAggregateNode(Plan.StageNode protoNode) {
+  private static AbstractPlanNode visitAggregateNode(Plan.StageNode protoNode) {
     Plan.AggregateNode protoAggregateNode = protoNode.getAggregateNode();
 
     AggregateNode aggregateNode = new AggregateNode(protoNode.getStageId(), extractDataSchema(protoNode),
@@ -223,7 +226,7 @@ public class DeserializationVisitor {
     return aggregateNode;
   }
 
-  private AbstractPlanNode visitJoinNode(Plan.StageNode protoNode) {
+  private static AbstractPlanNode visitJoinNode(Plan.StageNode protoNode) {
     Plan.JoinNode protoJoinNode = protoNode.getJoinNode();
 
     JoinNode.JoinKeys joinKeys = new JoinNode.JoinKeys(protoJoinNode.getJoinKeys().getLeftKeysList(),
@@ -246,14 +249,15 @@ public class DeserializationVisitor {
 
   private static DataSchema extractDataSchema(Plan.StageNode protoNode) {
     List<DataSchema.ColumnDataType> columnDataTypesList =
-        protoNode.getColumnDataTypesList().stream().map(ProtoExpressionVisitor::convertColumnDataType)
+        protoNode.getColumnDataTypesList().stream().map(ProtoExpressionToRexExpression::convertColumnDataType)
             .collect(Collectors.toList());
     String[] columnNames = protoNode.getColumnNamesList().toArray(new String[]{});
     return new DataSchema(columnNames, columnDataTypesList.toArray(new DataSchema.ColumnDataType[]{}));
   }
 
   private static List<RexExpression> convertExpressions(Plan.RexExpressionList expressionList) {
-    return expressionList.getItemList().stream().map(ProtoExpressionVisitor::process).collect(Collectors.toList());
+    return expressionList.getItemList().stream().map(ProtoExpressionToRexExpression::process)
+        .collect(Collectors.toList());
   }
 
   private static RelDistribution.Type convertDistributionType(Plan.RelDistributionType type) {

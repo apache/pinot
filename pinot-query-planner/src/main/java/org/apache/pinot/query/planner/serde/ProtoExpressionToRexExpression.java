@@ -31,8 +31,8 @@ import org.apache.pinot.spi.utils.ByteArray;
 /**
  * Converts Protobuf versions of RexExpression to appropriate RexExpression classes.
  */
-public class ProtoExpressionVisitor {
-  private ProtoExpressionVisitor() {
+public class ProtoExpressionToRexExpression {
+  private ProtoExpressionToRexExpression() {
   }
 
   public static RexExpression process(Expressions.RexExpression expression) {
@@ -55,7 +55,7 @@ public class ProtoExpressionVisitor {
 
   private static RexExpression visitFunctionCall(Expressions.FunctionCall functionCall) {
     List<RexExpression> functionOperands =
-        functionCall.getFunctionOperandsList().stream().map(ProtoExpressionVisitor::process)
+        functionCall.getFunctionOperandsList().stream().map(ProtoExpressionToRexExpression::process)
             .collect(Collectors.toList());
     return new RexExpression.FunctionCall(SqlKind.values()[functionCall.getSqlKind()],
         convertColumnDataType(functionCall.getDataType()), functionCall.getFunctionName(), functionOperands,

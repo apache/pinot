@@ -19,8 +19,8 @@
 package org.apache.pinot.query.planner.plannode;
 
 import org.apache.pinot.common.proto.Plan;
-import org.apache.pinot.query.planner.serde.DeserializationVisitor;
-import org.apache.pinot.query.planner.serde.SerializationVisitor;
+import org.apache.pinot.query.planner.serde.StageNodeDeserializer;
+import org.apache.pinot.query.planner.serde.PlanNodeSerializationVisitor;
 
 
 public final class StageNodeSerDeUtils {
@@ -29,11 +29,10 @@ public final class StageNodeSerDeUtils {
   }
 
   public static AbstractPlanNode deserializeStageNode(Plan.StageNode protoNode) {
-    return new DeserializationVisitor().process(protoNode);
+    return StageNodeDeserializer.process(protoNode);
   }
 
   public static Plan.StageNode serializeStageNode(AbstractPlanNode planNode) {
-    SerializationVisitor visitor = new SerializationVisitor();
-    return visitor.process(planNode);
+    return PlanNodeSerializationVisitor.INSTANCE.process(planNode);
   }
 }

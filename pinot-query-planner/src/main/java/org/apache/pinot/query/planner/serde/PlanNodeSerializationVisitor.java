@@ -45,13 +45,18 @@ import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 
 
-public class SerializationVisitor implements PlanNodeVisitor<Void, Plan.StageNode.Builder> {
+public class PlanNodeSerializationVisitor implements PlanNodeVisitor<Void, Plan.StageNode.Builder> {
+  public static final PlanNodeSerializationVisitor INSTANCE = new PlanNodeSerializationVisitor();
+
+  private PlanNodeSerializationVisitor() {
+  }
+
   public Plan.StageNode process(AbstractPlanNode planNode) {
     Plan.StageNode.Builder builder = Plan.StageNode.newBuilder().setStageId(planNode.getPlanFragmentId());
     DataSchema dataSchema = planNode.getDataSchema();
     for (int i = 0; i < dataSchema.getColumnNames().length; i++) {
       builder.addColumnNames(dataSchema.getColumnName(i));
-      builder.addColumnDataTypes(RexExpressionVisitor.convertColumnDataType(dataSchema.getColumnDataType(i)));
+      builder.addColumnDataTypes(RexExpressionToProtoExpression.convertColumnDataType(dataSchema.getColumnDataType(i)));
     }
 
     planNode.visit(this, builder);
@@ -73,7 +78,7 @@ public class SerializationVisitor implements PlanNodeVisitor<Void, Plan.StageNod
 
   @Override
   public Void visitFilter(FilterNode node, Plan.StageNode.Builder builder) {
-    Expressions.RexExpression condition = RexExpressionVisitor.process(node.getCondition());
+    Expressions.RexExpression condition = RexExpressionToProtoExpression.process(node.getCondition());
     Plan.FilterNode.Builder filterNodeBuilder = Plan.FilterNode.newBuilder().setCondition(condition);
     builder.setFilterNode(filterNodeBuilder);
 
@@ -173,7 +178,7 @@ public class SerializationVisitor implements PlanNodeVisitor<Void, Plan.StageNod
     for (List<RexExpression> row : node.getLiteralRows()) {
       Plan.RexExpressionList.Builder exprBuilder = Plan.RexExpressionList.newBuilder();
       List<Expressions.RexExpression> expressions =
-          row.stream().map(RexExpressionVisitor::process).collect(Collectors.toList());
+          row.stream().map(RexExpressionToProtoExpression::process).collect(Collectors.toList());
       exprBuilder.addAllItem(expressions);
       valueNodeBuilder.addRows(exprBuilder);
     }
@@ -185,9 +190,10 @@ public class SerializationVisitor implements PlanNodeVisitor<Void, Plan.StageNod
   @Override
   public Void visitWindow(WindowNode node, Plan.StageNode.Builder builder) {
     List<Plan.Direction> orderSetDirection =
-        node.getOrderSetDirection().stream().map(SerializationVisitor::convertDirection).collect(Collectors.toList());
+        node.getOrderSetDirection().stream().map(PlanNodeSerializationVisitor::convertDirection)
+            .collect(Collectors.toList());
     List<Plan.NullDirection> orderSetNullDirection =
-        node.getOrderSetNullDirection().stream().map(SerializationVisitor::convertNullDirection)
+        node.getOrderSetNullDirection().stream().map(PlanNodeSerializationVisitor::convertNullDirection)
             .collect(Collectors.toList());
 
     Plan.WindowNode.Builder windowNodeBuilder =
@@ -241,18 +247,18 @@ public class SerializationVisitor implements PlanNodeVisitor<Void, Plan.StageNod
 
   private static Plan.RexExpressionList.Builder convertExpressions(List<RexExpression> expressions) {
     return Plan.RexExpressionList.newBuilder()
-        .addAllItem(expressions.stream().map(RexExpressionVisitor::process).collect(Collectors.toList()));
+        .addAllItem(expressions.stream().map(RexExpressionToProtoExpression::process).collect(Collectors.toList()));
   }
 
   private static Plan.DirectionList.Builder convertDirectionsList(List<RelFieldCollation.Direction> directions) {
-    return Plan.DirectionList.newBuilder()
-        .addAllItem(directions.stream().map(SerializationVisitor::convertDirection).collect(Collectors.toList()));
+    return Plan.DirectionList.newBuilder().addAllItem(
+        directions.stream().map(PlanNodeSerializationVisitor::convertDirection).collect(Collectors.toList()));
   }
 
   private static Plan.NullDirectionList.Builder convertNullDirectionsList(
       List<RelFieldCollation.NullDirection> nullDirections) {
     return Plan.NullDirectionList.newBuilder().addAllItem(
-        nullDirections.stream().map(SerializationVisitor::convertNullDirection).collect(Collectors.toList()));
+        nullDirections.stream().map(PlanNodeSerializationVisitor::convertNullDirection).collect(Collectors.toList()));
   }
 
   private static Plan.RelDistributionType convertDistributionType(RelDistribution.Type type) {
