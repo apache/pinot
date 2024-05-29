@@ -77,11 +77,13 @@ public class QueryDispatcher {
   private final MailboxService _mailboxService;
   private final ExecutorService _executorService;
   private final Map<String, DispatchClient> _dispatchClientMap = new ConcurrentHashMap<>();
+  private final String _planVersion;
 
-  public QueryDispatcher(MailboxService mailboxService) {
+  public QueryDispatcher(MailboxService mailboxService, String planVersion) {
     _mailboxService = mailboxService;
     _executorService = Executors.newFixedThreadPool(2 * Runtime.getRuntime().availableProcessors(),
         new TracedThreadFactory(Thread.NORM_PRIORITY, false, PINOT_BROKER_QUERY_DISPATCHER_FORMAT));
+    _planVersion = planVersion;
   }
 
   public void start() {
@@ -151,6 +153,7 @@ public class QueryDispatcher {
       _executorService.submit(() -> {
         try {
           Worker.QueryRequest.Builder requestBuilder = Worker.QueryRequest.newBuilder();
+          requestBuilder.setPlanVersion(_planVersion);
           for (int i = 0; i < numStages; i++) {
             int stageId = i + 1;
             DispatchablePlanFragment stagePlan = stagePlans.get(stageId);

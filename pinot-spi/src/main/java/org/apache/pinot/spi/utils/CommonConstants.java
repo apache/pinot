@@ -1145,6 +1145,15 @@ public class CommonConstants {
     public enum WindowOverFlowMode {
       THROW, BREAK
     }
+
+    /**
+     * Configuration for plan versions.
+     */
+
+    public static final String KEY_OF_SUPPORTED_PLAN_VERSIONS = "pinot.query.plan.supported.versions";
+    public static final String KEY_OF_CURRENT_PLAN_VERSION = "pinot.query.plan.current.version";
+    public static final List<String> DEFAULT_OF_SUPPORTED_PLAN_VERSIONS = List.of("1");
+    public static final String DEFAULT_OF_CURRENT_PLAN_VERSION = "1";
   }
 
   public static class NullValuePlaceHolder {

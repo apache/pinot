@@ -86,7 +86,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     String hostname = config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME);
     int port = Integer.parseInt(config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT));
     _workerManager = new WorkerManager(hostname, port, _routingManager);
-    _queryDispatcher = new QueryDispatcher(new MailboxService(hostname, port, config));
+    _queryDispatcher = new QueryDispatcher(new MailboxService(hostname, port, config),
+        config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_CURRENT_PLAN_VERSION,
+            CommonConstants.MultiStageQueryRunner.DEFAULT_OF_CURRENT_PLAN_VERSION));
     LOGGER.info("Initialized MultiStageBrokerRequestHandler on host: {}, port: {} with broker id: {}, timeout: {}ms, "
             + "query log max length: {}, query log max rate: {}", hostname, port, _brokerId, _brokerTimeoutMs,
         _queryLogger.getMaxQueryLengthToLog(), _queryLogger.getLogRateLimit());
