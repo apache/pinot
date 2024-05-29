@@ -23,7 +23,7 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.http.Header;
+import org.apache.hc.core5.http.Header;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.utils.CommonConstants;

@@ -27,10 +27,10 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
-import org.apache.http.Header;
-import org.apache.http.HttpHeaders;
-import org.apache.http.HttpStatus;
-import org.apache.http.message.BasicHeader;
+import org.apache.hc.core5.http.Header;
+import org.apache.hc.core5.http.HttpHeaders;
+import org.apache.hc.core5.http.HttpStatus;
+import org.apache.hc.core5.http.message.BasicHeader;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.RoundRobinURIProvider;
@@ -125,46 +125,49 @@ public class HttpSegmentFetcher extends BaseSegmentFetcher {
         + "download URI: {}", retryCount, _retryCount, uriProvider.numAddresses());
     int tries;
     try {
-      tries = RetryPolicies.exponentialBackoffRetryPolicy(retryCount, _retryWaitMs, _retryDelayScaleFactor).attempt(
-          () -> {
-        URI uri = uriProvider.next();
-        try {
-          String hostName = downloadURI.getHost();
-          int port = downloadURI.getPort();
-          // If the original download address is specified as host name, need add a "HOST" HTTP header to the HTTP
-          // request. Otherwise, if the download address is a LB address, when the LB be configured as "disallow direct
-          // access by IP address", downloading will fail.
-          List<Header> httpHeaders = new LinkedList<>();
-          if (!InetAddresses.isInetAddress(hostName)) {
-            httpHeaders.add(new BasicHeader(HttpHeaders.HOST, hostName + ":" + port));
-          }
-          ret.set(_httpClient.downloadUntarFileStreamed(uri, dest, _authProvider, httpHeaders, maxStreamRateInByte));
+      tries =
+          RetryPolicies.exponentialBackoffRetryPolicy(retryCount, _retryWaitMs, _retryDelayScaleFactor).attempt(() -> {
+            URI uri = uriProvider.next();
+            try {
+              String hostName = downloadURI.getHost();
+              int port = downloadURI.getPort();
+              // If the original download address is specified as host name, need add a "HOST" HTTP header to the HTTP
+              // request. Otherwise, if the download address is a LB address, when the LB be configured as "disallow
+              // direct
+              // access by IP address", downloading will fail.
+              List<Header> httpHeaders = new LinkedList<>();
+              if (!InetAddresses.isInetAddress(hostName)) {
+                httpHeaders.add(new BasicHeader(HttpHeaders.HOST, hostName + ":" + port));
+              }
+              ret.set(
+                  _httpClient.downloadUntarFileStreamed(uri, dest, _authProvider, httpHeaders, maxStreamRateInByte));
 
-          return true;
-        } catch (HttpErrorStatusException e) {
-          int statusCode = e.getStatusCode();
-          if (statusCode == HttpStatus.SC_NOT_FOUND || statusCode >= 500) {
-            // Temporary exception
-            // 404 is treated as a temporary exception, as the downloadURI may be backed by multiple hosts,
-            // if singe host is down, can retry with another host.
-            _logger.warn("Got temporary error status code: {} while downloading segment from: {} to: {}", statusCode,
-                uri, dest, e);
-            return false;
-          } else {
-            // Permanent exception
-            _logger.error("Got permanent error status code: {} while downloading segment from: {} to: {}, won't retry",
-                statusCode, uri, dest, e);
-            throw e;
-          }
-        } catch (IOException e) {
-          _logger.warn("Caught IOException while stream download-untarring segment from: {} to: {}, retrying", uri,
-              dest, e);
-          return false;
-        } catch (Exception e) {
-          _logger.warn("Caught exception while downloading segment from: {} to: {}", uri, dest, e);
-          return false;
-        }
-      });
+              return true;
+            } catch (HttpErrorStatusException e) {
+              int statusCode = e.getStatusCode();
+              if (statusCode == HttpStatus.SC_NOT_FOUND || statusCode >= 500) {
+                // Temporary exception
+                // 404 is treated as a temporary exception, as the downloadURI may be backed by multiple hosts,
+                // if singe host is down, can retry with another host.
+                _logger.warn("Got temporary error status code: {} while downloading segment from: {} to: {}",
+                    statusCode, uri, dest, e);
+                return false;
+              } else {
+                // Permanent exception
+                _logger.error(
+                    "Got permanent error status code: {} while downloading segment from: {} to: {}, won't retry",
+                    statusCode, uri, dest, e);
+                throw e;
+              }
+            } catch (IOException e) {
+              _logger.warn("Caught IOException while stream download-untarring segment from: {} to: {}, retrying", uri,
+                  dest, e);
+              return false;
+            } catch (Exception e) {
+              _logger.warn("Caught exception while downloading segment from: {} to: {}", uri, dest, e);
+              return false;
+            }
+          });
     } catch (AttemptsExceededException e) {
       attempts.set(e.getAttempts());
       throw e;

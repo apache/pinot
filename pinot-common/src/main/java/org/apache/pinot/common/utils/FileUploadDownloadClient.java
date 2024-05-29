@@ -36,23 +36,23 @@ import javax.annotation.Nullable;
 import javax.net.ssl.SSLContext;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.http.Header;
-import org.apache.http.HttpEntity;
-import org.apache.http.HttpHeaders;
-import org.apache.http.HttpVersion;
-import org.apache.http.NameValuePair;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.client.methods.HttpPut;
-import org.apache.http.client.methods.HttpUriRequest;
-import org.apache.http.client.methods.RequestBuilder;
-import org.apache.http.entity.ContentType;
-import org.apache.http.entity.StringEntity;
-import org.apache.http.entity.mime.HttpMultipartMode;
-import org.apache.http.entity.mime.MultipartEntityBuilder;
-import org.apache.http.entity.mime.content.ContentBody;
-import org.apache.http.entity.mime.content.FileBody;
-import org.apache.http.entity.mime.content.InputStreamBody;
-import org.apache.http.message.BasicNameValuePair;
+import org.apache.hc.client5.http.classic.methods.HttpPost;
+import org.apache.hc.client5.http.classic.methods.HttpPut;
+import org.apache.hc.client5.http.entity.mime.ContentBody;
+import org.apache.hc.client5.http.entity.mime.FileBody;
+import org.apache.hc.client5.http.entity.mime.HttpMultipartMode;
+import org.apache.hc.client5.http.entity.mime.InputStreamBody;
+import org.apache.hc.client5.http.entity.mime.MultipartEntityBuilder;
+import org.apache.hc.core5.http.ClassicHttpRequest;
+import org.apache.hc.core5.http.ContentType;
+import org.apache.hc.core5.http.Header;
+import org.apache.hc.core5.http.HttpEntity;
+import org.apache.hc.core5.http.HttpHeaders;
+import org.apache.hc.core5.http.HttpVersion;
+import org.apache.hc.core5.http.NameValuePair;
+import org.apache.hc.core5.http.io.entity.StringEntity;
+import org.apache.hc.core5.http.io.support.ClassicRequestBuilder;
+import org.apache.hc.core5.http.message.BasicNameValuePair;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.restlet.resources.EndReplaceSegmentsRequest;
@@ -390,129 +390,129 @@ public class FileUploadDownloadClient implements AutoCloseable {
             + forceRevert);
   }
 
-  private static HttpUriRequest getUploadFileRequest(String method, URI uri, ContentBody contentBody,
+  private static ClassicHttpRequest getUploadFileRequest(String method, URI uri, ContentBody contentBody,
       @Nullable List<Header> headers, @Nullable List<NameValuePair> parameters, int socketTimeoutMs) {
     // Build the Http entity
-    HttpEntity entity = MultipartEntityBuilder.create().setMode(HttpMultipartMode.BROWSER_COMPATIBLE)
+    HttpEntity entity = MultipartEntityBuilder.create().setMode(HttpMultipartMode.LEGACY)
         .addPart(contentBody.getFilename(), contentBody).build();
 
     // Build the request
-    RequestBuilder requestBuilder =
-        RequestBuilder.create(method).setVersion(HttpVersion.HTTP_1_1).setUri(uri).setEntity(entity);
+    ClassicRequestBuilder requestBuilder =
+        ClassicRequestBuilder.create(method).setVersion(HttpVersion.HTTP_1_1).setUri(uri).setEntity(entity);
     HttpClient.addHeadersAndParameters(requestBuilder, headers, parameters);
-    HttpClient.setTimeout(requestBuilder, socketTimeoutMs);
+    // TODO FIXME HttpClient.setTimeout(requestBuilder, socketTimeoutMs);
     return requestBuilder.build();
   }
 
-  private static HttpUriRequest getDeleteFileRequest(String method, URI uri, ContentBody contentBody,
+  private static ClassicHttpRequest getDeleteFileRequest(String method, URI uri, ContentBody contentBody,
       @Nullable List<Header> headers, @Nullable List<NameValuePair> parameters, int socketTimeoutMs) {
     // Build the Http entity
-    HttpEntity entity = MultipartEntityBuilder.create().setMode(HttpMultipartMode.BROWSER_COMPATIBLE)
+    HttpEntity entity = MultipartEntityBuilder.create().setMode(HttpMultipartMode.LEGACY)
         .addPart(contentBody.getFilename(), contentBody).build();
 
     // Build the request
-    RequestBuilder requestBuilder =
-        RequestBuilder.create(method).setVersion(HttpVersion.HTTP_1_1).setUri(uri).setEntity(entity);
+    ClassicRequestBuilder requestBuilder =
+        ClassicRequestBuilder.create(method).setVersion(HttpVersion.HTTP_1_1).setUri(uri).setEntity(entity);
     HttpClient.addHeadersAndParameters(requestBuilder, headers, parameters);
-    HttpClient.setTimeout(requestBuilder, socketTimeoutMs);
+    // TODO FIXME HttpClient.setTimeout(requestBuilder, socketTimeoutMs);
     return requestBuilder.build();
   }
 
-  private static HttpUriRequest getAddSchemaRequest(URI uri, String schemaName, File schemaFile,
+  private static ClassicHttpRequest getAddSchemaRequest(URI uri, String schemaName, File schemaFile,
       @Nullable List<Header> headers, @Nullable List<NameValuePair> parameters) {
     return getUploadFileRequest(HttpPost.METHOD_NAME, uri, getContentBody(schemaName, schemaFile), headers, parameters,
         HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
   }
 
-  private static HttpUriRequest getUploadSegmentRequest(URI uri, String segmentName, File segmentFile,
+  private static ClassicHttpRequest getUploadSegmentRequest(URI uri, String segmentName, File segmentFile,
       @Nullable List<Header> headers, @Nullable List<NameValuePair> parameters, int socketTimeoutMs) {
     return getUploadFileRequest(HttpPost.METHOD_NAME, uri, getContentBody(segmentName, segmentFile), headers,
         parameters, socketTimeoutMs);
   }
 
-  private static HttpUriRequest getUploadSegmentRequest(URI uri, String segmentName, InputStream inputStream,
+  private static ClassicHttpRequest getUploadSegmentRequest(URI uri, String segmentName, InputStream inputStream,
       @Nullable List<Header> headers, @Nullable List<NameValuePair> parameters, int socketTimeoutMs) {
     return getUploadFileRequest(HttpPost.METHOD_NAME, uri, getContentBody(segmentName, inputStream), headers,
         parameters, socketTimeoutMs);
   }
 
-  private static HttpUriRequest getUploadSegmentMetadataRequest(URI uri, String segmentName, File segmentFile,
+  private static ClassicHttpRequest getUploadSegmentMetadataRequest(URI uri, String segmentName, File segmentFile,
       @Nullable List<Header> headers, @Nullable List<NameValuePair> parameters, int socketTimeoutMs) {
     return getUploadFileRequest(HttpPost.METHOD_NAME, uri, getContentBody(segmentName, segmentFile), headers,
         parameters, socketTimeoutMs);
   }
 
-  private static HttpUriRequest getUploadSegmentMetadataFilesRequest(URI uri, Map<String, File> metadataFiles,
+  private static ClassicHttpRequest getUploadSegmentMetadataFilesRequest(URI uri, Map<String, File> metadataFiles,
       @Nullable List<Header> headers, @Nullable List<NameValuePair> parameters, int segmentUploadRequestTimeoutMs) {
-    MultipartEntityBuilder multipartEntityBuilder =
-        MultipartEntityBuilder.create().setMode(HttpMultipartMode.BROWSER_COMPATIBLE);
+    MultipartEntityBuilder multipartEntityBuilder = MultipartEntityBuilder.create().setMode(HttpMultipartMode.LEGACY);
     for (Map.Entry<String, File> entry : metadataFiles.entrySet()) {
       multipartEntityBuilder.addPart(entry.getKey(), getContentBody(entry.getKey(), entry.getValue()));
     }
     HttpEntity entity = multipartEntityBuilder.build();
 
     // Build the POST request.
-    RequestBuilder requestBuilder =
-        RequestBuilder.create(HttpPost.METHOD_NAME).setVersion(HttpVersion.HTTP_1_1).setUri(uri).setEntity(entity);
+    ClassicRequestBuilder requestBuilder =
+        ClassicRequestBuilder.create(HttpPost.METHOD_NAME).setVersion(HttpVersion.HTTP_1_1).setUri(uri)
+            .setEntity(entity);
     HttpClient.addHeadersAndParameters(requestBuilder, headers, parameters);
-    HttpClient.setTimeout(requestBuilder, segmentUploadRequestTimeoutMs);
+    // TODO FIXME HttpClient.setTimeout(requestBuilder, segmentUploadRequestTimeoutMs);
     return requestBuilder.build();
   }
 
-  private static HttpUriRequest getSendSegmentUriRequest(URI uri, String downloadUri, @Nullable List<Header> headers,
-      @Nullable List<NameValuePair> parameters, int socketTimeoutMs) {
-    RequestBuilder requestBuilder = RequestBuilder.post(uri).setVersion(HttpVersion.HTTP_1_1)
+  private static ClassicHttpRequest getSendSegmentUriRequest(URI uri, String downloadUri,
+      @Nullable List<Header> headers, @Nullable List<NameValuePair> parameters, int socketTimeoutMs) {
+    ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.post(uri).setVersion(HttpVersion.HTTP_1_1)
         .setHeader(CustomHeaders.UPLOAD_TYPE, FileUploadType.URI.toString())
         .setHeader(CustomHeaders.DOWNLOAD_URI, downloadUri)
         .setHeader(HttpHeaders.CONTENT_TYPE, HttpClient.JSON_CONTENT_TYPE);
     HttpClient.addHeadersAndParameters(requestBuilder, headers, parameters);
-    HttpClient.setTimeout(requestBuilder, socketTimeoutMs);
+    // TODO FIXME HttpClient.setTimeout(requestBuilder, socketTimeoutMs);
     return requestBuilder.build();
   }
 
-  private static HttpUriRequest getSendSegmentJsonRequest(URI uri, String jsonString, @Nullable List<Header> headers,
-      @Nullable List<NameValuePair> parameters, int socketTimeoutMs) {
-    RequestBuilder requestBuilder = RequestBuilder.post(uri).setVersion(HttpVersion.HTTP_1_1)
+  private static ClassicHttpRequest getSendSegmentJsonRequest(URI uri, String jsonString,
+      @Nullable List<Header> headers, @Nullable List<NameValuePair> parameters, int socketTimeoutMs) {
+    ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.post(uri).setVersion(HttpVersion.HTTP_1_1)
         .setHeader(CustomHeaders.UPLOAD_TYPE, FileUploadType.JSON.toString())
         .setEntity(new StringEntity(jsonString, ContentType.APPLICATION_JSON));
     HttpClient.addHeadersAndParameters(requestBuilder, headers, parameters);
-    HttpClient.setTimeout(requestBuilder, socketTimeoutMs);
+    // TODO FIXME HttpClient.setTimeout(requestBuilder, socketTimeoutMs);
     return requestBuilder.build();
   }
 
-  private static HttpUriRequest getStartReplaceSegmentsRequest(URI uri, String jsonRequestBody, int socketTimeoutMs,
+  private static ClassicHttpRequest getStartReplaceSegmentsRequest(URI uri, String jsonRequestBody, int socketTimeoutMs,
       @Nullable AuthProvider authProvider) {
-    RequestBuilder requestBuilder = RequestBuilder.post(uri).setVersion(HttpVersion.HTTP_1_1)
+    ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.post(uri).setVersion(HttpVersion.HTTP_1_1)
         .setHeader(HttpHeaders.CONTENT_TYPE, HttpClient.JSON_CONTENT_TYPE)
         .setEntity(new StringEntity(jsonRequestBody, ContentType.APPLICATION_JSON));
     AuthProviderUtils.toRequestHeaders(authProvider).forEach(requestBuilder::addHeader);
-    HttpClient.setTimeout(requestBuilder, socketTimeoutMs);
+    // TODO FIXME HttpClient.setTimeout(requestBuilder, socketTimeoutMs);
     return requestBuilder.build();
   }
 
-  private static HttpUriRequest getEndReplaceSegmentsRequest(URI uri, String jsonRequestBody, int socketTimeoutMs,
+  private static ClassicHttpRequest getEndReplaceSegmentsRequest(URI uri, String jsonRequestBody, int socketTimeoutMs,
       @Nullable AuthProvider authProvider) {
-    RequestBuilder requestBuilder = RequestBuilder.post(uri).setVersion(HttpVersion.HTTP_1_1)
+    ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.post(uri).setVersion(HttpVersion.HTTP_1_1)
         .setHeader(HttpHeaders.CONTENT_TYPE, HttpClient.JSON_CONTENT_TYPE);
     if (jsonRequestBody != null) {
       requestBuilder.setEntity(new StringEntity(jsonRequestBody, ContentType.APPLICATION_JSON));
     }
     AuthProviderUtils.toRequestHeaders(authProvider).forEach(requestBuilder::addHeader);
-    HttpClient.setTimeout(requestBuilder, socketTimeoutMs);
+    // TODO FIXME HttpClient.setTimeout(requestBuilder, socketTimeoutMs);
     return requestBuilder.build();
   }
 
-  private static HttpUriRequest getRevertReplaceSegmentRequest(URI uri) {
-    RequestBuilder requestBuilder = RequestBuilder.post(uri).setVersion(HttpVersion.HTTP_1_1)
+  private static ClassicHttpRequest getRevertReplaceSegmentRequest(URI uri) {
+    ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.post(uri).setVersion(HttpVersion.HTTP_1_1)
         .setHeader(HttpHeaders.CONTENT_TYPE, HttpClient.JSON_CONTENT_TYPE);
     return requestBuilder.build();
   }
 
-  private static HttpUriRequest getSegmentCompletionProtocolRequest(URI uri, @Nullable List<Header> headers,
+  private static ClassicHttpRequest getSegmentCompletionProtocolRequest(URI uri, @Nullable List<Header> headers,
       @Nullable List<NameValuePair> parameters, int socketTimeoutMs) {
-    RequestBuilder requestBuilder = RequestBuilder.get(uri).setVersion(HttpVersion.HTTP_1_1);
+    ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.get(uri).setVersion(HttpVersion.HTTP_1_1);
     HttpClient.addHeadersAndParameters(requestBuilder, headers, parameters);
-    HttpClient.setTimeout(requestBuilder, socketTimeoutMs);
+    // TODO FIXME HttpClient.setTimeout(requestBuilder, socketTimeoutMs);
     return requestBuilder.build();
   }
 
@@ -887,9 +887,9 @@ public class FileUploadDownloadClient implements AutoCloseable {
       String uri =
           controllerRequestURLBuilder.forSegmentListAPI(rawTableName, tableTypeToFilter, excludeReplacedSegments,
               startTimestamp, endTimestamp, excludeOverlapping);
-      RequestBuilder requestBuilder = RequestBuilder.get(uri).setVersion(HttpVersion.HTTP_1_1);
+      ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.get(uri).setVersion(HttpVersion.HTTP_1_1);
       AuthProviderUtils.toRequestHeaders(authProvider).forEach(requestBuilder::addHeader);
-      HttpClient.setTimeout(requestBuilder, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
+      // TODO FIXME HttpClient.setTimeout(requestBuilder, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
       RetryPolicies.exponentialBackoffRetryPolicy(5, 10_000L, 2.0).attempt(() -> {
         try {
           SimpleHttpResponse response =
@@ -949,10 +949,10 @@ public class FileUploadDownloadClient implements AutoCloseable {
    */
   public String uploadToSegmentStore(String uri)
       throws URISyntaxException, IOException, HttpErrorStatusException {
-    RequestBuilder requestBuilder = RequestBuilder.post(new URI(uri)).setVersion(HttpVersion.HTTP_1_1);
-    HttpClient.setTimeout(requestBuilder, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
+    ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.post(new URI(uri)).setVersion(HttpVersion.HTTP_1_1);
     // sendRequest checks the response status code
-    SimpleHttpResponse response = HttpClient.wrapAndThrowHttpException(_httpClient.sendRequest(requestBuilder.build()));
+    SimpleHttpResponse response = HttpClient.wrapAndThrowHttpException(
+        _httpClient.sendRequest(requestBuilder.build(), HttpClient.DEFAULT_SOCKET_TIMEOUT_MS));
     String downloadUrl = response.getResponse();
     if (downloadUrl.isEmpty()) {
       throw new HttpErrorStatusException(
@@ -1072,11 +1072,10 @@ public class FileUploadDownloadClient implements AutoCloseable {
    * @throws IOException
    * @throws HttpErrorStatusException
    */
-  public SimpleHttpResponse endReplaceSegments(URI uri, int socketTimeoutMs, @Nullable
-  EndReplaceSegmentsRequest endReplaceSegmentsRequest, @Nullable AuthProvider authProvider)
+  public SimpleHttpResponse endReplaceSegments(URI uri, int socketTimeoutMs,
+      @Nullable EndReplaceSegmentsRequest endReplaceSegmentsRequest, @Nullable AuthProvider authProvider)
       throws IOException, HttpErrorStatusException {
-    String jsonBody = (endReplaceSegmentsRequest == null) ? null
-        : JsonUtils.objectToString(endReplaceSegmentsRequest);
+    String jsonBody = (endReplaceSegmentsRequest == null) ? null : JsonUtils.objectToString(endReplaceSegmentsRequest);
     return HttpClient.wrapAndThrowHttpException(
         _httpClient.sendRequest(getEndReplaceSegmentsRequest(uri, jsonBody, socketTimeoutMs, authProvider)));
   }

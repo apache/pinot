@@ -35,7 +35,7 @@ import javax.annotation.Nullable;
 import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLContext;
 import org.apache.commons.configuration2.ex.ConfigurationException;
-import org.apache.http.Header;
+import org.apache.hc.core5.http.Header;
 import org.apache.pinot.tools.AbstractBaseCommand;
 import org.apache.pinot.tools.utils.PinotConfigUtils;
 
