@@ -38,22 +38,22 @@ public class RexExpressionToProtoExpression {
 
   public static Expressions.RexExpression process(RexExpression expression) {
     if (expression instanceof RexExpression.InputRef) {
-      return deserializeInputRef((RexExpression.InputRef) expression);
+      return serializeInputRef((RexExpression.InputRef) expression);
     } else if (expression instanceof RexExpression.Literal) {
-      return deserializeLiteral((RexExpression.Literal) expression);
+      return serializeLiteral((RexExpression.Literal) expression);
     } else if (expression instanceof RexExpression.FunctionCall) {
-      return deserializeFunctionCall((RexExpression.FunctionCall) expression);
+      return serializeFunctionCall((RexExpression.FunctionCall) expression);
     }
 
     throw new RuntimeException(String.format("Unknown Type Expression Type: %s", expression.getKind()));
   }
 
-  private static Expressions.RexExpression deserializeInputRef(RexExpression.InputRef inputRef) {
+  private static Expressions.RexExpression serializeInputRef(RexExpression.InputRef inputRef) {
     return Expressions.RexExpression.newBuilder()
         .setInputRef(Expressions.InputRef.newBuilder().setIndex(inputRef.getIndex())).build();
   }
 
-  private static Expressions.RexExpression deserializeFunctionCall(RexExpression.FunctionCall functionCall) {
+  private static Expressions.RexExpression serializeFunctionCall(RexExpression.FunctionCall functionCall) {
     List<Expressions.RexExpression> functionOperands =
         functionCall.getFunctionOperands().stream().map(RexExpressionToProtoExpression::process)
             .collect(Collectors.toList());
@@ -66,7 +66,7 @@ public class RexExpressionToProtoExpression {
     return Expressions.RexExpression.newBuilder().setFunctionCall(protoFunctionCallBuilder).build();
   }
 
-  private static Expressions.RexExpression deserializeLiteral(RexExpression.Literal literal) {
+  private static Expressions.RexExpression serializeLiteral(RexExpression.Literal literal) {
     Expressions.Literal.Builder literalBuilder = Expressions.Literal.newBuilder();
     literalBuilder.setDataType(convertColumnDataType(literal.getDataType()));
     Object literalValue = literal.getValue();
