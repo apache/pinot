@@ -31,7 +31,6 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration2.Configuration;
 import org.apache.commons.configuration2.PropertiesConfiguration;
@@ -383,8 +382,7 @@ public class CommonsConfigurationUtils {
         }
       } catch (IOException exception) {
         throw new ConfigurationException(
-            String.format("Error occurred while reading configuration file %s ",
-                file.getName()), exception);
+            "Error occurred while reading configuration file " + file.getName(), exception);
       }
     }
     return versionValue;
@@ -392,7 +390,7 @@ public class CommonsConfigurationUtils {
 
   // Returns the version header string based on the version header value provided.
   // The return statement follow the pattern 'version = <value>'
-  static String getVersionHeaderString(@Nonnull String versionHeaderValue) {
+  static String getVersionHeaderString(String versionHeaderValue) {
     return String.format("%s%s%s", VERSION_HEADER_IDENTIFIER, VERSIONED_CONFIG_SEPARATOR, versionHeaderValue);
   }
 }
