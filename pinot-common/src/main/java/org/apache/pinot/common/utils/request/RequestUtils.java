@@ -46,6 +46,7 @@ import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
@@ -68,6 +69,20 @@ public class RequestUtils {
   }
 
   public static SqlNodeAndOptions parseQuery(String query, JsonNode request)
+      throws SqlCompilationException {
+    return parseQuery(query, request, CommonConstants.MultiStageQueryRunner.DEFAULT_OF_CURRENT_PLAN_VERSION);
+  }
+
+  public static SqlNodeAndOptions parseQuery(String query, JsonNode request, String planVersion)
+      throws SqlCompilationException {
+    if (planVersion.equals(CommonConstants.MultiStageQueryRunner.PlanVersions.V1)) {
+      return parseQueryV1(query, request);
+    }
+
+    throw new SqlCompilationException(String.format("Query Plan Version %s not supported", planVersion));
+  }
+
+  public static SqlNodeAndOptions parseQueryV1(String query, JsonNode request)
       throws SqlCompilationException {
     long parserStartTimeNs = System.nanoTime();
     SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(query);

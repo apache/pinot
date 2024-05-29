@@ -411,6 +411,9 @@ public class CommonConstants {
         // Indicates the maximum length of serialized response across all servers for a query. This value is equally
         // divided across all servers processing the query.
         public static final String MAX_QUERY_RESPONSE_SIZE_BYTES = "maxQueryResponseSizeBytes";
+
+        // Override default Plan Version.
+        public static final String PLAN_VERSION = "planVersion";
       }
 
       public static class QueryOptionValue {
@@ -1149,11 +1152,13 @@ public class CommonConstants {
     /**
      * Configuration for plan versions.
      */
-
+    public static class PlanVersions {
+      public static final String V1 = "1";
+    }
     public static final String KEY_OF_SUPPORTED_PLAN_VERSIONS = "pinot.query.plan.supported.versions";
     public static final String KEY_OF_CURRENT_PLAN_VERSION = "pinot.query.plan.current.version";
-    public static final List<String> DEFAULT_OF_SUPPORTED_PLAN_VERSIONS = List.of("1");
-    public static final String DEFAULT_OF_CURRENT_PLAN_VERSION = "1";
+    public static final List<String> DEFAULT_OF_SUPPORTED_PLAN_VERSIONS = List.of(PlanVersions.V1);
+    public static final String DEFAULT_OF_CURRENT_PLAN_VERSION = PlanVersions.V1;
   }
 
   public static class NullValuePlaceHolder {

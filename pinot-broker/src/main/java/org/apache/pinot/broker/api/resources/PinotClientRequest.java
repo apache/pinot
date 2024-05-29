@@ -68,8 +68,10 @@ import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.ManualAuthorization;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.trace.RequestScope;
 import org.apache.pinot.spi.trace.Tracing;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.sql.parsers.PinotSqlType;
@@ -103,6 +105,9 @@ public class PinotClientRequest {
 
   @Inject
   private HttpClientConnectionManager _httpConnMgr;
+
+  @Inject
+  private PinotConfiguration _configuration;
 
   @GET
   @ManagedAsync
@@ -305,7 +310,13 @@ public class PinotClientRequest {
       return new BrokerResponseNative(QueryException.getException(QueryException.SQL_PARSING_ERROR, e));
     }
     if (forceUseMultiStage) {
-      sqlNodeAndOptions.setExtraOptions(ImmutableMap.of(Request.QueryOptionKey.USE_MULTISTAGE_ENGINE, "true"));
+      // Pick up plan version from query options. If not set in query options, then pick up from the configuration.
+      String planVersion = sqlRequestJson.has(Request.QueryOptionKey.PLAN_VERSION)
+          ? sqlRequestJson.get(Request.QueryOptionKey.PLAN_VERSION).asText()
+          : _configuration.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_CURRENT_PLAN_VERSION,
+              CommonConstants.MultiStageQueryRunner.DEFAULT_OF_CURRENT_PLAN_VERSION);
+      sqlNodeAndOptions.setExtraOptions(ImmutableMap.of(Request.QueryOptionKey.USE_MULTISTAGE_ENGINE, "true",
+          Request.QueryOptionKey.PLAN_VERSION, planVersion));
     }
     PinotSqlType sqlType = sqlNodeAndOptions.getSqlType();
     if (onlyDql && sqlType != PinotSqlType.DQL) {
