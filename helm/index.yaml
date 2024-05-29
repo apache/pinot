@@ -3,7 +3,7 @@ entries:
   pinot:
   - apiVersion: v1
     appVersion: 1.0.0
-    created: "2024-05-25T17:11:29.789854-04:00"
+    created: "2024-05-29T15:15:38.010146-04:00"
     dependencies:
     - condition: pinot.zookeeper.enabled,zookeeper.enabled
       name: zookeeper
@@ -13,7 +13,7 @@ entries:
       to deliver scalable real time analytics with low latency. It can ingest data
       from offline data sources (such as Hadoop and flat files) as well as online
       sources (such as Kafka). Pinot is designed to scale horizontally.
-    digest: 82d585f788eacda0afc593c55e1dd60880547cbcde4e45783dfe936e4b60970b
+    digest: b0ff3d8aadd3c913a83adbcecdbab4fd80d23b5bfce7813f193298e14e1a6498
     home: https://pinot.apache.org/
     keywords:
       - olap

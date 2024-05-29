@@ -81,7 +81,7 @@ spec:
         {{- if .Values.controller.probes.livenessEnabled }}
         livenessProbe:
           initialDelaySeconds: {{ .Values.controller.probes.liveness.initialDelaySeconds | default .Values.probes.initialDelaySeconds }}
-          periodSeconds:{{ .Values.controller.probes.liveness.periodSeconds | default .Values.probes.periodSeconds }}
+          periodSeconds: {{ .Values.controller.probes.liveness.periodSeconds | default .Values.probes.periodSeconds }}
           failureThreshold: {{ .Values.controller.probes.liveness.failureThreshold | default .Values.probes.failureThreshold }}
           successThreshold: {{ .Values.controller.probes.liveness.successThreshold | default .Values.probes.successThreshold }}
           timeoutSeconds: {{ .Values.controller.probes.liveness.timeoutSeconds | default .Values.probes.timeoutSeconds }}
