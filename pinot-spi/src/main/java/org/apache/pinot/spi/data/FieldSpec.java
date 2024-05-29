@@ -101,7 +101,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   }
 
   public enum MaxLengthExceedStrategy {
-    TRIM_LENGTH, FAIL_INGESTION, SUBSTITUTE_DEFAULT_VALUE, NO_ACTION
+    TRIM_LENGTH, ERROR, SUBSTITUTE_DEFAULT_VALUE, NO_ACTION
   }
 
   protected String _name;

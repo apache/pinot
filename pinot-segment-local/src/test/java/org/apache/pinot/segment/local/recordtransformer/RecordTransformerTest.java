@@ -278,10 +278,10 @@ public class RecordTransformerTest {
       assertTrue(record.getFieldToValueMap().containsKey(GenericRow.INCOMPLETE_RECORD_KEY));
     }
 
-    // scenario where string contains null and fieldSpec maxLengthExceedStrategy is to FAIL_INGESTION
+    // scenario where string contains null and fieldSpec maxLengthExceedStrategy is to ERROR
     Schema schema = SCHEMA;
     schema.getFieldSpecFor("svStringWithNullCharacters")
-        .setMaxLengthExceedStrategy(FieldSpec.MaxLengthExceedStrategy.FAIL_INGESTION);
+        .setMaxLengthExceedStrategy(FieldSpec.MaxLengthExceedStrategy.ERROR);
     transformer = new SanitizationTransformer(schema);
     record = getRecord();
     for (int i = 0; i < NUM_ROUNDS; i++) {
@@ -307,10 +307,10 @@ public class RecordTransformerTest {
       assertTrue(record.getFieldToValueMap().containsKey(GenericRow.INCOMPLETE_RECORD_KEY));
     }
 
-    // scenario where string exceeds max length and fieldSpec maxLengthExceedStrategy is to FAIL_INGESTION
+    // scenario where string exceeds max length and fieldSpec maxLengthExceedStrategy is to ERROR
     schema = SCHEMA;
     schema.getFieldSpecFor("svStringWithLengthLimit")
-        .setMaxLengthExceedStrategy(FieldSpec.MaxLengthExceedStrategy.FAIL_INGESTION);
+        .setMaxLengthExceedStrategy(FieldSpec.MaxLengthExceedStrategy.ERROR);
     transformer = new SanitizationTransformer(schema);
     record = getRecord();
     for (int i = 0; i < NUM_ROUNDS; i++) {
@@ -388,7 +388,8 @@ public class RecordTransformerTest {
       assertTrue(record.getFieldToValueMap().containsKey(GenericRow.INCOMPLETE_RECORD_KEY));
     }
 
-    // scenario where json field exceeds max length and fieldSpec maxLengthExceedStrategy is to SUBSTITUTE_DEFAULT_VALUE
+    // scenario where json field exceeds max length and fieldSpec maxLengthExceedStrategy is to
+    // SUBSTITUTE_DEFAULT_VALUE
     schema = SCHEMA;
     schema.getFieldSpecFor("svJson").setMaxLength(10);
     schema.getFieldSpecFor("svJson")
@@ -402,7 +403,8 @@ public class RecordTransformerTest {
       assertTrue(record.getFieldToValueMap().containsKey(GenericRow.INCOMPLETE_RECORD_KEY));
     }
 
-    // scenario where json field exceeds max length and fieldSpec maxLengthExceedStrategy is to FAIL_INGESTION
+    // scenario where json field exceeds max length and fieldSpec maxLengthExceedStrategy is to
+    // SUBSTITUTE_DEFAULT_VALUE
     schema = SCHEMA;
     schema.getFieldSpecFor("svJson").setMaxLength(10);
     schema.getFieldSpecFor("svJson")
@@ -462,12 +464,11 @@ public class RecordTransformerTest {
       assertTrue(record.getFieldToValueMap().containsKey(GenericRow.INCOMPLETE_RECORD_KEY));
     }
 
-    // scenario where bytes field exceeds max length and fieldSpec maxLengthExceedStrategy is to
-    // FAIL_INGESTION
+    // scenario where bytes field exceeds max length and fieldSpec maxLengthExceedStrategy is to ERROR
     schema = SCHEMA;
     schema.getFieldSpecFor("svBytes").setMaxLength(2);
     schema.getFieldSpecFor("svBytes")
-        .setMaxLengthExceedStrategy(FieldSpec.MaxLengthExceedStrategy.FAIL_INGESTION);
+        .setMaxLengthExceedStrategy(FieldSpec.MaxLengthExceedStrategy.ERROR);
     transformer = new SanitizationTransformer(schema);
     record = getRecord();
     for (int i = 0; i < NUM_ROUNDS; i++) {
