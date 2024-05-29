@@ -19,10 +19,8 @@
 package org.apache.pinot.common.swagger;
 
 import io.swagger.jaxrs.config.BeanConfig;
-import java.net.InetAddress;
 import java.net.URL;
 import java.net.URLClassLoader;
-import java.net.UnknownHostException;
 import org.apache.pinot.common.utils.PinotStaticHttpHandler;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.glassfish.grizzly.http.server.CLStaticHttpHandler;
@@ -49,12 +47,6 @@ public class SwaggerSetupUtils {
     beanConfig.setBasePath(basePath);
     beanConfig.setResourcePackage(resourcePackage);
     beanConfig.setScan(true);
-
-    try {
-      beanConfig.setHost(InetAddress.getLocalHost().getHostName());
-    } catch (UnknownHostException e) {
-      throw new RuntimeException("Cannot get localhost name");
-    }
 
     ClassLoader classLoader = SwaggerSetupUtils.class.getClassLoader();
     CLStaticHttpHandler staticHttpHandler = new CLStaticHttpHandler(classLoader, "/api/");
