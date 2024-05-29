@@ -28,6 +28,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
@@ -49,6 +51,9 @@ import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
 import org.apache.helix.zookeeper.zkclient.exception.ZkBadVersionException;
 import org.apache.pinot.common.helix.ExtraInstanceConfig;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.metrics.ControllerMeter;
+import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.metrics.ControllerTimer;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -84,6 +89,7 @@ public class HelixHelper {
   public static synchronized void setMinNumCharsInISToTurnOnCompression(int minNumChars) {
     _minNumCharsInISToTurnOnCompression = minNumChars;
   }
+
   public static IdealState cloneIdealState(IdealState idealState) {
     return new IdealState(
         (ZNRecord) ZN_RECORD_SERIALIZER.deserialize(ZN_RECORD_SERIALIZER.serialize(idealState.getRecord())));
@@ -99,11 +105,18 @@ public class HelixHelper {
    */
   public static IdealState updateIdealState(final HelixManager helixManager, final String resourceName,
       final Function<IdealState, IdealState> updater, RetryPolicy policy, final boolean noChangeOk) {
+    final ControllerMetrics _controllerMetrics = ControllerMetrics.get();
+    final AtomicInteger retryCounter = new AtomicInteger(-1);
     try {
+      long updateStartTime = System.currentTimeMillis();
       IdealStateWrapper idealStateWrapper = new IdealStateWrapper();
       policy.attempt(new Callable<Boolean>() {
         @Override
         public Boolean call() {
+          retryCounter.incrementAndGet();
+          if(retryCounter.get() > 0) {
+            _controllerMetrics.addMeteredGlobalValue(ControllerMeter.IDEA_STATE_UPDATE_RETRY, 1L);
+          }
           HelixDataAccessor dataAccessor = helixManager.getHelixDataAccessor();
           PropertyKey idealStateKey = dataAccessor.keyBuilder().idealStates(resourceName);
           IdealState idealState = dataAccessor.getProperty(idealStateKey);
@@ -117,9 +130,11 @@ public class HelixHelper {
           try {
             updatedIdealState = updater.apply(idealStateCopy);
           } catch (PermanentUpdaterException e) {
+            _controllerMetrics.addMeteredGlobalValue(ControllerMeter.IDEA_STATE_UPDATE_FAILURE, 1L);
             LOGGER.error("Caught permanent exception while updating ideal state for resource: {}", resourceName, e);
             throw e;
           } catch (Exception e) {
+            _controllerMetrics.addMeteredGlobalValue(ControllerMeter.IDEA_STATE_UPDATE_FAILURE, 1L);
             LOGGER.error("Caught exception while updating ideal state for resource: {}", resourceName, e);
             return false;
           }
@@ -148,13 +163,16 @@ public class HelixHelper {
                 idealStateWrapper._idealState = updatedIdealState;
                 return true;
               } else {
+                _controllerMetrics.addMeteredGlobalValue(ControllerMeter.IDEA_STATE_UPDATE_FAILURE, 1L);
                 LOGGER.warn("Failed to update ideal state for resource: {}", resourceName);
                 return false;
               }
             } catch (ZkBadVersionException e) {
+              _controllerMetrics.addMeteredGlobalValue(ControllerMeter.IDEA_STATE_UPDATE_FAILURE, 1L);
               LOGGER.warn("Version changed while updating ideal state for resource: {}", resourceName);
               return false;
             } catch (Exception e) {
+              _controllerMetrics.addMeteredGlobalValue(ControllerMeter.IDEA_STATE_UPDATE_FAILURE, 1L);
               LOGGER.warn("Caught exception while updating ideal state for resource: {} (compressed={})", resourceName,
                   enableCompression, e);
               return false;
@@ -166,6 +184,7 @@ public class HelixHelper {
               LOGGER.warn("Idempotent or null ideal state update for resource {}, skipping update.", resourceName);
             }
             idealStateWrapper._idealState = idealState;
+            _controllerMetrics.addMeteredGlobalValue(ControllerMeter.IDEA_STATE_UPDATE_FAILURE, 1L);
             return true;
           }
         }
@@ -198,8 +217,13 @@ public class HelixHelper {
           return false;
         }
       });
+      retryCounter.set(0);
+      _controllerMetrics.addTimedValue(ControllerTimer.IDEA_STATE_UPDATE_LATENCY,
+              System.currentTimeMillis() - updateStartTime, TimeUnit.MILLISECONDS);
       return idealStateWrapper._idealState;
     } catch (Exception e) {
+      retryCounter.set(0);
+      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.IDEA_STATE_UPDATE_FAILURE, 1L);
       throw new RuntimeException("Caught exception while updating ideal state for resource: " + resourceName, e);
     }
   }
