@@ -25,7 +25,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.query.planner.plannode.AbstractPlanNode;
 import org.apache.pinot.query.planner.serde.StageNodeDeserializer;
@@ -40,7 +39,7 @@ public class QueryPlanSerDeUtils {
 
   public static StagePlan fromProtoStagePlan(Worker.StagePlan protoStagePlan)
       throws InvalidProtocolBufferException {
-    AbstractPlanNode rootNode = StageNodeDeserializer.process(Plan.StageNode.parseFrom(protoStagePlan.getRootNode()));
+    AbstractPlanNode rootNode = StageNodeDeserializer.process(protoStagePlan.getRootNode());
     StageMetadata stageMetadata = fromProtoStageMetadata(protoStagePlan.getStageMetadata());
     return new StagePlan(rootNode, stageMetadata);
   }

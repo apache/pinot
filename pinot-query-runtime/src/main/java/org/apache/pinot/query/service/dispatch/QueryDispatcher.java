@@ -38,6 +38,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.calcite.runtime.PairList;
 import org.apache.pinot.common.datablock.DataBlock;
+import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
@@ -117,8 +118,8 @@ public class QueryDispatcher {
       DispatchablePlanFragment stagePlan = stagePlans.get(i + 1);
       serverInstances.addAll(stagePlan.getServerInstanceToWorkerIdMap().keySet());
       stageInfoFutures.add(CompletableFuture.supplyAsync(() -> {
-        ByteString rootNode = PlanNodeSerializationVisitor.INSTANCE.process(
-            (AbstractPlanNode) stagePlan.getPlanFragment().getFragmentRoot()).toByteString();
+        Plan.StageNode rootNode = PlanNodeSerializationVisitor.INSTANCE.process(
+            (AbstractPlanNode) stagePlan.getPlanFragment().getFragmentRoot());
         ByteString customProperty = QueryPlanSerDeUtils.toProtoProperties(stagePlan.getCustomProperties());
         return new StageInfo(rootNode, customProperty);
       }, _executorService));
@@ -211,10 +212,10 @@ public class QueryDispatcher {
   }
 
   private static class StageInfo {
-    final ByteString _rootNode;
+    final Plan.StageNode _rootNode;
     final ByteString _customProperty;
 
-    private StageInfo(ByteString rootNode, ByteString customProperty) {
+    private StageInfo(Plan.StageNode rootNode, ByteString customProperty) {
       _rootNode = rootNode;
       _customProperty = customProperty;
     }

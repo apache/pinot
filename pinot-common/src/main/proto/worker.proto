@@ -18,6 +18,7 @@
 //
 
 syntax = "proto3";
+import "plan.proto";
 
 package org.apache.pinot.common.proto;
 
@@ -49,7 +50,7 @@ message QueryResponse {
 }
 
 message StagePlan {
-  bytes rootNode = 1; // Serialized StageNode
+  StageNode rootNode = 1;
   StageMetadata stageMetadata = 2;
 }
 
