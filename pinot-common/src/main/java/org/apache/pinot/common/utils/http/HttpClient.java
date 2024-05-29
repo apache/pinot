@@ -331,7 +331,8 @@ public class HttpClient implements AutoCloseable {
     }
   }
 
-  private static String httpEntityToString(HttpEntity httpEntity) throws IOException {
+  private static String httpEntityToString(HttpEntity httpEntity)
+      throws IOException {
     try {
       return EntityUtils.toString(httpEntity);
     } catch (ParseException exception) {
