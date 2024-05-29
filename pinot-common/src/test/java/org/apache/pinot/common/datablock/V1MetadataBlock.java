@@ -25,9 +25,11 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.pinot.segment.spi.memory.PinotInputStream;
 
 
 /**
@@ -111,8 +113,10 @@ public class V1MetadataBlock extends BaseDataBlock {
   public V1MetadataBlock(ByteBuffer byteBuffer)
       throws IOException {
     super(byteBuffer);
-    if (_variableSizeDataBytes != null && _variableSizeDataBytes.length > 0) {
-      _contents = JSON.readValue(_variableSizeDataBytes, Contents.class);
+    if (_variableSizeData != null && _variableSizeData.size() > 0) {
+      try (PinotInputStream stream = _variableSizeData.openInputStream()) {
+        _contents = JSON.readValue((InputStream) stream, Contents.class);
+      }
     } else {
       _contents = new Contents();
     }
@@ -144,7 +148,7 @@ public class V1MetadataBlock extends BaseDataBlock {
   }
 
   @Override
-  protected int positionOffsetInVariableBufferAndGetLength(int rowId, int colId) {
-    throw new UnsupportedOperationException("Metadata block uses JSON encoding for field access");
+  public Type getDataBlockType() {
+    return Type.METADATA;
   }
 }

@@ -20,11 +20,13 @@ package org.apache.pinot.common.datablock;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -36,12 +38,20 @@ public interface DataBlock {
 
   int getNumberOfRows();
 
+  int getNumberOfColumns();
+
   void addException(ProcessingException processingException);
 
   void addException(int errCode, String errMsg);
 
   Map<Integer, String> getExceptions();
 
+  /**
+   * Serialize the data block into a format that is compatible with {@link DataBlockSerde.Version#V2}.
+   *
+   * @deprecated Use {@link DataBlockUtils#serialize(DataBlockSerde.Version, DataBlock)} instead.
+   */
+  @Deprecated
   byte[] toBytes()
       throws IOException;
 
@@ -80,6 +90,10 @@ public interface DataBlock {
   @Nullable
   RoaringBitmap getNullRowIds(int colId);
 
+  Type getDataBlockType();
+
+  Raw asRaw();
+
   enum Type {
     ROW(0),
     COLUMNAR(1),
@@ -103,5 +117,29 @@ public interface DataBlock {
           throw new IllegalArgumentException("Invalid ordinal: " + ordinal);
       }
     }
+  }
+
+  interface Raw {
+    int getNumberOfRows();
+
+    int getNumberOfColumns();
+
+    @Nullable
+    Map<Integer, String> getExceptions();
+
+    @Nullable
+    String[] getStringDictionary();
+
+    @Nullable
+    DataSchema getDataSchema();
+
+    @Nullable
+    DataBuffer getFixedData();
+
+    @Nullable
+    DataBuffer getVarSizeData();
+
+    @Nullable
+    List<DataBuffer> getStatsByStage();
   }
 }

@@ -24,6 +24,9 @@ import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import org.apache.pinot.segment.spi.memory.DataBuffer;
+import org.apache.pinot.segment.spi.memory.PinotByteBuffer;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.*;
@@ -43,12 +46,10 @@ public class MetadataBlockTest extends BaseDataBlockContract {
     MetadataBlock metadataBlock = MetadataBlock.newEos();
 
     // Then:
-    byte[] expectedFixed = new byte[0];
-    assertEquals(metadataBlock._fixedSizeDataBytes, expectedFixed);
-    byte[] expectedVariable = new byte[0];
-    assertEquals(metadataBlock._variableSizeDataBytes, expectedVariable);
+    assertEquals(metadataBlock._fixedSizeData, PinotDataBuffer.empty());
+    assertEquals(metadataBlock._variableSizeData, PinotDataBuffer.empty());
 
-    List<ByteBuffer> statsByStage = metadataBlock.getStatsByStage();
+    List<DataBuffer> statsByStage = metadataBlock.getStatsByStage();
     assertNotNull(statsByStage, "Expected stats by stage to be non-null");
     assertEquals(statsByStage.size(), 0, "Expected no stats by stage");
   }
@@ -84,7 +85,8 @@ public class MetadataBlockTest extends BaseDataBlockContract {
   public void v2EosWithoutStatsIsReadInV1AsEosWithoutStats()
       throws IOException {
     ByteBuffer stats = ByteBuffer.wrap(new byte[]{0, 0, 0, 0});
-    MetadataBlock metadataBlock = new MetadataBlock(Lists.newArrayList(stats));
+    DataBuffer dataBuffer = PinotByteBuffer.wrap(stats);
+    MetadataBlock metadataBlock = new MetadataBlock(Lists.newArrayList(dataBuffer));
 
     byte[] bytes = metadataBlock.toBytes();
 
@@ -254,8 +256,8 @@ public class MetadataBlockTest extends BaseDataBlockContract {
     }
 
     @Override
-    protected int positionOffsetInVariableBufferAndGetLength(int rowId, int colId) {
-      return 0;
+    public Type getDataBlockType() {
+      return Type.METADATA;
     }
   }
 }

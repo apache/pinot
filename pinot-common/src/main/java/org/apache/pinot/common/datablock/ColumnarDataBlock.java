@@ -23,6 +23,7 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Objects;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.segment.spi.memory.DataBuffer;
 
 
 /**
@@ -33,12 +34,14 @@ public class ColumnarDataBlock extends BaseDataBlock {
   protected int[] _cumulativeColumnOffsetSizeInBytes;
   protected int[] _columnSizeInBytes;
 
-  public ColumnarDataBlock() {
-    super();
+  public ColumnarDataBlock(int numRows, DataSchema dataSchema, String[] stringDictionary,
+      byte[] fixedSizeDataBytes, byte[] variableSizeDataBytes) {
+    super(numRows, dataSchema, stringDictionary, fixedSizeDataBytes, variableSizeDataBytes);
+    computeBlockObjectConstants();
   }
 
   public ColumnarDataBlock(int numRows, DataSchema dataSchema, String[] stringDictionary,
-      byte[] fixedSizeDataBytes, byte[] variableSizeDataBytes) {
+      DataBuffer fixedSizeDataBytes, DataBuffer variableSizeDataBytes) {
     super(numRows, dataSchema, stringDictionary, fixedSizeDataBytes, variableSizeDataBytes);
     computeBlockObjectConstants();
   }
@@ -75,28 +78,9 @@ public class ColumnarDataBlock extends BaseDataBlock {
   }
 
   @Override
-  protected int positionOffsetInVariableBufferAndGetLength(int rowId, int colId) {
-    int offset = getOffsetInFixedBuffer(rowId, colId);
-    _variableSizeData.position(_fixedSizeData.getInt(offset));
-    return _fixedSizeData.getInt(offset + 4);
+  public Type getDataBlockType() {
+    return Type.COLUMNAR;
   }
 
-  @Override
-  public boolean equals(Object o) {
-    if (this == o) {
-      return true;
-    }
-    if (!(o instanceof ColumnarDataBlock)) {
-      return false;
-    }
-    ColumnarDataBlock that = (ColumnarDataBlock) o;
-    return Objects.deepEquals(_cumulativeColumnOffsetSizeInBytes, that._cumulativeColumnOffsetSizeInBytes)
-        && Objects.deepEquals(_columnSizeInBytes, that._columnSizeInBytes);
-  }
-
-  @Override
-  public int hashCode() {
-    return Objects.hash(Arrays.hashCode(_cumulativeColumnOffsetSizeInBytes), Arrays.hashCode(_columnSizeInBytes));
-  }
 // TODO: add whole-column access methods.
 }

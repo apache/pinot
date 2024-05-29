@@ -46,6 +46,9 @@ import org.apache.pinot.query.runtime.operator.LeafStageTransferableBlockOperato
 import org.apache.pinot.query.runtime.operator.LiteralValueOperator;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
+import org.apache.pinot.segment.spi.memory.DataBuffer;
+import org.apache.pinot.segment.spi.memory.PinotByteBuffer;
+import org.apache.pinot.segment.spi.memory.PinotInputStream;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -133,10 +136,10 @@ public class MultiStageQueryStats {
    * The serialized stats are returned in a list where the index is the stage id. Stages downstream or not related to
    * the current one will be null.
    */
-  public List<ByteBuffer> serialize()
+  public List<DataBuffer> serialize()
       throws IOException {
 
-    ArrayList<ByteBuffer> serializedStats = new ArrayList<>(getMaxStageId());
+    ArrayList<DataBuffer> serializedStats = new ArrayList<>(getMaxStageId());
     for (int i = 0; i < _currentStageId; i++) {
       serializedStats.add(null);
     }
@@ -147,7 +150,7 @@ public class MultiStageQueryStats {
       _currentStats.serialize(output);
       ByteBuffer currentBuf = ByteBuffer.wrap(baos.toByteArray());
 
-      serializedStats.add(currentBuf);
+      serializedStats.add(PinotByteBuffer.wrap(currentBuf));
 
       for (StageStats.Closed closedStats : _closedStats) {
         if (closedStats == null) {
@@ -157,7 +160,7 @@ public class MultiStageQueryStats {
         baos.reset();
         closedStats.serialize(output);
         ByteBuffer buf = ByteBuffer.wrap(baos.toByteArray());
-        serializedStats.add(buf);
+        serializedStats.add(PinotByteBuffer.wrap(buf));
       }
     }
     Preconditions.checkState(serializedStats.size() == getMaxStageId() + 1,
@@ -261,7 +264,7 @@ public class MultiStageQueryStats {
     }
   }
 
-  public void mergeUpstream(List<ByteBuffer> otherStats) {
+  public void mergeUpstream(List<DataBuffer> otherStats) {
     for (int i = 0; i <= _currentStageId && i < otherStats.size(); i++) {
       if (otherStats.get(i) != null) {
         throw new IllegalArgumentException("Cannot merge stats from early stage " + i + " into stats of "
@@ -271,11 +274,10 @@ public class MultiStageQueryStats {
     growUpToStage(otherStats.size() - 1);
 
     for (int i = _currentStageId + 1; i < otherStats.size(); i++) {
-      ByteBuffer otherBuf = otherStats.get(i);
+      DataBuffer otherBuf = otherStats.get(i);
       if (otherBuf != null) {
         StageStats.Closed myStats = getUpstreamStageStats(i);
-        try (InputStream is = new ByteBufferInputStream(Collections.singletonList(otherBuf));
-            DataInputStream dis = new DataInputStream(is)) {
+        try (PinotInputStream dis = otherBuf.openInputStream()) {
           if (myStats == null) {
             StageStats.Closed deserialized = StageStats.Closed.deserialize(dis);
             _closedStats.set(i - _currentStageId - 1, deserialized);
@@ -517,7 +519,7 @@ public class MultiStageQueryStats {
         }
       }
 
-      public void merge(DataInputStream input)
+      public void merge(PinotInputStream input)
           throws IOException {
         int numOperators = input.readInt();
         if (numOperators != _operatorTypes.size()) {

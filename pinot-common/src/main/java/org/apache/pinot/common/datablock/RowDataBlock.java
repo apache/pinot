@@ -23,6 +23,7 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Objects;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.segment.spi.memory.DataBuffer;
 
 
 /**
@@ -33,12 +34,14 @@ public class RowDataBlock extends BaseDataBlock {
   protected int[] _columnOffsets;
   protected int _rowSizeInBytes;
 
-  public RowDataBlock() {
-    super();
+  public RowDataBlock(int numRows, DataSchema dataSchema, String[] stringDictionary,
+      byte[] fixedSizeDataBytes, byte[] variableSizeDataBytes) {
+    super(numRows, dataSchema, stringDictionary, fixedSizeDataBytes, variableSizeDataBytes);
+    computeBlockObjectConstants();
   }
 
   public RowDataBlock(int numRows, DataSchema dataSchema, String[] stringDictionary,
-      byte[] fixedSizeDataBytes, byte[] variableSizeDataBytes) {
+      DataBuffer fixedSizeDataBytes, DataBuffer variableSizeDataBytes) {
     super(numRows, dataSchema, stringDictionary, fixedSizeDataBytes, variableSizeDataBytes);
     computeBlockObjectConstants();
   }
@@ -67,32 +70,14 @@ public class RowDataBlock extends BaseDataBlock {
     return rowId * _rowSizeInBytes + _columnOffsets[colId];
   }
 
-  @Override
-  protected int positionOffsetInVariableBufferAndGetLength(int rowId, int colId) {
-    int offset = getOffsetInFixedBuffer(rowId, colId);
-    _variableSizeData.position(_fixedSizeData.getInt(offset));
-    return _fixedSizeData.getInt(offset + 4);
-  }
-
   public int getRowSizeInBytes() {
     return _rowSizeInBytes;
   }
 
   @Override
-  public boolean equals(Object o) {
-    if (this == o) {
-      return true;
-    }
-    if (!(o instanceof RowDataBlock)) {
-      return false;
-    }
-    RowDataBlock that = (RowDataBlock) o;
-    return _rowSizeInBytes == that._rowSizeInBytes && Objects.deepEquals(_columnOffsets, that._columnOffsets);
+  public Type getDataBlockType() {
+    return Type.ROW;
   }
 
-  @Override
-  public int hashCode() {
-    return Objects.hash(Arrays.hashCode(_columnOffsets), _rowSizeInBytes);
-  }
 // TODO: add whole-row access methods.
 }

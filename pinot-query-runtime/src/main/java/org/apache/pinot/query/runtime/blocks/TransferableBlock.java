@@ -37,6 +37,8 @@ import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.datablock.DataBlockBuilder;
 import org.apache.pinot.core.util.DataBlockExtractUtils;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
+import org.apache.pinot.segment.spi.memory.DataBuffer;
+
 
 /**
  * A {@code TransferableBlock} is a wrapper around {@link DataBlock} for transferring data using
@@ -83,9 +85,9 @@ public class TransferableBlock implements Block {
     _errCodeToExceptionMap = null;
   }
 
-  public List<ByteBuffer> getSerializedStatsByStage() {
+  public List<DataBuffer> getSerializedStatsByStage() {
     if (isSuccessfulEndOfStreamBlock()) {
-      List<ByteBuffer> statsByStage;
+      List<DataBuffer> statsByStage;
       if (_dataBlock instanceof MetadataBlock) {
         statsByStage = ((MetadataBlock) _dataBlock).getStatsByStage();
         if (statsByStage == null) {
