@@ -124,12 +124,9 @@ public class HelixHelper {
           try {
             updatedIdealState = updater.apply(idealStateCopy);
           } catch (PermanentUpdaterException e) {
-            controllerMetrics.addMeteredValue(resourceName, ControllerMeter.IDEAL_STATE_UPDATE_FAILURE, 1L);
             LOGGER.error("Caught permanent exception while updating ideal state for resource: {}", resourceName, e);
             throw e;
           } catch (Exception e) {
-            controllerMetrics.addMeteredValue(resourceName, ControllerMeter.IDEAL_STATE_UPDATE_FAILURE, 1L);
-            LOGGER.error("Caught exception while updating ideal state for resource: {}", resourceName, e);
             return false;
           }
 
@@ -157,16 +154,13 @@ public class HelixHelper {
                 idealStateWrapper._idealState = updatedIdealState;
                 return true;
               } else {
-                controllerMetrics.addMeteredValue(resourceName, ControllerMeter.IDEAL_STATE_UPDATE_FAILURE, 1L);
                 LOGGER.warn("Failed to update ideal state for resource: {}", resourceName);
                 return false;
               }
             } catch (ZkBadVersionException e) {
-              controllerMetrics.addMeteredValue(resourceName, ControllerMeter.IDEAL_STATE_UPDATE_FAILURE, 1L);
               LOGGER.warn("Version changed while updating ideal state for resource: {}", resourceName);
               return false;
             } catch (Exception e) {
-              controllerMetrics.addMeteredValue(resourceName, ControllerMeter.IDEAL_STATE_UPDATE_FAILURE, 1L);
               LOGGER.warn("Caught exception while updating ideal state for resource: {} (compressed={})", resourceName,
                   enableCompression, e);
               return false;
@@ -178,7 +172,6 @@ public class HelixHelper {
               LOGGER.warn("Idempotent or null ideal state update for resource {}, skipping update.", resourceName);
             }
             idealStateWrapper._idealState = idealState;
-            controllerMetrics.addMeteredValue(resourceName, ControllerMeter.IDEAL_STATE_UPDATE_FAILURE, 1L);
             return true;
           }
         }
