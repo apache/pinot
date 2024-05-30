@@ -48,7 +48,6 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderFileConfig;
-import org.apache.pinot.plugin.record.enricher.RecordEnricherPipeline;
 import org.apache.pinot.spi.utils.StringUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,7 +68,7 @@ public class SegmentMapper {
   private final List<FieldSpec> _fieldSpecs;
   private final boolean _includeNullFields;
   private final int _numSortFields;
-  private final RecordEnricherPipeline _recordEnricherPipeline;
+  private final RecordTransformer _recordEnricherPipeline;
   private final CompositeTransformer _recordTransformer;
   private final TimeHandler _timeHandler;
   private final Partitioner[] _partitioners;
@@ -94,7 +93,7 @@ public class SegmentMapper {
     _fieldSpecs = pair.getLeft();
     _numSortFields = pair.getRight();
     _includeNullFields = tableConfig.getIndexingConfig().isNullHandlingEnabled();
-    _recordEnricherPipeline = RecordEnricherPipeline.fromTableConfig(tableConfig);
+    _recordEnricherPipeline = RecordTransformer.fromTableConfig(tableConfig);
     _recordTransformer = CompositeTransformer.composeAllTransformers(_customRecordTransformers, tableConfig, schema);
     _timeHandler = TimeHandlerFactory.getTimeHandler(processorConfig);
     List<PartitionerConfig> partitionerConfigs = processorConfig.getPartitionerConfigs();

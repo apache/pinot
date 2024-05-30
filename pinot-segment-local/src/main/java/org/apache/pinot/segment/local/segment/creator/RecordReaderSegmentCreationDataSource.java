@@ -19,7 +19,7 @@
 package org.apache.pinot.segment.local.segment.creator;
 
 import org.apache.pinot.common.Utils;
-import org.apache.pinot.plugin.record.enricher.RecordEnricherPipeline;
+import org.apache.pinot.segment.local.recordtransformer.RecordTransformer;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.SegmentPreIndexStatsCollectorImpl;
 import org.apache.pinot.segment.spi.creator.SegmentCreationDataSource;
 import org.apache.pinot.segment.spi.creator.SegmentPreIndexStatsCollector;
@@ -39,14 +39,14 @@ public class RecordReaderSegmentCreationDataSource implements SegmentCreationDat
   private static final Logger LOGGER = LoggerFactory.getLogger(RecordReaderSegmentCreationDataSource.class);
 
   private final RecordReader _recordReader;
-  private RecordEnricherPipeline _recordEnricherPipeline;
+  private RecordTransformer _recordEnricherPipeline;
   private TransformPipeline _transformPipeline;
 
   public RecordReaderSegmentCreationDataSource(RecordReader recordReader) {
     _recordReader = recordReader;
   }
 
-  public void setRecordEnricherPipeline(RecordEnricherPipeline recordEnricherPipeline) {
+  public void setRecordEnricherPipeline(RecordTransformer recordEnricherPipeline) {
     _recordEnricherPipeline = recordEnricherPipeline;
   }
 
@@ -57,8 +57,8 @@ public class RecordReaderSegmentCreationDataSource implements SegmentCreationDat
   @Override
   public SegmentPreIndexStatsCollector gatherStats(StatsCollectorConfig statsCollectorConfig) {
     try {
-      RecordEnricherPipeline recordEnricherPipeline = _recordEnricherPipeline != null ? _recordEnricherPipeline
-          : RecordEnricherPipeline.fromTableConfig(statsCollectorConfig.getTableConfig());
+      RecordTransformer recordEnricherPipeline = _recordEnricherPipeline != null ? _recordEnricherPipeline
+          : RecordTransformer.fromTableConfig(statsCollectorConfig.getTableConfig());
       TransformPipeline transformPipeline = _transformPipeline != null ? _transformPipeline
           : new TransformPipeline(statsCollectorConfig.getTableConfig(), statsCollectorConfig.getSchema());
 

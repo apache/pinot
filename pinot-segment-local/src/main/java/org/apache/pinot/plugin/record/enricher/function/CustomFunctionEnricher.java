@@ -38,6 +38,11 @@ import org.apache.pinot.spi.utils.JsonUtils;
 public class CustomFunctionEnricher implements RecordTransformer {
   private final Map<String, FunctionEvaluator> _fieldToFunctionEvaluator;
   private final List<String> _fieldsToExtract;
+  private static final String TYPE = "generateColumn";
+  @Override
+  public String getEnricherType() {
+    return TYPE;
+  }
 
   public CustomFunctionEnricher(JsonNode enricherProps) throws IOException {
     CustomFunctionEnricherConfig config = JsonUtils.jsonNodeToObject(enricherProps, CustomFunctionEnricherConfig.class);
@@ -63,5 +68,29 @@ public class CustomFunctionEnricher implements RecordTransformer {
       record.putValue(field, evaluator.evaluate(record));
     });
     return record;
+  }
+
+  @Override
+  public RecordTransformer createEnricher(JsonNode enricherProps)
+      throws IOException {
+    return new CustomFunctionEnricher(enricherProps);
+  }
+
+  @Override
+  public void validateEnrichmentConfig(JsonNode enricherProps, boolean validationConfig) {
+    CustomFunctionEnricherConfig config;
+    try {
+      config = JsonUtils.jsonNodeToObject(enricherProps, CustomFunctionEnricherConfig.class);
+      if (!validationConfig) {
+        return;
+      }
+      for (String function : config.getFieldToFunctionMap().values()) {
+        if (FunctionEvaluatorFactory.isGroovyExpression(function)) {
+          throw new IllegalArgumentException("Groovy expression is not allowed for enrichment");
+        }
+      }
+    } catch (IOException e) {
+      throw new IllegalArgumentException("Failed to parse custom function enricher config", e);
+    }
   }
 }

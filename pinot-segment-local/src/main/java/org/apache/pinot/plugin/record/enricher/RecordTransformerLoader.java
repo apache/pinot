@@ -18,13 +18,26 @@
  */
 package org.apache.pinot.plugin.record.enricher;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.ServiceLoader;
 import org.apache.pinot.segment.local.recordtransformer.RecordTransformer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
-public interface RecordEnricherFactory {
-  String getEnricherType();
-  RecordTransformer createEnricher(JsonNode enricherProps) throws IOException;
-  void validateEnrichmentConfig(JsonNode enricherProps, RecordEnricherValidationConfig validationConfig);
+public class RecordTransformerLoader {
+  private static final Logger LOGGER = LoggerFactory.getLogger(RecordTransformerLoader.class);
+  private static final Map<String, RecordTransformer> RECORD_ENRICHER_FACTORY_MAP = new HashMap<>();
+
+  static {
+    for (RecordTransformer recordEnricherFactory : ServiceLoader.load(RecordTransformer.class)) {
+      LOGGER.info("Registered record enricher factory type: {}", recordEnricherFactory.getEnricherType());
+      RECORD_ENRICHER_FACTORY_MAP.put(recordEnricherFactory.getEnricherType(), recordEnricherFactory);
+    }
+  }
+
+  public static Map<String, RecordTransformer> getRecordEnricherFactoryMap() {
+    return RECORD_ENRICHER_FACTORY_MAP;
+  }
 }

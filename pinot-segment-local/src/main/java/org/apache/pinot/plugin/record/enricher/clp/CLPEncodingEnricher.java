@@ -44,6 +44,7 @@ public class CLPEncodingEnricher implements RecordTransformer {
   private final ClpEnricherConfig _config;
   private final EncodedMessage _clpEncodedMessage;
   private final MessageEncoder _clpMessageEncoder;
+  private static final String ENRICHER_TYPE = "clpEnricher";
 
   public CLPEncodingEnricher(JsonNode enricherProperties) throws IOException {
     _config = JsonUtils.jsonNodeToObject(enricherProperties, ClpEnricherConfig.class);
@@ -97,5 +98,25 @@ public class CLPEncodingEnricher implements RecordTransformer {
     to.putValue(key + ClpRewriter.LOGTYPE_COLUMN_SUFFIX, logtype);
     to.putValue(key + ClpRewriter.DICTIONARY_VARS_COLUMN_SUFFIX, dictVars);
     to.putValue(key + ClpRewriter.ENCODED_VARS_COLUMN_SUFFIX, encodedVars);
+  }
+
+  @Override
+  public String getEnricherType() {
+    return ENRICHER_TYPE;
+  }
+
+  @Override
+  public RecordTransformer createEnricher(JsonNode enricherProps)
+      throws IOException {
+    return new CLPEncodingEnricher(enricherProps);
+  }
+
+  @Override
+  public void validateEnrichmentConfig(JsonNode enricherProps, boolean validationConfig) {
+    try {
+      ClpEnricherConfig config = JsonUtils.jsonNodeToObject(enricherProps, ClpEnricherConfig.class);
+    } catch (IOException e) {
+      throw new IllegalArgumentException("Failed to parse clp enricher config", e);
+    }
   }
 }

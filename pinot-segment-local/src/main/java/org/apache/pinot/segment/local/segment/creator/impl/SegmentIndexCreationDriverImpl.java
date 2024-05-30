@@ -36,7 +36,6 @@ import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.plugin.record.enricher.RecordEnricherPipeline;
 import org.apache.pinot.segment.local.realtime.converter.stats.RealtimeSegmentSegmentCreationDataSource;
 import org.apache.pinot.segment.local.recordtransformer.ComplexTypeTransformer;
 import org.apache.pinot.segment.local.recordtransformer.RecordTransformer;
@@ -102,7 +101,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   private SegmentCreator _indexCreator;
   private SegmentIndexCreationInfo _segmentIndexCreationInfo;
   private Schema _dataSchema;
-  private RecordEnricherPipeline _recordEnricherPipeline;
+  private RecordTransformer _recordEnricherPipeline;
   private TransformPipeline _transformPipeline;
   private IngestionSchemaValidator _ingestionSchemaValidator;
   private int _totalDocs = 0;
@@ -183,7 +182,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   public void init(SegmentGeneratorConfig config, RecordReader recordReader)
       throws Exception {
     SegmentCreationDataSource dataSource = new RecordReaderSegmentCreationDataSource(recordReader);
-    init(config, dataSource, RecordEnricherPipeline.fromTableConfig(config.getTableConfig()),
+    init(config, dataSource, RecordTransformer.fromTableConfig(config.getTableConfig()),
         new TransformPipeline(config.getTableConfig(), config.getSchema()));
   }
 
@@ -191,12 +190,12 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   public void init(SegmentGeneratorConfig config, SegmentCreationDataSource dataSource,
       RecordTransformer recordTransformer, @Nullable ComplexTypeTransformer complexTypeTransformer)
       throws Exception {
-    init(config, dataSource, RecordEnricherPipeline.fromTableConfig(config.getTableConfig()),
+    init(config, dataSource, RecordTransformer.fromTableConfig(config.getTableConfig()),
         new TransformPipeline(recordTransformer, complexTypeTransformer));
   }
 
   public void init(SegmentGeneratorConfig config, SegmentCreationDataSource dataSource,
-      RecordEnricherPipeline enricherPipeline, TransformPipeline transformPipeline)
+      RecordTransformer enricherPipeline, TransformPipeline transformPipeline)
       throws Exception {
     _config = config;
     _recordReader = dataSource.getRecordReader();
