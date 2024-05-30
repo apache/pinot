@@ -18,64 +18,219 @@
 //
 
 syntax = "proto3";
+import "expressions.proto";
 
 package org.apache.pinot.common.proto;
 
 message StageNode {
   int32 stageId = 1;
-  string nodeName = 2;
   repeated StageNode inputs = 3;
   repeated string columnNames = 4;
-  repeated string columnDataTypes = 5;
-  ObjectField objectField = 6;
-}
-
-// MemberVariableField defines the serialized format of the member variables of a class object.
-// MemberVariableField can be one of
-//   1. literal
-//   2. list
-//   3. map
-//   4. complex class object
-message MemberVariableField {
-  oneof member_variable_field {
-    LiteralField literalField = 1;
-    ListField listField = 2;
-    MapField mapField = 3;
-    ObjectField objectField = 4;
+  repeated ColumnDataType columnDataTypes = 5;
+  oneof nodeType {
+    TableScanNode tableScanNode = 102;
+    MailboxReceiveNode receiveNode = 103;
+    MailboxSendNode sendNode = 104;
+    SetOpNode setNode = 105;
+    ExchangeNode exchangeNode = 106;
+    SortNode sortNode = 107;
+    AggregateNode aggregateNode = 108;
+    JoinNode joinNode = 109;
+    LiteralValueNode literalValueNode = 110;
+    ProjectNode projectNode = 111;
+    ValueNode valueNode = 112;
+    WindowNode windowNode = 113;
+    FilterNode filterNode = 114;
   }
 }
 
-// ObjectField defines the serialized format of a complex class object.
-// it contains:
-//   1. its fully-qualified clazz name;
-//   2. its MemberVariableField map.
-message ObjectField {
-  string objectClassName = 1;
-  map<string, MemberVariableField> memberVariables = 2;
+message StrStrMap {
+  map<string, string> options = 1;
 }
 
-// LiteralField defines the serialized format of a literal field.
-message LiteralField {
-  oneof literal_field {
-    bool boolField = 1;
-    int32 intField = 2;
-    int64 longField = 3;
-    float floatField = 4;
-    double doubleField = 5;
-    string stringField = 6;
-    bytes bytesField = 7;
-    bytes bigDecimalField = 8;
-  }
+message NodeHint {
+  map<string, StrStrMap> hintOptions = 1;
 }
 
-// ListField defines the serialized format of a list field.
-// The content of the list is a MemberVariableField.
-message ListField {
-  repeated MemberVariableField content = 1;
+message TableScanNode {
+  NodeHint nodeHint = 1;
+  string tableName = 2;
+  repeated string tableScanColumns = 3;
 }
 
-// ListField defines the serialized format of a map field.
-// The key of the map is a string and the value of the map is a MemberVariableField.
-message MapField {
-  map<string, MemberVariableField> content = 1;
+enum PinotRelExchangeType {
+  STREAMING = 0;
+  SUB_PLAN = 1;
+  PIPELINE_BREAKER = 2;
+}
+
+enum RelDistributionType {
+  SINGLETON = 0;
+  HASH_DISTRIBUTED = 1;
+  RANGE_DISTRIBUTED = 2;
+  RANDOM_DISTRIBUTED = 3;
+  ROUND_ROBIN_DISTRIBUTED = 4;
+  BROADCAST_DISTRIBUTED = 5;
+  ANY = 6;
+}
+
+enum Direction {
+  ASCENDING = 0;
+  STRICTLY_ASCENDING = 1;
+  DESCENDING = 2;
+  STRICTLY_DESCENDING = 3;
+  CLUSTERED = 4;
+}
+
+enum NullDirection {
+  FIRST = 0;
+  LAST = 1;
+  UNSPECIFIED = 2;
+}
+
+message DirectionList {
+  repeated Direction item = 1;
+}
+
+message NullDirectionList {
+  repeated NullDirection item = 1;
+}
+
+message RexExpressionList {
+  repeated RexExpression item = 1;
+}
+
+message DistributionKeyList {
+  repeated int32 item = 1;
+}
+
+message MailboxReceiveNode {
+  int32 senderStageId = 1;
+  PinotRelExchangeType exchangeType = 2;
+  RelDistributionType distributionType = 3;
+  DistributionKeyList distributionKeys = 4;
+  repeated int32 collationKeys = 5;
+  DirectionList collationDirections = 6;
+  NullDirectionList collationNullDirections = 7;
+  bool sortOnSender = 8;
+  bool sortOnReceiver = 9;
+  StageNode sender = 10;
+}
+
+message MailboxSendNode {
+  int32 receiverStageId = 1;
+  RelDistributionType distributionType = 2;
+  PinotRelExchangeType exchangeType = 3;
+  DistributionKeyList distributionKeys = 4;
+  repeated int32 collationKeys = 5;
+  DirectionList collationDirections = 6;
+  bool sortOnSender = 7;
+  bool prePartitioned = 8;
+}
+
+enum SetOpType {
+  UNION = 0;
+  INTERSECT = 1;
+  MINUS = 2;
+}
+
+message SetOpNode {
+  SetOpType setOpType = 1;
+  bool all = 2;
+}
+
+message RelFieldCollation {
+  int32 fieldIndex = 1;
+  Direction direction = 2;
+  NullDirection nullDirection = 3;
+}
+
+message ExchangeNode {
+  PinotRelExchangeType exchangeType = 1;
+  RelDistributionType distributionType = 2;
+  repeated int32 keys = 3;
+  bool isSortOnSender = 4;
+  bool isSortOnReceiver = 5;
+  bool isPrePartitioned = 6;
+  repeated RelFieldCollation collations = 7;
+  repeated string tableNames = 8;
+}
+
+message SortNode {
+  RexExpressionList collationKeys = 1;
+  DirectionList collationDirections = 2;
+  NullDirectionList collationNullDirections = 3;
+  int32 fetch = 4;
+  int32 offset = 5;
+}
+
+enum AggType {
+  DIRECT = 0;
+  LEAF = 1;
+  INTERMEDIATE = 2;
+  FINAL = 3;
+}
+
+message AggregateNode {
+  NodeHint nodeHint = 1;
+  RexExpressionList aggCalls = 2;
+  repeated int32 filterArgIndices = 3;
+  RexExpressionList groupSet = 4;
+  AggType aggType = 5;
+}
+
+message FilterNode {
+  RexExpression condition = 1;
+}
+
+enum JoinRelType {
+  INNER = 0;
+  LEFT = 1;
+  RIGHT = 2;
+  FULL = 3;
+  SEMI = 4;
+  ANTI = 5;
+}
+
+message JoinKeys {
+  repeated int32 leftKeys = 1;
+  repeated int32 rightKeys = 2;
+}
+
+message JoinNode {
+  JoinRelType joinRelType = 1;
+  JoinKeys joinKeys = 2;
+  RexExpressionList joinClause = 3;
+  NodeHint joinHints = 4;
+  repeated string leftColumnNames = 5;
+  repeated string rightColumnNames = 6;
+}
+
+message LiteralValueNode {
+  bytes dataTable = 1;
+}
+
+message ProjectNode {
+  RexExpressionList projects = 1;
+}
+
+message ValueNode {
+  repeated RexExpressionList rows = 1;
+}
+
+enum WindowFrameType {
+    ROWS = 0;
+    RANGE = 1;
+}
+
+message WindowNode {
+  RexExpressionList groupSet = 1;
+  RexExpressionList orderSet = 2;
+  repeated Direction orderSetDirection = 3;
+  repeated NullDirection orderSetNullDirection = 4;
+  RexExpressionList aggCalls = 5;
+  int32 lowerBound = 6;
+  int32 upperBound = 7;
+  RexExpressionList constants = 8;
+  WindowFrameType windowFrameType = 9;
 }

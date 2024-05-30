@@ -52,6 +52,11 @@ public class ValueNode extends AbstractPlanNode {
     }
   }
 
+  public ValueNode(int stageId, DataSchema dataSchema, List<List<RexExpression>> rows) {
+    super(stageId, dataSchema);
+    _literalRows = rows;
+  }
+
   public List<List<RexExpression>> getLiteralRows() {
     return _literalRows;
   }

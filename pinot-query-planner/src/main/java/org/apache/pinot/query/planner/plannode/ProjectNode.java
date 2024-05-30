@@ -19,11 +19,8 @@
 package org.apache.pinot.query.planner.plannode;
 
 import java.util.List;
-import java.util.stream.Collectors;
-import org.apache.calcite.rex.RexNode;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
-import org.apache.pinot.query.planner.logical.RexExpressionUtils;
 import org.apache.pinot.query.planner.serde.ProtoProperties;
 
 
@@ -35,9 +32,9 @@ public class ProjectNode extends AbstractPlanNode {
     super(planFragmentId);
   }
 
-  public ProjectNode(int currentStageId, DataSchema dataSchema, List<RexNode> projects) {
-    super(currentStageId, dataSchema);
-    _projects = projects.stream().map(RexExpressionUtils::fromRexNode).collect(Collectors.toList());
+  public ProjectNode(int stageId, DataSchema dataSchema, List<RexExpression> expressions) {
+    super(stageId, dataSchema);
+    _projects = expressions;
   }
 
   public List<RexExpression> getProjects() {

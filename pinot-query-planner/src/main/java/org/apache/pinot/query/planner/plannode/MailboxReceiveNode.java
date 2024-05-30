@@ -99,6 +99,25 @@ public class MailboxReceiveNode extends AbstractPlanNode {
     _sender = sender;
   }
 
+  public MailboxReceiveNode(int planFragmentId, DataSchema dataSchema, int senderStageId,
+      RelDistribution.Type distributionType, PinotRelExchangeType exchangeType, List<Integer> distributionKeys,
+      List<RexExpression> collationKeys, List<Direction> collationDirectionsList,
+      List<NullDirection> collationNullDirectionsList, boolean sortOnSender, boolean sortOnReceiver,
+      MailboxSendNode mailboxSendNode) {
+    super(planFragmentId, dataSchema);
+    _senderStageId = senderStageId;
+    _distributionType = distributionType;
+    _exchangeType = exchangeType;
+    _distributionKeys = distributionKeys;
+    _collationKeys = collationKeys;
+    _collationDirections = collationDirectionsList;
+    _collationNullDirections = collationNullDirectionsList;
+    _isSortOnSender = sortOnSender;
+    Preconditions.checkState(!sortOnSender, "Input shouldn't be sorted as ordering on send is not yet implemented!");
+    _isSortOnReceiver = sortOnReceiver;
+    _sender = mailboxSendNode;
+  }
+
   public void setSenderStageId(Integer senderStageId) {
     _senderStageId = senderStageId;
   }
