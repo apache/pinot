@@ -65,8 +65,8 @@ public enum ControllerMeter implements AbstractMetrics.Meter {
   TABLE_REBALANCE_RETRY("TableRebalanceRetry", false),
   TABLE_REBALANCE_RETRY_TOO_MANY_TIMES("TableRebalanceRetryTooManyTimes", false),
   NUMBER_ADHOC_TASKS_SUBMITTED("adhocTasks", false),
-  IDEA_STATE_UPDATE_FAILURE("IdeaStateUpdateError", true),
-  IDEA_STATE_UPDATE_RETRY("IdeaStateUpdateRetry", true);
+  IDEA_STATE_UPDATE_FAILURE("IdeaStateUpdateFailure", false),
+  IDEA_STATE_UPDATE_RETRY("IdeaStateUpdateRetry", false);
 
 
   private final String _brokerMeterName;

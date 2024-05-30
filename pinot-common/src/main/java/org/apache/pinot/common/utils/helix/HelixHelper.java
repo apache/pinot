@@ -105,18 +105,13 @@ public class HelixHelper {
    */
   public static IdealState updateIdealState(final HelixManager helixManager, final String resourceName,
       final Function<IdealState, IdealState> updater, RetryPolicy policy, final boolean noChangeOk) {
-    final ControllerMetrics controllerMetrics = ControllerMetrics.get();
-    final AtomicInteger retryCounter = new AtomicInteger(-1);
+    ControllerMetrics controllerMetrics = ControllerMetrics.get();
     try {
       long updateStartTime = System.currentTimeMillis();
       IdealStateWrapper idealStateWrapper = new IdealStateWrapper();
-      policy.attempt(new Callable<Boolean>() {
+      int retries = policy.attempt(new Callable<Boolean>() {
         @Override
         public Boolean call() {
-          retryCounter.incrementAndGet();
-          if (retryCounter.get() > 0) {
-            controllerMetrics.addMeteredGlobalValue(ControllerMeter.IDEA_STATE_UPDATE_RETRY, 1L);
-          }
           HelixDataAccessor dataAccessor = helixManager.getHelixDataAccessor();
           PropertyKey idealStateKey = dataAccessor.keyBuilder().idealStates(resourceName);
           IdealState idealState = dataAccessor.getProperty(idealStateKey);
@@ -130,11 +125,11 @@ public class HelixHelper {
           try {
             updatedIdealState = updater.apply(idealStateCopy);
           } catch (PermanentUpdaterException e) {
-            controllerMetrics.addMeteredGlobalValue(ControllerMeter.IDEA_STATE_UPDATE_FAILURE, 1L);
+            controllerMetrics.addMeteredValue(resourceName, ControllerMeter.IDEA_STATE_UPDATE_FAILURE, 1L);
             LOGGER.error("Caught permanent exception while updating ideal state for resource: {}", resourceName, e);
             throw e;
           } catch (Exception e) {
-            controllerMetrics.addMeteredGlobalValue(ControllerMeter.IDEA_STATE_UPDATE_FAILURE, 1L);
+            controllerMetrics.addMeteredValue(resourceName, ControllerMeter.IDEA_STATE_UPDATE_FAILURE, 1L);
             LOGGER.error("Caught exception while updating ideal state for resource: {}", resourceName, e);
             return false;
           }
@@ -163,16 +158,16 @@ public class HelixHelper {
                 idealStateWrapper._idealState = updatedIdealState;
                 return true;
               } else {
-                controllerMetrics.addMeteredGlobalValue(ControllerMeter.IDEA_STATE_UPDATE_FAILURE, 1L);
+                controllerMetrics.addMeteredValue(resourceName, ControllerMeter.IDEA_STATE_UPDATE_FAILURE, 1L);
                 LOGGER.warn("Failed to update ideal state for resource: {}", resourceName);
                 return false;
               }
             } catch (ZkBadVersionException e) {
-              controllerMetrics.addMeteredGlobalValue(ControllerMeter.IDEA_STATE_UPDATE_FAILURE, 1L);
+              controllerMetrics.addMeteredValue(resourceName, ControllerMeter.IDEA_STATE_UPDATE_FAILURE, 1L);
               LOGGER.warn("Version changed while updating ideal state for resource: {}", resourceName);
               return false;
             } catch (Exception e) {
-              controllerMetrics.addMeteredGlobalValue(ControllerMeter.IDEA_STATE_UPDATE_FAILURE, 1L);
+              controllerMetrics.addMeteredValue(resourceName, ControllerMeter.IDEA_STATE_UPDATE_FAILURE, 1L);
               LOGGER.warn("Caught exception while updating ideal state for resource: {} (compressed={})", resourceName,
                   enableCompression, e);
               return false;
@@ -184,7 +179,7 @@ public class HelixHelper {
               LOGGER.warn("Idempotent or null ideal state update for resource {}, skipping update.", resourceName);
             }
             idealStateWrapper._idealState = idealState;
-            controllerMetrics.addMeteredGlobalValue(ControllerMeter.IDEA_STATE_UPDATE_FAILURE, 1L);
+            controllerMetrics.addMeteredValue(resourceName, ControllerMeter.IDEA_STATE_UPDATE_FAILURE, 1L);
             return true;
           }
         }
@@ -217,13 +212,12 @@ public class HelixHelper {
           return false;
         }
       });
-      retryCounter.set(0);
-      controllerMetrics.addTimedValue(ControllerTimer.IDEA_STATE_UPDATE_LATENCY,
+      controllerMetrics.addMeteredValue(resourceName, ControllerMeter.IDEA_STATE_UPDATE_RETRY, retries);
+      controllerMetrics.addTimedValue(resourceName, ControllerTimer.IDEA_STATE_UPDATE_TIME_MS,
               System.currentTimeMillis() - updateStartTime, TimeUnit.MILLISECONDS);
       return idealStateWrapper._idealState;
     } catch (Exception e) {
-      retryCounter.set(0);
-      controllerMetrics.addMeteredGlobalValue(ControllerMeter.IDEA_STATE_UPDATE_FAILURE, 1L);
+      controllerMetrics.addMeteredValue(resourceName, ControllerMeter.IDEA_STATE_UPDATE_FAILURE, 1L);
       throw new RuntimeException("Caught exception while updating ideal state for resource: " + resourceName, e);
     }
   }
