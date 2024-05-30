@@ -27,7 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.pinot.plugin.record.enricher.RecordTransformerLoader;
+import org.apache.pinot.plugin.record.enricher.RecordEnricherRegistry;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.EnrichmentConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
@@ -40,12 +40,12 @@ import org.slf4j.LoggerFactory;
  * The record transformer which takes a {@link GenericRow} and transform it based on some custom rules.
  */
 public interface RecordTransformer extends Serializable {
-  final boolean groovyDisabled = false;
+  final boolean GROOVY_DISABLED = false;
 
   static final Logger LOGGER = LoggerFactory.getLogger(RecordTransformer.class);
-  Map<String, RecordTransformer> RECORD_ENRICHER_FACTORY_MAP = RecordTransformerLoader.getRecordEnricherFactoryMap();
-  final List<RecordTransformer> enrichers = new ArrayList<>();
-  final Set<String> columnsToExtract = new HashSet<>();
+  Map<String, RecordTransformer> RECORD_ENRICHER_FACTORY_MAP = RecordEnricherRegistry.getRecordEnricherFactoryMap();
+  final List<RecordTransformer> ENRICHERS = new ArrayList<>();
+  final Set<String> COLUMNS_TO_EXTRACT = new HashSet<>();
   static final String NONE_TYPE = "";
 
   static void validateEnrichmentConfig(EnrichmentConfig enrichmentConfig, boolean config) {
@@ -131,20 +131,20 @@ public interface RecordTransformer extends Serializable {
   }
 
   default boolean isGroovyDisabled() {
-    return groovyDisabled;
+    return GROOVY_DISABLED;
   }
 
   default Set<String> getColumnsToExtract() {
-    return columnsToExtract;
+    return COLUMNS_TO_EXTRACT;
   }
 
   default void add(RecordTransformer enricher) {
-    enrichers.add(enricher);
-    columnsToExtract.addAll(enricher.getInputColumns());
+    ENRICHERS.add(enricher);
+    COLUMNS_TO_EXTRACT.addAll(enricher.getInputColumns());
   }
 
   default void run(GenericRow record) {
-    for (RecordTransformer enricher : enrichers) {
+    for (RecordTransformer enricher : ENRICHERS) {
       enricher.transform(record);
     }
   }
