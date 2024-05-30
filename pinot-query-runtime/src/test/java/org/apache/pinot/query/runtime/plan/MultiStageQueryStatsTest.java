@@ -19,7 +19,6 @@
 package org.apache.pinot.query.runtime.plan;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.List;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.query.runtime.operator.BaseMailboxReceiveOperator;

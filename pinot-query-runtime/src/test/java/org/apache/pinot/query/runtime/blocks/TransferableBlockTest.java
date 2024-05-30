@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.runtime.blocks;
 
-import java.nio.ByteBuffer;
 import java.util.List;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;

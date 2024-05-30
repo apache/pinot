@@ -1,13 +1,7 @@
 package org.apache.pinot.common.datablock;
 
 import java.io.IOException;
-import java.util.List;
-import java.util.Map;
-import javax.annotation.Nullable;
-import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
-import org.apache.pinot.segment.spi.memory.PinotInputStream;
-import org.apache.pinot.segment.spi.memory.PinotOutputStream;
 
 
 /**

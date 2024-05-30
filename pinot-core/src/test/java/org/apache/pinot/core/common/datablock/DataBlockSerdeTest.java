@@ -26,7 +26,9 @@ public class DataBlockSerdeTest {
     DataBlockUtils.setSerde(DataBlockSerde.Version.V2, new OriginalDataBlockSerde());
 
     int numRows = 1000;
-    DataSchema dataSchema = new DataSchema(new String[]{"value"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT});
+    DataSchema dataSchema = new DataSchema(
+        new String[]{"value"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT});
 
     List<Object[]> rows = new ArrayList<>(numRows);
     Random r = new Random(42);
@@ -46,7 +48,9 @@ public class DataBlockSerdeTest {
       throws IOException {
     DataBlockUtils.setSerde(DataBlockSerde.Version.V2, new OriginalDataBlockSerde());
     int numRows = 1000;
-    DataSchema dataSchema = new DataSchema(new String[]{"value"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT});
+    DataSchema dataSchema = new DataSchema(
+        new String[]{"value"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT});
 
     Object[] column = new Object[numRows];
     Random r = new Random(42);
@@ -70,7 +74,9 @@ public class DataBlockSerdeTest {
     DataBlockUtils.setSerde(DataBlockSerde.Version.V2, new ZeroCopyDataBlockSerde());
 
     int numRows = 1000;
-    DataSchema dataSchema = new DataSchema(new String[]{"value"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT});
+    DataSchema dataSchema = new DataSchema(
+        new String[]{"value"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT});
 
     List<Object[]> rows = new ArrayList<>(numRows);
     Random r = new Random(42);
@@ -90,7 +96,9 @@ public class DataBlockSerdeTest {
       throws IOException {
     DataBlockUtils.setSerde(DataBlockSerde.Version.V2, new ZeroCopyDataBlockSerde());
     int numRows = 1000;
-    DataSchema dataSchema = new DataSchema(new String[]{"value"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT});
+    DataSchema dataSchema = new DataSchema(
+        new String[]{"value"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT});
 
     Object[] column = new Object[numRows];
     Random r = new Random(42);
@@ -107,5 +115,4 @@ public class DataBlockSerdeTest {
     DataBlock deserializedDataBlock = DataBlockUtils.deserialize(new ByteBuffer[]{ByteBuffer.wrap(bytes)});
     Assert.assertEquals(deserializedDataBlock, dataBlock);
   }
-
 }

@@ -177,7 +177,8 @@ public class ZeroCopyDataBlockSerde implements DataBlockSerde {
           }
         }
         default:
-          throw new UnsupportedOperationException("Unsupported data table version: " + getVersion() + " with type: " + type);
+          throw new UnsupportedOperationException("Unsupported data table version: " + getVersion() + " with type: "
+              + type);
       }
     }
   }

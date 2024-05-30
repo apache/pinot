@@ -27,7 +27,6 @@ import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.Warmup;
 import org.openjdk.jmh.profile.GCProfiler;
-import org.openjdk.jmh.profile.LinuxPerfAsmProfiler;
 import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.RunnerException;
 import org.openjdk.jmh.runner.options.Options;
@@ -201,7 +200,6 @@ public class BenchmarkDataBlock {
       Options opt = new OptionsBuilder().include(BenchmarkDataBlock.BuildBlock.class.getSimpleName())
 //          .addProfiler(LinuxPerfAsmProfiler.class)
 //        .addProfiler(JavaFlightRecorderProfiler.class)
-//        .addProfiler(AsyncProfiler.class, "libPath=/home/gortiz/apps/async-profiler-3.0-linux-x64/lib/libasyncProfiler.so;output=jfr;dir=/tmp/")
           .addProfiler(GCProfiler.class)
           .build();
 
@@ -251,7 +249,6 @@ public class BenchmarkDataBlock {
       Options opt = new OptionsBuilder().include(BenchmarkDataBlock.Serialize.class.getSimpleName())
 //          .addProfiler(LinuxPerfAsmProfiler.class)
 //        .addProfiler(JavaFlightRecorderProfiler.class)
-//        .addProfiler(AsyncProfiler.class, "libPath=/home/gortiz/apps/async-profiler-3.0-linux-x64/lib/libasyncProfiler.so;output=jfr;dir=/tmp/")
           .addProfiler(GCProfiler.class)
           .build();
 
@@ -262,7 +259,6 @@ public class BenchmarkDataBlock {
     DataSchema.ColumnDataType _columnDataType = DataSchema.ColumnDataType.INT;
     DataBlock.Type _blockType = DataBlock.Type.COLUMNAR;
     int _nullPerCent = 10;
-//    @Param(value = {"bytes", "original_direct_small", "zero_direct_small", "zero_direct_large", "zero_heap_small", "zero_heap_large"})
     @Param(value = {"bytes", "zero_direct_small", "zero_heap_small"})
     String _version = "original_direct_small";
 
@@ -301,7 +297,6 @@ public class BenchmarkDataBlock {
       Options opt = new OptionsBuilder().include(BenchmarkDataBlock.Deserialize.class.getSimpleName())
 //          .addProfiler(LinuxPerfAsmProfiler.class)
 //        .addProfiler(JavaFlightRecorderProfiler.class)
-//        .addProfiler(AsyncProfiler.class, "libPath=/home/gortiz/apps/async-profiler-3.0-linux-x64/lib/libasyncProfiler.so;output=jfr;dir=/tmp/")
           .addProfiler(GCProfiler.class)
           .build();
 

@@ -24,7 +24,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.List;
@@ -35,27 +34,22 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.segment.spi.memory.CompoundDataBuffer;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
-import org.apache.pinot.segment.spi.memory.DataBufferPinotInputStream;
-import org.apache.pinot.segment.spi.memory.PagedPinotOutputStream;
-import org.apache.pinot.segment.spi.memory.PinotByteBuffer;
-import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
-import org.apache.pinot.segment.spi.memory.PinotInputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 public final class DataBlockUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(DataBlockUtils.class);
-  private static final EnumMap<DataBlockSerde.Version, DataBlockSerde> _serdes;
+  private static final EnumMap<DataBlockSerde.Version, DataBlockSerde> SERDES;
 
   static {
-    _serdes = new EnumMap<>(DataBlockSerde.Version.class);
-    _serdes.put(DataBlockSerde.Version.V2, new OriginalDataBlockSerde());
+    SERDES = new EnumMap<>(DataBlockSerde.Version.class);
+    SERDES.put(DataBlockSerde.Version.V2, new OriginalDataBlockSerde());
   }
 
   @VisibleForTesting
   public static void setSerde(DataBlockSerde.Version version, DataBlockSerde serde) {
-    _serdes.put(version, serde);
+    SERDES.put(version, serde);
   }
 
   private DataBlockUtils() {
@@ -106,7 +100,7 @@ public final class DataBlockUtils {
   public static List<ByteBuffer> serialize(DataBlockSerde.Version version, DataBlock dataBlock)
       throws IOException {
 
-    DataBlockSerde dataBlockSerde = _serdes.get(version);
+    DataBlockSerde dataBlockSerde = SERDES.get(version);
     if (dataBlockSerde == null) {
       throw new UnsupportedOperationException("Unsupported data block version: " + version);
     }
@@ -136,7 +130,7 @@ public final class DataBlockUtils {
     try (CompoundDataBuffer compoundBuffer = new CompoundDataBuffer(buffers, ByteOrder.BIG_ENDIAN, false)) {
       int versionAndSubVersion = compoundBuffer.getInt(0);
       int version = getVersion(versionAndSubVersion);
-      DataBlockSerde dataBlockSerde = _serdes.get(DataBlockSerde.Version.fromInt(version));
+      DataBlockSerde dataBlockSerde = SERDES.get(DataBlockSerde.Version.fromInt(version));
 
       DataBlock.Type type = getType(versionAndSubVersion);
 
