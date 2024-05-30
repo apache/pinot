@@ -32,14 +32,14 @@ public class RecordEnricherRegistry {
   private static final Logger LOGGER = LoggerFactory.getLogger(RecordEnricherRegistry.class);
   private static final Map<String, RecordTransformer> RECORD_ENRICHER_FACTORY_MAP = new HashMap<>();
 
+  public static Map<String, RecordTransformer> getRecordEnricherFactoryMap() {
+    return RECORD_ENRICHER_FACTORY_MAP;
+  }
+
   static {
     for (RecordTransformer recordEnricherFactory : ServiceLoader.load(RecordTransformer.class)) {
       LOGGER.info("Registered record enricher factory type: {}", recordEnricherFactory.getEnricherType());
       RECORD_ENRICHER_FACTORY_MAP.put(recordEnricherFactory.getEnricherType(), recordEnricherFactory);
     }
-  }
-
-  public static Map<String, RecordTransformer> getRecordEnricherFactoryMap() {
-    return RECORD_ENRICHER_FACTORY_MAP;
   }
 }
