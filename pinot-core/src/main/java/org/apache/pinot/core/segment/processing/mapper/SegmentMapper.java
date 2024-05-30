@@ -39,6 +39,7 @@ import org.apache.pinot.core.segment.processing.partitioner.PartitionerFactory;
 import org.apache.pinot.core.segment.processing.timehandler.TimeHandler;
 import org.apache.pinot.core.segment.processing.timehandler.TimeHandlerFactory;
 import org.apache.pinot.core.segment.processing.utils.SegmentProcessorUtils;
+import org.apache.pinot.segment.local.recordtransformer.ComplexTypeTransformer;
 import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
 import org.apache.pinot.segment.local.recordtransformer.RecordTransformer;
 import org.apache.pinot.segment.local.utils.IngestionUtils;
@@ -71,6 +72,7 @@ public class SegmentMapper {
   private final int _numSortFields;
   private final RecordEnricherPipeline _recordEnricherPipeline;
   private final CompositeTransformer _recordTransformer;
+  private final ComplexTypeTransformer _complexTypeTransformer;
   private final TimeHandler _timeHandler;
   private final Partitioner[] _partitioners;
   private final String[] _partitionsBuffer;
@@ -96,6 +98,7 @@ public class SegmentMapper {
     _includeNullFields = tableConfig.getIndexingConfig().isNullHandlingEnabled();
     _recordEnricherPipeline = RecordEnricherPipeline.fromTableConfig(tableConfig);
     _recordTransformer = CompositeTransformer.composeAllTransformers(_customRecordTransformers, tableConfig, schema);
+    _complexTypeTransformer = ComplexTypeTransformer.getComplexTypeTransformer(tableConfig);
     _timeHandler = TimeHandlerFactory.getTimeHandler(processorConfig);
     List<PartitionerConfig> partitionerConfigs = processorConfig.getPartitionerConfigs();
     int numPartitioners = partitionerConfigs.size();
@@ -171,21 +174,13 @@ public class SegmentMapper {
       reuse = recordReader.next(reuse);
       _recordEnricherPipeline.run(reuse);
 
-      // TODO: Add ComplexTypeTransformer here. Currently it is not idempotent so cannot add it
-
       if (reuse.getValue(GenericRow.MULTIPLE_RECORDS_KEY) != null) {
         //noinspection unchecked
         for (GenericRow row : (Collection<GenericRow>) reuse.getValue(GenericRow.MULTIPLE_RECORDS_KEY)) {
-          GenericRow transformedRow = _recordTransformer.transform(row);
-          if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow)) {
-            writeRecord(transformedRow);
-          }
+          transformAndWrite(row);
         }
       } else {
-        GenericRow transformedRow = _recordTransformer.transform(reuse);
-        if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow)) {
-          writeRecord(transformedRow);
-        }
+        transformAndWrite(reuse);
       }
       reuse.clear();
     }
@@ -199,6 +194,28 @@ public class SegmentMapper {
       return false;
     }
     return true;
+  }
+
+  private void transformAndWrite(GenericRow row)
+      throws IOException {
+    GenericRow decodedRow = row;
+    if (_complexTypeTransformer != null) {
+      decodedRow = _complexTypeTransformer.transform(row);
+    }
+    Collection<GenericRow> rows = (Collection<GenericRow>) decodedRow.getValue(GenericRow.MULTIPLE_RECORDS_KEY);
+    if (rows != null) {
+      for (GenericRow unrappedRow : rows) {
+        GenericRow transformedRow = _recordTransformer.transform(unrappedRow);
+        if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow)) {
+          writeRecord(transformedRow);
+        }
+      }
+    } else {
+      GenericRow transformedRow = _recordTransformer.transform(row);
+      if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow)) {
+        writeRecord(transformedRow);
+      }
+    }
   }
 
   private void writeRecord(GenericRow row)

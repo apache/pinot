@@ -104,10 +104,6 @@ public class CompositeTransformer implements RecordTransformer {
   public static CompositeTransformer composeAllTransformers(List<RecordTransformer> customTransformers,
       TableConfig tableConfig, Schema schema) {
     List<RecordTransformer> allTransformers = new ArrayList<>(customTransformers);
-    ComplexTypeTransformer complexTypeTransformer = ComplexTypeTransformer.getComplexTypeTransformer(tableConfig);
-    if (complexTypeTransformer != null) {
-      allTransformers.add(complexTypeTransformer);
-    }
     allTransformers.addAll(getDefaultTransformers(tableConfig, schema));
     return new CompositeTransformer(allTransformers);
   }
