@@ -18,11 +18,13 @@
  */
 package org.apache.pinot.common.function.scalar;
 
+import org.apache.calcite.linq4j.function.Strict;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
-
-// Logical transformation on boolean values.
-// Currently, only not is supported.
+/**
+ * Logical transformation on boolean values. Currently, only not is supported.
+ */
+@Strict
 public class LogicalFunctions {
   private LogicalFunctions() {
   }
