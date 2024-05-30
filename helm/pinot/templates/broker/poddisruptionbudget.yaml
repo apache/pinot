@@ -17,7 +17,7 @@
 # under the License.
 #
 
-{{- if .Values.broker.pdb.enabled -}}
+{{- if .Values.broker.pdb.enabled }}
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
@@ -30,5 +30,6 @@ spec:
   maxUnavailable: {{ .Values.broker.pdb.maxUnavailable }}
   {{- end }}
   selector:
-    {{- include "pinot.brokerMatchLabels" . | nindent 4 }}
+    matchLabels:
+      {{- include "pinot.brokerMatchLabels" . | nindent 6 }}
 {{- end }}

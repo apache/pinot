@@ -17,7 +17,7 @@
 # under the License.
 #
 
-{{- if .Values.server.pdb.enabled -}}
+{{- if .Values.server.pdb.enabled }}
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
@@ -30,5 +30,6 @@ spec:
   maxUnavailable: {{ .Values.server.pdb.maxUnavailable }}
   {{- end }}
   selector:
-    {{- include "pinot.serverMatchLabels" . | nindent 4 }}
+    matchLabels:
+      {{- include "pinot.serverMatchLabels" . | nindent 6 }}
 {{- end }}
