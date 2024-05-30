@@ -30,6 +30,7 @@ import javax.annotation.Nullable;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
+import org.apache.commons.lang.StringUtils;
 import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.pinot.broker.api.AccessControl;
 import org.apache.pinot.broker.api.RequesterIdentity;
@@ -191,7 +192,11 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     TableAuthorizationResult tableAuthorizationResult =
         hasTableAccess(requesterIdentity, tableNames, requestContext, httpHeaders);
     if (!tableAuthorizationResult.hasAccess()) {
-      throw new WebApplicationException("Permission denied . Message : " + tableAuthorizationResult.getFailureMessage(),
+      String failureMessage = tableAuthorizationResult.getFailureMessage();
+      if (StringUtils.isNotBlank(failureMessage)) {
+        failureMessage = "Reason: " + failureMessage;
+      }
+      throw new WebApplicationException("Permission denied." + failureMessage,
           Response.Status.FORBIDDEN);
     }
 

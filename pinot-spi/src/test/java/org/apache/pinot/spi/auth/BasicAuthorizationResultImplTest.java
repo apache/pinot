@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.spi.auth;
 
-import java.util.Arrays;
-import java.util.HashSet;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -47,42 +45,6 @@ public class BasicAuthorizationResultImplTest {
     BasicAuthorizationResultImpl result = BasicAuthorizationResultImpl.success();
     assertTrue(result.hasAccess());
     assertEquals("", result.getFailureMessage());
-  }
-
-  @Test
-  public void testJoinResultsBothHaveAccess() {
-    AuthorizationResult result1 = new BasicAuthorizationResultImpl(true);
-    AuthorizationResult result2 = new BasicAuthorizationResultImpl(true);
-    BasicAuthorizationResultImpl result = BasicAuthorizationResultImpl.joinResults(result1, result2);
-    assertTrue(result.hasAccess());
-    assertEquals("", result.getFailureMessage());
-  }
-
-  @Test
-  public void testJoinResultsOneHasNoAccess() {
-    AuthorizationResult result1 = new BasicAuthorizationResultImpl(true);
-    AuthorizationResult result2 = new BasicAuthorizationResultImpl(false, "Access Denied");
-    BasicAuthorizationResultImpl result = BasicAuthorizationResultImpl.joinResults(result1, result2);
-    assertFalse(result.hasAccess());
-    assertEquals("; Access Denied", result.getFailureMessage());
-  }
-
-  @Test
-  public void testJoinResultsOneHasNoAccessCrossImplementations() {
-    AuthorizationResult result1 = new BasicAuthorizationResultImpl(true);
-    AuthorizationResult result2 = new TableAuthorizationResult(new HashSet<>(Arrays.asList("table1", "table2")));
-    BasicAuthorizationResultImpl result = BasicAuthorizationResultImpl.joinResults(result1, result2);
-    assertFalse(result.hasAccess());
-    assertEquals("; Authorization Failed for tables: [table1, table2]", result.getFailureMessage());
-  }
-
-  @Test
-  public void testJoinResultsBothHaveNoAccess() {
-    AuthorizationResult result1 = new BasicAuthorizationResultImpl(false, "Access Denied 1");
-    AuthorizationResult result2 = new BasicAuthorizationResultImpl(false, "Access Denied 2");
-    BasicAuthorizationResultImpl result = BasicAuthorizationResultImpl.joinResults(result1, result2);
-    assertFalse(result.hasAccess());
-    assertEquals("Access Denied 1 ; Access Denied 2", result.getFailureMessage());
   }
 
   @Test

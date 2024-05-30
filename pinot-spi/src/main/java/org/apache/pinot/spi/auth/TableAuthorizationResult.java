@@ -20,7 +20,6 @@ package org.apache.pinot.spi.auth;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import org.apache.commons.lang.StringUtils;
@@ -35,12 +34,8 @@ public class TableAuthorizationResult implements AuthorizationResult {
   private static final TableAuthorizationResult SUCCESS = new TableAuthorizationResult(Set.of());
   private final Set<String> _failedTables;
 
-  public TableAuthorizationResult() {
-    _failedTables = new HashSet<>();
-  }
-
   public TableAuthorizationResult(Set<String> failedTables) {
-    _failedTables = new HashSet<>(failedTables);
+    _failedTables = failedTables;
   }
 
   /**

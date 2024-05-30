@@ -122,7 +122,6 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
       if (tables == null || tables.isEmpty()) {
         return TableAuthorizationResult.success();
       }
-      TableAuthorizationResult tableAuthorizationResult = new TableAuthorizationResult();
       BasicAuthPrincipal principal = principalOpt.get();
       Set<String> failedTables = new HashSet<>();
       for (String table : tables) {

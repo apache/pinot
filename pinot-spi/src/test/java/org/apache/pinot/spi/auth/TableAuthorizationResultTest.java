@@ -28,13 +28,6 @@ import org.testng.annotations.Test;
 public class TableAuthorizationResultTest {
 
   @Test
-  public void testDefaultConstructor() {
-    TableAuthorizationResult result = new TableAuthorizationResult();
-    Assert.assertTrue(result.hasAccess());
-    Assert.assertEquals("", result.getFailureMessage());
-  }
-
-  @Test
   public void testParameterizedConstructor() {
     Set<String> failedTables = new HashSet<>();
     failedTables.add("table1");
@@ -62,9 +55,7 @@ public class TableAuthorizationResultTest {
 
   @Test
   public void testGetFailureMessage() {
-    TableAuthorizationResult result = new TableAuthorizationResult();
-    Assert.assertEquals("", result.getFailureMessage());
-    result = new TableAuthorizationResult(Set.of("table1", "table2"));
+    TableAuthorizationResult result = new TableAuthorizationResult(Set.of("table1", "table2"));
     Assert.assertEquals(result.getFailureMessage(), "Authorization Failed for tables: [table1, table2]");
   }
 

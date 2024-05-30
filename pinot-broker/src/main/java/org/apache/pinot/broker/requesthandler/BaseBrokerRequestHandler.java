@@ -30,6 +30,7 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.broker.api.AccessControl;
 import org.apache.pinot.broker.api.RequesterIdentity;
 import org.apache.pinot.broker.broker.AccessControlFactory;
@@ -111,7 +112,11 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
       requestContext.setErrorCode(QueryException.ACCESS_DENIED_ERROR_CODE);
       _brokerQueryEventListener.onQueryCompletion(requestContext);
-      throw new WebApplicationException("Permission denied. Reason: " + authorizationResult.getFailureMessage(),
+      String failureMessage = authorizationResult.getFailureMessage();
+      if (StringUtils.isNotBlank(failureMessage)) {
+        failureMessage = "Reason: " + failureMessage;
+      }
+      throw new WebApplicationException("Permission denied." + failureMessage,
           Response.Status.FORBIDDEN);
     }
 

@@ -34,6 +34,7 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriInfo;
+import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.broker.api.AccessControl;
 import org.apache.pinot.broker.api.HttpRequesterIdentity;
 import org.apache.pinot.core.auth.FineGrainedAuthUtils;
@@ -86,9 +87,12 @@ public class AuthenticationFilter implements ContainerRequestFilter {
     AuthorizationResult authorizationResult = accessControl.authorize(httpRequestIdentity);
 
     if (!authorizationResult.hasAccess()) {
+      String failureMessage = authorizationResult.getFailureMessage();
+      if (StringUtils.isNotBlank(failureMessage)) {
+        failureMessage = "Reason: " + failureMessage;
+      }
       throw new WebApplicationException(
-          "Failed access check for " + httpRequestIdentity.getEndpointUrl() + " ,with reason: "
-              + authorizationResult.getFailureMessage(),
+          "Failed access check for " + httpRequestIdentity.getEndpointUrl() + "." + failureMessage,
           Response.Status.FORBIDDEN);
     }
 

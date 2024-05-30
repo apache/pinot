@@ -84,7 +84,6 @@ import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.util.GapfillUtils;
 import org.apache.pinot.spi.auth.AuthorizationResult;
-import org.apache.pinot.spi.auth.BasicAuthorizationResultImpl;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -370,8 +369,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
           serverPinotQuery == pinotQuery ? brokerRequest : CalciteSqlCompiler.convertToBrokerRequest(serverPinotQuery);
       AuthorizationResult authorizationResult = accessControl.authorize(requesterIdentity, serverBrokerRequest);
       if (authorizationResult.hasAccess()) {
-        authorizationResult = BasicAuthorizationResultImpl.joinResults(authorizationResult,
-            accessControl.authorize(httpHeaders, TargetType.TABLE, tableName, Actions.Table.QUERY));
+        authorizationResult = accessControl.authorize(httpHeaders, TargetType.TABLE, tableName, Actions.Table.QUERY);
       }
 
       _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.AUTHORIZATION,
@@ -382,7 +380,11 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         LOGGER.info("Access denied for request {}: {}, table: {}, reason :{}", requestId, query, tableName,
             authorizationResult.getFailureMessage());
         requestContext.setErrorCode(QueryException.ACCESS_DENIED_ERROR_CODE);
-        throw new WebApplicationException("Permission denied . Reason : " + authorizationResult.getFailureMessage(),
+        String failureMessage = authorizationResult.getFailureMessage();
+        if (StringUtils.isNotBlank(failureMessage)) {
+          failureMessage = "Reason: " + failureMessage;
+        }
+        throw new WebApplicationException("Permission denied." + failureMessage,
             Response.Status.FORBIDDEN);
       }
 

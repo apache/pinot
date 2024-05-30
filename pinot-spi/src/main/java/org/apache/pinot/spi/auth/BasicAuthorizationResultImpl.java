@@ -62,26 +62,6 @@ public class BasicAuthorizationResultImpl implements AuthorizationResult {
   }
 
   /**
-   * Combines the results of two AuthorizationResult instances.
-   * If both results grant access, a new result with access granted and no failure message is returned.
-   * If either result denies access, a new result with access denied and a combined failure message is returned.
-   *
-   * @param result1 the first AuthorizationResult.
-   * @param result2 the second AuthorizationResult.
-   * @return a combined BasicAuthorizationResultImpl based on the two provided results.
-   */
-  public static BasicAuthorizationResultImpl joinResults(AuthorizationResult result1, AuthorizationResult result2) {
-    boolean hasAccess = result1.hasAccess() && result2.hasAccess();
-    if (hasAccess) {
-      return BasicAuthorizationResultImpl.success();
-    }
-    String failureMessage = result1.getFailureMessage() + " ; " + result2.getFailureMessage();
-    failureMessage = failureMessage.trim();
-    return new BasicAuthorizationResultImpl(hasAccess, failureMessage);
-  }
-
-
-  /**
    * Indicates whether access is granted.
    *
    * @return true if access is granted, false otherwise.
