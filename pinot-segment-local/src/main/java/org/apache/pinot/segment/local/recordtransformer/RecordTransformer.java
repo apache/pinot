@@ -67,7 +67,8 @@ public interface RecordTransformer extends Serializable {
   }
 
   static RecordTransformer getPassThroughPipeline() {
-    return null;
+    return new RecordTransformer() {
+    };
   }
 
   static RecordTransformer fromIngestionConfig(IngestionConfig ingestionConfig) {
