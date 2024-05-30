@@ -305,7 +305,6 @@ public class PinotClientRequest {
       return new BrokerResponseNative(QueryException.getException(QueryException.SQL_PARSING_ERROR, e));
     }
     if (forceUseMultiStage) {
-      // Pick up plan version from query options. If not set in query options, then pick up from the configuration.
       sqlNodeAndOptions.setExtraOptions(ImmutableMap.of(Request.QueryOptionKey.USE_MULTISTAGE_ENGINE, "true"));
     }
     PinotSqlType sqlType = sqlNodeAndOptions.getSqlType();
