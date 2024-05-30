@@ -31,7 +31,6 @@ public class RecordEnricherRegistry {
   private static final Map<String, RecordTransformer> RECORD_ENRICHER_FACTORY_MAP = new HashMap<>();
 
   private RecordEnricherRegistry() {
-
   }
 
   public static Map<String, RecordTransformer> getRecordEnricherFactoryMap() {
