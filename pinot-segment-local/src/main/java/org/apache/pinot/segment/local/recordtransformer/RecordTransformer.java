@@ -52,7 +52,6 @@ public interface RecordTransformer extends Serializable {
     if (!RECORD_ENRICHER_FACTORY_MAP.containsKey(enrichmentConfig.getEnricherType())) {
       throw new IllegalArgumentException("No record enricher found for type: " + enrichmentConfig.getEnricherType());
     }
-
     RECORD_ENRICHER_FACTORY_MAP.get(enrichmentConfig.getEnricherType())
         .validateEnrichmentConfig(enrichmentConfig.getProperties(), config);
   }
