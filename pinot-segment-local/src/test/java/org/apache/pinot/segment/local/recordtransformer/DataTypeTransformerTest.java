@@ -201,7 +201,7 @@ public class DataTypeTransformerTest {
     }
     assertEqualsNoOrder((Object[]) DataTypeTransformer.standardize(COLUMN, values, false), expectedValues);
 
-    // Tests for Map with multi-entries List as values.
+    // Tests for Map with multi-entry List as values.
     Map<String, List<String>> testMapWithMultiValueList = new HashMap<>();
     testMapWithMultiValueList.put("testKey1", Arrays.asList("testValue1", "testValue2"));
     values = new Object[]{
@@ -209,12 +209,35 @@ public class DataTypeTransformerTest {
     };
     assertEqualsNoOrder((Object[]) DataTypeTransformer.standardize(COLUMN, values, false), expectedValues);
 
-    // Tests for Map with multi-entries Object[] as values.
+    // Tests for Map with multi-entry Object[] as values.
     Map<String, Object[]> testMapWithObjectArray = new HashMap<>();
     testMapWithObjectArray.put("testKey1", new Object[]{"testValue1", "testValue2"});
     values = new Object[]{
         new Object[0], testMapWithObjectArray
     };
     assertEqualsNoOrder((Object[]) DataTypeTransformer.standardize(COLUMN, values, false), expectedValues);
+
+    // Test for Map with multi key and multi-entry List as values.
+
+    Map<String, List<String>> testMapWithMultiKeyMultiValueList = new HashMap<>();
+    testMapWithMultiKeyMultiValueList.put("testKey1", Arrays.asList("testValue1", "testValue2"));
+    testMapWithMultiKeyMultiValueList.put("testKey2", Arrays.asList("testValue3", "testValue4"));
+    values = new Object[]{
+        new Object[0], testMapWithMultiKeyMultiValueList
+    };
+    Object[] expectedValuesNew =
+        new Object[]{new Object[]{"testValue1", "testValue2"}, new Object[]{"testValue3", "testValue4"}};
+    Object[] result = (Object[]) DataTypeTransformer.standardize(COLUMN, values, false);
+    Arrays.deepEquals(expectedValuesNew, result);
+
+    // Test for Map with multi key and multi-entry Object[] as values.
+    Map<String, Object[]> testMapWithMultiKeyMultiValueObjectArray = new HashMap<>();
+    testMapWithMultiKeyMultiValueObjectArray.put("testKey1", new Object[]{"testValue1", "testValue2"});
+    testMapWithMultiKeyMultiValueObjectArray.put("testKey2", new Object[]{"testValue3", "testValue4"});
+    values = new Object[]{
+        new Object[0], testMapWithMultiKeyMultiValueObjectArray
+    };
+    result = (Object[]) DataTypeTransformer.standardize(COLUMN, values, false);
+    Arrays.deepEquals(expectedValuesNew, result);
   }
 }

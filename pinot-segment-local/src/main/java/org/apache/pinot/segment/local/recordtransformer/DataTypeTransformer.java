@@ -153,11 +153,15 @@ public class DataTypeTransformer implements RecordTransformer {
       for (Object singleValue : values) {
         Object standardizedValue;
 
-        // Check if the value is a map and if the values of the map are single valued.
-        // Even if one of the values of the keys in the map are multivalued, we should treat
-        // the map as multivalued.
-        if (singleValue instanceof Map) {
-          standardizedValue = standardize(column, singleValue, areMapValuesSingleValued(((Map) singleValue).values()));
+        // Check if the value itself is multivalued.
+        if (singleValue instanceof Object[] || singleValue instanceof List) {
+          standardizedValue = standardize(column, singleValue, false);
+        } else if (singleValue instanceof Map) {
+          standardizedValue =
+              standardize(column, singleValue, areCollectionValuesSingleValued(((Map) singleValue).values()));
+        } else if (singleValue instanceof Collection) {
+          standardizedValue =
+              standardize(column, singleValue, areCollectionValuesSingleValued((Collection) singleValue));
         } else {
           standardizedValue = standardize(column, singleValue, true);
         }
@@ -181,7 +185,7 @@ public class DataTypeTransformer implements RecordTransformer {
     return value;
   }
 
-  private static boolean areMapValuesSingleValued(Collection values) {
+  private static boolean areCollectionValuesSingleValued(Collection values) {
     for (Object value : values) {
       if (value instanceof List) {
         if (((List<?>) value).size() > 1) {
@@ -206,7 +210,19 @@ public class DataTypeTransformer implements RecordTransformer {
     }
     List<Object> standardizedValues = new ArrayList<>(numValues);
     for (Object singleValue : collection) {
-      Object standardizedValue = standardize(column, singleValue, true);
+      Object standardizedValue;
+
+      // Check if the value itself is multivalued.
+      if (singleValue instanceof Object[] || singleValue instanceof List) {
+        standardizedValue = standardize(column, singleValue, false);
+      } else if (singleValue instanceof Map) {
+        standardizedValue =
+            standardize(column, singleValue, areCollectionValuesSingleValued(((Map) singleValue).values()));
+      } else if (singleValue instanceof Collection) {
+        standardizedValue = standardize(column, singleValue, areCollectionValuesSingleValued((Collection) singleValue));
+      } else {
+        standardizedValue = standardize(column, singleValue, true);
+      }
       if (standardizedValue != null) {
         standardizedValues.add(standardizedValue);
       }
