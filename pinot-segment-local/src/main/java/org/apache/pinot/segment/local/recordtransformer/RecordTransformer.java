@@ -22,11 +22,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.ServiceLoader;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.plugin.record.enricher.RecordTransformerLoader;
@@ -42,55 +40,15 @@ import org.slf4j.LoggerFactory;
  * The record transformer which takes a {@link GenericRow} and transform it based on some custom rules.
  */
 public interface RecordTransformer extends Serializable {
-  final boolean _groovyDisabled = false;
+  final boolean groovyDisabled = false;
 
   static final Logger LOGGER = LoggerFactory.getLogger(RecordTransformer.class);
   Map<String, RecordTransformer> RECORD_ENRICHER_FACTORY_MAP = RecordTransformerLoader.getRecordEnricherFactoryMap();
-  final List<RecordTransformer> _enrichers = new ArrayList<>();
-  final Set<String> _columnsToExtract = new HashSet<>();
+  final List<RecordTransformer> enrichers = new ArrayList<>();
+  final Set<String> columnsToExtract = new HashSet<>();
   static final String NONE_TYPE = "";
-  /**
-   * Returns {@code true} if the transformer is no-op (can be skipped), {@code false} otherwise.
-   */
-  default boolean isNoOp() {
-    return false;
-  }
 
-  /**
-   * Transforms a record based on some custom rules.
-   *
-   * @param record Record to transform
-   * @return Transformed record, or {@code null} if the record does not follow certain rules.
-   */
-  @Nullable
-  default GenericRow transform(GenericRow record) {return null;}
-
-  /**
-   * Returns the list of input columns required for enriching the record.
-   * This is used to make sure the required input fields are extracted.
-   */
-  default List<String> getInputColumns() {
-    return new ArrayList<>();
-  }
-
-  default String getEnricherType() {
-    return NONE_TYPE;
-  }
-
-  default RecordTransformer createEnricher(JsonNode enricherProps)
-      throws IOException {
-    return null;
-  }
-
-  default void validateEnrichmentConfig(JsonNode enricherProps, boolean validationConfig) {
-  }
-
-  default boolean isGroovyDisabled() {
-    return _groovyDisabled;
-  }
-
-  static void validateEnrichmentConfig(EnrichmentConfig enrichmentConfig,
-      boolean config) {
+  static void validateEnrichmentConfig(EnrichmentConfig enrichmentConfig, boolean config) {
     if (!RECORD_ENRICHER_FACTORY_MAP.containsKey(enrichmentConfig.getEnricherType())) {
       throw new IllegalArgumentException("No record enricher found for type: " + enrichmentConfig.getEnricherType());
     }
@@ -134,17 +92,59 @@ public interface RecordTransformer extends Serializable {
     return fromIngestionConfig(tableConfig.getIngestionConfig());
   }
 
+  /**
+   * Returns {@code true} if the transformer is no-op (can be skipped), {@code false} otherwise.
+   */
+  default boolean isNoOp() {
+    return false;
+  }
+
+  /**
+   * Transforms a record based on some custom rules.
+   *
+   * @param record Record to transform
+   * @return Transformed record, or {@code null} if the record does not follow certain rules.
+   */
+  @Nullable
+  default GenericRow transform(GenericRow record) {
+    return null;
+  }
+
+  /**
+   * Returns the list of input columns required for enriching the record.
+   * This is used to make sure the required input fields are extracted.
+   */
+  default List<String> getInputColumns() {
+    return new ArrayList<>();
+  }
+
+  default String getEnricherType() {
+    return NONE_TYPE;
+  }
+
+  default RecordTransformer createEnricher(JsonNode enricherProps)
+      throws IOException {
+    return null;
+  }
+
+  default void validateEnrichmentConfig(JsonNode enricherProps, boolean validationConfig) {
+  }
+
+  default boolean isGroovyDisabled() {
+    return groovyDisabled;
+  }
+
   default Set<String> getColumnsToExtract() {
-    return _columnsToExtract;
+    return columnsToExtract;
   }
 
   default void add(RecordTransformer enricher) {
-    _enrichers.add(enricher);
-    _columnsToExtract.addAll(enricher.getInputColumns());
+    enrichers.add(enricher);
+    columnsToExtract.addAll(enricher.getInputColumns());
   }
 
   default void run(GenericRow record) {
-    for (RecordTransformer enricher : _enrichers) {
+    for (RecordTransformer enricher : enrichers) {
       enricher.transform(record);
     }
   }
