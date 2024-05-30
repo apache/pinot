@@ -166,27 +166,34 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
    * <li> When either is of type {@link UploadedRealtimeSegmentName} then resolve on creation time, if same(rare
    * scenario) then give preference to uploaded time
    *
-   * @param segmentName replacing segment
-   * @param currentSegmentName current segment having the record for the given primary key
-   * @param segmentCreationTimeMs creation time of replacing segment
-   * @param currentSegmentCreationTimeMs creation time of current segment
+   * @param segmentName replacing segment name
+   * @param currentSegmentName current segment name having the record for the given primary key
+   * @param segmentCreationTimeMs replacing segment creation time
+   * @param currentSegmentCreationTimeMs current segment creation time
    * @return true if the record in replacing segment should replace the record in current segment
    */
   private boolean shouldReplaceOnComparisonTie(String segmentName, String currentSegmentName,
       long segmentCreationTimeMs, long currentSegmentCreationTimeMs) {
 
-    if (LLCSegmentName.isLLCSegment(segmentName) && LLCSegmentName.isLLCSegment(currentSegmentName)
-        && LLCSegmentName.getSequenceNumber(segmentName) > LLCSegmentName.getSequenceNumber(currentSegmentName)) {
-      return true;
+    LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentName);
+    LLCSegmentName currentLLCSegmentName = LLCSegmentName.of(currentSegmentName);
+    if (llcSegmentName != null && currentLLCSegmentName != null) {
+      return llcSegmentName.getSequenceNumber() > currentLLCSegmentName.getSequenceNumber();
     }
 
-    if (UploadedRealtimeSegmentName.isUploadedRealtimeSegmentName(segmentName)
-        && UploadedRealtimeSegmentName.isUploadedRealtimeSegmentName(currentSegmentName)) {
-      return new UploadedRealtimeSegmentName(segmentName).compareTo(new UploadedRealtimeSegmentName(currentSegmentName))
-          >= 0;
+    UploadedRealtimeSegmentName uploadedSegmentName = UploadedRealtimeSegmentName.of(segmentName);
+    UploadedRealtimeSegmentName currentUploadedSegmentName = UploadedRealtimeSegmentName.of(currentSegmentName);
+
+    if (uploadedSegmentName != null && currentUploadedSegmentName != null) {
+      int comparisonResult = uploadedSegmentName.compareTo(currentUploadedSegmentName);
+      if (comparisonResult == 0) {
+        Long.compare(segmentCreationTimeMs, currentSegmentCreationTimeMs);
+      } else {
+        return comparisonResult > 0;
+      }
     }
-    if (UploadedRealtimeSegmentName.isUploadedRealtimeSegmentName(segmentName)
-        || UploadedRealtimeSegmentName.isUploadedRealtimeSegmentName(currentSegmentName)) {
+
+    if (uploadedSegmentName != null || currentUploadedSegmentName != null) {
       if (segmentCreationTimeMs == currentSegmentCreationTimeMs) {
         return UploadedRealtimeSegmentName.isUploadedRealtimeSegmentName(segmentName);
       } else {

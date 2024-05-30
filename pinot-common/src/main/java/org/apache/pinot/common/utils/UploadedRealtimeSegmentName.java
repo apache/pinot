@@ -20,10 +20,12 @@ package org.apache.pinot.common.utils;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
+import java.util.Arrays;
 import java.util.Objects;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
+import org.joda.time.format.DateTimeFormat;
+import org.joda.time.format.DateTimeFormatter;
 
 
 /**
@@ -35,44 +37,58 @@ import javax.annotation.Nullable;
  */
 public class UploadedRealtimeSegmentName implements Comparable<UploadedRealtimeSegmentName> {
 
-  public static final String UPLOADED_REALTIME_SEGMENT_NAME_REGEX = "^uploaded_(.+)_(\\d+)_(\\d+)_(\\d+)$";
-
-  private static final Pattern NAME_PATTERN = Pattern.compile(UPLOADED_REALTIME_SEGMENT_NAME_REGEX);
   private static final String UPLOADED_PREFIX = "uploaded";
   private static final String SEPARATOR = "_";
+  private static final String DATE_FORMAT = "yyyyMMdd'T'HHmm'Z'";
+  private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormat.forPattern(DATE_FORMAT).withZoneUTC();
   private final String _tableName;
   private final int _partitionId;
   private final int _sequenceId;
-  private final long _creationTime;
+  private final String _creationTime;
   private final String _segmentName;
 
   public UploadedRealtimeSegmentName(String segmentName) {
 
-    Matcher matcher = NAME_PATTERN.matcher(segmentName);
-
-    if (matcher.find()) {
-      _tableName = matcher.group(1);
-      _partitionId = Integer.parseInt(matcher.group(2));
-      _sequenceId = Integer.parseInt(matcher.group(3));
-      _creationTime = Long.parseLong(matcher.group(4));
-
+    // split the segment name by the separator and get creation time, sequence id, partition id and table name from
+    // the end and validate segment name starts with prefix uploaded_
+    try {
+      String[] parts = StringUtils.split(segmentName, SEPARATOR);
+      Preconditions.checkState(parts.length >= 5 && parts[0].equals(UPLOADED_PREFIX),
+          "Uploaded segment name must be of the format uploaded_{tableName}_{partitionId}_{sequenceId}_{creationTime}");
+      _creationTime = parts[parts.length - 1];
+      _sequenceId = Integer.parseInt(parts[parts.length - 2]);
+      _partitionId = Integer.parseInt(parts[parts.length - 3]);
+      _tableName = Joiner.on(SEPARATOR).join(Arrays.copyOfRange(parts, 1, parts.length - 3));
       _segmentName = segmentName;
-    } else {
-      throw new IllegalArgumentException("Invalid uploaded realtime segment name: " + segmentName);
+    } catch (NumberFormatException e) {
+      throw new IllegalArgumentException("Invalid segment name: " + segmentName, e);
     }
   }
 
-  public UploadedRealtimeSegmentName(String tableName, int partitionId, int sequenceId, long creationTime) {
+  public UploadedRealtimeSegmentName(String tableName, int partitionId, int sequenceId, long msSinceEpoch) {
     _tableName = tableName;
     _partitionId = partitionId;
     _sequenceId = sequenceId;
-    _creationTime = creationTime;
-    _segmentName = Joiner.on(SEPARATOR).join(UPLOADED_PREFIX, tableName, partitionId, sequenceId, creationTime);
+    _creationTime = DATE_FORMATTER.print(msSinceEpoch);
+    _segmentName = Joiner.on(SEPARATOR).join(UPLOADED_PREFIX, tableName, partitionId, sequenceId, _creationTime);
   }
 
   public static boolean isUploadedRealtimeSegmentName(String segmentName) {
-    Matcher matcher = NAME_PATTERN.matcher(segmentName);
-    return matcher.matches();
+    String[] parts = StringUtils.split(segmentName, SEPARATOR);
+    if (parts.length < 5) {
+      return false;
+    }
+    if (!parts[0].equals(UPLOADED_PREFIX)) {
+      return false;
+    }
+    // return false if sequenceId and partitionId are not int
+    try {
+      Integer.parseInt(parts[parts.length - 2]);
+      Integer.parseInt(parts[parts.length - 3]);
+    } catch (NumberFormatException e) {
+      return false;
+    }
+    return true;
   }
 
   @Nullable
@@ -96,7 +112,12 @@ public class UploadedRealtimeSegmentName implements Comparable<UploadedRealtimeS
     return _sequenceId;
   }
 
-  public long getCreationTime() {
+  /**
+   * Returns the creation time in the format yyyyMMdd'T'HHmm'Z'
+   * To be used for only human readability and not for any computation
+   * @return
+   */
+  public String getCreationTime() {
     return _creationTime;
   }
 
@@ -110,10 +131,7 @@ public class UploadedRealtimeSegmentName implements Comparable<UploadedRealtimeS
     if (_partitionId != other._partitionId) {
       return Integer.compare(_partitionId, other._partitionId);
     }
-    if (_sequenceId != other._sequenceId) {
-      return Integer.compare(_sequenceId, other._sequenceId);
-    }
-    return Long.compare(_creationTime, other._creationTime);
+    return Integer.compare(_sequenceId, other._sequenceId);
   }
 
   @Override

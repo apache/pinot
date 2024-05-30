@@ -96,10 +96,6 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private String _startOffset;
   private String _endOffset;
 
-  // set uploadedSegmentPartitionId for segments of {@link Realtime.Status.UPLOADED} status if segment is externally
-  // partitioned
-  private int _uploadedSegmentPartitionId = -1;
-
   @Deprecated
   private String _rawTableName;
 
@@ -472,10 +468,6 @@ public class SegmentMetadataImpl implements SegmentMetadata {
         }
       }
       segmentMetadata.set("columns", columnsMetadata);
-    }
-
-    if (_uploadedSegmentPartitionId != -1) {
-      segmentMetadata.put("uploadedSegmentPartitionId", _uploadedSegmentPartitionId);
     }
 
     return segmentMetadata;

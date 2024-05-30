@@ -28,13 +28,13 @@ public class UploadedRealtimeSegmentNameTest {
 
   @Test
   public void testSegmentNameParsing() {
-    String segmentName = "uploaded_table_name_1_2_1234567890";
+    String segmentName = "uploaded_table_name_1_2_20240530T0000Z";
     UploadedRealtimeSegmentName uploadedSegmentName = new UploadedRealtimeSegmentName(segmentName);
 
     Assert.assertEquals(uploadedSegmentName.getTableName(), "table_name");
     Assert.assertEquals(uploadedSegmentName.getPartitionId(), 1);
     Assert.assertEquals(uploadedSegmentName.getSequenceId(), 2);
-    Assert.assertEquals(uploadedSegmentName.getCreationTime(), 1234567890L);
+    Assert.assertEquals(uploadedSegmentName.getCreationTime(), "20240530T0000Z");
   }
 
   @Test
@@ -42,11 +42,11 @@ public class UploadedRealtimeSegmentNameTest {
     String tableName = "tableName";
     int partitionId = 1;
     int sequenceId = 2;
-    long creationTime = 1234567890L;
+    long creationTime = 1717027200000L;
 
     UploadedRealtimeSegmentName uploadedSegmentName =
         new UploadedRealtimeSegmentName(tableName, partitionId, sequenceId, creationTime);
-    String expectedSegmentName = "uploaded_tableName_1_2_1234567890";
+    String expectedSegmentName = "uploaded_tableName_1_2_20240530T0000Z";
 
     Assert.assertEquals(uploadedSegmentName.getSegmentName(), expectedSegmentName);
   }
