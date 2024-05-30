@@ -142,8 +142,11 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
           TableAuthorizationResult tableAuthorizationResult =
               hasTableAccess(requesterIdentity, tableNames, requestContext, httpHeaders);
           if (!tableAuthorizationResult.hasAccess()) {
-            throw new WebApplicationException(
-                "Permission denied . Message : " + tableAuthorizationResult.getFailureMessage(),
+            String failureMessage = tableAuthorizationResult.getFailureMessage();
+            if (StringUtils.isNotBlank(failureMessage)) {
+              failureMessage = "Reason: " + failureMessage;
+            }
+            throw new WebApplicationException("Permission denied. " + failureMessage,
                 Response.Status.FORBIDDEN);
           }
           return constructMultistageExplainPlan(query, plan);
