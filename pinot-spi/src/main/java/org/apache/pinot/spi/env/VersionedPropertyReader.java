@@ -21,6 +21,7 @@ package org.apache.pinot.spi.env;
 import com.google.common.base.Preconditions;
 import java.io.Reader;
 import org.apache.commons.configuration2.PropertiesConfiguration.PropertiesReader;
+import org.apache.commons.lang3.StringUtils;
 
 
 /**
@@ -42,10 +43,10 @@ class VersionedPropertyReader extends PropertiesReader {
     // getPropertySeparator(), in general returns the PropertiesConfiguration `DEFAULT_SEPARATOR` value i.e. ' = '.
     String separator = getPropertySeparator();
     Preconditions.checkArgument(CommonsConfigurationUtils.VERSIONED_CONFIG_SEPARATOR.equals(separator),
-        String.format("versioned property configuration separator should be equal to '%s'",
-            CommonsConfigurationUtils.VERSIONED_CONFIG_SEPARATOR));
+        String.format("Versioned property configuration separator '%s' should be equal to '%s'",
+            separator, CommonsConfigurationUtils.VERSIONED_CONFIG_SEPARATOR));
 
-    String[] keyValue = line.split(getPropertySeparator());
+    String[] keyValue = StringUtils.splitByWholeSeparator(line, separator, 2);
     Preconditions.checkArgument(keyValue.length == 2, "property content split should result in key and value");
     initPropertyName(keyValue[0]);
     initPropertyValue(keyValue[1]);

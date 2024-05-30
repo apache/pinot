@@ -375,7 +375,7 @@ public class CommonsConfigurationUtils {
         String versionHeaderCommentPrefix = String.format("# %s", VERSION_HEADER_IDENTIFIER);
         // check whether the file has the version header or not
         if (StringUtils.startsWith(fileFirstLine, versionHeaderCommentPrefix)) {
-          String[] headerKeyValue = fileFirstLine.split(VERSIONED_CONFIG_SEPARATOR);
+          String[] headerKeyValue = StringUtils.splitByWholeSeparator(fileFirstLine, VERSIONED_CONFIG_SEPARATOR, 2);
           if (headerKeyValue.length == 2) {
             versionValue = headerKeyValue[1];
           }
