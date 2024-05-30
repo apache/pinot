@@ -106,7 +106,7 @@ public class HelixHelper {
       final Function<IdealState, IdealState> updater, RetryPolicy policy, final boolean noChangeOk) {
     ControllerMetrics controllerMetrics = ControllerMetrics.get();
     try {
-      long updateStartTime = System.currentTimeMillis();
+      long startTimeMs = System.currentTimeMillis();
       IdealStateWrapper idealStateWrapper = new IdealStateWrapper();
       int retries = policy.attempt(new Callable<Boolean>() {
         @Override
@@ -127,6 +127,7 @@ public class HelixHelper {
             LOGGER.error("Caught permanent exception while updating ideal state for resource: {}", resourceName, e);
             throw e;
           } catch (Exception e) {
+            LOGGER.error("Caught exception while updating ideal state for resource: {}", resourceName, e);
             return false;
           }
 
@@ -206,7 +207,7 @@ public class HelixHelper {
       });
       controllerMetrics.addMeteredValue(resourceName, ControllerMeter.IDEAL_STATE_UPDATE_RETRY, retries);
       controllerMetrics.addTimedValue(resourceName, ControllerTimer.IDEAL_STATE_UPDATE_TIME_MS,
-              System.currentTimeMillis() - updateStartTime, TimeUnit.MILLISECONDS);
+              System.currentTimeMillis() - startTimeMs, TimeUnit.MILLISECONDS);
       return idealStateWrapper._idealState;
     } catch (Exception e) {
       controllerMetrics.addMeteredValue(resourceName, ControllerMeter.IDEAL_STATE_UPDATE_FAILURE, 1L);
