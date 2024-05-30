@@ -18,12 +18,10 @@
  */
 package org.apache.pinot.plugin.record.enricher;
 
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.ServiceLoader;
 import org.apache.pinot.segment.local.recordtransformer.RecordTransformer;
-import org.apache.pinot.spi.config.table.ingestion.EnrichmentConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,6 +29,10 @@ import org.slf4j.LoggerFactory;
 public class RecordEnricherRegistry {
   private static final Logger LOGGER = LoggerFactory.getLogger(RecordEnricherRegistry.class);
   private static final Map<String, RecordTransformer> RECORD_ENRICHER_FACTORY_MAP = new HashMap<>();
+
+  private RecordEnricherRegistry() {
+
+  }
 
   public static Map<String, RecordTransformer> getRecordEnricherFactoryMap() {
     return RECORD_ENRICHER_FACTORY_MAP;
