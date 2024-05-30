@@ -385,10 +385,7 @@ public class JsonUtils {
     // Value
     if (node.isValueNode()) {
       String valueAsText = node.asText();
-      int maxValueLength = jsonIndexConfig.getMaxValueLength();
-      if (0 < maxValueLength && maxValueLength < valueAsText.length()) {
-        valueAsText = SKIPPED_VALUE_REPLACEMENT;
-      }
+      valueAsText = getSanitizedString(jsonIndexConfig.getMaxValueLength(), valueAsText);
       return Collections.singletonList(Collections.singletonMap(VALUE_KEY, valueAsText));
     }
 
@@ -529,6 +526,13 @@ public class JsonUtils {
       unnestResults(nestedResultsList.get(0), nestedResultsList, 1, nonNestedResult, results);
       return results;
     }
+  }
+
+  public static String getSanitizedString(int maxLength, String valueAsText) {
+    if (0 < maxLength && maxLength < valueAsText.length()) {
+      valueAsText = SKIPPED_VALUE_REPLACEMENT;
+    }
+    return valueAsText;
   }
 
   private static IncludeResult shouldInclude(JsonIndexConfig jsonIndexConfig, String path) {
