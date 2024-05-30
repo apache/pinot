@@ -1014,7 +1014,7 @@
         <groupId>org.apache.hadoop</groupId>
         <artifactId>hadoop-mapreduce-client-core</artifactId>
         <version>${hadoop.version}</version>
-        <scope>provided</scope>
+        <scope>compile</scope>
         <exclusions>
           <exclusion>
             <groupId>org.codehaus.jackson</groupId>
