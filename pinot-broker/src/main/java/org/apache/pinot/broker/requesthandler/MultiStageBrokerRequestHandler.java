@@ -19,7 +19,6 @@
 package org.apache.pinot.broker.requesthandler;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -113,9 +112,6 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     if (sqlNodeAndOptions == null) {
       try {
         sqlNodeAndOptions = RequestUtils.parseQuery(query, request);
-        sqlNodeAndOptions.setExtraOptions(
-            ImmutableMap.of(CommonConstants.Broker.Request.QueryOptionKey.PLAN_VERSION,
-                CommonConstants.MultiStageQueryRunner.DEFAULT_OF_CURRENT_PLAN_VERSION));
       } catch (Exception e) {
         // Do not log or emit metric here because it is pure user error
         requestContext.setErrorCode(QueryException.SQL_PARSING_ERROR_CODE);

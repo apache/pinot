@@ -42,7 +42,6 @@ import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.util.DataBlockExtractUtils;
 import org.apache.pinot.core.util.trace.TracedThreadFactory;
 import org.apache.pinot.query.mailbox.MailboxService;
@@ -152,7 +151,7 @@ public class QueryDispatcher {
       _executorService.submit(() -> {
         try {
           Worker.QueryRequest.Builder requestBuilder = Worker.QueryRequest.newBuilder();
-          requestBuilder.setPlanVersion(QueryOptionsUtils.getPlanVersion(queryOptions));
+          requestBuilder.setPlanVersion(CommonConstants.MultiStageQueryRunner.PlanVersions.V1);
           for (int i = 0; i < numStages; i++) {
             int stageId = i + 1;
             DispatchablePlanFragment stagePlan = stagePlans.get(stageId);

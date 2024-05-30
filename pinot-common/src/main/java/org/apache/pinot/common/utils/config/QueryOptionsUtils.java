@@ -302,9 +302,4 @@ public class QueryOptionsUtils {
     String windowOverflowModeStr = queryOptions.get(QueryOptionKey.WINDOW_OVERFLOW_MODE);
     return windowOverflowModeStr != null ? WindowOverFlowMode.valueOf(windowOverflowModeStr) : null;
   }
-
-  @Nullable
-  public static String getPlanVersion(Map<String, String> queryOptions) {
-    return queryOptions.get(QueryOptionKey.PLAN_VERSION);
-  }
 }
