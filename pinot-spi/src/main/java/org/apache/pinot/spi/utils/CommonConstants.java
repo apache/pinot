@@ -1145,6 +1145,13 @@ public class CommonConstants {
     public enum WindowOverFlowMode {
       THROW, BREAK
     }
+
+    /**
+     * Constants related to plan versions.
+     */
+    public static class PlanVersions {
+      public static final int V1 = 1;
+    }
   }
 
   public static class NullValuePlaceHolder {
