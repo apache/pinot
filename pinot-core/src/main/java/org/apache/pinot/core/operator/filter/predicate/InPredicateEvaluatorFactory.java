@@ -128,7 +128,8 @@ public class InPredicateEvaluatorFactory {
         }
         return new LongRawValueBasedInPredicateEvaluator(inPredicate, matchingValues);
       }
-      case STRING: {
+      case STRING:
+      case JSON: {
         List<String> stringValues = inPredicate.getValues();
         Set<String> matchingValues = new ObjectOpenHashSet<>(HashUtil.getMinHashSetSize(stringValues.size()));
         // NOTE: Add value-by-value to avoid overhead
