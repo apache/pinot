@@ -229,7 +229,7 @@
     <guava.version>33.1.0-jre</guava.version>
     <google.http-client.version>1.44.1</google.http-client.version>
     <protobuf.version>3.25.2</protobuf.version>
-    <grpc.version>1.61.1</grpc.version>
+    <grpc.version>1.62.2</grpc.version>
 
     <!-- Configuration for Scala -->
     <scala.version>2.12.19</scala.version>
