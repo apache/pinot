@@ -329,10 +329,6 @@ public class QueryEnvironment {
     }
 
     // ----
-    // Run Pinot rule to attach aggregation auxiliary info
-    hepProgramBuilder.addRuleCollection(PinotQueryRuleSets.PINOT_AGG_PROCESS_RULES);
-
-    // ----
     // Pushdown filters using a single HepInstruction.
     hepProgramBuilder.addRuleCollection(PinotQueryRuleSets.FILTER_PUSHDOWN_RULES);
 
