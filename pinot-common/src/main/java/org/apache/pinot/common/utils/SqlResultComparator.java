@@ -20,7 +20,6 @@ package org.apache.pinot.common.utils;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -203,59 +202,9 @@ public class SqlResultComparator {
     }
 
     // For now, just directly compare elements in result set
-    if (!areNonOrderByQueryElementsEqual(actualElementsSerialized, expectedElementsSerialized)) {
-      return false;
-    }
+    return areNonOrderByQueryElementsEqual(actualElementsSerialized, expectedElementsSerialized);
 
-    // Compare stage stats
-    ObjectNode actualStageStats = (ObjectNode) actual.get(FIELD_MULTI_STAGE_STATS);
-    ObjectNode expectedStageStats = (ObjectNode) expected.get(FIELD_MULTI_STAGE_STATS);
-    return areMultiStageStatsEqual(actualStageStats, expectedStageStats);
-  }
-
-  private static boolean areMultiStageStatsEqual(ObjectNode actualStageStats, ObjectNode expectedStageStats) {
-    String actualType = actualStageStats.get(FIELD_MULTI_STAGE_STATS_TYPE) != null
-        ? actualStageStats.get(FIELD_MULTI_STAGE_STATS_TYPE).asText()
-        : null;
-    String expectedType = expectedStageStats.get(FIELD_MULTI_STAGE_STATS_TYPE) != null
-        ? expectedStageStats.get(FIELD_MULTI_STAGE_STATS_TYPE).asText()
-        : null;
-
-    if (actualType != null && !actualType.equals(expectedType)) {
-      LOGGER.error("Mismatch in stage stats type. Actual: {}, Expected: {}", actualType, expectedType);
-      return false;
-    }
-
-    ArrayNode actualChildren = (ArrayNode) actualStageStats.get(FIELD_MULTI_STAGE_STATS_CHILDREN);
-    ArrayNode expectedChildren = (ArrayNode) expectedStageStats.get(FIELD_MULTI_STAGE_STATS_CHILDREN);
-
-    if (actualChildren == null && expectedChildren == null) {
-      return true;
-    }
-    if (actualChildren == null) {
-      LOGGER.error("No children found in stage stats for type: {}. Expected {} children.",
-          actualType, expectedChildren.size());
-      return false;
-    }
-    if (expectedChildren == null) {
-      LOGGER.error("Found unexpected children in stage stats for type: {}. Expected no children.", actualType);
-      return false;
-    }
-    if (actualChildren.size() != expectedChildren.size()) {
-      LOGGER.error("Mismatch in number of children for stage stats for type: {}. Actual: {}, Expected: {}",
-          actualType, actualChildren.size(), expectedChildren.size());
-      return false;
-    }
-
-    for (int i = 0; i < actualChildren.size(); i++) {
-      if (!areMultiStageStatsEqual((ObjectNode) actualChildren.get(i), (ObjectNode) expectedChildren.get(i))) {
-        return false;
-      }
-    }
-
-    // TODO: Verify other stats like emittedRows, fanIn, fanOut, inMemoryMessages, rawMessages etc.?
-
-    return true;
+    // Not verifying stage stats for now since they're still subject to change across versions
   }
 
   private static boolean areOrderByQueryElementsEqual(ArrayNode actualElements, ArrayNode expectedElements,
