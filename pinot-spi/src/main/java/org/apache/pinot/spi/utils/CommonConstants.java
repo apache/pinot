@@ -1150,7 +1150,7 @@ public class CommonConstants {
      * Constants related to plan versions.
      */
     public static class PlanVersions {
-      public static final String V1 = "1";
+      public static final int V1 = 1;
     }
   }
 

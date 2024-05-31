@@ -151,7 +151,7 @@ public class QueryDispatcher {
       _executorService.submit(() -> {
         try {
           Worker.QueryRequest.Builder requestBuilder = Worker.QueryRequest.newBuilder();
-          requestBuilder.setPlanVersion(CommonConstants.MultiStageQueryRunner.PlanVersions.V1);
+          requestBuilder.setVersion(CommonConstants.MultiStageQueryRunner.PlanVersions.V1);
           for (int i = 0; i < numStages; i++) {
             int stageId = i + 1;
             DispatchablePlanFragment stagePlan = stagePlans.get(stageId);
