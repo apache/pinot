@@ -75,6 +75,8 @@ public class GenericRow implements Serializable {
    */
   public static final String INCOMPLETE_RECORD_KEY = "$INCOMPLETE_RECORD_KEY$";
 
+  public static final String SANITIZED_RECORD_KEY = "$SANITIZED_RECORD_KEY$";
+
   private final Map<String, Object> _fieldToValueMap = new HashMap<>();
   private final Set<String> _nullValueFields = new HashSet<>();
 

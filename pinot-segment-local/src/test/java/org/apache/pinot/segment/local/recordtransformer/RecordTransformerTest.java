@@ -275,7 +275,7 @@ public class RecordTransformerTest {
       assertEquals(record.getValue("mvString2"), new Object[]{"123", "123", "123.0", "123.0", "123"});
       assertNull(record.getValue("$virtual"));
       assertTrue(record.getNullValueFields().isEmpty());
-      assertTrue(record.getFieldToValueMap().containsKey(GenericRow.INCOMPLETE_RECORD_KEY));
+      assertTrue(record.getFieldToValueMap().containsKey(GenericRow.SANITIZED_RECORD_KEY));
     }
 
     // scenario where string contains null and fieldSpec maxLengthExceedStrategy is to ERROR
@@ -304,7 +304,7 @@ public class RecordTransformerTest {
       record = transformer.transform(record);
       assertNotNull(record);
       assertEquals(record.getValue("svStringWithNullCharacters"), "null");
-      assertTrue(record.getFieldToValueMap().containsKey(GenericRow.INCOMPLETE_RECORD_KEY));
+      assertTrue(record.getFieldToValueMap().containsKey(GenericRow.SANITIZED_RECORD_KEY));
     }
 
     // scenario where string exceeds max length and fieldSpec maxLengthExceedStrategy is to ERROR
@@ -333,7 +333,7 @@ public class RecordTransformerTest {
       record = transformer.transform(record);
       assertNotNull(record);
       assertEquals(record.getValue("svStringWithLengthLimit"), "null");
-      assertTrue(record.getFieldToValueMap().containsKey(GenericRow.INCOMPLETE_RECORD_KEY));
+      assertTrue(record.getFieldToValueMap().containsKey(GenericRow.SANITIZED_RECORD_KEY));
     }
 
     // scenario where string exceeds max length and fieldSpec maxLengthExceedStrategy is to NO_ACTION
@@ -358,7 +358,7 @@ public class RecordTransformerTest {
       record = transformer.transform(record);
       assertNotNull(record);
       assertEquals(record.getValue("svStringWithNullCharacters"), "1");
-      assertTrue(record.getFieldToValueMap().containsKey(GenericRow.INCOMPLETE_RECORD_KEY));
+      assertTrue(record.getFieldToValueMap().containsKey(GenericRow.SANITIZED_RECORD_KEY));
     }
 
     // scenario where json field exceeds max length and fieldSpec maxLengthExceedStrategy is to NO_ACTION
@@ -385,7 +385,7 @@ public class RecordTransformerTest {
       record = transformer.transform(record);
       assertNotNull(record);
       assertEquals(record.getValue("svJson"), "{\"first\": ");
-      assertTrue(record.getFieldToValueMap().containsKey(GenericRow.INCOMPLETE_RECORD_KEY));
+      assertTrue(record.getFieldToValueMap().containsKey(GenericRow.SANITIZED_RECORD_KEY));
     }
 
     // scenario where json field exceeds max length and fieldSpec maxLengthExceedStrategy is to
@@ -400,7 +400,7 @@ public class RecordTransformerTest {
       record = transformer.transform(record);
       assertNotNull(record);
       assertEquals(record.getValue("svJson"), "null");
-      assertTrue(record.getFieldToValueMap().containsKey(GenericRow.INCOMPLETE_RECORD_KEY));
+      assertTrue(record.getFieldToValueMap().containsKey(GenericRow.SANITIZED_RECORD_KEY));
     }
 
     // scenario where json field exceeds max length and fieldSpec maxLengthExceedStrategy is to
@@ -446,7 +446,7 @@ public class RecordTransformerTest {
       record = transformer.transform(record);
       assertNotNull(record);
       assertEquals(record.getValue("svBytes"), "7b");
-      assertTrue(record.getFieldToValueMap().containsKey(GenericRow.INCOMPLETE_RECORD_KEY));
+      assertTrue(record.getFieldToValueMap().containsKey(GenericRow.SANITIZED_RECORD_KEY));
     }
 
     // scenario where bytes field exceeds max length and fieldSpec maxLengthExceedStrategy is to
@@ -461,7 +461,7 @@ public class RecordTransformerTest {
       record = transformer.transform(record);
       assertNotNull(record);
       assertEquals(record.getValue("svBytes"), BytesUtils.toHexString(new byte[0]));
-      assertTrue(record.getFieldToValueMap().containsKey(GenericRow.INCOMPLETE_RECORD_KEY));
+      assertTrue(record.getFieldToValueMap().containsKey(GenericRow.SANITIZED_RECORD_KEY));
     }
 
     // scenario where bytes field exceeds max length and fieldSpec maxLengthExceedStrategy is to ERROR

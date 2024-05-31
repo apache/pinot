@@ -25,7 +25,6 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.StringUtil;
 
 
@@ -42,10 +41,10 @@ import org.apache.pinot.spi.utils.StringUtil;
  * For SUBSTITUTE_DEFAULT_VALUE, the value is replaced with the default null value string.
  * For ERROR, an exception is thrown and the record is skipped.
  * For NO_ACTION, the value is kept as is if no NULL_CHARACTER present else trimmed till NULL.
- * In the first 2 scenarios, this metric INCOMPLETE_REALTIME_ROWS_CONSUMED can be tracked to know if a trimmed /
+ * In the first 2 scenarios, this metric REALTIME_ROWS_SANITIZED can be tracked to know if a trimmed /
  * default record was persisted.
  * In the third scenario, this metric ROWS_WITH_ERRORS can be tracked  to know if a record was skipped.
- * In the last scenario, this metric INCOMPLETE_REALTIME_ROWS_CONSUMED can be tracked to know if a record was trimmed
+ * In the last scenario, this metric REALTIME_ROWS_SANITIZED can be tracked to know if a record was trimmed
  * due to having a null character.
  */
 public class SanitizationTransformer implements RecordTransformer {
@@ -56,22 +55,21 @@ public class SanitizationTransformer implements RecordTransformer {
     FieldSpec.MaxLengthExceedStrategy maxLengthExceedStrategy;
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
       if (!fieldSpec.isVirtualColumn()) {
-        switch (fieldSpec.getDataType()) {
-          case STRING:
-            maxLengthExceedStrategy = fieldSpec.getMaxLengthExceedStrategy() == null
-                ? FieldSpec.MaxLengthExceedStrategy.TRIM_LENGTH : fieldSpec.getMaxLengthExceedStrategy();
-            _columnToColumnInfoMap.put(fieldSpec.getName(), new SanitizedColumnInfo(fieldSpec.getName(),
-                fieldSpec.getMaxLength(), maxLengthExceedStrategy, fieldSpec.getDefaultNullValueString()));
-            break;
-          case JSON:
-          case BYTES:
-            maxLengthExceedStrategy = fieldSpec.getMaxLengthExceedStrategy() == null
-                ? FieldSpec.MaxLengthExceedStrategy.NO_ACTION : fieldSpec.getMaxLengthExceedStrategy();
-            _columnToColumnInfoMap.put(fieldSpec.getName(), new SanitizedColumnInfo(fieldSpec.getName(),
-                fieldSpec.getMaxLength(), maxLengthExceedStrategy, fieldSpec.getDefaultNullValueString()));
-            break;
-          default:
-            // Do nothing for other data types
+        if (fieldSpec.getDataType().equals(FieldSpec.DataType.STRING)) {
+          maxLengthExceedStrategy =
+              fieldSpec.getMaxLengthExceedStrategy() == null ? FieldSpec.MaxLengthExceedStrategy.TRIM_LENGTH
+                  : fieldSpec.getMaxLengthExceedStrategy();
+          _columnToColumnInfoMap.put(fieldSpec.getName(), new SanitizedColumnInfo(fieldSpec.getName(),
+              fieldSpec.getMaxLength(), maxLengthExceedStrategy, fieldSpec.getDefaultNullValue()));
+        } else if (fieldSpec.getDataType().equals(FieldSpec.DataType.JSON) || fieldSpec.getDataType()
+            .equals(FieldSpec.DataType.BYTES)) {
+          maxLengthExceedStrategy = fieldSpec.getMaxLengthExceedStrategy() == null
+              ? FieldSpec.MaxLengthExceedStrategy.NO_ACTION : fieldSpec.getMaxLengthExceedStrategy();
+          if (maxLengthExceedStrategy.equals(FieldSpec.MaxLengthExceedStrategy.NO_ACTION)) {
+            continue;
+          }
+          _columnToColumnInfoMap.put(fieldSpec.getName(), new SanitizedColumnInfo(fieldSpec.getName(),
+              fieldSpec.getMaxLength(), fieldSpec.getMaxLengthExceedStrategy(), fieldSpec.getDefaultNullValue()));
         }
       }
     }
@@ -93,14 +91,14 @@ public class SanitizationTransformer implements RecordTransformer {
         result = sanitizeBytesValue(columnName, (byte[]) value, entry.getValue());
         record.putValue(columnName, result.getLeft());
         if (result.getRight()) {
-          record.putValue(GenericRow.INCOMPLETE_RECORD_KEY, true);
+          record.putValue(GenericRow.SANITIZED_RECORD_KEY, true);
         }
       } else if (value instanceof String) {
         // Single-valued String column
         result = sanitizeValue(columnName, (String) value, entry.getValue());
         record.putValue(columnName, result.getLeft());
         if (result.getRight()) {
-          record.putValue(GenericRow.INCOMPLETE_RECORD_KEY, true);
+          record.putValue(GenericRow.SANITIZED_RECORD_KEY, true);
         }
       } else {
         // Multi-valued String / BYTES column
@@ -113,7 +111,7 @@ public class SanitizationTransformer implements RecordTransformer {
           }
           values[i] = result.getLeft();
           if (result.getRight()) {
-            record.putValue(GenericRow.INCOMPLETE_RECORD_KEY, true);
+            record.putValue(GenericRow.SANITIZED_RECORD_KEY, true);
           }
         }
       }
@@ -140,7 +138,7 @@ public class SanitizationTransformer implements RecordTransformer {
         case TRIM_LENGTH:
           return Pair.of(sanitizedValue, true);
         case SUBSTITUTE_DEFAULT_VALUE:
-          return Pair.of(sanitizedColumnInfo.getDefaultValueAsString(), true);
+          return Pair.of(FieldSpec.getStringValue(sanitizedColumnInfo.getDefaultNullValue()), true);
         case ERROR:
           index = value.indexOf(NULL_CHARACTER);
           if (index < 0) {
@@ -182,7 +180,7 @@ public class SanitizationTransformer implements RecordTransformer {
         case TRIM_LENGTH:
           return Pair.of(Arrays.copyOf(value, sanitizedColumnInfo.getMaxLength()), true);
         case SUBSTITUTE_DEFAULT_VALUE:
-          return Pair.of(BytesUtils.toBytes(sanitizedColumnInfo.getDefaultValueAsString()), true);
+          return Pair.of((byte[]) sanitizedColumnInfo.getDefaultNullValue(), true);
         case ERROR:
           throw new IllegalStateException(
               String.format("Throwing exception as value for column %s exceeds configured max length %d.", columnName,
@@ -201,14 +199,14 @@ public class SanitizationTransformer implements RecordTransformer {
     private final String _columnName;
     private final int _maxLength;
     private final FieldSpec.MaxLengthExceedStrategy _maxLengthExceedStrategy;
-    private final String _defaultValueAsString;
+    private final Object _defaultNullValue;
 
     private SanitizedColumnInfo(String columnName, int maxLength,
-        FieldSpec.MaxLengthExceedStrategy maxLengthExceedStrategy, String defaultValueAsString) {
+        FieldSpec.MaxLengthExceedStrategy maxLengthExceedStrategy, Object defaultNullValue) {
       _columnName = columnName;
       _maxLength = maxLength;
       _maxLengthExceedStrategy = maxLengthExceedStrategy;
-      _defaultValueAsString = defaultValueAsString;
+      _defaultNullValue = defaultNullValue;
     }
 
     public String getColumnName() {
@@ -223,8 +221,8 @@ public class SanitizationTransformer implements RecordTransformer {
       return _maxLengthExceedStrategy;
     }
 
-    public String getDefaultValueAsString() {
-      return _defaultValueAsString;
+    public Object getDefaultNullValue() {
+      return _defaultNullValue;
     }
   }
 }
