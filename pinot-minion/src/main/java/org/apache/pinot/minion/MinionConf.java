@@ -66,6 +66,11 @@ public class MinionConf extends PinotConfiguration {
     return getProperty(END_REPLACE_SEGMENTS_TIMEOUT_MS_KEY, DEFAULT_END_REPLACE_SEGMENTS_SOCKET_TIMEOUT_MS);
   }
 
+  public boolean isAllowDownloadFromServer() {
+    return Boolean.parseBoolean(getProperty(CommonConstants.Minion.CONFIG_OF_ALLOW_DOWNLOAD_FROM_SERVER,
+        CommonConstants.Minion.DEFAULT_ALLOW_DOWNLOAD_FROM_SERVER));
+  }
+
   public PinotConfiguration getMetricsConfig() {
     return subset(CommonConstants.Minion.METRICS_CONFIG_PREFIX);
   }

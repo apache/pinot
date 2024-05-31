@@ -191,15 +191,16 @@ public class MinionTaskUtils {
   /**
    * Extract allowDownloadFromServer config from table task config
    */
-  public static boolean extractMinionAllowDownloadFromServer(TableConfig tableConfig, String taskType) {
+  public static boolean extractMinionAllowDownloadFromServer(TableConfig tableConfig, String taskType,
+      boolean defaultValue) {
     TableTaskConfig tableTaskConfig = tableConfig.getTaskConfig();
     if (tableTaskConfig != null) {
       Map<String, String> configs = tableTaskConfig.getConfigsForTaskType(taskType);
       if (configs != null && !configs.isEmpty()) {
         return Boolean.parseBoolean(configs.getOrDefault(TableTaskConfig.MINION_ALLOW_DOWNLOAD_FROM_SERVER,
-            String.valueOf(TableTaskConfig.DEFAULT_MINION_ALLOW_DOWNLOAD_FROM_SERVER)));
+            String.valueOf(defaultValue)));
       }
     }
-    return TableTaskConfig.DEFAULT_MINION_ALLOW_DOWNLOAD_FROM_SERVER;
+    return defaultValue;
   }
 }
