@@ -50,7 +50,7 @@ class VersionedPropertyReader extends PropertiesReader {
     Preconditions.checkArgument(keyValue.length == 2, "property content split should result in key and value");
     initPropertyName(keyValue[0]);
     initPropertyValue(keyValue[1]);
-    initPropertySeparator(getPropertySeparator());
+    initPropertySeparator(separator);
   }
 
   @Override
