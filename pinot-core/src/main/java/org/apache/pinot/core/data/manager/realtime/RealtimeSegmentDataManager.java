@@ -703,9 +703,11 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         //   persisted.
         // Take upsert snapshot before starting consuming events
         if (_partitionUpsertMetadataManager != null) {
-          _partitionUpsertMetadataManager.takeSnapshot();
-          // If upsertTTL is enabled, we will remove expired primary keys from upsertMetadata after taking snapshot.
+          // we should remove keys first and then take snapshot, this is because deletedKeysTTL flow removes keys from
+          // map and also updates removes valid doc ids. If we take snapshot just after that, this way we save one
+          // commit cycle for the deleted valid doc ids to reflect in snapshot
           _partitionUpsertMetadataManager.removeExpiredPrimaryKeys();
+          _partitionUpsertMetadataManager.takeSnapshot();
         }
 
         while (!_state.isFinal()) {

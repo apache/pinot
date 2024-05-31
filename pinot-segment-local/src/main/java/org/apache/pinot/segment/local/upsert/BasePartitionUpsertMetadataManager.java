@@ -103,6 +103,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
 
   // Tracks all the segments managed by this manager (excluding EmptySegment)
   protected final Set<IndexSegment> _trackedSegments = ConcurrentHashMap.newKeySet();
+  // This is to track all the segments where changes took place post last snapshot
+  protected final Set<IndexSegment> _updatedSegmentsSinceLastSnapshot = ConcurrentHashMap.newKeySet();
 
   // NOTE: We do not persist snapshot on the first consuming segment because most segments might not be loaded yet
   protected volatile boolean _gotFirstConsumingSegment = false;
@@ -855,7 +857,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     }
   }
 
-  // TODO: Consider optimizing it by tracking and persisting only the changed snapshot
   protected void doTakeSnapshot() {
     int numTrackedSegments = _trackedSegments.size();
     long numPrimaryKeysInSnapshot = 0L;
@@ -874,19 +875,32 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         numConsumingSegments++;
         continue;
       }
-      ImmutableSegmentImpl immutableSegment = (ImmutableSegmentImpl) segment;
-      if (!immutableSegment.hasValidDocIdsSnapshotFile()) {
-        segmentsWithoutSnapshot.add(immutableSegment);
+      if (!_updatedSegmentsSinceLastSnapshot.contains(segment)) {
+        // if no updates since last snapshot then skip
         continue;
       }
-      immutableSegment.persistValidDocIdsSnapshot();
-      numImmutableSegments++;
-      numPrimaryKeysInSnapshot += immutableSegment.getValidDocIds().getMutableRoaringBitmap().getCardinality();
+      try {
+        ImmutableSegmentImpl immutableSegment = (ImmutableSegmentImpl) segment;
+        if (!immutableSegment.hasValidDocIdsSnapshotFile()) {
+          segmentsWithoutSnapshot.add(immutableSegment);
+          continue;
+        }
+        immutableSegment.persistValidDocIdsSnapshot();
+        _updatedSegmentsSinceLastSnapshot.remove(segment);
+        numImmutableSegments++;
+        numPrimaryKeysInSnapshot += immutableSegment.getValidDocIds().getMutableRoaringBitmap().getCardinality();
+      } catch (Exception e) {
+        _logger.warn("Caught exception while taking snapshot for segment: {}, skipping", segment.getSegmentName(), e);
+      }
     }
     for (ImmutableSegmentImpl segment : segmentsWithoutSnapshot) {
-      segment.persistValidDocIdsSnapshot();
-      numImmutableSegments++;
-      numPrimaryKeysInSnapshot += segment.getValidDocIds().getMutableRoaringBitmap().getCardinality();
+      try {
+        segment.persistValidDocIdsSnapshot();
+        numImmutableSegments++;
+        numPrimaryKeysInSnapshot += segment.getValidDocIds().getMutableRoaringBitmap().getCardinality();
+      } catch (Exception e) {
+        _logger.warn("Caught exception while taking snapshot for segment: {}, skipping", segment.getSegmentName(), e);
+      }
     }
 
     _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId,
@@ -1059,6 +1073,10 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       doRemoveDocId(oldSegment, oldDocId);
       doAddDocId(validDocIds, queryableDocIds, newDocId, recordInfo);
     } finally {
+      if (_enableSnapshot) {
+        _updatedSegmentsSinceLastSnapshot.add(newSegment);
+        _updatedSegmentsSinceLastSnapshot.add(oldSegment);
+      }
       if (_consistencyMode == UpsertConfig.ConsistencyMode.SYNC) {
         _upsertViewLock.writeLock().unlock();
       } else if (_consistencyMode == UpsertConfig.ConsistencyMode.SNAPSHOT) {
@@ -1094,6 +1112,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         }
       }
     } finally {
+      if (_enableSnapshot) {
+        _updatedSegmentsSinceLastSnapshot.add(segment);
+      }
       if (_consistencyMode == UpsertConfig.ConsistencyMode.SNAPSHOT) {
         _updatedSegmentsSinceLastRefresh.add(segment);
         _upsertViewLock.readLock().unlock();
@@ -1111,6 +1132,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     try {
       doAddDocId(validDocIds, queryableDocIds, docId, recordInfo);
     } finally {
+      if (_enableSnapshot) {
+        _updatedSegmentsSinceLastSnapshot.add(segment);
+      }
       if (_consistencyMode == UpsertConfig.ConsistencyMode.SNAPSHOT) {
         _updatedSegmentsSinceLastRefresh.add(segment);
         _upsertViewLock.readLock().unlock();
@@ -1135,6 +1159,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     try {
       doRemoveDocId(segment, docId);
     } finally {
+      if (_enableSnapshot) {
+        _updatedSegmentsSinceLastSnapshot.add(segment);
+      }
       if (_consistencyMode == UpsertConfig.ConsistencyMode.SNAPSHOT) {
         _updatedSegmentsSinceLastRefresh.add(segment);
         _upsertViewLock.readLock().unlock();
