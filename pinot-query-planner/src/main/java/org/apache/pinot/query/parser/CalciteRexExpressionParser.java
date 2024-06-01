@@ -231,7 +231,7 @@ public class CalciteRexExpressionParser {
         }
         break;
       default:
-        functionName = functionKind.name();
+        functionName = canonicalizeFunctionName(functionKind.name());
         break;
     }
     List<RexExpression> childNodes = rexCall.getFunctionOperands();
@@ -288,7 +288,7 @@ public class CalciteRexExpressionParser {
 
   private static Expression getFunctionExpression(String canonicalName) {
     Expression expression = new Expression(ExpressionType.FUNCTION);
-    Function function = new Function(canonicalizeFunctionName(canonicalName));
+    Function function = new Function(canonicalName);
     expression.setFunctionCall(function);
     return expression;
   }

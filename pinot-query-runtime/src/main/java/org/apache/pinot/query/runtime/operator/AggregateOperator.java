@@ -27,10 +27,8 @@ import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.calcite.sql.SqlKind;
-import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datatable.StatMap;
-import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.utils.DataSchema;
@@ -43,13 +41,13 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionFactory;
 import org.apache.pinot.core.query.aggregation.function.CountAggregationFunction;
 import org.apache.pinot.core.util.DataBlockExtractUtils;
-import org.apache.pinot.query.planner.logical.LiteralHintUtils;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.AbstractPlanNode;
 import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
-import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.BooleanUtils;
 import org.roaringbitmap.RoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -65,11 +63,9 @@ public class AggregateOperator extends MultiStageOperator {
   private static final String EXPLAIN_NAME = "AGGREGATE_OPERATOR";
   private static final CountAggregationFunction COUNT_STAR_AGG_FUNCTION =
       new CountAggregationFunction(Collections.singletonList(ExpressionContext.forIdentifier("*")), false);
-  private static final ExpressionContext PLACEHOLDER_IDENTIFIER = ExpressionContext.forIdentifier("__PLACEHOLDER__");
 
   private final MultiStageOperator _inputOperator;
   private final DataSchema _resultSchema;
-  private final AggType _aggType;
   private final MultistageAggregationExecutor _aggregationExecutor;
   private final MultistageGroupByExecutor _groupByExecutor;
   @Nullable
@@ -78,29 +74,15 @@ public class AggregateOperator extends MultiStageOperator {
 
   private boolean _hasConstructedAggregateBlock;
 
-  public AggregateOperator(OpChainExecutionContext context, MultiStageOperator inputOperator,
-      DataSchema resultSchema, List<RexExpression> aggCalls, List<RexExpression> groupSet, AggType aggType,
-      List<Integer> filterArgIndices, @Nullable AbstractPlanNode.NodeHint nodeHint) {
+  public AggregateOperator(OpChainExecutionContext context, MultiStageOperator inputOperator, DataSchema resultSchema,
+      List<RexExpression> aggCalls, List<RexExpression> groupSet, AggType aggType, List<Integer> filterArgIndices,
+      @Nullable AbstractPlanNode.NodeHint nodeHint) {
     super(context);
     _inputOperator = inputOperator;
     _resultSchema = resultSchema;
-    _aggType = aggType;
-
-    // Process literal hints
-    Map<Integer, Map<Integer, Literal>> literalArgumentsMap = null;
-    if (nodeHint != null) {
-      Map<String, String> aggOptions = nodeHint._hintOptions.get(PinotHintOptions.INTERNAL_AGG_OPTIONS);
-      if (aggOptions != null) {
-        literalArgumentsMap = LiteralHintUtils.hintStringToLiteralMap(
-            aggOptions.get(PinotHintOptions.InternalAggregateOptions.AGG_CALL_SIGNATURE));
-      }
-    }
-    if (literalArgumentsMap == null) {
-      literalArgumentsMap = Collections.emptyMap();
-    }
 
     // Initialize the aggregation functions
-    AggregationFunction<?, ?>[] aggFunctions = getAggFunctions(aggCalls, literalArgumentsMap);
+    AggregationFunction<?, ?>[] aggFunctions = getAggFunctions(aggCalls);
 
     // Process the filter argument indices
     int numFunctions = aggFunctions.length;
@@ -214,27 +196,16 @@ public class AggregateOperator extends MultiStageOperator {
     return block;
   }
 
-  private AggregationFunction<?, ?>[] getAggFunctions(List<RexExpression> aggCalls,
-      Map<Integer, Map<Integer, Literal>> literalArgumentsMap) {
+  private AggregationFunction<?, ?>[] getAggFunctions(List<RexExpression> aggCalls) {
     int numFunctions = aggCalls.size();
     AggregationFunction<?, ?>[] aggFunctions = new AggregationFunction[numFunctions];
-    if (!_aggType.isInputIntermediateFormat()) {
-      for (int i = 0; i < numFunctions; i++) {
-        Map<Integer, Literal> literalArguments = literalArgumentsMap.getOrDefault(i, Collections.emptyMap());
-        aggFunctions[i] = getAggFunctionForRawInput((RexExpression.FunctionCall) aggCalls.get(i), literalArguments);
-      }
-    } else {
-      for (int i = 0; i < numFunctions; i++) {
-        Map<Integer, Literal> literalArguments = literalArgumentsMap.getOrDefault(i, Collections.emptyMap());
-        aggFunctions[i] =
-            getAggFunctionForIntermediateInput((RexExpression.FunctionCall) aggCalls.get(i), literalArguments);
-      }
+    for (int i = 0; i < numFunctions; i++) {
+      aggFunctions[i] = getAggFunction((RexExpression.FunctionCall) aggCalls.get(i));
     }
     return aggFunctions;
   }
 
-  private AggregationFunction<?, ?> getAggFunctionForRawInput(RexExpression.FunctionCall functionCall,
-      Map<Integer, Literal> literalArguments) {
+  private AggregationFunction<?, ?> getAggFunction(RexExpression.FunctionCall functionCall) {
     String functionName = functionCall.getFunctionName();
     List<RexExpression> operands = functionCall.getFunctionOperands();
     int numArguments = operands.size();
@@ -244,76 +215,24 @@ public class AggregateOperator extends MultiStageOperator {
       return COUNT_STAR_AGG_FUNCTION;
     }
     List<ExpressionContext> arguments = new ArrayList<>(numArguments);
-    for (int i = 0; i < numArguments; i++) {
-      Literal literalArgument = literalArguments.get(i);
-      if (literalArgument != null) {
-        arguments.add(ExpressionContext.forLiteralContext(literalArgument));
+    for (RexExpression operand : operands) {
+      if (operand instanceof RexExpression.InputRef) {
+        RexExpression.InputRef inputRef = (RexExpression.InputRef) operand;
+        arguments.add(ExpressionContext.forIdentifier(fromColIdToIdentifier(inputRef.getIndex())));
       } else {
-        RexExpression operand = operands.get(i);
-        switch (operand.getKind()) {
-          case INPUT_REF:
-            RexExpression.InputRef inputRef = (RexExpression.InputRef) operand;
-            arguments.add(ExpressionContext.forIdentifier(fromColIdToIdentifier(inputRef.getIndex())));
-            break;
-          case LITERAL:
-            RexExpression.Literal literalRexExp = (RexExpression.Literal) operand;
-            arguments.add(ExpressionContext.forLiteralContext(literalRexExp.getDataType().toDataType(),
-                literalRexExp.getValue()));
-            break;
-          default:
-            throw new IllegalStateException("Illegal aggregation function operand type: " + operand.getKind());
+        assert operand instanceof RexExpression.Literal;
+        RexExpression.Literal literal = (RexExpression.Literal) operand;
+        DataType dataType = literal.getDataType().toDataType();
+        Object value = literal.getValue();
+        // TODO: Fix BOOLEAN literal to directly store true/false
+        if (dataType == DataType.BOOLEAN) {
+          value = BooleanUtils.fromNonNullInternalValue(value);
         }
+        arguments.add(ExpressionContext.forLiteralContext(dataType, value));
       }
     }
-    handleListAggDistinctArg(functionName, functionCall, arguments);
     return AggregationFunctionFactory.getAggregationFunction(
         new FunctionContext(FunctionContext.Type.AGGREGATION, functionName, arguments), true);
-  }
-
-  private static AggregationFunction<?, ?> getAggFunctionForIntermediateInput(RexExpression.FunctionCall functionCall,
-      Map<Integer, Literal> literalArguments) {
-    String functionName = functionCall.getFunctionName();
-    List<RexExpression> operands = functionCall.getFunctionOperands();
-    int numArguments = operands.size();
-    Preconditions.checkState(numArguments == 1, "Intermediate aggregate must have 1 argument, got: %s", numArguments);
-    RexExpression operand = operands.get(0);
-    Preconditions.checkState(operand.getKind() == SqlKind.INPUT_REF,
-        "Intermediate aggregate argument must be an input reference, got: %s", operand.getKind());
-    // We might need to append extra arguments extracted from the hint to match the signature of the aggregation
-    Literal numArgumentsLiteral = literalArguments.get(-1);
-    if (numArgumentsLiteral == null) {
-      return AggregationFunctionFactory.getAggregationFunction(
-          new FunctionContext(FunctionContext.Type.AGGREGATION, functionName, Collections.singletonList(
-              ExpressionContext.forIdentifier(fromColIdToIdentifier(((RexExpression.InputRef) operand).getIndex())))),
-          true);
-    } else {
-      int numExpectedArguments = numArgumentsLiteral.getIntValue();
-      List<ExpressionContext> arguments = new ArrayList<>(numExpectedArguments);
-      arguments.add(
-          ExpressionContext.forIdentifier(fromColIdToIdentifier(((RexExpression.InputRef) operand).getIndex())));
-      for (int i = 1; i < numExpectedArguments; i++) {
-        Literal literalArgument = literalArguments.get(i);
-        if (literalArgument != null) {
-          arguments.add(ExpressionContext.forLiteralContext(literalArgument));
-        } else {
-          arguments.add(PLACEHOLDER_IDENTIFIER);
-        }
-      }
-      handleListAggDistinctArg(functionName, functionCall, arguments);
-      return AggregationFunctionFactory.getAggregationFunction(
-          new FunctionContext(FunctionContext.Type.AGGREGATION, functionName, arguments), true);
-    }
-  }
-
-  private static void handleListAggDistinctArg(String functionName, RexExpression.FunctionCall functionCall,
-      List<ExpressionContext> arguments) {
-    String upperCaseFunctionName =
-        AggregationFunctionType.getNormalizedAggregationFunctionName(functionName);
-    if (upperCaseFunctionName.equals("LISTAGG")) {
-      if (functionCall.isDistinct()) {
-        arguments.add(ExpressionContext.forLiteralContext(Literal.boolValue(true)));
-      }
-    }
   }
 
   private static String fromColIdToIdentifier(int colId) {

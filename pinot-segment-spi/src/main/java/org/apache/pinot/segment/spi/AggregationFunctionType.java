@@ -460,9 +460,10 @@ public enum AggregationFunctionType {
    * <p>NOTE: Underscores in the function name are ignored.
    */
   public static AggregationFunctionType getAggregationFunctionType(String functionName) {
-    if (functionName.regionMatches(true, 0, "percentile", 0, 10)) {
+    String normalizedFunctionName = getNormalizedAggregationFunctionName(functionName);
+    if (normalizedFunctionName.regionMatches(false, 0, "PERCENTILE", 0, 10)) {
       // This style of aggregation functions is not supported in the multistage engine
-      String remainingFunctionName = getNormalizedAggregationFunctionName(functionName).substring(10).toUpperCase();
+      String remainingFunctionName = normalizedFunctionName.substring(10).toUpperCase();
       if (remainingFunctionName.isEmpty() || remainingFunctionName.matches("\\d+")) {
         return PERCENTILE;
       } else if (remainingFunctionName.equals("EST") || remainingFunctionName.matches("EST\\d+")) {
@@ -496,7 +497,7 @@ public enum AggregationFunctionType {
       }
     } else {
       try {
-        return AggregationFunctionType.valueOf(getNormalizedAggregationFunctionName(functionName));
+        return AggregationFunctionType.valueOf(normalizedFunctionName);
       } catch (IllegalArgumentException e) {
         throw new IllegalArgumentException("Invalid aggregation function name: " + functionName);
       }

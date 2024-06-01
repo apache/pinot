@@ -246,8 +246,10 @@ public class RexExpressionUtils {
   }
 
   public static RexExpression fromAggregateCall(AggregateCall aggregateCall) {
-    List<RexExpression> operands =
-        aggregateCall.getArgList().stream().map(RexExpression.InputRef::new).collect(Collectors.toList());
+    List<RexExpression> operands = new ArrayList<>(aggregateCall.rexList.size());
+    for (RexNode rexNode : aggregateCall.rexList) {
+      operands.add(fromRexNode(rexNode));
+    }
     return new RexExpression.FunctionCall(aggregateCall.getAggregation().getKind(),
         RelToPlanNodeConverter.convertToColumnDataType(aggregateCall.getType()),
         aggregateCall.getAggregation().getName(), operands, aggregateCall.isDistinct());
