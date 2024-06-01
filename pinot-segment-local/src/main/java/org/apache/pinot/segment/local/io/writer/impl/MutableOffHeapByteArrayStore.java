@@ -223,10 +223,10 @@ public class MutableOffHeapByteArrayStore implements Closeable {
     int index = buffer.add(value);
     if (index < 0) {
       // Need to expand the buffer
-      long nextBufferSize = buffer.getSize() << 1;
-      if (nextBufferSize > 0 && nextBufferSize <= Integer.MAX_VALUE) {
+      int currentBufferSize = buffer.getSize();
+      if ((currentBufferSize << 1) >= 0) {
         // The expanded buffer size should be enough for the current value
-        buffer = expand(Math.max((int) nextBufferSize, valueLength + Integer.BYTES));
+        buffer = expand(Math.max(currentBufferSize << 1, valueLength + Integer.BYTES));
       } else {
         // Int overflow
         buffer = expand(Integer.MAX_VALUE);
