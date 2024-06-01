@@ -2939,9 +2939,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         + "  PinotLogicalSortExchange("
         + "distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])\\n"
         + "    LogicalProject(count=[$1], name=[$0])\\n"
-        + "      LogicalAggregate(group=[{0}], agg#0=[COUNT($1)])\\n"
+        + "      PinotLogicalAggregate(group=[{0}], agg#0=[COUNT($1)])\\n"
         + "        PinotLogicalExchange(distribution=[hash[0]])\\n"
-        + "          LogicalAggregate(group=[{17}], agg#0=[COUNT()])\\n"
+        + "          PinotLogicalAggregate(group=[{17}], agg#0=[COUNT()])\\n"
         + "            LogicalTableScan(table=[[default, mytable]])\\n"
         + "\"]]}");
 
