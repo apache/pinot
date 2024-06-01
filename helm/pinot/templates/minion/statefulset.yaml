@@ -41,7 +41,9 @@ spec:
         {{- if .Values.minion.automaticReload.enabled }}
         checksum/config: {{ include (print $.Template.BasePath "/minion/configmap.yaml") . | sha256sum}}
         {{- end }}
-{{ toYaml .Values.minion.podAnnotations | nindent 8 }}
+        {{- with .Values.minion.podAnnotations }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
     spec:
       terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
       serviceAccountName: {{ include "pinot.serviceAccountName" . }}
