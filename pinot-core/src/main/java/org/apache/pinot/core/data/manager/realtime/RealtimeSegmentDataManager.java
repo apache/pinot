@@ -1435,11 +1435,12 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     _acquiredConsumerSemaphore = new AtomicBoolean(false);
     InstanceDataManagerConfig instanceDataManagerConfig = _indexLoadingConfig.getInstanceDataManagerConfig();
     String clientIdSuffix =
-        instanceDataManagerConfig != null ? instanceDataManagerConfig.getConsumerClientIdSuffix() : "";
+        instanceDataManagerConfig != null ? instanceDataManagerConfig.getConsumerClientIdSuffix() : null;
     if (StringUtils.isNotBlank(clientIdSuffix)) {
-      clientIdSuffix = "-" + clientIdSuffix;
+      _clientId = _tableNameWithType + "-" + streamTopic + "-" + _partitionGroupId + "-" + clientIdSuffix;
+    } else {
+      _clientId = _tableNameWithType + "-" + streamTopic + "-" + _partitionGroupId;
     }
-    _clientId = _tableNameWithType + "-" + streamTopic + "-" + _partitionGroupId + clientIdSuffix;
     _segmentLogger = LoggerFactory.getLogger(RealtimeSegmentDataManager.class.getName() + "_" + _segmentNameStr);
     _tableStreamName = _tableNameWithType + "_" + streamTopic;
     if (_indexLoadingConfig.isRealtimeOffHeapAllocation() && !_indexLoadingConfig.isDirectRealtimeOffHeapAllocation()) {
