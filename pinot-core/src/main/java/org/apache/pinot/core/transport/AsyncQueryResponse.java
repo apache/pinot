@@ -18,8 +18,9 @@
  */
 package org.apache.pinot.core.transport;
 
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -28,7 +29,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.datatable.DataTable;
-import org.apache.pinot.common.utils.HashUtil;
+import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 
 
@@ -41,7 +42,7 @@ public class AsyncQueryResponse implements QueryResponse {
   private final long _requestId;
   private final AtomicReference<Status> _status = new AtomicReference<>(Status.IN_PROGRESS);
   private final AtomicInteger _numServersResponded = new AtomicInteger();
-  private final ConcurrentHashMap<ServerRoutingInstance, ServerResponse> _responseMap;
+  private final Map<ServerRoutingInstance, Map<Integer, ServerResponse>> _responses;
   private final CountDownLatch _countDownLatch;
   private final long _maxEndTimeMs;
   private final long _timeoutMs;
@@ -50,21 +51,31 @@ public class AsyncQueryResponse implements QueryResponse {
   private volatile ServerRoutingInstance _failedServer;
   private volatile Exception _exception;
 
-  public AsyncQueryResponse(QueryRouter queryRouter, long requestId, Set<ServerRoutingInstance> serversQueried,
-      long startTimeMs, long timeoutMs, ServerRoutingStatsManager serverRoutingStatsManager) {
+  public AsyncQueryResponse(QueryRouter queryRouter, long requestId,
+//      Set<ServerQueryRoutingContext> serverQueryRoutingContexts,
+      Map<ServerRoutingInstance, List<InstanceRequest>> requestMap, long startTimeMs, long timeoutMs,
+      ServerRoutingStatsManager serverRoutingStatsManager) {
     _queryRouter = queryRouter;
     _requestId = requestId;
-    int numServersQueried = serversQueried.size();
-    _responseMap = new ConcurrentHashMap<>(HashUtil.getHashMapCapacity(numServersQueried));
+    _responses = new ConcurrentHashMap<>();
     _serverRoutingStatsManager = serverRoutingStatsManager;
-    for (ServerRoutingInstance serverRoutingInstance : serversQueried) {
-      // Record stats related to query submission just before sending the request. Otherwise, if the response is
-      // received immediately, there's a possibility of updating query response stats before updating query
-      // submission stats.
-      _serverRoutingStatsManager.recordStatsForQuerySubmission(requestId, serverRoutingInstance.getInstanceId());
-      _responseMap.put(serverRoutingInstance, new ServerResponse(startTimeMs));
+    int numQueriesIssued = 0;
+    for (Map.Entry<ServerRoutingInstance, List<InstanceRequest>> serverRequests : requestMap.entrySet()) {
+      for (InstanceRequest request : serverRequests.getValue()) {
+        // Record stats related to query submission just before sending the request. Otherwise, if the response is
+        // received immediately, there's a possibility of updating query response stats before updating query
+        // submission stats.
+        _serverRoutingStatsManager.recordStatsForQuerySubmission(requestId, serverRequests.getKey().getInstanceId());
+
+        _responses.computeIfAbsent(serverRequests.getKey(), k -> new HashMap<>())
+            // we use query hash so that the same hash ID can be passed back from servers more easily than trying to
+            // instantiate a valid InstanceRequest obj and send its hash
+            .put(request.getQuery().getPinotQuery().hashCode(), new ServerResponse(startTimeMs));
+        numQueriesIssued++;
+      }
     }
-    _countDownLatch = new CountDownLatch(numServersQueried);
+
+    _countDownLatch = new CountDownLatch(numQueriesIssued);
     _timeoutMs = timeoutMs;
     _maxEndTimeMs = startTimeMs + timeoutMs;
   }
@@ -80,30 +91,32 @@ public class AsyncQueryResponse implements QueryResponse {
   }
 
   @Override
-  public Map<ServerRoutingInstance, ServerResponse> getCurrentResponses() {
-    return _responseMap;
+  public Map<ServerRoutingInstance, Map<Integer, ServerResponse>> getCurrentResponses() {
+    return _responses;
   }
 
   @Override
-  public Map<ServerRoutingInstance, ServerResponse> getFinalResponses()
+  public Map<ServerRoutingInstance, Map<Integer, ServerResponse>> getFinalResponses()
       throws InterruptedException {
     try {
       boolean finish = _countDownLatch.await(_maxEndTimeMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
       _status.compareAndSet(Status.IN_PROGRESS, finish ? Status.COMPLETED : Status.TIMED_OUT);
-      return _responseMap;
+      return _responses;
     } finally {
       // Update ServerRoutingStats for query completion. This is done here to ensure that the stats are updated for
       // servers even if the query times out or if servers have not responded.
-      for (Map.Entry<ServerRoutingInstance, ServerResponse> entry : _responseMap.entrySet()) {
-        ServerResponse response = entry.getValue();
+      for (Map.Entry<ServerRoutingInstance, Map<Integer, ServerResponse>> serverResponses : _responses.entrySet()) {
+        for (Map.Entry<Integer, ServerResponse> responsePair : serverResponses.getValue().entrySet()) {
+          ServerResponse response = responsePair.getValue();
 
-        // ServerResponse returns -1 if responseDelayMs is not set. This indicates that a response was not received
-        // from the server. Hence we set the latency to the timeout value.
-        long latency =
-            (response != null && response.getResponseDelayMs() >= 0) ? response.getResponseDelayMs() : _timeoutMs;
-        _serverRoutingStatsManager.recordStatsUponResponseArrival(_requestId, entry.getKey().getInstanceId(), latency);
+          // ServerResponse returns -1 if responseDelayMs is not set. This indicates that a response was not received
+          // from the server. Hence we set the latency to the timeout value.
+          long latency =
+              (response != null && response.getResponseDelayMs() >= 0) ? response.getResponseDelayMs() : _timeoutMs;
+          _serverRoutingStatsManager.recordStatsUponResponseArrival(_requestId,
+              serverResponses.getKey().getInstanceId(), latency);
+        }
       }
-
       _queryRouter.markQueryDone(_requestId);
     }
   }
@@ -112,15 +125,21 @@ public class AsyncQueryResponse implements QueryResponse {
   public String getServerStats() {
     StringBuilder stringBuilder = new StringBuilder(
         "(Server=SubmitDelayMs,ResponseDelayMs,ResponseSize,DeserializationTimeMs,RequestSentDelayMs)");
-    for (Map.Entry<ServerRoutingInstance, ServerResponse> entry : _responseMap.entrySet()) {
-      stringBuilder.append(';').append(entry.getKey().getShortName()).append('=').append(entry.getValue().toString());
+    for (Map.Entry<ServerRoutingInstance, Map<Integer, ServerResponse>> serverResponses : _responses.entrySet()) {
+      for (Map.Entry<Integer, ServerResponse> responsePair : serverResponses.getValue().entrySet()) {
+        ServerRoutingInstance serverRoutingInstance = serverResponses.getKey();
+        stringBuilder.append(';').append(serverRoutingInstance.getShortName()).append('=')
+            .append(responsePair.getValue().toString());
+      }
     }
     return stringBuilder.toString();
   }
 
   @Override
   public long getServerResponseDelayMs(ServerRoutingInstance serverRoutingInstance) {
-    return _responseMap.get(serverRoutingInstance).getResponseDelayMs();
+    // TODO(egalpin): How to get query hash here?
+    return -1L;
+//    return _responseMap.get(serverRoutingInstance).getResponseDelayMs();
   }
 
   @Nullable
@@ -144,21 +163,23 @@ public class AsyncQueryResponse implements QueryResponse {
     return _timeoutMs;
   }
 
-  void markRequestSubmitted(ServerRoutingInstance serverRoutingInstance) {
-    _responseMap.get(serverRoutingInstance).markRequestSubmitted();
+  void markRequestSubmitted(ServerRoutingInstance serverRoutingInstance, InstanceRequest instanceRequest) {
+    _responses.get(serverRoutingInstance).get(instanceRequest.getQuery().getPinotQuery().hashCode())
+        .markRequestSubmitted();
   }
 
-  void markRequestSent(ServerRoutingInstance serverRoutingInstance, int requestSentLatencyMs) {
-    _responseMap.get(serverRoutingInstance).markRequestSent(requestSentLatencyMs);
+  void markRequestSent(ServerRoutingInstance serverRoutingInstance, InstanceRequest instanceRequest,
+      int requestSentLatencyMs) {
+    _responses.get(serverRoutingInstance).get(instanceRequest.getQuery().hashCode())
+        .markRequestSent(requestSentLatencyMs);
   }
 
-  void receiveDataTable(ServerRoutingInstance serverRoutingInstance, DataTable dataTable, int responseSize,
-      int deserializationTimeMs) {
-    ServerResponse response = _responseMap.get(serverRoutingInstance);
+  void receiveDataTable(ServerRoutingInstance serverRoutingInstance, int queryHash, DataTable dataTable,
+      int responseSize, int deserializationTimeMs) {
+    ServerResponse response = _responses.get(serverRoutingInstance).get(queryHash);
     response.receiveDataTable(dataTable, responseSize, deserializationTimeMs);
-
-    _numServersResponded.getAndIncrement();
     _countDownLatch.countDown();
+    _numServersResponded.getAndIncrement();
   }
 
   void markQueryFailed(ServerRoutingInstance serverRoutingInstance, Exception exception) {
@@ -176,9 +197,13 @@ public class AsyncQueryResponse implements QueryResponse {
    * server hasn't responded yet.
    */
   void markServerDown(ServerRoutingInstance serverRoutingInstance, Exception exception) {
-    ServerResponse serverResponse = _responseMap.get(serverRoutingInstance);
-    if (serverResponse != null && serverResponse.getDataTable() == null) {
-      markQueryFailed(serverRoutingInstance, exception);
+    // TODO(egalpin): how to make servers down under the assumption that multiple queries
+    // to the same server are valid?
+    Map<Integer, ServerResponse> serverResponses = _responses.get(serverRoutingInstance);
+    for (ServerResponse serverResponse : serverResponses.values()) {
+      if (serverResponse != null && serverResponse.getDataTable() == null) {
+        markQueryFailed(serverRoutingInstance, exception);
+      }
     }
   }
 

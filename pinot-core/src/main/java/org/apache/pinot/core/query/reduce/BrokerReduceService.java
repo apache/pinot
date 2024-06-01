@@ -20,6 +20,7 @@ package org.apache.pinot.core.query.reduce;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -59,7 +60,8 @@ public class BrokerReduceService extends BaseReduceService {
   }
 
   public BrokerResponseNative reduceOnDataTable(BrokerRequest brokerRequest, BrokerRequest serverBrokerRequest,
-      Map<ServerRoutingInstance, DataTable> dataTableMap, long reduceTimeOutMs, BrokerMetrics brokerMetrics) {
+      Map<ServerRoutingInstance, Collection<DataTable>> dataTableMap, long reduceTimeOutMs,
+      BrokerMetrics brokerMetrics) {
     if (dataTableMap.isEmpty()) {
       // Empty response.
       return BrokerResponseNative.empty();
@@ -78,35 +80,38 @@ public class BrokerReduceService extends BaseReduceService {
     List<ServerRoutingInstance> serversWithConflictingDataSchema = new ArrayList<>();
 
     // Process server response metadata.
-    Iterator<Map.Entry<ServerRoutingInstance, DataTable>> iterator = dataTableMap.entrySet().iterator();
-    while (iterator.hasNext()) {
-      Map.Entry<ServerRoutingInstance, DataTable> entry = iterator.next();
-      DataTable dataTable = entry.getValue();
+    for (Map.Entry<ServerRoutingInstance, Collection<DataTable>> serverResponses : dataTableMap.entrySet()) {
+      Iterator<DataTable> tableIter = serverResponses.getValue().iterator();
+      while (tableIter.hasNext()) {
+        DataTable dataTable = tableIter.next();
+        ServerRoutingInstance serverRoutingInstance = serverResponses.getKey();
 
-      // aggregate metrics
-      aggregator.aggregate(entry.getKey(), dataTable);
+        // aggregate metrics
+        aggregator.aggregate(serverRoutingInstance, dataTable);
 
-      // After processing the metadata, remove data tables without data rows inside.
-      DataSchema dataSchema = dataTable.getDataSchema();
-      if (dataSchema == null) {
-        iterator.remove();
-      } else {
-        // Try to cache a data table with data rows inside, or cache one with data schema inside.
-        if (dataTable.getNumberOfRows() == 0) {
-          if (dataSchemaFromEmptyDataTable == null) {
-            dataSchemaFromEmptyDataTable = dataSchema;
-          }
-          iterator.remove();
+        // After processing the metadata, remove data tables without data rows inside.
+        DataSchema dataSchema = dataTable.getDataSchema();
+        if (dataSchema == null) {
+          tableIter.remove();
         } else {
-          if (dataSchemaFromNonEmptyDataTable == null) {
-            dataSchemaFromNonEmptyDataTable = dataSchema;
+          // Try to cache a data table with data rows inside, or cache one with data schema inside.
+          if (dataTable.getNumberOfRows() == 0) {
+            if (dataSchemaFromEmptyDataTable == null) {
+              dataSchemaFromEmptyDataTable = dataSchema;
+            }
+            tableIter.remove();
           } else {
-            // Remove data tables with conflicting data schema.
-            // NOTE: Only compare the column data types, since the column names (string representation of expression)
-            //       can change across different versions.
-            if (!Arrays.equals(dataSchema.getColumnDataTypes(), dataSchemaFromNonEmptyDataTable.getColumnDataTypes())) {
-              serversWithConflictingDataSchema.add(entry.getKey());
-              iterator.remove();
+            if (dataSchemaFromNonEmptyDataTable == null) {
+              dataSchemaFromNonEmptyDataTable = dataSchema;
+            } else {
+              // Remove data tables with conflicting data schema.
+              // NOTE: Only compare the column data types, since the column names (string representation of expression)
+              //       can change across different versions.
+              if (!Arrays.equals(dataSchema.getColumnDataTypes(),
+                  dataSchemaFromNonEmptyDataTable.getColumnDataTypes())) {
+                serversWithConflictingDataSchema.add(serverRoutingInstance);
+                tableIter.remove();
+              }
             }
           }
         }

@@ -49,12 +49,12 @@ public interface QueryResponse {
   /**
    * Returns the current server responses without blocking.
    */
-  Map<ServerRoutingInstance, ServerResponse> getCurrentResponses();
+  Map<ServerRoutingInstance, Map<Integer, ServerResponse>> getCurrentResponses();
 
   /**
    * Waits until the query is done (COMPLETED, FAILED or TIMED_OUT) and returns the final server responses.
    */
-  Map<ServerRoutingInstance, ServerResponse> getFinalResponses()
+  Map<ServerRoutingInstance, Map<Integer, ServerResponse>> getFinalResponses()
       throws InterruptedException;
 
   /**

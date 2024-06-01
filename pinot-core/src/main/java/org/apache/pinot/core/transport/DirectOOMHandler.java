@@ -73,7 +73,8 @@ public class DirectOOMHandler extends ChannelInboundHandlerAdapter {
       if (DIRECT_OOM_SHUTTING_DOWN.compareAndSet(false, true)) {
         try {
           LOGGER.error("Closing ALL channels to servers, as we are running out of direct memory "
-              + "while receiving response from {}", _serverRoutingInstance, cause);
+                  + "while receiving response from {}",
+              _serverRoutingInstance, cause);
           // close all channels to servers
           _serverToChannelMap.keySet().forEach(serverRoutingInstance -> {
             ServerChannels.ServerChannel removed = _serverToChannelMap.remove(serverRoutingInstance);

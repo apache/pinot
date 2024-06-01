@@ -19,6 +19,8 @@
 package org.apache.pinot.core.query.reduce;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -33,7 +35,6 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
-import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
@@ -63,11 +64,11 @@ public class BrokerReduceServiceTest {
       dataTableBuilder.finishRow();
     }
     DataTable dataTable = dataTableBuilder.build();
-    Map<ServerRoutingInstance, DataTable> dataTableMap = new HashMap<>();
+    Map<ServerRoutingInstance, Collection<DataTable>> dataTableMap = new HashMap<>();
     int numInstances = 1000;
     for (int i = 0; i < numInstances; i++) {
-      ServerRoutingInstance instance = new ServerRoutingInstance("localhost", i, TableType.OFFLINE);
-      dataTableMap.put(instance, dataTable);
+      ServerRoutingInstance instance = new ServerRoutingInstance("localhost", i);
+      dataTableMap.computeIfAbsent(instance, k -> new ArrayList<>()).add(dataTable);
     }
     long reduceTimeoutMs = 1;
     BrokerResponseNative brokerResponse =

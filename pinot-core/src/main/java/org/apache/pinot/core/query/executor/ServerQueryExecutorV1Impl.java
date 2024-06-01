@@ -133,20 +133,26 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   @Override
   public InstanceResponseBlock execute(ServerQueryRequest queryRequest, ExecutorService executorService,
       @Nullable ResultsBlockStreamer streamer) {
+    InstanceResponseBlock responseBlock;
+
     if (!queryRequest.isEnableTrace()) {
-      return executeInternal(queryRequest, executorService, streamer);
+      responseBlock = executeInternal(queryRequest, executorService, streamer);
+    } else {
+      try {
+        long requestId = queryRequest.getRequestId();
+        // NOTE: Use negative request id as trace id for REALTIME table to prevent id conflict when the same request
+        //       hitting both OFFLINE and REALTIME table (hybrid table setup)
+        long traceId =
+            TableNameBuilder.isRealtimeTableResource(queryRequest.getTableNameWithType()) ? -requestId : requestId;
+        Tracing.getTracer().register(traceId);
+        responseBlock = executeInternal(queryRequest, executorService, streamer);
+      } finally {
+        Tracing.getTracer().unregister();
+      }
     }
-    try {
-      long requestId = queryRequest.getRequestId();
-      // NOTE: Use negative request id as trace id for REALTIME table to prevent id conflict when the same request
-      //       hitting both OFFLINE and REALTIME table (hybrid table setup)
-      long traceId =
-          TableNameBuilder.isRealtimeTableResource(queryRequest.getTableNameWithType()) ? -requestId : requestId;
-      Tracing.getTracer().register(traceId);
-      return executeInternal(queryRequest, executorService, streamer);
-    } finally {
-      Tracing.getTracer().unregister();
-    }
+
+    responseBlock.addMetadata(MetadataKey.TABLE.getName(), queryRequest.getTableNameWithType());
+    return responseBlock;
   }
 
   private InstanceResponseBlock executeInternal(ServerQueryRequest queryRequest, ExecutorService executorService,

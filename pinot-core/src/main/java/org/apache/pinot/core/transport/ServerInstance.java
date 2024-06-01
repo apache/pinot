@@ -23,7 +23,6 @@ import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.utils.config.InstanceUtils;
-import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 
@@ -124,27 +123,31 @@ public final class ServerInstance {
     return _nettyTlsPort;
   }
 
+  public boolean isTlsEnabled() {
+    return getNettyTlsPort() > 0;
+  }
+
   // Does not require TLS until all servers guaranteed to be on TLS
   @Deprecated
-  public ServerRoutingInstance toServerRoutingInstance(TableType tableType, boolean preferNettyTls) {
+  public ServerRoutingInstance toServerRoutingInstance(boolean preferNettyTls) {
     if (preferNettyTls && _nettyTlsPort > 0) {
-      return new ServerRoutingInstance(_instanceId, _hostname, _nettyTlsPort, tableType, true);
+      return new ServerRoutingInstance(_instanceId, _hostname, _nettyTlsPort, true);
     } else {
-      return new ServerRoutingInstance(_instanceId, _hostname, _port, tableType);
+      return new ServerRoutingInstance(_instanceId, _hostname, _port);
     }
   }
 
-  public ServerRoutingInstance toServerRoutingInstance(TableType tableType, RoutingType routingType) {
+  public ServerRoutingInstance toServerRoutingInstance(RoutingType routingType) {
     switch (routingType) {
       case NETTY:
         Preconditions.checkState(_port > 0, "Netty port is not configured for server: %s", _instanceId);
-        return new ServerRoutingInstance(_instanceId, _hostname, _port, tableType);
+        return new ServerRoutingInstance(_instanceId, _hostname, _port);
       case GRPC:
         Preconditions.checkState(_grpcPort > 0, "GRPC port is not configured for server: %s", _instanceId);
-        return new ServerRoutingInstance(_instanceId, _hostname, _grpcPort, tableType);
+        return new ServerRoutingInstance(_instanceId, _hostname, _grpcPort);
       case NETTY_TLS:
         Preconditions.checkState(_nettyTlsPort > 0, "Netty TLS port is not configured for server: %s", _instanceId);
-        return new ServerRoutingInstance(_instanceId, _hostname, _nettyTlsPort, tableType, true);
+        return new ServerRoutingInstance(_instanceId, _hostname, _nettyTlsPort, true);
       default:
         throw new IllegalStateException("Unsupported routing type: " + routingType);
     }

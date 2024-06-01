@@ -27,7 +27,6 @@ import java.util.concurrent.TimeoutException;
 import java.util.function.Predicate;
 import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
-import org.apache.pinot.spi.config.table.TableType;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 import org.testng.annotations.Test;
@@ -48,7 +47,7 @@ public class StreamingReduceServiceTest {
     RuntimeException innerException = new RuntimeException(exceptionMessage);
     when(mockedResponse.next()).thenThrow(innerException);
     ExecutorService threadPoolService = Executors.newFixedThreadPool(1);
-    ServerRoutingInstance routingInstance = new ServerRoutingInstance("localhost", 9527, TableType.OFFLINE);
+    ServerRoutingInstance routingInstance = new ServerRoutingInstance("localhost", 9527);
     // supposedly we can use TestNG's annotation like @Test(expectedExceptions = { IOException.class }) to verify
     // here we hope to verify deeper to make sure the thrown exception is nested inside the exception
     assertTrue(verifyException(() -> {
@@ -77,7 +76,7 @@ public class StreamingReduceServiceTest {
       }
     });
     final ExecutorService threadPoolService = Executors.newFixedThreadPool(1);
-    final ServerRoutingInstance routingInstance = new ServerRoutingInstance("localhost", 9527, TableType.OFFLINE);
+    final ServerRoutingInstance routingInstance = new ServerRoutingInstance("localhost", 9527);
     //We cannot use TestNG's annotation like @Test(expectedExceptions = { IOException.class }) to verify
     // because the Exception we hope to verify is nested inside the final exception.
     assertTrue(verifyException(() -> {

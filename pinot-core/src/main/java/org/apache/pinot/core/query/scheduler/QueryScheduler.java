@@ -131,6 +131,7 @@ public abstract class QueryScheduler {
    * @return serialized query response
    */
   @Nullable
+  // egalpin: where dataTable is created and serialized
   protected byte[] processQueryAndSerialize(ServerQueryRequest queryRequest, ExecutorService executorService) {
 
     //Start instrumentation context. This must not be moved further below interspersed into the code.
@@ -153,6 +154,7 @@ public abstract class QueryScheduler {
       long requestId = queryRequest.getRequestId();
       Map<String, String> responseMetadata = instanceResponse.getResponseMetadata();
       responseMetadata.put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
+      responseMetadata.put(MetadataKey.QUERY_HASH.getName(), Integer.toString(queryRequest.getQueryHash()));
       byte[] responseBytes = serializeResponse(queryRequest, instanceResponse);
 
       // Log the statistics
