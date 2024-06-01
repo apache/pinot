@@ -84,9 +84,9 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     assertEquals(explain,
         "Execution Plan\n"
         + "LogicalProject(EXPR$0=[CASE(=($1, 0), null:BIGINT, $0)])\n"
-        + "  LogicalAggregate(group=[{}], agg#0=[COUNT($0)], agg#1=[COUNT($1)])\n"
+        + "  PinotLogicalAggregate(group=[{}], agg#0=[COUNT($0)], agg#1=[COUNT($1)])\n"
         + "    PinotLogicalExchange(distribution=[hash])\n"
-        + "      LogicalAggregate(group=[{}], agg#0=[COUNT() FILTER $0], agg#1=[COUNT()])\n"
+        + "      PinotLogicalAggregate(group=[{}], agg#0=[COUNT() FILTER $0], agg#1=[COUNT()])\n"
         + "        LogicalProject($f1=[=($0, _UTF-8'a')])\n"
         + "          LogicalTableScan(table=[[default, a]])\n");
   }
@@ -458,10 +458,11 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
         new Object[]{"EXPLAIN PLAN EXCLUDING ATTRIBUTES AS DOT FOR SELECT col1, COUNT(*) FROM a GROUP BY col1",
               "Execution Plan\n"
             + "digraph {\n"
-            + "\"PinotLogicalExchange\\n\" -> \"LogicalAggregate\\n\" [label=\"0\"]\n"
-            + "\"LogicalAggregate\\n\" -> \"PinotLogicalExchange\\n\" [label=\"0\"]\n"
-            + "\"LogicalTableScan\\n\" -> \"LogicalAggregate\\n\" [label=\"0\"]\n"
-            + "}\n"},
+            + "\"PinotLogicalExchange\\n\" -> \"PinotLogicalAggregat\\ne\\n\" [label=\"0\"]\n"
+            + "\"PinotLogicalAggregat\\ne\\n\" -> \"PinotLogicalExchange\\n\" [label=\"0\"]\n"
+            + "\"LogicalTableScan\\n\" -> \"PinotLogicalAggregat\\ne\\n\" [label=\"0\"]\n"
+            + "}\n"
+        },
         new Object[]{"EXPLAIN PLAN FOR SELECT a.col1, b.col3 FROM a JOIN b ON a.col1 = b.col1",
               "Execution Plan\n"
             + "LogicalProject(col1=[$0], col3=[$2])\n"

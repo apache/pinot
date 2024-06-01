@@ -20,9 +20,7 @@ package org.apache.pinot.calcite.rel.rules;
 
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
@@ -39,7 +37,6 @@ import org.apache.calcite.rel.hint.RelHint;
 import org.apache.calcite.rel.logical.LogicalAggregate;
 import org.apache.calcite.rel.rules.AggregateExtractProjectRule;
 import org.apache.calcite.rel.rules.AggregateReduceFunctionsRule;
-import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
@@ -55,6 +52,7 @@ import org.apache.calcite.util.mapping.MappingType;
 import org.apache.calcite.util.mapping.Mappings;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.calcite.rel.hint.PinotHintStrategyTable;
+import org.apache.pinot.calcite.rel.logical.PinotLogicalAggregate;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalExchange;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalSortExchange;
 import org.apache.pinot.calcite.sql.PinotSqlAggFunction;
@@ -89,20 +87,6 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
     super(operand(LogicalAggregate.class, any()), factory, null);
   }
 
-  @Override
-  public boolean matches(RelOptRuleCall call) {
-    if (call.rels.length < 1) {
-      return false;
-    }
-    if (call.rel(0) instanceof Aggregate) {
-      Aggregate agg = call.rel(0);
-      ImmutableList<RelHint> hints = agg.getHints();
-      return !PinotHintStrategyTable.containsHintOption(hints, PinotHintOptions.INTERNAL_AGG_OPTIONS,
-          PinotHintOptions.InternalAggregateOptions.AGG_TYPE);
-    }
-    return false;
-  }
-
   /**
    * Split the AGG into 3 plan fragments, all with the same AGG type (in some cases the final agg name may be different)
    * Pinot internal plan fragment optimization can use the info of the input data type to infer whether it should
@@ -113,18 +97,18 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
    */
   @Override
   public void onMatch(RelOptRuleCall call) {
-    Aggregate argRel = call.rel(0);
-    ImmutableList<RelHint> hints = argRel.getHints();
+    Aggregate aggRel = call.rel(0);
+    ImmutableList<RelHint> hints = aggRel.getHints();
     // Collation is not supported in leaf stage aggregation.
-    RelCollation collation = extractWithInGroupCollation(argRel);
-    boolean hasGroupBy = !argRel.getGroupSet().isEmpty();
+    RelCollation collation = extractWithInGroupCollation(aggRel);
+    boolean hasGroupBy = !aggRel.getGroupSet().isEmpty();
     if (collation != null || (hasGroupBy && PinotHintStrategyTable.isHintOptionTrue(hints,
         PinotHintOptions.AGGREGATE_HINT_OPTIONS,
         PinotHintOptions.AggregateOptions.SKIP_LEAF_STAGE_GROUP_BY_AGGREGATION))) {
       call.transformTo(createPlanWithExchangeDirectAggregation(call, collation));
     } else if (hasGroupBy && PinotHintStrategyTable.isHintOptionTrue(hints, PinotHintOptions.AGGREGATE_HINT_OPTIONS,
         PinotHintOptions.AggregateOptions.IS_PARTITIONED_BY_GROUP_BY_KEYS)) {
-      call.transformTo(createPlanWithDirectAggregation(call));
+      call.transformTo(new PinotLogicalAggregate(aggRel, buildAggCalls(aggRel, AggType.DIRECT), AggType.DIRECT));
     } else {
       call.transformTo(createPlanWithLeafExchangeFinalAggregate(call));
     }
@@ -142,35 +126,11 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
     return null;
   }
 
-  private static RelNode createPlanWithDirectAggregation(RelOptRuleCall call) {
-    Aggregate aggRel = call.rel(0);
-    List<RelHint> newHints =
-        PinotHintStrategyTable.replaceHintOptions(aggRel.getHints(), PinotHintOptions.INTERNAL_AGG_OPTIONS,
-            PinotHintOptions.InternalAggregateOptions.AGG_TYPE, AggType.DIRECT.name());
-    return new LogicalAggregate(aggRel.getCluster(), aggRel.getTraitSet(), newHints, aggRel.getInput(),
-        aggRel.getGroupSet(), aggRel.getGroupSets(), buildAggCalls(aggRel, AggType.DIRECT));
-  }
-
   /**
-   * Aggregate node will be split into LEAF + exchange + FINAL.
-   * TODO: Add optional INTERMEDIATE stage to reduce hotspot.
+   * Use this group by optimization to skip leaf stage aggregation when aggregating at leaf level is not desired. Many
+   * situation could be wasted effort to do group-by on leaf, eg: when cardinality of group by column is very high.
    */
-  private static RelNode createPlanWithLeafExchangeFinalAggregate(RelOptRuleCall call) {
-    Aggregate aggRel = call.rel(0);
-    // Create a LEAF aggregate.
-    Aggregate leafAggRel = convertAggForLeafInput(aggRel);
-    // Create an exchange node over the LEAF aggregate.
-    PinotLogicalExchange exchange = PinotLogicalExchange.create(leafAggRel,
-        RelDistributions.hash(ImmutableIntList.range(0, aggRel.getGroupCount())));
-    // Create a FINAL aggregate over the exchange.
-    return convertAggFromIntermediateInput(call, exchange, AggType.FINAL);
-  }
-
-  /**
-   * Use this group by optimization to skip leaf stage aggregation when aggregating at leaf level is not desired.
-   * Many situation could be wasted effort to do group-by on leaf, eg: when cardinality of group by column is very high.
-   */
-  private static RelNode createPlanWithExchangeDirectAggregation(RelOptRuleCall call,
+  private static PinotLogicalAggregate createPlanWithExchangeDirectAggregation(RelOptRuleCall call,
       @Nullable RelCollation collation) {
     Aggregate aggRel = call.rel(0);
     RelNode input = aggRel.getInput();
@@ -190,11 +150,23 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
       exchange = PinotLogicalExchange.create(input, distribution);
     }
 
-    List<RelHint> newHints =
-        PinotHintStrategyTable.replaceHintOptions(aggRel.getHints(), PinotHintOptions.INTERNAL_AGG_OPTIONS,
-            PinotHintOptions.InternalAggregateOptions.AGG_TYPE, AggType.DIRECT.name());
-    return new LogicalAggregate(aggRel.getCluster(), aggRel.getTraitSet(), newHints, exchange, groupSet,
-        aggRel.getGroupSets(), buildAggCalls(aggRel, AggType.DIRECT));
+    return new PinotLogicalAggregate(aggRel, exchange, buildAggCalls(aggRel, AggType.DIRECT), AggType.DIRECT);
+  }
+
+  /**
+   * Aggregate node will be split into LEAF + EXCHANGE + FINAL.
+   * TODO: Add optional INTERMEDIATE stage to reduce hotspot.
+   */
+  private static PinotLogicalAggregate createPlanWithLeafExchangeFinalAggregate(RelOptRuleCall call) {
+    Aggregate aggRel = call.rel(0);
+    // Create a LEAF aggregate.
+    PinotLogicalAggregate leafAggRel =
+        new PinotLogicalAggregate(aggRel, buildAggCalls(aggRel, AggType.LEAF), AggType.LEAF);
+    // Create an EXCHANGE node over the LEAF aggregate.
+    PinotLogicalExchange exchange = PinotLogicalExchange.create(leafAggRel,
+        RelDistributions.hash(ImmutableIntList.range(0, aggRel.getGroupCount())));
+    // Create a FINAL aggregate over the EXCHANGE.
+    return convertAggFromIntermediateInput(call, exchange, AggType.FINAL);
   }
 
   /**
@@ -246,29 +218,18 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
     return relBuilder.build();
   }
 
-  private static Aggregate convertAggForLeafInput(Aggregate aggRel) {
-    List<RelHint> newHints =
-        PinotHintStrategyTable.replaceHintOptions(aggRel.getHints(), PinotHintOptions.INTERNAL_AGG_OPTIONS,
-            PinotHintOptions.InternalAggregateOptions.AGG_TYPE, AggType.LEAF.name());
-    return new LogicalAggregate(aggRel.getCluster(), aggRel.getTraitSet(), newHints, aggRel.getInput(),
-        aggRel.getGroupSet(), aggRel.getGroupSets(), buildAggCalls(aggRel, AggType.LEAF));
-  }
-
-  private static RelNode convertAggFromIntermediateInput(RelOptRuleCall call, PinotLogicalExchange exchange,
-      AggType aggType) {
+  private static PinotLogicalAggregate convertAggFromIntermediateInput(RelOptRuleCall call,
+      PinotLogicalExchange exchange, AggType aggType) {
     Aggregate aggRel = call.rel(0);
     RelNode input = PinotRuleUtils.unboxRel(aggRel.getInput());
     List<RexNode> projects = (input instanceof Project) ? ((Project) input).getProjects() : null;
 
-    RexBuilder rexBuilder = exchange.getCluster().getRexBuilder();
+    // Create new AggregateCalls from exchange input. Exchange produces results with group keys followed by intermediate
+    // aggregate results.
     int groupCount = aggRel.getGroupCount();
     List<AggregateCall> orgAggCalls = aggRel.getAggCallList();
     int numAggCalls = orgAggCalls.size();
     List<AggregateCall> aggCalls = new ArrayList<>(numAggCalls);
-    Map<AggregateCall, RexNode> aggCallMapping = new HashMap<>();
-
-    // Create new AggregateCalls from exchange input. Exchange produces results with group keys followed by intermediate
-    // aggregate results.
     for (int i = 0; i < numAggCalls; i++) {
       AggregateCall orgAggCall = orgAggCalls.get(i);
       List<Integer> argList = orgAggCall.getArgList();
@@ -292,19 +253,10 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
           }
         }
       }
-      AggregateCall newAggregate = buildAggCall(exchange, orgAggCall, rexList, groupCount, aggType);
-      rexBuilder.addAggCall(newAggregate, groupCount, aggCalls, aggCallMapping, aggRel.getInput()::fieldIsNullable);
+      aggCalls.add(buildAggCall(exchange, orgAggCall, rexList, groupCount, aggType));
     }
 
-    RelBuilder relBuilder = call.builder();
-    relBuilder.push(exchange);
-    ImmutableBitSet groupSet = ImmutableBitSet.range(groupCount);
-    relBuilder.aggregate(relBuilder.groupKey(groupSet, ImmutableList.of(groupSet)), aggCalls);
-    List<RelHint> newHints =
-        PinotHintStrategyTable.replaceHintOptions(aggRel.getHints(), PinotHintOptions.INTERNAL_AGG_OPTIONS,
-            PinotHintOptions.InternalAggregateOptions.AGG_TYPE, aggType.name());
-    relBuilder.hints(newHints);
-    return relBuilder.build();
+    return new PinotLogicalAggregate(aggRel, exchange, ImmutableBitSet.range(groupCount), aggCalls, aggType);
   }
 
   private static List<AggregateCall> buildAggCalls(Aggregate aggRel, AggType aggType) {

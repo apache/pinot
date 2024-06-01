@@ -32,7 +32,6 @@ import org.apache.calcite.rel.core.JoinInfo;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.core.SetOp;
 import org.apache.calcite.rel.core.SortExchange;
-import org.apache.calcite.rel.logical.LogicalAggregate;
 import org.apache.calcite.rel.logical.LogicalFilter;
 import org.apache.calcite.rel.logical.LogicalJoin;
 import org.apache.calcite.rel.logical.LogicalProject;
@@ -46,6 +45,7 @@ import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rel.type.RelRecordType;
 import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.type.SqlTypeName;
+import org.apache.pinot.calcite.rel.logical.PinotLogicalAggregate;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalExchange;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalSortExchange;
 import org.apache.pinot.common.utils.DataSchema;
@@ -94,8 +94,8 @@ public final class RelToPlanNodeConverter {
       return convertLogicalProject((LogicalProject) node, currentStageId);
     } else if (node instanceof LogicalFilter) {
       return convertLogicalFilter((LogicalFilter) node, currentStageId);
-    } else if (node instanceof LogicalAggregate) {
-      return convertLogicalAggregate((LogicalAggregate) node, currentStageId);
+    } else if (node instanceof PinotLogicalAggregate) {
+      return convertLogicalAggregate((PinotLogicalAggregate) node, currentStageId);
     } else if (node instanceof LogicalSort) {
       return convertLogicalSort((LogicalSort) node, currentStageId);
     } else if (node instanceof LogicalValues) {
@@ -163,9 +163,9 @@ public final class RelToPlanNodeConverter {
         toDataSchema(node.getRowType()));
   }
 
-  private static PlanNode convertLogicalAggregate(LogicalAggregate node, int currentStageId) {
+  private static PlanNode convertLogicalAggregate(PinotLogicalAggregate node, int currentStageId) {
     return new AggregateNode(currentStageId, toDataSchema(node.getRowType()), node.getAggCallList(),
-        RexExpressionUtils.fromInputRefs(node.getGroupSet()), node.getHints());
+        RexExpressionUtils.fromInputRefs(node.getGroupSet()), node.getHints(), node.getAggType());
   }
 
   private static PlanNode convertLogicalProject(LogicalProject node, int currentStageId) {
