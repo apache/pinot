@@ -170,7 +170,7 @@ public final class RelToPlanNodeConverter {
 
   private static PlanNode convertLogicalProject(LogicalProject node, int currentStageId) {
     return new ProjectNode(currentStageId, toDataSchema(node.getRowType()),
-        node.getProjects().stream().map(RexExpressionUtils::fromRexNode).collect(Collectors.toList()));
+        RexExpressionUtils.fromRexNodes(node.getProjects()));
   }
 
   private static PlanNode convertLogicalFilter(LogicalFilter node, int currentStageId) {
@@ -196,8 +196,7 @@ public final class RelToPlanNodeConverter {
     // Parse out all equality JOIN conditions
     JoinInfo joinInfo = node.analyzeCondition();
     JoinNode.JoinKeys joinKeys = new JoinNode.JoinKeys(joinInfo.leftKeys, joinInfo.rightKeys);
-    List<RexExpression> joinClause =
-        joinInfo.nonEquiConditions.stream().map(RexExpressionUtils::fromRexNode).collect(Collectors.toList());
+    List<RexExpression> joinClause = RexExpressionUtils.fromRexNodes(joinInfo.nonEquiConditions);
     return new JoinNode(currentStageId, toDataSchema(node.getRowType()), toDataSchema(node.getLeft().getRowType()),
         toDataSchema(node.getRight().getRowType()), joinType, joinKeys, joinClause, node.getHints());
   }

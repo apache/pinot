@@ -28,15 +28,14 @@ import java.util.GregorianCalendar;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
 import org.apache.calcite.avatica.util.ByteString;
 import org.apache.calcite.rel.core.AggregateCall;
-import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.SqlKind;
+import org.apache.calcite.sql.SqlOperator;
 import org.apache.calcite.util.NlsString;
 import org.apache.calcite.util.Sarg;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -59,6 +58,14 @@ public class RexExpressionUtils {
     } else {
       throw new IllegalArgumentException("Unsupported RexNode type with SqlKind: " + rexNode.getKind());
     }
+  }
+
+  public static List<RexExpression> fromRexNodes(List<RexNode> rexNodes) {
+    List<RexExpression> rexExpressions = new ArrayList<>(rexNodes.size());
+    for (RexNode rexNode : rexNodes) {
+      rexExpressions.add(fromRexNode(rexNode));
+    }
+    return rexExpressions;
   }
 
   public static RexExpression.InputRef fromRexInputRef(RexInputRef rexInputRef) {
@@ -98,9 +105,7 @@ public class RexExpressionUtils {
   }
 
   public static RexExpression fromRexCall(RexCall rexCall) {
-    switch (rexCall.getKind()) {
-      case CASE:
-        return handleCase(rexCall);
+    switch (rexCall.op.kind) {
       case CAST:
         return handleCast(rexCall);
       case REINTERPRET:
@@ -108,54 +113,53 @@ public class RexExpressionUtils {
       case SEARCH:
         return handleSearch(rexCall);
       default:
-        List<RexExpression> operands =
-            rexCall.getOperands().stream().map(RexExpressionUtils::fromRexNode).collect(Collectors.toList());
-        return new RexExpression.FunctionCall(rexCall.getKind(),
-            RelToPlanNodeConverter.convertToColumnDataType(rexCall.getType()), rexCall.getOperator().getName(),
-            operands);
+        return new RexExpression.FunctionCall(RelToPlanNodeConverter.convertToColumnDataType(rexCall.type),
+            getFunctionName(rexCall.op), fromRexNodes(rexCall.operands));
     }
   }
 
-  private static RexExpression.FunctionCall handleCase(RexCall rexCall) {
-    List<RexExpression> operands =
-        rexCall.getOperands().stream().map(RexExpressionUtils::fromRexNode).collect(Collectors.toList());
-    return new RexExpression.FunctionCall(SqlKind.CASE,
-        RelToPlanNodeConverter.convertToColumnDataType(rexCall.getType()), "caseWhen", operands);
+  private static String getFunctionName(SqlOperator operator) {
+    switch (operator.kind) {
+      case OTHER:
+        // NOTE: SqlStdOperatorTable.CONCAT has OTHER kind and "||" as name
+        return operator.getName().equals("||") ? "CONCAT" : operator.getName();
+      case OTHER_FUNCTION:
+        return operator.getName();
+      default:
+        return operator.kind.name();
+    }
   }
 
   private static RexExpression.FunctionCall handleCast(RexCall rexCall) {
     // CAST is being rewritten into "rexCall.CAST<targetType>(inputValue)",
     //   - e.g. result type has already been converted into the CAST RexCall, so we assert single operand.
-    List<RexExpression> operands =
-        rexCall.getOperands().stream().map(RexExpressionUtils::fromRexNode).collect(Collectors.toList());
-    Preconditions.checkState(operands.size() == 1, "CAST takes exactly 2 arguments");
-    RelDataType castType = rexCall.getType();
-    operands.add(new RexExpression.Literal(ColumnDataType.STRING,
-        RelToPlanNodeConverter.convertToColumnDataType(castType).name()));
-    return new RexExpression.FunctionCall(SqlKind.CAST, RelToPlanNodeConverter.convertToColumnDataType(castType),
-        "CAST", operands);
+    assert rexCall.operands.size() == 1;
+    List<RexExpression> operands = new ArrayList<>(2);
+    operands.add(fromRexNode(rexCall.operands.get(0)));
+    ColumnDataType castType = RelToPlanNodeConverter.convertToColumnDataType(rexCall.type);
+    operands.add(new RexExpression.Literal(ColumnDataType.STRING, castType.name()));
+    return new RexExpression.FunctionCall(castType, SqlKind.CAST.name(), operands);
   }
 
   /**
    * Reinterpret is a pass-through function that does not change the type of the input.
    */
   private static RexExpression handleReinterpret(RexCall rexCall) {
-    List<RexNode> operands = rexCall.getOperands();
-    Preconditions.checkState(operands.size() == 1, "REINTERPRET takes only 1 argument");
-    return fromRexNode(operands.get(0));
+    assert rexCall.operands.size() == 1;
+    return fromRexNode(rexCall.operands.get(0));
   }
 
   private static RexExpression handleSearch(RexCall rexCall) {
-    List<RexNode> operands = rexCall.getOperands();
-    RexInputRef rexInputRef = (RexInputRef) operands.get(0);
-    RexLiteral rexLiteral = (RexLiteral) operands.get(1);
+    assert rexCall.operands.size() == 2;
+    RexInputRef rexInputRef = (RexInputRef) rexCall.operands.get(0);
+    RexLiteral rexLiteral = (RexLiteral) rexCall.operands.get(1);
     ColumnDataType dataType = RelToPlanNodeConverter.convertToColumnDataType(rexLiteral.getType());
     Sarg sarg = rexLiteral.getValueAs(Sarg.class);
     if (sarg.isPoints()) {
-      return new RexExpression.FunctionCall(SqlKind.IN, dataType, SqlKind.IN.name(),
+      return new RexExpression.FunctionCall(dataType, SqlKind.IN.name(),
           toFunctionOperands(rexInputRef, sarg.rangeSet.asRanges(), dataType));
     } else if (sarg.isComplementedPoints()) {
-      return new RexExpression.FunctionCall(SqlKind.NOT_IN, dataType, SqlKind.NOT_IN.name(),
+      return new RexExpression.FunctionCall(dataType, SqlKind.NOT_IN.name(),
           toFunctionOperands(rexInputRef, sarg.rangeSet.complement().asRanges(), dataType));
     } else {
       Set<Range<?>> ranges = sarg.rangeSet.asRanges();
@@ -190,7 +194,7 @@ public class RexExpressionUtils {
         }
       }
       ImmutableList<RexExpression> operands = ImmutableList.of(result, newExp);
-      result = new RexExpression.FunctionCall(SqlKind.OR, ColumnDataType.BOOLEAN, SqlKind.OR.name(), operands);
+      result = new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.OR.name(), operands);
     }
     return result;
   }
@@ -212,7 +216,7 @@ public class RexExpressionUtils {
       RexExpression upperConstraint =
           convertUpperBound(rexInput, dataType, range.upperBoundType(), range.upperEndpoint());
       ImmutableList<RexExpression> operands = ImmutableList.of(lowerConstraint, upperConstraint);
-      return new RexExpression.FunctionCall(SqlKind.AND, ColumnDataType.BOOLEAN, SqlKind.AND.name(), operands);
+      return new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.AND.name(), operands);
     }
   }
 
@@ -221,7 +225,7 @@ public class RexExpressionUtils {
     SqlKind sqlKind = boundType == BoundType.OPEN ? SqlKind.GREATER_THAN : SqlKind.GREATER_THAN_OR_EQUAL;
     RexExpression.Literal literal = new RexExpression.Literal(dataType, convertValue(dataType, endpoint));
     ImmutableList<RexExpression> operands = ImmutableList.of(inputRef, literal);
-    return new RexExpression.FunctionCall(sqlKind, ColumnDataType.BOOLEAN, sqlKind.name(), operands);
+    return new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, sqlKind.name(), operands);
   }
 
   private static RexExpression convertUpperBound(RexExpression.InputRef inputRef, ColumnDataType dataType,
@@ -229,7 +233,7 @@ public class RexExpressionUtils {
     SqlKind sqlKind = boundType == BoundType.OPEN ? SqlKind.LESS_THAN : SqlKind.LESS_THAN_OR_EQUAL;
     RexExpression.Literal literal = new RexExpression.Literal(dataType, convertValue(dataType, endpoint));
     ImmutableList<RexExpression> operands = ImmutableList.of(inputRef, literal);
-    return new RexExpression.FunctionCall(sqlKind, ColumnDataType.BOOLEAN, sqlKind.name(), operands);
+    return new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, sqlKind.name(), operands);
   }
 
   /**
@@ -246,13 +250,9 @@ public class RexExpressionUtils {
   }
 
   public static RexExpression fromAggregateCall(AggregateCall aggregateCall) {
-    List<RexExpression> operands = new ArrayList<>(aggregateCall.rexList.size());
-    for (RexNode rexNode : aggregateCall.rexList) {
-      operands.add(fromRexNode(rexNode));
-    }
-    return new RexExpression.FunctionCall(aggregateCall.getAggregation().getKind(),
-        RelToPlanNodeConverter.convertToColumnDataType(aggregateCall.getType()),
-        aggregateCall.getAggregation().getName(), operands, aggregateCall.isDistinct());
+    return new RexExpression.FunctionCall(RelToPlanNodeConverter.convertToColumnDataType(aggregateCall.type),
+        getFunctionName(aggregateCall.getAggregation()), fromRexNodes(aggregateCall.rexList),
+        aggregateCall.isDistinct());
   }
 
   public static List<RexExpression> fromInputRefs(Iterable<Integer> inputRefs) {

@@ -26,7 +26,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -249,10 +248,7 @@ public class AggregateOperator extends MultiStageOperator {
     int numKeys = groupSet.size();
     int[] groupKeyIds = new int[numKeys];
     for (int i = 0; i < numKeys; i++) {
-      RexExpression rexExp = groupSet.get(i);
-      Preconditions.checkState(rexExp.getKind() == SqlKind.INPUT_REF, "Group key must be an input reference, got: %s",
-          rexExp.getKind());
-      groupKeyIds[i] = ((RexExpression.InputRef) rexExp).getIndex();
+      groupKeyIds[i] = ((RexExpression.InputRef) groupSet.get(i)).getIndex();
     }
     return groupKeyIds;
   }

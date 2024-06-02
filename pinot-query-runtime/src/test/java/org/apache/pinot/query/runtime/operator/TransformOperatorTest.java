@@ -22,6 +22,7 @@ import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -35,9 +36,6 @@ import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
-
-import static org.apache.calcite.sql.SqlKind.MINUS;
-import static org.apache.calcite.sql.SqlKind.PLUS;
 
 
 public class TransformOperatorTest {
@@ -117,9 +115,9 @@ public class TransformOperatorTest {
     RexExpression.InputRef ref1 = new RexExpression.InputRef(1);
     List<RexExpression> functionOperands = ImmutableList.of(ref0, ref1);
     RexExpression.FunctionCall plus01 =
-        new RexExpression.FunctionCall(PLUS, ColumnDataType.DOUBLE, "plus", functionOperands);
+        new RexExpression.FunctionCall(ColumnDataType.DOUBLE, SqlKind.PLUS.name(), functionOperands);
     RexExpression.FunctionCall minus01 =
-        new RexExpression.FunctionCall(MINUS, ColumnDataType.DOUBLE, "minus", functionOperands);
+        new RexExpression.FunctionCall(ColumnDataType.DOUBLE, SqlKind.MINUS.name(), functionOperands);
     DataSchema resultSchema = new DataSchema(new String[]{"plusR", "minusR"},
         new ColumnDataType[]{ColumnDataType.DOUBLE, ColumnDataType.DOUBLE});
     TransformOperator op = new TransformOperator(OperatorTestUtil.getTracingContext(), _upstreamOp, resultSchema,
@@ -145,9 +143,9 @@ public class TransformOperatorTest {
     RexExpression.InputRef ref1 = new RexExpression.InputRef(1);
     List<RexExpression> functionOperands = ImmutableList.of(ref0, ref1);
     RexExpression.FunctionCall plus01 =
-        new RexExpression.FunctionCall(PLUS, ColumnDataType.DOUBLE, "plus", functionOperands);
+        new RexExpression.FunctionCall(ColumnDataType.DOUBLE, SqlKind.PLUS.name(), functionOperands);
     RexExpression.FunctionCall minus01 =
-        new RexExpression.FunctionCall(MINUS, ColumnDataType.DOUBLE, "minus", functionOperands);
+        new RexExpression.FunctionCall(ColumnDataType.DOUBLE, SqlKind.MINUS.name(), functionOperands);
     DataSchema resultSchema = new DataSchema(new String[]{"plusR", "minusR"},
         new ColumnDataType[]{ColumnDataType.DOUBLE, ColumnDataType.DOUBLE});
     TransformOperator op = new TransformOperator(OperatorTestUtil.getTracingContext(), _upstreamOp, resultSchema,

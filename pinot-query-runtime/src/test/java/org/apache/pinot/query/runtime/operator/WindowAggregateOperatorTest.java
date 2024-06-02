@@ -270,8 +270,8 @@ public class WindowAggregateOperatorTest {
       + "WindowFunction for function name: AVERAGE.*")
   public void testShouldThrowOnUnknownAggFunction() {
     // Given:
-    List<RexExpression> calls = ImmutableList.of(
-        new RexExpression.FunctionCall(SqlKind.AVG, ColumnDataType.INT, "AVERAGE", ImmutableList.of()));
+    List<RexExpression> calls =
+        ImmutableList.of(new RexExpression.FunctionCall(ColumnDataType.INT, "AVERAGE", ImmutableList.of()));
     List<RexExpression> group = ImmutableList.of(new RexExpression.InputRef(0));
     DataSchema outSchema = new DataSchema(new String[]{"unknown"}, new ColumnDataType[]{DOUBLE});
     DataSchema inSchema = new DataSchema(new String[]{"unknown"}, new ColumnDataType[]{DOUBLE});
@@ -290,7 +290,7 @@ public class WindowAggregateOperatorTest {
     // TODO: Remove this test when support is added for NTILE function
     // Given:
     List<RexExpression> calls =
-        ImmutableList.of(new RexExpression.FunctionCall(SqlKind.RANK, ColumnDataType.INT, "NTILE", ImmutableList.of()));
+        ImmutableList.of(new RexExpression.FunctionCall(ColumnDataType.INT, SqlKind.NTILE.name(), ImmutableList.of()));
     List<RexExpression> group = ImmutableList.of(new RexExpression.InputRef(0));
     DataSchema outSchema = new DataSchema(new String[]{"unknown"}, new ColumnDataType[]{DOUBLE});
     DataSchema inSchema = new DataSchema(new String[]{"unknown"}, new ColumnDataType[]{DOUBLE});
@@ -308,8 +308,8 @@ public class WindowAggregateOperatorTest {
       throws ProcessingException {
     // Given:
     List<RexExpression> calls =
-        ImmutableList.of(new RexExpression.FunctionCall(SqlKind.RANK, ColumnDataType.INT, "RANK", ImmutableList.of()),
-            new RexExpression.FunctionCall(SqlKind.DENSE_RANK, ColumnDataType.INT, "DENSE_RANK", ImmutableList.of()));
+        ImmutableList.of(new RexExpression.FunctionCall(ColumnDataType.INT, SqlKind.RANK.name(), ImmutableList.of()),
+            new RexExpression.FunctionCall(ColumnDataType.INT, SqlKind.DENSE_RANK.name(), ImmutableList.of()));
     List<RexExpression> group = ImmutableList.of(new RexExpression.InputRef(0));
     List<RexExpression> order = ImmutableList.of(new RexExpression.InputRef(1));
 
@@ -368,7 +368,7 @@ public class WindowAggregateOperatorTest {
       throws ProcessingException {
     // Given:
     List<RexExpression> calls = ImmutableList.of(
-        new RexExpression.FunctionCall(SqlKind.ROW_NUMBER, ColumnDataType.INT, "ROW_NUMBER", ImmutableList.of()));
+        new RexExpression.FunctionCall(ColumnDataType.INT, SqlKind.ROW_NUMBER.name(), ImmutableList.of()));
     List<RexExpression> group = ImmutableList.of(new RexExpression.InputRef(0));
     List<RexExpression> order = ImmutableList.of(new RexExpression.InputRef(1));
 
@@ -533,8 +533,8 @@ public class WindowAggregateOperatorTest {
     WindowAggregateOperator operator =
         new WindowAggregateOperator(OperatorTestUtil.getTracingContext(), _input, group, order,
             Arrays.asList(RelFieldCollation.Direction.ASCENDING), Arrays.asList(RelFieldCollation.NullDirection.LAST),
-            calls, Integer.MIN_VALUE, 0, WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema,
-            inSchema, getWindowHints(ImmutableMap.of()));
+            calls, Integer.MIN_VALUE, 0, WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema,
+            getWindowHints(ImmutableMap.of()));
 
     // When:
     TransferableBlock block1 = operator.nextBlock();
@@ -636,8 +636,7 @@ public class WindowAggregateOperatorTest {
     WindowAggregateOperator operator =
         new WindowAggregateOperator(OperatorTestUtil.getTracingContext(), _input, group, Collections.emptyList(),
             Collections.emptyList(), Collections.emptyList(), calls, Integer.MIN_VALUE, Integer.MAX_VALUE,
-            WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema,
-            getWindowHints(hintsMap));
+            WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema, getWindowHints(hintsMap));
 
     // When:
     TransferableBlock block = operator.nextBlock();
@@ -665,8 +664,7 @@ public class WindowAggregateOperatorTest {
     WindowAggregateOperator operator =
         new WindowAggregateOperator(OperatorTestUtil.getTracingContext(), _input, group, Collections.emptyList(),
             Collections.emptyList(), Collections.emptyList(), calls, Integer.MIN_VALUE, Integer.MAX_VALUE,
-            WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema,
-            getWindowHints(hintsMap));
+            WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema, getWindowHints(hintsMap));
 
     // When:
     TransferableBlock firstBlock = operator.nextBlock();
@@ -682,7 +680,7 @@ public class WindowAggregateOperatorTest {
   }
 
   private static RexExpression.FunctionCall getSum(RexExpression arg) {
-    return new RexExpression.FunctionCall(SqlKind.SUM, ColumnDataType.INT, "SUM", ImmutableList.of(arg));
+    return new RexExpression.FunctionCall(ColumnDataType.INT, SqlKind.SUM.name(), ImmutableList.of(arg));
   }
 
   private static AbstractPlanNode.NodeHint getWindowHints(Map<String, String> hintsMap) {

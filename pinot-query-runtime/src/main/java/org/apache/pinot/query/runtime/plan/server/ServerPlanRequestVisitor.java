@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.request.DataSource;
+import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.request.RequestUtils;
@@ -69,12 +70,11 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
     if (visit(node.getInputs().get(0), context)) {
       PinotQuery pinotQuery = context.getPinotQuery();
       if (pinotQuery.getGroupByList() == null) {
-        // set group-by list
-        pinotQuery.setGroupByList(CalciteRexExpressionParser.convertGroupByList(node.getGroupSet(), pinotQuery));
-        // set agg list
+        List<Expression> groupByList = CalciteRexExpressionParser.convertRexNodes(node.getGroupSet(), pinotQuery);
+        pinotQuery.setGroupByList(groupByList);
         pinotQuery.setSelectList(
-            CalciteRexExpressionParser.convertAggregateList(pinotQuery.getGroupByList(), node.getAggCalls(),
-                node.getFilterArgIndices(), pinotQuery));
+            CalciteRexExpressionParser.convertAggregateList(groupByList, node.getAggCalls(), node.getFilterArgIndices(),
+                pinotQuery));
         if (node.getAggType() == AggregateNode.AggType.DIRECT) {
           pinotQuery.putToQueryOptions(CommonConstants.Broker.Request.QueryOptionKey.SERVER_RETURN_FINAL_RESULT,
               "true");
@@ -167,7 +167,7 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
   public Void visitProject(ProjectNode node, ServerPlanRequestContext context) {
     if (visit(node.getInputs().get(0), context)) {
       PinotQuery pinotQuery = context.getPinotQuery();
-      pinotQuery.setSelectList(CalciteRexExpressionParser.convertProjectList(node.getProjects(), pinotQuery));
+      pinotQuery.setSelectList(CalciteRexExpressionParser.convertRexNodes(node.getProjects(), pinotQuery));
     }
     return null;
   }

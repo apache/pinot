@@ -20,7 +20,6 @@ package org.apache.pinot.query.planner.logical;
 
 import java.util.List;
 import org.apache.calcite.rex.RexNode;
-import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.serde.ProtoProperties;
 import org.checkerframework.checker.nullness.qual.Nullable;
@@ -31,13 +30,7 @@ import org.checkerframework.checker.nullness.qual.Nullable;
  */
 public interface RexExpression {
 
-  SqlKind getKind();
-
-  ColumnDataType getDataType();
-
   class InputRef implements RexExpression {
-    @ProtoProperties
-    private SqlKind _sqlKind;
     @ProtoProperties
     private int _index;
 
@@ -45,28 +38,15 @@ public interface RexExpression {
     }
 
     public InputRef(int index) {
-      _sqlKind = SqlKind.INPUT_REF;
       _index = index;
     }
 
     public int getIndex() {
       return _index;
     }
-
-    @Override
-    public SqlKind getKind() {
-      return _sqlKind;
-    }
-
-    @Override
-    public ColumnDataType getDataType() {
-      throw new IllegalStateException("InputRef does not have data type");
-    }
   }
 
   class Literal implements RexExpression {
-    @ProtoProperties
-    private SqlKind _sqlKind;
     @ProtoProperties
     private ColumnDataType _dataType;
     @ProtoProperties
@@ -79,32 +59,21 @@ public interface RexExpression {
      * NOTE: Value is the internal stored value for the data type. E.g. BOOLEAN -> int, TIMESTAMP -> long.
      */
     public Literal(ColumnDataType dataType, @Nullable Object value) {
-      _sqlKind = SqlKind.LITERAL;
       _dataType = dataType;
       _value = value;
     }
 
-    public Object getValue() {
-      return _value;
-    }
-
-    @Override
-    public SqlKind getKind() {
-      return _sqlKind;
-    }
-
-    @Override
     public ColumnDataType getDataType() {
       return _dataType;
+    }
+
+    @Nullable
+    public Object getValue() {
+      return _value;
     }
   }
 
   class FunctionCall implements RexExpression {
-    // the underlying SQL operator kind of this function.
-    // It can be either a standard SQL operator or an extended function kind.
-    // @see #SqlKind.FUNCTION, #SqlKind.OTHER, #SqlKind.OTHER_FUNCTION
-    @ProtoProperties
-    private SqlKind _sqlKind;
     // the return data type of the function.
     @ProtoProperties
     private ColumnDataType _dataType;
@@ -121,18 +90,20 @@ public interface RexExpression {
     public FunctionCall() {
     }
 
-    public FunctionCall(SqlKind sqlKind, ColumnDataType dataType, String functionName,
-        List<RexExpression> functionOperands) {
-      this(sqlKind, dataType, functionName, functionOperands, false);
+    public FunctionCall(ColumnDataType dataType, String functionName, List<RexExpression> functionOperands) {
+      this(dataType, functionName, functionOperands, false);
     }
 
-    public FunctionCall(SqlKind sqlKind, ColumnDataType dataType, String functionName,
-        List<RexExpression> functionOperands, boolean isDistinct) {
-      _sqlKind = sqlKind;
+    public FunctionCall(ColumnDataType dataType, String functionName, List<RexExpression> functionOperands,
+        boolean isDistinct) {
       _dataType = dataType;
       _functionName = functionName;
       _functionOperands = functionOperands;
       _isDistinct = isDistinct;
+    }
+
+    public ColumnDataType getDataType() {
+      return _dataType;
     }
 
     public String getFunctionName() {
@@ -145,16 +116,6 @@ public interface RexExpression {
 
     public boolean isDistinct() {
       return _isDistinct;
-    }
-
-    @Override
-    public SqlKind getKind() {
-      return _sqlKind;
-    }
-
-    @Override
-    public ColumnDataType getDataType() {
-      return _dataType;
     }
   }
 }
