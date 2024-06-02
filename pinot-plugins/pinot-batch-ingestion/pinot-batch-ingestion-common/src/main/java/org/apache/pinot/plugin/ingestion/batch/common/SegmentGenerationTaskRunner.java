@@ -178,7 +178,8 @@ public class SegmentGenerationTaskRunner implements Serializable {
           throw new IllegalArgumentException("Creation time must be a valid long value in segmentGeneratorConfig");
         }
         return new UploadedRealtimeSegmentNameGenerator(tableName,
-            segmentGeneratorConfig.getUploadedSegmentPartitionId(), creationTime);
+            segmentGeneratorConfig.getUploadedSegmentPartitionId(), creationTime,
+            segmentGeneratorConfig.getSegmentNamePostfix());
       default:
         throw new UnsupportedOperationException("Unsupported segment name generator type: " + segmentNameGeneratorType);
     }

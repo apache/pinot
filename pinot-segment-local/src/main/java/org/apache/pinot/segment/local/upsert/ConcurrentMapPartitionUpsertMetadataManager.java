@@ -195,7 +195,7 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
 
     if (uploadedSegmentName != null || currentUploadedSegmentName != null) {
       if (segmentCreationTimeMs == currentSegmentCreationTimeMs) {
-        return UploadedRealtimeSegmentName.isUploadedRealtimeSegmentName(segmentName);
+        return uploadedSegmentName != null;
       } else {
         return segmentCreationTimeMs > currentSegmentCreationTimeMs;
       }

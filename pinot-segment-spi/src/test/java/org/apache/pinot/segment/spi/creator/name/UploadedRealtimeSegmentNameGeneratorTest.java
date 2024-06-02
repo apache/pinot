@@ -33,8 +33,8 @@ public class UploadedRealtimeSegmentNameGeneratorTest {
     int sequenceId = 2;
 
     UploadedRealtimeSegmentNameGenerator generator =
-        new UploadedRealtimeSegmentNameGenerator(tableName, partitionId, creationTimeMillis);
-    String expectedSegmentName = "uploaded_tableName_1_2_1234567890";
+        new UploadedRealtimeSegmentNameGenerator(tableName, partitionId, creationTimeMillis, "suffix");
+    String expectedSegmentName = "uploaded__tableName__1__2__1234567890__suffix";
 
     String actualSegmentName = generator.generateSegmentName(sequenceId, null, null);
 

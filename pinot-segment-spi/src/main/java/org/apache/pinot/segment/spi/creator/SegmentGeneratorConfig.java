@@ -596,7 +596,7 @@ public class SegmentGeneratorConfig implements Serializable {
             _segmentNamePostfix);
       case BatchConfigProperties.SegmentNameGeneratorType.UPLOADED_REALTIME:
         return new UploadedRealtimeSegmentNameGenerator(_rawTableName, _uploadedSegmentPartitionId,
-            Long.parseLong(_segmentCreationTime));
+            Long.parseLong(_segmentCreationTime), _segmentNamePostfix);
       default:
         return new SimpleSegmentNameGenerator(_segmentNamePrefix != null ? _segmentNamePrefix : _rawTableName,
             _segmentNamePostfix);

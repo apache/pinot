@@ -794,7 +794,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
   }
 
   private static String getUploadedRealtimeSegmentName(int sequenceNumber, long creationTimeMs) {
-    return new UploadedRealtimeSegmentName(RAW_TABLE_NAME, 0, sequenceNumber, creationTimeMs).toString();
+    return new UploadedRealtimeSegmentName(RAW_TABLE_NAME, 0, sequenceNumber, creationTimeMs, null).toString();
   }
 
   private static PrimaryKey makePrimaryKey(int value) {

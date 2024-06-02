@@ -85,7 +85,7 @@ public class SegmentUtilsTest {
 
   @Test
   void testGetRealtimeSegmentPartitionIdForUploadedRealtimeSegment() {
-    String segmentName = "uploaded_table_name_3_100_1716185755000"; // replace with your segment name
+    String segmentName = "uploaded__table_name__3__100__1716185755000";
 
     try {
       Integer partitionId =
