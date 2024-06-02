@@ -804,7 +804,7 @@ const getAllTaskTypes = async () => {
 };
 
 const getTaskInfo = async (taskType) => {
-  const tasksResLength = await getTaskTypeTasks(taskType);
+  const tasksResLength = await getTaskTypeTasksCount(taskType);
   const stateRes = await getTaskTypeState(taskType);
 
   let state = get(stateRes, 'data', '');

@@ -131,6 +131,9 @@ export const getTaskTypes = (): Promise<AxiosResponse<OperationResponse>> =>
 export const getTaskTypeTasks = (taskType: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.get(`/tasks/${taskType}/tasks`, { headers: { ...headers, Accept: 'application/json' } });
 
+export const getTaskTypeTasksCount = (taskType: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.get(`/tasks/${taskType}/tasks/count`, { headers: { ...headers, Accept: 'application/json' } });
+
 export const getTaskTypeState = (taskType: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.get(`/tasks/${taskType}/state`, { headers: { ...headers, Accept: 'application/json' } });
 
