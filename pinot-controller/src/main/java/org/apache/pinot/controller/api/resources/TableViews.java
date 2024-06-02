@@ -115,7 +115,7 @@ public class TableViews {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/segments/{tableName}/info")
   @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_SEGMENT_STATUS)
-  @ApiOperation(value = "Get table external view", notes = "Get table external view")
+  @ApiOperation(value = "Get segment names to segment status map", notes = "Get segment statuses of each segment")
   public Map<String, String> getSegmentsStatusDetails(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "realtime|offline", required = false) @QueryParam("tableType") String tableTypeStr,
