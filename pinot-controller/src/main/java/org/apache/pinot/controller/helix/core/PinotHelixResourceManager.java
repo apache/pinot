@@ -2576,33 +2576,6 @@ public class PinotHelixResourceManager {
         instanceToSkippedSegmentsMap);
   }
 
-//  public Map<String, String> getSegmentStatus(String tableNameWithType, boolean errorSegmentsOnly) {
-//    IdealState idealState = getTableIdealState(tableNameWithType);
-//    Preconditions.checkState(idealState != null, "Could not find ideal state for table: %s", tableNameWithType);
-//    ExternalView externalView = getTableExternalView(tableNameWithType);
-//    Preconditions.checkState(externalView != null, "Could not find external view for table: %s", tableNameWithType);
-//
-//    Map<String, Set<String>> instanceToResetSegmentsMap = new HashMap<>();
-//    Map<String, Set<String>> instanceToSkippedSegmentsMap = new HashMap<>();
-//    Map<String, String> segmentStatusMap = new HashMap<>();
-//
-//    for (String segmentName : idealState.getPartitionSet()) {
-//      Set<String> instanceSet = idealState.getInstanceSet(segmentName);
-//      Map<String, String> idealStateMap = idealState.getStateMap(segmentName);
-//      Preconditions.checkState(CollectionUtils.isNotEmpty(instanceSet), "Could not find segment: %s in ideal state",
-//          segmentName);
-//      Map<String, String> externalViewStateMap = externalView.getStateMap(segmentName);
-//      for (String instance : instanceSet) {
-//        if(externalViewStateMap != null && SegmentStateModel.ERROR.equals(externalViewStateMap.get(instance))) {
-//
-//        }
-//
-//
-//      }
-//    }
-//    return segmentStatusMap;
-//  }
-
   private static Set<String> parseInstanceSet(IdealState idealState, String segmentName,
       @Nullable String targetInstance) {
     Set<String> instanceSet = idealState.getInstanceSet(segmentName);
