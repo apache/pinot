@@ -43,7 +43,6 @@ type TenantProps = BaseProps & {
 type Props = ClusterProps | TenantProps;
 
 export const AsyncInstanceTable = ({
-  instances,
   instanceType,
   cluster,
   tenant,
@@ -75,31 +74,18 @@ export const AsyncInstanceTable = ({
         );
       }
     } else {
-      return get(allInstancesData, lowerCase(instanceType));
+      return fetchInstancesOfType(instanceType);
     }
   };
 
-//   const fetchInstancesOfType = async (instanceType: InstanceType) => {
-//     return PinotMethodUtils.getAllInstances().then((instancesData) => {
-//       const lowercaseInstanceData = mapKeys(instancesData, (value, key) =>
-//         lowerCase(key)
-//       );
-//       return get(lowercaseInstanceData, lowerCase(instanceType));
-//     });
-//   };
-
-  const fetchData = async () => {
+  const fetchInstancesOfType = async (instanceType: InstanceType) => {
     return PinotMethodUtils.getAllInstances().then((instancesData) => {
       const lowercaseInstanceData = mapKeys(instancesData, (value, key) =>
-         lowerCase(key)
+        lowerCase(key)
       );
-      return lowercaseInstanceData;
+      return get(lowercaseInstanceData, lowerCase(instanceType));
     });
   };
-
-  useEffect(() => {
-    allInstancesData = fetchData();
-  }, []);
 
   useEffect(() => {
     const instances = fetchInstances(instanceType, tenant);
