@@ -223,6 +223,9 @@ public class TableSizeReader {
 
     @JsonProperty("segments")
     public Map<String, SegmentSizeDetails> _segments = new HashMap<>();
+
+    @JsonProperty("segmentCount")
+    public long _segmentCount = 0;
   }
 
   @JsonIgnoreProperties(ignoreUnknown = true)
@@ -333,6 +336,9 @@ public class TableSizeReader {
     } else {
       emitMetrics(tableNameWithType, ControllerGauge.TABLE_STORAGE_EST_MISSING_SEGMENT_PERCENT, 0);
     }
+
+    // Update segment count for each subtype
+    subTypeSizeDetails._segmentCount = subTypeSizeDetails._segments.size();
 
     return subTypeSizeDetails;
   }

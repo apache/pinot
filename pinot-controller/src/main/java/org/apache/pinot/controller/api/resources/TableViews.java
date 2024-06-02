@@ -26,6 +26,7 @@ import io.swagger.annotations.ApiParam;
 import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
+import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -48,6 +49,7 @@ import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -107,6 +109,90 @@ public class TableViews {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     TableType tableType = validateTableType(tableTypeStr);
     return getTableState(tableName, EXTERNALVIEW, tableType);
+  }
+
+  @GET
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/segments/{tableName}/info")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_SEGMENT_STATUS)
+  @ApiOperation(value = "Get table external view", notes = "Get table external view")
+  public Map<String, String> getSegmentsStatusDetails(
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "realtime|offline", required = false) @QueryParam("tableType") String tableTypeStr,
+      @Context HttpHeaders headers) {
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
+    TableType tableType = validateTableType(tableTypeStr);
+    TableView externalView = getTableState(tableName, EXTERNALVIEW, tableType);
+    TableView idealStateView = getTableState(tableName, IDEALSTATE, tableType);
+    Map<String, String> segmentStatusMap = new HashMap<>();
+    segmentStatusMap = getSegmentStatuses(externalView, idealStateView);
+    return segmentStatusMap;
+  }
+
+  private Map<String, String> getSegmentStatuses(TableView externalView, TableView idealStateView) {
+    Map<String, Map<String, String>> idealStateMap = new HashMap<>();
+    Map<String, String> resultsMap = new HashMap<>();
+    if (!idealStateView._offline.isEmpty()) {
+      idealStateMap = idealStateView._offline;
+    } else if (!idealStateView._realtime.isEmpty()) {
+      idealStateMap = idealStateView._realtime;
+    }
+    Map<String, Map<String, String>> externalViewMap = new HashMap<>();
+    if (!externalView._offline.isEmpty()) {
+      externalViewMap = externalView._offline;
+    } else if (!externalView._realtime.isEmpty()) {
+      externalViewMap = externalView._realtime;
+    }
+    for (Map.Entry<String, Map<String, String>> entry : externalViewMap.entrySet()) {
+      Map<String, String> externalViewEntryValue = entry.getValue();
+      if (isErrorSegment(externalViewEntryValue)) {
+        resultsMap.put(entry.getKey(), CommonConstants.Helix.StateModel.DisplaySegmentStatus.BAD);
+      } else if (isOnlineOrConsumingSegment(externalViewEntryValue) && externalViewMap.equals(idealStateMap)) {
+        resultsMap.put(entry.getKey(), CommonConstants.Helix.StateModel.DisplaySegmentStatus.GOOD);
+      } else if (isOfflineSegment(externalViewEntryValue) && externalViewMap.equals(idealStateMap)) {
+        resultsMap.put(entry.getKey(), CommonConstants.Helix.StateModel.DisplaySegmentStatus.GOOD);
+      } else if (externalViewEntryValue.isEmpty() || isOfflineSegment(externalViewEntryValue) && !idealStateMap.equals(
+          externalViewMap)) {
+        resultsMap.put(entry.getKey(), CommonConstants.Helix.StateModel.DisplaySegmentStatus.UPDATING);
+      } else {
+        resultsMap.put(entry.getKey(), CommonConstants.Helix.StateModel.DisplaySegmentStatus.UPDATING);
+      }
+    }
+    return resultsMap;
+  }
+
+  private boolean isErrorSegment(Map<String, String> externalStateMap) {
+    boolean isError = false;
+    for (Map.Entry<String, String> innerEntry : externalStateMap.entrySet()) {
+      if (innerEntry.getValue().equals(CommonConstants.Helix.StateModel.SegmentStateModel.ERROR)) {
+        isError = true;
+        break;
+      }
+    }
+    return isError;
+  }
+
+  private boolean isOnlineOrConsumingSegment(Map<String, String> externalStateMap) {
+    boolean isError = true;
+    for (Map.Entry<String, String> innerEntry : externalStateMap.entrySet()) {
+      if (!innerEntry.getValue().equals(CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING)
+          && !(innerEntry.getValue().equals(CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE))) {
+        isError = false;
+        break;
+      }
+    }
+    return isError;
+  }
+
+  private boolean isOfflineSegment(Map<String, String> externalStateMap) {
+    boolean isError = false;
+    for (Map.Entry<String, String> innerEntry : externalStateMap.entrySet()) {
+      if (innerEntry.getValue().equals(CommonConstants.Helix.StateModel.SegmentStateModel.OFFLINE)) {
+        isError = true;
+        break;
+      }
+    }
+    return isError;
   }
 
   // we use name "view" to closely match underlying names and to not
