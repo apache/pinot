@@ -23,6 +23,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -408,18 +409,16 @@ public class RequestUtils {
   private static final Map<String, String> CANONICAL_NAME_TO_SPECIAL_KEY_MAP;
 
   static {
-    CANONICAL_NAME_TO_SPECIAL_KEY_MAP = new HashMap<>();
+    ImmutableMap.Builder<String, String> builder = ImmutableMap.builder();
     for (FilterKind filterKind : FilterKind.values()) {
-      CANONICAL_NAME_TO_SPECIAL_KEY_MAP.put(canonicalizeFunctionName(filterKind.name()), filterKind.name());
+      builder.put(canonicalizeFunctionName(filterKind.name()), filterKind.name());
     }
-    CANONICAL_NAME_TO_SPECIAL_KEY_MAP.put("stdistance", "st_distance");
+    CANONICAL_NAME_TO_SPECIAL_KEY_MAP = builder.build();
   }
 
   /**
    * Converts the function name into its canonical form, but preserving the special keys.
    * - Keep FilterKind.name() as is because we need to read the FilterKind via FilterKind.valueOf().
-   * - Keep ST_Distance as is because we use exact match when applying geo-spatial index up to release 0.10.0.
-   * TODO: Remove the ST_Distance special handling after releasing 0.11.0.
    */
   public static String canonicalizeFunctionNamePreservingSpecialKey(String functionName) {
     String canonicalName = canonicalizeFunctionName(functionName);

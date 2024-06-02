@@ -64,11 +64,10 @@ message Literal {
 }
 
 message FunctionCall {
-  int32 sqlKind = 1;
-  ColumnDataType dataType = 2;
-  string functionName = 3;
-  repeated RexExpression functionOperands = 4;
-  bool isDistinct = 5;
+  ColumnDataType dataType = 1;
+  string functionName = 2;
+  repeated RexExpression functionOperands = 3;
+  bool isDistinct = 4;
 }
 
 message RexExpression {

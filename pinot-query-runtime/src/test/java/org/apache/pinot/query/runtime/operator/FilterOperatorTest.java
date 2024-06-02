@@ -168,7 +168,7 @@ public class FilterOperatorTest {
     });
     Mockito.when(_upstreamOperator.nextBlock())
         .thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{1, 1}, new Object[]{0, 0}, new Object[]{1, 0}));
-    RexExpression.FunctionCall andCall = new RexExpression.FunctionCall(SqlKind.AND, ColumnDataType.BOOLEAN, "AND",
+    RexExpression.FunctionCall andCall = new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.AND.name(),
         ImmutableList.of(new RexExpression.InputRef(0), new RexExpression.InputRef(1)));
 
     FilterOperator op =
@@ -188,7 +188,7 @@ public class FilterOperatorTest {
     });
     Mockito.when(_upstreamOperator.nextBlock())
         .thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{1, 1}, new Object[]{0, 0}, new Object[]{1, 0}));
-    RexExpression.FunctionCall orCall = new RexExpression.FunctionCall(SqlKind.OR, ColumnDataType.BOOLEAN, "OR",
+    RexExpression.FunctionCall orCall = new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.OR.name(),
         ImmutableList.of(new RexExpression.InputRef(0), new RexExpression.InputRef(1)));
 
     FilterOperator op =
@@ -210,7 +210,7 @@ public class FilterOperatorTest {
     });
     Mockito.when(_upstreamOperator.nextBlock())
         .thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{1, 1}, new Object[]{0, 0}, new Object[]{1, 0}));
-    RexExpression.FunctionCall notCall = new RexExpression.FunctionCall(SqlKind.NOT, ColumnDataType.BOOLEAN, "NOT",
+    RexExpression.FunctionCall notCall = new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.NOT.name(),
         ImmutableList.of(new RexExpression.InputRef(0)));
 
     FilterOperator op =
@@ -231,7 +231,7 @@ public class FilterOperatorTest {
     Mockito.when(_upstreamOperator.nextBlock())
         .thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{1, 2}, new Object[]{3, 2}, new Object[]{1, 1}));
     RexExpression.FunctionCall greaterThan =
-        new RexExpression.FunctionCall(SqlKind.GREATER_THAN, ColumnDataType.BOOLEAN, "greaterThan",
+        new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.GREATER_THAN.name(),
             ImmutableList.of(new RexExpression.InputRef(0), new RexExpression.InputRef(1)));
     FilterOperator op =
         new FilterOperator(OperatorTestUtil.getTracingContext(), _upstreamOperator, inputSchema, greaterThan);
@@ -251,7 +251,7 @@ public class FilterOperatorTest {
     Mockito.when(_upstreamOperator.nextBlock())
         .thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{"starTree"}, new Object[]{"treeStar"}));
     RexExpression.FunctionCall startsWith =
-        new RexExpression.FunctionCall(SqlKind.OTHER, ColumnDataType.BOOLEAN, "startsWith",
+        new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.STARTS_WITH.name(),
             ImmutableList.of(new RexExpression.InputRef(0), new RexExpression.Literal(ColumnDataType.STRING, "star")));
     FilterOperator op =
         new FilterOperator(OperatorTestUtil.getTracingContext(), _upstreamOperator, inputSchema, startsWith);
@@ -271,9 +271,8 @@ public class FilterOperatorTest {
     });
     Mockito.when(_upstreamOperator.nextBlock())
         .thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{"starTree"}, new Object[]{"treeStar"}));
-    RexExpression.FunctionCall startsWith =
-        new RexExpression.FunctionCall(SqlKind.OTHER, ColumnDataType.BOOLEAN, "startsWithError",
-            ImmutableList.of(new RexExpression.InputRef(0), new RexExpression.Literal(ColumnDataType.STRING, "star")));
+    RexExpression.FunctionCall startsWith = new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, "startsWithError",
+        ImmutableList.of(new RexExpression.InputRef(0), new RexExpression.Literal(ColumnDataType.STRING, "star")));
     new FilterOperator(OperatorTestUtil.getTracingContext(), _upstreamOperator, inputSchema, startsWith);
   }
 }

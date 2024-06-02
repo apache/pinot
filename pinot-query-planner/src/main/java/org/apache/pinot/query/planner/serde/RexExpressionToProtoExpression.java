@@ -20,8 +20,8 @@ package org.apache.pinot.query.planner.serde;
 
 import com.google.protobuf.ByteString;
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 import org.apache.commons.lang3.SerializationUtils;
 import org.apache.pinot.common.proto.Expressions;
 import org.apache.pinot.common.utils.DataSchema;
@@ -41,11 +41,10 @@ public class RexExpressionToProtoExpression {
       return serializeInputRef((RexExpression.InputRef) expression);
     } else if (expression instanceof RexExpression.Literal) {
       return serializeLiteral((RexExpression.Literal) expression);
-    } else if (expression instanceof RexExpression.FunctionCall) {
+    } else {
+      assert expression instanceof RexExpression.FunctionCall;
       return serializeFunctionCall((RexExpression.FunctionCall) expression);
     }
-
-    throw new RuntimeException(String.format("Unknown Type Expression Type: %s", expression.getKind()));
   }
 
   private static Expressions.RexExpression serializeInputRef(RexExpression.InputRef inputRef) {
@@ -54,15 +53,15 @@ public class RexExpressionToProtoExpression {
   }
 
   private static Expressions.RexExpression serializeFunctionCall(RexExpression.FunctionCall functionCall) {
-    List<Expressions.RexExpression> functionOperands =
-        functionCall.getFunctionOperands().stream().map(RexExpressionToProtoExpression::process)
-            .collect(Collectors.toList());
+    List<RexExpression> operands = functionCall.getFunctionOperands();
+    List<Expressions.RexExpression> protoOperands = new ArrayList<>(operands.size());
+    for (RexExpression operand : operands) {
+      protoOperands.add(process(operand));
+    }
     Expressions.FunctionCall.Builder protoFunctionCallBuilder =
-        Expressions.FunctionCall.newBuilder().setSqlKind(functionCall.getKind().ordinal())
-            .setDataType(convertColumnDataType(functionCall.getDataType()))
-            .setFunctionName(functionCall.getFunctionName()).addAllFunctionOperands(functionOperands)
+        Expressions.FunctionCall.newBuilder().setDataType(convertColumnDataType(functionCall.getDataType()))
+            .setFunctionName(functionCall.getFunctionName()).addAllFunctionOperands(protoOperands)
             .setIsDistinct(functionCall.isDistinct());
-
     return Expressions.RexExpression.newBuilder().setFunctionCall(protoFunctionCallBuilder).build();
   }
 

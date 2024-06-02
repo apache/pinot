@@ -214,8 +214,9 @@ public class AggregationUtils {
         _dataType = inputSchema.getColumnDataType(_inputRef);
       } else {
         _inputRef = -1;
-        _literal = ((RexExpression.Literal) rexExpression).getValue();
-        _dataType = rexExpression.getDataType();
+        RexExpression.Literal literal = (RexExpression.Literal) rexExpression;
+        _literal = literal.getValue();
+        _dataType = literal.getDataType();
       }
     }
 

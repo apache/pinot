@@ -20,7 +20,6 @@ package org.apache.pinot.query.planner.serde;
 
 import java.util.List;
 import java.util.stream.Collectors;
-import org.apache.calcite.sql.SqlKind;
 import org.apache.commons.lang3.SerializationUtils;
 import org.apache.pinot.common.proto.Expressions;
 import org.apache.pinot.common.utils.DataSchema;
@@ -57,9 +56,8 @@ public class ProtoExpressionToRexExpression {
     List<RexExpression> functionOperands =
         functionCall.getFunctionOperandsList().stream().map(ProtoExpressionToRexExpression::process)
             .collect(Collectors.toList());
-    return new RexExpression.FunctionCall(SqlKind.values()[functionCall.getSqlKind()],
-        convertColumnDataType(functionCall.getDataType()), functionCall.getFunctionName(), functionOperands,
-        functionCall.getIsDistinct());
+    return new RexExpression.FunctionCall(convertColumnDataType(functionCall.getDataType()),
+        functionCall.getFunctionName(), functionOperands, functionCall.getIsDistinct());
   }
 
   private static RexExpression deserializeLiteral(Expressions.Literal literal) {

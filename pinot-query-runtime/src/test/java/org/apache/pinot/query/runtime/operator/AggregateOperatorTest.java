@@ -233,8 +233,8 @@ public class AggregateOperatorTest {
   @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*AVERAGE.*")
   public void shouldThrowOnUnknownAggFunction() {
     // Given:
-    List<RexExpression> calls = ImmutableList.of(
-        new RexExpression.FunctionCall(SqlKind.AVG, ColumnDataType.INT, "AVERAGE", ImmutableList.of()));
+    List<RexExpression> calls =
+        ImmutableList.of(new RexExpression.FunctionCall(ColumnDataType.INT, "AVERAGE", ImmutableList.of()));
     List<RexExpression> group = ImmutableList.of(new RexExpression.InputRef(0));
     DataSchema outSchema = new DataSchema(new String[]{"unknown"}, new ColumnDataType[]{DOUBLE});
 
@@ -299,13 +299,12 @@ public class AggregateOperatorTest {
     // Then:
     Assert.assertEquals(block1.getNumRows(), 1, "when group limit reach it should only return that many groups");
     Assert.assertTrue(block2.isEndOfStreamBlock(), "Second block is EOS (done processing)");
-    StatMap<AggregateOperator.StatKey> aggrStats =
-        OperatorTestUtil.getStatMap(AggregateOperator.StatKey.class, block2);
+    StatMap<AggregateOperator.StatKey> aggrStats = OperatorTestUtil.getStatMap(AggregateOperator.StatKey.class, block2);
     Assert.assertTrue(aggrStats.getBoolean(AggregateOperator.StatKey.NUM_GROUPS_LIMIT_REACHED),
         "num groups limit should be reached");
   }
 
   private static RexExpression.FunctionCall getSum(RexExpression arg) {
-    return new RexExpression.FunctionCall(SqlKind.SUM, ColumnDataType.INT, "SUM", ImmutableList.of(arg));
+    return new RexExpression.FunctionCall(ColumnDataType.INT, SqlKind.SUM.name(), ImmutableList.of(arg));
   }
 }

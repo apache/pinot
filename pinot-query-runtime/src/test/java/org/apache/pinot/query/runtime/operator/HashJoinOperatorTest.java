@@ -325,7 +325,8 @@ public class HashJoinOperatorTest {
     List<RexExpression> functionOperands = new ArrayList<>();
     functionOperands.add(new RexExpression.InputRef(1));
     functionOperands.add(new RexExpression.InputRef(3));
-    joinClauses.add(new RexExpression.FunctionCall(SqlKind.NOT_EQUALS, ColumnDataType.BOOLEAN, "<>", functionOperands));
+    joinClauses.add(
+        new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.NOT_EQUALS.name(), functionOperands));
     DataSchema resultSchema =
         new DataSchema(new String[]{"int_col1", "string_col1", "int_col2", "string_col2"}, new ColumnDataType[]{
             ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING
@@ -363,7 +364,8 @@ public class HashJoinOperatorTest {
     List<RexExpression> functionOperands = new ArrayList<>();
     functionOperands.add(new RexExpression.InputRef(0));
     functionOperands.add(new RexExpression.InputRef(2));
-    joinClauses.add(new RexExpression.FunctionCall(SqlKind.NOT_EQUALS, ColumnDataType.BOOLEAN, "<>", functionOperands));
+    joinClauses.add(
+        new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.NOT_EQUALS.name(), functionOperands));
     DataSchema resultSchema =
         new DataSchema(new String[]{"int_col1", "string_col1", "int_co2", "string_col2"}, new ColumnDataType[]{
             ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING
@@ -658,7 +660,7 @@ public class HashJoinOperatorTest {
     TransferableBlock secondBlock = join.nextBlock();
     StatMap<HashJoinOperator.StatKey> joinStats =
         OperatorTestUtil.getStatMap(HashJoinOperator.StatKey.class, secondBlock);
-     Assert.assertTrue(joinStats.getBoolean(HashJoinOperator.StatKey.MAX_ROWS_IN_JOIN_REACHED),
+    Assert.assertTrue(joinStats.getBoolean(HashJoinOperator.StatKey.MAX_ROWS_IN_JOIN_REACHED),
         "Max rows in join should be reached");
   }
 }
