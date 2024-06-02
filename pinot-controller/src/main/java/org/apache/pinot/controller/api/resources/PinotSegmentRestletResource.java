@@ -94,6 +94,7 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.controller.api.resources.Constants.validateTableType;
 import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
@@ -230,20 +231,25 @@ public class PinotSegmentRestletResource {
   @Path("segments/{tableName}/servers")
   @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_SERVER_MAP)
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Get a map from server to segments hosted by the server",
-      notes = "Get a map from server to segments hosted by the server")
+  @ApiOperation(value = "Get a map from server to segments hosted by the server", notes = "Get a map from server to "
+      + "segments hosted by the server")
   public List<Map<String, Object>> getServerToSegmentsMap(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr, @Context HttpHeaders headers) {
+      @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
+      @QueryParam("detailed") boolean detailed, @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
-    List<String> tableNamesWithType = ResourceUtils
-        .getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, Constants.validateTableType(tableTypeStr),
-            LOGGER);
+    List<String> tableNamesWithType = ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName,
+        validateTableType(tableTypeStr), LOGGER);
     List<Map<String, Object>> resultList = new ArrayList<>(tableNamesWithType.size());
     for (String tableNameWithType : tableNamesWithType) {
       Map<String, Object> resultForTable = new LinkedHashMap<>();
       resultForTable.put("tableName", tableNameWithType);
-      resultForTable.put("serverToSegmentsMap", _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType));
+      if (detailed) {
+        resultForTable.put("serverToSegmentsMap", _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType));
+      } else {
+        resultForTable.put("serverToSegmentsCountMap",
+            _pinotHelixResourceManager.getServerToSegmentsCountMap(tableNameWithType));
+      }
       resultList.add(resultForTable);
     }
     return resultList;

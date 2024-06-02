@@ -381,16 +381,14 @@ const allSchemaDetailsColumnHeader = ["Schema Name", "Dimension Columns", "Date-
 const getAllSchemaDetails = async (schemaList) => {
   let schemaDetails:Array<any> = [];
   let promiseArr = [];
-  promiseArr = schemaList.map(async (o)=>{
-    return await getSchema(o);
-  });
+  promiseArr = await getSchemaInfo();
   const results = await Promise.all(promiseArr);
   schemaDetails = results.map((obj)=>{
     let schemaObj = [];
     schemaObj.push(obj.data.schemaName);
-    schemaObj.push(obj.data.dimensionFieldSpecs ? obj.data.dimensionFieldSpecs.length : 0);
-    schemaObj.push(obj.data.dateTimeFieldSpecs ? obj.data.dateTimeFieldSpecs.length : 0);
-    schemaObj.push(obj.data.metricFieldSpecs ? obj.data.metricFieldSpecs.length : 0);
+    schemaObj.push(obj.data.dimensionFieldSpecsCount);
+    schemaObj.push(obj.data.dateTimeFieldSpecsCount);
+    schemaObj.push(obj.data.metricFieldSpecsCount);
     schemaObj.push(schemaObj[1] + schemaObj[2] + schemaObj[3]);
     return schemaObj;
   })
@@ -806,7 +804,7 @@ const getAllTaskTypes = async () => {
 };
 
 const getTaskInfo = async (taskType) => {
-  const tasksRes = await getTaskTypeTasks(taskType);
+  const tasksResLength = await getTaskTypeTasks(taskType);
   const stateRes = await getTaskTypeState(taskType);
 
   let state = get(stateRes, 'data', '');
@@ -814,7 +812,7 @@ const getTaskInfo = async (taskType) => {
   if(typeof state !== "string") {
     state = "";
   }
-  return [tasksRes?.data?.length || 0, state];
+  return [tasksResLength, state];
 };
 
 const stopAllTasks = (taskType) => {

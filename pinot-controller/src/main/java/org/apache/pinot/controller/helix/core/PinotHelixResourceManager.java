@@ -139,6 +139,7 @@ import org.apache.pinot.controller.api.resources.InstanceInfo;
 import org.apache.pinot.controller.api.resources.OperationValidationResponse;
 import org.apache.pinot.controller.api.resources.PeriodicTaskInvocationResponse;
 import org.apache.pinot.controller.api.resources.StateType;
+import org.apache.pinot.controller.api.resources.TableViews;
 import org.apache.pinot.controller.helix.core.assignment.instance.InstanceAssignmentDriver;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignment;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentFactory;
@@ -2575,6 +2576,33 @@ public class PinotHelixResourceManager {
         instanceToSkippedSegmentsMap);
   }
 
+  public Map<String, String> getSegmentStatus(String tableNameWithType, boolean errorSegmentsOnly) {
+    IdealState idealState = getTableIdealState(tableNameWithType);
+    Preconditions.checkState(idealState != null, "Could not find ideal state for table: %s", tableNameWithType);
+    ExternalView externalView = getTableExternalView(tableNameWithType);
+    Preconditions.checkState(externalView != null, "Could not find external view for table: %s", tableNameWithType);
+
+    Map<String, Set<String>> instanceToResetSegmentsMap = new HashMap<>();
+    Map<String, Set<String>> instanceToSkippedSegmentsMap = new HashMap<>();
+    Map<String, String> segmentStatusMap = new HashMap<>();
+
+    for (String segmentName : idealState.getPartitionSet()) {
+      Set<String> instanceSet = idealState.getInstanceSet(segmentName);
+      Map<String, String> idealStateMap = idealState.getStateMap(segmentName);
+      Preconditions.checkState(CollectionUtils.isNotEmpty(instanceSet), "Could not find segment: %s in ideal state",
+          segmentName);
+      Map<String, String> externalViewStateMap = externalView.getStateMap(segmentName);
+      for (String instance : instanceSet) {
+        if(externalViewStateMap != null && SegmentStateModel.ERROR.equals(externalViewStateMap.get(instance))) {
+
+        }
+
+
+      }
+    }
+    return segmentStatusMap;
+  }
+
   private static Set<String> parseInstanceSet(IdealState idealState, String segmentName,
       @Nullable String targetInstance) {
     Set<String> instanceSet = idealState.getInstanceSet(segmentName);
@@ -2796,6 +2824,26 @@ public class PinotHelixResourceManager {
       }
     }
     return serverToSegmentsMap;
+  }
+
+  /**
+   * Returns a map from server instance to count of segments it serves for the given table. Ignore OFFLINE segments from
+   * the ideal state because they are not supposed to be served.
+   */
+  public Map<String, Integer> getServerToSegmentsCountMap(String tableNameWithType) {
+    Map<String, Integer> serverToSegmentCountMap = new TreeMap<>();
+    IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableNameWithType);
+    if (idealState == null) {
+      throw new IllegalStateException("Ideal state does not exist for table: " + tableNameWithType);
+    }
+    for (Map.Entry<String, Map<String, String>> entry : idealState.getRecord().getMapFields().entrySet()) {
+      for (Map.Entry<String, String> instanceStateEntry : entry.getValue().entrySet()) {
+        if (!instanceStateEntry.getValue().equals(SegmentStateModel.OFFLINE)) {
+          serverToSegmentCountMap.merge(instanceStateEntry.getKey(), 1, Integer::sum);
+        }
+      }
+    }
+    return serverToSegmentCountMap;
   }
 
   /**
