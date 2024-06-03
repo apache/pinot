@@ -74,5 +74,9 @@ public interface DataBlockSerde {
           throw new IllegalArgumentException("Unknown version: " + version);
       }
     }
+
+    public int getVersion() {
+      return _version;
+    }
   }
 }

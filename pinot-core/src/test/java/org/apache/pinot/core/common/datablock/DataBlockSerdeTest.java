@@ -55,8 +55,8 @@ public class DataBlockSerdeTest {
     }
 
     DataBlock dataBlock = DataBlockBuilder.buildFromRows(rows, dataSchema);
-    byte[] bytes = dataBlock.toBytes();
-    DataBlock deserializedDataBlock = DataBlockUtils.deserialize(new ByteBuffer[]{ByteBuffer.wrap(bytes)});
+    List<ByteBuffer> serialize = DataBlockUtils.serialize(DataBlockSerde.Version.V2, dataBlock);
+    DataBlock deserializedDataBlock = DataBlockUtils.deserialize(serialize);
     Assert.assertEquals(deserializedDataBlock, dataBlock);
   }
 
@@ -81,8 +81,8 @@ public class DataBlockSerdeTest {
     }
 
     DataBlock dataBlock = DataBlockBuilder.buildFromColumns(Collections.singletonList(column), dataSchema);
-    byte[] bytes = dataBlock.toBytes();
-    DataBlock deserializedDataBlock = DataBlockUtils.deserialize(new ByteBuffer[]{ByteBuffer.wrap(bytes)});
+    List<ByteBuffer> serialize = DataBlockUtils.serialize(DataBlockSerde.Version.V2, dataBlock);
+    DataBlock deserializedDataBlock = DataBlockUtils.deserialize(serialize);
     Assert.assertEquals(deserializedDataBlock, dataBlock);
   }
 
@@ -103,8 +103,8 @@ public class DataBlockSerdeTest {
     }
 
     DataBlock dataBlock = DataBlockBuilder.buildFromRows(rows, dataSchema);
-    byte[] bytes = dataBlock.toBytes();
-    DataBlock deserializedDataBlock = DataBlockUtils.deserialize(new ByteBuffer[]{ByteBuffer.wrap(bytes)});
+    List<ByteBuffer> serialize = DataBlockUtils.serialize(DataBlockSerde.Version.V2, dataBlock);
+    DataBlock deserializedDataBlock = DataBlockUtils.deserialize(serialize);
     Assert.assertEquals(deserializedDataBlock, dataBlock);
   }
 
@@ -129,8 +129,8 @@ public class DataBlockSerdeTest {
     }
 
     DataBlock dataBlock = DataBlockBuilder.buildFromColumns(Collections.singletonList(column), dataSchema);
-    byte[] bytes = dataBlock.toBytes();
-    DataBlock deserializedDataBlock = DataBlockUtils.deserialize(new ByteBuffer[]{ByteBuffer.wrap(bytes)});
+    List<ByteBuffer> serialize = DataBlockUtils.serialize(DataBlockSerde.Version.V2, dataBlock);
+    DataBlock deserializedDataBlock = DataBlockUtils.deserialize(serialize);
     Assert.assertEquals(deserializedDataBlock, dataBlock);
   }
 }

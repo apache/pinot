@@ -28,12 +28,14 @@ import java.util.Collections;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.segment.spi.memory.CompoundDataBuffer;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
+import org.apache.pinot.segment.spi.memory.PinotByteBuffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -106,7 +108,7 @@ public final class DataBlockUtils {
     }
 
     DataBlock.Type dataBlockType = dataBlock.getDataBlockType();
-    int firstInt = version.ordinal() + (dataBlockType.ordinal() << DataBlockUtils.VERSION_TYPE_SHIFT);
+    int firstInt = version.getVersion() + (dataBlockType.ordinal() << DataBlockUtils.VERSION_TYPE_SHIFT);
 
     DataBuffer dataBuffer = dataBlockSerde.serialize(dataBlock.asRaw(), firstInt);
 
@@ -123,6 +125,23 @@ public final class DataBlockUtils {
     ArrayList<ByteBuffer> result = new ArrayList<>();
     dataBuffer.appendAsByteBuffers(result);
     return result;
+  }
+
+
+  public static DataBlock deserialize(List<ByteBuffer> buffers)
+      throws IOException {
+    List<DataBuffer> dataBuffers = buffers.stream()
+        .map(PinotByteBuffer::wrap)
+        .collect(Collectors.toList());
+    try (CompoundDataBuffer compoundBuffer = new CompoundDataBuffer(dataBuffers, ByteOrder.BIG_ENDIAN, false)) {
+      int versionAndSubVersion = compoundBuffer.getInt(0);
+      int version = getVersion(versionAndSubVersion);
+      DataBlockSerde dataBlockSerde = SERDES.get(DataBlockSerde.Version.fromInt(version));
+
+      DataBlock.Type type = getType(versionAndSubVersion);
+
+      return dataBlockSerde.deserialize(compoundBuffer, 0, type);
+    }
   }
 
   public static DataBlock deserialize(ByteBuffer[] buffers)

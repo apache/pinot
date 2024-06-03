@@ -88,6 +88,7 @@ public class ZeroCopyDataBlockSerde implements DataBlockSerde {
 
     header.updateStarts();
     header.serialize(headerBuffer);
+    headerBuffer.flip();
 
     return builder.build();
   }
