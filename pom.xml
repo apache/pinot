@@ -226,6 +226,10 @@
     <google.cloud.libraries.version>26.40.0</google.cloud.libraries.version>
     <protobuf.version>3.25.2</protobuf.version> <!-- only getting used in proto compilation plugin -->
     <grpc.version>1.61.1</grpc.version>  <!-- only getting used in proto compilation plugin -->
+    <google.findbugs.version>3.0.2</google.findbugs.version>
+    <google.errorprone.version>2.27.1</google.errorprone.version>
+    <google.j2objc.version>3.0.0</google.j2objc.version>
+    <google.auto-service.version>1.1.1</google.auto-service.version>
 
     <!-- Configuration for Scala -->
     <scala.version>2.12.19</scala.version>
@@ -835,34 +839,28 @@
         <type>pom</type>
         <scope>import</scope>
       </dependency>
-      <!-- Solve the dependency converge issue between google-cloud-storage and google-cloud-nio -->
-      <dependency>
-        <groupId>com.google.apis</groupId>
-        <artifactId>google-api-services-storage</artifactId>
-        <version>v1-rev20240524-2.0.0</version>
-      </dependency>
       <!-- Solve the dependency converge issue between guava and calcite-core -->
       <dependency>
         <groupId>com.google.errorprone</groupId>
         <artifactId>error_prone_annotations</artifactId>
-        <version>2.28.0</version>
+        <version>${google.errorprone.version}</version>
       </dependency>
       <!-- Legacy Google Libraries -->
       <dependency>
         <groupId>com.google.auto.service</groupId>
         <artifactId>auto-service</artifactId>
-        <version>1.1.1</version>
+        <version>${google.auto-service.version}</version>
         <optional>true</optional> <!-- This is only needed at compilation time as an annotation processor -->
       </dependency>
       <dependency>
         <groupId>com.google.code.findbugs</groupId>
         <artifactId>jsr305</artifactId>
-        <version>3.0.2</version>
+        <version>${google.findbugs.version}</version>
       </dependency>
       <dependency>
         <groupId>com.google.j2objc</groupId>
         <artifactId>j2objc-annotations</artifactId>
-        <version>3.0.0</version>
+        <version>${google.j2objc.version}</version>
       </dependency>
 
       <!-- Hadoop -->
@@ -1391,7 +1389,7 @@
       <dependency>
         <groupId>net.openhft</groupId>
         <artifactId>posix</artifactId>
-        <version>2.26ea0</version>
+        <version>2.25ea0</version>
       </dependency>
       <dependency>
         <groupId>net.openhft</groupId>
@@ -1642,7 +1640,7 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-javadoc-plugin</artifactId>
-          <version>3.7.0</version>
+          <version>3.6.3</version>
           <configuration>
             <!-- Remove this after fixing all javadoc warnings -->
             <doclint>none</doclint>
