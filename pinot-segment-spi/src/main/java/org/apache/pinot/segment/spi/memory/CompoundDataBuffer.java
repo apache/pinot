@@ -629,7 +629,9 @@ public class CompoundDataBuffer implements DataBuffer {
         }
         return this;
       }
-      _buffers.add(buffer);
+      if (buffer.size() != 0) {
+        _buffers.add(buffer);
+      }
       return this;
     }
 
