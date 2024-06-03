@@ -137,7 +137,7 @@ public class PinotSchemaRestletResource {
             schema.getDateTimeFieldSpecs().size(), schema.getMetricFieldSpecs().size());
         schemasInfo.add(schemaInfo);
       } else {
-        LOGGER.info("Schema not found with name: " + schemaName + ", while fetching schema info." );
+        LOGGER.info("Schema not found with name: " + schemaName + ", while fetching schema info.");
       }
     }
     return schemasInfo;

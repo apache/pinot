@@ -139,7 +139,6 @@ import org.apache.pinot.controller.api.resources.InstanceInfo;
 import org.apache.pinot.controller.api.resources.OperationValidationResponse;
 import org.apache.pinot.controller.api.resources.PeriodicTaskInvocationResponse;
 import org.apache.pinot.controller.api.resources.StateType;
-import org.apache.pinot.controller.api.resources.TableViews;
 import org.apache.pinot.controller.helix.core.assignment.instance.InstanceAssignmentDriver;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignment;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentFactory;
