@@ -30,9 +30,9 @@ public class SchemaInfo {
 
   public SchemaInfo(String schemaName, int dimensionFieldSpecsCount, int dateTimeFieldSpecsCount,
       int metricFieldSpecsCount) {
-    this._schemaName = schemaName;
-    this._dimensionFieldSpecsCount = dimensionFieldSpecsCount;
-    this._dateTimeFieldSpecsCount = dateTimeFieldSpecsCount;
-    this._metricFieldSpecsCount = metricFieldSpecsCount;
+    _schemaName = schemaName;
+    _dimensionFieldSpecsCount = dimensionFieldSpecsCount;
+    _dateTimeFieldSpecsCount = dateTimeFieldSpecsCount;
+    _metricFieldSpecsCount = metricFieldSpecsCount;
   }
 }
