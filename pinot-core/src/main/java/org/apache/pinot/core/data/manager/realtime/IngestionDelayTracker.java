@@ -34,6 +34,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.spi.stream.LongMsgOffset;
+import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -88,6 +90,16 @@ public class IngestionDelayTracker {
     private final long _ingestionTimeMs;
     private final long _firstStreamIngestionTimeMs;
   }
+
+  private static class IngestionOffsets {
+    IngestionOffsets(StreamPartitionMsgOffset offset, StreamPartitionMsgOffset latestOffset) {
+      _offset = offset;
+      _latestOffset = latestOffset;
+    }
+    private final StreamPartitionMsgOffset _offset;
+    private final StreamPartitionMsgOffset _latestOffset;
+  }
+
   // Sleep interval for scheduled executor service thread that triggers read of ideal state
   private static final int SCHEDULED_EXECUTOR_THREAD_TICK_INTERVAL_MS = 300000; // 5 minutes +/- precision in timeouts
   // Once a partition is marked for verification, we wait 10 minutes to pull its ideal state.
@@ -98,6 +110,8 @@ public class IngestionDelayTracker {
 
   // HashMap used to store ingestion time measures for all partitions active for the current table.
   private final Map<Integer, IngestionTimestamps> _partitionToIngestionTimestampsMap = new ConcurrentHashMap<>();
+
+  private final Map<Integer, IngestionOffsets> _partitionToOffsetMap = new ConcurrentHashMap<>();
   // We mark partitions that go from CONSUMING to ONLINE in _partitionsMarkedForVerification: if they do not
   // go back to CONSUMING in some period of time, we verify whether they are still hosted in this server by reading
   // ideal state. This is done with the goal of minimizing reading ideal state for efficiency reasons.
@@ -172,6 +186,22 @@ public class IngestionDelayTracker {
     // Correct to zero for any time shifts due to NTP or time reset.
     agedIngestionDelayMs = Math.max(agedIngestionDelayMs, 0);
     return agedIngestionDelayMs;
+  }
+
+  private long getPartitionOffsetLag(IngestionOffsets offset) {
+    if (offset == null) {
+      return 0;
+    }
+    StreamPartitionMsgOffset msgOffset = offset._offset;
+    StreamPartitionMsgOffset latestOffset = offset._latestOffset;
+
+    // Compute aged delay for current partition
+    if (!(msgOffset instanceof LongMsgOffset && latestOffset instanceof LongMsgOffset)) {
+      return 0;
+    }
+
+    long ingestionDelayOffset = ((LongMsgOffset) latestOffset).getOffset() - ((LongMsgOffset) msgOffset).getOffset();
+    return ingestionDelayOffset;
   }
 
   /*
@@ -254,6 +284,31 @@ public class IngestionDelayTracker {
     }
     // If we are consuming we do not need to track this partition for removal.
     _partitionsMarkedForVerification.remove(partitionGroupId);
+  }
+
+  public void updateIngestionDelayOffset(StreamPartitionMsgOffset msgOffset, StreamPartitionMsgOffset latestOffset,
+      int partitionGroupId) {
+    // Store new measure and wipe old one for this partition
+    if (!_isServerReadyToServeQueries.get() || _realTimeTableDataManager.isShutDown()) {
+      // Do not update the ingestion delay metrics during server startup period
+      // or once the table data manager has been shutdown.
+      return;
+    }
+    if ((msgOffset == null)) {
+      // If stream does not return a valid ingestion timestamps don't publish a metric
+      return;
+    }
+    IngestionOffsets previousMeasure = _partitionToOffsetMap.put(partitionGroupId,
+        new IngestionOffsets(msgOffset, latestOffset));
+    if (previousMeasure == null) {
+      // First time we start tracking a partition we should start tracking it via metric
+      // Only publish the metric if supported by the underlying stream. If not supported the stream
+      // returns Long.MIN_VALUE
+      if (msgOffset != null) {
+        _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionGroupId,
+            ServerGauge.REALTIME_INGESTION_DELAY_OFFSET, () -> getPartitionIngestionDelayMsgOffset(partitionGroupId));
+      }
+    }
   }
 
   /*
@@ -344,6 +399,15 @@ public class IngestionDelayTracker {
       return 0;
     }
     return getIngestionDelayMs(currentMeasure._ingestionTimeMs);
+  }
+
+  public long getPartitionIngestionDelayMsgOffset(int partitionGroupId) {
+    // Not protected as this will only be invoked when metric is installed which happens after server ready
+    IngestionOffsets currentMeasure = _partitionToOffsetMap.get(partitionGroupId);
+    if (currentMeasure == null) { // Guard just in case we read the metric without initializing it
+      return 0;
+    }
+    return getPartitionOffsetLag(currentMeasure);
   }
 
   /*

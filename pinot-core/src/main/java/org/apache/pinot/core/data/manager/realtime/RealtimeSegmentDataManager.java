@@ -655,6 +655,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     updateCurrentDocumentCountMetrics();
     if (messageBatch.getUnfilteredMessageCount() > 0) {
       updateIngestionDelay(messageBatch.getLastMessageMetadata());
+      updateIngestionDelayOffset(messageBatch.getLastMessageMetadata());
       _hasMessagesFetched = true;
       if (streamMessageCount > 0 && _segmentLogger.isDebugEnabled()) {
         _segmentLogger.debug("Indexed {} messages ({} messages read from stream) current offset {}",
@@ -1776,6 +1777,19 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     if (metadata != null) {
       _realtimeTableDataManager.updateIngestionDelay(metadata.getRecordIngestionTimeMs(),
           metadata.getFirstStreamRecordIngestionTimeMs(), _partitionGroupId);
+    }
+  }
+
+  private void updateIngestionDelayOffset(RowMetadata metadata) {
+    if (metadata != null) {
+      try {
+        StreamPartitionMsgOffset latestOffset =
+            _partitionMetadataProvider.fetchStreamPartitionOffset(OffsetCriteria.LARGEST_OFFSET_CRITERIA, 5000);
+      _realtimeTableDataManager.updateIngestionDelayOffset(metadata.getOffset(),
+          latestOffset, _partitionGroupId);
+      } catch (Exception e) {
+        _segmentLogger.warn("Failed to fetch latest offset for updating ingestion delay", e);
+      }
     }
   }
 

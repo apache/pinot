@@ -72,7 +72,8 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
   END_TO_END_REALTIME_INGESTION_DELAY_MS("milliseconds", false),
   // Needed to track if valid doc id snapshots are present for faster restarts
   UPSERT_VALID_DOC_ID_SNAPSHOT_COUNT("upsertValidDocIdSnapshotCount", false),
-  UPSERT_PRIMARY_KEYS_IN_SNAPSHOT_COUNT("upsertPrimaryKeysInSnapshotCount", false);
+  UPSERT_PRIMARY_KEYS_IN_SNAPSHOT_COUNT("upsertPrimaryKeysInSnapshotCount", false),
+  REALTIME_INGESTION_DELAY_OFFSET("offsetLag", false);
 
   private final String _gaugeName;
   private final String _unit;

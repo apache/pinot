@@ -74,6 +74,7 @@ import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.spi.utils.TimeUtils;
@@ -269,6 +270,11 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
    */
   public void updateIngestionDelay(long ingestionTimeMs, long firstStreamIngestionTimeMs, int partitionGroupId) {
     _ingestionDelayTracker.updateIngestionDelay(ingestionTimeMs, firstStreamIngestionTimeMs, partitionGroupId);
+  }
+
+  public void updateIngestionDelayOffset(StreamPartitionMsgOffset offset, StreamPartitionMsgOffset latestOffset,
+      int partitionGroupId) {
+    _ingestionDelayTracker.updateIngestionDelayOffset(offset, latestOffset, partitionGroupId);
   }
 
   /*
