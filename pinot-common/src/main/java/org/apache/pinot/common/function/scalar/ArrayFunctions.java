@@ -230,6 +230,24 @@ public class ArrayFunctions {
     return idx > 0 && idx <= arr.length ? arr[idx - 1] : NullValuePlaceHolder.STRING;
   }
 
+  @ScalarFunction
+  public static int arraySumInt(int[] arr) {
+    int sum = 0;
+    for (int value : arr) {
+      sum += value;
+    }
+    return sum;
+  }
+
+  @ScalarFunction
+  public static long arraySumLong(long[] arr) {
+    long sum = 0;
+    for (long value : arr) {
+      sum += value;
+    }
+    return sum;
+  }
+
   @ScalarFunction(names = {"array", "arrayValueConstructor"}, isVarArg = true)
   public static Object arrayValueConstructor(Object... arr) {
     if (arr == null || arr.length == 0) {
