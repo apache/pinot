@@ -187,8 +187,10 @@ public class PagedPinotOutputStream extends PinotOutputStream {
   public void write(byte[] b, int off, int len)
       throws IOException {
     if (remainingInPage() >= len) {
+      _currentPage.position(_offsetInPage);
       _currentPage.put(b, off, len);
       _offsetInPage += len;
+      _currentPage.position(0);
     } else {
       int written = 0;
       while (written < len) {
@@ -198,7 +200,9 @@ public class PagedPinotOutputStream extends PinotOutputStream {
           continue;
         }
         int toWrite = Math.min(len - written, remainingInPage);
+        _currentPage.position(_offsetInPage);
         _currentPage.put(b, off + written, toWrite);
+        _currentPage.position(0);
         written += toWrite;
         _offsetInPage += toWrite;
       }
