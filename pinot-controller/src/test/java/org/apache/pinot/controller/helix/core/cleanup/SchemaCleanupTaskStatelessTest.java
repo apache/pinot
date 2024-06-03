@@ -97,6 +97,7 @@ public class SchemaCleanupTaskStatelessTest extends ControllerTest {
   public void testSchemaCleanupTask()
       throws Exception {
     PinotMetricUtils.cleanUp();
+    PinotMetricUtils.getPinotMetricsRegistry();
     // 1. Add a schema
     addSchema(createDummySchema("t1"));
     addSchema(createDummySchema("t2"));
@@ -146,6 +147,7 @@ public class SchemaCleanupTaskStatelessTest extends ControllerTest {
   public void testSchemaCleanupTaskNormalCase()
       throws Exception {
     PinotMetricUtils.cleanUp();
+    PinotMetricUtils.getPinotMetricsRegistry();
     // 1. Add a schema
     addSchema(createDummySchema("t1"));
     addSchema(createDummySchema("t2"));
@@ -219,6 +221,7 @@ public class SchemaCleanupTaskStatelessTest extends ControllerTest {
   public void testMissingSchema()
       throws Exception {
     PinotMetricUtils.cleanUp();
+    PinotMetricUtils.getPinotMetricsRegistry();
     // 1. Add a schema
     addSchema(createDummySchema("t1"));
     addSchema(createDummySchema("t2"));
