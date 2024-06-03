@@ -24,6 +24,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.StringUtil;
 
 
@@ -39,22 +40,41 @@ import org.apache.pinot.spi.utils.StringUtil;
  */
 public class SanitizationTransformer implements RecordTransformer {
   private final Map<String, Integer> _stringColumnMaxLengthMap = new HashMap<>();
+  private final Map<String, Integer> _jsonColumnMaxLengthMap = new HashMap<>();
+
+  private Long _sanitizedColValuesCount;
 
   public SanitizationTransformer(Schema schema) {
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
-      if (!fieldSpec.isVirtualColumn() && fieldSpec.getDataType() == DataType.STRING) {
-        _stringColumnMaxLengthMap.put(fieldSpec.getName(), fieldSpec.getMaxLength());
+      if (!fieldSpec.isVirtualColumn()) {
+        if (fieldSpec.getDataType() == DataType.STRING) {
+          _stringColumnMaxLengthMap.put(fieldSpec.getName(), fieldSpec.getMaxLength());
+        }
+        if (fieldSpec.getDataType() == DataType.JSON) {
+          _jsonColumnMaxLengthMap.put(fieldSpec.getName(), fieldSpec.getMaxLength());
+        }
       }
+      _sanitizedColValuesCount = 0L;
     }
+  }
+
+  public Long getSanitizedColValuesCount() {
+    return _sanitizedColValuesCount;
   }
 
   @Override
   public boolean isNoOp() {
-    return _stringColumnMaxLengthMap.isEmpty();
+    return _stringColumnMaxLengthMap.isEmpty() && _jsonColumnMaxLengthMap.isEmpty();
   }
 
   @Override
   public GenericRow transform(GenericRow record) {
+    sanitizeStringColumns(record);
+    sanitizeJsonColumns(record);
+    return record;
+  }
+
+  private void sanitizeStringColumns(GenericRow record) {
     for (Map.Entry<String, Integer> entry : _stringColumnMaxLengthMap.entrySet()) {
       String stringColumn = entry.getKey();
       int maxLength = entry.getValue();
@@ -63,6 +83,9 @@ public class SanitizationTransformer implements RecordTransformer {
         // Single-valued column
         String stringValue = (String) value;
         String sanitizedValue = StringUtil.sanitizeStringValue(stringValue, maxLength);
+        if (!sanitizedValue.equals(stringValue)) {
+          _sanitizedColValuesCount++;
+        }
         // NOTE: reference comparison
         //noinspection StringEquality
         if (sanitizedValue != stringValue) {
@@ -73,10 +96,41 @@ public class SanitizationTransformer implements RecordTransformer {
         Object[] values = (Object[]) value;
         int numValues = values.length;
         for (int i = 0; i < numValues; i++) {
-          values[i] = StringUtil.sanitizeStringValue(values[i].toString(), maxLength);
+          String sanitizedValue = StringUtil.sanitizeStringValue(values[i].toString(), maxLength);
+          if (!sanitizedValue.equals(values[i].toString())) {
+            _sanitizedColValuesCount++;
+          }
+          values[i] = sanitizedValue;
         }
       }
     }
-    return record;
+  }
+
+  private void sanitizeJsonColumns(GenericRow record) {
+    for (Map.Entry<String, Integer> entry : _jsonColumnMaxLengthMap.entrySet()) {
+      String stringColumn = entry.getKey();
+      int maxLength = entry.getValue();
+      Object value = record.getValue(stringColumn);
+      if (value instanceof String) {
+        // Single-valued json column
+        String stringValue = (String) value;
+        String sanitizedValue = JsonUtils.getSanitizedString(maxLength, stringValue);
+        if (!sanitizedValue.equals(stringValue)) {
+          record.putValue(stringColumn, sanitizedValue);
+          _sanitizedColValuesCount++;
+        }
+      } else {
+        // Multi-valued column json col
+        Object[] values = (Object[]) value;
+        int numValues = values.length;
+        for (int i = 0; i < numValues; i++) {
+          String sanitizedValue = StringUtil.sanitizeStringValue(values[i].toString(), maxLength);
+          if (!sanitizedValue.equals(values[i].toString())) {
+            values[i] = sanitizedValue;
+            _sanitizedColValuesCount++;
+          }
+        }
+      }
+    }
   }
 }

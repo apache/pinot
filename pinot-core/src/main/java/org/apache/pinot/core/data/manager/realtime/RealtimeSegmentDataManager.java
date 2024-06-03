@@ -613,6 +613,11 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           _segmentLogger.error(errorMessage, e);
           _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(), errorMessage, e));
         }
+        if (_transformPipeline.getRecordTransformer().getSanitizedColValuesCount() > 0) {
+          _serverMetrics.addMeteredTableValue(_tableNameWithType, String.valueOf(_partitionGroupId),
+              ServerMeter.SANITIZED_MAX_LEN_COLUMNS_COUNT,
+              _transformPipeline.getRecordTransformer().getSanitizedColValuesCount());
+        }
         if (reusedResult.getSkippedRowCount() > 0) {
           realtimeRowsDroppedMeter = _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.REALTIME_ROWS_FILTERED,
               reusedResult.getSkippedRowCount(), realtimeRowsDroppedMeter);
