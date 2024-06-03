@@ -20,7 +20,6 @@ package org.apache.pinot.common.utils;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
-import java.util.Arrays;
 import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
@@ -33,8 +32,11 @@ import org.joda.time.format.DateTimeFormatter;
  * optionalSuffix}
  *
  * <p>This naming convention is adopted to represent a segment uploaded to a realtime table. The naming
- * convention has been kept similar to {@LLCSegmentName} to but differentiates between stream generated LLCSegments
- * based on the prefix "uploaded" and an optional suffix.
+ * convention has been kept semantically similar to {@link LLCSegmentName} to but differs in following ways:
+ *
+ * <li> compulsory prefix updated, to quickly identify the segment is an uplaoded realtime segment
+ * <li> sequenceId is used to uniquely identify the segment created at the same time
+ * <li> optional suffix to encode any additional information about the segment
  */
 public class UploadedRealtimeSegmentName implements Comparable<UploadedRealtimeSegmentName> {
 
@@ -60,14 +62,13 @@ public class UploadedRealtimeSegmentName implements Comparable<UploadedRealtimeS
       Preconditions.checkState((parts.length == 5 || parts.length == 6) && parts[0].equals(UPLOADED_PREFIX),
           "Uploaded segment name must be of the format "
               + "uploaded__{tableName}__{partitionId}__{sequenceId}__{creationTime}");
-      int idx = parts.length - 1;
+      _tableName = parts[1];
+      _partitionId = Integer.parseInt(parts[2]);
+      _sequenceId = Integer.parseInt(parts[3]);
+      _creationTime = parts[4];
       if (parts.length == 6) {
-        _suffix = parts[idx--];
+        _suffix = parts[5];
       }
-      _creationTime = parts[idx--];
-      _sequenceId = Integer.parseInt(parts[idx--]);
-      _partitionId = Integer.parseInt(parts[idx]);
-      _tableName = Joiner.on(SEPARATOR).join(Arrays.copyOfRange(parts, 1, idx));
       _segmentName = segmentName;
     } catch (NumberFormatException e) {
       throw new IllegalArgumentException("Invalid segment name: " + segmentName, e);
@@ -84,7 +85,7 @@ public class UploadedRealtimeSegmentName implements Comparable<UploadedRealtimeS
    * @param suffix
    */
   public UploadedRealtimeSegmentName(String tableName, int partitionId, int sequenceId, long msSinceEpoch,
-      String suffix) {
+      @Nullable String suffix) {
     _tableName = tableName;
     _partitionId = partitionId;
     _sequenceId = sequenceId;
@@ -163,7 +164,8 @@ public class UploadedRealtimeSegmentName implements Comparable<UploadedRealtimeS
 
   @Override
   public int compareTo(UploadedRealtimeSegmentName other) {
-    Preconditions.checkState(_tableName.equals(other._tableName));
+    Preconditions.checkState(_tableName.equals(other._tableName),
+        "Cannot compare segment names from different table: %s, %s", _segmentName, other.getSegmentName());
     if (_partitionId != other._partitionId) {
       return Integer.compare(_partitionId, other._partitionId);
     }
@@ -190,10 +192,5 @@ public class UploadedRealtimeSegmentName implements Comparable<UploadedRealtimeS
   @Override
   public String toString() {
     return _segmentName;
-  }
-
-  // create a enum for source: externalUplaod, minion
-  public enum Source {
-    EXTERNAL_UPLOAD, MINION
   }
 }

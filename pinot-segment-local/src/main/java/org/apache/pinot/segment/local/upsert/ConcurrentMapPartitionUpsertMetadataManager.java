@@ -185,7 +185,8 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
     UploadedRealtimeSegmentName currentUploadedSegmentName = UploadedRealtimeSegmentName.of(currentSegmentName);
 
     if (uploadedSegmentName != null && currentUploadedSegmentName != null) {
-      int comparisonResult = uploadedSegmentName.compareTo(currentUploadedSegmentName);
+      int comparisonResult =
+          Integer.compare(uploadedSegmentName.getSequenceId(), currentUploadedSegmentName.getSequenceId());
       if (comparisonResult == 0) {
         Long.compare(segmentCreationTimeMs, currentSegmentCreationTimeMs);
       } else {
