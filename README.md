@@ -102,7 +102,7 @@ $ cd build/
 $ bin/quick-start-batch.sh
 ```
 
-For UI development setup refer this [doc](https://github.com/jayeshchoudhary/pinot/blob/master/pinot-controller/src/main/resources/Readme.md).
+For UI development setup refer this [doc](https://github.com/apache/pinot/blob/master/pinot-controller/src/main/resources/Readme.md).
 
 ## Deploying Pinot to Kubernetes
 Please refer to [Running Pinot on Kubernetes](https://docs.pinot.apache.org/basics/getting-started/kubernetes-quickstart) in our project documentation. Pinot also provides Kubernetes integrations with the interactive query engine, [Trino](https://docs.pinot.apache.org/integrations/trino) [Presto](https://docs.pinot.apache.org/integrations/presto), and the data visualization tool, [Apache Superset](kubernetes/helm/superset.yaml).
