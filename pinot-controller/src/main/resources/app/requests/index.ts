@@ -76,9 +76,6 @@ export const getSchemaList = (): Promise<AxiosResponse<QuerySchemas>> =>
 export const getSchema = (name: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.get(`/schemas/${name}`);
 
-export const getSchemaInfo = (): Promise<AxiosResponse<OperationResponse>> =>
-  baseApi.get(`/schemas/info`);
-
 export const putSchema = (name: string, params: string, reload?: boolean): Promise<AxiosResponse<OperationResponse>> => {
   let queryParams = {};
   
@@ -130,9 +127,6 @@ export const getTaskTypes = (): Promise<AxiosResponse<OperationResponse>> =>
 
 export const getTaskTypeTasks = (taskType: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.get(`/tasks/${taskType}/tasks`, { headers: { ...headers, Accept: 'application/json' } });
-
-export const getTaskTypeTasksCount = (taskType: string): Promise<AxiosResponse<OperationResponse>> =>
-  baseApi.get(`/tasks/${taskType}/tasks/count`, { headers: { ...headers, Accept: 'application/json' } });
 
 export const getTaskTypeState = (taskType: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.get(`/tasks/${taskType}/state`, { headers: { ...headers, Accept: 'application/json' } });
