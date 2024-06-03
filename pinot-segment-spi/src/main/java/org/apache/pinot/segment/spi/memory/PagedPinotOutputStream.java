@@ -1,3 +1,21 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 package org.apache.pinot.segment.spi.memory;
 
 import com.google.common.base.Preconditions;
@@ -5,9 +23,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.stream.Collectors;
 import org.apache.commons.lang3.ArchUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -64,25 +79,32 @@ public class PagedPinotOutputStream extends PinotOutputStream {
    * <p>
    * All pages but the last one will be {@link ByteBuffer#clear() cleared}.
    * The latest page will have its position set to 0 and its limit set to the last byte written.
+   *
+   * TODO: Add one option that let caller choose start and end offset.
    */
   public ByteBuffer[] getPages() {
-    long startOffset = getCurrentOffset();
     int numPages = _pages.size();
+
+    if (_written == (numPages - 1) * (long) _pageSize) { // last page is empty
+      numPages--;
+    }
     if (numPages == 0) {
       return new ByteBuffer[0];
     }
     ByteBuffer[] result = new ByteBuffer[numPages];
-    for (int i = 0; i < _pages.size(); i++) {
+
+    for (int i = 0; i < numPages; i++) {
       ByteBuffer byteBuffer = _pages.get(i);
       ByteBuffer page = byteBuffer.asReadOnlyBuffer();
       page.clear();
       result[i] = page;
     }
-    ByteBuffer lastPage = result[numPages - 1];
-    seek(_written);
-    lastPage.limit(_offsetInPage);
 
+    long startOffset = getCurrentOffset();
+    seek(_written);
+    result[numPages - 1].limit(_offsetInPage);
     seek(startOffset);
+
     return result;
   }
 
@@ -208,10 +230,27 @@ public class PagedPinotOutputStream extends PinotOutputStream {
     _written = Math.max(_written, _offsetInPage + _currentPageStartOffset);
   }
 
-  public CompoundDataBuffer asBuffer(ByteOrder order, boolean owner) {
-    List<DataBuffer> pages = Arrays.stream(getPages())
-        .map(PinotByteBuffer::wrap)
-        .collect(Collectors.toList());
+  /**
+   * Returns a view of the data written so far as a {@link DataBuffer}.
+   * <p>
+   * The returned DataBuffer will contain all the data being written. This is specially important when
+   * {@link #getCurrentOffset()} has been moved back from the latest written position.
+   *
+   * TODO: Add one option that let caller choose start and end offset.
+   */
+  public DataBuffer asBuffer(ByteOrder order, boolean owner) {
+    if (_written == 0) {
+      return PinotDataBuffer.empty();
+    }
+
+    // TODO: We can remove this check
+    ByteBuffer[] pages = getPages();
+    for (int i = 0; i < pages.length; i++) {
+      ByteBuffer page = pages[i];
+      if (page.remaining() != _pageSize && (i != pages.length - 1 || !page.hasRemaining())) {
+        throw new IllegalArgumentException("Unexpected remaining bytes in page " + i + ": " + page.remaining());
+      }
+    }
 
     return new CompoundDataBuffer(pages, order, owner);
   }

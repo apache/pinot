@@ -1,3 +1,21 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 package org.apache.pinot.segment.spi.memory;
 
 import java.io.File;
@@ -465,24 +483,25 @@ public class CompoundDataBuffer implements DataBuffer {
     int startBufferIndex = getBufferIndex(start);
     int endBufferIndex = getBufferIndex(end - 1);
 
-    DataBuffer[] buffers;
     if (startBufferIndex == endBufferIndex) {
       long bufferOffset = _bufferOffsets[startBufferIndex];
       DataBuffer buffer = _buffers[startBufferIndex];
-      DataBuffer firstBuffer = buffer.view(start - bufferOffset, end - bufferOffset, byteOrder);
-      buffers = new DataBuffer[]{firstBuffer};
+      return buffer.view(start - bufferOffset, end - bufferOffset, byteOrder);
     } else {
       DataBuffer firstBuffer = _buffers[startBufferIndex]
           .view(start - _bufferOffsets[startBufferIndex], _buffers[startBufferIndex].size(), byteOrder);
       DataBuffer lastBuffer = _buffers[endBufferIndex]
-          .view(0, end - _bufferOffsets[endBufferIndex] + 1, byteOrder);
+          .view(0, end - _bufferOffsets[endBufferIndex], byteOrder);
 
-      buffers = new DataBuffer[endBufferIndex - startBufferIndex + 1];
+      DataBuffer[] buffers = new DataBuffer[endBufferIndex - startBufferIndex + 1];
       buffers[0] = firstBuffer;
-      System.arraycopy(_buffers, startBufferIndex + 1, buffers, 1, buffers.length - 2);
+      if (buffers.length > 2) {
+        System.arraycopy(_buffers, startBufferIndex + 1, buffers, 1, buffers.length - 2);
+      }
       buffers[buffers.length - 1] = lastBuffer;
+
+      return new CompoundDataBuffer(buffers, byteOrder, false);
     }
-    return new CompoundDataBuffer(buffers, byteOrder, false);
   }
 
   @Override
