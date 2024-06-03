@@ -47,6 +47,7 @@ public class QueryOp extends BaseOp {
   private static final String COMMENT_DELIMITER = "#";
   private String _queryFileName;
   private String _expectedResultsFileName;
+  private boolean _useMultiStageQueryEngine = false;
 
   public QueryOp() {
     super(OpType.QUERY_OP);
@@ -71,6 +72,14 @@ public class QueryOp extends BaseOp {
 
   public void setExpectedResultsFileName(String expectedResultsFileName) {
     _expectedResultsFileName = expectedResultsFileName;
+  }
+
+  public boolean getUseMultiStageQueryEngine() {
+    return _useMultiStageQueryEngine;
+  }
+
+  public void setUseMultiStageQueryEngine(boolean useMultiStageQueryEngine) {
+    _useMultiStageQueryEngine = useMultiStageQueryEngine;
   }
 
   @Override
@@ -125,7 +134,9 @@ public class QueryOp extends BaseOp {
         JsonNode actualJson = null;
         if (expectedJson != null) {
           try {
-            actualJson = Utils.postSqlQuery(query, ClusterDescriptor.getInstance().getBrokerUrl());
+            actualJson = _useMultiStageQueryEngine
+                ? Utils.postMultiStageSqlQuery(query, ClusterDescriptor.getInstance().getBrokerUrl())
+                : Utils.postSqlQuery(query, ClusterDescriptor.getInstance().getBrokerUrl());
           } catch (Exception e) {
             LOGGER.error("Comparison FAILED: Line: {} Exception caught while running query: '{}', explain plan: {}",
                 queryLineNum, query, getExplainPlan(query), e);
@@ -134,7 +145,9 @@ public class QueryOp extends BaseOp {
 
         if (expectedJson != null && actualJson != null) {
           try {
-            boolean passed = SqlResultComparator.areEqual(actualJson, expectedJson, query);
+            boolean passed = _useMultiStageQueryEngine
+                ? SqlResultComparator.areMultiStageQueriesEqual(actualJson, expectedJson, query)
+                : SqlResultComparator.areEqual(actualJson, expectedJson, query);
             if (passed) {
               succeededQueryCount++;
               LOGGER.debug("Comparison PASSED: Line: {}, query: '{}', actual response: {}, expected response: {}",
@@ -163,11 +176,18 @@ public class QueryOp extends BaseOp {
     return testPassed;
   }
 
-  private static String getExplainPlan(String query) {
+  private String getExplainPlan(String query) {
     try {
-      JsonNode explainPlanResponse =
-          Utils.postSqlQuery("explain plan for " + query, ClusterDescriptor.getInstance().getBrokerUrl());
-      return ExplainPlanUtils.formatExplainPlan(explainPlanResponse);
+      if (!_useMultiStageQueryEngine) {
+        JsonNode explainPlanResponse =
+            Utils.postSqlQuery("explain plan for " + query, ClusterDescriptor.getInstance().getBrokerUrl());
+        return ExplainPlanUtils.formatExplainPlan(explainPlanResponse);
+      } else {
+        JsonNode explainPlanResponse =
+            Utils.postMultiStageSqlQuery("explain plan for " + query,
+                ClusterDescriptor.getInstance().getBrokerUrl());
+        return ExplainPlanUtils.formatMultiStageExplainPlan(explainPlanResponse);
+      }
     } catch (Throwable error) {
       return error.getMessage();
     }
