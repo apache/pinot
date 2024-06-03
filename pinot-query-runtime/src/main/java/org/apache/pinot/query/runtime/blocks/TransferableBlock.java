@@ -132,6 +132,14 @@ public class TransferableBlock implements Block {
    * If not already constructed. It will use {@link DataBlockUtils} to extract the row/columnar data from the
    * binary-packed format.
    *
+   * TODO: This method should never been called by operators, as it allocates a lot of memory for no reason.
+   *   Instead, an iterable should be returned.
+   *   That iterable can materialize rows one by one, without allocating all of them at once.
+   *   In fact transformations and filters could be implemented in zero allocate fashion by having a special type of
+   *   block that wraps the child block and decorates it with a transformation/predicate.
+   *   By doing so only operators that actually require to keep multi-stage results in memory will allocate memory.
+   *   PS: the term _allocate memory_ here means _keep alive an amount of memory proportional to the number of rows_.
+   *
    * @return data container.
    */
   public List<Object[]> getContainer() {

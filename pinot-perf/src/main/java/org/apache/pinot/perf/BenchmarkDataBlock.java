@@ -33,6 +33,7 @@ import org.apache.pinot.common.datablock.OriginalDataBlockSerde;
 import org.apache.pinot.common.datablock.ZeroCopyDataBlockSerde;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.datablock.DataBlockBuilder;
+import org.apache.pinot.core.common.datablock.DataBlockBuilder2;
 import org.apache.pinot.segment.spi.memory.PagedPinotOutputStream;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.openjdk.jmh.annotations.Benchmark;
@@ -76,7 +77,7 @@ public class BenchmarkDataBlock {
       _schema = new DataSchema(new String[]{"value"}, new DataSchema.ColumnDataType[]{columnDataType});
       _data = createData(rows);
 
-      _dataBlock = createDataBlock();
+      _dataBlock = createDataBlock(false);
       _bytes = new ByteBuffer[] {ByteBuffer.wrap(_dataBlock.toBytes())};
 
       int firstUnderscore = version.indexOf("_");
@@ -182,13 +183,21 @@ public class BenchmarkDataBlock {
       }
     }
 
-    private DataBlock createDataBlock()
+    private DataBlock createDataBlock(boolean optimized)
         throws IOException {
       switch (_blockType) {
         case COLUMNAR:
-          return DataBlockBuilder.buildFromColumns(_data, _schema);
+          if (optimized) {
+            return DataBlockBuilder2.buildFromColumns(_data, _schema);
+          } else {
+            return DataBlockBuilder.buildFromColumns(_data, _schema);
+          }
         case ROW:
-          return DataBlockBuilder.buildFromRows(_data, _schema);
+          if (optimized) {
+            return DataBlockBuilder2.buildFromRows(_data, _schema);
+          } else {
+            return DataBlockBuilder.buildFromRows(_data, _schema);
+          }
         default:
           throw new IllegalArgumentException("Unsupported data block type: " + _blockType);
       }
@@ -224,28 +233,31 @@ public class BenchmarkDataBlock {
       new Runner(opt).run();
     }
 
-//    @Param(value = {"INT", "LONG", "STRING", "BYTES", "BIG_DECIMAL", "BOOLEAN", "LONG_ARRAY", "STRING_ARRAY"})
+    @Param(value = {"INT", "LONG", "STRING", "BYTES", "BIG_DECIMAL", "BOOLEAN", "LONG_ARRAY", "STRING_ARRAY"})
 //    @Param(value = {"INT", "STRING", "BIG_DECIMAL", "LONG_ARRAY", "STRING_ARRAY"})
-    DataSchema.ColumnDataType _columnDataType = DataSchema.ColumnDataType.INT;
+    DataSchema.ColumnDataType _dataType;
     @Param(value = {"COLUMNAR", "ROW"})
     DataBlock.Type _blockType = DataBlock.Type.COLUMNAR;
 //    @Param(value = {"0", "10", "90"})
     int _nullPerCent = 0;
+    @Param(value = {"true", "false"})
+    boolean _new;
 
-    @Param(value = {"100", "10000", "1000000"})
+//    @Param(value = {"100", "10000", "1000000"})
+    @Param(value = {"10000"})
     int _rows;
 
     BenchmarkState _state;
     @Setup
     public void setup()
         throws IOException {
-      _state = new BenchmarkState(_rows, _columnDataType, "bytes", _nullPerCent, _blockType);
+      _state = new BenchmarkState(_rows, _dataType, "bytes", _nullPerCent, _blockType);
     }
 
     @Benchmark
     public DataBlock buildBlock()
         throws IOException {
-      return _state.createDataBlock();
+      return _state.createDataBlock(_new);
     }
   }
 
