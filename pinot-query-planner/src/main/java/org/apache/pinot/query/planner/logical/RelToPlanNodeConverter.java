@@ -85,7 +85,7 @@ public final class RelToPlanNodeConverter {
    * @param node relational node
    * @return stage node.
    */
-  public static PlanNode toStageNode(RelNode node, int currentStageId) {
+  public static PlanNode toPlanNode(RelNode node, int currentStageId) {
     if (node instanceof LogicalTableScan) {
       return convertLogicalTableScan((LogicalTableScan) node, currentStageId);
     } else if (node instanceof LogicalJoin) {
