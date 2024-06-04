@@ -83,6 +83,7 @@ import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.util.GapfillUtils;
+import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -366,18 +367,25 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       BrokerRequest brokerRequest = CalciteSqlCompiler.convertToBrokerRequest(pinotQuery);
       BrokerRequest serverBrokerRequest =
           serverPinotQuery == pinotQuery ? brokerRequest : CalciteSqlCompiler.convertToBrokerRequest(serverPinotQuery);
-      boolean hasTableAccess =
-          accessControl.hasAccess(requesterIdentity, serverBrokerRequest) && accessControl.hasAccess(httpHeaders,
-              TargetType.TABLE, tableName, Actions.Table.QUERY);
+      AuthorizationResult authorizationResult = accessControl.authorize(requesterIdentity, serverBrokerRequest);
+      if (authorizationResult.hasAccess()) {
+        authorizationResult = accessControl.authorize(httpHeaders, TargetType.TABLE, tableName, Actions.Table.QUERY);
+      }
 
       _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.AUTHORIZATION,
           System.nanoTime() - compilationEndTimeNs);
 
-      if (!hasTableAccess) {
+      if (!authorizationResult.hasAccess()) {
         _brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
-        LOGGER.info("Access denied for request {}: {}, table: {}", requestId, query, tableName);
+        LOGGER.info("Access denied for request {}: {}, table: {}, reason :{}", requestId, query, tableName,
+            authorizationResult.getFailureMessage());
         requestContext.setErrorCode(QueryException.ACCESS_DENIED_ERROR_CODE);
-        throw new WebApplicationException("Permission denied", Response.Status.FORBIDDEN);
+        String failureMessage = authorizationResult.getFailureMessage();
+        if (StringUtils.isNotBlank(failureMessage)) {
+          failureMessage = "Reason: " + failureMessage;
+        }
+        throw new WebApplicationException("Permission denied." + failureMessage,
+            Response.Status.FORBIDDEN);
       }
 
       // Get the tables hit by the request

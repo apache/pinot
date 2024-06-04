@@ -25,10 +25,12 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
+import org.apache.commons.lang.StringUtils;
 import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.pinot.broker.api.AccessControl;
 import org.apache.pinot.broker.api.RequesterIdentity;
@@ -64,6 +66,7 @@ import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.query.type.TypeFactory;
 import org.apache.pinot.query.type.TypeSystem;
+import org.apache.pinot.spi.auth.TableAuthorizationResult;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.DatabaseConflictException;
 import org.apache.pinot.spi.trace.RequestContext;
@@ -136,8 +139,15 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
           queryPlanResult = queryEnvironment.explainQuery(query, sqlNodeAndOptions, requestId);
           String plan = queryPlanResult.getExplainPlan();
           Set<String> tableNames = queryPlanResult.getTableNames();
-          if (!hasTableAccess(requesterIdentity, tableNames, requestContext, httpHeaders)) {
-            throw new WebApplicationException("Permission denied", Response.Status.FORBIDDEN);
+          TableAuthorizationResult tableAuthorizationResult =
+              hasTableAccess(requesterIdentity, tableNames, requestContext, httpHeaders);
+          if (!tableAuthorizationResult.hasAccess()) {
+            String failureMessage = tableAuthorizationResult.getFailureMessage();
+            if (StringUtils.isNotBlank(failureMessage)) {
+              failureMessage = "Reason: " + failureMessage;
+            }
+            throw new WebApplicationException("Permission denied. " + failureMessage,
+                Response.Status.FORBIDDEN);
           }
           return constructMultistageExplainPlan(query, plan);
         case SELECT:
@@ -182,8 +192,15 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     updatePhaseTimingForTables(tableNames, BrokerQueryPhase.REQUEST_COMPILATION, compilationTimeNs);
 
     // Validate table access.
-    if (!hasTableAccess(requesterIdentity, tableNames, requestContext, httpHeaders)) {
-      throw new WebApplicationException("Permission denied", Response.Status.FORBIDDEN);
+    TableAuthorizationResult tableAuthorizationResult =
+        hasTableAccess(requesterIdentity, tableNames, requestContext, httpHeaders);
+    if (!tableAuthorizationResult.hasAccess()) {
+      String failureMessage = tableAuthorizationResult.getFailureMessage();
+      if (StringUtils.isNotBlank(failureMessage)) {
+        failureMessage = "Reason: " + failureMessage;
+      }
+      throw new WebApplicationException("Permission denied." + failureMessage,
+          Response.Status.FORBIDDEN);
     }
 
     // Validate QPS quota
@@ -267,13 +284,26 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   /**
    * Validates whether the requester has access to all the tables.
    */
-  private boolean hasTableAccess(RequesterIdentity requesterIdentity, Set<String> tableNames,
+  private TableAuthorizationResult hasTableAccess(RequesterIdentity requesterIdentity, Set<String> tableNames,
       RequestContext requestContext, HttpHeaders httpHeaders) {
     final long startTimeNs = System.nanoTime();
     AccessControl accessControl = _accessControlFactory.create();
-    boolean hasAccess = accessControl.hasAccess(requesterIdentity, tableNames) && tableNames.stream()
-        .allMatch(table -> accessControl.hasAccess(httpHeaders, TargetType.TABLE, table, Actions.Table.QUERY));
-    if (!hasAccess) {
+
+    TableAuthorizationResult tableAuthorizationResult = accessControl.authorize(requesterIdentity, tableNames);
+
+    Set<String> failedTables = tableNames.stream()
+        .filter(table -> !accessControl.hasAccess(httpHeaders, TargetType.TABLE, table, Actions.Table.QUERY))
+        .collect(Collectors.toSet());
+
+    failedTables.addAll(tableAuthorizationResult.getFailedTables());
+
+    if (!failedTables.isEmpty()) {
+      tableAuthorizationResult = new TableAuthorizationResult(failedTables);
+    } else {
+      tableAuthorizationResult = TableAuthorizationResult.success();
+    }
+
+    if (!tableAuthorizationResult.hasAccess()) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
       LOGGER.warn("Access denied for requestId {}", requestContext.getRequestId());
       requestContext.setErrorCode(QueryException.ACCESS_DENIED_ERROR_CODE);
@@ -281,7 +311,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     updatePhaseTimingForTables(tableNames, BrokerQueryPhase.AUTHORIZATION, System.nanoTime() - startTimeNs);
 
-    return hasAccess;
+    return tableAuthorizationResult;
   }
 
   /**
