@@ -61,6 +61,7 @@ import org.slf4j.LoggerFactory;
  */
 public class ServerSegmentMetadataReader {
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerSegmentMetadataReader.class);
+  private static final int DEFAULT_SEGMENT_BATCH_SIZE_FOR_QUERYING_SERVER = 500;
 
   private final Executor _executor;
   private final HttpClientConnectionManager _connectionManager;
@@ -235,8 +236,15 @@ public class ServerSegmentMetadataReader {
           }
         }
       }
-      serverURLsAndBodies.add(generateValidDocIdsMetadataURL(tableNameWithType, segmentsToQuery, validDocIdsType,
-          serverToEndpoints.get(serverToSegments.getKey())));
+      int batches = (segmentsToQuery.size() + DEFAULT_SEGMENT_BATCH_SIZE_FOR_QUERYING_SERVER - 1)
+          / DEFAULT_SEGMENT_BATCH_SIZE_FOR_QUERYING_SERVER;
+      for (int i = 0; i < batches; i++) {
+        int start = i * DEFAULT_SEGMENT_BATCH_SIZE_FOR_QUERYING_SERVER;
+        int end = Math.min((i + 1) * DEFAULT_SEGMENT_BATCH_SIZE_FOR_QUERYING_SERVER, segmentsToQuery.size());
+        List<String> segmentsToQueryBatch = segmentsToQuery.subList(start, end);
+        serverURLsAndBodies.add(generateValidDocIdsMetadataURL(tableNameWithType, segmentsToQueryBatch, validDocIdsType,
+            serverToEndpoints.get(serverToSegments.getKey())));
+      }
     }
 
     BiMap<String, String> endpointsToServers = serverToEndpoints.inverse();
@@ -247,12 +255,12 @@ public class ServerSegmentMetadataReader {
 
     Map<String, String> requestHeaders = Map.of("Content-Type", "application/json");
     CompletionServiceHelper.CompletionServiceResponse serviceResponse =
-        completionServiceHelper.doMultiPostRequest(serverURLsAndBodies, tableNameWithType, false, requestHeaders,
+        completionServiceHelper.doMultiPostRequest(serverURLsAndBodies, tableNameWithType, true, requestHeaders,
             timeoutMs, null);
 
     Map<String, ValidDocIdsMetadataInfo> validDocIdsMetadataInfos = new HashMap<>();
     int failedParses = 0;
-    int returnedServersCount = 0;
+    int returnedServerRequestsCount = 0;
     for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
       try {
         String validDocIdsMetadataList = streamResponse.getValue();
@@ -262,21 +270,21 @@ public class ServerSegmentMetadataReader {
         for (ValidDocIdsMetadataInfo validDocIdsMetadataInfo: validDocIdsMetadataInfoList) {
           validDocIdsMetadataInfos.put(validDocIdsMetadataInfo.getSegmentName(), validDocIdsMetadataInfo);
         }
-        returnedServersCount++;
+        returnedServerRequestsCount++;
       } catch (Exception e) {
         failedParses++;
-        LOGGER.error("Unable to parse server {} response due to an error: ", streamResponse.getKey(), e);
+        LOGGER.error("Unable to parse {} server-request response due to an error: ", streamResponse.getKey(), e);
       }
     }
 
     if (failedParses != 0) {
-      LOGGER.error("Unable to parse server {} / {} response due to an error: ", failedParses,
+      LOGGER.error("Unable to parse {} / {} server-request responses due to an error: ", failedParses,
           serverURLsAndBodies.size());
     }
 
-    if (returnedServersCount != serverURLsAndBodies.size()) {
-      LOGGER.error("Unable to get validDocIdsMetadata from all servers. Expected: {}, Actual: {}",
-          serverURLsAndBodies.size(), returnedServersCount);
+    if (returnedServerRequestsCount != serverURLsAndBodies.size()) {
+      LOGGER.error("Unable to get validDocIdsMetadata from all server requests. Expected: {}, Actual: {}",
+          serverURLsAndBodies.size(), returnedServerRequestsCount);
     }
 
     if (segmentNames != null && !segmentNames.isEmpty() && segmentNames.size() != validDocIdsMetadataInfos.size()) {
@@ -284,8 +292,8 @@ public class ServerSegmentMetadataReader {
           segmentNames.size(), validDocIdsMetadataInfos.size());
     }
 
-    LOGGER.info("Retrieved validDocIds metadata for {} segments from {} servers.", validDocIdsMetadataInfos.size(),
-        returnedServersCount);
+    LOGGER.info("Retrieved validDocIds metadata for {} segments from {} server requests.",
+        validDocIdsMetadataInfos.size(), returnedServerRequestsCount);
     return new ArrayList<>(validDocIdsMetadataInfos.values());
   }
 

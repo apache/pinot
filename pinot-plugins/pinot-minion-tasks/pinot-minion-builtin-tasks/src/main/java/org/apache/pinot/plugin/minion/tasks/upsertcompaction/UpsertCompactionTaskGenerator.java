@@ -137,9 +137,6 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
           new ServerSegmentMetadataReader(_clusterInfoAccessor.getExecutor(),
               _clusterInfoAccessor.getConnectionManager());
 
-      // TODO: currently, we put segmentNames=null to get metadata for all segments. We can change this to get
-      // valid doc id metadata in batches with the loop.
-
       // By default, we use 'snapshot' for validDocIdsType. This means that we will use the validDocIds bitmap from
       // the snapshot from Pinot segment. This will require 'enableSnapshot' from UpsertConfig to be set to true.
       String validDocIdsTypeStr =

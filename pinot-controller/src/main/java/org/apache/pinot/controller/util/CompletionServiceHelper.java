@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.concurrent.CompletionService;
 import java.util.concurrent.Executor;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.http.util.EntityUtils;
@@ -129,13 +130,17 @@ public class CompletionServiceHelper {
         int statusCode = multiHttpRequestResponse.getResponse().getStatusLine().getStatusCode();
         if (statusCode >= 300) {
           String reason = multiHttpRequestResponse.getResponse().getStatusLine().getReasonPhrase();
-          LOGGER.error("Server: {} returned error: {}, reason: {}", instance, statusCode, reason);
+          LOGGER.error("Server: {} returned error: {}, reason: {} for uri: {}", instance, statusCode, reason, uri);
           completionServiceResponse._failedResponseCount++;
           continue;
         }
         String responseString = EntityUtils.toString(multiHttpRequestResponse.getResponse().getEntity());
-        completionServiceResponse._httpResponses
-            .put(multiRequestPerServer ? uri.toString() : instance, responseString);
+        String key = multiRequestPerServer ? uri.toString() : instance;
+        if (multiRequestPerServer && completionServiceResponse._httpResponses.containsKey(key)) {
+          LOGGER.warn("Appending random string to http response key name: {}", key);
+          key = key + "__" + RandomStringUtils.randomAlphanumeric(10);
+        }
+        completionServiceResponse._httpResponses.put(key, responseString);
       } catch (Exception e) {
         String reason = useCase == null ? "" : String.format(" in '%s'", useCase);
         LOGGER.error("Connection error {}. Details: {}", reason, e.getMessage());
@@ -151,10 +156,10 @@ public class CompletionServiceHelper {
       }
     }
 
-    int numServersResponded = completionServiceResponse._httpResponses.size();
-    if (numServersResponded != size) {
-      LOGGER.warn("Finished reading information for table: {} with {}/{} server responses", tableNameWithType,
-          numServersResponded, size);
+    int numServerRequestssResponded = completionServiceResponse._httpResponses.size();
+    if (numServerRequestssResponded != size) {
+      LOGGER.warn("Finished reading information for table: {} with {}/{} server-request responses", tableNameWithType,
+          numServerRequestssResponded, size);
     } else {
       LOGGER.info("Finished reading information for table: {}", tableNameWithType);
     }
