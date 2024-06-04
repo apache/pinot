@@ -357,4 +357,8 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
     String tmpSegmentName = indexDir.getParentFile().getName();
     return tmpSegmentName.substring(tmpSegmentName.indexOf("tmp-") + 4, tmpSegmentName.lastIndexOf('-'));
   }
+
+  public int getNumDocs() {
+    return _nextDocId;
+  }
 }

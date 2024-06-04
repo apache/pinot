@@ -74,11 +74,11 @@ public class NativeAndLuceneMutableTextIndexTest {
     TextIndexConfig config =
         new TextIndexConfig(false, null, null, false, false, null, null, true, 500, null, false);
     _realtimeLuceneTextIndex =
-        new RealtimeLuceneTextIndex(TEXT_COLUMN_NAME, INDEX_DIR, "fooBar", config);
+        new RealtimeLuceneTextIndex(TEXT_COLUMN_NAME, INDEX_DIR, "table__0__1__20240602T0014Z", config);
     _nativeMutableTextIndex = new NativeMutableTextIndex(TEXT_COLUMN_NAME);
 
     _realtimeLuceneMVTextIndex =
-        new RealtimeLuceneTextIndex(MV_TEXT_COLUMN_NAME, INDEX_DIR, "fooBar", config);
+        new RealtimeLuceneTextIndex(MV_TEXT_COLUMN_NAME, INDEX_DIR, "table__0__1__20240602T0014Z", config);
     _nativeMutableMVTextIndex = new NativeMutableTextIndex(MV_TEXT_COLUMN_NAME);
 
     String[] documents = getTextData();

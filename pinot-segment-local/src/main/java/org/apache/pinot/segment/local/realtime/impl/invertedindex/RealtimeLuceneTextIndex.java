@@ -55,6 +55,7 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
   private final String _column;
   private final String _segmentName;
   private boolean _enablePrefixSuffixMatchingInPhraseQueries = false;
+  private final RealtimeLuceneRefreshListener _refreshListener;
 
   /**
    * Created by {@link MutableSegmentImpl}
@@ -81,6 +82,9 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
               false /* commitOnClose */, false, null, null, config);
       IndexWriter indexWriter = _indexCreator.getIndexWriter();
       _searcherManager = new SearcherManager(indexWriter, false, false, null);
+      _refreshListener = new RealtimeLuceneRefreshListener(getTableName(), segmentName, column, getPartition(),
+          _indexCreator::getNumDocs);
+      _searcherManager.addListener(_refreshListener);
       _analyzer = _indexCreator.getIndexWriter().getConfig().getAnalyzer();
       _enablePrefixSuffixMatchingInPhraseQueries = config.isEnablePrefixSuffixMatchingInPhraseQueries();
     } catch (Exception e) {
@@ -199,10 +203,29 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
       _searcherManager = null;
       _indexCreator.close();
       _analyzer.close();
+      _refreshListener.close(); // clean up metrics
     } catch (Exception e) {
       LOGGER.error("Failed while closing the realtime text index for column {}, exception {}", _column, e.getMessage());
       throw new RuntimeException(e);
     }
+  }
+
+  /**
+   * Returns the partition from a segment name, or zero if partition is not a valid integer
+   */
+  private int getPartition() {
+    int start = _segmentName.indexOf("__") + 2;
+    int end = _segmentName.indexOf("__", start);
+    String partition = _segmentName.substring(start, end);
+    try {
+      return Integer.parseInt(partition);
+    } catch (NumberFormatException e) {
+      return 0;
+    }
+  }
+
+  private String getTableName() {
+    return _segmentName.substring(0, _segmentName.indexOf("__"));
   }
 
   public SearcherManager getSearcherManager() {
