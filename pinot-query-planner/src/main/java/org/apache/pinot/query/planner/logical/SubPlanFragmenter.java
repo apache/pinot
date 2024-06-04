@@ -42,13 +42,13 @@ import org.apache.pinot.query.planner.plannode.WindowNode;
 
 
 /**
- * SubPlanFragmenter is an implementation of {@link PlanNodeVisitor} to fragment a
- * {@link org.apache.pinot.query.planner.QueryPlan} into multiple {@link org.apache.pinot.query.planner.SubPlan}.
+ * SubPlanFragmenter is an implementation of {@link PlanNodeVisitor} to fragment a query plan into multiple sub-plans.
+ * TODO: Currently it is not hooked up because we don't support multiple sub-plans yet.
  *
  * The fragmenting process is as follows:
  * 1. Traverse the plan tree in a depth-first manner;
  * 2. For each node, if it is a SubPlan splittable ExchangeNode, switch it to a {@link LiteralValueNode};
- * 3. Increment current SubPlan Id by one and keep traverse the tree.
+ * 3. Increment current SubPlan ID by one and keep traverse the tree.
  */
 public class SubPlanFragmenter implements PlanNodeVisitor<PlanNode, SubPlanFragmenter.Context> {
   public static final SubPlanFragmenter INSTANCE = new SubPlanFragmenter();
