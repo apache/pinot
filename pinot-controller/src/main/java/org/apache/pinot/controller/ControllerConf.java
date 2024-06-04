@@ -316,8 +316,8 @@ public class ControllerConf extends PinotConfiguration {
   public static final String DISABLE_GROOVY = "controller.disable.ingestion.groovy";
   public static final boolean DEFAULT_DISABLE_GROOVY = true;
 
-  public static final String INSTANCE_POOL_AND_REPLICA_GROUP_CHECK_KEY = "instance.pool.and.replica.group.check";
-  public static final boolean DEFAULT_INSTANCE_POOL_AND_REPLICA_GROUP_CHECK = false;
+  public static final String ENFORCE_POOL_BASED_ASSIGNMENT_KEY = "enforce.pool.based.assignment";
+  public static final boolean DEFAULT_ENFORCE_POOL_BASED_ASSIGNMENT = false;
 
   public ControllerConf() {
     super(new HashMap<>());
@@ -1070,6 +1070,6 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   public boolean isInstancePoolAndReplicaGroupCheckEnabled() {
-    return getProperty(INSTANCE_POOL_AND_REPLICA_GROUP_CHECK_KEY, DEFAULT_INSTANCE_POOL_AND_REPLICA_GROUP_CHECK);
+    return getProperty(ENFORCE_POOL_BASED_ASSIGNMENT_KEY, DEFAULT_ENFORCE_POOL_BASED_ASSIGNMENT);
   }
 }
