@@ -19,9 +19,8 @@
 package org.apache.pinot.segment.local.realtime.impl.invertedindex;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Supplier;
 import org.apache.pinot.common.metrics.ServerGauge;
@@ -43,13 +42,13 @@ import org.apache.pinot.common.metrics.ServerMetrics;
  * <p> where the values are the maximum indexDelayMs or indexDelayDocs across all segments for that partition
  */
 public class RealtimeLuceneIndexingDelayTracker {
-  private final ConcurrentMap<String, TableDelay> _tableToPartitionToDelayMs;
+  private final Map<String, TableDelay> _tableToPartitionToDelayMs;
   // Lock is used to prevent removing a gauge while a new suppliers are being registered. Otherwise, it is possible
   // for the gauge to be removed after ServerMetrics.setOrUpdatePartitionGauge() has been called for the next segment
   private final ReentrantLock _lock = new ReentrantLock();
 
   private RealtimeLuceneIndexingDelayTracker() {
-    _tableToPartitionToDelayMs = new ConcurrentHashMap<>();
+    _tableToPartitionToDelayMs = new HashMap<>();
   }
 
   /**
@@ -112,7 +111,7 @@ public class RealtimeLuceneIndexingDelayTracker {
 
     TableDelay(String tableName) {
       _tableName = tableName;
-      _partitionDelayMap = new ConcurrentHashMap<>();
+      _partitionDelayMap = new HashMap<>();
       _serverMetrics = ServerMetrics.get();
     }
 
@@ -173,8 +172,8 @@ public class RealtimeLuceneIndexingDelayTracker {
 
     PartitionDelay(int partition) {
       _partition = partition;
-      _columnNumDocsDelaySuppliers = new ConcurrentHashMap<>();
-      _columnTimeMsDelaySuppliers = new ConcurrentHashMap<>();
+      _columnNumDocsDelaySuppliers = new HashMap<>();
+      _columnTimeMsDelaySuppliers = new HashMap<>();
     }
 
     void registerDelaySuppliers(String segmentName, String columnName, Supplier<Integer> numDocsDelaySupplier,
