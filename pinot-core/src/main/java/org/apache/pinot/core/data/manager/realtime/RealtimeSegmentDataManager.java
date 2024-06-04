@@ -654,8 +654,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
     updateCurrentDocumentCountMetrics();
     if (messageBatch.getUnfilteredMessageCount() > 0) {
-      updateIngestionDelay(messageBatch.getLastMessageMetadata());
-      updateIngestionDelayOffset(messageBatch.getLastMessageMetadata());
+      updateIngestionMetrics(messageBatch.getLastMessageMetadata());
       _hasMessagesFetched = true;
       if (streamMessageCount > 0 && _segmentLogger.isDebugEnabled()) {
         _segmentLogger.debug("Indexed {} messages ({} messages read from stream) current offset {}",
@@ -1773,20 +1772,13 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     _partitionMetadataProvider = _streamConsumerFactory.createPartitionMetadataProvider(_clientId, _partitionGroupId);
   }
 
-  private void updateIngestionDelay(RowMetadata metadata) {
-    if (metadata != null) {
-      _realtimeTableDataManager.updateIngestionDelay(metadata.getRecordIngestionTimeMs(),
-          metadata.getFirstStreamRecordIngestionTimeMs(), _partitionGroupId);
-    }
-  }
-
-  private void updateIngestionDelayOffset(RowMetadata metadata) {
+  private void updateIngestionMetrics(RowMetadata metadata) {
     if (metadata != null) {
       try {
         StreamPartitionMsgOffset latestOffset =
             _partitionMetadataProvider.fetchStreamPartitionOffset(OffsetCriteria.LARGEST_OFFSET_CRITERIA, 5000);
-      _realtimeTableDataManager.updateIngestionDelayOffset(metadata.getOffset(),
-          latestOffset, _partitionGroupId);
+        _realtimeTableDataManager.updateIngestionMetrics(metadata.getRecordIngestionTimeMs(),
+            metadata.getFirstStreamRecordIngestionTimeMs(), metadata.getOffset(), latestOffset, _partitionGroupId);
       } catch (Exception e) {
         _segmentLogger.warn("Failed to fetch latest offset for updating ingestion delay", e);
       }
@@ -1798,7 +1790,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
    */
   private void setIngestionDelayToZero() {
     long currentTimeMs = System.currentTimeMillis();
-    _realtimeTableDataManager.updateIngestionDelay(currentTimeMs, currentTimeMs, _partitionGroupId);
+    _realtimeTableDataManager.updateIngestionMetrics(currentTimeMs, currentTimeMs, null, null, _partitionGroupId);
   }
 
   // This should be done during commit? We may not always commit when we build a segment....

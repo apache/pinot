@@ -24,6 +24,8 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.spi.stream.LongMsgOffset;
+import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -251,6 +253,69 @@ public class IngestionDelayTrackerTest {
 
     // Test shutdown with no partitions
     ingestionDelayTracker = createTracker();
+    ingestionDelayTracker.shutdown();
+  }
+
+  @Test
+  public void testRecordIngestionDelayOffsetWithNoAging() {
+    final int partition0 = 0;
+    final int partition1 = 1;
+
+    IngestionDelayTracker ingestionDelayTracker = createTracker();
+    // Use fixed clock so samples don't age
+    Instant now = Instant.now();
+    ZoneId zoneId = ZoneId.systemDefault();
+    Clock clock = Clock.fixed(now, zoneId);
+    ingestionDelayTracker.setClock(clock);
+
+    // Test tracking offset lag for a single partition
+    StreamPartitionMsgOffset msgOffset0 = new LongMsgOffset(100);
+    StreamPartitionMsgOffset latestOffset0 = new LongMsgOffset(200);
+    ingestionDelayTracker.updateIngestionOffsets(msgOffset0, latestOffset0, partition0);
+    Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionOffsetLag(partition0), 100);
+
+    // Test tracking offset lag for another partition
+    StreamPartitionMsgOffset msgOffset1 = new LongMsgOffset(50);
+    StreamPartitionMsgOffset latestOffset1 = new LongMsgOffset(150);
+    ingestionDelayTracker.updateIngestionOffsets(msgOffset1, latestOffset1, partition1);
+    Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionOffsetLag(partition1), 100);
+
+    // Update offset lag for partition0
+    msgOffset0 = new LongMsgOffset(150);
+    latestOffset0 = new LongMsgOffset(200);
+    ingestionDelayTracker.updateIngestionOffsets(msgOffset0, latestOffset0, partition0);
+    Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionOffsetLag(partition0), 50);
+
+    ingestionDelayTracker.shutdown();
+  }
+
+  @Test
+  public void testRecordIngestionDelayOffsetWithAging() {
+    final int partition0 = 0;
+    final long partition0OffsetLag0 = 100;
+    final long partition0OffsetLag1 = 50;
+
+    IngestionDelayTracker ingestionDelayTracker = createTracker();
+
+    // With samples for a single partition, test that sample is aged as expected
+    Instant now = Instant.now();
+    ZoneId zoneId = ZoneId.systemDefault();
+    Clock clock = Clock.fixed(now, zoneId);
+    ingestionDelayTracker.setClock(clock);
+
+    StreamPartitionMsgOffset msgOffset0 = new LongMsgOffset(100);
+    StreamPartitionMsgOffset latestOffset0 = new LongMsgOffset(200);
+    ingestionDelayTracker.updateIngestionOffsets(msgOffset0, latestOffset0, partition0);
+    Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionOffsetLag(partition0), partition0OffsetLag0);
+
+    // Update offset lag and test aging
+    msgOffset0 = new LongMsgOffset(150);
+    latestOffset0 = new LongMsgOffset(200);
+    ingestionDelayTracker.updateIngestionOffsets(msgOffset0, latestOffset0, partition0);
+    Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionOffsetLag(partition0), partition0OffsetLag1);
+
+
+    Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionOffsetLag(partition0), partition0OffsetLag1);
     ingestionDelayTracker.shutdown();
   }
 }

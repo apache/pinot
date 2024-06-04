@@ -266,15 +266,15 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
    * Method used by RealtimeSegmentManagers to update their partition delays
    *
    * @param ingestionTimeMs Ingestion delay being reported.
+   * @param firstStreamIngestionTimeMs Ingestion time of the first message in the stream.
    * @param partitionGroupId Partition ID for which delay is being updated.
+   * @param offset last offset received for the partition.
+   * @param latestOffset latest upstream offset for the partition.
    */
-  public void updateIngestionDelay(long ingestionTimeMs, long firstStreamIngestionTimeMs, int partitionGroupId) {
-    _ingestionDelayTracker.updateIngestionDelay(ingestionTimeMs, firstStreamIngestionTimeMs, partitionGroupId);
-  }
-
-  public void updateIngestionDelayOffset(StreamPartitionMsgOffset offset, StreamPartitionMsgOffset latestOffset,
-      int partitionGroupId) {
-    _ingestionDelayTracker.updateIngestionDelayOffset(offset, latestOffset, partitionGroupId);
+  public void updateIngestionMetrics(long ingestionTimeMs, long firstStreamIngestionTimeMs,
+      StreamPartitionMsgOffset offset, StreamPartitionMsgOffset latestOffset, int partitionGroupId) {
+    _ingestionDelayTracker.updateIngestionMetrics(ingestionTimeMs, firstStreamIngestionTimeMs, offset, latestOffset,
+        partitionGroupId);
   }
 
   /*

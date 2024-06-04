@@ -196,12 +196,12 @@ public class IngestionDelayTracker {
     StreamPartitionMsgOffset latestOffset = offset._latestOffset;
 
     // Compute aged delay for current partition
+    // TODO: Support other types of offsets
     if (!(msgOffset instanceof LongMsgOffset && latestOffset instanceof LongMsgOffset)) {
       return 0;
     }
 
-    long ingestionDelayOffset = ((LongMsgOffset) latestOffset).getOffset() - ((LongMsgOffset) msgOffset).getOffset();
-    return ingestionDelayOffset;
+    return ((LongMsgOffset) latestOffset).getOffset() - ((LongMsgOffset) msgOffset).getOffset();
   }
 
   /*
@@ -246,20 +246,32 @@ public class IngestionDelayTracker {
     _clock = clock;
   }
 
-  /*
-   * Called by RealTimeSegmentDataManagers to post ingestion time updates to this tracker class.
+  /**
+   * Called by RealTimeSegmentDataManagers to update the ingestion delay metrics for a given partition.
    *
-   * @param ingestionTimeMs ingestion time being recorded.
-   * @param firstStreamIngestionTimeMs time the event was ingested in the first stage of the ingestion pipeline.
-   * @param partitionGroupId partition ID for which this ingestion time is being recorded.
+   * @param ingestionTimeMs             ingestion time being recorded.
+   * @param firstStreamIngestionTimeMs  time the event was ingested in the first stage of the ingestion pipeline.
+   * @param msgOffset                   message offset of the event being ingested.
+   * @param latestOffset                latest message offset in the stream.
+   * @param partitionGroupId            partition ID for which the ingestion metrics are being recorded.
    */
-  public void updateIngestionDelay(long ingestionTimeMs, long firstStreamIngestionTimeMs, int partitionGroupId) {
-    // Store new measure and wipe old one for this partition
+  public void updateIngestionMetrics(long ingestionTimeMs, long firstStreamIngestionTimeMs,
+      StreamPartitionMsgOffset msgOffset, StreamPartitionMsgOffset latestOffset,
+      int partitionGroupId) {
     if (!_isServerReadyToServeQueries.get() || _realTimeTableDataManager.isShutDown()) {
       // Do not update the ingestion delay metrics during server startup period
       // or once the table data manager has been shutdown.
       return;
     }
+
+    updateIngestionDelay(ingestionTimeMs, firstStreamIngestionTimeMs, partitionGroupId);
+    updateIngestionOffsets(msgOffset, latestOffset, partitionGroupId);
+
+    // If we are consuming we do not need to track this partition for removal.
+    _partitionsMarkedForVerification.remove(partitionGroupId);
+  }
+
+  public void updateIngestionDelay(long ingestionTimeMs, long firstStreamIngestionTimeMs, int partitionGroupId) {
     if ((ingestionTimeMs < 0) && (firstStreamIngestionTimeMs < 0)) {
       // If stream does not return a valid ingestion timestamps don't publish a metric
       return;
@@ -282,18 +294,10 @@ public class IngestionDelayTracker {
             () -> getPartitionEndToEndIngestionDelayMs(partitionGroupId));
       }
     }
-    // If we are consuming we do not need to track this partition for removal.
-    _partitionsMarkedForVerification.remove(partitionGroupId);
   }
 
-  public void updateIngestionDelayOffset(StreamPartitionMsgOffset msgOffset, StreamPartitionMsgOffset latestOffset,
+  public void updateIngestionOffsets(StreamPartitionMsgOffset msgOffset, StreamPartitionMsgOffset latestOffset,
       int partitionGroupId) {
-    // Store new measure and wipe old one for this partition
-    if (!_isServerReadyToServeQueries.get() || _realTimeTableDataManager.isShutDown()) {
-      // Do not update the ingestion delay metrics during server startup period
-      // or once the table data manager has been shutdown.
-      return;
-    }
     if ((msgOffset == null)) {
       // If stream does not return a valid ingestion timestamps don't publish a metric
       return;
@@ -306,7 +310,7 @@ public class IngestionDelayTracker {
       // returns Long.MIN_VALUE
       if (msgOffset != null) {
         _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionGroupId,
-            ServerGauge.REALTIME_INGESTION_DELAY_OFFSET, () -> getPartitionIngestionDelayMsgOffset(partitionGroupId));
+            ServerGauge.REALTIME_INGESTION_OFFSET_LAG, () -> getPartitionIngestionOffsetLag(partitionGroupId));
       }
     }
   }
@@ -401,7 +405,7 @@ public class IngestionDelayTracker {
     return getIngestionDelayMs(currentMeasure._ingestionTimeMs);
   }
 
-  public long getPartitionIngestionDelayMsgOffset(int partitionGroupId) {
+  public long getPartitionIngestionOffsetLag(int partitionGroupId) {
     // Not protected as this will only be invoked when metric is installed which happens after server ready
     IngestionOffsets currentMeasure = _partitionToOffsetMap.get(partitionGroupId);
     if (currentMeasure == null) { // Guard just in case we read the metric without initializing it
