@@ -100,7 +100,8 @@ public class KinesisConsumerTest {
 
     // Fetch first batch
     KinesisPartitionGroupOffset startOffset = new KinesisPartitionGroupOffset("0", "1");
-    KinesisMessageBatch kinesisMessageBatch = kinesisConsumer.fetchMessages(startOffset, TIMEOUT);
+    KinesisMessageBatch kinesisMessageBatch = kinesisConsumer.fetchMessages(startOffset, true, TIMEOUT);
+
     assertEquals(kinesisMessageBatch.getMessageCount(), NUM_RECORDS);
     for (int i = 0; i < NUM_RECORDS; i++) {
       assertEquals(baToString(kinesisMessageBatch.getStreamMessage(i).getValue()), DUMMY_RECORD_PREFIX + i);
@@ -108,7 +109,7 @@ public class KinesisConsumerTest {
     assertFalse(kinesisMessageBatch.isEndOfPartitionGroup());
 
     // Fetch second batch
-    kinesisMessageBatch = kinesisConsumer.fetchMessages(kinesisMessageBatch.getOffsetOfNextBatch(), TIMEOUT);
+    kinesisMessageBatch = kinesisConsumer.fetchMessages(kinesisMessageBatch.getOffsetOfNextBatch(), true, TIMEOUT);
     assertEquals(kinesisMessageBatch.getMessageCount(), NUM_RECORDS);
     for (int i = 0; i < NUM_RECORDS; i++) {
       assertEquals(baToString(kinesisMessageBatch.getStreamMessage(i).getValue()), DUMMY_RECORD_PREFIX + i);
@@ -132,7 +133,9 @@ public class KinesisConsumerTest {
 
     // Fetch first batch
     KinesisPartitionGroupOffset startOffset = new KinesisPartitionGroupOffset("0", "1");
-    KinesisMessageBatch kinesisMessageBatch = kinesisConsumer.fetchMessages(startOffset, TIMEOUT);
+    KinesisMessageBatch kinesisMessageBatch = kinesisConsumer.fetchMessages(startOffset, true, TIMEOUT);
+
+    assertTrue(kinesisMessageBatch.isEndOfPartitionGroup());
     assertEquals(kinesisMessageBatch.getMessageCount(), NUM_RECORDS);
     for (int i = 0; i < NUM_RECORDS; i++) {
       assertEquals(baToString(kinesisMessageBatch.getStreamMessage(i).getValue()), DUMMY_RECORD_PREFIX + i);
@@ -140,7 +143,7 @@ public class KinesisConsumerTest {
     assertTrue(kinesisMessageBatch.isEndOfPartitionGroup());
 
     // Fetch second batch
-    kinesisMessageBatch = kinesisConsumer.fetchMessages(kinesisMessageBatch.getOffsetOfNextBatch(), TIMEOUT);
+    kinesisMessageBatch = kinesisConsumer.fetchMessages(kinesisMessageBatch.getOffsetOfNextBatch(), true, TIMEOUT);
     assertEquals(kinesisMessageBatch.getMessageCount(), 0);
     assertTrue(kinesisMessageBatch.isEndOfPartitionGroup());
 

@@ -50,7 +50,8 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
   }
 
   @Override
-  public synchronized KafkaMessageBatch fetchMessages(StreamPartitionMsgOffset startMsgOffset, int timeoutMs) {
+  public synchronized KafkaMessageBatch fetchMessages(StreamPartitionMsgOffset startMsgOffset,
+      boolean isStartOffsetInclusive, int timeoutMs) {
     long startOffset = ((LongMsgOffset) startMsgOffset).getOffset();
     if (LOGGER.isDebugEnabled()) {
       LOGGER.debug("Polling partition: {}, startOffset: {}, timeout: {}ms", _topicPartition, startOffset, timeoutMs);

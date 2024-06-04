@@ -517,11 +517,12 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
       }
 
       @Override
-      public KafkaMessageBatch fetchMessages(StreamPartitionMsgOffset startOffset, int timeoutMs) {
+      public KafkaMessageBatch fetchMessages(StreamPartitionMsgOffset startOffset, boolean isStartOffsetInclusive,
+          int timeoutMs) {
         if (_exceptionDuringConsume) {
           throw new RuntimeException("TestException during consumption");
         }
-        return super.fetchMessages(startOffset, timeoutMs);
+        return super.fetchMessages(startOffset, true, timeoutMs);
       }
     }
   }

@@ -59,7 +59,8 @@ public class PulsarPartitionLevelConsumer extends PulsarPartitionLevelConnection
   }
 
   @Override
-  public synchronized PulsarMessageBatch fetchMessages(StreamPartitionMsgOffset startOffset, int timeoutMs) {
+  public synchronized PulsarMessageBatch fetchMessages(StreamPartitionMsgOffset startOffset,
+      boolean isStartOffsetInclusive, int timeoutMs) {
     MessageId startMessageId = ((MessageIdStreamOffset) startOffset).getMessageId();
     long endTimeMs = System.currentTimeMillis() + timeoutMs;
     List<BytesStreamMessage> messages = new ArrayList<>();
