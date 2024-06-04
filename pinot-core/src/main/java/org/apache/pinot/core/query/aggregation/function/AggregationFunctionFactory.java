@@ -36,7 +36,9 @@ import org.apache.pinot.core.query.aggregation.function.array.ArrayAggStringFunc
 import org.apache.pinot.core.query.aggregation.function.array.ListAggDistinctFunction;
 import org.apache.pinot.core.query.aggregation.function.array.ListAggFunction;
 import org.apache.pinot.core.query.aggregation.function.funnel.FunnelCountAggregationFunctionFactory;
-import org.apache.pinot.core.query.aggregation.function.funnel.FunnelMaxStepAggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.funnel.window.FunnelCompleteCountAggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.funnel.window.FunnelMatchStepAggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.funnel.window.FunnelMaxStepAggregationFunction;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
@@ -455,6 +457,10 @@ public class AggregationFunctionFactory {
             return new FunnelCountAggregationFunctionFactory(arguments).get();
           case FUNNELMAXSTEP:
             return new FunnelMaxStepAggregationFunction(arguments);
+          case FUNNELMATCHSTEP:
+            return new FunnelMatchStepAggregationFunction(arguments);
+          case FUNNELCOMPLETECOUNT:
+            return new FunnelCompleteCountAggregationFunction(arguments);
           case FREQUENTSTRINGSSKETCH:
             return new FrequentStringsSketchAggregationFunction(arguments);
           case FREQUENTLONGSSKETCH:
