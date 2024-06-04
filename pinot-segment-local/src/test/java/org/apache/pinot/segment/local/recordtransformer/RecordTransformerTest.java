@@ -36,6 +36,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -260,7 +261,9 @@ public class RecordTransformerTest {
   }
 
   @Test
-  public void testSanitationTransformer() {
+  public void testSanitizationTransformer() {
+    // scenario where string contains null and exceeds max length
+    // and fieldSpec maxLengthExceedStrategy is default (TRIM_LENGTH)
     RecordTransformer transformer = new SanitizationTransformer(SCHEMA);
     GenericRow record = getRecord();
     for (int i = 0; i < NUM_ROUNDS; i++) {
@@ -272,6 +275,210 @@ public class RecordTransformerTest {
       assertEquals(record.getValue("mvString2"), new Object[]{"123", "123", "123.0", "123.0", "123"});
       assertNull(record.getValue("$virtual"));
       assertTrue(record.getNullValueFields().isEmpty());
+      assertTrue(record.getFieldToValueMap().containsKey(GenericRow.SANITIZED_RECORD_KEY));
+    }
+
+    // scenario where string contains null and fieldSpec maxLengthExceedStrategy is to ERROR
+    Schema schema = SCHEMA;
+    schema.getFieldSpecFor("svStringWithNullCharacters")
+        .setMaxLengthExceedStrategy(FieldSpec.MaxLengthExceedStrategy.ERROR);
+    transformer = new SanitizationTransformer(schema);
+    record = getRecord();
+    for (int i = 0; i < NUM_ROUNDS; i++) {
+      try {
+        record = transformer.transform(record);
+      } catch (Exception e) {
+        assertTrue(e instanceof IllegalStateException);
+        assertEquals(e.getMessage(), "Throwing exception as value: 1\0002\0003 for column "
+            + "svStringWithNullCharacters contains null character.");
+      }
+    }
+
+    // scenario where string contains null and fieldSpec maxLengthExceedStrategy is to SUBSTITUTE_DEFAULT_VALUE
+    schema = SCHEMA;
+    schema.getFieldSpecFor("svStringWithNullCharacters")
+        .setMaxLengthExceedStrategy(FieldSpec.MaxLengthExceedStrategy.SUBSTITUTE_DEFAULT_VALUE);
+    transformer = new SanitizationTransformer(schema);
+    record = getRecord();
+    for (int i = 0; i < NUM_ROUNDS; i++) {
+      record = transformer.transform(record);
+      assertNotNull(record);
+      assertEquals(record.getValue("svStringWithNullCharacters"), "null");
+      assertTrue(record.getFieldToValueMap().containsKey(GenericRow.SANITIZED_RECORD_KEY));
+    }
+
+    // scenario where string exceeds max length and fieldSpec maxLengthExceedStrategy is to ERROR
+    schema = SCHEMA;
+    schema.getFieldSpecFor("svStringWithLengthLimit")
+        .setMaxLengthExceedStrategy(FieldSpec.MaxLengthExceedStrategy.ERROR);
+    transformer = new SanitizationTransformer(schema);
+    record = getRecord();
+    for (int i = 0; i < NUM_ROUNDS; i++) {
+      try {
+        record = transformer.transform(record);
+      } catch (Exception e) {
+        assertTrue(e instanceof IllegalStateException);
+        assertEquals(e.getMessage(), "Throwing exception as value: 123 for column svStringWithLengthLimit "
+            + "exceeds configured max length 2.");
+      }
+    }
+
+    // scenario where string exceeds max length and fieldSpec maxLengthExceedStrategy is to SUBSTITUTE_DEFAULT_VALUE
+    schema = SCHEMA;
+    schema.getFieldSpecFor("svStringWithLengthLimit")
+        .setMaxLengthExceedStrategy(FieldSpec.MaxLengthExceedStrategy.SUBSTITUTE_DEFAULT_VALUE);
+    transformer = new SanitizationTransformer(schema);
+    record = getRecord();
+    for (int i = 0; i < NUM_ROUNDS; i++) {
+      record = transformer.transform(record);
+      assertNotNull(record);
+      assertEquals(record.getValue("svStringWithLengthLimit"), "null");
+      assertTrue(record.getFieldToValueMap().containsKey(GenericRow.SANITIZED_RECORD_KEY));
+    }
+
+    // scenario where string exceeds max length and fieldSpec maxLengthExceedStrategy is to NO_ACTION
+    schema = SCHEMA;
+    schema.getFieldSpecFor("svStringWithLengthLimit")
+        .setMaxLengthExceedStrategy(FieldSpec.MaxLengthExceedStrategy.NO_ACTION);
+    transformer = new SanitizationTransformer(schema);
+    record = getRecord();
+    for (int i = 0; i < NUM_ROUNDS; i++) {
+      record = transformer.transform(record);
+      assertNotNull(record);
+      assertEquals(record.getValue("svStringWithLengthLimit"), "123");
+    }
+
+    // scenario where string contains null and fieldSpec maxLengthExceedStrategy is to NO_ACTION
+    schema = SCHEMA;
+    schema.getFieldSpecFor("svStringWithNullCharacters")
+        .setMaxLengthExceedStrategy(FieldSpec.MaxLengthExceedStrategy.NO_ACTION);
+    transformer = new SanitizationTransformer(schema);
+    record = getRecord();
+    for (int i = 0; i < NUM_ROUNDS; i++) {
+      record = transformer.transform(record);
+      assertNotNull(record);
+      assertEquals(record.getValue("svStringWithNullCharacters"), "1");
+      assertTrue(record.getFieldToValueMap().containsKey(GenericRow.SANITIZED_RECORD_KEY));
+    }
+
+    // scenario where json field exceeds max length and fieldSpec maxLengthExceedStrategy is to NO_ACTION
+    schema = SCHEMA;
+    schema.getFieldSpecFor("svJson").setMaxLength(10);
+    schema.getFieldSpecFor("svJson")
+        .setMaxLengthExceedStrategy(FieldSpec.MaxLengthExceedStrategy.NO_ACTION);
+    transformer = new SanitizationTransformer(schema);
+    record = getRecord();
+    for (int i = 0; i < NUM_ROUNDS; i++) {
+      record = transformer.transform(record);
+      assertNotNull(record);
+      assertEquals(record.getValue("svJson"), "{\"first\": \"daffy\", \"last\": \"duck\"}");
+    }
+
+    // scenario where json field exceeds max length and fieldSpec maxLengthExceedStrategy is to TRIM_LENGTH
+    schema = SCHEMA;
+    schema.getFieldSpecFor("svJson").setMaxLength(10);
+    schema.getFieldSpecFor("svJson")
+        .setMaxLengthExceedStrategy(FieldSpec.MaxLengthExceedStrategy.TRIM_LENGTH);
+    transformer = new SanitizationTransformer(schema);
+    record = getRecord();
+    for (int i = 0; i < NUM_ROUNDS; i++) {
+      record = transformer.transform(record);
+      assertNotNull(record);
+      assertEquals(record.getValue("svJson"), "{\"first\": ");
+      assertTrue(record.getFieldToValueMap().containsKey(GenericRow.SANITIZED_RECORD_KEY));
+    }
+
+    // scenario where json field exceeds max length and fieldSpec maxLengthExceedStrategy is to
+    // SUBSTITUTE_DEFAULT_VALUE
+    schema = SCHEMA;
+    schema.getFieldSpecFor("svJson").setMaxLength(10);
+    schema.getFieldSpecFor("svJson")
+        .setMaxLengthExceedStrategy(FieldSpec.MaxLengthExceedStrategy.SUBSTITUTE_DEFAULT_VALUE);
+    transformer = new SanitizationTransformer(schema);
+    record = getRecord();
+    for (int i = 0; i < NUM_ROUNDS; i++) {
+      record = transformer.transform(record);
+      assertNotNull(record);
+      assertEquals(record.getValue("svJson"), "null");
+      assertTrue(record.getFieldToValueMap().containsKey(GenericRow.SANITIZED_RECORD_KEY));
+    }
+
+    // scenario where json field exceeds max length and fieldSpec maxLengthExceedStrategy is to
+    // SUBSTITUTE_DEFAULT_VALUE
+    schema = SCHEMA;
+    schema.getFieldSpecFor("svJson").setMaxLength(10);
+    schema.getFieldSpecFor("svJson")
+        .setMaxLengthExceedStrategy(FieldSpec.MaxLengthExceedStrategy.SUBSTITUTE_DEFAULT_VALUE);
+    transformer = new SanitizationTransformer(schema);
+    record = getRecord();
+    for (int i = 0; i < NUM_ROUNDS; i++) {
+      try {
+        record = transformer.transform(record);
+      } catch (Exception e) {
+        assertTrue(e instanceof IllegalStateException);
+        assertEquals(e.getMessage(), "Throwing exception as value: "
+            + "{\"first\": \"daffy\", \"last\": \"duck\"} for column "
+            + "svJson exceeds configured max length 10.");
+      }
+    }
+
+    // scenario where bytes field exceeds max length and fieldSpec maxLengthExceedStrategy is to NO_ACTION
+    schema = SCHEMA;
+    schema.getFieldSpecFor("svBytes").setMaxLength(2);
+    schema.getFieldSpecFor("svBytes")
+        .setMaxLengthExceedStrategy(FieldSpec.MaxLengthExceedStrategy.NO_ACTION);
+    transformer = new SanitizationTransformer(schema);
+    record = getRecord();
+    for (int i = 0; i < NUM_ROUNDS; i++) {
+      record = transformer.transform(record);
+      assertNotNull(record);
+      assertEquals(record.getValue("svBytes"), "7b7b");
+    }
+
+    // scenario where bytes field exceeds max length and fieldSpec maxLengthExceedStrategy is to TRIM_LENGTH
+    schema = SCHEMA;
+    schema.getFieldSpecFor("svBytes").setMaxLength(2);
+    schema.getFieldSpecFor("svBytes")
+        .setMaxLengthExceedStrategy(FieldSpec.MaxLengthExceedStrategy.TRIM_LENGTH);
+    transformer = new SanitizationTransformer(schema);
+    record = getRecord();
+    for (int i = 0; i < NUM_ROUNDS; i++) {
+      record = transformer.transform(record);
+      assertNotNull(record);
+      assertEquals(record.getValue("svBytes"), "7b");
+      assertTrue(record.getFieldToValueMap().containsKey(GenericRow.SANITIZED_RECORD_KEY));
+    }
+
+    // scenario where bytes field exceeds max length and fieldSpec maxLengthExceedStrategy is to
+    // SUBSTITUTE_DEFAULT_VALUE
+    schema = SCHEMA;
+    schema.getFieldSpecFor("svBytes").setMaxLength(2);
+    schema.getFieldSpecFor("svBytes")
+        .setMaxLengthExceedStrategy(FieldSpec.MaxLengthExceedStrategy.SUBSTITUTE_DEFAULT_VALUE);
+    transformer = new SanitizationTransformer(schema);
+    record = getRecord();
+    for (int i = 0; i < NUM_ROUNDS; i++) {
+      record = transformer.transform(record);
+      assertNotNull(record);
+      assertEquals(record.getValue("svBytes"), BytesUtils.toHexString(new byte[0]));
+      assertTrue(record.getFieldToValueMap().containsKey(GenericRow.SANITIZED_RECORD_KEY));
+    }
+
+    // scenario where bytes field exceeds max length and fieldSpec maxLengthExceedStrategy is to ERROR
+    schema = SCHEMA;
+    schema.getFieldSpecFor("svBytes").setMaxLength(2);
+    schema.getFieldSpecFor("svBytes")
+        .setMaxLengthExceedStrategy(FieldSpec.MaxLengthExceedStrategy.ERROR);
+    transformer = new SanitizationTransformer(schema);
+    record = getRecord();
+    for (int i = 0; i < NUM_ROUNDS; i++) {
+      try {
+        record = transformer.transform(record);
+      } catch (Exception e) {
+        assertTrue(e instanceof IllegalStateException);
+        assertEquals(e.getMessage(), "Throwing exception as value: 7b7b for column svBytes "
+            + "exceeds configured max length 2.");
+      }
     }
   }
 

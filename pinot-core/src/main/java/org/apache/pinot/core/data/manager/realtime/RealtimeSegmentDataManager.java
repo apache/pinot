@@ -540,6 +540,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     PinotMeter realtimeRowsConsumedMeter = null;
     PinotMeter realtimeRowsDroppedMeter = null;
     PinotMeter realtimeIncompleteRowsConsumedMeter = null;
+    PinotMeter realtimeRowsSanitizedMeter = null;
 
     int indexedMessageCount = 0;
     int streamMessageCount = 0;
@@ -624,6 +625,11 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           realtimeIncompleteRowsConsumedMeter =
               _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.INCOMPLETE_REALTIME_ROWS_CONSUMED,
                   reusedResult.getIncompleteRowCount(), realtimeIncompleteRowsConsumedMeter);
+        }
+        if (reusedResult.getSanitizedRowCount() > 0) {
+          realtimeRowsSanitizedMeter =
+              _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.REALTIME_ROWS_SANITIZED,
+                  reusedResult.getSanitizedRowCount(), realtimeRowsSanitizedMeter);
         }
         List<GenericRow> transformedRows = reusedResult.getTransformedRows();
         for (GenericRow transformedRow : transformedRows) {
