@@ -147,8 +147,8 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
       // query results will be accurate, but after segment conversion the mapping file generated will be loaded
       // for only the first numDocs lucene docIds, which can cause IndexOutOfBounds errors.
       if (!_commitOnClose) {
-        indexWriterConfig.setOpenMode(IndexWriterConfig.OpenMode.CREATE);
         indexWriterConfig.setMergeScheduler(NoMergeScheduler.INSTANCE);
+        indexWriterConfig.setOpenMode(IndexWriterConfig.OpenMode.CREATE);
       }
 
       if (_reuseMutableIndex) {
