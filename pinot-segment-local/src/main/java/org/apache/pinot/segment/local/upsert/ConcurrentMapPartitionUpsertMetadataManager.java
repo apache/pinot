@@ -162,9 +162,10 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
    * <li> When the replacing segment and current segment are of {@link LLCSegmentName} then the PK should resolve to
    * row in segment with higher sequence id.
    * <li> When the replacing segment and current segment are of {@link UploadedRealtimeSegmentName} then the PK
-   * should resolve to row in segment with higher sequence id, creation time.
-   * <li> When either is of type {@link UploadedRealtimeSegmentName} then resolve on creation time, if same(rare
-   * scenario) then give preference to uploaded time
+   * should resolve to row in segment with higher creation time followed by sequence id.
+   * <li> For other cases resolve based on creation time of segment. In case the creation time is same, give
+   * preference to an uploaded segment. A segment which is not LLCSegment can be assumed to be uploaded segment and
+   * is given preference.
    *
    * @param segmentName replacing segment name
    * @param currentSegmentName current segment name having the record for the given primary key
@@ -181,27 +182,23 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
       return llcSegmentName.getSequenceNumber() > currentLLCSegmentName.getSequenceNumber();
     }
 
+    int creationTimeComparisonRes = Long.compare(segmentCreationTimeMs, currentSegmentCreationTimeMs);
+
     UploadedRealtimeSegmentName uploadedSegmentName = UploadedRealtimeSegmentName.of(segmentName);
     UploadedRealtimeSegmentName currentUploadedSegmentName = UploadedRealtimeSegmentName.of(currentSegmentName);
-
     if (uploadedSegmentName != null && currentUploadedSegmentName != null) {
-      int comparisonResult =
-          Integer.compare(uploadedSegmentName.getSequenceId(), currentUploadedSegmentName.getSequenceId());
-      if (comparisonResult == 0) {
-        Long.compare(segmentCreationTimeMs, currentSegmentCreationTimeMs);
+      if (creationTimeComparisonRes == 0) {
+        return uploadedSegmentName.getSequenceId() > currentUploadedSegmentName.getSequenceId();
       } else {
-        return comparisonResult > 0;
+        return creationTimeComparisonRes > 0;
       }
     }
 
-    if (uploadedSegmentName != null || currentUploadedSegmentName != null) {
-      if (segmentCreationTimeMs == currentSegmentCreationTimeMs) {
-        return uploadedSegmentName != null;
-      } else {
-        return segmentCreationTimeMs > currentSegmentCreationTimeMs;
-      }
+    if (creationTimeComparisonRes == 0) {
+      return llcSegmentName == null || uploadedSegmentName != null;
+    } else {
+      return creationTimeComparisonRes > 0;
     }
-    return false;
   }
 
   @Override

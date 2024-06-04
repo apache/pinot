@@ -34,7 +34,7 @@ import org.joda.time.format.DateTimeFormatter;
  * <p>This naming convention is adopted to represent a segment uploaded to a realtime table. The naming
  * convention has been kept semantically similar to {@link LLCSegmentName} to but differs in following ways:
  *
- * <li> compulsory prefix updated, to quickly identify the segment is an uplaoded realtime segment
+ * <li> compulsory prefix updated, to quickly identify the segment is an uploaded realtime segment
  * <li> sequenceId is used to uniquely identify the segment created at the same time
  * <li> optional suffix to encode any additional information about the segment
  */
