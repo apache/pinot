@@ -837,7 +837,6 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
             interruptRunnerThread(value.getAnchorThread());
           }
         }
-        LOGGER.error("Current task status recorded is {}", _threadEntriesMap);
       }
 
       private void interruptRunnerThread(Thread thread) {
