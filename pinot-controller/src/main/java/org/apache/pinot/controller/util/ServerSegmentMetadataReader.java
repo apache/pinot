@@ -61,7 +61,6 @@ import org.slf4j.LoggerFactory;
  */
 public class ServerSegmentMetadataReader {
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerSegmentMetadataReader.class);
-  private static final int DEFAULT_SEGMENT_BATCH_SIZE_FOR_QUERYING_SERVER = 500;
 
   private final Executor _executor;
   private final HttpClientConnectionManager _connectionManager;
@@ -221,7 +220,8 @@ public class ServerSegmentMetadataReader {
    */
   public List<ValidDocIdsMetadataInfo> getValidDocIdsMetadataFromServer(String tableNameWithType,
       Map<String, List<String>> serverToSegmentsMap, BiMap<String, String> serverToEndpoints,
-      @Nullable List<String> segmentNames, int timeoutMs, String validDocIdsType) {
+      @Nullable List<String> segmentNames, int timeoutMs, String validDocIdsType,
+      int numSegmentsBatchPerServerRequest) {
     List<Pair<String, String>> serverURLsAndBodies = new ArrayList<>();
     for (Map.Entry<String, List<String>> serverToSegments : serverToSegmentsMap.entrySet()) {
       List<String> segmentsForServer = serverToSegments.getValue();
@@ -236,11 +236,14 @@ public class ServerSegmentMetadataReader {
           }
         }
       }
-      int batches = (segmentsToQuery.size() + DEFAULT_SEGMENT_BATCH_SIZE_FOR_QUERYING_SERVER - 1)
-          / DEFAULT_SEGMENT_BATCH_SIZE_FOR_QUERYING_SERVER;
+
+      // Number of segments to query per server request. If a table has a lot of segments, then we might send a
+      // huge payload to pinot-server in request. Batching the requests will help in reducing the payload size.
+      int batches = (segmentsToQuery.size() + numSegmentsBatchPerServerRequest - 1)
+          / numSegmentsBatchPerServerRequest;
       for (int i = 0; i < batches; i++) {
-        int start = i * DEFAULT_SEGMENT_BATCH_SIZE_FOR_QUERYING_SERVER;
-        int end = Math.min((i + 1) * DEFAULT_SEGMENT_BATCH_SIZE_FOR_QUERYING_SERVER, segmentsToQuery.size());
+        int start = i * numSegmentsBatchPerServerRequest;
+        int end = Math.min((i + 1) * numSegmentsBatchPerServerRequest, segmentsToQuery.size());
         List<String> segmentsToQueryBatch = segmentsToQuery.subList(start, end);
         serverURLsAndBodies.add(generateValidDocIdsMetadataURL(tableNameWithType, segmentsToQueryBatch, validDocIdsType,
             serverToEndpoints.get(serverToSegments.getKey())));

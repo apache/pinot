@@ -58,6 +58,7 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
   private static final String DEFAULT_BUFFER_PERIOD = "7d";
   private static final double DEFAULT_INVALID_RECORDS_THRESHOLD_PERCENT = 0.0;
   private static final long DEFAULT_INVALID_RECORDS_THRESHOLD_COUNT = 0;
+  private static final int DEFAULT_SEGMENT_BATCH_SIZE_FOR_QUERYING_SERVER = 500;
 
   public static class SegmentSelectionResult {
 
@@ -143,6 +144,12 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
           taskConfigs.getOrDefault(UpsertCompactionTask.VALID_DOC_IDS_TYPE, ValidDocIdsType.SNAPSHOT.toString());
       ValidDocIdsType validDocIdsType = ValidDocIdsType.valueOf(validDocIdsTypeStr.toUpperCase());
 
+      // Number of segments to query per server request. If a table has a lot of segments, then we might send a
+      // huge payload to pinot-server in request. Batching the requests will help in reducing the payload size.
+      int numSegmentsBatchPerServerRequest =
+          Integer.parseInt(taskConfigs.getOrDefault(UpsertCompactionTask.NUM_SEGMENTS_BATCH_PER_SERVER_REQUEST,
+              String.valueOf(DEFAULT_SEGMENT_BATCH_SIZE_FOR_QUERYING_SERVER)));
+
       // Validate that the snapshot is enabled if validDocIdsType is validDocIdsSnapshot
       if (validDocIdsType == ValidDocIdsType.SNAPSHOT) {
         UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
@@ -160,7 +167,7 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
 
       List<ValidDocIdsMetadataInfo> validDocIdsMetadataList =
           serverSegmentMetadataReader.getValidDocIdsMetadataFromServer(tableNameWithType, serverToSegments,
-              serverToEndpoints, null, 60_000, validDocIdsType.toString());
+              serverToEndpoints, null, 60_000, validDocIdsType.toString(), numSegmentsBatchPerServerRequest);
 
       Map<String, SegmentZKMetadata> completedSegmentsMap =
           completedSegments.stream().collect(Collectors.toMap(SegmentZKMetadata::getSegmentName, Function.identity()));

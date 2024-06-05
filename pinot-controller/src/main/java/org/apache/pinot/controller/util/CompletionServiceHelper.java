@@ -136,6 +136,9 @@ public class CompletionServiceHelper {
         }
         String responseString = EntityUtils.toString(multiHttpRequestResponse.getResponse().getEntity());
         String key = multiRequestPerServer ? uri.toString() : instance;
+        // there can be a scenario where all the requests to a particular server had the same uri but the
+        // payload might be different. In that scenario, we should append a random string to the key so that
+        // we send all the responses back to the caller otherwise in the map, the last response will overwrite
         if (multiRequestPerServer && completionServiceResponse._httpResponses.containsKey(key)) {
           LOGGER.warn("Appending random string to http response key name: {}", key);
           key = key + "__" + RandomStringUtils.randomAlphanumeric(10);
@@ -156,10 +159,10 @@ public class CompletionServiceHelper {
       }
     }
 
-    int numServerRequestssResponded = completionServiceResponse._httpResponses.size();
-    if (numServerRequestssResponded != size) {
+    int numServerRequestsResponded = completionServiceResponse._httpResponses.size();
+    if (numServerRequestsResponded != size) {
       LOGGER.warn("Finished reading information for table: {} with {}/{} server-request responses", tableNameWithType,
-          numServerRequestssResponded, size);
+          numServerRequestsResponded, size);
     } else {
       LOGGER.info("Finished reading information for table: {}", tableNameWithType);
     }

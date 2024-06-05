@@ -159,7 +159,7 @@ public class TableMetadataReader {
    * @return a list of ValidDocIdsMetadataInfo
    */
   public JsonNode getAggregateValidDocIdsMetadata(String tableNameWithType, List<String> segmentNames,
-      String validDocIdsType, int timeoutMs)
+      String validDocIdsType, int timeoutMs, int numSegmentsBatchPerServerRequest)
       throws InvalidConfigException {
     final Map<String, List<String>> serverToSegments =
         _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType);
@@ -170,7 +170,7 @@ public class TableMetadataReader {
 
     List<ValidDocIdsMetadataInfo> aggregateTableMetadataInfo =
         serverSegmentMetadataReader.getValidDocIdsMetadataFromServer(tableNameWithType, serverToSegments, endpoints,
-            segmentNames, timeoutMs, validDocIdsType);
+            segmentNames, timeoutMs, validDocIdsType, numSegmentsBatchPerServerRequest);
     return JsonUtils.objectToJsonNode(aggregateTableMetadataInfo);
   }
 }

@@ -657,9 +657,7 @@ public class TablesResource {
     }
     try {
       if (!missingSegments.isEmpty()) {
-        throw new WebApplicationException(
-            String.format("Table %s has missing segments: %s)", tableNameWithType, segments),
-            Response.Status.NOT_FOUND);
+        LOGGER.warn("Table {} has missing segments {}", tableNameWithType, missingSegments);
       }
       List<Map<String, Object>> allValidDocIdsMetadata = new ArrayList<>(segmentDataManagers.size());
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
