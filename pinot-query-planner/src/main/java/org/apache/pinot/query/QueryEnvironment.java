@@ -291,7 +291,8 @@ public class QueryEnvironment {
   }
 
   private DispatchableSubPlan toDispatchableSubPlan(RelRoot relRoot, PlannerContext plannerContext, long requestId) {
-    SubPlan plan = PinotLogicalQueryPlanner.makePlan(relRoot);
+    PinotLogicalQueryPlanner logicalQueryPlanner = new PinotLogicalQueryPlanner();
+    SubPlan plan = logicalQueryPlanner.makePlan(relRoot);
     PinotDispatchPlanner pinotDispatchPlanner =
         new PinotDispatchPlanner(plannerContext, _workerManager, requestId, _tableCache);
     return pinotDispatchPlanner.createDispatchableSubPlan(plan);

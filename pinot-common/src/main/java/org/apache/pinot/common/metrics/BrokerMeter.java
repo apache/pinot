@@ -121,7 +121,33 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
   NETTY_CONNECTION_BYTES_RECEIVED("nettyConnection", true),
 
   PROACTIVE_CLUSTER_CHANGE_CHECK("proactiveClusterChangeCheck", true),
-  DIRECT_MEMORY_OOM("directMemoryOOMCount", true);
+  DIRECT_MEMORY_OOM("directMemoryOOMCount", true),
+
+  /**
+   * How many queries with joins have been executed.
+   * <p>
+   * For each query with at least one join, this meter is increased exactly once.
+   */
+  QUERIES_WITH_JOINS("queries", true),
+  /**
+   * How many joins have been executed.
+   * <p>
+   * For each query with at least one join, this meter is increased as many times as joins in the query.
+   */
+  JOIN_COUNT("queries", true),
+  /**
+   * How many queries with window functions have been executed.
+   * <p>
+   * For each query with at least one window function, this meter is increased exactly once.
+   */
+  QUERIES_WITH_WINDOW("queries", true),
+  /**
+   * How many window functions have been executed.
+   * <p>
+   * For each query with at least one window function, this meter is increased as many times as window functions in the
+   * query.
+   */
+  WINDOW_COUNT("queries", true),;
 
   private final String _brokerMeterName;
   private final String _unit;
