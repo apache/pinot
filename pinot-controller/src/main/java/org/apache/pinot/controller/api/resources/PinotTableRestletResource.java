@@ -974,7 +974,7 @@ public class PinotTableRestletResource {
       @ApiParam(value = "Valid doc ids type") @QueryParam("validDocIdsType")
       @DefaultValue("SNAPSHOT") ValidDocIdsType validDocIdsType,
       @ApiParam(value = "Number of segments in a batch per server request")
-      @QueryParam("numSegmentsBatchPerServerRequest") @DefaultValue("500") int numSegmentsBatchPerServerRequest,
+      @QueryParam("serverRequestBatchSize") @DefaultValue("500") int serverRequestBatchSize,
       @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     LOGGER.info("Received a request to fetch aggregate validDocIds metadata for a table {}", tableName);
@@ -994,7 +994,7 @@ public class PinotTableRestletResource {
       JsonNode segmentsMetadataJson =
           tableMetadataReader.getAggregateValidDocIdsMetadata(tableNameWithType, segmentNames,
               validDocIdsType.toString(), _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000,
-              numSegmentsBatchPerServerRequest);
+              serverRequestBatchSize);
       validDocIdsMetadata = JsonUtils.objectToPrettyString(segmentsMetadataJson);
     } catch (InvalidConfigException e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST);

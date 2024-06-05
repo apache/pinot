@@ -22,6 +22,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.BiMap;
+import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -239,15 +240,9 @@ public class ServerSegmentMetadataReader {
 
       // Number of segments to query per server request. If a table has a lot of segments, then we might send a
       // huge payload to pinot-server in request. Batching the requests will help in reducing the payload size.
-      int batches = (segmentsToQuery.size() + numSegmentsBatchPerServerRequest - 1)
-          / numSegmentsBatchPerServerRequest;
-      for (int i = 0; i < batches; i++) {
-        int start = i * numSegmentsBatchPerServerRequest;
-        int end = Math.min((i + 1) * numSegmentsBatchPerServerRequest, segmentsToQuery.size());
-        List<String> segmentsToQueryBatch = segmentsToQuery.subList(start, end);
-        serverURLsAndBodies.add(generateValidDocIdsMetadataURL(tableNameWithType, segmentsToQueryBatch, validDocIdsType,
-            serverToEndpoints.get(serverToSegments.getKey())));
-      }
+      Lists.partition(segmentsToQuery, numSegmentsBatchPerServerRequest).forEach(segmentsToQueryBatch ->
+          serverURLsAndBodies.add(generateValidDocIdsMetadataURL(tableNameWithType, segmentsToQueryBatch,
+              validDocIdsType, serverToEndpoints.get(serverToSegments.getKey()))));
     }
 
     BiMap<String, String> endpointsToServers = serverToEndpoints.inverse();

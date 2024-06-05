@@ -27,7 +27,6 @@ import java.util.Map;
 import java.util.concurrent.CompletionService;
 import java.util.concurrent.Executor;
 import javax.annotation.Nullable;
-import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.http.util.EntityUtils;
@@ -136,12 +135,13 @@ public class CompletionServiceHelper {
         }
         String responseString = EntityUtils.toString(multiHttpRequestResponse.getResponse().getEntity());
         String key = multiRequestPerServer ? uri.toString() : instance;
-        // there can be a scenario where all the requests to a particular server had the same uri but the
-        // payload might be different. In that scenario, we should append a random string to the key so that
-        // we send all the responses back to the caller otherwise in the map, the last response will overwrite
-        if (multiRequestPerServer && completionServiceResponse._httpResponses.containsKey(key)) {
-          LOGGER.warn("Appending random string to http response key name: {}", key);
-          key = key + "__" + RandomStringUtils.randomAlphanumeric(10);
+        // If there are multiple requests to the same server with the same URI but different payloads,
+        // we append a count value to the key to ensure each response is uniquely identified.
+        // Otherwise, the map will store only the last response, overwriting previous ones.
+        if (multiRequestPerServer) {
+          int count = completionServiceResponse._instanceToRequestCount.getOrDefault(key, 0) + 1;
+          completionServiceResponse._instanceToRequestCount.put(key, count);
+          key = key + "__" + count;
         }
         completionServiceResponse._httpResponses.put(key, responseString);
       } catch (Exception e) {
@@ -188,10 +188,13 @@ public class CompletionServiceHelper {
     public Map<String, String> _httpResponses;
     // Number of failures encountered when requesting
     public int _failedResponseCount;
+    // Map of instance to count of requests
+    public Map<String, Integer> _instanceToRequestCount;
 
     public CompletionServiceResponse() {
       _httpResponses = new HashMap<>();
       _failedResponseCount = 0;
+      _instanceToRequestCount = new HashMap<>();
     }
   }
 }
