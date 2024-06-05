@@ -19,13 +19,26 @@
 package org.apache.pinot.spi.env;
 
 import java.io.Reader;
+import java.io.Writer;
 import org.apache.commons.configuration2.PropertiesConfiguration.DefaultIOFactory;
 import org.apache.commons.configuration2.PropertiesConfiguration.PropertiesReader;
+import org.apache.commons.configuration2.PropertiesConfiguration.PropertiesWriter;
+import org.apache.commons.configuration2.convert.ListDelimiterHandler;
 
 
-public class ConfigFilePropertyReaderFactory extends DefaultIOFactory {
+/**
+ * VersionedIOFactory extends the DefaultIOFactory
+ * <p>
+ * Purpose: factory class for creating the custom versioned property configuration reader and writer.
+ */
+class VersionedIOFactory extends DefaultIOFactory {
   @Override
-  public PropertiesReader createPropertiesReader(Reader in) {
-    return new ConfigFilePropertyReader(in);
+  public PropertiesReader createPropertiesReader(Reader reader) {
+    return new VersionedPropertyReader(reader);
+  }
+
+  @Override
+  public PropertiesWriter createPropertiesWriter(Writer out, ListDelimiterHandler handler) {
+    return new VersionedPropertyWriter(out, handler);
   }
 }
