@@ -84,7 +84,7 @@ public class PinotLogicalQueryPlanner {
 //    return subPlanMap.get(0);
   }
 
-  private static PlanNode relNodeToPlanNode(RelNode node) {
+  private PlanNode relNodeToPlanNode(RelNode node) {
     PlanNode planNode = RelToPlanNodeConverter.toPlanNode(node, -1);
 
     if (planNode instanceof JoinNode) {
@@ -111,7 +111,7 @@ public class PinotLogicalQueryPlanner {
     return planNode;
   }
 
-  private static PlanFragment planNodeToPlanFragment(PlanNode node) {
+  private PlanFragment planNodeToPlanFragment(PlanNode node) {
     PlanFragmenter fragmenter = new PlanFragmenter();
     PlanFragmenter.Context fragmenterContext = fragmenter.createContext();
     node = node.visit(fragmenter, fragmenterContext);

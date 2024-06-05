@@ -51,7 +51,8 @@ public class PinotMetricUtils {
   private static final Map<MetricsRegistryRegistrationListener, Boolean> METRICS_REGISTRY_REGISTRATION_LISTENERS_MAP =
       new ConcurrentHashMap<>();
 
-  private static PinotMetricsFactory _pinotMetricsFactory = null;
+  private static final PinotMetricsFactory NOOP_FACTORY = new PinotMetricsFactory.Noop();
+  private static PinotMetricsFactory _pinotMetricsFactory = NOOP_FACTORY;
 
   /**
    * Initialize the metricsFactory ad registers the metricsRegistry
@@ -98,7 +99,7 @@ public class PinotMetricUtils {
         }
     );
 
-    Preconditions.checkState(_pinotMetricsFactory != null,
+    Preconditions.checkState(_pinotMetricsFactory != NOOP_FACTORY,
         "Failed to initialize PinotMetricsFactory. Please check if any pinot-metrics related jar is actually added to"
             + " the classpath.");
   }
@@ -194,9 +195,11 @@ public class PinotMetricUtils {
    */
   @VisibleForTesting
   public static void cleanUp() {
-    if (_pinotMetricsFactory != null) {
+    if (_pinotMetricsFactory == null) {
+      _pinotMetricsFactory = NOOP_FACTORY;
+    } else if (_pinotMetricsFactory != NOOP_FACTORY) {
       _pinotMetricsFactory.getPinotMetricsRegistry().shutdown();
-      _pinotMetricsFactory = null;
+      _pinotMetricsFactory = NOOP_FACTORY;
     }
   }
 
@@ -206,7 +209,7 @@ public class PinotMetricUtils {
    * @param metricsConfiguration metrics configs
    */
   public static synchronized PinotMetricsRegistry getPinotMetricsRegistry(PinotConfiguration metricsConfiguration) {
-    if (_pinotMetricsFactory == null) {
+    if (_pinotMetricsFactory == null || _pinotMetricsFactory == NOOP_FACTORY) {
       init(metricsConfiguration);
     }
     return _pinotMetricsFactory.getPinotMetricsRegistry();

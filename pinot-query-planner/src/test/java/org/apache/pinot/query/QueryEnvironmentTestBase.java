@@ -33,8 +33,6 @@ import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.calcite.jdbc.CalciteSchemaBuilder;
 import org.apache.pinot.common.config.provider.TableCache;
-import org.apache.pinot.common.metrics.BrokerMetrics;
-import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.TablePartitionInfo;
 import org.apache.pinot.core.routing.TablePartitionInfo.PartitionInfo;
@@ -48,8 +46,6 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
-
-import static org.mockito.Mockito.mock;
 
 
 public class QueryEnvironmentTestBase {
@@ -109,8 +105,6 @@ public class QueryEnvironmentTestBase {
     // the port doesn't matter as we are not actually making a server call.
     _queryEnvironment =
         getQueryEnvironment(3, 1, 2, TABLE_SCHEMAS, SERVER1_SEGMENTS, SERVER2_SEGMENTS, PARTITIONED_SEGMENTS_MAP);
-    BrokerMetrics.register(mock(BrokerMetrics.class));
-    ServerMetrics.register(mock(ServerMetrics.class));
   }
 
   @DataProvider(name = "testQueryDataProvider")
