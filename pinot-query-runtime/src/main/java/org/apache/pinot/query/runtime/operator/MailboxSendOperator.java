@@ -30,6 +30,7 @@ import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.common.datatable.StatMap;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.planner.logical.RexExpression;
@@ -146,6 +147,11 @@ public class MailboxSendOperator extends MultiStageOperator {
         updateEosBlock(block, _statMap);
         // no need to check early terminate signal b/c the current block is already EOS
         sendTransferableBlock(block);
+        // After sending its own stats, the sending operator of the stage 1 has the complete view of all stats
+        // Therefore this is the only place we can update some of the metrics like total seen rows or time spent.
+        if (_context.getStageId() == 1) {
+          updateMetrics(block);
+        }
       } else {
         if (sendTransferableBlock(block)) {
           earlyTerminate();
@@ -194,6 +200,23 @@ public class MailboxSendOperator extends MultiStageOperator {
   public void cancel(Throwable t) {
     super.cancel(t);
     _exchange.cancel(t);
+  }
+
+  private void updateMetrics(TransferableBlock block) {
+    ServerMetrics serverMetrics = ServerMetrics.get();
+    MultiStageQueryStats queryStats = block.getQueryStats();
+    if (queryStats == null) {
+      LOGGER.info("Query stats not found in the EOS block.");
+    } else {
+      for (MultiStageQueryStats.StageStats.Closed closed : queryStats.getClosedStats()) {
+        closed.forEach((type, stats) -> {
+          type.updateServerMetrics(stats, serverMetrics);
+        });
+      }
+      queryStats.getCurrentStats().forEach((type, stats) -> {
+        type.updateServerMetrics(stats, serverMetrics);
+      });
+    }
   }
 
   public enum StatKey implements StatMap.Key {

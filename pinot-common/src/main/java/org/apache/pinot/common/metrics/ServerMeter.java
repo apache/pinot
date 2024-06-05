@@ -118,7 +118,15 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   LARGE_QUERY_RESPONSES_SENT("largeResponses", false),
   TOTAL_THREAD_CPU_TIME_MILLIS("millis", false),
   LARGE_QUERY_RESPONSE_SIZE_EXCEPTIONS("exceptions", false),
-  STREAM_DATA_LOSS("streamDataLoss", false);
+  STREAM_DATA_LOSS("streamDataLoss", false),
+
+  // Multi-stage
+  HASH_JOIN_TIMES_MAX_ROWS_REACHED("times", true),
+  AGGREGATE_TIMES_NUM_GROUPS_LIMIT_REACHED("times", true),
+  MULTI_STAGE_IN_MEMORY_MESSAGES("messages", true),
+  MULTI_STAGE_RAW_MESSAGES("messages", true),
+  MULTI_STAGE_RAW_BYTES("bytes", true),
+  MAX_ROWS_IN_WINDOW_REACHED("times", true),;
 
   private final String _meterName;
   private final String _unit;

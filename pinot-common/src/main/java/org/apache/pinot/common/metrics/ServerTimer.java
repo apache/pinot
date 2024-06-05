@@ -54,7 +54,14 @@ public enum ServerTimer implements AbstractMetrics.Timer {
   UPSERT_REMOVE_EXPIRED_PRIMARY_KEYS_TIME_MS("milliseconds", false,
       "Total time taken to delete expired primary keys based on metadataTTL or deletedKeysTTL"),
   GRPC_QUERY_EXECUTION_MS("milliseconds", false, "Total execution time of a successful query over gRPC"),
-  UPSERT_SNAPSHOT_TIME_MS("milliseconds", false, "Total time taken to take upsert table snapshot");
+  UPSERT_SNAPSHOT_TIME_MS("milliseconds", false, "Total time taken to take upsert table snapshot"),
+
+  // Multi-stage
+  HASH_JOIN_CPU_TIME_BUILDING_HASH_TABLE_MS("millis", true),
+  MULTI_STAGE_SERIALIZATION_CPU_TIME_MS("millis", true),
+  MULTI_STAGE_DESERIALIZATION_CPU_TIME_MS("millis", true),
+  RECEIVE_DOWNSTREAM_CPU_TIME_MS("millis", true),
+  RECEIVE_UPSTREAM_CPU_WAIT_MS("millis", true),;
 
   private final String _timerName;
   private final boolean _global;

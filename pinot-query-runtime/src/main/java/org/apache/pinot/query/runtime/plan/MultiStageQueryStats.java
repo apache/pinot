@@ -256,7 +256,7 @@ public class MultiStageQueryStats {
           myStats.merge(otherStatsForStage);
         }
       } catch (IllegalArgumentException | IllegalStateException ex) {
-        LOGGER.warn("Error merging stats on stage {}. Ignoring the new stats", i, ex);
+        LOGGER.warn("Error merging stats on stage " + i + ". Ignoring the new stats", ex);
       }
     }
   }
@@ -284,12 +284,16 @@ public class MultiStageQueryStats {
             myStats.merge(dis);
           }
         } catch (IOException ex) {
-          LOGGER.warn("Error deserializing stats on stage {}. Considering the new stats empty", i, ex);
+          LOGGER.warn("Error deserializing stats on stage " + i + ". Considering the new stats empty", ex);
         } catch (IllegalArgumentException | IllegalStateException ex) {
-          LOGGER.warn("Error merging stats on stage {}. Ignoring the new stats", i, ex);
+          LOGGER.warn("Error merging stats on stage " + i + ". Ignoring the new stats", ex);
         }
       }
     }
+  }
+
+  public List<StageStats.Closed> getClosedStats() {
+    return Collections.unmodifiableList(_closedStats);
   }
 
   public JsonNode asJson() {
@@ -418,6 +422,14 @@ public class MultiStageQueryStats {
       return _operatorStats.size() - 1;
     }
 
+    public void forEach(BiConsumer<MultiStageOperator.Type, StatMap<?>> consumer) {
+      Iterator<MultiStageOperator.Type> typeIterator = _operatorTypes.iterator();
+      Iterator<StatMap<?>> statIterator = _operatorStats.iterator();
+      while (typeIterator.hasNext()) {
+        consumer.accept(typeIterator.next(), statIterator.next());
+      }
+    }
+
     public JsonNode asJson() {
       ArrayNode json = JsonUtils.newArrayNode();
 
@@ -538,14 +550,6 @@ public class MultiStageQueryStats {
       public static Closed deserialize(DataInput input)
           throws IOException {
         return deserialize(input, input.readInt());
-      }
-
-      public void forEach(BiConsumer<MultiStageOperator.Type, StatMap<?>> consumer) {
-        Iterator<MultiStageOperator.Type> typeIterator = _operatorTypes.iterator();
-        Iterator<StatMap<?>> statIterator = _operatorStats.iterator();
-        while (typeIterator.hasNext()) {
-          consumer.accept(typeIterator.next(), statIterator.next());
-        }
       }
     }
 
