@@ -59,8 +59,7 @@ public class DataBlockBuilder2 {
   private final Object2IntOpenHashMap<String> _dictionary = new Object2IntOpenHashMap<>();
   private final List<ByteBuffer> _fixedSizeBuffers = new ArrayList<>();
   private int _writtenFixedSizeBytes = 0;
-  private final PagedPinotOutputStream _varSizeDataOutputStream
-      = new PagedPinotOutputStream(PagedPinotOutputStream.HeapPageAllocator.createSmall());
+  private final PagedPinotOutputStream _varSizeDataOutputStream = PagedPinotOutputStream.createHeap();
   private final List<ByteBuffer> _varSizeBuffers = new ArrayList<>();
   private int _writtenVarSizeBytes = 0;
 
