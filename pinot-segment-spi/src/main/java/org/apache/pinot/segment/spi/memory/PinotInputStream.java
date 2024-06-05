@@ -26,7 +26,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 /**
- * Similar to Guava's {@link com.google.common.io.LittleEndianDataInputStream), but for Pinot.
+ * A {@link DataInput} that also implements {@link SeekableInputStream}.
  */
 public abstract class PinotInputStream extends SeekableInputStream implements DataInput {
 

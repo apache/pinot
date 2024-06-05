@@ -292,7 +292,7 @@ public class PinotByteBuffer extends PinotDataBuffer {
       ByteBuffer duplicate = _buffer.duplicate();
       int start = (int) offset;
       int end = start + (int) size;
-      ((Buffer) duplicate).position(start).limit(end);
+      duplicate.position(start).limit(end);
       channel.read(duplicate, srcOffset);
     }
   }

@@ -114,14 +114,20 @@ public class CompoundDataBuffer implements DataBuffer {
       throw new BufferUnderflowException();
     }
     byte[] result = new byte[length];
-    int remaining = length;
 
+    int bufferIndex = getBufferIndex(offset);
+    long inBufferIndex = offset - _bufferOffsets[bufferIndex];
+
+    DataBuffer buffer = _buffers[bufferIndex];
+    int toCopy = (int) Math.min(length, buffer.size() - inBufferIndex);
+    buffer.copyTo(inBufferIndex, result, 0, toCopy);
+
+    int remaining = length - toCopy;
     while (remaining > 0) {
-      int bufferIndex = getBufferIndex(offset);
-      DataBuffer buffer = _buffers[bufferIndex];
-      long inBufferIndex = offset - _bufferOffsets[bufferIndex];
-      int toCopy = (int) Math.min(remaining, buffer.size() - inBufferIndex);
-      buffer.copyTo(inBufferIndex, result, length - remaining, toCopy);
+      bufferIndex++;
+      buffer = _buffers[bufferIndex];
+      toCopy = (int) Math.min(remaining, buffer.size());
+      buffer.copyTo(0, result, length - remaining, toCopy);
 
       remaining -= toCopy;
     }
@@ -137,14 +143,16 @@ public class CompoundDataBuffer implements DataBuffer {
 
     int bufferIndex = getBufferIndex(offset);
     int remaining = size;
+    long inBufferIndex = offset - _bufferOffsets[bufferIndex];
     while (remaining > 0) {
       DataBuffer buffer = _buffers[bufferIndex];
-      int toRead = (int) Math.min(remaining, buffer.size());
-      buffer.readFrom(0, input, srcOffset, toRead);
+      int toRead = (int) Math.min(remaining, buffer.size() - inBufferIndex);
+      buffer.readFrom(inBufferIndex, input, srcOffset, toRead);
 
       bufferIndex++;
       remaining -= toRead;
       srcOffset += toRead;
+      inBufferIndex = 0; // from now on we always write in the first position of the buffer
     }
   }
 
@@ -156,17 +164,19 @@ public class CompoundDataBuffer implements DataBuffer {
 
     int startLimit = input.limit();
     int bufferIndex = getBufferIndex(offset);
+    long inBufferIndex = offset - _bufferOffsets[bufferIndex];
 
     while (input.hasRemaining()) {
       DataBuffer buffer = _buffers[bufferIndex];
-      int toRead = (int) Math.min(input.remaining(), buffer.size());
+      int toRead = (int) Math.min(input.remaining(), buffer.size() - inBufferIndex);
 
       input.limit(input.position() + toRead);
-      buffer.readFrom(0, input);
+      buffer.readFrom(inBufferIndex, input);
 
       input.position(input.limit());
       input.limit(startLimit);
       bufferIndex++;
+      inBufferIndex = 0; // from now on we always write in the first position of the buffer
     }
   }
 
@@ -178,15 +188,21 @@ public class CompoundDataBuffer implements DataBuffer {
     }
 
     int bufferIndex = getBufferIndex(offset);
-    long remaining = size;
-    while (remaining > 0) {
-      DataBuffer buffer = _buffers[bufferIndex];
-      long toRead = Math.min(remaining, buffer.size());
-      buffer.readFrom(0, file, srcOffset, toRead);
+    DataBuffer buffer = _buffers[bufferIndex];
+    long inBufferIndex = offset - _bufferOffsets[bufferIndex];
+    long toRead = Math.min(size, buffer.size() - inBufferIndex);
+    buffer.readFrom(inBufferIndex, file, srcOffset, toRead);
 
+    long fileOffset = srcOffset + toRead;
+    long remaining = size - toRead;
+    while (remaining > 0) {
       bufferIndex++;
+      buffer = _buffers[bufferIndex];
+      toRead = Math.min(remaining, buffer.size());
+      buffer.readFrom(0, file, fileOffset, toRead);
+
       remaining -= toRead;
-      srcOffset += toRead;
+      fileOffset += toRead;
     }
   }
 
@@ -204,16 +220,15 @@ public class CompoundDataBuffer implements DataBuffer {
     int toCopy = (int) Math.min(remaining, bufferToCopy.size() - inBufferIndex);
     bufferToCopy.copyTo(inBufferIndex, buffer, destOffset, toCopy);
 
-    bufferIndex++;
     remaining -= toCopy;
     destOffset += toCopy;
 
     while (remaining > 0) {
+      bufferIndex++;
       bufferToCopy = _buffers[bufferIndex];
       toCopy = (int) Math.min(remaining, bufferToCopy.size());
       bufferToCopy.copyTo(0, buffer, destOffset, toCopy);
 
-      bufferIndex++;
       remaining -= toCopy;
       destOffset += toCopy;
     }

@@ -58,20 +58,20 @@ public abstract class PinotOutputStream extends SeekableOutputStream implements 
   }
 
   public void writeInt(int v) throws IOException {
-    write(0xFF & v);
-    write(0xFF & (v >> 8));
-    write(0xFF & (v >> 16));
     write(0xFF & (v >> 24));
+    write(0xFF & (v >> 16));
+    write(0xFF & (v >> 8));
+    write(0xFF & v);
   }
 
   public void writeLong(long v) throws IOException {
-    byte[] bytes = Longs.toByteArray(Long.reverseBytes(v));
+    byte[] bytes = Longs.toByteArray(v);
     write(bytes, 0, bytes.length);
   }
 
   public void writeShort(int v) throws IOException {
-    write(0xFF & v);
     write(0xFF & (v >> 8));
+    write(0xFF & v);
   }
 
   /**

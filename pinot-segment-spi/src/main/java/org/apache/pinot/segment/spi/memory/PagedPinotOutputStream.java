@@ -33,14 +33,14 @@ import org.slf4j.LoggerFactory;
  * <p>
  * When a page is full, a new page is allocated and writing continues there.
  * The page size is determined by the {@link PageAllocator} used to create the stream.
- * Some {@link PageAllocator} implementations may support releasing pages, which can be useful to reduce memory usage.
- * The recommended page size goes from 4KBs to 1MB, depending on the use case, with a sweet spot.
- * {@link PageAllocator#MIN_RECOMMENDED_PAGE_SIZE} and {@link PageAllocator#MAX_RECOMMENDED_PAGE_SIZE} can be used to
- * determine the recommended page size for the current architecture.
  * <p>
  * This class is specially useful when writing data whose final size is not known in advance or when it is needed to
  * {@link #seek(long) seek} to a specific position in the stream.
  * Writes that cross page boundaries are handled transparently, although a performance penalty will be paid.
+ * <p>
+ * Some {@link PageAllocator} implementations may support releasing pages, which can be useful to reduce memory usage.
+ * The smaller the page size, the more pages will be allocated, but the allocation is quite faster. This is specially
+ * important in the case of heap allocation, in which case allocations smaller than TLAB will be faster.
  * <p>
  * Data written in this stream can be retrieved as a list of {@link ByteBuffer} pages using {@link #getPages()}, which
  * can be directly read using {@link CompoundDataBuffer} or send to the network as using
@@ -66,6 +66,10 @@ public class PagedPinotOutputStream extends PinotOutputStream {
     _pages.add(_currentPage);
   }
 
+  public static PagedPinotOutputStream createHeap() {
+    return new PagedPinotOutputStream(HeapPageAllocator.createSmall());
+  }
+
   private void nextPage() {
     moveCurrentOffset(remainingInPage());
   }
@@ -77,7 +81,7 @@ public class PagedPinotOutputStream extends PinotOutputStream {
   /**
    * Returns a read only view of the pages written so far.
    * <p>
-   * All pages but the last one will be {@link ByteBuffer#clear() cleared}.
+   * All pages but the last one will have its position set to 0 and the limit to their capacity.
    * The latest page will have its position set to 0 and its limit set to the last byte written.
    *
    * TODO: Add one option that let caller choose start and end offset.
@@ -85,7 +89,8 @@ public class PagedPinotOutputStream extends PinotOutputStream {
   public ByteBuffer[] getPages() {
     int numPages = _pages.size();
 
-    if (_written == (numPages - 1) * (long) _pageSize) { // last page is empty
+    boolean lastPageIsEmpty = _written == (numPages - 1) * (long) _pageSize;
+    if (lastPageIsEmpty) {
       numPages--;
     }
     if (numPages == 0) {
@@ -100,10 +105,12 @@ public class PagedPinotOutputStream extends PinotOutputStream {
       result[i] = page;
     }
 
-    long startOffset = getCurrentOffset();
-    seek(_written);
-    result[numPages - 1].limit(_offsetInPage);
-    seek(startOffset);
+    if (!lastPageIsEmpty) {
+      long startOffset = getCurrentOffset();
+      seek(_written);
+      result[numPages - 1].limit(_offsetInPage);
+      seek(startOffset);
+    }
 
     return result;
   }
@@ -257,6 +264,10 @@ public class PagedPinotOutputStream extends PinotOutputStream {
     }
 
     return new CompoundDataBuffer(pages, order, owner);
+  }
+
+  public int getPageSize() {
+    return _pageSize;
   }
 
   @Override
