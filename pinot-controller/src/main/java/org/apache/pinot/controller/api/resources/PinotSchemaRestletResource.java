@@ -124,7 +124,7 @@ public class PinotSchemaRestletResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/schemas/info")
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_SCHEMA)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_SCHEMA_INFO)
   @ApiOperation(value = "List all schemas info with count of field specs", notes = "Lists all schemas with field "
       + "count details")
   public List<SchemaInfo> getSchemaInfo(@Context HttpHeaders headers) {

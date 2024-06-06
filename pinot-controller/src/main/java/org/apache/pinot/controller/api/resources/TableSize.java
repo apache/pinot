@@ -109,8 +109,12 @@ public class TableSize {
       tableSizeDetails =
           tableSizeReader.getTableSizeDetails(tableName, _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
       if (!detailed) {
-        tableSizeDetails._offlineSegments._segments = new HashMap<>();
-        tableSizeDetails._realtimeSegments._segments = new HashMap<>();
+        if (tableSizeDetails._offlineSegments != null) {
+          tableSizeDetails._offlineSegments._segments = new HashMap<>();
+        }
+        if (tableSizeDetails._realtimeSegments != null) {
+          tableSizeDetails._realtimeSegments._segments = new HashMap<>();
+        }
       }
     } catch (Throwable t) {
       throw new ControllerApplicationException(LOGGER, String.format("Failed to read table size for %s", tableName),

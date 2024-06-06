@@ -18,15 +18,27 @@
  */
 package org.apache.pinot.spi.data;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+
 /**
  * This class gives the details of a particular schema and the corresponding column metrics
  *
  */
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class SchemaInfo {
-  String _schemaName;
-  int _dimensionFieldSpecsCount;
-  int _dateTimeFieldSpecsCount;
-  int _metricFieldSpecsCount;
+  @JsonProperty("schemaName")
+  private String _schemaName;
+
+  @JsonProperty("dimensionFieldSpecsCount")
+  private int _dimensionFieldSpecsCount;
+
+  @JsonProperty("dateTimeFieldSpecsCount")
+  private int _dateTimeFieldSpecsCount;
+
+  @JsonProperty("metricFieldSpecsCount")
+  private int _metricFieldSpecsCount;
 
   public SchemaInfo(String schemaName, int dimensionFieldSpecsCount, int dateTimeFieldSpecsCount,
       int metricFieldSpecsCount) {

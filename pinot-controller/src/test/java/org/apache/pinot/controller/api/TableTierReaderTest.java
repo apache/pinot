@@ -33,10 +33,12 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
+import java.util.stream.Collectors;
 import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.restlet.resources.SegmentConsumerInfo;
 import org.apache.pinot.common.restlet.resources.TableTierInfo;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.TableTierReader;
@@ -208,6 +210,17 @@ public class TableTierReaderTest {
     return subset;
   }
 
+  private Map<String, Integer> subsetOfServerSegmentsCount(String... servers) {
+    Map<String, Integer> subset = new HashMap<>();
+    for (String server : servers) {
+      FakeSizeServer fakeSvr = _serverMap.get(server);
+      ArrayList<String> segmentsOnServer = new ArrayList<>(fakeSvr._segTierMap.keySet());
+      segmentsOnServer.addAll(fakeSvr._mutableSegments);
+      subset.put(server, segmentsOnServer.size());
+    }
+    return subset;
+  }
+
   private BiMap<String, String> serverEndpoints(String... servers) {
     BiMap<String, String> endpoints = HashBiMap.create(servers.length);
     for (String server : servers) {
@@ -220,6 +233,8 @@ public class TableTierReaderTest {
       throws InvalidConfigException {
     when(_helix.getServerToSegmentsMap(ArgumentMatchers.anyString())).thenAnswer(
         invocationOnMock -> subsetOfServerSegments(servers));
+    when(_helix.getServerToSegmentsCountMap(ArgumentMatchers.anyString())).thenAnswer(
+        invocationOnMock -> subsetOfServerSegmentsCount(servers));
     if (segmentName != null) {
       when(_helix.getServers(ArgumentMatchers.anyString(), ArgumentMatchers.anyString())).thenAnswer(
           invocationOnMock -> new HashSet<>(Arrays.asList(servers)));

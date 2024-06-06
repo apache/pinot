@@ -27,6 +27,7 @@ import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
@@ -41,8 +42,11 @@ import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.MetricValueUtils;
 import org.apache.pinot.common.restlet.resources.SegmentSizeInfo;
 import org.apache.pinot.common.restlet.resources.TableSizeInfo;
+import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.controller.LeadControllerManager;
+import org.apache.pinot.controller.api.resources.Constants;
+import org.apache.pinot.controller.api.resources.ResourceUtils;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.controller.utils.FakeHttpServer;
@@ -213,6 +217,14 @@ public class TableSizeReaderTest {
     return subset;
   }
 
+  private Map<String, Integer> subsetOfServerSegmentsCount(String... servers) {
+    Map<String, Integer> subset = new HashMap<>();
+    for (String server : servers) {
+      subset.put(server, _serverMap.get(server)._segments.size());
+    }
+    return subset;
+  }
+
   private BiMap<String, String> serverEndpoints(String... servers) {
     BiMap<String, String> endpoints = HashBiMap.create(servers.length);
     for (String server : servers) {
@@ -235,6 +247,12 @@ public class TableSizeReaderTest {
       @Override
       public Object answer(InvocationOnMock invocationOnMock) throws Throwable {
         return subsetOfServerSegments(servers);
+      }
+    });
+    when(_helix.getServerToSegmentsCountMap(anyString())).thenAnswer(new Answer<Object>() {
+      @Override
+      public Object answer(InvocationOnMock invocationOnMock) throws Throwable {
+        return subsetOfServerSegmentsCount(servers);
       }
     });
 
@@ -310,6 +328,23 @@ public class TableSizeReaderTest {
       assertTrue(tableSize._reportedSizeInBytes != tableSize._estimatedSizeInBytes);
       assertTrue(tableSize._missingSegments > 0);
     }
+  }
+
+  @Test
+  public void testGetServerToSegmentsMap() throws InvalidConfigException {
+    final String[] servers = {"server0", "server1"};
+    String table = "offline";
+    TableSizeReader.TableSizeDetails tableSizeDetails = testRunner(servers, table);
+    TableSizeReader.TableSubTypeSizeDetails offlineSizes = tableSizeDetails._offlineSegments;
+    assertNotNull(offlineSizes);
+    validateTableSubTypeSize(servers, offlineSizes);
+    assertNull(tableSizeDetails._realtimeSegments);
+    List server0Segments = new ArrayList<String>();
+    server0Segments.add("s2");
+    server0Segments.add("s3");
+    server0Segments.add("s6");
+    assertEquals(_helix.getServerToSegmentsMap(table).get("server0"), server0Segments);
+    assertEquals(_helix.getServerToSegmentsCountMap(table).get("server0"), 3);
   }
 
   @Test

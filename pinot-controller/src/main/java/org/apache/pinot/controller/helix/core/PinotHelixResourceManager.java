@@ -53,6 +53,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.ws.rs.BadRequestException;
 import javax.ws.rs.ClientErrorException;
@@ -139,6 +140,7 @@ import org.apache.pinot.controller.api.resources.InstanceInfo;
 import org.apache.pinot.controller.api.resources.OperationValidationResponse;
 import org.apache.pinot.controller.api.resources.PeriodicTaskInvocationResponse;
 import org.apache.pinot.controller.api.resources.StateType;
+import org.apache.pinot.controller.api.resources.TableViews;
 import org.apache.pinot.controller.helix.core.assignment.instance.InstanceAssignmentDriver;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignment;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentFactory;
@@ -183,6 +185,9 @@ import org.apache.pinot.spi.utils.retry.RetryPolicy;
 import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.pinot.controller.api.resources.TableViews.EXTERNALVIEW;
+import static org.apache.pinot.controller.api.resources.TableViews.IDEALSTATE;
 
 
 public class PinotHelixResourceManager {
@@ -3066,6 +3071,135 @@ public class PinotHelixResourceManager {
       tableConfigs.add(realtimeTableConfig);
     }
     return tableConfigs;
+  }
+
+  // we use name "view" to closely match underlying names and to not
+  // confuse with table state of enable/disable
+  public TableViews.TableView getTableState(String tableName, String view, TableType tableType) {
+    TableViews.TableView tableView;
+    if (view.equalsIgnoreCase(IDEALSTATE)) {
+      tableView = getTableIdealState(tableName, tableType);
+    } else if (view.equalsIgnoreCase(EXTERNALVIEW)) {
+      tableView = getTableExternalView(tableName, tableType);
+    } else {
+      throw new ControllerApplicationException(LOGGER,
+          "Bad view name: " + view + ". Expected idealstate or externalview", Response.Status.BAD_REQUEST);
+    }
+
+    if (tableView._offline == null && tableView._realtime == null) {
+      throw new ControllerApplicationException(LOGGER, "Table not found", Response.Status.NOT_FOUND);
+    }
+    return tableView;
+  }
+
+  public TableViews.TableView getTableIdealState(String tableNameOptType, TableType tableType) {
+    TableViews.TableView tableView = new TableViews.TableView();
+    if (tableType == null || tableType == TableType.OFFLINE) {
+      tableView._offline = getIdealState(tableNameOptType, TableType.OFFLINE);
+    }
+    if (tableType == null || tableType == TableType.REALTIME) {
+      tableView._realtime = getIdealState(tableNameOptType, TableType.REALTIME);
+    }
+    return tableView;
+  }
+
+  public TableViews.TableView getTableExternalView(@Nonnull String tableNameOptType, @Nullable TableType tableType) {
+    TableViews.TableView tableView = new TableViews.TableView();
+    if (tableType == null || tableType == TableType.OFFLINE) {
+      tableView._offline = getExternalView(tableNameOptType, TableType.OFFLINE);
+    }
+    if (tableType == null || tableType == TableType.REALTIME) {
+      tableView._realtime = getExternalView(tableNameOptType, TableType.REALTIME);
+    }
+    return tableView;
+  }
+
+  public TableType validateTableType(String tableTypeStr) {
+    if (tableTypeStr == null) {
+      return null;
+    }
+    try {
+      return TableType.valueOf(tableTypeStr.toUpperCase());
+    } catch (IllegalArgumentException e) {
+      String errStr = "Illegal table type '" + tableTypeStr + "'";
+      throw new ControllerApplicationException(LOGGER, errStr, Response.Status.BAD_REQUEST, e);
+    }
+  }
+
+  public Map<String, String> getSegmentStatuses(TableViews.TableView externalView,
+      TableViews.TableView idealStateView) {
+    Map<String, Map<String, String>> idealStateMap = getStateMap(idealStateView);
+    Map<String, Map<String, String>> externalViewMap = getStateMap(externalView);
+    Map<String, String> resultsMap = new HashMap<>();
+
+    for (Map.Entry<String, Map<String, String>> entry : externalViewMap.entrySet()) {
+      String segment = entry.getKey();
+      Map<String, String> externalViewEntryValue = entry.getValue();
+      if (isErrorSegment(externalViewEntryValue)) {
+        resultsMap.put(segment, CommonConstants.Helix.StateModel.DisplaySegmentStatus.BAD);
+      } else if (isOnlineOrConsumingSegment(externalViewEntryValue) && externalViewMap.equals(idealStateMap)) {
+        resultsMap.put(segment, CommonConstants.Helix.StateModel.DisplaySegmentStatus.GOOD);
+      } else if (isOfflineSegment(externalViewEntryValue) && externalViewMap.equals(idealStateMap)) {
+        resultsMap.put(segment, CommonConstants.Helix.StateModel.DisplaySegmentStatus.GOOD);
+      } else {
+        resultsMap.put(segment, CommonConstants.Helix.StateModel.DisplaySegmentStatus.UPDATING);
+      }
+    }
+
+    return resultsMap;
+  }
+
+  private Map<String, Map<String, String>> getStateMap(TableViews.TableView view) {
+    if (!view._offline.isEmpty()) {
+      return view._offline;
+    } else if (!view._realtime.isEmpty()) {
+      return view._realtime;
+    } else {
+      return new HashMap<>();
+    }
+  }
+
+  private boolean isErrorSegment(Map<String, String> stateMap) {
+    return stateMap.values().contains(CommonConstants.Helix.StateModel.SegmentStateModel.ERROR);
+  }
+
+  private boolean isOnlineOrConsumingSegment(Map<String, String> stateMap) {
+    return stateMap.values().stream().allMatch(
+        state -> state.equals(CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING) || state.equals(
+            CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE));
+  }
+
+  private boolean isOfflineSegment(Map<String, String> stateMap) {
+    return stateMap.values().contains(CommonConstants.Helix.StateModel.SegmentStateModel.OFFLINE);
+  }
+
+  @Nullable
+  public Map<String, Map<String, String>> getIdealState(@Nonnull String tableNameOptType,
+      @Nullable TableType tableType) {
+    String tableNameWithType = getTableNameWithType(tableNameOptType, tableType);
+    IdealState resourceIdealState = getHelixAdmin()
+        .getResourceIdealState(getHelixClusterName(), tableNameWithType);
+    return resourceIdealState == null ? null : resourceIdealState.getRecord().getMapFields();
+  }
+
+  @Nullable
+  public Map<String, Map<String, String>> getExternalView(@Nonnull String tableNameOptType, TableType tableType) {
+    String tableNameWithType = getTableNameWithType(tableNameOptType, tableType);
+    ExternalView resourceEV = getHelixAdmin()
+        .getResourceExternalView(getHelixClusterName(), tableNameWithType);
+    return resourceEV == null ? null : resourceEV.getRecord().getMapFields();
+  }
+
+  public String getTableNameWithType(@Nonnull String tableNameOptType, @Nullable TableType tableType) {
+    if (tableType != null) {
+      if (tableType == TableType.OFFLINE) {
+        return TableNameBuilder.OFFLINE.tableNameWithType(tableNameOptType);
+      } else {
+        return TableNameBuilder.REALTIME.tableNameWithType(tableNameOptType);
+      }
+    } else {
+      return tableNameOptType;
+    }
   }
 
   public List<String> getServerInstancesForTable(String tableName, TableType tableType) {

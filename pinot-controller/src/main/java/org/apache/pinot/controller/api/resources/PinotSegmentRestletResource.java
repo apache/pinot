@@ -94,6 +94,8 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.controller.api.resources.TableViews.EXTERNALVIEW;
+import static org.apache.pinot.controller.api.resources.TableViews.IDEALSTATE;
 import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
@@ -235,7 +237,7 @@ public class PinotSegmentRestletResource {
   public List<Map<String, Object>> getServerToSegmentsMap(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
-      @QueryParam("detailed") boolean detailed, @Context HttpHeaders headers) {
+      @QueryParam("detailed")  @DefaultValue("true") boolean detailed, @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     List<String> tableNamesWithType = ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName,
         Constants.validateTableType(tableTypeStr), LOGGER);
@@ -252,6 +254,24 @@ public class PinotSegmentRestletResource {
       resultList.add(resultForTable);
     }
     return resultList;
+  }
+
+  @GET
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/segments/{tableName}/info")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_SEGMENT_STATUS)
+  @ApiOperation(value = "Get segment names to segment status map", notes = "Get segment statuses of each segment")
+  public Map<String, String> getSegmentsStatusDetails(
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "realtime|offline", required = false) @QueryParam("tableType") String tableTypeStr,
+      @Context HttpHeaders headers) {
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
+    TableType tableType = _pinotHelixResourceManager.validateTableType(tableTypeStr);
+    TableViews.TableView externalView = _pinotHelixResourceManager.getTableState(tableName, EXTERNALVIEW, tableType);
+    TableViews.TableView idealStateView = _pinotHelixResourceManager.getTableState(tableName, IDEALSTATE, tableType);
+    Map<String, String> segmentStatusMap = new HashMap<>();
+    segmentStatusMap = _pinotHelixResourceManager.getSegmentStatuses(externalView, idealStateView);
+    return segmentStatusMap;
   }
 
   @GET
