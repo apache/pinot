@@ -148,8 +148,12 @@ public class SegmentGeneratorConfigTest {
     segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
     segmentGeneratorConfig.setUploadedSegmentPartitionId(0);
     segmentGeneratorConfig.setCreationTime("1234567890");
+    segmentGeneratorConfig.setSegmentNamePrefix("prefix");
+    segmentGeneratorConfig.setSegmentNamePostfix("5");
 
     Assert.assertTrue(segmentGeneratorConfig.getSegmentNameGenerator() instanceof UploadedRealtimeSegmentNameGenerator);
+    Assert.assertTrue(
+        segmentGeneratorConfig.getSegmentNameGenerator().toString().contains("tableName=test"));
 
     // Table config has no time column defined
     tableConfig =

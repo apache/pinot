@@ -161,11 +161,10 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
   /**
    * <li> When the replacing segment and current segment are of {@link LLCSegmentName} then the PK should resolve to
    * row in segment with higher sequence id.
-   * <li> When the replacing segment and current segment are of {@link UploadedRealtimeSegmentName} then the PK
-   * should resolve to row in segment with higher creation time followed by sequence id.
-   * <li> For other cases resolve based on creation time of segment. In case the creation time is same, give
-   * preference to an uploaded segment. A segment which is not LLCSegment can be assumed to be uploaded segment and
-   * is given preference.
+   * <li> If either or both are not LLC segment, then resolve based on creation time of segment. If creation time is
+   * same then prefer uploaded segment if other is LLCSegmentName
+   * <li> If both are uploaded segment, prefer standard UploadedRealtimeSegmentName, if still a tie, then resolve to
+   * current segment.
    *
    * @param segmentName replacing segment name
    * @param currentSegmentName current segment name having the record for the given primary key
@@ -173,32 +172,31 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
    * @param currentSegmentCreationTimeMs current segment creation time
    * @return true if the record in replacing segment should replace the record in current segment
    */
-  private boolean shouldReplaceOnComparisonTie(String segmentName, String currentSegmentName,
+  protected boolean shouldReplaceOnComparisonTie(String segmentName, String currentSegmentName,
       long segmentCreationTimeMs, long currentSegmentCreationTimeMs) {
 
+    // resolve using sequence id if both are LLCSegmentName
     LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentName);
     LLCSegmentName currentLLCSegmentName = LLCSegmentName.of(currentSegmentName);
     if (llcSegmentName != null && currentLLCSegmentName != null) {
       return llcSegmentName.getSequenceNumber() > currentLLCSegmentName.getSequenceNumber();
     }
 
+    // either or both are uploaded segments, prefer the latest segment
     int creationTimeComparisonRes = Long.compare(segmentCreationTimeMs, currentSegmentCreationTimeMs);
-
-    UploadedRealtimeSegmentName uploadedSegmentName = UploadedRealtimeSegmentName.of(segmentName);
-    UploadedRealtimeSegmentName currentUploadedSegmentName = UploadedRealtimeSegmentName.of(currentSegmentName);
-    if (uploadedSegmentName != null && currentUploadedSegmentName != null) {
-      if (creationTimeComparisonRes == 0) {
-        return uploadedSegmentName.getSequenceId() > currentUploadedSegmentName.getSequenceId();
-      } else {
-        return creationTimeComparisonRes > 0;
-      }
-    }
-
-    if (creationTimeComparisonRes == 0) {
-      return llcSegmentName == null || uploadedSegmentName != null;
-    } else {
+    if (creationTimeComparisonRes != 0) {
       return creationTimeComparisonRes > 0;
     }
+
+    // if both are uploaded segment, prefer standard UploadedRealtimeSegmentName, if still a tie, then resolve to
+    // current segment
+    if (UploadedRealtimeSegmentName.of(currentSegmentName) != null) {
+      return false;
+    }
+    if (UploadedRealtimeSegmentName.of(segmentName) != null) {
+      return true;
+    }
+    return false;
   }
 
   @Override

@@ -179,7 +179,7 @@ public class SegmentGenerationTaskRunner implements Serializable {
         }
         return new UploadedRealtimeSegmentNameGenerator(tableName,
             segmentGeneratorConfig.getUploadedSegmentPartitionId(), creationTime,
-            segmentGeneratorConfig.getSegmentNamePostfix());
+            segmentGeneratorConfig.getSegmentNamePrefix(), segmentGeneratorConfig.getSegmentNamePostfix());
       default:
         throw new UnsupportedOperationException("Unsupported segment name generator type: " + segmentNameGeneratorType);
     }
