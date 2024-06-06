@@ -227,7 +227,7 @@
     <protobuf.version>3.25.2</protobuf.version> <!-- only getting used in proto compilation plugin -->
     <grpc.version>1.61.1</grpc.version>  <!-- only getting used in proto compilation plugin -->
     <google.findbugs.version>3.0.2</google.findbugs.version>
-    <google.errorprone.version>2.27.1</google.errorprone.version>
+    <google.errorprone.version>2.28.0</google.errorprone.version>
     <google.j2objc.version>3.0.0</google.j2objc.version>
     <google.auto-service.version>1.1.1</google.auto-service.version>
 
@@ -831,7 +831,24 @@
         <version>${httpcore5.version}</version>
       </dependency>
 
+      <!-- grpc-bom -->
+      <dependency>
+        <groupId>io.grpc</groupId>
+        <artifactId>grpc-bom</artifactId>
+        <version>${grpc.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <!-- protobuf-bom -->
+      <dependency>
+        <groupId>com.google.protobuf</groupId>
+        <artifactId>protobuf-bom</artifactId>
+        <version>${protobuf.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
       <!-- Google Libraries -->
+      <!-- google libraries-bom should be after grpc & protobuf bom for respective specified version in runtime -->
       <dependency>
         <groupId>com.google.cloud</groupId>
         <artifactId>libraries-bom</artifactId>
@@ -839,6 +856,8 @@
         <type>pom</type>
         <scope>import</scope>
       </dependency>
+
+
       <!-- Solve the dependency converge issue between guava and calcite-core -->
       <dependency>
         <groupId>com.google.errorprone</groupId>
@@ -1389,7 +1408,7 @@
       <dependency>
         <groupId>net.openhft</groupId>
         <artifactId>posix</artifactId>
-        <version>2.25ea0</version>
+        <version>2.26ea0</version>
       </dependency>
       <dependency>
         <groupId>net.openhft</groupId>
@@ -1640,7 +1659,7 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-javadoc-plugin</artifactId>
-          <version>3.6.3</version>
+          <version>3.7.0</version>
           <configuration>
             <!-- Remove this after fixing all javadoc warnings -->
             <doclint>none</doclint>
