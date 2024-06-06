@@ -177,7 +177,7 @@ public class AddSchemaCommand extends AbstractBaseAdminCommand implements Comman
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
       URI schemaURI = FileUploadDownloadClient
           .getUploadSchemaURI(_controllerProtocol, _controllerHost, Integer.parseInt(_controllerPort));
-      schemaURI = new URI(schemaURI + "?override=" + _override + "?force=" + _force);
+      schemaURI = new URI(schemaURI + "?override=" + _override + "&force=" + _force);
       fileUploadDownloadClient.addSchema(schemaURI,
           schema.getSchemaName(), schemaFile, AuthProviderUtils.makeAuthHeaders(
               AuthProviderUtils.makeAuthProvider(_authProvider, _authTokenUrl, _authToken,
