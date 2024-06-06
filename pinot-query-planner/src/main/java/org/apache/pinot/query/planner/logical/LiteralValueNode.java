@@ -18,9 +18,10 @@
  */
 package org.apache.pinot.query.planner.logical;
 
+import java.util.List;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.query.planner.plannode.AbstractPlanNode;
+import org.apache.pinot.query.planner.plannode.BasePlanNode;
 import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
 
 
@@ -28,12 +29,12 @@ import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
  * TODO: A placeholder class for literal values coming after SubPlan execution.
  * Expected to have drastic change in the future.
  */
-public class LiteralValueNode extends AbstractPlanNode {
+public class LiteralValueNode extends BasePlanNode {
 
   private DataTable _dataTable;
 
   public LiteralValueNode(DataSchema dataSchema) {
-    super(-1, dataSchema);
+    super(-1, dataSchema, null, List.of());
   }
 
   public void setDataTable(DataTable dataTable) {

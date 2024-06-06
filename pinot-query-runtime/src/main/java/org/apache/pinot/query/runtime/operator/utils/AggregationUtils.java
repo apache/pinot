@@ -43,12 +43,13 @@ public class AggregationUtils {
   private AggregationUtils() {
   }
 
-  public static Key extractRowKey(Object[] row, List<RexExpression> groupSet) {
-    Object[] keyElements = new Object[groupSet.size()];
-    for (int i = 0; i < groupSet.size(); i++) {
-      keyElements[i] = row[((RexExpression.InputRef) groupSet.get(i)).getIndex()];
+  public static Key extractRowKey(Object[] row, int[] indices) {
+    int numKeys = indices.length;
+    Object[] values = new Object[numKeys];
+    for (int i = 0; i < numKeys; i++) {
+      values[i] = row[indices[i]];
     }
-    return new Key(keyElements);
+    return new Key(values);
   }
 
   public static Key extractEmptyKey() {
@@ -204,26 +205,26 @@ public class AggregationUtils {
       return _dataType;
     }
 
-    public Accumulator(RexExpression.FunctionCall aggCall, String functionName,
-        DataSchema inputSchema) {
+    public Accumulator(RexExpression.FunctionCall aggCall, DataSchema inputSchema) {
       // agg function operand should either be a InputRef or a Literal
-      RexExpression rexExpression = toAggregationFunctionOperand(aggCall);
-      if (rexExpression instanceof RexExpression.InputRef) {
-        _inputRef = ((RexExpression.InputRef) rexExpression).getIndex();
+      RexExpression operand = toAggregationFunctionOperand(aggCall);
+      if (operand instanceof RexExpression.InputRef) {
+        _inputRef = ((RexExpression.InputRef) operand).getIndex();
         _literal = null;
         _dataType = inputSchema.getColumnDataType(_inputRef);
       } else {
         _inputRef = -1;
-        RexExpression.Literal literal = (RexExpression.Literal) rexExpression;
+        RexExpression.Literal literal = (RexExpression.Literal) operand;
         _literal = literal.getValue();
         _dataType = literal.getDataType();
       }
     }
 
-    private RexExpression toAggregationFunctionOperand(RexExpression.FunctionCall rexExpression) {
-      List<RexExpression> functionOperands = rexExpression.getFunctionOperands();
-      Preconditions.checkState(functionOperands.size() < 2, "aggregate functions cannot have more than one operand");
-      return functionOperands.size() > 0 ? functionOperands.get(0) : new RexExpression.Literal(ColumnDataType.INT, 1);
+    private RexExpression toAggregationFunctionOperand(RexExpression.FunctionCall aggCall) {
+      List<RexExpression> functionOperands = aggCall.getFunctionOperands();
+      int numOperands = functionOperands.size();
+      Preconditions.checkState(numOperands < 2, "Aggregate functions cannot have more than one operand");
+      return numOperands == 1 ? functionOperands.get(0) : new RexExpression.Literal(ColumnDataType.INT, 1);
     }
   }
 }

@@ -19,7 +19,7 @@
 package org.apache.pinot.query.runtime.operator.window;
 
 import java.util.List;
-import org.apache.commons.collections.CollectionUtils;
+import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.operator.WindowAggregateOperator;
@@ -32,24 +32,24 @@ import org.apache.pinot.query.runtime.operator.utils.AggregationUtils;
  *
  */
 public abstract class WindowFunction extends AggregationUtils.Accumulator {
-  protected final String _functionName;
+  protected final int[] _orderKeys;
+  protected final boolean _partitionByOnly;
   protected final int[] _inputRefs;
-  protected final boolean _isPartitionByOnly;
-  protected final List<RexExpression> _orderSet;
 
-  public WindowFunction(RexExpression.FunctionCall aggCall, String functionName,
-      DataSchema inputSchema, WindowAggregateOperator.OrderSetInfo orderSetInfo) {
-    super(aggCall, functionName, inputSchema);
-    _isPartitionByOnly = CollectionUtils.isEmpty(orderSetInfo.getOrderSet()) || orderSetInfo.isPartitionByOnly();
-    boolean isRankingWindowFunction = WindowAggregateOperator.RANKING_FUNCTION_NAMES.contains(functionName);
-    int[] inputRefs = new int[]{_inputRef};
-    if (isRankingWindowFunction) {
-      inputRefs = orderSetInfo._orderSet.stream().map(RexExpression.InputRef.class::cast)
-          .mapToInt(RexExpression.InputRef::getIndex).toArray();
+  public WindowFunction(RexExpression.FunctionCall aggCall, DataSchema inputSchema, List<RelFieldCollation> collations,
+      boolean partitionByOnly) {
+    super(aggCall, inputSchema);
+    int numOrderKeys = collations.size();
+    _orderKeys = new int[numOrderKeys];
+    for (int i = 0; i < numOrderKeys; i++) {
+      _orderKeys[i] = collations.get(i).getFieldIndex();
     }
-    _functionName = functionName;
-    _inputRefs = inputRefs;
-    _orderSet = orderSetInfo._orderSet;
+    _partitionByOnly = partitionByOnly;
+    if (WindowAggregateOperator.RANKING_FUNCTION_NAMES.contains(aggCall.getFunctionName())) {
+      _inputRefs = _orderKeys;
+    } else {
+      _inputRefs = new int[]{_inputRef};
+    }
   }
 
   /**

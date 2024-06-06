@@ -20,28 +20,29 @@ package org.apache.pinot.query.runtime.operator.window.value;
 
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
-import org.apache.pinot.query.runtime.operator.WindowAggregateOperator;
 
 
 public class LagValueWindowFunction extends ValueWindowFunction {
 
-  public LagValueWindowFunction(RexExpression.FunctionCall aggCall,
-      String functionName, DataSchema inputSchema,
-      WindowAggregateOperator.OrderSetInfo orderSetInfo) {
-    super(aggCall, functionName, inputSchema, orderSetInfo);
+  public LagValueWindowFunction(RexExpression.FunctionCall aggCall, DataSchema inputSchema,
+      List<RelFieldCollation> collations, boolean partitionByOnly) {
+    super(aggCall, inputSchema, collations, partitionByOnly);
   }
 
   @Override
   public List<Object> processRows(List<Object[]> rows) {
-    List<Object> result = new ArrayList<>();
-    for (int i = 0; i < rows.size(); i++) {
-      if (i == 0) {
+    List<Object> result = new ArrayList<>(rows.size());
+    Object[] prevRow = null;
+    for (Object[] row : rows) {
+      if (prevRow == null) {
         result.add(null);
       } else {
-        result.add(extractValueFromRow(rows.get(i - 1)));
+        result.add(extractValueFromRow(prevRow));
       }
+      prevRow = row;
     }
     return result;
   }

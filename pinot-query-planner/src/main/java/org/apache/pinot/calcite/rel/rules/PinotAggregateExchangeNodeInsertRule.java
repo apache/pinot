@@ -25,10 +25,8 @@ import javax.annotation.Nullable;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.RelCollation;
-import org.apache.calcite.rel.RelCollations;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelDistributions;
-import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Aggregate;
 import org.apache.calcite.rel.core.AggregateCall;
@@ -118,9 +116,9 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
   @Nullable
   private static RelCollation extractWithInGroupCollation(Aggregate aggRel) {
     for (AggregateCall aggCall : aggRel.getAggCallList()) {
-      List<RelFieldCollation> fieldCollations = aggCall.getCollation().getFieldCollations();
-      if (!fieldCollations.isEmpty()) {
-        return RelCollations.of(fieldCollations);
+      RelCollation collation = aggCall.getCollation();
+      if (!collation.getFieldCollations().isEmpty()) {
+        return collation;
       }
     }
     return null;

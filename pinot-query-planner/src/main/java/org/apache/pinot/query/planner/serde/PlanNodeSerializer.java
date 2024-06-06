@@ -18,24 +18,26 @@
  */
 package org.apache.pinot.query.planner.serde;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.core.JoinRelType;
-import org.apache.calcite.rel.logical.PinotRelExchangeType;
+import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.common.proto.Expressions;
 import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
-import org.apache.pinot.query.planner.plannode.AbstractPlanNode;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
+import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.query.planner.plannode.PlanNode.NodeHint;
 import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
@@ -46,317 +48,180 @@ import org.apache.pinot.query.planner.plannode.WindowNode;
 
 
 public class PlanNodeSerializer {
-
   private PlanNodeSerializer() {
   }
 
-  public static Plan.StageNode process(AbstractPlanNode planNode) {
-    Plan.StageNode.Builder builder = Plan.StageNode.newBuilder().setStageId(planNode.getPlanFragmentId());
-    DataSchema dataSchema = planNode.getDataSchema();
-    for (int i = 0; i < dataSchema.getColumnNames().length; i++) {
-      builder.addColumnNames(dataSchema.getColumnName(i));
-      builder.addColumnDataTypes(RexExpressionToProtoExpression.convertColumnDataType(dataSchema.getColumnDataType(i)));
-    }
-
+  public static Plan.PlanNode process(PlanNode planNode) {
+    Plan.PlanNode.Builder builder = Plan.PlanNode.newBuilder().setStageId(planNode.getStageId())
+        .setDataSchema(convertDataSchema(planNode.getDataSchema()))
+        .setNodeHint(convertNodeHint(planNode.getNodeHint()));
     planNode.visit(SerializationVisitor.INSTANCE, builder);
-    planNode.getInputs().forEach(input -> builder.addInputs(process((AbstractPlanNode) input)));
-
+    planNode.getInputs().forEach(input -> builder.addInputs(process(input)));
     return builder.build();
   }
 
-  private static class SerializationVisitor implements PlanNodeVisitor<Void, Plan.StageNode.Builder> {
+  private static Plan.DataSchema convertDataSchema(DataSchema dataSchema) {
+    Plan.DataSchema.Builder dataSchemaBuilder = Plan.DataSchema.newBuilder();
+    String[] columnNames = dataSchema.getColumnNames();
+    ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
+    int numColumns = columnNames.length;
+    for (int i = 0; i < numColumns; i++) {
+      dataSchemaBuilder.addColumnNames(columnNames[i]);
+      dataSchemaBuilder.addColumnDataTypes(RexExpressionToProtoExpression.convertColumnDataType(columnDataTypes[i]));
+    }
+    return dataSchemaBuilder.build();
+  }
+
+  private static Plan.NodeHint convertNodeHint(NodeHint nodeHint) {
+    Plan.NodeHint.Builder nodeHintBuilder = Plan.NodeHint.newBuilder();
+    for (Map.Entry<String, Map<String, String>> entry : nodeHint.getHintOptions().entrySet()) {
+      Plan.StrStrMap.Builder strStrMapBuilder = Plan.StrStrMap.newBuilder();
+      strStrMapBuilder.putAllOptions(entry.getValue());
+      nodeHintBuilder.putHintOptions(entry.getKey(), strStrMapBuilder.build());
+    }
+    return nodeHintBuilder.build();
+  }
+
+  private static class SerializationVisitor implements PlanNodeVisitor<Void, Plan.PlanNode.Builder> {
     public static final SerializationVisitor INSTANCE = new SerializationVisitor();
 
     private SerializationVisitor() {
     }
 
     @Override
-    public Void visitAggregate(AggregateNode node, Plan.StageNode.Builder builder) {
-      Plan.AggregateNode.Builder aggregateNodeBuilder =
-          Plan.AggregateNode.newBuilder().setNodeHint(getNodeHintBuilder(node.getNodeHint()))
-              .setAggCalls(convertExpressions(node.getAggCalls())).addAllFilterArgIndices(node.getFilterArgIndices())
-              .setGroupSet(convertExpressions(node.getGroupSet())).setAggType(convertAggType(node.getAggType()));
-
-      builder.setAggregateNode(aggregateNodeBuilder);
+    public Void visitAggregate(AggregateNode node, Plan.PlanNode.Builder builder) {
+      Plan.AggregateNode aggregateNode =
+          Plan.AggregateNode.newBuilder().addAllAggCalls(convertFunctionCalls(node.getAggCalls()))
+              .addAllFilterArgs(node.getFilterArgs()).addAllGroupKeys(node.getGroupKeys())
+              .setAggType(convertAggType(node.getAggType())).build();
+      builder.setAggregateNode(aggregateNode);
       return null;
     }
 
     @Override
-    public Void visitFilter(FilterNode node, Plan.StageNode.Builder builder) {
-      Expressions.RexExpression condition = RexExpressionToProtoExpression.process(node.getCondition());
-      Plan.FilterNode.Builder filterNodeBuilder = Plan.FilterNode.newBuilder().setCondition(condition);
-      builder.setFilterNode(filterNodeBuilder);
-
+    public Void visitFilter(FilterNode node, Plan.PlanNode.Builder builder) {
+      Plan.FilterNode filterNode = Plan.FilterNode.newBuilder()
+          .setCondition(RexExpressionToProtoExpression.convertExpression(node.getCondition())).build();
+      builder.setFilterNode(filterNode);
       return null;
     }
 
     @Override
-    public Void visitJoin(JoinNode node, Plan.StageNode.Builder builder) {
-      Plan.JoinKeys.Builder joinKeyBuilder = Plan.JoinKeys.newBuilder().addAllLeftKeys(node.getJoinKeys().getLeftKeys())
-          .addAllRightKeys(node.getJoinKeys().getRightKeys());
-
-      Plan.JoinNode.Builder joinNodeBuilder =
-          Plan.JoinNode.newBuilder().setJoinRelType(convertJoinRelType(node.getJoinRelType()))
-              .setJoinKeys(joinKeyBuilder).setJoinClause(convertExpressions(node.getJoinClauses()))
-              .setJoinHints(getNodeHintBuilder(node.getJoinHints())).addAllLeftColumnNames(node.getLeftColumnNames())
-              .addAllRightColumnNames(node.getRightColumnNames());
-
-      builder.setJoinNode(joinNodeBuilder);
-
+    public Void visitJoin(JoinNode node, Plan.PlanNode.Builder builder) {
+      Plan.JoinNode joinNode =
+          Plan.JoinNode.newBuilder().setJoinType(convertJoinType(node.getJoinType())).addAllLeftKeys(node.getLeftKeys())
+              .addAllRightKeys(node.getRightKeys())
+              .addAllNonEquiConditions(convertExpressions(node.getNonEquiConditions())).build();
+      builder.setJoinNode(joinNode);
       return null;
     }
 
     @Override
-    public Void visitMailboxReceive(MailboxReceiveNode node, Plan.StageNode.Builder builder) {
-      Plan.MailboxReceiveNode.Builder receiveNodeBuilder =
+    public Void visitMailboxReceive(MailboxReceiveNode node, Plan.PlanNode.Builder builder) {
+      Plan.MailboxReceiveNode mailboxReceiveNode =
           Plan.MailboxReceiveNode.newBuilder().setSenderStageId(node.getSenderStageId())
-              .setDistributionType(convertDistributionType(node.getDistributionType()))
-              .setExchangeType(convertExchangeType(node.getExchangeType())).addAllCollationKeys(
-                  node.getCollationKeys().stream().map((e) -> ((RexExpression.InputRef) e).getIndex())
-                      .collect(Collectors.toList()))
-              .setCollationDirections(convertDirectionsList(node.getCollationDirections()))
-              .setCollationNullDirections(convertNullDirectionsList(node.getCollationNullDirections()))
-              .setSortOnSender(node.isSortOnSender()).setSortOnReceiver(node.isSortOnReceiver())
-              .setSender(process(node.getSender()));
-      if (node.getDistributionKeys() != null) {
-        receiveNodeBuilder.setDistributionKeys(
-            Plan.DistributionKeyList.newBuilder().addAllItem(node.getDistributionKeys()).build());
-      }
-      builder.setReceiveNode(receiveNodeBuilder);
-
+              .setExchangeType(convertExchangeType(node.getExchangeType()))
+              .setDistributionType(convertDistributionType(node.getDistributionType())).addAllKeys(node.getKeys())
+              .addAllCollations(convertCollations(node.getCollations())).setSort(node.isSort())
+              .setSortedOnSender(node.isSortedOnSender()).build();
+      builder.setMailboxReceiveNode(mailboxReceiveNode);
       return null;
     }
 
     @Override
-    public Void visitMailboxSend(MailboxSendNode node, Plan.StageNode.Builder builder) {
-      Plan.MailboxSendNode.Builder sendNodeBuilder =
+    public Void visitMailboxSend(MailboxSendNode node, Plan.PlanNode.Builder builder) {
+      Plan.MailboxSendNode mailboxSendNode =
           Plan.MailboxSendNode.newBuilder().setReceiverStageId(node.getReceiverStageId())
               .setExchangeType(convertExchangeType(node.getExchangeType()))
-              .setDistributionType(convertDistributionType(node.getDistributionType())).addAllCollationKeys(
-                  node.getCollationKeys().stream().map((e) -> ((RexExpression.InputRef) e).getIndex())
-                      .collect(Collectors.toList()))
-              .setCollationDirections(convertDirectionsList(node.getCollationDirections()))
-              .setSortOnSender(node.isSortOnSender()).setPrePartitioned(node.isPrePartitioned());
-      if (node.getDistributionKeys() != null) {
-        sendNodeBuilder.setDistributionKeys(
-            Plan.DistributionKeyList.newBuilder().addAllItem(node.getDistributionKeys()).build());
-      }
-
-      builder.setSendNode(sendNodeBuilder);
+              .setDistributionType(convertDistributionType(node.getDistributionType())).addAllKeys(node.getKeys())
+              .setPrePartitioned(node.isPrePartitioned()).addAllCollations(convertCollations(node.getCollations()))
+              .setSort(node.isSort()).build();
+      builder.setMailboxSendNode(mailboxSendNode);
       return null;
     }
 
     @Override
-    public Void visitProject(ProjectNode node, Plan.StageNode.Builder builder) {
-      Plan.ProjectNode.Builder projectNodeBuilder =
-          Plan.ProjectNode.newBuilder().setProjects(convertExpressions(node.getProjects()));
-      builder.setProjectNode(projectNodeBuilder);
-
+    public Void visitProject(ProjectNode node, Plan.PlanNode.Builder builder) {
+      Plan.ProjectNode projectNode =
+          Plan.ProjectNode.newBuilder().addAllProjects(convertExpressions(node.getProjects())).build();
+      builder.setProjectNode(projectNode);
       return null;
     }
 
     @Override
-    public Void visitSort(SortNode node, Plan.StageNode.Builder builder) {
-      Plan.SortNode.Builder sortNodeBuilder =
-          Plan.SortNode.newBuilder().setCollationKeys(convertExpressions(node.getCollationKeys()))
-              .setCollationDirections(convertDirectionsList(node.getCollationDirections()))
-              .setCollationNullDirections(convertNullDirectionsList(node.getCollationNullDirections()))
-              .setFetch(node.getFetch()).setOffset(node.getOffset());
-
-      builder.setSortNode(sortNodeBuilder);
-
+    public Void visitSetOp(SetOpNode node, Plan.PlanNode.Builder builder) {
+      Plan.SetOpNode setOpNode =
+          Plan.SetOpNode.newBuilder().setSetOpType(convertSetOpType(node.getSetOpType())).setAll(node.isAll()).build();
+      builder.setSetOpNode(setOpNode);
       return null;
     }
 
     @Override
-    public Void visitTableScan(TableScanNode node, Plan.StageNode.Builder builder) {
-      Plan.TableScanNode.Builder tableScanNodeBuilder =
-          Plan.TableScanNode.newBuilder().setTableName(node.getTableName())
-              .addAllTableScanColumns(node.getTableScanColumns()).setNodeHint(getNodeHintBuilder(node.getNodeHint()));
-      builder.setTableScanNode(tableScanNodeBuilder);
-
+    public Void visitSort(SortNode node, Plan.PlanNode.Builder builder) {
+      Plan.SortNode sortNode =
+          Plan.SortNode.newBuilder().addAllCollations(convertCollations(node.getCollations())).setFetch(node.getFetch())
+              .setOffset(node.getOffset()).build();
+      builder.setSortNode(sortNode);
       return null;
     }
 
     @Override
-    public Void visitValue(ValueNode node, Plan.StageNode.Builder builder) {
-      Plan.ValueNode.Builder valueNodeBuilder = Plan.ValueNode.newBuilder();
-      for (List<RexExpression> row : node.getLiteralRows()) {
-        Plan.RexExpressionList.Builder exprBuilder = Plan.RexExpressionList.newBuilder();
-        List<Expressions.RexExpression> expressions =
-            row.stream().map(RexExpressionToProtoExpression::process).collect(Collectors.toList());
-        exprBuilder.addAllItem(expressions);
-        valueNodeBuilder.addRows(exprBuilder);
-      }
-      builder.setValueNode(valueNodeBuilder);
-
+    public Void visitTableScan(TableScanNode node, Plan.PlanNode.Builder builder) {
+      Plan.TableScanNode tableScanNode =
+          Plan.TableScanNode.newBuilder().setTableName(node.getTableName()).addAllColumns(node.getColumns()).build();
+      builder.setTableScanNode(tableScanNode);
       return null;
     }
 
     @Override
-    public Void visitWindow(WindowNode node, Plan.StageNode.Builder builder) {
-      List<Plan.Direction> orderSetDirection =
-          node.getOrderSetDirection().stream().map(SerializationVisitor::convertDirection).collect(Collectors.toList());
-      List<Plan.NullDirection> orderSetNullDirection =
-          node.getOrderSetNullDirection().stream().map(SerializationVisitor::convertNullDirection)
-              .collect(Collectors.toList());
-
-      Plan.WindowNode.Builder windowNodeBuilder =
-          Plan.WindowNode.newBuilder().setGroupSet(convertExpressions(node.getGroupSet()))
-              .setOrderSet(convertExpressions(node.getOrderSet())).addAllOrderSetDirection(orderSetDirection)
-              .addAllOrderSetNullDirection(orderSetNullDirection).setAggCalls(convertExpressions(node.getAggCalls()))
-              .setLowerBound(node.getLowerBound()).setUpperBound(node.getUpperBound())
-              .setConstants(convertExpressions(node.getConstants()))
-              .setWindowFrameType(convertWindowFrameType(node.getWindowFrameType()));
-
-      builder.setWindowNode(windowNodeBuilder);
-
+    public Void visitValue(ValueNode node, Plan.PlanNode.Builder builder) {
+      Plan.ValueNode valueNode =
+          Plan.ValueNode.newBuilder().addAllLiteralRows(convertLiteralRows(node.getLiteralRows())).build();
+      builder.setValueNode(valueNode);
       return null;
     }
 
     @Override
-    public Void visitSetOp(SetOpNode node, Plan.StageNode.Builder builder) {
-      Plan.SetOpNode.Builder setOpBuilder =
-          Plan.SetOpNode.newBuilder().setSetOpType(convertSetOpType(node.getSetOpType())).setAll(node.isAll());
-      builder.setSetNode(setOpBuilder);
-
+    public Void visitWindow(WindowNode node, Plan.PlanNode.Builder builder) {
+      Plan.WindowNode windowNode = Plan.WindowNode.newBuilder().addAllAggCalls(convertFunctionCalls(node.getAggCalls()))
+          .addAllKeys(node.getKeys()).addAllCollations(convertCollations(node.getCollations()))
+          .setWindowFrameType(convertWindowFrameType(node.getWindowFrameType())).setLowerBound(node.getLowerBound())
+          .setUpperBound(node.getUpperBound()).addAllConstants(convertLiterals(node.getConstants())).build();
+      builder.setWindowNode(windowNode);
       return null;
     }
 
     @Override
-    public Void visitExchange(ExchangeNode node, Plan.StageNode.Builder builder) {
-      Plan.ExchangeNode.Builder exchangeNodeBuilder =
-          Plan.ExchangeNode.newBuilder().setExchangeType(convertExchangeType(node.getExchangeType()))
-              .setDistributionType(convertDistributionType(node.getDistributionType()))
-              .addAllKeys(node.getDistributionKeys()).setIsSortOnSender(node.isSortOnSender())
-              .setIsSortOnReceiver(node.isSortOnReceiver()).setIsPrePartitioned(node.isPrePartitioned())
-              .addAllCollations(node.getCollations().stream().map(
-                  c -> Plan.RelFieldCollation.newBuilder().setFieldIndex(c.getFieldIndex())
-                      .setDirection(convertDirection(c.getDirection()))
-                      .setNullDirection(convertNullDirection(c.nullDirection)).build()).collect(Collectors.toList()))
-              .addAllTableNames(node.getTableNames());
-      builder.setExchangeNode(exchangeNodeBuilder);
-
-      return null;
+    public Void visitExchange(ExchangeNode exchangeNode, Plan.PlanNode.Builder context) {
+      throw new IllegalStateException("ExchangeNode should not be visited by SerializationVisitor");
     }
 
-    private static Plan.NodeHint.Builder getNodeHintBuilder(AbstractPlanNode.NodeHint nodeHint) {
-      Plan.NodeHint.Builder builder = Plan.NodeHint.newBuilder();
-      for (Map.Entry<String, Map<String, String>> entry : nodeHint._hintOptions.entrySet()) {
-        Plan.StrStrMap.Builder strMapBuilder = Plan.StrStrMap.newBuilder();
-        strMapBuilder.putAllOptions(entry.getValue());
-        builder.putHintOptions(entry.getKey(), strMapBuilder.build());
+    private static List<Expressions.Expression> convertExpressions(List<RexExpression> expressions) {
+      List<Expressions.Expression> protoExpressions = new ArrayList<>(expressions.size());
+      for (RexExpression expression : expressions) {
+        protoExpressions.add(RexExpressionToProtoExpression.convertExpression(expression));
       }
-      return builder;
+      return protoExpressions;
     }
 
-    private static Plan.RexExpressionList.Builder convertExpressions(List<RexExpression> expressions) {
-      return Plan.RexExpressionList.newBuilder()
-          .addAllItem(expressions.stream().map(RexExpressionToProtoExpression::process).collect(Collectors.toList()));
-    }
-
-    private static Plan.DirectionList.Builder convertDirectionsList(List<RelFieldCollation.Direction> directions) {
-      return Plan.DirectionList.newBuilder()
-          .addAllItem(directions.stream().map(SerializationVisitor::convertDirection).collect(Collectors.toList()));
-    }
-
-    private static Plan.NullDirectionList.Builder convertNullDirectionsList(
-        List<RelFieldCollation.NullDirection> nullDirections) {
-      return Plan.NullDirectionList.newBuilder().addAllItem(
-          nullDirections.stream().map(SerializationVisitor::convertNullDirection).collect(Collectors.toList()));
-    }
-
-    private static Plan.RelDistributionType convertDistributionType(RelDistribution.Type type) {
-      switch (type) {
-        case SINGLETON:
-          return Plan.RelDistributionType.SINGLETON;
-        case HASH_DISTRIBUTED:
-          return Plan.RelDistributionType.HASH_DISTRIBUTED;
-        case RANGE_DISTRIBUTED:
-          return Plan.RelDistributionType.RANGE_DISTRIBUTED;
-        case RANDOM_DISTRIBUTED:
-          return Plan.RelDistributionType.RANDOM_DISTRIBUTED;
-        case ROUND_ROBIN_DISTRIBUTED:
-          return Plan.RelDistributionType.ROUND_ROBIN_DISTRIBUTED;
-        case BROADCAST_DISTRIBUTED:
-          return Plan.RelDistributionType.BROADCAST_DISTRIBUTED;
-        case ANY:
-          return Plan.RelDistributionType.ANY;
-        default:
+    private static List<Expressions.FunctionCall> convertFunctionCalls(List<RexExpression.FunctionCall> functionCalls) {
+      List<Expressions.FunctionCall> protoFunctionCalls = new ArrayList<>(functionCalls.size());
+      for (RexExpression.FunctionCall functionCall : functionCalls) {
+        protoFunctionCalls.add(RexExpressionToProtoExpression.convertFunctionCall(functionCall));
       }
-      throw new RuntimeException(String.format("Unknown RelDistribution.Type %s", type));
+      return protoFunctionCalls;
     }
 
-    private static Plan.PinotRelExchangeType convertExchangeType(PinotRelExchangeType exchangeType) {
-      switch (exchangeType) {
-        case SUB_PLAN:
-          return Plan.PinotRelExchangeType.SUB_PLAN;
-        case STREAMING:
-          return Plan.PinotRelExchangeType.STREAMING;
-        case PIPELINE_BREAKER:
-          return Plan.PinotRelExchangeType.PIPELINE_BREAKER;
-        default:
+    private static List<Expressions.Literal> convertLiterals(List<RexExpression.Literal> literals) {
+      List<Expressions.Literal> protoLiterals = new ArrayList<>(literals.size());
+      for (RexExpression.Literal literal : literals) {
+        protoLiterals.add(RexExpressionToProtoExpression.convertLiteral(literal));
       }
-
-      throw new RuntimeException(String.format("Unknown PinotRelExchangeType %s", exchangeType));
+      return protoLiterals;
     }
 
-    private static Plan.Direction convertDirection(RelFieldCollation.Direction direction) {
-      switch (direction) {
-        case ASCENDING:
-          return Plan.Direction.ASCENDING;
-        case STRICTLY_ASCENDING:
-          return Plan.Direction.STRICTLY_ASCENDING;
-        case DESCENDING:
-          return Plan.Direction.DESCENDING;
-        case STRICTLY_DESCENDING:
-          return Plan.Direction.STRICTLY_DESCENDING;
-        case CLUSTERED:
-          return Plan.Direction.CLUSTERED;
-        default:
-      }
-      throw new RuntimeException(String.format("Unknown Direction %s", direction));
-    }
-
-    private static Plan.NullDirection convertNullDirection(RelFieldCollation.NullDirection nullDirection) {
-      switch (nullDirection) {
-        case FIRST:
-          return Plan.NullDirection.FIRST;
-        case LAST:
-          return Plan.NullDirection.LAST;
-        default:
-      }
-
-      return Plan.NullDirection.UNSPECIFIED;
-    }
-
-    private static Plan.SetOpType convertSetOpType(SetOpNode.SetOpType type) {
-      switch (type) {
-        case INTERSECT:
-          return Plan.SetOpType.INTERSECT;
-        case UNION:
-          return Plan.SetOpType.UNION;
-        case MINUS:
-          return Plan.SetOpType.MINUS;
-        default:
-      }
-      throw new RuntimeException(String.format("Unknown SetOpType %s", type));
-    }
-
-    private static Plan.WindowFrameType convertWindowFrameType(WindowNode.WindowFrameType windowFrameType) {
-      switch (windowFrameType) {
-        case ROWS:
-          return Plan.WindowFrameType.ROWS;
-        case RANGE:
-          return Plan.WindowFrameType.RANGE;
-        default:
-      }
-
-      throw new RuntimeException(String.format("Unknown WindowFrameType %s", windowFrameType));
-    }
-
-    private static Plan.AggType convertAggType(AggregateNode.AggType type) {
-      switch (type) {
+    private static Plan.AggType convertAggType(AggregateNode.AggType aggType) {
+      switch (aggType) {
         case DIRECT:
           return Plan.AggType.DIRECT;
         case LEAF:
@@ -366,27 +231,136 @@ public class PlanNodeSerializer {
         case FINAL:
           return Plan.AggType.FINAL;
         default:
+          throw new IllegalStateException("Unsupported AggType: " + aggType);
       }
-      throw new RuntimeException(String.format("Unknown AggType %s", type));
     }
 
-    private static Plan.JoinRelType convertJoinRelType(JoinRelType joinRelType) {
-      switch (joinRelType) {
-        case ANTI:
-          return Plan.JoinRelType.ANTI;
-        case FULL:
-          return Plan.JoinRelType.FULL;
-        case LEFT:
-          return Plan.JoinRelType.LEFT;
-        case SEMI:
-          return Plan.JoinRelType.SEMI;
+    private static Plan.JoinType convertJoinType(JoinRelType joinType) {
+      switch (joinType) {
         case INNER:
-          return Plan.JoinRelType.INNER;
+          return Plan.JoinType.INNER;
+        case LEFT:
+          return Plan.JoinType.LEFT;
         case RIGHT:
-          return Plan.JoinRelType.RIGHT;
+          return Plan.JoinType.RIGHT;
+        case FULL:
+          return Plan.JoinType.FULL;
+        case SEMI:
+          return Plan.JoinType.SEMI;
+        case ANTI:
+          return Plan.JoinType.ANTI;
         default:
+          throw new IllegalStateException("Unsupported JoinRelType: " + joinType);
       }
-      throw new RuntimeException(String.format("Unknown JoinRelType %s", joinRelType));
+    }
+
+    private static Plan.ExchangeType convertExchangeType(PinotRelExchangeType exchangeType) {
+      switch (exchangeType) {
+        case STREAMING:
+          return Plan.ExchangeType.STREAMING;
+        case SUB_PLAN:
+          return Plan.ExchangeType.SUB_PLAN;
+        case PIPELINE_BREAKER:
+          return Plan.ExchangeType.PIPELINE_BREAKER;
+        default:
+          throw new IllegalStateException("Unsupported PinotRelExchangeType: " + exchangeType);
+      }
+    }
+
+    private static Plan.DistributionType convertDistributionType(RelDistribution.Type distributionType) {
+      switch (distributionType) {
+        case SINGLETON:
+          return Plan.DistributionType.SINGLETON;
+        case HASH_DISTRIBUTED:
+          return Plan.DistributionType.HASH_DISTRIBUTED;
+        case RANGE_DISTRIBUTED:
+          return Plan.DistributionType.RANGE_DISTRIBUTED;
+        case RANDOM_DISTRIBUTED:
+          return Plan.DistributionType.RANDOM_DISTRIBUTED;
+        case ROUND_ROBIN_DISTRIBUTED:
+          return Plan.DistributionType.ROUND_ROBIN_DISTRIBUTED;
+        case BROADCAST_DISTRIBUTED:
+          return Plan.DistributionType.BROADCAST_DISTRIBUTED;
+        case ANY:
+          return Plan.DistributionType.ANY;
+        default:
+          throw new IllegalStateException("Unsupported RelDistribution.Type: " + distributionType);
+      }
+    }
+
+    private static Plan.Direction convertDirection(RelFieldCollation.Direction direction) {
+      switch (direction) {
+        case ASCENDING:
+          return Plan.Direction.ASCENDING;
+        case DESCENDING:
+          return Plan.Direction.DESCENDING;
+        // TODO: Currently we only support ASCENDING and DESCENDING.
+        default:
+          throw new IllegalStateException("Unsupported RelFieldCollation.Direction: " + direction);
+      }
+    }
+
+    private static Plan.NullDirection convertNullDirection(RelFieldCollation.NullDirection nullDirection) {
+      switch (nullDirection) {
+        case FIRST:
+          return Plan.NullDirection.FIRST;
+        case LAST:
+          return Plan.NullDirection.LAST;
+        case UNSPECIFIED:
+          return Plan.NullDirection.UNSPECIFIED;
+        default:
+          throw new IllegalStateException("Unsupported RelFieldCollation.NullDirection: " + nullDirection);
+      }
+    }
+
+    private static List<Plan.Collation> convertCollations(List<RelFieldCollation> collations) {
+      List<Plan.Collation> protoCollations = new ArrayList<>(collations.size());
+      for (RelFieldCollation collation : collations) {
+        protoCollations.add(Plan.Collation.newBuilder().setIndex(collation.getFieldIndex())
+            .setDirection(convertDirection(collation.direction))
+            .setNullDirection(convertNullDirection(collation.nullDirection)).build());
+      }
+      return protoCollations;
+    }
+
+    private static Plan.SetOpType convertSetOpType(SetOpNode.SetOpType setOpType) {
+      switch (setOpType) {
+        case UNION:
+          return Plan.SetOpType.UNION;
+        case INTERSECT:
+          return Plan.SetOpType.INTERSECT;
+        case MINUS:
+          return Plan.SetOpType.MINUS;
+        default:
+          throw new IllegalStateException("Unsupported SetOpType: " + setOpType);
+      }
+    }
+
+    private static Plan.LiteralRow convertLiteralRow(List<RexExpression.Literal> literalRow) {
+      List<Expressions.Literal> values = new ArrayList<>(literalRow.size());
+      for (RexExpression.Literal literal : literalRow) {
+        values.add(RexExpressionToProtoExpression.convertLiteral(literal));
+      }
+      return Plan.LiteralRow.newBuilder().addAllValues(values).build();
+    }
+
+    private static List<Plan.LiteralRow> convertLiteralRows(List<List<RexExpression.Literal>> literalRows) {
+      List<Plan.LiteralRow> protoLiteralRows = new ArrayList<>(literalRows.size());
+      for (List<RexExpression.Literal> literalRow : literalRows) {
+        protoLiteralRows.add(convertLiteralRow(literalRow));
+      }
+      return protoLiteralRows;
+    }
+
+    private static Plan.WindowFrameType convertWindowFrameType(WindowNode.WindowFrameType windowFrameType) {
+      switch (windowFrameType) {
+        case ROWS:
+          return Plan.WindowFrameType.ROWS;
+        case RANGE:
+          return Plan.WindowFrameType.RANGE;
+        default:
+          throw new IllegalStateException("Unsupported WindowFrameType: " + windowFrameType);
+      }
     }
   }
 }

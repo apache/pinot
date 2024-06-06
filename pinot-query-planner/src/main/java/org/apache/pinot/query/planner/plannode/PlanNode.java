@@ -18,34 +18,83 @@
  */
 package org.apache.pinot.query.planner.plannode;
 
-import java.io.Serializable;
+import com.google.common.collect.Maps;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.hint.RelHint;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.query.planner.serde.PlanNodeDeserializer;
+import org.apache.pinot.query.planner.serde.PlanNodeSerializer;
 
 
 /**
- * PlanNode is a serializable version of the {@link org.apache.calcite.rel.RelNode}.
- *
- * TODO: PlanNode currently uses java.io.Serializable as its serialization format.
- * We should experiment with other type of serialization format for better performance.
- * Essentially what we need is a way to exclude the planner context from the RelNode but only keeps the
- * constructed relational content because we will no longer revisit the planner after PlanFragment is created.
+ * PlanNode is a serializable version of the {@link RelNode}. See {@link PlanNodeSerializer} and
+ * {@link PlanNodeDeserializer} for details.
  */
-public interface PlanNode extends Serializable {
+public interface PlanNode {
 
-  int getPlanFragmentId();
+  int getStageId();
 
-  void setPlanFragmentId(int planFragmentId);
-
-  List<PlanNode> getInputs();
-
-  void addInput(PlanNode planNode);
+  // NOTE: Stage ID is not determined when the plan node is created, so we need a setter.
+  void setStageId(int stageId);
 
   DataSchema getDataSchema();
 
-  void setDataSchema(DataSchema dataSchema);
+  NodeHint getNodeHint();
+
+  List<PlanNode> getInputs();
 
   String explain();
 
   <T, C> T visit(PlanNodeVisitor<T, C> visitor, C context);
+
+  class NodeHint {
+    public static final NodeHint EMPTY = new NodeHint(Map.of());
+
+    private final Map<String, Map<String, String>> _hintOptions;
+
+    public NodeHint(Map<String, Map<String, String>> hintOptions) {
+      _hintOptions = hintOptions;
+    }
+
+    public static NodeHint fromRelHints(List<RelHint> relHints) {
+      int numHints = relHints.size();
+      Map<String, Map<String, String>> hintOptions;
+      if (numHints == 0) {
+        hintOptions = Map.of();
+      } else if (numHints == 1) {
+        RelHint relHint = relHints.get(0);
+        hintOptions = Map.of(relHint.hintName, relHint.kvOptions);
+      } else {
+        hintOptions = Maps.newHashMapWithExpectedSize(numHints);
+        for (RelHint relHint : relHints) {
+          hintOptions.put(relHint.hintName, relHint.kvOptions);
+        }
+      }
+      return new NodeHint(hintOptions);
+    }
+
+    public Map<String, Map<String, String>> getHintOptions() {
+      return _hintOptions;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (!(o instanceof NodeHint)) {
+        return false;
+      }
+      NodeHint nodeHint = (NodeHint) o;
+      return Objects.equals(_hintOptions, nodeHint._hintOptions);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(_hintOptions);
+    }
+  }
 }

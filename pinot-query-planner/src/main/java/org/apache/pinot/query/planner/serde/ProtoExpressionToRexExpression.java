@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.query.planner.serde;
 
+import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 import org.apache.commons.lang3.SerializationUtils;
 import org.apache.pinot.common.proto.Expressions;
 import org.apache.pinot.common.utils.DataSchema;
@@ -34,38 +34,38 @@ public class ProtoExpressionToRexExpression {
   private ProtoExpressionToRexExpression() {
   }
 
-  public static RexExpression process(Expressions.RexExpression expression) {
+  public static RexExpression convertExpression(Expressions.Expression expression) {
     switch (expression.getExpressionCase()) {
       case INPUTREF:
-        return deserializeInputRef(expression.getInputRef());
+        return convertInputRef(expression.getInputRef());
       case LITERAL:
-        return deserializeLiteral(expression.getLiteral());
+        return convertLiteral(expression.getLiteral());
       case FUNCTIONCALL:
-        return deserializeFunctionCall(expression.getFunctionCall());
+        return convertFunctionCall(expression.getFunctionCall());
       default:
+        throw new IllegalStateException("Unsupported proto Expression type: " + expression.getExpressionCase());
     }
-
-    throw new RuntimeException(String.format("Unknown Type Expression Type: %s", expression.getExpressionCase()));
   }
 
-  private static RexExpression deserializeInputRef(Expressions.InputRef inputRef) {
+  public static RexExpression.InputRef convertInputRef(Expressions.InputRef inputRef) {
     return new RexExpression.InputRef(inputRef.getIndex());
   }
 
-  private static RexExpression deserializeFunctionCall(Expressions.FunctionCall functionCall) {
-    List<RexExpression> functionOperands =
-        functionCall.getFunctionOperandsList().stream().map(ProtoExpressionToRexExpression::process)
-            .collect(Collectors.toList());
+  public static RexExpression.FunctionCall convertFunctionCall(Expressions.FunctionCall functionCall) {
+    List<Expressions.Expression> protoOperands = functionCall.getFunctionOperandsList();
+    List<RexExpression> operands = new ArrayList<>(protoOperands.size());
+    for (Expressions.Expression protoOperand : protoOperands) {
+      operands.add(convertExpression(protoOperand));
+    }
     return new RexExpression.FunctionCall(convertColumnDataType(functionCall.getDataType()),
-        functionCall.getFunctionName(), functionOperands, functionCall.getIsDistinct());
+        functionCall.getFunctionName(), operands, functionCall.getIsDistinct());
   }
 
-  private static RexExpression deserializeLiteral(Expressions.Literal literal) {
+  public static RexExpression.Literal convertLiteral(Expressions.Literal literal) {
     DataSchema.ColumnDataType dataType = convertColumnDataType(literal.getDataType());
     if (literal.getIsValueNull()) {
       return new RexExpression.Literal(dataType, null);
     }
-
     Object obj;
     switch (literal.getLiteralFieldCase()) {
       case BOOLFIELD:
@@ -93,9 +93,7 @@ public class ProtoExpressionToRexExpression {
         obj = SerializationUtils.deserialize(literal.getSerializedField().toByteArray());
         break;
       default:
-        throw new RuntimeException(
-            String.format("Literal of type %s not supported. Serialization Type: %s", literal.getDataType(),
-                literal.getLiteralFieldCase()));
+        throw new IllegalStateException("Unsupported proto Literal type: " + literal.getLiteralFieldCase());
     }
     return new RexExpression.Literal(dataType, obj);
   }
@@ -140,8 +138,10 @@ public class ProtoExpressionToRexExpression {
         return DataSchema.ColumnDataType.BYTES_ARRAY;
       case OBJECT:
         return DataSchema.ColumnDataType.OBJECT;
-      default:
+      case UNKNOWN:
         return DataSchema.ColumnDataType.UNKNOWN;
+      default:
+        throw new IllegalStateException("Unsupported proto ColumnDataType: " + dataType);
     }
   }
 }

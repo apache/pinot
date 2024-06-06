@@ -22,8 +22,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.calcite.runtime.ImmutablePairList;
+import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.query.planner.SubPlanMetadata;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
@@ -54,10 +54,10 @@ public class SubPlanFragmenter implements PlanNodeVisitor<PlanNode, SubPlanFragm
   public static final SubPlanFragmenter INSTANCE = new SubPlanFragmenter();
 
   private PlanNode process(PlanNode node, Context context) {
-    node.setPlanFragmentId(context._currentSubPlanId);
+    node.setStageId(context._currentSubPlanId);
     List<PlanNode> inputs = node.getInputs();
     for (int i = 0; i < inputs.size(); i++) {
-      context._previousSubPlanId = node.getPlanFragmentId();
+      context._previousSubPlanId = node.getStageId();
       inputs.set(i, inputs.get(i).visit(this, context));
     }
     return node;

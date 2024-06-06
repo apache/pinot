@@ -19,21 +19,19 @@
 package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Function;
 import java.util.stream.Collectors;
-import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
-import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.SendingMailbox;
-import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.physical.MailboxIdUtils;
+import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.routing.MailboxInfo;
 import org.apache.pinot.query.routing.RoutingInfo;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
@@ -59,39 +57,29 @@ public class MailboxSendOperator extends MultiStageOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(MailboxSendOperator.class);
   private static final String EXPLAIN_NAME = "MAILBOX_SEND";
 
-  private final MultiStageOperator _sourceOperator;
+  private final MultiStageOperator _input;
   private final BlockExchange _exchange;
-  private final List<RexExpression> _collationKeys;
-  private final List<RelFieldCollation.Direction> _collationDirections;
-  private final boolean _isSortOnSender;
   private final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
 
-  public MailboxSendOperator(OpChainExecutionContext context, MultiStageOperator sourceOperator,
-      RelDistribution.Type distributionType, @Nullable List<Integer> distributionKeys,
-      @Nullable List<RexExpression> collationKeys, @Nullable List<RelFieldCollation.Direction> collationDirections,
-      boolean isSortOnSender, int receiverStageId) {
-    this(context, sourceOperator,
-        statMap -> getBlockExchange(context, distributionType, distributionKeys, receiverStageId, statMap),
-        collationKeys, collationDirections, isSortOnSender);
+  // TODO: Support sort on sender
+  public MailboxSendOperator(OpChainExecutionContext context, MultiStageOperator input, MailboxSendNode node) {
+    this(context, input,
+        statMap -> getBlockExchange(context, node.getReceiverStageId(), node.getDistributionType(), node.getKeys(),
+            statMap));
     _statMap.merge(StatKey.STAGE, context.getStageId());
     _statMap.merge(StatKey.PARALLELISM, 1);
   }
 
   @VisibleForTesting
-  MailboxSendOperator(OpChainExecutionContext context, MultiStageOperator sourceOperator,
-      Function<StatMap<StatKey>, BlockExchange> exchangeFactory,
-      @Nullable List<RexExpression> collationKeys, @Nullable List<RelFieldCollation.Direction> collationDirections,
-      boolean isSortOnSender) {
+  MailboxSendOperator(OpChainExecutionContext context, MultiStageOperator input,
+      Function<StatMap<StatKey>, BlockExchange> exchangeFactory) {
     super(context);
-    _sourceOperator = sourceOperator;
+    _input = input;
     _exchange = exchangeFactory.apply(_statMap);
-    _collationKeys = collationKeys;
-    _collationDirections = collationDirections;
-    _isSortOnSender = isSortOnSender;
   }
 
-  private static BlockExchange getBlockExchange(OpChainExecutionContext context, RelDistribution.Type distributionType,
-      @Nullable List<Integer> distributionKeys, int receiverStageId, StatMap<StatKey> statMap) {
+  private static BlockExchange getBlockExchange(OpChainExecutionContext context, int receiverStageId,
+      RelDistribution.Type distributionType, List<Integer> keys, StatMap<StatKey> statMap) {
     Preconditions.checkState(SUPPORTED_EXCHANGE_TYPES.contains(distributionType), "Unsupported distribution type: %s",
         distributionType);
     MailboxService mailboxService = context.getMailboxService();
@@ -107,8 +95,7 @@ public class MailboxSendOperator extends MultiStageOperator {
         .map(v -> mailboxService.getSendingMailbox(v.getHostname(), v.getPort(), v.getMailboxId(), deadlineMs, statMap))
         .collect(Collectors.toList());
     statMap.merge(StatKey.FAN_OUT, sendingMailboxes.size());
-    return BlockExchange.getExchange(sendingMailboxes, distributionType, distributionKeys,
-        TransferableBlockUtils::splitBlock);
+    return BlockExchange.getExchange(sendingMailboxes, distributionType, keys, TransferableBlockUtils::splitBlock);
   }
 
   @Override
@@ -129,10 +116,9 @@ public class MailboxSendOperator extends MultiStageOperator {
 
   @Override
   public List<MultiStageOperator> getChildOperators() {
-    return Collections.singletonList(_sourceOperator);
+    return Collections.singletonList(_input);
   }
 
-  @Nullable
   @Override
   public String toExplainString() {
     return EXPLAIN_NAME;
@@ -141,7 +127,7 @@ public class MailboxSendOperator extends MultiStageOperator {
   @Override
   protected TransferableBlock getNextBlock() {
     try {
-      TransferableBlock block = _sourceOperator.nextBlock();
+      TransferableBlock block = _input.nextBlock();
       if (block.isSuccessfulEndOfStreamBlock()) {
         updateEosBlock(block, _statMap);
         // no need to check early terminate signal b/c the current block is already EOS
@@ -197,6 +183,7 @@ public class MailboxSendOperator extends MultiStageOperator {
   }
 
   public enum StatKey implements StatMap.Key {
+    //@formatter:off
     EXECUTION_TIME_MS(StatMap.Type.LONG) {
       @Override
       public boolean includeDefaultInJson() {
@@ -266,7 +253,9 @@ public class MailboxSendOperator extends MultiStageOperator {
       public boolean includeDefaultInJson() {
         return true;
       }
-    },;
+    };
+    //@formatter:on
+
     private final StatMap.Type _type;
 
     StatKey(StatMap.Type type) {
