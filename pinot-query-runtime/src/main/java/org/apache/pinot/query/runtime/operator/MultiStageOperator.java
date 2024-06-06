@@ -215,7 +215,7 @@ public abstract class MultiStageOperator
         if (maxRowsInJoinReached) {
           serverMetrics.addMeteredGlobalValue(ServerMeter.HASH_JOIN_TIMES_MAX_ROWS_REACHED, 1);
         }
-        serverMetrics.addTimedValue(ServerTimer.HASH_JOIN_CPU_TIME_BUILDING_HASH_TABLE_MS,
+        serverMetrics.addTimedValue(ServerTimer.HASH_JOIN_BUILD_TABLE_CPU_TIME_MS,
             stats.getLong(HashJoinOperator.StatKey.TIME_BUILDING_HASH_TABLE_MS), TimeUnit.MILLISECONDS);
       }
     },
@@ -271,9 +271,9 @@ public abstract class MultiStageOperator
 
         serverMetrics.addTimedValue(ServerTimer.MULTI_STAGE_DESERIALIZATION_CPU_TIME_MS,
             stats.getLong(BaseMailboxReceiveOperator.StatKey.DESERIALIZATION_TIME_MS), TimeUnit.MILLISECONDS);
-        serverMetrics.addTimedValue(ServerTimer.RECEIVE_DOWNSTREAM_CPU_TIME_MS,
+        serverMetrics.addTimedValue(ServerTimer.RECEIVE_DOWNSTREAM_WAIT_CPU_TIME_MS,
             stats.getLong(BaseMailboxReceiveOperator.StatKey.DOWNSTREAM_WAIT_MS), TimeUnit.MILLISECONDS);
-        serverMetrics.addTimedValue(ServerTimer.RECEIVE_UPSTREAM_CPU_WAIT_MS,
+        serverMetrics.addTimedValue(ServerTimer.RECEIVE_UPSTREAM_WAIT_CPU_TIME_MS,
             stats.getLong(BaseMailboxReceiveOperator.StatKey.UPSTREAM_WAIT_MS), TimeUnit.MILLISECONDS);
       }
     },
@@ -348,7 +348,7 @@ public abstract class MultiStageOperator
         @SuppressWarnings("unchecked")
         StatMap<WindowAggregateOperator.StatKey> stats = (StatMap<WindowAggregateOperator.StatKey>) map;
         if (stats.getBoolean(WindowAggregateOperator.StatKey.MAX_ROWS_IN_WINDOW_REACHED)) {
-          serverMetrics.addMeteredGlobalValue(ServerMeter.MAX_ROWS_IN_WINDOW_REACHED, 1);
+          serverMetrics.addMeteredGlobalValue(ServerMeter.WINDOW_TIMES_MAX_ROWS_REACHED, 1);
         }
       }
     },;
