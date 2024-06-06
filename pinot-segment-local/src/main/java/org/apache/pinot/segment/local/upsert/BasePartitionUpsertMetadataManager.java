@@ -104,6 +104,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   // Tracks all the segments managed by this manager (excluding EmptySegment)
   protected final Set<IndexSegment> _trackedSegments = ConcurrentHashMap.newKeySet();
   // This is to track all the segments where changes took place post last snapshot
+  // Note: we need not take any _snapshotLock while updating this set as it is only updated by the upsert thread
   protected final Set<IndexSegment> _updatedSegmentsSinceLastSnapshot = ConcurrentHashMap.newKeySet();
 
   // NOTE: We do not persist snapshot on the first consuming segment because most segments might not be loaded yet
@@ -1073,10 +1074,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       doRemoveDocId(oldSegment, oldDocId);
       doAddDocId(validDocIds, queryableDocIds, newDocId, recordInfo);
     } finally {
-      if (_enableSnapshot) {
-        _updatedSegmentsSinceLastSnapshot.add(newSegment);
-        _updatedSegmentsSinceLastSnapshot.add(oldSegment);
-      }
       if (_consistencyMode == UpsertConfig.ConsistencyMode.SYNC) {
         _upsertViewLock.writeLock().unlock();
       } else if (_consistencyMode == UpsertConfig.ConsistencyMode.SNAPSHOT) {
@@ -1087,6 +1084,10 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         // can refresh the bitmaps. The other threads that are about to update the bitmaps will be blocked until
         // refreshing is done.
         doBatchRefreshUpsertView(_upsertViewRefreshIntervalMs);
+      }
+      if (_enableSnapshot) {
+        _updatedSegmentsSinceLastSnapshot.add(newSegment);
+        _updatedSegmentsSinceLastSnapshot.add(oldSegment);
       }
     }
   }
@@ -1112,14 +1113,14 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         }
       }
     } finally {
-      if (_enableSnapshot) {
-        _updatedSegmentsSinceLastSnapshot.add(segment);
-      }
       if (_consistencyMode == UpsertConfig.ConsistencyMode.SNAPSHOT) {
         _updatedSegmentsSinceLastRefresh.add(segment);
         _upsertViewLock.readLock().unlock();
         // Batch refresh takes WLock. Do it outside RLock for clarity.
         doBatchRefreshUpsertView(_upsertViewRefreshIntervalMs);
+      }
+      if (_enableSnapshot) {
+        _updatedSegmentsSinceLastSnapshot.add(segment);
       }
     }
   }
@@ -1132,14 +1133,14 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     try {
       doAddDocId(validDocIds, queryableDocIds, docId, recordInfo);
     } finally {
-      if (_enableSnapshot) {
-        _updatedSegmentsSinceLastSnapshot.add(segment);
-      }
       if (_consistencyMode == UpsertConfig.ConsistencyMode.SNAPSHOT) {
         _updatedSegmentsSinceLastRefresh.add(segment);
         _upsertViewLock.readLock().unlock();
         // Batch refresh takes WLock. Do it outside RLock for clarity.
         doBatchRefreshUpsertView(_upsertViewRefreshIntervalMs);
+      }
+      if (_enableSnapshot) {
+        _updatedSegmentsSinceLastSnapshot.add(segment);
       }
     }
   }
@@ -1159,14 +1160,14 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     try {
       doRemoveDocId(segment, docId);
     } finally {
-      if (_enableSnapshot) {
-        _updatedSegmentsSinceLastSnapshot.add(segment);
-      }
       if (_consistencyMode == UpsertConfig.ConsistencyMode.SNAPSHOT) {
         _updatedSegmentsSinceLastRefresh.add(segment);
         _upsertViewLock.readLock().unlock();
         // Batch refresh takes WLock. Do it outside RLock for clarity.
         doBatchRefreshUpsertView(_upsertViewRefreshIntervalMs);
+      }
+      if (_enableSnapshot) {
+        _updatedSegmentsSinceLastSnapshot.add(segment);
       }
     }
   }
