@@ -206,7 +206,8 @@ public class ConsumingSegmentInfoReaderStatelessTest {
   private void mockSetup(final String[] servers, final Set<String> consumingSegments)
       throws InvalidConfigException {
     when(_helix.getServerToSegmentsMap(anyString())).thenAnswer(invocationOnMock -> subsetOfServerSegments(servers));
-    when(_helix.getServerToSegmentsCountMap(anyString())).thenAnswer(invocationOnMock -> subsetOfServerSegmentsCount(servers));
+    when(_helix.getServerToSegmentsCountMap(anyString())).thenAnswer(
+        invocationOnMock -> subsetOfServerSegmentsCount(servers));
     when(_helix.getServers(anyString(), anyString())).thenAnswer(
         invocationOnMock -> new TreeSet<>(Arrays.asList(servers)));
     when(_helix.getDataInstanceAdminEndpoints(ArgumentMatchers.anySet())).thenAnswer(

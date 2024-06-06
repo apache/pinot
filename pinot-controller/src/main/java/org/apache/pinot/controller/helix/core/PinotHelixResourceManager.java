@@ -186,9 +186,6 @@ import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.controller.api.resources.TableViews.EXTERNALVIEW;
-import static org.apache.pinot.controller.api.resources.TableViews.IDEALSTATE;
-
 
 public class PinotHelixResourceManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotHelixResourceManager.class);
@@ -3077,9 +3074,9 @@ public class PinotHelixResourceManager {
   // confuse with table state of enable/disable
   public TableViews.TableView getTableState(String tableName, String view, TableType tableType) {
     TableViews.TableView tableView;
-    if (view.equalsIgnoreCase(IDEALSTATE)) {
+    if (view.equalsIgnoreCase(TableViews.IDEALSTATE)) {
       tableView = getTableIdealState(tableName, tableType);
-    } else if (view.equalsIgnoreCase(EXTERNALVIEW)) {
+    } else if (view.equalsIgnoreCase(TableViews.EXTERNALVIEW)) {
       tableView = getTableExternalView(tableName, tableType);
     } else {
       throw new ControllerApplicationException(LOGGER,
