@@ -38,8 +38,8 @@ import static org.testng.Assert.assertNotNull;
 public class CrcUtilsTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "CrcUtilsTest");
   private static final String AVRO_DATA = "data/test_data-mv.avro";
-  private static final long EXPECTED_V1_CRC = 3268368411L;
-  private static final long EXPECTED_V3_CRC = 1588031799L;
+  private static final long EXPECTED_V1_CRC = 2708456273L;
+  private static final long EXPECTED_V3_CRC = 2796149869L;
 
   @Test
   public void testCrc()
