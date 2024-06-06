@@ -242,7 +242,7 @@ public class ColumnMetadataImpl implements ColumnMetadata {
             defaultNullValueString, maxLengthExceedStrategy);
         break;
       case METRIC:
-        fieldSpec = new MetricFieldSpec(column, dataType, defaultNullValueString);
+        fieldSpec = new MetricFieldSpec(column, dataType, defaultNullValueString, maxLength, maxLengthExceedStrategy);
         break;
       case TIME:
         TimeUnit timeUnit = TimeUnit.valueOf(config.getString(Segment.TIME_UNIT, "DAYS").toUpperCase());
