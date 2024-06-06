@@ -180,7 +180,7 @@
     <sslcontext.kickstart.version>8.3.5</sslcontext.kickstart.version>
 
     <confluent.version>7.6.1</confluent.version>
-    <pulsar.version>3.2.3</pulsar.version>
+    <pulsar.version>3.3.0</pulsar.version>
     <flink.version>1.19.0</flink.version>
 
     <!-- Apache Commons Libraries -->
