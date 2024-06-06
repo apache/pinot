@@ -224,8 +224,8 @@
 
     <!-- Google Libraries -->
     <google.cloud.libraries.version>26.40.0</google.cloud.libraries.version>
-    <protobuf.version>3.25.2</protobuf.version> <!-- only getting used in proto compilation plugin -->
-    <grpc.version>1.61.1</grpc.version>  <!-- only getting used in proto compilation plugin -->
+    <grpc.version>1.61.1</grpc.version>
+    <protobuf.version>3.25.2</protobuf.version>
     <google.findbugs.version>3.0.2</google.findbugs.version>
     <google.errorprone.version>2.28.0</google.errorprone.version>
     <google.j2objc.version>3.0.0</google.j2objc.version>
