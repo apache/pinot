@@ -657,9 +657,11 @@ public class TablesResource {
     }
     try {
       if (!missingSegments.isEmpty()) {
-        throw new WebApplicationException(
-            String.format("Table %s has missing segments: %s)", tableNameWithType, segments),
-            Response.Status.NOT_FOUND);
+        // we need not abort here or throw exception as we can still process the segments that are available
+        // During UpsertCompactionTaskGenerator, controller sends a lot of segments to server to fetch validDocIds
+        // and it may happen that a segment is deleted concurrently. In such cases, we should log a warning and
+        // process the remaining available segments.
+        LOGGER.warn("Table {} has missing segments {}", tableNameWithType, missingSegments);
       }
       List<Map<String, Object>> allValidDocIdsMetadata = new ArrayList<>(segmentDataManagers.size());
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
