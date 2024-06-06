@@ -329,13 +329,21 @@ public enum AggregationFunctionType {
       OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.STRING, SqlTypeFamily.BOOLEAN),
           ordinal -> ordinal > 1), ReturnTypes.VARCHAR, ReturnTypes.explicit(SqlTypeName.OTHER)),
 
+  SUMARRAYLONG("sumArrayLong", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
+      OperandTypes.family(SqlTypeFamily.ARRAY), ArrayReturnTypeInference.forType(SqlTypeName.BIGINT),
+      ReturnTypes.explicit(SqlTypeName.OTHER)),
+  SUMARRAYDOUBLE("sumArrayDouble", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
+      OperandTypes.family(SqlTypeFamily.ARRAY), ArrayReturnTypeInference.forType(SqlTypeName.DOUBLE),
+      ReturnTypes.explicit(SqlTypeName.OTHER)),
+
   // funnel aggregate functions
   FUNNELMAXSTEP("funnelMaxStep", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
       OperandTypes.VARIADIC, ReturnTypes.BIGINT, ReturnTypes.explicit(SqlTypeName.OTHER)),
   FUNNELCOMPLETECOUNT("funnelCompleteCount", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
       OperandTypes.VARIADIC, ReturnTypes.BIGINT, ReturnTypes.explicit(SqlTypeName.OTHER)),
   FUNNELMATCHSTEP("funnelMatchStep", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
-      OperandTypes.VARIADIC, IntArrayReturnTypeInference.INSTANCE, ReturnTypes.explicit(SqlTypeName.OTHER)),
+      OperandTypes.VARIADIC, ArrayReturnTypeInference.INT_ARRAY_RETURN_TYPE_INFERENCE,
+      ReturnTypes.explicit(SqlTypeName.OTHER)),
   // TODO: revisit support for funnel count in V2
   FUNNELCOUNT("funnelCount");
 
@@ -511,15 +519,26 @@ public enum AggregationFunctionType {
     }
   }
 
-  static class IntArrayReturnTypeInference implements SqlReturnTypeInference {
-    static final IntArrayReturnTypeInference INSTANCE = new IntArrayReturnTypeInference();
+  static class ArrayReturnTypeInference implements SqlReturnTypeInference {
+    static final ArrayReturnTypeInference INT_ARRAY_RETURN_TYPE_INFERENCE =
+        ArrayReturnTypeInference.forType(SqlTypeName.INTEGER);
+
+    private final SqlTypeName _sqlTypeName;
+
+    ArrayReturnTypeInference(SqlTypeName sqlTypeName) {
+      _sqlTypeName = sqlTypeName;
+    }
 
     @Override
     public RelDataType inferReturnType(
         SqlOperatorBinding opBinding) {
       RelDataTypeFactory typeFactory = opBinding.getTypeFactory();
-      RelDataType elementType = typeFactory.createSqlType(SqlTypeName.INTEGER);
+      RelDataType elementType = typeFactory.createSqlType(_sqlTypeName);
       return typeFactory.createArrayType(elementType, -1);
+    }
+
+    static ArrayReturnTypeInference forType(SqlTypeName sqlTypeName) {
+      return new ArrayReturnTypeInference(sqlTypeName);
     }
   }
 }
