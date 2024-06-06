@@ -139,8 +139,7 @@ public class CompletionServiceHelper {
         // we append a count value to the key to ensure each response is uniquely identified.
         // Otherwise, the map will store only the last response, overwriting previous ones.
         if (multiRequestPerServer) {
-          int count = completionServiceResponse._instanceToRequestCount.getOrDefault(key, 0) + 1;
-          completionServiceResponse._instanceToRequestCount.put(key, count);
+          int count = completionServiceResponse._instanceToRequestCount.compute(key, (k, v) -> v == null ? 1 : v + 1);
           key = key + "__" + count;
         }
         completionServiceResponse._httpResponses.put(key, responseString);
