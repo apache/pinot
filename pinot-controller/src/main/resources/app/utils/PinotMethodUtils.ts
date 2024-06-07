@@ -407,7 +407,7 @@ const allTableDetailsColumnHeader = [
 ];
 
 const getTableSizes = (tableName: string) => {
-  return getTableSize(tableName).then(result => {
+  return getTableSize(tableName, false).then(result => {
     return {
       reported_size: Utils.formatBytes(result.data.reportedSizeInBytes),
       estimated_size: Utils.formatBytes(result.data.estimatedSizeInBytes),
@@ -434,7 +434,7 @@ const getAllTableDetails = (tablesList) => {
   if (tablesList.length) {
     const promiseArr = [];
     tablesList.map((name) => {
-      promiseArr.push(getTableSize(name));
+      promiseArr.push(getTableSize(name, false));
       promiseArr.push(getIdealState(name));
       promiseArr.push(getExternalView(name));
     });
@@ -495,7 +495,7 @@ const getAllTableDetails = (tablesList) => {
 // API: /tables/:tableName/size
 // Expected Output: {tableName: '', reportedSize: '', estimatedSize: ''}
 const getTableSummaryData = (tableName) => {
-  return getTableSize(tableName).then(({ data }) => {
+  return getTableSize(tableName, false).then(({ data }) => {
     return {
       tableName: data.tableName,
       reportedSize: data.reportedSizeInBytes,
