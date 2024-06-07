@@ -49,6 +49,7 @@ public abstract class IndexedTable extends BaseTable {
 
   protected Collection<Record> _topRecords;
   private int _numResizes;
+  private boolean _isResized = false;
   private long _resizeTimeNs;
 
   /**
@@ -139,7 +140,7 @@ public abstract class IndexedTable extends BaseTable {
   protected void resize() {
     assert _hasOrderBy;
     long startTimeNs = System.nanoTime();
-    _tableResizer.resizeRecordsMap(_lookupMap, _trimSize);
+    _isResized |= _tableResizer.resizeRecordsMap(_lookupMap, _trimSize);
     long resizeTimeNs = System.nanoTime() - startTimeNs;
     _numResizes++;
     _resizeTimeNs += resizeTimeNs;
@@ -186,6 +187,10 @@ public abstract class IndexedTable extends BaseTable {
 
   public int getNumResizes() {
     return _numResizes;
+  }
+
+  public boolean isResized() {
+    return _isResized;
   }
 
   public long getResizeTimeMs() {

@@ -154,6 +154,8 @@ public class GroupByDataTableReducer implements DataTableReducer {
       brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.NUM_RESIZES, indexedTable.getNumResizes());
       brokerMetrics.addValueToTableGauge(rawTableName, BrokerGauge.RESIZE_TIME_MS, indexedTable.getResizeTimeMs());
     }
+    // Set brokerResized if resizing is done in the broker reduce phase.
+    brokerResponseNative.setBrokerResized(indexedTable.isResized());
     int numRecords = indexedTable.size();
     Iterator<Record> sortedIterator = indexedTable.iterator();
 

@@ -374,7 +374,8 @@ public class AggregateOperator extends MultiStageOperator {
         return true;
       }
     },
-    NUM_GROUPS_LIMIT_REACHED(StatMap.Type.BOOLEAN);
+    NUM_GROUPS_LIMIT_REACHED(StatMap.Type.BOOLEAN),
+    BROKER_RESIZED(StatMap.Type.BOOLEAN);
 
     private final StatMap.Type _type;
 

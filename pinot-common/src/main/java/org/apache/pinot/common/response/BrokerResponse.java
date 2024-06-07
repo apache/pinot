@@ -85,6 +85,11 @@ public interface BrokerResponse {
   boolean isNumGroupsLimitReached();
 
   /**
+   * Returns whether resizing is done in the broker reduce phase.
+   */
+  boolean isBrokerResized();
+
+  /**
    * Returns whether the limit for max rows in join has been reached.
    */
   boolean isMaxRowsInJoinReached();
