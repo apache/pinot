@@ -19,7 +19,6 @@
 package org.apache.pinot.query.runtime.operator;
 
 import java.util.List;
-import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
@@ -34,9 +33,9 @@ public class MinusAllOperator extends SetOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(MinusAllOperator.class);
   private static final String EXPLAIN_NAME = "MINUS_ALL";
 
-  public MinusAllOperator(OpChainExecutionContext opChainExecutionContext, List<MultiStageOperator> upstreamOperators,
+  public MinusAllOperator(OpChainExecutionContext opChainExecutionContext, List<MultiStageOperator> inputOperators,
       DataSchema dataSchema) {
-    super(opChainExecutionContext, upstreamOperators, dataSchema);
+    super(opChainExecutionContext, inputOperators, dataSchema);
   }
 
   @Override
@@ -49,7 +48,6 @@ public class MinusAllOperator extends SetOperator {
     return Type.MINUS;
   }
 
-  @Nullable
   @Override
   public String toExplainString() {
     return EXPLAIN_NAME;

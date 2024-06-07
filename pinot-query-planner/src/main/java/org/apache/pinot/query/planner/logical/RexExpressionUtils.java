@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Set;
 import org.apache.calcite.avatica.util.ByteString;
 import org.apache.calcite.rel.core.AggregateCall;
+import org.apache.calcite.rel.core.Window;
 import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexLiteral;
@@ -249,23 +250,21 @@ public class RexExpressionUtils {
     return result;
   }
 
-  public static RexExpression fromAggregateCall(AggregateCall aggregateCall) {
+  public static RexExpression.FunctionCall fromAggregateCall(AggregateCall aggregateCall) {
     return new RexExpression.FunctionCall(RelToPlanNodeConverter.convertToColumnDataType(aggregateCall.type),
         getFunctionName(aggregateCall.getAggregation()), fromRexNodes(aggregateCall.rexList),
         aggregateCall.isDistinct());
   }
 
-  public static List<RexExpression> fromInputRefs(Iterable<Integer> inputRefs) {
-    List<RexExpression> rexExpressionInputRefs = new ArrayList<>();
-    inputRefs.forEach(k -> rexExpressionInputRefs.add(new RexExpression.InputRef(k)));
-    return rexExpressionInputRefs;
+  public static RexExpression.FunctionCall fromWindowAggregateCall(Window.RexWinAggCall winAggCall) {
+    return new RexExpression.FunctionCall(RelToPlanNodeConverter.convertToColumnDataType(winAggCall.type),
+        getFunctionName(winAggCall.op), fromRexNodes(winAggCall.operands), winAggCall.distinct);
   }
 
-  public static Integer getValueAsInt(RexNode in) {
+  public static Integer getValueAsInt(@Nullable RexNode in) {
     if (in == null) {
       return -1;
     }
-
     Preconditions.checkArgument(in instanceof RexLiteral, "expected literal, got " + in);
     RexLiteral literal = (RexLiteral) in;
     return literal.getValueAs(Integer.class);

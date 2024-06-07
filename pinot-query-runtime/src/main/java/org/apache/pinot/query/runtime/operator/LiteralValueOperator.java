@@ -18,14 +18,13 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
-import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.List;
-import javax.annotation.Nullable;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
@@ -43,11 +42,10 @@ public class LiteralValueOperator extends MultiStageOperator {
   private boolean _isLiteralBlockReturned;
   private final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
 
-  public LiteralValueOperator(OpChainExecutionContext context, DataSchema dataSchema,
-      List<List<RexExpression>> rexLiteralRows) {
+  public LiteralValueOperator(OpChainExecutionContext context, ValueNode node) {
     super(context);
-    _dataSchema = dataSchema;
-    _rexLiteralBlock = constructBlock(rexLiteralRows);
+    _dataSchema = node.getDataSchema();
+    _rexLiteralBlock = constructBlock(node.getLiteralRows());
     // only return a single literal block when it is the 1st virtual server. otherwise, result will be duplicated.
     _isLiteralBlockReturned = context.getId().getVirtualServerId() != 0;
   }
@@ -65,10 +63,9 @@ public class LiteralValueOperator extends MultiStageOperator {
 
   @Override
   public List<MultiStageOperator> getChildOperators() {
-    return ImmutableList.of();
+    return List.of();
   }
 
-  @Nullable
   @Override
   public String toExplainString() {
     return EXPLAIN_NAME;
@@ -94,21 +91,24 @@ public class LiteralValueOperator extends MultiStageOperator {
     return Type.LITERAL;
   }
 
-  private TransferableBlock constructBlock(List<List<RexExpression>> rexLiteralRows) {
+  private TransferableBlock constructBlock(List<List<RexExpression.Literal>> literalRows) {
     List<Object[]> blockContent = new ArrayList<>();
-    for (List<RexExpression> rexLiteralRow : rexLiteralRows) {
-      Object[] row = new Object[_dataSchema.size()];
+    for (List<RexExpression.Literal> row : literalRows) {
+      Object[] values = new Object[_dataSchema.size()];
       for (int i = 0; i < _dataSchema.size(); i++) {
-        row[i] = ((RexExpression.Literal) rexLiteralRow.get(i)).getValue();
+        values[i] = row.get(i).getValue();
       }
-      blockContent.add(row);
+      blockContent.add(values);
     }
     return new TransferableBlock(blockContent, _dataSchema, DataBlock.Type.ROW);
   }
 
   public enum StatKey implements StatMap.Key {
+    //@formatter:off
     EXECUTION_TIME_MS(StatMap.Type.LONG),
     EMITTED_ROWS(StatMap.Type.LONG);
+    //@formatter:on
+
     private final StatMap.Type _type;
 
     StatKey(StatMap.Type type) {

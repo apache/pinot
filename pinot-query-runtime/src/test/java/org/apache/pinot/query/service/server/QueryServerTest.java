@@ -23,7 +23,6 @@ import com.google.protobuf.ByteString;
 import io.grpc.Deadline;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -39,7 +38,6 @@ import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.QueryTestSet;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
-import org.apache.pinot.query.planner.plannode.AbstractPlanNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.serde.PlanNodeSerializer;
 import org.apache.pinot.query.routing.QueryPlanSerDeUtils;
@@ -147,7 +145,7 @@ public class QueryServerTest extends QueryTestSet {
         try {
           verify(mockRunner, times(workerMetadataList.size())).processQuery(any(), argThat(stagePlan -> {
             PlanNode planNode = dispatchableStagePlan.getPlanFragment().getFragmentRoot();
-            return isStageNodesEqual(planNode, stagePlan.getRootNode()) && isStageMetadataEqual(stageMetadata,
+            return planNode.equals(stagePlan.getRootNode()) && isStageMetadataEqual(stageMetadata,
                 stagePlan.getStageMetadata());
           }), argThat(requestMetadataMap -> requestId.equals(
               requestMetadataMap.get(CommonConstants.Query.Request.MetadataKeys.REQUEST_ID))));
@@ -195,23 +193,6 @@ public class QueryServerTest extends QueryTestSet {
         actual.getTableSegmentsMap());
   }
 
-  private static boolean isStageNodesEqual(PlanNode left, PlanNode right) {
-    // This only checks the stage tree structure is correct. because the input/stageId fields are not
-    // part of the generic proto ser/de; which is tested in query planner.
-    if (left.getPlanFragmentId() != right.getPlanFragmentId() || left.getClass() != right.getClass()
-        || left.getInputs().size() != right.getInputs().size()) {
-      return false;
-    }
-    left.getInputs().sort(Comparator.comparingInt(PlanNode::getPlanFragmentId));
-    right.getInputs().sort(Comparator.comparingInt(PlanNode::getPlanFragmentId));
-    for (int i = 0; i < left.getInputs().size(); i++) {
-      if (!isStageNodesEqual(left.getInputs().get(i), right.getInputs().get(i))) {
-        return false;
-      }
-    }
-    return true;
-  }
-
   private Worker.QueryResponse submitRequest(Worker.QueryRequest queryRequest, Map<String, String> requestMetadata) {
     String host = requestMetadata.get(KEY_OF_SERVER_INSTANCE_HOST);
     int port = Integer.parseInt(requestMetadata.get(KEY_OF_SERVER_INSTANCE_PORT));
@@ -226,8 +207,7 @@ public class QueryServerTest extends QueryTestSet {
 
   private Worker.QueryRequest getQueryRequest(DispatchableSubPlan queryPlan, int stageId) {
     DispatchablePlanFragment stagePlan = queryPlan.getQueryStageList().get(stageId);
-    Plan.StageNode rootNode =
-        PlanNodeSerializer.process((AbstractPlanNode) stagePlan.getPlanFragment().getFragmentRoot());
+    Plan.PlanNode rootNode = PlanNodeSerializer.process(stagePlan.getPlanFragment().getFragmentRoot());
     List<Worker.WorkerMetadata> workerMetadataList =
         QueryPlanSerDeUtils.toProtoWorkerMetadataList(stagePlan.getWorkerMetadataList());
     ByteString customProperty = QueryPlanSerDeUtils.toProtoProperties(stagePlan.getCustomProperties());

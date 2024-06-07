@@ -31,8 +31,8 @@ import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.query.planner.PlannerUtils;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
-import org.apache.pinot.query.planner.plannode.AbstractPlanNode;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.BasePlanNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
@@ -389,15 +389,15 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
   // Test Utils.
   // --------------------------------------------------------------------------
 
-  private static void assertNodeTypeNotIn(PlanNode node, List<Class<? extends AbstractPlanNode>> bannedNodeType) {
+  private static void assertNodeTypeNotIn(PlanNode node, List<Class<? extends BasePlanNode>> bannedNodeType) {
     assertFalse(isOneOf(bannedNodeType, node));
     for (PlanNode child : node.getInputs()) {
       assertNodeTypeNotIn(child, bannedNodeType);
     }
   }
 
-  private static boolean isOneOf(List<Class<? extends AbstractPlanNode>> allowedNodeTypes, PlanNode node) {
-    for (Class<? extends AbstractPlanNode> allowedNodeType : allowedNodeTypes) {
+  private static boolean isOneOf(List<Class<? extends BasePlanNode>> allowedNodeTypes, PlanNode node) {
+    for (Class<? extends BasePlanNode> allowedNodeType : allowedNodeTypes) {
       if (node.getClass() == allowedNodeType) {
         return true;
       }

@@ -20,6 +20,7 @@ package org.apache.pinot.query.parser;
 
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelFieldCollation.Direction;
 import org.apache.calcite.rel.RelFieldCollation.NullDirection;
 import org.apache.pinot.common.request.Expression;
@@ -65,14 +66,23 @@ public class CalciteRexExpressionParser {
     return expressions;
   }
 
-  public static List<Expression> convertAggregateList(List<Expression> groupByList, List<RexExpression> aggCallList,
-      List<Integer> filterArgIndices, PinotQuery pinotQuery) {
-    int numAggCalls = aggCallList.size();
+  public static List<Expression> convertInputRefs(List<Integer> inputRefs, PinotQuery pinotQuery) {
+    List<Expression> selectList = pinotQuery.getSelectList();
+    List<Expression> expressions = new ArrayList<>(inputRefs.size());
+    for (Integer inputRef : inputRefs) {
+      expressions.add(selectList.get(inputRef));
+    }
+    return expressions;
+  }
+
+  public static List<Expression> convertAggregateList(List<Expression> groupByList,
+      List<RexExpression.FunctionCall> aggCalls, List<Integer> filterArgs, PinotQuery pinotQuery) {
+    int numAggCalls = aggCalls.size();
     List<Expression> expressions = new ArrayList<>(groupByList.size() + numAggCalls);
     expressions.addAll(groupByList);
     for (int i = 0; i < numAggCalls; i++) {
-      Expression aggFunction = toExpression(aggCallList.get(i), pinotQuery);
-      int filterArgIdx = filterArgIndices.get(i);
+      Expression aggFunction = compileFunctionExpression(aggCalls.get(i), pinotQuery);
+      int filterArgIdx = filterArgs.get(i);
       if (filterArgIdx == -1) {
         expressions.add(aggFunction);
       } else {
@@ -84,31 +94,28 @@ public class CalciteRexExpressionParser {
   }
 
   public static List<Expression> convertOrderByList(SortNode node, PinotQuery pinotQuery) {
-    List<RexExpression> collationKeys = node.getCollationKeys();
-    List<Direction> collationDirections = node.getCollationDirections();
-    List<NullDirection> collationNullDirections = node.getCollationNullDirections();
-    int numKeys = collationKeys.size();
-    List<Expression> orderByExpressions = new ArrayList<>(numKeys);
-    for (int i = 0; i < numKeys; i++) {
-      orderByExpressions.add(
-          convertOrderBy(collationKeys.get(i), collationDirections.get(i), collationNullDirections.get(i), pinotQuery));
+    List<RelFieldCollation> collations = node.getCollations();
+    List<Expression> orderByExpressions = new ArrayList<>(collations.size());
+    for (RelFieldCollation collation : collations) {
+      orderByExpressions.add(convertOrderBy(collation, pinotQuery));
     }
     return orderByExpressions;
   }
 
-  private static Expression convertOrderBy(RexExpression rexNode, Direction direction, NullDirection nullDirection,
-      PinotQuery pinotQuery) {
-    Expression expression = toExpression(rexNode, pinotQuery);
-    if (direction == Direction.ASCENDING) {
-      Expression asc = RequestUtils.getFunctionExpression(ASC, expression);
+  private static Expression convertOrderBy(RelFieldCollation collation, PinotQuery pinotQuery) {
+    Expression key = pinotQuery.getSelectList().get(collation.getFieldIndex());
+    if (collation.direction == Direction.ASCENDING) {
+      Expression asc = RequestUtils.getFunctionExpression(ASC, key);
       // NOTE: Add explicit NULL direction only if it is not the default behavior (default behavior treats NULL as the
       //       largest value)
-      return nullDirection == NullDirection.FIRST ? RequestUtils.getFunctionExpression(NULLS_FIRST, asc) : asc;
+      return collation.nullDirection == NullDirection.FIRST ? RequestUtils.getFunctionExpression(NULLS_FIRST, asc)
+          : asc;
     } else {
-      Expression desc = RequestUtils.getFunctionExpression(DESC, expression);
+      Expression desc = RequestUtils.getFunctionExpression(DESC, key);
       // NOTE: Add explicit NULL direction only if it is not the default behavior (default behavior treats NULL as the
       //       largest value)
-      return nullDirection == NullDirection.LAST ? RequestUtils.getFunctionExpression(NULLS_LAST, desc) : desc;
+      return collation.nullDirection == NullDirection.LAST ? RequestUtils.getFunctionExpression(NULLS_LAST, desc)
+          : desc;
     }
   }
 

@@ -18,28 +18,18 @@
  */
 package org.apache.pinot.query.planner.plannode;
 
-import org.apache.calcite.rex.RexNode;
+import java.util.List;
+import java.util.Objects;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
-import org.apache.pinot.query.planner.logical.RexExpressionUtils;
-import org.apache.pinot.query.planner.serde.ProtoProperties;
 
 
-public class FilterNode extends AbstractPlanNode {
-  @ProtoProperties
-  private RexExpression _condition;
+public class FilterNode extends BasePlanNode {
+  private final RexExpression _condition;
 
-  public FilterNode(int planFragmentId) {
-    super(planFragmentId);
-  }
-
-  public FilterNode(int currentStageId, DataSchema dataSchema, RexNode condition) {
-    super(currentStageId, dataSchema);
-    _condition = RexExpressionUtils.fromRexNode(condition);
-  }
-
-  public FilterNode(int stageId, DataSchema dataSchema, RexExpression condition) {
-    super(stageId, dataSchema);
+  public FilterNode(int stageId, DataSchema dataSchema, NodeHint nodeHint, List<PlanNode> inputs,
+      RexExpression condition) {
+    super(stageId, dataSchema, nodeHint, inputs);
     _condition = condition;
   }
 
@@ -55,5 +45,25 @@ public class FilterNode extends AbstractPlanNode {
   @Override
   public <T, C> T visit(PlanNodeVisitor<T, C> visitor, C context) {
     return visitor.visitFilter(this, context);
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (!(o instanceof FilterNode)) {
+      return false;
+    }
+    if (!super.equals(o)) {
+      return false;
+    }
+    FilterNode that = (FilterNode) o;
+    return Objects.equals(_condition, that._condition);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(super.hashCode(), _condition);
   }
 }

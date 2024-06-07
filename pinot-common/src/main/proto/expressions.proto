@@ -66,11 +66,11 @@ message Literal {
 message FunctionCall {
   ColumnDataType dataType = 1;
   string functionName = 2;
-  repeated RexExpression functionOperands = 3;
+  repeated Expression functionOperands = 3;
   bool isDistinct = 4;
 }
 
-message RexExpression {
+message Expression {
   oneof expression {
     InputRef inputRef = 1;
     Literal literal = 2;

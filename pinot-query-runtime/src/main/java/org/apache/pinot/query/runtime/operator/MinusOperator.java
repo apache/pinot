@@ -34,9 +34,9 @@ public class MinusOperator extends SetOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(MinusOperator.class);
   private static final String EXPLAIN_NAME = "MINUS";
 
-  public MinusOperator(OpChainExecutionContext opChainExecutionContext, List<MultiStageOperator> upstreamOperators,
+  public MinusOperator(OpChainExecutionContext opChainExecutionContext, List<MultiStageOperator> inputOperators,
       DataSchema dataSchema) {
-    super(opChainExecutionContext, upstreamOperators, dataSchema);
+    super(opChainExecutionContext, inputOperators, dataSchema);
   }
 
   @Override

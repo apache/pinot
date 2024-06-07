@@ -36,36 +36,35 @@ public class RexExpressionToProtoExpression {
   private RexExpressionToProtoExpression() {
   }
 
-  public static Expressions.RexExpression process(RexExpression expression) {
+  public static Expressions.Expression convertExpression(RexExpression expression) {
+    Expressions.Expression.Builder expressionBuilder = Expressions.Expression.newBuilder();
     if (expression instanceof RexExpression.InputRef) {
-      return serializeInputRef((RexExpression.InputRef) expression);
+      expressionBuilder.setInputRef(convertInputRef((RexExpression.InputRef) expression));
     } else if (expression instanceof RexExpression.Literal) {
-      return serializeLiteral((RexExpression.Literal) expression);
+      expressionBuilder.setLiteral(convertLiteral((RexExpression.Literal) expression));
     } else {
       assert expression instanceof RexExpression.FunctionCall;
-      return serializeFunctionCall((RexExpression.FunctionCall) expression);
+      expressionBuilder.setFunctionCall(convertFunctionCall((RexExpression.FunctionCall) expression));
     }
+    return expressionBuilder.build();
   }
 
-  private static Expressions.RexExpression serializeInputRef(RexExpression.InputRef inputRef) {
-    return Expressions.RexExpression.newBuilder()
-        .setInputRef(Expressions.InputRef.newBuilder().setIndex(inputRef.getIndex())).build();
+  public static Expressions.InputRef convertInputRef(RexExpression.InputRef inputRef) {
+    return Expressions.InputRef.newBuilder().setIndex(inputRef.getIndex()).build();
   }
 
-  private static Expressions.RexExpression serializeFunctionCall(RexExpression.FunctionCall functionCall) {
+  public static Expressions.FunctionCall convertFunctionCall(RexExpression.FunctionCall functionCall) {
     List<RexExpression> operands = functionCall.getFunctionOperands();
-    List<Expressions.RexExpression> protoOperands = new ArrayList<>(operands.size());
+    List<Expressions.Expression> protoOperands = new ArrayList<>(operands.size());
     for (RexExpression operand : operands) {
-      protoOperands.add(process(operand));
+      protoOperands.add(convertExpression(operand));
     }
-    Expressions.FunctionCall.Builder protoFunctionCallBuilder =
-        Expressions.FunctionCall.newBuilder().setDataType(convertColumnDataType(functionCall.getDataType()))
-            .setFunctionName(functionCall.getFunctionName()).addAllFunctionOperands(protoOperands)
-            .setIsDistinct(functionCall.isDistinct());
-    return Expressions.RexExpression.newBuilder().setFunctionCall(protoFunctionCallBuilder).build();
+    return Expressions.FunctionCall.newBuilder().setDataType(convertColumnDataType(functionCall.getDataType()))
+        .setFunctionName(functionCall.getFunctionName()).addAllFunctionOperands(protoOperands)
+        .setIsDistinct(functionCall.isDistinct()).build();
   }
 
-  private static Expressions.RexExpression serializeLiteral(RexExpression.Literal literal) {
+  public static Expressions.Literal convertLiteral(RexExpression.Literal literal) {
     Expressions.Literal.Builder literalBuilder = Expressions.Literal.newBuilder();
     literalBuilder.setDataType(convertColumnDataType(literal.getDataType()));
     Object literalValue = literal.getValue();
@@ -93,8 +92,7 @@ public class RexExpressionToProtoExpression {
     } else {
       literalBuilder.setIsValueNull(true);
     }
-
-    return Expressions.RexExpression.newBuilder().setLiteral(literalBuilder).build();
+    return literalBuilder.build();
   }
 
   public static Expressions.ColumnDataType convertColumnDataType(DataSchema.ColumnDataType dataType) {
@@ -137,8 +135,10 @@ public class RexExpressionToProtoExpression {
         return Expressions.ColumnDataType.BYTES_ARRAY;
       case OBJECT:
         return Expressions.ColumnDataType.OBJECT;
-      default:
+      case UNKNOWN:
         return Expressions.ColumnDataType.UNKNOWN;
+      default:
+        throw new IllegalArgumentException("Unsupported ColumnDataType: " + dataType);
     }
   }
 }

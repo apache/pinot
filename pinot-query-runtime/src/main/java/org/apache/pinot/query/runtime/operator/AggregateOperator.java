@@ -19,7 +19,6 @@
 package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -41,8 +40,7 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunctionFacto
 import org.apache.pinot.core.query.aggregation.function.CountAggregationFunction;
 import org.apache.pinot.core.util.DataBlockExtractUtils;
 import org.apache.pinot.query.planner.logical.RexExpression;
-import org.apache.pinot.query.planner.plannode.AbstractPlanNode;
-import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
+import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -63,7 +61,7 @@ public class AggregateOperator extends MultiStageOperator {
   private static final CountAggregationFunction COUNT_STAR_AGG_FUNCTION =
       new CountAggregationFunction(Collections.singletonList(ExpressionContext.forIdentifier("*")), false);
 
-  private final MultiStageOperator _inputOperator;
+  private final MultiStageOperator _input;
   private final DataSchema _resultSchema;
   private final MultistageAggregationExecutor _aggregationExecutor;
   private final MultistageGroupByExecutor _groupByExecutor;
@@ -73,34 +71,35 @@ public class AggregateOperator extends MultiStageOperator {
 
   private boolean _hasConstructedAggregateBlock;
 
-  public AggregateOperator(OpChainExecutionContext context, MultiStageOperator inputOperator, DataSchema resultSchema,
-      List<RexExpression> aggCalls, List<RexExpression> groupSet, AggType aggType, List<Integer> filterArgIndices,
-      @Nullable AbstractPlanNode.NodeHint nodeHint) {
+  public AggregateOperator(OpChainExecutionContext context, MultiStageOperator input, AggregateNode node) {
     super(context);
-    _inputOperator = inputOperator;
-    _resultSchema = resultSchema;
+    _input = input;
+    _resultSchema = node.getDataSchema();
 
     // Initialize the aggregation functions
-    AggregationFunction<?, ?>[] aggFunctions = getAggFunctions(aggCalls);
+    AggregationFunction<?, ?>[] aggFunctions = getAggFunctions(node.getAggCalls());
+    int numFunctions = aggFunctions.length;
 
     // Process the filter argument indices
-    int numFunctions = aggFunctions.length;
+    List<Integer> filterArgs = node.getFilterArgs();
     int[] filterArgIds = new int[numFunctions];
     int maxFilterArgId = -1;
     for (int i = 0; i < numFunctions; i++) {
-      filterArgIds[i] = filterArgIndices.get(i);
+      filterArgIds[i] = filterArgs.get(i);
       maxFilterArgId = Math.max(maxFilterArgId, filterArgIds[i]);
     }
 
     // Initialize the appropriate executor.
-    if (groupSet.isEmpty()) {
+    List<Integer> groupKeys = node.getGroupKeys();
+    AggregateNode.AggType aggType = node.getAggType();
+    if (groupKeys.isEmpty()) {
       _aggregationExecutor =
           new MultistageAggregationExecutor(aggFunctions, filterArgIds, maxFilterArgId, aggType, _resultSchema);
       _groupByExecutor = null;
     } else {
       _groupByExecutor =
-          new MultistageGroupByExecutor(getGroupKeyIds(groupSet), aggFunctions, filterArgIds, maxFilterArgId, aggType,
-              _resultSchema, context.getOpChainMetadata(), nodeHint);
+          new MultistageGroupByExecutor(getGroupKeyIds(groupKeys), aggFunctions, filterArgIds, maxFilterArgId, aggType,
+              _resultSchema, context.getOpChainMetadata(), node.getNodeHint());
       _aggregationExecutor = null;
     }
   }
@@ -123,10 +122,9 @@ public class AggregateOperator extends MultiStageOperator {
 
   @Override
   public List<MultiStageOperator> getChildOperators() {
-    return ImmutableList.of(_inputOperator);
+    return List.of(_input);
   }
 
-  @Nullable
   @Override
   public String toExplainString() {
     return EXPLAIN_NAME;
@@ -145,10 +143,10 @@ public class AggregateOperator extends MultiStageOperator {
     }
     assert finalBlock.isSuccessfulEndOfStreamBlock() : "Final block must be EOS block";
     _eosBlock = updateEosBlock(finalBlock, _statMap);
-    return produceAggregatedBlock(finalBlock);
+    return produceAggregatedBlock();
   }
 
-  private TransferableBlock produceAggregatedBlock(TransferableBlock finalBlock) {
+  private TransferableBlock produceAggregatedBlock() {
     _hasConstructedAggregateBlock = true;
     if (_aggregationExecutor != null) {
       return new TransferableBlock(_aggregationExecutor.getResult(), _resultSchema, DataBlock.Type.ROW);
@@ -160,7 +158,7 @@ public class AggregateOperator extends MultiStageOperator {
         TransferableBlock dataBlock = new TransferableBlock(rows, _resultSchema, DataBlock.Type.ROW);
         if (_groupByExecutor.isNumGroupsLimitReached()) {
           _statMap.merge(StatKey.NUM_GROUPS_LIMIT_REACHED, true);
-          _inputOperator.earlyTerminate();
+          _input.earlyTerminate();
         }
         return dataBlock;
       }
@@ -173,10 +171,10 @@ public class AggregateOperator extends MultiStageOperator {
    * @return the last block, which must always be either an error or the end of the stream
    */
   private TransferableBlock consumeGroupBy() {
-    TransferableBlock block = _inputOperator.nextBlock();
+    TransferableBlock block = _input.nextBlock();
     while (block.isDataBlock()) {
       _groupByExecutor.processBlock(block);
-      block = _inputOperator.nextBlock();
+      block = _input.nextBlock();
     }
     return block;
   }
@@ -187,19 +185,19 @@ public class AggregateOperator extends MultiStageOperator {
    * @return the last block, which must always be either an error or the end of the stream
    */
   private TransferableBlock consumeAggregation() {
-    TransferableBlock block = _inputOperator.nextBlock();
+    TransferableBlock block = _input.nextBlock();
     while (block.isDataBlock()) {
       _aggregationExecutor.processBlock(block);
-      block = _inputOperator.nextBlock();
+      block = _input.nextBlock();
     }
     return block;
   }
 
-  private AggregationFunction<?, ?>[] getAggFunctions(List<RexExpression> aggCalls) {
+  private AggregationFunction<?, ?>[] getAggFunctions(List<RexExpression.FunctionCall> aggCalls) {
     int numFunctions = aggCalls.size();
     AggregationFunction<?, ?>[] aggFunctions = new AggregationFunction[numFunctions];
     for (int i = 0; i < numFunctions; i++) {
-      aggFunctions[i] = getAggFunction((RexExpression.FunctionCall) aggCalls.get(i));
+      aggFunctions[i] = getAggFunction(aggCalls.get(i));
     }
     return aggFunctions;
   }
@@ -244,11 +242,11 @@ public class AggregateOperator extends MultiStageOperator {
     return Integer.parseInt(identifier.substring(1));
   }
 
-  private int[] getGroupKeyIds(List<RexExpression> groupSet) {
-    int numKeys = groupSet.size();
+  private int[] getGroupKeyIds(List<Integer> groupKeys) {
+    int numKeys = groupKeys.size();
     int[] groupKeyIds = new int[numKeys];
     for (int i = 0; i < numKeys; i++) {
-      groupKeyIds[i] = ((RexExpression.InputRef) groupSet.get(i)).getIndex();
+      groupKeyIds[i] = groupKeys.get(i);
     }
     return groupKeyIds;
   }
@@ -362,6 +360,7 @@ public class AggregateOperator extends MultiStageOperator {
   }
 
   public enum StatKey implements StatMap.Key {
+    //@formatter:off
     EXECUTION_TIME_MS(StatMap.Type.LONG) {
       @Override
       public boolean includeDefaultInJson() {
@@ -375,6 +374,7 @@ public class AggregateOperator extends MultiStageOperator {
       }
     },
     NUM_GROUPS_LIMIT_REACHED(StatMap.Type.BOOLEAN);
+    //@formatter:on
 
     private final StatMap.Type _type;
 

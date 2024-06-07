@@ -18,31 +18,33 @@
  */
 package org.apache.pinot.query.runtime.operator.window.value;
 
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
-import org.apache.pinot.query.runtime.operator.WindowAggregateOperator;
 
 
 public class LeadValueWindowFunction extends ValueWindowFunction {
 
-  public LeadValueWindowFunction(RexExpression.FunctionCall aggCall,
-      String functionName, DataSchema inputSchema,
-      WindowAggregateOperator.OrderSetInfo orderSetInfo) {
-    super(aggCall, functionName, inputSchema, orderSetInfo);
+  public LeadValueWindowFunction(RexExpression.FunctionCall aggCall, DataSchema inputSchema,
+      List<RelFieldCollation> collations, boolean partitionByOnly) {
+    super(aggCall, inputSchema, collations, partitionByOnly);
   }
 
   @Override
   public List<Object> processRows(List<Object[]> rows) {
-    List<Object> result = new ArrayList<>();
-    for (int i = 0; i < rows.size(); i++) {
-      if (i == rows.size() - 1) {
-        result.add(null);
+    int numRows = rows.size();
+    Object[] result = new Object[numRows];
+    Object[] nextRow = null;
+    for (int i = numRows - 1; i >= 0; i--) {
+      if (nextRow == null) {
+        result[i] = null;
       } else {
-        result.add(extractValueFromRow(rows.get(i + 1)));
+        result[i] = extractValueFromRow(nextRow);
       }
+      nextRow = rows.get(i);
     }
-    return result;
+    return Arrays.asList(result);
   }
 }

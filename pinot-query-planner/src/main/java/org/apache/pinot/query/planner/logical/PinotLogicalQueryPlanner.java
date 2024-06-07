@@ -26,34 +26,28 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import org.apache.calcite.rel.RelDistribution;
-import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
-import org.apache.calcite.rel.logical.PinotRelExchangeType;
-import org.apache.pinot.common.metrics.BrokerMeter;
-import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.SubPlan;
 import org.apache.pinot.query.planner.SubPlanMetadata;
-import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
-import org.apache.pinot.query.planner.plannode.WindowNode;
 
 
 /**
  * PinotLogicalQueryPlanner walks top-down from {@link RelRoot} and construct a forest of trees with {@link PlanNode}.
  */
 public class PinotLogicalQueryPlanner {
-
-  private boolean _windowFunctionFound = false;
-  private boolean _joinFound = false;
+  private PinotLogicalQueryPlanner() {
+  }
 
   /**
    * Converts a Calcite {@link RelRoot} into a Pinot {@link SubPlan}.
    */
-  public SubPlan makePlan(RelRoot relRoot) {
-    PlanNode rootNode = relNodeToPlanNode(relRoot.rel);
+  public static SubPlan makePlan(RelRoot relRoot) {
+    PlanNode rootNode = new RelToPlanNodeConverter().toPlanNode(relRoot.rel);
     PlanFragment rootFragment = planNodeToPlanFragment(rootNode);
     return new SubPlan(rootFragment,
         new SubPlanMetadata(RelToPlanNodeConverter.getTableNamesFromRelRoot(relRoot.rel), relRoot.fields), List.of());
@@ -84,34 +78,7 @@ public class PinotLogicalQueryPlanner {
 //    return subPlanMap.get(0);
   }
 
-  private PlanNode relNodeToPlanNode(RelNode node) {
-    PlanNode planNode = RelToPlanNodeConverter.toPlanNode(node, -1);
-
-    if (planNode instanceof JoinNode) {
-      BrokerMetrics brokerMetrics = BrokerMetrics.get();
-      brokerMetrics.addMeteredGlobalValue(BrokerMeter.JOIN_COUNT, 1);
-      if (!_joinFound) {
-        brokerMetrics.addMeteredGlobalValue(BrokerMeter.QUERIES_WITH_JOINS, 1);
-        _joinFound = true;
-      }
-    }
-    if (planNode instanceof WindowNode) {
-      BrokerMetrics brokerMetrics = BrokerMetrics.get();
-      brokerMetrics.addMeteredGlobalValue(BrokerMeter.WINDOW_COUNT, 1);
-      if (!_windowFunctionFound) {
-        brokerMetrics.addMeteredGlobalValue(BrokerMeter.QUERIES_WITH_WINDOW, 1);
-        _windowFunctionFound = true;
-      }
-    }
-
-    List<RelNode> inputs = node.getInputs();
-    for (RelNode input : inputs) {
-      planNode.addInput(relNodeToPlanNode(input));
-    }
-    return planNode;
-  }
-
-  private PlanFragment planNodeToPlanFragment(PlanNode node) {
+  private static PlanFragment planNodeToPlanFragment(PlanNode node) {
     PlanFragmenter fragmenter = new PlanFragmenter();
     PlanFragmenter.Context fragmenterContext = fragmenter.createContext();
     node = node.visit(fragmenter, fragmenterContext);
@@ -120,10 +87,10 @@ public class PinotLogicalQueryPlanner {
 
     // Sub plan root needs to send final results back to the Broker
     // TODO: Should be SINGLETON (currently SINGLETON has to be local, so use BROADCAST_DISTRIBUTED instead)
-    MailboxSendNode subPlanRootSenderNode = new MailboxSendNode(node.getPlanFragmentId(), node.getDataSchema(), 0,
-        RelDistribution.Type.BROADCAST_DISTRIBUTED, PinotRelExchangeType.getDefaultExchangeType(), null, null, false,
-        false);
-    subPlanRootSenderNode.addInput(node);
+    MailboxSendNode subPlanRootSenderNode =
+        new MailboxSendNode(node.getStageId(), node.getDataSchema(), List.of(node), 0,
+            PinotRelExchangeType.getDefaultExchangeType(), RelDistribution.Type.BROADCAST_DISTRIBUTED, null, false,
+            null, false);
     PlanFragment planFragment1 = new PlanFragment(1, subPlanRootSenderNode, new ArrayList<>());
     planFragmentMap.put(1, planFragment1);
     for (Int2ObjectMap.Entry<IntList> entry : childPlanFragmentIdsMap.int2ObjectEntrySet()) {
@@ -134,8 +101,8 @@ public class PinotLogicalQueryPlanner {
         childPlanFragments.add(planFragmentMap.get(childPlanFragmentIdIterator.nextInt()));
       }
     }
-    MailboxReceiveNode rootReceiveNode = new MailboxReceiveNode(0, node.getDataSchema(), node.getPlanFragmentId(),
-        RelDistribution.Type.BROADCAST_DISTRIBUTED, PinotRelExchangeType.getDefaultExchangeType(), null, null, false,
+    MailboxReceiveNode rootReceiveNode = new MailboxReceiveNode(0, node.getDataSchema(), List.of(), node.getStageId(),
+        PinotRelExchangeType.getDefaultExchangeType(), RelDistribution.Type.BROADCAST_DISTRIBUTED, null, null, false,
         false, subPlanRootSenderNode);
     return new PlanFragment(0, rootReceiveNode, Collections.singletonList(planFragment1));
   }
