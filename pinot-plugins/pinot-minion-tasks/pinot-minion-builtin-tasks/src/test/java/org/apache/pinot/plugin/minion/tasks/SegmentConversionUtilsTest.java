@@ -25,7 +25,7 @@ import com.sun.net.httpserver.HttpServer;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.util.Random;
-import org.apache.http.HttpStatus;
+import org.apache.hc.core5.http.HttpStatus;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.Assert;
