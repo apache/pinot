@@ -83,21 +83,21 @@ public class IngestionDelayTracker {
 
   // Class to wrap supported timestamps collected for an ingested event
   private static class IngestionTimestamps {
+    private final long _firstStreamIngestionTimeMs;
+    private final long _ingestionTimeMs;
     IngestionTimestamps(long ingestionTimesMs, long firstStreamIngestionTimeMs) {
       _ingestionTimeMs = ingestionTimesMs;
       _firstStreamIngestionTimeMs = firstStreamIngestionTimeMs;
     }
-    private final long _ingestionTimeMs;
-    private final long _firstStreamIngestionTimeMs;
   }
 
   private static class IngestionOffsets {
+    private final StreamPartitionMsgOffset _latestOffset;
+    private final StreamPartitionMsgOffset _offset;
     IngestionOffsets(StreamPartitionMsgOffset offset, StreamPartitionMsgOffset latestOffset) {
       _offset = offset;
       _latestOffset = latestOffset;
     }
-    private final StreamPartitionMsgOffset _offset;
-    private final StreamPartitionMsgOffset _latestOffset;
   }
 
   // Sleep interval for scheduled executor service thread that triggers read of ideal state
@@ -192,16 +192,16 @@ public class IngestionDelayTracker {
     if (offset == null) {
       return 0;
     }
-    StreamPartitionMsgOffset msgOffset = offset._offset;
+    StreamPartitionMsgOffset currentOffset = offset._offset;
     StreamPartitionMsgOffset latestOffset = offset._latestOffset;
 
     // Compute aged delay for current partition
     // TODO: Support other types of offsets
-    if (!(msgOffset instanceof LongMsgOffset && latestOffset instanceof LongMsgOffset)) {
+    if (!(currentOffset instanceof LongMsgOffset && latestOffset instanceof LongMsgOffset)) {
       return 0;
     }
 
-    return ((LongMsgOffset) latestOffset).getOffset() - ((LongMsgOffset) msgOffset).getOffset();
+    return ((LongMsgOffset) latestOffset).getOffset() - ((LongMsgOffset) currentOffset).getOffset();
   }
 
   /*
@@ -212,11 +212,13 @@ public class IngestionDelayTracker {
    */
   private void removePartitionId(int partitionGroupId) {
     _partitionToIngestionTimestampsMap.remove(partitionGroupId);
+    _partitionToOffsetMap.remove(partitionGroupId);
     // If we are removing a partition we should stop reading its ideal state.
     _partitionsMarkedForVerification.remove(partitionGroupId);
     _serverMetrics.removePartitionGauge(_metricName, partitionGroupId, ServerGauge.REALTIME_INGESTION_DELAY_MS);
     _serverMetrics.removePartitionGauge(_metricName, partitionGroupId,
         ServerGauge.END_TO_END_REALTIME_INGESTION_DELAY_MS);
+    _serverMetrics.removePartitionGauge(_metricName, partitionGroupId, ServerGauge.REALTIME_INGESTION_OFFSET_LAG);
   }
 
   /*
@@ -296,19 +298,19 @@ public class IngestionDelayTracker {
     }
   }
 
-  public void updateIngestionOffsets(StreamPartitionMsgOffset msgOffset, StreamPartitionMsgOffset latestOffset,
+  public void updateIngestionOffsets(StreamPartitionMsgOffset currentOffset, StreamPartitionMsgOffset latestOffset,
       int partitionGroupId) {
-    if ((msgOffset == null)) {
-      // If stream does not return a valid ingestion timestamps don't publish a metric
+    if ((currentOffset == null)) {
+      // If stream does not return a valid ingestion offset don't publish a metric
       return;
     }
-    IngestionOffsets previousMeasure = _partitionToOffsetMap.put(partitionGroupId,
-        new IngestionOffsets(msgOffset, latestOffset));
+    IngestionOffsets previousMeasure =
+        _partitionToOffsetMap.put(partitionGroupId, new IngestionOffsets(currentOffset, latestOffset));
     if (previousMeasure == null) {
       // First time we start tracking a partition we should start tracking it via metric
       // Only publish the metric if supported by the underlying stream. If not supported the stream
       // returns Long.MIN_VALUE
-      if (msgOffset != null) {
+      if (currentOffset != null) {
         _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionGroupId,
             ServerGauge.REALTIME_INGESTION_OFFSET_LAG, () -> getPartitionIngestionOffsetLag(partitionGroupId));
       }
