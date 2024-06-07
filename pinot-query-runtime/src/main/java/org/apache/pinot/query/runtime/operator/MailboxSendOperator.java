@@ -19,6 +19,7 @@
 package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.EnumSet;
@@ -28,6 +29,7 @@ import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelFieldCollation;
+import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.planner.logical.RexExpression;
@@ -37,7 +39,7 @@ import org.apache.pinot.query.routing.RoutingInfo;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
-import org.apache.pinot.query.runtime.operator.utils.OperatorUtils;
+import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.exception.QueryCancelledException;
 import org.slf4j.Logger;
@@ -62,29 +64,34 @@ public class MailboxSendOperator extends MultiStageOperator {
   private final List<RexExpression> _collationKeys;
   private final List<RelFieldCollation.Direction> _collationDirections;
   private final boolean _isSortOnSender;
+  private final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
 
   public MailboxSendOperator(OpChainExecutionContext context, MultiStageOperator sourceOperator,
       RelDistribution.Type distributionType, @Nullable List<Integer> distributionKeys,
       @Nullable List<RexExpression> collationKeys, @Nullable List<RelFieldCollation.Direction> collationDirections,
       boolean isSortOnSender, int receiverStageId) {
-    this(context, sourceOperator, getBlockExchange(context, distributionType, distributionKeys, receiverStageId),
+    this(context, sourceOperator,
+        statMap -> getBlockExchange(context, distributionType, distributionKeys, receiverStageId, statMap),
         collationKeys, collationDirections, isSortOnSender);
+    _statMap.merge(StatKey.STAGE, context.getStageId());
+    _statMap.merge(StatKey.PARALLELISM, 1);
   }
 
   @VisibleForTesting
-  MailboxSendOperator(OpChainExecutionContext context, MultiStageOperator sourceOperator, BlockExchange exchange,
+  MailboxSendOperator(OpChainExecutionContext context, MultiStageOperator sourceOperator,
+      Function<StatMap<StatKey>, BlockExchange> exchangeFactory,
       @Nullable List<RexExpression> collationKeys, @Nullable List<RelFieldCollation.Direction> collationDirections,
       boolean isSortOnSender) {
     super(context);
     _sourceOperator = sourceOperator;
-    _exchange = exchange;
+    _exchange = exchangeFactory.apply(_statMap);
     _collationKeys = collationKeys;
     _collationDirections = collationDirections;
     _isSortOnSender = isSortOnSender;
   }
 
   private static BlockExchange getBlockExchange(OpChainExecutionContext context, RelDistribution.Type distributionType,
-      @Nullable List<Integer> distributionKeys, int receiverStageId) {
+      @Nullable List<Integer> distributionKeys, int receiverStageId, StatMap<StatKey> statMap) {
     Preconditions.checkState(SUPPORTED_EXCHANGE_TYPES.contains(distributionType), "Unsupported distribution type: %s",
         distributionType);
     MailboxService mailboxService = context.getMailboxService();
@@ -97,10 +104,27 @@ public class MailboxSendOperator extends MultiStageOperator {
         MailboxIdUtils.toRoutingInfos(requestId, context.getStageId(), context.getWorkerId(), receiverStageId,
             mailboxInfos);
     List<SendingMailbox> sendingMailboxes = routingInfos.stream()
-        .map(v -> mailboxService.getSendingMailbox(v.getHostname(), v.getPort(), v.getMailboxId(), deadlineMs))
+        .map(v -> mailboxService.getSendingMailbox(v.getHostname(), v.getPort(), v.getMailboxId(), deadlineMs, statMap))
         .collect(Collectors.toList());
+    statMap.merge(StatKey.FAN_OUT, sendingMailboxes.size());
     return BlockExchange.getExchange(sendingMailboxes, distributionType, distributionKeys,
         TransferableBlockUtils::splitBlock);
+  }
+
+  @Override
+  public void registerExecution(long time, int numRows) {
+    _statMap.merge(StatKey.EXECUTION_TIME_MS, time);
+    _statMap.merge(StatKey.EMITTED_ROWS, numRows);
+  }
+
+  @Override
+  public Type getOperatorType() {
+    return Type.MAILBOX_SEND;
+  }
+
+  @Override
+  protected Logger logger() {
+    return LOGGER;
   }
 
   @Override
@@ -119,12 +143,9 @@ public class MailboxSendOperator extends MultiStageOperator {
     try {
       TransferableBlock block = _sourceOperator.nextBlock();
       if (block.isSuccessfulEndOfStreamBlock()) {
-        // Stats need to be populated here because the block is being sent to the mailbox
-        // and the receiving opChain will not be able to access the stats from the previous opChain
-        TransferableBlock eosBlockWithStats = TransferableBlockUtils.getEndOfStreamTransferableBlock(
-            OperatorUtils.getMetadataFromOperatorStats(_opChainStats.getOperatorStatsMap()));
+        updateEosBlock(block, _statMap);
         // no need to check early terminate signal b/c the current block is already EOS
-        sendTransferableBlock(eosBlockWithStats);
+        sendTransferableBlock(block);
       } else {
         if (sendTransferableBlock(block)) {
           earlyTerminate();
@@ -133,7 +154,7 @@ public class MailboxSendOperator extends MultiStageOperator {
       return block;
     } catch (QueryCancelledException e) {
       LOGGER.debug("Query was cancelled! for opChain: {}", _context.getId());
-      return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+      return createLeafBlock();
     } catch (TimeoutException e) {
       LOGGER.warn("Timed out transferring data on opChain: {}", _context.getId(), e);
       return TransferableBlockUtils.getErrorTransferableBlock(e);
@@ -149,6 +170,11 @@ public class MailboxSendOperator extends MultiStageOperator {
     }
   }
 
+  protected TransferableBlock createLeafBlock() {
+    return TransferableBlockUtils.getEndOfStreamTransferableBlock(
+        MultiStageQueryStats.createCancelledSend(_context.getStageId(), _statMap));
+  }
+
   private boolean sendTransferableBlock(TransferableBlock block)
       throws Exception {
     boolean isEarlyTerminated = _exchange.send(block);
@@ -156,15 +182,6 @@ public class MailboxSendOperator extends MultiStageOperator {
       LOGGER.debug("==[SEND]== Block " + block + " sent from: " + _context.getId());
     }
     return isEarlyTerminated;
-  }
-
-  /**
-   * This method is overridden to return true because this operator is last in the chain and needs to collect
-   * execution time stats
-   */
-  @Override
-  protected boolean shouldCollectStats() {
-    return true;
   }
 
   @Override
@@ -177,5 +194,88 @@ public class MailboxSendOperator extends MultiStageOperator {
   public void cancel(Throwable t) {
     super.cancel(t);
     _exchange.cancel(t);
+  }
+
+  public enum StatKey implements StatMap.Key {
+    EXECUTION_TIME_MS(StatMap.Type.LONG) {
+      @Override
+      public boolean includeDefaultInJson() {
+        return true;
+      }
+    },
+    EMITTED_ROWS(StatMap.Type.LONG) {
+      @Override
+      public boolean includeDefaultInJson() {
+        return true;
+      }
+    },
+    STAGE(StatMap.Type.INT) {
+      @Override
+      public int merge(int value1, int value2) {
+        return StatMap.Key.eqNotZero(value1, value2);
+      }
+
+      @Override
+      public boolean includeDefaultInJson() {
+        return true;
+      }
+    },
+    /**
+     * Number of parallelism of the stage this operator is the root of.
+     * <p>
+     * The CPU times reported by this stage will be proportional to this number.
+     */
+    PARALLELISM(StatMap.Type.INT),
+    /**
+     * How many receive mailboxes are being written by this send operator.
+     */
+    FAN_OUT(StatMap.Type.INT) {
+      @Override
+      public int merge(int value1, int value2) {
+        return Math.max(value1, value2);
+      }
+    },
+    /**
+     * How many messages have been sent in heap format by this mailbox.
+     * <p>
+     * The lower the relation between RAW_MESSAGES and IN_MEMORY_MESSAGES, the more efficient the exchange is.
+     */
+    IN_MEMORY_MESSAGES(StatMap.Type.INT),
+    /**
+     * How many messages have been sent in raw format and therefore serialized by this mailbox.
+     * <p>
+     * The higher the relation between RAW_MESSAGES and IN_MEMORY_MESSAGES, the less efficient the exchange is.
+     */
+    RAW_MESSAGES(StatMap.Type.INT),
+    /**
+     * How many bytes have been serialized by this mailbox.
+     * <p>
+     * A high number here indicates that the mailbox is sending a lot of data to other servers.
+     */
+    SERIALIZED_BYTES(StatMap.Type.LONG) {
+      @Override
+      public boolean includeDefaultInJson() {
+        return true;
+      }
+    },
+    /**
+     * How long (in CPU time) it took to serialize the raw messages sent by this mailbox.
+     */
+    SERIALIZATION_TIME_MS(StatMap.Type.LONG) {
+      @Override
+      public boolean includeDefaultInJson() {
+        return true;
+      }
+    },;
+    private final StatMap.Type _type;
+
+    StatKey(StatMap.Type type) {
+      _type = type;
+    }
+
+    @Override
+    public StatMap.Type getType() {
+      return _type;
+    }
   }
 }

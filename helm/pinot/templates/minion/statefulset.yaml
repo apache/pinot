@@ -38,7 +38,12 @@ spec:
       labels:
         {{- include "pinot.minionLabels" . | nindent 8 }}
       annotations:
-{{ toYaml .Values.minion.podAnnotations | indent 8 }}
+        {{- if .Values.minion.automaticReload.enabled }}
+        checksum/config: {{ include (print $.Template.BasePath "/minion/configmap.yaml") . | sha256sum}}
+        {{- end }}
+        {{- with .Values.minion.podAnnotations }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
     spec:
       terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
       serviceAccountName: {{ include "pinot.serviceAccountName" . }}
@@ -83,16 +88,33 @@ spec:
 {{- end }}     
         {{- if .Values.minion.probes.livenessEnabled }}
         livenessProbe:
-          initialDelaySeconds: {{ .Values.probes.initialDelaySeconds }}
-          periodSeconds: {{ .Values.probes.periodSeconds }}
+          initialDelaySeconds: {{ .Values.minion.probes.liveness.initialDelaySeconds | default .Values.probes.initialDelaySeconds }}
+          periodSeconds: {{ .Values.minion.probes.liveness.periodSeconds | default .Values.probes.periodSeconds }}
+          failureThreshold: {{ .Values.minion.probes.liveness.failureThreshold | default .Values.probes.failureThreshold }}
+          successThreshold: {{ .Values.minion.probes.liveness.successThreshold | default .Values.probes.successThreshold }}
+          timeoutSeconds: {{ .Values.minion.probes.liveness.timeoutSeconds | default .Values.probes.timeoutSeconds }}
           httpGet:
             path: {{ .Values.minion.probes.endpoint }}
             port: {{ .Values.minion.service.port }}
         {{- end }}
         {{- if .Values.minion.probes.readinessEnabled }}
         readinessProbe:
-          initialDelaySeconds: {{ .Values.probes.initialDelaySeconds }}
-          periodSeconds: {{ .Values.probes.periodSeconds }}
+          initialDelaySeconds: {{ .Values.minion.probes.readiness.initialDelaySeconds | default .Values.probes.initialDelaySeconds }}
+          periodSeconds: {{ .Values.minion.probes.readiness.periodSeconds | default .Values.probes.periodSeconds }}
+          failureThreshold: {{ .Values.minion.probes.readiness.failureThreshold | default .Values.probes.failureThreshold }}
+          successThreshold: {{ .Values.minion.probes.readiness.successThreshold | default .Values.probes.successThreshold }}
+          timeoutSeconds: {{ .Values.minion.probes.readiness.timeoutSeconds | default .Values.probes.timeoutSeconds }}
+          httpGet:
+            path: {{ .Values.minion.probes.endpoint }}
+            port: {{ .Values.minion.service.port }}
+        {{- end }}
+        {{- if .Values.minion.probes.startupEnabled }}
+        startupProbe:
+          initialDelaySeconds: {{ .Values.minion.probes.startup.initialDelaySeconds | default .Values.probes.initialDelaySeconds }}
+          periodSeconds: {{ .Values.minion.probes.startup.periodSeconds | default .Values.probes.periodSeconds }}
+          failureThreshold: {{ .Values.minion.probes.startup.failureThreshold | default .Values.probes.failureThreshold }}
+          successThreshold: {{ .Values.minion.probes.startup.successThreshold | default .Values.probes.successThreshold }}
+          timeoutSeconds: {{ .Values.minion.probes.startup.timeoutSeconds | default .Values.probes.timeoutSeconds }}
           httpGet:
             path: {{ .Values.minion.probes.endpoint }}
             port: {{ .Values.minion.service.port }}

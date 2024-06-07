@@ -25,7 +25,7 @@ import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.blocks.TransferableBlockTestUtils;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
@@ -66,13 +66,13 @@ public class IntersectOperatorTest {
     });
     Mockito.when(_leftOperator.nextBlock())
         .thenReturn(OperatorTestUtil.block(schema, new Object[]{1, "AA"}, new Object[]{2, "BB"}, new Object[]{3, "CC"}))
-        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
     Mockito.when(_rightOperator.nextBlock()).thenReturn(
             OperatorTestUtil.block(schema, new Object[]{1, "AA"}, new Object[]{2, "BB"}, new Object[]{4, "DD"}))
-        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
 
     IntersectOperator intersectOperator =
-        new IntersectOperator(OperatorTestUtil.getDefaultContext(), ImmutableList.of(_leftOperator, _rightOperator),
+        new IntersectOperator(OperatorTestUtil.getTracingContext(), ImmutableList.of(_leftOperator, _rightOperator),
             schema);
 
     TransferableBlock result = intersectOperator.nextBlock();
@@ -95,14 +95,14 @@ public class IntersectOperatorTest {
     Mockito.when(_leftOperator.nextBlock())
         .thenReturn(OperatorTestUtil.block(schema, new Object[]{1, "AA"}, new Object[]{2, "BB"}, new Object[]{3, "CC"},
             new Object[]{1, "AA"}, new Object[]{2, "BB"}, new Object[]{3, "CC"}))
-        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
     Mockito.when(_rightOperator.nextBlock()).thenReturn(
             OperatorTestUtil.block(schema, new Object[]{1, "AA"}, new Object[]{2, "BB"}, new Object[]{4, "DD"},
                 new Object[]{1, "AA"}, new Object[]{2, "BB"}, new Object[]{4, "DD"}))
-        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
 
     IntersectOperator intersectOperator =
-        new IntersectOperator(OperatorTestUtil.getDefaultContext(), ImmutableList.of(_leftOperator, _rightOperator),
+        new IntersectOperator(OperatorTestUtil.getTracingContext(), ImmutableList.of(_leftOperator, _rightOperator),
             schema);
 
     TransferableBlock result = intersectOperator.nextBlock();

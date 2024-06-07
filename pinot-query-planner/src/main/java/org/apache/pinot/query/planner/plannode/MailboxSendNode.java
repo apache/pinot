@@ -80,6 +80,21 @@ public class MailboxSendNode extends AbstractPlanNode {
     _isPrePartitioned = isPrePartitioned;
   }
 
+  public MailboxSendNode(int planFragmentId, DataSchema dataSchema, int receiverStageId,
+      RelDistribution.Type distributionType, PinotRelExchangeType exchangeType, List<Integer> distributionKeys,
+      List<RexExpression> collationKeys, List<RelFieldCollation.Direction> collationDirections, boolean sortOnSender,
+      boolean prePartitioned) {
+    super(planFragmentId, dataSchema);
+    _receiverStageId = receiverStageId;
+    _distributionType = distributionType;
+    _exchangeType = exchangeType;
+    _distributionKeys = distributionKeys;
+    _collationKeys = collationKeys;
+    _collationDirections = collationDirections;
+    _isSortOnSender = sortOnSender;
+    _isPrePartitioned = prePartitioned;
+  }
+
   public int getReceiverStageId() {
     return _receiverStageId;
   }
@@ -131,7 +146,7 @@ public class MailboxSendNode extends AbstractPlanNode {
     sb.append(_distributionType);
     sb.append(')');
     if (isPrePartitioned()) {
-       sb.append("[PARTITIONED]");
+      sb.append("[PARTITIONED]");
     }
     if (isSortOnSender()) {
       sb.append("[SORTED]");

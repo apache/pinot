@@ -32,6 +32,11 @@
       "dataType": "STRING",
       "name": "newStringMVDimension",
       "singleValueField": false
+    },
+    {
+      "dataType": "STRING",
+      "name": "newRawStringSVDimension",
+      "defaultNullValue": "null"
     }
   ]
 }

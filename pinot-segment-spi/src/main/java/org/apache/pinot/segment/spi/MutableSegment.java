@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.spi;
 
+import java.io.File;
 import java.io.IOException;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -42,4 +43,9 @@ public interface MutableSegment extends IndexSegment {
    * @return The number of records indexed
    */
   int getNumDocsIndexed();
+
+  /**
+   * Returns the consumer dir containing any segment files.
+   */
+  File getConsumerDir();
 }

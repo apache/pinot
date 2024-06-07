@@ -315,6 +315,22 @@ public class IngestionDelayTracker {
   }
 
   /*
+   * Method to get timestamp used for the ingestion delay for a given partition.
+   *
+   * @param partitionGroupId partition for which we are retrieving the delay
+   *
+   * @return ingestion delay timestamp in milliseconds for the given partition ID.
+   */
+  public long getPartitionIngestionTimeMs(int partitionGroupId) {
+    // Not protected as this will only be invoked when metric is installed which happens after server ready
+    IngestionTimestamps currentMeasure = _partitionToIngestionTimestampsMap.get(partitionGroupId);
+    if (currentMeasure == null) { // Guard just in case we read the metric without initializing it
+      return Long.MIN_VALUE;
+    }
+    return currentMeasure._ingestionTimeMs;
+  }
+
+  /*
    * Method to get ingestion delay for a given partition.
    *
    * @param partitionGroupId partition for which we are retrieving the delay

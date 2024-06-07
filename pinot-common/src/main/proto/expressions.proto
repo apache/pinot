@@ -1,0 +1,79 @@
+//
+// Licensed to the Apache Software Foundation (ASF) under one
+// or more contributor license agreements.  See the NOTICE file
+// distributed with this work for additional information
+// regarding copyright ownership.  The ASF licenses this file
+// to you under the Apache License, Version 2.0 (the
+// "License"); you may not use this file except in compliance
+// with the License.  You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
+//
+
+syntax = "proto3";
+
+package org.apache.pinot.common.proto;
+
+enum ColumnDataType {
+  INT = 0;
+  LONG = 1;
+  FLOAT = 2;
+  DOUBLE = 3;
+  BIG_DECIMAL = 4;
+  BOOLEAN = 5;
+  TIMESTAMP = 6;
+  STRING = 7;
+  JSON = 8;
+  BYTES = 9;
+  OBJECT = 10;
+  INT_ARRAY = 11;
+  LONG_ARRAY = 12;
+  FLOAT_ARRAY = 13;
+  DOUBLE_ARRAY = 14;
+  BOOLEAN_ARRAY = 15;
+  TIMESTAMP_ARRAY = 16;
+  STRING_ARRAY = 17;
+  BYTES_ARRAY = 18;
+  UNKNOWN = 19;
+}
+
+message InputRef {
+  int32 index = 1;
+}
+
+message Literal {
+  ColumnDataType dataType = 1;
+  bool isValueNull = 2;
+  oneof literalField {
+    bool boolField = 101;
+    int32 intField = 102;
+    int64 longField = 103;
+    float floatField = 104;
+    double doubleField = 105;
+    string stringField = 106;
+    bytes bytesField = 107;
+    bytes serializedField = 108;
+  }
+}
+
+message FunctionCall {
+  ColumnDataType dataType = 1;
+  string functionName = 2;
+  repeated RexExpression functionOperands = 3;
+  bool isDistinct = 4;
+}
+
+message RexExpression {
+  oneof expression {
+    InputRef inputRef = 1;
+    Literal literal = 2;
+    FunctionCall functionCall = 3;
+  }
+}

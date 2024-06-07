@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockDocIdIterator;
@@ -173,7 +174,7 @@ abstract class BaseStarTreeV2Test<R, A> {
     StarTreeIndexConfig starTreeIndexConfig =
         new StarTreeIndexConfig(Arrays.asList(DIMENSION_D1, DIMENSION_D2), null, null, Collections.singletonList(
             new StarTreeAggregationConfig(METRIC, _valueAggregator.getAggregationType().getName(),
-                getCompressionCodec())), MAX_LEAF_RECORDS);
+                getCompressionCodec(), true, getIndexVersion(), null, null)), MAX_LEAF_RECORDS);
     File indexDir = new File(TEMP_DIR, SEGMENT_NAME);
     // Randomly build star-tree using on-heap or off-heap mode
     MultipleTreesBuilder.BuildMode buildMode =
@@ -479,14 +480,21 @@ abstract class BaseStarTreeV2Test<R, A> {
   /**
    * Can be overridden to force the compression codec.
    */
+  @Nullable
   CompressionCodec getCompressionCodec() {
     CompressionCodec[] compressionCodecs = CompressionCodec.values();
-    while (true) {
-      CompressionCodec compressionCodec = compressionCodecs[RANDOM.nextInt(compressionCodecs.length)];
-      if (compressionCodec.isApplicableToRawIndex()) {
-        return compressionCodec;
-      }
-    }
+    CompressionCodec compressionCodec = compressionCodecs[RANDOM.nextInt(compressionCodecs.length)];
+    return compressionCodec.isApplicableToRawIndex() ? compressionCodec : null;
+  }
+
+  /**
+   * Can be overridden to force the index version.
+   */
+  @Nullable
+  Integer getIndexVersion() {
+    // Allow 2, 3, 4 or null
+    int version = 1 + RANDOM.nextInt(4);
+    return version > 1 ? version : null;
   }
 
   abstract ValueAggregator<R, A> getValueAggregator();

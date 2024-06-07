@@ -87,7 +87,7 @@ public class PinotDriver implements Driver {
       if (!this.acceptsURL(url)) {
         return null;
       }
-      LOGGER.info("Initiating connection to database for url: " + url);
+      LOGGER.info("Initiating connection to database for url: {}", url);
 
       Map<String, String> urlParams = DriverUtils.getURLParams(url);
       info.putAll(urlParams);

@@ -49,9 +49,15 @@ securityContext: {}
   # runAsNonRoot: true
   # runAsUser: 1000
 
+# default values of the probes i.e. liveness and readiness.
+# customization of values is present at the component level.
 probes:
   initialDelaySeconds: 60
   periodSeconds: 10
+  failureThreshold: 10
+  # should be 1 for liveness and startup probe, as per K8s doc.
+  successThreshold: 1
+  timeoutSeconds: 10
 
 serviceAccount:
   # Specifies whether a service account should be created
@@ -92,6 +98,27 @@ controller:
     endpoint: "/health"
     livenessEnabled: false
     readinessEnabled: false
+    startupEnabled: false
+    liveness:
+      initialDelaySeconds: 60
+      failureThreshold: 10
+      timeoutSeconds: 10
+      successThreshold: 1
+      periodSeconds: 10
+
+    readiness:
+      initialDelaySeconds: 60
+      failureThreshold: 10
+      timeoutSeconds: 10
+      successThreshold: 1
+      periodSeconds: 10
+
+    startup:
+      initialDelaySeconds: 60
+      failureThreshold: 10
+      timeoutSeconds: 10
+      successThreshold: 1
+      periodSeconds: 10
 
   persistence:
     enabled: true
@@ -114,6 +141,11 @@ controller:
 
   log4j2ConfFile: /opt/pinot/etc/conf/pinot-controller-log4j2.xml
   pluginsDir: /opt/pinot/plugins
+
+  pdb:
+    enabled: false 
+    minAvailable: ""
+    maxUnavailable: 50%
 
   service:
     annotations: {}
@@ -163,6 +195,10 @@ controller:
   affinity: {}
 
   podAnnotations: {}
+
+  # set enabled as true, to automatically roll controller stateful set for configmap change
+  automaticReload:
+    enabled: false
 
   updateStrategy:
     type: RollingUpdate
@@ -214,10 +250,36 @@ broker:
     endpoint: "/health"
     livenessEnabled: true
     readinessEnabled: true
+    startupEnabled: false
+    liveness:
+      initialDelaySeconds: 60
+      failureThreshold: 10
+      timeoutSeconds: 10
+      successThreshold: 1
+      periodSeconds: 10
+
+    readiness:
+      initialDelaySeconds: 60
+      failureThreshold: 10
+      timeoutSeconds: 10
+      successThreshold: 1
+      periodSeconds: 10
+
+    startup:
+      initialDelaySeconds: 60
+      failureThreshold: 10
+      timeoutSeconds: 10
+      successThreshold: 1
+      periodSeconds: 10
 
   persistence:
     extraVolumes: []
     extraVolumeMounts: []
+
+  pdb:
+    enabled: false
+    minAvailable: ""
+    maxUnavailable: 50%
 
   service:
     annotations: {}
@@ -269,6 +331,10 @@ broker:
 
   podAnnotations: {}
 
+  # set enabled as true, to automatically roll broker stateful set for configmap change
+  automaticReload:
+    enabled: false
+
   updateStrategy:
     type: RollingUpdate
 
@@ -312,6 +378,30 @@ server:
     endpoint: "/health"
     livenessEnabled: false
     readinessEnabled: false
+    startupEnabled: false
+    liveness:
+      endpoint: "/health/liveness"
+      initialDelaySeconds: 60
+      failureThreshold: 10
+      timeoutSeconds: 10
+      successThreshold: 1
+      periodSeconds: 10
+
+    readiness:
+      endpoint: "/health/readiness"
+      initialDelaySeconds: 60
+      failureThreshold: 10
+      timeoutSeconds: 10
+      successThreshold: 1
+      periodSeconds: 10
+
+    startup:
+      endpoint: "/health/liveness"
+      initialDelaySeconds: 60
+      failureThreshold: 10
+      timeoutSeconds: 10
+      successThreshold: 1
+      periodSeconds: 10
 
   dataDir: /var/pinot/server/data/index
   segmentTarDir: /var/pinot/server/data/segment
@@ -330,6 +420,11 @@ server:
 
   log4j2ConfFile: /opt/pinot/etc/conf/pinot-server-log4j2.xml
   pluginsDir: /opt/pinot/plugins
+
+  pdb:
+    enabled: false 
+    minAvailable: ""
+    maxUnavailable: 1
 
   service:
     annotations: {}
@@ -361,6 +456,10 @@ server:
   tolerations: []
 
   podAnnotations: {}
+
+  # set enabled as true, to automatically roll server stateful set for configmap change
+  automaticReload:
+    enabled: false
 
   updateStrategy:
     type: RollingUpdate
@@ -407,6 +506,27 @@ minion:
     endpoint: "/health"
     livenessEnabled: true
     readinessEnabled: true
+    startupEnabled: false
+    liveness:
+      initialDelaySeconds: 60
+      failureThreshold: 10
+      timeoutSeconds: 10
+      successThreshold: 1
+      periodSeconds: 10
+
+    readiness:
+      initialDelaySeconds: 60
+      failureThreshold: 10
+      timeoutSeconds: 10
+      successThreshold: 1
+      periodSeconds: 10
+
+    startup:
+      initialDelaySeconds: 60
+      failureThreshold: 10
+      timeoutSeconds: 10
+      successThreshold: 1
+      periodSeconds: 10
 
   dataDir: /var/pinot/minion/data
   jvmOpts: "-XX:ActiveProcessorCount=2 -Xms256M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-minion.log"
@@ -452,6 +572,9 @@ minion:
 
   podAnnotations: {}
 
+  automaticReload:
+    enabled: false
+
   updateStrategy:
     type: RollingUpdate
 
@@ -494,6 +617,27 @@ minionStateless:
     endpoint: "/health"
     livenessEnabled: true
     readinessEnabled: true
+    startupEnabled: true
+    liveness:
+      initialDelaySeconds: 60
+      failureThreshold: 10
+      timeoutSeconds: 10
+      successThreshold: 1
+      periodSeconds: 10
+
+    readiness:
+      initialDelaySeconds: 60
+      failureThreshold: 10
+      timeoutSeconds: 10
+      successThreshold: 1
+      periodSeconds: 10
+
+    startup:
+      initialDelaySeconds: 60
+      failureThreshold: 10
+      timeoutSeconds: 10
+      successThreshold: 1
+      periodSeconds: 10
 
   dataDir: /var/pinot/minion/data
   jvmOpts: "-XX:ActiveProcessorCount=2 -Xms256M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-minion.log"

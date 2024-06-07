@@ -237,7 +237,7 @@ public class VarByteChunkSVForwardIndexTest {
       maxStringLengthInBytes = Math.max(maxStringLengthInBytes, value.getBytes(UTF_8).length);
     }
 
-    int numDocsPerChunk = SingleValueVarByteRawIndexCreator.getNumDocsPerChunk(maxStringLengthInBytes);
+    int numDocsPerChunk = SingleValueVarByteRawIndexCreator.getNumDocsPerChunk(maxStringLengthInBytes, 1024 * 1024);
     try (VarByteChunkForwardIndexWriter writer = new VarByteChunkForwardIndexWriter(outFile, compressionType, numDocs,
         numDocsPerChunk, maxStringLengthInBytes, 3)) {
       // NOTE: No need to test BYTES explicitly because STRING is handled as UTF-8 encoded bytes

@@ -39,6 +39,10 @@ public class UpsertConfig extends BaseJsonConfig {
     APPEND, IGNORE, INCREMENT, MAX, MIN, OVERWRITE, UNION
   }
 
+  public enum ConsistencyMode {
+    NONE, SYNC, SNAPSHOT
+  }
+
   @JsonPropertyDescription("Upsert mode.")
   private Mode _mode;
 
@@ -74,6 +78,12 @@ public class UpsertConfig extends BaseJsonConfig {
 
   @JsonPropertyDescription("Whether to preload segments for fast upsert metadata recovery")
   private boolean _enablePreload;
+
+  @JsonPropertyDescription("Configure the way to provide consistent view for upsert table")
+  private ConsistencyMode _consistencyMode = ConsistencyMode.NONE;
+
+  @JsonPropertyDescription("Refresh interval when using the snapshot consistency mode")
+  private long _upsertViewRefreshIntervalMs = 3000;
 
   @JsonPropertyDescription("Custom class for upsert metadata manager")
   private String _metadataManagerClass;
@@ -145,6 +155,14 @@ public class UpsertConfig extends BaseJsonConfig {
 
   public boolean isEnablePreload() {
     return _enablePreload;
+  }
+
+  public ConsistencyMode getConsistencyMode() {
+    return _consistencyMode;
+  }
+
+  public long getUpsertViewRefreshIntervalMs() {
+    return _upsertViewRefreshIntervalMs;
   }
 
   public boolean isDropOutOfOrderRecord() {
@@ -235,6 +253,14 @@ public class UpsertConfig extends BaseJsonConfig {
 
   public void setEnablePreload(boolean enablePreload) {
     _enablePreload = enablePreload;
+  }
+
+  public void setConsistencyMode(ConsistencyMode consistencyMode) {
+    _consistencyMode = consistencyMode;
+  }
+
+  public void setUpsertViewRefreshIntervalMs(long upsertViewRefreshIntervalMs) {
+    _upsertViewRefreshIntervalMs = upsertViewRefreshIntervalMs;
   }
 
   public void setDropOutOfOrderRecord(boolean dropOutOfOrderRecord) {

@@ -58,9 +58,10 @@ public class ConcurrentMapTableUpsertMetadataManager extends BaseTableUpsertMeta
   }
 
   @Override
-  public void setSegmentContexts(List<SegmentContext> segmentContexts) {
+  public void setSegmentContexts(List<SegmentContext> segmentContexts, Map<String, String> queryOptions) {
     _partitionMetadataManagerMap.forEach(
-        (partitionID, upsertMetadataManager) -> upsertMetadataManager.setSegmentContexts(segmentContexts));
+        (partitionID, upsertMetadataManager) -> upsertMetadataManager.setSegmentContexts(segmentContexts,
+            queryOptions));
   }
 
   @Override

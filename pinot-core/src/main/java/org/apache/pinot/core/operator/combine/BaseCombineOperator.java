@@ -123,9 +123,9 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
             //       exception into the query response, and the main thread might wait infinitely (until timeout) or
             //       throw unexpected exceptions (such as NPE).
             if (t instanceof Exception) {
-              LOGGER.error("Caught exception while processing query: " + _queryContext, t);
+              LOGGER.error("Caught exception while processing query: {}", _queryContext, t);
             } else {
-              LOGGER.error("Caught serious error while processing query: " + _queryContext, t);
+              LOGGER.error("Caught serious error while processing query: {}", _queryContext, t);
             }
             onProcessSegmentsException(t);
           } finally {

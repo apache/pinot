@@ -47,6 +47,14 @@ public class IntColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
 
       _maxNumberOfMultiValues = Math.max(_maxNumberOfMultiValues, values.length);
       updateTotalNumberOfEntries(values);
+    } else if (entry instanceof int[]) {
+      int[] values = (int[]) entry;
+      for (int value : values) {
+        _values.add(value);
+      }
+
+      _maxNumberOfMultiValues = Math.max(_maxNumberOfMultiValues, values.length);
+      updateTotalNumberOfEntries(values.length);
     } else {
       int value = (int) entry;
       addressSorted(value);

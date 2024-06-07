@@ -32,6 +32,7 @@ import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.JoinOverFlowMode;
+import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.WindowOverFlowMode;
 
 
 /**
@@ -138,6 +139,11 @@ public class QueryOptionsUtils {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.SKIP_UPSERT));
   }
 
+  public static long getUpsertViewFreshnessMs(Map<String, String> queryOptions) {
+    String freshnessMsString = queryOptions.get(QueryOptionKey.UPSERT_VIEW_FRESHNESS_MS);
+    return freshnessMsString != null ? Long.parseLong(freshnessMsString) : -1;
+  }
+
   public static boolean isScanStarTreeNodes(Map<String, String> queryOptions) {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.SCAN_STAR_TREE_NODES));
   }
@@ -194,6 +200,10 @@ public class QueryOptionsUtils {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.EXPLAIN_PLAN_VERBOSE));
   }
 
+  public static boolean isUseMultistageEngine(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.USE_MULTISTAGE_ENGINE));
+  }
+
   @Nullable
   public static Integer getMaxExecutionThreads(Map<String, String> queryOptions) {
     String maxExecutionThreadsString = queryOptions.get(QueryOptionKey.MAX_EXECUTION_THREADS);
@@ -224,6 +234,10 @@ public class QueryOptionsUtils {
 
   public static boolean isServerReturnFinalResult(Map<String, String> queryOptions) {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.SERVER_RETURN_FINAL_RESULT));
+  }
+
+  public static boolean isServerReturnFinalResultKeyUnpartitioned(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.SERVER_RETURN_FINAL_RESULT_KEY_UNPARTITIONED));
   }
 
   @Nullable
@@ -275,5 +289,17 @@ public class QueryOptionsUtils {
   public static JoinOverFlowMode getJoinOverflowMode(Map<String, String> queryOptions) {
     String joinOverflowModeStr = queryOptions.get(QueryOptionKey.JOIN_OVERFLOW_MODE);
     return joinOverflowModeStr != null ? JoinOverFlowMode.valueOf(joinOverflowModeStr) : null;
+  }
+
+  @Nullable
+  public static Integer getMaxRowsInWindow(Map<String, String> queryOptions) {
+    String maxRowsInWindow = queryOptions.get(QueryOptionKey.MAX_ROWS_IN_WINDOW);
+    return maxRowsInWindow != null ? Integer.parseInt(maxRowsInWindow) : null;
+  }
+
+  @Nullable
+  public static WindowOverFlowMode getWindowOverflowMode(Map<String, String> queryOptions) {
+    String windowOverflowModeStr = queryOptions.get(QueryOptionKey.WINDOW_OVERFLOW_MODE);
+    return windowOverflowModeStr != null ? WindowOverFlowMode.valueOf(windowOverflowModeStr) : null;
   }
 }

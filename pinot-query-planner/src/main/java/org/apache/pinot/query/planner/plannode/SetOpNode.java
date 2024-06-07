@@ -57,7 +57,7 @@ public class SetOpNode extends AbstractPlanNode {
 
   @Override
   public String explain() {
-    return _setOpType.toString();
+    return _all ? _setOpType.toString() + "_ALL" : _setOpType.toString();
   }
 
   @Override

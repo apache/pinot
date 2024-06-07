@@ -180,7 +180,7 @@ public class StartControllerCommand extends AbstractBaseAdminCommand implements 
   public boolean execute()
       throws Exception {
     try {
-      LOGGER.info("Executing command: " + toString());
+      LOGGER.info("Executing command: {}", toString());
       Map<String, Object> controllerConf = getControllerConf();
       StartServiceManagerCommand startServiceManagerCommand =
           new StartServiceManagerCommand().setZkAddress(_zkAddress).setClusterName(_clusterName).setPort(-1)

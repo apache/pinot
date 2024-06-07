@@ -23,12 +23,12 @@ import java.util.concurrent.locks.ReentrantLock;
 
 
 public class SegmentLocks {
-  private static final SegmentLocks DEFAULT_LOCKS = create();
   private static final int DEFAULT_NUM_LOCKS = 10000;
+
   private final Lock[] _locks;
   private final int _numLocks;
 
-  private SegmentLocks(int numLocks) {
+  public SegmentLocks(int numLocks) {
     _numLocks = numLocks;
     _locks = new Lock[numLocks];
     for (int i = 0; i < numLocks; i++) {
@@ -36,18 +36,30 @@ public class SegmentLocks {
     }
   }
 
+  public SegmentLocks() {
+    this(DEFAULT_NUM_LOCKS);
+  }
+
   public Lock getLock(String tableNameWithType, String segmentName) {
     return _locks[Math.abs((31 * tableNameWithType.hashCode() + segmentName.hashCode()) % _numLocks)];
   }
 
+  // DO NOT use global lock because that can break tests with multiple server instances
+
+  @Deprecated
+  private static final SegmentLocks DEFAULT_LOCKS = create();
+
+  @Deprecated
   public static Lock getSegmentLock(String tableNameWithType, String segmentName) {
     return DEFAULT_LOCKS.getLock(tableNameWithType, segmentName);
   }
 
+  @Deprecated
   public static SegmentLocks create() {
     return new SegmentLocks(DEFAULT_NUM_LOCKS);
   }
 
+  @Deprecated
   public static SegmentLocks create(int numLocks) {
     return new SegmentLocks(numLocks);
   }

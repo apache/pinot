@@ -26,8 +26,11 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.annotation.Nullable;
+import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.sql.SqlFunctionCategory;
 import org.apache.calcite.sql.SqlKind;
+import org.apache.calcite.sql.SqlOperatorBinding;
 import org.apache.calcite.sql.type.OperandTypes;
 import org.apache.calcite.sql.type.ReturnTypes;
 import org.apache.calcite.sql.type.SqlOperandTypeChecker;
@@ -322,8 +325,17 @@ public enum AggregationFunctionType {
   ARRAYAGG("arrayAgg", null, SqlKind.ARRAY_AGG, SqlFunctionCategory.USER_DEFINED_FUNCTION,
       OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.STRING, SqlTypeFamily.BOOLEAN),
           ordinal -> ordinal > 1), ReturnTypes.TO_ARRAY, ReturnTypes.explicit(SqlTypeName.OTHER)),
+  LISTAGG("listAgg", null, SqlKind.LISTAGG, SqlFunctionCategory.USER_DEFINED_FUNCTION,
+      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.STRING, SqlTypeFamily.BOOLEAN),
+          ordinal -> ordinal > 1), ReturnTypes.VARCHAR, ReturnTypes.explicit(SqlTypeName.OTHER)),
 
   // funnel aggregate functions
+  FUNNELMAXSTEP("funnelMaxStep", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
+      OperandTypes.VARIADIC, ReturnTypes.BIGINT, ReturnTypes.explicit(SqlTypeName.OTHER)),
+  FUNNELCOMPLETECOUNT("funnelCompleteCount", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
+      OperandTypes.VARIADIC, ReturnTypes.BIGINT, ReturnTypes.explicit(SqlTypeName.OTHER)),
+  FUNNELMATCHSTEP("funnelMatchStep", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
+      OperandTypes.VARIADIC, IntArrayReturnTypeInference.INSTANCE, ReturnTypes.explicit(SqlTypeName.OTHER)),
   // TODO: revisit support for funnel count in V2
   FUNNELCOUNT("funnelCount");
 
@@ -455,9 +467,10 @@ public enum AggregationFunctionType {
    * <p>NOTE: Underscores in the function name are ignored.
    */
   public static AggregationFunctionType getAggregationFunctionType(String functionName) {
-    if (functionName.regionMatches(true, 0, "percentile", 0, 10)) {
+    String normalizedFunctionName = getNormalizedAggregationFunctionName(functionName);
+    if (normalizedFunctionName.regionMatches(false, 0, "PERCENTILE", 0, 10)) {
       // This style of aggregation functions is not supported in the multistage engine
-      String remainingFunctionName = getNormalizedAggregationFunctionName(functionName).substring(10).toUpperCase();
+      String remainingFunctionName = normalizedFunctionName.substring(10).toUpperCase();
       if (remainingFunctionName.isEmpty() || remainingFunctionName.matches("\\d+")) {
         return PERCENTILE;
       } else if (remainingFunctionName.equals("EST") || remainingFunctionName.matches("EST\\d+")) {
@@ -491,10 +504,22 @@ public enum AggregationFunctionType {
       }
     } else {
       try {
-        return AggregationFunctionType.valueOf(getNormalizedAggregationFunctionName(functionName));
+        return AggregationFunctionType.valueOf(normalizedFunctionName);
       } catch (IllegalArgumentException e) {
         throw new IllegalArgumentException("Invalid aggregation function name: " + functionName);
       }
+    }
+  }
+
+  static class IntArrayReturnTypeInference implements SqlReturnTypeInference {
+    static final IntArrayReturnTypeInference INSTANCE = new IntArrayReturnTypeInference();
+
+    @Override
+    public RelDataType inferReturnType(
+        SqlOperatorBinding opBinding) {
+      RelDataTypeFactory typeFactory = opBinding.getTypeFactory();
+      RelDataType elementType = typeFactory.createSqlType(SqlTypeName.INTEGER);
+      return typeFactory.createArrayType(elementType, -1);
     }
   }
 }

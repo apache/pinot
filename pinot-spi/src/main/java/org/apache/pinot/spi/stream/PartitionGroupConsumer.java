@@ -45,10 +45,10 @@ public interface PartitionGroupConsumer extends Closeable {
   }
 
   /**
-   * Return messages from the stream partition group within the specified timeout
+   * Fetches messages from the stream partition from the given start offset within the specified timeout.
    *
-   * The message may be fetched by actively polling the source or by retrieving from a pre-fetched buffer. This depends
-   * on the implementation.
+   * This method should return within the timeout. If there is no message available before time runs out, an empty
+   * message batch should be returned.
    *
    * @param startOffset The offset of the first message desired, inclusive
    * @param timeoutMs Timeout in milliseconds

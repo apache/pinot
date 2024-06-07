@@ -64,4 +64,9 @@ public class ExplainPlanUtils {
     }
     return explainPlan.toString();
   }
+
+  public static String formatMultiStageExplainPlan(JsonNode explainPlanJson) {
+    JsonNode rows = explainPlanJson.get("resultTable").get("rows");
+    return rows.get(0).get(1).asText();
+  }
 }

@@ -26,15 +26,20 @@ import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public final class DataBlockUtils {
+  private static final Logger LOGGER = LoggerFactory.getLogger(DataBlockUtils.class);
+
   private DataBlockUtils() {
   }
 
   static final int VERSION_TYPE_SHIFT = 5;
 
   public static MetadataBlock getErrorDataBlock(Exception e) {
+    LOGGER.info("Caught exception while processing query", e);
     if (e instanceof ProcessingException) {
       return getErrorDataBlock(Collections.singletonMap(((ProcessingException) e).getErrorCode(), extractErrorMsg(e)));
     } else {
@@ -51,33 +56,40 @@ public final class DataBlockUtils {
   }
 
   public static MetadataBlock getErrorDataBlock(Map<Integer, String> exceptions) {
-    MetadataBlock errorBlock = new MetadataBlock(MetadataBlock.MetadataBlockType.ERROR);
-    for (Map.Entry<Integer, String> exception : exceptions.entrySet()) {
-      errorBlock.addException(exception.getKey(), exception.getValue());
-    }
-    return errorBlock;
+    return MetadataBlock.newError(exceptions);
   }
 
-  public static MetadataBlock getEndOfStreamDataBlock() {
-    return new MetadataBlock(MetadataBlock.MetadataBlockType.EOS);
+  /**
+   * Reads an integer from the given byte buffer.
+   * <p>
+   * The returned integer contains both the version and the type of the data block.
+   * {@link #getVersion(int)} and {@link #getType(int)} can be used to extract the version and the type.
+   * @param byteBuffer byte buffer to read from. A single int will be read
+   */
+  public static int readVersionType(ByteBuffer byteBuffer) {
+    return byteBuffer.getInt();
   }
 
-  public static MetadataBlock getEndOfStreamDataBlock(Map<String, String> stats) {
-    return new MetadataBlock(MetadataBlock.MetadataBlockType.EOS, stats);
+  public static int getVersion(int versionType) {
+    return versionType & ((1 << VERSION_TYPE_SHIFT) - 1);
+  }
+
+  public static DataBlock.Type getType(int versionType) {
+    return DataBlock.Type.fromOrdinal(versionType >> VERSION_TYPE_SHIFT);
   }
 
   public static DataBlock getDataBlock(ByteBuffer byteBuffer)
       throws IOException {
-    int versionType = byteBuffer.getInt();
-    int version = versionType & ((1 << VERSION_TYPE_SHIFT) - 1);
-    DataBlock.Type type = DataBlock.Type.fromOrdinal(versionType >> VERSION_TYPE_SHIFT);
+    int versionType = readVersionType(byteBuffer);
+    int version = getVersion(versionType);
+    DataBlock.Type type = getType(versionType);
     switch (type) {
       case COLUMNAR:
         return new ColumnarDataBlock(byteBuffer);
       case ROW:
         return new RowDataBlock(byteBuffer);
       case METADATA:
-        return new MetadataBlock(byteBuffer);
+        return MetadataBlock.deserialize(byteBuffer, version);
       default:
         throw new UnsupportedOperationException("Unsupported data table version: " + version + " with type: " + type);
     }

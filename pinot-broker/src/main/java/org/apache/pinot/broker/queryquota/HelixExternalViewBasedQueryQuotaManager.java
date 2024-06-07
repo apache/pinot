@@ -224,6 +224,7 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
           tableNameWithType, overallRate, previousRate, perBrokerRate, onlineCount, stat.getVersion());
     }
     addMaxBurstQPSCallbackTableGaugeIfNeeded(tableNameWithType, queryQuotaEntity);
+    addQueryQuotaCapacityUtilizationRateTableGaugeIfNeeded(tableNameWithType, queryQuotaEntity);
     if (isQueryRateLimitDisabled()) {
       LOGGER.info("Query rate limiting is currently disabled for this broker. So it won't take effect immediately.");
     }
@@ -245,6 +246,7 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
       queryQuotaEntity.setRateLimiter(null);
     }
     addMaxBurstQPSCallbackTableGaugeIfNeeded(tableNameWithType, queryQuotaEntity);
+    addQueryQuotaCapacityUtilizationRateTableGaugeIfNeeded(tableNameWithType, queryQuotaEntity);
   }
 
   /**
@@ -254,6 +256,27 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
     final QueryQuotaEntity finalQueryQuotaEntity = queryQuotaEntity;
     _brokerMetrics.addCallbackTableGaugeIfNeeded(tableNameWithType, BrokerGauge.MAX_BURST_QPS,
         () -> (long) finalQueryQuotaEntity.getMaxQpsTracker().getMaxCountPerBucket());
+  }
+
+  /**
+   * Add the query quota capacity utilization rate table gauge to the metric system if the qps quota is specified.
+   */
+  private void addQueryQuotaCapacityUtilizationRateTableGaugeIfNeeded(String tableNameWithType,
+      QueryQuotaEntity queryQuotaEntity) {
+    if (queryQuotaEntity.getRateLimiter() != null) {
+      final QueryQuotaEntity finalQueryQuotaEntity = queryQuotaEntity;
+      _brokerMetrics.setOrUpdateTableGauge(tableNameWithType, BrokerGauge.QUERY_QUOTA_CAPACITY_UTILIZATION_RATE, () -> {
+        double perBrokerRate = finalQueryQuotaEntity.getRateLimiter().getRate();
+        int actualHitCountWithinTimeRange = finalQueryQuotaEntity.getMaxQpsTracker().getHitCount();
+        long hitCountAllowedWithinTimeRage =
+            (long) (perBrokerRate * finalQueryQuotaEntity.getMaxQpsTracker().getDefaultTimeRangeMs() / 1000L);
+        // Since the MaxQpsTracker specifies 1-min window as valid time range, we can get the query quota capacity
+        // utilization by using the actual hit count within 1 min divided by the expected hit count within 1 min.
+        long percentageOfCapacityUtilization = actualHitCountWithinTimeRange * 100L / hitCountAllowedWithinTimeRage;
+        LOGGER.debug("The percentage of rate limit capacity utilization is {}", percentageOfCapacityUtilization);
+        return percentageOfCapacityUtilization;
+      });
+    }
   }
 
   /**
@@ -316,13 +339,6 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
 
     // Emit the qps capacity utilization rate.
     int numHits = queryQuotaEntity.getQpsTracker().getHitCount();
-    if (_brokerMetrics != null) {
-      int percentageOfCapacityUtilization = (int) (numHits * 100 / perBrokerRate);
-      LOGGER.debug("The percentage of rate limit capacity utilization is {}", percentageOfCapacityUtilization);
-      _brokerMetrics.setValueOfTableGauge(tableNameWithType, BrokerGauge.QUERY_QUOTA_CAPACITY_UTILIZATION_RATE,
-          percentageOfCapacityUtilization);
-    }
-
     if (!rateLimiter.tryAcquire()) {
       LOGGER.info("Quota is exceeded for table: {}. Per-broker rate: {}. Current qps: {}", tableNameWithType,
           perBrokerRate, numHits);

@@ -19,8 +19,8 @@
 package org.apache.pinot.core.operator.filter.predicate;
 
 import com.google.common.base.Preconditions;
-import java.util.regex.Matcher;
 import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
+import org.apache.pinot.common.utils.regex.Matcher;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 

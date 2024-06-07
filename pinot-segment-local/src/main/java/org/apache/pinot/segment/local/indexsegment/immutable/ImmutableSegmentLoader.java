@@ -68,35 +68,45 @@ public class ImmutableSegmentLoader {
       throws Exception {
     IndexLoadingConfig defaultIndexLoadingConfig = new IndexLoadingConfig();
     defaultIndexLoadingConfig.setReadMode(readMode);
-    return load(indexDir, defaultIndexLoadingConfig, null, false);
+    return load(indexDir, defaultIndexLoadingConfig, false);
   }
 
   /**
    * Loads the segment with specified table config and schema.
    * This method is used to access the segment without modifying it, i.e. in read-only mode.
    */
+  @Deprecated
   public static ImmutableSegment load(File indexDir, ReadMode readMode, TableConfig tableConfig,
       @Nullable Schema schema)
       throws Exception {
     IndexLoadingConfig defaultIndexLoadingConfig = new IndexLoadingConfig(tableConfig, schema);
     defaultIndexLoadingConfig.setReadMode(readMode);
-    return load(indexDir, defaultIndexLoadingConfig, schema, false);
+    return load(indexDir, defaultIndexLoadingConfig, false);
   }
 
   /**
-   * Loads the segment with empty schema but a specified IndexLoadingConfig.
+   * Loads the segment with specified IndexLoadingConfig.
    * This method modifies the segment like to convert segment format, add or remove indices.
    * Mostly used by UT cases to add some specific index for testing purpose.
    */
   public static ImmutableSegment load(File indexDir, IndexLoadingConfig indexLoadingConfig)
       throws Exception {
-    return load(indexDir, indexLoadingConfig, null, true);
+    return load(indexDir, indexLoadingConfig, true);
+  }
+
+  /**
+   * Loads the segment with specified IndexLoadingConfig.
+   * This method modifies the segment like to convert segment format, add or remove indices.
+   */
+  public static ImmutableSegment load(File indexDir, IndexLoadingConfig indexLoadingConfig, boolean needPreprocess)
+      throws Exception {
+    return load(indexDir, indexLoadingConfig, indexLoadingConfig.getSchema(), needPreprocess);
   }
 
   /**
    * Loads the segment with specified schema and IndexLoadingConfig, usually from Zookeeper.
    * This method modifies the segment like to convert segment format, add or remove indices.
-   * Mainly used during segment reloading.
+   * Mostly used by UT cases to add some specific index for testing purpose.
    */
   public static ImmutableSegment load(File indexDir, IndexLoadingConfig indexLoadingConfig, @Nullable Schema schema)
       throws Exception {

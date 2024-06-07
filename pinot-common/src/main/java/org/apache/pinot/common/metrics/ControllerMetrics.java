@@ -19,6 +19,7 @@
 package org.apache.pinot.common.metrics;
 
 import java.util.concurrent.atomic.AtomicReference;
+import org.apache.pinot.spi.metrics.NoopPinotMetricsRegistry;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Controller.DEFAULT_METRICS_PREFIX;
@@ -29,10 +30,11 @@ import static org.apache.pinot.spi.utils.CommonConstants.Controller.DEFAULT_METR
  */
 public class ControllerMetrics
     extends AbstractMetrics<AbstractMetrics.QueryPhase, ControllerMeter, ControllerGauge, ControllerTimer> {
-  private static final AtomicReference<ControllerMetrics> CONTROLLER_METRICS_INSTANCE = new AtomicReference<>();
+  private static final ControllerMetrics NOOP = new ControllerMetrics(new NoopPinotMetricsRegistry());
+  private static final AtomicReference<ControllerMetrics> CONTROLLER_METRICS_INSTANCE = new AtomicReference<>(NOOP);
 
   public static boolean register(ControllerMetrics controllerMetrics) {
-    return CONTROLLER_METRICS_INSTANCE.compareAndSet(null, controllerMetrics);
+    return CONTROLLER_METRICS_INSTANCE.compareAndSet(NOOP, controllerMetrics);
   }
 
   public static ControllerMetrics get() {

@@ -19,9 +19,11 @@
 package org.apache.pinot.controller.helix.core.minion.generator;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.lang.StringUtils;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.task.JobConfig;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
@@ -130,5 +132,13 @@ public abstract class BaseTaskGenerator implements PinotTaskGenerator {
   @Override
   public String getMinionInstanceTag(TableConfig tableConfig) {
     return TaskGeneratorUtils.extractMinionInstanceTag(tableConfig, getTaskType());
+  }
+
+  public Map<String, String> getBaseTaskConfigs(TableConfig tableConfig, List<String> segmentNames) {
+    Map<String, String> baseConfigs = new HashMap<>();
+    baseConfigs.put(MinionConstants.TABLE_NAME_KEY, tableConfig.getTableName());
+    baseConfigs.put(MinionConstants.SEGMENT_NAME_KEY, StringUtils.join(segmentNames,
+          MinionConstants.SEGMENT_NAME_SEPARATOR));
+    return baseConfigs;
   }
 }

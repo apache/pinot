@@ -27,6 +27,8 @@ import org.apache.pinot.spi.config.BaseJsonConfig;
 
 public class TableTaskConfig extends BaseJsonConfig {
   private final Map<String, Map<String, String>> _taskTypeConfigsMap;
+  public final static String MINION_ALLOW_DOWNLOAD_FROM_SERVER = "allowDownloadFromServer";
+  public final static boolean DEFAULT_MINION_ALLOW_DOWNLOAD_FROM_SERVER = false;
 
   @JsonCreator
   public TableTaskConfig(@JsonProperty(value = "taskTypeConfigsMap", required = true)

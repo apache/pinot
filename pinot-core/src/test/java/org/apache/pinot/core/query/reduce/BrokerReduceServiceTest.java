@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.exception.QueryException;
+import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
@@ -34,10 +35,11 @@ import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.mock;
 import static org.testng.Assert.assertEquals;
 
 
@@ -46,10 +48,8 @@ public class BrokerReduceServiceTest {
   @Test
   public void testReduceTimeout()
       throws IOException {
-    Map<String, Object> properties = new HashMap<>();
-    properties.put(CommonConstants.Broker.CONFIG_OF_MAX_REDUCE_THREADS_PER_QUERY, 2);
-    BrokerReduceService brokerReduceService = new BrokerReduceService(new PinotConfiguration(properties));
-
+    BrokerReduceService brokerReduceService =
+        new BrokerReduceService(new PinotConfiguration(Map.of(Broker.CONFIG_OF_MAX_REDUCE_THREADS_PER_QUERY, 2)));
     BrokerRequest brokerRequest =
         CalciteSqlCompiler.compileToBrokerRequest("SELECT COUNT(*) FROM testTable GROUP BY col1");
     DataSchema dataSchema =
@@ -71,9 +71,12 @@ public class BrokerReduceServiceTest {
     }
     long reduceTimeoutMs = 1;
     BrokerResponseNative brokerResponse =
-        brokerReduceService.reduceOnDataTable(brokerRequest, brokerRequest, dataTableMap, reduceTimeoutMs, null);
-    List<QueryProcessingException> processingExceptions = brokerResponse.getProcessingExceptions();
-    assertEquals(processingExceptions.size(), 1);
-    assertEquals(processingExceptions.get(0).getErrorCode(), QueryException.BROKER_TIMEOUT_ERROR_CODE);
+        brokerReduceService.reduceOnDataTable(brokerRequest, brokerRequest, dataTableMap, reduceTimeoutMs,
+            mock(BrokerMetrics.class));
+    brokerReduceService.shutDown();
+
+    List<QueryProcessingException> exceptions = brokerResponse.getExceptions();
+    assertEquals(exceptions.size(), 1);
+    assertEquals(exceptions.get(0).getErrorCode(), QueryException.BROKER_TIMEOUT_ERROR_CODE);
   }
 }

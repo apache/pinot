@@ -169,5 +169,10 @@ public class MinionConstants {
      * Valid doc ids type
      */
     public static final String VALID_DOC_IDS_TYPE = "validDocIdsType";
+
+    /**
+     * number of segments to query in one batch to fetch valid doc id metadata, by default 500
+     */
+    public static final String NUM_SEGMENTS_BATCH_PER_SERVER_REQUEST = "numSegmentsBatchPerServerRequest";
   }
 }

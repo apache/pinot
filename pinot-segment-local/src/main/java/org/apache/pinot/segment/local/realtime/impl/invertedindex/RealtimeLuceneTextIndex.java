@@ -78,7 +78,7 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
       // for realtime
       _indexCreator =
           new LuceneTextIndexCreator(column, new File(segmentIndexDir.getAbsolutePath() + "/" + segmentName),
-              false /* commitOnClose */, true, null, config);
+              false /* commitOnClose */, false, null, null, config);
       IndexWriter indexWriter = _indexCreator.getIndexWriter();
       _searcherManager = new SearcherManager(indexWriter, false, false, null);
       _analyzer = _indexCreator.getIndexWriter().getConfig().getAnalyzer();
@@ -151,9 +151,9 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
       return searchFuture.get();
     } catch (InterruptedException e) {
       docIDCollector.markShouldCancel();
-      LOGGER.warn("TEXT_MATCH query timeout on realtime consuming segment {}, column {}, search query {}", _segmentName,
-          _column, searchQuery);
-      throw new RuntimeException("TEXT_MATCH query timeout on realtime consuming segment");
+      LOGGER.warn("TEXT_MATCH query interrupted while querying the consuming segment {}, column {}, search query {}",
+          _segmentName, _column, searchQuery);
+      throw new RuntimeException("TEXT_MATCH query interrupted while querying the consuming segment");
     } catch (Exception e) {
       LOGGER.error("Failed while searching the realtime text index for segment {}, column {}, search query {},"
               + " exception {}", _segmentName, _column, searchQuery, e.getMessage());
@@ -198,6 +198,7 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
       _searcherManager.close();
       _searcherManager = null;
       _indexCreator.close();
+      _analyzer.close();
     } catch (Exception e) {
       LOGGER.error("Failed while closing the realtime text index for column {}, exception {}", _column, e.getMessage());
       throw new RuntimeException(e);

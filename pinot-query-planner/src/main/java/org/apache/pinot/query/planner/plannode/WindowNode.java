@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.core.Window;
+import org.apache.calcite.rel.hint.RelHint;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
@@ -51,6 +52,24 @@ public class WindowNode extends AbstractPlanNode {
   private List<RexExpression> _constants;
   @ProtoProperties
   private WindowFrameType _windowFrameType;
+  @ProtoProperties
+  private NodeHint _windowHints;
+
+  public WindowNode(int stageId, DataSchema dataSchema, List<RexExpression> groupSet, List<RexExpression> orderSet,
+      List<RelFieldCollation.Direction> orderSetDirection, List<RelFieldCollation.NullDirection> orderSetNullDirection,
+      List<RexExpression> aggCalls, int lowerBound, int upperBound, List<RexExpression> constants,
+      WindowFrameType windowFrameType) {
+    super(stageId, dataSchema);
+    _groupSet = groupSet;
+    _orderSet = orderSet;
+    _orderSetDirection = orderSetDirection;
+    _orderSetNullDirection = orderSetNullDirection;
+    _aggCalls = aggCalls;
+    _lowerBound = lowerBound;
+    _upperBound = upperBound;
+    _constants = constants;
+    _windowFrameType = windowFrameType;
+  }
 
   /**
    * Enum to denote the type of window frame
@@ -66,7 +85,7 @@ public class WindowNode extends AbstractPlanNode {
   }
 
   public WindowNode(int planFragmentId, List<Window.Group> windowGroups, List<RexLiteral> constants,
-      DataSchema dataSchema) {
+      DataSchema dataSchema, List<RelHint> windowHints) {
     super(planFragmentId, dataSchema);
     // Only a single Window Group should exist per WindowNode.
     Preconditions.checkState(windowGroups.size() == 1,
@@ -103,6 +122,7 @@ public class WindowNode extends AbstractPlanNode {
     for (RexLiteral constant : constants) {
       _constants.add(RexExpressionUtils.fromRexLiteral(constant));
     }
+    _windowHints = new NodeHint(windowHints);
   }
 
   @Override
@@ -149,5 +169,9 @@ public class WindowNode extends AbstractPlanNode {
 
   public List<RexExpression> getConstants() {
     return _constants;
+  }
+
+  public NodeHint getWindowHints() {
+    return _windowHints;
   }
 }

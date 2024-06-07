@@ -98,6 +98,11 @@ public interface IndexCreationContext {
   boolean isRealtimeConversion();
 
   /**
+   * Used in conjunction with isRealtimeConversion, this returns the location of the consumer directory used
+   */
+  File getConsumerDir();
+
+  /**
    * This contains immutableToMutableIdMap mapping generated in {@link SegmentIndexCreationDriver}
    *
    * This allows for index creation during realtime segment conversion to take advantage of mutable to immutable
@@ -127,6 +132,7 @@ public interface IndexCreationContext {
     private boolean _fixedLength;
     private boolean _textCommitOnClose;
     private boolean _realtimeConversion = false;
+    private File _consumerDir;
     private int[] _immutableToMutableIdMap;
 
     public Builder withColumnIndexCreationInfo(ColumnIndexCreationInfo columnIndexCreationInfo) {
@@ -250,6 +256,11 @@ public interface IndexCreationContext {
       return this;
     }
 
+    public Builder withConsumerDir(File consumerDir) {
+      _consumerDir = consumerDir;
+      return this;
+    }
+
     public Builder withImmutableToMutableIdMap(int[] immutableToMutableIdMap) {
       _immutableToMutableIdMap = immutableToMutableIdMap;
       return this;
@@ -260,7 +271,7 @@ public interface IndexCreationContext {
           _maxRowLengthInBytes, _onHeap, Objects.requireNonNull(_fieldSpec), _sorted, _cardinality,
           _totalNumberOfEntries, _totalDocs, _hasDictionary, _minValue, _maxValue, _forwardIndexDisabled,
           _sortedUniqueElementsArray, _optimizedDictionary, _fixedLength, _textCommitOnClose, _columnStatistics,
-          _realtimeConversion, _immutableToMutableIdMap);
+          _realtimeConversion, _consumerDir, _immutableToMutableIdMap);
     }
 
     public Builder withSortedUniqueElementsArray(Object sortedUniqueElementsArray) {
@@ -295,6 +306,7 @@ public interface IndexCreationContext {
     private final boolean _textCommitOnClose;
     private final ColumnStatistics _columnStatistics;
     private final boolean _realtimeConversion;
+    private final File _consumerDir;
     private final int[] _immutableToMutableIdMap;
 
     public Common(File indexDir, int lengthOfLongestEntry,
@@ -302,7 +314,7 @@ public interface IndexCreationContext {
         FieldSpec fieldSpec, boolean sorted, int cardinality, int totalNumberOfEntries,
         int totalDocs, boolean hasDictionary, Comparable<?> minValue, Comparable<?> maxValue,
         boolean forwardIndexDisabled, Object sortedUniqueElementsArray, boolean optimizeDictionary, boolean fixedLength,
-        boolean textCommitOnClose, ColumnStatistics columnStatistics, boolean realtimeConversion,
+        boolean textCommitOnClose, ColumnStatistics columnStatistics, boolean realtimeConversion, File consumerDir,
         int[] immutableToMutableIdMap) {
       _indexDir = indexDir;
       _lengthOfLongestEntry = lengthOfLongestEntry;
@@ -324,6 +336,7 @@ public interface IndexCreationContext {
       _textCommitOnClose = textCommitOnClose;
       _columnStatistics = columnStatistics;
       _realtimeConversion = realtimeConversion;
+      _consumerDir = consumerDir;
       _immutableToMutableIdMap = immutableToMutableIdMap;
     }
 
@@ -414,6 +427,11 @@ public interface IndexCreationContext {
     @Override
     public boolean isRealtimeConversion() {
       return _realtimeConversion;
+    }
+
+    @Override
+    public File getConsumerDir() {
+      return _consumerDir;
     }
 
     @Override

@@ -1069,7 +1069,7 @@ public class PinotHelixResourceManager {
           "Failed to fetch broker tag for table " + tableNameWithType + " due to exception: " + e.getMessage());
     }
     if (tableConfig == null) {
-      LOGGER.warn("Table " + tableNameWithType + " does not exist");
+      LOGGER.warn("Table {} does not exist", tableNameWithType);
       throw new InvalidConfigException(
           "Invalid table configuration for table " + tableNameWithType + ". Table does not exist");
     }
@@ -1350,7 +1350,7 @@ public class PinotHelixResourceManager {
     int numberOfInstances = brokerTenant.getNumberOfInstances();
     if (unTaggedInstanceList.size() < numberOfInstances) {
       String message = "Failed to allocate broker instances to Tag : " + brokerTenant.getTenantName()
-          + ", Current number of untagged server instances : " + unTaggedInstanceList.size()
+          + ", Current number of untagged broker instances : " + unTaggedInstanceList.size()
           + ", Request asked number is : " + brokerTenant.getNumberOfInstances();
       LOGGER.error(message);
       return PinotResourceManagerResponse.failure(message);

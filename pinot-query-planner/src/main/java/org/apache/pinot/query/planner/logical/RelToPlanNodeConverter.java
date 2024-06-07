@@ -32,7 +32,6 @@ import org.apache.calcite.rel.core.JoinInfo;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.core.SetOp;
 import org.apache.calcite.rel.core.SortExchange;
-import org.apache.calcite.rel.logical.LogicalAggregate;
 import org.apache.calcite.rel.logical.LogicalFilter;
 import org.apache.calcite.rel.logical.LogicalJoin;
 import org.apache.calcite.rel.logical.LogicalProject;
@@ -44,12 +43,15 @@ import org.apache.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rel.type.RelRecordType;
+import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.type.SqlTypeName;
+import org.apache.pinot.calcite.rel.logical.PinotLogicalAggregate;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalExchange;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalSortExchange;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DatabaseUtils;
+import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
@@ -83,7 +85,7 @@ public final class RelToPlanNodeConverter {
    * @param node relational node
    * @return stage node.
    */
-  public static PlanNode toStageNode(RelNode node, int currentStageId) {
+  public static PlanNode toPlanNode(RelNode node, int currentStageId) {
     if (node instanceof LogicalTableScan) {
       return convertLogicalTableScan((LogicalTableScan) node, currentStageId);
     } else if (node instanceof LogicalJoin) {
@@ -92,8 +94,8 @@ public final class RelToPlanNodeConverter {
       return convertLogicalProject((LogicalProject) node, currentStageId);
     } else if (node instanceof LogicalFilter) {
       return convertLogicalFilter((LogicalFilter) node, currentStageId);
-    } else if (node instanceof LogicalAggregate) {
-      return convertLogicalAggregate((LogicalAggregate) node, currentStageId);
+    } else if (node instanceof PinotLogicalAggregate) {
+      return convertLogicalAggregate((PinotLogicalAggregate) node, currentStageId);
     } else if (node instanceof LogicalSort) {
       return convertLogicalSort((LogicalSort) node, currentStageId);
     } else if (node instanceof LogicalValues) {
@@ -128,9 +130,9 @@ public final class RelToPlanNodeConverter {
       }
     }
     RelDistribution inputDistributionTrait = node.getInputs().get(0).getTraitSet().getDistribution();
-    boolean isPrePartitioned = inputDistributionTrait != null
-        && inputDistributionTrait.getType() == RelDistribution.Type.HASH_DISTRIBUTED
-        && inputDistributionTrait == node.getDistribution();
+    boolean isPrePartitioned =
+        inputDistributionTrait != null && inputDistributionTrait.getType() == RelDistribution.Type.HASH_DISTRIBUTED
+            && inputDistributionTrait == node.getDistribution();
     List<RelFieldCollation> fieldCollations = (collation == null) ? null : collation.getFieldCollations();
 
     // Compute all the tables involved under this exchange node
@@ -150,7 +152,8 @@ public final class RelToPlanNodeConverter {
   }
 
   private static PlanNode convertLogicalWindow(LogicalWindow node, int currentStageId) {
-    return new WindowNode(currentStageId, node.groups, node.constants, toDataSchema(node.getRowType()));
+    return new WindowNode(currentStageId, node.groups, node.constants, toDataSchema(node.getRowType()),
+        node.getHints());
   }
 
   private static PlanNode convertLogicalSort(LogicalSort node, int currentStageId) {
@@ -160,13 +163,14 @@ public final class RelToPlanNodeConverter {
         toDataSchema(node.getRowType()));
   }
 
-  private static PlanNode convertLogicalAggregate(LogicalAggregate node, int currentStageId) {
+  private static PlanNode convertLogicalAggregate(PinotLogicalAggregate node, int currentStageId) {
     return new AggregateNode(currentStageId, toDataSchema(node.getRowType()), node.getAggCallList(),
-        RexExpressionUtils.fromInputRefs(node.getGroupSet()), node.getHints());
+        RexExpressionUtils.fromInputRefs(node.getGroupSet()), node.getHints(), node.getAggType());
   }
 
   private static PlanNode convertLogicalProject(LogicalProject node, int currentStageId) {
-    return new ProjectNode(currentStageId, toDataSchema(node.getRowType()), node.getProjects());
+    return new ProjectNode(currentStageId, toDataSchema(node.getRowType()),
+        RexExpressionUtils.fromRexNodes(node.getProjects()));
   }
 
   private static PlanNode convertLogicalFilter(LogicalFilter node, int currentStageId) {
@@ -192,8 +196,7 @@ public final class RelToPlanNodeConverter {
     // Parse out all equality JOIN conditions
     JoinInfo joinInfo = node.analyzeCondition();
     JoinNode.JoinKeys joinKeys = new JoinNode.JoinKeys(joinInfo.leftKeys, joinInfo.rightKeys);
-    List<RexExpression> joinClause =
-        joinInfo.nonEquiConditions.stream().map(RexExpressionUtils::fromRexNode).collect(Collectors.toList());
+    List<RexExpression> joinClause = RexExpressionUtils.fromRexNodes(joinInfo.nonEquiConditions);
     return new JoinNode(currentStageId, toDataSchema(node.getRowType()), toDataSchema(node.getLeft().getRowType()),
         toDataSchema(node.getRight().getRowType()), joinType, joinKeys, joinClause, node.getHints());
   }
@@ -259,7 +262,11 @@ public final class RelToPlanNodeConverter {
   /**
    * Calcite uses DEMICAL type to infer data type hoisting and infer arithmetic result types. down casting this back to
    * the proper primitive type for Pinot.
+   * TODO: Revisit this method:
+   *  - Currently we are converting exact value to approximate value
+   *  - Integer can only cover all values with precision 9; Long can only cover all values with precision 18
    *
+   * {@link RequestUtils#getLiteralExpression(SqlLiteral)}
    * @param relDataType the DECIMAL rel data type.
    * @param isArray
    * @return proper {@link ColumnDataType}.
@@ -277,9 +284,9 @@ public final class RelToPlanNodeConverter {
         return isArray ? ColumnDataType.DOUBLE_ARRAY : ColumnDataType.BIG_DECIMAL;
       }
     } else {
-      if (precision <= 14) {
-        return isArray ? ColumnDataType.FLOAT_ARRAY : ColumnDataType.FLOAT;
-      } else if (precision <= 30) {
+      // NOTE: Do not use FLOAT to represent DECIMAL to be consistent with single-stage engine behavior.
+      //       See {@link RequestUtils#getLiteralExpression(SqlLiteral)}.
+      if (precision <= 30) {
         return isArray ? ColumnDataType.DOUBLE_ARRAY : ColumnDataType.DOUBLE;
       } else {
         return isArray ? ColumnDataType.DOUBLE_ARRAY : ColumnDataType.BIG_DECIMAL;

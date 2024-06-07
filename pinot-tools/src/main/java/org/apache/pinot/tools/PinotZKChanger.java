@@ -85,9 +85,8 @@ public class PinotZKChanger {
       for (String server : mapIS.keySet()) {
         String state = mapIS.get(server);
         if (mapEV == null || mapEV.get(server) == null || !mapEV.get(server).equals(state)) {
-          LOGGER.info(
-              "Mismatch: segment " + segment + " server:" + server + " expected state:" + state + " actual state:" + (
-                  (mapEV == null || mapEV.get(server) == null) ? "null" : mapEV.get(server)));
+          LOGGER.info("Mismatch: segment {} server:{} expected state:{} actual state:{}", segment, server, state,
+              (mapEV == null || mapEV.get(server) == null) ? "null" : mapEV.get(server));
           numDiff = numDiff + 1;
         }
       }
@@ -109,9 +108,8 @@ public class PinotZKChanger {
       if (diff == 0) {
         break;
       } else {
-        LOGGER.info(
-            "Waiting for externalView to match idealstate for table:" + resourceName + " Num segments difference:"
-                + diff);
+        LOGGER.info("Waiting for externalView to match idealstate for table:{} Num segments difference:{}",
+            resourceName, diff);
         Thread.sleep(30000);
       }
     } while (diff > 0);
@@ -133,7 +131,7 @@ public class PinotZKChanger {
     DescriptiveStatistics stats = new DescriptiveStatistics();
     for (String server : serverToSegmentMapping.keySet()) {
       List<String> list = serverToSegmentMapping.get(server);
-      LOGGER.info("server " + server + " has " + list.size() + " segments");
+      LOGGER.info("server {} has {} segments", server, list.size());
       stats.addValue(list.size());
     }
     LOGGER.info("Segment Distrbution stat");

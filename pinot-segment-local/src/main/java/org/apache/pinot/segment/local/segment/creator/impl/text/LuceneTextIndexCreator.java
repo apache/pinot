@@ -36,9 +36,11 @@ import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
+import org.apache.lucene.index.NoMergeScheduler;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
+import org.apache.lucene.store.NRTCachingDirectory;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndex;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentColumnarIndexCreator;
 import org.apache.pinot.segment.local.segment.index.text.AbstractTextIndexCreator;
@@ -88,6 +90,8 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
    * @param segmentIndexDir segment index directory
    * @param commit true if the index should be committed (at the end after all documents have
    *               been added), false if index should not be committed
+   * @param realtimeConversion index creator should create an index using the realtime segment
+   * @param consumerDir consumer dir containing the realtime index, used when realtimeConversion and commit is true
    * @param immutableToMutableIdMap immutableToMutableIdMap from segment conversion
    * Note on commit:
    *               Once {@link SegmentColumnarIndexCreator}
@@ -105,7 +109,7 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
    * @param config the text index config
    */
   public LuceneTextIndexCreator(String column, File segmentIndexDir, boolean commit, boolean realtimeConversion,
-      @Nullable int[] immutableToMutableIdMap, TextIndexConfig config) {
+      @Nullable File consumerDir, @Nullable int[] immutableToMutableIdMap, TextIndexConfig config) {
     _textColumn = column;
     _commitOnClose = commit;
 
@@ -131,14 +135,39 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
       indexWriterConfig.setCommitOnClose(commit);
       indexWriterConfig.setUseCompoundFile(config.isLuceneUseCompoundFile());
 
+      // For the realtime segment, prevent background merging. The realtime segment will call .commit()
+      // on the IndexWriter when segment conversion occurs. By default, Lucene will sometimes choose to
+      // merge segments in the background, which is problematic because the lucene index directory's
+      // contents is copied to create the immutable segment. If a background merge occurs during this
+      // copy, a FileNotFoundException will be triggered and segment build will fail.
+      //
+      // Also, for the realtime segment, we set the OpenMode to CREATE to ensure that any existing artifacts
+      // will be overwritten. This is necessary because the realtime segment can be created multiple times
+      // during a server crash and restart scenario. If the existing artifacts are appended to, the realtime
+      // query results will be accurate, but after segment conversion the mapping file generated will be loaded
+      // for only the first numDocs lucene docIds, which can cause IndexOutOfBounds errors.
+      if (!_commitOnClose) {
+        indexWriterConfig.setMergeScheduler(NoMergeScheduler.INSTANCE);
+        indexWriterConfig.setOpenMode(IndexWriterConfig.OpenMode.CREATE);
+      }
+
       if (_reuseMutableIndex) {
         LOGGER.info("Reusing the realtime lucene index for segment {} and column {}", segmentIndexDir, column);
         indexWriterConfig.setOpenMode(IndexWriterConfig.OpenMode.CREATE_OR_APPEND);
-        convertMutableSegment(segmentIndexDir, immutableToMutableIdMap, indexWriterConfig);
+        convertMutableSegment(segmentIndexDir, consumerDir, immutableToMutableIdMap, indexWriterConfig);
         return;
       }
 
-      _indexDirectory = FSDirectory.open(_indexFile.toPath());
+      if (_commitOnClose) {
+        _indexDirectory = FSDirectory.open(_indexFile.toPath());
+      } else {
+        // For realtime index, use NRTCachingDirectory to reduce the number of open files. This buffers the
+        // flushes triggered by the near real-time refresh and writes them to disk when the buffer is full,
+        // reducing the number of small writes.
+        _indexDirectory =
+            new NRTCachingDirectory(FSDirectory.open(_indexFile.toPath()), config.getLuceneMaxBufferSizeMB(),
+                config.getLuceneMaxBufferSizeMB());
+      }
       _indexWriter = new IndexWriter(_indexDirectory, indexWriterConfig);
     } catch (ReflectiveOperationException e) {
       throw new RuntimeException(
@@ -151,7 +180,7 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
 
   public LuceneTextIndexCreator(IndexCreationContext context, TextIndexConfig indexConfig) {
     this(context.getFieldSpec().getName(), context.getIndexDir(), context.isTextCommitOnClose(),
-        context.isRealtimeConversion(), context.getImmutableToMutableIdMap(), indexConfig);
+        context.isRealtimeConversion(), context.getConsumerDir(), context.getImmutableToMutableIdMap(), indexConfig);
   }
 
   public IndexWriter getIndexWriter() {
@@ -164,12 +193,12 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
    * @param immutableToMutableIdMap immutableToMutableIdMap from segment conversion
    * @param indexWriterConfig indexWriterConfig
    */
-  private void convertMutableSegment(File segmentIndexDir, @Nullable int[] immutableToMutableIdMap,
+  private void convertMutableSegment(File segmentIndexDir, File consumerDir, @Nullable int[] immutableToMutableIdMap,
       IndexWriterConfig indexWriterConfig) {
     try {
       // Copy the mutable index to the v1 index location
       File dest = getV1TextIndexFile(segmentIndexDir);
-      File mutableDir = getMutableIndexDir(segmentIndexDir);
+      File mutableDir = getMutableIndexDir(segmentIndexDir, consumerDir);
       FileUtils.copyDirectory(mutableDir, dest);
 
       // Remove the copied write.lock file
@@ -334,12 +363,15 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
     return new File(indexDir, luceneIndexDirectory);
   }
 
-  private File getMutableIndexDir(File indexDir) {
+  private File getMutableIndexDir(File indexDir, File consumerDir) {
+    String segmentName = getSegmentName(indexDir);
+    return new File(new File(consumerDir, segmentName),
+        _textColumn + V1Constants.Indexes.LUCENE_V99_TEXT_INDEX_FILE_EXTENSION);
+  }
+
+  private String getSegmentName(File indexDir) {
     // tmpSegmentName format: tmp-tableName__9__1__20240227T0254Z-1709002522086
     String tmpSegmentName = indexDir.getParentFile().getName();
-    String segmentName = tmpSegmentName.substring(tmpSegmentName.indexOf("tmp-") + 4, tmpSegmentName.lastIndexOf('-'));
-    String mutableDir = indexDir.getParentFile().getParentFile().getParent() + "/consumers/" + segmentName + "/"
-        + _textColumn + V1Constants.Indexes.LUCENE_V99_TEXT_INDEX_FILE_EXTENSION;
-    return new File(mutableDir);
+    return tmpSegmentName.substring(tmpSegmentName.indexOf("tmp-") + 4, tmpSegmentName.lastIndexOf('-'));
   }
 }

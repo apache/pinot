@@ -35,6 +35,7 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   DELETED_SEGMENT_COUNT("segments", false),
   DELETE_TABLE_FAILURES("tables", false),
   REALTIME_ROWS_CONSUMED("rows", true),
+  REALTIME_ROWS_SANITIZED("rows", true),
   REALTIME_ROWS_FETCHED("rows", false),
   REALTIME_ROWS_FILTERED("rows", false),
   INVALID_REALTIME_ROWS_DROPPED("rows", false),
@@ -108,6 +109,8 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   GRPC_QUERIES("grpcQueries", true),
   GRPC_BYTES_RECEIVED("grpcBytesReceived", true),
   GRPC_BYTES_SENT("grpcBytesSent", true),
+  GRPC_TRANSPORT_READY("grpcTransport", true),
+  GRPC_TRANSPORT_TERMINATED("grpcTransport", true),
 
   NUM_SEGMENTS_PRUNED_INVALID("numSegmentsPrunedInvalid", false),
   NUM_SEGMENTS_PRUNED_BY_LIMIT("numSegmentsPrunedByLimit", false),

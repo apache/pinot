@@ -692,9 +692,7 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
         String downloadURL = StringUtils.join(downloadURLsList.get(i), MinionConstants.URL_SEPARATOR);
         Map<String, String> configs = MinionTaskUtils.getPushTaskConfig(tableNameWithType, taskConfigs,
             _clusterInfoAccessor);
-        configs.put(MinionConstants.TABLE_NAME_KEY, tableNameWithType);
-        configs.put(MinionConstants.SEGMENT_NAME_KEY,
-            StringUtils.join(segmentNamesList.get(i), MinionConstants.SEGMENT_NAME_SEPARATOR));
+        configs.putAll(getBaseTaskConfigs(tableConfig, segmentNamesList.get(i)));
         configs.put(MinionConstants.DOWNLOAD_URL_KEY, downloadURL);
         configs.put(MinionConstants.UPLOAD_URL_KEY, _clusterInfoAccessor.getVipUrl() + "/segments");
         configs.put(MinionConstants.ENABLE_REPLACE_SEGMENTS_KEY, "true");

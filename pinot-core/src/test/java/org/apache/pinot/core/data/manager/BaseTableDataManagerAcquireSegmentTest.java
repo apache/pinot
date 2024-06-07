@@ -22,14 +22,12 @@ import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -37,6 +35,7 @@ import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.data.manager.offline.OfflineTableDataManager;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
@@ -66,12 +65,9 @@ public class BaseTableDataManagerAcquireSegmentTest {
   // Set once for every test
   private volatile int _nDestroys;
   private volatile boolean _closing;
-  private Set<ImmutableSegment> _allSegments = new HashSet<>();
-  private Set<SegmentDataManager> _accessedSegManagers =
-      Collections.newSetFromMap(new ConcurrentHashMap<SegmentDataManager, Boolean>());
-  private Set<SegmentDataManager> _allSegManagers =
-      Collections.newSetFromMap(new ConcurrentHashMap<SegmentDataManager, Boolean>());
-  private AtomicInteger _numQueries = new AtomicInteger(0);
+  private final Set<ImmutableSegment> _allSegments = new HashSet<>();
+  private final Set<SegmentDataManager> _accessedSegManagers = ConcurrentHashMap.newKeySet();
+  private final Set<SegmentDataManager> _allSegManagers = ConcurrentHashMap.newKeySet();
   private Map<String, ImmutableSegmentDataManager> _internalSegMap;
   private Throwable _exception;
   private Thread _masterThread;
@@ -110,7 +106,6 @@ public class BaseTableDataManagerAcquireSegmentTest {
     _allSegments.clear();
     _accessedSegManagers.clear();
     _allSegManagers.clear();
-    _numQueries.set(0);
     _exception = null;
     _masterThread = null;
   }
@@ -123,7 +118,8 @@ public class BaseTableDataManagerAcquireSegmentTest {
     when(instanceDataManagerConfig.getDeletedSegmentsCacheTtlMinutes()).thenReturn(DELETED_SEGMENTS_TTL_MINUTES);
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
     TableDataManager tableDataManager = new OfflineTableDataManager();
-    tableDataManager.init(instanceDataManagerConfig, tableConfig, mock(HelixManager.class), null, null);
+    tableDataManager.init(instanceDataManagerConfig, mock(HelixManager.class), new SegmentLocks(), tableConfig, null,
+        null);
     tableDataManager.start();
     Field segsMapField = BaseTableDataManager.class.getDeclaredField("_segmentDataManagerMap");
     segsMapField.setAccessible(true);
@@ -159,7 +155,7 @@ public class BaseTableDataManagerAcquireSegmentTest {
     Assert.assertEquals(tableDataManager.getNumSegments(), 1);
     SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segmentName);
     Assert.assertEquals(segmentDataManager.getReferenceCount(), 2);
-    tableDataManager.removeSegment(segmentName);
+    tableDataManager.offloadSegment(segmentName);
     Assert.assertEquals(tableDataManager.getNumSegments(), 0);
     Assert.assertEquals(segmentDataManager.getReferenceCount(), 1);
     Assert.assertEquals(_nDestroys, 0);
@@ -184,10 +180,10 @@ public class BaseTableDataManagerAcquireSegmentTest {
     // return false.
     tableDataManager.addSegment(immutableSegment);
     Assert.assertFalse(tableDataManager.isSegmentDeletedRecently(segmentName));
-    tableDataManager.removeSegment(segmentName);
+    tableDataManager.offloadSegment(segmentName);
 
     // Removing the segment again is fine.
-    tableDataManager.removeSegment(segmentName);
+    tableDataManager.offloadSegment(segmentName);
     Assert.assertEquals(tableDataManager.getNumSegments(), 0);
 
     // Add a new segment and remove it in order this time.
@@ -219,7 +215,7 @@ public class BaseTableDataManagerAcquireSegmentTest {
     // Delete ix2 without accessing it.
     SegmentDataManager sdm2 = _internalSegMap.get(anotherSeg);
     Assert.assertEquals(sdm2.getReferenceCount(), 1);
-    tableDataManager.removeSegment(anotherSeg);
+    tableDataManager.offloadSegment(anotherSeg);
     Assert.assertEquals(tableDataManager.getNumSegments(), 0);
     Assert.assertEquals(sdm2.getReferenceCount(), 0);
     verify(ix2, times(1)).destroy();
@@ -453,10 +449,11 @@ public class BaseTableDataManagerAcquireSegmentTest {
     }
 
     // Remove the segment _lo and then bump _lo
-    private void removeSegment() {
+    private void removeSegment()
+        throws Exception {
       // Keep at least one segment in place.
       if (_hi > _lo) {
-        _tableDataManager.removeSegment(SEGMENT_PREFIX + _lo);
+        _tableDataManager.offloadSegment(SEGMENT_PREFIX + _lo);
         _lo++;
       } else {
         addSegment();

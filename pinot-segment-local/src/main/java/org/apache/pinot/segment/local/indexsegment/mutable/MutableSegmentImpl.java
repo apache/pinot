@@ -140,6 +140,7 @@ public class MutableSegmentImpl implements MutableSegment {
   private final PartitionFunction _partitionFunction;
   private final int _mainPartitionId; // partition id designated for this consuming segment
   private final boolean _nullHandlingEnabled;
+  private final File _consumerDir;
 
   private final Map<String, IndexContainer> _indexContainerMap = new HashMap<>();
 
@@ -216,6 +217,7 @@ public class MutableSegmentImpl implements MutableSegment {
     _partitionFunction = config.getPartitionFunction();
     _mainPartitionId = config.getPartitionId();
     _nullHandlingEnabled = config.isNullHandlingEnabled();
+    _consumerDir = new File(config.getConsumerDir());
 
     Collection<FieldSpec> allFieldSpecs = _schema.getAllFieldSpecs();
     List<FieldSpec> physicalFieldSpecs = new ArrayList<>(allFieldSpecs.size());
@@ -283,7 +285,7 @@ public class MutableSegmentImpl implements MutableSegment {
               .withEstimatedCardinality(_statsHistory.getEstimatedCardinality(column))
               .withEstimatedColSize(_statsHistory.getEstimatedAvgColSize(column))
               .withAvgNumMultiValues(_statsHistory.getEstimatedAvgColSize(column))
-              .withConsumerDir(config.getConsumerDir() != null ? new File(config.getConsumerDir()) : null)
+              .withConsumerDir(_consumerDir)
               .withFixedLengthBytes(fixedByteSize).build();
 
       // Partition info
@@ -853,6 +855,11 @@ public class MutableSegmentImpl implements MutableSegment {
   }
 
   @Override
+  public File getConsumerDir() {
+    return _consumerDir;
+  }
+
+  @Override
   public String getSegmentName() {
     return _segmentName;
   }
@@ -946,17 +953,18 @@ public class MutableSegmentImpl implements MutableSegment {
   }
 
   @Override
-  public void destroy() {
-    _logger.info("Trying to close RealtimeSegmentImpl : {}", _segmentName);
-
-    // Remove the upsert and dedup metadata before closing the readers
+  public void offload() {
     if (_partitionUpsertMetadataManager != null) {
       _partitionUpsertMetadataManager.removeSegment(this);
     }
-
     if (_partitionDedupMetadataManager != null) {
       _partitionDedupMetadataManager.removeSegment(this);
     }
+  }
+
+  @Override
+  public void destroy() {
+    _logger.info("Trying to close RealtimeSegmentImpl : {}", _segmentName);
 
     // Gather statistics for off-heap mode
     if (_offHeap) {

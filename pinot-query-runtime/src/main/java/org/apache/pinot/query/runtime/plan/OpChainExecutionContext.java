@@ -20,12 +20,12 @@ package org.apache.pinot.query.runtime.plan;
 
 import java.util.Collections;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.operator.OpChainId;
-import org.apache.pinot.query.runtime.operator.OpChainStats;
 import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerResult;
 import org.apache.pinot.query.runtime.plan.server.ServerPlanRequestContext;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -45,7 +45,7 @@ public class OpChainExecutionContext {
   private final WorkerMetadata _workerMetadata;
   private final VirtualServerAddress _server;
   private final OpChainId _id;
-  private final OpChainStats _stats;
+  @Nullable
   private final PipelineBreakerResult _pipelineBreakerResult;
   private final boolean _traceEnabled;
 
@@ -53,7 +53,7 @@ public class OpChainExecutionContext {
 
   public OpChainExecutionContext(MailboxService mailboxService, long requestId, long deadlineMs,
       Map<String, String> opChainMetadata, StageMetadata stageMetadata, WorkerMetadata workerMetadata,
-      PipelineBreakerResult pipelineBreakerResult) {
+      @Nullable PipelineBreakerResult pipelineBreakerResult) {
     _mailboxService = mailboxService;
     _requestId = requestId;
     _deadlineMs = deadlineMs;
@@ -63,11 +63,7 @@ public class OpChainExecutionContext {
     _server =
         new VirtualServerAddress(mailboxService.getHostname(), mailboxService.getPort(), workerMetadata.getWorkerId());
     _id = new OpChainId(requestId, workerMetadata.getWorkerId(), stageMetadata.getStageId());
-    _stats = new OpChainStats(_id.toString());
     _pipelineBreakerResult = pipelineBreakerResult;
-    if (pipelineBreakerResult != null && pipelineBreakerResult.getOpChainStats() != null) {
-      _stats.getOperatorStatsMap().putAll(pipelineBreakerResult.getOpChainStats().getOperatorStatsMap());
-    }
     _traceEnabled = Boolean.parseBoolean(opChainMetadata.get(CommonConstants.Broker.Request.TRACE));
   }
 
@@ -111,10 +107,7 @@ public class OpChainExecutionContext {
     return _id;
   }
 
-  public OpChainStats getStats() {
-    return _stats;
-  }
-
+  @Nullable
   public PipelineBreakerResult getPipelineBreakerResult() {
     return _pipelineBreakerResult;
   }

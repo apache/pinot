@@ -22,6 +22,8 @@ import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -29,6 +31,7 @@ import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
  * {@link MultiStageOperator#getNextBlock()} API.
  */
 public class MailboxReceiveOperator extends BaseMailboxReceiveOperator {
+  private static final Logger LOGGER = LoggerFactory.getLogger(MailboxReceiveOperator.class);
   private static final String EXPLAIN_NAME = "MAILBOX_RECEIVE";
 
   public MailboxReceiveOperator(OpChainExecutionContext context, RelDistribution.Type exchangeType, int senderStageId) {
@@ -41,6 +44,11 @@ public class MailboxReceiveOperator extends BaseMailboxReceiveOperator {
   }
 
   @Override
+  protected Logger logger() {
+    return LOGGER;
+  }
+
+  @Override
   protected TransferableBlock getNextBlock() {
     TransferableBlock block = _multiConsumer.readBlockBlocking();
     // When early termination flag is set, caller is expecting an EOS block to be returned, however since the 2 stages
@@ -49,6 +57,9 @@ public class MailboxReceiveOperator extends BaseMailboxReceiveOperator {
     // MailboxReceiveOperator to continue pulling and dropping data block until an EOS block is observed.
     while (_isEarlyTerminated && !block.isEndOfStreamBlock()) {
       block = _multiConsumer.readBlockBlocking();
+    }
+    if (block.isSuccessfulEndOfStreamBlock()) {
+      updateEosBlock(block, _statMap);
     }
     return block;
   }

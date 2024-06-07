@@ -22,6 +22,7 @@ import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -35,9 +36,6 @@ import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
-
-import static org.apache.calcite.sql.SqlKind.MINUS;
-import static org.apache.calcite.sql.SqlKind.PLUS;
 
 
 public class TransformOperatorTest {
@@ -69,7 +67,7 @@ public class TransformOperatorTest {
     // Output column value
     RexExpression.InputRef ref0 = new RexExpression.InputRef(0);
     RexExpression.InputRef ref1 = new RexExpression.InputRef(1);
-    TransformOperator op = new TransformOperator(OperatorTestUtil.getDefaultContext(), _upstreamOp, resultSchema,
+    TransformOperator op = new TransformOperator(OperatorTestUtil.getTracingContext(), _upstreamOp, resultSchema,
         ImmutableList.of(ref0, ref1), upStreamSchema);
     TransferableBlock result = op.nextBlock();
 
@@ -93,7 +91,7 @@ public class TransformOperatorTest {
     // Set up literal operands
     RexExpression.Literal boolLiteral = new RexExpression.Literal(ColumnDataType.BOOLEAN, 1);
     RexExpression.Literal strLiteral = new RexExpression.Literal(ColumnDataType.STRING, "str");
-    TransformOperator op = new TransformOperator(OperatorTestUtil.getDefaultContext(), _upstreamOp, resultSchema,
+    TransformOperator op = new TransformOperator(OperatorTestUtil.getTracingContext(), _upstreamOp, resultSchema,
         ImmutableList.of(boolLiteral, strLiteral), upStreamSchema);
     TransferableBlock result = op.nextBlock();
     // Literal operands should just output original literals.
@@ -117,12 +115,12 @@ public class TransformOperatorTest {
     RexExpression.InputRef ref1 = new RexExpression.InputRef(1);
     List<RexExpression> functionOperands = ImmutableList.of(ref0, ref1);
     RexExpression.FunctionCall plus01 =
-        new RexExpression.FunctionCall(PLUS, ColumnDataType.DOUBLE, "plus", functionOperands);
+        new RexExpression.FunctionCall(ColumnDataType.DOUBLE, SqlKind.PLUS.name(), functionOperands);
     RexExpression.FunctionCall minus01 =
-        new RexExpression.FunctionCall(MINUS, ColumnDataType.DOUBLE, "minus", functionOperands);
+        new RexExpression.FunctionCall(ColumnDataType.DOUBLE, SqlKind.MINUS.name(), functionOperands);
     DataSchema resultSchema = new DataSchema(new String[]{"plusR", "minusR"},
         new ColumnDataType[]{ColumnDataType.DOUBLE, ColumnDataType.DOUBLE});
-    TransformOperator op = new TransformOperator(OperatorTestUtil.getDefaultContext(), _upstreamOp, resultSchema,
+    TransformOperator op = new TransformOperator(OperatorTestUtil.getTracingContext(), _upstreamOp, resultSchema,
         ImmutableList.of(plus01, minus01), upStreamSchema);
     TransferableBlock result = op.nextBlock();
     Assert.assertTrue(!result.isErrorBlock());
@@ -145,12 +143,12 @@ public class TransformOperatorTest {
     RexExpression.InputRef ref1 = new RexExpression.InputRef(1);
     List<RexExpression> functionOperands = ImmutableList.of(ref0, ref1);
     RexExpression.FunctionCall plus01 =
-        new RexExpression.FunctionCall(PLUS, ColumnDataType.DOUBLE, "plus", functionOperands);
+        new RexExpression.FunctionCall(ColumnDataType.DOUBLE, SqlKind.PLUS.name(), functionOperands);
     RexExpression.FunctionCall minus01 =
-        new RexExpression.FunctionCall(MINUS, ColumnDataType.DOUBLE, "minus", functionOperands);
+        new RexExpression.FunctionCall(ColumnDataType.DOUBLE, SqlKind.MINUS.name(), functionOperands);
     DataSchema resultSchema = new DataSchema(new String[]{"plusR", "minusR"},
         new ColumnDataType[]{ColumnDataType.DOUBLE, ColumnDataType.DOUBLE});
-    TransformOperator op = new TransformOperator(OperatorTestUtil.getDefaultContext(), _upstreamOp, resultSchema,
+    TransformOperator op = new TransformOperator(OperatorTestUtil.getTracingContext(), _upstreamOp, resultSchema,
         ImmutableList.of(plus01, minus01), upStreamSchema);
 
     TransferableBlock result = op.nextBlock();
@@ -169,7 +167,7 @@ public class TransformOperatorTest {
     RexExpression.Literal strLiteral = new RexExpression.Literal(ColumnDataType.STRING, "str");
     DataSchema resultSchema = new DataSchema(new String[]{"inCol", "strCol"},
         new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.STRING});
-    TransformOperator op = new TransformOperator(OperatorTestUtil.getDefaultContext(), _upstreamOp, resultSchema,
+    TransformOperator op = new TransformOperator(OperatorTestUtil.getTracingContext(), _upstreamOp, resultSchema,
         ImmutableList.of(boolLiteral, strLiteral), upStreamSchema);
     TransferableBlock result = op.nextBlock();
     Assert.assertTrue(result.isErrorBlock());
@@ -190,7 +188,7 @@ public class TransformOperatorTest {
     RexExpression.Literal strLiteral = new RexExpression.Literal(ColumnDataType.STRING, "str");
     DataSchema resultSchema = new DataSchema(new String[]{"boolCol", "strCol"},
         new ColumnDataType[]{ColumnDataType.BOOLEAN, ColumnDataType.STRING});
-    TransformOperator op = new TransformOperator(OperatorTestUtil.getDefaultContext(), _upstreamOp, resultSchema,
+    TransformOperator op = new TransformOperator(OperatorTestUtil.getTracingContext(), _upstreamOp, resultSchema,
         ImmutableList.of(boolLiteral, strLiteral), upStreamSchema);
     TransferableBlock result = op.nextBlock();
     // First block has two rows
@@ -219,7 +217,7 @@ public class TransformOperatorTest {
     DataSchema upStreamSchema = new DataSchema(new String[]{"string1", "string2"}, new ColumnDataType[]{
         ColumnDataType.STRING, ColumnDataType.STRING
     });
-    new TransformOperator(OperatorTestUtil.getDefaultContext(), _upstreamOp, resultSchema, new ArrayList<>(),
+    new TransformOperator(OperatorTestUtil.getTracingContext(), _upstreamOp, resultSchema, new ArrayList<>(),
         upStreamSchema);
   }
 
@@ -232,7 +230,7 @@ public class TransformOperatorTest {
         ColumnDataType.STRING, ColumnDataType.STRING
     });
     RexExpression.InputRef ref0 = new RexExpression.InputRef(0);
-    new TransformOperator(OperatorTestUtil.getDefaultContext(), _upstreamOp, resultSchema, ImmutableList.of(ref0),
+    new TransformOperator(OperatorTestUtil.getTracingContext(), _upstreamOp, resultSchema, ImmutableList.of(ref0),
         upStreamSchema);
   }
 };

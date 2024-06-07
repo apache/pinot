@@ -121,7 +121,7 @@ public class ValidateConfigCommand extends AbstractBaseCommand implements Comman
   private void validateTableConfig()
       throws Exception {
     List<String> tableNames = getTableNames();
-    LOGGER.info("Validating table config for tables: " + tableNames);
+    LOGGER.info("Validating table config for tables: {}", tableNames);
     for (String tableName : tableNames) {
       LOGGER.info("  Validating table config for table: \"{}\"", tableName);
       try {
@@ -139,7 +139,7 @@ public class ValidateConfigCommand extends AbstractBaseCommand implements Comman
   private void validateSchema()
       throws Exception {
     List<String> schemaNames = getSchemaNames();
-    LOGGER.info("Validating schemas: " + schemaNames);
+    LOGGER.info("Validating schemas: {}", schemaNames);
     for (String schemaName : schemaNames) {
       LOGGER.info("  Validating schema: \"{}\"", schemaName);
       try {

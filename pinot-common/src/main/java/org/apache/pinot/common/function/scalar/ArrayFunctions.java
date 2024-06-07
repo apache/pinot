@@ -25,6 +25,7 @@ import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
 import java.math.BigDecimal;
 import java.util.Arrays;
+import org.apache.calcite.linq4j.function.SemiStrict;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
@@ -33,6 +34,7 @@ import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
 /**
  * Inbuilt array scalar functions. See {@link ArrayUtils} for details.
  */
+@SemiStrict
 public class ArrayFunctions {
   private ArrayFunctions() {
   }
@@ -226,6 +228,24 @@ public class ArrayFunctions {
   @ScalarFunction
   public static String arrayElementAtString(String[] arr, int idx) {
     return idx > 0 && idx <= arr.length ? arr[idx - 1] : NullValuePlaceHolder.STRING;
+  }
+
+  @ScalarFunction
+  public static int arraySumInt(int[] arr) {
+    int sum = 0;
+    for (int value : arr) {
+      sum += value;
+    }
+    return sum;
+  }
+
+  @ScalarFunction
+  public static long arraySumLong(long[] arr) {
+    long sum = 0;
+    for (long value : arr) {
+      sum += value;
+    }
+    return sum;
   }
 
   @ScalarFunction(names = {"array", "arrayValueConstructor"}, isVarArg = true)

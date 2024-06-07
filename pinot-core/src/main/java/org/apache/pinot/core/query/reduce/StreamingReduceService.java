@@ -25,7 +25,6 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
-import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.DataTableFactory;
@@ -59,7 +58,7 @@ public class StreamingReduceService extends BaseReduceService {
 
   public BrokerResponseNative reduceOnStreamResponse(BrokerRequest brokerRequest,
       Map<ServerRoutingInstance, Iterator<Server.ServerResponse>> serverResponseMap, long reduceTimeOutMs,
-      @Nullable BrokerMetrics brokerMetrics)
+      BrokerMetrics brokerMetrics)
       throws IOException {
     if (serverResponseMap.isEmpty()) {
       // Empty response.

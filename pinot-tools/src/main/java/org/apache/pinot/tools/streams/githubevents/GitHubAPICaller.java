@@ -114,7 +114,7 @@ public class GitHubAPICaller {
           githubAPIResponse.setResetTimeMs(Long.parseLong(resetTimeSeconds) * 1000);
         }
       } catch (NumberFormatException e) {
-        LOGGER.warn("Could not parse remainingLimit: " + remainingLimit);
+        LOGGER.warn("Could not parse remainingLimit: {}", remainingLimit);
       }
       if (statusLine.getStatusCode() == 200) {
         githubAPIResponse.setEtag(httpResponse.getFirstHeader(ETAG_HEADER).getValue());

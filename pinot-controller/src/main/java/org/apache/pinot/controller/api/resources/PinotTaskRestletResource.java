@@ -553,9 +553,9 @@ public class PinotTaskRestletResource {
 
   @GET
   @Path("/tasks/scheduler/jobDetails")
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_SCHEDULER_INFO)
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_SCHEDULER_JOB_DETAILS)
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation("Fetch cron scheduler job keys")
+  @ApiOperation("Fetch job details for table tasks")
   public Map<String, Object> getCronSchedulerJobDetails(
       @ApiParam(value = "Table name (with type suffix)", required = true) @QueryParam("tableName") String tableName,
       @ApiParam(value = "Task type") @QueryParam("taskType") String taskType, @Context HttpHeaders headers)
@@ -661,7 +661,7 @@ public class PinotTaskRestletResource {
     } catch (NoTaskScheduledException e) {
       throw new ControllerApplicationException(LOGGER,
           "No task is generated for table: " + adhocTaskConfig.getTableName() + ", with task type: "
-              + adhocTaskConfig.getTaskType(), Response.Status.BAD_REQUEST);
+              + adhocTaskConfig.getTaskType(), Response.Status.BAD_REQUEST, e);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER,
           "Failed to create adhoc task: " + ExceptionUtils.getStackTrace(e), Response.Status.INTERNAL_SERVER_ERROR, e);

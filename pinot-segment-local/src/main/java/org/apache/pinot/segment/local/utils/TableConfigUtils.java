@@ -512,7 +512,6 @@ public final class TableConfigUtils {
         }
       }
 
-
       // Transform configs
       List<TransformConfig> transformConfigs = ingestionConfig.getTransformConfigs();
       if (transformConfigs != null) {
@@ -652,6 +651,15 @@ public final class TableConfigUtils {
                 String.format("Task %s contains an invalid cron schedule: %s", taskTypeConfigName, cronExprStr), e);
           }
         }
+        boolean isAllowDownloadFromServer = Boolean.parseBoolean(
+            taskTypeConfig.getOrDefault(TableTaskConfig.MINION_ALLOW_DOWNLOAD_FROM_SERVER,
+                String.valueOf(TableTaskConfig.DEFAULT_MINION_ALLOW_DOWNLOAD_FROM_SERVER)));
+        if (isAllowDownloadFromServer) {
+          Preconditions.checkState(tableConfig.getValidationConfig().getPeerSegmentDownloadScheme() != null,
+              String.format("Table %s has task %s with allowDownloadFromServer set to true, but "
+                      + "peerSegmentDownloadScheme is not set in the table config", tableConfig.getTableName(),
+                  taskTypeConfigName));
+        }
         // Task Specific validation for REALTIME_TO_OFFLINE_TASK_TYPE
         // TODO task specific validate logic should directly call to PinotTaskGenerator API
         if (taskTypeConfigName.equals(REALTIME_TO_OFFLINE_TASK_TYPE)) {
@@ -764,9 +772,9 @@ public final class TableConfigUtils {
         tableConfig.getRoutingConfig() != null && isRoutingStrategyAllowedForUpsert(tableConfig.getRoutingConfig()),
         "Upsert/Dedup table must use strict replica-group (i.e. strictReplicaGroup) based routing");
     Preconditions.checkState(tableConfig.getTenantConfig().getTagOverrideConfig() == null || (
-        tableConfig.getTenantConfig().getTagOverrideConfig().getRealtimeConsuming() == null
-            && tableConfig.getTenantConfig().getTagOverrideConfig().getRealtimeCompleted()
-            == null), "Invalid tenant tag override used for Upsert/Dedup table");
+            tableConfig.getTenantConfig().getTagOverrideConfig().getRealtimeConsuming() == null
+                && tableConfig.getTenantConfig().getTagOverrideConfig().getRealtimeCompleted() == null),
+        "Invalid tenant tag override used for Upsert/Dedup table");
 
     // specifically for upsert
     UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
@@ -793,15 +801,13 @@ public final class TableConfigUtils {
         Preconditions.checkState(fieldSpec.isSingleValueField(),
             String.format("The deleteRecordColumn - %s must be a single-valued column", deleteRecordColumn));
         DataType dataType = fieldSpec.getDataType();
-        Preconditions.checkState(
-            dataType == DataType.BOOLEAN || dataType == DataType.STRING || dataType.isNumeric(),
+        Preconditions.checkState(dataType == DataType.BOOLEAN || dataType == DataType.STRING || dataType.isNumeric(),
             String.format("The deleteRecordColumn - %s must be of type: String / Boolean / Numeric",
                 deleteRecordColumn));
       }
 
       String outOfOrderRecordColumn = upsertConfig.getOutOfOrderRecordColumn();
-      Preconditions.checkState(
-          outOfOrderRecordColumn == null || !upsertConfig.isDropOutOfOrderRecord(),
+      Preconditions.checkState(outOfOrderRecordColumn == null || !upsertConfig.isDropOutOfOrderRecord(),
           "outOfOrderRecordColumn and dropOutOfOrderRecord shouldn't exist together for upsert table");
 
       if (outOfOrderRecordColumn != null) {
@@ -837,8 +843,8 @@ public final class TableConfigUtils {
       String comparisonColumn = comparisonColumns.get(0);
       DataType comparisonColumnDataType = schema.getFieldSpecFor(comparisonColumn).getDataType();
       Preconditions.checkState(comparisonColumnDataType.isNumeric(),
-          "MetadataTTL / DeletedKeysTTL must have comparison column: %s in numeric type, found: %s",
-          comparisonColumn, comparisonColumnDataType);
+          "MetadataTTL / DeletedKeysTTL must have comparison column: %s in numeric type, found: %s", comparisonColumn,
+          comparisonColumnDataType);
     }
 
     if (upsertConfig.getMetadataTTL() > 0) {
@@ -869,14 +875,11 @@ public final class TableConfigUtils {
             tableConfig.getInstanceAssignmentConfigMap().get(instancePartitionsType.toString());
         if (instanceAssignmentConfig.getPartitionSelector()
             == InstanceAssignmentConfig.PartitionSelector.MIRROR_SERVER_SET_PARTITION_SELECTOR) {
-          Preconditions.checkState(
-              tableConfig.getInstancePartitionsMap().containsKey(instancePartitionsType),
+          Preconditions.checkState(tableConfig.getInstancePartitionsMap().containsKey(instancePartitionsType),
               String.format("Both InstanceAssignmentConfigMap and InstancePartitionsMap needed for %s, as "
-                      + "MIRROR_SERVER_SET_PARTITION_SELECTOR is used",
-                  instancePartitionsType));
+                  + "MIRROR_SERVER_SET_PARTITION_SELECTOR is used", instancePartitionsType));
         } else {
-          Preconditions.checkState(
-              !tableConfig.getInstancePartitionsMap().containsKey(instancePartitionsType),
+          Preconditions.checkState(!tableConfig.getInstancePartitionsMap().containsKey(instancePartitionsType),
               String.format("Both InstanceAssignmentConfigMap and InstancePartitionsMap set for %s",
                   instancePartitionsType));
         }
@@ -1100,7 +1103,6 @@ public final class TableConfigUtils {
     }
 
     List<StarTreeIndexConfig> starTreeIndexConfigList = indexingConfig.getStarTreeIndexConfigs();
-    Set<AggregationFunctionColumnPair> storedTypes = new HashSet<>();
     if (starTreeIndexConfigList != null) {
       for (StarTreeIndexConfig starTreeIndexConfig : starTreeIndexConfigList) {
         // Dimension split order cannot be null
@@ -1108,6 +1110,10 @@ public final class TableConfigUtils {
           columnNameToConfigMap.put(columnName, STAR_TREE_CONFIG_NAME);
         }
         List<String> functionColumnPairs = starTreeIndexConfig.getFunctionColumnPairs();
+        List<StarTreeAggregationConfig> aggregationConfigs = starTreeIndexConfig.getAggregationConfigs();
+        Preconditions.checkState(functionColumnPairs == null || aggregationConfigs == null,
+            "Only one of 'functionColumnPairs' or 'aggregationConfigs' can be specified in StarTreeIndexConfig");
+        Set<AggregationFunctionColumnPair> storedTypes = new HashSet<>();
         if (functionColumnPairs != null) {
           for (String functionColumnPair : functionColumnPairs) {
             AggregationFunctionColumnPair columnPair;
@@ -1128,7 +1134,6 @@ public final class TableConfigUtils {
             }
           }
         }
-        List<StarTreeAggregationConfig> aggregationConfigs = starTreeIndexConfig.getAggregationConfigs();
         if (aggregationConfigs != null) {
           for (StarTreeAggregationConfig aggregationConfig : aggregationConfigs) {
             AggregationFunctionColumnPair columnPair;
@@ -1332,9 +1337,8 @@ public final class TableConfigUtils {
     }
 
     Preconditions.checkState(!indexingConfig.isOptimizeDictionaryForMetrics() && !indexingConfig.isOptimizeDictionary(),
-        String.format(
-            "Dictionary override optimization options (OptimizeDictionary, optimizeDictionaryForMetrics)"
-                + " not supported with forward index for column: %s, disabled", columnName));
+        String.format("Dictionary override optimization options (OptimizeDictionary, optimizeDictionaryForMetrics)"
+            + " not supported with forward index for column: %s, disabled", columnName));
 
     boolean hasDictionary = fieldConfig.getEncodingType() == EncodingType.DICTIONARY;
     boolean hasInvertedIndex =
@@ -1413,8 +1417,8 @@ public final class TableConfigUtils {
         } else {
           if (quotaConfig.getStorageInBytes() > maxAllowedSizeInBytes) {
             throw new IllegalStateException(
-                String.format("Invalid storage quota: %d, max allowed size: %d", quotaConfig.getStorageInBytes(),
-                    maxAllowedSizeInBytes));
+                String.format("Exceeded storage size for dimension table. Requested size: %d, Max allowed size: %d",
+                    quotaConfig.getStorageInBytes(), maxAllowedSizeInBytes));
           }
         }
       }

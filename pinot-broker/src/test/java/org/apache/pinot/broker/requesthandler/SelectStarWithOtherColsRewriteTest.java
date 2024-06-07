@@ -57,7 +57,7 @@ public class SelectStarWithOtherColsRewriteTest {
   public void testShouldExpandWhenOnlyStarIsSelected() {
     String sql = "SELECT * FROM baseballStats";
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
-    BaseBrokerRequestHandler.updateColumnNames("baseballStats", pinotQuery, false, COL_MAP);
+    BaseSingleStageBrokerRequestHandler.updateColumnNames("baseballStats", pinotQuery, false, COL_MAP);
     List<Expression> newSelections = pinotQuery.getSelectList();
     Map<String, Integer> countMap = new HashMap<>();
     for (Expression selection : newSelections) {
@@ -79,7 +79,7 @@ public class SelectStarWithOtherColsRewriteTest {
   public void testShouldNotReturnExtraDefaultColumns() {
     String sql = "SELECT $docId,*,$segmentName FROM baseballStats";
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
-    BaseBrokerRequestHandler.updateColumnNames("baseballStats", pinotQuery, false, COL_MAP);
+    BaseSingleStageBrokerRequestHandler.updateColumnNames("baseballStats", pinotQuery, false, COL_MAP);
     List<Expression> newSelections = pinotQuery.getSelectList();
     int docIdCnt = 0;
     int segmentNameCnt = 0;
@@ -108,7 +108,7 @@ public class SelectStarWithOtherColsRewriteTest {
   public void testShouldNotDedupMultipleRequestedColumns() {
     String sql = "SELECT playerID,*,G_old FROM baseballStats";
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
-    BaseBrokerRequestHandler.updateColumnNames("baseballStats", pinotQuery, false, COL_MAP);
+    BaseSingleStageBrokerRequestHandler.updateColumnNames("baseballStats", pinotQuery, false, COL_MAP);
     List<Expression> newSelections = pinotQuery.getSelectList();
     int playerIdCnt = 0;
     int goldCount = 0;
@@ -135,7 +135,7 @@ public class SelectStarWithOtherColsRewriteTest {
   public void testSelectionOrder() {
     String sql = "SELECT playerID,*,G_old FROM baseballStats";
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
-    BaseBrokerRequestHandler.updateColumnNames("baseballStats", pinotQuery, false, COL_MAP);
+    BaseSingleStageBrokerRequestHandler.updateColumnNames("baseballStats", pinotQuery, false, COL_MAP);
     List<Expression> newSelections = pinotQuery.getSelectList();
     Assert.assertEquals(newSelections.get(0).getIdentifier().getName(), "playerID");
     Assert.assertEquals(newSelections.get(newSelections.size() - 1).getIdentifier().getName(), "G_old");
@@ -154,7 +154,7 @@ public class SelectStarWithOtherColsRewriteTest {
   public void testAliasing() {
     String sql = "SELECT playerID as pid,* FROM baseballStats";
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
-    BaseBrokerRequestHandler.updateColumnNames("baseballStats", pinotQuery, false, COL_MAP);
+    BaseSingleStageBrokerRequestHandler.updateColumnNames("baseballStats", pinotQuery, false, COL_MAP);
     List<Expression> newSelections = pinotQuery.getSelectList();
     Assert.assertTrue(newSelections.get(0).isSetFunctionCall());
     Assert.assertEquals(newSelections.get(0).getFunctionCall().getOperator(), "as");
@@ -178,7 +178,7 @@ public class SelectStarWithOtherColsRewriteTest {
   public void testFuncOnColumns1() {
     String sql = "SELECT sqrt(homeRuns),* FROM baseballStats";
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
-    BaseBrokerRequestHandler.updateColumnNames("baseballStats", pinotQuery, false, COL_MAP);
+    BaseSingleStageBrokerRequestHandler.updateColumnNames("baseballStats", pinotQuery, false, COL_MAP);
     List<Expression> newSelections = pinotQuery.getSelectList();
     Assert.assertTrue(newSelections.get(0).isSetFunctionCall());
     Assert.assertEquals(newSelections.get(0).getFunctionCall().getOperator(), "sqrt");
@@ -201,7 +201,7 @@ public class SelectStarWithOtherColsRewriteTest {
   public void testFuncOnColumns2() {
     String sql = "SELECT add(homeRuns,groundedIntoDoublePlays),* FROM baseballStats";
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
-    BaseBrokerRequestHandler.updateColumnNames("baseballStats", pinotQuery, false, COL_MAP);
+    BaseSingleStageBrokerRequestHandler.updateColumnNames("baseballStats", pinotQuery, false, COL_MAP);
     List<Expression> newSelections = pinotQuery.getSelectList();
     Assert.assertTrue(newSelections.get(0).isSetFunctionCall());
     Assert.assertEquals(newSelections.get(0).getFunctionCall().getOperator(), "add");
@@ -230,7 +230,7 @@ public class SelectStarWithOtherColsRewriteTest {
   public void testMultipleUnqualifiedStars() {
     String sql = "SELECT *,* FROM baseballStats";
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
-    BaseBrokerRequestHandler.updateColumnNames("baseballStats", pinotQuery, false, COL_MAP);
+    BaseSingleStageBrokerRequestHandler.updateColumnNames("baseballStats", pinotQuery, false, COL_MAP);
     List<Expression> newSelections = pinotQuery.getSelectList();
     Assert.assertEquals(newSelections.get(0).getIdentifier().getName(), "G_old");
     Assert.assertEquals(newSelections.get(1).getIdentifier().getName(), "groundedIntoDoublePlays");
@@ -250,7 +250,7 @@ public class SelectStarWithOtherColsRewriteTest {
         "SELECT abs(homeRuns),sqrt(groundedIntoDoublePlays),*,$segmentName,$hostName,playerStint as pstint,playerID  "
             + "FROM baseballStats";
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
-    BaseBrokerRequestHandler.updateColumnNames("baseballStats", pinotQuery, false, COL_MAP);
+    BaseSingleStageBrokerRequestHandler.updateColumnNames("baseballStats", pinotQuery, false, COL_MAP);
     List<Expression> newSelections = pinotQuery.getSelectList();
     Assert.assertTrue(newSelections.get(0).isSetFunctionCall());
     Assert.assertEquals(newSelections.get(0).getFunctionCall().getOperator(), "abs");

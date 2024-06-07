@@ -18,17 +18,20 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
+import com.google.common.collect.HashMultiset;
+import com.google.common.collect.Multiset;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.datablock.DataBlock;
+import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.ExplainPlanRows;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 
@@ -41,7 +44,7 @@ import org.apache.pinot.segment.spi.IndexSegment;
  * UnionOperator: The right child operator is consumed in a blocking manner.
  */
 public abstract class SetOperator extends MultiStageOperator {
-  protected final Set<Record> _rightRowSet;
+  protected final Multiset<Record> _rightRowSet;
 
   private final List<MultiStageOperator> _upstreamOperators;
   private final MultiStageOperator _leftChildOperator;
@@ -50,8 +53,10 @@ public abstract class SetOperator extends MultiStageOperator {
   private final DataSchema _dataSchema;
 
   private boolean _isRightSetBuilt;
-  private boolean _isTerminated;
-  private TransferableBlock _upstreamErrorBlock;
+  protected TransferableBlock _upstreamErrorBlock;
+  @Nullable
+  private MultiStageQueryStats _rightQueryStats = null;
+  protected final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
 
   public SetOperator(OpChainExecutionContext opChainExecutionContext, List<MultiStageOperator> upstreamOperators,
       DataSchema dataSchema) {
@@ -60,9 +65,14 @@ public abstract class SetOperator extends MultiStageOperator {
     _upstreamOperators = upstreamOperators;
     _leftChildOperator = getChildOperators().get(0);
     _rightChildOperator = getChildOperators().get(1);
-    _rightRowSet = new HashSet<>();
+    _rightRowSet = HashMultiset.create();
     _isRightSetBuilt = false;
-    _isTerminated = false;
+  }
+
+  @Override
+  public void registerExecution(long time, int numRows) {
+    _statMap.merge(StatKey.EXECUTION_TIME_MS, time);
+    _statMap.merge(StatKey.EMITTED_ROWS, numRows);
   }
 
   @Override
@@ -92,9 +102,6 @@ public abstract class SetOperator extends MultiStageOperator {
 
   @Override
   protected TransferableBlock getNextBlock() {
-    if (_isTerminated) {
-      return TransferableBlockUtils.getEndOfStreamTransferableBlock();
-    }
     if (!_isRightSetBuilt) {
       // construct a SET with all the right side rows.
       constructRightBlockSet();
@@ -121,6 +128,8 @@ public abstract class SetOperator extends MultiStageOperator {
       _upstreamErrorBlock = block;
     } else {
       _isRightSetBuilt = true;
+      _rightQueryStats = block.getQueryStats();
+      assert _rightQueryStats != null;
     }
   }
 
@@ -133,7 +142,12 @@ public abstract class SetOperator extends MultiStageOperator {
       return _upstreamErrorBlock;
     }
     if (leftBlock.isSuccessfulEndOfStreamBlock()) {
-      return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+      assert _rightQueryStats != null;
+      MultiStageQueryStats leftQueryStats = leftBlock.getQueryStats();
+      assert leftQueryStats != null;
+      _rightQueryStats.mergeInOrder(leftQueryStats, getOperatorType(), _statMap);
+      _rightQueryStats.getCurrentStats().concat(leftQueryStats.getCurrentStats());
+      return TransferableBlockUtils.getEndOfStreamTransferableBlock(_rightQueryStats);
     }
     for (Object[] row : leftBlock.getContainer()) {
       if (handleRowMatched(row)) {
@@ -150,4 +164,29 @@ public abstract class SetOperator extends MultiStageOperator {
    * @return true if the row is matched.
    */
   protected abstract boolean handleRowMatched(Object[] row);
+
+  public enum StatKey implements StatMap.Key {
+    EXECUTION_TIME_MS(StatMap.Type.LONG) {
+      @Override
+      public boolean includeDefaultInJson() {
+        return true;
+      }
+    },
+    EMITTED_ROWS(StatMap.Type.LONG) {
+      @Override
+      public boolean includeDefaultInJson() {
+        return true;
+      }
+    };
+    private final StatMap.Type _type;
+
+    StatKey(StatMap.Type type) {
+      _type = type;
+    }
+
+    @Override
+    public StatMap.Type getType() {
+      return _type;
+    }
+  }
 }

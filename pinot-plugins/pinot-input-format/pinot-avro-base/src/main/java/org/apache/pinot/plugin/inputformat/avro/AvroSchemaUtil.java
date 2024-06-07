@@ -21,6 +21,7 @@ package org.apache.pinot.plugin.inputformat.avro;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.avro.Conversion;
 import org.apache.avro.Conversions;
@@ -162,7 +163,19 @@ public class AvroSchemaUtil {
     if (field == null || field.schema() == null) {
       return value;
     }
-    LogicalType logicalType = LogicalTypes.fromSchemaIgnoreInvalid(field.schema());
+    // Choose the non-null schema when the field schema is represented as union schema. Only then, the avro library
+    // is able to determine the correct logical type for the field.
+    Schema fieldSchema = field.schema();
+    if (fieldSchema.isUnion()) {
+      List<Schema> fieldSchemas = fieldSchema.getTypes();
+      for (Schema curSchema: fieldSchemas) {
+        if (curSchema.getLogicalType() != null) {
+          fieldSchema = curSchema;
+          break;
+        }
+      }
+    }
+    LogicalType logicalType = LogicalTypes.fromSchemaIgnoreInvalid(fieldSchema);
     if (logicalType == null) {
       return value;
     }
@@ -170,6 +183,6 @@ public class AvroSchemaUtil {
     if (conversion == null) {
       return value;
     }
-    return Conversions.convertToLogicalType(value, field.schema(), logicalType, conversion);
+    return Conversions.convertToLogicalType(value, fieldSchema, logicalType, conversion);
   }
 }

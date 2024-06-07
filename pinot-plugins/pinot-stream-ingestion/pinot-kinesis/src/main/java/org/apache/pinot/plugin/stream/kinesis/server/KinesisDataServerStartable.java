@@ -111,9 +111,9 @@ public class KinesisDataServerStartable implements StreamDataServerStartable {
         }
       }, 1000L, 30000, "Kinesis stream " + topic + " is not created or is not in active state");
 
-      LOGGER.info("Kinesis stream created successfully: " + topic);
+      LOGGER.info("Kinesis stream created successfully: {}", topic);
     } catch (Exception e) {
-      LOGGER.warn("Error occurred while creating topic: " + topic, e);
+      LOGGER.warn("Error occurred while creating topic: {}", topic, e);
     }
   }
 
@@ -137,9 +137,9 @@ public class KinesisDataServerStartable implements StreamDataServerStartable {
         }
         Thread.sleep(checkIntervalMs);
       } catch (Exception e) {
-        LOGGER.error("Caught exception while checking the condition" + errorMessageSuffix, e);
+        LOGGER.error("Caught exception while checking the condition{}", errorMessageSuffix, e);
       }
     }
-    LOGGER.error("Failed to meet condition in " + timeoutMs + "ms" + errorMessageSuffix);
+    LOGGER.error("Failed to meet condition in {}ms{}", timeoutMs, errorMessageSuffix);
   }
 }

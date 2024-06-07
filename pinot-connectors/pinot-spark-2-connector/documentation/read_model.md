@@ -139,3 +139,4 @@ val df = spark.read
 | pinotServerTimeoutMs | The maximum timeout(ms) to get data from pinot server | No | 10 mins |
 | useGrpcServer | Boolean value to enable reads via gRPC. This option is more memory efficient both on Pinot server and Spark executor side because it utilizes streaming. Requires gRPC to be enabled on Pinot server. | No | false |
 | queryOptions | Comma separated list of Pinot query options (e.g. "enableNullHandling=true,skipUpsert=true") | No | "" |
+| failOnInvalidSegments | Fail the read operation if response metadata indicates invalid segments                                                                                                                                       | No | false                                                 |

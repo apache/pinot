@@ -23,8 +23,10 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.RemovalListener;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.query.mailbox.channel.ChannelManager;
 import org.apache.pinot.query.mailbox.channel.GrpcMailboxServer;
+import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -99,11 +101,12 @@ public class MailboxService {
    * not open the underlying channel or acquire any additional resources. Instead, it will initialize lazily when the
    * data is sent for the first time.
    */
-  public SendingMailbox getSendingMailbox(String hostname, int port, String mailboxId, long deadlineMs) {
+  public SendingMailbox getSendingMailbox(String hostname, int port, String mailboxId, long deadlineMs,
+      StatMap<MailboxSendOperator.StatKey> statMap) {
     if (_hostname.equals(hostname) && _port == port) {
-      return new InMemorySendingMailbox(mailboxId, this, deadlineMs);
+      return new InMemorySendingMailbox(mailboxId, this, deadlineMs, statMap);
     } else {
-      return new GrpcSendingMailbox(mailboxId, _channelManager, hostname, port, deadlineMs);
+      return new GrpcSendingMailbox(mailboxId, _channelManager, hostname, port, deadlineMs, statMap);
     }
   }
 

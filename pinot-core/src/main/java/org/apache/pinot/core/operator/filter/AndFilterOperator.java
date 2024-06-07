@@ -19,13 +19,16 @@
 package org.apache.pinot.core.operator.filter;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.docidsets.AndDocIdSet;
+import org.apache.pinot.core.operator.docidsets.EmptyDocIdSet;
 import org.apache.pinot.core.operator.docidsets.MatchAllDocIdSet;
+import org.apache.pinot.core.operator.docidsets.NotDocIdSet;
 import org.apache.pinot.core.operator.docidsets.OrDocIdSet;
 import org.apache.pinot.spi.trace.Tracing;
 import org.roaringbitmap.buffer.BufferFastAggregation;
@@ -59,13 +62,29 @@ public class AndFilterOperator extends BaseFilterOperator {
   protected BlockDocIdSet getFalses() {
     List<BlockDocIdSet> blockDocIdSets = new ArrayList<>(_filterOperators.size());
     for (BaseFilterOperator filterOperator : _filterOperators) {
-      if (filterOperator.isResultEmpty()) {
-        blockDocIdSets.add(new MatchAllDocIdSet(_numDocs));
-      } else {
-        blockDocIdSets.add(filterOperator.getFalses());
+      BlockDocIdSet trues = filterOperator.getTrues();
+      if (trues instanceof EmptyDocIdSet) {
+        return new MatchAllDocIdSet(_numDocs);
       }
+      if (trues instanceof MatchAllDocIdSet) {
+        continue;
+      }
+      if (_nullHandlingEnabled) {
+        BlockDocIdSet nulls = filterOperator.getNulls();
+        if (!(nulls instanceof EmptyDocIdSet)) {
+          blockDocIdSets.add(new OrDocIdSet(Arrays.asList(trues, nulls), _numDocs));
+          continue;
+        }
+      }
+      blockDocIdSets.add(trues);
     }
-    return new OrDocIdSet(blockDocIdSets, _numDocs);
+    if (blockDocIdSets.isEmpty()) {
+      return EmptyDocIdSet.getInstance();
+    }
+    if (blockDocIdSets.size() == 1) {
+      return new NotDocIdSet(blockDocIdSets.get(0), _numDocs);
+    }
+    return new NotDocIdSet(new AndDocIdSet(blockDocIdSets, _queryOptions), _numDocs);
   }
 
   @Override

@@ -68,19 +68,23 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
     boolean enablePreload = upsertConfig.isEnablePreload();
     double metadataTTL = upsertConfig.getMetadataTTL();
     double deletedKeysTTL = upsertConfig.getDeletedKeysTTL();
+    UpsertConfig.ConsistencyMode consistencyMode = upsertConfig.getConsistencyMode();
+    long upsertViewRefreshIntervalMs = upsertConfig.getUpsertViewRefreshIntervalMs();
     File tableIndexDir = tableDataManager.getTableDataDir();
     _context = new UpsertContext.Builder().setTableConfig(tableConfig).setSchema(schema)
         .setPrimaryKeyColumns(primaryKeyColumns).setComparisonColumns(comparisonColumns)
         .setDeleteRecordColumn(deleteRecordColumn).setHashFunction(hashFunction)
         .setPartialUpsertHandler(partialUpsertHandler).setEnableSnapshot(enableSnapshot).setEnablePreload(enablePreload)
-        .setMetadataTTL(metadataTTL).setDeletedKeysTTL(deletedKeysTTL).setTableIndexDir(tableIndexDir)
+        .setMetadataTTL(metadataTTL).setDeletedKeysTTL(deletedKeysTTL).setConsistencyMode(consistencyMode)
+        .setUpsertViewRefreshIntervalMs(upsertViewRefreshIntervalMs).setTableIndexDir(tableIndexDir)
         .setTableDataManager(tableDataManager).build();
     LOGGER.info(
         "Initialized {} for table: {} with primary key columns: {}, comparison columns: {}, delete record column: {},"
             + " hash function: {}, upsert mode: {}, enable snapshot: {}, enable preload: {}, metadata TTL: {},"
-            + " deleted Keys TTL: {}, table index dir: {}", getClass().getSimpleName(), _tableNameWithType,
-        primaryKeyColumns, comparisonColumns, deleteRecordColumn, hashFunction, upsertConfig.getMode(), enableSnapshot,
-        enablePreload, metadataTTL, deletedKeysTTL, tableIndexDir);
+            + " deleted Keys TTL: {}, consistency mode: {}, upsert view refresh interval: {}ms, table index dir: {}",
+        getClass().getSimpleName(), _tableNameWithType, primaryKeyColumns, comparisonColumns, deleteRecordColumn,
+        hashFunction, upsertConfig.getMode(), enableSnapshot, enablePreload, metadataTTL, deletedKeysTTL,
+        consistencyMode, upsertViewRefreshIntervalMs, tableIndexDir);
 
     initCustomVariables();
   }

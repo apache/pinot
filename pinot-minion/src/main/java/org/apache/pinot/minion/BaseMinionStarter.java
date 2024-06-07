@@ -214,6 +214,7 @@ public abstract class BaseMinionStarter implements ServiceStartable {
     minionMetrics.setValueOfGlobalGauge(MinionGauge.VERSION, PinotVersion.VERSION_METRIC_NAME, 1);
     MinionMetrics.register(minionMetrics);
     minionContext.setMinionMetrics(minionMetrics);
+    minionContext.setAllowDownloadFromServer(_config.isAllowDownloadFromServer());
 
     // Install default SSL context if necessary (even if not force-enabled everywhere)
     TlsConfig tlsDefaults = TlsUtils.extractTlsConfig(_config, CommonConstants.Minion.MINION_TLS_PREFIX);
@@ -332,7 +333,7 @@ public abstract class BaseMinionStarter implements ServiceStartable {
     LOGGER.info("Shutting down admin application");
     _minionAdminApplication.stop();
 
-    LOGGER.info("Stopping Pinot minion: " + _instanceId);
+    LOGGER.info("Stopping Pinot minion: {}", _instanceId);
     _helixManager.disconnect();
     LOGGER.info("Deregistering service status handler");
     ServiceStatus.removeServiceStatusCallback(_instanceId);

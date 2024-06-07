@@ -249,6 +249,46 @@ public class NoDictionaryEqualsPredicateEvaluatorsTest {
   }
 
   @Test
+  public void testJsonPredicateEvaluators() {
+    String jsonStringTemplate = "{\"id\": %s, \"name\": %s}";
+    String jsonString = String.format(jsonStringTemplate,
+        RandomStringUtils.randomAlphanumeric(MAX_STRING_LENGTH),
+        RandomStringUtils.randomAlphanumeric(MAX_STRING_LENGTH));
+
+    EqPredicate eqPredicate = new EqPredicate(COLUMN_EXPRESSION, jsonString);
+    PredicateEvaluator eqPredicateEvaluator =
+        EqualsPredicateEvaluatorFactory.newRawValueBasedEvaluator(eqPredicate, FieldSpec.DataType.STRING);
+
+    NotEqPredicate notEqPredicate = new NotEqPredicate(COLUMN_EXPRESSION, jsonString);
+    PredicateEvaluator neqPredicateEvaluator =
+        NotEqualsPredicateEvaluatorFactory.newRawValueBasedEvaluator(notEqPredicate, FieldSpec.DataType.STRING);
+
+    Assert.assertTrue(eqPredicateEvaluator.applySV(jsonString));
+    Assert.assertFalse(neqPredicateEvaluator.applySV(jsonString));
+
+    String[] randomJsonStrings = new String[NUM_MULTI_VALUES];
+    PredicateEvaluatorTestUtils.fillRandomJson(randomJsonStrings, jsonStringTemplate, 2, MAX_STRING_LENGTH);
+    randomJsonStrings[_random.nextInt(NUM_MULTI_VALUES)] = jsonString;
+
+    Assert.assertTrue(eqPredicateEvaluator.applyMV(randomJsonStrings, NUM_MULTI_VALUES));
+    Assert.assertFalse(neqPredicateEvaluator.applyMV(randomJsonStrings, NUM_MULTI_VALUES));
+
+    for (int i = 0; i < 100; i++) {
+      String randomJson = String.format(jsonStringTemplate,
+          RandomStringUtils.randomAlphanumeric(MAX_STRING_LENGTH),
+          RandomStringUtils.randomAlphanumeric(MAX_STRING_LENGTH));
+      Assert.assertEquals(eqPredicateEvaluator.applySV(randomJson), (randomJson.equals(jsonString)));
+      Assert.assertEquals(neqPredicateEvaluator.applySV(randomJson), (!randomJson.equals(jsonString)));
+
+      PredicateEvaluatorTestUtils.fillRandomJson(randomJsonStrings, jsonStringTemplate, 2, MAX_STRING_LENGTH);
+      Assert.assertEquals(eqPredicateEvaluator.applyMV(randomJsonStrings, NUM_MULTI_VALUES),
+          ArrayUtils.contains(randomJsonStrings, jsonString));
+      Assert.assertEquals(neqPredicateEvaluator.applyMV(randomJsonStrings, NUM_MULTI_VALUES),
+          !ArrayUtils.contains(randomJsonStrings, jsonString));
+    }
+  }
+
+  @Test
   public void testBytesPredicateEvaluators() {
     byte[] bytesValue = RandomStringUtils.random(MAX_STRING_LENGTH).getBytes();
     String stringValue = BytesUtils.toHexString(bytesValue);

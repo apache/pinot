@@ -96,6 +96,14 @@ public interface MessageBatch<T> {
     return false;
   }
 
+  /**
+   * Returns {code true} if the current batch has data loss.
+   * This is useful to determine if there were gaps in the stream.
+   */
+  default boolean hasDataLoss() {
+    return false;
+  }
+
   @Deprecated
   default T getMessageAtIndex(int index) {
     throw new UnsupportedOperationException();

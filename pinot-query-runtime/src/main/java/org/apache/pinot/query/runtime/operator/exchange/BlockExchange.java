@@ -89,6 +89,7 @@ public abstract class BlockExchange {
       // Send metadata to only one randomly picked mailbox, and empty EOS block to other mailboxes
       int numMailboxes = _sendingMailboxes.size();
       int mailboxIdToSendMetadata = ThreadLocalRandom.current().nextInt(numMailboxes);
+      assert block.getQueryStats() != null;
       for (int i = 0; i < numMailboxes; i++) {
         SendingMailbox sendingMailbox = _sendingMailboxes.get(i);
         TransferableBlock blockToSend =

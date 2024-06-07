@@ -80,7 +80,7 @@ public class DataGenerator {
         IntRange range = _genSpec.getRangeMap().get(column);
         generator = GeneratorFactory.getGeneratorFor(dataType, range.getMinimumInteger(), range.getMaximumInteger());
       } else {
-        LOGGER.error("cardinality for this column does not exist : " + column);
+        LOGGER.error("cardinality for this column does not exist : {}", column);
         throw new RuntimeException("cardinality for this column does not exist");
       }
       generator.init();

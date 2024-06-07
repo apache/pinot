@@ -533,26 +533,27 @@ public class SchemaConformingTransformerV2 implements RecordTransformer {
 
     if (shingleIndexOverlapLength >= valLength) {
       if (_logger.isDebugEnabled()) {
-        _logger.warn("The shingleIndexOverlapLength " + shingleIndexOverlapLength + " is longer than the value length "
-            + valLength + ". Shingling will not be applied since only one document will be generated.");
+        _logger.warn(
+            "The shingleIndexOverlapLength {} is longer than the value length {}. Shingling will not be applied since "
+                + "only one document will be generated.", shingleIndexOverlapLength, valLength);
       }
       generateTextIndexLuceneDocument(kv, shingleIndexDocuments, shingleIndexMaxLength);
       return;
     }
 
     if (minDocumentLength > MAXIMUM_LUCENE_DOCUMENT_SIZE) {
-      _logger.debug("The minimum document length " + minDocumentLength + " (" + MIN_DOCUMENT_LENGTH_DESCRIPTION + ") "
-          + " exceeds the limit of maximum Lucene document size " + MAXIMUM_LUCENE_DOCUMENT_SIZE + ". Value will be "
-          + "truncated and shingling will not be applied.");
+      _logger.debug("The minimum document length {} (" + MIN_DOCUMENT_LENGTH_DESCRIPTION
+          + ")  exceeds the limit of maximum Lucene document size " + MAXIMUM_LUCENE_DOCUMENT_SIZE
+          + ". Value will be truncated and shingling will not be applied.", minDocumentLength);
       generateTextIndexLuceneDocument(kv, shingleIndexDocuments, shingleIndexMaxLength);
       return;
     }
 
     // This logging becomes expensive if user accidentally sets a very low shingleIndexMaxLength
     if (shingleIndexMaxLength < minDocumentLength) {
-      _logger.debug("The shingleIndexMaxLength " + shingleIndexMaxLength + " is smaller than the minimum document "
-          + "length " + minDocumentLength + " (" + MIN_DOCUMENT_LENGTH_DESCRIPTION + "). Increasing the "
-          + "shingleIndexMaxLength to maximum Lucene document size " + MAXIMUM_LUCENE_DOCUMENT_SIZE + ".");
+      _logger.debug("The shingleIndexMaxLength {} is smaller than the minimum document length {} ("
+          + MIN_DOCUMENT_LENGTH_DESCRIPTION + "). Increasing the shingleIndexMaxLength to maximum Lucene document size "
+          + MAXIMUM_LUCENE_DOCUMENT_SIZE + ".", shingleIndexMaxLength, minDocumentLength);
       shingleIndexMaxLength = MAXIMUM_LUCENE_DOCUMENT_SIZE;
     }
 

@@ -647,20 +647,24 @@ public class TablesResource {
     TableDataManager tableDataManager =
         ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableNameWithType);
     List<String> missingSegments = new ArrayList<>();
+    int nonImmutableSegmentCount = 0;
+    int missingValidDocIdSnapshotSegmentCount = 0;
     List<SegmentDataManager> segmentDataManagers;
     if (segments == null) {
       segmentDataManagers = tableDataManager.acquireAllSegments();
     } else {
       segmentDataManagers = tableDataManager.acquireSegments(segments, missingSegments);
-      if (!missingSegments.isEmpty()) {
-        throw new WebApplicationException(
-            String.format("Table %s has missing segments: %s)", tableNameWithType, segments),
-            Response.Status.NOT_FOUND);
-      }
     }
-    List<Map<String, Object>> allValidDocIdsMetadata = new ArrayList<>();
-    for (SegmentDataManager segmentDataManager : segmentDataManagers) {
-      try {
+    try {
+      if (!missingSegments.isEmpty()) {
+        // we need not abort here or throw exception as we can still process the segments that are available
+        // During UpsertCompactionTaskGenerator, controller sends a lot of segments to server to fetch validDocIds
+        // and it may happen that a segment is deleted concurrently. In such cases, we should log a warning and
+        // process the remaining available segments.
+        LOGGER.warn("Table {} has missing segments {}", tableNameWithType, missingSegments);
+      }
+      List<Map<String, Object>> allValidDocIdsMetadata = new ArrayList<>(segmentDataManagers.size());
+      for (SegmentDataManager segmentDataManager : segmentDataManagers) {
         IndexSegment indexSegment = segmentDataManager.getSegment();
         if (indexSegment == null) {
           LOGGER.warn("Table {} segment {} does not exist", tableNameWithType, segmentDataManager.getSegmentName());
@@ -668,9 +672,12 @@ public class TablesResource {
         }
         // Skip the consuming segments
         if (!(indexSegment instanceof ImmutableSegmentImpl)) {
-          String msg = String.format("Table %s segment %s is not a immutable segment", tableNameWithType,
-              segmentDataManager.getSegmentName());
-          LOGGER.warn(msg);
+          if (LOGGER.isDebugEnabled()) {
+            String msg = String.format("Table %s segment %s is not a immutable segment", tableNameWithType,
+                segmentDataManager.getSegmentName());
+            LOGGER.debug(msg);
+          }
+          nonImmutableSegmentCount++;
           continue;
         }
 
@@ -679,11 +686,14 @@ public class TablesResource {
         String finalValidDocIdsType = validDocIdSnapshotPair.getLeft().toString();
         MutableRoaringBitmap validDocIdsSnapshot = validDocIdSnapshotPair.getRight();
         if (validDocIdsSnapshot == null) {
-          String msg = String.format(
-              "Found that validDocIds is missing while processing validDocIdsMetadata for table %s segment %s while "
-                  + "reading the validDocIds with validDocIdType %s",
-              tableNameWithType, segmentDataManager.getSegmentName(), validDocIdsType);
-          LOGGER.warn(msg);
+          if (LOGGER.isDebugEnabled()) {
+            String msg = String.format(
+                "Found that validDocIds is missing while processing validDocIdsMetadata for table %s segment %s while "
+                    + "reading the validDocIds with validDocIdType %s", tableNameWithType,
+                segmentDataManager.getSegmentName(), validDocIdsType);
+            LOGGER.debug(msg);
+          }
+          missingValidDocIdSnapshotSegmentCount++;
           continue;
         }
 
@@ -698,11 +708,22 @@ public class TablesResource {
         validDocIdsMetadata.put("segmentCrc", indexSegment.getSegmentMetadata().getCrc());
         validDocIdsMetadata.put("validDocIdsType", finalValidDocIdsType);
         allValidDocIdsMetadata.add(validDocIdsMetadata);
-      } finally {
+      }
+      if (nonImmutableSegmentCount > 0) {
+        LOGGER.warn("Table {} has {} non-immutable segments found while processing validDocIdsMetadata",
+            tableNameWithType, nonImmutableSegmentCount);
+      }
+      if (missingValidDocIdSnapshotSegmentCount > 0) {
+        LOGGER.warn("Found that validDocIds is missing for {} segments while processing validDocIdsMetadata "
+                + "for table {} while reading the validDocIds with validDocIdType {}. ",
+            missingValidDocIdSnapshotSegmentCount, tableNameWithType, validDocIdsType);
+      }
+      return allValidDocIdsMetadata;
+    } finally {
+      for (SegmentDataManager segmentDataManager : segmentDataManagers) {
         tableDataManager.releaseSegment(segmentDataManager);
       }
     }
-    return allValidDocIdsMetadata;
   }
 
   private Pair<ValidDocIdsType, MutableRoaringBitmap> getValidDocIds(IndexSegment indexSegment,

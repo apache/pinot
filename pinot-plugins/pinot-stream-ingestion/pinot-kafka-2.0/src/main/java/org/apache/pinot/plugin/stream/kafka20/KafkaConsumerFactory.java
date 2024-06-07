@@ -20,11 +20,18 @@ package org.apache.pinot.plugin.stream.kafka20;
 
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;
 import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
+import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 
 
 public class KafkaConsumerFactory extends StreamConsumerFactory {
+
+  @Override
+  protected void init(StreamConfig streamConfig) {
+    KafkaConfigBackwardCompatibleUtils.handleStreamConfig(streamConfig);
+    super.init(streamConfig);
+  }
 
   @Override
   public StreamMetadataProvider createPartitionMetadataProvider(String clientId, int partition) {

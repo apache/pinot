@@ -127,7 +127,7 @@ public class UpdateSegmentState extends AbstractBaseCommand implements Command {
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
 
   private void init() {
-    LOGGER.info("Trying to connect to " + _zkAddress + " cluster " + _clusterName);
+    LOGGER.info("Trying to connect to {} cluster {}", _zkAddress, _clusterName);
     _helixAdmin = new ZKHelixAdmin(_zkAddress);
     ZNRecordSerializer serializer = new ZNRecordSerializer();
     String path = PropertyPathBuilder.propertyStore(_clusterName);
@@ -154,7 +154,7 @@ public class UpdateSegmentState extends AbstractBaseCommand implements Command {
       throws Exception {
     IdealState idealState = _helixAdmin.getResourceIdealState(_clusterName, tableName);
     if (idealState == null) {
-      LOGGER.info("No IDEALSTATE found for table " + tableName);
+      LOGGER.info("No IDEALSTATE found for table {}", tableName);
       return;
     }
     Map<String, Map<String, String>> mapFieldsIS = idealState.getRecord().getMapFields();
@@ -168,20 +168,20 @@ public class UpdateSegmentState extends AbstractBaseCommand implements Command {
           if (_fix) {
             mapIS.put(server, TO_STATE);
           } else {
-            LOGGER.info("Table:" + tableName + ",Segment:" + segment + ",Server:" + server + ":" + FROM_STATE);
+            LOGGER.info("Table:{},Segment:{},Server:{}:" + FROM_STATE, tableName, segment, server);
           }
           nChanges++;
         }
       }
     }
     if (nChanges == 0) {
-      LOGGER.info("No segments detected in " + FROM_STATE + " state for table " + tableName);
+      LOGGER.info("No segments detected in " + FROM_STATE + " state for table {}", tableName);
     } else {
       if (_fix) {
-        LOGGER.info("Replacing IDEALSTATE for table " + tableName + " with " + nChanges + " changes");
+        LOGGER.info("Replacing IDEALSTATE for table {} with {} changes", tableName, nChanges);
         _helixAdmin.setResourceIdealState(_clusterName, tableName, idealState);
       } else {
-        LOGGER.info("Detected " + nChanges + " instances in " + FROM_STATE + " in table " + tableName);
+        LOGGER.info("Detected {} instances in " + FROM_STATE + " in table {}", nChanges, tableName);
       }
     }
   }
@@ -201,16 +201,16 @@ public class UpdateSegmentState extends AbstractBaseCommand implements Command {
 
     if (_tenantName != null) {
       // Do this for all tenant tables
-      LOGGER.info("Working on all tables for tenant " + _tenantName);
+      LOGGER.info("Working on all tables for tenant {}", _tenantName);
       List<String> tableNames = getAllTenantTables();
-      LOGGER.info("Found " + tableNames.size() + " tables for tenant " + _tenantName);
+      LOGGER.info("Found {} tables for tenant {}", tableNames.size(), _tenantName);
       if (!tableNames.isEmpty()) {
         for (String tableName : tableNames) {
           fixTableIdealState(tableName);
         }
       }
     } else {
-      LOGGER.info("Working on table " + _tableName);
+      LOGGER.info("Working on table {}", _tableName);
       fixTableIdealState(_tableName);
     }
     return true;

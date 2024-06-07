@@ -59,8 +59,8 @@ import static org.testng.Assert.*;
 
 public class OfflineGRPCServerIntegrationTest extends BaseClusterIntegrationTest {
   private static final ExecutorService EXECUTOR_SERVICE = Executors.newFixedThreadPool(2);
-  private static final DataTableReducerContext DATATABLE_REDUCER_CONTEXT = new DataTableReducerContext(
-      EXECUTOR_SERVICE, 2, 10000, 10000, 5000);
+  private static final DataTableReducerContext DATATABLE_REDUCER_CONTEXT =
+      new DataTableReducerContext(EXECUTOR_SERVICE, 2, 10000, 10000, 5000);
 
   @BeforeClass
   public void setUp()
@@ -106,7 +106,7 @@ public class OfflineGRPCServerIntegrationTest extends BaseClusterIntegrationTest
     GrpcQueryClient queryClient = getGrpcQueryClient();
     String sql = "SELECT * FROM mytable_OFFLINE LIMIT 1000000 OPTION(timeoutMs=30000)";
     BrokerRequest brokerRequest = CalciteSqlCompiler.compileToBrokerRequest(sql);
-    List<String> segments = _helixResourceManager.getSegmentsFor("mytable_OFFLINE", false);
+    List<String> segments = _helixResourceManager.getSegmentsFor("mytable_OFFLINE", true);
 
     GrpcRequestBuilder requestBuilder = new GrpcRequestBuilder().setSegments(segments);
     testNonStreamingRequest(queryClient.submit(requestBuilder.setSql(sql).build()));
@@ -121,15 +121,12 @@ public class OfflineGRPCServerIntegrationTest extends BaseClusterIntegrationTest
   @Test(dataProvider = "provideSqlTestCases")
   public void testQueryingGrpcServer(String sql)
       throws Exception {
-    GrpcQueryClient queryClient = getGrpcQueryClient();
-    List<String> segments = _helixResourceManager.getSegmentsFor("mytable_OFFLINE", false);
-
-    GrpcRequestBuilder requestBuilder = new GrpcRequestBuilder().setSegments(segments);
-    DataTable dataTable = collectNonStreamingRequestResult(queryClient.submit(requestBuilder.setSql(sql).build()));
-
-    requestBuilder.setEnableStreaming(true);
-    collectAndCompareResult(sql, queryClient.submit(requestBuilder.setSql(sql).build()), dataTable);
-    queryClient.close();
+    try (GrpcQueryClient queryClient = getGrpcQueryClient()) {
+      List<String> segments = _helixResourceManager.getSegmentsFor("mytable_OFFLINE", true);
+      GrpcRequestBuilder requestBuilder = new GrpcRequestBuilder().setSql(sql).setSegments(segments);
+      DataTable dataTable = collectNonStreamingRequestResult(queryClient.submit(requestBuilder.build()));
+      collectAndCompareResult(sql, queryClient.submit(requestBuilder.setEnableStreaming(true).build()), dataTable);
+    }
   }
 
   @DataProvider(name = "provideSqlTestCases")
@@ -157,12 +154,15 @@ public class OfflineGRPCServerIntegrationTest extends BaseClusterIntegrationTest
 
     // distinct
     entries.add(new Object[]{"SELECT DISTINCT(AirlineID) FROM mytable_OFFLINE LIMIT 1000000"});
-    entries.add(new Object[]{"SELECT AirlineID, ArrTime FROM mytable_OFFLINE "
-        + "GROUP BY AirlineID, ArrTime LIMIT 1000000"});
+    entries.add(new Object[]{
+        "SELECT AirlineID, ArrTime FROM mytable_OFFLINE GROUP BY AirlineID, ArrTime LIMIT 1000000"
+    });
 
     // order by
-    entries.add(new Object[]{"SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') "
-        + "FROM mytable_OFFLINE ORDER BY DaysSinceEpoch limit 1000000"});
+    entries.add(new Object[]{
+        "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable_OFFLINE "
+            + "ORDER BY DaysSinceEpoch limit 1000000"
+    });
 
     return entries.toArray(new Object[entries.size()][]);
   }
@@ -205,10 +205,9 @@ public class OfflineGRPCServerIntegrationTest extends BaseClusterIntegrationTest
         BrokerResponseNative streamingBrokerResponse = new BrokerResponseNative();
         reducer.reduceAndSetResults("mytable_OFFLINE", cachedDataSchema, dataTableMap, streamingBrokerResponse,
             DATATABLE_REDUCER_CONTEXT, mock(BrokerMetrics.class));
-        dataTableMap.clear();
-        dataTableMap.put(mock(ServerRoutingInstance.class), nonStreamResultDataTable);
         BrokerResponseNative nonStreamBrokerResponse = new BrokerResponseNative();
-        reducer.reduceAndSetResults("mytable_OFFLINE", cachedDataSchema, dataTableMap, nonStreamBrokerResponse,
+        reducer.reduceAndSetResults("mytable_OFFLINE", nonStreamResultDataTable.getDataSchema(),
+            Map.of(mock(ServerRoutingInstance.class), nonStreamResultDataTable), nonStreamBrokerResponse,
             DATATABLE_REDUCER_CONTEXT, mock(BrokerMetrics.class));
         assertEquals(streamingBrokerResponse.getResultTable().getRows().size(),
             nonStreamBrokerResponse.getResultTable().getRows().size());

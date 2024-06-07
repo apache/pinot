@@ -18,17 +18,21 @@
  */
 package org.apache.pinot.core.accounting;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
+import org.apache.commons.io.FileUtils;
 import org.apache.log4j.Level;
 import org.apache.log4j.LogManager;
 import org.apache.pinot.common.datatable.DataTable;
@@ -47,8 +51,15 @@ import org.apache.pinot.core.query.scheduler.SchedulerGroupAccountant;
 import org.apache.pinot.core.query.scheduler.resources.QueryExecutorService;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
+import org.apache.pinot.segment.local.realtime.impl.json.MutableJsonIndexImpl;
+import org.apache.pinot.segment.local.segment.creator.impl.inv.json.OffHeapJsonIndexCreator;
+import org.apache.pinot.segment.local.segment.index.readers.json.ImmutableJsonIndexReader;
+import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.index.creator.JsonIndexCreator;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
+import org.apache.pinot.spi.config.table.JsonIndexConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.trace.Tracing;
@@ -369,6 +380,105 @@ public class ResourceManagerAccountingTest {
   }
 
   /**
+   * Test instrumentation in getMatchingFlattenedDocsMap() from
+   * {@link org.apache.pinot.segment.spi.index.reader.JsonIndexReader}
+   *
+   * Since getMatchingFlattenedDocsMap() can collect a large map before processing any blocks, it is required to
+   * check for OOM during map generation. This test generates a mutable and immutable json index, and generates a map
+   * as would happen in json_extract_index execution.
+   *
+   * It is roughly equivalent to running json_extract_index(col, '$.key', 'STRING').
+   */
+  @Test
+  public void testJsonIndexExtractMapOOM()
+      throws Exception {
+    HashMap<String, Object> configs = new HashMap<>();
+    ServerMetrics.register(Mockito.mock(ServerMetrics.class));
+    ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(true);
+    LogManager.getLogger(PerQueryCPUMemResourceUsageAccountant.class).setLevel(Level.OFF);
+    LogManager.getLogger(ThreadResourceUsageProvider.class).setLevel(Level.OFF);
+    configs.put(CommonConstants.Accounting.CONFIG_OF_ALARMING_LEVEL_HEAP_USAGE_RATIO, 0.00f);
+    configs.put(CommonConstants.Accounting.CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO, 0.00f);
+    configs.put(CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME,
+        "org.apache.pinot.core.accounting.PerQueryCPUMemAccountantFactory");
+    configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING, true);
+    configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING, false);
+    configs.put(CommonConstants.Accounting.CONFIG_OF_OOM_PROTECTION_KILLING_QUERY, true);
+    configs.put(CommonConstants.Accounting.CONFIG_OF_MIN_MEMORY_FOOTPRINT_TO_KILL_RATIO, 0.00f);
+
+    PinotConfiguration config = getConfig(2, 2, configs);
+    ResourceManager rm = getResourceManager(2, 2, 1, 1, configs);
+    // init accountant and start watcher task
+    Tracing.ThreadAccountantOps.initializeThreadAccountant(config, "testJsonIndexExtractMapOOM");
+
+    Supplier<String> randomJsonValue = () -> {
+      Random random = new Random();
+      int length = random.nextInt(1000);
+      StringBuilder sb = new StringBuilder();
+      for (int i = 0; i < length; i++) {
+        sb.append((char) (random.nextInt(26) + 'a'));
+      }
+      return "{\"key\":\"" + sb + "\"}";
+    };
+
+    File indexDir = new File(FileUtils.getTempDirectory(), "testJsonIndexExtractMapOOM");
+    FileUtils.forceMkdir(indexDir);
+    String colName = "col";
+    try (JsonIndexCreator offHeapIndexCreator = new OffHeapJsonIndexCreator(indexDir, colName, new JsonIndexConfig());
+        MutableJsonIndexImpl mutableJsonIndex = new MutableJsonIndexImpl(new JsonIndexConfig())) {
+      // build json indexes
+      for (int i = 0; i < 1000000; i++) {
+        String val = randomJsonValue.get();
+        offHeapIndexCreator.add(val);
+        mutableJsonIndex.add(val);
+      }
+      offHeapIndexCreator.seal();
+
+      CountDownLatch latch = new CountDownLatch(2);
+      AtomicBoolean mutableEarlyTerminationOccurred = new AtomicBoolean(false);
+
+      // test mutable json index .getMatchingFlattenedDocsMap()
+      rm.getQueryRunners().submit(() -> {
+        Tracing.ThreadAccountantOps.setupRunner("testJsonExtractIndexId1");
+        try {
+          mutableJsonIndex.getMatchingFlattenedDocsMap("key", null);
+        } catch (EarlyTerminationException e) {
+          mutableEarlyTerminationOccurred.set(true);
+          Tracing.ThreadAccountantOps.clear();
+        } finally {
+          latch.countDown();
+        }
+      });
+
+      // test immutable json index .getMatchingFlattenedDocsMap()
+      File indexFile = new File(indexDir, colName + V1Constants.Indexes.JSON_INDEX_FILE_EXTENSION);
+      AtomicBoolean immutableEarlyTerminationOccurred = new AtomicBoolean(false);
+      rm.getQueryRunners().submit(() -> {
+        Tracing.ThreadAccountantOps.setupRunner("testJsonExtractIndexId2");
+        try {
+          try (PinotDataBuffer offHeapDataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(indexFile);
+              ImmutableJsonIndexReader offHeapIndexReader = new ImmutableJsonIndexReader(offHeapDataBuffer, 1000000)) {
+            offHeapIndexReader.getMatchingFlattenedDocsMap("key", null);
+          } catch (IOException e) {
+            Assert.fail("failed .getMatchingFlattenedDocsMap for the immutable json index");
+          }
+        } catch (EarlyTerminationException e) {
+          immutableEarlyTerminationOccurred.set(true);
+          Tracing.ThreadAccountantOps.clear();
+        } finally {
+          latch.countDown();
+        }
+      });
+
+      latch.await();
+      Assert.assertTrue(mutableEarlyTerminationOccurred.get(),
+          "Expected early termination reading the mutable index");
+      Assert.assertTrue(immutableEarlyTerminationOccurred.get(),
+          "Expected early termination reading the immutable index");
+    }
+  }
+
+  /**
    * Test thread memory usage tracking and query killing in multi-thread environment， add @Test to run.
    */
   @SuppressWarnings("unused")
@@ -410,7 +520,7 @@ public class ResourceManagerAccountingTest {
               Tracing.ThreadAccountantOps.sample();
               if (Thread.interrupted() || thread.isInterrupted()) {
                 Tracing.ThreadAccountantOps.clear();
-                LOGGER.error("KilledWorker " + queryId + " " + finalJ);
+                LOGGER.error("KilledWorker {} {}", queryId, finalJ);
                 return;
               }
               a[i] = new long[200000];
@@ -429,7 +539,7 @@ public class ResourceManagerAccountingTest {
           for (int i = 0; i < 10; i++) {
             futuresThread[i].cancel(true);
           }
-          LOGGER.error("Killed " + queryId);
+          LOGGER.error("Killed {}", queryId);
         }
         Tracing.ThreadAccountantOps.clear();
       });

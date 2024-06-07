@@ -41,7 +41,7 @@ class PinotDataSource extends TableProvider with DataSourceRegister {
 
     val pinotTableSchema =
       PinotClusterClient.getTableSchema(controller, tableName)
-    TypeConverter.pinotSchemaToSparkSchema(pinotTableSchema)
+    DataExtractor.pinotSchemaToSparkSchema(pinotTableSchema)
   }
 
   override def getTable(schema: StructType,

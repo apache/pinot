@@ -26,11 +26,13 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.DataBlockUtils;
+import org.apache.pinot.common.datablock.MetadataBlock;
+import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 
 
 public final class TransferableBlockUtils {
   private static final int MEDIAN_COLUMN_SIZE_BYTES = 8;
-  private static final TransferableBlock EMPTY_EOS = new TransferableBlock(DataBlockUtils.getEndOfStreamDataBlock());
+  private static final TransferableBlock EMPTY_EOS = new TransferableBlock(MetadataBlock.newEos());
 
   private TransferableBlockUtils() {
     // do not instantiate.
@@ -40,8 +42,12 @@ public final class TransferableBlockUtils {
     return EMPTY_EOS;
   }
 
-  public static TransferableBlock getEndOfStreamTransferableBlock(Map<String, String> statsMap) {
-    return new TransferableBlock(DataBlockUtils.getEndOfStreamDataBlock(statsMap));
+  public static TransferableBlock getEndOfStreamTransferableBlock(MultiStageQueryStats stats) {
+    return new TransferableBlock(stats);
+  }
+
+  public static TransferableBlock wrap(DataBlock dataBlock) {
+    return new TransferableBlock(dataBlock);
   }
 
   public static TransferableBlock getErrorTransferableBlock(Exception e) {

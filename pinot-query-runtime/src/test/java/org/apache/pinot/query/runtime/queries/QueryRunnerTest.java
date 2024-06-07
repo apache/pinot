@@ -155,7 +155,7 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
    */
   @Test(dataProvider = "testDataWithSqlToFinalRowCount")
   public void testSqlWithFinalRowCountChecker(String sql, int expectedRows) {
-    ResultTable resultTable = queryRunner(sql, null);
+    ResultTable resultTable = queryRunner(sql, false).getResultTable();
     Assert.assertEquals(resultTable.getRows().size(), expectedRows);
   }
 
@@ -168,7 +168,7 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
   @Test(dataProvider = "testSql")
   public void testSqlWithH2Checker(String sql)
       throws Exception {
-    ResultTable resultTable = queryRunner(sql, null);
+    ResultTable resultTable = queryRunner(sql, false).getResultTable();
     // query H2 for data
     List<Object[]> expectedRows = queryH2(sql);
     compareRowEquals(resultTable, expectedRows);
@@ -181,7 +181,7 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
   public void testSqlWithExceptionMsgChecker(String sql, String exceptionMsg) {
     try {
       // query pinot
-      ResultTable resultTable = queryRunner(sql, null);
+      ResultTable resultTable = queryRunner(sql, false).getResultTable();
       Assert.fail("Expected error with message '" + exceptionMsg + "'. But instead rows were returned: "
           + JsonUtils.objectToPrettyString(resultTable));
     } catch (Exception e) {
@@ -223,12 +223,11 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
 
         // test dateTrunc
         //   - on leaf stage
-        new Object[]{"SELECT dateTrunc('DAY', ts) FROM a LIMIT 10", 10}, new Object[]{"SELECT dateTrunc('DAY', CAST"
-        + "(col3 AS BIGINT)) FROM a LIMIT 10", 10},
+        new Object[]{"SELECT dateTrunc('DAY', ts) FROM a LIMIT 10", 10},
+        new Object[]{"SELECT dateTrunc('DAY', CAST(col3 AS BIGINT)) FROM a LIMIT 10", 10},
         //   - on intermediate stage
-        new Object[]{
-            "SELECT dateTrunc('DAY', round(a.ts, b.ts)) FROM a JOIN b " + "ON a.col1 = b.col1 AND a.col2 = b.col2", 15
-        }, new Object[]{"SELECT dateTrunc('DAY', CAST(MAX(a.col3) AS BIGINT)) FROM a", 1},
+        new Object[]{"SELECT dateTrunc('DAY', a.ts + b.ts) FROM a JOIN b ON a.col1 = b.col1 AND a.col2 = b.col2", 15},
+        new Object[]{"SELECT dateTrunc('DAY', CAST(MAX(a.col3) AS BIGINT)) FROM a", 1},
 
         // ScalarFunction
         // test function can be used in predicate/leaf/intermediate stage (using regexpLike)
@@ -248,7 +247,7 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
 
         // test groups limit in both leaf and intermediate stage
         new Object[]{"SET numGroupsLimit = 1; SELECT col1, COUNT(*) FROM a GROUP BY col1", 1},
-        new Object[]{"SET " + "numGroupsLimit = 2; SELECT col1, COUNT(*) FROM a GROUP BY col1", 2},
+        new Object[]{"SET numGroupsLimit = 2; SELECT col1, COUNT(*) FROM a GROUP BY col1", 2},
         new Object[]{"SET numGroupsLimit = 1; "
             + "SELECT a.col2, b.col2, COUNT(*) FROM a JOIN b USING (col1) GROUP BY a.col2, b.col2", 1},
         new Object[]{"SET numGroupsLimit = 2; "

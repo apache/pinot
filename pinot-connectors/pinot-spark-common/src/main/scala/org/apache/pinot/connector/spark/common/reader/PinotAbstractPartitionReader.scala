@@ -34,7 +34,7 @@ trait PinotAbstractPartitionReader[RowType] {
   def _partitionId: Int
   def _pinotSplit: PinotSplit
   def _dataSourceOptions: PinotDataSourceReadOptions
-  def _translator: (DataTable) => Seq[RowType]
+  def _dataExtractor: (DataTable) => Seq[RowType]
 
   private val (responseIterator: Iterator[RowType], source: Closeable) = getIteratorAndSource()
   private[this] var currentRow: RowType = _
@@ -59,12 +59,12 @@ trait PinotAbstractPartitionReader[RowType] {
     if (_dataSourceOptions.useGrpcServer) {
       val dataFetcher = PinotGrpcServerDataFetcher(_pinotSplit)
       val iterable = dataFetcher.fetchData()
-        .flatMap(_translator)
+        .flatMap(_dataExtractor)
       (iterable, dataFetcher)
     } else {
       (PinotServerDataFetcher(_partitionId, _pinotSplit, _dataSourceOptions)
         .fetchData()
-        .flatMap(_translator)
+        .flatMap(_dataExtractor)
         .toIterator,
         () => {})
     }

@@ -2,6 +2,7 @@ cscope.*
 .classpath
 .project
 .svn
+.java-version
 .externalToolBuilders/
 maven-eclipse.xml
 target/

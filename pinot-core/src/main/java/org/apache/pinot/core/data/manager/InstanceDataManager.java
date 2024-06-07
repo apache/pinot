@@ -75,20 +75,37 @@ public interface InstanceDataManager {
       throws Exception;
 
   /**
-   * Adds a segment into an REALTIME table.
-   * <p>The segment might be committed or under consuming.
+   * Adds an ONLINE segment into a table.
+   * This method is triggered by state transition to ONLINE state.
    */
-  void addRealtimeSegment(String realtimeTableName, String segmentName)
+  void addOnlineSegment(String tableNameWithType, String segmentName)
+      throws Exception;
+
+  /**
+   * Adds a CONSUMING segment into a REALTIME table.
+   * This method is triggered by state transition to CONSUMING state.
+   */
+  void addConsumingSegment(String realtimeTableName, String segmentName)
+      throws Exception;
+
+  /**
+   * Replaces an already loaded segment in a table if the segment has been overridden in the deep store (CRC mismatch).
+   * This method is triggered by a custom message (NOT state transition), and the target segment should be in ONLINE
+   * state.
+   */
+  void replaceSegment(String tableNameWithType, String segmentName)
       throws Exception;
 
   /**
    * Offloads a segment from table but not dropping its data from server.
+   * This method is triggered by state transition to OFFLINE state.
    */
   void offloadSegment(String tableNameWithType, String segmentName)
       throws Exception;
 
   /**
    * Delete segment data from the server physically.
+   * This method is triggered by state transition to DROPPED state.
    */
   void deleteSegment(String tableNameWithType, String segmentName)
       throws Exception;
@@ -116,15 +133,6 @@ public interface InstanceDataManager {
    */
   void reloadSegments(String tableNameWithType, List<String> segmentNames, boolean forceDownload,
       SegmentRefreshSemaphore segmentRefreshSemaphore)
-      throws Exception;
-
-  /**
-   * Adds or replaces a segment in a table. Different from segment reloading, this method
-   * doesn't assume the existence of TableDataManager object and it can actually initialize
-   * the TableDataManager for the segment. A new segment is downloaded if the local one is
-   * not working or has a different CRC from the remote one.
-   */
-  void addOrReplaceSegment(String tableNameWithType, String segmentName)
       throws Exception;
 
   /**

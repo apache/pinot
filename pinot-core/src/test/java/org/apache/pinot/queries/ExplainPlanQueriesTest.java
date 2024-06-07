@@ -21,8 +21,6 @@ package org.apache.pinot.queries;
 import java.io.File;
 import java.net.URL;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -41,6 +39,7 @@ import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.ExplainPlanRows;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.offline.TableDataManagerProvider;
@@ -55,6 +54,7 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoa
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
+import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
@@ -62,12 +62,12 @@ import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -111,30 +111,34 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
   private final static String MV_COL1_RAW = "mvRawCol1";
   private final static String MV_COL1_NO_INDEX = "mvNoIndexCol1";
 
+  //@formatter:off
   private static final Schema SCHEMA = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
-      .addSingleValueDimension(COL1_RAW, FieldSpec.DataType.INT)
-      .addSingleValueDimension(COL1_NO_INDEX, FieldSpec.DataType.INT)
-      .addSingleValueDimension(COL2_NO_INDEX, FieldSpec.DataType.INT)
-      .addSingleValueDimension(COL3_NO_INDEX, FieldSpec.DataType.INT)
-      .addSingleValueDimension(COL4_NO_INDEX, FieldSpec.DataType.BOOLEAN)
-      .addSingleValueDimension(COL1_INVERTED_INDEX, FieldSpec.DataType.DOUBLE)
-      .addSingleValueDimension(COL2_INVERTED_INDEX, FieldSpec.DataType.INT)
-      .addSingleValueDimension(COL3_INVERTED_INDEX, FieldSpec.DataType.STRING)
-      .addSingleValueDimension(COL1_RANGE_INDEX, FieldSpec.DataType.DOUBLE)
-      .addSingleValueDimension(COL2_RANGE_INDEX, FieldSpec.DataType.INT)
-      .addSingleValueDimension(COL3_RANGE_INDEX, FieldSpec.DataType.INT)
-      .addSingleValueDimension(COL1_SORTED_INDEX, FieldSpec.DataType.DOUBLE)
-      .addSingleValueDimension(COL1_JSON_INDEX, FieldSpec.DataType.JSON)
-      .addSingleValueDimension(COL1_TEXT_INDEX, FieldSpec.DataType.STRING)
-      .addMultiValueDimension(MV_COL1_RAW, FieldSpec.DataType.INT)
-      .addMultiValueDimension(MV_COL1_NO_INDEX, FieldSpec.DataType.INT).build();
+      .addSingleValueDimension(COL1_RAW, DataType.INT)
+      .addSingleValueDimension(COL1_NO_INDEX, DataType.INT)
+      .addSingleValueDimension(COL2_NO_INDEX, DataType.INT)
+      .addSingleValueDimension(COL3_NO_INDEX, DataType.INT)
+      .addSingleValueDimension(COL4_NO_INDEX, DataType.BOOLEAN)
+      .addSingleValueDimension(COL1_INVERTED_INDEX, DataType.DOUBLE)
+      .addSingleValueDimension(COL2_INVERTED_INDEX, DataType.INT)
+      .addSingleValueDimension(COL3_INVERTED_INDEX, DataType.STRING)
+      .addSingleValueDimension(COL1_RANGE_INDEX, DataType.DOUBLE)
+      .addSingleValueDimension(COL2_RANGE_INDEX, DataType.INT)
+      .addSingleValueDimension(COL3_RANGE_INDEX, DataType.INT)
+      .addSingleValueDimension(COL1_SORTED_INDEX, DataType.DOUBLE)
+      .addSingleValueDimension(COL1_JSON_INDEX, DataType.JSON)
+      .addSingleValueDimension(COL1_TEXT_INDEX, DataType.STRING)
+      .addMultiValueDimension(MV_COL1_RAW, DataType.INT)
+      .addMultiValueDimension(MV_COL1_NO_INDEX, DataType.INT)
+      .build();
 
-  private static final DataSchema DATA_SCHEMA = new DataSchema(new String[]{"Operator", "Operator_Id", "Parent_Id"},
-      new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
-          DataSchema.ColumnDataType.INT});
+  private static final DataSchema DATA_SCHEMA = new DataSchema(
+      new String[]{"Operator", "Operator_Id", "Parent_Id"},
+      new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.INT}
+  );
+  //@formatter:on
 
   private static final TableConfig TABLE_CONFIG =
-      new TableConfigBuilder(TableType.OFFLINE).setNoDictionaryColumns(Arrays.asList(COL1_RAW, MV_COL1_RAW))
+      new TableConfigBuilder(TableType.OFFLINE).setNoDictionaryColumns(List.of(COL1_RAW, MV_COL1_RAW))
           .setTableName(RAW_TABLE_NAME).build();
 
   private IndexSegment _indexSegment;
@@ -196,19 +200,19 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
       throws Exception {
     IndexingConfig indexingConfig = TABLE_CONFIG.getIndexingConfig();
 
-    List<String> invertedIndexColumns = Arrays.asList(COL1_INVERTED_INDEX, COL2_INVERTED_INDEX, COL3_INVERTED_INDEX);
+    List<String> invertedIndexColumns = List.of(COL1_INVERTED_INDEX, COL2_INVERTED_INDEX, COL3_INVERTED_INDEX);
     indexingConfig.setInvertedIndexColumns(invertedIndexColumns);
 
-    List<String> rangeIndexColumns = Arrays.asList(COL1_RANGE_INDEX, COL2_RANGE_INDEX, COL3_RANGE_INDEX);
+    List<String> rangeIndexColumns = List.of(COL1_RANGE_INDEX, COL2_RANGE_INDEX, COL3_RANGE_INDEX);
     indexingConfig.setRangeIndexColumns(rangeIndexColumns);
 
-    List<String> sortedIndexColumns = Collections.singletonList(COL1_SORTED_INDEX);
+    List<String> sortedIndexColumns = List.of(COL1_SORTED_INDEX);
     indexingConfig.setSortedColumn(sortedIndexColumns);
 
-    List<String> jsonIndexColumns = Arrays.asList(COL1_JSON_INDEX);
+    List<String> jsonIndexColumns = List.of(COL1_JSON_INDEX);
     indexingConfig.setJsonIndexColumns(jsonIndexColumns);
 
-    List<String> textIndexColumns = Arrays.asList(COL1_TEXT_INDEX);
+    List<String> textIndexColumns = List.of(COL1_TEXT_INDEX);
 
     File tableDataDir = new File(TEMP_DIR, OFFLINE_TABLE_NAME);
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(TABLE_CONFIG, SCHEMA);
@@ -286,14 +290,14 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     ImmutableSegment immutableSegment4 = createImmutableSegment(records4, SEGMENT_NAME_4);
 
     _indexSegment = immutableSegment1;
-    _indexSegments = Arrays.asList(immutableSegment1, immutableSegment2, immutableSegment3, immutableSegment4);
+    _indexSegments = List.of(immutableSegment1, immutableSegment2, immutableSegment3, immutableSegment4);
 
     // Mock the instance data manager
     InstanceDataManagerConfig instanceDataManagerConfig = mock(InstanceDataManagerConfig.class);
     when(instanceDataManagerConfig.getInstanceDataDir()).thenReturn(TEMP_DIR.getAbsolutePath());
     TableDataManager tableDataManager =
-        new TableDataManagerProvider(instanceDataManagerConfig).getTableDataManager(TABLE_CONFIG,
-            mock(HelixManager.class));
+        new TableDataManagerProvider(instanceDataManagerConfig, mock(HelixManager.class),
+            new SegmentLocks()).getTableDataManager(TABLE_CONFIG);
     tableDataManager.start();
     for (IndexSegment indexSegment : _indexSegments) {
       tableDataManager.addSegment((ImmutableSegment) indexSegment);
@@ -304,8 +308,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     // Set up the query executor
     URL resourceUrl = getClass().getClassLoader().getResource(QUERY_EXECUTOR_CONFIG_PATH);
     Assert.assertNotNull(resourceUrl);
-    PropertiesConfiguration queryExecutorConfig =
-        CommonsConfigurationUtils.fromFile(new File(resourceUrl.getFile()));
+    PropertiesConfiguration queryExecutorConfig = CommonsConfigurationUtils.fromFile(new File(resourceUrl.getFile()));
     _queryExecutor = new ServerQueryExecutorV1Impl();
     _queryExecutor.init(new PinotConfiguration(queryExecutorConfig), instanceDataManager, ServerMetrics.get());
 
@@ -315,8 +318,8 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     _queryExecutorWithPrefetchEnabled.init(prefetchEnabledConf, instanceDataManager, ServerMetrics.get());
 
     // Create the BrokerReduceService
-    _brokerReduceService = new BrokerReduceService(new PinotConfiguration(
-        Collections.singletonMap(CommonConstants.Broker.CONFIG_OF_MAX_REDUCE_THREADS_PER_QUERY, 2)));
+    _brokerReduceService =
+        new BrokerReduceService(new PinotConfiguration(Map.of(Broker.CONFIG_OF_MAX_REDUCE_THREADS_PER_QUERY, 2)));
   }
 
   private ResultTable getPrefetchEnabledResulTable(ResultTable resultTable) {
@@ -403,7 +406,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     brokerRequest.getPinotQuery().getDataSource().setTableName(RAW_TABLE_NAME);
     BrokerResponseNative brokerResponse =
         _brokerReduceService.reduceOnDataTable(brokerRequest, brokerRequest, dataTableMap,
-            CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS, null);
+            Broker.DEFAULT_BROKER_TIMEOUT_MS, BROKER_METRICS);
 
     QueriesTestUtils.testExplainSegmentsResult(brokerResponse, expected);
   }
@@ -1017,8 +1020,8 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result3.add(new Object[]{"DOC_ID_SET", 5, 4});
     result3.add(new Object[]{"FILTER_OR", 6, 5});
     result3.add(new Object[]{
-        "FILTER_INVERTED_INDEX(indexLookUp:inverted_index,operator:IN,predicate:invertedIndexCol2 IN ('1','2','30'))",
-        7, 6
+        "FILTER_INVERTED_INDEX(indexLookUp:inverted_index,operator:IN,"
+            + "predicate:invertedIndexCol2 IN ('1','2','30'))", 7, 6
     });
     result3.add(new Object[]{
         "FILTER_SORTED_INDEX(indexLookUp:sorted_index,operator:NOT_IN,predicate:invertedIndexCol3 NOT IN "
@@ -1123,8 +1126,8 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result3.add(new Object[]{"DOC_ID_SET", 5, 4});
     result3.add(new Object[]{"FILTER_OR", 6, 5});
     result3.add(new Object[]{
-        "FILTER_INVERTED_INDEX(indexLookUp:inverted_index,operator:IN,predicate:invertedIndexCol2 IN ('1','2','30'))",
-        7, 6
+        "FILTER_INVERTED_INDEX(indexLookUp:inverted_index,operator:IN,"
+            + "predicate:invertedIndexCol2 IN ('1','2','30'))", 7, 6
     });
     result3.add(new Object[]{
         "FILTER_SORTED_INDEX(indexLookUp:sorted_index,operator:NOT_IN,predicate:invertedIndexCol3 NOT IN "

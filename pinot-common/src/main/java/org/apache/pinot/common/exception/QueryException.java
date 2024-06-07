@@ -223,11 +223,14 @@ public class QueryException {
       case QueryException.ACCESS_DENIED_ERROR_CODE:
       case QueryException.JSON_COMPILATION_ERROR_CODE:
       case QueryException.JSON_PARSING_ERROR_CODE:
+      case QueryException.QUERY_CANCELLATION_ERROR_CODE:
       case QueryException.QUERY_VALIDATION_ERROR_CODE:
-      case QueryException.UNKNOWN_COLUMN_ERROR_CODE:
+      case QueryException.SERVER_OUT_OF_CAPACITY_ERROR_CODE:
+      case QueryException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE:
       case QueryException.SQL_PARSING_ERROR_CODE:
       case QueryException.TOO_MANY_REQUESTS_ERROR_CODE:
       case QueryException.TABLE_DOES_NOT_EXIST_ERROR_CODE:
+      case QueryException.UNKNOWN_COLUMN_ERROR_CODE:
         return true;
       default:
         return false;

@@ -19,10 +19,8 @@
 package org.apache.pinot.broker.broker;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import io.swagger.jaxrs.config.BeanConfig;
+import io.swagger.jaxrs.listing.SwaggerSerializers;
 import java.io.IOException;
-import java.net.URL;
-import java.net.URLClassLoader;
 import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.Executor;
@@ -35,6 +33,8 @@ import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
 import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.swagger.SwaggerApiListingResource;
+import org.apache.pinot.common.swagger.SwaggerSetupUtils;
 import org.apache.pinot.common.utils.log.DummyLogFileServer;
 import org.apache.pinot.common.utils.log.LocalLogFileServer;
 import org.apache.pinot.common.utils.log.LogFileServer;
@@ -46,8 +46,6 @@ import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.PinotReflectionUtils;
-import org.glassfish.grizzly.http.server.CLStaticHttpHandler;
-import org.glassfish.grizzly.http.server.HttpHandler;
 import org.glassfish.grizzly.http.server.HttpServer;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.jackson.JacksonFeature;
@@ -88,9 +86,8 @@ public class BrokerAdminApiApplication extends ResourceConfig {
     _executorService =
         Executors.newCachedThreadPool(new ThreadFactoryBuilder().setNameFormat("async-task-thread-%d").build());
     PoolingHttpClientConnectionManager connMgr = new PoolingHttpClientConnectionManager();
-    int timeoutMs = (int) brokerConf
-        .getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_TIMEOUT_MS,
-            CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS);
+    int timeoutMs = (int) brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_TIMEOUT_MS,
+        CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS);
     connMgr.setDefaultSocketConfig(SocketConfig.custom().setSoTimeout(timeoutMs).build());
     Instant startTime = Instant.now();
     register(new AbstractBinder() {
@@ -115,15 +112,15 @@ public class BrokerAdminApiApplication extends ResourceConfig {
         bind(startTime).named(BrokerAdminApiApplication.START_TIME);
       }
     });
-    boolean enableBoundedJerseyThreadPoolExecutor = brokerConf
-        .getProperty(CommonConstants.Broker.CONFIG_OF_ENABLE_BOUNDED_JERSEY_THREADPOOL_EXECUTOR,
+    boolean enableBoundedJerseyThreadPoolExecutor =
+        brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_ENABLE_BOUNDED_JERSEY_THREADPOOL_EXECUTOR,
             CommonConstants.Broker.DEFAULT_ENABLE_BOUNDED_JERSEY_THREADPOOL_EXECUTOR);
     if (enableBoundedJerseyThreadPoolExecutor) {
       register(buildBrokerManagedAsyncExecutorProvider(brokerConf, brokerMetrics));
     }
     register(JacksonFeature.class);
-    registerClasses(io.swagger.jaxrs.listing.ApiListingResource.class);
-    registerClasses(io.swagger.jaxrs.listing.SwaggerSerializers.class);
+    register(SwaggerApiListingResource.class);
+    register(SwaggerSerializers.class);
     register(AuthenticationFilter.class);
   }
 
@@ -137,45 +134,20 @@ public class BrokerAdminApiApplication extends ResourceConfig {
     }
 
     if (_swaggerBrokerEnabled) {
-      PinotReflectionUtils.runWithLock(this::setupSwagger);
+      PinotReflectionUtils.runWithLock(() ->
+          SwaggerSetupUtils.setupSwagger("Broker", _brokerResourcePackages, _useHttps, "/", _httpServer));
     } else {
       LOGGER.info("Hiding Swagger UI for Broker, by {}", CommonConstants.Broker.CONFIG_OF_SWAGGER_BROKER_ENABLED);
     }
   }
 
-  private void setupSwagger() {
-    BeanConfig beanConfig = new BeanConfig();
-    beanConfig.setTitle("Pinot Broker API");
-    beanConfig.setDescription("APIs for accessing Pinot broker information");
-    beanConfig.setContact("https://github.com/apache/pinot");
-    beanConfig.setVersion("1.0");
-    beanConfig.setExpandSuperTypes(false);
-    if (_useHttps) {
-      beanConfig.setSchemes(new String[]{CommonConstants.HTTPS_PROTOCOL});
-    } else {
-      beanConfig.setSchemes(new String[]{CommonConstants.HTTP_PROTOCOL, CommonConstants.HTTPS_PROTOCOL});
-    }
-    beanConfig.setBasePath("/");
-    beanConfig.setResourcePackage(_brokerResourcePackages);
-    beanConfig.setScan(true);
-
-    HttpHandler httpHandler = new CLStaticHttpHandler(BrokerAdminApiApplication.class.getClassLoader(), "/api/");
-    // map both /api and /help to swagger docs. /api because it looks nice. /help for backward compatibility
-    _httpServer.getServerConfiguration().addHttpHandler(httpHandler, "/api/", "/help/");
-
-    URL swaggerDistLocation =
-        BrokerAdminApiApplication.class.getClassLoader().getResource(CommonConstants.CONFIG_OF_SWAGGER_RESOURCES_PATH);
-    CLStaticHttpHandler swaggerDist = new CLStaticHttpHandler(new URLClassLoader(new URL[]{swaggerDistLocation}));
-    _httpServer.getServerConfiguration().addHttpHandler(swaggerDist, "/swaggerui-dist/");
-  }
-
   private BrokerManagedAsyncExecutorProvider buildBrokerManagedAsyncExecutorProvider(PinotConfiguration brokerConf,
       BrokerMetrics brokerMetrics) {
-    int corePoolSize = brokerConf
-        .getProperty(CommonConstants.Broker.CONFIG_OF_JERSEY_THREADPOOL_EXECUTOR_CORE_POOL_SIZE,
+    int corePoolSize =
+        brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_JERSEY_THREADPOOL_EXECUTOR_CORE_POOL_SIZE,
             CommonConstants.Broker.DEFAULT_JERSEY_THREADPOOL_EXECUTOR_CORE_POOL_SIZE);
-    int maximumPoolSize = brokerConf
-        .getProperty(CommonConstants.Broker.CONFIG_OF_JERSEY_THREADPOOL_EXECUTOR_MAX_POOL_SIZE,
+    int maximumPoolSize =
+        brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_JERSEY_THREADPOOL_EXECUTOR_MAX_POOL_SIZE,
             CommonConstants.Broker.DEFAULT_JERSEY_THREADPOOL_EXECUTOR_MAX_POOL_SIZE);
     int queueSize = brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_JERSEY_THREADPOOL_EXECUTOR_QUEUE_SIZE,
         CommonConstants.Broker.DEFAULT_JERSEY_THREADPOOL_EXECUTOR_QUEUE_SIZE);

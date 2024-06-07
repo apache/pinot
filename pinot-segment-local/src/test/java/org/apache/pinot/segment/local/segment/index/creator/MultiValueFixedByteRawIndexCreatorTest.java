@@ -157,7 +157,7 @@ public class MultiValueFixedByteRawIndexCreatorTest {
     file.delete();
     MultiValueFixedByteRawIndexCreator creator =
         new MultiValueFixedByteRawIndexCreator(new File(OUTPUT_DIR), compressionType, column, numDocs, dataType,
-            maxElements, false, writerVersion);
+            maxElements, false, writerVersion, 1024 * 1024, 1000);
     inputs.forEach(input -> injector.inject(creator, input));
     creator.close();
 

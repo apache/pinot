@@ -122,7 +122,7 @@
     <argLine>-Xms4g -Xmx4g</argLine>
     <SKIP_INTEGRATION_TESTS>true</SKIP_INTEGRATION_TESTS>
     <surefire.version>3.2.5</surefire.version>
-    <maven-enforcer-plugin.version>3.4.1</maven-enforcer-plugin.version>
+    <maven-enforcer-plugin.version>3.5.0</maven-enforcer-plugin.version>
 
     <!-- Checkstyle violation prop.-->
     <checkstyle.violation.severity>warning</checkstyle.violation.severity>
@@ -131,11 +131,11 @@
     <!-- Configuration for Packaging -->
     <shade.prefix>org.apache.pinot.shaded</shade.prefix>
     <maven-jar-plugin.version>3.4.1</maven-jar-plugin.version>
-    <maven-shade-plugin.version>3.5.3</maven-shade-plugin.version>
+    <maven-shade-plugin.version>3.6.0</maven-shade-plugin.version>
     <shade.phase.prop>none</shade.phase.prop>
 
     <avro.version>1.11.3</avro.version>
-    <parquet.version>1.13.1</parquet.version>
+    <parquet.version>1.14.0</parquet.version>
     <orc.version>1.9.3</orc.version>
     <hive.version>2.8.1</hive.version>
     <helix.version>1.3.1</helix.version>
@@ -147,12 +147,12 @@
     <hk2.version>2.6.1</hk2.version>
     <javassist.version>3.30.2-GA</javassist.version>
     <swagger.version>1.6.14</swagger.version>
-    <swagger-ui.version>5.17.0</swagger-ui.version>
+    <swagger-ui.version>5.17.14</swagger-ui.version>
     <hadoop.version>3.3.6</hadoop.version>
     <jsonpath.version>2.9.0</jsonpath.version>
     <jsonsmart.version>2.5.1</jsonsmart.version>
     <quartz.version>2.3.2</quartz.version>
-    <calcite.version>1.36.0</calcite.version>
+    <calcite.version>1.37.0</calcite.version>
     <lucene.version>9.10.0</lucene.version>
     <reflections.version>0.10.2</reflections.version>
     <dynatrace.hash4j.version>0.17.0</dynatrace.hash4j.version>
@@ -161,10 +161,10 @@
     <snappy-java.version>1.1.10.5</snappy-java.version>
     <zstd-jni.version>1.5.6-3</zstd-jni.version>
     <lz4-java.version>1.8.0</lz4-java.version>
-    <libthrift.verion>0.20.0</libthrift.verion>
+    <libthrift.verion>0.18.1</libthrift.verion>
     <log4j.version>2.23.1</log4j.version>
     <slf4j.version>2.0.13</slf4j.version>
-    <netty.version>4.1.109.Final</netty.version>
+    <netty.version>4.1.110.Final</netty.version>
     <reactivestreams.version>1.0.4</reactivestreams.version>
     <jts.version>1.19.0</jts.version>
     <h3.version>4.1.1</h3.version>
@@ -172,54 +172,49 @@
     <audienceannotations.version>0.15.0</audienceannotations.version>
     <clp-ffi.version>0.4.4</clp-ffi.version>
     <stax2-api.version>4.2.2</stax2-api.version>
-    <aws.sdk.version>2.25.40</aws.sdk.version>
+    <aws.sdk.version>2.25.67</aws.sdk.version>
     <joda-time.version>2.12.7</joda-time.version>
     <janino.version>3.1.12</janino.version>
     <testng.version>7.10.2</testng.version>
     <woodstox.version>6.6.2</woodstox.version>
-    <sslcontext.kickstart.version>8.3.4</sslcontext.kickstart.version>
+    <sslcontext.kickstart.version>8.3.5</sslcontext.kickstart.version>
 
     <confluent.version>7.6.1</confluent.version>
-    <pulsar.version>3.2.2</pulsar.version>
-    <flink.version>1.14.6</flink.version>
+    <pulsar.version>3.3.0</pulsar.version>
+    <flink.version>1.19.0</flink.version>
 
     <!-- Apache Commons Libraries -->
     <commons-lang3.version>3.14.0</commons-lang3.version>
     <commons-collections4.version>4.4</commons-collections4.version>
     <commons-text.version>1.12.0</commons-text.version>
-    <commons-compress.version>1.26.1</commons-compress.version>
+    <commons-compress.version>1.26.2</commons-compress.version>
     <commons-math3.version>3.6.1</commons-math3.version>
-    <commons-csv.version>1.10.0</commons-csv.version>
+    <commons-csv.version>1.11.0</commons-csv.version>
     <commons-configuration2.version>2.10.1</commons-configuration2.version>
     <commons-io.version>2.16.1</commons-io.version>
     <commons-codec.version>1.17.0</commons-codec.version>
-    <commons-cli.version>1.7.0</commons-cli.version>
-    <commons-net.version>3.10.0</commons-net.version>
-    <commons-validator.version>1.8.0</commons-validator.version>
+    <commons-cli.version>1.8.0</commons-cli.version>
+    <commons-net.version>3.11.0</commons-net.version>
+    <commons-validator.version>1.9.0</commons-validator.version>
     <!-- Legacy Apache Commons Libraries -->
     <commons-lang.version>2.6</commons-lang.version>
     <commons-collections.version>3.2.2</commons-collections.version>
     <commons-math.version>2.2</commons-math.version>
 
-    <!-- Jakarta Libraries -->
-    <jakarta.servlet-api.version>6.0.0</jakarta.servlet-api.version>
-    <jakarta.inject-api.version>2.0.1</jakarta.inject-api.version>
-    <jakarta.validation-api.version>3.0.2</jakarta.validation-api.version>
-    <jakarta.annotation-api.version>3.0.0</jakarta.annotation-api.version>
-    <jakarta.xml.bind-api.version>4.0.2</jakarta.xml.bind-api.version>
-    <jakarta.ws.rs-api.version>3.1.0</jakarta.ws.rs-api.version>
-    <jakarta.activation-api.version>2.1.3</jakarta.activation-api.version>
-    <jakarta.servlet.jsp-api.version>3.1.1</jakarta.servlet.jsp-api.version>
-    <!-- Legacy Javax Libraries -->
+    <!-- Java EE Libraries -->
+    <!-- Include both newer jakarta ones and older javax ones, but not migrate to Jakarta EE yet -->
+    <!-- DO NOT upgrade these versions unless we are migrating to Jakarta EE -->
+    <jakarta.servlet-api.version>4.0.4</jakarta.servlet-api.version>
     <javax.servlet-api.version>4.0.1</javax.servlet-api.version>
-    <javax.validation-api.version>2.0.1.Final</javax.validation-api.version>
+    <jakarta.annotation-api.version>1.3.5</jakarta.annotation-api.version>
     <javax.annotation-api.version>1.3.2</javax.annotation-api.version>
+    <jakarta.validation-api.version>2.0.2</jakarta.validation-api.version>
+    <javax.validation-api.version>2.0.1.Final</javax.validation-api.version>
+    <jakarta.xml.bind-api.version>2.3.3</jakarta.xml.bind-api.version>
     <javax.jaxb-api.version>2.3.1</javax.jaxb-api.version>
-    <javax.stax-api.version>1.0-2</javax.stax-api.version>
+    <jakarta.ws.rs-api.version>2.1.6</jakarta.ws.rs-api.version>
     <javax.ws.rs-api.version>2.1.1</javax.ws.rs-api.version>
-    <javax.jsr311-api.version>1.1.1</javax.jsr311-api.version>
-    <javax.activation.version>1.1.1</javax.activation.version>
-    <javax.jsp-api.version>2.3.3</javax.jsp-api.version>
+    <jakarta.activation-api.version>1.2.2</jakarta.activation-api.version>
 
     <!-- HTTP Components Libraries -->
     <httpclient.version>4.5.14</httpclient.version>
@@ -228,7 +223,7 @@
     <httpcore5.version>5.2.4</httpcore5.version>
 
     <!-- Google Libraries -->
-    <google.cloud.libraries.version>26.37.0</google.cloud.libraries.version>
+    <google.cloud.libraries.version>26.40.0</google.cloud.libraries.version>
     <google.auth.version>1.23.0</google.auth.version>
     <gson.version>2.10.1</gson.version>
     <guava.version>33.1.0-jre</guava.version>
@@ -241,16 +236,16 @@
     <scala.compat.version>2.12</scala.compat.version>
 
     <!-- Solve conflict across dependencies -->
-    <kotlin.stdlib.version>1.9.23</kotlin.stdlib.version>
+    <kotlin.stdlib.version>1.9.24</kotlin.stdlib.version>
     <okio.version>3.9.0</okio.version>
     <kerby.version>2.0.3</kerby.version>
     <jline.version>3.26.1</jline.version>
-    <wildfly.version>1.7.0.Final</wildfly.version>
+    <wildfly.version>2.0.0</wildfly.version>
     <jettison.version>1.5.4</jettison.version>
     <eclipse.jetty.version>9.4.54.v20240208</eclipse.jetty.version>
-    <nimbus-jose-jwt.version>9.37.3</nimbus-jose-jwt.version>
-    <bouncycastle.version>1.78</bouncycastle.version>
-    <aircompressor.version>0.26</aircompressor.version>
+    <nimbus-jose-jwt.version>9.39.3</nimbus-jose-jwt.version>
+    <bouncycastle.version>1.78.1</bouncycastle.version>
+    <aircompressor.version>0.27</aircompressor.version>
     <jna.version>5.14.0</jna.version>
   </properties>
 
@@ -423,7 +418,7 @@
       <dependency>
         <groupId>org.checkerframework</groupId>
         <artifactId>checker-qual</artifactId>
-        <version>3.42.0</version>
+        <version>3.44.0</version>
       </dependency>
       <dependency>
         <groupId>org.codehaus.groovy</groupId>
@@ -746,21 +741,16 @@
         <version>${commons-math.version}</version>
       </dependency>
 
-      <!-- Jakarta Libraries -->
+      <!-- Java EE Libraries -->
       <dependency>
         <groupId>jakarta.servlet</groupId>
         <artifactId>jakarta.servlet-api</artifactId>
         <version>${jakarta.servlet-api.version}</version>
       </dependency>
       <dependency>
-        <groupId>jakarta.inject</groupId>
-        <artifactId>jakarta.inject-api</artifactId>
-        <version>${jakarta.inject-api.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>jakarta.validation</groupId>
-        <artifactId>jakarta.validation-api</artifactId>
-        <version>${jakarta.validation-api.version}</version>
+        <groupId>javax.servlet</groupId>
+        <artifactId>javax.servlet-api</artifactId>
+        <version>${javax.servlet-api.version}</version>
       </dependency>
       <dependency>
         <groupId>jakarta.annotation</groupId>
@@ -768,30 +758,14 @@
         <version>${jakarta.annotation-api.version}</version>
       </dependency>
       <dependency>
-        <groupId>jakarta.xml.bind</groupId>
-        <artifactId>jakarta.xml.bind-api</artifactId>
-        <version>${jakarta.xml.bind-api.version}</version>
+        <groupId>javax.annotation</groupId>
+        <artifactId>javax.annotation-api</artifactId>
+        <version>${javax.annotation-api.version}</version>
       </dependency>
       <dependency>
-        <groupId>jakarta.ws.rs</groupId>
-        <artifactId>jakarta.ws.rs-api</artifactId>
-        <version>${jakarta.ws.rs-api.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>jakarta.activation</groupId>
-        <artifactId>jakarta.activation-api</artifactId>
-        <version>${jakarta.activation-api.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>jakarta.servlet.jsp</groupId>
-        <artifactId>jakarta.servlet.jsp-api</artifactId>
-        <version>${jakarta.servlet.jsp-api.version}</version>
-      </dependency>
-      <!-- Legacy Javax Libraries -->
-      <dependency>
-        <groupId>javax.servlet</groupId>
-        <artifactId>javax.servlet-api</artifactId>
-        <version>${javax.servlet-api.version}</version>
+        <groupId>jakarta.validation</groupId>
+        <artifactId>jakarta.validation-api</artifactId>
+        <version>${jakarta.validation-api.version}</version>
       </dependency>
       <dependency>
         <groupId>javax.validation</groupId>
@@ -799,9 +773,9 @@
         <version>${javax.validation-api.version}</version>
       </dependency>
       <dependency>
-        <groupId>javax.annotation</groupId>
-        <artifactId>javax.annotation-api</artifactId>
-        <version>${javax.annotation-api.version}</version>
+        <groupId>jakarta.xml.bind</groupId>
+        <artifactId>jakarta.xml.bind-api</artifactId>
+        <version>${jakarta.xml.bind-api.version}</version>
       </dependency>
       <dependency>
         <groupId>javax.xml.bind</groupId>
@@ -809,9 +783,9 @@
         <version>${javax.jaxb-api.version}</version>
       </dependency>
       <dependency>
-        <groupId>javax.xml.bind</groupId>
-        <artifactId>stax-api</artifactId>
-        <version>${javax.stax-api.version}</version>
+        <groupId>jakarta.ws.rs</groupId>
+        <artifactId>jakarta.ws.rs-api</artifactId>
+        <version>${jakarta.ws.rs-api.version}</version>
       </dependency>
       <dependency>
         <groupId>javax.ws.rs</groupId>
@@ -819,19 +793,9 @@
         <version>${javax.ws.rs-api.version}</version>
       </dependency>
       <dependency>
-        <groupId>javax.ws.rs</groupId>
-        <artifactId>jsr311-api</artifactId>
-        <version>${javax.jsr311-api.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>javax.activation</groupId>
-        <artifactId>activation</artifactId>
-        <version>${javax.activation.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>javax.servlet.jsp</groupId>
-        <artifactId>javax.servlet.jsp-api</artifactId>
-        <version>${javax.jsp-api.version}</version>
+        <groupId>jakarta.activation</groupId>
+        <artifactId>jakarta.activation-api</artifactId>
+        <version>${jakarta.activation-api.version}</version>
       </dependency>
 
       <!-- HTTP Components Libraries -->
@@ -879,13 +843,13 @@
       <dependency>
         <groupId>com.google.apis</groupId>
         <artifactId>google-api-services-storage</artifactId>
-        <version>v1-rev20240319-2.0.0</version>
+        <version>v1-rev20240524-2.0.0</version>
       </dependency>
       <!-- Solve the dependency converge issue between guava and calcite-core -->
       <dependency>
         <groupId>com.google.errorprone</groupId>
         <artifactId>error_prone_annotations</artifactId>
-        <version>2.27.0</version>
+        <version>2.28.0</version>
       </dependency>
       <!-- Legacy Google Libraries -->
       <dependency>
@@ -1050,7 +1014,7 @@
         <groupId>org.apache.hadoop</groupId>
         <artifactId>hadoop-mapreduce-client-core</artifactId>
         <version>${hadoop.version}</version>
-        <scope>provided</scope>
+        <scope>compile</scope>
         <exclusions>
           <exclusion>
             <groupId>org.codehaus.jackson</groupId>
@@ -1367,7 +1331,7 @@
       <dependency>
         <groupId>org.mockito</groupId>
         <artifactId>mockito-core</artifactId>
-        <version>5.11.0</version>
+        <version>5.12.0</version>
         <scope>test</scope>
       </dependency>
       <dependency>
@@ -1393,7 +1357,7 @@
       <dependency>
         <groupId>info.picocli</groupId>
         <artifactId>picocli</artifactId>
-        <version>4.7.5</version>
+        <version>4.7.6</version>
       </dependency>
       <dependency>
         <groupId>org.glassfish.tyrus.bundles</groupId>
@@ -1431,12 +1395,12 @@
       <dependency>
         <groupId>net.openhft</groupId>
         <artifactId>posix</artifactId>
-        <version>2.25ea0</version>
+        <version>2.26ea0</version>
       </dependency>
       <dependency>
         <groupId>net.openhft</groupId>
         <artifactId>chronicle-core</artifactId>
-        <version>2.25ea14</version>
+        <version>2.25ea15</version>
       </dependency>
       <dependency>
         <groupId>org.ow2.asm</groupId>
@@ -1484,14 +1448,26 @@
 
       <dependency>
         <groupId>org.apache.flink</groupId>
-        <artifactId>flink-clients_${scala.compat.version}</artifactId>
+        <artifactId>flink-clients</artifactId>
         <version>${flink.version}</version>
         <scope>test</scope>
       </dependency>
       <dependency>
         <groupId>org.apache.flink</groupId>
-        <artifactId>flink-streaming-java_${scala.compat.version}</artifactId>
+        <artifactId>flink-streaming-java</artifactId>
         <version>${flink.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.flink</groupId>
+        <artifactId>flink-java</artifactId>
+        <version>${flink.version}</version>
+        <exclusions>
+          <!-- excluding Kryo library due to Maven Enforcer convergence error -->
+          <exclusion>
+            <groupId>com.esotericsoftware.kryo</groupId>
+            <artifactId>kryo</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <dependency>
         <groupId>org.jetbrains.kotlin</groupId>
@@ -1670,7 +1646,7 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-javadoc-plugin</artifactId>
-          <version>3.6.3</version>
+          <version>3.7.0</version>
           <configuration>
             <!-- Remove this after fixing all javadoc warnings -->
             <doclint>none</doclint>
@@ -1781,8 +1757,6 @@
                     <excludes>
                       <!-- Use org.slf4j:jcl-over-slf4j -->
                       <exclude>commons-logging:commons-logging</exclude>
-                      <!-- Use org.glassfish.hk2.external:jakarta.inject -->
-                      <exclude>javax.inject:javax.inject</exclude>
                     </excludes>
                   </bannedDependencies>
                 </rules>
@@ -1799,7 +1773,7 @@
         <plugin>
           <groupId>com.mycila</groupId>
           <artifactId>license-maven-plugin</artifactId>
-          <version>4.3</version>
+          <version>4.5</version>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
@@ -1875,7 +1849,7 @@
         <plugin>
           <groupId>net.alchim31.maven</groupId>
           <artifactId>scala-maven-plugin</artifactId>
-          <version>4.9.0</version>
+          <version>4.9.1</version>
           <executions>
             <execution>
               <id>add-source</id>
@@ -1934,7 +1908,7 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-checkstyle-plugin</artifactId>
-        <version>3.3.1</version>
+        <version>3.4.0</version>
         <configuration>
           <configLocation>${pinot.root}/config/checkstyle.xml</configLocation>
           <suppressionsLocation>${pinot.root}/config/suppressions.xml</suppressionsLocation>
@@ -1948,7 +1922,7 @@
           <dependency>
             <groupId>com.puppycrawl.tools</groupId>
             <artifactId>checkstyle</artifactId>
-            <version>10.16.0</version>
+            <version>10.17.0</version>
           </dependency>
         </dependencies>
         <executions>
@@ -2061,7 +2035,7 @@
       <plugin>
         <groupId>com.mycila</groupId>
         <artifactId>license-maven-plugin</artifactId>
-        <version>4.3</version>
+        <version>4.5</version>
         <configuration>
           <licenseSets>
             <licenseSet>
@@ -2141,6 +2115,9 @@
                 <exclude>**/.project</exclude>
                 <exclude>**/.classpath</exclude>
                 <exclude>.externalToolBuilders/**</exclude>
+
+                <!-- specific files -->
+                <exclude>**/src/test/resources/*version-header.properties</exclude>
               </excludes>
             </licenseSet>
           </licenseSets>
@@ -2266,6 +2243,9 @@
 
             <!-- MISC -->
             <exclude>**/.factorypath</exclude>
+
+            <!-- specific files -->
+            <exclude>**/src/test/resources/*version-header.properties</exclude>
           </excludes>
         </configuration>
       </plugin>
@@ -2386,7 +2366,7 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-jxr-plugin</artifactId>
-        <version>3.3.2</version>
+        <version>3.4.0</version>
         <configuration>
           <aggregate>true</aggregate>
         </configuration>

@@ -100,7 +100,7 @@ public class HnswVectorIndexCreator implements VectorIndexCreator {
   @Override
   public void seal() {
     try {
-      LOGGER.info("Sealing HNSW index for column: " + _vectorColumn);
+      LOGGER.info("Sealing HNSW index for column: {}", _vectorColumn);
       _indexWriter.forceMerge(1);
     } catch (Exception e) {
       throw new RuntimeException("Caught exception while sealing the HNSW index for column: " + _vectorColumn, e);

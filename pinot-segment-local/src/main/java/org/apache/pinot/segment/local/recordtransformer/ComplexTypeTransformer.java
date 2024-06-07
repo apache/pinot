@@ -257,7 +257,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
     for (String column : columns) {
       Object value = record.getValue(column);
       if (value instanceof Map) {
-        Map<String, Object> map = (Map) record.removeValue(column);
+        Map<String, Object> map = (Map) value;
         List<String> mapColumns = new ArrayList<>();
         for (Map.Entry<String, Object> entry : new ArrayList<>(map.entrySet())) {
           String flattenName = concat(column, entry.getKey());

@@ -21,6 +21,7 @@ package org.apache.pinot.tools;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -291,6 +292,13 @@ public class MultistageEngineQuickStart extends Quickstart {
   @Override
   public String[] getDefaultBatchTableDirectories() {
     return MULTI_STAGE_TABLE_DIRECTORIES;
+  }
+
+  @Override
+  protected Map<String, Object> getConfigOverrides() {
+    Map<String, Object> configOverrides = new HashMap<>();
+    configOverrides.put(CommonConstants.Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT, true);
+    return configOverrides;
   }
 
   @Override

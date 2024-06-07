@@ -24,16 +24,19 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.datablock.DataBlock;
+import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.routing.StageMetadata;
-import org.apache.pinot.query.routing.VirtualServerAddress;
+import org.apache.pinot.query.routing.StagePlan;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.operator.utils.OperatorUtils;
+import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.query.runtime.plan.server.ServerPlanRequestContext;
 import org.apache.pinot.query.testutils.MockDataBlockOperatorFactory;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.testng.Assert;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -52,10 +55,8 @@ public class OperatorTestUtil {
   public static final String OP_1 = "op1";
   public static final String OP_2 = "op2";
 
-  public static Map<String, String> getDummyStats(long requestId, int stageId, VirtualServerAddress serverAddress) {
-    OperatorStats operatorStats = new OperatorStats(requestId, stageId, serverAddress);
-    String statsId = new OpChainId(requestId, serverAddress.workerId(), stageId).toString();
-    return OperatorUtils.getMetadataFromOperatorStats(ImmutableMap.of(statsId, operatorStats));
+  public static MultiStageQueryStats getDummyStats(int stageId) {
+    return MultiStageQueryStats.createLeaf(stageId, new StatMap<>(LeafStageTransferableBlockOperator.StatKey.class));
   }
 
   static {
@@ -85,20 +86,44 @@ public class OperatorTestUtil {
         stageMetadata.getWorkerMetadataList().get(0), null);
   }
 
-  public static OpChainExecutionContext getDefaultContext() {
-    return getDefaultContext(ImmutableMap.of(CommonConstants.Broker.Request.TRACE, "true"));
+  public static OpChainExecutionContext getTracingContext() {
+    return getTracingContext(ImmutableMap.of(CommonConstants.Broker.Request.TRACE, "true"));
   }
 
-  public static OpChainExecutionContext getDefaultContextWithTracingDisabled() {
-    return getDefaultContext(ImmutableMap.of());
+  public static OpChainExecutionContext getNoTracingContext() {
+    return getTracingContext(ImmutableMap.of());
   }
 
-  private static OpChainExecutionContext getDefaultContext(Map<String, String> opChainMetadata) {
+  private static OpChainExecutionContext getTracingContext(Map<String, String> opChainMetadata) {
     MailboxService mailboxService = mock(MailboxService.class);
     when(mailboxService.getHostname()).thenReturn("localhost");
     when(mailboxService.getPort()).thenReturn(1234);
     WorkerMetadata workerMetadata = new WorkerMetadata(0, ImmutableMap.of(), ImmutableMap.of());
-    return new OpChainExecutionContext(mailboxService, 123L, Long.MAX_VALUE, opChainMetadata,
-        new StageMetadata(0, ImmutableList.of(workerMetadata), ImmutableMap.of()), workerMetadata, null);
+    StageMetadata stageMetadata = new StageMetadata(0, ImmutableList.of(workerMetadata), ImmutableMap.of());
+    OpChainExecutionContext opChainExecutionContext = new OpChainExecutionContext(mailboxService, 123L, Long.MAX_VALUE,
+        opChainMetadata, stageMetadata, workerMetadata, null);
+
+    StagePlan stagePlan = new StagePlan(null, stageMetadata);
+
+    opChainExecutionContext.setLeafStageContext(
+        new ServerPlanRequestContext(stagePlan, null, null, null));
+    return opChainExecutionContext;
+  }
+
+  /**
+   * Verifies that the given block is a successful end of stream block, verifies that its stats are of the same family
+   * as the given keyClass and returns the {@link StatMap} cast to the that key class.
+   */
+  public static <K extends Enum<K> & StatMap.Key> StatMap<K> getStatMap(Class<K> keyClass, TransferableBlock block) {
+    Assert.assertTrue(block.isSuccessfulEndOfStreamBlock(), "Expected EOS block but found " + block.getClass());
+    MultiStageQueryStats queryStats = block.getQueryStats();
+    Assert.assertNotNull(queryStats, "Stats holder should not be null");
+    MultiStageQueryStats.StageStats stageStats = queryStats.getCurrentStats();
+    Assert.assertEquals(stageStats.getLastOperatorStats().getKeyClass(), keyClass,
+        "Key class should be " + keyClass.getName());
+
+    @SuppressWarnings("unchecked")
+    StatMap<K> lastOperatorStats = (StatMap<K>) stageStats.getLastOperatorStats();
+    return lastOperatorStats;
   }
 }

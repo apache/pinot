@@ -19,7 +19,6 @@
 
 package org.apache.pinot.segment.local.segment.index.dictionary;
 
-import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import java.io.File;
@@ -224,6 +223,10 @@ public class DictionaryIndexType
       boolean optimizeDictionaryForMetrics, double noDictionarySizeRatioThreshold,
       FieldSpec fieldSpec, FieldIndexConfigs fieldIndexConfigs, int cardinality,
       int totalNumberOfEntries) {
+    // For an inverted index dictionary is required
+    if (fieldIndexConfigs.getConfig(StandardIndexes.inverted()).isEnabled()) {
+      return true;
+    }
     if (optimizeDictionary) {
       // Do not create dictionaries for json or text index columns as they are high-cardinality values almost always
       if ((fieldIndexConfigs.getConfig(StandardIndexes.json()).isEnabled() || fieldIndexConfigs.getConfig(
@@ -297,8 +300,19 @@ public class DictionaryIndexType
     FieldSpec.DataType dataType = metadata.getDataType();
     boolean loadOnHeap = indexConfig.isOnHeap();
     String columnName = metadata.getColumnName();
+
+    // If interning is enabled, get the required interners.
+    FALFInterner<String> strInterner = null;
+    FALFInterner<byte[]> byteInterner = null;
+    Intern internConfig = indexConfig.getIntern();
     if (loadOnHeap) {
-      LOGGER.info("Loading on-heap dictionary for column: {}, intern={}", columnName, internIdentifierStr != null);
+      LOGGER.info("Loading on-heap dictionary for column: {}", columnName);
+      if (internConfig != null && !internConfig.isDisabled()) {
+        DictionaryInternerHolder internerHolder = DictionaryInternerHolder.getInstance();
+        strInterner = internerHolder.getStrInterner(internIdentifierStr, internConfig.getCapacity());
+        byteInterner = internerHolder.getByteInterner(internIdentifierStr, internConfig.getCapacity());
+        LOGGER.info("Enabling interning for dictionary column: {}", columnName);
+      }
     }
 
     int length = metadata.getCardinality();
@@ -321,24 +335,11 @@ public class DictionaryIndexType
             : new BigDecimalDictionary(dataBuffer, length, numBytesPerValue);
       case STRING:
         numBytesPerValue = metadata.getColumnMaxLength();
-
-        // If interning is enabled, get the required interners.
-        FALFInterner<String> strInterner = null;
-        FALFInterner<byte[]> byteInterner = null;
-        Intern internConfig = indexConfig.getIntern();
-        if (internConfig != null && !internConfig.isDisabled()) {
-          Preconditions.checkState(loadOnHeap, "Interning is only supported for on-heap dictionaries.");
-          DictionaryInternerHolder internerHolder = DictionaryInternerHolder.getInstance();
-          strInterner = internerHolder.getStrInterner(internIdentifierStr, internConfig.getCapacity());
-          byteInterner = internerHolder.getByteInterner(internIdentifierStr, internConfig.getCapacity());
-          LOGGER.info("Enabling interning for dictionary column: {}", columnName);
-        }
-
         return loadOnHeap ? new OnHeapStringDictionary(dataBuffer, length, numBytesPerValue, strInterner, byteInterner)
             : new StringDictionary(dataBuffer, length, numBytesPerValue);
       case BYTES:
         numBytesPerValue = metadata.getColumnMaxLength();
-        return loadOnHeap ? new OnHeapBytesDictionary(dataBuffer, length, numBytesPerValue)
+        return loadOnHeap ? new OnHeapBytesDictionary(dataBuffer, length, numBytesPerValue, byteInterner)
             : new BytesDictionary(dataBuffer, length, numBytesPerValue);
       default:
         throw new IllegalStateException("Unsupported data type for dictionary: " + dataType);

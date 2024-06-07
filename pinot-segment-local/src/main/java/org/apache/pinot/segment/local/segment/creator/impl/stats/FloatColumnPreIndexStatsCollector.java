@@ -47,6 +47,14 @@ public class FloatColumnPreIndexStatsCollector extends AbstractColumnStatisticsC
 
       _maxNumberOfMultiValues = Math.max(_maxNumberOfMultiValues, values.length);
       updateTotalNumberOfEntries(values);
+    } else if (entry instanceof float[]) {
+      float[] values = (float[]) entry;
+      for (float value : values) {
+        _values.add(value);
+      }
+
+      _maxNumberOfMultiValues = Math.max(_maxNumberOfMultiValues, values.length);
+      updateTotalNumberOfEntries(values.length);
     } else {
       float value = (float) entry;
       addressSorted(value);

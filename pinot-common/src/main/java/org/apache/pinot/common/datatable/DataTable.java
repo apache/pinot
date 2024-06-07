@@ -110,6 +110,8 @@ public interface DataTable {
     NUM_SEGMENTS_PROCESSED(6, "numSegmentsProcessed", MetadataValueType.INT),
     NUM_SEGMENTS_MATCHED(7, "numSegmentsMatched", MetadataValueType.INT),
     NUM_CONSUMING_SEGMENTS_QUERIED(8, "numConsumingSegmentsQueried", MetadataValueType.INT),
+    // the timestamp indicating the freshness of the data queried in consuming segments.
+    // This can be ingestion timestamp if provided by the stream, or the last index time
     MIN_CONSUMING_FRESHNESS_TIME_MS(9, "minConsumingFreshnessTimeMs", MetadataValueType.LONG),
     TOTAL_DOCS(10, "totalDocs", MetadataValueType.LONG),
     NUM_GROUPS_LIMIT_REACHED(11, "numGroupsLimitReached", MetadataValueType.STRING),
@@ -129,6 +131,7 @@ public interface DataTable {
     EXPLAIN_PLAN_NUM_MATCH_ALL_FILTER_SEGMENTS(25, "explainPlanNumMatchAllFilterSegments", MetadataValueType.INT),
     NUM_CONSUMING_SEGMENTS_PROCESSED(26, "numConsumingSegmentsProcessed", MetadataValueType.INT),
     NUM_CONSUMING_SEGMENTS_MATCHED(27, "numConsumingSegmentsMatched", MetadataValueType.INT),
+    // The following keys (28 - 34) are deprecated keys for multi-stage query engine.
     NUM_BLOCKS(28, "numBlocks", MetadataValueType.INT),
     NUM_ROWS(29, "numRows", MetadataValueType.INT),
     OPERATOR_EXECUTION_TIME_MS(30, "operatorExecutionTimeMs", MetadataValueType.LONG),

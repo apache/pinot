@@ -284,6 +284,50 @@ public class NoDictionaryInPredicateEvaluatorTest {
   }
 
   @Test
+  public void testJsonPredicateEvaluators() {
+    String jsonStringTemplate = "{\"id\": %s, \"name\": %s}";
+
+    List<String> jsonValues = new ArrayList<>(NUM_PREDICATE_VALUES);
+    Set<String> jsonValueSet = new HashSet<>();
+
+    for (int i = 0; i < 100; i++) {
+      String jsonString = String.format(jsonStringTemplate,
+          RandomStringUtils.randomAlphanumeric(MAX_STRING_LENGTH),
+          RandomStringUtils.randomAlphanumeric(MAX_STRING_LENGTH));
+      jsonValues.add(jsonString);
+      jsonValueSet.add(jsonString);
+    }
+
+    InPredicate inPredicate = new InPredicate(COLUMN_EXPRESSION, jsonValues);
+    PredicateEvaluator inPredicateEvaluator =
+        InPredicateEvaluatorFactory.newRawValueBasedEvaluator(inPredicate, FieldSpec.DataType.STRING);
+
+    NotInPredicate notInPredicate = new NotInPredicate(COLUMN_EXPRESSION, jsonValues);
+    PredicateEvaluator notInPredicateEvaluator =
+        NotInPredicateEvaluatorFactory.newRawValueBasedEvaluator(notInPredicate, FieldSpec.DataType.STRING);
+
+    for (String value : jsonValueSet) {
+      Assert.assertTrue(inPredicateEvaluator.applySV(value));
+      Assert.assertFalse(notInPredicateEvaluator.applySV(value));
+    }
+
+    for (int i = 0; i < 100; i++) {
+      String randomJsonValue = String.format(jsonStringTemplate,
+          RandomStringUtils.randomAlphanumeric(MAX_STRING_LENGTH),
+          RandomStringUtils.randomAlphanumeric(MAX_STRING_LENGTH));
+      Assert.assertEquals(inPredicateEvaluator.applySV(randomJsonValue), jsonValueSet.contains(randomJsonValue));
+      Assert.assertEquals(notInPredicateEvaluator.applySV(randomJsonValue), !jsonValueSet.contains(randomJsonValue));
+    }
+
+    String[] multiValues = new String[NUM_MULTI_VALUES];
+    PredicateEvaluatorTestUtils.fillRandomJson(multiValues, jsonStringTemplate, 2, MAX_STRING_LENGTH);
+    multiValues[_random.nextInt(NUM_MULTI_VALUES)] = jsonValues.get(_random.nextInt(NUM_PREDICATE_VALUES));
+
+    Assert.assertTrue(inPredicateEvaluator.applyMV(multiValues, NUM_MULTI_VALUES));
+    Assert.assertFalse(notInPredicateEvaluator.applyMV(multiValues, NUM_MULTI_VALUES));
+  }
+
+  @Test
   public void testBytesPredicateEvaluators() {
     List<String> stringValues = new ArrayList<>(NUM_PREDICATE_VALUES);
     Set<byte[]> valueSet = new HashSet<>();

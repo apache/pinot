@@ -22,6 +22,7 @@ import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.Function;
+import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.sql.FilterKind;
 
@@ -97,10 +98,7 @@ public class IdenticalPredicateFilterOptimizer extends BaseAndOrBooleanFilterOpt
   }
 
   private boolean isLiteralZero(Expression expression) {
-    if (!expression.isSetLiteral()) {
-      return false;
-    }
-    Object literalValue = expression.getLiteral().getFieldValue();
-    return literalValue.equals(0) || literalValue.equals(0L) || literalValue.equals(0d);
+    Literal literal = expression.getLiteral();
+    return literal != null && literal.isSetIntValue() && literal.getIntValue() == 0;
   }
 }

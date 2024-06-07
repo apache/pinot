@@ -179,6 +179,11 @@ public class FastHLLAggregationFunction extends BaseSingleInputAggregationFuncti
     return intermediateResult.cardinality();
   }
 
+  @Override
+  public Long mergeFinalResult(Long finalResult1, Long finalResult2) {
+    return finalResult1 + finalResult2;
+  }
+
   private static HyperLogLog convertStringToHLL(String value) {
     char[] chars = value.toCharArray();
     int length = chars.length;

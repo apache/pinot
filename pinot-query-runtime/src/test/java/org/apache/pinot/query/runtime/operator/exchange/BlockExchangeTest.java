@@ -27,7 +27,7 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.runtime.blocks.BlockSplitter;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.blocks.TransferableBlockTestUtils;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.Mockito;
@@ -67,7 +67,7 @@ public class BlockExchangeTest {
     BlockExchange exchange = new TestBlockExchange(destinations);
 
     // When:
-    exchange.send(TransferableBlockUtils.getEndOfStreamTransferableBlock());
+    exchange.send(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
 
     // Then:
     ArgumentCaptor<TransferableBlock> captor = ArgumentCaptor.forClass(TransferableBlock.class);
