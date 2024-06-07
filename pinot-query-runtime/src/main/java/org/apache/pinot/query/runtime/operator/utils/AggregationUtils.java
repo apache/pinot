@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.runtime.operator.utils;
 
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.util.HashMap;
 import java.util.List;
@@ -223,8 +222,7 @@ public class AggregationUtils {
     private RexExpression toAggregationFunctionOperand(RexExpression.FunctionCall aggCall) {
       List<RexExpression> functionOperands = aggCall.getFunctionOperands();
       int numOperands = functionOperands.size();
-      Preconditions.checkState(numOperands < 2, "Aggregate functions cannot have more than one operand");
-      return numOperands == 1 ? functionOperands.get(0) : new RexExpression.Literal(ColumnDataType.INT, 1);
+      return numOperands == 0 ? new RexExpression.Literal(ColumnDataType.INT, 1) : functionOperands.get(0);
     }
   }
 }

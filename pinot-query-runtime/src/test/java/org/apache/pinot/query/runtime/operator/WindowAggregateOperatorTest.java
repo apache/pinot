@@ -561,6 +561,96 @@ public class WindowAggregateOperatorTest {
         "Max rows in window should be reached");
   }
 
+  @Test
+  public void testLeadLagWindowFunction() {
+    // Given:
+    DataSchema inputSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, STRING});
+    when(_input.nextBlock()).thenReturn(
+            OperatorTestUtil.block(inputSchema, new Object[]{3, "and"}, new Object[]{2, "bar"}, new Object[]{2, "foo"},
+                new Object[]{1, "foo"})).thenReturn(
+            OperatorTestUtil.block(inputSchema, new Object[]{1, "foo"}, new Object[]{2, "foo"}, new Object[]{1, "numb"},
+                new Object[]{2, "the"}, new Object[]{3, "true"}))
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    DataSchema resultSchema = new DataSchema(new String[]{"group", "arg", "lead", "lag"},
+        new ColumnDataType[]{INT, STRING, INT, INT});
+    List<Integer> keys = List.of(0);
+    List<RelFieldCollation> collations =
+        List.of(new RelFieldCollation(1, RelFieldCollation.Direction.ASCENDING, RelFieldCollation.NullDirection.LAST));
+    List<RexExpression.FunctionCall> aggCalls =
+        List.of(new RexExpression.FunctionCall(ColumnDataType.INT, SqlKind.LEAD.name(),
+                List.of(new RexExpression.InputRef(0), new RexExpression.Literal(ColumnDataType.INT, 1))),
+            new RexExpression.FunctionCall(ColumnDataType.INT, SqlKind.LAG.name(),
+                List.of(new RexExpression.InputRef(0), new RexExpression.Literal(ColumnDataType.INT, 1))));
+    WindowAggregateOperator operator =
+        getOperator(inputSchema, resultSchema, keys, collations, aggCalls, WindowNode.WindowFrameType.RANGE,
+            Integer.MIN_VALUE, 0);
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    // Then:
+    verifyResultRows(resultRows, keys, Map.of(
+        1, List.of(
+            new Object[]{1, "foo", 1, null},
+            new Object[]{1, "foo", 1, 1},
+            new Object[]{1, "numb", null, 1}),
+        2, List.of(
+            new Object[]{2, "bar", 2, null},
+            new Object[]{2, "foo", 2, 2},
+            new Object[]{2, "foo", 2, 2},
+            new Object[]{2, "the", null, 2}),
+        3, List.of(
+            new Object[]{3, "and", 3, null},
+            new Object[]{3, "true", null, 3})
+    ));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  @Test
+  public void testLeadLagWindowFunction2() {
+    // Given:
+    DataSchema inputSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, STRING});
+    when(_input.nextBlock()).thenReturn(
+            OperatorTestUtil.block(inputSchema, new Object[]{3, "and"}, new Object[]{2, "bar"}, new Object[]{2, "foo"},
+                new Object[]{1, "foo"})).thenReturn(
+            OperatorTestUtil.block(inputSchema, new Object[]{1, "foo"}, new Object[]{2, "foo"}, new Object[]{1, "numb"},
+                new Object[]{2, "the"}, new Object[]{3, "true"}))
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    DataSchema resultSchema = new DataSchema(new String[]{"group", "arg", "lead", "lag"},
+        new ColumnDataType[]{INT, STRING, INT, INT});
+    List<Integer> keys = List.of(0);
+    List<RelFieldCollation> collations =
+        List.of(new RelFieldCollation(1, RelFieldCollation.Direction.ASCENDING, RelFieldCollation.NullDirection.LAST));
+    List<RexExpression.FunctionCall> aggCalls =
+        List.of(new RexExpression.FunctionCall(ColumnDataType.INT, SqlKind.LEAD.name(),
+                List.of(new RexExpression.InputRef(0), new RexExpression.Literal(ColumnDataType.INT, 2),
+                    new RexExpression.Literal(ColumnDataType.INT, 100))),
+            new RexExpression.FunctionCall(ColumnDataType.INT, SqlKind.LAG.name(),
+                List.of(new RexExpression.InputRef(0), new RexExpression.Literal(ColumnDataType.INT, 1),
+                    new RexExpression.Literal(ColumnDataType.INT, 200))));
+    WindowAggregateOperator operator =
+        getOperator(inputSchema, resultSchema, keys, collations, aggCalls, WindowNode.WindowFrameType.RANGE,
+            Integer.MIN_VALUE, 0);
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    // Then:
+    verifyResultRows(resultRows, keys, Map.of(
+        1, List.of(
+            new Object[]{1, "foo", 1, 200},
+            new Object[]{1, "foo", 100, 1},
+            new Object[]{1, "numb", 100, 1}),
+        2, List.of(
+            new Object[]{2, "bar", 2, 200},
+            new Object[]{2, "foo", 2, 2},
+            new Object[]{2, "foo", 100, 2},
+            new Object[]{2, "the", 100, 2}),
+        3, List.of(
+            new Object[]{3, "and", 100, 200},
+            new Object[]{3, "true", 100, 3})
+    ));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
   private WindowAggregateOperator getOperator(DataSchema inputSchema, DataSchema resultSchema, List<Integer> keys,
       List<RelFieldCollation> collations, List<RexExpression.FunctionCall> aggCalls,
       WindowNode.WindowFrameType windowFrameType, int lowerBound, int upperBound, PlanNode.NodeHint nodeHint) {
