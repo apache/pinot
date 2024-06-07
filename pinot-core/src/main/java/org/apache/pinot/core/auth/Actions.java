@@ -116,6 +116,7 @@ public class Actions {
     public static final String GET_DEBUG_INFO = "GetDebugInfo";
     public static final String GET_EXTERNAL_VIEW = "GetExternalView";
     public static final String GET_SEGMENT_STATUS = "GetSegmentStatus";
+    public static final String GET_TABLE_STATUS = "GetTableStatus";
     public static final String GET_IDEAL_STATE = "GetIdealState";
     public static final String GET_INSTANCE = "GetInstance";
     public static final String GET_INSTANCE_PARTITIONS = "GetInstancePartitions";

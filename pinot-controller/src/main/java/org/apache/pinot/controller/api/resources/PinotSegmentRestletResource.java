@@ -64,6 +64,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.http.conn.HttpClientConnectionManager;
+import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
@@ -259,19 +260,23 @@ public class PinotSegmentRestletResource {
   @Path("/segments/{tableName}/info")
   @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_SEGMENT_STATUS)
   @ApiOperation(value = "Get segment names to segment status map", notes = "Get segment statuses of each segment")
-  public Map<String, String> getSegmentsStatusDetails(
+  public String getSegmentsStatusDetails(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "realtime|offline", required = false) @QueryParam("tableType") String tableTypeStr,
-      @Context HttpHeaders headers) {
+      @DefaultValue("0") @QueryParam("jtPageSize") int offset,
+      @DefaultValue("10") @QueryParam("jtPageSize") int pageSize, @Context HttpHeaders headers)
+      throws JsonProcessingException {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     TableType tableType = _pinotHelixResourceManager.validateTableType(tableTypeStr);
     TableViews.TableView externalView =
         _pinotHelixResourceManager.getTableState(tableName, TableViews.EXTERNALVIEW, tableType);
     TableViews.TableView idealStateView =
         _pinotHelixResourceManager.getTableState(tableName, TableViews.IDEALSTATE, tableType);
-    Map<String, String> segmentStatusMap = new HashMap<>();
-    segmentStatusMap = _pinotHelixResourceManager.getSegmentStatuses(externalView, idealStateView);
-    return segmentStatusMap;
+    List<SegmentStatusInfo> segmentStatusInfoListMap = new ArrayList<>();
+    segmentStatusInfoListMap = _pinotHelixResourceManager.getSegmentStatuses(externalView, idealStateView);
+    List<SegmentStatusInfo> segmentStatusPaginationList =
+        Utils.paginateResults(segmentStatusInfoListMap, offset, pageSize);
+    return JsonUtils.objectToPrettyString(segmentStatusPaginationList);
   }
 
   @GET

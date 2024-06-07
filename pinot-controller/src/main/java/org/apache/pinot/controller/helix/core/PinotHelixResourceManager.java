@@ -139,6 +139,7 @@ import org.apache.pinot.controller.api.exception.UserAlreadyExistsException;
 import org.apache.pinot.controller.api.resources.InstanceInfo;
 import org.apache.pinot.controller.api.resources.OperationValidationResponse;
 import org.apache.pinot.controller.api.resources.PeriodicTaskInvocationResponse;
+import org.apache.pinot.controller.api.resources.SegmentStatusInfo;
 import org.apache.pinot.controller.api.resources.StateType;
 import org.apache.pinot.controller.api.resources.TableViews;
 import org.apache.pinot.controller.helix.core.assignment.instance.InstanceAssignmentDriver;
@@ -3123,27 +3124,45 @@ public class PinotHelixResourceManager {
     }
   }
 
-  public Map<String, String> getSegmentStatuses(TableViews.TableView externalView,
+  public String getTableStatus(TableViews.TableView externalView, TableViews.TableView idealStateView) {
+    List<SegmentStatusInfo> segmentStatusMap = getSegmentStatuses(externalView, idealStateView);
+    Set<String> segmentNamesSet = getStateMap(idealStateView).keySet();
+
+    // Using streams to get the key-value pairs
+    List<String> segmentStatusList =
+        segmentStatusMap.stream().filter(info -> segmentNamesSet.contains(info.getSegmentName()))
+            .map(SegmentStatusInfo::getSegmentStatus).collect(Collectors.toList());
+    if (segmentStatusList.contains(CommonConstants.Helix.StateModel.DisplaySegmentStatus.BAD)) {
+      return Helix.StateModel.DisplaySegmentStatus.BAD;
+    } else if (segmentStatusList.contains(Helix.StateModel.DisplaySegmentStatus.UPDATING)) {
+      return Helix.StateModel.DisplaySegmentStatus.UPDATING;
+    }
+    return Helix.StateModel.DisplaySegmentStatus.GOOD;
+  }
+
+  public List<SegmentStatusInfo> getSegmentStatuses(TableViews.TableView externalView,
       TableViews.TableView idealStateView) {
     Map<String, Map<String, String>> idealStateMap = getStateMap(idealStateView);
     Map<String, Map<String, String>> externalViewMap = getStateMap(externalView);
-    Map<String, String> resultsMap = new HashMap<>();
+    List<SegmentStatusInfo> segmentStatusInfoList = new ArrayList<>();
 
     for (Map.Entry<String, Map<String, String>> entry : externalViewMap.entrySet()) {
       String segment = entry.getKey();
       Map<String, String> externalViewEntryValue = entry.getValue();
       if (isErrorSegment(externalViewEntryValue)) {
-        resultsMap.put(segment, CommonConstants.Helix.StateModel.DisplaySegmentStatus.BAD);
+        segmentStatusInfoList.add(
+            new SegmentStatusInfo(segment, CommonConstants.Helix.StateModel.DisplaySegmentStatus.BAD));
       } else if (isOnlineOrConsumingSegment(externalViewEntryValue) && externalViewMap.equals(idealStateMap)) {
-        resultsMap.put(segment, CommonConstants.Helix.StateModel.DisplaySegmentStatus.GOOD);
+        segmentStatusInfoList.add(
+            new SegmentStatusInfo(segment, CommonConstants.Helix.StateModel.DisplaySegmentStatus.GOOD));
       } else if (isOfflineSegment(externalViewEntryValue) && externalViewMap.equals(idealStateMap)) {
-        resultsMap.put(segment, CommonConstants.Helix.StateModel.DisplaySegmentStatus.GOOD);
+        segmentStatusInfoList.add(
+            new SegmentStatusInfo(segment, CommonConstants.Helix.StateModel.DisplaySegmentStatus.GOOD));
       } else {
-        resultsMap.put(segment, CommonConstants.Helix.StateModel.DisplaySegmentStatus.UPDATING);
+        segmentStatusInfoList.add(new SegmentStatusInfo(segment, Helix.StateModel.DisplaySegmentStatus.UPDATING));
       }
     }
-
-    return resultsMap;
+    return segmentStatusInfoList;
   }
 
   private Map<String, Map<String, String>> getStateMap(TableViews.TableView view) {

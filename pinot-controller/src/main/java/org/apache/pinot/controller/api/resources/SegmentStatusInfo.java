@@ -16,33 +16,31 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.restlet.resources;
+package org.apache.pinot.controller.api.resources;
 
-import java.io.IOException;
-import java.util.Collections;
-import java.util.List;
-import javax.ws.rs.WebApplicationException;
-import javax.ws.rs.core.Response;
-import org.apache.pinot.spi.utils.JsonUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
- * Util class for Pinot APIs.
+ * This class gives the details of a particular segment and it's status
+ *
  */
-public class ResourceUtils {
-  private ResourceUtils() {
+public class SegmentStatusInfo {
+  public String getSegmentName() {
+    return _segmentName;
   }
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(ResourceUtils.class);
+  @JsonProperty("schemaName")
+  String _segmentName;
 
-  public static String convertToJsonString(Object object) {
-    try {
-      return JsonUtils.objectToPrettyString(object);
-    } catch (IOException e) {
-      LOGGER.error("Failed to convert json into string: ", e);
-      throw new WebApplicationException("Failed to convert json into string.", Response.Status.INTERNAL_SERVER_ERROR);
-    }
+  public String getSegmentStatus() {
+    return _segmentStatus;
+  }
+
+  @JsonProperty("schemaStatus")
+  String _segmentStatus;
+
+  public SegmentStatusInfo(String segmentName, String segmentStatus) {
+    _segmentName = segmentName;
+    _segmentStatus = segmentStatus;
   }
 }
