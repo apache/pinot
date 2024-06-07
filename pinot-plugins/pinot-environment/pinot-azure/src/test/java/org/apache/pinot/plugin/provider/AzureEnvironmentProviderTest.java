@@ -31,8 +31,8 @@ import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import static org.apache.http.HttpStatus.SC_NOT_FOUND;
-import static org.apache.http.HttpStatus.SC_OK;
+import static org.apache.hc.core5.http.HttpStatus.SC_NOT_FOUND;
+import static org.apache.hc.core5.http.HttpStatus.SC_OK;
 import static org.apache.pinot.plugin.provider.AzureEnvironmentProvider.IMDS_ENDPOINT;
 import static org.apache.pinot.plugin.provider.AzureEnvironmentProvider.MAX_RETRY;
 import static org.mockito.Mockito.*;
