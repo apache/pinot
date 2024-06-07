@@ -19,8 +19,6 @@
 package org.apache.pinot.common.restlet.resources;
 
 import java.io.IOException;
-import java.util.Collections;
-import java.util.List;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Response;
 import org.apache.pinot.spi.utils.JsonUtils;
