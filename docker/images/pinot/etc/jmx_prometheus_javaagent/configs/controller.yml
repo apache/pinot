@@ -64,6 +64,9 @@ rules:
     database: "$2"
     table: "$1$3"
     tableType: "$4"
+- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.dataDir\\.(\\w+)\"><>(\\w+)"
+  name: "pinot_controller_dataDir_$1_$2"
+  cache: true
 - pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.numberSegmentUploadTimeoutExceeded\"><>(\\w+)"
   name: "pinot_controller_numberSegmentUploadTimeoutExceeded_$1"
   cache: true
@@ -228,6 +231,10 @@ rules:
     database: "$2"
     table: "$1$3"
     tableType: "$4"
+# Controller periodic task metrics
+- pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"?pinot\\.controller\\.(\\w+)\\.controllerPeriodicTaskRun\"?><>(\\w+)"
+  name: "pinot_controller_periodicTaskRun_$1_$2"
+  cache: true
 - pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.version\\.(\\w+)\"?><>(\\w+)"
   name: "pinot_$1_version"
   cache: true
