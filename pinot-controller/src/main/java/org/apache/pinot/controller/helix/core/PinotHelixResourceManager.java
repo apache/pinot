@@ -3166,9 +3166,9 @@ public class PinotHelixResourceManager {
   }
 
   private Map<String, Map<String, String>> getStateMap(TableViews.TableView view) {
-    if (view!= null && view._offline!= null && !view._offline.isEmpty()) {
+    if (view != null && view._offline != null && !view._offline.isEmpty()) {
       return view._offline;
-    } else if (view!= null && view._realtime!= null && !view._realtime.isEmpty()) {
+    } else if (view != null && view._realtime != null && !view._realtime.isEmpty()) {
       return view._realtime;
     } else {
       return new HashMap<>();
