@@ -46,6 +46,7 @@ public class CompactedPinotSegmentRecordReaderTest {
   private static final String M1 = "m1";
   private static final String M2 = "m2";
   private static final String TIME = "t";
+  private static final String DELETE_COLUMN = "del_col";
 
   private String _segmentOutputDir;
   private File _segmentIndexDir;
@@ -60,6 +61,10 @@ public class CompactedPinotSegmentRecordReaderTest {
     String segmentName = "compactedPinotSegmentRecordReaderTest";
     _segmentOutputDir = Files.createTempDir().toString();
     _rows = PinotSegmentUtil.createTestData(schema, NUM_ROWS);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      GenericRow row = _rows.get(i);
+      row.putValue(DELETE_COLUMN, i % 2 == 0 ? "true" : "false");
+    }
     _recordReader = new GenericRowRecordReader(_rows);
     _segmentIndexDir =
         PinotSegmentUtil.createSegment(tableConfig, schema, segmentName, _segmentOutputDir, _recordReader);
@@ -67,6 +72,7 @@ public class CompactedPinotSegmentRecordReaderTest {
 
   private Schema createPinotSchema() {
     return new Schema.SchemaBuilder().setSchemaName("schema").addSingleValueDimension(D_SV_1, FieldSpec.DataType.STRING)
+        .addSingleValueDimension(DELETE_COLUMN, FieldSpec.DataType.STRING)
         .addMultiValueDimension(D_MV_1, FieldSpec.DataType.STRING).addMetric(M1, FieldSpec.DataType.INT)
         .addMetric(M2, FieldSpec.DataType.FLOAT)
         .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.HOURS, TIME), null).build();
@@ -116,6 +122,47 @@ public class CompactedPinotSegmentRecordReaderTest {
     for (int i = 0; i < rewoundOuputRows.size(); i++) {
       GenericRow outputRow = rewoundOuputRows.get(i);
       GenericRow row = _rows.get(i * 2);
+      Assert.assertEquals(outputRow.getValue(D_SV_1), row.getValue(D_SV_1));
+      Assert.assertTrue(PinotSegmentUtil.compareMultiValueColumn(outputRow.getValue(D_MV_1), row.getValue(D_MV_1)));
+      Assert.assertEquals(outputRow.getValue(M1), row.getValue(M1));
+      Assert.assertEquals(outputRow.getValue(M2), row.getValue(M2));
+      Assert.assertEquals(outputRow.getValue(TIME), row.getValue(TIME));
+    }
+  }
+
+  @Test
+  public void testCompactedPinotSegmentRecordReaderWithDeleteColumn()
+      throws Exception {
+
+    RoaringBitmap validDocIds = new RoaringBitmap();
+    for (int i = 0; i < NUM_ROWS; i += 2) {
+      validDocIds.add(i);
+    }
+    List<GenericRow> evenOutputRows = new ArrayList<>();
+    try (CompactedPinotSegmentRecordReader compactedReader = new CompactedPinotSegmentRecordReader(_segmentIndexDir,
+        validDocIds, DELETE_COLUMN)) {
+      while (compactedReader.hasNext()) {
+        evenOutputRows.add(compactedReader.next());
+      }
+    }
+
+    validDocIds = new RoaringBitmap();
+    for (int i = 1; i < NUM_ROWS; i += 2) {
+      validDocIds.add(i);
+    }
+    List<GenericRow> oddOutputRows = new ArrayList<>();
+    try (CompactedPinotSegmentRecordReader compactedReader = new CompactedPinotSegmentRecordReader(_segmentIndexDir,
+        validDocIds, DELETE_COLUMN)) {
+      while (compactedReader.hasNext()) {
+        oddOutputRows.add(compactedReader.next());
+      }
+    }
+
+    Assert.assertEquals(evenOutputRows.size(), 0, "All even rows are deleted");
+    Assert.assertEquals(oddOutputRows.size(), NUM_ROWS / 2, "All odd rows are kept");
+    for (int i = 0; i < oddOutputRows.size(); i++) {
+      GenericRow outputRow = oddOutputRows.get(i);
+      GenericRow row = _rows.get(i * 2 + 1);
       Assert.assertEquals(outputRow.getValue(D_SV_1), row.getValue(D_SV_1));
       Assert.assertTrue(PinotSegmentUtil.compareMultiValueColumn(outputRow.getValue(D_MV_1), row.getValue(D_MV_1)));
       Assert.assertEquals(outputRow.getValue(M1), row.getValue(M1));
