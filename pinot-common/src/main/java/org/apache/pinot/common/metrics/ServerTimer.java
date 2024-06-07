@@ -54,7 +54,36 @@ public enum ServerTimer implements AbstractMetrics.Timer {
   UPSERT_REMOVE_EXPIRED_PRIMARY_KEYS_TIME_MS("milliseconds", false,
       "Total time taken to delete expired primary keys based on metadataTTL or deletedKeysTTL"),
   GRPC_QUERY_EXECUTION_MS("milliseconds", false, "Total execution time of a successful query over gRPC"),
-  UPSERT_SNAPSHOT_TIME_MS("milliseconds", false, "Total time taken to take upsert table snapshot");
+  UPSERT_SNAPSHOT_TIME_MS("milliseconds", false, "Total time taken to take upsert table snapshot"),
+
+  // Multi-stage
+  /**
+   * Time spent building the hash table for the join.
+   * This is the sum of all time spent by all workers in the stage.
+   */
+  HASH_JOIN_BUILD_TABLE_CPU_TIME_MS("millis", true),
+  /**
+   * Time spent serializing blocks into bytes to be sent to the next stage.
+   * This is the sum of all time spent by all workers in the stage.
+   */
+  MULTI_STAGE_SERIALIZATION_CPU_TIME_MS("millis", true),
+  /**
+   * Time spent deserializing bytes into blocks to be processed by the stage.
+   * This is the sum of all time spent by all workers in the stage.
+   */
+  MULTI_STAGE_DESERIALIZATION_CPU_TIME_MS("millis", true),
+  /**
+   * Time waiting on the receive mailbox for its parent operator to consume the data.
+   * Remember that each stage may have several workers and each one will have a receive mailbox for each worker it is
+   * reading from. This is the sum of all time waiting.
+   */
+  RECEIVE_DOWNSTREAM_WAIT_CPU_TIME_MS("millis", true),
+  /**
+   * Time waiting on the receive mailbox waiting for the child operator to produce the data.
+   * Remember that each stage may have several workers and each one will have a receive mailbox for each worker it is
+   * reading from. This is the sum of all time waiting.
+   */
+  RECEIVE_UPSTREAM_WAIT_CPU_TIME_MS("millis", true);
 
   private final String _timerName;
   private final boolean _global;
