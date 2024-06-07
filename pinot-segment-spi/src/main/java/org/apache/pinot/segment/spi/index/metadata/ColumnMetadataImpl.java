@@ -229,14 +229,20 @@ public class ColumnMetadataImpl implements ColumnMetadata {
     if (defaultNullValueString != null && storedType == DataType.STRING) {
       defaultNullValueString = CommonsConfigurationUtils.recoverSpecialCharacterInPropertyValue(defaultNullValueString);
     }
+    int maxLength = config.getInt(Column.getKeyFor(column, Column.SCHEMA_MAX_LENGTH), FieldSpec.DEFAULT_MAX_LENGTH);
+    String maxLengthExceedStrategyString =
+        config.getString(Column.getKeyFor(column, Column.SCHEMA_MAX_LENGTH_EXCEED_STRATEGY), null);
+    FieldSpec.MaxLengthExceedStrategy maxLengthExceedStrategy = maxLengthExceedStrategyString != null
+        ? FieldSpec.MaxLengthExceedStrategy.valueOf(maxLengthExceedStrategyString) : null;
     FieldSpec fieldSpec;
     switch (fieldType) {
       case DIMENSION:
         boolean isSingleValue = config.getBoolean(Column.getKeyFor(column, Column.IS_SINGLE_VALUED));
-        fieldSpec = new DimensionFieldSpec(column, dataType, isSingleValue, defaultNullValueString);
+        fieldSpec = new DimensionFieldSpec(column, dataType, isSingleValue, maxLength,
+            defaultNullValueString, maxLengthExceedStrategy);
         break;
       case METRIC:
-        fieldSpec = new MetricFieldSpec(column, dataType, defaultNullValueString);
+        fieldSpec = new MetricFieldSpec(column, dataType, defaultNullValueString, maxLength, maxLengthExceedStrategy);
         break;
       case TIME:
         TimeUnit timeUnit = TimeUnit.valueOf(config.getString(Segment.TIME_UNIT, "DAYS").toUpperCase());
