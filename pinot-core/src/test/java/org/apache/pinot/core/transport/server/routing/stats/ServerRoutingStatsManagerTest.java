@@ -131,7 +131,7 @@ public class ServerRoutingStatsManagerTest {
     int requestId = 0;
 
     // Submit stats for server1.
-    manager.recordStatsAfterQuerySubmission(requestId++, "server1");
+    manager.recordStatsForQuerySubmission(requestId++, "server1");
     waitForStatsUpdate(manager, requestId);
 
     List<Pair<String, Integer>> numInFlightReqList = manager.fetchNumInFlightRequestsForAllServers();
@@ -156,7 +156,7 @@ public class ServerRoutingStatsManagerTest {
     assertEquals(score, 0.0);
 
     // Submit more stats for server 1.
-    manager.recordStatsAfterQuerySubmission(requestId++, "server1");
+    manager.recordStatsForQuerySubmission(requestId++, "server1");
     waitForStatsUpdate(manager, requestId);
 
     numInFlightReqList = manager.fetchNumInFlightRequestsForAllServers();
@@ -181,7 +181,7 @@ public class ServerRoutingStatsManagerTest {
     assertEquals(score, 0.0);
 
     // Add a new server server2.
-    manager.recordStatsAfterQuerySubmission(requestId++, "server2");
+    manager.recordStatsForQuerySubmission(requestId++, "server2");
     waitForStatsUpdate(manager, requestId);
 
 

@@ -61,7 +61,7 @@ public class AsyncQueryResponse implements QueryResponse {
       // Record stats related to query submission just before sending the request. Otherwise, if the response is
       // received immediately, there's a possibility of updating query response stats before updating query
       // submission stats.
-      _serverRoutingStatsManager.recordStatsAfterQuerySubmission(requestId, serverRoutingInstance.getInstanceId());
+      _serverRoutingStatsManager.recordStatsForQuerySubmission(requestId, serverRoutingInstance.getInstanceId());
       _responseMap.put(serverRoutingInstance, new ServerResponse(startTimeMs));
     }
     _countDownLatch = new CountDownLatch(numServersQueried);
