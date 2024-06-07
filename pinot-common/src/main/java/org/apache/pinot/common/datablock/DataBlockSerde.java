@@ -57,7 +57,12 @@ public interface DataBlockSerde {
    * compatible in both serialization and deserialization ways.
    */
   enum Version {
-    V2(2);
+    /**
+     * The version used Pinot 1.0, 1.1 and 1.2.
+     * <p>
+     * Older Pinot version name the version with id 1.
+     */
+    V1_V2(2);
 
     private final int _version;
 
@@ -69,7 +74,7 @@ public interface DataBlockSerde {
       switch (version) {
         case 1:
         case 2:
-          return V2;
+          return V1_V2;
         default:
           throw new IllegalArgumentException("Unknown version: " + version);
       }

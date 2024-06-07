@@ -19,17 +19,11 @@
 package org.apache.pinot.common.datablock;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.io.DataOutput;
-import java.io.IOException;
-import java.nio.BufferUnderflowException;
-import java.nio.ByteBuffer;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
-import org.apache.pinot.segment.spi.memory.PinotByteBuffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -65,81 +59,6 @@ public class MetadataBlock extends BaseDataBlock {
   public MetadataBlock(List<DataBuffer> statsByStage) {
     super(0, null, new String[0], new byte[0], new byte[0]);
     _statsByStage = statsByStage;
-  }
-
-  MetadataBlock(ByteBuffer byteBuffer)
-      throws IOException {
-    super(byteBuffer);
-  }
-
-  @Override
-  protected void serializeMetadata(DataOutput output)
-      throws IOException {
-    if (_statsByStage == null) {
-      output.writeInt(0);
-      return;
-    }
-    int size = _statsByStage.size();
-    output.writeInt(size);
-    if (size > 0) {
-      byte[] bytes = new byte[4096];
-      for (DataBuffer stat : _statsByStage) {
-        if (stat == null) {
-          output.writeBoolean(false);
-        } else {
-          output.writeBoolean(true);
-          if (stat.size() > Integer.MAX_VALUE) {
-            throw new IOException("Stat size is too large to serialize");
-          }
-          output.writeInt((int) stat.size());
-          int copied = 0;
-          while (copied < stat.size()) {
-            int length = (int) Math.min(stat.size() - copied, bytes.length);
-            stat.copyTo(copied, bytes, 0, length);
-            output.write(bytes, 0, length);
-            copied += length;
-          }
-        }
-      }
-    }
-  }
-
-  public static MetadataBlock deserialize(ByteBuffer byteBuffer, int version)
-      throws IOException {
-    switch (version) {
-      case 1:
-      case 2:
-        return new MetadataBlock(byteBuffer);
-      default:
-        throw new IOException("Unsupported metadata block version: " + version);
-    }
-  }
-
-  @Override
-  protected void deserializeMetadata(ByteBuffer buffer)
-      throws IOException {
-    try {
-      int statsSize = buffer.getInt();
-
-      List<DataBuffer> stats = new ArrayList<>(statsSize);
-
-      for (int i = 0; i < statsSize; i++) {
-        if (buffer.get() != 0) {
-          int length = buffer.getInt();
-          buffer.limit(buffer.position() + length);
-          stats.add(PinotByteBuffer.wrap(buffer.slice()));
-          buffer.position(buffer.limit());
-          buffer.limit(buffer.capacity());
-        } else {
-          stats.add(null);
-        }
-      }
-      _statsByStage = stats;
-    } catch (BufferUnderflowException e) {
-      LOGGER.info("Failed to read stats from metadata block. Considering it empty", e);;
-    } catch (RuntimeException e) {
-      LOGGER.warn("Failed to read stats from metadata block. Considering it empty", e);;
-    }
   }
 
   public MetadataBlockType getType() {

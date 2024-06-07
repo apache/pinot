@@ -20,6 +20,7 @@ package org.apache.pinot.common.datablock;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -47,12 +48,10 @@ public interface DataBlock {
   Map<Integer, String> getExceptions();
 
   /**
-   * Serialize the data block into a format that is compatible with {@link DataBlockSerde.Version#V2}.
-   *
-   * @deprecated Use {@link DataBlockUtils#serialize(DataBlockSerde.Version, DataBlock)} instead.
+   * This is basically a wrap on top of {@link DataBlockUtils#serialize(DataBlock)} but implementations can catch
+   * the result so messages sent to more than one receiving mailbox don't need to be serialized as many times.
    */
-  @Deprecated
-  byte[] toBytes()
+  List<ByteBuffer> serialize()
       throws IOException;
 
   // --------------------------------------------------------------------------
@@ -119,6 +118,16 @@ public interface DataBlock {
     }
   }
 
+  /**
+   * A raw representation of the block.
+   * <p>
+   * Do not confuse this with the serialized form of the block. This is a representation of the block in memory and
+   * it is completely dependent on the current Pinot version. That means that this representation can change between
+   * Pinot versions.
+   * <p>
+   * The {@link DataBlockSerde} is responsible for serializing and deserializing this raw representation into a binary
+   * format that is compatible with the other Pinot versions.
+   */
   interface Raw {
     int getNumberOfRows();
 
@@ -133,9 +142,15 @@ public interface DataBlock {
     @Nullable
     DataSchema getDataSchema();
 
+    /**
+     * The actual content is different depending on whether this is a row-based or columnar data block.
+     */
     @Nullable
     DataBuffer getFixedData();
 
+    /**
+     * The actual content is different depending on whether this is a row-based or columnar data block.
+     */
     @Nullable
     DataBuffer getVarSizeData();
 

@@ -26,9 +26,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.apache.pinot.segment.spi.memory.PinotInputStream;
 
 
@@ -37,9 +37,6 @@ import org.apache.pinot.segment.spi.memory.PinotInputStream;
  * <p>
  * This version stored the metadata in a {@code Map<String, String>} which was encoded as JSON and stored in the
  * variable size data buffer.
- * <p>
- * Instances of this class are not actually seen by the operators. Instead, they are converted to {@link MetadataBlock}
- * in {@link MetadataBlock#deserialize(ByteBuffer, int)}.
  * <p>
  * The reason to keep it here is mostly for backwards compatibility and testing. In order to simplify the code, the
  * stats engine just ignores the metadata of these objects, but we need to be able to deserialize them anyway.
@@ -102,6 +99,11 @@ public class V1MetadataBlock extends BaseDataBlock {
     _contents = new Contents(type.name(), stats);
   }
 
+  private V1MetadataBlock(Contents content) {
+    super(0, null, new String[0], new byte[]{0}, toContents(content));
+    _contents = content;
+  }
+
   private static byte[] toContents(Contents type) {
     try {
       return JSON.writeValueAsBytes(type);
@@ -110,15 +112,27 @@ public class V1MetadataBlock extends BaseDataBlock {
     }
   }
 
-  public V1MetadataBlock(ByteBuffer byteBuffer)
+  public static V1MetadataBlock fromByteBuffer(DataBuffer dataBuffer)
       throws IOException {
-    super(byteBuffer);
-    if (_variableSizeData != null && _variableSizeData.size() > 0) {
-      try (PinotInputStream stream = _variableSizeData.openInputStream()) {
-        _contents = JSON.readValue((InputStream) stream, Contents.class);
+
+    try (PinotInputStream stream = dataBuffer.openInputStream()) {
+      // Read header.
+      long skipped = stream.skip(11 * Integer.BYTES); // metadata we don't care about
+      assert skipped == 11 * Integer.BYTES;
+      int variableSizeDataStart = stream.readInt();
+      int variableSizeDataLength = stream.readInt();
+
+      // Read metadata.
+      stream.readInt();
+
+      Contents contents;
+      if (variableSizeDataLength > 0) {
+        stream.seek(variableSizeDataStart);
+        contents = JSON.readValue((InputStream) stream, Contents.class);
+      } else {
+        contents = new Contents();
       }
-    } else {
-      _contents = new Contents();
+      return new V1MetadataBlock(contents);
     }
   }
 

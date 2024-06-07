@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.common.datablock;
 
-import java.io.IOException;
-import java.nio.ByteBuffer;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
 
@@ -41,12 +39,6 @@ public class ColumnarDataBlock extends BaseDataBlock {
   public ColumnarDataBlock(int numRows, DataSchema dataSchema, String[] stringDictionary,
       DataBuffer fixedSizeDataBytes, DataBuffer variableSizeDataBytes) {
     super(numRows, dataSchema, stringDictionary, fixedSizeDataBytes, variableSizeDataBytes);
-    computeBlockObjectConstants();
-  }
-
-  public ColumnarDataBlock(ByteBuffer byteBuffer)
-      throws IOException {
-    super(byteBuffer);
     computeBlockObjectConstants();
   }
 

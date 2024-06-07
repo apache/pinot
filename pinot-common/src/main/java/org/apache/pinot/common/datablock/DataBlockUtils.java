@@ -46,7 +46,7 @@ public final class DataBlockUtils {
 
   static {
     SERDES = new EnumMap<>(DataBlockSerde.Version.class);
-    SERDES.put(DataBlockSerde.Version.V2, new OriginalDataBlockSerde());
+    SERDES.put(DataBlockSerde.Version.V1_V2, new ZeroCopyDataBlockSerde());
   }
 
   @VisibleForTesting
@@ -99,6 +99,12 @@ public final class DataBlockUtils {
     return DataBlock.Type.fromOrdinal(versionType >> VERSION_TYPE_SHIFT);
   }
 
+  public static List<ByteBuffer> serialize(DataBlock dataBlock)
+      throws IOException {
+    return serialize(DataBlockSerde.Version.V1_V2, dataBlock);
+  }
+
+  @VisibleForTesting
   public static List<ByteBuffer> serialize(DataBlockSerde.Version version, DataBlock dataBlock)
       throws IOException {
 
@@ -127,6 +133,17 @@ public final class DataBlockUtils {
     return result;
   }
 
+  public static DataBlock deserialize(ByteBuffer buffer)
+      throws IOException {
+    PinotByteBuffer dataBuffer = PinotByteBuffer.wrap(buffer);
+    int versionAndSubVersion = dataBuffer.getInt(0);
+    int version = getVersion(versionAndSubVersion);
+    DataBlockSerde dataBlockSerde = SERDES.get(DataBlockSerde.Version.fromInt(version));
+
+    DataBlock.Type type = getType(versionAndSubVersion);
+
+    return dataBlockSerde.deserialize(dataBuffer, 0, type);
+  }
 
   public static DataBlock deserialize(List<ByteBuffer> buffers)
       throws IOException {
@@ -154,24 +171,6 @@ public final class DataBlockUtils {
       DataBlock.Type type = getType(versionAndSubVersion);
 
       return dataBlockSerde.deserialize(compoundBuffer, 0, type);
-    }
-  }
-
-  @Deprecated
-  public static DataBlock getDataBlock(ByteBuffer byteBuffer)
-      throws IOException {
-    int versionType = readVersionType(byteBuffer);
-    int version = getVersion(versionType);
-    DataBlock.Type type = getType(versionType);
-    switch (type) {
-      case COLUMNAR:
-        return new ColumnarDataBlock(byteBuffer);
-      case ROW:
-        return new RowDataBlock(byteBuffer);
-      case METADATA:
-        return MetadataBlock.deserialize(byteBuffer, version);
-      default:
-        throw new UnsupportedOperationException("Unsupported data table version: " + version + " with type: " + type);
     }
   }
 

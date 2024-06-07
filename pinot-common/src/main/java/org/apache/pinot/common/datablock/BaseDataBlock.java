@@ -19,7 +19,6 @@
 package org.apache.pinot.common.datablock;
 
 import com.google.common.base.Preconditions;
-import java.io.DataOutput;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -43,7 +42,6 @@ import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.apache.pinot.segment.spi.memory.PinotByteBuffer;
 import org.apache.pinot.segment.spi.memory.PinotInputStream;
-import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
@@ -100,6 +98,8 @@ public abstract class BaseDataBlock implements DataBlock, DataBlock.Raw {
   protected String[] _stringDictionary;
   protected DataBuffer _fixedSizeData;
   protected DataBuffer _variableSizeData;
+  @Nullable
+  private List<ByteBuffer> _serialized;
 
   /**
    * construct a base data block.
@@ -135,68 +135,6 @@ public abstract class BaseDataBlock implements DataBlock, DataBlock.Raw {
     _fixedSizeData = fixedSizeData;
     _variableSizeData = variableSizeData;
     _errCodeToExceptionMap = new HashMap<>();
-  }
-
-  public BaseDataBlock(ByteBuffer byteBuffer)
-      throws IOException {
-    // Read header.
-    _numRows = byteBuffer.getInt();
-    _numColumns = byteBuffer.getInt();
-    int exceptionsStart = byteBuffer.getInt();
-    int exceptionsLength = byteBuffer.getInt();
-    int dictionaryMapStart = byteBuffer.getInt();
-    int dictionaryMapLength = byteBuffer.getInt();
-    int dataSchemaStart = byteBuffer.getInt();
-    int dataSchemaLength = byteBuffer.getInt();
-    int fixedSizeDataStart = byteBuffer.getInt();
-    int fixedSizeDataLength = byteBuffer.getInt();
-    int variableSizeDataStart = byteBuffer.getInt();
-    int variableSizeDataLength = byteBuffer.getInt();
-
-    // Read exceptions.
-    if (exceptionsLength != 0) {
-      byteBuffer.position(exceptionsStart);
-      _errCodeToExceptionMap = deserializeExceptions(byteBuffer);
-    } else {
-      _errCodeToExceptionMap = new HashMap<>();
-    }
-
-    // Read dictionary.
-    if (dictionaryMapLength != 0) {
-      byteBuffer.position(dictionaryMapStart);
-      _stringDictionary = deserializeStringDictionary(byteBuffer);
-    } else {
-      _stringDictionary = null;
-    }
-
-    // Read data schema.
-    if (dataSchemaLength != 0) {
-      byteBuffer.position(dataSchemaStart);
-      _dataSchema = DataSchema.fromBytes(byteBuffer);
-    } else {
-      _dataSchema = null;
-    }
-
-    // Read fixed size data.
-    if (fixedSizeDataLength != 0) {
-      byte[] fixedSizeDataBytes = new byte[fixedSizeDataLength];
-      byteBuffer.position(fixedSizeDataStart);
-      byteBuffer.get(fixedSizeDataBytes);
-      _fixedSizeData = PinotByteBuffer.wrap(fixedSizeDataBytes);
-    } else {
-      _fixedSizeData = null;
-    }
-
-    // Read variable size data.
-    byte[] variableSizeDataBytes = new byte[variableSizeDataLength];
-    if (variableSizeDataLength != 0) {
-      byteBuffer.position(variableSizeDataStart);
-      byteBuffer.get(variableSizeDataBytes);
-    }
-    _variableSizeData = PinotByteBuffer.wrap(variableSizeDataBytes);
-
-    // Read metadata.
-    deserializeMetadata(byteBuffer);
   }
 
   @Override
@@ -464,26 +402,13 @@ public abstract class BaseDataBlock implements DataBlock, DataBlock.Raw {
     return _errCodeToExceptionMap;
   }
 
-  /**
-   * Serialize this data block to a byte array.
-   * <p>
-   * In order to deserialize it, {@link DataBlockUtils#getDataBlock(ByteBuffer)} should be used.
-   */
   @Override
-  public byte[] toBytes()
+  public List<ByteBuffer> serialize()
       throws IOException {
-    ThreadResourceUsageProvider threadResourceUsageProvider = new ThreadResourceUsageProvider();
-
-    UnsynchronizedByteArrayOutputStream byteArrayOutputStream = new UnsynchronizedByteArrayOutputStream(8192);
-    DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
-    writeLeadingSections(dataOutputStream);
-
-    // Write metadata: length followed by actual metadata bytes.
-    // NOTE: We ignore metadata serialization time in "responseSerializationCpuTimeNs" as it's negligible while
-    // considering it will bring a lot code complexity.
-    serializeMetadata(dataOutputStream);
-
-    return byteArrayOutputStream.toByteArray();
+    if (_serialized == null) {
+      _serialized = DataBlockUtils.serialize(this);
+    }
+    return _serialized;
   }
 
   private void writeLeadingSections(DataOutputStream dataOutputStream)
@@ -562,32 +487,6 @@ public abstract class BaseDataBlock implements DataBlock, DataBlock.Raw {
         IOUtils.copy(inputStream, dataOutputStream);
       }
     }
-  }
-
-  /**
-   * Writes the metadata section to the given data output stream.
-   */
-  protected void serializeMetadata(DataOutput dataOutputStream)
-      throws IOException {
-    dataOutputStream.writeInt(0);
-  }
-
-  /**
-   * Deserializes the metadata section from the given byte buffer.
-   * <p>
-   * This is the counterpart of {@link #serializeMetadata(DataOutput)} and it is guaranteed that the buffer will
-   * be positioned at the start of the metadata section when this method is called.
-   * <p>
-   * <strong>Important:</strong> It is mandatory for implementations to leave the cursor at the end of the metadata, in
-   * the exact same position as it was when {@link #serializeMetadata(DataOutput)} was called.
-   * <p>
-   * <strong>Important:</strong> This method will be called at the end of the BaseDataConstructor constructor to read
-   * the metadata section. This means that it will be called <strong>before</strong> the subclass have been constructor
-   * have been called. Therefore it is not possible to use any subclass fields in this method.
-   */
-  protected void deserializeMetadata(ByteBuffer buffer)
-      throws IOException {
-    buffer.getInt();
   }
 
   private byte[] serializeExceptions()
@@ -811,6 +710,6 @@ public abstract class BaseDataBlock implements DataBlock, DataBlock.Raw {
 
   @Override
   public final int hashCode() {
-    return Objects.hash(_errCodeToExceptionMap, _numRows, _numColumns, _dataSchema);
+    return Objects.hash(_errCodeToExceptionMap, _numRows, _dataSchema);
   }
 }

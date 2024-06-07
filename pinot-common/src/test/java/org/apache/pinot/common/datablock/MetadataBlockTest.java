@@ -21,9 +21,11 @@ package org.apache.pinot.common.datablock;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import org.apache.pinot.segment.spi.memory.CompoundDataBuffer;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.apache.pinot.segment.spi.memory.PinotByteBuffer;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
@@ -31,12 +33,7 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.*;
 
-public class MetadataBlockTest extends BaseDataBlockContract {
-  @Override
-  protected BaseDataBlock deserialize(ByteBuffer byteBuffer, int versionType)
-      throws IOException {
-    return new MetadataBlock(byteBuffer);
-  }
+public class MetadataBlockTest {
 
   @Test
   public void emptyMetadataBlock()
@@ -55,21 +52,13 @@ public class MetadataBlockTest extends BaseDataBlockContract {
   }
 
   @Test
-  public void emptyDataBlockCorrectness()
-      throws IOException {
-    testSerdeCorrectness(MetadataBlock.newEos());
-  }
-
-  @Test
   public void v1ErrorWithExceptionsIsDecodedAsV2ErrorWithSameExceptions()
       throws IOException {
     V1MetadataBlock v1MetadataBlock = new V1MetadataBlock(MetadataBlock.MetadataBlockType.ERROR);
     v1MetadataBlock.addException(250, "timeout");
     v1MetadataBlock.addException(500, "server error");
 
-    byte[] bytes = v1MetadataBlock.toBytes();
-    ByteBuffer buff = ByteBuffer.wrap(bytes);
-    DataBlock dataBlock = DataBlockUtils.getDataBlock(buff);
+    DataBlock dataBlock = DataBlockUtils.deserialize(v1MetadataBlock.serialize());
 
     assertTrue(dataBlock instanceof MetadataBlock, "V1MetadataBlock should be always decoded as MetadataBlock");
     MetadataBlock metadataBlock = (MetadataBlock) dataBlock;
@@ -82,18 +71,18 @@ public class MetadataBlockTest extends BaseDataBlockContract {
    * Verifies that a V2 EOS with empty stats is read in V1 as EOS without stats
    */
   @Test
+  @Deprecated // can be removed in 1.2.0
   public void v2EosWithoutStatsIsReadInV1AsEosWithoutStats()
       throws IOException {
     ByteBuffer stats = ByteBuffer.wrap(new byte[]{0, 0, 0, 0});
     DataBuffer dataBuffer = PinotByteBuffer.wrap(stats);
     MetadataBlock metadataBlock = new MetadataBlock(Lists.newArrayList(dataBuffer));
 
-    byte[] bytes = metadataBlock.toBytes();
-
     // This is how V1 blocks were deserialized
-    ByteBuffer buff = ByteBuffer.wrap(bytes);
-    DataBlockUtils.readVersionType(buff); // consume the version information before decoding
-    V1MetadataBlock v1MetadataBlock = new V1MetadataBlock(buff);
+    CompoundDataBuffer buffer = new CompoundDataBuffer.Builder(ByteOrder.BIG_ENDIAN)
+        .addBuffers(DataBlockUtils.serialize(metadataBlock))
+        .build();
+    V1MetadataBlock v1MetadataBlock = V1MetadataBlock.fromByteBuffer(buffer);
 
     assertEquals(v1MetadataBlock.getType(), MetadataBlock.MetadataBlockType.EOS, "Expected EOS type");
     assertEquals(v1MetadataBlock.getStats(), Collections.emptyMap(), "Expected no stats by stage");
@@ -104,16 +93,16 @@ public class MetadataBlockTest extends BaseDataBlockContract {
    * Verifies that a V2 EOS with stats is read in V1 as EOS without stats
    */
   @Test
+  @Deprecated // can be removed in 1.2.0
   public void v2EosWithStatsIsReadInV1AsEosWithoutStats()
       throws IOException {
     MetadataBlock metadataBlock = MetadataBlock.newEos();
 
-    byte[] bytes = metadataBlock.toBytes();
-
     // This is how V1 blocks were deserialized
-    ByteBuffer buff = ByteBuffer.wrap(bytes);
-    DataBlockUtils.readVersionType(buff); // consume the version information before decoding
-    V1MetadataBlock v1MetadataBlock = new V1MetadataBlock(buff);
+    CompoundDataBuffer buffer = new CompoundDataBuffer.Builder(ByteOrder.BIG_ENDIAN)
+        .addBuffers(DataBlockUtils.serialize(metadataBlock))
+        .build();
+    V1MetadataBlock v1MetadataBlock = V1MetadataBlock.fromByteBuffer(buffer);
 
     assertEquals(v1MetadataBlock.getType(), MetadataBlock.MetadataBlockType.EOS, "Expected EOS type");
     assertEquals(v1MetadataBlock.getStats(), Collections.emptyMap(), "Expected no stats by stage");
@@ -124,18 +113,18 @@ public class MetadataBlockTest extends BaseDataBlockContract {
    * Verifies that a V2 error code is read in V1 as error with the same exceptions
    */
   @Test
+  @Deprecated // can be removed in 1.2.0
   public void v2ErrorIsReadInV1AsErrorWithSameExceptions()
       throws IOException {
     HashMap<Integer, String> errorMap = new HashMap<>();
     errorMap.put(250, "timeout");
     MetadataBlock metadataBlock = MetadataBlock.newError(errorMap);
 
-    byte[] bytes = metadataBlock.toBytes();
-
     // This is how V1 blocks were deserialized
-    ByteBuffer buff = ByteBuffer.wrap(bytes);
-    DataBlockUtils.readVersionType(buff); // consume the version information before decoding
-    V1MetadataBlock v1MetadataBlock = new V1MetadataBlock(buff);
+    CompoundDataBuffer buffer = new CompoundDataBuffer.Builder(ByteOrder.BIG_ENDIAN)
+        .addBuffers(DataBlockUtils.serialize(metadataBlock))
+        .build();
+    V1MetadataBlock v1MetadataBlock = V1MetadataBlock.fromByteBuffer(buffer);
 
     assertEquals(v1MetadataBlock.getType(), MetadataBlock.MetadataBlockType.ERROR, "Expected error type");
     assertEquals(v1MetadataBlock.getStats(), Collections.emptyMap(), "Expected no stats by stage");
@@ -146,13 +135,12 @@ public class MetadataBlockTest extends BaseDataBlockContract {
    * Verifies that a V1 error code is decoded as a V2 error code with the same exceptions
    */
   @Test
+  @Deprecated // can be removed in 1.2.0
   public void v1EosWithoutStatsIsDecodedAsV2EosWithoutStats()
       throws IOException {
     V1MetadataBlock v1MetadataBlock = new V1MetadataBlock(MetadataBlock.MetadataBlockType.EOS, new HashMap<>());
 
-    byte[] bytes = v1MetadataBlock.toBytes();
-    ByteBuffer buff = ByteBuffer.wrap(bytes);
-    DataBlock dataBlock = DataBlockUtils.getDataBlock(buff);
+    DataBlock dataBlock = DataBlockUtils.deserialize(v1MetadataBlock.serialize());
 
     assertTrue(dataBlock instanceof MetadataBlock, "V1MetadataBlock should be always decoded as MetadataBlock");
     MetadataBlock metadataBlock = (MetadataBlock) dataBlock;
@@ -165,6 +153,7 @@ public class MetadataBlockTest extends BaseDataBlockContract {
    * Verifies that a V1 EOS with stats is decoded as a V2 EOS without stats
    */
   @Test
+  @Deprecated // can be removed in 1.2.0
   public void v1EosWithStatsIsDecodedAsV2EosWithoutStats()
       throws IOException {
     HashMap<String, String> stats = new HashMap<>();
@@ -172,9 +161,7 @@ public class MetadataBlockTest extends BaseDataBlockContract {
     stats.put("baz", "qux");
     V1MetadataBlock v1MetadataBlock = new V1MetadataBlock(MetadataBlock.MetadataBlockType.EOS, stats);
 
-    byte[] bytes = v1MetadataBlock.toBytes();
-    ByteBuffer buff = ByteBuffer.wrap(bytes);
-    DataBlock dataBlock = DataBlockUtils.getDataBlock(buff);
+    DataBlock dataBlock = DataBlockUtils.deserialize(v1MetadataBlock.serialize());
 
     assertTrue(dataBlock instanceof MetadataBlock, "V1MetadataBlock should be always decoded as MetadataBlock");
     MetadataBlock metadataBlock = (MetadataBlock) dataBlock;
@@ -187,6 +174,7 @@ public class MetadataBlockTest extends BaseDataBlockContract {
    * Verifies that a V0 EOS without exceptions is decoded as a V2 EOS without stats
    */
   @Test
+  @Deprecated // can be removed in 1.2.0
   public void v0EosWithoutExceptionsIsDecodedAsV2EosWithoutStats()
       throws IOException {
     // Given:
@@ -194,18 +182,19 @@ public class MetadataBlockTest extends BaseDataBlockContract {
     // during rollout or if server versions are mismatched that we can still handle
     // the old format
     V0MetadataBlock legacyBlock = new V0MetadataBlock();
-    byte[] bytes = legacyBlock.toBytes();
 
     // When:
-    ByteBuffer buff = ByteBuffer.wrap(bytes);
-    DataBlockUtils.readVersionType(buff); // consume the version information before decoding
-    MetadataBlock metadataBlock = new MetadataBlock(buff);
+    DataBlock deserialized = DataBlockUtils.deserialize(DataBlockUtils.serialize(legacyBlock));
 
     // Then:
+    assertTrue(deserialized instanceof MetadataBlock, "V0MetadataBlock should be always decoded as "
+        + "MetadataBlock");
+    MetadataBlock metadataBlock = (MetadataBlock) deserialized;
     assertEquals(metadataBlock.getType(), MetadataBlock.MetadataBlockType.EOS);
   }
 
   @Test
+  @Deprecated // can be removed in 1.2.0
   public void v0EosWithExceptionsIsDecodedAsV2ErrorWithSameExceptions()
       throws IOException {
     // Given:
@@ -214,14 +203,14 @@ public class MetadataBlockTest extends BaseDataBlockContract {
     // the old format
     V0MetadataBlock legacyBlock = new V0MetadataBlock();
     legacyBlock.addException(250, "timeout");
-    byte[] bytes = legacyBlock.toBytes();
 
     // When:
-    ByteBuffer buff = ByteBuffer.wrap(bytes);
-    DataBlockUtils.readVersionType(buff); // consume the version information before decoding
-    MetadataBlock metadataBlock = new MetadataBlock(buff);
+    DataBlock deserialized = DataBlockUtils.deserialize(DataBlockUtils.serialize(legacyBlock));
 
     // Then:
+    assertTrue(deserialized instanceof MetadataBlock, "V0MetadataBlock should be always decoded as "
+        + "MetadataBlock");
+    MetadataBlock metadataBlock = (MetadataBlock) deserialized;
     assertEquals(metadataBlock.getType(), MetadataBlock.MetadataBlockType.ERROR);
     assertEquals(metadataBlock.getExceptions(), legacyBlock.getExceptions(), "Expected exceptions");
   }

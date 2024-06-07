@@ -37,6 +37,10 @@ import org.apache.pinot.segment.spi.memory.PinotInputStream;
 import org.apache.pinot.segment.spi.memory.PinotOutputStream;
 
 
+/**
+ * An efficient serde that implements {@link DataBlockSerde.Version#V1_V2} using trying to make as fewer copies as
+ * possible.
+ */
 public class ZeroCopyDataBlockSerde implements DataBlockSerde {
 
   private final PagedPinotOutputStream.PageAllocator _allocator;
@@ -264,7 +268,7 @@ public class ZeroCopyDataBlockSerde implements DataBlockSerde {
 
   @Override
   public Version getVersion() {
-    return Version.V2;
+    return Version.V1_V2;
   }
 
   static class Header {
