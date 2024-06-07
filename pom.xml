@@ -177,7 +177,7 @@
     <janino.version>3.1.12</janino.version>
     <testng.version>7.10.2</testng.version>
     <woodstox.version>6.6.2</woodstox.version>
-    <sslcontext.kickstart.version>8.3.5</sslcontext.kickstart.version>
+    <sslcontext.kickstart.version>8.3.6</sslcontext.kickstart.version>
 
     <confluent.version>7.6.1</confluent.version>
     <pulsar.version>3.3.0</pulsar.version>
