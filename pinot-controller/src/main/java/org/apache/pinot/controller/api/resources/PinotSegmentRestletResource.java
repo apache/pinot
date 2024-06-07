@@ -263,8 +263,8 @@ public class PinotSegmentRestletResource {
   public String getSegmentsStatusDetails(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "realtime|offline", required = false) @QueryParam("tableType") String tableTypeStr,
-      @DefaultValue("0") @QueryParam("jtPageSize") int offset,
-      @DefaultValue("10") @QueryParam("jtPageSize") int pageSize, @Context HttpHeaders headers)
+      @DefaultValue("0") @QueryParam("offset") int offset,
+      @DefaultValue("10") @QueryParam("pagesize") int pageSize, @Context HttpHeaders headers)
       throws JsonProcessingException {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     TableType tableType = _pinotHelixResourceManager.validateTableType(tableTypeStr);
