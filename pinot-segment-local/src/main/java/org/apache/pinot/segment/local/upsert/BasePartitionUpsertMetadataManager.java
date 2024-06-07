@@ -108,6 +108,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   protected final Set<IndexSegment> _updatedSegmentsSinceLastSnapshot = ConcurrentHashMap.newKeySet();
 
   // NOTE: We do not persist snapshot on the first consuming segment because most segments might not be loaded yet
+  // We only do this for Full-Upsert tables, for partial-upsert tables, we have a check allSegmentsLoaded
   protected volatile boolean _gotFirstConsumingSegment = false;
   protected final ReadWriteLock _snapshotLock;
 
@@ -835,8 +836,10 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     if (!_enableSnapshot) {
       return;
     }
-    if (!_gotFirstConsumingSegment) {
-      _logger.info("Skip taking snapshot before getting the first consuming segment");
+    if (_partialUpsertHandler == null && !_gotFirstConsumingSegment) {
+      // We only skip for full-Upsert tables, for partial-upsert tables, we have a check allSegmentsLoaded in
+      // RealtimeTableDataManager
+      _logger.info("Skip taking snapshot before getting the first consuming segment for full-upsert table");
       return;
     }
     if (!startOperation()) {
