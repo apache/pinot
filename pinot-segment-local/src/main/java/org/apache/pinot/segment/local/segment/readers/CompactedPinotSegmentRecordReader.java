@@ -38,11 +38,10 @@ public class CompactedPinotSegmentRecordReader implements RecordReader {
   private final PinotSegmentRecordReader _pinotSegmentRecordReader;
   private final RoaringBitmap _validDocIdsBitmap;
   private final String _deleteRecordColumn;
-
-  // Valid doc ids iterator
-  private PeekableIntIterator _validDocIdsIterator;
   // Reusable generic row to store the next row to return
   private final GenericRow _nextRow = new GenericRow();
+  // Valid doc ids iterator
+  private PeekableIntIterator _validDocIdsIterator;
   // Flag to mark whether we need to fetch another row
   private boolean _nextRowReturned = true;
 

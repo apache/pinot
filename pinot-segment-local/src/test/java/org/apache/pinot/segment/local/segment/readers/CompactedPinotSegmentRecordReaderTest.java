@@ -85,7 +85,6 @@ public class CompactedPinotSegmentRecordReaderTest {
   @Test
   public void testCompactedPinotSegmentRecordReader()
       throws Exception {
-
     RoaringBitmap validDocIds = new RoaringBitmap();
     for (int i = 0; i < NUM_ROWS; i += 2) {
       validDocIds.add(i);
@@ -133,7 +132,6 @@ public class CompactedPinotSegmentRecordReaderTest {
   @Test
   public void testCompactedPinotSegmentRecordReaderWithDeleteColumn()
       throws Exception {
-
     RoaringBitmap validDocIds = new RoaringBitmap();
     for (int i = 0; i < NUM_ROWS; i += 2) {
       validDocIds.add(i);

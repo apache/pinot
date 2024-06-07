@@ -259,7 +259,7 @@ public class ServerSegmentMetadataReader {
         List<ValidDocIdsMetadataInfo> validDocIdsMetadataInfoList =
             JsonUtils.stringToObject(validDocIdsMetadataList, new TypeReference<ArrayList<ValidDocIdsMetadataInfo>>() {
             });
-        for (ValidDocIdsMetadataInfo validDocIdsMetadataInfo: validDocIdsMetadataInfoList) {
+        for (ValidDocIdsMetadataInfo validDocIdsMetadataInfo : validDocIdsMetadataInfoList) {
           validDocIdsMetadataInfos.put(validDocIdsMetadataInfo.getSegmentName(), validDocIdsMetadataInfo);
         }
         returnedServersCount++;
@@ -280,8 +280,8 @@ public class ServerSegmentMetadataReader {
     }
 
     if (segmentNames != null && !segmentNames.isEmpty() && segmentNames.size() != validDocIdsMetadataInfos.size()) {
-      LOGGER.error("Unable to get validDocIdsMetadata for all segments. Expected: {}, Actual: {}",
-          segmentNames.size(), validDocIdsMetadataInfos.size());
+      LOGGER.error("Unable to get validDocIdsMetadata for all segments. Expected: {}, Actual: {}", segmentNames.size(),
+          validDocIdsMetadataInfos.size());
     }
 
     LOGGER.info("Retrieved validDocIds metadata for {} segments from {} servers.", validDocIdsMetadataInfos.size(),
