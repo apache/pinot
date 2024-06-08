@@ -126,10 +126,6 @@ public class QueryRouter {
       ServerRoutingInstance serverRoutingInstance = entry.getKey();
       ServerChannels serverChannels = serverRoutingInstance.isTlsEnabled() ? _serverChannelsTls : _serverChannels;
       try {
-        // Record stats related to query submission just before sending the request. Otherwise, if the response is
-        // received immediately, there's a possibility of updating query response stats before updating query
-        // submission stats.
-        _serverRoutingStatsManager.recordStatsAfterQuerySubmission(requestId, serverRoutingInstance.getInstanceId());
         serverChannels.sendRequest(rawTableName, asyncQueryResponse, serverRoutingInstance, entry.getValue(),
             timeoutMs);
         asyncQueryResponse.markRequestSubmitted(serverRoutingInstance);

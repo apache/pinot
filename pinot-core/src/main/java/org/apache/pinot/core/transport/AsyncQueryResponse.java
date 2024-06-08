@@ -56,13 +56,17 @@ public class AsyncQueryResponse implements QueryResponse {
     _requestId = requestId;
     int numServersQueried = serversQueried.size();
     _responseMap = new ConcurrentHashMap<>(HashUtil.getHashMapCapacity(numServersQueried));
+    _serverRoutingStatsManager = serverRoutingStatsManager;
     for (ServerRoutingInstance serverRoutingInstance : serversQueried) {
+      // Record stats related to query submission just before sending the request. Otherwise, if the response is
+      // received immediately, there's a possibility of updating query response stats before updating query
+      // submission stats.
+      _serverRoutingStatsManager.recordStatsForQuerySubmission(requestId, serverRoutingInstance.getInstanceId());
       _responseMap.put(serverRoutingInstance, new ServerResponse(startTimeMs));
     }
     _countDownLatch = new CountDownLatch(numServersQueried);
     _timeoutMs = timeoutMs;
     _maxEndTimeMs = startTimeMs + timeoutMs;
-    _serverRoutingStatsManager = serverRoutingStatsManager;
   }
 
   @Override
