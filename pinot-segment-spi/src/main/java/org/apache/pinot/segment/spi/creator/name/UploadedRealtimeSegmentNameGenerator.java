@@ -28,18 +28,16 @@ import org.apache.commons.lang3.StringUtils;
  * Implementation for generating segment names of the format UploadedRealtimeSegmentName:
  * {prefix}__{tableName}__{partitionId}__{creationTime}__{suffix}
  *
- * <p>This naming convention is adopted to represent uploaded segments to a realtime table see
- * UploadedRealtimeSegmentName. The semantic is similar
- * to LLCSegmentName. This naming convention should be preferred when the data is partitioned in offline generated
- * segments and should be assigned based same as realtime segments of the table generated from stream.
+ * <p> Naming convention to represent uploaded segments to a realtime table see UploadedRealtimeSegmentName. The
+ * semantic is similar to LLCSegmentName. This naming convention should be preferred when the data is partitioned in
+ * generated segments and should be assigned based on partitionId to ensure consistency with stream partitioning for
+ * upsert tables.
  */
 public class UploadedRealtimeSegmentNameGenerator implements SegmentNameGenerator {
 
   private static final String DELIMITER = "__";
   private final String _tableName;
   private final int _partitionId;
-  // creation time must be in long and milliseconds since epoch to be consistent with creation.meta time for valid
-  // comparison in segment replace flow.
   private final long _creationTimeMillis;
   private final String _prefix;
 
@@ -62,7 +60,7 @@ public class UploadedRealtimeSegmentNameGenerator implements SegmentNameGenerato
             && !prefix.contains(DELIMITER), "Invalid tableName or prefix for UploadedRealtimeSegmentNameGenerator");
     Preconditions.checkArgument(creationTimeMillis > 0, "Creation time must be greater than 0");
     if (suffix != null) {
-      Preconditions.checkArgument(suffix.length() > 0 && !suffix.contains(DELIMITER),
+      Preconditions.checkArgument(StringUtils.isNotBlank(suffix) && !suffix.contains(DELIMITER),
           "Invalid suffix for UploadedRealtimeSegmentNameGenerator");
     }
     _tableName = tableName;

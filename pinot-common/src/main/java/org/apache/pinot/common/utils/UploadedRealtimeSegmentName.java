@@ -34,10 +34,10 @@ import org.joda.time.format.DateTimeFormatter;
  * convention has been kept semantically similar to {@link LLCSegmentName} but differs in following ways:
  *
  * <li> prefix to quickly identify the type/source of segment e.g. "uploaded"/"minion"
- * <li> tableName to be same as the table name of segment
- * <li> partitionId to identify the right parition for upsert table segment table assignment.
+ * <li> name of the table to which the segment belongs
+ * <li> partitionId which should be consistent as the stream partitioning in case of upsert realtime tables.
  * <li> creationTime creation time of segment of the format yyyyMMdd'T'HHmm'Z'
- * <li> suffix to deduplicate segment names created at the same time
+ * <li> suffix to uniquely identify segments created at the same time.
  *
  * Use {@link org.apache.pinot.segment.spi.creator.name.UploadedRealtimeSegmentNameGenerator} to generate segment names.
  */
@@ -92,7 +92,7 @@ public class UploadedRealtimeSegmentName implements Comparable<UploadedRealtimeS
   }
 
   /**
-   * Returns true if the segment name is of the format: {prefix}__{tableName}__{partitionId}__{creationTime}__{suffix}
+   * Checks if the segment name is of the format: {prefix}__{tableName}__{partitionId}__{creationTime}__{suffix}
    * @param segmentName
    * @return boolean true if the segment name is of the format: {prefix}__{tableName}__{partitionId}__{creationTime}
    * __{suffix}
@@ -135,6 +135,10 @@ public class UploadedRealtimeSegmentName implements Comparable<UploadedRealtimeS
 
   public String getSegmentName() {
     return _segmentName;
+  }
+
+  public String getPrefix() {
+    return _prefix;
   }
 
   public String getSuffix() {

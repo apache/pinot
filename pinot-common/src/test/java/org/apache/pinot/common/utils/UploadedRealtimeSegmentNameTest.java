@@ -33,6 +33,7 @@ public class UploadedRealtimeSegmentNameTest {
 
     Assert.assertEquals(uploadedRealtimeSegmentName.getTableName(), "table_name");
     Assert.assertEquals(uploadedRealtimeSegmentName.getPartitionId(), 1);
+    Assert.assertEquals(uploadedRealtimeSegmentName.getPrefix(), "uploaded");
     Assert.assertEquals(uploadedRealtimeSegmentName.getSuffix(), "suffix");
     Assert.assertEquals(uploadedRealtimeSegmentName.getCreationTime(), "20240530T0000Z");
   }
