@@ -81,8 +81,8 @@ public class TransformOperatorTest {
         OperatorTestUtil.block(inputSchema, new Object[]{1, "a"}, new Object[]{2, "b"}));
     DataSchema resultSchema = new DataSchema(new String[]{"boolCol", "strCol"},
         new ColumnDataType[]{ColumnDataType.BOOLEAN, ColumnDataType.STRING});
-    List<RexExpression> projects = List.of(new RexExpression.Literal(ColumnDataType.BOOLEAN, 1),
-        new RexExpression.Literal(ColumnDataType.STRING, "str"));
+    List<RexExpression> projects =
+        List.of(RexExpression.Literal.TRUE, new RexExpression.Literal(ColumnDataType.STRING, "str"));
     TransformOperator operator = getOperator(inputSchema, resultSchema, projects);
     List<Object[]> resultRows = operator.nextBlock().getContainer();
     assertEquals(resultRows.size(), 2);
@@ -138,8 +138,8 @@ public class TransformOperatorTest {
         TransferableBlockUtils.getErrorTransferableBlock(new Exception("transformError")));
     DataSchema resultSchema = new DataSchema(new String[]{"inCol", "strCol"},
         new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.STRING});
-    List<RexExpression> projects = List.of(new RexExpression.Literal(ColumnDataType.BOOLEAN, 1),
-        new RexExpression.Literal(ColumnDataType.STRING, "str"));
+    List<RexExpression> projects =
+        List.of(RexExpression.Literal.TRUE, new RexExpression.Literal(ColumnDataType.STRING, "str"));
     TransformOperator operator = getOperator(inputSchema, resultSchema, projects);
     TransferableBlock block = operator.nextBlock();
     assertTrue(block.isErrorBlock());
@@ -158,8 +158,8 @@ public class TransformOperatorTest {
         }));
     DataSchema resultSchema = new DataSchema(new String[]{"boolCol", "strCol"},
         new ColumnDataType[]{ColumnDataType.BOOLEAN, ColumnDataType.STRING});
-    List<RexExpression> projects = List.of(new RexExpression.Literal(ColumnDataType.BOOLEAN, 1),
-        new RexExpression.Literal(ColumnDataType.STRING, "str"));
+    List<RexExpression> projects =
+        List.of(RexExpression.Literal.TRUE, new RexExpression.Literal(ColumnDataType.STRING, "str"));
     TransformOperator operator = getOperator(inputSchema, resultSchema, projects);
     // First block has 1 row.
     List<Object[]> resultRows1 = operator.nextBlock().getContainer();

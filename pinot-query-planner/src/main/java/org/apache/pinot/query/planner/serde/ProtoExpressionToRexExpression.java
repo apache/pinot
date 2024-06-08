@@ -20,9 +20,8 @@ package org.apache.pinot.query.planner.serde;
 
 import java.util.ArrayList;
 import java.util.List;
-import org.apache.commons.lang3.SerializationUtils;
 import org.apache.pinot.common.proto.Expressions;
-import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.spi.utils.ByteArray;
 
@@ -62,84 +61,70 @@ public class ProtoExpressionToRexExpression {
   }
 
   public static RexExpression.Literal convertLiteral(Expressions.Literal literal) {
-    DataSchema.ColumnDataType dataType = convertColumnDataType(literal.getDataType());
-    if (literal.getIsValueNull()) {
+    ColumnDataType dataType = convertColumnDataType(literal.getDataType());
+    if (literal.hasNull()) {
       return new RexExpression.Literal(dataType, null);
     }
-    Object obj;
-    switch (literal.getLiteralFieldCase()) {
-      case BOOLFIELD:
-        obj = literal.getBoolField();
-        break;
-      case INTFIELD:
-        obj = literal.getIntField();
-        break;
-      case LONGFIELD:
-        obj = literal.getLongField();
-        break;
-      case FLOATFIELD:
-        obj = literal.getFloatField();
-        break;
-      case DOUBLEFIELD:
-        obj = literal.getDoubleField();
-        break;
-      case STRINGFIELD:
-        obj = literal.getStringField();
-        break;
-      case BYTESFIELD:
-        obj = new ByteArray(literal.getBytesField().toByteArray());
-        break;
-      case SERIALIZEDFIELD:
-        obj = SerializationUtils.deserialize(literal.getSerializedField().toByteArray());
-        break;
+    switch (dataType.getStoredType()) {
+      case INT:
+        return new RexExpression.Literal(dataType, literal.getInt());
+      case LONG:
+        return new RexExpression.Literal(dataType, literal.getLong());
+      case FLOAT:
+        return new RexExpression.Literal(dataType, literal.getFloat());
+      case DOUBLE:
+        return new RexExpression.Literal(dataType, literal.getDouble());
+      case STRING:
+        return new RexExpression.Literal(dataType, literal.getString());
+      case BYTES:
+        return new RexExpression.Literal(dataType, new ByteArray(literal.getBytes().toByteArray()));
       default:
-        throw new IllegalStateException("Unsupported proto Literal type: " + literal.getLiteralFieldCase());
+        throw new IllegalStateException("Unsupported ColumnDataType: " + dataType);
     }
-    return new RexExpression.Literal(dataType, obj);
   }
 
-  public static DataSchema.ColumnDataType convertColumnDataType(Expressions.ColumnDataType dataType) {
+  public static ColumnDataType convertColumnDataType(Expressions.ColumnDataType dataType) {
     switch (dataType) {
       case INT:
-        return DataSchema.ColumnDataType.INT;
+        return ColumnDataType.INT;
       case LONG:
-        return DataSchema.ColumnDataType.LONG;
+        return ColumnDataType.LONG;
       case FLOAT:
-        return DataSchema.ColumnDataType.FLOAT;
+        return ColumnDataType.FLOAT;
       case DOUBLE:
-        return DataSchema.ColumnDataType.DOUBLE;
+        return ColumnDataType.DOUBLE;
       case BIG_DECIMAL:
-        return DataSchema.ColumnDataType.BIG_DECIMAL;
+        return ColumnDataType.BIG_DECIMAL;
       case BOOLEAN:
-        return DataSchema.ColumnDataType.BOOLEAN;
+        return ColumnDataType.BOOLEAN;
       case TIMESTAMP:
-        return DataSchema.ColumnDataType.TIMESTAMP;
+        return ColumnDataType.TIMESTAMP;
       case STRING:
-        return DataSchema.ColumnDataType.STRING;
+        return ColumnDataType.STRING;
       case JSON:
-        return DataSchema.ColumnDataType.JSON;
+        return ColumnDataType.JSON;
       case BYTES:
-        return DataSchema.ColumnDataType.BYTES;
+        return ColumnDataType.BYTES;
       case INT_ARRAY:
-        return DataSchema.ColumnDataType.INT_ARRAY;
+        return ColumnDataType.INT_ARRAY;
       case LONG_ARRAY:
-        return DataSchema.ColumnDataType.LONG_ARRAY;
+        return ColumnDataType.LONG_ARRAY;
       case FLOAT_ARRAY:
-        return DataSchema.ColumnDataType.FLOAT_ARRAY;
+        return ColumnDataType.FLOAT_ARRAY;
       case DOUBLE_ARRAY:
-        return DataSchema.ColumnDataType.DOUBLE_ARRAY;
+        return ColumnDataType.DOUBLE_ARRAY;
       case BOOLEAN_ARRAY:
-        return DataSchema.ColumnDataType.BOOLEAN_ARRAY;
+        return ColumnDataType.BOOLEAN_ARRAY;
       case TIMESTAMP_ARRAY:
-        return DataSchema.ColumnDataType.TIMESTAMP_ARRAY;
+        return ColumnDataType.TIMESTAMP_ARRAY;
       case STRING_ARRAY:
-        return DataSchema.ColumnDataType.STRING_ARRAY;
+        return ColumnDataType.STRING_ARRAY;
       case BYTES_ARRAY:
-        return DataSchema.ColumnDataType.BYTES_ARRAY;
+        return ColumnDataType.BYTES_ARRAY;
       case OBJECT:
-        return DataSchema.ColumnDataType.OBJECT;
+        return ColumnDataType.OBJECT;
       case UNKNOWN:
-        return DataSchema.ColumnDataType.UNKNOWN;
+        return ColumnDataType.UNKNOWN;
       default:
         throw new IllegalStateException("Unsupported proto ColumnDataType: " + dataType);
     }

@@ -19,13 +19,13 @@
 package org.apache.pinot.query.planner.serde;
 
 import com.google.protobuf.ByteString;
-import java.io.Serializable;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
-import org.apache.commons.lang3.SerializationUtils;
 import org.apache.pinot.common.proto.Expressions;
-import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 
 
@@ -66,36 +66,42 @@ public class RexExpressionToProtoExpression {
 
   public static Expressions.Literal convertLiteral(RexExpression.Literal literal) {
     Expressions.Literal.Builder literalBuilder = Expressions.Literal.newBuilder();
-    literalBuilder.setDataType(convertColumnDataType(literal.getDataType()));
-    Object literalValue = literal.getValue();
-    if (literalValue != null) {
-      if (literalValue instanceof Boolean) {
-        literalBuilder.setBoolField((Boolean) literalValue);
-      } else if (literalValue instanceof Integer) {
-        literalBuilder.setIntField((Integer) literalValue);
-      } else if (literalValue instanceof Long) {
-        literalBuilder.setLongField((Long) literalValue);
-      } else if (literalValue instanceof Float) {
-        literalBuilder.setFloatField((Float) literalValue);
-      } else if (literalValue instanceof Double) {
-        literalBuilder.setDoubleField((Double) literalValue);
-      } else if (literalValue instanceof String) {
-        literalBuilder.setStringField((String) literalValue);
-      } else if (literalValue instanceof ByteArray) {
-        literalBuilder.setBytesField(ByteString.copyFrom(((ByteArray) literalValue).getBytes()));
-      } else {
-        Serializable value = literal.getDataType().convert(literal.getValue());
-        byte[] data = SerializationUtils.serialize(value);
-        literalBuilder.setSerializedField(ByteString.copyFrom(data));
-      }
-      literalBuilder.setIsValueNull(false);
+    ColumnDataType dataType = literal.getDataType();
+    literalBuilder.setDataType(convertColumnDataType(dataType));
+    Object value = literal.getValue();
+    if (value == null) {
+      literalBuilder.setNull(true);
     } else {
-      literalBuilder.setIsValueNull(true);
+      switch (dataType.getStoredType()) {
+        case INT:
+          literalBuilder.setInt((Integer) value);
+          break;
+        case LONG:
+          literalBuilder.setLong((Long) value);
+          break;
+        case FLOAT:
+          literalBuilder.setFloat((Float) value);
+          break;
+        case DOUBLE:
+          literalBuilder.setDouble((Double) value);
+          break;
+        case BIG_DECIMAL:
+          literalBuilder.setBytes(ByteString.copyFrom(BigDecimalUtils.serialize((BigDecimal) value)));
+          break;
+        case STRING:
+          literalBuilder.setString((String) value);
+          break;
+        case BYTES:
+          literalBuilder.setBytes(ByteString.copyFrom(((ByteArray) value).getBytes()));
+          break;
+        default:
+          throw new IllegalStateException("Unsupported ColumnDataType: " + dataType);
+      }
     }
     return literalBuilder.build();
   }
 
-  public static Expressions.ColumnDataType convertColumnDataType(DataSchema.ColumnDataType dataType) {
+  public static Expressions.ColumnDataType convertColumnDataType(ColumnDataType dataType) {
     switch (dataType) {
       case INT:
         return Expressions.ColumnDataType.INT;

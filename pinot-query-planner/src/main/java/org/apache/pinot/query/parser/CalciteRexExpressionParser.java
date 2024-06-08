@@ -24,11 +24,11 @@ import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelFieldCollation.Direction;
 import org.apache.calcite.rel.RelFieldCollation.NullDirection;
 import org.apache.pinot.common.request.Expression;
+import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.SortNode;
-import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.sql.parsers.ParserUtils;
 
 
@@ -123,27 +123,23 @@ public class CalciteRexExpressionParser {
     if (rexNode instanceof RexExpression.InputRef) {
       return inputRefToIdentifier((RexExpression.InputRef) rexNode, pinotQuery);
     } else if (rexNode instanceof RexExpression.Literal) {
-      return compileLiteralExpression(((RexExpression.Literal) rexNode).getValue());
+      return RequestUtils.getLiteralExpression(toLiteral((RexExpression.Literal) rexNode));
     } else {
       assert rexNode instanceof RexExpression.FunctionCall;
       return compileFunctionExpression((RexExpression.FunctionCall) rexNode, pinotQuery);
     }
   }
 
-  /**
-   * Copy and modify from {@link RequestUtils#getLiteralExpression(Object)}.
-   * TODO: Revisit whether we should use internal value type (e.g. 0/1 for BOOLEAN, ByteArray for BYTES) here.
-   */
-  private static Expression compileLiteralExpression(Object object) {
-    if (object instanceof ByteArray) {
-      return RequestUtils.getLiteralExpression(((ByteArray) object).getBytes());
-    }
-    return RequestUtils.getLiteralExpression(object);
-  }
-
   private static Expression inputRefToIdentifier(RexExpression.InputRef inputRef, PinotQuery pinotQuery) {
     List<Expression> selectList = pinotQuery.getSelectList();
     return selectList.get(inputRef.getIndex());
+  }
+
+  public static Literal toLiteral(RexExpression.Literal literal) {
+    Object value = literal.getValue();
+    // NOTE: Value is stored in internal format in RexExpression.Literal.
+    return value != null ? RequestUtils.getLiteral(literal.getDataType().toExternal(value))
+        : RequestUtils.getNullLiteral();
   }
 
   private static Expression compileFunctionExpression(RexExpression.FunctionCall rexCall, PinotQuery pinotQuery) {

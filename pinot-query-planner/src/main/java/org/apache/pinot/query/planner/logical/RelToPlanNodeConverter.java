@@ -288,8 +288,12 @@ public final class RelToPlanNodeConverter {
 
   public static ColumnDataType convertToColumnDataType(RelDataType relDataType) {
     SqlTypeName sqlTypeName = relDataType.getSqlTypeName();
+    if (sqlTypeName == SqlTypeName.NULL) {
+      return ColumnDataType.UNKNOWN;
+    }
     boolean isArray = (sqlTypeName == SqlTypeName.ARRAY);
     if (isArray) {
+      assert relDataType.getComponentType() != null;
       sqlTypeName = relDataType.getComponentType().getSqlTypeName();
     }
     switch (sqlTypeName) {
