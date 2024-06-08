@@ -603,7 +603,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       // Rewrite the expression
       function.setFunctionName(TransformFunctionType.IN_ID_SET.name());
       arguments.set(1,
-          ExpressionContext.forLiteralContext(FieldSpec.DataType.STRING, ((IdSet) result).toBase64String()));
+          ExpressionContext.forLiteral(FieldSpec.DataType.STRING, ((IdSet) result).toBase64String()));
     } else {
       for (ExpressionContext argument : arguments) {
         handleSubquery(argument, tableDataManager, indexSegments, timerContext, executorService, endTimeMs);

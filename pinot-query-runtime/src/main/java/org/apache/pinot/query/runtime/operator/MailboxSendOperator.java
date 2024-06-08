@@ -195,9 +195,9 @@ public class MailboxSendOperator extends MultiStageOperator {
       LOGGER.info("Query stats not found in the EOS block.");
     } else {
       for (MultiStageQueryStats.StageStats.Closed closed : queryStats.getClosedStats()) {
-        closed.forEach((type, stats) -> {
-          type.updateServerMetrics(stats, serverMetrics);
-        });
+        if (closed != null) {
+          closed.forEach((type, stats) -> type.updateServerMetrics(stats, serverMetrics));
+        }
       }
       queryStats.getCurrentStats().forEach((type, stats) -> {
         type.updateServerMetrics(stats, serverMetrics);

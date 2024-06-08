@@ -59,11 +59,10 @@ public class FilterOperatorTest {
   @Test
   public void shouldPropagateUpstreamErrorBlock() {
     when(_input.nextBlock()).thenReturn(TransferableBlockUtils.getErrorTransferableBlock(new Exception("filterError")));
-    RexExpression booleanLiteral = new RexExpression.Literal(ColumnDataType.BOOLEAN, 1);
     DataSchema inputSchema = new DataSchema(new String[]{"boolCol"}, new ColumnDataType[]{
         ColumnDataType.BOOLEAN
     });
-    FilterOperator operator = getOperator(inputSchema, booleanLiteral);
+    FilterOperator operator = getOperator(inputSchema, RexExpression.Literal.TRUE);
     TransferableBlock block = operator.getNextBlock();
     assertTrue(block.isErrorBlock());
     assertTrue(block.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains("filterError"));
@@ -71,25 +70,23 @@ public class FilterOperatorTest {
 
   @Test
   public void shouldPropagateUpstreamEOS() {
-    RexExpression booleanLiteral = new RexExpression.Literal(ColumnDataType.BOOLEAN, 1);
     DataSchema inputSchema = new DataSchema(new String[]{"intCol"}, new ColumnDataType[]{
         ColumnDataType.INT
     });
     when(_input.nextBlock()).thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
-    FilterOperator operator = getOperator(inputSchema, booleanLiteral);
+    FilterOperator operator = getOperator(inputSchema, RexExpression.Literal.TRUE);
     TransferableBlock block = operator.getNextBlock();
     assertTrue(block.isEndOfStreamBlock());
   }
 
   @Test
   public void shouldHandleTrueBooleanLiteralFilter() {
-    RexExpression booleanLiteral = new RexExpression.Literal(ColumnDataType.BOOLEAN, 1);
     DataSchema inputSchema = new DataSchema(new String[]{"intCol"}, new ColumnDataType[]{
         ColumnDataType.INT
     });
     when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{0}, new Object[]{1}))
         .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
-    FilterOperator operator = getOperator(inputSchema, booleanLiteral);
+    FilterOperator operator = getOperator(inputSchema, RexExpression.Literal.TRUE);
     List<Object[]> resultRows = operator.getNextBlock().getContainer();
     assertEquals(resultRows.size(), 2);
     assertEquals(resultRows.get(0), new Object[]{0});
@@ -98,12 +95,11 @@ public class FilterOperatorTest {
 
   @Test
   public void shouldHandleFalseBooleanLiteralFilter() {
-    RexExpression booleanLiteral = new RexExpression.Literal(ColumnDataType.BOOLEAN, 0);
     DataSchema inputSchema = new DataSchema(new String[]{"intCol"}, new ColumnDataType[]{
         ColumnDataType.INT
     });
     when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{1}, new Object[]{2}));
-    FilterOperator operator = getOperator(inputSchema, booleanLiteral);
+    FilterOperator operator = getOperator(inputSchema, RexExpression.Literal.FALSE);
     List<Object[]> resultRows = operator.getNextBlock().getContainer();
     assertTrue(resultRows.isEmpty());
   }

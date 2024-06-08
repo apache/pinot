@@ -20,8 +20,9 @@ package org.apache.pinot.common.request.context;
 
 import java.util.Objects;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.Literal;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 /**
@@ -42,12 +43,16 @@ public class ExpressionContext {
   // Only set when the _type is LITERAL
   private final LiteralContext _literal;
 
-  public static ExpressionContext forLiteralContext(Literal literal) {
-    return new ExpressionContext(Type.LITERAL, null, null, new LiteralContext(literal));
+  public static ExpressionContext forLiteral(LiteralContext literal) {
+    return new ExpressionContext(Type.LITERAL, null, null, literal);
   }
 
-  public static ExpressionContext forLiteralContext(FieldSpec.DataType type, Object val) {
-    return new ExpressionContext(Type.LITERAL, null, null, new LiteralContext(type, val));
+  public static ExpressionContext forLiteral(Literal literal) {
+    return forLiteral(new LiteralContext(literal));
+  }
+
+  public static ExpressionContext forLiteral(DataType type, @Nullable Object value) {
+    return forLiteral(new LiteralContext(type, value));
   }
 
   public static ExpressionContext forIdentifier(String identifier) {
@@ -70,7 +75,7 @@ public class ExpressionContext {
   }
 
   // Please check the _type of this context is Literal before calling get, otherwise it may return null.
-  public LiteralContext getLiteral(){
+  public LiteralContext getLiteral() {
     return _literal;
   }
 
@@ -104,7 +109,8 @@ public class ExpressionContext {
       return false;
     }
     ExpressionContext that = (ExpressionContext) o;
-    return _type == that._type && Objects.equals(_identifier, that._identifier) && Objects.equals(_function, that._function) && Objects.equals(_literal, that._literal);
+    return _type == that._type && Objects.equals(_identifier, that._identifier) && Objects.equals(_function,
+        that._function) && Objects.equals(_literal, that._literal);
   }
 
   @Override

@@ -60,6 +60,9 @@ public interface RexExpression {
   }
 
   class Literal implements RexExpression {
+    public static final Literal TRUE = new Literal(ColumnDataType.BOOLEAN, 1);
+    public static final Literal FALSE = new Literal(ColumnDataType.BOOLEAN, 0);
+
     private final ColumnDataType _dataType;
     private final Object _value;
 

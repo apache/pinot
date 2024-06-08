@@ -39,12 +39,11 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionFactory;
 import org.apache.pinot.core.query.aggregation.function.CountAggregationFunction;
 import org.apache.pinot.core.util.DataBlockExtractUtils;
+import org.apache.pinot.query.parser.CalciteRexExpressionParser;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
-import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.spi.utils.BooleanUtils;
 import org.roaringbitmap.RoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -218,14 +217,8 @@ public class AggregateOperator extends MultiStageOperator {
         arguments.add(ExpressionContext.forIdentifier(fromColIdToIdentifier(inputRef.getIndex())));
       } else {
         assert operand instanceof RexExpression.Literal;
-        RexExpression.Literal literal = (RexExpression.Literal) operand;
-        DataType dataType = literal.getDataType().toDataType();
-        Object value = literal.getValue();
-        // TODO: Fix BOOLEAN literal to directly store true/false
-        if (dataType == DataType.BOOLEAN) {
-          value = BooleanUtils.fromNonNullInternalValue(value);
-        }
-        arguments.add(ExpressionContext.forLiteralContext(dataType, value));
+        arguments.add(
+            ExpressionContext.forLiteral(CalciteRexExpressionParser.toLiteral((RexExpression.Literal) operand)));
       }
     }
     return AggregationFunctionFactory.getAggregationFunction(
