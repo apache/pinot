@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.request.context;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.Objects;
 import java.util.Set;
 import javax.annotation.Nullable;
@@ -51,6 +52,7 @@ public class ExpressionContext {
     return forLiteral(new LiteralContext(literal));
   }
 
+  @VisibleForTesting
   public static ExpressionContext forLiteral(DataType type, @Nullable Object value) {
     return forLiteral(new LiteralContext(type, value));
   }

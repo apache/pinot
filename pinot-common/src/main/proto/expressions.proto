@@ -58,7 +58,32 @@ message Literal {
     double double = 6;
     string string = 7;
     bytes bytes = 8;
+    IntArray intArray = 9;
+    LongArray longArray = 10;
+    FloatArray floatArray = 11;
+    DoubleArray doubleArray = 12;
+    StringArray stringArray = 13;
   }
+}
+
+message IntArray {
+  repeated int32 values = 1;
+}
+
+message LongArray {
+  repeated int64 values = 1;
+}
+
+message FloatArray {
+  repeated float values = 1;
+}
+
+message DoubleArray {
+  repeated double values = 1;
+}
+
+message StringArray {
+  repeated string values = 1;
 }
 
 message FunctionCall {

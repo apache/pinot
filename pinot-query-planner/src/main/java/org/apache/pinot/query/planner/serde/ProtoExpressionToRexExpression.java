@@ -23,6 +23,7 @@ import java.util.List;
 import org.apache.pinot.common.proto.Expressions;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 
 
@@ -74,10 +75,67 @@ public class ProtoExpressionToRexExpression {
         return new RexExpression.Literal(dataType, literal.getFloat());
       case DOUBLE:
         return new RexExpression.Literal(dataType, literal.getDouble());
+      case BIG_DECIMAL:
+        return new RexExpression.Literal(dataType, BigDecimalUtils.deserialize(literal.getBytes().toByteArray()));
       case STRING:
         return new RexExpression.Literal(dataType, literal.getString());
       case BYTES:
         return new RexExpression.Literal(dataType, new ByteArray(literal.getBytes().toByteArray()));
+      case INT_ARRAY: {
+        Expressions.IntArray intArray = literal.getIntArray();
+        int numValues = intArray.getValuesCount();
+        int[] values = new int[numValues];
+        {
+          for (int i = 0; i < numValues; i++) {
+            values[i] = intArray.getValues(i);
+          }
+        }
+        return new RexExpression.Literal(dataType, values);
+      }
+      case LONG_ARRAY: {
+        Expressions.LongArray longArray = literal.getLongArray();
+        int numValues = longArray.getValuesCount();
+        long[] values = new long[numValues];
+        {
+          for (int i = 0; i < numValues; i++) {
+            values[i] = longArray.getValues(i);
+          }
+        }
+        return new RexExpression.Literal(dataType, values);
+      }
+      case FLOAT_ARRAY: {
+        Expressions.FloatArray floatArray = literal.getFloatArray();
+        int numValues = floatArray.getValuesCount();
+        float[] values = new float[numValues];
+        {
+          for (int i = 0; i < numValues; i++) {
+            values[i] = floatArray.getValues(i);
+          }
+        }
+        return new RexExpression.Literal(dataType, values);
+      }
+      case DOUBLE_ARRAY: {
+        Expressions.DoubleArray doubleArray = literal.getDoubleArray();
+        int numValues = doubleArray.getValuesCount();
+        double[] values = new double[numValues];
+        {
+          for (int i = 0; i < numValues; i++) {
+            values[i] = doubleArray.getValues(i);
+          }
+        }
+        return new RexExpression.Literal(dataType, values);
+      }
+      case STRING_ARRAY: {
+        Expressions.StringArray stringArray = literal.getStringArray();
+        int numValues = stringArray.getValuesCount();
+        String[] values = new String[numValues];
+        {
+          for (int i = 0; i < numValues; i++) {
+            values[i] = stringArray.getValues(i);
+          }
+        }
+        return new RexExpression.Literal(dataType, values);
+      }
       default:
         throw new IllegalStateException("Unsupported ColumnDataType: " + dataType);
     }

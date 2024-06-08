@@ -19,8 +19,13 @@
 package org.apache.pinot.query.planner.serde;
 
 import com.google.protobuf.ByteString;
+import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
+import it.unimi.dsi.fastutil.floats.FloatArrayList;
+import it.unimi.dsi.fastutil.ints.IntArrayList;
+import it.unimi.dsi.fastutil.longs.LongArrayList;
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import org.apache.pinot.common.proto.Expressions;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -93,6 +98,26 @@ public class RexExpressionToProtoExpression {
           break;
         case BYTES:
           literalBuilder.setBytes(ByteString.copyFrom(((ByteArray) value).getBytes()));
+          break;
+        case INT_ARRAY:
+          literalBuilder.setIntArray(
+              Expressions.IntArray.newBuilder().addAllValues(IntArrayList.wrap((int[]) value)).build());
+          break;
+        case LONG_ARRAY:
+          literalBuilder.setLongArray(
+              Expressions.LongArray.newBuilder().addAllValues(LongArrayList.wrap((long[]) value)).build());
+          break;
+        case FLOAT_ARRAY:
+          literalBuilder.setFloatArray(
+              Expressions.FloatArray.newBuilder().addAllValues(FloatArrayList.wrap((float[]) value)).build());
+          break;
+        case DOUBLE_ARRAY:
+          literalBuilder.setDoubleArray(
+              Expressions.DoubleArray.newBuilder().addAllValues(DoubleArrayList.wrap((double[]) value)).build());
+          break;
+        case STRING_ARRAY:
+          literalBuilder.setStringArray(
+              Expressions.StringArray.newBuilder().addAllValues(Arrays.asList((String[]) value)).build());
           break;
         default:
           throw new IllegalStateException("Unsupported ColumnDataType: " + dataType);

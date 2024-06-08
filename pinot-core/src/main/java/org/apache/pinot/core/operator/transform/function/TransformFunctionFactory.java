@@ -338,12 +338,13 @@ public class TransformFunctionFactory {
         return new IdentifierTransformFunction(columnName, columnContextMap.get(columnName));
       case LITERAL:
         LiteralContext literal = expression.getLiteral();
-        if (literal.getValue() != null && literal.getValue() instanceof ArrayList) {
+        if (literal.isSingleValue()) {
+          return queryContext.getOrComputeSharedValue(LiteralTransformFunction.class, literal,
+              LiteralTransformFunction::new);
+        } else {
           return queryContext.getOrComputeSharedValue(ArrayLiteralTransformFunction.class, literal,
               ArrayLiteralTransformFunction::new);
         }
-        return queryContext.getOrComputeSharedValue(LiteralTransformFunction.class, literal,
-            LiteralTransformFunction::new);
       default:
         throw new IllegalStateException();
     }

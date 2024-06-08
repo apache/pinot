@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.planner.logical;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import org.apache.calcite.rex.RexNode;
@@ -92,12 +93,12 @@ public interface RexExpression {
         return false;
       }
       Literal literal = (Literal) o;
-      return _dataType == literal._dataType && Objects.equals(_value, literal._value);
+      return _dataType == literal._dataType && Objects.deepEquals(_value, literal._value);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hash(_dataType, _value);
+      return Arrays.deepHashCode(new Object[]{_dataType, _value});
     }
   }
 

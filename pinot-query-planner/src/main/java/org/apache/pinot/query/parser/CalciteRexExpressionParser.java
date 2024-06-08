@@ -26,9 +26,12 @@ import org.apache.calcite.rel.RelFieldCollation.NullDirection;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.SortNode;
+import org.apache.pinot.spi.utils.BooleanUtils;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.sql.parsers.ParserUtils;
 
 
@@ -137,9 +140,19 @@ public class CalciteRexExpressionParser {
 
   public static Literal toLiteral(RexExpression.Literal literal) {
     Object value = literal.getValue();
+    if (value == null) {
+      return RequestUtils.getNullLiteral();
+    }
     // NOTE: Value is stored in internal format in RexExpression.Literal.
-    return value != null ? RequestUtils.getLiteral(literal.getDataType().toExternal(value))
-        : RequestUtils.getNullLiteral();
+    //       Do not convert TIMESTAMP/BOOLEAN_ARRAY/TIMESTAMP_ARRAY to external format because they are not explicitly
+    //       supported in single-stage engine Literal.
+    ColumnDataType dataType = literal.getDataType();
+    if (dataType == ColumnDataType.BOOLEAN) {
+      value = BooleanUtils.isTrueInternalValue(value);
+    } else if (dataType == ColumnDataType.BYTES) {
+      value = ((ByteArray) value).getBytes();
+    }
+    return RequestUtils.getLiteral(value);
   }
 
   private static Expression compileFunctionExpression(RexExpression.FunctionCall rexCall, PinotQuery pinotQuery) {
