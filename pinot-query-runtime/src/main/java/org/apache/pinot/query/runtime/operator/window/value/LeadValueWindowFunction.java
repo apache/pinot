@@ -18,32 +18,66 @@
  */
 package org.apache.pinot.query.runtime.operator.window.value;
 
+import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
 
 
 public class LeadValueWindowFunction extends ValueWindowFunction {
 
+  private final int _offset;
+  private final Object _defaultValue;
+
   public LeadValueWindowFunction(RexExpression.FunctionCall aggCall, DataSchema inputSchema,
       List<RelFieldCollation> collations, boolean partitionByOnly) {
     super(aggCall, inputSchema, collations, partitionByOnly);
+    int offset = 1;
+    Object defaultValue = null;
+    List<RexExpression> operands = aggCall.getFunctionOperands();
+    int numOperands = operands.size();
+    if (numOperands > 1) {
+      RexExpression secondOperand = operands.get(1);
+      Preconditions.checkArgument(secondOperand instanceof RexExpression.Literal,
+          "Second operand (offset) of LAG function must be a literal");
+      Object offsetValue = ((RexExpression.Literal) secondOperand).getValue();
+      if (offsetValue instanceof Number) {
+        offset = ((Number) offsetValue).intValue();
+      }
+    }
+    if (numOperands == 3) {
+      RexExpression thirdOperand = operands.get(2);
+      Preconditions.checkArgument(thirdOperand instanceof RexExpression.Literal,
+          "Third operand (default value) of LAG function must be a literal");
+      RexExpression.Literal defaultValueLiteral = (RexExpression.Literal) thirdOperand;
+      defaultValue = defaultValueLiteral.getValue();
+      if (defaultValue != null) {
+        DataSchema.ColumnDataType srcDataType = defaultValueLiteral.getDataType();
+        DataSchema.ColumnDataType destDataType = inputSchema.getColumnDataType(0);
+        if (srcDataType != destDataType) {
+          // Convert the default value to the same data type as the input column
+          // (e.g. convert INT to LONG, FLOAT to DOUBLE, etc.
+          defaultValue = PinotDataType.getPinotDataTypeForExecution(destDataType)
+              .convert(defaultValue, PinotDataType.getPinotDataTypeForExecution(srcDataType));
+        }
+      }
+    }
+    _offset = offset;
+    _defaultValue = defaultValue;
   }
 
   @Override
   public List<Object> processRows(List<Object[]> rows) {
     int numRows = rows.size();
     Object[] result = new Object[numRows];
-    Object[] nextRow = null;
-    for (int i = numRows - 1; i >= 0; i--) {
-      if (nextRow == null) {
-        result[i] = null;
-      } else {
-        result[i] = extractValueFromRow(nextRow);
-      }
-      nextRow = rows.get(i);
+    for (int i = 0; i < numRows - _offset; i++) {
+      result[i] = extractValueFromRow(rows.get(i + _offset));
+    }
+    if (_defaultValue != null) {
+      Arrays.fill(result, numRows - _offset, numRows, _defaultValue);
     }
     return Arrays.asList(result);
   }
