@@ -999,13 +999,16 @@ public class PinotHelixResourceManager {
       LOGGER.info("Trying to delete segments: {} from table: {} ", segmentNames, tableNameWithType);
       Preconditions.checkArgument(TableNameBuilder.isTableResource(tableNameWithType),
           "Table name: %s is not a valid table name with type suffix", tableNameWithType);
-      HelixHelper.removeSegmentsFromIdealState(_helixZkManager, tableNameWithType, segmentNames);
-      if (retentionPeriod != null) {
-        _segmentDeletionManager.deleteSegments(tableNameWithType, segmentNames,
-            TimeUtils.convertPeriodToMillis(retentionPeriod));
-      } else {
-        TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
-        _segmentDeletionManager.deleteSegments(tableNameWithType, segmentNames, tableConfig);
+
+      synchronized (getTableUpdaterLock(tableNameWithType)) {
+        HelixHelper.removeSegmentsFromIdealState(_helixZkManager, tableNameWithType, segmentNames);
+        if (retentionPeriod != null) {
+          _segmentDeletionManager.deleteSegments(tableNameWithType, segmentNames,
+              TimeUtils.convertPeriodToMillis(retentionPeriod));
+        } else {
+          TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
+          _segmentDeletionManager.deleteSegments(tableNameWithType, segmentNames, tableConfig);
+        }
       }
       return PinotResourceManagerResponse.success("Segment " + segmentNames + " deleted");
     } catch (final Exception e) {
