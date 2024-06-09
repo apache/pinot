@@ -31,6 +31,7 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.utils.DoubleVectorOpUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.spi.utils.ArrayCopyUtils;
 
 
 /**
@@ -60,15 +61,15 @@ public class HistogramAggregationFunction extends BaseSingleInputAggregationFunc
       ExpressionContext arrayExpression = arguments.get(1);
       Preconditions.checkArgument(
           // ARRAY function
-          ((arrayExpression.getType() == ExpressionContext.Type.FUNCTION)
-              && (arrayExpression.getFunction().getFunctionName().equals(ARRAY_CONSTRUCTOR)))
-              || ((arrayExpression.getType() == ExpressionContext.Type.LITERAL)
-              && (arrayExpression.getLiteral().getValue() instanceof List)),
+          (arrayExpression.getType() == ExpressionContext.Type.FUNCTION && arrayExpression.getFunction()
+              .getFunctionName().equals(ARRAY_CONSTRUCTOR)) || (
+              arrayExpression.getType() == ExpressionContext.Type.LITERAL && !arrayExpression.getLiteral()
+                  .isSingleValue()),
           "Please use the format of `Histogram(columnName, ARRAY[1,10,100])` to specify the bin edges");
       if (arrayExpression.getType() == ExpressionContext.Type.FUNCTION) {
         _bucketEdges = parseVector(arrayExpression.getFunction().getArguments());
       } else {
-        _bucketEdges = parseVectorLiteral((List) arrayExpression.getLiteral().getValue());
+        _bucketEdges = parseVectorLiteral(arrayExpression.getLiteral().getValue());
       }
       _lower = _bucketEdges[0];
       _upper = _bucketEdges[_bucketEdges.length - 1];
@@ -111,22 +112,35 @@ public class HistogramAggregationFunction extends BaseSingleInputAggregationFunc
         ret[i] = arrayStr.get(i).getLiteral().getDoubleValue();
       }
       if (i > 0) {
-        Preconditions.checkState(ret[i] > ret[i - 1], "The bin edges must be strictly increasing");
+        Preconditions.checkArgument(ret[i] > ret[i - 1], "The bin edges must be strictly increasing");
       }
     }
     return ret;
   }
 
-  private double[] parseVectorLiteral(List arrayStr) {
-    int len = arrayStr.size();
-    Preconditions.checkArgument(len > 1, "The number of bin edges must be greater than 1");
-    double[] ret = new double[len];
-    for (int i = 0; i < len; i++) {
-      // TODO: Represent infinity as literal instead of identifier
-      ret[i] = Double.parseDouble(arrayStr.get(i).toString());
-      if (i > 0) {
-        Preconditions.checkState(ret[i] > ret[i - 1], "The bin edges must be strictly increasing");
-      }
+  private double[] parseVectorLiteral(Object array) {
+    Preconditions.checkArgument(array != null, "The bin edges must not be null");
+    double[] ret;
+    if (array instanceof int[]) {
+      int[] intArray = (int[]) array;
+      ret = new double[intArray.length];
+      ArrayCopyUtils.copy(intArray, ret, intArray.length);
+    } else if (array instanceof long[]) {
+      long[] longArray = (long[]) array;
+      ret = new double[longArray.length];
+      ArrayCopyUtils.copy(longArray, ret, longArray.length);
+    } else if (array instanceof float[]) {
+      float[] floatArray = (float[]) array;
+      ret = new double[floatArray.length];
+      ArrayCopyUtils.copy(floatArray, ret, floatArray.length);
+    } else if (array instanceof double[]) {
+      ret = (double[]) array;
+    } else {
+      throw new IllegalArgumentException("Unsupported array type: " + array.getClass());
+    }
+    Preconditions.checkArgument(ret.length > 1, "The number of bin edges must be greater than 1");
+    for (int i = 1; i < ret.length; i++) {
+      Preconditions.checkArgument(ret[i] > ret[i - 1], "The bin edges must be strictly increasing");
     }
     return ret;
   }

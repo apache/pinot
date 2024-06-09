@@ -170,48 +170,48 @@ public class RequestUtils {
       return getNullLiteral();
     }
     if (object instanceof Boolean) {
-      return RequestUtils.getLiteral((boolean) object);
+      return getLiteral((boolean) object);
     }
     if (object instanceof Integer) {
-      return RequestUtils.getLiteral((int) object);
+      return getLiteral((int) object);
     }
     if (object instanceof Long) {
-      return RequestUtils.getLiteral((long) object);
+      return getLiteral((long) object);
     }
     if (object instanceof Float) {
-      return RequestUtils.getLiteral((float) object);
+      return getLiteral((float) object);
     }
     if (object instanceof Double) {
-      return RequestUtils.getLiteral((double) object);
+      return getLiteral((double) object);
     }
     if (object instanceof BigDecimal) {
-      return RequestUtils.getLiteral((BigDecimal) object);
+      return getLiteral((BigDecimal) object);
     }
     if (object instanceof Timestamp) {
-      return RequestUtils.getLiteral(((Timestamp) object).getTime());
+      return getLiteral(((Timestamp) object).getTime());
     }
     if (object instanceof String) {
-      return RequestUtils.getLiteral((String) object);
+      return getLiteral((String) object);
     }
     if (object instanceof byte[]) {
-      return RequestUtils.getLiteral((byte[]) object);
+      return getLiteral((byte[]) object);
     }
     if (object instanceof int[]) {
-      return RequestUtils.getLiteral((int[]) object);
+      return getLiteral((int[]) object);
     }
     if (object instanceof long[]) {
-      return RequestUtils.getLiteral((long[]) object);
+      return getLiteral((long[]) object);
     }
     if (object instanceof float[]) {
-      return RequestUtils.getLiteral((float[]) object);
+      return getLiteral((float[]) object);
     }
     if (object instanceof double[]) {
-      return RequestUtils.getLiteral((double[]) object);
+      return getLiteral((double[]) object);
     }
     if (object instanceof String[]) {
-      return RequestUtils.getLiteral((String[]) object);
+      return getLiteral((String[]) object);
     }
-    return RequestUtils.getLiteral(object.toString());
+    return getLiteral(object.toString());
   }
 
   public static Literal getLiteral(SqlLiteral node) {
