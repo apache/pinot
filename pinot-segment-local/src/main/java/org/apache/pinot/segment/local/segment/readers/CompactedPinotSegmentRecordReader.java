@@ -74,7 +74,10 @@ public class CompactedPinotSegmentRecordReader implements RecordReader {
       return true;
     }
 
-    // Try to get the next row to return, skip invalid doc and deleted doc.
+    // Try to get the next row to return, skip invalid docs. If _deleteRecordColumn is set, the deleteRecord (i.e.
+    // the tombstone record used to soft-delete old record) is also skipped.
+    // Note that dropping deleteRecord too soon may cause the old soft-deleted record to show up unexpectedly, so one
+    // should be careful when to skip the deleteRecord.
     while (_validDocIdsIterator.hasNext()) {
       int docId = _validDocIdsIterator.next();
       _nextRow.clear();
