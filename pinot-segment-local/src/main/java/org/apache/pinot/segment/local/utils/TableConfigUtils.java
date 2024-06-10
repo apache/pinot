@@ -45,6 +45,7 @@ import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.segment.local.function.FunctionEvaluator;
 import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
+import org.apache.pinot.segment.local.recordtransformer.RecordTransformer;
 import org.apache.pinot.segment.local.recordtransformer.SchemaConformingTransformer;
 import org.apache.pinot.segment.local.recordtransformer.SchemaConformingTransformerV2;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.BitSlicedRangeIndexCreator;
@@ -85,8 +86,6 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.ingestion.batch.BatchConfig;
-import org.apache.pinot.spi.recordenricher.RecordEnricherRegistry;
-import org.apache.pinot.spi.recordenricher.RecordEnricherValidationConfig;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -106,9 +105,11 @@ import static org.apache.pinot.segment.spi.AggregationFunctionType.*;
  * FIXME: Merge this TableConfigUtils with the TableConfigUtils from pinot-common when merging of modules is done
  */
 public final class TableConfigUtils {
-  private TableConfigUtils() {
-  }
-
+  public final static EnumSet<AggregationFunctionType> AVAILABLE_CORE_VALUE_AGGREGATORS =
+      EnumSet.of(MIN, MAX, SUM, DISTINCTCOUNTHLL, DISTINCTCOUNTRAWHLL, DISTINCTCOUNTTHETASKETCH,
+          DISTINCTCOUNTRAWTHETASKETCH, DISTINCTCOUNTTUPLESKETCH, DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH,
+          SUMVALUESINTEGERSUMTUPLESKETCH, AVGVALUEINTEGERSUMTUPLESKETCH, DISTINCTCOUNTHLLPLUS, DISTINCTCOUNTRAWHLLPLUS,
+          DISTINCTCOUNTCPCSKETCH, DISTINCTCOUNTRAWCPCSKETCH, DISTINCTCOUNTULL, DISTINCTCOUNTRAWULL);
   private static final Logger LOGGER = LoggerFactory.getLogger(TableConfigUtils.class);
   private static final String SCHEDULE_KEY = "schedule";
   private static final String STAR_TREE_CONFIG_NAME = "StarTreeIndex Config";
@@ -126,6 +127,9 @@ public final class TableConfigUtils {
   private static final Set<String> UPSERT_DEDUP_ALLOWED_ROUTING_STRATEGIES =
       ImmutableSet.of(RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE,
           RoutingConfig.MULTI_STAGE_REPLICA_GROUP_SELECTOR_TYPE);
+
+  private TableConfigUtils() {
+  }
 
   /**
    * @see TableConfigUtils#validate(TableConfig, Schema, String, boolean)
@@ -507,8 +511,8 @@ public final class TableConfigUtils {
       List<EnrichmentConfig> enrichmentConfigs = ingestionConfig.getEnrichmentConfigs();
       if (enrichmentConfigs != null) {
         for (EnrichmentConfig enrichmentConfig : enrichmentConfigs) {
-          RecordEnricherRegistry.validateEnrichmentConfig(enrichmentConfig,
-              new RecordEnricherValidationConfig(disableGroovy));
+          RecordTransformer.validateEnrichmentConfig(enrichmentConfig,
+              disableGroovy);
         }
       }
 
@@ -624,12 +628,6 @@ public final class TableConfigUtils {
       }
     }
   }
-
-  public final static EnumSet<AggregationFunctionType> AVAILABLE_CORE_VALUE_AGGREGATORS =
-      EnumSet.of(MIN, MAX, SUM, DISTINCTCOUNTHLL, DISTINCTCOUNTRAWHLL, DISTINCTCOUNTTHETASKETCH,
-          DISTINCTCOUNTRAWTHETASKETCH, DISTINCTCOUNTTUPLESKETCH, DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH,
-          SUMVALUESINTEGERSUMTUPLESKETCH, AVGVALUEINTEGERSUMTUPLESKETCH, DISTINCTCOUNTHLLPLUS, DISTINCTCOUNTRAWHLLPLUS,
-          DISTINCTCOUNTCPCSKETCH, DISTINCTCOUNTRAWCPCSKETCH, DISTINCTCOUNTULL, DISTINCTCOUNTRAWULL);
 
   @VisibleForTesting
   static void validateTaskConfigs(TableConfig tableConfig, Schema schema) {
@@ -1462,11 +1460,6 @@ public final class TableConfigUtils {
     }
   }
 
-  // enum of all the skip-able validation types.
-  public enum ValidationType {
-    ALL, TASK, UPSERT
-  }
-
   /**
    * needsEmptySegmentPruner checks if EmptySegmentPruner is needed for a TableConfig.
    * @param tableConfig Input table config.
@@ -1542,5 +1535,10 @@ public final class TableConfigUtils {
       clone.setFieldConfigList(cleanFieldConfigList);
     }
     return clone;
+  }
+
+  // enum of all the skip-able validation types.
+  public enum ValidationType {
+    ALL, TASK, UPSERT
   }
 }

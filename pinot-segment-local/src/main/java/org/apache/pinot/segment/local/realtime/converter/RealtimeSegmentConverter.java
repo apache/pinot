@@ -26,6 +26,7 @@ import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.segment.local.realtime.converter.stats.RealtimeSegmentSegmentCreationDataSource;
+import org.apache.pinot.segment.local.recordtransformer.RecordTransformer;
 import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
@@ -42,7 +43,6 @@ import org.apache.pinot.spi.config.table.SegmentZKPropsConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.recordenricher.RecordEnricherPipeline;
 
 
 public class RealtimeSegmentConverter {
@@ -74,11 +74,25 @@ public class RealtimeSegmentConverter {
     _nullHandlingEnabled = nullHandlingEnabled;
     if (_tableConfig.getIngestionConfig() != null
         && _tableConfig.getIngestionConfig().getStreamIngestionConfig() != null) {
-      _enableColumnMajor = _tableConfig.getIngestionConfig()
-          .getStreamIngestionConfig().getColumnMajorSegmentBuilderEnabled();
+      _enableColumnMajor =
+          _tableConfig.getIngestionConfig().getStreamIngestionConfig().getColumnMajorSegmentBuilderEnabled();
     } else {
       _enableColumnMajor = _tableConfig.getIndexingConfig().isColumnMajorSegmentBuilderEnabled();
     }
+  }
+
+  /**
+   * Returns a new schema containing only physical columns
+   */
+  @VisibleForTesting
+  public static Schema getUpdatedSchema(Schema original) {
+    Schema newSchema = new Schema();
+    for (FieldSpec fieldSpec : original.getAllFieldSpecs()) {
+      if (!fieldSpec.isVirtualColumn()) {
+        newSchema.addField(fieldSpec);
+      }
+    }
+    return newSchema;
   }
 
   public void build(@Nullable SegmentVersion segmentVersion, ServerMetrics serverMetrics)
@@ -129,7 +143,7 @@ public class RealtimeSegmentConverter {
       recordReader.init(_realtimeSegmentImpl, sortedDocIds);
       RealtimeSegmentSegmentCreationDataSource dataSource =
           new RealtimeSegmentSegmentCreationDataSource(_realtimeSegmentImpl, recordReader);
-      driver.init(genConfig, dataSource, RecordEnricherPipeline.getPassThroughPipeline(),
+      driver.init(genConfig, dataSource, RecordTransformer.getPassThroughPipeline(),
           TransformPipeline.getPassThroughPipeline());
 
       if (!_enableColumnMajor) {
@@ -157,20 +171,6 @@ public class RealtimeSegmentConverter {
         genConfig.setIndexOn(indexType, colConf == null ? defaultConfig : colConf, column);
       }
     }
-  }
-
-  /**
-   * Returns a new schema containing only physical columns
-   */
-  @VisibleForTesting
-  public static Schema getUpdatedSchema(Schema original) {
-    Schema newSchema = new Schema();
-    for (FieldSpec fieldSpec : original.getAllFieldSpecs()) {
-      if (!fieldSpec.isVirtualColumn()) {
-        newSchema.addField(fieldSpec);
-      }
-    }
-    return newSchema;
   }
 
   public boolean isColumnMajorEnabled() {

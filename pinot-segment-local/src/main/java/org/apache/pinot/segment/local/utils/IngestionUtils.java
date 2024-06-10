@@ -35,6 +35,7 @@ import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.segment.local.function.FunctionEvaluator;
 import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
 import org.apache.pinot.segment.local.recordtransformer.ComplexTypeTransformer;
+import org.apache.pinot.segment.local.recordtransformer.RecordTransformer;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.name.FixedSegmentNameGenerator;
@@ -65,7 +66,6 @@ import org.apache.pinot.spi.ingestion.batch.spec.PinotClusterSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.PushJobSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.TableSpec;
-import org.apache.pinot.spi.recordenricher.RecordEnricherPipeline;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
@@ -109,10 +109,9 @@ public final class IngestionUtils {
       BatchIngestionConfig batchIngestionConfig)
       throws ClassNotFoundException, IOException {
     Preconditions.checkState(batchIngestionConfig != null && batchIngestionConfig.getBatchConfigMaps() != null
-        && batchIngestionConfig.getBatchConfigMaps().size() == 1,
+            && batchIngestionConfig.getBatchConfigMaps().size() == 1,
         "Must provide batchIngestionConfig and contains exactly 1 batchConfigMap for table: %s, "
-            + "for generating SegmentGeneratorConfig",
-        tableConfig.getTableName());
+            + "for generating SegmentGeneratorConfig", tableConfig.getTableName());
 
     // apply config override provided by user.
     BatchConfig batchConfig =
@@ -125,8 +124,8 @@ public final class IngestionUtils {
     segmentGeneratorConfig.setOutDir(batchConfig.getOutputDirURI());
 
     // Reader configs
-    segmentGeneratorConfig
-        .setRecordReaderPath(RecordReaderFactory.getRecordReaderClassName(batchConfig.getInputFormat().toString()));
+    segmentGeneratorConfig.setRecordReaderPath(
+        RecordReaderFactory.getRecordReaderClassName(batchConfig.getInputFormat().toString()));
     Map<String, String> recordReaderProps = batchConfig.getRecordReaderProps();
     segmentGeneratorConfig.setReaderConfig(RecordReaderFactory.getRecordReaderConfig(batchConfig.getInputFormat(),
         IngestionConfigUtils.getRecordReaderProps(recordReaderProps)));
@@ -170,8 +169,8 @@ public final class IngestionUtils {
         return new SimpleSegmentNameGenerator(rawTableName, batchConfig.getSegmentNamePostfix(),
             batchConfig.isAppendUUIDToSegmentName(), batchConfig.isExcludeTimeInSegmentName());
       default:
-        throw new IllegalStateException(String
-            .format("Unsupported segmentNameGeneratorType: %s for table: %s", segmentNameGeneratorType,
+        throw new IllegalStateException(
+            String.format("Unsupported segmentNameGeneratorType: %s for table: %s", segmentNameGeneratorType,
                 tableConfig.getTableName()));
     }
   }
@@ -199,8 +198,8 @@ public final class IngestionUtils {
       @Nullable AuthProvider authProvider)
       throws Exception {
 
-    SegmentGenerationJobSpec segmentUploadSpec = generateSegmentUploadSpec(tableNameWithType, batchConfig,
-        authProvider);
+    SegmentGenerationJobSpec segmentUploadSpec =
+        generateSegmentUploadSpec(tableNameWithType, batchConfig, authProvider);
 
     List<String> segmentTarURIStrs = segmentTarURIs.stream().map(URI::toString).collect(Collectors.toList());
     String pushMode = batchConfig.getPushMode();
@@ -209,8 +208,8 @@ public final class IngestionUtils {
         try {
           SegmentPushUtils.pushSegments(segmentUploadSpec, LOCAL_PINOT_FS, segmentTarURIStrs);
         } catch (RetriableOperationException | AttemptsExceededException e) {
-          throw new RuntimeException(String
-              .format("Caught exception while uploading segments. Push mode: TAR, segment tars: [%s]",
+          throw new RuntimeException(
+              String.format("Caught exception while uploading segments. Push mode: TAR, segment tars: [%s]",
                   segmentTarURIStrs), e);
         }
         break;
@@ -229,8 +228,9 @@ public final class IngestionUtils {
           }
           SegmentPushUtils.sendSegmentUris(segmentUploadSpec, segmentUris);
         } catch (RetriableOperationException | AttemptsExceededException e) {
-          throw new RuntimeException(String
-              .format("Caught exception while uploading segments. Push mode: URI, segment URIs: [%s]", segmentUris), e);
+          throw new RuntimeException(
+              String.format("Caught exception while uploading segments. Push mode: URI, segment URIs: [%s]",
+                  segmentUris), e);
         }
         break;
       case METADATA:
@@ -240,12 +240,13 @@ public final class IngestionUtils {
             outputSegmentDirURI = URI.create(batchConfig.getOutputSegmentDirURI());
           }
           PinotFS outputFileFS = getOutputPinotFS(batchConfig, outputSegmentDirURI);
-          Map<String, String> segmentUriToTarPathMap = SegmentPushUtils.getSegmentUriToTarPathMap(outputSegmentDirURI,
-              segmentUploadSpec.getPushJobSpec(), segmentTarURIStrs.toArray(new String[0]));
+          Map<String, String> segmentUriToTarPathMap =
+              SegmentPushUtils.getSegmentUriToTarPathMap(outputSegmentDirURI, segmentUploadSpec.getPushJobSpec(),
+                  segmentTarURIStrs.toArray(new String[0]));
           SegmentPushUtils.sendSegmentUriAndMetadata(segmentUploadSpec, outputFileFS, segmentUriToTarPathMap);
         } catch (RetriableOperationException | AttemptsExceededException e) {
-          throw new RuntimeException(String
-              .format("Caught exception while uploading segments. Push mode: METADATA, segment URIs: [%s]",
+          throw new RuntimeException(
+              String.format("Caught exception while uploading segments. Push mode: METADATA, segment URIs: [%s]",
                   segmentTarURIStrs), e);
         }
         break;
@@ -382,7 +383,7 @@ public final class IngestionUtils {
         }
       }
 
-      fields.addAll(RecordEnricherPipeline.fromIngestionConfig(ingestionConfig).getColumnsToExtract());
+      fields.addAll(RecordTransformer.fromIngestionConfig(ingestionConfig).getColumnsToExtract());
       List<TransformConfig> transformConfigs = ingestionConfig.getTransformConfigs();
       if (transformConfigs != null) {
         for (TransformConfig transformConfig : transformConfigs) {

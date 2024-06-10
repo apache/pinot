@@ -16,45 +16,29 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.recordenricher;
+package org.apache.pinot.plugin.record.enricher;
 
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.ServiceLoader;
-import org.apache.pinot.spi.config.table.ingestion.EnrichmentConfig;
+import org.apache.pinot.segment.local.recordtransformer.RecordTransformer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 public class RecordEnricherRegistry {
   private static final Logger LOGGER = LoggerFactory.getLogger(RecordEnricherRegistry.class);
-  private static final Map<String, RecordEnricherFactory> RECORD_ENRICHER_FACTORY_MAP = new HashMap<>();
+  private static final Map<String, RecordTransformer> RECORD_ENRICHER_FACTORY_MAP = new HashMap<>();
 
   private RecordEnricherRegistry() {
   }
 
-  public static void validateEnrichmentConfig(EnrichmentConfig enrichmentConfig,
-      RecordEnricherValidationConfig config) {
-    if (!RECORD_ENRICHER_FACTORY_MAP.containsKey(enrichmentConfig.getEnricherType())) {
-      throw new IllegalArgumentException("No record enricher found for type: " + enrichmentConfig.getEnricherType());
-    }
-
-    RECORD_ENRICHER_FACTORY_MAP.get(enrichmentConfig.getEnricherType())
-        .validateEnrichmentConfig(enrichmentConfig.getProperties(), config);
-  }
-
-  public static RecordEnricher createRecordEnricher(EnrichmentConfig enrichmentConfig)
-      throws IOException {
-    if (!RECORD_ENRICHER_FACTORY_MAP.containsKey(enrichmentConfig.getEnricherType())) {
-      throw new IllegalArgumentException("No record enricher found for type: " + enrichmentConfig.getEnricherType());
-    }
-    return RECORD_ENRICHER_FACTORY_MAP.get(enrichmentConfig.getEnricherType())
-        .createEnricher(enrichmentConfig.getProperties());
+  public static Map<String, RecordTransformer> getRecordEnricherFactoryMap() {
+    return RECORD_ENRICHER_FACTORY_MAP;
   }
 
   static {
-    for (RecordEnricherFactory recordEnricherFactory : ServiceLoader.load(RecordEnricherFactory.class)) {
+    for (RecordTransformer recordEnricherFactory : ServiceLoader.load(RecordTransformer.class)) {
       LOGGER.info("Registered record enricher factory type: {}", recordEnricherFactory.getEnricherType());
       RECORD_ENRICHER_FACTORY_MAP.put(recordEnricherFactory.getEnricherType(), recordEnricherFactory);
     }

@@ -80,7 +80,6 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.recordenricher.RecordEnricherPipeline;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.slf4j.Logger;
@@ -102,7 +101,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   private SegmentCreator _indexCreator;
   private SegmentIndexCreationInfo _segmentIndexCreationInfo;
   private Schema _dataSchema;
-  private RecordEnricherPipeline _recordEnricherPipeline;
+  private RecordTransformer _recordEnricherPipeline;
   private TransformPipeline _transformPipeline;
   private IngestionSchemaValidator _ingestionSchemaValidator;
   private int _totalDocs = 0;
@@ -112,6 +111,29 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   private long _totalIndexTime = 0;
   private long _totalStatsCollectorTime = 0;
   private boolean _continueOnError;
+
+  public static void persistCreationMeta(File indexDir, long crc, long creationTime)
+      throws IOException {
+    File segmentDir = SegmentDirectoryPaths.findSegmentDirectory(indexDir);
+    File creationMetaFile = new File(segmentDir, V1Constants.SEGMENT_CREATION_META);
+    try (DataOutputStream output = new DataOutputStream(new FileOutputStream(creationMetaFile))) {
+      output.writeLong(crc);
+      output.writeLong(creationTime);
+    }
+  }
+
+  /**
+   * Uses config and column properties like storedType and length of elements to determine if
+   * varLengthDictionary should be used for a column
+   * @deprecated Use
+   * {@link DictionaryIndexType#shouldUseVarLengthDictionary(String, Set, DataType, ColumnStatistics)} instead.
+   */
+  @Deprecated
+  public static boolean shouldUseVarLengthDictionary(String columnName, Set<String> varLengthDictColumns,
+      DataType columnStoredType, ColumnStatistics columnProfile) {
+    return DictionaryIndexType.shouldUseVarLengthDictionary(columnName, varLengthDictColumns, columnStoredType,
+        columnProfile);
+  }
 
   @Override
   public void init(SegmentGeneratorConfig config)
@@ -160,7 +182,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   public void init(SegmentGeneratorConfig config, RecordReader recordReader)
       throws Exception {
     SegmentCreationDataSource dataSource = new RecordReaderSegmentCreationDataSource(recordReader);
-    init(config, dataSource, RecordEnricherPipeline.fromTableConfig(config.getTableConfig()),
+    init(config, dataSource, RecordTransformer.fromTableConfig(config.getTableConfig()),
         new TransformPipeline(config.getTableConfig(), config.getSchema()));
   }
 
@@ -168,13 +190,12 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   public void init(SegmentGeneratorConfig config, SegmentCreationDataSource dataSource,
       RecordTransformer recordTransformer, @Nullable ComplexTypeTransformer complexTypeTransformer)
       throws Exception {
-    init(config, dataSource, RecordEnricherPipeline.fromTableConfig(config.getTableConfig()),
+    init(config, dataSource, RecordTransformer.fromTableConfig(config.getTableConfig()),
         new TransformPipeline(recordTransformer, complexTypeTransformer));
   }
 
   public void init(SegmentGeneratorConfig config, SegmentCreationDataSource dataSource,
-      RecordEnricherPipeline enricherPipeline,
-      TransformPipeline transformPipeline)
+      RecordTransformer enricherPipeline, TransformPipeline transformPipeline)
       throws Exception {
     _config = config;
     _recordReader = dataSource.getRecordReader();
@@ -521,16 +542,6 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     return _segmentStats.getColumnProfileFor(columnName);
   }
 
-  public static void persistCreationMeta(File indexDir, long crc, long creationTime)
-      throws IOException {
-    File segmentDir = SegmentDirectoryPaths.findSegmentDirectory(indexDir);
-    File creationMetaFile = new File(segmentDir, V1Constants.SEGMENT_CREATION_META);
-    try (DataOutputStream output = new DataOutputStream(new FileOutputStream(creationMetaFile))) {
-      output.writeLong(crc);
-      output.writeLong(creationTime);
-    }
-  }
-
   /**
    * Complete the stats gathering process and store the stats information in indexCreationInfoMap.
    */
@@ -561,19 +572,6 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
               defaultNullValue));
     }
     _segmentIndexCreationInfo.setTotalDocs(_totalDocs);
-  }
-
-  /**
-   * Uses config and column properties like storedType and length of elements to determine if
-   * varLengthDictionary should be used for a column
-   * @deprecated Use
-   * {@link DictionaryIndexType#shouldUseVarLengthDictionary(String, Set, DataType, ColumnStatistics)} instead.
-   */
-  @Deprecated
-  public static boolean shouldUseVarLengthDictionary(String columnName, Set<String> varLengthDictColumns,
-      DataType columnStoredType, ColumnStatistics columnProfile) {
-    return DictionaryIndexType.shouldUseVarLengthDictionary(columnName, varLengthDictColumns, columnStoredType,
-        columnProfile);
   }
 
   /**
