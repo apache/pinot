@@ -20,13 +20,15 @@ package org.apache.pinot.client;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import org.apache.pinot.common.broker.BrokerInfo;
 
 
 public class BrokerData {
-  private final Map<String, List<String>> _tableToBrokerMap;
+  private final Map<String, Set<BrokerInfo>> _tableToBrokerMap;
   private final List<String> _brokers;
 
-  public Map<String, List<String>> getTableToBrokerMap() {
+  public Map<String, Set<BrokerInfo>> getTableToBrokerMap() {
     return _tableToBrokerMap;
   }
 
@@ -34,7 +36,7 @@ public class BrokerData {
     return _brokers;
   }
 
-  public BrokerData(Map<String, List<String>> tableToBrokerMap, List<String> brokers) {
+  public BrokerData(Map<String, Set<BrokerInfo>> tableToBrokerMap, List<String> brokers) {
     _tableToBrokerMap = tableToBrokerMap;
     _brokers = brokers;
   }

@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.client;
+package org.apache.pinot.common.broker;
 
 import com.google.common.collect.ImmutableMap;
 import java.io.ByteArrayInputStream;

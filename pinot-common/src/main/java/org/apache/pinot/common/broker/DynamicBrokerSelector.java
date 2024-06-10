@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.client;
+package org.apache.pinot.common.broker;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
@@ -33,20 +33,20 @@ import javax.annotation.Nullable;
 import org.I0Itec.zkclient.IZkDataListener;
 import org.I0Itec.zkclient.ZkClient;
 import org.I0Itec.zkclient.serialize.BytesPushThroughSerializer;
-import org.apache.pinot.client.utils.BrokerSelectorUtils;
 
 
 /**
  * Maintains a mapping between table name and list of brokers
  */
 public class DynamicBrokerSelector implements BrokerSelector, IZkDataListener {
-  private static final Random RANDOM = new Random();
+  protected static final Random RANDOM = new Random();
 
-  private final AtomicReference<Map<String, List<String>>> _tableToBrokerListMapRef = new AtomicReference<>();
-  private final AtomicReference<List<String>> _allBrokerListRef = new AtomicReference<>();
-  private final ZkClient _zkClient;
-  private final ExternalViewReader _evReader;
-  private final List<String> _brokerList;
+  protected final AtomicReference<Map<String, Set<BrokerInfo>>> _tableToBrokerListMapRef = new AtomicReference<>();
+  protected final AtomicReference<Set<BrokerInfo>> _allBrokerListRef = new AtomicReference<>();
+  protected final ZkClient _zkClient;
+  protected final ExternalViewReader _evReader;
+  protected final List<String> _brokerList;
+  protected final boolean _preferTlsPort;
   //The preferTlsPort will be mapped to client config in the future, when we support full TLS
   public DynamicBrokerSelector(String zkServers, boolean preferTlsPort) {
     _zkClient = getZkClient(zkServers);
@@ -55,6 +55,7 @@ public class DynamicBrokerSelector implements BrokerSelector, IZkDataListener {
     _zkClient.subscribeDataChanges(ExternalViewReader.BROKER_EXTERNAL_VIEW_PATH, this);
     _evReader = getEvReader(_zkClient, preferTlsPort);
     _brokerList = ImmutableList.of(zkServers);
+    _preferTlsPort = preferTlsPort;
     refresh();
   }
   public DynamicBrokerSelector(String zkServers) {
@@ -77,31 +78,42 @@ public class DynamicBrokerSelector implements BrokerSelector, IZkDataListener {
   }
 
   private void refresh() {
-    Map<String, List<String>> tableToBrokerListMap = _evReader.getTableToBrokersMap();
+    Map<String, Set<BrokerInfo>> tableToBrokerListMap = _evReader.getTableToBrokerInfosMap();
     _tableToBrokerListMapRef.set(tableToBrokerListMap);
-    Set<String> brokerSet = new HashSet<>();
-    for (List<String> brokerList : tableToBrokerListMap.values()) {
-      brokerSet.addAll(brokerList);
+    Set<BrokerInfo> brokerSet = new HashSet<>();
+    for (Set<BrokerInfo> brokerInfoSet : tableToBrokerListMap.values()) {
+      brokerSet.addAll(brokerInfoSet);
     }
-    _allBrokerListRef.set(new ArrayList<>(brokerSet));
+    _allBrokerListRef.set(brokerSet);
+  }
+
+  @Nullable
+  @Override
+  public BrokerInfo selectBrokerInfo(String... tableNames) {
+    Set<BrokerInfo> brokerInfoList = _allBrokerListRef.get();
+    if (!(tableNames == null || tableNames.length == 0 || tableNames[0] == null)) {
+      // getting list of brokers hosting all the tables.
+      Set<BrokerInfo> commonBrokers = BrokerSelectorUtils.getTablesCommonBrokers(Arrays.asList(tableNames),
+          _tableToBrokerListMapRef.get());
+      if (commonBrokers != null && !commonBrokers.isEmpty()) {
+        brokerInfoList = commonBrokers;
+      }
+    }
+
+    // Return a broker randomly if table is null or no broker is found for the specified table.
+    List<BrokerInfo> list = new ArrayList<>(brokerInfoList);
+    if (!list.isEmpty()) {
+      return list.get(RANDOM.nextInt(list.size()));
+    }
+    return null;
   }
 
   @Nullable
   @Override
   public String selectBroker(String... tableNames) {
-    if (!(tableNames == null || tableNames.length == 0 || tableNames[0] == null)) {
-      // getting list of brokers hosting all the tables.
-      List<String> list = BrokerSelectorUtils.getTablesCommonBrokers(Arrays.asList(tableNames),
-          _tableToBrokerListMapRef.get());
-      if (list != null && !list.isEmpty()) {
-        return list.get(RANDOM.nextInt(list.size()));
-      }
-    }
-
-    // Return a broker randomly if table is null or no broker is found for the specified table.
-    List<String> list = _allBrokerListRef.get();
-    if (list != null && !list.isEmpty()) {
-      return list.get(RANDOM.nextInt(list.size()));
+    BrokerInfo brokerInfo = selectBrokerInfo(tableNames);
+    if (brokerInfo != null) {
+      return brokerInfo.getHostPort(_preferTlsPort);
     }
     return null;
   }
