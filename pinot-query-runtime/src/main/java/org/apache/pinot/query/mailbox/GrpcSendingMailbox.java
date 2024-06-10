@@ -141,7 +141,7 @@ public class GrpcSendingMailbox implements SendingMailbox {
       if (bytes.isEmpty()) {
         byteString = ByteString.EMPTY;
       } else {
-        byteString = ByteString.copyFrom(bytes.get(0));
+        byteString = UnsafeByteOperations.unsafeWrap(bytes.get(0));
         for (int i = 1; i < bytes.size(); i++) {
           byteString = byteString.concat(UnsafeByteOperations.unsafeWrap(bytes.get(i)));
         }
