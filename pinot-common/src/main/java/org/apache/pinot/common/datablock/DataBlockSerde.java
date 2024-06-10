@@ -24,6 +24,13 @@ import org.apache.pinot.segment.spi.memory.DataBuffer;
 
 /**
  * An interface that can be implemented to support different types of data block serialization and deserialization.
+ * <p>
+ * It is important to distinguish between the serialization format and the data block raw representation.
+ * The raw representation is the in-memory representation of the data block and is completely dependent on the
+ * runtime Pinot version while the serialization format is the format used to write the data block through the network.
+ * Two Pinot nodes in different versions may represent the same data block in different raw representations but there
+ * should be at least one common serialization format (defined by the {@link Version} used) that can be used to
+ * serialize and deserialize the data block between the two nodes.
  */
 public interface DataBlockSerde {
 
