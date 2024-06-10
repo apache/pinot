@@ -35,27 +35,67 @@ import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.datablock.ZeroCopyDataBlockSerde;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.datablock.DataBlockBuilder;
-import org.apache.pinot.core.common.datablock.DataBlockBuilderV2;
 import org.apache.pinot.segment.spi.memory.PagedPinotOutputStream;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.Fork;
+import org.openjdk.jmh.annotations.Level;
 import org.openjdk.jmh.annotations.Measurement;
 import org.openjdk.jmh.annotations.OutputTimeUnit;
 import org.openjdk.jmh.annotations.Param;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
+import org.openjdk.jmh.annotations.Threads;
 import org.openjdk.jmh.annotations.Warmup;
 import org.openjdk.jmh.profile.GCProfiler;
+import org.openjdk.jmh.results.format.ResultFormatType;
 import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.RunnerException;
 import org.openjdk.jmh.runner.options.ChainedOptionsBuilder;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 
+@Warmup(iterations = 2, time = 2)
+@Measurement(iterations = 5, time = 1)
+@Fork(value = 1, jvmArgsPrepend = {
+    "--add-opens=java.base/java.nio=ALL-UNNAMED",
+    "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED",
+    "--add-opens=java.base/java.lang=ALL-UNNAMED",
+    "--add-opens=java.base/java.util=ALL-UNNAMED",
+    "--add-opens=java.base/java.lang.reflect=ALL-UNNAMED"
+})
+@Threads(5)
+@State(Scope.Benchmark)
+@OutputTimeUnit(TimeUnit.MILLISECONDS)
 public class BenchmarkDataBlock {
 
-  private BenchmarkDataBlock() {
+  public static void main(String[] args)
+      throws RunnerException {
+    start(BenchmarkDataBlock.class, opt -> opt
+//            .addProfiler(LinuxPerfAsmProfiler.class)
+//            .addProfiler(JavaFlightRecorderProfiler.class)
+        .addProfiler(GCProfiler.class));
+  }
+
+  @Param(value = {"INT", "LONG", "STRING", "BYTES", "BIG_DECIMAL", "LONG_ARRAY", "STRING_ARRAY"})
+  DataSchema.ColumnDataType _dataType;
+  @Param(value = {"COLUMNAR", "ROW"})
+  DataBlock.Type _blockType = DataBlock.Type.COLUMNAR;
+  //    @Param(value = {"0", "10", "90"})
+  int _nullPerCent = 10;
+
+//  @Param(value = {"direct_small", "heap_small"})
+  String _version = "heap_small";
+
+  @Param(value = {"10000", "1000000"})
+  int _rows;
+
+  BenchmarkState _state;
+
+  @Setup(Level.Trial)
+  public void setup()
+      throws IOException {
+    _state = new BenchmarkState(_rows, _dataType, _version, _nullPerCent, _blockType);
   }
 
   public static void start(Class<? extends BenchmarkDataBlock> benchmarkClass,
@@ -69,10 +109,37 @@ public class BenchmarkDataBlock {
     if (sdkJava.canExecute()) {
       opt.jvm(sdkJava.getAbsolutePath());
     }
+    opt.resultFormat(ResultFormatType.CSV);
 
     builderConsumer.accept(opt);
 
     new Runner(opt.build()).run();
+  }
+
+  @Benchmark
+  public DataBlock buildBlock()
+      throws IOException {
+    return _state.createDataBlock();
+  }
+
+  @Benchmark
+  public Object serialize()
+      throws IOException {
+    return DataBlockUtils.serialize(DataBlockSerde.Version.V1_V2, _state._dataBlock);
+  }
+
+  @Benchmark
+  public DataBlock deserialize()
+      throws IOException {
+    return DataBlockUtils.deserialize(_state._bytes);
+  }
+
+  @Benchmark
+  public DataBlock all()
+      throws IOException {
+    DataBlock dataBlock = _state.createDataBlock();
+    List<ByteBuffer> buffers = DataBlockUtils.serialize(dataBlock);
+    return DataBlockUtils.deserialize(buffers);
   }
 
   public static class BenchmarkState {
@@ -87,14 +154,6 @@ public class BenchmarkDataBlock {
     private final List<ByteBuffer> _bytes;
 
     private final CheckedFunction<List<Object[]>, DataBlock> _generateBlock;
-    private final CheckedFunction<List<ByteBuffer>, DataBlock> _deserialize;
-    private final CheckedFunction<DataBlock, List<ByteBuffer>> _serialize;
-
-    public BenchmarkState(int rows, DataSchema.ColumnDataType columnDataType, int nullPerCent,
-        DataBlock.Type blockType)
-        throws IOException {
-      this(rows, columnDataType, "heap_small", nullPerCent, blockType);
-    }
 
     public BenchmarkState(int rows, DataSchema.ColumnDataType columnDataType, String version, int nullPerCent,
         DataBlock.Type blockType)
@@ -112,6 +171,12 @@ public class BenchmarkDataBlock {
         _dataBlock = DataBlockBuilder.buildFromRows(_data, _schema);
       }
       _bytes = DataBlockUtils.serialize(_dataBlock);
+
+      if (blockType == DataBlock.Type.COLUMNAR) {
+        _generateBlock = (data) -> DataBlockBuilder.buildFromColumns(data, _schema);
+      } else {
+        _generateBlock = (data) -> DataBlockBuilder.buildFromRows(data, _schema);
+      }
 
       PagedPinotOutputStream.PageAllocator alloc;
 
@@ -131,15 +196,7 @@ public class BenchmarkDataBlock {
         default:
           throw new IllegalArgumentException("Cannot get allocator from version: " + version);
       }
-
-      if (blockType == DataBlock.Type.COLUMNAR) {
-        _generateBlock = (data) -> DataBlockBuilderV2.buildFromColumns(data, _schema);
-      } else {
-        _generateBlock = (data) -> DataBlockBuilderV2.buildFromRows(data, _schema);
-      }
       DataBlockUtils.setSerde(DataBlockSerde.Version.V1_V2, new ZeroCopyDataBlockSerde(alloc));
-      _deserialize = DataBlockUtils::deserialize;
-      _serialize = (dataBlock) -> DataBlockUtils.serialize(DataBlockSerde.Version.V1_V2, dataBlock);
     }
 
     private List<Object[]> createData(int numRows) {
@@ -203,218 +260,10 @@ public class BenchmarkDataBlock {
         throws IOException {
       return _generateBlock.apply(_data);
     }
-
-    private List<ByteBuffer> serialize(DataBlock dataBlock)
-        throws IOException {
-      return _serialize.apply(dataBlock);
-    }
-
-    private DataBlock deserialize(List<ByteBuffer> buffers)
-        throws IOException {
-      return _deserialize.apply(buffers);
-    }
   }
 
   interface CheckedFunction<I, O> {
     O apply(I input)
         throws IOException;
-  }
-
-  @Warmup(iterations = 2, time = 2)
-  @Measurement(iterations = 5, time = 1)
-  @Fork(value = 1, jvmArgsPrepend = {
-      "--add-opens=java.base/java.nio=ALL-UNNAMED",
-      "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED",
-      "--add-opens=java.base/java.lang=ALL-UNNAMED",
-      "--add-opens=java.base/java.util=ALL-UNNAMED",
-      "--add-opens=java.base/java.lang.reflect=ALL-UNNAMED"
-  })
-  @State(Scope.Benchmark)
-  @OutputTimeUnit(TimeUnit.MILLISECONDS)
-  public static class BuildBlock extends BenchmarkDataBlock {
-
-    public static void main(String[] args)
-        throws RunnerException {
-      start(BenchmarkDataBlock.BuildBlock.class, opt ->
-        opt
-//            .addProfiler(LinuxPerfAsmProfiler.class)
-//            .addProfiler(JavaFlightRecorderProfiler.class)
-            .addProfiler(GCProfiler.class)
-      );
-    }
-
-    @Param(value = {"INT", "LONG", "STRING", "BYTES", "BIG_DECIMAL", "BOOLEAN", "LONG_ARRAY", "STRING_ARRAY"})
-    DataSchema.ColumnDataType _dataType;
-    @Param(value = {"COLUMNAR", "ROW"})
-    DataBlock.Type _blockType = DataBlock.Type.COLUMNAR;
-    //    @Param(value = {"0", "10", "90"})
-    int _nullPerCent = 10;
-
-    @Param(value = {"10000", "1000000"})
-    int _rows;
-
-    BenchmarkState _state;
-
-    @Setup
-    public void setup()
-        throws IOException {
-      _state = new BenchmarkState(_rows, _dataType, _nullPerCent, _blockType);
-    }
-
-    @Benchmark
-    public DataBlock buildBlock()
-        throws IOException {
-      return _state.createDataBlock();
-    }
-  }
-
-  @Warmup(iterations = 2, time = 2)
-  @Measurement(iterations = 5, time = 2)
-  @Fork(value = 1, jvmArgsPrepend = {
-      "--add-opens=java.base/java.nio=ALL-UNNAMED",
-      "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED",
-      "--add-opens=java.base/java.lang=ALL-UNNAMED",
-      "--add-opens=java.base/java.util=ALL-UNNAMED",
-      "--add-opens=java.base/java.lang.reflect=ALL-UNNAMED"
-  })
-  @State(Scope.Benchmark)
-  @OutputTimeUnit(TimeUnit.MILLISECONDS)
-  public static class Serialize extends BenchmarkDataBlock {
-
-    public static void main(String[] args)
-        throws RunnerException {
-      start(BenchmarkDataBlock.Serialize.class, opt ->
-              opt
-//            .addProfiler(LinuxPerfAsmProfiler.class)
-//            .addProfiler(JavaFlightRecorderProfiler.class)
-                  .addProfiler(GCProfiler.class)
-      );
-    }
-
-    @Param(value = {"INT", "STRING", "BIG_DECIMAL", "LONG_ARRAY", "STRING_ARRAY"})
-    DataSchema.ColumnDataType _columnDataType = DataSchema.ColumnDataType.INT;
-    DataBlock.Type _blockType = DataBlock.Type.COLUMNAR;
-    //    @Param(value = {"0", "10", "90"})
-    int _nullPerCent = 10;
-    @Param(value = {"direct_small", "heap_small"})
-    String _version;
-
-    @Param(value = {"10000", "1000000"})
-    int _rows = 10000;
-
-    BenchmarkState _state;
-
-    @Setup
-    public void setup()
-        throws IOException {
-      _state = new BenchmarkState(_rows, _columnDataType, _version, _nullPerCent, _blockType);
-    }
-
-    @Benchmark
-    public Object serialize()
-        throws IOException {
-      return _state._serialize.apply(_state._dataBlock);
-    }
-  }
-
-  @Warmup(iterations = 2, time = 2)
-  @Measurement(iterations = 5, time = 2)
-  @Fork(value = 1, jvmArgsPrepend = {
-      "--add-opens=java.base/java.nio=ALL-UNNAMED",
-      "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED",
-      "--add-opens=java.base/java.lang=ALL-UNNAMED",
-      "--add-opens=java.base/java.util=ALL-UNNAMED",
-      "--add-opens=java.base/java.lang.reflect=ALL-UNNAMED"
-  })
-  @State(Scope.Benchmark)
-  @OutputTimeUnit(TimeUnit.MILLISECONDS)
-  public static class Deserialize extends BenchmarkDataBlock {
-
-    public static void main(String[] args)
-        throws RunnerException {
-      start(BenchmarkDataBlock.Deserialize.class, opt ->
-              opt
-//            .addProfiler(LinuxPerfAsmProfiler.class)
-//            .addProfiler(JavaFlightRecorderProfiler.class)
-                  .addProfiler(GCProfiler.class)
-      );
-    }
-
-    @Param(value = {"INT", "STRING", "BIG_DECIMAL", "LONG_ARRAY", "STRING_ARRAY"})
-    DataSchema.ColumnDataType _columnDataType = DataSchema.ColumnDataType.INT;
-    DataBlock.Type _blockType = DataBlock.Type.COLUMNAR;
-    int _nullPerCent = 10;
-    @Param(value = {"direct_small", "heap_small"})
-    String _version;
-
-    @Param(value = {"10000", "1000000"})
-    int _rows = 10000;
-
-    BenchmarkState _state;
-
-    @Setup
-    public void setup()
-        throws IOException {
-      _state = new BenchmarkState(_rows, _columnDataType, _version, _nullPerCent, _blockType);
-    }
-
-    @Benchmark
-    public DataBlock deserialize()
-        throws IOException {
-      return _state.deserialize(_state._bytes);
-    }
-  }
-
-  @Warmup(iterations = 2, time = 4)
-  @Measurement(iterations = 5, time = 1)
-  @Fork(value = 1, jvmArgsPrepend = {
-      "--add-opens=java.base/java.nio=ALL-UNNAMED",
-      "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED",
-      "--add-opens=java.base/java.lang=ALL-UNNAMED",
-      "--add-opens=java.base/java.util=ALL-UNNAMED",
-      "--add-opens=java.base/java.lang.reflect=ALL-UNNAMED"
-  })
-  @State(Scope.Benchmark)
-  @OutputTimeUnit(TimeUnit.MILLISECONDS)
-  public static class BuildSerde extends BenchmarkDataBlock {
-
-    public static void main(String[] args)
-        throws RunnerException {
-      start(BenchmarkDataBlock.BuildSerde.class, opt ->
-              opt
-//            .addProfiler(LinuxPerfAsmProfiler.class)
-//            .addProfiler(JavaFlightRecorderProfiler.class)
-                  .addProfiler(GCProfiler.class)
-      );
-    }
-
-    @Param(value = {"INT", "LONG", "STRING", "BYTES", "BIG_DECIMAL", "BOOLEAN", "LONG_ARRAY", "STRING_ARRAY"})
-    DataSchema.ColumnDataType _dataType;
-    @Param(value = {"COLUMNAR", "ROW"})
-    DataBlock.Type _blockType = DataBlock.Type.COLUMNAR;
-    //    @Param(value = {"0", "10", "90"})
-    int _nullPerCent = 10;
-
-    @Param(value = {"direct_small", "heap_small"})
-    String _version;
-
-    @Param(value = {"10000", "1000000"})
-    int _rows;
-
-    BenchmarkState _state;
-
-    @Setup
-    public void setup()
-        throws IOException {
-      _state = new BenchmarkState(_rows, _dataType, _version, _nullPerCent, _blockType);
-    }
-
-    @Benchmark
-    public DataBlock all()
-        throws IOException {
-      DataBlock dataBlock = _state.createDataBlock();
-      List<ByteBuffer> buffers = _state.serialize(dataBlock);
-      return _state.deserialize(buffers);
-    }
   }
 }
