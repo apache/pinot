@@ -225,12 +225,7 @@ public class HistogramAggregationFunction extends BaseSingleInputAggregationFunc
 
   @Override
   public DoubleArrayList extractFinalResult(DoubleArrayList doubleArrayList) {
-    int count = doubleArrayList.size();
-    if (count < 1L) {
-      throw new IllegalStateException("histogram result shouldn't be empty!");
-    } else {
-      return new DoubleArrayList(doubleArrayList.elements());
-    }
+    return doubleArrayList;
   }
 
   @Override

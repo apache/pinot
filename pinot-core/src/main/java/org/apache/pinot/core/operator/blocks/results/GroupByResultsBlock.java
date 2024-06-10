@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
+import org.apache.pinot.common.utils.ArrayListUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
@@ -251,28 +252,28 @@ public class GroupByResultsBlock extends BaseResultsBlock {
         break;
       case INT_ARRAY:
         if (value instanceof IntArrayList) {
-          dataTableBuilder.setColumn(columnIndex, ((IntArrayList) value).elements());
+          dataTableBuilder.setColumn(columnIndex, ArrayListUtils.toIntArray((IntArrayList) value));
         } else {
           dataTableBuilder.setColumn(columnIndex, (int[]) value);
         }
         break;
       case LONG_ARRAY:
         if (value instanceof LongArrayList) {
-          dataTableBuilder.setColumn(columnIndex, ((LongArrayList) value).elements());
+          dataTableBuilder.setColumn(columnIndex, ArrayListUtils.toLongArray((LongArrayList) value));
         } else {
           dataTableBuilder.setColumn(columnIndex, (long[]) value);
         }
         break;
       case FLOAT_ARRAY:
         if (value instanceof FloatArrayList) {
-          dataTableBuilder.setColumn(columnIndex, ((FloatArrayList) value).elements());
+          dataTableBuilder.setColumn(columnIndex, ArrayListUtils.toFloatArray((FloatArrayList) value));
         } else {
           dataTableBuilder.setColumn(columnIndex, (float[]) value);
         }
         break;
       case DOUBLE_ARRAY:
         if (value instanceof DoubleArrayList) {
-          dataTableBuilder.setColumn(columnIndex, ((DoubleArrayList) value).elements());
+          dataTableBuilder.setColumn(columnIndex, ArrayListUtils.toDoubleArray((DoubleArrayList) value));
         } else {
           dataTableBuilder.setColumn(columnIndex, (double[]) value);
         }
@@ -280,7 +281,7 @@ public class GroupByResultsBlock extends BaseResultsBlock {
       case STRING_ARRAY:
         if (value instanceof ObjectArrayList) {
           //noinspection unchecked
-          dataTableBuilder.setColumn(columnIndex, ((ObjectArrayList<String>) value).elements());
+          dataTableBuilder.setColumn(columnIndex, ArrayListUtils.toStringArray((ObjectArrayList<String>) value));
         } else {
           dataTableBuilder.setColumn(columnIndex, (String[]) value);
         }
