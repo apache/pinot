@@ -94,8 +94,8 @@ public class MinionTaskUtils {
       String pushMode = IngestionConfigUtils.getPushMode(taskConfigs);
 
       Map<String, String> singleFileGenerationTaskConfig = new HashMap<>(taskConfigs);
-      if (pushMode == null || pushMode.toUpperCase()
-          .contentEquals(BatchConfigProperties.SegmentPushType.TAR.toString())) {
+      if (pushMode == null
+          || pushMode.toUpperCase().contentEquals(BatchConfigProperties.SegmentPushType.TAR.toString())) {
         singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_MODE,
             BatchConfigProperties.SegmentPushType.TAR.toString());
       } else {
@@ -158,7 +158,7 @@ public class MinionTaskUtils {
       ServerSegmentMetadataReader serverSegmentMetadataReader = new ServerSegmentMetadataReader();
       try {
         return serverSegmentMetadataReader.getValidDocIdsBitmapFromServer(tableNameWithType, segmentName, endpoint,
-            validDocIdsType, 60_000);
+                validDocIdsType, 60_000);
       } catch (Exception e) {
         LOGGER.info("Unable to retrieve validDocIdsBitmap for {} from {}", segmentName, endpoint);
       }
@@ -167,7 +167,7 @@ public class MinionTaskUtils {
   }
 
   public static List<String> getServers(String segmentName, String tableNameWithType, HelixAdmin helixAdmin,
-      String clusterName) {
+                                        String clusterName) {
     ExternalView externalView = helixAdmin.getResourceExternalView(clusterName, tableNameWithType);
     if (externalView == null) {
       throw new IllegalStateException("External view does not exist for table: " + tableNameWithType);
@@ -197,8 +197,8 @@ public class MinionTaskUtils {
     if (tableTaskConfig != null) {
       Map<String, String> configs = tableTaskConfig.getConfigsForTaskType(taskType);
       if (configs != null && !configs.isEmpty()) {
-        return Boolean.parseBoolean(
-            configs.getOrDefault(TableTaskConfig.MINION_ALLOW_DOWNLOAD_FROM_SERVER, String.valueOf(defaultValue)));
+        return Boolean.parseBoolean(configs.getOrDefault(TableTaskConfig.MINION_ALLOW_DOWNLOAD_FROM_SERVER,
+            String.valueOf(defaultValue)));
       }
     }
     return defaultValue;

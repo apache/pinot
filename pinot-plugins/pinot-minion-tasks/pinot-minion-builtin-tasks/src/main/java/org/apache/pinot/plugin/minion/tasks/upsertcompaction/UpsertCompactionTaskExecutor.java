@@ -99,7 +99,7 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
     }
 
     try (CompactedPinotSegmentRecordReader compactedRecordReader = new CompactedPinotSegmentRecordReader(indexDir,
-        validDocIds, tableConfig.getUpsertDeleteRecordColumn())) {
+        validDocIds)) {
       SegmentGeneratorConfig config = getSegmentGeneratorConfig(workingDir, tableConfig, segmentMetadata, segmentName,
           getSchema(tableNameWithType));
       SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
