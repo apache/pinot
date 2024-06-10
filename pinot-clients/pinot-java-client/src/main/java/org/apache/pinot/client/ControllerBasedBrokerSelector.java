@@ -21,6 +21,7 @@ package org.apache.pinot.client;
 
 import java.util.List;
 import java.util.Properties;
+import org.apache.pinot.common.broker.BrokerSelector;
 
 
 /**
@@ -31,11 +32,6 @@ public class ControllerBasedBrokerSelector implements BrokerSelector {
 
   private final UpdatableBrokerCache _brokerCache;
   private final Properties _properties;
-
-  public ControllerBasedBrokerSelector(String scheme, String controllerHost, int controllerPort)
-      throws Exception {
-    this(scheme, controllerHost, controllerPort, new Properties());
-  }
 
   public ControllerBasedBrokerSelector(String scheme, String controllerHost, int controllerPort, Properties properties)
       throws Exception {

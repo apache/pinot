@@ -35,8 +35,10 @@ import java.util.Set;
 import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 import javax.net.ssl.SSLContext;
-import org.apache.pinot.client.utils.BrokerSelectorUtils;
 import org.apache.pinot.client.utils.ConnectionUtils;
+import org.apache.pinot.common.broker.BrokerInfo;
+import org.apache.pinot.common.broker.BrokerSelectorUtils;
+import org.apache.pinot.common.broker.ExternalViewReader;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
@@ -141,15 +143,15 @@ public class BrokerCache {
 
   private BrokerData getBrokerData(Map<String, List<BrokerInstance>> responses) {
     Set<String> brokers = new HashSet<>();
-    Map<String, List<String>> tableToBrokersMap = new HashMap<>();
+    Map<String, Set<BrokerInfo>> tableToBrokersMap = new HashMap<>();
     Set<String> uniqueTableNames = new HashSet<>();
 
     for (Map.Entry<String, List<BrokerInstance>> tableToBrokers : responses.entrySet()) {
-      List<String> brokersForTable = new ArrayList<>();
+      Set<BrokerInfo> brokersForTable = new HashSet<>();
       tableToBrokers.getValue().forEach(br -> {
-        String brokerHostPort = br.getHost() + ":" + br.getPort();
-        brokersForTable.add(brokerHostPort);
-        brokers.add(brokerHostPort);
+        BrokerInfo brokerInfo = new BrokerInfo(br.getHost(), br.getPort());
+        brokersForTable.add(brokerInfo);
+        brokers.add(brokerInfo.getHostPort(false));
       });
       String tableName = tableToBrokers.getKey();
       tableToBrokersMap.put(tableName, brokersForTable);
@@ -163,19 +165,18 @@ public class BrokerCache {
       if (!tableToBrokersMap.containsKey(tableName)) {
         // 2 possible scenarios:
         // 1) Both OFFLINE_SUFFIX and REALTIME_SUFFIX tables present -> use intersection of both the lists
-        // 2) Either OFFLINE_SUFFIX or REALTIME_SUFFIX (and npt both) raw table present -> use the list as it is
+        // 2) Either OFFLINE_SUFFIX or REALTIME_SUFFIX (and not both) raw table present -> use the list as it is
 
         String offlineTable = tableName + ExternalViewReader.OFFLINE_SUFFIX;
         String realtimeTable = tableName + ExternalViewReader.REALTIME_SUFFIX;
         if (tableToBrokersMap.containsKey(offlineTable) && tableToBrokersMap.containsKey(realtimeTable)) {
-          List<String> realtimeBrokers = tableToBrokersMap.get(realtimeTable);
-          List<String> offlineBrokers = tableToBrokersMap.get(offlineTable);
-          List<String> tableBrokers =
-              realtimeBrokers.stream().filter(offlineBrokers::contains).collect(Collectors.toList());
-          tableToBrokersMap.put(tableName, tableBrokers);
+          Set<BrokerInfo> realtimeBrokers = tableToBrokersMap.get(realtimeTable);
+          Set<BrokerInfo> offlineBrokers = tableToBrokersMap.get(offlineTable);
+          realtimeBrokers.retainAll(offlineBrokers);
+          tableToBrokersMap.put(tableName, realtimeBrokers);
         } else {
           tableToBrokersMap.put(tableName, tableToBrokersMap.getOrDefault(offlineTable,
-              tableToBrokersMap.getOrDefault(realtimeTable, new ArrayList<>())));
+              tableToBrokersMap.getOrDefault(realtimeTable, new HashSet<>())));
         }
       }
     });
@@ -196,8 +197,11 @@ public class BrokerCache {
         tableNames == null ? tableNames : Arrays.stream(tableNames).filter(Objects::nonNull).toArray(String[]::new);
     if (!(tableNames == null || tableNames.length == 0)) {
        // returning list of common brokers hosting all the tables.
-       brokers = BrokerSelectorUtils.getTablesCommonBrokers(Arrays.asList(tableNames),
+       Set<BrokerInfo> commonBrokers = BrokerSelectorUtils.getTablesCommonBrokers(Arrays.asList(tableNames),
            _brokerData.getTableToBrokerMap());
+       if (commonBrokers != null && !commonBrokers.isEmpty()) {
+         brokers = commonBrokers.stream().map(br -> br.getHostPort(false)).collect(Collectors.toList());
+       }
     }
 
     if (brokers == null || brokers.isEmpty()) {

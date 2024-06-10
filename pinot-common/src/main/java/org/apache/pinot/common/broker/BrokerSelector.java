@@ -16,37 +16,31 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.client;
+package org.apache.pinot.common.broker;
 
-import com.google.common.collect.ImmutableList;
 import java.util.List;
-import java.util.Random;
+import org.apache.commons.lang.NotImplementedException;
 
 
-/**
- * Picks a broker randomly from list of brokers provided. This assumes that all the provided brokers
- * are healthy. There is no health check done on the brokers
- */
-public class SimpleBrokerSelector implements BrokerSelector {
+public interface BrokerSelector {
+  /**
+   * Returns the broker address in the form host:port
+   * @param tableNames
+   * @return
+   */
+  String selectBroker(String... tableNames);
 
-  private final List<String> _brokerList;
-  private final Random _random = new Random();
-
-  public SimpleBrokerSelector(List<String> brokerList) {
-    _brokerList = ImmutableList.copyOf(brokerList);
+  default BrokerInfo selectBrokerInfo(String... tableName) {
+   throw new NotImplementedException();
   }
 
-  @Override
-  public String selectBroker(String... tableNames) {
-    return _brokerList.get(_random.nextInt(_brokerList.size()));
-  }
+  /**
+   * Returns list of all brokers.
+   */
+  List<String> getBrokers();
 
-  @Override
-  public List<String> getBrokers() {
-    return ImmutableList.copyOf(_brokerList);
-  }
-
-  @Override
-  public void close() {
-  }
+  /**
+   * Close any resources
+   */
+  void close();
 }

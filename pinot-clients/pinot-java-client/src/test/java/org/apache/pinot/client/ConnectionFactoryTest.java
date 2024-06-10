@@ -24,6 +24,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import org.I0Itec.zkclient.ZkClient;
+import org.apache.pinot.common.broker.DynamicBrokerSelector;
+import org.apache.pinot.common.broker.ExternalViewReader;
 import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.Test;

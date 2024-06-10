@@ -20,6 +20,7 @@ package org.apache.pinot.client;
 
 import java.util.Collections;
 import java.util.concurrent.CompletableFuture;
+import org.apache.pinot.common.broker.BrokerSelector;
 import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.Test;

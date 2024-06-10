@@ -29,16 +29,11 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Objects;
-import java.util.Random;
 import java.util.Set;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.ws.rs.GET;
@@ -52,13 +47,13 @@ import javax.ws.rs.core.Response;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.Utils;
+import org.apache.pinot.common.broker.BrokerInfo;
+import org.apache.pinot.common.broker.BrokerSelector;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.DatabaseUtils;
-import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessControl;
@@ -70,7 +65,6 @@ import org.apache.pinot.core.auth.ManualAuthorization;
 import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.parser.utils.ParserUtils;
-import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.exception.DatabaseConflictException;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
@@ -88,7 +82,6 @@ import org.slf4j.LoggerFactory;
 @Path("/")
 public class PinotQueryResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotQueryResource.class);
-  private static final Random RANDOM = new Random();
 
   @Inject
   SqlQueryExecutor _sqlQueryExecutor;
@@ -101,6 +94,9 @@ public class PinotQueryResource {
 
   @Inject
   ControllerConf _controllerConf;
+
+  @Inject
+  BrokerSelector _brokerSelector;
 
   @POST
   @Path("sql")
@@ -220,37 +216,22 @@ public class PinotQueryResource {
       return QueryException.getException(QueryException.SQL_PARSING_ERROR,
           new Exception("Unable to find table for this query", e)).toString();
     }
-    List<String> instanceIds;
-    if (tableNames.size() != 0) {
-      List<TableConfig> tableConfigList = getListTableConfigs(tableNames);
-      if (tableConfigList == null || tableConfigList.size() == 0) {
-        return QueryException.getException(QueryException.TABLE_DOES_NOT_EXIST_ERROR,
-            new Exception("Unable to find table in cluster, table does not exist")).toString();
-      }
-
-      // find the unions of all the broker tenant tags of the queried tables.
-      Set<String> brokerTenantsUnion = getBrokerTenantsUnion(tableConfigList);
-      if (brokerTenantsUnion.isEmpty()) {
-        return QueryException.getException(QueryException.BROKER_REQUEST_SEND_ERROR,
-                new Exception(String.format("Unable to dispatch multistage query for tables: [%s]", tableNames)))
-            .toString();
-      }
-      instanceIds = findCommonBrokerInstances(brokerTenantsUnion);
-      if (instanceIds.isEmpty()) {
+    BrokerInfo brokerInfo;
+    if (!tableNames.isEmpty()) {
+      brokerInfo = _brokerSelector.selectBrokerInfo(tableNames.toArray(new String[0]));
+      if (brokerInfo == null) {
         // No common broker found for table tenants
-        LOGGER.error("Unable to find a common broker instance for table tenants. Tables: {}, Tenants: {}", tableNames,
-            brokerTenantsUnion);
-        throw QueryException.getException(QueryException.BROKER_RESOURCE_MISSING_ERROR, new Exception(
-            "Unable to find a common broker instance for table tenants. Tables: " + tableNames + ", Tenants: "
-                + brokerTenantsUnion));
+        LOGGER.error("Unable to find a common broker instance for table tenants. Tables: {}", tableNames);
+        throw QueryException.getException(QueryException.BROKER_RESOURCE_MISSING_ERROR,
+            new Exception("Unable to find a common broker instance for table tenants. Tables: " + tableNames));
       }
     } else {
       // TODO fail these queries going forward. Added this logic to take care of tautologies like BETWEEN 0 and -1.
-      instanceIds = _pinotHelixResourceManager.getAllBrokerInstances();
+      brokerInfo = _brokerSelector.selectBrokerInfo();
       LOGGER.error("Unable to find table name from SQL {} thus dispatching to random broker.", query);
     }
-    String instanceId = selectRandomInstanceId(instanceIds);
-    return sendRequestToBroker(query, instanceId, traceEnabled, queryOptions, httpHeaders);
+    //TODO: Check if broker is online. Or is ExternalView up to date on liveness of the broker?
+    return sendRequestToBroker(query, brokerInfo, traceEnabled, queryOptions, httpHeaders);
   }
 
   private String getQueryResponse(String query, @Nullable SqlNode sqlNode, String traceEnabled, String queryOptions,
@@ -295,82 +276,21 @@ public class PinotQueryResource {
     }
 
     // Get brokers for the resource table.
-    List<String> instanceIds = _pinotHelixResourceManager.getBrokerInstancesFor(rawTableName);
-    String instanceId = selectRandomInstanceId(instanceIds);
-    return sendRequestToBroker(query, instanceId, traceEnabled, queryOptions, httpHeaders);
+    BrokerInfo brokerInfo = _brokerSelector.selectBrokerInfo(rawTableName);
+    return sendRequestToBroker(query, brokerInfo, traceEnabled, queryOptions, httpHeaders);
   }
 
-  // given a list of tables, returns the list of tableConfigs
-  private List<TableConfig> getListTableConfigs(List<String> tableNames) {
-    List<TableConfig> allTableConfigList = new ArrayList<>();
-    for (String tableName : tableNames) {
-      List<TableConfig> tableConfigList = new ArrayList<>();
-      if (_pinotHelixResourceManager.hasRealtimeTable(tableName)) {
-        tableConfigList.add(Objects.requireNonNull(_pinotHelixResourceManager.getRealtimeTableConfig(tableName)));
-      }
-      if (_pinotHelixResourceManager.hasOfflineTable(tableName)) {
-        tableConfigList.add(Objects.requireNonNull(_pinotHelixResourceManager.getOfflineTableConfig(tableName)));
-      }
-      if (tableConfigList.size() == 0) {
-        return null;
-      }
-      allTableConfigList.addAll(tableConfigList);
-    }
-    return allTableConfigList;
-  }
-
-  private String selectRandomInstanceId(List<String> instanceIds)
+  private String sendRequestToBroker(String query, BrokerInfo brokerInfo, String traceEnabled, String queryOptions,
+      HttpHeaders httpHeaders)
       throws ProcessingException {
-    if (instanceIds.isEmpty()) {
+    if (brokerInfo == null) {
       throw QueryException.getException(QueryException.BROKER_RESOURCE_MISSING_ERROR, "No broker found for query");
-    }
-
-    instanceIds.retainAll(_pinotHelixResourceManager.getOnlineInstanceList());
-    if (instanceIds.isEmpty()) {
-      throw QueryException.getException(QueryException.BROKER_INSTANCE_MISSING_ERROR,
-          "No online broker found for query");
-    }
-
-    // Send query to a random broker.
-    return instanceIds.get(RANDOM.nextInt(instanceIds.size()));
-  }
-
-  private List<String> findCommonBrokerInstances(Set<String> brokerTenants) {
-    Stream<InstanceConfig> brokerInstanceConfigs = _pinotHelixResourceManager.getAllBrokerInstanceConfigs().stream();
-    for (String brokerTenant : brokerTenants) {
-      brokerInstanceConfigs = brokerInstanceConfigs.filter(
-          instanceConfig -> instanceConfig.containsTag(TagNameUtils.getBrokerTagForTenant(brokerTenant)));
-    }
-    return brokerInstanceConfigs.map(InstanceConfig::getInstanceName).collect(Collectors.toList());
-  }
-
-  // return the union of brokerTenants from the tables list.
-  private Set<String> getBrokerTenantsUnion(List<TableConfig> tableConfigList) {
-    Set<String> tableBrokerTenants = new HashSet<>();
-    for (TableConfig tableConfig : tableConfigList) {
-      tableBrokerTenants.add(tableConfig.getTenantConfig().getBroker());
-    }
-    return tableBrokerTenants;
-  }
-
-  private String sendRequestToBroker(String query, String instanceId, String traceEnabled, String queryOptions,
-      HttpHeaders httpHeaders) {
-    InstanceConfig instanceConfig = _pinotHelixResourceManager.getHelixInstanceConfig(instanceId);
-    if (instanceConfig == null) {
-      LOGGER.error("Instance {} not found", instanceId);
-      return QueryException.INTERNAL_ERROR.toString();
-    }
-
-    String hostName = instanceConfig.getHostName();
-    // Backward-compatible with legacy hostname of format 'Broker_<hostname>'
-    if (hostName.startsWith(CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE)) {
-      hostName = hostName.substring(CommonConstants.Helix.BROKER_INSTANCE_PREFIX_LENGTH);
     }
 
     String protocol = _controllerConf.getControllerBrokerProtocol();
     int port = _controllerConf.getControllerBrokerPortOverride() > 0 ? _controllerConf.getControllerBrokerPortOverride()
-        : Integer.parseInt(instanceConfig.getPort());
-    String url = getQueryURL(protocol, hostName, port);
+        : brokerInfo.getPort();
+    String url = getQueryURL(protocol, brokerInfo.getHostname(), port);
     ObjectNode requestJson = getRequestJson(query, traceEnabled, queryOptions);
 
     // forward client-supplied headers
