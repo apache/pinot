@@ -223,13 +223,13 @@
     <httpcore5.version>5.2.4</httpcore5.version>
 
     <!-- Google Libraries -->
+    <protobuf.version>3.25.3</protobuf.version>
+    <grpc.version>1.62.2</grpc.version>
     <google.cloud.libraries.version>26.40.0</google.cloud.libraries.version>
-    <grpc.version>1.61.1</grpc.version>
-    <protobuf.version>3.25.2</protobuf.version>
-    <google.findbugs.version>3.0.2</google.findbugs.version>
+    <google.auto-service.version>1.1.1</google.auto-service.version>
     <google.errorprone.version>2.28.0</google.errorprone.version>
     <google.j2objc.version>3.0.0</google.j2objc.version>
-    <google.auto-service.version>1.1.1</google.auto-service.version>
+    <google.jsr305.version>3.0.2</google.jsr305.version>
 
     <!-- Configuration for Scala -->
     <scala.version>2.12.19</scala.version>
@@ -831,14 +831,7 @@
         <version>${httpcore5.version}</version>
       </dependency>
 
-      <!-- grpc-bom -->
-      <dependency>
-        <groupId>io.grpc</groupId>
-        <artifactId>grpc-bom</artifactId>
-        <version>${grpc.version}</version>
-        <type>pom</type>
-        <scope>import</scope>
-      </dependency>
+      <!-- Google Libraries -->
       <!-- protobuf-bom -->
       <dependency>
         <groupId>com.google.protobuf</groupId>
@@ -847,8 +840,15 @@
         <type>pom</type>
         <scope>import</scope>
       </dependency>
-      <!-- Google Libraries -->
-      <!-- google libraries-bom should be after grpc & protobuf bom for respective specified version in runtime -->
+      <!-- grpc-bom -->
+      <dependency>
+        <groupId>io.grpc</groupId>
+        <artifactId>grpc-bom</artifactId>
+        <version>${grpc.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <!-- libraries-bom should be imported after protobuf-bom and grpc-bom to honor their versions -->
       <dependency>
         <groupId>com.google.cloud</groupId>
         <artifactId>libraries-bom</artifactId>
@@ -856,30 +856,29 @@
         <type>pom</type>
         <scope>import</scope>
       </dependency>
-
-
-      <!-- Solve the dependency converge issue between guava and calcite-core -->
-      <dependency>
-        <groupId>com.google.errorprone</groupId>
-        <artifactId>error_prone_annotations</artifactId>
-        <version>${google.errorprone.version}</version>
-      </dependency>
-      <!-- Legacy Google Libraries -->
       <dependency>
         <groupId>com.google.auto.service</groupId>
         <artifactId>auto-service</artifactId>
         <version>${google.auto-service.version}</version>
         <optional>true</optional> <!-- This is only needed at compilation time as an annotation processor -->
       </dependency>
+      <!-- Solve the dependency converge issue between guava and calcite-core -->
       <dependency>
-        <groupId>com.google.code.findbugs</groupId>
-        <artifactId>jsr305</artifactId>
-        <version>${google.findbugs.version}</version>
+        <groupId>com.google.errorprone</groupId>
+        <artifactId>error_prone_annotations</artifactId>
+        <version>${google.errorprone.version}</version>
       </dependency>
+      <!-- Solve the dependency converge issue between guava and protobuf -->
       <dependency>
         <groupId>com.google.j2objc</groupId>
         <artifactId>j2objc-annotations</artifactId>
         <version>${google.j2objc.version}</version>
+      </dependency>
+      <!-- Solve the dependency converge issue between google and flink libraries -->
+      <dependency>
+        <groupId>com.google.code.findbugs</groupId>
+        <artifactId>jsr305</artifactId>
+        <version>${google.jsr305.version}</version>
       </dependency>
 
       <!-- Hadoop -->
