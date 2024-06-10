@@ -135,14 +135,7 @@ public final class DataBlockUtils {
 
   public static DataBlock deserialize(ByteBuffer buffer)
       throws IOException {
-    PinotByteBuffer dataBuffer = PinotByteBuffer.wrap(buffer);
-    int versionAndSubVersion = dataBuffer.getInt(0);
-    int version = getVersion(versionAndSubVersion);
-    DataBlockSerde dataBlockSerde = SERDES.get(DataBlockSerde.Version.fromInt(version));
-
-    DataBlock.Type type = getType(versionAndSubVersion);
-
-    return dataBlockSerde.deserialize(dataBuffer, 0, type);
+    return deserialize(PinotByteBuffer.wrap(buffer));
   }
 
   public static DataBlock deserialize(List<ByteBuffer> buffers)
@@ -151,27 +144,26 @@ public final class DataBlockUtils {
         .map(PinotByteBuffer::wrap)
         .collect(Collectors.toList());
     try (CompoundDataBuffer compoundBuffer = new CompoundDataBuffer(dataBuffers, ByteOrder.BIG_ENDIAN, false)) {
-      int versionAndSubVersion = compoundBuffer.getInt(0);
-      int version = getVersion(versionAndSubVersion);
-      DataBlockSerde dataBlockSerde = SERDES.get(DataBlockSerde.Version.fromInt(version));
-
-      DataBlock.Type type = getType(versionAndSubVersion);
-
-      return dataBlockSerde.deserialize(compoundBuffer, 0, type);
+      return deserialize(compoundBuffer);
     }
   }
 
   public static DataBlock deserialize(ByteBuffer[] buffers)
       throws IOException {
     try (CompoundDataBuffer compoundBuffer = new CompoundDataBuffer(buffers, ByteOrder.BIG_ENDIAN, false)) {
-      int versionAndSubVersion = compoundBuffer.getInt(0);
-      int version = getVersion(versionAndSubVersion);
-      DataBlockSerde dataBlockSerde = SERDES.get(DataBlockSerde.Version.fromInt(version));
-
-      DataBlock.Type type = getType(versionAndSubVersion);
-
-      return dataBlockSerde.deserialize(compoundBuffer, 0, type);
+      return deserialize(compoundBuffer);
     }
+  }
+
+  public static DataBlock deserialize(DataBuffer buffer)
+      throws IOException {
+    int versionAndSubVersion = buffer.getInt(0);
+    int version = getVersion(versionAndSubVersion);
+    DataBlockSerde dataBlockSerde = SERDES.get(DataBlockSerde.Version.fromInt(version));
+
+    DataBlock.Type type = getType(versionAndSubVersion);
+
+    return dataBlockSerde.deserialize(buffer, 0, type);
   }
 
   /**
