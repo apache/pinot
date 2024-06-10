@@ -40,6 +40,7 @@ import org.apache.pinot.segment.spi.creator.name.FixedSegmentNameGenerator;
 import org.apache.pinot.segment.spi.creator.name.NormalizedDateSegmentNameGenerator;
 import org.apache.pinot.segment.spi.creator.name.SegmentNameGenerator;
 import org.apache.pinot.segment.spi.creator.name.SimpleSegmentNameGenerator;
+import org.apache.pinot.segment.spi.creator.name.UploadedRealtimeSegmentNameGenerator;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
@@ -107,6 +108,8 @@ public class SegmentGeneratorConfig implements Serializable {
   private String _creatorVersion = null;
   private SegmentNameGenerator _segmentNameGenerator = null;
   private SegmentPartitionConfig _segmentPartitionConfig = null;
+
+  private int _uploadedSegmentPartitionId = -1;
   private int _sequenceId = -1;
   private TimeColumnType _timeColumnType = TimeColumnType.EPOCH;
   private DateTimeFormatSpec _dateTimeFormatSpec = null;
@@ -463,6 +466,9 @@ public class SegmentGeneratorConfig implements Serializable {
     _segmentTimeColumnName = timeColumnName;
   }
 
+  public int getUploadedSegmentPartitionId() {
+    return _uploadedSegmentPartitionId;
+  }
   public int getSequenceId() {
     return _sequenceId;
   }
@@ -473,6 +479,13 @@ public class SegmentGeneratorConfig implements Serializable {
 
   public FSTType getFSTIndexType() {
     return _fstTypeForFSTIndex;
+  }
+
+  /**
+   * Use this method to add partitionId if it is generated externally during segment upload
+   */
+  public void setUploadedSegmentPartitionId(int partitionId) {
+    _uploadedSegmentPartitionId = partitionId;
   }
 
   /**
@@ -581,6 +594,9 @@ public class SegmentGeneratorConfig implements Serializable {
             IngestionConfigUtils.getBatchSegmentIngestionType(_tableConfig),
             IngestionConfigUtils.getBatchSegmentIngestionFrequency(_tableConfig), _dateTimeFormatSpec,
             _segmentNamePostfix);
+      case BatchConfigProperties.SegmentNameGeneratorType.UPLOADED_REALTIME:
+        return new UploadedRealtimeSegmentNameGenerator(_rawTableName, _uploadedSegmentPartitionId,
+            Long.parseLong(_segmentCreationTime), _segmentNamePrefix, _segmentNamePostfix);
       default:
         return new SimpleSegmentNameGenerator(_segmentNamePrefix != null ? _segmentNamePrefix : _rawTableName,
             _segmentNamePostfix);
@@ -598,6 +614,11 @@ public class SegmentGeneratorConfig implements Serializable {
 
     if (_segmentTimeColumnDataType == FieldSpec.DataType.STRING && _timeColumnType == TimeColumnType.SIMPLE_DATE) {
       return BatchConfigProperties.SegmentNameGeneratorType.NORMALIZED_DATE;
+    }
+
+    // if segment is externally partitioned
+    if (_uploadedSegmentPartitionId != -1) {
+      return BatchConfigProperties.SegmentNameGeneratorType.UPLOADED_REALTIME;
     }
 
     return BatchConfigProperties.SegmentNameGeneratorType.SIMPLE;

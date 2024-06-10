@@ -22,6 +22,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.pinot.segment.spi.creator.name.FixedSegmentNameGenerator;
 import org.apache.pinot.segment.spi.creator.name.NormalizedDateSegmentNameGenerator;
 import org.apache.pinot.segment.spi.creator.name.SimpleSegmentNameGenerator;
+import org.apache.pinot.segment.spi.creator.name.UploadedRealtimeSegmentNameGenerator;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -139,6 +140,20 @@ public class SegmentGeneratorConfigTest {
 
     Assert.assertTrue(segmentGeneratorConfig.getSegmentNameGenerator() instanceof SimpleSegmentNameGenerator);
     Assert.assertTrue(segmentGeneratorConfig.getSegmentNameGenerator().toString().contains("tableName=testTable"));
+
+    // Table config is externally partitioned
+    tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName("test").build();
+
+    segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
+    segmentGeneratorConfig.setUploadedSegmentPartitionId(0);
+    segmentGeneratorConfig.setCreationTime("1234567890");
+    segmentGeneratorConfig.setSegmentNamePrefix("prefix");
+    segmentGeneratorConfig.setSegmentNamePostfix("5");
+
+    Assert.assertTrue(segmentGeneratorConfig.getSegmentNameGenerator() instanceof UploadedRealtimeSegmentNameGenerator);
+    Assert.assertTrue(
+        segmentGeneratorConfig.getSegmentNameGenerator().toString().contains("tableName=test"));
 
     // Table config has no time column defined
     tableConfig =
