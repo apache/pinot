@@ -113,6 +113,7 @@ import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
 import org.apache.pinot.core.segment.processing.lifecycle.PinotSegmentLifecycleEventListenerManager;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
+import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
 import org.apache.pinot.spi.data.Schema;
@@ -253,6 +254,9 @@ public abstract class BaseControllerStarter implements ServiceStartable {
 
     // Initialize the table config tuner registry.
     TableConfigTunerRegistry.init(_config.getTableConfigTunerPackages());
+
+    TableConfigUtils.setDisableGroovy(_config.isDisableIngestionGroovy());
+    TableConfigUtils.setEnforcePoolBasedAssignment(_config.isEnforcePoolBasedAssignmentEnabled());
   }
 
   private void inferHostnameIfNeeded(ControllerConf config) {

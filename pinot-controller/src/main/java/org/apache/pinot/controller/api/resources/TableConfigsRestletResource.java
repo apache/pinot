@@ -448,16 +448,14 @@ public class TableConfigsRestletResource {
         Preconditions.checkState(offlineRawTableName.equals(rawTableName),
             "Name in 'offline' table config: %s must be equal to 'tableName': %s", offlineRawTableName, rawTableName);
         TableConfigUtils.validateTableName(offlineTableConfig);
-        TableConfigUtils.validate(offlineTableConfig, schema, typesToSkip, _controllerConf.isDisableIngestionGroovy(),
-            _controllerConf.isInstancePoolAndReplicaGroupCheckEnabled());
+        TableConfigUtils.validate(offlineTableConfig, schema, typesToSkip);
       }
       if (realtimeTableConfig != null) {
         String realtimeRawTableName = TableNameBuilder.extractRawTableName(realtimeTableConfig.getTableName());
         Preconditions.checkState(realtimeRawTableName.equals(rawTableName),
             "Name in 'realtime' table config: %s must be equal to 'tableName': %s", realtimeRawTableName, rawTableName);
         TableConfigUtils.validateTableName(realtimeTableConfig);
-        TableConfigUtils.validate(realtimeTableConfig, schema, typesToSkip, _controllerConf.isDisableIngestionGroovy(),
-            _controllerConf.isInstancePoolAndReplicaGroupCheckEnabled());
+        TableConfigUtils.validate(realtimeTableConfig, schema, typesToSkip);
       }
       if (offlineTableConfig != null && realtimeTableConfig != null) {
         TableConfigUtils.verifyHybridTableConfigs(rawTableName, offlineTableConfig, realtimeTableConfig);

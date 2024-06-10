@@ -325,7 +325,10 @@ public class TableConfigUtilsTest {
 
     // invalid transform config since Groovy is disabled
     try {
-      TableConfigUtils.validate(tableConfig, schema, null, true, false);
+      TableConfigUtils.setDisableGroovy(true);
+      TableConfigUtils.validate(tableConfig, schema, null);
+      // Reset to false
+      TableConfigUtils.setDisableGroovy(false);
       Assert.fail("Should fail when Groovy functions disabled but found in transform config");
     } catch (IllegalStateException e) {
       // expected
@@ -358,7 +361,10 @@ public class TableConfigUtilsTest {
     // invalid filter config since Groovy is disabled
     ingestionConfig.setFilterConfig(new FilterConfig("Groovy({timestamp > 0}, timestamp)"));
     try {
-      TableConfigUtils.validate(tableConfig, schema, null, true, false);
+      TableConfigUtils.setDisableGroovy(true);
+      TableConfigUtils.validate(tableConfig, schema, null);
+      // Reset to false
+      TableConfigUtils.setDisableGroovy(false);
       Assert.fail("Should fail when Groovy functions disabled but found in filter config");
     } catch (IllegalStateException e) {
       // expected
@@ -2113,7 +2119,7 @@ public class TableConfigUtilsTest {
     }
 
     // validate that TASK config will be skipped with skip string.
-    TableConfigUtils.validate(tableConfig, schema, "TASK,UPSERT", false, false);
+    TableConfigUtils.validate(tableConfig, schema, "TASK,UPSERT");
 
     // invalid period
     HashMap<String, String> invalidPeriodConfig = new HashMap<>(realtimeToOfflineTaskConfig);

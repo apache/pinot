@@ -127,11 +127,23 @@ public final class TableConfigUtils {
       ImmutableSet.of(RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE,
           RoutingConfig.MULTI_STAGE_REPLICA_GROUP_SELECTOR_TYPE);
 
+  private static boolean _disableGroovy;
+
+  private static boolean _enforcePoolBasedAssignment;
+
+  public static void setDisableGroovy(boolean disableGroovy) {
+    _disableGroovy = disableGroovy;
+  }
+
+  public static void setEnforcePoolBasedAssignment(boolean enforcePoolBasedAssignment) {
+    _enforcePoolBasedAssignment = enforcePoolBasedAssignment;
+  }
+
   /**
-   * @see TableConfigUtils#validate(TableConfig, Schema, String, boolean, boolean)
+   * @see TableConfigUtils#validate(TableConfig, Schema, String)
    */
   public static void validate(TableConfig tableConfig, @Nullable Schema schema) {
-    validate(tableConfig, schema, null, false, false);
+    validate(tableConfig, schema, null);
   }
 
   /**
@@ -145,8 +157,7 @@ public final class TableConfigUtils {
    *
    * TODO: Add more validations for each section (e.g. validate conditions are met for aggregateMetrics)
    */
-  public static void validate(TableConfig tableConfig, @Nullable Schema schema, @Nullable String typesToSkip,
-      boolean disableGroovy, boolean validateIPnRG) {
+  public static void validate(TableConfig tableConfig, @Nullable Schema schema, @Nullable String typesToSkip) {
     Set<ValidationType> skipTypes = parseTypesToSkipString(typesToSkip);
     if (tableConfig.getTableType() == TableType.REALTIME) {
       Preconditions.checkState(schema != null, "Schema should not be null for REALTIME table");
@@ -158,7 +169,7 @@ public final class TableConfigUtils {
     if (!skipTypes.contains(ValidationType.ALL)) {
       validateTableSchemaConfig(tableConfig);
       validateValidationConfig(tableConfig, schema);
-      validateIngestionConfig(tableConfig, schema, disableGroovy);
+      validateIngestionConfig(tableConfig, schema);
 
       // Only allow realtime tables with non-null stream.type and LLC consumer.type
       if (tableConfig.getTableType() == TableType.REALTIME) {
@@ -185,7 +196,7 @@ public final class TableConfigUtils {
         validateTaskConfigs(tableConfig, schema);
       }
 
-      if (validateIPnRG) {
+      if (_enforcePoolBasedAssignment) {
         validateInstancePoolsNReplicaGroups(tableConfig);
       }
     }
@@ -341,11 +352,6 @@ public final class TableConfigUtils {
     validateRetentionConfig(tableConfig);
   }
 
-  @VisibleForTesting
-  public static void validateIngestionConfig(TableConfig tableConfig, @Nullable Schema schema) {
-    validateIngestionConfig(tableConfig, schema, false);
-  }
-
   /**
    * Validates the following:
    * 1. validity of filter function
@@ -356,7 +362,7 @@ public final class TableConfigUtils {
    * 6. ingestion type for dimension tables
    */
   @VisibleForTesting
-  public static void validateIngestionConfig(TableConfig tableConfig, @Nullable Schema schema, boolean disableGroovy) {
+  public static void validateIngestionConfig(TableConfig tableConfig, @Nullable Schema schema) {
     IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
 
     if (ingestionConfig != null) {
@@ -399,7 +405,7 @@ public final class TableConfigUtils {
       if (filterConfig != null) {
         String filterFunction = filterConfig.getFilterFunction();
         if (filterFunction != null) {
-          if (disableGroovy && FunctionEvaluatorFactory.isGroovyExpression(filterFunction)) {
+          if (_disableGroovy && FunctionEvaluatorFactory.isGroovyExpression(filterFunction)) {
             throw new IllegalStateException(
                 "Groovy filter functions are disabled for table config. Found '" + filterFunction + "'");
           }
@@ -542,7 +548,7 @@ public final class TableConfigUtils {
       if (enrichmentConfigs != null) {
         for (EnrichmentConfig enrichmentConfig : enrichmentConfigs) {
           RecordEnricherRegistry.validateEnrichmentConfig(enrichmentConfig,
-              new RecordEnricherValidationConfig(disableGroovy));
+              new RecordEnricherValidationConfig(_disableGroovy));
         }
       }
 
@@ -568,7 +574,7 @@ public final class TableConfigUtils {
                     + "aggregations");
           }
           FunctionEvaluator expressionEvaluator;
-          if (disableGroovy && FunctionEvaluatorFactory.isGroovyExpression(transformFunction)) {
+          if (_disableGroovy && FunctionEvaluatorFactory.isGroovyExpression(transformFunction)) {
             throw new IllegalStateException(
                 "Groovy transform functions are disabled for table config. Found '" + transformFunction
                     + "' for column '" + columnName + "'");

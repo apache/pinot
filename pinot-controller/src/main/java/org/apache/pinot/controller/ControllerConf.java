@@ -1069,7 +1069,7 @@ public class ControllerConf extends PinotConfiguration {
     return value;
   }
 
-  public boolean isInstancePoolAndReplicaGroupCheckEnabled() {
+  public boolean isEnforcePoolBasedAssignmentEnabled() {
     return getProperty(ENFORCE_POOL_BASED_ASSIGNMENT_KEY, DEFAULT_ENFORCE_POOL_BASED_ASSIGNMENT);
   }
 }
