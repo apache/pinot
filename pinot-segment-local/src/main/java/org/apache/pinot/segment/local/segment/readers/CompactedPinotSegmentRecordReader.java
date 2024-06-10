@@ -26,6 +26,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
+import org.apache.pinot.spi.utils.BooleanUtils;
 import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -36,19 +37,25 @@ import org.roaringbitmap.RoaringBitmap;
 public class CompactedPinotSegmentRecordReader implements RecordReader {
   private final PinotSegmentRecordReader _pinotSegmentRecordReader;
   private final RoaringBitmap _validDocIdsBitmap;
-
+  private final String _deleteRecordColumn;
+  // Reusable generic row to store the next row to return
+  private final GenericRow _nextRow = new GenericRow();
   // Valid doc ids iterator
   private PeekableIntIterator _validDocIdsIterator;
-  // Reusable generic row to store the next row to return
-  private GenericRow _nextRow = new GenericRow();
   // Flag to mark whether we need to fetch another row
   private boolean _nextRowReturned = true;
 
   public CompactedPinotSegmentRecordReader(File indexDir, RoaringBitmap validDocIds) {
+    this(indexDir, validDocIds, null);
+  }
+
+  public CompactedPinotSegmentRecordReader(File indexDir, RoaringBitmap validDocIds,
+      @Nullable String deleteRecordColumn) {
     _pinotSegmentRecordReader = new PinotSegmentRecordReader();
     _pinotSegmentRecordReader.init(indexDir, null, null);
     _validDocIdsBitmap = validDocIds;
     _validDocIdsIterator = validDocIds.getIntIterator();
+    _deleteRecordColumn = deleteRecordColumn;
   }
 
   @Override
@@ -67,11 +74,14 @@ public class CompactedPinotSegmentRecordReader implements RecordReader {
       return true;
     }
 
-    // Try to get the next row to return
-    if (_validDocIdsIterator.hasNext()) {
+    // Try to get the next row to return, skip invalid doc and deleted doc.
+    while (_validDocIdsIterator.hasNext()) {
       int docId = _validDocIdsIterator.next();
       _nextRow.clear();
       _pinotSegmentRecordReader.getRecord(docId, _nextRow);
+      if (_deleteRecordColumn != null && BooleanUtils.toBoolean(_nextRow.getValue(_deleteRecordColumn))) {
+        continue;
+      }
       _nextRowReturned = false;
       return true;
     }
