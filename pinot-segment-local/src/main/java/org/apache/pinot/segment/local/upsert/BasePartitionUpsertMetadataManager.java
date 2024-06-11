@@ -48,6 +48,7 @@ import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
 import org.apache.helix.model.IdealState;
+import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerGauge;
@@ -105,8 +106,12 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
 
   // Tracks all the segments managed by this manager (excluding EmptySegment)
   protected final Set<IndexSegment> _trackedSegments = ConcurrentHashMap.newKeySet();
+  // This is to track all the segments where changes took place post last snapshot
+  // Note: we need not take any _snapshotLock while updating this set as it is only updated by the upsert thread
+  protected final Set<IndexSegment> _updatedSegmentsSinceLastSnapshot = ConcurrentHashMap.newKeySet();
 
   // NOTE: We do not persist snapshot on the first consuming segment because most segments might not be loaded yet
+  // We only do this for Full-Upsert tables, for partial-upsert tables, we have a check allSegmentsLoaded
   protected volatile boolean _gotFirstConsumingSegment = false;
   protected final ReadWriteLock _snapshotLock;
 
@@ -874,8 +879,10 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     if (!_enableSnapshot) {
       return;
     }
-    if (!_gotFirstConsumingSegment) {
-      _logger.info("Skip taking snapshot before getting the first consuming segment");
+    if (_partialUpsertHandler == null && !_gotFirstConsumingSegment) {
+      // We only skip for full-Upsert tables, for partial-upsert tables, we have a check allSegmentsLoaded in
+      // RealtimeTableDataManager
+      _logger.info("Skip taking snapshot before getting the first consuming segment for full-upsert table");
       return;
     }
     if (!startOperation()) {
@@ -897,7 +904,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     }
   }
 
-  // TODO: Consider optimizing it by tracking and persisting only the changed snapshot
   protected void doTakeSnapshot() {
     int numTrackedSegments = _trackedSegments.size();
     long numPrimaryKeysInSnapshot = 0L;
@@ -916,19 +922,34 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         numConsumingSegments++;
         continue;
       }
-      ImmutableSegmentImpl immutableSegment = (ImmutableSegmentImpl) segment;
-      if (!immutableSegment.hasValidDocIdsSnapshotFile()) {
-        segmentsWithoutSnapshot.add(immutableSegment);
+      if (!_updatedSegmentsSinceLastSnapshot.contains(segment)) {
+        // if no updates since last snapshot then skip
         continue;
       }
-      immutableSegment.persistValidDocIdsSnapshot();
-      numImmutableSegments++;
-      numPrimaryKeysInSnapshot += immutableSegment.getValidDocIds().getMutableRoaringBitmap().getCardinality();
+      try {
+        ImmutableSegmentImpl immutableSegment = (ImmutableSegmentImpl) segment;
+        if (!immutableSegment.hasValidDocIdsSnapshotFile()) {
+          segmentsWithoutSnapshot.add(immutableSegment);
+          continue;
+        }
+        immutableSegment.persistValidDocIdsSnapshot();
+        _updatedSegmentsSinceLastSnapshot.remove(segment);
+        numImmutableSegments++;
+        numPrimaryKeysInSnapshot += immutableSegment.getValidDocIds().getMutableRoaringBitmap().getCardinality();
+      } catch (Exception e) {
+        _logger.warn("Caught exception while taking snapshot for segment: {}, skipping", segment.getSegmentName(), e);
+        Utils.rethrowException(e);
+      }
     }
     for (ImmutableSegmentImpl segment : segmentsWithoutSnapshot) {
-      segment.persistValidDocIdsSnapshot();
-      numImmutableSegments++;
-      numPrimaryKeysInSnapshot += segment.getValidDocIds().getMutableRoaringBitmap().getCardinality();
+      try {
+        segment.persistValidDocIdsSnapshot();
+        numImmutableSegments++;
+        numPrimaryKeysInSnapshot += segment.getValidDocIds().getMutableRoaringBitmap().getCardinality();
+      } catch (Exception e) {
+        _logger.warn("Caught exception while taking snapshot for segment: {}, skipping", segment.getSegmentName(), e);
+        Utils.rethrowException(e);
+      }
     }
 
     _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId,
@@ -1112,6 +1133,10 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         // refreshing is done.
         doBatchRefreshUpsertView(_upsertViewRefreshIntervalMs);
       }
+      if (_enableSnapshot) {
+        _updatedSegmentsSinceLastSnapshot.add(newSegment);
+        _updatedSegmentsSinceLastSnapshot.add(oldSegment);
+      }
     }
   }
 
@@ -1142,6 +1167,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         // Batch refresh takes WLock. Do it outside RLock for clarity.
         doBatchRefreshUpsertView(_upsertViewRefreshIntervalMs);
       }
+      if (_enableSnapshot) {
+        _updatedSegmentsSinceLastSnapshot.add(segment);
+      }
     }
   }
 
@@ -1158,6 +1186,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         _upsertViewLock.readLock().unlock();
         // Batch refresh takes WLock. Do it outside RLock for clarity.
         doBatchRefreshUpsertView(_upsertViewRefreshIntervalMs);
+      }
+      if (_enableSnapshot) {
+        _updatedSegmentsSinceLastSnapshot.add(segment);
       }
     }
   }
@@ -1182,6 +1213,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         _upsertViewLock.readLock().unlock();
         // Batch refresh takes WLock. Do it outside RLock for clarity.
         doBatchRefreshUpsertView(_upsertViewRefreshIntervalMs);
+      }
+      if (_enableSnapshot) {
+        _updatedSegmentsSinceLastSnapshot.add(segment);
       }
     }
   }
