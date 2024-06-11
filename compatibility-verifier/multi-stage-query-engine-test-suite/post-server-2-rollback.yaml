@@ -18,16 +18,16 @@
 #
 
 # Operations to be done.
-description: Operations to be run after controller rollback
+description: Operations to be run after server rollback
 operations:
   - type: segmentOp
-    description: Add segment FeatureTest1_Segment9 to table FeatureTest1
+    description: Add segment FeatureTest1_Segment6 to table FeatureTest1
     op: UPLOAD
     inputDataFileName: data/FeatureTest1-data-00.csv
     schemaFileName: FeatureTest1-schema.json
     tableConfigFileName: feature-test-1.json
     recordReaderConfigFileName: data/recordReaderConfig.json
-    segmentName: FeatureTest1_Segment9
+    segmentName: FeatureTest1_Segment6
   - type: streamOp
     description: publish rows to PinotRealtimeFeatureTest2Event
     op: PRODUCE
@@ -41,13 +41,3 @@ operations:
     useMultiStageQueryEngine: true
     queryFileName: queries/feature-test-multi-stage.queries
     expectedResultsFileName: query-results/feature-test-multi-stage.results
-  - type: segmentOp
-    description: Delete segment FeatureTest1_Segment
-    op: DELETE
-    tableConfigFileName: feature-test-1.json
-    segmentName: FeatureTest1_Segment
-  - type: tableOp
-    description: Delete table feature-test-1.json
-    op: DELETE
-    schemaFileName: FeatureTest1-schema.json
-    tableConfigFileName: feature-test-1.json
