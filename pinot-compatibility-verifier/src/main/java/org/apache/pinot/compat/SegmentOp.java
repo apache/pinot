@@ -85,6 +85,7 @@ public class SegmentOp extends BaseOp {
     super(OpType.SEGMENT_OP);
   }
 
+
   public Op getOp() {
     return _op;
   }
