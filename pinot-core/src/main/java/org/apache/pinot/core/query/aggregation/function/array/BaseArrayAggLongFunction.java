@@ -96,6 +96,9 @@ public abstract class BaseArrayAggLongFunction<I extends AbstractLongCollection>
 
   @Override
   public LongArrayList extractFinalResult(I arrayList) {
+    if (arrayList == null) {
+      return new LongArrayList();
+    }
     return new LongArrayList(arrayList);
   }
 }
