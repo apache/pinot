@@ -26,6 +26,10 @@
 <module name="Checker">
   <property name="severity" value="${checkstyle.severity}" default="warning"/>
 
+  <!-- Filters: https://checkstyle.org/filters/index.html -->
+
+  <module name="SuppressWithPlainTextCommentFilter"/>
+
   <!-- LENGTHS -->
 
   <!-- Desired line length is 120 -->
