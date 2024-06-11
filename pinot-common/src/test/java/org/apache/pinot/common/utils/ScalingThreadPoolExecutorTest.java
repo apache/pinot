@@ -57,6 +57,21 @@ public class ScalingThreadPoolExecutorTest {
         "Timed out waiting for thread pool to scale down");
   }
 
+  @Test
+  public void testRapidSubmission() {
+    ThreadPoolExecutor executorService = (ThreadPoolExecutor) ScalingThreadPoolExecutor.newScalingThreadPool(0, 4, 0L);
+    Runnable r1 = getSleepingRunnable();
+    Runnable r2 = getSleepingRunnable();
+
+    // When Runnables are submitted rapidly, the pool should scale up to 2 threads. The previous test cases can fail
+    // to catch such a race condition because Runnables are initialized as they are submitted, which introduced enough
+    // delay to avoid the condition
+    executorService.submit(r1);
+    executorService.submit(r2);
+    TestUtils.waitForCondition(aVoid -> executorService.getPoolSize() == 2, 2000,
+        "Timed out waiting for thread pool to scale up");
+  }
+
   private Runnable getSleepingRunnable() {
     return () -> {
       try {

@@ -33,12 +33,13 @@ import javax.annotation.Nonnull;
  * ScalingThreadPoolExecutor is an auto-scaling ThreadPoolExecutor. If there is no available thread for a new task,
  * a new thread will be created by the internal ThreadPoolExecutor to process the task (up to maximumPoolSize). If
  * there is an available thread, no additional thread will be created.
- *
+ * <p>
  * This is done by creating a ScalingQueue that will 'reject' a new task if there are no available threads, forcing
  * the pool to create a new thread. The rejection is then handled to queue the task anyway.
- *
+ * <p>
  * This differs from the plain ThreadPoolExecutor implementation which does not create new threads if the queue (not
- * thread pool) has capacity. For a more complete explanation, see:
+ * thread pool) has capacity. For a more complete explanation, see (note: the orginal version includes a race
+ * condition, and the implementation here differs slightly):
  * https://github.com/kimchy/kimchy.github.com/blob/master/_posts/2008-11-23-juc-executorservice-gotcha.textile
  */
 public class ScalingThreadPoolExecutor extends ThreadPoolExecutor {
@@ -76,7 +77,6 @@ public class ScalingThreadPoolExecutor extends ThreadPoolExecutor {
     ScalingQueue<Runnable> queue = new ScalingQueue<>();
     ThreadPoolExecutor executor = new ScalingThreadPoolExecutor(min, max, keepAliveTime, TimeUnit.MILLISECONDS, queue);
     executor.setRejectedExecutionHandler(new ForceQueuePolicy());
-    queue.setThreadPoolExecutor(executor);
     return executor;
   }
 
@@ -100,29 +100,42 @@ public class ScalingThreadPoolExecutor extends ThreadPoolExecutor {
    */
   static class ScalingQueue<E> extends LinkedBlockingQueue<E> {
 
-    private ThreadPoolExecutor _executor;
+    AtomicInteger _currentIdleThreadCount = new AtomicInteger(0);
 
     // Creates a queue of size Integer.MAX_SIZE
     public ScalingQueue() {
       super();
     }
 
-    // Sets the executor this queue belongs to
-    public void setThreadPoolExecutor(ThreadPoolExecutor executor) {
-      _executor = executor;
+    @Override
+    @Nonnull
+    public E take()
+        throws InterruptedException {
+      _currentIdleThreadCount.incrementAndGet();
+      E e = super.take();
+      _currentIdleThreadCount.decrementAndGet();
+      return e;
+    }
+
+    @Override
+    public E poll(long timeout, TimeUnit unit)
+        throws InterruptedException {
+      _currentIdleThreadCount.incrementAndGet();
+      E e = super.poll(timeout, unit);
+      _currentIdleThreadCount.decrementAndGet();
+      return e;
     }
 
     /**
-     * Inserts the specified element at the tail of this queue if there is at least one available thread
-     * to run the current task. If all pool threads are actively busy, it rejects the offer.
+     * Inserts the specified element at the tail of this queue if there is at least one idle thread
+     * to run the current task. If all pool threads are actively busy, the offer is rejected.
      *
      * @param e the element to add.
      * @return true if it was possible to add the element to this queue, else false
      */
     @Override
     public boolean offer(@Nonnull E e) {
-      int allWorkingThreads = _executor.getActiveCount() + super.size();
-      return allWorkingThreads < _executor.getPoolSize() && super.offer(e);
+      return _currentIdleThreadCount.get() > 0 && super.offer(e);
     }
   }
 }
