@@ -187,8 +187,8 @@ public class ExternalViewReader {
 
   public Map<String, List<String>> getTableToBrokersMap() {
     Map<String, List<String>> tableToBrokersMap = new HashMap<>();
-    Map<String, Set<BrokerInfo>> tableToBrokerInfosMap = getTableToBrokerInfosMap();
-    for (Entry<String, Set<BrokerInfo>> entry : tableToBrokerInfosMap.entrySet()) {
+    Map<String, List<BrokerInfo>> tableToBrokerInfosMap = getTableToBrokerInfosMap();
+    for (Entry<String, List<BrokerInfo>> entry : tableToBrokerInfosMap.entrySet()) {
       tableToBrokersMap.put(entry.getKey(),
           entry.getValue().stream().map(b -> b.getHostPort(_preferTlsPort)).collect(Collectors.toList()));
     }
