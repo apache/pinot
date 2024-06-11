@@ -705,8 +705,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         if (_partitionUpsertMetadataManager != null) {
           if (_tableConfig.getUpsertMetadataTTL() > 0) {
             // If upsertMetadataTTL is enabled, we will remove expired primary keys from upsertMetadata
-            // AFTER taking a snapshot. Taking the snapshot first is crucial to ensure we capture the final
-            // state of a particular key before it exits the TTL window.
+            // AFTER taking a snapshot. Taking the snapshot first is crucial to capture the final
+            // state of each key before it exits the TTL window. Out-of-TTL segments are skipped in
+            // the doAddSegment flow, and the snapshot is used to enableUpsert on the immutable out-of-TTL segment.
+            // If no snapshot is found, the entire segment is marked as valid and queryable.
             _partitionUpsertMetadataManager.takeSnapshot();
             _partitionUpsertMetadataManager.removeExpiredPrimaryKeys();
           } else {
