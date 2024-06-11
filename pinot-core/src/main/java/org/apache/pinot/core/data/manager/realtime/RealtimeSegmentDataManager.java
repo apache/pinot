@@ -226,7 +226,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
   private static final int MINIMUM_CONSUME_TIME_MINUTES = 10;
   private static final long TIME_THRESHOLD_FOR_LOG_MINUTES = 1;
-  private static final long TIME_EXTENSION_ON_EMPTY_SEGMENT_HOURS = 1;
   private static final int MSG_COUNT_THRESHOLD_FOR_LOG = 100000;
   private static final int BUILD_TIME_LEASE_SECONDS = 30;
   private static final int MAX_CONSECUTIVE_ERROR_COUNT = 5;
@@ -269,7 +268,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
   // Segment end criteria
   private volatile long _consumeEndTime = 0;
-  private volatile boolean _hasMessagesFetched = false;
   private volatile boolean _endOfPartitionGroup = false;
   private volatile boolean _forceCommitMessageReceived = false;
   private volatile StreamPartitionMsgOffset _finalOffset; // Exclusive, used when we want to catch up to this one
@@ -331,11 +329,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         //   - partition group is ended
         //   - force commit message has been received
         if (now >= _consumeEndTime) {
-          if (!_hasMessagesFetched) {
-            _segmentLogger.info("No events came in, extending time by {} hours", TIME_EXTENSION_ON_EMPTY_SEGMENT_HOURS);
-            _consumeEndTime += TimeUnit.HOURS.toMillis(TIME_EXTENSION_ON_EMPTY_SEGMENT_HOURS);
-            return false;
-          }
           _segmentLogger
               .info("Stopping consumption due to time limit start={} now={} numRowsConsumed={} numRowsIndexed={}",
                   _startTimeMs, now, _numRowsConsumed, _numRowsIndexed);
@@ -661,7 +654,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     updateCurrentDocumentCountMetrics();
     if (messageBatch.getUnfilteredMessageCount() > 0) {
       updateIngestionMetrics(messageBatch.getLastMessageMetadata());
-      _hasMessagesFetched = true;
       if (streamMessageCount > 0 && _segmentLogger.isDebugEnabled()) {
         _segmentLogger.debug("Indexed {} messages ({} messages read from stream) current offset {}",
             indexedMessageCount, streamMessageCount, _currentOffset);

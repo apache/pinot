@@ -582,10 +582,6 @@ public class RealtimeSegmentDataManagerTest {
       Assert.assertFalse(segmentDataManager.invokeEndCriteriaReached());
       // We should still get false because there is no messages fetched
       segmentDataManager._timeSupplier.add(Fixtures.MAX_TIME_FOR_SEGMENT_CLOSE_MS + 1);
-      Assert.assertFalse(segmentDataManager.invokeEndCriteriaReached());
-      // Once there are messages fetched, and the time exceeds the extended hour, we should get true
-      setHasMessagesFetched(segmentDataManager, true);
-      segmentDataManager._timeSupplier.add(TimeUnit.HOURS.toMillis(1));
       Assert.assertTrue(segmentDataManager.invokeEndCriteriaReached());
       Assert.assertEquals(segmentDataManager.getStopReason(), SegmentCompletionProtocol.REASON_TIME_LIMIT);
     }
@@ -636,13 +632,6 @@ public class RealtimeSegmentDataManagerTest {
       segmentDataManager._timeSupplier.set(endTime);
       Assert.assertTrue(segmentDataManager.invokeEndCriteriaReached());
     }
-  }
-
-  private void setHasMessagesFetched(FakeRealtimeSegmentDataManager segmentDataManager, boolean hasMessagesFetched)
-      throws Exception {
-    Field field = RealtimeSegmentDataManager.class.getDeclaredField("_hasMessagesFetched");
-    field.setAccessible(true);
-    field.set(segmentDataManager, hasMessagesFetched);
   }
 
   // If commit fails, make sure that we do not re-build the segment when we try to commit again.
