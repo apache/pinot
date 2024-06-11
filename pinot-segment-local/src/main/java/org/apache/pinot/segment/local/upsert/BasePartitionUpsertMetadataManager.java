@@ -48,6 +48,7 @@ import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
 import org.apache.helix.model.IdealState;
+import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerGauge;
@@ -895,6 +896,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         numPrimaryKeysInSnapshot += immutableSegment.getValidDocIds().getMutableRoaringBitmap().getCardinality();
       } catch (Exception e) {
         _logger.warn("Caught exception while taking snapshot for segment: {}, skipping", segment.getSegmentName(), e);
+        Utils.rethrowException(e);
       }
     }
     for (ImmutableSegmentImpl segment : segmentsWithoutSnapshot) {
@@ -904,6 +906,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         numPrimaryKeysInSnapshot += segment.getValidDocIds().getMutableRoaringBitmap().getCardinality();
       } catch (Exception e) {
         _logger.warn("Caught exception while taking snapshot for segment: {}, skipping", segment.getSegmentName(), e);
+        Utils.rethrowException(e);
       }
     }
 
