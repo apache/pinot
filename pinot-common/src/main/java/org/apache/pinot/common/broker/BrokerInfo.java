@@ -21,6 +21,9 @@ package org.apache.pinot.common.broker;
 import java.util.Objects;
 
 
+/**
+ * Store ID and network information about Brokers required by components that have to select a broker.
+ */
 public class BrokerInfo {
   private final String _instanceId;
   private final String _hostname;
@@ -35,6 +38,7 @@ public class BrokerInfo {
   }
 
   public BrokerInfo(String hostname, int port) {
+    // If an instance ID is not specified, then use host:port as the identifier.
     _instanceId = hostname + ":" + port;
     _hostname = hostname;
     _port = port;
@@ -61,6 +65,7 @@ public class BrokerInfo {
     return String.format("%s:%s", _hostname, preferTlsPort && _tlsPort > 0 ? _tlsPort : _port);
   }
 
+  // equals only uses Instance ID to check for equality.
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -73,6 +78,7 @@ public class BrokerInfo {
     return Objects.equals(getInstanceId(), that.getInstanceId());
   }
 
+  // hashCode only uses Instance ID to generate the hash.
   @Override
   public int hashCode() {
     return Objects.hash(getInstanceId());

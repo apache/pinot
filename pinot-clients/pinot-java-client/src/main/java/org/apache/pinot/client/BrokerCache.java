@@ -143,7 +143,7 @@ public class BrokerCache {
 
   private BrokerData getBrokerData(Map<String, List<BrokerInstance>> responses) {
     Set<String> brokers = new HashSet<>();
-    Map<String, Set<BrokerInfo>> tableToBrokersMap = new HashMap<>();
+    Map<String, List<BrokerInfo>> tableToBrokersMap = new HashMap<>();
     Set<String> uniqueTableNames = new HashSet<>();
 
     for (Map.Entry<String, List<BrokerInstance>> tableToBrokers : responses.entrySet()) {
@@ -154,7 +154,7 @@ public class BrokerCache {
         brokers.add(brokerInfo.getHostPort(false));
       });
       String tableName = tableToBrokers.getKey();
-      tableToBrokersMap.put(tableName, brokersForTable);
+      tableToBrokersMap.put(tableName, new ArrayList<>(brokersForTable));
 
       String rawTableName = TableNameBuilder.extractRawTableName(tableName);
       uniqueTableNames.add(rawTableName);
@@ -170,13 +170,13 @@ public class BrokerCache {
         String offlineTable = tableName + ExternalViewReader.OFFLINE_SUFFIX;
         String realtimeTable = tableName + ExternalViewReader.REALTIME_SUFFIX;
         if (tableToBrokersMap.containsKey(offlineTable) && tableToBrokersMap.containsKey(realtimeTable)) {
-          Set<BrokerInfo> realtimeBrokers = tableToBrokersMap.get(realtimeTable);
-          Set<BrokerInfo> offlineBrokers = tableToBrokersMap.get(offlineTable);
+          List<BrokerInfo> realtimeBrokers = tableToBrokersMap.get(realtimeTable);
+          List<BrokerInfo> offlineBrokers = tableToBrokersMap.get(offlineTable);
           realtimeBrokers.retainAll(offlineBrokers);
           tableToBrokersMap.put(tableName, realtimeBrokers);
         } else {
           tableToBrokersMap.put(tableName, tableToBrokersMap.getOrDefault(offlineTable,
-              tableToBrokersMap.getOrDefault(realtimeTable, new HashSet<>())));
+              tableToBrokersMap.getOrDefault(realtimeTable, new ArrayList<>())));
         }
       }
     });
@@ -197,7 +197,7 @@ public class BrokerCache {
         tableNames == null ? tableNames : Arrays.stream(tableNames).filter(Objects::nonNull).toArray(String[]::new);
     if (!(tableNames == null || tableNames.length == 0)) {
        // returning list of common brokers hosting all the tables.
-       Set<BrokerInfo> commonBrokers = BrokerSelectorUtils.getTablesCommonBrokers(Arrays.asList(tableNames),
+       List<BrokerInfo> commonBrokers = BrokerSelectorUtils.getTablesCommonBrokers(Arrays.asList(tableNames),
            _brokerData.getTableToBrokerMap());
        if (commonBrokers != null && !commonBrokers.isEmpty()) {
          brokers = commonBrokers.stream().map(br -> br.getHostPort(false)).collect(Collectors.toList());

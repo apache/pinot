@@ -22,11 +22,9 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
-import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
@@ -41,8 +39,8 @@ import org.I0Itec.zkclient.serialize.BytesPushThroughSerializer;
 public class DynamicBrokerSelector implements BrokerSelector, IZkDataListener {
   protected static final Random RANDOM = new Random();
 
-  protected final AtomicReference<Map<String, Set<BrokerInfo>>> _tableToBrokerListMapRef = new AtomicReference<>();
-  protected final AtomicReference<Set<BrokerInfo>> _allBrokerListRef = new AtomicReference<>();
+  protected final AtomicReference<Map<String, List<BrokerInfo>>> _tableToBrokerListMapRef = new AtomicReference<>();
+  protected final AtomicReference<List<BrokerInfo>> _allBrokerListRef = new AtomicReference<>();
   protected final ZkClient _zkClient;
   protected final ExternalViewReader _evReader;
   protected final List<String> _brokerList;
@@ -78,22 +76,22 @@ public class DynamicBrokerSelector implements BrokerSelector, IZkDataListener {
   }
 
   private void refresh() {
-    Map<String, Set<BrokerInfo>> tableToBrokerListMap = _evReader.getTableToBrokerInfosMap();
+    Map<String, List<BrokerInfo>> tableToBrokerListMap = _evReader.getTableToBrokerInfosMap();
     _tableToBrokerListMapRef.set(tableToBrokerListMap);
-    Set<BrokerInfo> brokerSet = new HashSet<>();
-    for (Set<BrokerInfo> brokerInfoSet : tableToBrokerListMap.values()) {
-      brokerSet.addAll(brokerInfoSet);
+    List<BrokerInfo> brokerList = new ArrayList<>();
+    for (List<BrokerInfo> brokerInfoSet : tableToBrokerListMap.values()) {
+      brokerList.addAll(brokerInfoSet);
     }
-    _allBrokerListRef.set(brokerSet);
+    _allBrokerListRef.set(brokerList);
   }
 
   @Nullable
   @Override
   public BrokerInfo selectBrokerInfo(String... tableNames) {
-    Set<BrokerInfo> brokerInfoList = _allBrokerListRef.get();
+    List<BrokerInfo> brokerInfoList = _allBrokerListRef.get();
     if (!(tableNames == null || tableNames.length == 0 || tableNames[0] == null)) {
       // getting list of brokers hosting all the tables.
-      Set<BrokerInfo> commonBrokers = BrokerSelectorUtils.getTablesCommonBrokers(Arrays.asList(tableNames),
+      List<BrokerInfo> commonBrokers = BrokerSelectorUtils.getTablesCommonBrokers(Arrays.asList(tableNames),
           _tableToBrokerListMapRef.get());
       if (commonBrokers != null && !commonBrokers.isEmpty()) {
         brokerInfoList = commonBrokers;
@@ -101,9 +99,8 @@ public class DynamicBrokerSelector implements BrokerSelector, IZkDataListener {
     }
 
     // Return a broker randomly if table is null or no broker is found for the specified table.
-    List<BrokerInfo> list = new ArrayList<>(brokerInfoList);
-    if (!list.isEmpty()) {
-      return list.get(RANDOM.nextInt(list.size()));
+    if (!brokerInfoList.isEmpty()) {
+      return brokerInfoList.get(RANDOM.nextInt(brokerInfoList.size()));
     }
     return null;
   }
