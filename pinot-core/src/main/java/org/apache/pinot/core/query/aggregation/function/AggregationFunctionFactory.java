@@ -441,13 +441,13 @@ public class AggregationFunctionFactory {
             return new SumValuesIntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum);
           case AVGVALUEINTEGERSUMTUPLESKETCH:
             return new AvgValueIntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum);
-          case PARENTEXPRMAX:
+          case PINOTPARENTAGGEXPRMAX:
             return new ParentExprMinMaxAggregationFunction(arguments, true);
-          case PARENTEXPRMIN:
+          case PINOTPARENTAGGEXPRMIN:
             return new ParentExprMinMaxAggregationFunction(arguments, false);
-          case CHILDEXPRMAX:
+          case PINOTCHILDAGGEXPRMAX:
             return new ChildExprMinMaxAggregationFunction(arguments, true);
-          case CHILDEXPRMIN:
+          case PINOTCHILDAGGEXPRMIN:
             return new ChildExprMinMaxAggregationFunction(arguments, false);
           case EXPRMAX:
           case EXPRMIN:

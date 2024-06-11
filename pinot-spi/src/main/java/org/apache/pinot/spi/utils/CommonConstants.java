@@ -1097,8 +1097,8 @@ public class CommonConstants {
   }
 
   public static class RewriterConstants {
-    public static final String PARENT_AGGREGATION_NAME_PREFIX = "parent";
-    public static final String CHILD_AGGREGATION_NAME_PREFIX = "child";
+    public static final String PARENT_AGGREGATION_NAME_PREFIX = "pinotparentagg";
+    public static final String CHILD_AGGREGATION_NAME_PREFIX = "pinotchildagg";
     public static final String CHILD_AGGREGATION_SEPERATOR = "@";
     public static final String CHILD_KEY_SEPERATOR = "_";
   }
