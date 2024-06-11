@@ -55,6 +55,30 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
   }
 
   @Test(dataProvider = "useBothQueryEngines")
+  public void testArrayAggWithEmptyPredicate(boolean useMultiStageQueryEngine) throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query =
+        String.format("SELECT "
+            + "arrayAgg(boolCol, 'BOOLEAN'), "
+            + "arrayAgg(intCol, 'INT'), "
+            + "arrayAgg(longCol, 'LONG'), "
+            // NOTE: FLOAT array is auto converted to DOUBLE array
+            + (useMultiStageQueryEngine ? "arrayAgg(floatCol, 'DOUBLE'), " : "arrayAgg(floatCol, 'FLOAT'), ")
+            + "arrayAgg(doubleCol, 'DOUBLE'), "
+            + "arrayAgg(stringCol, 'STRING'), "
+            + "arrayAgg(timestampCol, 'TIMESTAMP') "
+            + "FROM %s WHERE intCol < 0 LIMIT %d", getTableName(), getCountStarResult());
+    JsonNode jsonNode = postQuery(query);
+    JsonNode rows = jsonNode.get("resultTable").get("rows");
+    assertEquals(rows.size(), 1);
+    JsonNode row = rows.get(0);
+    assertEquals(row.size(), 7);
+    for (int i = 0; i < 7; i++) {
+      assertEquals(row.get(i).size(), 0);
+    }
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
   public void testArrayAggQueries(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);

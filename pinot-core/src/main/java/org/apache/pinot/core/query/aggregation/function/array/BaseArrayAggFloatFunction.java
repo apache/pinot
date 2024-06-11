@@ -93,6 +93,9 @@ public abstract class BaseArrayAggFloatFunction<I extends AbstractFloatCollectio
 
   @Override
   public FloatArrayList extractFinalResult(I floatArrayList) {
+    if (floatArrayList == null) {
+      return new FloatArrayList();
+    }
     return new FloatArrayList(floatArrayList);
   }
 }
