@@ -523,7 +523,7 @@ public class DataSchema {
         return (int[]) value;
       } else if (value instanceof IntArrayList) {
         // For ArrayAggregationFunction
-        return ((IntArrayList) value).elements();
+        return ArrayListUtils.toIntArray((IntArrayList) value);
       }
       throw new IllegalStateException(String.format("Cannot convert: '%s' to int[]", value));
     }
@@ -533,7 +533,7 @@ public class DataSchema {
         return (float[]) value;
       } else if (value instanceof FloatArrayList) {
         // For ArrayAggregationFunction
-        return ((FloatArrayList) value).elements();
+        return ArrayListUtils.toFloatArray((FloatArrayList) value);
       }
       throw new IllegalStateException(String.format("Cannot convert: '%s' to float[]", value));
     }
@@ -543,7 +543,7 @@ public class DataSchema {
         return (double[]) value;
       } else if (value instanceof DoubleArrayList) {
         // For HistogramAggregationFunction and ArrayAggregationFunction
-        return ((DoubleArrayList) value).elements();
+        return ArrayListUtils.toDoubleArray((DoubleArrayList) value);
       } else if (value instanceof int[]) {
         int[] intValues = (int[]) value;
         int length = intValues.length;
@@ -576,7 +576,7 @@ public class DataSchema {
         return (long[]) value;
       } else if (value instanceof LongArrayList) {
         // For FunnelCountAggregationFunction and ArrayAggregationFunction
-        return ((LongArrayList) value).elements();
+        return ArrayListUtils.toLongArray((LongArrayList) value);
       } else {
         int[] intValues = (int[]) value;
         int length = intValues.length;
@@ -593,7 +593,7 @@ public class DataSchema {
         return (String[]) value;
       } else if (value instanceof ObjectArrayList) {
         // For ArrayAggregationFunction
-        return ((ObjectArrayList<String>) value).toArray(new String[0]);
+        return ArrayListUtils.toStringArray((ObjectArrayList<String>) value);
       }
       throw new IllegalStateException(String.format("Cannot convert: '%s' to String[]", value));
     }
