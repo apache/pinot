@@ -26,7 +26,7 @@ import java.util.concurrent.RejectedExecutionHandler;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 
 /**
@@ -108,22 +108,26 @@ public class ScalingThreadPoolExecutor extends ThreadPoolExecutor {
     }
 
     @Override
-    @Nonnull
     public E take()
         throws InterruptedException {
       _currentIdleThreadCount.incrementAndGet();
-      E e = super.take();
-      _currentIdleThreadCount.decrementAndGet();
-      return e;
+      try {
+        return super.take();
+      } finally {
+        _currentIdleThreadCount.decrementAndGet();
+      }
     }
 
     @Override
+    @Nullable
     public E poll(long timeout, TimeUnit unit)
         throws InterruptedException {
       _currentIdleThreadCount.incrementAndGet();
-      E e = super.poll(timeout, unit);
-      _currentIdleThreadCount.decrementAndGet();
-      return e;
+      try {
+        return super.poll(timeout, unit);
+      } finally {
+        _currentIdleThreadCount.decrementAndGet();
+      }
     }
 
     /**
@@ -134,7 +138,7 @@ public class ScalingThreadPoolExecutor extends ThreadPoolExecutor {
      * @return true if it was possible to add the element to this queue, else false
      */
     @Override
-    public boolean offer(@Nonnull E e) {
+    public boolean offer(E e) {
       return _currentIdleThreadCount.get() > 0 && super.offer(e);
     }
   }
