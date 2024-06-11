@@ -54,7 +54,9 @@ import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerTimer;
+import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.SegmentUtils;
+import org.apache.pinot.common.utils.UploadedRealtimeSegmentName;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
@@ -558,6 +560,46 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   protected void addSegmentWithoutUpsert(ImmutableSegmentImpl segment, ThreadSafeMutableRoaringBitmap validDocIds,
       @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, Iterator<RecordInfo> recordInfoIterator) {
     addOrReplaceSegment(segment, validDocIds, queryableDocIds, recordInfoIterator, null, null);
+  }
+
+  /**
+   * <li> When the replacing segment and current segment are of {@link LLCSegmentName} then the PK should resolve to
+   * row in segment with higher sequence id.
+   * <li> If either or both are not LLC segment, then resolve based on creation time of segment. If creation time is
+   * same then prefer uploaded segment if other is LLCSegmentName
+   * <li> If both are uploaded segment, prefer standard UploadedRealtimeSegmentName, if still a tie, then resolve to
+   * current segment.
+   *
+   * @param segmentName replacing segment name
+   * @param currentSegmentName current segment name having the record for the given primary key
+   * @param segmentCreationTimeMs replacing segment creation time
+   * @param currentSegmentCreationTimeMs current segment creation time
+   * @return true if the record in replacing segment should replace the record in current segment
+   */
+  protected boolean shouldReplaceOnComparisonTie(String segmentName, String currentSegmentName,
+      long segmentCreationTimeMs, long currentSegmentCreationTimeMs) {
+    // resolve using sequence id if both are LLCSegmentName
+    LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentName);
+    LLCSegmentName currentLLCSegmentName = LLCSegmentName.of(currentSegmentName);
+    if (llcSegmentName != null && currentLLCSegmentName != null) {
+      return llcSegmentName.getSequenceNumber() > currentLLCSegmentName.getSequenceNumber();
+    }
+
+    // either or both are uploaded segments, prefer the latest segment
+    int creationTimeComparisonRes = Long.compare(segmentCreationTimeMs, currentSegmentCreationTimeMs);
+    if (creationTimeComparisonRes != 0) {
+      return creationTimeComparisonRes > 0;
+    }
+
+    // if both are uploaded segment, prefer standard UploadedRealtimeSegmentName, if still a tie, then resolve to
+    // current segment
+    if (UploadedRealtimeSegmentName.of(currentSegmentName) != null) {
+      return false;
+    }
+    if (UploadedRealtimeSegmentName.of(segmentName) != null) {
+      return true;
+    }
+    return false;
   }
 
   @Override
