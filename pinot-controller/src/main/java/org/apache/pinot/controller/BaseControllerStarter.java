@@ -260,7 +260,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
       _tenantRebalancer = new DefaultTenantRebalancer(_helixResourceManager, _tenantRebalanceExecutorService);
     }
 
-    LOGGER.info("Using DynamicBrokerSelector with Zookeeper: {} and cluster name: {}", _helixZkURL, _helixClusterName);
+    LOGGER.info("Using CommonTenantBrokerSelector with Zookeeper: {} and cluster name: {}", _helixZkURL, _helixClusterName);
     _brokerSelector = new CommonTenantBrokerSelector(String.format("%s/%s", _helixZkURL, _helixClusterName));
 
     // Initialize the table config tuner registry.
