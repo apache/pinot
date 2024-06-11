@@ -29,16 +29,15 @@ import org.slf4j.LoggerFactory;
 
 
 public class TableUpsertMetadataManagerFactory {
-  private TableUpsertMetadataManagerFactory() {
-  }
-
-  private static final Logger LOGGER = LoggerFactory.getLogger(TableUpsertMetadataManagerFactory.class);
   public static final String UPSERT_DEFAULT_METADATA_MANAGER_CLASS = "default.metadata.manager.class";
   public static final String UPSERT_DEFAULT_ENABLE_SNAPSHOT = "default.enable.snapshot";
   public static final String UPSERT_DEFAULT_ENABLE_PRELOAD = "default.enable.preload";
-
   public static final String UPSERT_DEFAULT_ALLOW_PARTIAL_UPSERT_CONSUMPTION_DURING_COMMIT =
       "default.allow.partial.upsert.consumption.during.commit";
+  private static final Logger LOGGER = LoggerFactory.getLogger(TableUpsertMetadataManagerFactory.class);
+
+  private TableUpsertMetadataManagerFactory() {
+  }
 
   public static TableUpsertMetadataManager create(TableConfig tableConfig,
       @Nullable PinotConfiguration instanceUpsertConfig) {
@@ -83,8 +82,14 @@ public class TableUpsertMetadataManagerFactory {
                 metadataManagerClass, tableNameWithType), e);
       }
     } else {
-      LOGGER.info("Creating ConcurrentMapTableUpsertMetadataManager for table: {}", tableNameWithType);
-      metadataManager = new ConcurrentMapTableUpsertMetadataManager();
+      if (upsertConfig.isEnableConsistentDeletes()) {
+        LOGGER.info("Creating ConcurrentMapTableUpsertMetadataManagerForConsistentDeletes for table: {}",
+            tableNameWithType);
+        metadataManager = new ConcurrentMapTableUpsertMetadataManagerForConsistentDeletes();
+      } else {
+        LOGGER.info("Creating ConcurrentMapTableUpsertMetadataManager for table: {}", tableNameWithType);
+        metadataManager = new ConcurrentMapTableUpsertMetadataManager();
+      }
     }
 
     return metadataManager;

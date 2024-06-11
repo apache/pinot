@@ -858,6 +858,38 @@ public final class TableConfigUtils {
       }
     }
 
+    // enableConsistentDeletes shouldn't exist with metadataTTL
+    if (upsertConfig != null && upsertConfig.isEnableConsistentDeletes()) {
+      Preconditions.checkState(upsertConfig.getMetadataTTL() == 0,
+          "enableConsistentDeletes and metadataTTL shouldn't exist together for upsert table");
+    }
+
+    // enableConsistentDeletes shouldn't exist with enablePreload
+    if (upsertConfig != null && upsertConfig.isEnableConsistentDeletes()) {
+      Preconditions.checkState(!upsertConfig.isEnablePreload(),
+          "enableConsistentDeletes and enablePreload shouldn't exist together for upsert table");
+    }
+
+    // enableConsistentDeletes should exist with deletedKeysTTL
+    if (upsertConfig != null && upsertConfig.isEnableConsistentDeletes()) {
+      Preconditions.checkState(upsertConfig.getDeletedKeysTTL() > 0,
+          "enableConsistentDeletes should exist with deletedKeysTTL for upsert table");
+    }
+
+    // enableConsistentDeletes should exist with enableSnapshot
+    if (upsertConfig != null && upsertConfig.isEnableConsistentDeletes()) {
+      Preconditions.checkState(upsertConfig.isEnableSnapshot(),
+          "enableConsistentDeletes should exist with enableSnapshot for upsert table");
+    }
+
+    // enableConsistentDeletes should exist with UpsertCompactionTask
+    if (upsertConfig != null && upsertConfig.isEnableConsistentDeletes()) {
+      TableTaskConfig taskConfig = tableConfig.getTaskConfig();
+      Preconditions.checkState(taskConfig != null
+              && taskConfig.getTaskTypeConfigsMap().containsKey(UPSERT_COMPACTION_TASK_TYPE),
+          "enableConsistentDeletes should exist with UpsertCompactionTask for upsert table");
+    }
+
     Preconditions.checkState(
         tableConfig.getInstanceAssignmentConfigMap() == null || !tableConfig.getInstanceAssignmentConfigMap()
             .containsKey(InstancePartitionsType.COMPLETED),

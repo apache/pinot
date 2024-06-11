@@ -79,6 +79,9 @@ public class UpsertConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Whether to preload segments for fast upsert metadata recovery")
   private boolean _enablePreload;
 
+  @JsonPropertyDescription("If we are using deletion + compaction we need to enable this for data consistency")
+  private boolean _enableConsistentDeletes;
+
   @JsonPropertyDescription("Configure the way to provide consistent view for upsert table")
   private ConsistencyMode _consistencyMode = ConsistencyMode.NONE;
 
@@ -158,6 +161,10 @@ public class UpsertConfig extends BaseJsonConfig {
 
   public boolean isEnablePreload() {
     return _enablePreload;
+  }
+
+  public boolean isEnableConsistentDeletes() {
+    return _enableConsistentDeletes;
   }
 
   public ConsistencyMode getConsistencyMode() {
@@ -268,6 +275,10 @@ public class UpsertConfig extends BaseJsonConfig {
 
   public void setDropOutOfOrderRecord(boolean dropOutOfOrderRecord) {
     _dropOutOfOrderRecord = dropOutOfOrderRecord;
+  }
+
+  public void setEnableConsistentDeletes(boolean enableConsistentDeletes) {
+    _enableConsistentDeletes = enableConsistentDeletes;
   }
 
   public void setMetadataManagerClass(String metadataManagerClass) {

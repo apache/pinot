@@ -1,0 +1,75 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.pinot.segment.local.upsert;
+
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import org.apache.pinot.segment.spi.SegmentContext;
+
+
+/**
+ * Implementation of {@link TableUpsertMetadataManager} that is backed by a {@link ConcurrentHashMap} and ensures
+ * consistent deletions. This should be used when the table is configured with 'consistentDeletes' set to true.
+ */
+public class ConcurrentMapTableUpsertMetadataManagerForConsistentDeletes extends BaseTableUpsertMetadataManager {
+  private final Map<Integer, ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes>
+      _partitionMetadataManagerMap = new ConcurrentHashMap<>();
+
+  @Override
+  public ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes getOrCreatePartitionManager(int partitionId) {
+    return _partitionMetadataManagerMap.computeIfAbsent(partitionId,
+        k -> new ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes(_tableNameWithType, k, _context));
+  }
+
+  @Override
+  public void stop() {
+    for (ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes metadataManager
+        : _partitionMetadataManagerMap.values()) {
+      metadataManager.stop();
+    }
+  }
+
+  @Override
+  public Map<Integer, Long> getPartitionToPrimaryKeyCount() {
+    Map<Integer, Long> partitionToPrimaryKeyCount = new HashMap<>();
+    _partitionMetadataManagerMap.forEach(
+        (partitionID, upsertMetadataManager) -> partitionToPrimaryKeyCount.put(partitionID,
+            upsertMetadataManager.getNumPrimaryKeys()));
+    return partitionToPrimaryKeyCount;
+  }
+
+  @Override
+  public void setSegmentContexts(List<SegmentContext> segmentContexts, Map<String, String> queryOptions) {
+    _partitionMetadataManagerMap.forEach(
+        (partitionID, upsertMetadataManager) -> upsertMetadataManager.setSegmentContexts(segmentContexts,
+            queryOptions));
+  }
+
+  @Override
+  public void close()
+      throws IOException {
+    for (ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes metadataManager
+        : _partitionMetadataManagerMap.values()) {
+      metadataManager.close();
+    }
+  }
+}

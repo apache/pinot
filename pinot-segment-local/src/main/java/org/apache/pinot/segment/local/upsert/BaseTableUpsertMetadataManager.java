@@ -83,7 +83,9 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
         .setPartialUpsertHandler(partialUpsertHandler).setEnableSnapshot(enableSnapshot)
         .setEnablePreload(_enablePreload).setMetadataTTL(metadataTTL).setDeletedKeysTTL(deletedKeysTTL)
         .setConsistencyMode(_consistencyMode).setUpsertViewRefreshIntervalMs(upsertViewRefreshIntervalMs)
-        .setTableIndexDir(tableIndexDir).setTableDataManager(tableDataManager).build();
+        .setTableIndexDir(tableIndexDir).setDropOutOfOrderRecord(upsertConfig.isDropOutOfOrderRecord())
+        .setEnableConsistentDeletes(upsertConfig.isEnableConsistentDeletes())
+        .setTableDataManager(tableDataManager).build();
     LOGGER.info(
         "Initialized {} for table: {} with primary key columns: {}, comparison columns: {}, delete record column: {},"
             + " hash function: {}, upsert mode: {}, enable snapshot: {}, enable preload: {}, metadata TTL: {},"
