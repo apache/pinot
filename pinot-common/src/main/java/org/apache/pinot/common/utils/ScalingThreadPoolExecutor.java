@@ -38,7 +38,7 @@ import javax.annotation.Nullable;
  * the pool to create a new thread. The rejection is then handled to queue the task anyway.
  * <p>
  * This differs from the plain ThreadPoolExecutor implementation which does not create new threads if the queue (not
- * thread pool) has capacity. For a more complete explanation, see (note: the orginal version includes a race
+ * thread pool) has capacity. For a more complete explanation, see (note: the original version includes a race
  * condition, and the implementation here differs slightly):
  * https://github.com/kimchy/kimchy.github.com/blob/master/_posts/2008-11-23-juc-executorservice-gotcha.textile
  */
