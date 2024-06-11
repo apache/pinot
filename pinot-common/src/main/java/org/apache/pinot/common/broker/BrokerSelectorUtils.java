@@ -22,7 +22,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 
 
 public class BrokerSelectorUtils {
@@ -34,11 +33,11 @@ public class BrokerSelectorUtils {
    *
    * @param tableNames: List of table names.
    * @param brokerData: map holding data for table hosting on brokers.
-   * @return set of common brokers hosting all the tables.
+   * @return list of common brokers hosting all the tables.
    */
-  public static Set<BrokerInfo> getTablesCommonBrokers(List<String> tableNames,
-      Map<String, Set<BrokerInfo>> brokerData) {
-    List<Set<BrokerInfo>> tablesBrokersList = new ArrayList<>();
+  public static List<BrokerInfo> getTablesCommonBrokers(List<String> tableNames,
+      Map<String, List<BrokerInfo>> brokerData) {
+    List<List<BrokerInfo>> tablesBrokersList = new ArrayList<>();
     for (String name: tableNames) {
       String tableName = getTableNameWithoutSuffix(name);
       int idx = tableName.indexOf('.');
@@ -58,7 +57,7 @@ public class BrokerSelectorUtils {
       return null;
     }
 
-    Set<BrokerInfo> commonBrokers = tablesBrokersList.get(0);
+    List<BrokerInfo> commonBrokers = tablesBrokersList.get(0);
     for (int i = 1; i < tablesBrokersList.size(); i++) {
       commonBrokers.retainAll(tablesBrokersList.get(i));
     }

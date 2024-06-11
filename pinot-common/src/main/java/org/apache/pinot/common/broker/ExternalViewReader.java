@@ -152,8 +152,8 @@ public class ExternalViewReader {
     return new ByteArrayInputStream(brokerResourceNodeData);
   }
 
-  public Map<String, Set<BrokerInfo>> getTableToBrokerInfosMap() {
-    Map<String, Set<BrokerInfo>> brokerInfosMap = new HashMap<>();
+  public Map<String, List<BrokerInfo>> getTableToBrokerInfosMap() {
+    Map<String, List<BrokerInfo>> brokerInfosMap = new HashMap<>();
     try {
       byte[] brokerResourceNodeData = _zkClient.readData(BROKER_EXTERNAL_VIEW_PATH, true);
       brokerResourceNodeData = unpackZnodeIfNecessary(brokerResourceNodeData);
@@ -165,7 +165,7 @@ public class ExternalViewReader {
         Entry<String, JsonNode> resourceEntry = resourceEntries.next();
         String resourceName = resourceEntry.getKey();
         String tableName = resourceName.replace(OFFLINE_SUFFIX, "").replace(REALTIME_SUFFIX, "");
-        Set<BrokerInfo> brokerUrls = brokerInfosMap.computeIfAbsent(tableName, k -> new HashSet<>());
+        Set<BrokerInfo> brokerUrls = new HashSet<>();
         JsonNode resource = resourceEntry.getValue();
         Iterator<Entry<String, JsonNode>> brokerEntries = resource.fields();
         while (brokerEntries.hasNext()) {
@@ -175,6 +175,7 @@ public class ExternalViewReader {
             brokerUrls.add(getBrokerInfo(brokerName));
           }
         }
+        brokerInfosMap.put(tableName, new ArrayList<>(brokerUrls));
       }
     } catch (Exception e) {
       LOGGER.warn("Exception while reading External view from zookeeper", e);

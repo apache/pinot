@@ -59,7 +59,7 @@ import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.broker.BrokerSelector;
-import org.apache.pinot.common.broker.CommonTenantBroker;
+import org.apache.pinot.common.broker.CommonTenantBrokerSelector;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
@@ -256,7 +256,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     }
 
     LOGGER.info("Using DynamicBrokerSelector with Zookeeper: {} and cluster name: {}", _helixZkURL, _helixClusterName);
-    _brokerSelector = new CommonTenantBroker(String.format("%s/%s", _helixZkURL, _helixClusterName));
+    _brokerSelector = new CommonTenantBrokerSelector(String.format("%s/%s", _helixZkURL, _helixClusterName));
 
     // Initialize the table config tuner registry.
     TableConfigTunerRegistry.init(_config.getTableConfigTunerPackages());

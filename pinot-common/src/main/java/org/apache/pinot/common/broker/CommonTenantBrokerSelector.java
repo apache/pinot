@@ -21,17 +21,21 @@ package org.apache.pinot.common.broker;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Set;
 import javax.annotation.Nullable;
 
 
-public class CommonTenantBroker extends DynamicBrokerSelector {
+/**
+ * CommonTenantBrokerSelector selects brokers using the following rules:
+ * - if no tables are specified, return a random broker.
+ * - if ONE or more table are specified, then a broker serving that table is selected. If none found, null is returned.
+ */
+public class CommonTenantBrokerSelector extends DynamicBrokerSelector {
 
-  public CommonTenantBroker(String zkServers, boolean preferTlsPort) {
+  public CommonTenantBrokerSelector(String zkServers, boolean preferTlsPort) {
     super(zkServers, preferTlsPort);
   }
 
-  public CommonTenantBroker(String zkServers) {
+  public CommonTenantBrokerSelector(String zkServers) {
     super(zkServers);
   }
 
@@ -40,7 +44,7 @@ public class CommonTenantBroker extends DynamicBrokerSelector {
   public BrokerInfo selectBrokerInfo(String... tableNames) {
     if (!(tableNames == null || tableNames.length == 0 || tableNames[0] == null)) {
       // getting list of brokers hosting all the tables.
-      Set<BrokerInfo> commonBrokers = BrokerSelectorUtils.getTablesCommonBrokers(Arrays.asList(tableNames),
+      List<BrokerInfo> commonBrokers = BrokerSelectorUtils.getTablesCommonBrokers(Arrays.asList(tableNames),
           _tableToBrokerListMapRef.get());
       if (commonBrokers != null && !commonBrokers.isEmpty()) {
         // Return a broker randomly if table is null or no broker is found for the specified table.
@@ -50,12 +54,15 @@ public class CommonTenantBroker extends DynamicBrokerSelector {
         }
       }
     } else {
+      // If no tables were specified, return a random broker.
       List<BrokerInfo> list = new ArrayList<>(_allBrokerListRef.get());
       if (!list.isEmpty()) {
         return list.get(RANDOM.nextInt(list.size()));
       }
     }
 
+    // Return null if tables were specified and no brokers were found. Do not return a random broker unlike other
+    // selectors.
     return null;
   }
 }
