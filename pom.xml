@@ -190,7 +190,7 @@
     <commons-compress.version>1.26.2</commons-compress.version>
     <commons-math3.version>3.6.1</commons-math3.version>
     <commons-csv.version>1.11.0</commons-csv.version>
-    <commons-configuration2.version>2.10.1</commons-configuration2.version>
+    <commons-configuration2.version>2.11.0</commons-configuration2.version>
     <commons-io.version>2.16.1</commons-io.version>
     <commons-codec.version>1.17.0</commons-codec.version>
     <commons-cli.version>1.8.0</commons-cli.version>
