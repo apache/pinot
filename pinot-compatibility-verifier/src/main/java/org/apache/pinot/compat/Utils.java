@@ -36,11 +36,11 @@ public class Utils {
 
   /**
    * Replace all occurrence of a string in originalDataFile and write the replaced content to replacedDataFile.
-   * @param originalDataFile
-   * @param replacedDataFile
-   * @param original
-   * @param replaced
-   * @throws IOException
+   * @param originalDataFile original data file
+   * @param replacedDataFile replaced data file
+   * @param original original string
+   * @param replaced replaced string
+   * @throws IOException if an I/O error occurs
    */
   public static void replaceContent(File originalDataFile, File replacedDataFile, String original, String replaced)
       throws IOException {

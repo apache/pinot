@@ -42,8 +42,6 @@ import org.slf4j.LoggerFactory;
 public class QueryOp extends BaseOp {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryOp.class);
 
-  private static final String NUM_DOCS_SCANNED_KEY = "numDocsScanned";
-  private static final String TIME_USED_MS_KEY = "timeUsedMs";
   private static final String COMMENT_DELIMITER = "#";
   private String _queryFileName;
   private String _expectedResultsFileName;
@@ -84,7 +82,7 @@ public class QueryOp extends BaseOp {
 
   @Override
   boolean runOp(int generationNumber) {
-    System.out.println("Verifying queries in " + _queryFileName + " against results in " + _expectedResultsFileName);
+    LOGGER.info("Verifying queries in {} against results in {}", _queryFileName, _expectedResultsFileName);
     try {
       for (int i = 1; i <= generationNumber; i++) {
         if (!verifyQueries(i)) {

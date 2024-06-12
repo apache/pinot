@@ -96,10 +96,10 @@ public class TableOp extends BaseOp {
       case DELETE:
         return deleteTable();
       case UPDATE_CONFIG:
-        System.out.println("Updating table config to " + _tableConfigFileName);
+        LOGGER.info("Updating table config to {}", _tableConfigFileName);
         break;
       case UPDATE_SCHEMA:
-        System.out.println("Updating schema to " + _schemaFileName);
+        LOGGER.info("Updating schema to {}", _schemaFileName);
         break;
       default:
         break;
@@ -109,7 +109,7 @@ public class TableOp extends BaseOp {
 
   private boolean createSchema() {
     try {
-      Map<String, String> headers = new HashMap<String, String>() {{
+      Map<String, String> headers = new HashMap<>() {{
         put("Content-type", "application/json");
       }};
       ControllerTest.sendPostRequestRaw(

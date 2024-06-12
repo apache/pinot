@@ -57,14 +57,14 @@ public class CompatibilityOpsRunner {
     Yaml yaml = new Yaml(new CustomConstructor(new LoaderOptions()), representer);
 
     CompatTestOperation operation = yaml.loadAs(inputStream, CompatTestOperation.class);
-    LOGGER.info("Running compat verifications from file:{} ({})", path.toString(), operation.getDescription());
+    LOGGER.info("Running compat verifications from file:{} ({})", path, operation.getDescription());
 
     boolean passed = true;
     for (BaseOp op : operation.getOperations()) {
       op.setParentDir(parentDir);
       if (!op.run(_generationNumber)) {
         passed = false;
-        System.out.println("Failure");
+        LOGGER.error("Failure");
         break;
       }
     }

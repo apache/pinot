@@ -20,6 +20,8 @@ package org.apache.pinot.compat;
 
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "type")
@@ -37,6 +39,7 @@ public abstract class BaseOp {
   private String _name;
   private final OpType _opType;
   private String _description = "No description provided";
+  private static final Logger LOGGER = LoggerFactory.getLogger(BaseOp.class);
   protected static final String GENERATION_NUMBER_PLACEHOLDER = "__GENERATION_NUMBER__";
   protected static final String CONFIG_PLACEHOLDER = "/config/";
   private String _parentDir;
@@ -74,7 +77,7 @@ public abstract class BaseOp {
   }
 
   public boolean run(int generationNumber) {
-    System.out.println("Running OpType " + _opType.toString() + ": " + getDescription());
+    LOGGER.info("Running OpType " + _opType.toString() + ": " + getDescription());
     return runOp(generationNumber);
   }
 
