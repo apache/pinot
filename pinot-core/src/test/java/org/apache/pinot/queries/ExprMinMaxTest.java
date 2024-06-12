@@ -45,6 +45,8 @@ import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -60,6 +62,7 @@ import static org.testng.Assert.fail;
  * Queries test for exprmin/exprmax functions.
  */
 public class ExprMinMaxTest extends BaseQueriesTest {
+  Logger LOGGER = LoggerFactory.getLogger(ExprMinMaxTest.class);
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "ExprMinMaxTest");
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String SEGMENT_NAME = "testSegment";
@@ -556,6 +559,7 @@ public class ExprMinMaxTest extends BaseQueriesTest {
     BrokerResponseNative brokerResponse = getBrokerResponse(query);
     Object groupByExplainPlan = brokerResponse.getResultTable().getRows().get(3)[0];
     String explainPlan = groupByExplainPlan.toString();
+    LOGGER.info("explainPlanTest: {}", explainPlan);
     Assert.assertTrue(explainPlan.contains("childaggregation_exprMin('0', mvIntColumn, mvIntColumn, intColumn)"));
     Assert.assertTrue(
         explainPlan.contains("childaggregation_exprMin('1', mvStringColumn, mvStringColumn, intColumn, doubleColumn)"));
