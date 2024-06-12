@@ -52,6 +52,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.spi.utils.CommonConstants.RewriterConstants.*;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
@@ -559,13 +560,14 @@ public class ExprMinMaxTest extends BaseQueriesTest {
     BrokerResponseNative brokerResponse = getBrokerResponse(query);
     Object groupByExplainPlan = brokerResponse.getResultTable().getRows().get(3)[0];
     String explainPlan = groupByExplainPlan.toString();
-    LOGGER.info("explainPlanTest: {}", explainPlan);
-    Assert.assertTrue(explainPlan.contains("childaggregation_exprMin('0', mvIntColumn, mvIntColumn, intColumn)"));
     Assert.assertTrue(
-        explainPlan.contains("childaggregation_exprMin('1', mvStringColumn, mvStringColumn, intColumn, doubleColumn)"));
-    Assert.assertTrue(explainPlan.contains("parentaggregation_exprMin('0', '1', intColumn, mvIntColumn)"));
+        explainPlan.contains(CHILD_AGGREGATION_NAME_PREFIX + "_exprMin('0', mvIntColumn, mvIntColumn, intColumn)"));
+    Assert.assertTrue(explainPlan.contains(
+        CHILD_AGGREGATION_NAME_PREFIX + "_exprMin('1', mvStringColumn, mvStringColumn, intColumn, doubleColumn)"));
     Assert.assertTrue(
-        explainPlan.contains("parentaggregation_exprMin('1', '2', intColumn, doubleColumn, mvStringColumn)"));
+        explainPlan.contains(PARENT_AGGREGATION_NAME_PREFIX + "_exprMin('0', '1', intColumn, mvIntColumn)"));
+    Assert.assertTrue(explainPlan.contains(
+        PARENT_AGGREGATION_NAME_PREFIX + "_exprMin('1', '2', intColumn, doubleColumn, mvStringColumn)"));
   }
 
   @Test
