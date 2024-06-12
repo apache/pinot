@@ -555,15 +555,13 @@ public class ExprMinMaxTest extends BaseQueriesTest {
         + "expr_min(mvStringColumn, intColumn, doubleColumn) FROM testTable GROUP BY groupByMVIntColumn";
     BrokerResponseNative brokerResponse = getBrokerResponse(query);
     Object groupByExplainPlan = brokerResponse.getResultTable().getRows().get(3)[0];
-    Assert.assertTrue(groupByExplainPlan
-        .toString().contains("childaggregation_exprMin('0', mvIntColumn, mvIntColumn, intColumn)"));
-    Assert.assertTrue(groupByExplainPlan
-        .toString()
-        .contains("childaggregation_exprMin('1', mvStringColumn, mvStringColumn, intColumn, doubleColumn)"));
-    Assert.assertTrue(groupByExplainPlan
-        .toString().contains("parentaggregation_exprMin('0', '1', intColumn, mvIntColumn)"));
-    Assert.assertTrue(groupByExplainPlan
-        .toString().contains("parentaggregation_exprMin('1', '2', intColumn, doubleColumn, mvStringColumn)"));
+    String explainPlan = groupByExplainPlan.toString()
+    Assert.assertTrue(explainPlan.contains("childaggregation_exprMin('0', mvIntColumn, mvIntColumn, intColumn)"));
+    Assert.assertTrue(
+        explainPlan.contains("childaggregation_exprMin('1', mvStringColumn, mvStringColumn, intColumn, doubleColumn)"));
+    Assert.assertTrue(explainPlan.contains("parentaggregation_exprMin('0', '1', intColumn, mvIntColumn)"));
+    Assert.assertTrue(
+        explainPlan.contains("parentaggregation_exprMin('1', '2', intColumn, doubleColumn, mvStringColumn)"));
   }
 
   @Test
