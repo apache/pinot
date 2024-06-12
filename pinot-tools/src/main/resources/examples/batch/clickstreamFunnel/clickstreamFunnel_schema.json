@@ -1,0 +1,25 @@
+{
+  "schemaName": "clickstreamFunnel",
+  "enableColumnBasedNullHandling": false,
+  "dimensionFieldSpecs": [
+    {
+      "name": "event_name",
+      "dataType": "STRING",
+      "notNull": false
+    },
+    {
+      "name": "user_id",
+      "dataType": "LONG",
+      "notNull": false
+    }
+  ],
+  "dateTimeFieldSpecs": [
+    {
+      "name": "ts",
+      "dataType": "LONG",
+      "notNull": false,
+      "format": "EPOCH|SECONDS|1",
+      "granularity": "SECONDS|1"
+    }
+  ]
+}
