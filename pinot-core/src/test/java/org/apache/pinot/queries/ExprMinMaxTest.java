@@ -62,7 +62,7 @@ import static org.testng.Assert.fail;
  * Queries test for exprmin/exprmax functions.
  */
 public class ExprMinMaxTest extends BaseQueriesTest {
-  Logger LOGGER = LoggerFactory.getLogger(ExprMinMaxTest.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(ExprMinMaxTest.class);
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "ExprMinMaxTest");
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String SEGMENT_NAME = "testSegment";
