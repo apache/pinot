@@ -88,11 +88,15 @@ public class QueryRoutingTest {
   }
 
   private QueryServer getQueryServer(int responseDelayMs, byte[] responseBytes) {
+    return getQueryServer(responseDelayMs, responseBytes, TEST_PORT);
+  }
+
+  private QueryServer getQueryServer(int responseDelayMs, byte[] responseBytes, int port) {
     ServerMetrics serverMetrics = mock(ServerMetrics.class);
     InstanceRequestHandler handler = new InstanceRequestHandler("server01", new PinotConfiguration(),
         mockQueryScheduler(responseDelayMs, responseBytes), serverMetrics, mock(AccessControl.class));
     ServerMetrics.register(serverMetrics);
-    return new QueryServer(TEST_PORT, null, handler);
+    return new QueryServer(port, null, handler);
   }
 
   private QueryScheduler mockQueryScheduler(int responseDelayMs, byte[] responseBytes) {
@@ -292,8 +296,11 @@ public class QueryRoutingTest {
   @Test
   public void testSkipUnavailableServer()
       throws IOException, InterruptedException {
-    ServerInstance serverInstance1 = new ServerInstance("localhost", TEST_PORT);
-    ServerInstance serverInstance2 = new ServerInstance("localhost", TEST_PORT + 1);
+    // Using a different port is a hack to avoid resource conflict with other tests, ideally queryServer.shutdown()
+    // should ensure there is no possibility of resource conflict.
+    int port = 12346;
+    ServerInstance serverInstance1 = new ServerInstance("localhost", port);
+    ServerInstance serverInstance2 = new ServerInstance("localhost", port + 1);
     ServerRoutingInstance serverRoutingInstance1 =
         serverInstance1.toServerRoutingInstance(TableType.OFFLINE, ServerInstance.RoutingType.NETTY);
     ServerRoutingInstance serverRoutingInstance2 =
@@ -315,7 +322,7 @@ public class QueryRoutingTest {
     byte[] successResponseBytes = dataTableSuccess.toBytes();
 
     // Only start a single QueryServer, on port from serverInstance1
-    QueryServer queryServer = getQueryServer(500, successResponseBytes);
+    QueryServer queryServer = getQueryServer(500, successResponseBytes, port);
     queryServer.start();
 
     // Submit the query with skipUnavailableServers=true, the single started server should return a valid response
