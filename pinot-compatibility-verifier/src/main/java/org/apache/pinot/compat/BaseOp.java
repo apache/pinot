@@ -77,7 +77,7 @@ public abstract class BaseOp {
   }
 
   public boolean run(int generationNumber) {
-    LOGGER.info("Running OpType " + _opType.toString() + ": " + getDescription());
+    LOGGER.info("Running OpType {} : {}", _opType.toString(), getDescription());
     return runOp(generationNumber);
   }
 

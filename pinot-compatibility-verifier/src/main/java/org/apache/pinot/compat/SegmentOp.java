@@ -233,8 +233,8 @@ public class SegmentOp extends BaseOp {
    * Verify given table and segment name in the controller are in the state matching the parameter.
    * @param state of the segment to be verified in the controller.
    * @return true if segment is in the state provided in the parameter, else false.
-   * @throws IOException
-   * @throws InterruptedException
+   * @throws IOException when unable to get the external view for the table.
+   * @throws InterruptedException when thread sleep is interrupted.
    */
   private boolean verifySegmentInState(String state)
       throws IOException, InterruptedException {
@@ -308,8 +308,8 @@ public class SegmentOp extends BaseOp {
   /**
    * Verify given table name and segment name deleted from the controller.
    * @return true if no segment found, else false.
-   * @throws IOException
-   * @throws InterruptedException
+   * @throws IOException when unable to get the external view for the table.
+   * @throws InterruptedException when thread sleep is interrupted.
    */
   private boolean verifySegmentDeleted()
       throws IOException, InterruptedException {

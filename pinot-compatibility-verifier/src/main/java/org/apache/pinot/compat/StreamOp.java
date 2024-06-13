@@ -167,9 +167,8 @@ public class StreamOp extends BaseOp {
       int partitions = Integer.parseInt(streamConfigMap.getProperty(NUM_PARTITIONS));
 
       final Map<String, Object> config = new HashMap<>();
-      config.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG,
-          ClusterDescriptor.getInstance().getDefaultHost() + ":" + ClusterDescriptor.getInstance().getKafkaPort());
-      config.put(AdminClientConfig.CLIENT_ID_CONFIG, "Kafka2AdminClient-" + UUID.randomUUID().toString());
+      config.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, ClusterDescriptor.getInstance().getKafkaServerUrl());
+      config.put(AdminClientConfig.CLIENT_ID_CONFIG, "Kafka2AdminClient-" + UUID.randomUUID());
       config.put(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, 15000);
       AdminClient adminClient = KafkaAdminClient.create(config);
       NewTopic topic = new NewTopic(topicName, partitions, KAFKA_REPLICATION_FACTOR);
