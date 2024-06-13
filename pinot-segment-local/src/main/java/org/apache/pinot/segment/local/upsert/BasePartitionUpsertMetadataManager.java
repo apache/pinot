@@ -624,9 +624,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     try {
       boolean addRecord = doAddRecord(segment, recordInfo);
       _trackedSegments.add(segment);
-      if (_enableSnapshot) {
-        _updatedSegmentsSinceLastSnapshot.add(segment);
-      }
       return addRecord;
     } finally {
       finishOperation();
