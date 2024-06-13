@@ -183,7 +183,8 @@ public class AsyncQueryResponse implements QueryResponse {
   }
 
   /**
-   * Wait for one less server response
+   * Wait for one less server response. This is used when the server is skipped, as
+   * query submission will have failed we do not want to wait for the response.
    */
   void skipServerResponse() {
     _countDownLatch.countDown();
