@@ -19,19 +19,27 @@
 package org.apache.pinot.spi.utils;
 
 import java.sql.Timestamp;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 
 
 public class TimestampUtils {
+
+  private static final String[] SDF_FORMATS = {
+      "yyyy-MM-dd'T'HH:mm:ss'Z'", "yyyy-MM-dd'T'HH:mm:ssZ",
+      "yyyy-MM-dd'T'HH:mm:ss", "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
+      "yyyy-MM-dd'T'HH:mm:ss.SSSZ", "yyyy-MM-dd HH:mm:ss",
+      "MM/dd/yyyy HH:mm:ss", "MM/dd/yyyy'T'HH:mm:ss.SSS'Z'",
+      "MM/dd/yyyy'T'HH:mm:ss.SSSZ", "MM/dd/yyyy'T'HH:mm:ss.SSS",
+      "MM/dd/yyyy'T'HH:mm:ssZ", "MM/dd/yyyy'T'HH:mm:ss",
+      "yyyy:MM:dd HH:mm:ss", "yyyyMMdd", "MM/dd/yyyy"
+  };
+
   private TimestampUtils() {
   }
 
   /**
    * Parses the given timestamp string into {@link Timestamp}.
-   * <p>Two formats of timestamp are supported:
-   * <ul>
-   *   <li>'yyyy-mm-dd hh:mm:ss[.fffffffff]'</li>
-   *   <li>Millis since epoch</li>
-   * </ul>
    */
   public static Timestamp toTimestamp(String timestampString) {
     try {
@@ -40,18 +48,17 @@ public class TimestampUtils {
       try {
         return new Timestamp(Long.parseLong(timestampString));
       } catch (Exception e1) {
-        throw new IllegalArgumentException(String.format("Invalid timestamp: '%s'", timestampString));
+        try {
+          return dateTimeToTimestamp(timestampString);
+        } catch (Exception e2) {
+          throw new IllegalArgumentException(String.format("Invalid timestamp: '%s'", timestampString));
+        }
       }
     }
   }
 
   /**
    * Parses the given timestamp string into millis since epoch.
-   * <p>Two formats of timestamp are supported:
-   * <ul>
-   *   <li>'yyyy-mm-dd hh:mm:ss[.fffffffff]'</li>
-   *   <li>Millis since epoch</li>
-   * </ul>
    */
   public static long toMillisSinceEpoch(String timestampString) {
     try {
@@ -60,8 +67,30 @@ public class TimestampUtils {
       try {
         return Long.parseLong(timestampString);
       } catch (Exception e1) {
-        throw new IllegalArgumentException(String.format("Invalid timestamp: '%s'", timestampString));
+        try {
+          return dateTimeToTimestamp(timestampString).getTime();
+        } catch (Exception e2) {
+          throw new IllegalArgumentException(String.format("Invalid timestamp: '%s'", timestampString));
+        }
       }
     }
+  }
+
+  /**
+   * Infers a date time format from a valid {@link Timestamp} string.
+   */
+  private static Timestamp dateTimeToTimestamp(String timestampString) {
+    Timestamp result = null;
+    for (String parse : SDF_FORMATS) {
+      SimpleDateFormat sdf = new SimpleDateFormat(parse);
+      try {
+        result = Timestamp.from(sdf.parse(timestampString).toInstant());
+      } catch (ParseException e) {
+      }
+    }
+    if (result == null) {
+      throw new IllegalArgumentException(String.format("Date format not recognized: '%s'", timestampString));
+    }
+    return result;
   }
 }
