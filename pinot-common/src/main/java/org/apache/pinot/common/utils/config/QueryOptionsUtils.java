@@ -302,4 +302,8 @@ public class QueryOptionsUtils {
     String windowOverflowModeStr = queryOptions.get(QueryOptionKey.WINDOW_OVERFLOW_MODE);
     return windowOverflowModeStr != null ? WindowOverFlowMode.valueOf(windowOverflowModeStr) : null;
   }
+
+  public static boolean isSkipUnavailableServers(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.SKIP_UNAVAILABLE_SERVERS));
+  }
 }

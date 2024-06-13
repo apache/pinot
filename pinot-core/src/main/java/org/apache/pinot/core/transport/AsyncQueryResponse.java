@@ -181,4 +181,11 @@ public class AsyncQueryResponse implements QueryResponse {
       markQueryFailed(serverRoutingInstance, exception);
     }
   }
+
+  /**
+   * Wait for one less server response
+   */
+  void skipServerResponse() {
+    _countDownLatch.countDown();
+  }
 }

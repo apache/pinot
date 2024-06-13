@@ -19,6 +19,7 @@
 package org.apache.pinot.core.transport;
 
 import com.google.common.util.concurrent.Futures;
+import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -29,6 +30,8 @@ import org.apache.pinot.common.datatable.DataTable.MetadataKey;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.query.scheduler.QueryScheduler;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
@@ -284,6 +287,86 @@ public class QueryRoutingTest {
     _requestCount += 2;
     waitForStatsUpdate(_requestCount);
     assertEquals(_serverRoutingStatsManager.fetchNumInFlightRequestsForServer(serverId).intValue(), 0);
+  }
+
+  @Test
+  public void testSkipUnavailableServer()
+      throws IOException, InterruptedException {
+    ServerInstance serverInstance1 = new ServerInstance("localhost", TEST_PORT);
+    ServerInstance serverInstance2 = new ServerInstance("localhost", TEST_PORT + 1);
+    ServerRoutingInstance serverRoutingInstance1 =
+        serverInstance1.toServerRoutingInstance(TableType.OFFLINE, ServerInstance.RoutingType.NETTY);
+    ServerRoutingInstance serverRoutingInstance2 =
+        serverInstance2.toServerRoutingInstance(TableType.OFFLINE, ServerInstance.RoutingType.NETTY);
+    Map<ServerInstance, Pair<List<String>, List<String>>> routingTable =
+        Map.of(serverInstance1, Pair.of(Collections.emptyList(), Collections.emptyList()), serverInstance2,
+            Pair.of(Collections.emptyList(), Collections.emptyList()));
+
+    long requestId = 123;
+    DataSchema dataSchema =
+        new DataSchema(new String[]{"column1"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING});
+    DataTableBuilder builder = DataTableBuilderFactory.getDataTableBuilder(dataSchema);
+    builder.startRow();
+    builder.setColumn(0, "value1");
+    builder.finishRow();
+    DataTable dataTableSuccess = builder.build();
+    Map<String, String> dataTableMetadata = dataTableSuccess.getMetadata();
+    dataTableMetadata.put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
+    byte[] successResponseBytes = dataTableSuccess.toBytes();
+
+    // Only start a single QueryServer, on port from serverInstance1
+    QueryServer queryServer = getQueryServer(500, successResponseBytes);
+    queryServer.start();
+
+    // Submit the query with skipUnavailableServers=true, the single started server should return a valid response
+    BrokerRequest brokerRequest =
+        CalciteSqlCompiler.compileToBrokerRequest("SET skipUnavailableServers=true; SELECT * FROM testTable");
+    long startTime = System.currentTimeMillis();
+    AsyncQueryResponse asyncQueryResponse =
+        _queryRouter.submitQuery(requestId, "testTable", brokerRequest, routingTable, null, null, 10_000L);
+    Map<ServerRoutingInstance, ServerResponse> response = asyncQueryResponse.getFinalResponses();
+    assertEquals(response.size(), 2);
+    assertTrue(response.containsKey(serverRoutingInstance1));
+    assertTrue(response.containsKey(serverRoutingInstance2));
+
+    ServerResponse serverResponse1 = response.get(serverRoutingInstance1);
+    ServerResponse serverResponse2 = response.get(serverRoutingInstance2);
+    assertNotNull(serverResponse1.getDataTable());
+    assertNull(serverResponse2.getDataTable());
+    assertTrue(serverResponse1.getResponseDelayMs() > 500);   // > response delay set by getQueryServer
+    assertTrue(serverResponse2.getResponseDelayMs() < 100);   // connection refused, no delay
+    assertTrue(System.currentTimeMillis() - startTime > 500); // > response delay set by getQueryServer
+    _requestCount += 4;
+    waitForStatsUpdate(_requestCount);
+    assertEquals(
+        _serverRoutingStatsManager.fetchNumInFlightRequestsForServer(serverInstance1.getInstanceId()).intValue(), 0);
+    assertEquals(
+        _serverRoutingStatsManager.fetchNumInFlightRequestsForServer(serverInstance2.getInstanceId()).intValue(), 0);
+
+    // Submit the same query without skipUnavailableServers, the servers should not return any response
+    brokerRequest = CalciteSqlCompiler.compileToBrokerRequest("SELECT * FROM testTable");
+    startTime = System.currentTimeMillis();
+    asyncQueryResponse =
+        _queryRouter.submitQuery(requestId, "testTable", brokerRequest, routingTable, null, null, 10_000L);
+    response = asyncQueryResponse.getFinalResponses();
+    assertEquals(response.size(), 2);
+    assertTrue(response.containsKey(serverRoutingInstance1));
+    assertTrue(response.containsKey(serverRoutingInstance2));
+
+    serverResponse1 = response.get(serverRoutingInstance1);
+    serverResponse2 = response.get(serverRoutingInstance2);
+    assertNull(serverResponse1.getDataTable());
+    assertNull(serverResponse2.getDataTable());
+    assertTrue(serverResponse1.getResponseDelayMs() < 100);
+    assertTrue(serverResponse2.getResponseDelayMs() < 100);
+    assertTrue(System.currentTimeMillis() - startTime < 100);
+    _requestCount += 4;
+    waitForStatsUpdate(_requestCount);
+    assertEquals(
+        _serverRoutingStatsManager.fetchNumInFlightRequestsForServer(serverInstance1.getInstanceId()).intValue(), 0);
+    assertEquals(
+        _serverRoutingStatsManager.fetchNumInFlightRequestsForServer(serverInstance2.getInstanceId()).intValue(), 0);
+    queryServer.shutDown();
   }
 
   private void waitForStatsUpdate(long taskCount) {
