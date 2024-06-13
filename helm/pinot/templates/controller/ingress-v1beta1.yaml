@@ -6,6 +6,7 @@ apiVersion: extensions/v1beta1
 kind: Ingress
 metadata:
   name: {{ $serviceName }}
+  namespace: {{ .Values.namespace }}
 {{- if .Values.controller.ingress.v1beta1.annotations }}
   annotations:
 {{ toYaml .Values.controller.ingress.v1beta1.annotations | indent 4 }}

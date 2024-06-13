@@ -21,6 +21,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: {{ include "pinot.broker.fullname" . }}
+  namespace: {{ .Values.namespace }}
   annotations:
 {{ toYaml .Values.broker.service.annotations | indent 4 }}
   labels:

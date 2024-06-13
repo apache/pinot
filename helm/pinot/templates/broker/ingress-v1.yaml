@@ -6,6 +6,7 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: {{ $serviceName }}
+  namespace: {{ .Values.namespace }}
 {{- if .Values.broker.ingress.v1.annotations }}
   annotations:
 {{ toYaml .Values.broker.ingress.v1.annotations | indent 4 }}
