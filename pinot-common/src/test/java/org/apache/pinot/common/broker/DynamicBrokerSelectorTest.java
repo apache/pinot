@@ -53,9 +53,9 @@ public class DynamicBrokerSelectorTest {
   public void setUp()
       throws Exception {
     openMocks(this);
-    Map<String, List<String>> tableToBrokerListMap = new HashMap<>();
-    tableToBrokerListMap.put("table1", Collections.singletonList("broker1"));
-    when(_mockExternalViewReader.getTableToBrokersMap()).thenReturn(tableToBrokerListMap);
+    Map<String, List<BrokerInfo>> tableToBrokerInfoListMap = new HashMap<>();
+    tableToBrokerInfoListMap.put("table1", Collections.singletonList(new BrokerInfo("id1", "broker1", 8080, -1)));
+    when(_mockExternalViewReader.getTableToBrokerInfosMap()).thenReturn(tableToBrokerInfoListMap);
     _dynamicBrokerSelectorUnderTest = Mockito.spy(new DynamicBrokerSelector(ZK_SERVER) {
       @Override
       protected ExternalViewReader getEvReader(ZkClient zkClient) {
@@ -78,14 +78,14 @@ public class DynamicBrokerSelectorTest {
   public void testHandleDataChange() {
     _dynamicBrokerSelectorUnderTest.handleDataChange("dataPath", "data");
 
-    verify(_mockExternalViewReader, times(2)).getTableToBrokersMap();
+    verify(_mockExternalViewReader, times(2)).getTableToBrokerInfosMap();
   }
 
   @Test
   public void testHandleDataDeleted() {
     _dynamicBrokerSelectorUnderTest.handleDataDeleted("dataPath");
 
-    verify(_mockExternalViewReader, times(2)).getTableToBrokersMap();
+    verify(_mockExternalViewReader, times(2)).getTableToBrokerInfosMap();
   }
 
   @Test
@@ -94,22 +94,22 @@ public class DynamicBrokerSelectorTest {
 
     String result = _dynamicBrokerSelectorUnderTest.selectBroker("table1");
 
-    assertEquals("broker1", result);
+    assertEquals(result, "broker1:8080");
   }
 
   @Test
   public void testSelectBrokerWithDBAndTableName() {
     _dynamicBrokerSelectorUnderTest.handleDataChange("dataPath", "data");
     String result = _dynamicBrokerSelectorUnderTest.selectBroker("db1.table1");
-    assertEquals("broker1", result);
+    assertEquals("broker1:8080", result);
 
-    Map<String, List<String>> tableToBrokerListMap = new HashMap<>();
-    tableToBrokerListMap.put("table1", Collections.singletonList("broker1"));
-    tableToBrokerListMap.put("db1.table1", Collections.singletonList("broker2"));
-    when(_mockExternalViewReader.getTableToBrokersMap()).thenReturn(tableToBrokerListMap);
+    Map<String, List<BrokerInfo>> tableToBrokerInfoListMap = new HashMap<>();
+    tableToBrokerInfoListMap.put("table1", Collections.singletonList(new BrokerInfo("id1", "broker1", 8080, -1)));
+    tableToBrokerInfoListMap.put("db1.table1", Collections.singletonList(new BrokerInfo("id2", "broker2", 8080, -1)));
+    when(_mockExternalViewReader.getTableToBrokerInfosMap()).thenReturn(tableToBrokerInfoListMap);
     _dynamicBrokerSelectorUnderTest.handleDataChange("dataPath", "data");
     result = _dynamicBrokerSelectorUnderTest.selectBroker("db1.table1");
-    assertEquals("broker2", result);
+    assertEquals(result, "broker2:8080");
   }
 
   @Test
@@ -118,12 +118,12 @@ public class DynamicBrokerSelectorTest {
 
     String result = _dynamicBrokerSelectorUnderTest.selectBroker(null);
 
-    assertEquals("broker1", result);
+    assertEquals("broker1:8080", result);
   }
 
   @Test
   public void testSelectBrokerForNullTableAndEmptyBrokerListRef() {
-    when(_mockExternalViewReader.getTableToBrokersMap()).thenReturn(Collections.emptyMap());
+    when(_mockExternalViewReader.getTableToBrokerInfosMap()).thenReturn(Collections.emptyMap());
     _dynamicBrokerSelectorUnderTest.handleDataChange("dummy-data-path", "dummy-date");
 
     String result = _dynamicBrokerSelectorUnderTest.selectBroker(null);
@@ -133,7 +133,7 @@ public class DynamicBrokerSelectorTest {
 
   @Test
   public void testSelectBrokerForNonNullTableAndEmptyBrokerListRef() {
-    when(_mockExternalViewReader.getTableToBrokersMap()).thenReturn(Collections.emptyMap());
+    when(_mockExternalViewReader.getTableToBrokerInfosMap()).thenReturn(Collections.emptyMap());
     _dynamicBrokerSelectorUnderTest.handleDataChange("dummy-data-path", "dummy-date");
 
     String result = _dynamicBrokerSelectorUnderTest.selectBroker("dummyTableName");
