@@ -30,6 +30,7 @@ import javax.annotation.Nullable;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
+import org.apache.commons.collections4.SetUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.pinot.broker.api.AccessControl;
@@ -318,6 +319,12 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
    * Returns true if the QPS quota of the tables has exceeded.
    */
   private boolean hasExceededQPSQuota(Set<String> tableNames, RequestContext requestContext) {
+    String database = DatabaseUtils.extractDatabaseFromTableName(tableNames.iterator().next());
+    if (!_queryQuotaManager.acquireDatabase(database)) {
+      LOGGER.warn("Request {}: query exceeds quota for database: {}", requestContext.getRequestId(), database);
+      requestContext.setErrorCode(QueryException.TOO_MANY_REQUESTS_ERROR_CODE);
+      return true;
+    }
     for (String tableName : tableNames) {
       if (!_queryQuotaManager.acquire(tableName)) {
         LOGGER.warn("Request {}: query exceeds quota for table: {}", requestContext.getRequestId(), tableName);
