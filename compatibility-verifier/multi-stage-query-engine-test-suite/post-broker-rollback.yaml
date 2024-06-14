@@ -21,13 +21,13 @@
 description: Operations to be run after broker rollback
 operations:
   - type: segmentOp
-    description: Add segment FeatureTest1_Segment6 to table FeatureTest1
+    description: Add segment FeatureTest1_Segment8 to table FeatureTest1
     op: UPLOAD
     inputDataFileName: data/FeatureTest1-data-00.csv
     schemaFileName: FeatureTest1-schema.json
     tableConfigFileName: feature-test-1.json
     recordReaderConfigFileName: data/recordReaderConfig.json
-    segmentName: FeatureTest1_Segment6
+    segmentName: FeatureTest1_Segment8
   - type: streamOp
     description: publish rows to PinotRealtimeFeatureTest2Event
     op: PRODUCE
