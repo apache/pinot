@@ -37,29 +37,6 @@
     <testcontainers.version>1.19.8</testcontainers.version>
   </properties>
 
-  <build>
-    <plugins>
-      <plugin>
-        <groupId>org.codehaus.mojo</groupId>
-        <artifactId>appassembler-maven-plugin</artifactId>
-        <configuration>
-          <programs>
-            <program>
-              <mainClass>org.apache.pinot.compat.tests.CompatibilityOpsRunner</mainClass>
-              <name>pinot-compat-test-runner</name>
-              <jvmSettings>
-                <initialMemorySize>2G</initialMemorySize>
-                <maxMemorySize>2G</maxMemorySize>
-              </jvmSettings>
-            </program>
-          </programs>
-          <repositoryLayout>flat</repositoryLayout>
-          <repositoryName>lib</repositoryName>
-        </configuration>
-      </plugin>
-    </plugins>
-  </build>
-
   <profiles>
     <profile>
       <id>no-integration-tests</id>
