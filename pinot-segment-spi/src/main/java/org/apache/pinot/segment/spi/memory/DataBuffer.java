@@ -251,42 +251,37 @@ public interface DataBuffer extends Closeable {
     } else {
       intSize = (int) size;
     }
-    if (intSize >= 8) {
-      firstLong = dataBuffer.getLong(0);
-      lastLong = dataBuffer.getLong(size - 8);
-    } else {
-      switch (intSize) {
-        case 0:
-          firstLong = 0;
-          lastLong = 0;
-          break;
-        case 1:
-          firstLong = dataBuffer.getByte(0);
-          lastLong = firstLong;
-          break;
-        case 2:
-          firstLong = dataBuffer.getShort(0);
-          lastLong = firstLong;
-          break;
-        case 3:
-          firstLong = dataBuffer.getShort(0);
-          lastLong = dataBuffer.getShort(1);
-          break;
-        case 4:
-          firstLong = dataBuffer.getInt(0);
-          lastLong = firstLong;
-          break;
-        case 5:
-        case 6:
-        case 7:
-          firstLong = dataBuffer.getInt(0);
-          lastLong = dataBuffer.getInt(intSize - 4);
-          break;
-        default:
-          firstLong = dataBuffer.getLong(0);
-          lastLong = dataBuffer.getLong(size - 8);
-          break;
-      }
+    switch (intSize) {
+      case 0:
+        firstLong = 0;
+        lastLong = 0;
+        break;
+      case 1:
+        firstLong = dataBuffer.getByte(0);
+        lastLong = firstLong;
+        break;
+      case 2:
+        firstLong = dataBuffer.getShort(0);
+        lastLong = firstLong;
+        break;
+      case 3:
+        firstLong = dataBuffer.getShort(0);
+        lastLong = dataBuffer.getShort(1);
+        break;
+      case 4:
+        firstLong = dataBuffer.getInt(0);
+        lastLong = firstLong;
+        break;
+      case 5:
+      case 6:
+      case 7:
+        firstLong = dataBuffer.getInt(0);
+        lastLong = dataBuffer.getInt(intSize - 4);
+        break;
+      default:
+        firstLong = dataBuffer.getLong(0);
+        lastLong = dataBuffer.getLong(size - 8);
+        break;
     }
     return Objects.hash(size, firstLong, lastLong);
   }
