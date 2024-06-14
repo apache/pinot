@@ -48,6 +48,9 @@ import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -112,5 +115,56 @@ public class TableSize {
       throw new ControllerApplicationException(LOGGER, "Table " + tableName + " not found", Response.Status.NOT_FOUND);
     }
     return tableSizeDetails;
+  }
+
+  @GET
+  @Path("/tables/{tableName}/sizeQuotaInfo")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_SIZE)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Get table quota size info", notes = "Compare table size with the storage quota limits. "
+      + "Table size is the size of untarred segments including replication")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 404, message = "Table not found"),
+      @ApiResponse(code = 500, message = "Internal server error")
+  })
+  public TableSizeQuotaInfo getTableSizeQuotaInfo(
+      @ApiParam(value = "Table name with type", required = true, example = "myTable_REALTIME | myTable_OFFLINE")
+      @PathParam("tableName") String tableName, @Context HttpHeaders headers) {
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
+    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
+    TableSizeReader.TableSizeDetails tableSizeDetails = getTableSize(tableName, headers);
+    TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableName);
+    long storageQuota = -1;
+    if (tableConfig != null && tableConfig.getQuotaConfig() != null) {
+      storageQuota = tableConfig.getQuotaConfig().getStorageInBytes();
+    }
+    TableSizeReader.TableSubTypeSizeDetails sizeDetails = TableType.REALTIME.equals(tableType) ?
+        tableSizeDetails._realtimeSegments : tableSizeDetails._offlineSegments;
+    return new TableSizeQuotaInfo(storageQuota,
+        Math.max(sizeDetails._estimatedSizeInBytes, sizeDetails._reportedSizeInBytes));
+  }
+
+  static class TableSizeQuotaInfo {
+    private final long _quotaSizeInBytes;
+    private final long _tableSizeInBytes;
+    private final boolean _quotaReached;
+
+    public TableSizeQuotaInfo(long quotaSizeInBytes, long tableSizeInBytes) {
+      _quotaSizeInBytes = quotaSizeInBytes;
+      _tableSizeInBytes = tableSizeInBytes;
+      _quotaReached = quotaSizeInBytes != -1 && tableSizeInBytes >= quotaSizeInBytes;
+    }
+
+    public long getQuotaSizeInBytes() {
+      return _quotaSizeInBytes;
+    }
+
+    public long getTableSizeInBytes() {
+      return _tableSizeInBytes;
+    }
+
+    public boolean isQuotaReached() {
+      return _quotaReached;
+    }
   }
 }

@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.server.realtime;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.File;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -29,12 +31,14 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.ClientSSLContextGenerator;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
+import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.http.HttpClientConfig;
 import org.apache.pinot.core.data.manager.realtime.Server2ControllerSegmentUploader;
 import org.apache.pinot.core.util.SegmentCompletionProtocolUtils;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.DataSizeUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -184,6 +188,45 @@ public class ServerSegmentCompletionProtocolHandler {
       return SegmentCompletionProtocol.RESP_NOT_SENT;
     }
     return sendRequest(url);
+  }
+
+  /**
+   * Validates whether the storage quota for the given table is reached or not
+   * @param tableName table name to check the storage quota breach
+   * @return false if the storage quota is not reached, true otherwise
+   */
+  public boolean checkTableStorageQuotaReached(String tableName) {
+    String leadControllerUrl = getLeadControllerUrl();
+    if (leadControllerUrl == null) {
+      return true;
+    }
+    try {
+      SimpleHttpResponse response = _fileUploadDownloadClient.sendStorageQuotaCheckRequest(leadControllerUrl,
+          tableName, AuthProviderUtils.toRequestHeaders(_authProvider));
+      JsonNode sizeInfo = new ObjectMapper().readTree(response.getResponse());
+      LOGGER.info("Total table size : {}, quota size : {}",
+          DataSizeUtils.fromBytes(sizeInfo.get("tableSizeInBytes").asLong()),
+          DataSizeUtils.fromBytes(sizeInfo.get("quotaSizeInBytes").asLong()));
+      return sizeInfo.get("quotaReached").asBoolean();
+    } catch (Exception e) {
+      LOGGER.error("Error getting quota info from lead controller url: {}", leadControllerUrl, e);
+      return true;
+    }
+  }
+
+  private String getLeadControllerUrl() {
+    ControllerLeaderLocator leaderLocator = ControllerLeaderLocator.getInstance();
+    final Pair<String, Integer> leaderHostPort = leaderLocator.getControllerLeader(_rawTableName);
+    if (leaderHostPort == null) {
+      return null;
+    }
+    Integer port = leaderHostPort.getRight();
+    String protocol = _protocol;
+    if (_controllerHttpsPort != null) {
+      port = _controllerHttpsPort;
+      protocol = HTTPS_PROTOCOL;
+    }
+    return String.format("%s://%s:%s", protocol, leaderHostPort.getLeft(), port);
   }
 
   private String createSegmentCompletionUrl(SegmentCompletionProtocol.Request request) {
