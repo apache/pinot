@@ -24,7 +24,6 @@ import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
@@ -77,7 +76,7 @@ public class CompoundDataBuffer implements DataBuffer {
   }
 
   public CompoundDataBuffer(ByteBuffer[] buffers, ByteOrder order, boolean owner) {
-    this(Arrays.stream(buffers).map(PinotByteBuffer::wrap).toArray(DataBuffer[]::new), order, owner);
+    this(asDataBufferArray(buffers), order, owner);
   }
 
   /**
@@ -88,7 +87,15 @@ public class CompoundDataBuffer implements DataBuffer {
    *              this buffer is closed.
    */
   public CompoundDataBuffer(List<DataBuffer> buffers, ByteOrder order, boolean owner) {
-    this(buffers.toArray(DataBuffer[]::new), order, owner);
+    this(buffers.toArray(new DataBuffer[0]), order, owner);
+  }
+
+  private static DataBuffer[] asDataBufferArray(ByteBuffer[] buffers) {
+    DataBuffer[] result = new DataBuffer[buffers.length];
+    for (int i = 0; i < buffers.length; i++) {
+      result[i] = PinotByteBuffer.wrap(buffers[i]);
+    }
+    return result;
   }
 
   private int getBufferIndex(long offset) {
