@@ -109,33 +109,33 @@ public class ControllerTest {
    */
   public static final ControllerTest DEFAULT_INSTANCE = new ControllerTest();
 
-  protected final String _clusterName = getClass().getSimpleName();
+  protected static HttpClient _httpClient;
 
-  protected static HttpClient _httpClient = null;
+  protected final String _clusterName = getClass().getSimpleName();
+  protected final List<HelixManager> _fakeInstanceHelixManagers = new ArrayList<>();
 
   protected int _nextControllerPort = 16000;
   protected int _nextBrokerPort = 17000;
   protected int _nextServerPort = 18000;
   protected int _nextMinionPort = 19000;
 
-  protected int _controllerPort;
-  protected String _controllerBaseApiUrl;
-  protected ControllerConf _controllerConfig;
-  protected ControllerRequestURLBuilder _controllerRequestURLBuilder;
+  private ZkStarter.ZookeeperInstance _zookeeperInstance;
 
-  protected ControllerRequestClient _controllerRequestClient = null;
-
-  protected final List<HelixManager> _fakeInstanceHelixManagers = new ArrayList<>();
-  protected String _controllerDataDir;
-
+  // The following fields need to be reset when stopping the controller.
   protected BaseControllerStarter _controllerStarter;
+  protected int _controllerPort;
+  protected ControllerRequestClient _controllerRequestClient;
+
+  // The following fields are always set when controller is started. No need to reset them when stopping the controller.
+  protected ControllerConf _controllerConfig;
+  protected String _controllerBaseApiUrl;
+  protected ControllerRequestURLBuilder _controllerRequestURLBuilder;
+  protected String _controllerDataDir;
   protected PinotHelixResourceManager _helixResourceManager;
   protected HelixManager _helixManager;
-  protected HelixAdmin _helixAdmin;
   protected HelixDataAccessor _helixDataAccessor;
+  protected HelixAdmin _helixAdmin;
   protected ZkHelixPropertyStore<ZNRecord> _propertyStore;
-
-  private ZkStarter.ZookeeperInstance _zookeeperInstance;
 
   /**
    * Acquire the {@link ControllerTest} default instance that can be shared across different test cases.
@@ -291,6 +291,7 @@ public class ControllerTest {
     assertNotNull(_controllerStarter, "Controller hasn't been started");
     _controllerStarter.stop();
     _controllerStarter = null;
+    _controllerPort = 0;
     _controllerRequestClient = null;
     FileUtils.deleteQuietly(new File(_controllerDataDir));
   }
