@@ -220,19 +220,20 @@ public interface DataBuffer extends Closeable {
   }
 
   static boolean sameContent(DataBuffer buffer1, DataBuffer buffer2) {
-    if (buffer1.size() != buffer2.size()) {
+    long size = buffer1.size();
+    if (size != buffer2.size()) {
       return false;
     }
-    DataBuffer nativeBuffer1 = buffer1.view(0, buffer1.size(), ByteOrder.nativeOrder());
-    DataBuffer nativeBuffer2 = buffer2.view(0, buffer1.size(), ByteOrder.nativeOrder());
+    DataBuffer nativeBuffer1 = buffer1.view(0, size, ByteOrder.nativeOrder());
+    DataBuffer nativeBuffer2 = buffer2.view(0, size, ByteOrder.nativeOrder());
 
-    long maxLong = nativeBuffer1.size() & ~7L;
+    long maxLong = size & ~7L;
     for (long i = 0; i < maxLong; i += 8) {
       if (nativeBuffer1.getLong(i) != nativeBuffer2.getLong(i)) {
         return false;
       }
     }
-    for (long i = maxLong; i < buffer1.size(); i++) {
+    for (long i = maxLong; i < size; i++) {
       if (buffer1.getByte(i) != buffer2.getByte(i)) {
         return false;
       }
