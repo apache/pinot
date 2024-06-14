@@ -850,6 +850,11 @@
       </dependency>
       <!-- libraries-bom should be imported after protobuf-bom and grpc-bom to honor their versions -->
       <dependency>
+        <groupId>com.google.guava</groupId>
+        <artifactId>guava</artifactId>
+        <version>${guava.version}</version>
+      </dependency>
+      <dependency>
         <groupId>com.google.cloud</groupId>
         <artifactId>libraries-bom</artifactId>
         <version>${google.cloud.libraries.version}</version>
