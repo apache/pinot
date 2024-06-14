@@ -48,11 +48,17 @@
             <program>
               <mainClass>org.apache.pinot.compat.CompatibilityOpsRunner</mainClass>
               <name>pinot-compat-test-runner</name>
+              <jvmSettings>
+                <initialMemorySize>2G</initialMemorySize>
+                <maxMemorySize>2G</maxMemorySize>
+                <extraArguments>
+                  <extraArgument>-Dlog4j2.configurationFile=pinot-compatibility-verifier-log4j2.xml</extraArgument>
+                </extraArguments>
+              </jvmSettings>
             </program>
           </programs>
           <repositoryLayout>flat</repositoryLayout>
           <repositoryName>lib</repositoryName>
-          <extraJvmArguments>-Xms2G -Xmx2G -Dlog4j2.configurationFile=log4j2.xml</extraJvmArguments>
         </configuration>
       </plugin>
     </plugins>
