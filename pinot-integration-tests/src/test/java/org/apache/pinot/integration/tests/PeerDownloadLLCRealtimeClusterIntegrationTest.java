@@ -28,7 +28,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
-import org.apache.avro.reflect.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.ExternalView;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
@@ -110,6 +109,23 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends BaseRealtimeC
   }
 
   @Override
+  protected void overrideControllerConf(Map<String, Object> properties) {
+    // Override the data dir config.
+    properties.put(ControllerConf.DATA_DIR, "mockfs://" + getHelixClusterName());
+    properties.put(ControllerConf.LOCAL_TEMP_DIR, FileUtils.getTempDirectory().getAbsolutePath());
+    // Use the mock PinotFS as the PinotFS.
+    properties.put("pinot.controller.storage.factory.class.mockfs",
+        "org.apache.pinot.integration.tests.PeerDownloadLLCRealtimeClusterIntegrationTest$MockPinotFS");
+  }
+
+  @Override
+  public void startController()
+      throws Exception {
+    super.startController();
+    enableResourceConfigForLeadControllerResource(_enableLeadControllerResource);
+  }
+
+  @Override
   public void startServer()
       throws Exception {
     startServers(NUM_SERVERS);
@@ -132,21 +148,6 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends BaseRealtimeC
   }
 
   @Override
-  public void startController()
-      throws Exception {
-    Map<String, Object> controllerConfig = getDefaultControllerConfiguration();
-    // Override the data dir config.
-    controllerConfig.put(ControllerConf.DATA_DIR, "mockfs://" + getHelixClusterName());
-    controllerConfig.put(ControllerConf.LOCAL_TEMP_DIR, FileUtils.getTempDirectory().getAbsolutePath());
-    // Use the mock PinotFS as the PinotFS.
-    controllerConfig.put("pinot.controller.storage.factory.class.mockfs",
-        "org.apache.pinot.integration.tests.PeerDownloadLLCRealtimeClusterIntegrationTest$MockPinotFS");
-    startController(controllerConfig);
-    enableResourceConfigForLeadControllerResource(_enableLeadControllerResource);
-  }
-
-  @Nullable
-  @Override
   protected String getLoadMode() {
     return "MMAP";
   }
@@ -160,8 +161,8 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends BaseRealtimeC
     // Set the segment deep store uri.
     configuration.setProperty("pinot.server.instance.segment.store.uri", "mockfs://" + getHelixClusterName());
     // For setting the HDFS segment fetcher.
-    configuration
-        .setProperty(CommonConstants.Server.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY + ".protocols", "file,http");
+    configuration.setProperty(CommonConstants.Server.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY + ".protocols",
+        "file,http");
     if (_isConsumerDirConfigured) {
       configuration.setProperty(CommonConstants.Server.CONFIG_OF_CONSUMER_DIR, CONSUMER_DIRECTORY);
     }
@@ -217,8 +218,8 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends BaseRealtimeC
       Map<String, String> instanceToStateMap = externalView.getStateMap(segment);
       Assert.assertEquals(2, instanceToStateMap.size());
       for (Map.Entry<String, String> instanceState : instanceToStateMap.entrySet()) {
-        Assert.assertTrue("ONLINE".equalsIgnoreCase(instanceState.getValue()) || "CONSUMING"
-            .equalsIgnoreCase(instanceState.getValue()));
+        Assert.assertTrue("ONLINE".equalsIgnoreCase(instanceState.getValue()) || "CONSUMING".equalsIgnoreCase(
+            instanceState.getValue()));
       }
     }
   }

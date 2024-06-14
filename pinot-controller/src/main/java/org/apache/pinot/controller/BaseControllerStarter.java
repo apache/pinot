@@ -347,7 +347,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   }
 
   @Override
-  public PinotConfiguration getConfig() {
+  public ControllerConf getConfig() {
     return _config;
   }
 

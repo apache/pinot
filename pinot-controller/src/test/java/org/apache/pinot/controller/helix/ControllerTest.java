@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.controller.helix;
 
-import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.net.URISyntaxException;
@@ -34,8 +33,6 @@ import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang.StringUtils;
-import org.apache.commons.lang.math.RandomUtils;
 import org.apache.helix.ConfigAccessor;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
@@ -77,7 +74,6 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
-import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -87,16 +83,11 @@ import org.slf4j.LoggerFactory;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE;
-import static org.apache.pinot.spi.utils.CommonConstants.Server.DEFAULT_ADMIN_API_PORT;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertTrue;
-import static org.testng.Assert.fail;
+import static org.testng.Assert.*;
 
 
 public class ControllerTest {
   public static final String LOCAL_HOST = "localhost";
-  public static final int DEFAULT_CONTROLLER_PORT = 18998;
   public static final String DEFAULT_DATA_DIR = new File(FileUtils.getTempDirectoryPath(),
       "test-controller-data-dir" + System.currentTimeMillis()).getAbsolutePath();
   public static final String DEFAULT_LOCAL_TEMP_DIR = new File(FileUtils.getTempDirectoryPath(),
@@ -122,8 +113,13 @@ public class ControllerTest {
 
   protected static HttpClient _httpClient = null;
 
-  private int _controllerPort;
-  private String _controllerBaseApiUrl;
+  protected int _nextControllerPort = 16000;
+  protected int _nextBrokerPort = 17000;
+  protected int _nextServerPort = 18000;
+  protected int _nextMinionPort = 19000;
+
+  protected int _controllerPort;
+  protected String _controllerBaseApiUrl;
   protected ControllerConf _controllerConfig;
   protected ControllerRequestURLBuilder _controllerRequestURLBuilder;
 
@@ -211,14 +207,17 @@ public class ControllerTest {
 
   public Map<String, Object> getDefaultControllerConfiguration() {
     Map<String, Object> properties = new HashMap<>();
-
-    properties.put(ControllerConf.CONTROLLER_HOST, LOCAL_HOST);
-    properties.put(ControllerConf.CONTROLLER_PORT,
-        NetUtils.findOpenPort(DEFAULT_CONTROLLER_PORT + RandomUtils.nextInt(10000)));
-    properties.put(ControllerConf.DATA_DIR, DEFAULT_DATA_DIR);
-    properties.put(ControllerConf.LOCAL_TEMP_DIR, DEFAULT_LOCAL_TEMP_DIR);
     properties.put(ControllerConf.ZK_STR, getZkUrl());
     properties.put(ControllerConf.HELIX_CLUSTER_NAME, getHelixClusterName());
+    properties.put(ControllerConf.CONTROLLER_HOST, LOCAL_HOST);
+    int controllerPort = NetUtils.findOpenPort(_nextControllerPort);
+    properties.put(ControllerConf.CONTROLLER_PORT, controllerPort);
+    if (_controllerPort == 0) {
+      _controllerPort = controllerPort;
+    }
+    _nextControllerPort = controllerPort + 1;
+    properties.put(ControllerConf.DATA_DIR, DEFAULT_DATA_DIR);
+    properties.put(ControllerConf.LOCAL_TEMP_DIR, DEFAULT_LOCAL_TEMP_DIR);
     // Enable groovy on the controller
     properties.put(ControllerConf.DISABLE_GROOVY, false);
     properties.put(CommonConstants.CONFIG_OF_TIMEZONE, "UTC");
@@ -226,8 +225,17 @@ public class ControllerTest {
     return properties;
   }
 
+  /**
+   * Can be overridden to add more properties.
+   */
   protected void overrideControllerConf(Map<String, Object> properties) {
-    // do nothing, to be overridden by tests if they need something specific
+  }
+
+  /**
+   * Can be overridden to use a different implementation.
+   */
+  public BaseControllerStarter createControllerStarter() {
+    return new ControllerStarter();
   }
 
   public void startController()
@@ -237,29 +245,16 @@ public class ControllerTest {
 
   public void startController(Map<String, Object> properties)
       throws Exception {
-    Preconditions.checkState(_controllerStarter == null);
+    assertNull(_controllerStarter, "Controller is already started");
+    assertTrue(_controllerPort > 0, "Controller port is not assigned");
 
-    _controllerConfig = new ControllerConf(properties);
-
-    String controllerScheme = "http";
-    if (StringUtils.isNotBlank(_controllerConfig.getControllerVipProtocol())) {
-      controllerScheme = _controllerConfig.getControllerVipProtocol();
-    }
-
-    _controllerPort = DEFAULT_CONTROLLER_PORT;
-    if (StringUtils.isNotBlank(_controllerConfig.getControllerPort())) {
-      _controllerPort = Integer.parseInt(_controllerConfig.getControllerPort());
-    } else if (StringUtils.isNotBlank(_controllerConfig.getControllerVipPort())) {
-      _controllerPort = Integer.parseInt(_controllerConfig.getControllerVipPort());
-    }
-
-    _controllerBaseApiUrl = controllerScheme + "://localhost:" + _controllerPort;
-    _controllerRequestURLBuilder = ControllerRequestURLBuilder.baseUrl(_controllerBaseApiUrl);
-    _controllerDataDir = _controllerConfig.getDataDir();
-
-    _controllerStarter = getControllerStarter();
+    _controllerStarter = createControllerStarter();
     _controllerStarter.init(new PinotConfiguration(properties));
     _controllerStarter.start();
+    _controllerConfig = _controllerStarter.getConfig();
+    _controllerBaseApiUrl = _controllerConfig.generateVipUrl();
+    _controllerRequestURLBuilder = ControllerRequestURLBuilder.baseUrl(_controllerBaseApiUrl);
+    _controllerDataDir = _controllerConfig.getDataDir();
     _helixResourceManager = _controllerStarter.getHelixResourceManager();
     _helixManager = _controllerStarter.getHelixControllerManager();
     _helixDataAccessor = _helixManager.getHelixDataAccessor();
@@ -293,7 +288,7 @@ public class ControllerTest {
   }
 
   public void stopController() {
-    Preconditions.checkState(_controllerStarter != null);
+    assertNotNull(_controllerStarter, "Controller hasn't been started");
     _controllerStarter.stop();
     _controllerStarter = null;
     _controllerRequestClient = null;
@@ -394,29 +389,12 @@ public class ControllerTest {
 
   public void addFakeServerInstancesToAutoJoinHelixCluster(int numInstances, boolean isSingleTenant)
       throws Exception {
-    addFakeServerInstancesToAutoJoinHelixCluster(numInstances, isSingleTenant, Server.DEFAULT_ADMIN_API_PORT);
-  }
-
-  public void addFakeServerInstancesToAutoJoinHelixCluster(int numInstances, boolean isSingleTenant, int baseAdminPort)
-      throws Exception {
     for (int i = 0; i < numInstances; i++) {
-      addFakeServerInstanceToAutoJoinHelixCluster(SERVER_INSTANCE_ID_PREFIX + i, isSingleTenant,
-          NetUtils.findOpenPort(baseAdminPort + i + RandomUtils.nextInt(10000)));
+      addFakeServerInstanceToAutoJoinHelixCluster(SERVER_INSTANCE_ID_PREFIX + i, isSingleTenant);
     }
   }
 
-  public int getFakeServerInstanceCount() {
-    return _helixAdmin.getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_OFFLINE").size()
-        + _helixAdmin.getInstancesInClusterWithTag(getHelixClusterName(), UNTAGGED_SERVER_INSTANCE).size();
-  }
-
   public void addFakeServerInstanceToAutoJoinHelixCluster(String instanceId, boolean isSingleTenant)
-      throws Exception {
-    addFakeServerInstanceToAutoJoinHelixCluster(instanceId, isSingleTenant,
-        NetUtils.findOpenPort(Server.DEFAULT_ADMIN_API_PORT + RandomUtils.nextInt(10000)));
-  }
-
-  public void addFakeServerInstanceToAutoJoinHelixCluster(String instanceId, boolean isSingleTenant, int adminPort)
       throws Exception {
     HelixManager helixManager =
         HelixManagerFactory.getZKHelixManager(getHelixClusterName(), instanceId, InstanceType.PARTICIPANT, getZkUrl());
@@ -433,31 +411,27 @@ public class ControllerTest {
     }
     HelixConfigScope configScope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.PARTICIPANT,
         getHelixClusterName()).forParticipant(instanceId).build();
-    helixAdmin.setConfig(configScope,
-        Collections.singletonMap(Helix.Instance.ADMIN_PORT_KEY, Integer.toString(adminPort)));
+    int adminPort = NetUtils.findOpenPort(_nextServerPort);
+    helixAdmin.setConfig(configScope, Map.of(Helix.Instance.ADMIN_PORT_KEY, Integer.toString(adminPort)));
+    _nextServerPort = adminPort + 1;
     _fakeInstanceHelixManagers.add(helixManager);
   }
 
   /** Add fake server instances until total number of server instances reaches maxCount */
   public void addMoreFakeServerInstancesToAutoJoinHelixCluster(int maxCount, boolean isSingleTenant)
       throws Exception {
-    addMoreFakeServerInstancesToAutoJoinHelixCluster(maxCount, isSingleTenant,
-        NetUtils.findOpenPort(DEFAULT_ADMIN_API_PORT + RandomUtils.nextInt(10000)));
-  }
-
-  /** Add fake server instances until total number of server instances reaches maxCount */
-  public void addMoreFakeServerInstancesToAutoJoinHelixCluster(int maxCount, boolean isSingleTenant, int baseAdminPort)
-      throws Exception {
-
     // get current instance count
     int currentCount = getFakeServerInstanceCount();
 
     // Add more instances if current count is less than max instance count.
-    if (currentCount < maxCount) {
-      for (int i = currentCount; i < maxCount; i++) {
-        addFakeServerInstanceToAutoJoinHelixCluster(SERVER_INSTANCE_ID_PREFIX + i, isSingleTenant, baseAdminPort + i);
-      }
+    for (int i = currentCount; i < maxCount; i++) {
+      addFakeServerInstanceToAutoJoinHelixCluster(SERVER_INSTANCE_ID_PREFIX + i, isSingleTenant);
     }
+  }
+
+  public int getFakeServerInstanceCount() {
+    return _helixAdmin.getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_OFFLINE").size()
+        + _helixAdmin.getInstancesInClusterWithTag(getHelixClusterName(), UNTAGGED_SERVER_INSTANCE).size();
   }
 
   public static class FakeSegmentOnlineOfflineStateModelFactory extends StateModelFactory<StateModel> {
@@ -933,6 +907,10 @@ public class ControllerTest {
     return _helixAdmin;
   }
 
+  public BaseControllerStarter getControllerStarter() {
+    return _controllerStarter;
+  }
+
   public PinotHelixResourceManager getHelixResourceManager() {
     return _helixResourceManager;
   }
@@ -951,10 +929,6 @@ public class ControllerTest {
 
   public int getControllerPort() {
     return _controllerPort;
-  }
-
-  public BaseControllerStarter getControllerStarter() {
-    return _controllerStarter == null ? new ControllerStarter() : _controllerStarter;
   }
 
   public ControllerConf getControllerConfig() {

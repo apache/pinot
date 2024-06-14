@@ -27,45 +27,29 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+
 /**
  * Integration test that starts one broker with auto-discovered echo service and test it
  */
 public class BrokerServiceDiscoveryIntegrationTest extends BaseClusterIntegrationTestSet {
-  private static final String TENANT_NAME = "TestTenant";
 
   @Override
-  protected String getBrokerTenant() {
-    return TENANT_NAME;
-  }
-
-  @Override
-  protected String getServerTenant() {
-    return TENANT_NAME;
-  }
-
-  protected PinotConfiguration getDefaultBrokerConfiguration() {
-    PinotConfiguration config = new PinotConfiguration();
-    config.setProperty(CommonConstants.Broker.BROKER_SERVICE_AUTO_DISCOVERY, true);
-    return config;
+  protected void overrideBrokerConf(PinotConfiguration brokerConf) {
+    brokerConf.setProperty(CommonConstants.Broker.BROKER_SERVICE_AUTO_DISCOVERY, true);
   }
 
   @BeforeClass
   public void setUp()
       throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
-
-    // Start the Pinot cluster
     startZk();
     startController();
-    startBrokers(1);
-    startServers(1);
+    startBroker();
   }
 
   @AfterClass
   public void tearDown()
-          throws Exception {
-
-    // Brokers and servers has been stopped
+      throws Exception {
     stopBroker();
     stopController();
     stopZk();

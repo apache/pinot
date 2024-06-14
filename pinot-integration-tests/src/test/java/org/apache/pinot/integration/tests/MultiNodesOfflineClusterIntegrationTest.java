@@ -96,6 +96,7 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
 
     // Stop the broker
     brokerStarter.stop();
+    _brokerPorts.remove(_brokerPorts.size() - 1);
 
     // Dropping the broker should fail because it is still in the broker resource
     try {

@@ -106,15 +106,8 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
     return TENANT_NAME;
   }
 
-  @BeforeClass
-  public void setUp()
-      throws Exception {
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
-
-    startZk();
-    startKafka();
-
-    Map<String, Object> properties = getDefaultControllerConfiguration();
+  @Override
+  protected void overrideControllerConf(Map<String, Object> properties) {
     properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, false);
     properties.put(ControllerPeriodicTasksConf.STATUS_CHECKER_INITIAL_DELAY_IN_SECONDS,
         PERIODIC_TASK_INITIAL_DELAY_SECONDS);
@@ -132,10 +125,18 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
         PERIODIC_TASK_FREQUENCY_PERIOD);
     properties.put(ControllerPeriodicTasksConf.STATUS_CHECKER_WAIT_FOR_PUSH_TIME_PERIOD,
         PERIODIC_TASK_WAIT_FOR_PUSH_TIME_PERIOD);
+  }
 
-    startController(properties);
+  @BeforeClass
+  public void setUp()
+      throws Exception {
+    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
+
+    startZk();
+    startController();
     startBrokers(NUM_BROKERS);
     startServers(NUM_OFFLINE_SERVERS + NUM_REALTIME_SERVERS);
+    startKafka();
 
     // Create tenants
     createBrokerTenant(TENANT_NAME, NUM_BROKERS);

@@ -263,19 +263,21 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    */
   protected Schema createSchema()
       throws IOException {
-    InputStream inputStream =
-        BaseClusterIntegrationTest.class.getClassLoader().getResourceAsStream(getSchemaFileName());
-    Assert.assertNotNull(inputStream);
-    Schema schema = Schema.fromInputStream(inputStream);
+    Schema schema = createSchema(getSchemaFileName());
     schema.setSchemaName(getTableName());
     return schema;
   }
 
+  protected Schema createSchema(String schemaFileName)
+      throws IOException {
+    InputStream inputStream = BaseClusterIntegrationTest.class.getClassLoader().getResourceAsStream(schemaFileName);
+    Assert.assertNotNull(inputStream);
+    return Schema.fromInputStream(inputStream);
+  }
+
   protected Schema createSchema(File schemaFile)
       throws IOException {
-    InputStream inputStream = new FileInputStream(schemaFile);
-    Assert.assertNotNull(inputStream);
-    return JsonUtils.inputStreamToObject(inputStream, Schema.class);
+    return Schema.fromInputStream(new FileInputStream(schemaFile));
   }
 
   protected TableConfig createTableConfig(File tableConfigFile)
