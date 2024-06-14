@@ -25,7 +25,6 @@ import org.apache.pinot.segment.local.segment.index.AbstractSerdeIndexContract;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexConfig;
-import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.*;
@@ -37,7 +36,7 @@ public class InvertedIndexTypeTest {
   public static class ConfTest extends AbstractSerdeIndexContract {
 
     protected void assertEquals(IndexConfig expected) {
-      Assert.assertEquals(getActualConfig("dimInt", StandardIndexes.inverted()), expected);
+      checkConfigsMatch(StandardIndexes.inverted(), "dimInt", expected);
     }
 
     @Test

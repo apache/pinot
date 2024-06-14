@@ -288,7 +288,7 @@ public class IndexLoadingConfig {
     return FieldIndexConfigsUtil.createIndexConfigsByColName(tableConfig, schema, this::getDeserializer);
   }
 
-  private <C extends IndexConfig> ColumnConfigDeserializer<C> getDeserializer(IndexType<C, ?, ?> indexType) {
+  public <C extends IndexConfig> ColumnConfigDeserializer<C> getDeserializer(IndexType<C, ?, ?> indexType) {
     ColumnConfigDeserializer<C> deserializer;
 
     ColumnConfigDeserializer<C> stdDeserializer = indexType::getConfig;
@@ -303,7 +303,7 @@ public class IndexLoadingConfig {
         deserializer = IndexConfigDeserializer.fromMap(table -> fromIndexLoadingConfig);
       } else if (_segmentTier == null) {
         deserializer =
-            IndexConfigDeserializer.fromMap(table -> fromIndexLoadingConfig).withFallbackAlternative(stdDeserializer);
+            stdDeserializer.withFallbackAlternative(IndexConfigDeserializer.fromMap(table -> fromIndexLoadingConfig));
       } else {
         // No need to fall back to fromIndexLoadingConfig which contains index configs for default tier, when looking
         // for tier specific index configs.

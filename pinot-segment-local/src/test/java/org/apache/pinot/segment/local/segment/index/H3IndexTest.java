@@ -125,7 +125,7 @@ public class H3IndexTest {
   public static class ConfTest extends AbstractSerdeIndexContract {
 
     protected void assertEquals(H3IndexConfig expected) {
-      Assert.assertEquals(getActualConfig("dimStr", StandardIndexes.h3()), expected);
+      checkConfigsMatch(StandardIndexes.h3(), "dimStr", expected);
     }
 
     @Test
