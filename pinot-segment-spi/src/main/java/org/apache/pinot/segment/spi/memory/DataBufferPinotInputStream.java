@@ -136,7 +136,8 @@ public class DataBufferPinotInputStream extends PinotInputStream {
   }
 
   @Override
-  public boolean readBoolean() throws EOFException {
+  public boolean readBoolean()
+      throws EOFException {
     if (_currentOffset >= _dataBuffer.size()) {
       throw new EOFException();
     }
