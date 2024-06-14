@@ -698,9 +698,11 @@ public class PinotTableRestletResource {
     }
   }
 
-  /** Waits for jobId to be persisted using a retry policy. Tables with 100k+ segments
-    * take up to a few seconds for the jobId to persist. This ensures the jobId is present
-    * before returning the jobId to the caller, so they can correctly poll the jobId. **/
+  /**
+   * Waits for jobId to be persisted using a retry policy.
+   * Tables with 100k+ segments take up to a few seconds for the jobId to persist. This ensures the jobId is present
+   * before returning the jobId to the caller, so they can correctly poll the jobId.
+   **/
   public void waitForJobIdToPersist(String jobId, String tableNameWithType) {
       try {
           // This retry policy waits at most for 3.5 to 7s in total. This is chosen to cover
