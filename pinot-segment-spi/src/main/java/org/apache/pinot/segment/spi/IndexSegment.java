@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.spi;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import javax.annotation.Nullable;
@@ -140,4 +141,11 @@ public interface IndexSegment {
    * Destroys segment in memory and closes file handlers if in MMAP mode.
    */
   void destroy();
+
+  /**
+   * Returns the mapping of original doc id position to current doc id position. Used in sorted value indexes.
+   */
+  default List<Integer> getOriginalDocIDPositionMapping() {
+    return Collections.emptyList();
+  }
 }

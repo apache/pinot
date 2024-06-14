@@ -864,7 +864,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
    */
   @SuppressWarnings({"rawtypes", "unchecked"})
   protected static Iterator<RecordInfo> resolveComparisonTies(Iterator<RecordInfo> recordInfoIterator,
-      HashFunction hashFunction) {
+      HashFunction hashFunction, List<Integer> originalDocIDPositionMappings) {
     Map<Object, RecordInfo> deDuplicatedRecordInfo = new HashMap<>();
     while (recordInfoIterator.hasNext()) {
       RecordInfo recordInfo = recordInfoIterator.next();
@@ -875,8 +875,15 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
               return recordInfo;
             }
             int comparisonResult = newComparisonValue.compareTo(maxComparisonValueRecordInfo.getComparisonValue());
-            if (comparisonResult >= 0) {
+            if (comparisonResult > 0) {
               return recordInfo;
+            } else if (comparisonResult == 0) {
+              // Check if mappings are empty or the current record has a higher doc ID position
+              if (originalDocIDPositionMappings.isEmpty()
+                  || originalDocIDPositionMappings.get(recordInfo.getDocId())
+                      > originalDocIDPositionMappings.get(maxComparisonValueRecordInfo.getDocId())) {
+                return recordInfo;
+              }
             }
             return maxComparisonValueRecordInfo;
           });
