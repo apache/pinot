@@ -22,10 +22,36 @@ import com.google.common.primitives.Longs;
 import java.io.DataOutput;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 
 
-public abstract class PinotOutputStream extends SeekableOutputStream implements DataOutput {
+public abstract class PinotOutputStream extends OutputStream implements DataOutput {
+
+  /**
+   * Return the current position in the OutputStream.
+   *
+   * @return current position in bytes from the start of the stream
+   */
+  public abstract long getCurrentOffset();
+
+  /**
+   * Seek to a new position in the OutputStream.
+   *
+   * @param newPos the new position to seek to
+   * @throws IllegalArgumentException If the new position is negative
+   */
+  public abstract void seek(long newPos);
+
+  /**
+   * Moves the current offset, applying the given change.
+   * @param change the change to apply to the current offset
+   * @throws IllegalArgumentException if the new position is negative
+   */
+  public void moveCurrentOffset(long change) {
+    long newOffset = getCurrentOffset() + change;
+    seek(newOffset);
+  }
 
   @Override
   public void writeBoolean(boolean v) throws IOException {
