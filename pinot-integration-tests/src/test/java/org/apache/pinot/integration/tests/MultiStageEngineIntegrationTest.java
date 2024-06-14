@@ -74,7 +74,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
 
     // Start the Pinot cluster
     startZk();
-    startController(getDefaultControllerConfiguration());
+    startController();
     startBroker();
     startServer();
     setupTenants();

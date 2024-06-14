@@ -22,7 +22,6 @@ import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -167,13 +166,6 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
 
   private long getCountStarResultWithoutUpsert() {
     return 10;
-  }
-
-  private Schema createSchema(String schemaFileName)
-      throws IOException {
-    InputStream inputStream = BaseClusterIntegrationTest.class.getClassLoader().getResourceAsStream(schemaFileName);
-    Assert.assertNotNull(inputStream);
-    return Schema.fromInputStream(inputStream);
   }
 
   private long queryCountStarWithoutUpsert(String tableName) {
@@ -402,15 +394,14 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
   @Test
   public void testDefaultMetadataManagerClass()
       throws Exception {
-    PinotConfiguration config = getServerConf(12345);
-    config.setProperty(Joiner.on(".").join(CommonConstants.Server.INSTANCE_DATA_MANAGER_CONFIG_PREFIX,
+    PinotConfiguration serverConf = getServerConf(NUM_SERVERS);
+    serverConf.setProperty(Joiner.on(".").join(CommonConstants.Server.INSTANCE_DATA_MANAGER_CONFIG_PREFIX,
             HelixInstanceDataManagerConfig.UPSERT_CONFIG_PREFIX,
             TableUpsertMetadataManagerFactory.UPSERT_DEFAULT_METADATA_MANAGER_CLASS),
         DummyTableUpsertMetadataManager.class.getName());
 
-    BaseServerStarter serverStarter = null;
+    BaseServerStarter serverStarter = startOneServer(serverConf);
     try {
-      serverStarter = startOneServer(config);
       HelixManager helixManager = serverStarter.getServerInstance().getHelixManager();
       InstanceConfig instanceConfig = HelixHelper.getInstanceConfig(helixManager, serverStarter.getInstanceId());
       // updateInstanceTags
@@ -447,9 +438,7 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
       deleteSchema(dummyTableName);
       waitForEVToDisappear(dummyTableName);
     } finally {
-      if (serverStarter != null) {
-        serverStarter.stop();
-      }
+      serverStarter.stop();
       // Re-initialize the executor for SegmentBuildTimeLeaseExtender to avoid the NullPointerException for the other
       // tests.
       SegmentBuildTimeLeaseExtender.initExecutor();

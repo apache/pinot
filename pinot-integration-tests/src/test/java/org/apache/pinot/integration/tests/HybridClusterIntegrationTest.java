@@ -67,6 +67,11 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     return TENANT_NAME;
   }
 
+  @Override
+  protected void overrideControllerConf(Map<String, Object> properties) {
+    properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, false);
+  }
+
   protected void overrideBrokerConf(PinotConfiguration configuration) {
     configuration.setProperty(CommonConstants.Broker.CONFIG_OF_BROKER_INSTANCE_TAGS,
         TagNameUtils.getBrokerTagForTenant(TENANT_NAME));
@@ -116,18 +121,11 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
 
   protected void startHybridCluster()
       throws Exception {
-    // Start Zk and Kafka
     startZk();
-    startKafka();
-
-    // Start the Pinot cluster
-    Map<String, Object> properties = getDefaultControllerConfiguration();
-    properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, false);
-
-    startController(properties);
-
+    startController();
     startBroker();
     startServers(2);
+    startKafka();
 
     // Create tenants
     createServerTenant(TENANT_NAME, 1, 1);
@@ -160,6 +158,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
 
     // Stop the broker
     brokerStarter.stop();
+    _brokerPorts.remove(_brokerPorts.size() - 1);
 
     // Dropping the broker should fail because it is still in the broker resource
     try {

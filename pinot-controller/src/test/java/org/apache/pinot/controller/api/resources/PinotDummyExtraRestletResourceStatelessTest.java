@@ -36,14 +36,17 @@ import static org.testng.Assert.assertEquals;
 @Test(groups = "stateless")
 public class PinotDummyExtraRestletResourceStatelessTest extends ControllerTest {
 
+  @Override
+  protected void overrideControllerConf(Map<String, Object> properties) {
+    properties.put(CONTROLLER_RESOURCE_PACKAGES,
+        DEFAULT_CONTROLLER_RESOURCE_PACKAGES + ",org.apache.pinot.controller.api.extraresources");
+  }
+
   @BeforeClass
   public void setUp()
       throws Exception {
     startZk();
-    Map<String, Object> properties = getDefaultControllerConfiguration();
-    properties.put(CONTROLLER_RESOURCE_PACKAGES,
-        DEFAULT_CONTROLLER_RESOURCE_PACKAGES + ",org.apache.pinot.controller.api.extraresources");
-    startController(properties);
+    startController();
   }
 
   @Test

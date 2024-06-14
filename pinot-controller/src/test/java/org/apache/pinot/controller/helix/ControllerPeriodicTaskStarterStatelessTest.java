@@ -52,7 +52,7 @@ public class ControllerPeriodicTaskStarterStatelessTest extends ControllerTest {
   }
 
   @Override
-  public ControllerStarter getControllerStarter() {
+  public ControllerStarter createControllerStarter() {
     return new MockControllerStarter();
   }
 
