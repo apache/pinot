@@ -160,10 +160,13 @@ public class MinionTaskUtils {
         return serverSegmentMetadataReader.getValidDocIdsBitmapFromServer(tableNameWithType, segmentName, endpoint,
             validDocIdsType, 60_000);
       } catch (Exception e) {
-        LOGGER.info("Unable to retrieve validDocIdsBitmap for {} from {}", segmentName, endpoint);
+        LOGGER.warn(
+            String.format("Unable to retrieve validDocIds bitmap for segment: %s from endpoint: %s", segmentName,
+                endpoint), e);
       }
     }
-    throw new IllegalStateException("Unable to retrieve validDocIds for segment: " + segmentName);
+    throw new IllegalStateException(
+        String.format("Unable to retrieve validDocIds bitmap for segment: %s from servers: %s", segmentName, servers));
   }
 
   public static List<String> getServers(String segmentName, String tableNameWithType, HelixAdmin helixAdmin,
