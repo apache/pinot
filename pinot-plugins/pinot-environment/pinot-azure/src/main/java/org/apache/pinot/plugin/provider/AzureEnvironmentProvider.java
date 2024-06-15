@@ -141,6 +141,8 @@ public class AzureEnvironmentProvider implements PinotEnvironmentProvider {
         throw new RuntimeException(errorMsg);
       }
       return EntityUtils.toString(closeableHttpResponse.getEntity());
+    } catch (RuntimeException ex) {
+      throw ex;
     } catch (Exception ex) {
       throw new RuntimeException(String.format(
           "[AzureEnvironmentProvider]: Failed to retrieve metadata from Azure Instance Metadata Service %s",
