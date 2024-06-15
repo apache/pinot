@@ -114,10 +114,10 @@ public class ControllerTest {
   protected final String _clusterName = getClass().getSimpleName();
   protected final List<HelixManager> _fakeInstanceHelixManagers = new ArrayList<>();
 
-  protected int _nextControllerPort = 16000;
-  protected int _nextBrokerPort = 17000;
-  protected int _nextServerPort = 18000;
-  protected int _nextMinionPort = 19000;
+  protected int _nextControllerPort = 20000;
+  protected int _nextBrokerPort = _nextControllerPort + 1000;
+  protected int _nextServerPort = _nextBrokerPort + 1000;
+  protected int _nextMinionPort = _nextServerPort + 1000;
 
   private ZkStarter.ZookeeperInstance _zookeeperInstance;
 
@@ -294,6 +294,14 @@ public class ControllerTest {
     _controllerPort = 0;
     _controllerRequestClient = null;
     FileUtils.deleteQuietly(new File(_controllerDataDir));
+  }
+
+  public void restartController()
+      throws Exception {
+    assertNotNull(_controllerStarter, "Controller hasn't been started");
+    _controllerStarter.stop();
+    _controllerStarter = null;
+    startController(_controllerConfig.toMap());
   }
 
   public int getFakeBrokerInstanceCount() {
