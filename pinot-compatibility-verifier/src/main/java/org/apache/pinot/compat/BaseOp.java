@@ -36,7 +36,6 @@ public abstract class BaseOp {
     TABLE_OP, SEGMENT_OP, QUERY_OP, STREAM_OP,
   }
 
-  private String _name;
   private final OpType _opType;
   private String _description = "No description provided";
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseOp.class);
@@ -48,20 +47,8 @@ public abstract class BaseOp {
     _opType = opType;
   }
 
-  public String getName() {
-    return _name;
-  }
-
-  public void setName(String name) {
-    _name = name;
-  }
-
   public void setDescription(String description) {
     _description = description;
-  }
-
-  public String getDescription() {
-    return _description;
   }
 
   public String getParentDir() {
@@ -77,7 +64,7 @@ public abstract class BaseOp {
   }
 
   public boolean run(int generationNumber) {
-    LOGGER.info("Running OpType {} : {}", _opType.toString(), getDescription());
+    LOGGER.info("Running OpType {} : {}", _opType.toString(), _description);
     return runOp(generationNumber);
   }
 

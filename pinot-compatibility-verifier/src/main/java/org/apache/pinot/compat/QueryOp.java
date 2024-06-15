@@ -56,24 +56,12 @@ public class QueryOp extends BaseOp {
     return trimmedLine.isEmpty() || trimmedLine.startsWith(COMMENT_DELIMITER);
   }
 
-  public String getQueryFileName() {
-    return _queryFileName;
-  }
-
   public void setQueryFileName(String queryFileName) {
     _queryFileName = queryFileName;
   }
 
-  public String getExpectedResultsFileName() {
-    return _expectedResultsFileName;
-  }
-
   public void setExpectedResultsFileName(String expectedResultsFileName) {
     _expectedResultsFileName = expectedResultsFileName;
-  }
-
-  public boolean getUseMultiStageQueryEngine() {
-    return _useMultiStageQueryEngine;
   }
 
   public void setUseMultiStageQueryEngine(boolean useMultiStageQueryEngine) {

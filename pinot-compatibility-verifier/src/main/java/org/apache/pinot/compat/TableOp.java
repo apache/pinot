@@ -61,24 +61,12 @@ public class TableOp extends BaseOp {
     super(OpType.TABLE_OP);
   }
 
-  public String getSchemaFileName() {
-    return _schemaFileName;
-  }
-
   public void setSchemaFileName(String schemaFileName) {
     _schemaFileName = schemaFileName;
   }
 
-  public Op getOp() {
-    return _op;
-  }
-
   public void setOp(Op op) {
     _op = op;
-  }
-
-  public String getTableConfigFileName() {
-    return _tableConfigFileName;
   }
 
   public void setTableConfigFileName(String tableConfigFileName) {

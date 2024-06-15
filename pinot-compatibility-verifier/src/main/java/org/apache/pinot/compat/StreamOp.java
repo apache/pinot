@@ -98,48 +98,24 @@ public class StreamOp extends BaseOp {
     super(OpType.STREAM_OP);
   }
 
-  public Op getOp() {
-    return _op;
-  }
-
   public void setOp(Op op) {
     _op = op;
-  }
-
-  public String getStreamConfigFileName() {
-    return _streamConfigFileName;
   }
 
   public void setStreamConfigFileName(String streamConfigFileName) {
     _streamConfigFileName = streamConfigFileName;
   }
 
-  public int getNumRows() {
-    return _numRows;
-  }
-
   public void setNumRows(int numRows) {
     _numRows = numRows;
-  }
-
-  public String getInputDataFileName() {
-    return _inputDataFileName;
   }
 
   public void setInputDataFileName(String inputDataFileName) {
     _inputDataFileName = inputDataFileName;
   }
 
-  public String getTableConfigFileName() {
-    return _tableConfigFileName;
-  }
-
   public void setTableConfigFileName(String tableConfigFileName) {
     _tableConfigFileName = tableConfigFileName;
-  }
-
-  public String getRecordReaderConfigFileName() {
-    return _recordReaderConfigFileName;
   }
 
   public void setRecordReaderConfigFileName(String recordReaderConfigFileName) {

@@ -85,25 +85,12 @@ public class SegmentOp extends BaseOp {
     super(OpType.SEGMENT_OP);
   }
 
-
-  public Op getOp() {
-    return _op;
-  }
-
   public void setOp(Op op) {
     _op = op;
   }
 
-  public String getInputDataFileName() {
-    return _inputDataFileName;
-  }
-
   public void setInputDataFileName(String inputDataFileName) {
     _inputDataFileName = inputDataFileName;
-  }
-
-  public String getTableConfigFileName() {
-    return _tableConfigFileName;
   }
 
   public void setTableConfigFileName(String tableConfigFileName) {
@@ -114,16 +101,8 @@ public class SegmentOp extends BaseOp {
     _schemaFileName = schemaFileName;
   }
 
-  public String getSchemaFileName() {
-    return _schemaFileName;
-  }
-
   public void setRecordReaderConfigFileName(String recordReaderConfigFileName) {
     _recordReaderConfigFileName = recordReaderConfigFileName;
-  }
-
-  public String getRecordReaderConfigFileName() {
-    return _recordReaderConfigFileName;
   }
 
   public void setSegmentName(String segmentName) {
