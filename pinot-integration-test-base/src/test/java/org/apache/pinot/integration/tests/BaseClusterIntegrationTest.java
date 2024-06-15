@@ -270,7 +270,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
   protected Schema createSchema(String schemaFileName)
       throws IOException {
-    InputStream inputStream = BaseClusterIntegrationTest.class.getClassLoader().getResourceAsStream(schemaFileName);
+    InputStream inputStream = getClass().getClassLoader().getResourceAsStream(schemaFileName);
     Assert.assertNotNull(inputStream);
     return Schema.fromInputStream(inputStream);
   }
@@ -291,13 +291,13 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    * Creates a new OFFLINE table config.
    */
   protected TableConfig createOfflineTableConfig() {
-    return new TableConfigBuilder(TableType.OFFLINE).setTableName(getTableName())
-        .setTimeColumnName(getTimeColumnName()).setSortedColumn(getSortedColumn())
-        .setInvertedIndexColumns(getInvertedIndexColumns()).setNoDictionaryColumns(getNoDictionaryColumns())
-        .setRangeIndexColumns(getRangeIndexColumns()).setBloomFilterColumns(getBloomFilterColumns())
-        .setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas()).setSegmentVersion(getSegmentVersion())
-        .setLoadMode(getLoadMode()).setTaskConfig(getTaskConfig()).setBrokerTenant(getBrokerTenant())
-        .setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig()).setQueryConfig(getQueryConfig())
+    return new TableConfigBuilder(TableType.OFFLINE).setTableName(getTableName()).setTimeColumnName(getTimeColumnName())
+        .setSortedColumn(getSortedColumn()).setInvertedIndexColumns(getInvertedIndexColumns())
+        .setNoDictionaryColumns(getNoDictionaryColumns()).setRangeIndexColumns(getRangeIndexColumns())
+        .setBloomFilterColumns(getBloomFilterColumns()).setFieldConfigList(getFieldConfigs())
+        .setNumReplicas(getNumReplicas()).setSegmentVersion(getSegmentVersion()).setLoadMode(getLoadMode())
+        .setTaskConfig(getTaskConfig()).setBrokerTenant(getBrokerTenant()).setServerTenant(getServerTenant())
+        .setIngestionConfig(getIngestionConfig()).setQueryConfig(getQueryConfig())
         .setNullHandlingEnabled(getNullHandlingEnabled()).setSegmentPartitionConfig(getSegmentPartitionConfig())
         .build();
   }
@@ -399,9 +399,8 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   /**
    * Creates a new Upsert enabled table config.
    */
-  protected TableConfig createCSVUpsertTableConfig(String tableName, @Nullable String kafkaTopicName,
-      int numPartitions, Map<String, String> streamDecoderProperties, UpsertConfig upsertConfig,
-      String primaryKeyColumn) {
+  protected TableConfig createCSVUpsertTableConfig(String tableName, @Nullable String kafkaTopicName, int numPartitions,
+      Map<String, String> streamDecoderProperties, UpsertConfig upsertConfig, String primaryKeyColumn) {
     Map<String, ColumnPartitionConfig> columnPartitionConfigMap = new HashMap<>();
     columnPartitionConfigMap.put(primaryKeyColumn, new ColumnPartitionConfig("Murmur", numPartitions));
 
@@ -469,18 +468,14 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         Properties properties = getPinotConnectionProperties();
         properties.put("useMultistageEngine", "true");
         _pinotConnectionV2 = ConnectionFactory.fromZookeeper(getZkUrl() + "/" + getHelixClusterName(),
-            new JsonAsyncHttpPinotClientTransportFactory()
-                .withConnectionProperties(properties)
-                .buildTransport());
+            new JsonAsyncHttpPinotClientTransportFactory().withConnectionProperties(properties).buildTransport());
       }
       return _pinotConnectionV2;
     }
     if (_pinotConnection == null) {
-      _pinotConnection =
-          ConnectionFactory.fromZookeeper(getZkUrl() + "/" + getHelixClusterName(),
-              new JsonAsyncHttpPinotClientTransportFactory()
-                  .withConnectionProperties(getPinotConnectionProperties())
-                  .buildTransport());
+      _pinotConnection = ConnectionFactory.fromZookeeper(getZkUrl() + "/" + getHelixClusterName(),
+          new JsonAsyncHttpPinotClientTransportFactory().withConnectionProperties(getPinotConnectionProperties())
+              .buildTransport());
     }
     return _pinotConnection;
   }
@@ -554,7 +549,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    */
   protected List<File> unpackTarData(String tarFileName, File outputDir)
       throws Exception {
-    InputStream inputStream = BaseClusterIntegrationTest.class.getClassLoader().getResourceAsStream(tarFileName);
+    InputStream inputStream = getClass().getClassLoader().getResourceAsStream(tarFileName);
     Assert.assertNotNull(inputStream);
     return TarGzCompressionUtils.untar(inputStream, outputDir);
   }
