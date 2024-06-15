@@ -37,6 +37,13 @@ public class BrokerInfo {
     _tlsPort = tlsPort;
   }
 
+  public BrokerInfo(String instanceId, String hostname, int port) {
+    _instanceId = instanceId;
+    _hostname = hostname;
+    _port = port;
+    _tlsPort = -1;
+  }
+
   public BrokerInfo(String hostname, int port) {
     // If an instance ID is not specified, then use host:port as the identifier.
     _instanceId = hostname + ":" + port;

@@ -92,8 +92,7 @@ public class ExternalViewReaderTest {
   }
 
   @Test
-  public void testGetLiveBrokers()
-      throws IOException {
+  public void testGetLiveBrokers() {
     // Setup
     final List<String> expectedResult = Arrays.asList("12.34.56.78:1234");
     when(_mockZkClient.readData(Mockito.anyString(), Mockito.anyBoolean())).thenReturn("json".getBytes());
@@ -130,7 +129,7 @@ public class ExternalViewReaderTest {
     final Map<String, List<String>> result = _externalViewReaderUnderTest.getTableToBrokersMap();
 
     // Verify the results
-    assertEquals(expectedResult, result);
+    assertEquals(result, expectedResult);
   }
 
   @Test
