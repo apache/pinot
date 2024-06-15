@@ -22,7 +22,7 @@ apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
   name: {{ include "pinot.server.fullname" . }}
-  namespace: {{ .Values.namespace }}
+  namespace: {{ include "pinot.namespace" . }}
 spec:
   {{- if .Values.server.pdb.minAvailable }}
   minAvailable: {{ .Values.server.pdb.minAvailable }}

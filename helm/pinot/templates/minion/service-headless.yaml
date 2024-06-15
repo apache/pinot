@@ -22,7 +22,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: {{ template "pinot.minion.headless" . }}
-  namespace: {{ .Values.namespace }}
+  namespace: {{ include "pinot.namespace" . }}
   labels:
     {{- include "pinot.minionLabels" . | nindent 4 }}
 spec:

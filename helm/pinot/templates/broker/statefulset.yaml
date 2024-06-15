@@ -21,7 +21,7 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: {{ include "pinot.broker.fullname" . }}
-  namespace: {{ .Values.namespace }}
+  namespace: {{ include "pinot.namespace" . }}
   labels:
     {{- include "pinot.brokerLabels" . | nindent 4 }}
 spec:

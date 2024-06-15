@@ -17,20 +17,13 @@
 # under the License.
 #
 
-{{- if .Values.broker.pdb.enabled }}
-apiVersion: policy/v1
-kind: PodDisruptionBudget
+apiVersion: v1
+kind: Namespace
 metadata:
-  name: {{ include "pinot.broker.fullname" . }}
-  namespace: {{ include "pinot.namespace" . }}
-spec:
-  {{- if .Values.broker.pdb.minAvailable }}
-  minAvailable: {{ .Values.broker.pdb.minAvailable }}
-  {{- end }}
-  {{- if .Values.broker.pdb.maxUnavailable }}
-  maxUnavailable: {{ .Values.broker.pdb.maxUnavailable }}
-  {{- end }}
-  selector:
-    matchLabels:
-      {{- include "pinot.brokerMatchLabels" . | nindent 6 }}
-{{- end }}
+  name: {{ include "pinot.namespace" . }}
+  labels:
+    {{- include "pinot.labels" . | nindent 4 }}
+  {{- with .Values.namespaceAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+    {{- end }}

@@ -19,7 +19,8 @@
 
 # Default values for Pinot.
 
-namespace: pinot
+namespaceOverride:
+namespaceAnnotations: {}
 
 image:
   repository: apachepinot/pinot
