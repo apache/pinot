@@ -525,7 +525,7 @@ public class HttpClient implements AutoCloseable {
       List<Header> httpHeaders) {
     ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.get(uri).setVersion(HttpVersion.HTTP_1_1);
     AuthProviderUtils.toRequestHeaders(authProvider).forEach(requestBuilder::addHeader);
-    // TODO WHAT ABOUT THIS HttpClient.setTimeout(requestBuilder, socketTimeoutMs);
+    // TODO fixme HttpClient.setTimeout(requestBuilder, socketTimeoutMs);
     String userInfo = uri.getUserInfo();
     if (userInfo != null) {
       String encoded = Base64.encodeBase64String(userInfo.getBytes(UTF_8));
