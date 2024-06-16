@@ -1255,6 +1255,14 @@ public class PinotTableRestletResource {
       throw new IllegalArgumentException("Table '" + table2 + "' cannot be found in the Pinot cluster.");
     }
 
+    Set<String> table1Partitions = table1IdealState.getPartitionSet();
+    Set<String> table2Partitions = table2IdealState.getPartitionSet();
+
+    // If table1 has 0 partitions, check if table2 also has 0 partitions
+    if (table1Partitions.isEmpty()) {
+      return table2Partitions.isEmpty();
+    }
+
     for (String partition : table1IdealState.getPartitionSet()) {
       if (table2IdealState.getPartitionSet().contains(partition)) {
         Set<String> table1Servers = new HashSet<>(table1IdealState.getInstanceStateMap(partition).keySet());
