@@ -1228,4 +1228,46 @@ public class PinotTableRestletResource {
 
     return timeBoundaryMs;
   }
+
+  @GET
+  @Path("/{table1}/{table2}/validate-colocation")
+  @ApiOperation(value = "Validate if two tables are colocated", notes = "Checks if the segments of the specified "
+           + "partitions from both tables are served by the same servers")
+  public StringResultResponse validateColocation(
+          @ApiParam(value = "Name of the first table", required = true) @PathParam("table1") String table1,
+          @ApiParam(value = "Name of the second table", required = true) @PathParam("table2") String table2) {
+
+    boolean areColocated = checkColocation(table1, table2);
+    String resultMessage = areColocated ? "true" : "false";
+    return new StringResultResponse(resultMessage);
+  }
+
+  private boolean checkColocation(String table1, String table2) {
+    IdealState table1IdealState = _pinotHelixResourceManager.getHelixAdmin()
+            .getResourceIdealState(_pinotHelixResourceManager.getHelixClusterName(), table1);
+    IdealState table2IdealState = _pinotHelixResourceManager.getHelixAdmin()
+            .getResourceIdealState(_pinotHelixResourceManager.getHelixClusterName(), table2);
+
+    if (table1IdealState == null) {
+      throw new IllegalArgumentException("Table '" + table1 + "' cannot be found in the Pinot cluster.");
+    }
+    if (table2IdealState == null) {
+      throw new IllegalArgumentException("Table '" + table2 + "' cannot be found in the Pinot cluster.");
+    }
+
+    for (String partition : table1IdealState.getPartitionSet()) {
+      if (table2IdealState.getPartitionSet().contains(partition)) {
+        Set<String> table1Servers = new HashSet<>(table1IdealState.getInstanceStateMap(partition).keySet());
+        Set<String> table2Servers = new HashSet<>(table2IdealState.getInstanceStateMap(partition).keySet());
+
+        if (!table1Servers.equals(table2Servers)) {
+          return false;
+        }
+      } else {
+        return false;
+      }
+    }
+
+    return true;
+  }
 }
