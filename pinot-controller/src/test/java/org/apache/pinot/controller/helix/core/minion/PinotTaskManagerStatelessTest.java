@@ -203,12 +203,8 @@ public class PinotTaskManagerStatelessTest extends ControllerTest {
         "JobGroupNames should have SegmentGenerationAndPushTask only");
     validateJob(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE, "0 */10 * ? * * *");
 
-    // Restart controller. We need to set the port after stopping the controller because we are reusing the same config.
-    int controllerPort = _controllerPort;
-    stopController();
-    _controllerPort = controllerPort;
-    startController(properties);
-    // wait for controller to start correctly.
+    // Restart controller.
+    restartController();
     TestUtils.waitForCondition((aVoid) -> {
       try {
         long tableSize = getTableSize(OFFLINE_TABLE_NAME);
