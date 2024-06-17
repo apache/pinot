@@ -1135,7 +1135,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       } finally {
         _upsertViewLock.writeLock().unlock();
       }
-      trackUpdatedSegmentsSinceLastSnapshot(oldSegment);
     } else if (_consistencyMode == UpsertConfig.ConsistencyMode.SNAPSHOT) {
       _upsertViewLock.readLock().lock();
       try {

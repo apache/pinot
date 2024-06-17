@@ -40,17 +40,12 @@ public class UpsertUtils {
   }
 
   public static MutableRoaringBitmap getQueryableDocIdsSnapshotFromSegment(IndexSegment segment) {
-    MutableRoaringBitmap queryableDocIdsSnapshot = null;
     ThreadSafeMutableRoaringBitmap queryableDocIds = segment.getQueryableDocIds();
     if (queryableDocIds != null) {
-      queryableDocIdsSnapshot = queryableDocIds.getMutableRoaringBitmap();
-    } else {
-      ThreadSafeMutableRoaringBitmap validDocIds = segment.getValidDocIds();
-      if (validDocIds != null) {
-        queryableDocIdsSnapshot = validDocIds.getMutableRoaringBitmap();
-      }
+      return queryableDocIds.getMutableRoaringBitmap();
     }
-    return queryableDocIdsSnapshot;
+    ThreadSafeMutableRoaringBitmap validDocIds = segment.getValidDocIds();
+    return validDocIds != null ? validDocIds.getMutableRoaringBitmap() : null;
   }
 
   /**

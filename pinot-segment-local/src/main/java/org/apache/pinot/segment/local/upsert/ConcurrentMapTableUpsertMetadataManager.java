@@ -69,8 +69,8 @@ public class ConcurrentMapTableUpsertMetadataManager extends BaseTableUpsertMeta
               queryOptions));
     }
     // If no consistency mode is used, we get queryableDocIds bitmaps as kept by the segment objects directly.
-    // Even if consistency mode is used, we should still check if any segment context doesn't set its bitmap, because
-    // the partitionMetadataManagers may not track all segments of the table, like those out of the metadata TTL.
+    // Even if consistency mode is used, we should still check if any segment doesn't get its validDocIds bitmap,
+    // because partitionMetadataManagers may not track all segments of the table, like those out of the metadata TTL.
     for (SegmentContext segmentContext : segmentContexts) {
       if (segmentContext.getQueryableDocIdsSnapshot() == null) {
         IndexSegment segment = segmentContext.getIndexSegment();
