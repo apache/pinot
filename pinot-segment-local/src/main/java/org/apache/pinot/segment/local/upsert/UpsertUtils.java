@@ -26,6 +26,7 @@ import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -36,6 +37,20 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 @SuppressWarnings("rawtypes")
 public class UpsertUtils {
   private UpsertUtils() {
+  }
+
+  public static MutableRoaringBitmap getQueryableDocIdsSnapshotFromSegment(IndexSegment segment) {
+    MutableRoaringBitmap queryableDocIdsSnapshot = null;
+    ThreadSafeMutableRoaringBitmap queryableDocIds = segment.getQueryableDocIds();
+    if (queryableDocIds != null) {
+      queryableDocIdsSnapshot = queryableDocIds.getMutableRoaringBitmap();
+    } else {
+      ThreadSafeMutableRoaringBitmap validDocIds = segment.getValidDocIds();
+      if (validDocIds != null) {
+        queryableDocIdsSnapshot = validDocIds.getMutableRoaringBitmap();
+      }
+    }
+    return queryableDocIdsSnapshot;
   }
 
   /**

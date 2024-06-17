@@ -104,7 +104,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   protected final ServerMetrics _serverMetrics;
   protected final Logger _logger;
 
-  // Tracks all the segments managed by this manager (excluding EmptySegment)
+  // Tracks all the segments managed by this manager, excluding EmptySegment and segments out of metadata TTL.
+  // Basically, it's possible that some segments in the table partition are not tracked here, as their upsert metadata
+  // is not managed by the manager currently.
   protected final Set<IndexSegment> _trackedSegments = ConcurrentHashMap.newKeySet();
   // Track all the immutable segments where changes took place since last snapshot was taken.
   // Note: we need take to take _snapshotLock RLock while updating this set as it may be updated by the multiple
@@ -1122,20 +1124,26 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   protected void replaceDocId(IndexSegment newSegment, ThreadSafeMutableRoaringBitmap validDocIds,
       @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, IndexSegment oldSegment, int oldDocId, int newDocId,
       RecordInfo recordInfo) {
-    if (_consistencyMode == UpsertConfig.ConsistencyMode.SYNC) {
-      _upsertViewLock.writeLock().lock();
-    } else if (_consistencyMode == UpsertConfig.ConsistencyMode.SNAPSHOT) {
-      _upsertViewLock.readLock().lock();
-    }
-    try {
+    if (_consistencyMode == UpsertConfig.ConsistencyMode.NONE) {
       doRemoveDocId(oldSegment, oldDocId);
       doAddDocId(validDocIds, queryableDocIds, newDocId, recordInfo);
-    } finally {
-      if (_consistencyMode == UpsertConfig.ConsistencyMode.SYNC) {
+    } else if (_consistencyMode == UpsertConfig.ConsistencyMode.SYNC) {
+      _upsertViewLock.writeLock().lock();
+      try {
+        doRemoveDocId(oldSegment, oldDocId);
+        doAddDocId(validDocIds, queryableDocIds, newDocId, recordInfo);
+      } finally {
         _upsertViewLock.writeLock().unlock();
-      } else if (_consistencyMode == UpsertConfig.ConsistencyMode.SNAPSHOT) {
+      }
+      trackUpdatedSegmentsSinceLastSnapshot(oldSegment);
+    } else if (_consistencyMode == UpsertConfig.ConsistencyMode.SNAPSHOT) {
+      _upsertViewLock.readLock().lock();
+      try {
+        doRemoveDocId(oldSegment, oldDocId);
+        doAddDocId(validDocIds, queryableDocIds, newDocId, recordInfo);
         _updatedSegmentsSinceLastRefresh.add(newSegment);
         _updatedSegmentsSinceLastRefresh.add(oldSegment);
+      } finally {
         _upsertViewLock.readLock().unlock();
         // Batch refresh takes WLock. Do it outside RLock for clarity. The R/W lock ensures that only one thread
         // can refresh the bitmaps. The other threads that are about to update the bitmaps will be blocked until
@@ -1154,38 +1162,43 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
    */
   protected void replaceDocId(IndexSegment segment, ThreadSafeMutableRoaringBitmap validDocIds,
       @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, int oldDocId, int newDocId, RecordInfo recordInfo) {
-    if (_consistencyMode == UpsertConfig.ConsistencyMode.SNAPSHOT) {
+    if (_consistencyMode != UpsertConfig.ConsistencyMode.SNAPSHOT) {
+      doReplaceDocId(validDocIds, queryableDocIds, oldDocId, newDocId, recordInfo);
+    } else {
       _upsertViewLock.readLock().lock();
-    }
-    try {
-      validDocIds.replace(oldDocId, newDocId);
-      if (queryableDocIds != null) {
-        if (recordInfo.isDeleteRecord()) {
-          queryableDocIds.remove(oldDocId);
-        } else {
-          queryableDocIds.replace(oldDocId, newDocId);
-        }
-      }
-    } finally {
-      if (_consistencyMode == UpsertConfig.ConsistencyMode.SNAPSHOT) {
+      try {
+        doReplaceDocId(validDocIds, queryableDocIds, oldDocId, newDocId, recordInfo);
         _updatedSegmentsSinceLastRefresh.add(segment);
+      } finally {
         _upsertViewLock.readLock().unlock();
         // Batch refresh takes WLock. Do it outside RLock for clarity.
         doBatchRefreshUpsertView(_upsertViewRefreshIntervalMs);
+      }
+    }
+  }
+
+  private void doReplaceDocId(ThreadSafeMutableRoaringBitmap validDocIds,
+      @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, int oldDocId, int newDocId, RecordInfo recordInfo) {
+    validDocIds.replace(oldDocId, newDocId);
+    if (queryableDocIds != null) {
+      if (recordInfo.isDeleteRecord()) {
+        queryableDocIds.remove(oldDocId);
+      } else {
+        queryableDocIds.replace(oldDocId, newDocId);
       }
     }
   }
 
   protected void addDocId(IndexSegment segment, ThreadSafeMutableRoaringBitmap validDocIds,
       @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, int docId, RecordInfo recordInfo) {
-    if (_consistencyMode == UpsertConfig.ConsistencyMode.SNAPSHOT) {
-      _upsertViewLock.readLock().lock();
-    }
-    try {
+    if (_consistencyMode != UpsertConfig.ConsistencyMode.SNAPSHOT) {
       doAddDocId(validDocIds, queryableDocIds, docId, recordInfo);
-    } finally {
-      if (_consistencyMode == UpsertConfig.ConsistencyMode.SNAPSHOT) {
+    } else {
+      _upsertViewLock.readLock().lock();
+      try {
+        doAddDocId(validDocIds, queryableDocIds, docId, recordInfo);
         _updatedSegmentsSinceLastRefresh.add(segment);
+      } finally {
         _upsertViewLock.readLock().unlock();
         // Batch refresh takes WLock. Do it outside RLock for clarity.
         doBatchRefreshUpsertView(_upsertViewRefreshIntervalMs);
@@ -1193,8 +1206,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     }
   }
 
-  private void doAddDocId(ThreadSafeMutableRoaringBitmap validDocIds, ThreadSafeMutableRoaringBitmap queryableDocIds,
-      int docId, RecordInfo recordInfo) {
+  private void doAddDocId(ThreadSafeMutableRoaringBitmap validDocIds,
+      @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, int docId, RecordInfo recordInfo) {
     validDocIds.add(docId);
     if (queryableDocIds != null && !recordInfo.isDeleteRecord()) {
       queryableDocIds.add(docId);
@@ -1202,14 +1215,14 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   }
 
   protected void removeDocId(IndexSegment segment, int docId) {
-    if (_consistencyMode == UpsertConfig.ConsistencyMode.SNAPSHOT) {
-      _upsertViewLock.readLock().lock();
-    }
-    try {
+    if (_consistencyMode != UpsertConfig.ConsistencyMode.SNAPSHOT) {
       doRemoveDocId(segment, docId);
-    } finally {
-      if (_consistencyMode == UpsertConfig.ConsistencyMode.SNAPSHOT) {
+    } else {
+      _upsertViewLock.readLock().lock();
+      try {
+        doRemoveDocId(segment, docId);
         _updatedSegmentsSinceLastRefresh.add(segment);
+      } finally {
         _upsertViewLock.readLock().unlock();
         // Batch refresh takes WLock. Do it outside RLock for clarity.
         doBatchRefreshUpsertView(_upsertViewRefreshIntervalMs);
@@ -1276,25 +1289,11 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     }
   }
 
-  private static MutableRoaringBitmap getQueryableDocIdsSnapshotFromSegment(IndexSegment segment) {
-    MutableRoaringBitmap queryableDocIdsSnapshot = null;
-    ThreadSafeMutableRoaringBitmap queryableDocIds = segment.getQueryableDocIds();
-    if (queryableDocIds != null) {
-      queryableDocIdsSnapshot = queryableDocIds.getMutableRoaringBitmap();
-    } else {
-      ThreadSafeMutableRoaringBitmap validDocIds = segment.getValidDocIds();
-      if (validDocIds != null) {
-        queryableDocIdsSnapshot = validDocIds.getMutableRoaringBitmap();
-      }
-    }
-    return queryableDocIdsSnapshot;
-  }
-
   private void setSegmentContexts(List<SegmentContext> segmentContexts) {
     for (SegmentContext segmentContext : segmentContexts) {
       IndexSegment segment = segmentContext.getIndexSegment();
       if (_trackedSegments.contains(segment)) {
-        segmentContext.setQueryableDocIdsSnapshot(getQueryableDocIdsSnapshotFromSegment(segment));
+        segmentContext.setQueryableDocIdsSnapshot(UpsertUtils.getQueryableDocIdsSnapshotFromSegment(segment));
       }
     }
   }
@@ -1320,8 +1319,11 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       }
       Map<IndexSegment, MutableRoaringBitmap> updated = new HashMap<>();
       for (IndexSegment segment : _trackedSegments) {
-        if (current == null || _updatedSegmentsSinceLastRefresh.contains(segment)) {
-          updated.put(segment, getQueryableDocIdsSnapshotFromSegment(segment));
+        // Update bitmap for segment updated since last refresh or not in the view yet. This also handles segments
+        // that are tracked by _trackedSegments but not by _updatedSegmentsSinceLastRefresh, like those didn't update
+        // any bitmaps as their docs simply lost all the upsert comparisons with the existing docs.
+        if (current == null || current.get(segment) == null || _updatedSegmentsSinceLastRefresh.contains(segment)) {
+          updated.put(segment, UpsertUtils.getQueryableDocIdsSnapshotFromSegment(segment));
         } else {
           updated.put(segment, current.get(segment));
         }
@@ -1333,6 +1335,16 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     } finally {
       _upsertViewLock.writeLock().unlock();
     }
+  }
+
+  @VisibleForTesting
+  Map<IndexSegment, MutableRoaringBitmap> getSegmentQueryableDocIdsMap() {
+    return _segmentQueryableDocIdsMap;
+  }
+
+  @VisibleForTesting
+  Set<IndexSegment> getUpdatedSegmentsSinceLastRefresh() {
+    return _updatedSegmentsSinceLastRefresh;
   }
 
   protected void doClose()

@@ -352,6 +352,7 @@ public class CommonConstants {
       public static class QueryOptionKey {
         public static final String TIMEOUT_MS = "timeoutMs";
         public static final String SKIP_UPSERT = "skipUpsert";
+        public static final String SKIP_UPSERT_VIEW = "skipUpsertView";
         public static final String UPSERT_VIEW_FRESHNESS_MS = "upsertViewFreshnessMs";
         public static final String USE_STAR_TREE = "useStarTree";
         public static final String SCAN_STAR_TREE_NODES = "scanStarTreeNodes";
