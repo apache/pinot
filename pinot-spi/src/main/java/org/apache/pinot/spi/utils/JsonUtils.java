@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.spi.utils;
 
+import com.fasterxml.jackson.core.JsonEncoding;
 import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -38,6 +40,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.AbstractMap;
 import java.util.ArrayList;
@@ -237,6 +240,17 @@ public class JsonUtils {
   public static String objectToString(Object object)
       throws JsonProcessingException {
     return DEFAULT_WRITER.writeValueAsString(object);
+  }
+
+  public static void objectToOutputStream(Object object, OutputStream outputStream)
+      throws IOException {
+    JsonGenerator jg = new JsonFactory().createGenerator(outputStream, JsonEncoding.UTF8);
+    objectToGenerator(object, jg);
+  }
+
+  public static void objectToGenerator(Object object, JsonGenerator jsonGenerator)
+      throws IOException {
+    DEFAULT_WRITER.writeValue(jsonGenerator, object);
   }
 
   public static String objectToPrettyString(Object object)
