@@ -9,3 +9,4 @@ reviewers:
 bots:
   - buildkite
   - buildkite_bot
+  - svc-buildkite-git
