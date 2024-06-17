@@ -1124,10 +1124,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   protected void replaceDocId(IndexSegment newSegment, ThreadSafeMutableRoaringBitmap validDocIds,
       @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, IndexSegment oldSegment, int oldDocId, int newDocId,
       RecordInfo recordInfo) {
-    if (_consistencyMode == UpsertConfig.ConsistencyMode.NONE) {
-      doRemoveDocId(oldSegment, oldDocId);
-      doAddDocId(validDocIds, queryableDocIds, newDocId, recordInfo);
-    } else if (_consistencyMode == UpsertConfig.ConsistencyMode.SYNC) {
+    if (_consistencyMode == UpsertConfig.ConsistencyMode.SYNC) {
       _upsertViewLock.writeLock().lock();
       try {
         doRemoveDocId(oldSegment, oldDocId);
@@ -1149,6 +1146,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         // refreshing is done.
         doBatchRefreshUpsertView(_upsertViewRefreshIntervalMs);
       }
+    } else {
+      doRemoveDocId(oldSegment, oldDocId);
+      doAddDocId(validDocIds, queryableDocIds, newDocId, recordInfo);
     }
     trackUpdatedSegmentsSinceLastSnapshot(oldSegment);
   }

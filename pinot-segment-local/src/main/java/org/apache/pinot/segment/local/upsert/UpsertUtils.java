@@ -39,6 +39,7 @@ public class UpsertUtils {
   private UpsertUtils() {
   }
 
+  @Nullable
   public static MutableRoaringBitmap getQueryableDocIdsSnapshotFromSegment(IndexSegment segment) {
     ThreadSafeMutableRoaringBitmap queryableDocIds = segment.getQueryableDocIds();
     if (queryableDocIds != null) {
