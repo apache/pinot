@@ -181,7 +181,7 @@
 
     <confluent.version>7.6.1</confluent.version>
     <pulsar.version>3.3.0</pulsar.version>
-    <flink.version>1.19.0</flink.version>
+    <flink.version>1.19.1</flink.version>
 
     <!-- Apache Commons Libraries -->
     <commons-lang3.version>3.14.0</commons-lang3.version>
