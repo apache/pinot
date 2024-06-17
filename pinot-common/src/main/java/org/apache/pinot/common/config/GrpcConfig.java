@@ -33,6 +33,8 @@ public class GrpcConfig {
   // Default use plain text for transport
   private static final String DEFAULT_IS_USE_PLAIN_TEXT = "true";
 
+  public static final String CONFIG_QUERY_WORKER_THREADS = "queryWorkerThreads";
+
   private final TlsConfig _tlsConfig;
   private final PinotConfiguration _pinotConfig;
 
@@ -73,5 +75,13 @@ public class GrpcConfig {
 
   public PinotConfiguration getPinotConfig() {
     return _pinotConfig;
+  }
+
+  public int getQueryWorkerThreads() {
+    return _pinotConfig.getProperty(CONFIG_QUERY_WORKER_THREADS, Integer.class);
+  }
+
+  public boolean isQueryWorkerThreadsSet() {
+    return _pinotConfig.containsKey(CONFIG_QUERY_WORKER_THREADS);
   }
 }
