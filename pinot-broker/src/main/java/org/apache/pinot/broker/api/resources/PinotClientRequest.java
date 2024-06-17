@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.broker.api.resources;
 
+import com.fasterxml.jackson.core.JsonEncoding;
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.annotations.VisibleForTesting;
@@ -33,8 +36,8 @@ import io.swagger.annotations.ApiResponses;
 import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
-import java.io.ByteArrayInputStream;
-import java.nio.charset.StandardCharsets;
+import java.io.IOException;
+import java.io.OutputStream;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -55,6 +58,7 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.StreamingOutput;
 import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.pinot.broker.api.HttpRequesterIdentity;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
@@ -64,6 +68,8 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
+import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
@@ -155,9 +161,9 @@ public class PinotClientRequest {
       if (!requestJson.has(Request.SQL)) {
         throw new IllegalStateException("Payload is missing the query string field 'sql'");
       }
-      Response response = getPinotQueryResponse(
-          executeSqlQuery((ObjectNode) requestJson, makeHttpIdentity(requestContext), false, httpHeaders));
-      asyncResponse.resume(response);
+      BrokerResponse brokerResponse =
+          executeSqlQuery((ObjectNode) requestJson, makeHttpIdentity(requestContext), false, httpHeaders);
+      asyncResponse.resume(getPinotQueryResponse(brokerResponse));
     } catch (WebApplicationException wae) {
       asyncResponse.resume(wae);
     } catch (Exception e) {
@@ -373,12 +379,162 @@ public class PinotClientRequest {
       queryErrorCodeHeaderValue = exceptions.get(0).getErrorCode();
     }
 
-    byte[] buf = brokerResponse.toJsonString().getBytes(StandardCharsets.UTF_8);
-
     // returning the Response with OK status and header value.
     return Response.ok()
         .header(PINOT_QUERY_ERROR_CODE_HEADER, queryErrorCodeHeaderValue)
-        .entity(new ByteArrayInputStream(buf))
+        .entity(new StreamBrokerResponse(brokerResponse)).type(MediaType.APPLICATION_JSON)
         .build();
+  }
+
+  private static class StreamBrokerResponse implements StreamingOutput {
+    private final BrokerResponse _brokerResponse;
+
+    StreamBrokerResponse(BrokerResponse brokerResponse) {
+      _brokerResponse = brokerResponse;
+    }
+
+    public void write(OutputStream os)
+        throws IOException, WebApplicationException {
+      JsonGenerator jg = new JsonFactory().createGenerator(os, JsonEncoding.UTF8);
+
+      jg.writeStartObject();
+
+      /*
+      // JsonPropertyOrder
+    "resultTable", "numRowsResultSet", "partialResult", "exceptions", "numGroupsLimitReached", "timeUsedMs",
+    "requestId", "brokerId", "numDocsScanned", "totalDocs", "numEntriesScannedInFilter", "numEntriesScannedPostFilter",
+    "numServersQueried", "numServersResponded", "numSegmentsQueried", "numSegmentsProcessed", "numSegmentsMatched",
+    "numConsumingSegmentsQueried", "numConsumingSegmentsProcessed", "numConsumingSegmentsMatched",
+    "minConsumingFreshnessTimeMs", "numSegmentsPrunedByBroker", "numSegmentsPrunedByServer",
+    "numSegmentsPrunedInvalid", "numSegmentsPrunedByLimit", "numSegmentsPrunedByValue", "brokerReduceTimeMs",
+    "offlineThreadCpuTimeNs", "realtimeThreadCpuTimeNs", "offlineSystemActivitiesCpuTimeNs",
+    "realtimeSystemActivitiesCpuTimeNs", "offlineResponseSerializationCpuTimeNs",
+    "realtimeResponseSerializationCpuTimeNs", "offlineTotalCpuTimeNs", "realtimeTotalCpuTimeNs",
+    "explainPlanNumEmptyFilterSegments", "explainPlanNumMatchAllFilterSegments", "traceInfo"
+       */
+
+      ResultTable resultTable = _brokerResponse.getResultTable();
+
+      if (resultTable != null) {
+        jg.writeFieldName("resultTable");
+        jg.writeStartObject();
+
+        jg.writeFieldName("dataSchema");
+        jg.writeStartObject();
+
+        jg.writeFieldName("columnNames");
+        jg.writeStartArray();
+        for (String columnName : resultTable.getDataSchema().getColumnNames()) {
+          jg.writeString(columnName);
+        }
+        jg.writeEndArray(); // End columnNames
+
+        jg.writeFieldName("columnDataTypes");
+        jg.writeStartArray();
+        for (DataSchema.ColumnDataType columnDataType : resultTable.getDataSchema().getColumnDataTypes()) {
+          jg.writeString(columnDataType.name());
+        }
+        jg.writeEndArray(); // End columnDataTypes
+
+        jg.writeEndObject(); // End dataSchema
+
+        jg.writeArrayFieldStart("rows");
+        for (Object[] row : resultTable.getRows()) {
+          jg.writeStartArray();
+          for (Object column : row) {
+            jg.writeObject(column);
+          }
+          jg.writeEndArray();
+        }
+        jg.writeEndArray(); // End rows
+
+        jg.writeEndObject(); // End resultTable
+      }
+
+      jg.writeFieldName("numRowsResultSet");
+      jg.writeNumber(_brokerResponse.getNumRowsResultSet());
+      jg.writeFieldName("partialResult");
+      jg.writeBoolean(_brokerResponse.isPartialResult());
+      jg.writeArrayFieldStart("exceptions");
+      jg.writeEndArray();
+      jg.writeFieldName("numGroupsLimitReached");
+      jg.writeBoolean(_brokerResponse.isNumGroupsLimitReached());
+      jg.writeFieldName("timeUsedMs");
+      jg.writeNumber(_brokerResponse.getTimeUsedMs());
+      jg.writeFieldName("requestId");
+      jg.writeString(_brokerResponse.getRequestId());
+      jg.writeFieldName("brokerId");
+      jg.writeString(_brokerResponse.getBrokerId());
+      jg.writeFieldName("numDocsScanned");
+      jg.writeNumber(_brokerResponse.getNumDocsScanned());
+      jg.writeFieldName("totalDocs");
+      jg.writeNumber(_brokerResponse.getTotalDocs());
+      jg.writeFieldName("numEntriesScannedInFilter");
+      jg.writeNumber(_brokerResponse.getNumEntriesScannedInFilter());
+      jg.writeFieldName("numEntriesScannedPostFilter");
+      jg.writeNumber(_brokerResponse.getNumEntriesScannedPostFilter());
+      jg.writeFieldName("numServersQueried");
+      jg.writeNumber(_brokerResponse.getNumServersQueried());
+      jg.writeFieldName("numServersResponded");
+      jg.writeNumber(_brokerResponse.getNumServersResponded());
+      jg.writeFieldName("numSegmentsQueried");
+      jg.writeNumber(_brokerResponse.getNumSegmentsQueried());
+      jg.writeFieldName("numSegmentsProcessed");
+      jg.writeNumber(_brokerResponse.getNumSegmentsProcessed());
+      jg.writeFieldName("numSegmentsMatched");
+      jg.writeNumber(_brokerResponse.getNumSegmentsMatched());
+      jg.writeFieldName("numConsumingSegmentsQueried");
+      jg.writeNumber(_brokerResponse.getNumConsumingSegmentsQueried());
+      jg.writeFieldName("numConsumingSegmentsProcessed");
+      jg.writeNumber(_brokerResponse.getNumConsumingSegmentsProcessed());
+      jg.writeFieldName("numConsumingSegmentsMatched");
+      jg.writeNumber(_brokerResponse.getNumConsumingSegmentsMatched());
+      jg.writeFieldName("minConsumingFreshnessTimeMs");
+      jg.writeNumber(_brokerResponse.getMinConsumingFreshnessTimeMs());
+      jg.writeFieldName("numSegmentsPrunedByBroker");
+      jg.writeNumber(_brokerResponse.getNumSegmentsPrunedByBroker());
+      jg.writeFieldName("numSegmentsPrunedByServer");
+      jg.writeNumber(_brokerResponse.getNumSegmentsPrunedByBroker());
+      jg.writeFieldName("numSegmentsPrunedInvalid");
+      jg.writeNumber(_brokerResponse.getNumSegmentsPrunedInvalid());
+      jg.writeFieldName("numSegmentsPrunedByLimit");
+      jg.writeNumber(_brokerResponse.getNumSegmentsPrunedByLimit());
+      jg.writeFieldName("numSegmentsPrunedByValue");
+      jg.writeNumber(_brokerResponse.getNumSegmentsPrunedByValue());
+      jg.writeFieldName("brokerReduceTimeMs");
+      jg.writeNumber(_brokerResponse.getBrokerReduceTimeMs());
+      jg.writeFieldName("offlineThreadCpuTimeNs");
+      jg.writeNumber(_brokerResponse.getOfflineThreadCpuTimeNs());
+      jg.writeFieldName("realtimeThreadCpuTimeNs");
+      jg.writeNumber(_brokerResponse.getRealtimeThreadCpuTimeNs());
+      jg.writeFieldName("offlineSystemActivitiesCpuTimeNs");
+      jg.writeNumber(_brokerResponse.getOfflineSystemActivitiesCpuTimeNs());
+      jg.writeFieldName("realtimeSystemActivitiesCpuTimeNs");
+      jg.writeNumber(_brokerResponse.getRealtimeSystemActivitiesCpuTimeNs());
+      jg.writeFieldName("offlineResponseSerializationCpuTimeNs");
+      jg.writeNumber(_brokerResponse.getOfflineResponseSerializationCpuTimeNs());
+      jg.writeFieldName("realtimeResponseSerializationCpuTimeNs");
+      jg.writeNumber(_brokerResponse.getRealtimeResponseSerializationCpuTimeNs());
+      jg.writeFieldName("offlineTotalCpuTimeNs");
+      jg.writeNumber(_brokerResponse.getOfflineTotalCpuTimeNs());
+      jg.writeFieldName("realtimeTotalCpuTimeNs");
+      jg.writeNumber(_brokerResponse.getRealtimeTotalCpuTimeNs());
+      jg.writeFieldName("explainPlanNumEmptyFilterSegments");
+      jg.writeNumber(_brokerResponse.getExplainPlanNumEmptyFilterSegments());
+      jg.writeFieldName("explainPlanNumMatchAllFilterSegments");
+      jg.writeNumber(_brokerResponse.getExplainPlanNumMatchAllFilterSegments());
+
+      jg.writeFieldName("traceInfo");
+      jg.writeStartObject();
+      Map<String, String> traceInfo = _brokerResponse.getTraceInfo();
+      for(String key : traceInfo.keySet()) {
+        jg.writeFieldName(key);
+        jg.writeString(traceInfo.get(key));
+      }
+      jg.writeEndObject(); // End traceInfo
+
+      jg.writeEndObject();
+      jg.close();
+    }
   }
 }
