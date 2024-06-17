@@ -69,22 +69,31 @@ public class RangeIndexHandler extends BaseIndexHandler {
     String segmentName = _segmentDirectory.getSegmentMetadata().getName();
     Set<String> columnsToAddIdx = new HashSet<>(_columnsToAddIdx);
     Set<String> existingColumns = segmentReader.toSegmentDirectory().getColumnsWithIndex(StandardIndexes.range());
+
+    // Check if any index updates are required.
+    boolean rangeIndexUpdated = false;
+
     // Check if any existing index need to be removed.
     for (String column : existingColumns) {
       if (!columnsToAddIdx.remove(column)) {
         LOGGER.info("Need to remove existing range index from segment: {}, column: {}", segmentName, column);
-        return true;
+        rangeIndexUpdated = true;
       }
     }
-    // Check if any new index need to be added.
     for (String column : columnsToAddIdx) {
       ColumnMetadata columnMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
-      if (shouldCreateRangeIndex(columnMetadata)) {
+      if (columnMetadata == null) {
+        continue;
+      }
+      if (columnMetadata.isSorted()) {
+        LOGGER.info("Skipping creation of range index for segment: {}, column: {} as it is a sorted column",
+            segmentName, column);
+      } else {
         LOGGER.info("Need to create new range index for segment: {}, column: {}", segmentName, column);
-        return true;
+        rangeIndexUpdated = true;
       }
     }
-    return false;
+    return rangeIndexUpdated;
   }
 
   @Override
@@ -103,15 +112,10 @@ public class RangeIndexHandler extends BaseIndexHandler {
     }
     for (String column : columnsToAddIdx) {
       ColumnMetadata columnMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
-      if (shouldCreateRangeIndex(columnMetadata)) {
+      if (columnMetadata != null && !columnMetadata.isSorted()) {
         createRangeIndexForColumn(segmentWriter, columnMetadata);
       }
     }
-  }
-
-  private boolean shouldCreateRangeIndex(ColumnMetadata columnMetadata) {
-    // Only create range index on unsorted columns
-    return columnMetadata != null && !columnMetadata.isSorted();
   }
 
   private void createRangeIndexForColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata)
