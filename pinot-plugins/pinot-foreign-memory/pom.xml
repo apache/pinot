@@ -1,0 +1,175 @@
+<?xml version="1.0"?>
+<!--
+
+    Licensed to the Apache Software Foundation (ASF) under one
+    or more contributor license agreements.  See the NOTICE file
+    distributed with this work for additional information
+    regarding copyright ownership.  The ASF licenses this file
+    to you under the Apache License, Version 2.0 (the
+    "License"); you may not use this file except in compliance
+    with the License.  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing,
+    software distributed under the License is distributed on an
+    "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+    KIND, either express or implied.  See the License for the
+    specific language governing permissions and limitations
+    under the License.
+
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <artifactId>pinot-plugins</artifactId>
+    <groupId>org.apache.pinot</groupId>
+    <version>1.1.0-SNAPSHOT</version>
+    <relativePath>..</relativePath>
+  </parent>
+
+  <artifactId>pinot-foreign-memory</artifactId>
+  <packaging>pom</packaging>
+  <name>Pinot Foreing Memory</name>
+  <url>https://pinot.apache.org/</url>
+  <properties>
+    <pinot.root>${basedir}/../..</pinot.root>
+    <plugin.type>pinot-input-format</plugin.type>
+<!--    <build.profile.id>dev</build.profile.id>-->
+    <jdk.version>22</jdk.version>
+    <maven.compiler.source>22</maven.compiler.source>
+    <maven.compiler.target>22</maven.compiler.target>
+  </properties>
+
+  <dependencies>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-segment-spi</artifactId>
+    </dependency>
+    <!-- test -->
+    <dependency>
+      <groupId>commons-io</groupId>
+      <artifactId>commons-io</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-segment-spi</artifactId>
+      <version>${project.version}</version>
+      <type>test-jar</type>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <executions>
+          <execution>
+<!--            <id>default-compile</id>-->
+<!--            <phase>none</phase> &lt;!&ndash; By default code in this project is not compiled &ndash;&gt;-->
+            <goals>
+              <goal>compile</goal>
+            </goals>
+            <configuration>
+              <release>22</release>
+            </configuration>
+          </execution>
+        </executions>
+        <configuration>
+          <source>22</source>
+          <target>22</target>
+        </configuration>
+      </plugin>
+<!--      <plugin>-->
+<!--        <groupId>org.apache.maven.plugins</groupId>-->
+<!--        <artifactId>maven-surefire-plugin</artifactId>-->
+
+<!--      </plugin>-->
+    </plugins>
+  </build>
+<!--profile from gortiz-->
+<!--  <profiles>-->
+<!--    <profile>-->
+<!--      &lt;!&ndash; Only if JDK is at least 20, we compile the code &ndash;&gt;-->
+<!--      <id>java22</id>-->
+<!--      <activation>-->
+<!--        <jdk>[21,)</jdk>-->
+<!--      </activation>-->
+<!--      <build>-->
+<!--        <plugins>-->
+<!--          <plugin>-->
+<!--            <groupId>org.apache.maven.plugins</groupId>-->
+<!--            <artifactId>maven-compiler-plugin</artifactId>-->
+<!--            <executions>-->
+<!--              <execution>-->
+<!--                <id>default-compile</id>-->
+<!--                <phase>compile</phase>-->
+<!--              </execution>-->
+<!--            </executions>-->
+<!--          </plugin>-->
+<!--        </plugins>-->
+<!--      </build>-->
+<!--    </profile>-->
+<!--  </profiles>-->
+
+  <profiles>
+    <profile>
+      <id>jdk22</id>
+      <activation>
+        <jdk>[22,)</jdk>
+      </activation>
+      <build>
+        <pluginManagement>
+          <plugins>
+            <plugin>
+              <groupId>org.apache.maven.plugins</groupId>
+              <artifactId>maven-compiler-plugin</artifactId>
+              <executions>
+                <execution>
+                  <id>jdk22</id>
+                  <goals>
+                    <goal>compile</goal>
+                  </goals>
+                  <configuration>
+                    <release>${jdk.version}</release>
+                    <source>${jdk.version}</source>
+                    <target>${jdk.version}</target>
+<!--                    <compileSourceRoots>-->
+<!--                      <compileSourceRoot>C:\GitHubProjects\pinot\pinot-plugins\pinot-foreign-memory\src\main\java</compileSourceRoot>-->
+<!--                    </compileSourceRoots>-->
+<!--                    <multiReleaseOutput>true</multiReleaseOutput>-->
+                  </configuration>
+                </execution>
+              </executions>
+            </plugin>
+            <plugin>
+              <groupId>org.apache.maven.plugins</groupId>
+              <artifactId>maven-jar-plugin</artifactId>
+              <executions>
+                <execution>
+                  <id>default-jar</id>
+                  <configuration>
+                    <archive>
+                      <manifestEntries>
+                        <Multi-Release>true</Multi-Release>
+                      </manifestEntries>
+                    </archive>
+                  </configuration>
+                </execution>
+              </executions>
+            </plugin>
+          </plugins>
+        </pluginManagement>
+      </build>
+    </profile>
+  </profiles>
+</project>
