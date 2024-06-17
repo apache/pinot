@@ -18,20 +18,20 @@
  */
 package org.apache.pinot.tools.admin.command;
 
-import java.util.Collections;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.spi.auth.AuthProvider;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.NetUtils;
-import org.apache.pinot.tools.Command;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
+import java.util.Arrays;
+import java.util.Collections;
+
 
 @CommandLine.Command(name = "DeleteTable")
-public class DeleteTableCommand extends AbstractBaseAdminCommand implements Command {
+public class DeleteTableCommand extends AbstractExecuteBaseAdminCommand {
   private static final Logger LOGGER = LoggerFactory.getLogger(DeleteTableCommand.class);
 
   @CommandLine.Option(names = {"-tableName"}, required = true, description = "Name of the table to delete.")
@@ -44,30 +44,6 @@ public class DeleteTableCommand extends AbstractBaseAdminCommand implements Comm
       + "segments (e.g. 12h, 3d); If not set, the retention period will default to the first config that's not null: "
       + "the cluster setting, then '7d'. Using 0d or -1d will instantly delete segments without retention.")
   private String _retention;
-
-  @CommandLine.Option(names = {"-controllerHost"}, required = false, description = "Host name for controller.")
-  private String _controllerHost;
-
-  @CommandLine.Option(names = {"-controllerPort"}, required = false, description = "Port number for controller.")
-  private String _controllerPort = DEFAULT_CONTROLLER_PORT;
-
-  @CommandLine.Option(names = {"-controllerProtocol"}, required = false, description = "Protocol for controller.")
-  private String _controllerProtocol = CommonConstants.HTTP_PROTOCOL;
-
-  @CommandLine.Option(names = {"-exec"}, required = false, description = "Execute the command.")
-  private boolean _exec;
-
-  @CommandLine.Option(names = {"-user"}, required = false, description = "Username for basic auth.")
-  private String _user;
-
-  @CommandLine.Option(names = {"-password"}, required = false, description = "Password for basic auth.")
-  private String _password;
-
-  @CommandLine.Option(names = {"-authToken"}, required = false, description = "Http auth token.")
-  private String _authToken;
-
-  @CommandLine.Option(names = {"-authTokenUrl"}, required = false, description = "Http auth token url.")
-  private String _authTokenUrl;
 
   @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true, description = "Print "
       + "this message.")
@@ -97,6 +73,7 @@ public class DeleteTableCommand extends AbstractBaseAdminCommand implements Comm
     String retString =
         ("DeleteTable -tableName " + _tableName + " -type " + _type + " -retention " + _retention
             + " -controllerProtocol " + _controllerProtocol + " -controllerHost " + _controllerHost
+            + Arrays.toString(_headers)
             + " -controllerPort " + _controllerPort + " -user " + _user + " -password " + "[hidden]");
     return ((_exec) ? (retString + " -exec") : retString);
   }
@@ -120,41 +97,6 @@ public class DeleteTableCommand extends AbstractBaseAdminCommand implements Comm
     return this;
   }
 
-  public DeleteTableCommand setControllerHost(String controllerHost) {
-    _controllerHost = controllerHost;
-    return this;
-  }
-
-  public DeleteTableCommand setControllerPort(String controllerPort) {
-    _controllerPort = controllerPort;
-    return this;
-  }
-
-  public DeleteTableCommand setControllerProtocol(String controllerProtocol) {
-    _controllerProtocol = controllerProtocol;
-    return this;
-  }
-
-  public DeleteTableCommand setUser(String user) {
-    _user = user;
-    return this;
-  }
-
-  public DeleteTableCommand setPassword(String password) {
-    _password = password;
-    return this;
-  }
-
-  public DeleteTableCommand setExecute(boolean exec) {
-    _exec = exec;
-    return this;
-  }
-
-  public DeleteTableCommand setAuthProvider(AuthProvider authProvider) {
-    _authProvider = authProvider;
-    return this;
-  }
-
   @Override
   public boolean execute()
       throws Exception {
@@ -172,7 +114,8 @@ public class DeleteTableCommand extends AbstractBaseAdminCommand implements Comm
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
       fileUploadDownloadClient.getHttpClient().sendDeleteRequest(FileUploadDownloadClient
           .getDeleteTableURI(_controllerProtocol, _controllerHost, Integer.parseInt(_controllerPort),
-              _tableName, _type, _retention), Collections.emptyMap(), AuthProviderUtils.makeAuthProvider(_authProvider,
+              _tableName, _type, _retention), getHeadersAsMap(Collections.emptyList()),
+              AuthProviderUtils.makeAuthProvider(_authProvider,
           _authTokenUrl, _authToken, _user, _password));
     } catch (Exception e) {
       LOGGER.error("Got Exception while deleting Pinot Table: {}", _tableName, e);

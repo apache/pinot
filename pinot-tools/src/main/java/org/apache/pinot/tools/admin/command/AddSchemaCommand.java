@@ -18,34 +18,25 @@
  */
 package org.apache.pinot.tools.admin.command;
 
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.net.URI;
-import java.util.Collections;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.NetUtils;
-import org.apache.pinot.tools.Command;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.net.URI;
+import java.util.Arrays;
+import java.util.Collections;
+
 
 @CommandLine.Command(name = "AddSchema")
-public class AddSchemaCommand extends AbstractBaseAdminCommand implements Command {
+public class AddSchemaCommand extends AbstractExecuteBaseAdminCommand {
   private static final Logger LOGGER = LoggerFactory.getLogger(AddSchemaCommand.class);
-
-  @CommandLine.Option(names = {"-controllerHost"}, required = false, description = "Host name for controller.")
-  private String _controllerHost;
-
-  @CommandLine.Option(names = {"-controllerPort"}, required = false, description = "Port number for controller.")
-  private String _controllerPort = DEFAULT_CONTROLLER_PORT;
-
-  @CommandLine.Option(names = {"-controllerProtocol"}, required = false, description = "Protocol for controller.")
-  private String _controllerProtocol = CommonConstants.HTTP_PROTOCOL;
 
   @CommandLine.Option(names = {"-schemaFile"}, required = true, description = "Path to schema file.")
   private String _schemaFile = null;
@@ -57,21 +48,6 @@ public class AddSchemaCommand extends AbstractBaseAdminCommand implements Comman
   @CommandLine.Option(names = {"-force"}, required = false, description = "Whether to force overriding the schema if "
       + "the schema exists.")
   private boolean _force = false;
-
-  @CommandLine.Option(names = {"-exec"}, required = false, description = "Execute the command.")
-  private boolean _exec;
-
-  @CommandLine.Option(names = {"-user"}, required = false, description = "Username for basic auth.")
-  private String _user;
-
-  @CommandLine.Option(names = {"-password"}, required = false, description = "Password for basic auth.")
-  private String _password;
-
-  @CommandLine.Option(names = {"-authToken"}, required = false, description = "Http auth token.")
-  private String _authToken;
-
-  @CommandLine.Option(names = {"-authTokenUrl"}, required = false, description = "Http auth token url.")
-  private String _authTokenUrl;
 
   @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
       description = "Print this message.")
@@ -97,7 +73,8 @@ public class AddSchemaCommand extends AbstractBaseAdminCommand implements Comman
   @Override
   public String toString() {
     String retString = ("AddSchema -controllerProtocol " + _controllerProtocol + " -controllerHost " + _controllerHost
-        + " -controllerPort " + _controllerPort + " -schemaFile " + _schemaFile + " -override " + _override + " _force "
+        + " -controllerPort " + _controllerPort + " -headers " + Arrays.toString(_headers) + " -schemaFile "
+        + _schemaFile + " -override " + _override + " _force "
         + _force + " -user " + _user + " -password " + "[hidden]");
 
     return ((_exec) ? (retString + " -exec") : retString);
@@ -105,21 +82,6 @@ public class AddSchemaCommand extends AbstractBaseAdminCommand implements Comman
 
   @Override
   public void cleanup() {
-  }
-
-  public AddSchemaCommand setControllerHost(String controllerHost) {
-    _controllerHost = controllerHost;
-    return this;
-  }
-
-  public AddSchemaCommand setControllerPort(String controllerPort) {
-    _controllerPort = controllerPort;
-    return this;
-  }
-
-  public AddSchemaCommand setControllerProtocol(String controllerProtocol) {
-    _controllerProtocol = controllerProtocol;
-    return this;
   }
 
   public AddSchemaCommand setSchemaFilePath(String schemaFilePath) {
@@ -134,23 +96,6 @@ public class AddSchemaCommand extends AbstractBaseAdminCommand implements Comman
 
   public AddSchemaCommand setForce(boolean force) {
     _force = force;
-    return this;
-  }
-
-  public void setUser(String user) {
-    _user = user;
-  }
-
-  public void setPassword(String password) {
-    _password = password;
-  }
-
-  public void setAuthProvider(AuthProvider authProvider) {
-    _authProvider = authProvider;
-  }
-
-  public AddSchemaCommand setExecute(boolean exec) {
-    _exec = exec;
     return this;
   }
 
@@ -179,9 +124,10 @@ public class AddSchemaCommand extends AbstractBaseAdminCommand implements Comman
           .getUploadSchemaURI(_controllerProtocol, _controllerHost, Integer.parseInt(_controllerPort));
       schemaURI = new URI(schemaURI + "?override=" + _override + "&force=" + _force);
       fileUploadDownloadClient.addSchema(schemaURI,
-          schema.getSchemaName(), schemaFile, AuthProviderUtils.makeAuthHeaders(
-              AuthProviderUtils.makeAuthProvider(_authProvider, _authTokenUrl, _authToken,
-              _user, _password)), Collections.emptyList());
+          schema.getSchemaName(), schemaFile, getHeaders(
+              AuthProviderUtils.makeAuthHeaders(
+                      AuthProviderUtils.makeAuthProvider(_authProvider, _authTokenUrl, _authToken, _user, _password))
+          ), Collections.emptyList());
     } catch (Exception e) {
       LOGGER.error("Got Exception to upload Pinot Schema: {}", schema.getSchemaName(), e);
       return false;
