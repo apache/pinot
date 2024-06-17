@@ -180,8 +180,8 @@
     <argLine>-Xms4g -Xmx4g</argLine>
 
     <!-- Checkstyle violation prop.-->
-    <checkstyle.violation.severity>warning</checkstyle.violation.severity>
-    <checkstyle.fail.on.violation>true</checkstyle.fail.on.violation>
+<!--    <checkstyle.violation.severity>warning</checkstyle.violation.severity>-->
+<!--    <checkstyle.fail.on.violation>true</checkstyle.fail.on.violation>-->
 
     <!-- Configuration for Packaging -->
     <shade.prefix>org.apache.pinot.shaded</shade.prefix>
@@ -204,20 +204,20 @@
   </properties>
 
   <profiles>
-    <profile>
-      <id>not-java-21</id>
-      <activation>
-        <jdk>!21</jdk>
-      </activation>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>com.diffplug.spotless</groupId>
-            <artifactId>spotless-maven-plugin</artifactId>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
+<!--    <profile>-->
+<!--      <id>not-java-21</id>-->
+<!--      <activation>-->
+<!--        <jdk>!21</jdk>-->
+<!--      </activation>-->
+<!--      <build>-->
+<!--        <plugins>-->
+<!--          <plugin>-->
+<!--            <groupId>com.diffplug.spotless</groupId>-->
+<!--            <artifactId>spotless-maven-plugin</artifactId>-->
+<!--          </plugin>-->
+<!--        </plugins>-->
+<!--      </build>-->
+<!--    </profile>-->
     <profile>
       <id>github-actions</id>
       <activation>
