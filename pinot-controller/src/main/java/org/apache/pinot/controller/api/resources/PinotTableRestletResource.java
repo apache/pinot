@@ -707,13 +707,7 @@ public class PinotTableRestletResource {
     try {
       // This retry policy waits at most for 7.5s to 15s in total. This is chosen to cover typical delays for tables
       // with many segments and avoid excessive HTTP request timeouts.
-      RetryPolicies.exponentialBackoffRetryPolicy(5, 500L, 2.0).attempt(() -> {
-        Map<String, String> controllerJobZKMetadata = getControllerJobMetadata(jobId);
-        if (controllerJobZKMetadata == null) {
-          return false;
-        }
-        return true;
-      });
+      RetryPolicies.exponentialBackoffRetryPolicy(5, 500L, 2.0).attempt(() -> getControllerJobMetadata(jobId) != null);
     } catch (Exception e) {
       LOGGER.warn("waiting for jobId not successful while rebalancing table: {}", tableNameWithType);
     }
