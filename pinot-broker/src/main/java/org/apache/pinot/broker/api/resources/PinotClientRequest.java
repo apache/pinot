@@ -33,6 +33,8 @@ import io.swagger.annotations.ApiResponses;
 import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
+import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -153,9 +155,9 @@ public class PinotClientRequest {
       if (!requestJson.has(Request.SQL)) {
         throw new IllegalStateException("Payload is missing the query string field 'sql'");
       }
-      BrokerResponse brokerResponse =
-          executeSqlQuery((ObjectNode) requestJson, makeHttpIdentity(requestContext), false, httpHeaders);
-      asyncResponse.resume(getPinotQueryResponse(brokerResponse));
+      Response response = getPinotQueryResponse(
+          executeSqlQuery((ObjectNode) requestJson, makeHttpIdentity(requestContext), false, httpHeaders));
+      asyncResponse.resume(response);
     } catch (WebApplicationException wae) {
       asyncResponse.resume(wae);
     } catch (Exception e) {
@@ -371,9 +373,12 @@ public class PinotClientRequest {
       queryErrorCodeHeaderValue = exceptions.get(0).getErrorCode();
     }
 
+    byte[] buf = brokerResponse.toJsonString().getBytes(StandardCharsets.UTF_8);
+
     // returning the Response with OK status and header value.
     return Response.ok()
         .header(PINOT_QUERY_ERROR_CODE_HEADER, queryErrorCodeHeaderValue)
-        .entity(brokerResponse.toJsonString()).build();
+        .entity(new ByteArrayInputStream(buf))
+        .build();
   }
 }
