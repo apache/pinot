@@ -26,4 +26,4 @@ metadata:
   {{- with .Values.namespaceAnnotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
-    {{- end }}
+  {{- end }}
