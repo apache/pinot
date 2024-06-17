@@ -244,13 +244,7 @@ public class JsonUtils {
 
   public static void objectToOutputStream(Object object, OutputStream outputStream)
       throws IOException {
-    JsonGenerator jg = new JsonFactory().createGenerator(outputStream, JsonEncoding.UTF8);
-    objectToGenerator(object, jg);
-  }
-
-  public static void objectToGenerator(Object object, JsonGenerator jsonGenerator)
-      throws IOException {
-    DEFAULT_WRITER.writeValue(jsonGenerator, object);
+    DEFAULT_WRITER.writeValue(outputStream, object);
   }
 
   public static String objectToPrettyString(Object object)
