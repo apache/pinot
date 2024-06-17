@@ -702,22 +702,21 @@ public class PinotTableRestletResource {
    * Waits for jobId to be persisted using a retry policy.
    * Tables with 100k+ segments take up to a few seconds for the jobId to persist. This ensures the jobId is present
    * before returning the jobId to the caller, so they can correctly poll the jobId.
-   **/
+   */
   public void waitForJobIdToPersist(String jobId, String tableNameWithType) {
-      try {
-          // This retry policy waits at most for 3.5 to 7s in total. This is chosen to cover
-          // typical delays for tables with many segments and avoid excessive HTTP request timeouts.
-          RetryPolicies.exponentialBackoffRetryPolicy(5, 500L, 2.0)
-                  .attempt(() -> {
-            Map<String, String> controllerJobZKMetadata = getControllerJobMetadata(jobId);
-            if (controllerJobZKMetadata == null) {
-              return false;
-            }
-            return true;
-          });
-      } catch (Exception e) {
-        LOGGER.warn("waiting for jobId not successful while rebalancing table: {}", tableNameWithType);
-      }
+    try {
+      // This retry policy waits at most for 7.5s to 15s in total. This is chosen to cover typical delays for tables
+      // with many segments and avoid excessive HTTP request timeouts.
+      RetryPolicies.exponentialBackoffRetryPolicy(5, 500L, 2.0).attempt(() -> {
+        Map<String, String> controllerJobZKMetadata = getControllerJobMetadata(jobId);
+        if (controllerJobZKMetadata == null) {
+          return false;
+        }
+        return true;
+      });
+    } catch (Exception e) {
+      LOGGER.warn("waiting for jobId not successful while rebalancing table: {}", tableNameWithType);
+    }
   }
 
   public Map<String, String> getControllerJobMetadata(String jobId) {
