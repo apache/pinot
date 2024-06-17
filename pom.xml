@@ -239,7 +239,7 @@
     <kotlin.stdlib.version>1.9.24</kotlin.stdlib.version>
     <okio.version>3.9.0</okio.version>
     <kerby.version>2.0.3</kerby.version>
-    <jline.version>3.26.1</jline.version>
+    <jline.version>3.26.2</jline.version>
     <wildfly.version>2.0.0</wildfly.version>
     <jettison.version>1.5.4</jettison.version>
     <eclipse.jetty.version>9.4.54.v20240208</eclipse.jetty.version>
