@@ -21,6 +21,7 @@ package org.apache.pinot.core.query.optimizer.filter;
 import java.math.BigDecimal;
 import java.util.List;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.Function;
@@ -399,6 +400,8 @@ public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
         dataType = DataType.INT;
       } else if ("VARCHAR".equals(targetTypeLiteral)) {
         dataType = DataType.STRING;
+      } else if (targetTypeLiteral.endsWith("_ARRAY")) {
+        dataType = DataType.valueOf(StringUtils.removeEnd(targetTypeLiteral, "_ARRAY").trim());
       } else {
         dataType = DataType.valueOf(targetTypeLiteral);
       }
