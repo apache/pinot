@@ -352,6 +352,7 @@ public class CommonConstants {
       public static class QueryOptionKey {
         public static final String TIMEOUT_MS = "timeoutMs";
         public static final String SKIP_UPSERT = "skipUpsert";
+        public static final String SKIP_UPSERT_VIEW = "skipUpsertView";
         public static final String UPSERT_VIEW_FRESHNESS_MS = "upsertViewFreshnessMs";
         public static final String USE_STAR_TREE = "useStarTree";
         public static final String SCAN_STAR_TREE_NODES = "scanStarTreeNodes";
@@ -411,6 +412,9 @@ public class CommonConstants {
         // Indicates the maximum length of serialized response across all servers for a query. This value is equally
         // divided across all servers processing the query.
         public static final String MAX_QUERY_RESPONSE_SIZE_BYTES = "maxQueryResponseSizeBytes";
+
+        // If query submission causes an exception, still continue to submit the query to other servers
+        public static final String SKIP_UNAVAILABLE_SERVERS = "skipUnavailableServers";
       }
 
       public static class QueryOptionValue {

@@ -46,10 +46,10 @@ import org.apache.pinot.query.runtime.operator.operands.TransformOperandFactory;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.utils.BooleanUtils;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.JoinOverFlowMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 
 /**
  * This basic {@code BroadcastJoinOperator} implement a basic broadcast join algorithm.
@@ -237,8 +237,16 @@ public class HashJoinOperator extends MultiStageOperator {
           ProcessingException resourceLimitExceededException =
               new ProcessingException(QueryException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE);
           resourceLimitExceededException.setMessage(
-              "Cannot build in memory hash table for join operator, reach number of rows limit: "
-                  + _maxRowsInHashTable);
+              "Cannot build in memory hash table for join operator, reach number of rows limit: " + _maxRowsInHashTable
+                  + ". Consider increasing the limit for the maximum number of rows in a join either via the query "
+                  + "option '" + CommonConstants.Broker.Request.QueryOptionKey.MAX_ROWS_IN_JOIN + "' or the '"
+                  + PinotHintOptions.JoinHintOptions.MAX_ROWS_IN_JOIN + "' hint in the '"
+                  + PinotHintOptions.JOIN_HINT_OPTIONS + "'. Alternatively, if partial results are acceptable, the join"
+                  + " overflow mode can be set to '" + JoinOverFlowMode.BREAK.name() + "' either via the query option '"
+                  + CommonConstants.Broker.Request.QueryOptionKey.JOIN_OVERFLOW_MODE + "' or the '"
+                  + PinotHintOptions.JoinHintOptions.JOIN_OVERFLOW_MODE + "' hint in the '"
+                  + PinotHintOptions.JOIN_HINT_OPTIONS + "'. Furthermore, if there is a large disparity in the size of "
+                  + "the two tables being joined, use the smaller table as the right input instead of the left.");
           throw resourceLimitExceededException;
         } else {
           // Just fill up the buffer.

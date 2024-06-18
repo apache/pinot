@@ -72,8 +72,7 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
   private final QueryExecutor _queryExecutor;
   private final ServerMetrics _serverMetrics;
   private final Server _server;
-  private final ExecutorService _executorService =
-      Executors.newFixedThreadPool(ResourceManager.DEFAULT_QUERY_WORKER_THREADS);
+  private final ExecutorService _executorService;
   private final AccessControl _accessControl;
   private final ServerQueryLogger _queryLogger = ServerQueryLogger.getInstance();
 
@@ -100,6 +99,8 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
 
   public GrpcQueryServer(int port, GrpcConfig config, TlsConfig tlsConfig, QueryExecutor queryExecutor,
       ServerMetrics serverMetrics, AccessControl accessControl) {
+    _executorService = Executors.newFixedThreadPool(config.isQueryWorkerThreadsSet() ? config.getQueryWorkerThreads()
+        : ResourceManager.DEFAULT_QUERY_WORKER_THREADS);
     _queryExecutor = queryExecutor;
     _serverMetrics = serverMetrics;
     if (tlsConfig != null) {

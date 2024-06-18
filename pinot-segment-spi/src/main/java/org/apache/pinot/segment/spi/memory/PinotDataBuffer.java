@@ -521,13 +521,15 @@ public abstract class PinotDataBuffer implements Closeable {
    * Given an array of bytes, writes the content in the specified position.
    */
   public void readFrom(long offset, byte[] buffer, int srcOffset, int size) {
-    assert offset <= Integer.MAX_VALUE;
-    int intOffset = (int) offset;
-
+    if (offset + size > size()) {
+      throw new IndexOutOfBoundsException("Buffer overflow: offset = " + offset + ", size = " + size
+          + ", buffer size = " + size());
+    }
     if (size <= BULK_BYTES_PROCESSING_THRESHOLD) {
+      long currentOffset = offset;
       int end = srcOffset + size;
       for (int i = srcOffset; i < end; i++) {
-        putByte(intOffset++, buffer[i]);
+        putByte(currentOffset++, buffer[i]);
       }
     } else {
       toDirectByteBuffer(offset, size).put(buffer, srcOffset, size);

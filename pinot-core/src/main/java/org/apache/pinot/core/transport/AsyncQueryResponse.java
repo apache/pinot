@@ -181,4 +181,12 @@ public class AsyncQueryResponse implements QueryResponse {
       markQueryFailed(serverRoutingInstance, exception);
     }
   }
+
+  /**
+   * Wait for one less server response. This is used when the server is skipped, as
+   * query submission will have failed we do not want to wait for the response.
+   */
+  void skipServerResponse() {
+    _countDownLatch.countDown();
+  }
 }

@@ -24,6 +24,7 @@ import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.segment.local.upsert.UpsertUtils;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
@@ -71,7 +72,7 @@ public class FilterPlanNodeTest {
     // Result should be invariant - always exactly 3 docs
     for (int i = 0; i < 10_000; i++) {
       SegmentContext segmentContext = new SegmentContext(segment);
-      segmentContext.setQueryableDocIdsSnapshot(TestUtils.getQueryableDocIdsSnapshotFromSegment(segment));
+      segmentContext.setQueryableDocIdsSnapshot(UpsertUtils.getQueryableDocIdsSnapshotFromSegment(segment));
       assertEquals(getNumberOfFilteredDocs(segmentContext, queryContext), 3);
     }
 

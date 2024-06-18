@@ -6,6 +6,7 @@ cscope.*
 .externalToolBuilders/
 maven-eclipse.xml
 target/
+examples/
 bin/
 */bin/
 .idea
