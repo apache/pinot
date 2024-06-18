@@ -77,18 +77,19 @@ public class BenchmarkDataBlock {
         .addProfiler(GCProfiler.class));
   }
 
-  @Param(value = {"INT", "LONG", "STRING", "BYTES", "BIG_DECIMAL", "LONG_ARRAY", "STRING_ARRAY"})
+//  @Param(value = {"INT", "LONG", "STRING", "BYTES", "BIG_DECIMAL", "LONG_ARRAY", "STRING_ARRAY"})
+  @Param(value = {"INT", "LONG", "STRING", "BYTES", "LONG_ARRAY"})
   DataSchema.ColumnDataType _dataType;
   @Param(value = {"COLUMNAR", "ROW"})
   DataBlock.Type _blockType = DataBlock.Type.COLUMNAR;
   //    @Param(value = {"0", "10", "90"})
   int _nullPerCent = 10;
 
-//  @Param(value = {"direct_small", "heap_small"})
+  @Param(value = {"direct_small", "heap_small", "direct_large"})
   String _version = "heap_small";
 
-  @Param(value = {"10000", "1000000"})
-  int _rows;
+//  @Param(value = {"10000", "1000000"})
+  int _rows = 10000;
 
   BenchmarkState _state;
 
@@ -172,12 +173,6 @@ public class BenchmarkDataBlock {
       }
       _bytes = DataBlockUtils.serialize(_dataBlock);
 
-      if (blockType == DataBlock.Type.COLUMNAR) {
-        _generateBlock = (data) -> DataBlockBuilder.buildFromColumns(data, _schema);
-      } else {
-        _generateBlock = (data) -> DataBlockBuilder.buildFromRows(data, _schema);
-      }
-
       PagedPinotOutputStream.PageAllocator alloc;
 
       switch (version) {
@@ -195,6 +190,12 @@ public class BenchmarkDataBlock {
           break;
         default:
           throw new IllegalArgumentException("Cannot get allocator from version: " + version);
+      }
+
+      if (blockType == DataBlock.Type.COLUMNAR) {
+        _generateBlock = (data) -> DataBlockBuilder.buildFromColumns(data, _schema, alloc);
+      } else {
+        _generateBlock = (data) -> DataBlockBuilder.buildFromRows(data, _schema, alloc);
       }
       DataBlockUtils.setSerde(DataBlockSerde.Version.V1_V2, new ZeroCopyDataBlockSerde(alloc));
     }
@@ -226,9 +227,9 @@ public class BenchmarkDataBlock {
       int distinctStrings = 100;
       switch (_columnDataType) {
         case INT:
-          return r.nextInt();
+          return (Object) r.nextInt();
         case LONG:
-          return r.nextLong();
+          return (Object) r.nextLong();
         case STRING:
           return "string" + r.nextInt(distinctStrings);
         case BYTES:
@@ -238,7 +239,7 @@ public class BenchmarkDataBlock {
         case BIG_DECIMAL:
           return new BigDecimal(r.nextDouble());
         case BOOLEAN:
-          return r.nextBoolean() ? 1 : 0;
+          return (Object) (r.nextBoolean() ? 1 : 0);
         case LONG_ARRAY:
           long[] longArray = new long[10];
           for (int i = 0; i < longArray.length; i++) {

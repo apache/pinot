@@ -51,6 +51,12 @@ public class DataBlockBuilder {
 
   public static RowDataBlock buildFromRows(List<Object[]> rows, DataSchema dataSchema)
       throws IOException {
+    return buildFromRows(rows, dataSchema, PagedPinotOutputStream.HeapPageAllocator.createSmall());
+  }
+
+  public static RowDataBlock buildFromRows(List<Object[]> rows, DataSchema dataSchema,
+      PagedPinotOutputStream.PageAllocator allocator)
+      throws IOException {
     int numRows = rows.size();
 
     // TODO: consolidate these null utils into data table utils.
@@ -69,7 +75,7 @@ public class DataBlockBuilder {
     ByteBuffer fixedSize = ByteBuffer.allocate(fixedBytesRequired)
         .order(ByteOrder.BIG_ENDIAN);
 
-    PagedPinotOutputStream varSize = PagedPinotOutputStream.createHeap();
+    PagedPinotOutputStream varSize = new PagedPinotOutputStream(allocator);
     Object2IntOpenHashMap<String> dictionary = new Object2IntOpenHashMap<>();
 
     for (int rowId = 0; rowId < numRows; rowId++) {
@@ -151,7 +157,14 @@ public class DataBlockBuilder {
     return buildRowBlock(numRows, dataSchema, getReverseDictionary(dictionary), fixedSize, varBufferBuilder);
   }
 
+
   public static ColumnarDataBlock buildFromColumns(List<Object[]> columns, DataSchema dataSchema)
+      throws IOException {
+    return buildFromColumns(columns, dataSchema, PagedPinotOutputStream.HeapPageAllocator.createSmall());
+  }
+
+  public static ColumnarDataBlock buildFromColumns(List<Object[]> columns, DataSchema dataSchema,
+      PagedPinotOutputStream.PageAllocator allocator)
       throws IOException {
     int numRows = columns.isEmpty() ? 0 : columns.get(0).length;
 
@@ -169,7 +182,7 @@ public class DataBlockBuilder {
     ByteBuffer fixedSize = ByteBuffer.allocate(fixedBytesRequired);
     CompoundDataBuffer.Builder varBufferBuilder = new CompoundDataBuffer.Builder(ByteOrder.BIG_ENDIAN, true);
 
-    try (PagedPinotOutputStream varSize = PagedPinotOutputStream.createHeap()) {
+    try (PagedPinotOutputStream varSize = new PagedPinotOutputStream(allocator)) {
       for (int colId = 0; colId < numColumns; colId++) {
         RoaringBitmap nullBitmap = new RoaringBitmap();
         nullBitmaps[colId] = nullBitmap;
@@ -407,8 +420,7 @@ public class DataBlockBuilder {
     return rowSizeInBytes;
   }
 
-  private static void writeVarOffsetInFixed(ByteBuffer fixedSize, PagedPinotOutputStream varSize)
-      throws IOException {
+  private static void writeVarOffsetInFixed(ByteBuffer fixedSize, PagedPinotOutputStream varSize) {
     long offsetInVar = varSize.getCurrentOffset();
     Preconditions.checkState(offsetInVar <= Integer.MAX_VALUE,
         "Cannot handle variable size output stream larger than 2GB");
