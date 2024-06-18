@@ -38,6 +38,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.AbstractMap;
 import java.util.ArrayList;
@@ -237,6 +238,11 @@ public class JsonUtils {
   public static String objectToString(Object object)
       throws JsonProcessingException {
     return DEFAULT_WRITER.writeValueAsString(object);
+  }
+
+  public static void objectToOutputStream(Object object, OutputStream outputStream)
+      throws IOException {
+    DEFAULT_WRITER.writeValue(outputStream, object);
   }
 
   public static String objectToPrettyString(Object object)
