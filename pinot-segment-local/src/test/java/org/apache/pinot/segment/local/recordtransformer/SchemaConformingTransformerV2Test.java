@@ -87,7 +87,7 @@ public class SchemaConformingTransformerV2Test {
           .set(TEST_JSON_NULL_FIELD_NAME, TEST_JSON_NULL_NODE).set(TEST_JSON_STRING_FIELD_NAME, TEST_JSON_STRING_NODE)
           .set(TEST_JSON_INT_NO_IDX_FIELD_NAME, TEST_INT_NODE)
           .set(TEST_JSON_STRING_NO_IDX_FIELD_NAME, TEST_JSON_STRING_NO_IDX_NODE);
-  private static String jsonKeyValueSeparator = String.valueOf((char) 0x1E);
+  private static String jsonKeyValueSeparator = "\u001e";
 
   static {
     ServerMetrics.register(mock(ServerMetrics.class));
