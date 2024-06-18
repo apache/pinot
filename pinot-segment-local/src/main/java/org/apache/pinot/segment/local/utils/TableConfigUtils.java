@@ -745,7 +745,7 @@ public final class TableConfigUtils {
           if (taskTypeConfig.containsKey("bufferTimePeriod")) {
             TimeUtils.convertPeriodToMillis(taskTypeConfig.get("bufferTimePeriod"));
           }
-          // check maxNumRecordsPerSegment
+          // check invalidRecordsThresholdPercent
           if (taskTypeConfig.containsKey("invalidRecordsThresholdPercent")) {
             Preconditions.checkState(Double.parseDouble(taskTypeConfig.get("invalidRecordsThresholdPercent")) > 0
                     && Double.parseDouble(taskTypeConfig.get("invalidRecordsThresholdPercent")) <= 100,
@@ -753,8 +753,8 @@ public final class TableConfigUtils {
           }
           // check invalidRecordsThresholdCount
           if (taskTypeConfig.containsKey("invalidRecordsThresholdCount")) {
-            Preconditions.checkState(Long.parseLong(taskTypeConfig.get("invalidRecordsThresholdCount")) >= 1,
-                "invalidRecordsThresholdCount must be >= 1");
+            Preconditions.checkState(Long.parseLong(taskTypeConfig.get("invalidRecordsThresholdCount")) >= 0,
+                "invalidRecordsThresholdCount must be >= 0");
           }
           // check that either invalidRecordsThresholdPercent or invalidRecordsThresholdCount was provided
           Preconditions.checkState(
