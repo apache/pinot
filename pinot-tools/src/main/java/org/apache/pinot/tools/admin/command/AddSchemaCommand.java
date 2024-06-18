@@ -18,6 +18,11 @@
  */
 package org.apache.pinot.tools.admin.command;
 
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.net.URI;
+import java.util.Arrays;
+import java.util.Collections;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.spi.auth.AuthProvider;
@@ -26,12 +31,6 @@ import org.apache.pinot.spi.utils.NetUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
-
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.net.URI;
-import java.util.Arrays;
-import java.util.Collections;
 
 
 @CommandLine.Command(name = "AddSchema")

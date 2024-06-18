@@ -1,5 +1,9 @@
 package org.apache.pinot.tools.admin.command;
 
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+import javax.net.ssl.SSLContext;
 import org.apache.http.Header;
 import org.apache.http.message.BasicHeader;
 import org.apache.pinot.common.utils.ClientSSLContextGenerator;
@@ -8,11 +12,6 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.tools.Command;
 import picocli.CommandLine;
-
-import javax.net.ssl.SSLContext;
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 public abstract class AbstractExecuteBaseAdminCommand extends AbstractBaseAdminCommand implements Command {
     @CommandLine.Option(names = {"-controllerHost"}, required = false, description = "Host name for controller.")
