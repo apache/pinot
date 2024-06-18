@@ -412,6 +412,9 @@ public class CommonConstants {
         // Indicates the maximum length of serialized response across all servers for a query. This value is equally
         // divided across all servers processing the query.
         public static final String MAX_QUERY_RESPONSE_SIZE_BYTES = "maxQueryResponseSizeBytes";
+
+        // If query submission causes an exception, still continue to submit the query to other servers
+        public static final String SKIP_UNAVAILABLE_SERVERS = "skipUnavailableServers";
       }
 
       public static class QueryOptionValue {
