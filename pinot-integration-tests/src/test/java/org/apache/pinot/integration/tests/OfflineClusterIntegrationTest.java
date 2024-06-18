@@ -2113,6 +2113,51 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(row.get(0).asDouble(), 16071.0 / 2);
   }
 
+  @Test
+  public void testWindowAggregationV2()
+      throws Exception {
+    setUseMultiStageQueryEngine(true);
+    String tmpTableQuery =
+        "select DaysSinceEpoch, count(*) as num_trips from mytable GROUP BY DaysSinceEpoch order by DaysSinceEpoch";
+    JsonNode tmpTableResult = postQuery(tmpTableQuery).get("resultTable").get("rows");
+
+    String query = "WITH tmp AS (\n"
+        + "  select count(*) as num_trips, DaysSinceEpoch  from mytable GROUP BY DaysSinceEpoch\n"
+        + ")\n"
+        + "\n"
+        + "SELECT\n"
+        + "    DaysSinceEpoch,\n"
+        + "    num_trips,\n"
+        + "    LAG(num_trips, 2) OVER (ORDER BY DaysSinceEpoch) AS previous_num_trips,\n"
+        + "    num_trips - LAG(num_trips, 2) OVER (ORDER BY DaysSinceEpoch) AS difference\n"
+        + "FROM\n"
+        + "    tmp";
+    JsonNode response = postQuery(query);
+    JsonNode resultTable = response.get("resultTable");
+    assertEquals(resultTable.get("dataSchema").get("columnDataTypes").toString(),
+        "[\"INT\",\"LONG\",\"LONG\",\"LONG\"]");
+    JsonNode rows = resultTable.get("rows");
+    assertEquals(rows.size(), 364);
+    for (int i = 0; i < 2; i++) {
+      JsonNode row = rows.get(i);
+      JsonNode tmpTableRow = tmpTableResult.get(i);
+      assertEquals(row.size(), 4);
+      assertEquals(row.get(0).asInt(), tmpTableRow.get(0).asInt());
+      assertEquals(row.get(1).asLong(), tmpTableRow.get(1).asLong());
+      assertTrue(row.get(2).isNull());
+      assertTrue(row.get(2).isNull());
+    }
+    for (int i = 2; i < 363; i++) {
+      JsonNode row = rows.get(i);
+      assertEquals(row.size(), 4);
+      JsonNode tmpTableRow = tmpTableResult.get(i);
+      assertEquals(row.get(0).asInt(), tmpTableRow.get(0).asInt());
+      assertEquals(row.get(1).asLong(), tmpTableRow.get(1).asLong());
+      assertEquals(rows.get(i - 2).get(1).asLong(), row.get(2).asLong());
+      assertEquals(row.get(1).asLong() - row.get(2).asLong(), row.get(3).asLong());
+    }
+  }
+
   @Test(dataProvider = "useBothQueryEngines")
   public void testSelectionUDF(boolean useMultiStageQueryEngine)
       throws Exception {
