@@ -33,7 +33,7 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/../..</pinot.root>
-    <circe.version>0.14.7</circe.version>
+    <circe.version>0.14.8</circe.version>
     <paranameter.version>2.8</paranameter.version>
     <scalaxml.version>2.3.0</scalaxml.version>
     <scalatest.version>3.2.18</scalatest.version>
