@@ -91,7 +91,7 @@ public class DummyTableUpsertMetadataManager extends BaseTableUpsertMetadataMana
     }
 
     @Override
-    protected void addOrReplaceSegment(ImmutableSegmentImpl segment, ThreadSafeMutableRoaringBitmap validDocIds,
+    protected void doAddOrReplaceSegment(ImmutableSegmentImpl segment, ThreadSafeMutableRoaringBitmap validDocIds,
         @org.jetbrains.annotations.Nullable ThreadSafeMutableRoaringBitmap queryableDocIds,
         Iterator<RecordInfo> recordInfoIterator, @org.jetbrains.annotations.Nullable IndexSegment oldSegment,
         @org.jetbrains.annotations.Nullable MutableRoaringBitmap validDocIdsForOldSegment) {
