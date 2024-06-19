@@ -109,8 +109,8 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   private File _tempIndexDir;
   private String _segmentName;
   private long _totalRecordReadTimeNs = 0;
-  private long _totalIndexTime = 0;
-  private long _totalStatsCollectorTime = 0;
+  private long _totalIndexTimeNs = 0;
+  private long _totalStatsCollectorTimeNs = 0;
   private boolean _continueOnError;
 
   @Override
@@ -273,22 +273,20 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       GenericRow reuse = new GenericRow();
       TransformPipeline.Result reusedResult = new TransformPipeline.Result();
       while (_recordReader.hasNext()) {
-        long recordReadStopTime = System.nanoTime();
-        long indexStopTime;
+        long recordReadStopTimeNs;
         reuse.clear();
 
         try {
-          long recordReadStartTime = System.nanoTime();
           GenericRow decodedRow = _recordReader.next(reuse);
-          recordReadStartTime = System.nanoTime();
+          long recordReadStartTimeNs = System.nanoTime();
 
           // Should not be needed anymore.
           // Add row to indexes
           _recordEnricherPipeline.run(decodedRow);
           _transformPipeline.processRow(decodedRow, reusedResult);
 
-          recordReadStopTime = System.nanoTime();
-          _totalRecordReadTimeNs += (recordReadStopTime - recordReadStartTime);
+          recordReadStopTimeNs = System.nanoTime();
+          _totalRecordReadTimeNs += (recordReadStopTimeNs - recordReadStartTimeNs);
         } catch (Exception e) {
           if (!_continueOnError) {
             throw new RuntimeException("Error occurred while reading row during indexing", e);
@@ -302,8 +300,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
         for (GenericRow row : reusedResult.getTransformedRows()) {
           _indexCreator.indexRow(row);
         }
-        indexStopTime = System.currentTimeMillis();
-        _totalIndexTime += (indexStopTime - recordReadStopTime);
+        _totalIndexTimeNs += (System.nanoTime() - recordReadStopTimeNs);
         incompleteRowsFound += reusedResult.getIncompleteRowCount();
       }
     } catch (Exception e) {
@@ -439,8 +436,8 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     persistCreationMeta(segmentOutputDir, crc, creationTime);
 
     LOGGER.info("Driver, record read time : {}", TimeUnit.NANOSECONDS.toMillis(_totalRecordReadTimeNs));
-    LOGGER.info("Driver, stats collector time : {}", _totalStatsCollectorTime);
-    LOGGER.info("Driver, indexing time : {}", _totalIndexTime);
+    LOGGER.info("Driver, stats collector time : {}", _totalStatsCollectorTimeNs);
+    LOGGER.info("Driver, indexing time : {}", _totalIndexTimeNs);
   }
 
   private void updatePostSegmentCreationIndexes(File indexDir)
@@ -536,6 +533,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
    */
   void buildIndexCreationInfo()
       throws Exception {
+    long statsCollectorStartTime = System.nanoTime();
     Set<String> varLengthDictionaryColumns = new HashSet<>(_config.getVarLengthDictionaryColumns());
     Set<String> rawIndexCreationColumns = _config.getRawIndexCreationColumns();
     Set<String> rawIndexCompressionTypeKeys = _config.getRawIndexCompressionType().keySet();
@@ -561,6 +559,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
               defaultNullValue));
     }
     _segmentIndexCreationInfo.setTotalDocs(_totalDocs);
+    _totalStatsCollectorTimeNs = System.nanoTime() - statsCollectorStartTime;
   }
 
   /**
