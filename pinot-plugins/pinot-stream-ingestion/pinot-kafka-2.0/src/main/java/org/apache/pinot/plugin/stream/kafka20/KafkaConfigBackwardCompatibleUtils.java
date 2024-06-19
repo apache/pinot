@@ -18,17 +18,23 @@
  */
 package org.apache.pinot.plugin.stream.kafka20;
 
+import java.io.BufferedReader;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.stream.StreamConfig;
 
 
 public class KafkaConfigBackwardCompatibleUtils {
+
   private KafkaConfigBackwardCompatibleUtils() {
   }
 
   public static final String KAFKA_COMMON_PACKAGE_PREFIX = "org.apache.kafka.common";
   public static final String PINOT_SHADED_PACKAGE_PREFIX = "org.apache.pinot.shaded.";
+  public static final String SASL_JAAS_CONFIG = "sasl.jaas.config";
 
   /**
    * Handle the stream config to replace the Kafka common package with the shaded version if needed.
@@ -37,6 +43,7 @@ public class KafkaConfigBackwardCompatibleUtils {
     Map<String, String> streamConfigMap = streamConfig.getStreamConfigsMap();
     //FIXME: This needs to be done because maven shade plugin also overwrites the constants in the classes
     String prefixToReplace = KAFKA_COMMON_PACKAGE_PREFIX.replace(PINOT_SHADED_PACKAGE_PREFIX, "");
+
     for (Map.Entry<String, String> entry : streamConfigMap.entrySet()) {
       String[] valueParts = StringUtils.split(entry.getValue(), ' ');
       boolean updated = false;
@@ -57,8 +64,57 @@ public class KafkaConfigBackwardCompatibleUtils {
           }
         }
       }
+
       if (updated) {
         entry.setValue(String.join(" ", valueParts));
+      }
+    }
+
+    // Read the file specified by the -Djava.security.auth.login.config VM argument
+    String loginConfigFile = System.getProperty("java.security.auth.login.config");
+    StringBuilder jaasConfigContent = new StringBuilder();
+    if (loginConfigFile != null) {
+      try (BufferedReader br = new BufferedReader(new InputStreamReader(new FileInputStream(loginConfigFile)))) {
+        String line;
+        while ((line = br.readLine()) != null) {
+          jaasConfigContent.append(line).append("\n");
+        }
+      } catch (IOException e) {
+        throw new RuntimeException("Failed to read JAAS config file: " + loginConfigFile, e);
+      }
+    }
+
+    // Process JAAS config content
+    if (jaasConfigContent.length() > 0) {
+      String jaasContent = jaasConfigContent.toString();
+      boolean updated = false;
+      String[] lines = jaasContent.split("\n");
+      for (int i = 0; i < lines.length; i++) {
+        if (lines[i].contains(prefixToReplace)) {
+          String className = lines[i].trim().split(" ")[0];
+          if (className.startsWith(prefixToReplace)) {
+            try {
+              Class.forName(className);
+            } catch (ClassNotFoundException e1) {
+              // If not, replace the class with the shaded version
+              try {
+                String shadedClassName = PINOT_SHADED_PACKAGE_PREFIX + className.substring(prefixToReplace.length());
+                Class.forName(shadedClassName);
+                lines[i] = lines[i].replace(className, shadedClassName);
+                updated = true;
+              } catch (ClassNotFoundException e2) {
+                // Do nothing, shaded class is not found as well, keep the original class
+              }
+            }
+          }
+        }
+      }
+      if (updated) {
+        String updatedJaasConfig = String.join("\n", lines);
+        String jassConfigProperty =
+            updatedJaasConfig.substring(updatedJaasConfig.indexOf("{") + 1).substring(0, updatedJaasConfig.indexOf("}"))
+                .replace("\n", " ");
+        streamConfigMap.putIfAbsent(SASL_JAAS_CONFIG, jassConfigProperty);
       }
     }
   }
