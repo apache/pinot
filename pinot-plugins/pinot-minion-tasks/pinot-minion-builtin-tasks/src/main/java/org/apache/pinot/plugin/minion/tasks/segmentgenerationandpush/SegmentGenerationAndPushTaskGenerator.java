@@ -180,8 +180,11 @@ public class SegmentGenerationAndPushTaskGenerator extends BaseTaskGenerator {
     Map<String, String> batchConfigMap = new HashMap<>();
     TableTaskConfig tableTaskConfig = tableConfig.getTaskConfig();
     if (tableTaskConfig != null) {
-      batchConfigMap.putAll(
-          tableTaskConfig.getConfigsForTaskType(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE));
+      Map<String, String> taskTypeConfig =
+      tableTaskConfig.getConfigsForTaskType(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE);
+      if (taskTypeConfig != null) {
+        batchConfigMap.putAll(taskTypeConfig);
+      }
     }
     batchConfigMap.putAll(taskConfigs);
 
