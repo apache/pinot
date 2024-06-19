@@ -40,7 +40,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.http.conn.HttpClientConnectionManager;
-import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
+import org.apache.pinot.common.http.PoolingHttpClientConnectionManagerHelper;
 import org.apache.pinot.common.restlet.resources.TableMetadataInfo;
 import org.apache.pinot.common.restlet.resources.TableSegments;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsBitmapResponse;
@@ -68,7 +68,7 @@ public class ServerSegmentMetadataReader {
 
   public ServerSegmentMetadataReader() {
     _executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
-    _connectionManager = new PoolingHttpClientConnectionManager();
+    _connectionManager = PoolingHttpClientConnectionManagerHelper.createWithSocketFactory();
   }
 
   public ServerSegmentMetadataReader(Executor executor, HttpClientConnectionManager connectionManager) {

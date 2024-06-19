@@ -58,6 +58,7 @@ import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
 import org.apache.pinot.common.http.MultiHttpRequest;
 import org.apache.pinot.common.http.MultiHttpRequestResponse;
+import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.auth.Actions;
@@ -124,6 +125,9 @@ public class PinotRunningQueryResource {
           .setSocketTimeout(timeoutMs).build();
 
       CloseableHttpClient client = HttpClients.custom().setConnectionManager(_httpConnMgr)
+          // The `setSSLSocketFactory` has to be set after `setConnectionManager` due to the bug described here:
+          // https://github.com/apache/pinot/issues/13431#issuecomment-2178323975
+          .setSSLSocketFactory(TlsUtils.buildConnectionSocketFactory())
           .setDefaultRequestConfig(defaultRequestConfig).build();
 
       String protocol = _controllerConf.getControllerBrokerProtocol();

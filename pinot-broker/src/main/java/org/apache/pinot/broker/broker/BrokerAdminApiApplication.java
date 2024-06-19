@@ -32,6 +32,7 @@ import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
 import org.apache.pinot.broker.routing.BrokerRoutingManager;
+import org.apache.pinot.common.http.PoolingHttpClientConnectionManagerHelper;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.swagger.SwaggerApiListingResource;
 import org.apache.pinot.common.swagger.SwaggerSetupUtils;
@@ -85,7 +86,7 @@ public class BrokerAdminApiApplication extends ResourceConfig {
     }
     _executorService =
         Executors.newCachedThreadPool(new ThreadFactoryBuilder().setNameFormat("async-task-thread-%d").build());
-    PoolingHttpClientConnectionManager connMgr = new PoolingHttpClientConnectionManager();
+    PoolingHttpClientConnectionManager connMgr = PoolingHttpClientConnectionManagerHelper.createWithSocketFactory();
     int timeoutMs = (int) brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_TIMEOUT_MS,
         CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS);
     connMgr.setDefaultSocketConfig(SocketConfig.custom().setSoTimeout(timeoutMs).build());

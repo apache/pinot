@@ -60,6 +60,7 @@ import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.function.FunctionRegistry;
+import org.apache.pinot.common.http.PoolingHttpClientConnectionManagerHelper;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
@@ -464,7 +465,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
 
     _sqlQueryExecutor = new SqlQueryExecutor(_config.generateVipUrl());
 
-    _connectionManager = new PoolingHttpClientConnectionManager();
+    _connectionManager = PoolingHttpClientConnectionManagerHelper.createWithSocketFactory();
     _connectionManager.setDefaultSocketConfig(
         SocketConfig.custom().setSoTimeout(_config.getServerAdminRequestTimeoutSeconds() * 1000).build());
 
