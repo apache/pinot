@@ -257,11 +257,11 @@ public class NoDictionaryEqualsPredicateEvaluatorsTest {
 
     EqPredicate eqPredicate = new EqPredicate(COLUMN_EXPRESSION, jsonString);
     PredicateEvaluator eqPredicateEvaluator =
-        EqualsPredicateEvaluatorFactory.newRawValueBasedEvaluator(eqPredicate, FieldSpec.DataType.STRING);
+        EqualsPredicateEvaluatorFactory.newRawValueBasedEvaluator(eqPredicate, FieldSpec.DataType.JSON);
 
     NotEqPredicate notEqPredicate = new NotEqPredicate(COLUMN_EXPRESSION, jsonString);
     PredicateEvaluator neqPredicateEvaluator =
-        NotEqualsPredicateEvaluatorFactory.newRawValueBasedEvaluator(notEqPredicate, FieldSpec.DataType.STRING);
+        NotEqualsPredicateEvaluatorFactory.newRawValueBasedEvaluator(notEqPredicate, FieldSpec.DataType.JSON);
 
     Assert.assertTrue(eqPredicateEvaluator.applySV(jsonString));
     Assert.assertFalse(neqPredicateEvaluator.applySV(jsonString));
