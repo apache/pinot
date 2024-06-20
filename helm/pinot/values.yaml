@@ -19,6 +19,9 @@
 
 # Default values for Pinot.
 
+namespaceOverride:
+namespaceAnnotations: {}
+
 image:
   repository: apachepinot/pinot
   # Pinot docker images are available at https://hub.docker.com/r/apachepinot/pinot/tags
