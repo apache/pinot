@@ -33,6 +33,8 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.zkclient.exception.ZkNoNodeException;
 import org.apache.pinot.broker.broker.helix.ClusterChangeHandler;
+import org.apache.pinot.common.config.provider.QuotaConfigProvider;
+import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -66,6 +68,7 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
   private final Map<String, QueryQuotaEntity> _databaseRateLimiterMap = new ConcurrentHashMap<>();
 
   private HelixManager _helixManager;
+  private QuotaConfigProvider _quotaConfigProvider;
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private volatile boolean _queryRateLimitDisabled;
 
@@ -80,6 +83,7 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
     _helixManager = helixManager;
     _propertyStore = _helixManager.getHelixPropertyStore();
     getQueryQuotaEnabledFlagFromInstanceConfig();
+    _quotaConfigProvider = new QuotaConfigProvider(_propertyStore, new TableCache(_propertyStore, true));
   }
 
   @Override
@@ -235,7 +239,9 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
   }
 
   private void createDatabaseRateLimiter(String databaseName) {
-    double dbRateLimit = 50; // temp declaration until finalize where to store this config
+    String configName = _quotaConfigProvider.getNamespacedConfigName(null, databaseName, null, "databaseMaxQps");
+    String configVale = _quotaConfigProvider.getConfig(configName);
+    double dbRateLimit = configVale == null ? -1 : Double.parseDouble(configVale);
     int totalBrokers =
         (int) HelixHelper.getAllInstances(_helixManager.getClusterManagmentTool(), _helixManager.getClusterName())
             .stream()

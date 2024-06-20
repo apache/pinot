@@ -30,7 +30,6 @@ import javax.annotation.Nullable;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
-import org.apache.commons.collections4.SetUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.pinot.broker.api.AccessControl;
