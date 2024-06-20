@@ -334,6 +334,11 @@
       <artifactId>re2j</artifactId>
       <version>1.7</version>
     </dependency>
+    <dependency>
+      <groupId>com.google.auto.service</groupId>
+      <artifactId>auto-service</artifactId>
+    </dependency>
+
     <!-- Test -->
     <dependency>
       <groupId>org.testng</groupId>

@@ -16,29 +16,27 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.spi.memory;
+package org.apache.pinot.spi.executor;
 
-import org.apache.commons.lang3.JavaVersion;
-import org.apache.commons.lang3.SystemUtils;
-import org.testng.SkipException;
-import org.testng.annotations.BeforeClass;
+import java.util.concurrent.ExecutorService;
+import org.apache.pinot.spi.env.PinotConfiguration;
 
 
-public class PinotLArrayByteBufferTest extends PinotDataBufferTest {
-  public PinotLArrayByteBufferTest() {
-    super(new LArrayPinotBufferFactory());
-  }
+public interface ExecutorServiceProvider {
+  /**
+   * An id that identifies this specific provider.
+   * <p>
+   * This id is used to select the provider in the configuration.
+   */
+  String id();
 
-  @Override
-  protected boolean prioritizeByteBuffer() {
-    return false;
-  }
-
-  @BeforeClass
-  public void abortOnModernJava() {
-    if (SystemUtils.isJavaVersionAtLeast(JavaVersion.JAVA_16)) {
-      throw new SkipException("Skipping LArray tests because they cannot run in Java "
-          + SystemUtils.JAVA_SPECIFICATION_VERSION);
-    }
-  }
+  /**
+   * Creates a new {@link ExecutorService} instance.
+   *
+   * @param conf the configuration to use
+   * @param confPrefix the prefix to use for the configuration
+   * @param baseName the base name for the threads. A prefix that all threads will share.
+   * @return a new {@link ExecutorService} instance
+   */
+  ExecutorService create(PinotConfiguration conf, String confPrefix, String baseName);
 }

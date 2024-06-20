@@ -16,23 +16,24 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.spi.utils;
+package org.apache.pinot.common.utils;
 
-import net.openhft.chronicle.core.Jvm;
+import com.google.auto.service.AutoService;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.executor.ExecutorServiceProvider;
 
 
-public class JavaVersion {
-
-  /**
-   * Returns the major Java version (ie 6, 8, 11, 15, 21, etc)
-   */
-  public static final int VERSION;
-
-  static {
-    Jvm.init();
-    VERSION = Jvm.majorVersion();
+@AutoService(ExecutorServiceProvider.class)
+public class CachedExecutorServiceProvider implements ExecutorServiceProvider {
+  @Override
+  public String id() {
+    return "cached";
   }
 
-  private JavaVersion() {
+  @Override
+  public ExecutorService create(PinotConfiguration conf, String confPrefix, String baseName) {
+    return Executors.newCachedThreadPool(new NamedThreadFactory(baseName));
   }
 }

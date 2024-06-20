@@ -16,13 +16,16 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.runtime.executor;
+package org.apache.pinot.spi.executor;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.ServiceLoader;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.common.utils.NamedThreadFactory;
+import org.apache.commons.lang3.JavaVersion;
+import org.apache.commons.lang3.SystemUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,16 +35,48 @@ public class ExecutorServiceUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(ExecutorServiceUtils.class);
   private static final long DEFAULT_TERMINATION_MILLIS = 30_000;
 
+  private static final String DEFAULT_PROVIDER;
+  private static final Map<String, ExecutorServiceProvider> PROVIDERS;
+
+  static {
+    PROVIDERS = new HashMap<>();
+    for (ExecutorServiceProvider provider : ServiceLoader.load(ExecutorServiceProvider.class)) {
+      ExecutorServiceProvider old = PROVIDERS.put(provider.id(), provider);
+      if (old != null) {
+        LOGGER.warn("Duplicate provider for id '{}': {} and {}", provider.id(), old, provider);
+      }
+    }
+    if (SystemUtils.isJavaVersionAtLeast(JavaVersion.JAVA_21) && PROVIDERS.containsKey("virtual")) {
+      DEFAULT_PROVIDER = "virtual";
+    } else if (PROVIDERS.containsKey("cached")) {
+      DEFAULT_PROVIDER = "cached";
+    } else if (!PROVIDERS.isEmpty()) {
+      DEFAULT_PROVIDER = PROVIDERS.keySet().iterator().next();
+    } else {
+      throw new IllegalStateException("No executor service providers found");
+    }
+    LOGGER.info("Default executor service provider: {}", DEFAULT_PROVIDER);
+  }
+
   private ExecutorServiceUtils() {
   }
 
   public static ExecutorService createDefault(String baseName) {
-    return Executors.newCachedThreadPool(new NamedThreadFactory(baseName));
+    return create(DEFAULT_PROVIDER, new PinotConfiguration(), baseName, "executor.default");
   }
 
   public static ExecutorService create(PinotConfiguration conf, String confPrefix, String baseName) {
-    //TODO: make this configurable
-    return Executors.newCachedThreadPool(new NamedThreadFactory(baseName));
+    return create(DEFAULT_PROVIDER, conf, confPrefix, baseName);
+  }
+
+  public static ExecutorService create(String defaultType, PinotConfiguration conf, String confPrefix,
+      String baseName) {
+    String type = conf.getProperty(confPrefix + ".type", defaultType);
+    ExecutorServiceProvider provider = PROVIDERS.get(type);
+    if (provider == null) {
+      throw new IllegalArgumentException("Unknown executor service provider: " + type);
+    }
+    return provider.create(conf, confPrefix, baseName);
   }
 
   /**
