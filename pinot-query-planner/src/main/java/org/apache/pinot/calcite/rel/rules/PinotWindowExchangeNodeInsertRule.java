@@ -40,6 +40,7 @@ import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexInputRef;
+import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.SqlAggFunction;
 import org.apache.calcite.sql.SqlKind;
@@ -172,6 +173,17 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
             newRexNode = window.constants.get(inputRefIndex - windowInputSize);
             changed = true;
             aggCallChanged = true;
+          } else {
+            RelNode windowInputRelNode = ((HepRelVertex) window.getInput()).getCurrentRel();
+            if (windowInputRelNode instanceof LogicalProject) {
+              RexNode inputRefRexNode = ((LogicalProject) windowInputRelNode).getProjects().get(inputRefIndex);
+              if (inputRefRexNode instanceof RexLiteral) {
+                // If the input reference is a literal, replace it with the literal value
+                newRexNode = inputRefRexNode;
+                changed = true;
+                aggCallChanged = true;
+              }
+            }
           }
         }
         rexList.add(newRexNode);
