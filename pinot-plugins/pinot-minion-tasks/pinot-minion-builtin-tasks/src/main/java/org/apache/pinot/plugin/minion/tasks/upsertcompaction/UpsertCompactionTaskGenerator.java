@@ -57,7 +57,7 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
   private static final Logger LOGGER = LoggerFactory.getLogger(UpsertCompactionTaskGenerator.class);
   private static final String DEFAULT_BUFFER_PERIOD = "7d";
   private static final double DEFAULT_INVALID_RECORDS_THRESHOLD_PERCENT = 0.0;
-  private static final long DEFAULT_INVALID_RECORDS_THRESHOLD_COUNT = 0;
+  private static final long DEFAULT_INVALID_RECORDS_THRESHOLD_COUNT = 1;
   private static final int DEFAULT_NUM_SEGMENTS_BATCH_PER_SERVER_REQUEST = 500;
 
   public static class SegmentSelectionResult {
@@ -239,8 +239,8 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
       double invalidRecordPercent = ((double) totalInvalidDocs / totalDocs) * 100;
       if (totalInvalidDocs == totalDocs) {
         segmentsForDeletion.add(segment.getSegmentName());
-      } else if (invalidRecordPercent > invalidRecordsThresholdPercent
-          && totalInvalidDocs > invalidRecordsThresholdCount) {
+      } else if (invalidRecordPercent >= invalidRecordsThresholdPercent
+          && totalInvalidDocs >= invalidRecordsThresholdCount) {
         segmentsForCompaction.add(Pair.of(segment, totalInvalidDocs));
       }
     }
