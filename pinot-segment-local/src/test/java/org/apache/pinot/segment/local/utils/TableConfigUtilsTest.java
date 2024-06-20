@@ -2356,7 +2356,7 @@ public class TableConfigUtilsTest {
     TableConfigUtils.validateTaskConfigs(tableConfig, schema);
 
     // test with invalid invalidRecordsThresholdPercents
-    upsertCompactionTaskConfig = ImmutableMap.of("invalidRecordsThresholdPercent", "0");
+    upsertCompactionTaskConfig = ImmutableMap.of("invalidRecordsThresholdPercent", "-1");
     TableConfig zeroPercentTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
         .setUpsertConfig(upsertConfig)
         .setTaskConfig(new TableTaskConfig(ImmutableMap.of("UpsertCompactionTask", upsertCompactionTaskConfig)))
@@ -2372,7 +2372,7 @@ public class TableConfigUtilsTest {
         () -> TableConfigUtils.validateTaskConfigs(hundredTenPercentTableConfig, schema));
 
     // test with invalid invalidRecordsThresholdCount
-    upsertCompactionTaskConfig = ImmutableMap.of("invalidRecordsThresholdCount", "-1");
+    upsertCompactionTaskConfig = ImmutableMap.of("invalidRecordsThresholdCount", "0");
     TableConfig invalidCountTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
         .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL))
         .setTaskConfig(new TableTaskConfig(ImmutableMap.of("UpsertCompactionTask", upsertCompactionTaskConfig)))
