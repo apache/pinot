@@ -34,7 +34,7 @@ import net.openhft.chronicle.core.Jvm;
 import net.openhft.chronicle.core.OS;
 import net.openhft.posix.MSyncFlag;
 import net.openhft.posix.PosixAPI;
-import org.apache.pinot.segment.spi.utils.JavaVersion;
+import org.apache.commons.lang3.SystemUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -224,7 +224,8 @@ public class MmapMemory implements Memory {
           // IGNORE
         }
       }
-      throw new NoSuchMethodException("Cannot find how to create memory map files in Java " + JavaVersion.VERSION);
+      throw new NoSuchMethodException("Cannot find how to create memory map files in Java "
+          + SystemUtils.JAVA_SPECIFICATION_VERSION);
     }
   }
 

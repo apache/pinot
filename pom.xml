@@ -381,6 +381,66 @@
         <scala.compat.version>2.13</scala.compat.version>
       </properties>
     </profile>
+
+    <profile>
+      <id>java21</id>
+      <activation>
+        <jdk>[21,)</jdk>
+      </activation>
+
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-compiler-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>java21-multi-version-compile</id>
+                <phase>compile</phase>
+                <goals>
+                  <goal>compile</goal>
+                </goals>
+                <configuration>
+                  <release>21</release>
+                  <compileSourceRoots>
+                    <compileSourceRoot>src/main/java21</compileSourceRoot>
+                  </compileSourceRoots>
+                  <multiReleaseOutput>true</multiReleaseOutput>
+                </configuration>
+              </execution>
+              <execution>
+                <id>java21-multi-version-services</id>
+                <phase>compile</phase>
+                <goals>
+                  <goal>compile</goal>
+                </goals>
+                <configuration>
+                  <release>21</release>
+                  <compileSourceRoots>
+                    <compileSourceRoot>src/main/java21</compileSourceRoot>
+                  </compileSourceRoots>
+                  <proc>only</proc>
+                  <annotationProcessorPaths>
+                    <path>
+                      <groupId>org.glassfish.hk2</groupId>
+                      <artifactId>hk2-metadata-generator</artifactId>
+                    </path>
+                    <path>
+                      <groupId>org.apache.logging.log4j</groupId>
+                      <artifactId>log4j-core</artifactId>
+                    </path>
+                    <path>
+                      <groupId>com.google.auto.service</groupId>
+                      <artifactId>auto-service</artifactId>
+                    </path>
+                  </annotationProcessorPaths>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
   </profiles>
 
   <dependencyManagement>
@@ -2072,6 +2132,7 @@
                 <Implementation-Version>${project.version}-${buildNumber}</Implementation-Version>
                 <Implementation-Vendor-Id>${project.groupId}</Implementation-Vendor-Id>
                 <Implementation-Vendor>${project.organization.name}</Implementation-Vendor>
+                <Multi-Release>true</Multi-Release>
               </manifestEntries>
             </archive>
           </configuration>
@@ -2218,6 +2279,21 @@
             <target>${jdk.version}</target>
             <fork>true</fork>
             <encoding>${project.build.sourceEncoding}</encoding>
+            <annotationProcessorPathsUseDepMgmt>true</annotationProcessorPathsUseDepMgmt>
+            <annotationProcessorPaths>
+              <path>
+                <groupId>org.glassfish.hk2</groupId>
+                <artifactId>hk2-metadata-generator</artifactId>
+              </path>
+              <path>
+                <groupId>org.apache.logging.log4j</groupId>
+                <artifactId>log4j-core</artifactId>
+              </path>
+              <path>
+                <groupId>com.google.auto.service</groupId>
+                <artifactId>auto-service</artifactId>
+              </path>
+            </annotationProcessorPaths>
           </configuration>
         </plugin>
         <plugin>

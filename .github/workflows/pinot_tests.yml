@@ -82,11 +82,11 @@ jobs:
         distribution: [ "temurin" ]
         skip_bytebuffer: [false]
         include:
-          - java: 21
+          - java: 22
             testset: 1
             distribution: "temurin"
             skip_bytebuffer: true
-          - java: 21
+          - java: 22
             testset: 2
             distribution: "temurin"
             skip_bytebuffer: true
@@ -163,11 +163,11 @@ jobs:
         distribution: [ "temurin" ]
         skip_bytebuffer: [false]
         include:
-          - java: 21
+          - java: 22
             testset: 1
             distribution: "temurin"
             skip_bytebuffer: true
-          - java: 21
+          - java: 22
             testset: 2
             distribution: "temurin"
             skip_bytebuffer: true
@@ -381,7 +381,7 @@ jobs:
         distribution: [ "temurin" ]
         skip_bytebuffer: [false]
         include:
-          - java: 21
+          - java: 22
             distribution: "temurin"
             skip_bytebuffer: true
     name: Pinot Quickstart on JDK ${{ matrix.java }}-${{ matrix.distribution }} with skip bytebuffers:${{matrix.skip_bytebuffer}}

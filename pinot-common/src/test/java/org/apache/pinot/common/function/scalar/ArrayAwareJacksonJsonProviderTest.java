@@ -23,7 +23,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
-import org.apache.pinot.segment.spi.utils.JavaVersion;
+import org.apache.commons.lang3.JavaVersion;
+import org.apache.commons.lang3.SystemUtils;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.*;
@@ -106,7 +107,7 @@ public class ArrayAwareJacksonJsonProviderTest {
     } catch (NullPointerException e) {
       // It's supposed to get a JsonPathException, but JsonPath library actually
       // has a bug leading to NullPointerException while creating the JsonPathException.
-      if (JavaVersion.VERSION < 14) {
+      if (SystemUtils.isJavaVersionAtMost(JavaVersion.JAVA_13)) {
         // In modern Java versions messages is something like "Cannot invoke "Object.getClass()" because "obj" is null"
         assertNull(e.getMessage());
       }
