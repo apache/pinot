@@ -758,7 +758,23 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     }
   }
 
-  protected abstract void removeSegment(IndexSegment segment, MutableRoaringBitmap validDocIds);
+  protected void removeSegment(IndexSegment segment, MutableRoaringBitmap validDocIds) {
+    doRemoveSegment(segment, doGetRecordInfoIteratorForRemoveSegment(segment, validDocIds));
+  }
+
+  protected Iterator<RecordInfo> doGetRecordInfoIteratorForRemoveSegment(IndexSegment segment,
+      MutableRoaringBitmap validDocIds) {
+    try (UpsertUtils.RecordInfoReader recordInfoReader = new UpsertUtils.RecordInfoReader(segment, _primaryKeyColumns,
+        _comparisonColumns, _deleteRecordColumn)) {
+      return UpsertUtils.getRecordInfoIterator(recordInfoReader, validDocIds);
+    } catch (Exception e) {
+      throw new RuntimeException(
+          String.format("Caught exception while removing segment: %s, table: %s", segment.getSegmentName(),
+              _tableNameWithType), e);
+    }
+  }
+
+  protected abstract void doRemoveSegment(IndexSegment segment, Iterator<RecordInfo> recordInfoIterator);
 
   @Override
   public void removeSegment(IndexSegment segment) {
@@ -806,11 +822,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     long startTimeMs = System.currentTimeMillis();
 
     MutableRoaringBitmap validDocIds =
-        segment.getValidDocIds() != null ? segment.getValidDocIds().getMutableRoaringBitmap() : null;
-    if (validDocIds == null || validDocIds.isEmpty()) {
-      _logger.info("Skip removing segment without valid docs: {}", segmentName);
-      return;
-    }
+        segment.getValidDocIds() != null ? segment.getValidDocIds().getMutableRoaringBitmap()
+            : new MutableRoaringBitmap();
 
     _logger.info("Removing {} primary keys for segment: {}", validDocIds.getCardinality(), segmentName);
     removeSegment(segment, validDocIds);

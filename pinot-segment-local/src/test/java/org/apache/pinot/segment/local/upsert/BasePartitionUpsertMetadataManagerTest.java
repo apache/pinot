@@ -714,6 +714,10 @@ public class BasePartitionUpsertMetadataManagerTest {
     }
 
     @Override
+    protected void doRemoveSegment(IndexSegment segment, Iterator<RecordInfo> recordInfoIterator) {
+    }
+
+    @Override
     protected GenericRow doUpdateRecord(GenericRow record, RecordInfo recordInfo) {
       return null;
     }
