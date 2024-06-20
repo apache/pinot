@@ -685,14 +685,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       long catchUpTimeMillis = 0L;
       _startTimeMs = now();
       try {
-        boolean quotaLimitReached = quotaCheck();
-        if (quotaLimitReached) {
-          do {
-            quotaLimitReached = quotaCheck();
-            Thread.sleep(RealtimeTableDataManager.READY_TO_CONSUME_DATA_CHECK_INTERVAL_MS);
-          } while (quotaLimitReached);
-        }
-
         if (!_isReadyToConsumeData.getAsBoolean()) {
           do {
             //noinspection BusyWait
@@ -727,6 +719,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
             _partitionUpsertMetadataManager.removeExpiredPrimaryKeys();
             _partitionUpsertMetadataManager.takeSnapshot();
           }
+        }
+
+        while (quotaCheck()) {
+          Thread.sleep(RealtimeTableDataManager.STORAGE_QUOTA_CHECK_INTERVAL_MS);
         }
 
         while (!_state.isFinal()) {

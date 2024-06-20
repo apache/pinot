@@ -204,12 +204,14 @@ public class ServerSegmentCompletionProtocolHandler {
       SimpleHttpResponse response = _fileUploadDownloadClient.sendStorageQuotaCheckRequest(leadControllerUrl,
           tableName, AuthProviderUtils.toRequestHeaders(_authProvider));
       JsonNode sizeInfo = new ObjectMapper().readTree(response.getResponse());
-      LOGGER.info("Total table size : {}, quota size : {}",
-          DataSizeUtils.fromBytes(sizeInfo.get("tableSizeInBytes").asLong()),
-          DataSizeUtils.fromBytes(sizeInfo.get("quotaSizeInBytes").asLong()));
+      JsonNode sizeInfoMetadata = sizeInfo.get("metadata");
+      LOGGER.info("Storage quota {} for table {}. Total table size : {}, quota size : {}",
+          sizeInfo.get("quotaReached").asBoolean() ? "breached" : "honored", tableName,
+          DataSizeUtils.fromBytes(sizeInfoMetadata.get("tableSizeInBytes").asLong()),
+          DataSizeUtils.fromBytes(sizeInfoMetadata.get("tableQuotaInBytes").asLong()));
       return sizeInfo.get("quotaReached").asBoolean();
     } catch (Exception e) {
-      LOGGER.error("Error getting quota info from lead controller url: {}", leadControllerUrl, e);
+      LOGGER.error("Failing the check upon error getting quota info from lead controller: {}", leadControllerUrl, e);
       return true;
     }
   }

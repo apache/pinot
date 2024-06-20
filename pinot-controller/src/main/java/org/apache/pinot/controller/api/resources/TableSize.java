@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.api.resources;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiKeyAuthDefinition;
 import io.swagger.annotations.ApiOperation;
@@ -27,6 +28,8 @@ import io.swagger.annotations.ApiResponses;
 import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.Executor;
 import javax.inject.Inject;
 import javax.ws.rs.GET;
@@ -138,33 +141,20 @@ public class TableSize {
     if (tableConfig != null && tableConfig.getQuotaConfig() != null) {
       storageQuota = tableConfig.getQuotaConfig().getStorageInBytes();
     }
-    TableSizeReader.TableSubTypeSizeDetails sizeDetails = TableType.REALTIME.equals(tableType) ?
-        tableSizeDetails._realtimeSegments : tableSizeDetails._offlineSegments;
-    return new TableSizeQuotaInfo(storageQuota,
-        Math.max(sizeDetails._estimatedSizeInBytes, sizeDetails._reportedSizeInBytes));
+    TableSizeReader.TableSubTypeSizeDetails sizeDetails = TableType.REALTIME.equals(tableType)
+        ? tableSizeDetails._realtimeSegments
+        : tableSizeDetails._offlineSegments;
+    TableSizeQuotaInfo quotaInfo = new TableSizeQuotaInfo();
+    quotaInfo._quotaReached = storageQuota <= sizeDetails._estimatedSizeInBytes;
+    quotaInfo._metadata.put("tableSizeInBytes", String.valueOf(sizeDetails._estimatedSizeInBytes));
+    quotaInfo._metadata.put("tableQuotaInBytes", String.valueOf(storageQuota));
+    return quotaInfo;
   }
 
   static class TableSizeQuotaInfo {
-    private final long _quotaSizeInBytes;
-    private final long _tableSizeInBytes;
-    private final boolean _quotaReached;
-
-    public TableSizeQuotaInfo(long quotaSizeInBytes, long tableSizeInBytes) {
-      _quotaSizeInBytes = quotaSizeInBytes;
-      _tableSizeInBytes = tableSizeInBytes;
-      _quotaReached = quotaSizeInBytes != -1 && tableSizeInBytes >= quotaSizeInBytes;
-    }
-
-    public long getQuotaSizeInBytes() {
-      return _quotaSizeInBytes;
-    }
-
-    public long getTableSizeInBytes() {
-      return _tableSizeInBytes;
-    }
-
-    public boolean isQuotaReached() {
-      return _quotaReached;
-    }
+    @JsonProperty("quotaReached")
+    boolean _quotaReached;
+    @JsonProperty("metadata")
+    final Map<String, String> _metadata = new HashMap<>();
   }
 }
