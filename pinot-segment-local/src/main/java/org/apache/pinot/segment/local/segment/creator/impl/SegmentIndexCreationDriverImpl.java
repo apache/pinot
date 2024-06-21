@@ -31,7 +31,6 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
@@ -435,9 +434,9 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     // Persist creation metadata to disk
     persistCreationMeta(segmentOutputDir, crc, creationTime);
 
-    LOGGER.info("Driver, record read time : {}", TimeUnit.NANOSECONDS.toMillis(_totalRecordReadTimeNs));
-    LOGGER.info("Driver, stats collector time : {}", _totalStatsCollectorTimeNs);
-    LOGGER.info("Driver, indexing time : {}", _totalIndexTimeNs);
+    LOGGER.info("Driver, record read time (in ns) : {}", _totalRecordReadTimeNs);
+    LOGGER.info("Driver, stats collector time (in ns) : {}", _totalStatsCollectorTimeNs);
+    LOGGER.info("Driver, indexing time (in ns) : {}", _totalIndexTimeNs);
   }
 
   private void updatePostSegmentCreationIndexes(File indexDir)
