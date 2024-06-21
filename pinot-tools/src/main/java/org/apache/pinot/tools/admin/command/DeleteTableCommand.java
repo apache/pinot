@@ -72,7 +72,7 @@ public class DeleteTableCommand extends AbstractExecuteBaseAdminCommand {
     String retString =
         ("DeleteTable -tableName " + _tableName + " -type " + _type + " -retention " + _retention
             + " -controllerProtocol " + _controllerProtocol + " -controllerHost " + _controllerHost
-            + Arrays.toString(_headers)
+            + " -headers " + Arrays.toString(_headers)
             + " -controllerPort " + _controllerPort + " -user " + _user + " -password " + "[hidden]");
     return ((_exec) ? (retString + " -exec") : retString);
   }

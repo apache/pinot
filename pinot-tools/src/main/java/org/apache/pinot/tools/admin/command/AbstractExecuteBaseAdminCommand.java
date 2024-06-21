@@ -1,3 +1,21 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 package org.apache.pinot.tools.admin.command;
 
 import java.util.List;
@@ -37,37 +55,37 @@ public abstract class AbstractExecuteBaseAdminCommand extends AbstractBaseAdminC
     @CommandLine.Parameters(paramLabel = "-headers", description = "Additional headers to send.")
     protected String[] _headers;
 
-    final public AbstractExecuteBaseAdminCommand setControllerHost(String controllerHost) {
+    public AbstractExecuteBaseAdminCommand setControllerHost(String controllerHost) {
       _controllerHost = controllerHost;
       return this;
     }
 
-    final public AbstractExecuteBaseAdminCommand setControllerPort(String controllerPort) {
+    public AbstractExecuteBaseAdminCommand setControllerPort(String controllerPort) {
       _controllerPort = controllerPort;
       return this;
     }
 
-    final public AbstractExecuteBaseAdminCommand setControllerProtocol(String controllerProtocol) {
+    public AbstractExecuteBaseAdminCommand setControllerProtocol(String controllerProtocol) {
       _controllerProtocol = controllerProtocol;
       return this;
     }
 
-    final public AbstractExecuteBaseAdminCommand setUser(String user) {
+    public AbstractExecuteBaseAdminCommand setUser(String user) {
       _user = user;
       return this;
     }
 
-    final public AbstractExecuteBaseAdminCommand setPassword(String password) {
+    public AbstractExecuteBaseAdminCommand setPassword(String password) {
       _password = password;
       return this;
     }
 
-    final public AbstractExecuteBaseAdminCommand setAuthProvider(AuthProvider authProvider) {
+    public AbstractExecuteBaseAdminCommand setAuthProvider(AuthProvider authProvider) {
       _authProvider = authProvider;
       return this;
     }
 
-    final public AbstractExecuteBaseAdminCommand setHeaders(List<String> headers) {
+    public AbstractExecuteBaseAdminCommand setHeaders(List<String> headers) {
         _headers = headers.toArray(new String[headers.size()]);
         return this;
     }
@@ -81,7 +99,7 @@ public abstract class AbstractExecuteBaseAdminCommand extends AbstractBaseAdminC
       }
     }
 
-    final protected List<Header> getHeaders(List<Header> headers) {
+    protected List<Header> getHeaders(List<Header> headers) {
         if (_headers != null) {
             for (String header: _headers) {
                 String[] pair = header.split("=");
@@ -94,11 +112,11 @@ public abstract class AbstractExecuteBaseAdminCommand extends AbstractBaseAdminC
         return headers;
     }
 
-    final protected Map<String, String> getHeadersAsMap(List<Header> headers) {
+    protected Map<String, String> getHeadersAsMap(List<Header> headers) {
         return getHeaders(headers).stream().collect(Collectors.toMap(Header::getName, Header::getValue));
     }
 
-    final public AbstractExecuteBaseAdminCommand setExecute(boolean exec) {
+    public AbstractExecuteBaseAdminCommand setExecute(boolean exec) {
       _exec = exec;
       return this;
     }
