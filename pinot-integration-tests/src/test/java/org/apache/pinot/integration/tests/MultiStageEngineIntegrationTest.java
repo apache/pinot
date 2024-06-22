@@ -804,6 +804,14 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     assertNoError(jsonNode);
   }
 
+  @Test
+  public void testMVNumericCastInFilter() throws Exception {
+    String sqlQuery = "SELECT COUNT(*) FROM mytable WHERE arrayToMV(CAST(DivAirportIDs AS BIGINT ARRAY)) > 0";
+    JsonNode jsonNode = postQuery(sqlQuery);
+    assertNoError(jsonNode);
+    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asInt(), 15482);
+  }
+
   @Override
   protected String getTableName() {
     return _tableName;
