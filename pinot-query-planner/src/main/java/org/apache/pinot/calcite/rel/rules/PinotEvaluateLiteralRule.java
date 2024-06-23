@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.calcite.avatica.util.ByteString;
+import org.apache.calcite.avatica.util.TimeUnitRange;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.logical.LogicalFilter;
@@ -233,6 +234,8 @@ public class PinotEvaluateLiteralRule {
     } else if (value instanceof ByteString) {
       // BYTES
       return ((ByteString) value).getBytes();
+    } else if (value instanceof TimeUnitRange) {
+      return ((TimeUnitRange) value).name();
     } else {
       return value;
     }

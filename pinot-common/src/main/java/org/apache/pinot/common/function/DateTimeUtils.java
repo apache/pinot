@@ -33,7 +33,7 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Helper methods and constructs for datetrunc function
+ * Helper methods and constructs for date/time functions
  */
 public class DateTimeUtils {
   private DateTimeUtils() {
@@ -41,6 +41,7 @@ public class DateTimeUtils {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(DateTimeUtils.class);
   private static final DateTimeFieldType QUARTER_OF_YEAR = new QuarterOfYearDateTimeField();
+  private static final Chronology CHRONOLOGY_UTC = ISOChronology.getInstanceUTC();
 
   public static DateTimeField getTimestampField(ISOChronology chronology, String unitString) {
     switch (unitString.toLowerCase()) {
@@ -150,6 +151,43 @@ public class DateTimeUtils {
       public DurationField getField(Chronology chronology) {
         return new ScaledDurationField(chronology.months(), QUARTER_OF_YEAR_DURATION_FIELD_TYPE, 3);
       }
+    }
+  }
+
+  /**
+   * The supported field types for the EXTRACT operator
+   */
+  public enum ExtractFieldType {
+    YEAR, QUARTER, MONTH, WEEK, DAY, DOY, DOW, HOUR, MINUTE, SECOND
+  }
+
+  /**
+   * Helper method to implement the SQL <code>EXTRACT</code> operator.
+   */
+  public static int extract(ExtractFieldType extractFieldType, long timestamp) {
+    switch (extractFieldType) {
+      case YEAR:
+        return CHRONOLOGY_UTC.year().get(timestamp);
+      case QUARTER:
+        return (CHRONOLOGY_UTC.monthOfYear().get(timestamp) - 1) / 3 + 1;
+      case MONTH:
+        return CHRONOLOGY_UTC.monthOfYear().get(timestamp);
+      case WEEK:
+        return CHRONOLOGY_UTC.weekOfWeekyear().get(timestamp);
+      case DAY:
+        return CHRONOLOGY_UTC.dayOfMonth().get(timestamp);
+      case DOY:
+        return CHRONOLOGY_UTC.dayOfYear().get(timestamp);
+      case DOW:
+        return CHRONOLOGY_UTC.dayOfWeek().get(timestamp);
+      case HOUR:
+        return CHRONOLOGY_UTC.hourOfDay().get(timestamp);
+      case MINUTE:
+        return CHRONOLOGY_UTC.minuteOfHour().get(timestamp);
+      case SECOND:
+        return CHRONOLOGY_UTC.secondOfMinute().get(timestamp);
+      default:
+        throw new IllegalArgumentException("Unsupported FIELD type");
     }
   }
 }

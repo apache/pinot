@@ -20,24 +20,18 @@ package org.apache.pinot.core.operator.transform.function;
 
 import java.util.List;
 import java.util.Map;
+import java.util.stream.IntStream;
+import org.apache.pinot.common.function.DateTimeUtils;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.joda.time.Chronology;
-import org.joda.time.DateTimeField;
-import org.joda.time.chrono.ISOChronology;
 import org.roaringbitmap.RoaringBitmap;
 
 
 public class ExtractTransformFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "extract";
   private TransformFunction _mainTransformFunction;
-  protected Field _field;
-  protected Chronology _chronology = ISOChronology.getInstanceUTC();
-
-  private enum Field {
-    YEAR, QUARTER, MONTH, WEEK, DAY, DOY, DOW, HOUR, MINUTE, SECOND
-  }
+  private DateTimeUtils.ExtractFieldType _field;
 
   @Override
   public String getName() {
@@ -51,7 +45,7 @@ public class ExtractTransformFunction extends BaseTransformFunction {
       throw new IllegalArgumentException("Exactly 2 arguments are required for EXTRACT transform function");
     }
 
-    _field = Field.valueOf(((LiteralTransformFunction) arguments.get(0)).getStringLiteral());
+    _field = DateTimeUtils.ExtractFieldType.valueOf(((LiteralTransformFunction) arguments.get(0)).getStringLiteral());
     _mainTransformFunction = arguments.get(1);
   }
 
@@ -65,58 +59,8 @@ public class ExtractTransformFunction extends BaseTransformFunction {
     int numDocs = valueBlock.getNumDocs();
     initIntValuesSV(numDocs);
     long[] timestamps = _mainTransformFunction.transformToLongValuesSV(valueBlock);
-    convert(timestamps, numDocs, _intValuesSV);
+    IntStream.range(0, numDocs).forEach(i -> _intValuesSV[i] = DateTimeUtils.extract(_field, timestamps[i]));
     return _intValuesSV;
-  }
-
-  private void convert(long[] timestamps, int numDocs, int[] output) {
-    for (int i = 0; i < numDocs; i++) {
-      DateTimeField accessor;
-      switch (_field) {
-        case YEAR:
-          accessor = _chronology.year();
-          output[i] = accessor.get(timestamps[i]);
-          break;
-        case QUARTER:
-          accessor = _chronology.monthOfYear();
-          output[i] = (accessor.get(timestamps[i]) - 1) / 3 + 1;
-          break;
-        case MONTH:
-          accessor = _chronology.monthOfYear();
-          output[i] = accessor.get(timestamps[i]);
-          break;
-        case WEEK:
-          accessor = _chronology.weekOfWeekyear();
-          output[i] = accessor.get(timestamps[i]);
-          break;
-        case DAY:
-          accessor = _chronology.dayOfMonth();
-          output[i] = accessor.get(timestamps[i]);
-          break;
-        case DOY:
-          accessor = _chronology.dayOfYear();
-          output[i] = accessor.get(timestamps[i]);
-          break;
-        case DOW:
-          accessor = _chronology.dayOfWeek();
-          output[i] = accessor.get(timestamps[i]);
-          break;
-        case HOUR:
-          accessor = _chronology.hourOfDay();
-          output[i] = accessor.get(timestamps[i]);
-          break;
-        case MINUTE:
-          accessor = _chronology.minuteOfHour();
-          output[i] = accessor.get(timestamps[i]);
-          break;
-        case SECOND:
-          accessor = _chronology.secondOfMinute();
-          output[i] = accessor.get(timestamps[i]);
-          break;
-        default:
-          throw new IllegalArgumentException("Unsupported FIELD type");
-      }
-    }
   }
 
   @Override
