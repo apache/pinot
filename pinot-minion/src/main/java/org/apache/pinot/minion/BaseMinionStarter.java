@@ -281,6 +281,7 @@ public abstract class BaseMinionStarter implements ServiceStartable {
     minionContext.setHelixManager(_helixManager);
     LOGGER.info("Starting minion admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));
     _minionAdminApplication = new MinionAdminApiApplication(_instanceId, _config);
+    registerExtraComponents(_minionAdminApplication);
     _minionAdminApplication.start(_listenerConfigs);
 
     // Initialize health check callback
@@ -346,5 +347,14 @@ public abstract class BaseMinionStarter implements ServiceStartable {
       LOGGER.warn("Failed to clean up Minion data directory: {}", MinionContext.getInstance().getDataDir(), e);
     }
     LOGGER.info("Pinot minion stopped");
+  }
+
+  /**
+   * This method is called after initialization of BrokerAdminApiApplication object
+   * and before calling start to allow custom broker starters to register additional
+   * components.
+   * @param minionAdminApiApplication is the application
+   */
+  protected void registerExtraComponents(MinionAdminApiApplication minionAdminApiApplication) {
   }
 }

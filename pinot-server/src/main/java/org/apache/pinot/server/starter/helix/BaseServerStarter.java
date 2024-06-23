@@ -618,6 +618,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
     // Start restlet server for admin API endpoint
     LOGGER.info("Starting server admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));
     _adminApiApplication = new AdminApiApplication(_serverInstance, accessControlFactory, _serverConf);
+    registerExtraComponents(_adminApiApplication);
     _adminApiApplication.start(_listenerConfigs);
 
     // Init QueryRewriterFactory
@@ -930,5 +931,14 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
     PinotConfiguration pinotCrypterConfig = config.subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_PINOT_CRYPTER);
     PinotCrypterFactory.init(pinotCrypterConfig);
+  }
+
+  /**
+   * This method is called after initialization of BrokerAdminApiApplication object
+   * and before calling start to allow custom broker starters to register additional
+   * components.
+   * @param adminApiApplication is the application
+   */
+  protected void registerExtraComponents(AdminApiApplication adminApiApplication) {
   }
 }
