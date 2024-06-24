@@ -77,6 +77,7 @@ import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.roaringbitmap.PeekableIntIterator;
@@ -759,14 +760,14 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   }
 
   protected void removeSegment(IndexSegment segment, MutableRoaringBitmap validDocIds) {
-    doRemoveSegment(segment, doGetRecordInfoIteratorForRemoveSegment(segment, validDocIds));
+    removeSegment(segment, doGetPrimaryKeyIteratorForRemoveSegment(segment, validDocIds));
   }
 
-  protected Iterator<RecordInfo> doGetRecordInfoIteratorForRemoveSegment(IndexSegment segment,
+  protected Iterator<PrimaryKey> doGetPrimaryKeyIteratorForRemoveSegment(IndexSegment segment,
       MutableRoaringBitmap validDocIds) {
-    try (UpsertUtils.RecordInfoReader recordInfoReader = new UpsertUtils.RecordInfoReader(segment, _primaryKeyColumns,
-        _comparisonColumns, _deleteRecordColumn)) {
-      return UpsertUtils.getRecordInfoIterator(recordInfoReader, validDocIds);
+    try (UpsertUtils.PrimaryKeyReader primaryKeyReader = new UpsertUtils.PrimaryKeyReader(segment,
+        _primaryKeyColumns)) {
+      return UpsertUtils.getPrimaryKeyIterator(primaryKeyReader, validDocIds);
     } catch (Exception e) {
       throw new RuntimeException(
           String.format("Caught exception while removing segment: %s, table: %s", segment.getSegmentName(),
@@ -774,7 +775,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     }
   }
 
-  protected abstract void doRemoveSegment(IndexSegment segment, Iterator<RecordInfo> recordInfoIterator);
+  protected abstract void removeSegment(IndexSegment segment, Iterator<PrimaryKey> primaryKeyIterator);
 
   @Override
   public void removeSegment(IndexSegment segment) {
