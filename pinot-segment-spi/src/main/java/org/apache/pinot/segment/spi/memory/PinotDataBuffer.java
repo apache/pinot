@@ -19,7 +19,7 @@
 package org.apache.pinot.segment.spi.memory;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.io.Closeable;
+import com.google.common.collect.MapMaker;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -29,7 +29,6 @@ import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.WeakHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
@@ -37,6 +36,7 @@ import org.apache.pinot.segment.spi.memory.unsafe.UnsafePinotBufferFactory;
 import org.apache.pinot.segment.spi.utils.JavaVersion;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.plugin.PluginManager;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -57,7 +57,7 @@ import org.slf4j.LoggerFactory;
  * </ul>
  */
 @ThreadSafe
-public abstract class PinotDataBuffer implements Closeable {
+public abstract class PinotDataBuffer implements DataBuffer {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotDataBuffer.class);
 
   public static final ByteOrder NATIVE_ORDER = ByteOrder.nativeOrder();
@@ -71,8 +71,8 @@ public abstract class PinotDataBuffer implements Closeable {
   private static final boolean DEFAULT_PRIORITIZE_BYTE_BUFFER;
 
   static {
-     String skipBbEnvValue = System.getenv(SKIP_BYTEBUFFER_ENV);
-     DEFAULT_PRIORITIZE_BYTE_BUFFER = !Boolean.parseBoolean(skipBbEnvValue);
+    String skipBbEnvValue = System.getenv(SKIP_BYTEBUFFER_ENV);
+    DEFAULT_PRIORITIZE_BYTE_BUFFER = !Boolean.parseBoolean(skipBbEnvValue);
   }
 
   private static class BufferContext {
@@ -110,7 +110,8 @@ public abstract class PinotDataBuffer implements Closeable {
   private static final AtomicLong MMAP_BUFFER_COUNT = new AtomicLong();
   private static final AtomicLong MMAP_BUFFER_USAGE = new AtomicLong();
   private static final AtomicLong ALLOCATION_FAILURE_COUNT = new AtomicLong();
-  private static final Map<PinotDataBuffer, BufferContext> BUFFER_CONTEXT_MAP = new WeakHashMap<>();
+  // we need to use MapMaker instead of WeakHashMap because we want to use identity comparison for the keys
+  private static final Map<PinotDataBuffer, BufferContext> BUFFER_CONTEXT_MAP = new MapMaker().weakKeys().makeMap();
 
   /**
    * Configuration key used to change the offheap buffer factory used by Pinot.
@@ -233,9 +234,7 @@ public abstract class PinotDataBuffer implements Closeable {
     }
     DIRECT_BUFFER_COUNT.getAndIncrement();
     DIRECT_BUFFER_USAGE.getAndAdd(size);
-    synchronized (BUFFER_CONTEXT_MAP) {
-      BUFFER_CONTEXT_MAP.put(buffer, new BufferContext(BufferContext.Type.DIRECT, size, null, description));
-    }
+    BUFFER_CONTEXT_MAP.put(buffer, new BufferContext(BufferContext.Type.DIRECT, size, null, description));
     return buffer;
   }
 
@@ -257,10 +256,8 @@ public abstract class PinotDataBuffer implements Closeable {
     }
     DIRECT_BUFFER_COUNT.getAndIncrement();
     DIRECT_BUFFER_USAGE.getAndAdd(size);
-    synchronized (BUFFER_CONTEXT_MAP) {
-      BUFFER_CONTEXT_MAP.put(buffer,
-          new BufferContext(BufferContext.Type.DIRECT, size, file.getAbsolutePath().intern(), description));
-    }
+    BUFFER_CONTEXT_MAP.put(buffer,
+        new BufferContext(BufferContext.Type.DIRECT, size, file.getAbsolutePath().intern(), description));
     return buffer;
   }
 
@@ -292,10 +289,8 @@ public abstract class PinotDataBuffer implements Closeable {
     }
     MMAP_BUFFER_COUNT.getAndIncrement();
     MMAP_BUFFER_USAGE.getAndAdd(size);
-    synchronized (BUFFER_CONTEXT_MAP) {
-      BUFFER_CONTEXT_MAP
-          .put(buffer, new BufferContext(BufferContext.Type.MMAP, size, file.getAbsolutePath().intern(), description));
-    }
+    BUFFER_CONTEXT_MAP.put(buffer,
+        new BufferContext(BufferContext.Type.MMAP, size, file.getAbsolutePath().intern(), description));
     return buffer;
   }
 
@@ -338,19 +333,20 @@ public abstract class PinotDataBuffer implements Closeable {
   }
 
   public static List<String> getBufferInfo() {
-    synchronized (BUFFER_CONTEXT_MAP) {
-      List<String> bufferInfo = new ArrayList<>(BUFFER_CONTEXT_MAP.size());
-      for (BufferContext bufferContext : BUFFER_CONTEXT_MAP.values()) {
-        bufferInfo.add(bufferContext.toString());
-      }
-      return bufferInfo;
+    List<String> bufferInfo = new ArrayList<>(BUFFER_CONTEXT_MAP.size());
+    for (BufferContext bufferContext : BUFFER_CONTEXT_MAP.values()) {
+      bufferInfo.add(bufferContext.toString());
     }
+    return bufferInfo;
   }
 
   private static String getBufferStats() {
-    return String
-        .format("Direct buffer count: %s, size: %s; Mmap buffer count: %s, size: %s", DIRECT_BUFFER_COUNT.get(),
-            DIRECT_BUFFER_USAGE.get(), MMAP_BUFFER_COUNT.get(), MMAP_BUFFER_USAGE.get());
+    return String.format("Direct buffer count: %s, size: %s; Mmap buffer count: %s, size: %s",
+        DIRECT_BUFFER_COUNT.get(), DIRECT_BUFFER_USAGE.get(), MMAP_BUFFER_COUNT.get(), MMAP_BUFFER_USAGE.get());
+  }
+
+  public static PinotDataBuffer empty() {
+    return PinotByteBuffer.EMPTY;
   }
 
   private volatile boolean _closeable;
@@ -363,12 +359,8 @@ public abstract class PinotDataBuffer implements Closeable {
   public synchronized void close()
       throws IOException {
     if (_closeable) {
-      flush();
-      release();
       BufferContext bufferContext;
-      synchronized (BUFFER_CONTEXT_MAP) {
-        bufferContext = BUFFER_CONTEXT_MAP.remove(this);
-      }
+      bufferContext = BUFFER_CONTEXT_MAP.remove(this);
       if (bufferContext != null) {
         if (bufferContext._type == BufferContext.Type.DIRECT) {
           DIRECT_BUFFER_COUNT.getAndDecrement();
@@ -378,98 +370,129 @@ public abstract class PinotDataBuffer implements Closeable {
           MMAP_BUFFER_USAGE.getAndAdd(-bufferContext._size);
         }
       }
+      flush();
+      release();
       _closeable = false;
     }
   }
 
+  @Override
   public byte getByte(int offset) {
     return getByte((long) offset);
   }
 
+  @Override
   public abstract byte getByte(long offset);
 
+  @Override
   public void putByte(int offset, byte value) {
     putByte((long) offset, value);
   }
 
+  @Override
   public abstract void putByte(long offset, byte value);
 
+  @Override
   public char getChar(int offset) {
     return getChar((long) offset);
   }
 
+  @Override
   public abstract char getChar(long offset);
 
+  @Override
   public void putChar(int offset, char value) {
     putChar((long) offset, value);
   }
 
+  @Override
   public abstract void putChar(long offset, char value);
 
+  @Override
   public short getShort(int offset) {
     return getShort((long) offset);
   }
 
+  @Override
   public abstract short getShort(long offset);
 
+  @Override
   public void putShort(int offset, short value) {
     putShort((long) offset, value);
   }
 
+  @Override
   public abstract void putShort(long offset, short value);
 
+  @Override
   public int getInt(int offset) {
     return getInt((long) offset);
   }
 
+  @Override
   public abstract int getInt(long offset);
 
+  @Override
   public void putInt(int offset, int value) {
     putInt((long) offset, value);
   }
 
+  @Override
   public abstract void putInt(long offset, int value);
 
+  @Override
   public long getLong(int offset) {
     return getLong((long) offset);
   }
 
+  @Override
   public abstract long getLong(long offset);
 
+  @Override
   public void putLong(int offset, long value) {
     putLong((long) offset, value);
   }
 
+  @Override
   public abstract void putLong(long offset, long value);
 
+  @Override
   public float getFloat(int offset) {
     return getFloat((long) offset);
   }
 
+  @Override
   public abstract float getFloat(long offset);
 
+  @Override
   public void putFloat(int offset, float value) {
     putFloat((long) offset, value);
   }
 
+  @Override
   public abstract void putFloat(long offset, float value);
 
+  @Override
   public double getDouble(int offset) {
     return getDouble((long) offset);
   }
 
+  @Override
   public abstract double getDouble(long offset);
 
+  @Override
   public void putDouble(int offset, double value) {
     putDouble((long) offset, value);
   }
 
+  @Override
   public abstract void putDouble(long offset, double value);
 
   /**
    * Given an array of bytes, copies the content of this object into the array of bytes.
    * The first byte to be copied is the one that could be read with {@code this.getByte(offset)}
    */
+  @Override
   public void copyTo(long offset, byte[] buffer, int destOffset, int size) {
     if (size <= BULK_BYTES_PROCESSING_THRESHOLD) {
       int end = destOffset + size;
@@ -485,6 +508,7 @@ public abstract class PinotDataBuffer implements Closeable {
    * Given an array of bytes, copies the content of this object into the array of bytes.
    * The first byte to be copied is the one that could be read with {@code this.getByte(offset)}
    */
+  @Override
   public void copyTo(long offset, byte[] buffer) {
     copyTo(offset, buffer, 0, buffer.length);
   }
@@ -495,31 +519,51 @@ public abstract class PinotDataBuffer implements Closeable {
    * overriding priority, as when methods of this class are optimized by the runtime compiler, some or all checks
    * (if any) may be elided. Hence, the caller must not rely on the checks and corresponding exceptions!
    */
-  public void copyTo(long offset, PinotDataBuffer buffer, long destOffset, long size) {
-    int pageSize = Integer.MAX_VALUE;
-    long alreadyCopied = 0;
+  @Override
+  public void copyTo(long offset, DataBuffer buffer, long destOffset, long size) {
+    if (buffer instanceof PinotDataBuffer) {
+      int pageSize = Integer.MAX_VALUE;
+      long alreadyCopied = 0;
 
-    while (size - alreadyCopied > 0L) {
-      int step;
-      long remaining = size - alreadyCopied;
+      while (size - alreadyCopied > 0L) {
+        int step;
+        long remaining = size - alreadyCopied;
 
-      if (remaining > pageSize) {
-        step = pageSize;
-      } else {
-        step = (int) remaining;
+        if (remaining > pageSize) {
+          step = pageSize;
+        } else {
+          step = (int) remaining;
+        }
+        ByteBuffer destBb = ((PinotDataBuffer) buffer).toDirectByteBuffer(destOffset + alreadyCopied, step);
+        ByteBuffer myView = toDirectByteBuffer(offset + alreadyCopied, step);
+
+        destBb.put(myView);
+
+        alreadyCopied += step;
       }
-      ByteBuffer destBb = buffer.toDirectByteBuffer(destOffset + alreadyCopied, step);
-      ByteBuffer myView = toDirectByteBuffer(offset + alreadyCopied, step);
+    } else {
+      byte[] temp = new byte[BULK_BYTES_PROCESSING_THRESHOLD];
+      long alreadyCopied = 0;
+      while (size - alreadyCopied > 0L) {
+        int step;
+        long remaining = size - alreadyCopied;
 
-      destBb.put(myView);
-
-      alreadyCopied += step;
+        if (remaining > BULK_BYTES_PROCESSING_THRESHOLD) {
+          step = BULK_BYTES_PROCESSING_THRESHOLD;
+        } else {
+          step = (int) remaining;
+        }
+        copyTo(offset + alreadyCopied, temp, 0, step);
+        buffer.readFrom(destOffset + alreadyCopied, temp, 0, step);
+        alreadyCopied += step;
+      }
     }
   }
 
   /**
    * Given an array of bytes, writes the content in the specified position.
    */
+  @Override
   public void readFrom(long offset, byte[] buffer, int srcOffset, int size) {
     if (offset + size > size()) {
       throw new IndexOutOfBoundsException("Buffer overflow: offset = " + offset + ", size = " + size
@@ -536,19 +580,20 @@ public abstract class PinotDataBuffer implements Closeable {
     }
   }
 
+  @Override
   public void readFrom(long offset, byte[] buffer) {
     readFrom(offset, buffer, 0, buffer.length);
   }
 
+  @Override
   public void readFrom(long offset, ByteBuffer buffer) {
     toDirectByteBuffer(offset, buffer.remaining()).put(buffer);
   }
 
+  @Override
   public void readFrom(long offset, File file, long srcOffset, long size)
       throws IOException {
-    try (
-        RandomAccessFile raf = new RandomAccessFile(file, "r");
-        FileChannel fileChannel = raf.getChannel()) {
+    try (RandomAccessFile raf = new RandomAccessFile(file, "r"); FileChannel fileChannel = raf.getChannel()) {
       int step = Integer.MAX_VALUE / 2;
       while (size > Integer.MAX_VALUE) {
         ByteBuffer bb = toDirectByteBuffer(offset, step);
@@ -562,22 +607,32 @@ public abstract class PinotDataBuffer implements Closeable {
     }
   }
 
+  @Override
   public abstract long size();
 
+  @Override
   public abstract ByteOrder order();
 
   /**
    * Creates a view of the range [start, end) of this buffer with the given byte order. Calling {@link #flush()} or
    * {@link #close()} has no effect on view.
    */
+  @Override
   public abstract PinotDataBuffer view(long start, long end, ByteOrder byteOrder);
 
   /**
    * Creates a view of the range [start, end) of this buffer with the current byte order. Calling {@link #flush()} or
    * {@link #close()} has no effect on view.
    */
+  @Override
   public PinotDataBuffer view(long start, long end) {
     return view(start, end, order());
+  }
+
+  @Override
+  public ImmutableRoaringBitmap viewAsRoaringBitmap(long offset, int length) {
+    ByteBuffer bb = toDirectByteBuffer(offset, length, ByteOrder.LITTLE_ENDIAN);
+    return new ImmutableRoaringBitmap(bb);
   }
 
   /**
@@ -616,9 +671,6 @@ public abstract class PinotDataBuffer implements Closeable {
    *   <li>A write made by either the receiver or the returned ByteBuffer will be seen by the other.</li>
    * </ol>
    *
-   * Depending on the implementation, this may be a view (and therefore changes on any buffer will be seen by the other)
-   * or a copy (in which case the cost will be higher, but each copy will have their own lifecycle).
-   *
    */
   // TODO: Most calls to this method are just used to then read the content of the buffer.
   //  This is unnecessary an generates 2-5 unnecessary objects. We should benchmark whether there is some advantage on
@@ -627,6 +679,23 @@ public abstract class PinotDataBuffer implements Closeable {
     return toDirectByteBuffer(offset, size, order());
   }
 
+  @Override
+  public ByteBuffer copyOrView(long offset, int size, ByteOrder byteOrder) {
+    return toDirectByteBuffer(offset, size, byteOrder);
+  }
+
+  @Override
+  public void appendAsByteBuffers(List<ByteBuffer> appendTo) {
+    long size = size();
+    long offset = 0;
+    while (size - offset > 0) {
+      int byteBufferSize = (int) Math.min(size - offset, Integer.MAX_VALUE);
+      appendTo.add(copyOrView(offset, byteBufferSize));
+      offset += size;
+    }
+  }
+
+  @Override
   public abstract void flush();
 
   public abstract void release()
@@ -644,8 +713,25 @@ public abstract class PinotDataBuffer implements Closeable {
       throw new IllegalArgumentException("Size " + size + " cannot be negative");
     }
     if (offset + size > capacity) {
-      throw new IllegalArgumentException("Size (" + size + ") + offset (" + offset + ") exceeds the capacity of "
-          + capacity);
+      throw new IllegalArgumentException(
+          "Size (" + size + ") + offset (" + offset + ") exceeds the capacity of " + capacity);
     }
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (!(o instanceof DataBuffer)) {
+      return false;
+    }
+    DataBuffer buffer = (DataBuffer) o;
+    return DataBuffer.sameContent(this, buffer);
+  }
+
+  @Override
+  public int hashCode() {
+    return DataBuffer.commonHashCode(this);
   }
 }
