@@ -617,7 +617,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
     // Start restlet server for admin API endpoint
     LOGGER.info("Starting server admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));
-    _adminApiApplication = createServerApp();
+    _adminApiApplication = createServerAdminApp();
     _adminApiApplication.start(_listenerConfigs);
 
     // Init QueryRewriterFactory
@@ -932,7 +932,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
     PinotCrypterFactory.init(pinotCrypterConfig);
   }
 
-  protected AdminApiApplication createServerApp() {
+  protected AdminApiApplication createServerAdminApp() {
     return new AdminApiApplication(_serverInstance, _accessControlFactory, _serverConf);
   }
 }
