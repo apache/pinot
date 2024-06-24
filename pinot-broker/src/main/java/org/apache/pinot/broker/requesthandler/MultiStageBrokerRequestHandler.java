@@ -79,6 +79,7 @@ import org.slf4j.LoggerFactory;
 
 public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(MultiStageBrokerRequestHandler.class);
+  private static final int NUM_UNAVAILABLE_SEGMENTS_TO_LOG = 10;
 
   private final WorkerManager _workerManager;
   private final QueryDispatcher _queryDispatcher;
@@ -241,9 +242,11 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     for (Map.Entry<String, Set<String>> entry : dispatchableSubPlan.getTableToUnavailableSegmentsMap().entrySet()) {
       String tableName = entry.getKey();
       Set<String> unavailableSegments = entry.getValue();
-      numUnavailableSegments += unavailableSegments.size();
+      int unavailableSegmentsInSubPlan = unavailableSegments.size();
+      numUnavailableSegments += unavailableSegmentsInSubPlan;
       brokerResponse.addException(QueryException.getException(QueryException.SERVER_SEGMENT_MISSING_ERROR,
-          String.format("Find unavailable segments: %s for table: %s", unavailableSegments, tableName)));
+          String.format("Found %d unavailable segments for table %s: %s", unavailableSegmentsInSubPlan, tableName,
+              toSizeLimitedString(unavailableSegments, NUM_UNAVAILABLE_SEGMENTS_TO_LOG))));
     }
     requestContext.setNumUnavailableSegments(numUnavailableSegments);
 
@@ -358,5 +361,16 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       Map<String, Integer> serverResponses) {
     // TODO: Support query cancellation for multi-stage engine
     throw new UnsupportedOperationException();
+  }
+
+  /**
+   * Returns the string representation of the Set of Strings with a limit on the number of elements.
+   * @param setOfStrings Set of strings
+   * @param limit Limit on the number of elements
+   * @return String representation of the set of the form [a,b,c...].
+   */
+  private static String toSizeLimitedString(Set<String> setOfStrings, int limit) {
+    return setOfStrings.stream().limit(limit)
+        .collect(Collectors.joining(", ", "[", setOfStrings.size() > limit ? "...]" : "]"));
   }
 }
