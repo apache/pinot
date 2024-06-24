@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
+import com.google.common.collect.HashMultiset;
+import com.google.common.collect.Multiset;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datatable.StatMap;
@@ -44,12 +44,11 @@ import org.apache.pinot.segment.spi.IndexSegment;
  * UnionOperator: The right child operator is consumed in a blocking manner.
  */
 public abstract class SetOperator extends MultiStageOperator {
-  protected final Set<Record> _rightRowSet;
+  protected final Multiset<Record> _rightRowSet;
 
-  private final List<MultiStageOperator> _upstreamOperators;
+  private final List<MultiStageOperator> _inputOperators;
   private final MultiStageOperator _leftChildOperator;
   private final MultiStageOperator _rightChildOperator;
-
   private final DataSchema _dataSchema;
 
   private boolean _isRightSetBuilt;
@@ -58,14 +57,14 @@ public abstract class SetOperator extends MultiStageOperator {
   private MultiStageQueryStats _rightQueryStats = null;
   protected final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
 
-  public SetOperator(OpChainExecutionContext opChainExecutionContext, List<MultiStageOperator> upstreamOperators,
+  public SetOperator(OpChainExecutionContext opChainExecutionContext, List<MultiStageOperator> inputOperators,
       DataSchema dataSchema) {
     super(opChainExecutionContext);
     _dataSchema = dataSchema;
-    _upstreamOperators = upstreamOperators;
+    _inputOperators = inputOperators;
     _leftChildOperator = getChildOperators().get(0);
     _rightChildOperator = getChildOperators().get(1);
-    _rightRowSet = new HashSet<>();
+    _rightRowSet = HashMultiset.create();
     _isRightSetBuilt = false;
   }
 
@@ -77,7 +76,7 @@ public abstract class SetOperator extends MultiStageOperator {
 
   @Override
   public List<MultiStageOperator> getChildOperators() {
-    return _upstreamOperators;
+    return _inputOperators;
   }
 
   @Override
@@ -166,6 +165,7 @@ public abstract class SetOperator extends MultiStageOperator {
   protected abstract boolean handleRowMatched(Object[] row);
 
   public enum StatKey implements StatMap.Key {
+    //@formatter:off
     EXECUTION_TIME_MS(StatMap.Type.LONG) {
       @Override
       public boolean includeDefaultInJson() {
@@ -178,6 +178,8 @@ public abstract class SetOperator extends MultiStageOperator {
         return true;
       }
     };
+    //@formatter:on
+
     private final StatMap.Type _type;
 
     StatKey(StatMap.Type type) {

@@ -45,11 +45,14 @@ import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.spi.utils.CommonConstants.RewriterConstants.*;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
@@ -60,6 +63,7 @@ import static org.testng.Assert.fail;
  * Queries test for exprmin/exprmax functions.
  */
 public class ExprMinMaxTest extends BaseQueriesTest {
+  private static final Logger LOGGER = LoggerFactory.getLogger(ExprMinMaxTest.class);
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "ExprMinMaxTest");
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String SEGMENT_NAME = "testSegment";
@@ -195,13 +199,13 @@ public class ExprMinMaxTest extends BaseQueriesTest {
 
     query = "SELECT expr_max(mvDoubleColumn, mvDoubleColumn) FROM testTable";
     BrokerResponse brokerResponse = getBrokerResponse(query);
-    Assert.assertTrue(brokerResponse.getProcessingExceptions().get(0).getMessage().contains(
+    Assert.assertTrue(brokerResponse.getExceptions().get(0).getMessage().contains(
         "java.lang.IllegalStateException: ExprMinMax only supports single-valued measuring columns"
     ));
 
     query = "SELECT expr_max(mvDoubleColumn, jsonColumn) FROM testTable";
     brokerResponse = getBrokerResponse(query);
-    Assert.assertTrue(brokerResponse.getProcessingExceptions().get(0).getMessage().contains(
+    Assert.assertTrue(brokerResponse.getExceptions().get(0).getMessage().contains(
         "Cannot compute exprminMax measuring on non-comparable type: JSON"
     ));
   }
@@ -555,15 +559,15 @@ public class ExprMinMaxTest extends BaseQueriesTest {
         + "expr_min(mvStringColumn, intColumn, doubleColumn) FROM testTable GROUP BY groupByMVIntColumn";
     BrokerResponseNative brokerResponse = getBrokerResponse(query);
     Object groupByExplainPlan = brokerResponse.getResultTable().getRows().get(3)[0];
-    Assert.assertTrue(groupByExplainPlan
-        .toString().contains("child_exprMin('0', mvIntColumn, mvIntColumn, intColumn)"));
-    Assert.assertTrue(groupByExplainPlan
-        .toString()
-        .contains("child_exprMin('1', mvStringColumn, mvStringColumn, intColumn, doubleColumn)"));
-    Assert.assertTrue(groupByExplainPlan
-        .toString().contains("parent_exprMin('0', '1', intColumn, mvIntColumn)"));
-    Assert.assertTrue(groupByExplainPlan
-        .toString().contains("parent_exprMin('1', '2', intColumn, doubleColumn, mvStringColumn)"));
+    String explainPlan = groupByExplainPlan.toString();
+    Assert.assertTrue(
+        explainPlan.contains(CHILD_AGGREGATION_NAME_PREFIX + "_exprMin('0', mvIntColumn, mvIntColumn, intColumn)"));
+    Assert.assertTrue(explainPlan.contains(
+        CHILD_AGGREGATION_NAME_PREFIX + "_exprMin('1', mvStringColumn, mvStringColumn, intColumn, doubleColumn)"));
+    Assert.assertTrue(
+        explainPlan.contains(PARENT_AGGREGATION_NAME_PREFIX + "_exprMin('0', '1', intColumn, mvIntColumn)"));
+    Assert.assertTrue(explainPlan.contains(
+        PARENT_AGGREGATION_NAME_PREFIX + "_exprMin('1', '2', intColumn, doubleColumn, mvStringColumn)"));
   }
 
   @Test

@@ -31,6 +31,8 @@ import org.apache.pinot.common.utils.config.InstanceUtils;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
 import org.apache.pinot.controller.util.ServerSegmentMetadataReader;
 import org.apache.pinot.minion.MinionContext;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.LocalPinotFS;
 import org.apache.pinot.spi.filesystem.PinotFS;
@@ -92,8 +94,8 @@ public class MinionTaskUtils {
       String pushMode = IngestionConfigUtils.getPushMode(taskConfigs);
 
       Map<String, String> singleFileGenerationTaskConfig = new HashMap<>(taskConfigs);
-      if (pushMode == null
-          || pushMode.toUpperCase().contentEquals(BatchConfigProperties.SegmentPushType.TAR.toString())) {
+      if (pushMode == null || pushMode.toUpperCase()
+          .contentEquals(BatchConfigProperties.SegmentPushType.TAR.toString())) {
         singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_MODE,
             BatchConfigProperties.SegmentPushType.TAR.toString());
       } else {
@@ -156,16 +158,19 @@ public class MinionTaskUtils {
       ServerSegmentMetadataReader serverSegmentMetadataReader = new ServerSegmentMetadataReader();
       try {
         return serverSegmentMetadataReader.getValidDocIdsBitmapFromServer(tableNameWithType, segmentName, endpoint,
-                validDocIdsType, 60_000);
+            validDocIdsType, 60_000);
       } catch (Exception e) {
-        LOGGER.info("Unable to retrieve validDocIdsBitmap for {} from {}", segmentName, endpoint);
+        LOGGER.warn(
+            String.format("Unable to retrieve validDocIds bitmap for segment: %s from endpoint: %s", segmentName,
+                endpoint), e);
       }
     }
-    throw new IllegalStateException("Unable to retrieve validDocIds for segment: " + segmentName);
+    throw new IllegalStateException(
+        String.format("Unable to retrieve validDocIds bitmap for segment: %s from servers: %s", segmentName, servers));
   }
 
   public static List<String> getServers(String segmentName, String tableNameWithType, HelixAdmin helixAdmin,
-                                        String clusterName) {
+      String clusterName) {
     ExternalView externalView = helixAdmin.getResourceExternalView(clusterName, tableNameWithType);
     if (externalView == null) {
       throw new IllegalStateException("External view does not exist for table: " + tableNameWithType);
@@ -184,5 +189,21 @@ public class MinionTaskUtils {
       throw new IllegalStateException("Failed to find any ONLINE servers for segment: " + segmentName);
     }
     return servers;
+  }
+
+  /**
+   * Extract allowDownloadFromServer config from table task config
+   */
+  public static boolean extractMinionAllowDownloadFromServer(TableConfig tableConfig, String taskType,
+      boolean defaultValue) {
+    TableTaskConfig tableTaskConfig = tableConfig.getTaskConfig();
+    if (tableTaskConfig != null) {
+      Map<String, String> configs = tableTaskConfig.getConfigsForTaskType(taskType);
+      if (configs != null && !configs.isEmpty()) {
+        return Boolean.parseBoolean(
+            configs.getOrDefault(TableTaskConfig.MINION_ALLOW_DOWNLOAD_FROM_SERVER, String.valueOf(defaultValue)));
+      }
+    }
+    return defaultValue;
   }
 }

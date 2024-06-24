@@ -48,7 +48,7 @@ public class DistinctCountULLValueAggregatorTest {
             .ifPresent(input::add)
     );
     DistinctCountULLValueAggregator agg = new DistinctCountULLValueAggregator(Collections.singletonList(
-        ExpressionContext.forLiteralContext(Literal.intValue(12))
+        ExpressionContext.forLiteral(Literal.intValue(12))
     ));
     byte[] bytes = agg.serializeAggregatedValue(input);
     UltraLogLog aggregated = agg.getInitialAggregatedValue(bytes);
@@ -67,7 +67,7 @@ public class DistinctCountULLValueAggregatorTest {
             .ifPresent(input::add)
     );
     DistinctCountULLValueAggregator agg = new DistinctCountULLValueAggregator(Collections.singletonList(
-        ExpressionContext.forLiteralContext(Literal.intValue(12))
+        ExpressionContext.forLiteral(Literal.intValue(12))
     ));
     byte[] bytes = agg.serializeAggregatedValue(input);
     UltraLogLog aggregated = agg.getInitialAggregatedValue(bytes);

@@ -61,7 +61,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
             _readersByIndex.put(indexType, reader);
           }
         } catch (IndexReaderConstraintException ex) {
-          LOGGER.warn("Constraint violation when indexing " + columnName + " with " + indexType + " index", ex);
+          LOGGER.warn("Constraint violation when indexing {} with {} index", columnName, indexType, ex);
         }
       }
     }

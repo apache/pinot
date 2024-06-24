@@ -70,6 +70,7 @@ public abstract class QuickStartBase {
   private static final String NEW_LINE = "\n";
 
   protected static final String[] DEFAULT_OFFLINE_TABLE_DIRECTORIES = new String[]{
+      "examples/batch/clickstreamFunnel",
       "examples/batch/airlineStats",
       "examples/minions/batch/baseballStats",
       "examples/batch/dimBaseballTeams",

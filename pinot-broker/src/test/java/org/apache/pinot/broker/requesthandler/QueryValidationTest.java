@@ -115,16 +115,17 @@ public class QueryValidationTest {
 
   @Test
   public void testReplicaGroupToQueryInvalidQuery() {
-    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(
-        "SET numReplicaGroupsToQuery='illegal'; SELECT COUNT(*) FROM MY_TABLE");
-    Assert.assertThrows(IllegalStateException.class, () -> BaseBrokerRequestHandler.validateRequest(pinotQuery, 10));
+    PinotQuery pinotQuery =
+        CalciteSqlParser.compileToPinotQuery("SET numReplicaGroupsToQuery='illegal'; SELECT COUNT(*) FROM MY_TABLE");
+    Assert.assertThrows(IllegalStateException.class,
+        () -> BaseSingleStageBrokerRequestHandler.validateRequest(pinotQuery, 10));
   }
 
   private void testRejectGroovyQuery(String query, boolean queryContainsGroovy) {
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
 
     try {
-      BaseBrokerRequestHandler.rejectGroovyQuery(pinotQuery);
+      BaseSingleStageBrokerRequestHandler.rejectGroovyQuery(pinotQuery);
       if (queryContainsGroovy) {
         Assert.fail("Query should have failed since groovy was found in query: " + pinotQuery);
       }
@@ -136,7 +137,7 @@ public class QueryValidationTest {
   private void testUnsupportedQuery(String query, String errorMessage) {
     try {
       PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
-      BaseBrokerRequestHandler.validateRequest(pinotQuery, 1000);
+      BaseSingleStageBrokerRequestHandler.validateRequest(pinotQuery, 1000);
       Assert.fail("Query should have failed");
     } catch (Exception e) {
       Assert.assertEquals(e.getMessage(), errorMessage);
@@ -147,7 +148,7 @@ public class QueryValidationTest {
       String query, String errorMessage) {
     try {
       PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
-      BaseBrokerRequestHandler.updateColumnNames(rawTableName, pinotQuery, isCaseInsensitive, columnNameMap);
+      BaseSingleStageBrokerRequestHandler.updateColumnNames(rawTableName, pinotQuery, isCaseInsensitive, columnNameMap);
       Assert.fail("Query should have failed");
     } catch (Exception e) {
       Assert.assertEquals(errorMessage, e.getMessage());
@@ -158,7 +159,7 @@ public class QueryValidationTest {
       String query) {
     try {
       PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
-      BaseBrokerRequestHandler.updateColumnNames(rawTableName, pinotQuery, isCaseInsensitive, columnNameMap);
+      BaseSingleStageBrokerRequestHandler.updateColumnNames(rawTableName, pinotQuery, isCaseInsensitive, columnNameMap);
     } catch (Exception e) {
       Assert.fail("Query should have succeeded");
     }

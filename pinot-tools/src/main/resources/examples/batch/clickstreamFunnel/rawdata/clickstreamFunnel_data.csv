@@ -1,0 +1,17 @@
+user_id,event_name,ts
+1,screen_viewed,1718112405
+1,screen_clicked,1718112406
+1,purchased,1718112407
+1,screen_viewed,1718112402
+1,screen_clicked,1718112403
+1,purchased,1718112404
+2,screen_viewed,1718112405
+2,screen_clicked,1718112406
+2,purchased,1718112407
+3,screen_viewed,1718112404
+3,screen_clicked,1718112405
+3,cart_viewed,1718112406
+3,purchased,1718112407
+4,screen_viewed,1717939609
+4,screen_clicked,1718112405
+4,purchased,1718112405

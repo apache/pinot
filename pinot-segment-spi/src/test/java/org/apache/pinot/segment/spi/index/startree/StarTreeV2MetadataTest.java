@@ -21,7 +21,6 @@ package org.apache.pinot.segment.spi.index.startree;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import org.apache.commons.configuration2.Configuration;
@@ -40,8 +39,8 @@ public class StarTreeV2MetadataTest {
     expected.put(AggregationFunctionColumnPair.fromColumnName("count__*"), AggregationSpec.DEFAULT);
     expected.put(AggregationFunctionColumnPair.fromColumnName("sum__dimX"), AggregationSpec.DEFAULT);
 
-    Configuration configuration = createConfiguration(Collections.singletonList("dimX"), null, expected);
-    StarTreeV2Metadata starTreeV2Metadata = new StarTreeV2Metadata(configuration);
+    Configuration metadataProperties = createMetadata(List.of("dimX"), expected);
+    StarTreeV2Metadata starTreeV2Metadata = new StarTreeV2Metadata(metadataProperties);
     TreeMap<AggregationFunctionColumnPair, AggregationSpec> actual = starTreeV2Metadata.getAggregationSpecs();
     assertEquals(expected, actual);
   }
@@ -57,8 +56,8 @@ public class StarTreeV2MetadataTest {
     expected.put(thetaColumnPair, AggregationSpec.DEFAULT);
     expected.put(rawThetaColumnPair, AggregationSpec.DEFAULT);
 
-    Configuration configuration = createConfiguration(Collections.singletonList("dimX"), null, expected);
-    StarTreeV2Metadata starTreeV2Metadata = new StarTreeV2Metadata(configuration);
+    Configuration metadataProperties = createMetadata(List.of("dimX"), expected);
+    StarTreeV2Metadata starTreeV2Metadata = new StarTreeV2Metadata(metadataProperties);
     TreeMap<AggregationFunctionColumnPair, AggregationSpec> actual = starTreeV2Metadata.getAggregationSpecs();
     expected.remove(rawThetaColumnPair);
     assertEquals(expected, actual);
@@ -71,8 +70,8 @@ public class StarTreeV2MetadataTest {
     expected.add(AggregationFunctionColumnPair.fromColumnName("count__*"));
     expected.add(AggregationFunctionColumnPair.fromColumnName("sum__dimX"));
 
-    Configuration configuration = createConfiguration(Collections.singletonList("dimX"), expected, null);
-    StarTreeV2Metadata starTreeV2Metadata = new StarTreeV2Metadata(configuration);
+    Configuration metadataProperties = createMetadata(List.of("dimX"), expected);
+    StarTreeV2Metadata starTreeV2Metadata = new StarTreeV2Metadata(metadataProperties);
     Set<AggregationFunctionColumnPair> actual = starTreeV2Metadata.getFunctionColumnPairs();
     assertEquals(expected, actual);
   }
@@ -88,8 +87,8 @@ public class StarTreeV2MetadataTest {
     expected.add(thetaColumnPair);
     expected.add(rawThetaColumnPair);
 
-    Configuration configuration = createConfiguration(Collections.singletonList("dimX"), expected, null);
-    StarTreeV2Metadata starTreeV2Metadata = new StarTreeV2Metadata(configuration);
+    Configuration metadataProperties = createMetadata(Collections.singletonList("dimX"), expected);
+    StarTreeV2Metadata starTreeV2Metadata = new StarTreeV2Metadata(metadataProperties);
     Set<AggregationFunctionColumnPair> actual = starTreeV2Metadata.getFunctionColumnPairs();
 
     expected.remove(rawThetaColumnPair);
@@ -97,34 +96,22 @@ public class StarTreeV2MetadataTest {
     assertTrue(starTreeV2Metadata.containsFunctionColumnPair(thetaColumnPair));
   }
 
-  private static Configuration createConfiguration(List<String> dimensionsSplitOrder,
-      Set<AggregationFunctionColumnPair> functionColumnPairs,
+  private static Configuration createMetadata(List<String> dimensionsSplitOrder,
       TreeMap<AggregationFunctionColumnPair, AggregationSpec> aggregationSpecs) {
+    Configuration metadataProperties = new PropertiesConfiguration();
+    StarTreeV2Metadata.writeMetadata(metadataProperties, 1, dimensionsSplitOrder, aggregationSpecs, 10000, Set.of());
+    return metadataProperties;
+  }
+
+  // This is the old star-tree metadata format
+  private static Configuration createMetadata(List<String> dimensionsSplitOrder,
+      Set<AggregationFunctionColumnPair> functionColumnPairs) {
     Configuration metadataProperties = new PropertiesConfiguration();
     metadataProperties.setProperty(StarTreeV2Constants.MetadataKey.TOTAL_DOCS, 1);
     metadataProperties.setProperty(StarTreeV2Constants.MetadataKey.DIMENSIONS_SPLIT_ORDER, dimensionsSplitOrder);
-    if (functionColumnPairs != null) {
-      metadataProperties.setProperty(StarTreeV2Constants.MetadataKey.FUNCTION_COLUMN_PAIRS, functionColumnPairs);
-      metadataProperties.setProperty(StarTreeV2Constants.MetadataKey.AGGREGATION_COUNT, 0);
-    } else {
-      metadataProperties.setProperty(StarTreeV2Constants.MetadataKey.AGGREGATION_COUNT, aggregationSpecs.size());
-      int index = 0;
-      for (Map.Entry<AggregationFunctionColumnPair, AggregationSpec> entry : aggregationSpecs.entrySet()) {
-        AggregationFunctionColumnPair functionColumnPair = entry.getKey();
-        AggregationSpec aggregationSpec = entry.getValue();
-        String prefix = StarTreeV2Constants.MetadataKey.AGGREGATION_PREFIX + index + '.';
-        metadataProperties.setProperty(prefix + StarTreeV2Constants.MetadataKey.FUNCTION_TYPE,
-            functionColumnPair.getFunctionType().getName());
-        metadataProperties.setProperty(prefix + StarTreeV2Constants.MetadataKey.COLUMN_NAME,
-            functionColumnPair.getColumn());
-        metadataProperties.setProperty(prefix + StarTreeV2Constants.MetadataKey.COMPRESSION_CODEC,
-            aggregationSpec.getCompressionType());
-        index++;
-      }
-    }
+    metadataProperties.setProperty(StarTreeV2Constants.MetadataKey.FUNCTION_COLUMN_PAIRS, functionColumnPairs);
     metadataProperties.setProperty(StarTreeV2Constants.MetadataKey.MAX_LEAF_RECORDS, 10000);
-    metadataProperties.setProperty(StarTreeV2Constants.MetadataKey.SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS,
-        new HashSet<>());
+    metadataProperties.setProperty(StarTreeV2Constants.MetadataKey.SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS, Set.of());
     return metadataProperties;
   }
 }

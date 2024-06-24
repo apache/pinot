@@ -565,6 +565,10 @@ public abstract class PinotDataBuffer implements DataBuffer {
    */
   @Override
   public void readFrom(long offset, byte[] buffer, int srcOffset, int size) {
+    if (offset + size > size()) {
+      throw new IndexOutOfBoundsException("Buffer overflow: offset = " + offset + ", size = " + size
+          + ", buffer size = " + size());
+    }
     if (size <= BULK_BYTES_PROCESSING_THRESHOLD) {
       long currentOffset = offset;
       int end = srcOffset + size;

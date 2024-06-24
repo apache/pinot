@@ -827,8 +827,9 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
         for (Map.Entry<String, AggregatedStats> entry : _aggregatedUsagePerActiveQuery.entrySet()) {
           AggregatedStats value = entry.getValue();
           if (value._cpuNS > _cpuTimeBasedKillingThresholdNS) {
-            LOGGER.error("Query {} got picked because using {} ns of cpu time, greater than threshold {}",
-                value._queryId, value.getCpuNS(), _cpuTimeBasedKillingThresholdNS);
+            LOGGER.error("Current task status recorded is {}. Query {} got picked because using {} ns of cpu time,"
+                    + " greater than threshold {}", _threadEntriesMap, value._queryId, value.getCpuNS(),
+                _cpuTimeBasedKillingThresholdNS);
             value._exceptionAtomicReference.set(new RuntimeException(
                 String.format("Query %s got killed on %s: %s because using %d "
                         + "CPU time exceeding limit of %d ns CPU time",
@@ -836,7 +837,6 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
             interruptRunnerThread(value.getAnchorThread());
           }
         }
-        LOGGER.error("Current task status recorded is {}", _threadEntriesMap);
       }
 
       private void interruptRunnerThread(Thread thread) {

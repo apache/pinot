@@ -51,7 +51,7 @@ public class CommonConstants {
       "org.apache.pinot.spi.eventlistener.query.NoOpBrokerQueryEventListener";
 
   public static final String SWAGGER_AUTHORIZATION_KEY = "oauth";
-  public static final String CONFIG_OF_SWAGGER_RESOURCES_PATH = "META-INF/resources/webjars/swagger-ui/5.17.0/";
+  public static final String CONFIG_OF_SWAGGER_RESOURCES_PATH = "META-INF/resources/webjars/swagger-ui/5.17.14/";
   public static final String CONFIG_OF_TIMEZONE = "pinot.timezone";
 
   public static final String DATABASE = "database";
@@ -352,6 +352,8 @@ public class CommonConstants {
       public static class QueryOptionKey {
         public static final String TIMEOUT_MS = "timeoutMs";
         public static final String SKIP_UPSERT = "skipUpsert";
+        public static final String SKIP_UPSERT_VIEW = "skipUpsertView";
+        public static final String UPSERT_VIEW_FRESHNESS_MS = "upsertViewFreshnessMs";
         public static final String USE_STAR_TREE = "useStarTree";
         public static final String SCAN_STAR_TREE_NODES = "scanStarTreeNodes";
         public static final String ROUTING_OPTIONS = "routingOptions";
@@ -365,7 +367,17 @@ public class CommonConstants {
         public static final String EXPLAIN_PLAN_VERBOSE = "explainPlanVerbose";
         public static final String USE_MULTISTAGE_ENGINE = "useMultistageEngine";
         public static final String ENABLE_NULL_HANDLING = "enableNullHandling";
+
+        // Can be applied to aggregation and group-by queries to ask servers to directly return final results instead of
+        // intermediate results for aggregations.
         public static final String SERVER_RETURN_FINAL_RESULT = "serverReturnFinalResult";
+        // Can be applied to group-by queries to ask servers to directly return final results instead of intermediate
+        // results for aggregations. Different from SERVER_RETURN_FINAL_RESULT, this option should be used when the
+        // group key is not server partitioned, but the aggregated values are server partitioned. When this option is
+        // used, server will return final results, but won't directly trim the result to the query limit.
+        public static final String SERVER_RETURN_FINAL_RESULT_KEY_UNPARTITIONED =
+            "serverReturnFinalResultKeyUnpartitioned";
+
         // Reorder scan based predicates based on cardinality and number of selected values
         public static final String AND_SCAN_REORDERING = "AndScanReordering";
         public static final String SKIP_INDEXES = "skipIndexes";
@@ -390,12 +402,19 @@ public class CommonConstants {
         public static final String MAX_ROWS_IN_JOIN = "maxRowsInJoin";
         public static final String JOIN_OVERFLOW_MODE = "joinOverflowMode";
 
+        // Handle WINDOW Overflow
+        public static final String MAX_ROWS_IN_WINDOW = "maxRowsInWindow";
+        public static final String WINDOW_OVERFLOW_MODE = "windowOverflowMode";
+
         // Indicates the maximum length of the serialized response per server for a query.
         public static final String MAX_SERVER_RESPONSE_SIZE_BYTES = "maxServerResponseSizeBytes";
 
         // Indicates the maximum length of serialized response across all servers for a query. This value is equally
         // divided across all servers processing the query.
         public static final String MAX_QUERY_RESPONSE_SIZE_BYTES = "maxQueryResponseSizeBytes";
+
+        // If query submission causes an exception, still continue to submit the query to other servers
+        public static final String SKIP_UNAVAILABLE_SERVERS = "skipUnavailableServers";
       }
 
       public static class QueryOptionValue {
@@ -553,6 +572,8 @@ public class CommonConstants {
 
     public static final String CONFIG_OF_TRANSFORM_FUNCTIONS = "pinot.server.transforms";
     public static final String CONFIG_OF_SERVER_QUERY_REWRITER_CLASS_NAMES = "pinot.server.query.rewriter.class.names";
+    public static final String CONFIG_OF_SERVER_QUERY_REGEX_CLASS = "pinot.server.query.regex.class";
+    public static final String DEFAULT_SERVER_QUERY_REGEX_CLASS = "JAVA_UTIL";
     public static final String CONFIG_OF_ENABLE_QUERY_CANCELLATION = "pinot.server.enable.query.cancellation";
     public static final String CONFIG_OF_NETTY_SERVER_ENABLED = "pinot.server.netty.enabled";
     public static final boolean DEFAULT_NETTY_SERVER_ENABLED = true;
@@ -699,6 +720,8 @@ public class CommonConstants {
     public static final String CONFIG_OF_SEGMENT_STORE_URI = "segment.store.uri";
     public static final String CONFIG_OF_LOGGER_ROOT_DIR = "pinot.server.logger.root.dir";
 
+    public static final String CONFIG_OF_REALTIME_SEGMENT_CONSUMER_CLIENT_ID_SUFFIX = "consumer.client.id.suffix";
+
     public static class SegmentCompletionProtocol {
       public static final String PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER = "pinot.server.segment.uploader";
 
@@ -827,6 +850,8 @@ public class CommonConstants {
     public static final String CONFIG_OF_EVENT_OBSERVER_CLEANUP_DELAY_IN_SEC =
         "pinot.minion.event.observer.cleanupDelayInSec";
     public static final char TASK_LIST_SEPARATOR = ',';
+    public static final String CONFIG_OF_ALLOW_DOWNLOAD_FROM_SERVER = "pinot.minion.task.allow.download.from.server";
+    public static final String DEFAULT_ALLOW_DOWNLOAD_FROM_SERVER = "false";
   }
 
   public static class ControllerJob {
@@ -1076,8 +1101,8 @@ public class CommonConstants {
   }
 
   public static class RewriterConstants {
-    public static final String PARENT_AGGREGATION_NAME_PREFIX = "parent";
-    public static final String CHILD_AGGREGATION_NAME_PREFIX = "child";
+    public static final String PARENT_AGGREGATION_NAME_PREFIX = "pinotparentagg";
+    public static final String CHILD_AGGREGATION_NAME_PREFIX = "pinotchildagg";
     public static final String CHILD_AGGREGATION_SEPERATOR = "@";
     public static final String CHILD_KEY_SEPERATOR = "_";
   }
@@ -1115,6 +1140,23 @@ public class CommonConstants {
 
     public enum JoinOverFlowMode {
       THROW, BREAK
+    }
+
+    /**
+     * Configuration for window overflow.
+     */
+    public static final String KEY_OF_MAX_ROWS_IN_WINDOW = "pinot.query.window.max.rows";
+    public static final String KEY_OF_WINDOW_OVERFLOW_MODE = "pinot.query.window.overflow.mode";
+
+    public enum WindowOverFlowMode {
+      THROW, BREAK
+    }
+
+    /**
+     * Constants related to plan versions.
+     */
+    public static class PlanVersions {
+      public static final int V1 = 1;
     }
   }
 

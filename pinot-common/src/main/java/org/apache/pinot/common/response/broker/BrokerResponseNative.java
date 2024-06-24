@@ -19,6 +19,7 @@
 package org.apache.pinot.common.response.broker;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
@@ -28,6 +29,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.ProcessingException;
@@ -36,21 +38,22 @@ import org.apache.pinot.spi.utils.JsonUtils;
 
 
 /**
- * This class implements pinot-broker's response format for any given query.
- * All fields either primitive data types, or native objects (as opposed to JSONObjects).
- * <p>
- * Supports serialization via JSON.
+ * Broker response for single-stage engine.
+ * This class can be used to serialize/deserialize the broker response.
  */
 @JsonPropertyOrder({
-    "resultTable", "requestId", "brokerId", "exceptions", "numServersQueried", "numServersResponded",
-    "numSegmentsQueried", "numSegmentsProcessed", "numSegmentsMatched", "numConsumingSegmentsQueried",
-    "numConsumingSegmentsProcessed", "numConsumingSegmentsMatched", "numDocsScanned", "numEntriesScannedInFilter",
-    "numEntriesScannedPostFilter", "numGroupsLimitReached", "maxRowsInJoinReached", "totalDocs", "timeUsedMs",
+    "resultTable", "numRowsResultSet", "partialResult", "exceptions", "numGroupsLimitReached", "timeUsedMs",
+    "requestId", "brokerId", "numDocsScanned", "totalDocs", "numEntriesScannedInFilter", "numEntriesScannedPostFilter",
+    "numServersQueried", "numServersResponded", "numSegmentsQueried", "numSegmentsProcessed", "numSegmentsMatched",
+    "numConsumingSegmentsQueried", "numConsumingSegmentsProcessed", "numConsumingSegmentsMatched",
+    "minConsumingFreshnessTimeMs", "numSegmentsPrunedByBroker", "numSegmentsPrunedByServer",
+    "numSegmentsPrunedInvalid", "numSegmentsPrunedByLimit", "numSegmentsPrunedByValue", "brokerReduceTimeMs",
     "offlineThreadCpuTimeNs", "realtimeThreadCpuTimeNs", "offlineSystemActivitiesCpuTimeNs",
     "realtimeSystemActivitiesCpuTimeNs", "offlineResponseSerializationCpuTimeNs",
-    "realtimeResponseSerializationCpuTimeNs", "offlineTotalCpuTimeNs", "realtimeTotalCpuTimeNs", "brokerReduceTimeMs",
-    "segmentStatistics", "traceInfo", "partialResult"
+    "realtimeResponseSerializationCpuTimeNs", "offlineTotalCpuTimeNs", "realtimeTotalCpuTimeNs",
+    "explainPlanNumEmptyFilterSegments", "explainPlanNumMatchAllFilterSegments", "traceInfo"
 })
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class BrokerResponseNative implements BrokerResponse {
   public static final BrokerResponseNative EMPTY_RESULT = BrokerResponseNative.empty();
   public static final BrokerResponseNative NO_TABLE_RESULT =
@@ -59,58 +62,52 @@ public class BrokerResponseNative implements BrokerResponse {
       new BrokerResponseNative(QueryException.TABLE_DOES_NOT_EXIST_ERROR);
   public static final BrokerResponseNative BROKER_ONLY_EXPLAIN_PLAN_OUTPUT = getBrokerResponseExplainPlanOutput();
 
+  private ResultTable _resultTable;
+  private int _numRowsResultSet = 0;
+  private List<QueryProcessingException> _exceptions = new ArrayList<>();
+  private boolean _numGroupsLimitReached = false;
+  private long _timeUsedMs = 0L;
   private String _requestId;
   private String _brokerId;
-  private int _numServersQueried = 0;
-  private int _numServersResponded = 0;
   private long _numDocsScanned = 0L;
+  private long _totalDocs = 0L;
   private long _numEntriesScannedInFilter = 0L;
   private long _numEntriesScannedPostFilter = 0L;
+  private int _numServersQueried = 0;
+  private int _numServersResponded = 0;
   private long _numSegmentsQueried = 0L;
   private long _numSegmentsProcessed = 0L;
   private long _numSegmentsMatched = 0L;
   private long _numConsumingSegmentsQueried = 0L;
   private long _numConsumingSegmentsProcessed = 0L;
   private long _numConsumingSegmentsMatched = 0L;
-  // the timestamp indicating the freshness of the data queried in consuming segments.
-  // This can be ingestion timestamp if provided by the stream, or the last index time
   private long _minConsumingFreshnessTimeMs = 0L;
+  private long _numSegmentsPrunedByBroker = 0L;
+  private long _numSegmentsPrunedByServer = 0L;
+  private long _numSegmentsPrunedInvalid = 0L;
+  private long _numSegmentsPrunedByLimit = 0L;
+  private long _numSegmentsPrunedByValue = 0L;
   private long _brokerReduceTimeMs = 0L;
-
-  private long _totalDocs = 0L;
-  private boolean _numGroupsLimitReached = false;
-  private long _timeUsedMs = 0L;
   private long _offlineThreadCpuTimeNs = 0L;
   private long _realtimeThreadCpuTimeNs = 0L;
   private long _offlineSystemActivitiesCpuTimeNs = 0L;
   private long _realtimeSystemActivitiesCpuTimeNs = 0L;
   private long _offlineResponseSerializationCpuTimeNs = 0L;
   private long _realtimeResponseSerializationCpuTimeNs = 0L;
-  private long _offlineTotalCpuTimeNs = 0L;
-  private long _realtimeTotalCpuTimeNs = 0L;
-  private long _numSegmentsPrunedByBroker = 0L;
-  private long _numSegmentsPrunedByServer = 0L;
-  private long _numSegmentsPrunedInvalid = 0L;
-  private long _numSegmentsPrunedByLimit = 0L;
-  private long _numSegmentsPrunedByValue = 0L;
   private long _explainPlanNumEmptyFilterSegments = 0L;
   private long _explainPlanNumMatchAllFilterSegments = 0L;
-  private int _numRowsResultSet = 0;
-  private ResultTable _resultTable;
   private Map<String, String> _traceInfo = new HashMap<>();
-  private List<QueryProcessingException> _processingExceptions = new ArrayList<>();
-  private List<String> _segmentStatistics = new ArrayList<>();
 
   public BrokerResponseNative() {
   }
 
   public BrokerResponseNative(ProcessingException exception) {
-    _processingExceptions.add(new QueryProcessingException(exception.getErrorCode(), exception.getMessage()));
+    _exceptions.add(new QueryProcessingException(exception.getErrorCode(), exception.getMessage()));
   }
 
   public BrokerResponseNative(List<ProcessingException> exceptions) {
     for (ProcessingException exception : exceptions) {
-      _processingExceptions.add(new QueryProcessingException(exception.getErrorCode(), exception.getMessage()));
+      _exceptions.add(new QueryProcessingException(exception.getErrorCode(), exception.getMessage()));
     }
   }
 
@@ -136,454 +133,354 @@ public class BrokerResponseNative implements BrokerResponse {
     return JsonUtils.stringToObject(jsonString, BrokerResponseNative.class);
   }
 
-  @JsonProperty("offlineSystemActivitiesCpuTimeNs")
-  @Override
-  public long getOfflineSystemActivitiesCpuTimeNs() {
-    return _offlineSystemActivitiesCpuTimeNs;
-  }
-
-  @JsonProperty("offlineSystemActivitiesCpuTimeNs")
-  public void setOfflineSystemActivitiesCpuTimeNs(long offlineSystemActivitiesCpuTimeNs) {
-    _offlineSystemActivitiesCpuTimeNs = offlineSystemActivitiesCpuTimeNs;
-  }
-
-  @JsonProperty("realtimeSystemActivitiesCpuTimeNs")
-  @Override
-  public long getRealtimeSystemActivitiesCpuTimeNs() {
-    return _realtimeSystemActivitiesCpuTimeNs;
-  }
-
-  @JsonProperty("realtimeSystemActivitiesCpuTimeNs")
-  public void setRealtimeSystemActivitiesCpuTimeNs(long realtimeSystemActivitiesCpuTimeNs) {
-    _realtimeSystemActivitiesCpuTimeNs = realtimeSystemActivitiesCpuTimeNs;
-  }
-
-  @JsonProperty("offlineThreadCpuTimeNs")
-  @Override
-  public long getOfflineThreadCpuTimeNs() {
-    return _offlineThreadCpuTimeNs;
-  }
-
-  @JsonProperty("offlineThreadCpuTimeNs")
-  public void setOfflineThreadCpuTimeNs(long timeUsedMs) {
-    _offlineThreadCpuTimeNs = timeUsedMs;
-  }
-
-  @JsonProperty("realtimeThreadCpuTimeNs")
-  @Override
-  public long getRealtimeThreadCpuTimeNs() {
-    return _realtimeThreadCpuTimeNs;
-  }
-
-  @JsonProperty("realtimeThreadCpuTimeNs")
-  public void setRealtimeThreadCpuTimeNs(long timeUsedMs) {
-    _realtimeThreadCpuTimeNs = timeUsedMs;
-  }
-
-  @JsonProperty("offlineResponseSerializationCpuTimeNs")
-  @Override
-  public long getOfflineResponseSerializationCpuTimeNs() {
-    return _offlineResponseSerializationCpuTimeNs;
-  }
-
-  @JsonProperty("offlineResponseSerializationCpuTimeNs")
-  public void setOfflineResponseSerializationCpuTimeNs(long offlineResponseSerializationCpuTimeNs) {
-    _offlineResponseSerializationCpuTimeNs = offlineResponseSerializationCpuTimeNs;
-  }
-
-  @JsonProperty("realtimeResponseSerializationCpuTimeNs")
-  @Override
-  public long getRealtimeResponseSerializationCpuTimeNs() {
-    return _realtimeResponseSerializationCpuTimeNs;
-  }
-
-  @JsonProperty("realtimeResponseSerializationCpuTimeNs")
-  public void setRealtimeResponseSerializationCpuTimeNs(long realtimeResponseSerializationCpuTimeNs) {
-    _realtimeResponseSerializationCpuTimeNs = realtimeResponseSerializationCpuTimeNs;
-  }
-
-  @JsonProperty("offlineTotalCpuTimeNs")
-  @Override
-  public long getOfflineTotalCpuTimeNs() {
-    return _offlineTotalCpuTimeNs;
-  }
-
-  @JsonProperty("offlineTotalCpuTimeNs")
-  public void setOfflineTotalCpuTimeNs(long offlineTotalCpuTimeNs) {
-    _offlineTotalCpuTimeNs = offlineTotalCpuTimeNs;
-  }
-
-  @JsonProperty("realtimeTotalCpuTimeNs")
-  @Override
-  public long getRealtimeTotalCpuTimeNs() {
-    return _realtimeTotalCpuTimeNs;
-  }
-
-  @JsonProperty("realtimeTotalCpuTimeNs")
-  public void setRealtimeTotalCpuTimeNs(long realtimeTotalCpuTimeNs) {
-    _realtimeTotalCpuTimeNs = realtimeTotalCpuTimeNs;
-  }
-
-  @JsonProperty("numSegmentsPrunedByBroker")
-  @Override
-  public long getNumSegmentsPrunedByBroker() {
-    return _numSegmentsPrunedByBroker;
-  }
-
-  @JsonProperty("numSegmentsPrunedByBroker")
-  @Override
-  public void setNumSegmentsPrunedByBroker(long numSegmentsPrunedByBroker) {
-    _numSegmentsPrunedByBroker = numSegmentsPrunedByBroker;
-  }
-
-  @JsonProperty("numSegmentsPrunedByServer")
-  @Override
-  public long getNumSegmentsPrunedByServer() {
-    return _numSegmentsPrunedByServer;
-  }
-
-  @JsonProperty("numSegmentsPrunedByServer")
-  public void setNumSegmentsPrunedByServer(long numSegmentsPrunedByServer) {
-    _numSegmentsPrunedByServer = numSegmentsPrunedByServer;
-  }
-
-  @JsonProperty("numSegmentsPrunedInvalid")
-  @Override
-  public long getNumSegmentsPrunedInvalid() {
-    return _numSegmentsPrunedInvalid;
-  }
-
-  @JsonProperty("numSegmentsPrunedInvalid")
-  public void setNumSegmentsPrunedInvalid(long numSegmentsPrunedInvalid) {
-    _numSegmentsPrunedInvalid = numSegmentsPrunedInvalid;
-  }
-
-  @JsonProperty("numSegmentsPrunedByLimit")
-  @Override
-  public long getNumSegmentsPrunedByLimit() {
-    return _numSegmentsPrunedByLimit;
-  }
-
-  @JsonProperty("numSegmentsPrunedByLimit")
-  public void setNumSegmentsPrunedByLimit(long numSegmentsPrunedByLimit) {
-    _numSegmentsPrunedByLimit = numSegmentsPrunedByLimit;
-  }
-
-  @JsonProperty("numSegmentsPrunedByValue")
-  @Override
-  public long getNumSegmentsPrunedByValue() {
-    return _numSegmentsPrunedByValue;
-  }
-
-  @JsonProperty("numSegmentsPrunedByValue")
-  public void setNumSegmentsPrunedByValue(long numSegmentsPrunedByValue) {
-    _numSegmentsPrunedByValue = numSegmentsPrunedByValue;
-  }
-
-  @JsonProperty("explainPlanNumEmptyFilterSegments")
-  @Override
-  public long getExplainPlanNumEmptyFilterSegments() {
-    return _explainPlanNumEmptyFilterSegments;
-  }
-
-  @JsonProperty("explainPlanNumEmptyFilterSegments")
-  public void setExplainPlanNumEmptyFilterSegments(long explainPlanNumEmptyFilterSegments) {
-    _explainPlanNumEmptyFilterSegments = explainPlanNumEmptyFilterSegments;
-  }
-
-  @JsonProperty("explainPlanNumMatchAllFilterSegments")
-  @Override
-  public long getExplainPlanNumMatchAllFilterSegments() {
-    return _explainPlanNumMatchAllFilterSegments;
-  }
-
-  @JsonProperty("explainPlanNumMatchAllFilterSegments")
-  public void setExplainPlanNumMatchAllFilterSegments(long explainPlanNumMatchAllFilterSegments) {
-    _explainPlanNumMatchAllFilterSegments = explainPlanNumMatchAllFilterSegments;
-  }
-
-  @JsonProperty("resultTable")
   @JsonInclude(JsonInclude.Include.NON_NULL)
+  @Nullable
   @Override
   public ResultTable getResultTable() {
     return _resultTable;
   }
 
-  @JsonProperty("resultTable")
   @Override
-  public void setResultTable(ResultTable resultTable) {
+  public void setResultTable(@Nullable ResultTable resultTable) {
     _resultTable = resultTable;
-    // If query level parameter is set to not return the results, then resultTable will be null.
+    // NOTE: Update _numRowsResultSet when setting non-null result table. We might set null result table when user wants
+    //       to hide the result but only show the stats, in which case we should not update _numRowsResultSet.
     if (resultTable != null) {
       _numRowsResultSet = resultTable.getRows().size();
     }
   }
 
-  @JsonProperty("exceptions")
-  public List<QueryProcessingException> getProcessingExceptions() {
-    return _processingExceptions;
-  }
-
-  @JsonProperty("exceptions")
-  public void setProcessingExceptions(List<QueryProcessingException> processingExceptions) {
-    _processingExceptions = processingExceptions;
-  }
-
-  @JsonProperty("numServersQueried")
   @Override
-  public int getNumServersQueried() {
-    return _numServersQueried;
+  public int getNumRowsResultSet() {
+    return _numRowsResultSet;
   }
 
-  @JsonProperty("numServersQueried")
-  public void setNumServersQueried(int numServersQueried) {
-    _numServersQueried = numServersQueried;
+  public void setNumRowsResultSet(int numRowsResultSet) {
+    _numRowsResultSet = numRowsResultSet;
   }
 
-  @JsonProperty("numServersResponded")
+  @JsonProperty(access = JsonProperty.Access.READ_ONLY)
   @Override
-  public int getNumServersResponded() {
-    return _numServersResponded;
+  public boolean isPartialResult() {
+    return getExceptionsSize() > 0 || isNumGroupsLimitReached();
   }
 
-  @JsonProperty("numServersResponded")
   @Override
-  public void setNumServersResponded(int numServersResponded) {
-    _numServersResponded = numServersResponded;
+  public List<QueryProcessingException> getExceptions() {
+    return _exceptions;
   }
 
-  @JsonProperty("numDocsScanned")
-  public long getNumDocsScanned() {
-    return _numDocsScanned;
+  public void setExceptions(List<QueryProcessingException> exceptions) {
+    _exceptions = exceptions;
   }
 
-  @JsonProperty("numDocsScanned")
-  public void setNumDocsScanned(long numDocsScanned) {
-    _numDocsScanned = numDocsScanned;
+  public void addException(QueryProcessingException exception) {
+    _exceptions.add(exception);
   }
 
-  @JsonProperty("numEntriesScannedInFilter")
-  @Override
-  public long getNumEntriesScannedInFilter() {
-    return _numEntriesScannedInFilter;
+  public void addException(ProcessingException exception) {
+    addException(new QueryProcessingException(exception.getErrorCode(), exception.getMessage()));
   }
 
-  @JsonProperty("numEntriesScannedInFilter")
-  public void setNumEntriesScannedInFilter(long numEntriesScannedInFilter) {
-    _numEntriesScannedInFilter = numEntriesScannedInFilter;
-  }
-
-  @JsonProperty("numEntriesScannedPostFilter")
-  @Override
-  public long getNumEntriesScannedPostFilter() {
-    return _numEntriesScannedPostFilter;
-  }
-
-  @JsonProperty("numEntriesScannedPostFilter")
-  public void setNumEntriesScannedPostFilter(long numEntriesScannedPostFilter) {
-    _numEntriesScannedPostFilter = numEntriesScannedPostFilter;
-  }
-
-  @JsonProperty("numSegmentsQueried")
-  @Override
-  public long getNumSegmentsQueried() {
-    return _numSegmentsQueried;
-  }
-
-  @JsonProperty("numSegmentsQueried")
-  public void setNumSegmentsQueried(long numSegmentsQueried) {
-    _numSegmentsQueried = numSegmentsQueried;
-  }
-
-  @JsonProperty("numSegmentsProcessed")
-  @Override
-  public long getNumSegmentsProcessed() {
-    return _numSegmentsProcessed;
-  }
-
-  @JsonProperty("numSegmentsProcessed")
-  public void setNumSegmentsProcessed(long numSegmentsProcessed) {
-    _numSegmentsProcessed = numSegmentsProcessed;
-  }
-
-  @JsonProperty("numSegmentsMatched")
-  @Override
-  public long getNumSegmentsMatched() {
-    return _numSegmentsMatched;
-  }
-
-  @JsonProperty("numSegmentsMatched")
-  public void setNumSegmentsMatched(long numSegmentsMatched) {
-    _numSegmentsMatched = numSegmentsMatched;
-  }
-
-  @JsonProperty("numConsumingSegmentsQueried")
-  @Override
-  public long getNumConsumingSegmentsQueried() {
-    return _numConsumingSegmentsQueried;
-  }
-
-  @JsonProperty("numConsumingSegmentsQueried")
-  public void setNumConsumingSegmentsQueried(long numConsumingSegmentsQueried) {
-    _numConsumingSegmentsQueried = numConsumingSegmentsQueried;
-  }
-
-  @JsonProperty("numConsumingSegmentsProcessed")
-  @Override
-  public long getNumConsumingSegmentsProcessed() {
-    return _numConsumingSegmentsProcessed;
-  }
-
-  @JsonProperty("numConsumingSegmentsProcessed")
-  public void setNumConsumingSegmentsProcessed(long numConsumingSegmentsProcessed) {
-    _numConsumingSegmentsProcessed = numConsumingSegmentsProcessed;
-  }
-
-  @JsonProperty("numConsumingSegmentsMatched")
-  @Override
-  public long getNumConsumingSegmentsMatched() {
-    return _numConsumingSegmentsMatched;
-  }
-
-  @JsonProperty("numConsumingSegmentsMatched")
-  public void setNumConsumingSegmentsMatched(long numConsumingSegmentsMatched) {
-    _numConsumingSegmentsMatched = numConsumingSegmentsMatched;
-  }
-
-  @JsonProperty("minConsumingFreshnessTimeMs")
-  @Override
-  public long getMinConsumingFreshnessTimeMs() {
-    return _minConsumingFreshnessTimeMs;
-  }
-
-  @JsonProperty("minConsumingFreshnessTimeMs")
-  public void setMinConsumingFreshnessTimeMs(long minConsumingFreshnessTimeMs) {
-    _minConsumingFreshnessTimeMs = minConsumingFreshnessTimeMs;
-  }
-
-  @JsonProperty("totalDocs")
-  @Override
-  public long getTotalDocs() {
-    return _totalDocs;
-  }
-
-  @JsonProperty("totalDocs")
-  public void setTotalDocs(long totalDocs) {
-    _totalDocs = totalDocs;
-  }
-
-  @JsonProperty("numGroupsLimitReached")
   @Override
   public boolean isNumGroupsLimitReached() {
     return _numGroupsLimitReached;
   }
 
-  @JsonProperty("numGroupsLimitReached")
   public void setNumGroupsLimitReached(boolean numGroupsLimitReached) {
     _numGroupsLimitReached = numGroupsLimitReached;
   }
 
-  @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+  @JsonIgnore
+  @Override
   public boolean isMaxRowsInJoinReached() {
     return false;
   }
 
-  @JsonProperty(access = JsonProperty.Access.READ_ONLY)
-  public boolean isPartialResult() {
-    return isNumGroupsLimitReached() || getExceptionsSize() > 0 || isMaxRowsInJoinReached();
+  @JsonIgnore
+  @Override
+  public boolean isMaxRowsInWindowReached() {
+    return false;
   }
 
-  @JsonProperty("timeUsedMs")
   @Override
   public long getTimeUsedMs() {
     return _timeUsedMs;
   }
 
-  @JsonProperty("timeUsedMs")
-  @Override
   public void setTimeUsedMs(long timeUsedMs) {
     _timeUsedMs = timeUsedMs;
   }
 
-  @JsonProperty(access = JsonProperty.Access.READ_ONLY)
-  @Override
-  public int getNumRowsResultSet() {
-    return BrokerResponse.super.getNumRowsResultSet();
-  }
-
-  @JsonProperty("segmentStatistics")
-  public List<String> getSegmentStatistics() {
-    return _segmentStatistics;
-  }
-
-  @JsonProperty("segmentStatistics")
-  public void setSegmentStatistics(List<String> segmentStatistics) {
-    _segmentStatistics = segmentStatistics;
-  }
-
-  @JsonProperty("traceInfo")
-  public Map<String, String> getTraceInfo() {
-    return _traceInfo;
-  }
-
-  @JsonProperty("traceInfo")
-  public void setTraceInfo(Map<String, String> traceInfo) {
-    _traceInfo = traceInfo;
-  }
-
-  @JsonIgnore
-  @Override
-  public void setExceptions(List<ProcessingException> exceptions) {
-    // TODO: This is incorrect. It is adding and not setting the exceptions
-    //   But there is some code that seems to depend on this.
-    for (ProcessingException exception : exceptions) {
-      _processingExceptions.add(new QueryProcessingException(exception.getErrorCode(), exception.getMessage()));
-    }
-  }
-
-  public void addToExceptions(QueryProcessingException processingException) {
-    _processingExceptions.add(processingException);
-  }
-
-  @JsonIgnore
-  @Override
-  public int getExceptionsSize() {
-    return _processingExceptions.size();
-  }
-
-  @JsonProperty("requestId")
   @Override
   public String getRequestId() {
     return _requestId;
   }
 
-  @JsonProperty("requestId")
   @Override
   public void setRequestId(String requestId) {
     _requestId = requestId;
   }
 
-  @JsonProperty("brokerId")
   @Override
   public String getBrokerId() {
     return _brokerId;
   }
 
-  @JsonProperty("brokerId")
   @Override
-  public void setBrokerId(String requestId) {
-    _brokerId = requestId;
+  public void setBrokerId(String brokerId) {
+    _brokerId = brokerId;
   }
 
-  @JsonProperty("brokerReduceTimeMs")
+  @Override
+  public long getNumDocsScanned() {
+    return _numDocsScanned;
+  }
+
+  public void setNumDocsScanned(long numDocsScanned) {
+    _numDocsScanned = numDocsScanned;
+  }
+
+  @Override
+  public long getTotalDocs() {
+    return _totalDocs;
+  }
+
+  public void setTotalDocs(long totalDocs) {
+    _totalDocs = totalDocs;
+  }
+
+  @Override
+  public long getNumEntriesScannedInFilter() {
+    return _numEntriesScannedInFilter;
+  }
+
+  public void setNumEntriesScannedInFilter(long numEntriesScannedInFilter) {
+    _numEntriesScannedInFilter = numEntriesScannedInFilter;
+  }
+
+  @Override
+  public long getNumEntriesScannedPostFilter() {
+    return _numEntriesScannedPostFilter;
+  }
+
+  public void setNumEntriesScannedPostFilter(long numEntriesScannedPostFilter) {
+    _numEntriesScannedPostFilter = numEntriesScannedPostFilter;
+  }
+
+  @Override
+  public int getNumServersQueried() {
+    return _numServersQueried;
+  }
+
+  public void setNumServersQueried(int numServersQueried) {
+    _numServersQueried = numServersQueried;
+  }
+
+  @Override
+  public int getNumServersResponded() {
+    return _numServersResponded;
+  }
+
+  public void setNumServersResponded(int numServersResponded) {
+    _numServersResponded = numServersResponded;
+  }
+
+  @Override
+  public long getNumSegmentsQueried() {
+    return _numSegmentsQueried;
+  }
+
+  public void setNumSegmentsQueried(long numSegmentsQueried) {
+    _numSegmentsQueried = numSegmentsQueried;
+  }
+
+  @Override
+  public long getNumSegmentsProcessed() {
+    return _numSegmentsProcessed;
+  }
+
+  public void setNumSegmentsProcessed(long numSegmentsProcessed) {
+    _numSegmentsProcessed = numSegmentsProcessed;
+  }
+
+  @Override
+  public long getNumSegmentsMatched() {
+    return _numSegmentsMatched;
+  }
+
+  public void setNumSegmentsMatched(long numSegmentsMatched) {
+    _numSegmentsMatched = numSegmentsMatched;
+  }
+
+  @Override
+  public long getNumConsumingSegmentsQueried() {
+    return _numConsumingSegmentsQueried;
+  }
+
+  public void setNumConsumingSegmentsQueried(long numConsumingSegmentsQueried) {
+    _numConsumingSegmentsQueried = numConsumingSegmentsQueried;
+  }
+
+  @Override
+  public long getNumConsumingSegmentsProcessed() {
+    return _numConsumingSegmentsProcessed;
+  }
+
+  public void setNumConsumingSegmentsProcessed(long numConsumingSegmentsProcessed) {
+    _numConsumingSegmentsProcessed = numConsumingSegmentsProcessed;
+  }
+
+  @Override
+  public long getNumConsumingSegmentsMatched() {
+    return _numConsumingSegmentsMatched;
+  }
+
+  public void setNumConsumingSegmentsMatched(long numConsumingSegmentsMatched) {
+    _numConsumingSegmentsMatched = numConsumingSegmentsMatched;
+  }
+
+  @Override
+  public long getMinConsumingFreshnessTimeMs() {
+    return _minConsumingFreshnessTimeMs;
+  }
+
+  public void setMinConsumingFreshnessTimeMs(long minConsumingFreshnessTimeMs) {
+    _minConsumingFreshnessTimeMs = minConsumingFreshnessTimeMs;
+  }
+
+  @Override
+  public long getNumSegmentsPrunedByBroker() {
+    return _numSegmentsPrunedByBroker;
+  }
+
+  public void setNumSegmentsPrunedByBroker(long numSegmentsPrunedByBroker) {
+    _numSegmentsPrunedByBroker = numSegmentsPrunedByBroker;
+  }
+
+  @Override
+  public long getNumSegmentsPrunedByServer() {
+    return _numSegmentsPrunedByServer;
+  }
+
+  public void setNumSegmentsPrunedByServer(long numSegmentsPrunedByServer) {
+    _numSegmentsPrunedByServer = numSegmentsPrunedByServer;
+  }
+
+  @Override
+  public long getNumSegmentsPrunedInvalid() {
+    return _numSegmentsPrunedInvalid;
+  }
+
+  public void setNumSegmentsPrunedInvalid(long numSegmentsPrunedInvalid) {
+    _numSegmentsPrunedInvalid = numSegmentsPrunedInvalid;
+  }
+
+  @Override
+  public long getNumSegmentsPrunedByLimit() {
+    return _numSegmentsPrunedByLimit;
+  }
+
+  public void setNumSegmentsPrunedByLimit(long numSegmentsPrunedByLimit) {
+    _numSegmentsPrunedByLimit = numSegmentsPrunedByLimit;
+  }
+
+  @Override
+  public long getNumSegmentsPrunedByValue() {
+    return _numSegmentsPrunedByValue;
+  }
+
+  public void setNumSegmentsPrunedByValue(long numSegmentsPrunedByValue) {
+    _numSegmentsPrunedByValue = numSegmentsPrunedByValue;
+  }
+
   @Override
   public long getBrokerReduceTimeMs() {
     return _brokerReduceTimeMs;
   }
 
-  @JsonProperty("brokerReduceTimeMs")
-  @Override
   public void setBrokerReduceTimeMs(long brokerReduceTimeMs) {
     _brokerReduceTimeMs = brokerReduceTimeMs;
+  }
+
+  @Override
+  public long getOfflineThreadCpuTimeNs() {
+    return _offlineThreadCpuTimeNs;
+  }
+
+  public void setOfflineThreadCpuTimeNs(long offlineThreadCpuTimeNs) {
+    _offlineThreadCpuTimeNs = offlineThreadCpuTimeNs;
+  }
+
+  @Override
+  public long getOfflineSystemActivitiesCpuTimeNs() {
+    return _offlineSystemActivitiesCpuTimeNs;
+  }
+
+  public void setOfflineSystemActivitiesCpuTimeNs(long offlineSystemActivitiesCpuTimeNs) {
+    _offlineSystemActivitiesCpuTimeNs = offlineSystemActivitiesCpuTimeNs;
+  }
+
+  @Override
+  public long getOfflineResponseSerializationCpuTimeNs() {
+    return _offlineResponseSerializationCpuTimeNs;
+  }
+
+  public void setOfflineResponseSerializationCpuTimeNs(long offlineResponseSerializationCpuTimeNs) {
+    _offlineResponseSerializationCpuTimeNs = offlineResponseSerializationCpuTimeNs;
+  }
+
+  @Override
+  public long getRealtimeThreadCpuTimeNs() {
+    return _realtimeThreadCpuTimeNs;
+  }
+
+  public void setRealtimeThreadCpuTimeNs(long timeUsedMs) {
+    _realtimeThreadCpuTimeNs = timeUsedMs;
+  }
+
+  @Override
+  public long getRealtimeSystemActivitiesCpuTimeNs() {
+    return _realtimeSystemActivitiesCpuTimeNs;
+  }
+
+  public void setRealtimeSystemActivitiesCpuTimeNs(long realtimeSystemActivitiesCpuTimeNs) {
+    _realtimeSystemActivitiesCpuTimeNs = realtimeSystemActivitiesCpuTimeNs;
+  }
+
+  @Override
+  public long getRealtimeResponseSerializationCpuTimeNs() {
+    return _realtimeResponseSerializationCpuTimeNs;
+  }
+
+  public void setRealtimeResponseSerializationCpuTimeNs(long realtimeResponseSerializationCpuTimeNs) {
+    _realtimeResponseSerializationCpuTimeNs = realtimeResponseSerializationCpuTimeNs;
+  }
+
+  @Override
+  public long getExplainPlanNumEmptyFilterSegments() {
+    return _explainPlanNumEmptyFilterSegments;
+  }
+
+  public void setExplainPlanNumEmptyFilterSegments(long explainPlanNumEmptyFilterSegments) {
+    _explainPlanNumEmptyFilterSegments = explainPlanNumEmptyFilterSegments;
+  }
+
+  @Override
+  public long getExplainPlanNumMatchAllFilterSegments() {
+    return _explainPlanNumMatchAllFilterSegments;
+  }
+
+  public void setExplainPlanNumMatchAllFilterSegments(long explainPlanNumMatchAllFilterSegments) {
+    _explainPlanNumMatchAllFilterSegments = explainPlanNumMatchAllFilterSegments;
+  }
+
+  @Override
+  public Map<String, String> getTraceInfo() {
+    return _traceInfo;
+  }
+
+  public void setTraceInfo(Map<String, String> traceInfo) {
+    _traceInfo = traceInfo;
   }
 }

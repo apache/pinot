@@ -30,8 +30,11 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
@@ -46,6 +49,7 @@ import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.MutableSegment;
+import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
@@ -65,9 +69,7 @@ import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 
 public class BasePartitionUpsertMetadataManagerTest {
@@ -198,32 +200,35 @@ public class BasePartitionUpsertMetadataManagerTest {
   @Test
   public void testTakeSnapshotInOrder()
       throws IOException {
+    UpsertContext upsertContext = mock(UpsertContext.class);
+    when(upsertContext.isSnapshotEnabled()).thenReturn(true);
     DummyPartitionUpsertMetadataManager upsertMetadataManager =
-        new DummyPartitionUpsertMetadataManager("myTable", 0, mock(UpsertContext.class));
+        new DummyPartitionUpsertMetadataManager("myTable", 0, upsertContext);
 
     List<String> segmentsTakenSnapshot = new ArrayList<>();
 
     File segDir01 = new File(TEMP_DIR, "seg01");
     ImmutableSegmentImpl seg01 = createImmutableSegment("seg01", segDir01, segmentsTakenSnapshot);
     seg01.enableUpsert(upsertMetadataManager, createValidDocIds(0, 1, 2, 3), null);
-    upsertMetadataManager.trackSegment(seg01);
+    upsertMetadataManager.addSegment(seg01);
     // seg01 has a tmp snapshot file, but no snapshot file
     FileUtils.touch(new File(segDir01, V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME + "_tmp"));
 
     File segDir02 = new File(TEMP_DIR, "seg02");
     ImmutableSegmentImpl seg02 = createImmutableSegment("seg02", segDir02, segmentsTakenSnapshot);
     seg02.enableUpsert(upsertMetadataManager, createValidDocIds(0, 1, 2, 3, 4, 5), null);
-    upsertMetadataManager.trackSegment(seg02);
+    upsertMetadataManager.addSegment(seg02);
     // seg02 has snapshot file, so its snapshot is taken first.
     FileUtils.touch(new File(segDir02, V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
 
     File segDir03 = new File(TEMP_DIR, "seg03");
     ImmutableSegmentImpl seg03 = createImmutableSegment("seg03", segDir03, segmentsTakenSnapshot);
     seg03.enableUpsert(upsertMetadataManager, createValidDocIds(3, 4, 7), null);
-    upsertMetadataManager.trackSegment(seg03);
+    upsertMetadataManager.addSegment(seg03);
 
     // The mutable segments will be skipped.
-    upsertMetadataManager.trackSegment(mock(MutableSegmentImpl.class));
+    MutableSegmentImpl seg04 = mock(MutableSegmentImpl.class);
+    upsertMetadataManager.addRecord(seg04, mock(RecordInfo.class));
 
     upsertMetadataManager.doTakeSnapshot();
     assertEquals(segmentsTakenSnapshot.size(), 3);
@@ -240,6 +245,390 @@ public class BasePartitionUpsertMetadataManagerTest {
     assertEquals(seg02.loadValidDocIdsFromSnapshot().getCardinality(), 6);
     assertTrue(segDir03.exists());
     assertEquals(seg03.loadValidDocIdsFromSnapshot().getCardinality(), 3);
+  }
+
+  @Test
+  public void testTakeSnapshotInOrderBasedOnUpdates()
+      throws IOException {
+    UpsertContext upsertContext = mock(UpsertContext.class);
+    when(upsertContext.isSnapshotEnabled()).thenReturn(true);
+    DummyPartitionUpsertMetadataManager upsertMetadataManager =
+        new DummyPartitionUpsertMetadataManager("myTable", 0, upsertContext);
+
+    List<String> segmentsTakenSnapshot = new ArrayList<>();
+
+    File segDir01 = new File(TEMP_DIR, "seg01");
+    ImmutableSegmentImpl seg01 = createImmutableSegment("seg01", segDir01, segmentsTakenSnapshot);
+    seg01.enableUpsert(upsertMetadataManager, createValidDocIds(0, 1, 2, 3), null);
+    upsertMetadataManager.addSegment(seg01);
+    // seg01 has a tmp snapshot file, but no snapshot file
+    FileUtils.touch(new File(segDir01, V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME + "_tmp"));
+
+    File segDir02 = new File(TEMP_DIR, "seg02");
+    ImmutableSegmentImpl seg02 = createImmutableSegment("seg02", segDir02, segmentsTakenSnapshot);
+    seg02.enableUpsert(upsertMetadataManager, createValidDocIds(0, 1, 2, 3, 4, 5), null);
+    upsertMetadataManager.addSegment(seg02);
+    // seg02 has snapshot file, so its snapshot is taken first.
+    FileUtils.touch(new File(segDir02, V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
+
+    File segDir03 = new File(TEMP_DIR, "seg03");
+    ImmutableSegmentImpl seg03 = createImmutableSegment("seg03", segDir03, segmentsTakenSnapshot);
+    seg03.enableUpsert(upsertMetadataManager, createValidDocIds(3, 4, 7), null);
+    // just track it but not mark it as updated.
+    upsertMetadataManager.trackSegment(seg03);
+
+    // The mutable segments will be skipped.
+    MutableSegmentImpl seg04 = mock(MutableSegmentImpl.class);
+    upsertMetadataManager.addRecord(seg04, mock(RecordInfo.class));
+
+    upsertMetadataManager.doTakeSnapshot();
+    assertEquals(segmentsTakenSnapshot.size(), 2);
+    // The snapshot of seg02 was taken firstly, as it's the only segment with existing snapshot.
+    assertEquals(segmentsTakenSnapshot.get(0), "seg02");
+    // Set is used to track segments internally, so we can't assert the order of the other segments deterministically,
+    // but all 3 segments should have taken their snapshots.
+    assertTrue(segmentsTakenSnapshot.containsAll(Arrays.asList("seg01", "seg02")));
+
+    assertEquals(TEMP_DIR.list().length, 3);
+    assertTrue(segDir01.exists());
+    assertEquals(seg01.loadValidDocIdsFromSnapshot().getCardinality(), 4);
+    assertTrue(segDir02.exists());
+    assertEquals(seg02.loadValidDocIdsFromSnapshot().getCardinality(), 6);
+    assertTrue(segDir03.exists());
+    assertNull(seg03.loadValidDocIdsFromSnapshot());
+  }
+
+  // Losing segment is the one that lost all comparisons with docs from other segments, thus becomes empty of valid
+  // docs. Previously such segment was not tracked for snapshotting, but we should take snapshot of its empty bitmap.
+  @Test
+  public void testTakeSnapshotWithLosingSegment()
+      throws IOException {
+    UpsertContext upsertContext = mock(UpsertContext.class);
+    when(upsertContext.isSnapshotEnabled()).thenReturn(true);
+    DummyPartitionUpsertMetadataManager upsertMetadataManager =
+        new DummyPartitionUpsertMetadataManager("myTable", 0, upsertContext);
+
+    List<String> segmentsTakenSnapshot = new ArrayList<>();
+
+    File segDir01 = new File(TEMP_DIR, "seg01");
+    ImmutableSegmentImpl seg01 = createImmutableSegment("seg01", segDir01, segmentsTakenSnapshot);
+    seg01.enableUpsert(upsertMetadataManager, createValidDocIds(0, 1, 2, 3), null);
+    // addSegment() would track seg, and mark it as updated for snapshotting.
+    upsertMetadataManager.addSegment(seg01);
+    // seg01 has a tmp snapshot file, but no snapshot file
+    FileUtils.touch(new File(segDir01, V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME + "_tmp"));
+
+    File segDir02 = new File(TEMP_DIR, "seg02");
+    ImmutableSegmentImpl seg02 = createImmutableSegment("seg02", segDir02, segmentsTakenSnapshot);
+    seg02.enableUpsert(upsertMetadataManager, createValidDocIds(0, 1, 2, 3, 4, 5), null);
+    upsertMetadataManager.addSegment(seg02);
+    // seg02 has snapshot file, so its snapshot is taken first.
+    FileUtils.touch(new File(segDir02, V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
+
+    File segDir03 = new File(TEMP_DIR, "seg03");
+    ImmutableSegmentImpl seg03 = createImmutableSegment("seg03", segDir03, segmentsTakenSnapshot);
+    seg03.enableUpsert(upsertMetadataManager, createValidDocIds(3, 4, 7), null);
+    upsertMetadataManager.addSegment(seg03);
+
+    // The mutable segments will be skipped.
+    MutableSegmentImpl seg04 = mock(MutableSegmentImpl.class);
+    upsertMetadataManager.addRecord(seg04, mock(RecordInfo.class));
+
+    upsertMetadataManager.doTakeSnapshot();
+    assertEquals(segmentsTakenSnapshot.size(), 3);
+    // The snapshot of seg02 was taken firstly, as it's the only segment with existing snapshot.
+    assertEquals(segmentsTakenSnapshot.get(0), "seg02");
+    // Set is used to track segments internally, so we can't assert the order of the other segments deterministically,
+    // but all 3 segments should have taken their snapshots.
+    assertTrue(segmentsTakenSnapshot.containsAll(Arrays.asList("seg01", "seg02", "seg03")));
+
+    assertEquals(TEMP_DIR.list().length, 3);
+    assertTrue(segDir01.exists());
+    assertEquals(seg01.loadValidDocIdsFromSnapshot().getCardinality(), 4);
+    assertTrue(segDir02.exists());
+    assertEquals(seg02.loadValidDocIdsFromSnapshot().getCardinality(), 6);
+    assertTrue(segDir03.exists());
+    assertEquals(seg03.loadValidDocIdsFromSnapshot().getCardinality(), 3);
+  }
+
+  @Test
+  public void testConsistencyModeSync()
+      throws Exception {
+    UpsertContext upsertContext = mock(UpsertContext.class);
+    when(upsertContext.getConsistencyMode()).thenReturn(UpsertConfig.ConsistencyMode.SYNC);
+    DummyPartitionUpsertMetadataManager upsertMetadataManager =
+        new DummyPartitionUpsertMetadataManager("myTable", 0, upsertContext);
+
+    CountDownLatch latch = new CountDownLatch(1);
+    Map<IndexSegment, ThreadSafeMutableRoaringBitmap> segmentQueryableDocIdsMap = new HashMap<>();
+    IndexSegment seg01 = mock(IndexSegment.class);
+    ThreadSafeMutableRoaringBitmap validDocIds01 = createThreadSafeMutableRoaringBitmap(10);
+    AtomicBoolean called = new AtomicBoolean(false);
+    when(seg01.getValidDocIds()).then(invocationOnMock -> {
+      called.set(true);
+      latch.await();
+      return validDocIds01;
+    });
+    upsertMetadataManager.trackSegment(seg01);
+    segmentQueryableDocIdsMap.put(seg01, validDocIds01);
+
+    IndexSegment seg02 = mock(IndexSegment.class);
+    ThreadSafeMutableRoaringBitmap validDocIds02 = createThreadSafeMutableRoaringBitmap(11);
+    when(seg02.getValidDocIds()).thenReturn(validDocIds02);
+    upsertMetadataManager.trackSegment(seg02);
+    segmentQueryableDocIdsMap.put(seg02, validDocIds02);
+
+    IndexSegment seg03 = mock(IndexSegment.class);
+    ThreadSafeMutableRoaringBitmap validDocIds03 = createThreadSafeMutableRoaringBitmap(12);
+    when(seg03.getValidDocIds()).thenReturn(validDocIds03);
+    upsertMetadataManager.trackSegment(seg03);
+    segmentQueryableDocIdsMap.put(seg03, validDocIds03);
+
+    List<SegmentContext> segmentContexts = new ArrayList<>();
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    try {
+      // This thread does replaceDocId and takes WLock first.
+      executor.submit(() -> {
+        RecordInfo recordInfo = new RecordInfo(null, 5, null, false);
+        upsertMetadataManager.replaceDocId(seg03, validDocIds03, null, seg01, 0, 12, recordInfo);
+      });
+      // This thread gets segment contexts, but it's blocked until the first thread finishes replaceDocId.
+      long startMs = System.currentTimeMillis();
+      Future<Long> future = executor.submit(() -> {
+        // Check called flag to let the first thread do replaceDocId, thus get WLock, first.
+        while (!called.get()) {
+          Thread.sleep(10);
+        }
+        segmentQueryableDocIdsMap.forEach((k, v) -> segmentContexts.add(new SegmentContext(k)));
+        upsertMetadataManager.setSegmentContexts(segmentContexts, new HashMap<>());
+        return System.currentTimeMillis() - startMs;
+      });
+      // The first thread can only finish after the latch is counted down after 2s.
+      // So the 2nd thread getting segment contexts will be blocked for 2s+.
+      Thread.sleep(2000);
+      latch.countDown();
+      long duration = future.get(3, TimeUnit.SECONDS);
+      assertTrue(duration >= 2000, duration + " was less than expected");
+    } finally {
+      executor.shutdownNow();
+    }
+    assertEquals(segmentContexts.size(), 3);
+    for (SegmentContext sc : segmentContexts) {
+      ThreadSafeMutableRoaringBitmap validDocIds = segmentQueryableDocIdsMap.get(sc.getIndexSegment());
+      assertNotNull(validDocIds);
+      // SegmentContext holds a clone of the original queryableDocIds held by the segment object.
+      assertNotSame(sc.getQueryableDocIdsSnapshot(), validDocIds.getMutableRoaringBitmap());
+      assertEquals(sc.getQueryableDocIdsSnapshot(), validDocIds.getMutableRoaringBitmap());
+      // docId=0 in seg01 got invalidated.
+      if (sc.getIndexSegment() == seg01) {
+        assertFalse(sc.getQueryableDocIdsSnapshot().contains(0));
+      }
+      // docId=12 in seg03 was newly added.
+      if (sc.getIndexSegment() == seg03) {
+        assertTrue(sc.getQueryableDocIdsSnapshot().contains(12));
+      }
+    }
+  }
+
+  @Test
+  public void testConsistencyModeSnapshot()
+      throws Exception {
+    UpsertContext upsertContext = mock(UpsertContext.class);
+    when(upsertContext.getConsistencyMode()).thenReturn(UpsertConfig.ConsistencyMode.SNAPSHOT);
+    when(upsertContext.getUpsertViewRefreshIntervalMs()).thenReturn(3000L);
+    DummyPartitionUpsertMetadataManager upsertMetadataManager =
+        new DummyPartitionUpsertMetadataManager("myTable", 0, upsertContext);
+
+    CountDownLatch latch = new CountDownLatch(1);
+    Map<IndexSegment, ThreadSafeMutableRoaringBitmap> segmentQueryableDocIdsMap = new HashMap<>();
+    IndexSegment seg01 = mock(IndexSegment.class);
+    ThreadSafeMutableRoaringBitmap validDocIds01 = createThreadSafeMutableRoaringBitmap(10);
+    AtomicBoolean called = new AtomicBoolean(false);
+    when(seg01.getValidDocIds()).then(invocationOnMock -> {
+      called.set(true);
+      latch.await();
+      return validDocIds01;
+    });
+    upsertMetadataManager.trackSegment(seg01);
+    segmentQueryableDocIdsMap.put(seg01, validDocIds01);
+
+    IndexSegment seg02 = mock(IndexSegment.class);
+    ThreadSafeMutableRoaringBitmap validDocIds02 = createThreadSafeMutableRoaringBitmap(11);
+    when(seg02.getValidDocIds()).thenReturn(validDocIds02);
+    upsertMetadataManager.trackSegment(seg02);
+    segmentQueryableDocIdsMap.put(seg02, validDocIds02);
+
+    IndexSegment seg03 = mock(IndexSegment.class);
+    ThreadSafeMutableRoaringBitmap validDocIds03 = createThreadSafeMutableRoaringBitmap(12);
+    when(seg03.getValidDocIds()).thenReturn(validDocIds03);
+    upsertMetadataManager.trackSegment(seg03);
+    segmentQueryableDocIdsMap.put(seg03, validDocIds03);
+
+    List<SegmentContext> segmentContexts = new ArrayList<>();
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    try {
+      // This thread does replaceDocId and takes WLock first, and it'll refresh the upsert view
+      executor.submit(() -> {
+        RecordInfo recordInfo = new RecordInfo(null, 5, null, false);
+        upsertMetadataManager.replaceDocId(seg03, validDocIds03, null, seg01, 0, 12, recordInfo);
+      });
+      // This thread gets segment contexts, but it's blocked until the first thread finishes replaceDocId.
+      long startMs = System.currentTimeMillis();
+      Future<Long> future = executor.submit(() -> {
+        // Check called flag to let the first thread do replaceDocId, thus get WLock, first.
+        while (!called.get()) {
+          Thread.sleep(10);
+        }
+        segmentQueryableDocIdsMap.forEach((k, v) -> segmentContexts.add(new SegmentContext(k)));
+        // This thread reuses the upsert view refreshed by the first thread above.
+        upsertMetadataManager.setSegmentContexts(segmentContexts, new HashMap<>());
+        return System.currentTimeMillis() - startMs;
+      });
+      // The first thread can only finish after the latch is counted down after 2s.
+      // So the 2nd thread getting segment contexts will be blocked for 2s+.
+      Thread.sleep(2000);
+      latch.countDown();
+      long duration = future.get(3, TimeUnit.SECONDS);
+      assertTrue(duration >= 2000, duration + " was less than expected");
+    } finally {
+      executor.shutdownNow();
+    }
+    assertEquals(segmentContexts.size(), 3);
+    assertEquals(upsertMetadataManager.getSegmentQueryableDocIdsMap().size(), 3);
+    assertTrue(upsertMetadataManager.getUpdatedSegmentsSinceLastRefresh().isEmpty());
+
+    // Get the upsert view again, and the existing bitmap objects should be set in segment contexts.
+    // The segmentContexts initialized above holds the same bitmaps objects as from the upsert view.
+    List<SegmentContext> reuseSegmentContexts = new ArrayList<>();
+    segmentQueryableDocIdsMap.forEach((k, v) -> reuseSegmentContexts.add(new SegmentContext(k)));
+    upsertMetadataManager.setSegmentContexts(reuseSegmentContexts, new HashMap<>());
+    for (SegmentContext reuseSC : reuseSegmentContexts) {
+      for (SegmentContext sc : segmentContexts) {
+        if (reuseSC.getIndexSegment() == sc.getIndexSegment()) {
+          assertSame(reuseSC.getQueryableDocIdsSnapshot(), sc.getQueryableDocIdsSnapshot());
+        }
+      }
+      ThreadSafeMutableRoaringBitmap validDocIds = segmentQueryableDocIdsMap.get(reuseSC.getIndexSegment());
+      assertNotNull(validDocIds);
+      // The upsert view holds a clone of the original queryableDocIds held by the segment object.
+      assertNotSame(reuseSC.getQueryableDocIdsSnapshot(), validDocIds.getMutableRoaringBitmap());
+      assertEquals(reuseSC.getQueryableDocIdsSnapshot(), validDocIds.getMutableRoaringBitmap());
+      // docId=0 in seg01 got invalidated.
+      if (reuseSC.getIndexSegment() == seg01) {
+        assertFalse(reuseSC.getQueryableDocIdsSnapshot().contains(0));
+      }
+      // docId=12 in seg03 was newly added.
+      if (reuseSC.getIndexSegment() == seg03) {
+        assertTrue(reuseSC.getQueryableDocIdsSnapshot().contains(12));
+      }
+    }
+
+    // Force refresh the upsert view when getting it, so different bitmap objects should be set in segment contexts.
+    upsertMetadataManager.getUpdatedSegmentsSinceLastRefresh().addAll(Arrays.asList(seg01, seg02, seg03));
+    List<SegmentContext> refreshSegmentContexts = new ArrayList<>();
+    segmentQueryableDocIdsMap.forEach((k, v) -> refreshSegmentContexts.add(new SegmentContext(k)));
+    Map<String, String> queryOptions = new HashMap<>();
+    queryOptions.put("upsertViewFreshnessMs", "0");
+    upsertMetadataManager.setSegmentContexts(refreshSegmentContexts, queryOptions);
+    for (SegmentContext refreshSC : refreshSegmentContexts) {
+      for (SegmentContext sc : segmentContexts) {
+        if (refreshSC.getIndexSegment() == sc.getIndexSegment()) {
+          assertNotSame(refreshSC.getQueryableDocIdsSnapshot(), sc.getQueryableDocIdsSnapshot());
+        }
+      }
+      ThreadSafeMutableRoaringBitmap validDocIds = segmentQueryableDocIdsMap.get(refreshSC.getIndexSegment());
+      assertNotNull(validDocIds);
+      // The upsert view holds a clone of the original queryableDocIds held by the segment object.
+      assertNotSame(refreshSC.getQueryableDocIdsSnapshot(), validDocIds.getMutableRoaringBitmap());
+      assertEquals(refreshSC.getQueryableDocIdsSnapshot(), validDocIds.getMutableRoaringBitmap());
+      // docId=0 in seg01 got invalidated.
+      if (refreshSC.getIndexSegment() == seg01) {
+        assertFalse(refreshSC.getQueryableDocIdsSnapshot().contains(0));
+      }
+      // docId=12 in seg03 was newly added.
+      if (refreshSC.getIndexSegment() == seg03) {
+        assertTrue(refreshSC.getQueryableDocIdsSnapshot().contains(12));
+      }
+    }
+  }
+
+  @Test
+  public void testConsistencyModeSnapshotWithUntrackedSegments()
+      throws Exception {
+    UpsertContext upsertContext = mock(UpsertContext.class);
+    when(upsertContext.getConsistencyMode()).thenReturn(UpsertConfig.ConsistencyMode.SNAPSHOT);
+    when(upsertContext.getUpsertViewRefreshIntervalMs()).thenReturn(3000L);
+    DummyPartitionUpsertMetadataManager upsertMetadataManager =
+        new DummyPartitionUpsertMetadataManager("myTable", 0, upsertContext);
+
+    CountDownLatch latch = new CountDownLatch(1);
+    Map<IndexSegment, ThreadSafeMutableRoaringBitmap> segmentQueryableDocIdsMap = new HashMap<>();
+    IndexSegment seg01 = mock(IndexSegment.class);
+    ThreadSafeMutableRoaringBitmap validDocIds01 = createThreadSafeMutableRoaringBitmap(10);
+    AtomicBoolean called = new AtomicBoolean(false);
+    when(seg01.getValidDocIds()).thenReturn(validDocIds01);
+    upsertMetadataManager.trackSegment(seg01);
+    segmentQueryableDocIdsMap.put(seg01, validDocIds01);
+
+    IndexSegment seg02 = mock(IndexSegment.class);
+    ThreadSafeMutableRoaringBitmap validDocIds02 = createThreadSafeMutableRoaringBitmap(11);
+    when(seg02.getValidDocIds()).thenReturn(validDocIds02);
+    upsertMetadataManager.trackSegment(seg02);
+    segmentQueryableDocIdsMap.put(seg02, validDocIds02);
+
+    IndexSegment seg03 = mock(IndexSegment.class);
+    ThreadSafeMutableRoaringBitmap validDocIds03 = createThreadSafeMutableRoaringBitmap(12);
+    when(seg03.getValidDocIds()).thenReturn(validDocIds03);
+    upsertMetadataManager.trackSegment(seg03);
+    segmentQueryableDocIdsMap.put(seg03, validDocIds03);
+
+    RecordInfo recordInfo = new RecordInfo(null, 5, null, false);
+    upsertMetadataManager.replaceDocId(seg03, validDocIds03, null, seg01, 0, 12, recordInfo);
+
+    List<SegmentContext> segmentContexts = new ArrayList<>();
+    segmentQueryableDocIdsMap.forEach((k, v) -> segmentContexts.add(new SegmentContext(k)));
+    upsertMetadataManager.setSegmentContexts(segmentContexts, new HashMap<>());
+    assertEquals(segmentContexts.size(), 3);
+    assertEquals(upsertMetadataManager.getSegmentQueryableDocIdsMap().size(), 3);
+
+    // We can force to refresh the upsert view by clearing up the current upsert view, even though there are no updated
+    // segments tracked in _updatedSegmentsSinceLastRefresh.
+    assertTrue(upsertMetadataManager.getUpdatedSegmentsSinceLastRefresh().isEmpty());
+    upsertMetadataManager.getSegmentQueryableDocIdsMap().clear();
+
+    List<SegmentContext> refreshSegmentContexts = new ArrayList<>();
+    segmentQueryableDocIdsMap.forEach((k, v) -> refreshSegmentContexts.add(new SegmentContext(k)));
+    Map<String, String> queryOptions = new HashMap<>();
+    queryOptions.put("upsertViewFreshnessMs", "0");
+    upsertMetadataManager.setSegmentContexts(refreshSegmentContexts, queryOptions);
+    for (SegmentContext refreshSC : refreshSegmentContexts) {
+      for (SegmentContext sc : segmentContexts) {
+        if (refreshSC.getIndexSegment() == sc.getIndexSegment()) {
+          assertNotSame(refreshSC.getQueryableDocIdsSnapshot(), sc.getQueryableDocIdsSnapshot());
+        }
+      }
+      ThreadSafeMutableRoaringBitmap validDocIds = segmentQueryableDocIdsMap.get(refreshSC.getIndexSegment());
+      assertNotNull(validDocIds);
+      // The upsert view holds a clone of the original queryableDocIds held by the segment object.
+      assertNotSame(refreshSC.getQueryableDocIdsSnapshot(), validDocIds.getMutableRoaringBitmap());
+      assertEquals(refreshSC.getQueryableDocIdsSnapshot(), validDocIds.getMutableRoaringBitmap());
+      // docId=0 in seg01 got invalidated.
+      if (refreshSC.getIndexSegment() == seg01) {
+        assertFalse(refreshSC.getQueryableDocIdsSnapshot().contains(0));
+      }
+      // docId=12 in seg03 was newly added.
+      if (refreshSC.getIndexSegment() == seg03) {
+        assertTrue(refreshSC.getQueryableDocIdsSnapshot().contains(12));
+      }
+    }
+  }
+
+  private static ThreadSafeMutableRoaringBitmap createThreadSafeMutableRoaringBitmap(int docCnt) {
+    ThreadSafeMutableRoaringBitmap bitmap = new ThreadSafeMutableRoaringBitmap();
+    for (int i = 0; i < docCnt; i++) {
+      bitmap.add(i);
+    }
+    return bitmap;
   }
 
   @Test
@@ -310,7 +699,7 @@ public class BasePartitionUpsertMetadataManagerTest {
     }
 
     @Override
-    protected void addOrReplaceSegment(ImmutableSegmentImpl segment, ThreadSafeMutableRoaringBitmap validDocIds,
+    protected void doAddOrReplaceSegment(ImmutableSegmentImpl segment, ThreadSafeMutableRoaringBitmap validDocIds,
         @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, Iterator<RecordInfo> recordInfoIterator,
         @Nullable IndexSegment oldSegment, @Nullable MutableRoaringBitmap validDocIdsForOldSegment) {
     }

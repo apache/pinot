@@ -44,7 +44,7 @@ public class ControllerApplicationException extends WebApplicationException {
       if (e == null) {
         logger.info(message);
       } else {
-        logger.info(message + " exception: " + e.getMessage());
+        logger.info("{} exception: {}", message, e.getMessage());
       }
     } else {
       if (e == null) {

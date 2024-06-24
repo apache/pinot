@@ -1,0 +1,102 @@
+//
+// Licensed to the Apache Software Foundation (ASF) under one
+// or more contributor license agreements.  See the NOTICE file
+// distributed with this work for additional information
+// regarding copyright ownership.  The ASF licenses this file
+// to you under the Apache License, Version 2.0 (the
+// "License"); you may not use this file except in compliance
+// with the License.  You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
+//
+
+syntax = "proto3";
+
+package org.apache.pinot.common.proto;
+
+enum ColumnDataType {
+  INT = 0;
+  LONG = 1;
+  FLOAT = 2;
+  DOUBLE = 3;
+  BIG_DECIMAL = 4;
+  BOOLEAN = 5;
+  TIMESTAMP = 6;
+  STRING = 7;
+  JSON = 8;
+  BYTES = 9;
+  OBJECT = 10;
+  INT_ARRAY = 11;
+  LONG_ARRAY = 12;
+  FLOAT_ARRAY = 13;
+  DOUBLE_ARRAY = 14;
+  BOOLEAN_ARRAY = 15;
+  TIMESTAMP_ARRAY = 16;
+  STRING_ARRAY = 17;
+  BYTES_ARRAY = 18;
+  UNKNOWN = 19;
+}
+
+message InputRef {
+  int32 index = 1;
+}
+
+message Literal {
+  ColumnDataType dataType = 1;
+  oneof value {
+    bool null = 2;
+    int32 int = 3;
+    int64 long = 4;
+    float float = 5;
+    double double = 6;
+    string string = 7;
+    bytes bytes = 8;
+    IntArray intArray = 9;
+    LongArray longArray = 10;
+    FloatArray floatArray = 11;
+    DoubleArray doubleArray = 12;
+    StringArray stringArray = 13;
+  }
+}
+
+message IntArray {
+  repeated int32 values = 1;
+}
+
+message LongArray {
+  repeated int64 values = 1;
+}
+
+message FloatArray {
+  repeated float values = 1;
+}
+
+message DoubleArray {
+  repeated double values = 1;
+}
+
+message StringArray {
+  repeated string values = 1;
+}
+
+message FunctionCall {
+  ColumnDataType dataType = 1;
+  string functionName = 2;
+  repeated Expression functionOperands = 3;
+  bool isDistinct = 4;
+}
+
+message Expression {
+  oneof expression {
+    InputRef inputRef = 1;
+    Literal literal = 2;
+    FunctionCall functionCall = 3;
+  }
+}

@@ -21,9 +21,15 @@ package org.apache.pinot.common.utils.request;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
+import it.unimi.dsi.fastutil.ints.IntArrayList;
+import it.unimi.dsi.fastutil.longs.LongArrayList;
 import java.math.BigDecimal;
+import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -31,7 +37,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
+import javax.annotation.Nullable;
 import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.SqlNumericLiteral;
 import org.apache.commons.lang3.StringUtils;
@@ -99,8 +105,116 @@ public class RequestUtils {
     return expression;
   }
 
-  public static Expression getLiteralExpression(SqlLiteral node) {
-    Expression expression = new Expression(ExpressionType.LITERAL);
+  public static Literal getNullLiteral() {
+    return Literal.nullValue(true);
+  }
+
+  public static Literal getLiteral(boolean value) {
+    return Literal.boolValue(value);
+  }
+
+  public static Literal getLiteral(int value) {
+    return Literal.intValue(value);
+  }
+
+  public static Literal getLiteral(long value) {
+    return Literal.longValue(value);
+  }
+
+  public static Literal getLiteral(float value) {
+    return Literal.floatValue(Float.floatToRawIntBits(value));
+  }
+
+  public static Literal getLiteral(double value) {
+    return Literal.doubleValue(value);
+  }
+
+  public static Literal getLiteral(BigDecimal value) {
+    return Literal.bigDecimalValue(BigDecimalUtils.serialize(value));
+  }
+
+  public static Literal getLiteral(String value) {
+    return Literal.stringValue(value);
+  }
+
+  public static Literal getLiteral(byte[] value) {
+    return Literal.binaryValue(value);
+  }
+
+  public static Literal getLiteral(int[] value) {
+    return Literal.intArrayValue(IntArrayList.wrap(value));
+  }
+
+  public static Literal getLiteral(long[] value) {
+    return Literal.longArrayValue(LongArrayList.wrap(value));
+  }
+
+  public static Literal getLiteral(float[] value) {
+    IntArrayList intBitsList = new IntArrayList(value.length);
+    for (float floatValue : value) {
+      intBitsList.add(Float.floatToRawIntBits(floatValue));
+    }
+    return Literal.floatArrayValue(intBitsList);
+  }
+
+  public static Literal getLiteral(double[] value) {
+    return Literal.doubleArrayValue(DoubleArrayList.wrap(value));
+  }
+
+  public static Literal getLiteral(String[] value) {
+    return Literal.stringArrayValue(Arrays.asList(value));
+  }
+
+  public static Literal getLiteral(@Nullable Object object) {
+    if (object == null) {
+      return getNullLiteral();
+    }
+    if (object instanceof Boolean) {
+      return getLiteral((boolean) object);
+    }
+    if (object instanceof Integer) {
+      return getLiteral((int) object);
+    }
+    if (object instanceof Long) {
+      return getLiteral((long) object);
+    }
+    if (object instanceof Float) {
+      return getLiteral((float) object);
+    }
+    if (object instanceof Double) {
+      return getLiteral((double) object);
+    }
+    if (object instanceof BigDecimal) {
+      return getLiteral((BigDecimal) object);
+    }
+    if (object instanceof Timestamp) {
+      return getLiteral(((Timestamp) object).getTime());
+    }
+    if (object instanceof String) {
+      return getLiteral((String) object);
+    }
+    if (object instanceof byte[]) {
+      return getLiteral((byte[]) object);
+    }
+    if (object instanceof int[]) {
+      return getLiteral((int[]) object);
+    }
+    if (object instanceof long[]) {
+      return getLiteral((long[]) object);
+    }
+    if (object instanceof float[]) {
+      return getLiteral((float[]) object);
+    }
+    if (object instanceof double[]) {
+      return getLiteral((double[]) object);
+    }
+    if (object instanceof String[]) {
+      return getLiteral((String[]) object);
+    }
+    return getLiteral(object.toString());
+  }
+
+  public static Literal getLiteral(SqlLiteral node) {
     Literal literal = new Literal();
     if (node instanceof SqlNumericLiteral) {
       BigDecimal bigDecimalValue = node.bigDecimalValue();
@@ -108,14 +222,11 @@ public class RequestUtils {
       SqlNumericLiteral sqlNumericLiteral = (SqlNumericLiteral) node;
       if (sqlNumericLiteral.isExact() && sqlNumericLiteral.isInteger()) {
         long longValue = bigDecimalValue.longValue();
-        /* TODO: Uncomment this after releasing 1.1 because server side int support is added after releasing 1.0
         if (longValue <= Integer.MAX_VALUE && longValue >= Integer.MIN_VALUE) {
           literal.setIntValue((int) longValue);
         } else {
           literal.setLongValue(longValue);
         }
-         */
-        literal.setLongValue(longValue);
       } else {
         // TODO: Support exact decimal value
         literal.setDoubleValue(bigDecimalValue.doubleValue());
@@ -133,156 +244,156 @@ public class RequestUtils {
           break;
       }
     }
-    expression.setLiteral(literal);
-    return expression;
+    return literal;
   }
 
-  public static Expression createNewLiteralExpression() {
+  public static Expression getLiteralExpression(Literal literal) {
     Expression expression = new Expression(ExpressionType.LITERAL);
-    Literal literal = new Literal();
     expression.setLiteral(literal);
-    return expression;
-  }
-
-  public static Expression getLiteralExpression(boolean value) {
-    Expression expression = createNewLiteralExpression();
-    expression.getLiteral().setBoolValue(value);
-    return expression;
-  }
-
-  /* TODO: Uncomment this after releasing 1.1 because server side int support is added after releasing 1.0
-  public static Expression getLiteralExpression(int value) {
-    Expression expression = createNewLiteralExpression();
-    expression.getLiteral().setIntValue(value);
-    return expression;
-  }
-   */
-
-  public static Expression getLiteralExpression(long value) {
-    Expression expression = createNewLiteralExpression();
-    expression.getLiteral().setLongValue(value);
-    return expression;
-  }
-
-  /* TODO: Uncomment this after releasing 1.1 because float is added after releasing 1.0
-  public static Expression getLiteralExpression(float value) {
-    Expression expression = createNewLiteralExpression();
-    expression.getLiteral().setFloatValue(Float.floatToRawIntBits(value));
-    return expression;
-  }
-   */
-
-  public static Expression getLiteralExpression(double value) {
-    Expression expression = createNewLiteralExpression();
-    expression.getLiteral().setDoubleValue(value);
-    return expression;
-  }
-
-  public static Expression getLiteralExpression(String value) {
-    Expression expression = createNewLiteralExpression();
-    expression.getLiteral().setStringValue(value);
-    return expression;
-  }
-
-  public static Expression getLiteralExpression(byte[] value) {
-    Expression expression = createNewLiteralExpression();
-    // TODO(After 1.0.0): This is for backward-compatibility, we can set the binary value directly instead of
-    //  converting it to hex string after the next released version.
-    expression.getLiteral().setStringValue(BytesUtils.toHexString(value));
-    return expression;
-  }
-
-  public static Expression getLiteralExpression(BigDecimal value) {
-    Expression expression = createNewLiteralExpression();
-    expression.getLiteral().setBigDecimalValue(BigDecimalUtils.serialize(value));
-    return expression;
-  }
-
-  public static Expression getLiteralExpression(int[] value) {
-    Expression expression = createNewLiteralExpression();
-    expression.getLiteral().setIntArrayValue(Arrays.stream(value).boxed().collect(Collectors.toList()));
-    return expression;
-  }
-
-  public static Expression getLiteralExpression(long[] value) {
-    Expression expression = createNewLiteralExpression();
-    expression.getLiteral().setLongArrayValue(Arrays.stream(value).boxed().collect(Collectors.toList()));
-    return expression;
-  }
-
-  public static Expression getLiteralExpression(float[] value) {
-    Expression expression = createNewLiteralExpression();
-    expression.getLiteral().setFloatArrayValue(
-        IntStream.range(0, value.length).mapToObj(i -> Float.floatToRawIntBits(value[i])).collect(Collectors.toList()));
-    return expression;
-  }
-
-  public static Expression getLiteralExpression(double[] value) {
-    Expression expression = createNewLiteralExpression();
-    expression.getLiteral().setDoubleArrayValue(Arrays.stream(value).boxed().collect(Collectors.toList()));
-    return expression;
-  }
-
-  public static Expression getLiteralExpression(String[] value) {
-    Expression expression = createNewLiteralExpression();
-    expression.getLiteral().setStringArrayValue(Arrays.asList(value));
     return expression;
   }
 
   public static Expression getNullLiteralExpression() {
-    Expression expression = createNewLiteralExpression();
-    expression.getLiteral().setNullValue(true);
-    return expression;
+    return getLiteralExpression(getNullLiteral());
   }
 
-  public static Expression getLiteralExpression(Object object) {
-    if (object == null) {
-      return getNullLiteralExpression();
+  public static Expression getLiteralExpression(boolean value) {
+    return getLiteralExpression(getLiteral(value));
+  }
+
+  public static Expression getLiteralExpression(int value) {
+    return getLiteralExpression(getLiteral(value));
+  }
+
+  public static Expression getLiteralExpression(long value) {
+    return getLiteralExpression(getLiteral(value));
+  }
+
+  public static Expression getLiteralExpression(float value) {
+    return getLiteralExpression(getLiteral(value));
+  }
+
+  public static Expression getLiteralExpression(double value) {
+    return getLiteralExpression(getLiteral(value));
+  }
+
+  public static Expression getLiteralExpression(BigDecimal value) {
+    return getLiteralExpression(getLiteral(value));
+  }
+
+  public static Expression getLiteralExpression(String value) {
+    return getLiteralExpression(getLiteral(value));
+  }
+
+  public static Expression getLiteralExpression(byte[] value) {
+    return getLiteralExpression(getLiteral(value));
+  }
+
+  public static Expression getLiteralExpression(int[] value) {
+    return getLiteralExpression(getLiteral(value));
+  }
+
+  public static Expression getLiteralExpression(long[] value) {
+    return getLiteralExpression(getLiteral(value));
+  }
+
+  public static Expression getLiteralExpression(float[] value) {
+    return getLiteralExpression(getLiteral(value));
+  }
+
+  public static Expression getLiteralExpression(double[] value) {
+    return getLiteralExpression(getLiteral(value));
+  }
+
+  public static Expression getLiteralExpression(String[] value) {
+    return getLiteralExpression(getLiteral(value));
+  }
+
+  public static Expression getLiteralExpression(SqlLiteral node) {
+    return getLiteralExpression(getLiteral(node));
+  }
+
+  public static Expression getLiteralExpression(@Nullable Object object) {
+    return getLiteralExpression(getLiteral(object));
+  }
+
+  /**
+   * Returns the value of the given literal.
+   */
+  @Nullable
+  public static Object getLiteralValue(Literal literal) {
+    Literal._Fields type = literal.getSetField();
+    switch (type) {
+      case NULL_VALUE:
+        return null;
+      case BOOL_VALUE:
+        return literal.getBoolValue();
+      case INT_VALUE:
+        return literal.getIntValue();
+      case LONG_VALUE:
+        return literal.getLongValue();
+      case FLOAT_VALUE:
+        return Float.intBitsToFloat(literal.getFloatValue());
+      case DOUBLE_VALUE:
+        return literal.getDoubleValue();
+      case BIG_DECIMAL_VALUE:
+        return BigDecimalUtils.deserialize(literal.getBigDecimalValue());
+      case STRING_VALUE:
+        return literal.getStringValue();
+      case BINARY_VALUE:
+        return literal.getBinaryValue();
+      case INT_ARRAY_VALUE:
+        return literal.getIntArrayValue().stream().mapToInt(Integer::intValue).toArray();
+      case LONG_ARRAY_VALUE:
+        return literal.getLongArrayValue().stream().mapToLong(Long::longValue).toArray();
+      case FLOAT_ARRAY_VALUE:
+        List<Integer> floatList = literal.getFloatArrayValue();
+        int numFloats = floatList.size();
+        float[] floatArray = new float[numFloats];
+        for (int i = 0; i < numFloats; i++) {
+          floatArray[i] = Float.intBitsToFloat(floatList.get(i));
+        }
+        return floatArray;
+      case DOUBLE_ARRAY_VALUE:
+        return literal.getDoubleArrayValue().stream().mapToDouble(Double::doubleValue).toArray();
+      case STRING_ARRAY_VALUE:
+        return literal.getStringArrayValue().toArray(new String[0]);
+      default:
+        throw new IllegalStateException("Unsupported field type: " + type);
     }
-    /* TODO: Uncomment this after releasing 1.1 because server side int support is added after releasing 1.0
-    if (object instanceof Integer) {
-      return RequestUtils.getLiteralExpression((int) object);
+  }
+
+  /**
+   * Returns the string representation of the given literal.
+   */
+  public static String getLiteralString(Literal literal) {
+    Literal._Fields type = literal.getSetField();
+    switch (type) {
+      case BOOL_VALUE:
+        return Boolean.toString(literal.getBoolValue());
+      case INT_VALUE:
+        return Integer.toString(literal.getIntValue());
+      case LONG_VALUE:
+        return Long.toString(literal.getLongValue());
+      case FLOAT_VALUE:
+        return Float.toString(Float.intBitsToFloat(literal.getFloatValue()));
+      case DOUBLE_VALUE:
+        return Double.toString(literal.getDoubleValue());
+      case BIG_DECIMAL_VALUE:
+        return BigDecimalUtils.deserialize(literal.getBigDecimalValue()).toPlainString();
+      case STRING_VALUE:
+        return literal.getStringValue();
+      case BINARY_VALUE:
+        return BytesUtils.toHexString(literal.getBinaryValue());
+      default:
+        throw new IllegalStateException("Unsupported string representation of field type: " + type);
     }
-    if (object instanceof Long) {
-      return RequestUtils.getLiteralExpression((long) object);
-    }
-     */
-    if (object instanceof Integer || object instanceof Long) {
-      return RequestUtils.getLiteralExpression(((Number) object).longValue());
-    }
-    if (object instanceof Float) {
-      // We need to use Double.parseDouble(object.toString()) instead of ((Number) object).doubleValue()
-      // or ((Float) object).doubleValue() because the latter two will return slightly different values
-      // For example, if object is 0.06f, Double.parseDouble(object.toString()) will return 0.06, while
-      // ((Number) object).doubleValue() or ((Float) object).doubleValue() will return 0.05999999865889549
-      // TODO: Switch to RequestUtils.getLiteralExpression(float value) after releasing 1.1
-      return RequestUtils.getLiteralExpression(Double.parseDouble(object.toString()));
-    }
-    if (object instanceof Double) {
-      return RequestUtils.getLiteralExpression((double) object);
-    }
-    if (object instanceof byte[]) {
-      return RequestUtils.getLiteralExpression((byte[]) object);
-    }
-    if (object instanceof Boolean) {
-      return RequestUtils.getLiteralExpression((boolean) object);
-    }
-    if (object instanceof int[]) {
-      return RequestUtils.getLiteralExpression((int[]) object);
-    }
-    if (object instanceof long[]) {
-      return RequestUtils.getLiteralExpression((long[]) object);
-    }
-    if (object instanceof float[]) {
-      return RequestUtils.getLiteralExpression((float[]) object);
-    }
-    if (object instanceof double[]) {
-      return RequestUtils.getLiteralExpression((double[]) object);
-    }
-    if (object instanceof String[]) {
-      return RequestUtils.getLiteralExpression((String[]) object);
-    }
-    return RequestUtils.getLiteralExpression(object.toString());
+  }
+
+  public static String getLiteralString(Expression expression) {
+    Literal literal = expression.getLiteral();
+    Preconditions.checkArgument(literal != null, "Got non-literal expression: %s", expression);
+    return getLiteralString(literal);
   }
 
   public static Function getFunction(String canonicalName, List<Expression> operands) {
@@ -340,25 +451,23 @@ public class RequestUtils {
   private static final Map<String, String> CANONICAL_NAME_TO_SPECIAL_KEY_MAP;
 
   static {
-    CANONICAL_NAME_TO_SPECIAL_KEY_MAP = new HashMap<>();
+    ImmutableMap.Builder<String, String> builder = ImmutableMap.builder();
     for (FilterKind filterKind : FilterKind.values()) {
-      CANONICAL_NAME_TO_SPECIAL_KEY_MAP.put(canonicalizeFunctionName(filterKind.name()), filterKind.name());
+      builder.put(canonicalizeFunctionName(filterKind.name()), filterKind.name());
     }
-    CANONICAL_NAME_TO_SPECIAL_KEY_MAP.put("stdistance", "st_distance");
+    CANONICAL_NAME_TO_SPECIAL_KEY_MAP = builder.build();
   }
 
   /**
    * Converts the function name into its canonical form, but preserving the special keys.
    * - Keep FilterKind.name() as is because we need to read the FilterKind via FilterKind.valueOf().
-   * - Keep ST_Distance as is because we use exact match when applying geo-spatial index up to release 0.10.0.
-   * TODO: Remove the ST_Distance special handling after releasing 0.11.0.
    */
   public static String canonicalizeFunctionNamePreservingSpecialKey(String functionName) {
     String canonicalName = canonicalizeFunctionName(functionName);
     return CANONICAL_NAME_TO_SPECIAL_KEY_MAP.getOrDefault(canonicalName, canonicalName);
   }
 
-  public static String prettyPrint(Expression expression) {
+  public static String prettyPrint(@Nullable Expression expression) {
     if (expression == null) {
       return "null";
     }
@@ -366,14 +475,7 @@ public class RequestUtils {
       return expression.getIdentifier().getName();
     }
     if (expression.getLiteral() != null) {
-      /* TODO: Uncomment this after releasing 1.1 because server side int support is added after releasing 1.0
-      if (expression.getLiteral().isSetIntValue()) {
-        return Integer.toString(expression.getLiteral().getIntValue());
-      )
-       */
-      if (expression.getLiteral().isSetLongValue()) {
-        return Long.toString(expression.getLiteral().getLongValue());
-      }
+      return prettyPrint(expression.getLiteral());
     }
     if (expression.getFunctionCall() != null) {
       String res = expression.getFunctionCall().getOperator() + "(";
@@ -389,7 +491,44 @@ public class RequestUtils {
       res += ")";
       return res;
     }
-    return null;
+    throw new IllegalStateException("Unsupported expression type: " + expression.getType());
+  }
+
+  public static String prettyPrint(Literal literal) {
+    Literal._Fields type = literal.getSetField();
+    switch (type) {
+      case NULL_VALUE:
+        return "null";
+      case BOOL_VALUE:
+        return Boolean.toString(literal.getBoolValue());
+      case INT_VALUE:
+        return Integer.toString(literal.getIntValue());
+      case LONG_VALUE:
+        return Long.toString(literal.getLongValue());
+      case FLOAT_VALUE:
+        return Float.toString(Float.intBitsToFloat(literal.getFloatValue()));
+      case DOUBLE_VALUE:
+        return Double.toString(literal.getDoubleValue());
+      case BIG_DECIMAL_VALUE:
+        return BigDecimalUtils.deserialize(literal.getBigDecimalValue()).toPlainString();
+      case STRING_VALUE:
+        return "'" + literal.getStringValue() + "'";
+      case BINARY_VALUE:
+        return "X'" + BytesUtils.toHexString(literal.getBinaryValue()) + "'";
+      case INT_ARRAY_VALUE:
+        return literal.getIntArrayValue().toString();
+      case LONG_ARRAY_VALUE:
+        return literal.getLongArrayValue().toString();
+      case FLOAT_ARRAY_VALUE:
+        return literal.getFloatArrayValue().stream().map(Float::intBitsToFloat).collect(Collectors.toList()).toString();
+      case DOUBLE_ARRAY_VALUE:
+        return literal.getDoubleArrayValue().toString();
+      case STRING_ARRAY_VALUE:
+        return literal.getStringArrayValue().stream().map(value -> "'" + value + "'").collect(Collectors.toList())
+            .toString();
+      default:
+        throw new IllegalStateException("Unsupported field type: " + type);
+    }
   }
 
   private static Set<String> getTableNames(DataSource dataSource) {

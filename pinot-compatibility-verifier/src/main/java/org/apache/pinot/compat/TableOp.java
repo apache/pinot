@@ -21,6 +21,7 @@ package org.apache.pinot.compat;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.Charset;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -88,15 +89,17 @@ public class TableOp extends BaseOp {
   boolean runOp(int generationNumber) {
     switch (_op) {
       case CREATE:
-        createSchema();
+        if (!createSchema()) {
+          return false;
+        }
         return createTable();
       case DELETE:
         return deleteTable();
       case UPDATE_CONFIG:
-        System.out.println("Updating table config to " + _tableConfigFileName);
+        LOGGER.info("Updating table config to {}", _tableConfigFileName);
         break;
       case UPDATE_SCHEMA:
-        System.out.println("Updating schema to " + _schemaFileName);
+        LOGGER.info("Updating schema to {}", _schemaFileName);
         break;
       default:
         break;
@@ -106,12 +109,13 @@ public class TableOp extends BaseOp {
 
   private boolean createSchema() {
     try {
-      Map<String, String> headers = new HashMap<String, String>() {{
+      Map<String, String> headers = new HashMap<>() {{
         put("Content-type", "application/json");
       }};
       ControllerTest.sendPostRequestRaw(
           ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.getInstance().getControllerUrl()).forSchemaCreate(),
-          FileUtils.readFileToString(new File(getAbsoluteFileName(_schemaFileName))), headers);
+          FileUtils.readFileToString(new File(getAbsoluteFileName(_schemaFileName)), Charset.defaultCharset()),
+          headers);
       return true;
     } catch (IOException e) {
       LOGGER.error("Failed to create schema with file: {}", _schemaFileName, e);
@@ -123,7 +127,8 @@ public class TableOp extends BaseOp {
     try {
       ControllerTest.sendPostRequestRaw(
           ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.getInstance().getControllerUrl()).forTableCreate(),
-          FileUtils.readFileToString(new File(getAbsoluteFileName(_tableConfigFileName))), Collections.emptyMap());
+          FileUtils.readFileToString(new File(getAbsoluteFileName(_tableConfigFileName)), Charset.defaultCharset()),
+          Collections.emptyMap());
       return true;
     } catch (IOException e) {
       LOGGER.error("Failed to create table with file: {}", _tableConfigFileName, e);

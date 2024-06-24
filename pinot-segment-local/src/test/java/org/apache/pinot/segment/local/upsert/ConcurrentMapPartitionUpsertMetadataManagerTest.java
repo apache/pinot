@@ -34,6 +34,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.utils.UploadedRealtimeSegmentName;
 import org.apache.pinot.segment.local.indexsegment.immutable.EmptyIndexSegment;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
@@ -378,6 +379,143 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     verifyAddReplaceRemoveSegmentWithRecordDelete(HashFunction.MURMUR3, true);
   }
 
+  @Test
+  public void verifyAddReplaceUploadedSegment1()
+      throws IOException {
+    ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
+        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0,
+            _contextBuilder.setHashFunction(HashFunction.NONE).build());
+    Map<Object, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
+    Set<IndexSegment> trackedSegments = upsertMetadataManager._trackedSegments;
+
+    // Add the first segment
+    int numRecords = 6;
+    int[] primaryKeys = new int[]{0, 1, 2, 0, 1, 0};
+    int[] timestamps = new int[]{100, 100, 100, 80, 120, 100};
+    ThreadSafeMutableRoaringBitmap validDocIds1 = new ThreadSafeMutableRoaringBitmap();
+    List<PrimaryKey> primaryKeys1 = getPrimaryKeyList(numRecords, primaryKeys);
+    SegmentMetadataImpl segmentMetadata = mock(SegmentMetadataImpl.class);
+    when(segmentMetadata.getIndexCreationTime()).thenReturn(1000L);
+    ImmutableSegmentImpl segment1 =
+        mockImmutableSegmentWithSegmentMetadata(1, validDocIds1, null, primaryKeys1, segmentMetadata, null);
+    List<RecordInfo> recordInfoList1;
+    // get recordInfo by iterating all records.
+    recordInfoList1 = getRecordInfoList(numRecords, primaryKeys, timestamps, null);
+    upsertMetadataManager.addSegment(segment1, validDocIds1, null, recordInfoList1.iterator());
+    trackedSegments.add(segment1);
+    // segment1: 0 -> {5, 100}, 1 -> {4, 120}, 2 -> {2, 100}
+    assertEquals(recordLocationMap.size(), 3);
+    checkRecordLocation(recordLocationMap, 0, segment1, 5, 100, HashFunction.NONE);
+    checkRecordLocation(recordLocationMap, 1, segment1, 4, 120, HashFunction.NONE);
+    checkRecordLocation(recordLocationMap, 2, segment1, 2, 100, HashFunction.NONE);
+    assertEquals(validDocIds1.getMutableRoaringBitmap().toArray(), new int[]{2, 4, 5});
+
+    // Add the second segment of uploaded name format with same creation time
+    numRecords = 2;
+    primaryKeys = new int[]{0, 3};
+    timestamps = new int[]{100, 80};
+    ThreadSafeMutableRoaringBitmap validDocIds2 = new ThreadSafeMutableRoaringBitmap();
+    ImmutableSegmentImpl uploadedSegment2 =
+        mockUploadedImmutableSegment("2", validDocIds2, null, getPrimaryKeyList(numRecords, primaryKeys), 1000L);
+    List<RecordInfo> recordInfoList2;
+    // get recordInfo by iterating all records.
+    recordInfoList2 = getRecordInfoList(numRecords, primaryKeys, timestamps, null);
+    upsertMetadataManager.addSegment(uploadedSegment2, validDocIds2, null, recordInfoList2.iterator());
+    trackedSegments.add(uploadedSegment2);
+
+    // segment1: 1 -> {4, 120}, 2 -> {2, 100}
+    // uploadedSegment2: 0 -> {0, 100}, 3 -> {1, 80}
+    assertEquals(recordLocationMap.size(), 4);
+    checkRecordLocation(recordLocationMap, 0, uploadedSegment2, 0, 100, HashFunction.NONE);
+    checkRecordLocation(recordLocationMap, 1, segment1, 4, 120, HashFunction.NONE);
+    checkRecordLocation(recordLocationMap, 2, segment1, 2, 100, HashFunction.NONE);
+    checkRecordLocation(recordLocationMap, 3, uploadedSegment2, 1, 80, HashFunction.NONE);
+    assertEquals(validDocIds1.getMutableRoaringBitmap().toArray(), new int[]{2, 4});
+    assertEquals(validDocIds2.getMutableRoaringBitmap().toArray(), new int[]{0, 1});
+
+    // replace uploadedSegment2
+    ThreadSafeMutableRoaringBitmap newValidDocIds2 = new ThreadSafeMutableRoaringBitmap();
+    ImmutableSegmentImpl newUploadedSegment2 =
+        mockUploadedImmutableSegment("2", newValidDocIds2, null, getPrimaryKeyList(numRecords, primaryKeys), 1020L);
+    upsertMetadataManager.replaceSegment(newUploadedSegment2, newValidDocIds2, null, recordInfoList2.iterator(),
+        uploadedSegment2);
+    trackedSegments.add(newUploadedSegment2);
+    trackedSegments.remove(uploadedSegment2);
+
+    // segment1: 1 -> {4, 120}, 2 -> {2, 100}
+    // newUploadedSegment2: 0 -> {0, 100}, 3 -> {1, 80}
+    assertEquals(recordLocationMap.size(), 4);
+    checkRecordLocation(recordLocationMap, 0, newUploadedSegment2, 0, 100, HashFunction.NONE);
+    checkRecordLocation(recordLocationMap, 1, segment1, 4, 120, HashFunction.NONE);
+    checkRecordLocation(recordLocationMap, 2, segment1, 2, 100, HashFunction.NONE);
+    checkRecordLocation(recordLocationMap, 3, newUploadedSegment2, 1, 80, HashFunction.NONE);
+    assertEquals(validDocIds1.getMutableRoaringBitmap().toArray(), new int[]{2, 4});
+    assertEquals(newValidDocIds2.getMutableRoaringBitmap().toArray(), new int[]{0, 1});
+
+    // add upploadedSegment3 with higher creation time than newUploadedSegment2
+    numRecords = 1;
+    primaryKeys = new int[]{0};
+    timestamps = new int[]{100};
+    ThreadSafeMutableRoaringBitmap validDocIds3 = new ThreadSafeMutableRoaringBitmap();
+    ImmutableSegmentImpl uploadedSegment3 =
+        mockUploadedImmutableSegment("3", validDocIds3, null, getPrimaryKeyList(numRecords, primaryKeys), 1040L);
+    List<RecordInfo> recordInfoList3;
+    // get recordInfo by iterating all records.
+    recordInfoList3 = getRecordInfoList(numRecords, primaryKeys, timestamps, null);
+    upsertMetadataManager.addSegment(uploadedSegment3, validDocIds3, null, recordInfoList3.iterator());
+
+    // segment1: 1 -> {4, 120}, 2 -> {2, 100}
+    // newUploadedSegment2: 3 -> {1, 80}
+    // uploadedSegment3: 0 -> {0, 100}
+    assertEquals(recordLocationMap.size(), 4);
+    checkRecordLocation(recordLocationMap, 0, uploadedSegment3, 0, 100, HashFunction.NONE);
+    checkRecordLocation(recordLocationMap, 1, segment1, 4, 120, HashFunction.NONE);
+    checkRecordLocation(recordLocationMap, 2, segment1, 2, 100, HashFunction.NONE);
+    checkRecordLocation(recordLocationMap, 3, newUploadedSegment2, 1, 80, HashFunction.NONE);
+    assertEquals(validDocIds1.getMutableRoaringBitmap().toArray(), new int[]{2, 4});
+    assertEquals(newValidDocIds2.getMutableRoaringBitmap().toArray(), new int[]{1});
+    assertEquals(validDocIds3.getMutableRoaringBitmap().toArray(), new int[]{0});
+
+    // add uploadedSegment4 with higher creation time than segment 1 and same creation time as uploadedSegment3
+    numRecords = 2;
+    primaryKeys = new int[]{0, 1};
+    timestamps = new int[]{100, 120};
+    ThreadSafeMutableRoaringBitmap validDocIds4 = new ThreadSafeMutableRoaringBitmap();
+    ImmutableSegmentImpl uploadedSegment4 =
+        mockUploadedImmutableSegment("4", validDocIds4, null, getPrimaryKeyList(numRecords, primaryKeys), 1040L);
+    List<RecordInfo> recordInfoList4;
+    // get recordInfo by iterating all records.
+    recordInfoList4 = getRecordInfoList(numRecords, primaryKeys, timestamps, null);
+    upsertMetadataManager.addSegment(uploadedSegment4, validDocIds4, null, recordInfoList4.iterator());
+
+    // segment1: 2 -> {2, 100}
+    // newUploadedSegment2: 3 -> {1, 80}
+    // uploadedSegment3: 0 -> {0, 100}
+    // uploadedSegment4: 1 -> {1, 120}
+    assertEquals(recordLocationMap.size(), 4);
+    checkRecordLocation(recordLocationMap, 0, uploadedSegment3, 0, 100, HashFunction.NONE);
+    checkRecordLocation(recordLocationMap, 1, uploadedSegment4, 1, 120, HashFunction.NONE);
+    checkRecordLocation(recordLocationMap, 2, segment1, 2, 100, HashFunction.NONE);
+    checkRecordLocation(recordLocationMap, 3, newUploadedSegment2, 1, 80, HashFunction.NONE);
+    assertEquals(validDocIds1.getMutableRoaringBitmap().toArray(), new int[]{2});
+    assertEquals(newValidDocIds2.getMutableRoaringBitmap().toArray(), new int[]{1});
+    assertEquals(validDocIds3.getMutableRoaringBitmap().toArray(), new int[]{0});
+    assertEquals(validDocIds4.getMutableRoaringBitmap().toArray(), new int[]{1});
+
+    // remove segments
+    upsertMetadataManager.removeSegment(segment1);
+    upsertMetadataManager.removeSegment(uploadedSegment2);
+    upsertMetadataManager.removeSegment(newUploadedSegment2);
+    upsertMetadataManager.removeSegment(uploadedSegment3);
+    upsertMetadataManager.removeSegment(uploadedSegment4);
+
+    // Stop the metadata manager
+    upsertMetadataManager.stop();
+
+    // Close the metadata manager
+    upsertMetadataManager.close();
+  }
+
   private void verifyAddReplaceRemoveSegmentWithRecordDelete(HashFunction hashFunction, boolean enableSnapshot)
       throws IOException {
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
@@ -606,6 +744,33 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     when(forwardIndex.getInt(anyInt(), any())).thenAnswer(
         invocation -> primaryKeys.get(invocation.getArgument(0)).getValues()[0]);
     when(dataSource.getForwardIndex()).thenReturn(forwardIndex);
+    SegmentMetadataImpl segmentMetadata = mock(SegmentMetadataImpl.class);
+    when(segmentMetadata.getIndexCreationTime()).thenReturn(System.currentTimeMillis());
+    when(segment.getSegmentMetadata()).thenReturn(segmentMetadata);
+    return segment;
+  }
+
+  private static ImmutableSegmentImpl mockUploadedImmutableSegment(String suffix,
+      ThreadSafeMutableRoaringBitmap validDocIds, @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds,
+      List<PrimaryKey> primaryKeys, Long creationTimeMs) {
+    if (creationTimeMs == null) {
+      creationTimeMs = System.currentTimeMillis();
+    }
+    ImmutableSegmentImpl segment = mock(ImmutableSegmentImpl.class);
+    when(segment.getSegmentName()).thenReturn(getUploadedRealtimeSegmentName(creationTimeMs, suffix));
+    when(segment.getValidDocIds()).thenReturn(validDocIds);
+    when(segment.getQueryableDocIds()).thenReturn(queryableDocIds);
+    DataSource dataSource = mock(DataSource.class);
+    when(segment.getDataSource(anyString())).thenReturn(dataSource);
+    ForwardIndexReader forwardIndex = mock(ForwardIndexReader.class);
+    when(forwardIndex.isSingleValue()).thenReturn(true);
+    when(forwardIndex.getStoredType()).thenReturn(DataType.INT);
+    when(forwardIndex.getInt(anyInt(), any())).thenAnswer(
+        invocation -> primaryKeys.get(invocation.getArgument(0)).getValues()[0]);
+    when(dataSource.getForwardIndex()).thenReturn(forwardIndex);
+    SegmentMetadataImpl segmentMetadata = mock(SegmentMetadataImpl.class);
+    when(segmentMetadata.getIndexCreationTime()).thenReturn(creationTimeMs);
+    when(segment.getSegmentMetadata()).thenReturn(segmentMetadata);
     return segment;
   }
 
@@ -654,6 +819,10 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
 
   private static String getSegmentName(int sequenceNumber) {
     return new LLCSegmentName(RAW_TABLE_NAME, 0, sequenceNumber, System.currentTimeMillis()).toString();
+  }
+
+  private static String getUploadedRealtimeSegmentName(long creationTimeMs, String suffix) {
+    return new UploadedRealtimeSegmentName(RAW_TABLE_NAME, 0, creationTimeMs, "uploaded", suffix).toString();
   }
 
   private static PrimaryKey makePrimaryKey(int value) {

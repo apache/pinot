@@ -34,7 +34,12 @@ public class ConcurrentIndexedTable extends IndexedTable {
 
   public ConcurrentIndexedTable(DataSchema dataSchema, QueryContext queryContext, int resultSize, int trimSize,
       int trimThreshold) {
-    super(dataSchema, queryContext, resultSize, trimSize, trimThreshold, new ConcurrentHashMap<>());
+    this(dataSchema, false, queryContext, resultSize, trimSize, trimThreshold);
+  }
+
+  public ConcurrentIndexedTable(DataSchema dataSchema, boolean hasFinalInput, QueryContext queryContext, int resultSize,
+      int trimSize, int trimThreshold) {
+    super(dataSchema, hasFinalInput, queryContext, resultSize, trimSize, trimThreshold, new ConcurrentHashMap<>());
   }
 
   /**

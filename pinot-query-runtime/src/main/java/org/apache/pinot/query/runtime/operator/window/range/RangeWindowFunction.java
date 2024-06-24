@@ -19,14 +19,16 @@
 package org.apache.pinot.query.runtime.operator.window.range;
 
 import com.google.common.collect.ImmutableMap;
+import java.util.List;
 import java.util.Map;
+import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
-import org.apache.pinot.query.runtime.operator.WindowAggregateOperator;
 import org.apache.pinot.query.runtime.operator.window.WindowFunction;
 
 
 public abstract class RangeWindowFunction extends WindowFunction {
+  //@formatter:off
   public static final Map<String, Class<? extends WindowFunction>> WINDOW_FUNCTION_MAP =
       ImmutableMap.<String, Class<? extends WindowFunction>>builder()
           // Range window functions
@@ -34,10 +36,11 @@ public abstract class RangeWindowFunction extends WindowFunction {
           .put("RANK", RankWindowFunction.class)
           .put("DENSE_RANK", DenseRankWindowFunction.class)
           .build();
+  //@formatter:on
 
-  public RangeWindowFunction(RexExpression.FunctionCall aggCall, String functionName,
-      DataSchema inputSchema, WindowAggregateOperator.OrderSetInfo orderSetInfo) {
-    super(aggCall, functionName, inputSchema, orderSetInfo);
+  public RangeWindowFunction(RexExpression.FunctionCall aggCall, DataSchema inputSchema,
+      List<RelFieldCollation> collations, boolean partitionByOnly) {
+    super(aggCall, inputSchema, collations, partitionByOnly);
   }
 
   protected int compareRows(Object[] leftRow, Object[] rightRow) {
@@ -55,6 +58,7 @@ public abstract class RangeWindowFunction extends WindowFunction {
         if (rightValue == null) {
           return 1;
         } else {
+          //noinspection rawtypes,unchecked
           int result = ((Comparable) leftValue).compareTo(rightValue);
           if (result != 0) {
             return result;

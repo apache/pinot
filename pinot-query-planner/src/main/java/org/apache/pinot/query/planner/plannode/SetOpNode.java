@@ -18,31 +18,25 @@
  */
 package org.apache.pinot.query.planner.plannode;
 
+import java.util.List;
+import java.util.Objects;
 import org.apache.calcite.rel.core.SetOp;
 import org.apache.calcite.rel.logical.LogicalIntersect;
 import org.apache.calcite.rel.logical.LogicalMinus;
 import org.apache.calcite.rel.logical.LogicalUnion;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.query.planner.serde.ProtoProperties;
 
 
 /**
  * Set operation node is used to represent UNION, INTERSECT, EXCEPT.
  */
-public class SetOpNode extends AbstractPlanNode {
+public class SetOpNode extends BasePlanNode {
+  private final SetOpType _setOpType;
+  private final boolean _all;
 
-  @ProtoProperties
-  private SetOpType _setOpType;
-
-  @ProtoProperties
-  private boolean _all;
-
-  public SetOpNode(int planFragmentId) {
-    super(planFragmentId);
-  }
-
-  public SetOpNode(SetOpType setOpType, int planFragmentId, DataSchema dataSchema, boolean all) {
-    super(planFragmentId, dataSchema);
+  public SetOpNode(int stageId, DataSchema dataSchema, NodeHint nodeHint, List<PlanNode> inputs, SetOpType setOpType,
+      boolean all) {
+    super(stageId, dataSchema, nodeHint, inputs);
     _setOpType = setOpType;
     _all = all;
   }
@@ -57,12 +51,32 @@ public class SetOpNode extends AbstractPlanNode {
 
   @Override
   public String explain() {
-    return _setOpType.toString();
+    return _all ? _setOpType.toString() + "_ALL" : _setOpType.toString();
   }
 
   @Override
   public <T, C> T visit(PlanNodeVisitor<T, C> visitor, C context) {
     return visitor.visitSetOp(this, context);
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (!(o instanceof SetOpNode)) {
+      return false;
+    }
+    if (!super.equals(o)) {
+      return false;
+    }
+    SetOpNode setOpNode = (SetOpNode) o;
+    return _all == setOpNode._all && _setOpType == setOpNode._setOpType;
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(super.hashCode(), _setOpType, _all);
   }
 
   public enum SetOpType {

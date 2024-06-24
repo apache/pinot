@@ -179,6 +179,22 @@ public class AndFilterOperatorTest {
   }
 
   @Test
+  public void testAndWithNullHandlingDisabled() {
+    int numDocs = 4;
+    int[] docIds1 = new int[]{0, 3};
+    int[] docIds2 = new int[]{0, 1};
+    int[] nullDocIds1 = new int[]{};
+    int[] nullDocIds2 = new int[]{};
+
+    AndFilterOperator andFilterOperator = new AndFilterOperator(
+        Arrays.asList(new TestFilterOperator(docIds1, nullDocIds1, numDocs),
+            new TestFilterOperator(docIds2, nullDocIds2, numDocs)), null, numDocs, false);
+
+    Assert.assertEquals(TestUtils.getDocIds(andFilterOperator.getTrues()), ImmutableList.of(0));
+    Assert.assertEquals(TestUtils.getDocIds(andFilterOperator.getFalses()), ImmutableList.of(1, 2, 3));
+  }
+
+  @Test
   public void testAndWithNullOneFilterIsEmpty() {
     int numDocs = 10;
     int[] docIds1 = new int[]{1, 2, 3};
@@ -191,5 +207,31 @@ public class AndFilterOperatorTest {
     Assert.assertEquals(TestUtils.getDocIds(andFilterOperator.getTrues()), Collections.emptyList());
     Assert.assertEquals(TestUtils.getDocIds(andFilterOperator.getFalses()),
         ImmutableList.of(0, 1, 2, 3, 4, 5, 6, 7, 8, 9));
+  }
+
+  @Test
+  public void testAndWithNullOneFilterMatchesAll() {
+    int numDocs = 10;
+    int[] docIds1 = new int[]{1, 2, 3};
+    int[] nullDocIds1 = new int[]{4, 5, 6};
+
+    AndFilterOperator andFilterOperator = new AndFilterOperator(
+        Arrays.asList(new TestFilterOperator(docIds1, nullDocIds1, numDocs), new MatchAllFilterOperator(numDocs)), null,
+        numDocs, true);
+
+    Assert.assertEquals(TestUtils.getDocIds(andFilterOperator.getTrues()), ImmutableList.of(1, 2, 3));
+    Assert.assertEquals(TestUtils.getDocIds(andFilterOperator.getFalses()), ImmutableList.of(0, 7, 8, 9));
+  }
+
+  @Test
+  public void testAndWithAllMatchesAll() {
+    int numDocs = 10;
+    AndFilterOperator andFilterOperator =
+        new AndFilterOperator(Arrays.asList(new MatchAllFilterOperator(numDocs), new MatchAllFilterOperator(numDocs)),
+            null, numDocs, true);
+
+    Assert.assertEquals(TestUtils.getDocIds(andFilterOperator.getTrues()),
+        ImmutableList.of(0, 1, 2, 3, 4, 5, 6, 7, 8, 9));
+    Assert.assertEquals(TestUtils.getDocIds(andFilterOperator.getFalses()), Collections.emptyList());
   }
 }

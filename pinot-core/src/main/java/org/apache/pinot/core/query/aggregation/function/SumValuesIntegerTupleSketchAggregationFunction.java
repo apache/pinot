@@ -59,4 +59,9 @@ public class SumValuesIntegerTupleSketchAggregationFunction extends IntegerTuple
     double estimate = retainedTotal / result.getTheta();
     return Math.round(estimate);
   }
+
+  @Override
+  public Comparable mergeFinalResult(Comparable finalResult1, Comparable finalResult2) {
+    return (Long) finalResult1 + (Long) finalResult2;
+  }
 }

@@ -44,6 +44,12 @@ public class SegmentUtils {
     if (llcSegmentName != null) {
       return llcSegmentName.getPartitionGroupId();
     }
+
+    UploadedRealtimeSegmentName uploadedRealtimeSegmentName = UploadedRealtimeSegmentName.of(segmentName);
+    if (uploadedRealtimeSegmentName != null) {
+      return uploadedRealtimeSegmentName.getPartitionId();
+    }
+
     // Otherwise, retrieve the partition id from the segment zk metadata.
     SegmentZKMetadata segmentZKMetadata =
         ZKMetadataProvider.getSegmentZKMetadata(helixManager.getHelixPropertyStore(), realtimeTableName, segmentName);

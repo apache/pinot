@@ -48,7 +48,7 @@ public class CLPEncodingRealtimeIntegrationTest extends BaseClusterIntegrationTe
     // Start a customized controller with more frequent realtime segment validation
     startController();
     startBroker();
-    startServers(1);
+    startServer();
 
     startKafka();
     pushAvroIntoKafka(_avroFiles);

@@ -229,7 +229,7 @@ public class PinotTableRestletResource {
       TableConfigTunerUtils.applyTunerConfigs(_pinotHelixResourceManager, tableConfig, schema, Collections.emptyMap());
 
       // TableConfigUtils.validate(...) is used across table create/update.
-      TableConfigUtils.validate(tableConfig, schema, typesToSkip, _controllerConf.isDisableIngestionGroovy());
+      TableConfigUtils.validate(tableConfig, schema, typesToSkip);
       TableConfigUtils.validateTableName(tableConfig);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);
@@ -498,7 +498,7 @@ public class PinotTableRestletResource {
       }
 
       Schema schema = _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
-      TableConfigUtils.validate(tableConfig, schema, typesToSkip, _controllerConf.isDisableIngestionGroovy());
+      TableConfigUtils.validate(tableConfig, schema, typesToSkip);
     } catch (Exception e) {
       String msg = String.format("Invalid table config: %s with error: %s", tableName, e.getMessage());
       throw new ControllerApplicationException(LOGGER, msg, Response.Status.BAD_REQUEST, e);
@@ -579,7 +579,7 @@ public class PinotTableRestletResource {
       if (schema == null) {
         throw new SchemaNotFoundException("Got empty schema");
       }
-      TableConfigUtils.validate(tableConfig, schema, typesToSkip, _controllerConf.isDisableIngestionGroovy());
+      TableConfigUtils.validate(tableConfig, schema, typesToSkip);
       ObjectNode tableConfigValidateStr = JsonUtils.newObjectNode();
       if (tableConfig.getTableType() == TableType.OFFLINE) {
         tableConfigValidateStr.set(TableType.OFFLINE.name(), tableConfig.toJsonNode());
@@ -684,6 +684,7 @@ public class PinotTableRestletResource {
               LOGGER.error("Caught exception/error while rebalancing table: {}", tableNameWithType, t);
             }
           });
+          waitForJobIdToPersist(dryRunResult.getJobId(), tableNameWithType);
           return new RebalanceResult(dryRunResult.getJobId(), RebalanceResult.Status.IN_PROGRESS,
               "In progress, check controller logs for updates", dryRunResult.getInstanceAssignment(),
               dryRunResult.getTierInstanceAssignment(), dryRunResult.getSegmentAssignment());
@@ -695,6 +696,25 @@ public class PinotTableRestletResource {
     } catch (TableNotFoundException e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.NOT_FOUND);
     }
+  }
+
+  /**
+   * Waits for jobId to be persisted using a retry policy.
+   * Tables with 100k+ segments take up to a few seconds for the jobId to persist. This ensures the jobId is present
+   * before returning the jobId to the caller, so they can correctly poll the jobId.
+   */
+  public void waitForJobIdToPersist(String jobId, String tableNameWithType) {
+    try {
+      // This retry policy waits at most for 7.5s to 15s in total. This is chosen to cover typical delays for tables
+      // with many segments and avoid excessive HTTP request timeouts.
+      RetryPolicies.exponentialBackoffRetryPolicy(5, 500L, 2.0).attempt(() -> getControllerJobMetadata(jobId) != null);
+    } catch (Exception e) {
+      LOGGER.warn("waiting for jobId not successful while rebalancing table: {}", tableNameWithType);
+    }
+  }
+
+  public Map<String, String> getControllerJobMetadata(String jobId) {
+    return _pinotHelixResourceManager.getControllerJobZKMetadata(jobId, ControllerJobType.TABLE_REBALANCE);
   }
 
   @DELETE
@@ -745,8 +765,7 @@ public class PinotTableRestletResource {
   public ServerRebalanceJobStatusResponse rebalanceStatus(
       @ApiParam(value = "Rebalance Job Id", required = true) @PathParam("jobId") String jobId)
       throws JsonProcessingException {
-    Map<String, String> controllerJobZKMetadata =
-        _pinotHelixResourceManager.getControllerJobZKMetadata(jobId, ControllerJobType.TABLE_REBALANCE);
+    Map<String, String> controllerJobZKMetadata = getControllerJobMetadata(jobId);
 
     if (controllerJobZKMetadata == null) {
       throw new ControllerApplicationException(LOGGER, "Failed to find controller job id: " + jobId,
@@ -972,7 +991,10 @@ public class PinotTableRestletResource {
       @ApiParam(value = "A list of segments", allowMultiple = true) @QueryParam("segmentNames")
       List<String> segmentNames,
       @ApiParam(value = "Valid doc ids type") @QueryParam("validDocIdsType")
-      @DefaultValue("SNAPSHOT") ValidDocIdsType validDocIdsType, @Context HttpHeaders headers) {
+      @DefaultValue("SNAPSHOT") ValidDocIdsType validDocIdsType,
+      @ApiParam(value = "Number of segments in a batch per server request")
+      @QueryParam("serverRequestBatchSize") @DefaultValue("500") int serverRequestBatchSize,
+      @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     LOGGER.info("Received a request to fetch aggregate validDocIds metadata for a table {}", tableName);
     TableType tableType = Constants.validateTableType(tableTypeStr);
@@ -990,7 +1012,8 @@ public class PinotTableRestletResource {
       validDocIdsType = (validDocIdsType == null) ? ValidDocIdsType.SNAPSHOT : validDocIdsType;
       JsonNode segmentsMetadataJson =
           tableMetadataReader.getAggregateValidDocIdsMetadata(tableNameWithType, segmentNames,
-              validDocIdsType.toString(), _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
+              validDocIdsType.toString(), _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000,
+              serverRequestBatchSize);
       validDocIdsMetadata = JsonUtils.objectToPrettyString(segmentsMetadataJson);
     } catch (InvalidConfigException e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST);

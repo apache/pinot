@@ -30,6 +30,7 @@ import java.util.List;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.request.context.FilterContext;
+import org.apache.pinot.common.utils.ArrayListUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
@@ -195,19 +196,19 @@ public class AggregationResultsBlock extends BaseResultsBlock {
         dataTableBuilder.setColumn(index, (ByteArray) result);
         break;
       case INT_ARRAY:
-        dataTableBuilder.setColumn(index, ((IntArrayList) result).elements());
+        dataTableBuilder.setColumn(index, ArrayListUtils.toIntArray((IntArrayList) result));
         break;
       case LONG_ARRAY:
-        dataTableBuilder.setColumn(index, ((LongArrayList) result).elements());
+        dataTableBuilder.setColumn(index, ArrayListUtils.toLongArray((LongArrayList) result));
         break;
       case FLOAT_ARRAY:
-        dataTableBuilder.setColumn(index, ((FloatArrayList) result).elements());
+        dataTableBuilder.setColumn(index, ArrayListUtils.toFloatArray((FloatArrayList) result));
         break;
       case DOUBLE_ARRAY:
-        dataTableBuilder.setColumn(index, ((DoubleArrayList) result).elements());
+        dataTableBuilder.setColumn(index, ArrayListUtils.toDoubleArray((DoubleArrayList) result));
         break;
       case STRING_ARRAY:
-        dataTableBuilder.setColumn(index, ((ObjectArrayList<String>) result).elements());
+        dataTableBuilder.setColumn(index, ArrayListUtils.toStringArray((ObjectArrayList<String>) result));
         break;
       default:
         throw new IllegalStateException("Illegal column data type in final result: " + columnDataType);

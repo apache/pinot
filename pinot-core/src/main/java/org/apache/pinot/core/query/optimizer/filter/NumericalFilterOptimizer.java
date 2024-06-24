@@ -116,10 +116,8 @@ public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
     boolean result = kind == FilterKind.NOT_EQUALS;
 
     switch (rhs.getLiteral().getSetField()) {
-      case SHORT_VALUE:
       case INT_VALUE:
-        // No rewrites needed since SHORT and INT conversion to numeric column types (INT, LONG, FLOAT, and DOUBLE) is
-        // lossless and will be implicitly handled on the server side.
+        // No rewrites needed since INT conversion to numeric column types can be handled on the server side.
         break;
       case LONG_VALUE: {
         long actual = rhs.getLiteral().getLongValue();
@@ -162,6 +160,11 @@ public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
         }
         break;
       }
+      case FLOAT_VALUE: {
+        float actual = Float.intBitsToFloat(rhs.getLiteral().getFloatValue());
+        System.out.println(actual);
+        break;
+      }
       case DOUBLE_VALUE: {
         double actual = rhs.getLiteral().getDoubleValue();
         switch (dataType) {
@@ -190,8 +193,8 @@ public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
           default:
             break;
         }
+        break;
       }
-      break;
       default:
         break;
     }
@@ -205,10 +208,8 @@ public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
   private static Expression rewriteRangeExpression(Expression range, FilterKind kind, DataType dataType,
       Expression rhs) {
     switch (rhs.getLiteral().getSetField()) {
-      case SHORT_VALUE:
       case INT_VALUE:
-        // No rewrites needed since SHORT and INT conversion to numeric column types (INT, LONG, FLOAT, and DOUBLE) is
-        // lossless and will be implicitly handled on the server side.
+        // No rewrites needed since INT conversion to numeric column types can be handled on the server side.
         break;
       case LONG_VALUE: {
         long actual = rhs.getLiteral().getLongValue();
@@ -268,6 +269,11 @@ public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
           default:
             break;
         }
+        break;
+      }
+      case FLOAT_VALUE: {
+        float actual = Float.intBitsToFloat(rhs.getLiteral().getFloatValue());
+        System.out.println(actual);
         break;
       }
       case DOUBLE_VALUE: {
@@ -332,8 +338,8 @@ public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
           default:
             break;
         }
+        break;
       }
-      break;
       default:
         break;
     }
@@ -389,6 +395,13 @@ public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
       String targetTypeLiteral =
           expression.getFunctionCall().getOperands().get(1).getLiteral().getStringValue().toUpperCase();
       DataType dataType;
+
+      // Strip out _ARRAY suffix that can be used to represent an MV field type since the semantics here will be the
+      // same as that for the equivalent SV field of the same type
+      if (targetTypeLiteral.endsWith("_ARRAY")) {
+        targetTypeLiteral = targetTypeLiteral.substring(0, targetTypeLiteral.length() - 6);
+      }
+
       if ("INTEGER".equals(targetTypeLiteral)) {
         dataType = DataType.INT;
       } else if ("VARCHAR".equals(targetTypeLiteral)) {
@@ -406,9 +419,9 @@ public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
     if (expression.getType() == ExpressionType.LITERAL) {
       Literal._Fields type = expression.getLiteral().getSetField();
       switch (type) {
-        case SHORT_VALUE:
         case INT_VALUE:
         case LONG_VALUE:
+        case FLOAT_VALUE:
         case DOUBLE_VALUE:
           return true;
         default:

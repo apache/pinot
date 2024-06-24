@@ -105,11 +105,11 @@ public class PhysicalExplainPlanVisitor implements PlanNodeVisitor<StringBuilder
    * @return stringify format of the explained result wrapped with contextual info.
    */
   private StringBuilder appendInfo(PlanNode node, Context context) {
-    int planFragmentId = node.getPlanFragmentId();
+    int stageId = node.getStageId();
     context._builder
         .append(context._prefix)
         .append('[')
-        .append(planFragmentId)
+        .append(stageId)
         .append("]@")
         .append(context._host.getHostname())
         .append(':')
@@ -167,7 +167,7 @@ public class PhysicalExplainPlanVisitor implements PlanNodeVisitor<StringBuilder
   public StringBuilder visitMailboxReceive(MailboxReceiveNode node, Context context) {
     appendInfo(node, context).append('\n');
 
-    MailboxSendNode sender = (MailboxSendNode) node.getSender();
+    MailboxSendNode sender = node.getSender();
     int senderStageId = node.getSenderStageId();
     DispatchablePlanFragment dispatchablePlanFragment = _dispatchableSubPlan.getQueryStageList().get(senderStageId);
 
@@ -213,8 +213,8 @@ public class PhysicalExplainPlanVisitor implements PlanNodeVisitor<StringBuilder
 
     int receiverStageId = node.getReceiverStageId();
     List<MailboxInfo> receiverMailboxInfos =
-        _dispatchableSubPlan.getQueryStageList().get(node.getPlanFragmentId()).getWorkerMetadataList()
-            .get(context._workerId).getMailboxInfosMap().get(receiverStageId).getMailboxInfos();
+        _dispatchableSubPlan.getQueryStageList().get(node.getStageId()).getWorkerMetadataList().get(context._workerId)
+            .getMailboxInfosMap().get(receiverStageId).getMailboxInfos();
     context._builder.append("->");
     // Sort to ensure print order
     String receivers = receiverMailboxInfos.stream().sorted(Comparator.comparingInt(MailboxInfo::getPort))
@@ -237,7 +237,7 @@ public class PhysicalExplainPlanVisitor implements PlanNodeVisitor<StringBuilder
     return appendInfo(node, context)
         .append(' ')
         .append(_dispatchableSubPlan.getQueryStageList()
-            .get(node.getPlanFragmentId())
+            .get(node.getStageId())
             .getWorkerIdToSegmentsMap()
             .get(context._host))
         .append('\n');

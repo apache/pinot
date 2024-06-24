@@ -18,9 +18,10 @@
  */
 package org.apache.pinot.common.function.scalar;
 
+import org.apache.calcite.linq4j.function.Strict;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
-
+@Strict
 public class TrigonometricFunctions {
   private TrigonometricFunctions() {
   }

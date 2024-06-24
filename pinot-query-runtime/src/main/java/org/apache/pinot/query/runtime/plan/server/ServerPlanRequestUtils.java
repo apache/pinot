@@ -44,7 +44,6 @@ import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.optimizer.QueryOptimizer;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
-import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.StagePlan;
@@ -244,18 +243,16 @@ public class ServerPlanRequestUtils {
   /**
    * attach the dynamic filter to the given PinotQuery.
    */
-  static void attachDynamicFilter(PinotQuery pinotQuery, JoinNode.JoinKeys joinKeys, List<Object[]> dataContainer,
-      DataSchema dataSchema) {
-    List<Integer> leftJoinKeys = joinKeys.getLeftKeys();
-    List<Integer> rightJoinKeys = joinKeys.getRightKeys();
+  static void attachDynamicFilter(PinotQuery pinotQuery, List<Integer> leftKeys, List<Integer> rightKeys,
+      List<Object[]> dataContainer, DataSchema dataSchema) {
     List<Expression> expressions = new ArrayList<>();
-    for (int i = 0; i < leftJoinKeys.size(); i++) {
-      Expression leftExpr = pinotQuery.getSelectList().get(leftJoinKeys.get(i));
+    for (int i = 0; i < leftKeys.size(); i++) {
+      Expression leftExpr = pinotQuery.getSelectList().get(leftKeys.get(i));
       if (dataContainer.isEmpty()) {
         // put a constant false expression
         expressions.add(RequestUtils.getLiteralExpression(false));
       } else {
-        int rightIdx = rightJoinKeys.get(i);
+        int rightIdx = rightKeys.get(i);
         List<Expression> operands = new ArrayList<>(dataContainer.size() + 1);
         operands.add(leftExpr);
         operands.addAll(computeInOperands(dataContainer, dataSchema, rightIdx));
@@ -306,11 +303,7 @@ public class ServerPlanRequestUtils {
         }
         Arrays.sort(arrFloat);
         for (int rowIdx = 0; rowIdx < numRows; rowIdx++) {
-          // TODO: Create float literal when it is supported
-          // NOTE: We cannot directly cast float to double here because we want to preserve the exact value. E.g. 0.05f
-          //       will be casted to 0.05000000074505806. Predicate evaluation uses string format to match the values,
-          //       so here we need to create the double value based on the string format of the float value.
-          expressions.add(RequestUtils.getLiteralExpression(Double.parseDouble(Float.toString(arrFloat[rowIdx]))));
+          expressions.add(RequestUtils.getLiteralExpression(arrFloat[rowIdx]));
         }
         break;
       case DOUBLE:

@@ -113,7 +113,7 @@ public class GenerateDataCommand extends AbstractBaseAdminCommand implements Com
   @Override
   public boolean execute()
       throws Exception {
-    LOGGER.info("Executing command: " + toString());
+    LOGGER.info("Executing command: {}", toString());
 
     if ((_numRecords < 0) || (_numFiles < 0)) {
       throw new RuntimeException("Cannot generate negative number of records/files.");

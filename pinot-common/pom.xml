@@ -269,10 +269,6 @@
       <artifactId>jopt-simple</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.google.code.findbugs</groupId>
-      <artifactId>jsr305</artifactId>
-    </dependency>
-    <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
       <artifactId>jackson-annotations</artifactId>
     </dependency>
@@ -333,7 +329,11 @@
       <groupId>io.github.hakky54</groupId>
       <artifactId>sslcontext-kickstart-for-netty</artifactId>
     </dependency>
-
+    <dependency>
+      <groupId>com.google.re2j</groupId>
+      <artifactId>re2j</artifactId>
+      <version>1.7</version>
+    </dependency>
     <!-- Test -->
     <dependency>
       <groupId>org.testng</groupId>

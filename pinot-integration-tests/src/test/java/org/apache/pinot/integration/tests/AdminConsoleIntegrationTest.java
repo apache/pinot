@@ -18,10 +18,13 @@
  */
 package org.apache.pinot.integration.tests;
 
+import java.nio.charset.StandardCharsets;
+import java.util.Objects;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.pinot.broker.broker.BrokerAdminApiApplication;
 import org.apache.pinot.controller.api.ControllerAdminApiApplication;
+import org.apache.pinot.minion.MinionAdminApiApplication;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -44,6 +47,7 @@ public class AdminConsoleIntegrationTest extends BaseClusterIntegrationTest {
     startController();
     startBroker();
     startServer();
+    startMinion();
   }
 
   @AfterClass
@@ -52,21 +56,25 @@ public class AdminConsoleIntegrationTest extends BaseClusterIntegrationTest {
     stopServer();
     stopBroker();
     stopController();
+    stopMinion();
     stopZk();
     FileUtils.deleteQuietly(_tempDir);
   }
 
   /**
-   * Tests resposnes to /api and /help.
+   * Tests responses to /api and /help.
    */
   @Test
   public void testApiHelp()
       throws Exception {
+    String apiIndexHtmlPage = "api/index.html";
+
     // test controller
     String response = sendGetRequest(getControllerBaseApiUrl() + "/help");
     String expected =
-        IOUtils.toString(ControllerAdminApiApplication.class.getClassLoader().getResourceAsStream("api/index.html"),
-            "UTF-8");
+        IOUtils.toString(Objects.requireNonNull(
+                ControllerAdminApiApplication.class.getClassLoader().getResourceAsStream(apiIndexHtmlPage)),
+            StandardCharsets.UTF_8);
     Assert.assertEquals(response, expected);
     // help and api map to the same content
     response = sendGetRequest(getControllerBaseApiUrl() + "/api");
@@ -74,21 +82,33 @@ public class AdminConsoleIntegrationTest extends BaseClusterIntegrationTest {
 
     // test broker
     response = sendGetRequest(getBrokerBaseApiUrl() + "/help");
-    expected = IOUtils.toString(BrokerAdminApiApplication.class.getClassLoader().getResourceAsStream("api/index.html"),
-        "UTF-8");
+    expected = IOUtils.toString(
+        Objects.requireNonNull(BrokerAdminApiApplication.class.getClassLoader().getResourceAsStream(apiIndexHtmlPage)),
+        StandardCharsets.UTF_8);
     Assert.assertEquals(response, expected);
     // help and api map to the same content
     response = sendGetRequest(getBrokerBaseApiUrl() + "/api");
     Assert.assertEquals(response, expected);
-    String serverBaseApiUrl = "http://localhost:" + getServerAdminApiPort();
-    // test server
-    response = sendGetRequest(serverBaseApiUrl + "/help");
-    expected = IOUtils.toString(BrokerAdminApiApplication.class.getClassLoader().getResourceAsStream("api/index.html"),
-        "UTF-8");
-    Assert.assertEquals(response, expected);
 
+    // test server
+    String serverBaseApiUrl = "http://localhost:" + getServerAdminApiPort();
+    response = sendGetRequest(serverBaseApiUrl + "/help");
+    expected = IOUtils.toString(
+        Objects.requireNonNull(BrokerAdminApiApplication.class.getClassLoader().getResourceAsStream(apiIndexHtmlPage)),
+        StandardCharsets.UTF_8);
+    Assert.assertEquals(response, expected);
     // help and api map to the same content
     response = sendGetRequest(serverBaseApiUrl + "/api");
+    Assert.assertEquals(response, expected);
+
+    // test minion
+    response = sendGetRequest(getMinionBaseApiUrl() + "/help");
+    expected = IOUtils.toString(
+        Objects.requireNonNull(MinionAdminApiApplication.class.getClassLoader().getResourceAsStream(apiIndexHtmlPage)),
+        StandardCharsets.UTF_8);
+    Assert.assertEquals(response, expected);
+    // help and api map to the same content
+    response = sendGetRequest(getMinionBaseApiUrl() + "/api");
     Assert.assertEquals(response, expected);
   }
 
@@ -112,7 +132,8 @@ public class AdminConsoleIntegrationTest extends BaseClusterIntegrationTest {
     return new Object[][] {
         new Object[] { "controller", getControllerBaseApiUrl() },
         new Object[] { "broker", getBrokerBaseApiUrl() },
-        new Object[] { "server", "http://localhost:" + getServerAdminApiPort() }
+        new Object[] { "server", "http://localhost:" + getServerAdminApiPort() },
+        new Object[] { "minion", getMinionBaseApiUrl()},
     };
   }
 }

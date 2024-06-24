@@ -34,10 +34,12 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.function.BooleanSupplier;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerGauge;
@@ -67,6 +69,7 @@ import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
+import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.CompletionConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
@@ -102,6 +105,10 @@ import org.apache.pinot.spi.stream.StreamPartitionMsgOffsetFactory;
 import org.apache.pinot.spi.utils.CommonConstants.ConsumerState;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.CompletionMode;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
+import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
+import org.apache.pinot.spi.utils.retry.RetriableOperationException;
+import org.apache.pinot.spi.utils.retry.RetryPolicies;
+import org.apache.pinot.spi.utils.retry.RetryPolicy;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
@@ -309,6 +316,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private final StreamPartitionMsgOffset _latestStreamOffsetAtStartupTime;
   private final CompletionMode _segmentCompletionMode;
   private final List<String> _filteredMessageOffsets = new ArrayList<>();
+  private final boolean _allowConsumptionDuringCommit;
   private boolean _trackFilteredMessageOffsets = false;
 
   // TODO each time this method is called, we print reason for stop. Good to print only once.
@@ -399,12 +407,12 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     _serverMetrics.addMeteredTableValue(_tableStreamName, ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS,
         1L);
     if (_consecutiveErrorCount > MAX_CONSECUTIVE_ERROR_COUNT) {
-      _segmentLogger.warn("Stream transient exception when fetching messages, stopping consumption after "
-          + _consecutiveErrorCount + " attempts", e);
+      _segmentLogger.warn("Stream transient exception when fetching messages, stopping consumption after {} attempts",
+          _consecutiveErrorCount, e);
       throw e;
     } else {
-      _segmentLogger.warn("Stream transient exception when fetching messages, retrying (count="
-          + _consecutiveErrorCount + ")", e);
+      _segmentLogger.warn("Stream transient exception when fetching messages, retrying (count={})",
+          _consecutiveErrorCount, e);
       Uninterruptibles.sleepUninterruptibly(1, TimeUnit.SECONDS);
       recreateStreamConsumer("Too many transient errors");
     }
@@ -461,10 +469,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         throw t;
       }
 
-      StreamPartitionMsgOffset batchFirstOffset = messageBatch.getFirstMessageOffset();
-      if (batchFirstOffset != null) {
-        validateStartOffset(_currentOffset, batchFirstOffset);
-      }
+      reportDataLoss(messageBatch);
 
       boolean endCriteriaReached = processStreamEvents(messageBatch, idlePipeSleepTimeMillis);
 
@@ -536,6 +541,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     PinotMeter realtimeRowsConsumedMeter = null;
     PinotMeter realtimeRowsDroppedMeter = null;
     PinotMeter realtimeIncompleteRowsConsumedMeter = null;
+    PinotMeter realtimeRowsSanitizedMeter = null;
 
     int indexedMessageCount = 0;
     int streamMessageCount = 0;
@@ -621,6 +627,11 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
               _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.INCOMPLETE_REALTIME_ROWS_CONSUMED,
                   reusedResult.getIncompleteRowCount(), realtimeIncompleteRowsConsumedMeter);
         }
+        if (reusedResult.getSanitizedRowCount() > 0) {
+          realtimeRowsSanitizedMeter =
+              _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.REALTIME_ROWS_SANITIZED,
+                  reusedResult.getSanitizedRowCount(), realtimeRowsSanitizedMeter);
+        }
         List<GenericRow> transformedRows = reusedResult.getTransformedRows();
         for (GenericRow transformedRow : transformedRows) {
           try {
@@ -650,7 +661,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
     updateCurrentDocumentCountMetrics();
     if (messageBatch.getUnfilteredMessageCount() > 0) {
-      updateIngestionDelay(messageBatch.getLastMessageMetadata());
+      updateIngestionMetrics(messageBatch.getLastMessageMetadata());
       _hasMessagesFetched = true;
       if (streamMessageCount > 0 && _segmentLogger.isDebugEnabled()) {
         _segmentLogger.debug("Indexed {} messages ({} messages read from stream) current offset {}",
@@ -693,9 +704,22 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         //   persisted.
         // Take upsert snapshot before starting consuming events
         if (_partitionUpsertMetadataManager != null) {
-          _partitionUpsertMetadataManager.takeSnapshot();
-          // If upsertTTL is enabled, we will remove expired primary keys from upsertMetadata after taking snapshot.
-          _partitionUpsertMetadataManager.removeExpiredPrimaryKeys();
+          if (_tableConfig.getUpsertMetadataTTL() > 0) {
+            // If upsertMetadataTTL is enabled, we will remove expired primary keys from upsertMetadata
+            // AFTER taking a snapshot. Taking the snapshot first is crucial to capture the final
+            // state of each key before it exits the TTL window. Out-of-TTL segments are skipped in
+            // the doAddSegment flow, and the snapshot is used to enableUpsert on the immutable out-of-TTL segment.
+            // If no snapshot is found, the entire segment is marked as valid and queryable.
+            _partitionUpsertMetadataManager.takeSnapshot();
+            _partitionUpsertMetadataManager.removeExpiredPrimaryKeys();
+          } else {
+            // We should remove deleted-keys first and then take a snapshot. This is because the deletedKeysTTL
+            // flow removes keys from the map and updates to remove valid doc IDs. By taking the snapshot immediately
+            // after this process, we save one commit cycle, ensuring that the deletion of valid doc IDs is reflected
+            // immediately
+            _partitionUpsertMetadataManager.removeExpiredPrimaryKeys();
+            _partitionUpsertMetadataManager.takeSnapshot();
+          }
         }
 
         while (!_state.isFinal()) {
@@ -750,38 +774,38 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
               // Keep this in memory, but wait for the online transition, and download when it comes in.
               _state = State.DISCARDED;
               break;
-            case KEEP:
+            case KEEP: {
+              if (_segmentCompletionMode == CompletionMode.DOWNLOAD) {
+                _state = State.DISCARDED;
+                break;
+              }
               _state = State.RETAINING;
-              switch (_segmentCompletionMode) {
-                case DOWNLOAD:
-                  _state = State.DISCARDED;
-                  break;
-                case DEFAULT:
-                  // Lock the segment to avoid multiple threads touching the same segment.
-                  Lock segmentLock = _realtimeTableDataManager.getSegmentLock(_segmentNameStr);
-                  segmentLock.lock();
-                  try {
-                    if (buildSegmentAndReplace()) {
-                      _state = State.RETAINED;
-                      break;
-                    }
-                  } finally {
-                    segmentLock.unlock();
-                  }
+              // Lock the segment to avoid multiple threads touching the same segment.
+              Lock segmentLock = _realtimeTableDataManager.getSegmentLock(_segmentNameStr);
+              // NOTE: We need to lock interruptibly because the lock might already be held by the Helix thread for the
+              //       CONSUMING -> ONLINE state transition.
+              segmentLock.lockInterruptibly();
+              try {
+                if (buildSegmentAndReplace()) {
+                  _state = State.RETAINED;
+                } else {
                   // Could not build segment for some reason. We can only download it.
                   _state = State.ERROR;
                   _segmentLogger.error("Could not build segment for {}", _segmentNameStr);
-                  break;
-                default:
-                  break;
+                }
+              } finally {
+                segmentLock.unlock();
               }
               break;
-            case COMMIT:
+            }
+            case COMMIT: {
               _state = State.COMMITTING;
               _currentOffset = _partitionGroupConsumer.checkpoint(_currentOffset);
               // Lock the segment to avoid multiple threads touching the same segment.
               Lock segmentLock = _realtimeTableDataManager.getSegmentLock(_segmentNameStr);
-              segmentLock.lock();
+              // NOTE: We need to lock interruptibly because the lock might already be held by the Helix thread for the
+              //       CONSUMING -> ONLINE state transition.
+              segmentLock.lockInterruptibly();
               try {
                 long buildTimeSeconds = response.getBuildTimeSeconds();
                 buildSegmentForCommit(buildTimeSeconds * 1000L);
@@ -804,6 +828,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
               _segmentLogger.info("Could not commit segment. Retrying after hold");
               hold();
               break;
+            }
             default:
               _segmentLogger.error("Holding after response from Controller: {}", response.toJsonString());
               hold();
@@ -811,13 +836,18 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           }
         }
       } catch (Exception e) {
-        String errorMessage = "Exception while in work";
-        _segmentLogger.error(errorMessage, e);
-        postStopConsumedMsg(e.getClass().getName());
-        _state = State.ERROR;
-        _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(), errorMessage, e));
-        _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.LLC_PARTITION_CONSUMING, 0);
-        return;
+        if (_shouldStop) {
+          _segmentLogger.info("Caught exception in consumer thread after stop() is invoked: {}, ignoring the exception",
+              e.toString());
+        } else {
+          String errorMessage = "Exception while in work";
+          _segmentLogger.error(errorMessage, e);
+          postStopConsumedMsg(e.getClass().getName());
+          _state = State.ERROR;
+          _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(), errorMessage, e));
+          _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.LLC_PARTITION_CONSUMING, 0);
+          return;
+        }
       }
 
       removeSegmentFile();
@@ -915,18 +945,16 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   }
 
   /**
-   * Checks if the begin offset of the stream partition has been fast-forwarded.
-   * batchFirstOffset should be less than or equal to startOffset.
-   * If batchFirstOffset is greater, then some messages were not received.
+   * Checks and reports if the consumer is going through data loss.
    *
-   * @param startOffset The offset of the first message desired, inclusive.
-   * @param batchFirstOffset The offset of the first message in the batch.
+   * @param messageBatch Message batch to validate
    */
-  private void validateStartOffset(StreamPartitionMsgOffset startOffset, StreamPartitionMsgOffset batchFirstOffset) {
-    if (batchFirstOffset.compareTo(startOffset) > 0) {
+  private void reportDataLoss(MessageBatch messageBatch) {
+    if (messageBatch.hasDataLoss()) {
       _serverMetrics.addMeteredTableValue(_tableStreamName, ServerMeter.STREAM_DATA_LOSS, 1L);
-      String message =
-          "startOffset(" + startOffset + ") is older than topic's beginning offset(" + batchFirstOffset + ")";
+      String message = String.format("Message loss detected in stream partition: %s for table: %s startOffset: %s "
+              + "batchFirstOffset: %s", _partitionGroupId, _tableNameWithType, _startOffset,
+          messageBatch.getFirstMessageOffset());
       _segmentLogger.error(message);
       _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(), message, null));
     }
@@ -957,7 +985,12 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
   @VisibleForTesting
   SegmentBuildDescriptor buildSegmentInternal(boolean forCommit) {
-    closeStreamConsumers();
+    // for partial upsert tables, do not release _partitionGroupConsumerSemaphore proactively and rely on offload()
+    // to release the semaphore. This ensures new consuming segment is not consuming until the segment replacement is
+    // complete.
+    if (_allowConsumptionDuringCommit) {
+      closeStreamConsumers();
+    }
     // Do not allow building segment when table data manager is already shut down
     if (_realtimeTableDataManager.isShutDown()) {
       _segmentLogger.warn("Table data manager is already shut down");
@@ -1166,12 +1199,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     _serverMetrics.removeTableGauge(_clientId, ServerGauge.LLC_PARTITION_CONSUMING);
   }
 
-  protected void hold() {
-    try {
-      Thread.sleep(SegmentCompletionProtocol.MAX_HOLD_TIME_MS);
-    } catch (InterruptedException e) {
-      _segmentLogger.warn("Interrupted while holding");
-    }
+  protected void hold()
+      throws InterruptedException {
+    Thread.sleep(SegmentCompletionProtocol.MAX_HOLD_TIME_MS);
   }
 
   private static class ConsumptionStopIndicator {
@@ -1242,13 +1272,11 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       // Remove the segment file before we do anything else.
       removeSegmentFile();
       _leaseExtender.removeSegment(_segmentNameStr);
-      final StreamPartitionMsgOffset endOffset =
-          _streamPartitionMsgOffsetFactory.create(segmentZKMetadata.getEndOffset());
-      _segmentLogger
-          .info("State: {}, transitioning from CONSUMING to ONLINE (startOffset: {}, endOffset: {})", _state.toString(),
-              _startOffset, endOffset);
+      StreamPartitionMsgOffset endOffset = _streamPartitionMsgOffsetFactory.create(segmentZKMetadata.getEndOffset());
+      _segmentLogger.info("State: {}, transitioning from CONSUMING to ONLINE (startOffset: {}, endOffset: {})", _state,
+          _startOffset, endOffset);
       stop();
-      _segmentLogger.info("Consumer thread stopped in state {}", _state.toString());
+      _segmentLogger.info("Consumer thread stopped in state {}", _state);
 
       switch (_state) {
         case COMMITTED:
@@ -1314,7 +1342,12 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
   protected void downloadSegmentAndReplace(SegmentZKMetadata segmentZKMetadata)
       throws Exception {
-    closeStreamConsumers();
+    // for partial upsert tables, do not release _partitionGroupConsumerSemaphore proactively and rely on offload()
+    // to release the semaphore. This ensures new consuming segment is not consuming until the segment replacement is
+    // complete.
+    if (_allowConsumptionDuringCommit) {
+      closeStreamConsumers();
+    }
     _realtimeTableDataManager.downloadAndReplaceConsumingSegment(segmentZKMetadata);
   }
 
@@ -1349,8 +1382,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   public void doOffload() {
     try {
       stop();
-    } catch (InterruptedException e) {
-      _segmentLogger.error("Could not stop consumer thread");
+    } catch (Exception e) {
+      _segmentLogger.error("Caught exception while stopping the consumer thread", e);
     }
     closeStreamConsumers();
     cleanupMetrics();
@@ -1370,19 +1403,21 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
   /**
    * Stop the consuming thread.
+   *
+   * This method is invoked in 2 places:
+   * 1. By the Helix thread when handling the segment state transition from CONSUMING to ONLINE. When this method is
+   *    invoked, Helix thread should already hold the segment lock, and the consumer thread is not building the segment.
+   *    We can safely interrupt the consumer thread and wait for it to join.
+   * 2. By either the Helix thread or consumer thread to offload the segment. In this case, we can also safely interrupt
+   *    the consumer thread because there is no need to build the segment.
    */
   public void stop()
       throws InterruptedException {
     _shouldStop = true;
-    // This method could be called either when we get an ONLINE transition or
-    // when we commit a segment and replace the realtime segment with a committed
-    // one. In the latter case, we don't want to call join.
-    if (Thread.currentThread() != _consumerThread) {
-      Uninterruptibles.joinUninterruptibly(_consumerThread, 10, TimeUnit.MINUTES);
-
-      if (_consumerThread.isAlive()) {
-        _segmentLogger.warn("Failed to stop consumer thread within 10 minutes");
-      }
+    if (Thread.currentThread() != _consumerThread && _consumerThread.isAlive()) {
+      // Interrupt the consumer thread and wait for it to join.
+      _consumerThread.interrupt();
+      _consumerThread.join();
     }
   }
 
@@ -1392,7 +1427,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       RealtimeTableDataManager realtimeTableDataManager, String resourceDataDir, IndexLoadingConfig indexLoadingConfig,
       Schema schema, LLCSegmentName llcSegmentName, Semaphore partitionGroupConsumerSemaphore,
       ServerMetrics serverMetrics, @Nullable PartitionUpsertMetadataManager partitionUpsertMetadataManager,
-      @Nullable PartitionDedupMetadataManager partitionDedupMetadataManager, BooleanSupplier isReadyToConsumeData) {
+      @Nullable PartitionDedupMetadataManager partitionDedupMetadataManager, BooleanSupplier isReadyToConsumeData)
+      throws AttemptsExceededException, RetriableOperationException {
     _segBuildSemaphore = realtimeTableDataManager.getSegmentBuildSemaphore();
     _segmentZKMetadata = segmentZKMetadata;
     _tableConfig = tableConfig;
@@ -1430,7 +1466,14 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
             _segmentZKMetadata.getStatus().toString());
     _partitionGroupConsumerSemaphore = partitionGroupConsumerSemaphore;
     _acquiredConsumerSemaphore = new AtomicBoolean(false);
-    _clientId = _tableNameWithType + "-" + streamTopic + "-" + _partitionGroupId;
+    InstanceDataManagerConfig instanceDataManagerConfig = _indexLoadingConfig.getInstanceDataManagerConfig();
+    String clientIdSuffix =
+        instanceDataManagerConfig != null ? instanceDataManagerConfig.getConsumerClientIdSuffix() : null;
+    if (StringUtils.isNotBlank(clientIdSuffix)) {
+      _clientId = _tableNameWithType + "-" + streamTopic + "-" + _partitionGroupId + "-" + clientIdSuffix;
+    } else {
+      _clientId = _tableNameWithType + "-" + streamTopic + "-" + _partitionGroupId;
+    }
     _segmentLogger = LoggerFactory.getLogger(RealtimeSegmentDataManager.class.getName() + "_" + _segmentNameStr);
     _tableStreamName = _tableNameWithType + "_" + streamTopic;
     if (_indexLoadingConfig.isRealtimeOffHeapAllocation() && !_indexLoadingConfig.isDirectRealtimeOffHeapAllocation()) {
@@ -1524,14 +1567,25 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
     // Create message decoder
     Set<String> fieldsToRead = IngestionUtils.getFieldsForRecordExtractor(_tableConfig.getIngestionConfig(), _schema);
+    RetryPolicy retryPolicy = RetryPolicies.exponentialBackoffRetryPolicy(5, 1000L, 1.2f);
+    AtomicReference<StreamDataDecoder> localStreamDataDecoder = new AtomicReference<>();
     try {
-      StreamMessageDecoder streamMessageDecoder = createMessageDecoder(fieldsToRead);
-      _streamDataDecoder = new StreamDataDecoderImpl(streamMessageDecoder);
+      retryPolicy.attempt(() -> {
+        try {
+          StreamMessageDecoder streamMessageDecoder = createMessageDecoder(fieldsToRead);
+          localStreamDataDecoder.set(new StreamDataDecoderImpl(streamMessageDecoder));
+          return true;
+        } catch (Exception e) {
+          _segmentLogger.warn("Failed to initialize the StreamMessageDecoder: ", e);
+          return false;
+        }
+      });
     } catch (Exception e) {
-      _realtimeTableDataManager.addSegmentError(_segmentNameStr,
-          new SegmentErrorInfo(now(), "Failed to initialize the StreamMessageDecoder", e));
+      _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(),
+          "Failed to initialize the StreamMessageDecoder", e));
       throw e;
     }
+    _streamDataDecoder = localStreamDataDecoder.get();
 
     try {
       _recordEnricherPipeline = RecordEnricherPipeline.fromTableConfig(tableConfig);
@@ -1571,6 +1625,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       _segmentLogger
           .info("Starting consumption on realtime consuming segment {} maxRowCount {} maxEndTime {}", llcSegmentName,
               _segmentMaxRowCount, new DateTime(_consumeEndTime, DateTimeZone.UTC));
+      _allowConsumptionDuringCommit = !_realtimeTableDataManager.isPartialUpsertEnabled() ? true
+          : _tableConfig.getUpsertConfig().isAllowPartialUpsertConsumptionDuringCommit();
     } catch (Exception e) {
       // In case of exception thrown here, segment goes to ERROR state. Then any attempt to reset the segment from
       // ERROR -> OFFLINE -> CONSUMING via Helix Admin fails because the semaphore is acquired, but not released.
@@ -1751,10 +1807,16 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     _partitionMetadataProvider = _streamConsumerFactory.createPartitionMetadataProvider(_clientId, _partitionGroupId);
   }
 
-  private void updateIngestionDelay(RowMetadata metadata) {
+  private void updateIngestionMetrics(RowMetadata metadata) {
     if (metadata != null) {
-      _realtimeTableDataManager.updateIngestionDelay(metadata.getRecordIngestionTimeMs(),
-          metadata.getFirstStreamRecordIngestionTimeMs(), _partitionGroupId);
+      try {
+        StreamPartitionMsgOffset latestOffset =
+            _partitionMetadataProvider.fetchStreamPartitionOffset(OffsetCriteria.LARGEST_OFFSET_CRITERIA, 5000);
+        _realtimeTableDataManager.updateIngestionMetrics(metadata.getRecordIngestionTimeMs(),
+            metadata.getFirstStreamRecordIngestionTimeMs(), metadata.getOffset(), latestOffset, _partitionGroupId);
+      } catch (Exception e) {
+        _segmentLogger.warn("Failed to fetch latest offset for updating ingestion delay", e);
+      }
     }
   }
 
@@ -1763,7 +1825,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
    */
   private void setIngestionDelayToZero() {
     long currentTimeMs = System.currentTimeMillis();
-    _realtimeTableDataManager.updateIngestionDelay(currentTimeMs, currentTimeMs, _partitionGroupId);
+    _realtimeTableDataManager.updateIngestionMetrics(currentTimeMs, currentTimeMs, null, null, _partitionGroupId);
   }
 
   // This should be done during commit? We may not always commit when we build a segment....

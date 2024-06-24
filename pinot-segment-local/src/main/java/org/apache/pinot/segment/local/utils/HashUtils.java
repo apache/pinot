@@ -19,6 +19,9 @@
 package org.apache.pinot.segment.local.utils;
 
 import com.google.common.hash.Hashing;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.util.UUID;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -36,6 +39,30 @@ public class HashUtils {
     return Hashing.md5().hashBytes(bytes).asBytes();
   }
 
+  /**
+   * Returns a byte array that is a concatenation of the binary representation of each of the passed UUID values.
+   * If any of the values is not a valid UUID, then we return the result of {@link PrimaryKey#asBytes()}.
+   */
+  public static byte[] hashUUID(PrimaryKey primaryKey) {
+    Object[] values = primaryKey.getValues();
+    byte[] result = new byte[values.length * 16];
+    ByteBuffer byteBuffer = ByteBuffer.wrap(result).order(ByteOrder.BIG_ENDIAN);
+    for (Object value : values) {
+      if (value == null) {
+        throw new IllegalArgumentException("Found null value in primary key");
+      }
+      UUID uuid;
+      try {
+        uuid = UUID.fromString(value.toString());
+      } catch (Throwable t) {
+        return primaryKey.asBytes();
+      }
+      byteBuffer.putLong(uuid.getMostSignificantBits());
+      byteBuffer.putLong(uuid.getLeastSignificantBits());
+    }
+    return result;
+  }
+
   public static Object hashPrimaryKey(PrimaryKey primaryKey, HashFunction hashFunction) {
     switch (hashFunction) {
       case NONE:
@@ -44,6 +71,8 @@ public class HashUtils {
         return new ByteArray(HashUtils.hashMD5(primaryKey.asBytes()));
       case MURMUR3:
         return new ByteArray(HashUtils.hashMurmur3(primaryKey.asBytes()));
+      case UUID:
+        return new ByteArray(HashUtils.hashUUID(primaryKey));
       default:
         throw new IllegalArgumentException(String.format("Unrecognized hash function %s", hashFunction));
     }

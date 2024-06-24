@@ -43,12 +43,13 @@ public class FunctionOperand implements TransformOperand {
   private final List<TransformOperand> _operands;
   private final Object[] _reusableOperandHolder;
 
-  public FunctionOperand(RexExpression.FunctionCall functionCall, String canonicalName, DataSchema dataSchema) {
+  public FunctionOperand(RexExpression.FunctionCall functionCall, DataSchema dataSchema) {
     _resultType = functionCall.getDataType();
     List<RexExpression> operands = functionCall.getFunctionOperands();
     int numOperands = operands.size();
-    FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(canonicalName, numOperands);
-    Preconditions.checkState(functionInfo != null, "Cannot find function with name: %s", canonicalName);
+    FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(functionCall.getFunctionName(), numOperands);
+    Preconditions.checkState(functionInfo != null, "Cannot find function with name: %s",
+        functionCall.getFunctionName());
     _functionInvoker = new FunctionInvoker(functionInfo);
     if (!_functionInvoker.getMethod().isVarArgs()) {
       Class<?>[] parameterClasses = _functionInvoker.getParameterClasses();

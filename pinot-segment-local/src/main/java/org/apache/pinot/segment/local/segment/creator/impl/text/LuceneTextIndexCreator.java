@@ -40,6 +40,7 @@ import org.apache.lucene.index.NoMergeScheduler;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
+import org.apache.lucene.store.NRTCachingDirectory;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndex;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentColumnarIndexCreator;
 import org.apache.pinot.segment.local.segment.index.text.AbstractTextIndexCreator;
@@ -139,8 +140,15 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
       // merge segments in the background, which is problematic because the lucene index directory's
       // contents is copied to create the immutable segment. If a background merge occurs during this
       // copy, a FileNotFoundException will be triggered and segment build will fail.
+      //
+      // Also, for the realtime segment, we set the OpenMode to CREATE to ensure that any existing artifacts
+      // will be overwritten. This is necessary because the realtime segment can be created multiple times
+      // during a server crash and restart scenario. If the existing artifacts are appended to, the realtime
+      // query results will be accurate, but after segment conversion the mapping file generated will be loaded
+      // for only the first numDocs lucene docIds, which can cause IndexOutOfBounds errors.
       if (!_commitOnClose) {
         indexWriterConfig.setMergeScheduler(NoMergeScheduler.INSTANCE);
+        indexWriterConfig.setOpenMode(IndexWriterConfig.OpenMode.CREATE);
       }
 
       if (_reuseMutableIndex) {
@@ -150,7 +158,16 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
         return;
       }
 
-      _indexDirectory = FSDirectory.open(_indexFile.toPath());
+      if (_commitOnClose) {
+        _indexDirectory = FSDirectory.open(_indexFile.toPath());
+      } else {
+        // For realtime index, use NRTCachingDirectory to reduce the number of open files. This buffers the
+        // flushes triggered by the near real-time refresh and writes them to disk when the buffer is full,
+        // reducing the number of small writes.
+        _indexDirectory =
+            new NRTCachingDirectory(FSDirectory.open(_indexFile.toPath()), config.getLuceneMaxBufferSizeMB(),
+                config.getLuceneMaxBufferSizeMB());
+      }
       _indexWriter = new IndexWriter(_indexDirectory, indexWriterConfig);
     } catch (ReflectiveOperationException e) {
       throw new RuntimeException(

@@ -30,6 +30,7 @@ import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlOperatorBinding;
 import org.apache.calcite.sql.type.OperandTypes;
 import org.apache.calcite.sql.type.ReturnTypes;
+import org.apache.calcite.sql.type.SqlOperandCountRanges;
 import org.apache.calcite.sql.type.SqlOperandTypeChecker;
 import org.apache.calcite.sql.type.SqlReturnTypeInference;
 import org.apache.calcite.sql.type.SqlTypeFamily;
@@ -193,7 +194,11 @@ public enum TransformFunctionType {
   ARRAY_MAX("arrayMax", ReturnTypes.cascade(opBinding -> positionalComponentReturnType(opBinding, 0),
       SqlTypeTransforms.FORCE_NULLABLE), OperandTypes.family(SqlTypeFamily.ARRAY), "array_max"),
   ARRAY_SUM("arraySum", ReturnTypes.DOUBLE, OperandTypes.family(SqlTypeFamily.ARRAY), "array_sum"),
-  VALUE_IN("valueIn", "value_in"),
+  ARRAY_SUM_INT("arraySumInt", ReturnTypes.INTEGER, OperandTypes.family(SqlTypeFamily.ARRAY), "array_sum_int"),
+  ARRAY_SUM_LONG("arraySumLong", ReturnTypes.BIGINT, OperandTypes.family(SqlTypeFamily.ARRAY), "array_sum_long"),
+
+  VALUE_IN("valueIn", ReturnTypes.ARG0_FORCE_NULLABLE, OperandTypes.variadic(SqlOperandCountRanges.from(2)),
+      "value_in"),
   MAP_VALUE("mapValue", ReturnTypes.cascade(opBinding ->
       opBinding.getOperandType(2).getComponentType(), SqlTypeTransforms.FORCE_NULLABLE),
       OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.ANY, SqlTypeFamily.ANY)),

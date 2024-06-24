@@ -67,7 +67,7 @@ public class StarTreeBuilderUtilsTest {
         Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 200);
 
     // Create StartTreeAggregationConfigs with StarTreeAggregationConfig.
-    StarTreeAggregationConfig starTreeAggregationConfig1 = new StarTreeAggregationConfig("Distance", "MAX", null);
+    StarTreeAggregationConfig starTreeAggregationConfig1 = new StarTreeAggregationConfig("Distance", "MAX");
 
     // Different AggregationConfig.
     StarTreeIndexConfig starTreeIndexConfig5 = new StarTreeIndexConfig(Arrays.asList("Carrier", "Distance"), null, null,

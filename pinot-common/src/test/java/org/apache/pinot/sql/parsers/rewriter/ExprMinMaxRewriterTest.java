@@ -30,21 +30,21 @@ public class ExprMinMaxRewriterTest {
   @Test
   public void testQueryRewrite() {
     testQueryRewrite("SELECT EXPR_MIN(col2,col1), EXPR_MIN(col3,col1) FROM myTable",
-        "SELECT CHILD_EXPR_MIN(0,col2,col2,col1), "
-            + "CHILD_EXPR_MIN(0,col3,col3,col1),"
-            + "PARENT_EXPR_MIN(0,1,col1,col2,col3) FROM myTable");
+        "SELECT PINOTCHILDAGG_EXPR_MIN(0,col2,col2,col1), "
+            + "PINOTCHILDAGG_EXPR_MIN(0,col3,col3,col1),"
+            + "PINOTPARENTAGG_EXPR_MIN(0,1,col1,col2,col3) FROM myTable");
 
     testQueryRewrite("SELECT EXPR_MIN(col2,col1), EXPR_MIN(col2,col1) FROM myTable",
-        "SELECT CHILD_EXPR_MIN(0,col2,col2,col1),"
-            + "PARENT_EXPR_MIN(0,1,col1,col2) FROM myTable");
+        "SELECT PINOTCHILDAGG_EXPR_MIN(0,col2,col2,col1),"
+            + "PINOTPARENTAGG_EXPR_MIN(0,1,col1,col2) FROM myTable");
 
     testQueryRewrite("SELECT EXPR_MIN(col5,col1,col2), EXPR_MIN(col6,col1,col2), EXPR_MAX(col6,col1,col2) "
             + "FROM myTable",
-        "SELECT CHILD_EXPR_MIN(0,col5,col5,col1,col2), "
-            + "CHILD_EXPR_MIN(0,col6,col6,col1,col2), "
-            + "CHILD_EXPR_MAX(0,col6,col6,col1,col2),"
-            + "PARENT_EXPR_MIN(0,2,col1,col2,col5,col6),"
-            + "PARENT_EXPR_MAX(0,2,col1,col2,col6) FROM myTable");
+        "SELECT PINOTCHILDAGG_EXPR_MIN(0,col5,col5,col1,col2), "
+            + "PINOTCHILDAGG_EXPR_MIN(0,col6,col6,col1,col2), "
+            + "PINOTCHILDAGG_EXPR_MAX(0,col6,col6,col1,col2),"
+            + "PINOTPARENTAGG_EXPR_MIN(0,2,col1,col2,col5,col6),"
+            + "PINOTPARENTAGG_EXPR_MAX(0,2,col1,col2,col6) FROM myTable");
   }
 
   @Test
@@ -52,20 +52,20 @@ public class ExprMinMaxRewriterTest {
     testQueryRewrite("SELECT EXPR_MIN(col5,col1,col2), EXPR_MIN(col6,col1,col3),"
             + "EXPR_MIN(col6,col3,col1) FROM myTable GROUP BY col3 "
             + "ORDER BY col3 DESC",
-        "SELECT CHILD_EXPR_MIN(0,col5,col5,col1,col2), "
-            + "CHILD_EXPR_MIN(1,col6,col6,col1,col3),"
-            + "CHILD_EXPR_MIN(2,col6,col6,col3,col1),"
-            + "PARENT_EXPR_MIN(1,2,col1,col3,col6),"
-            + "PARENT_EXPR_MIN(0,2,col1,col2,col5),"
-            + "PARENT_EXPR_MIN(2,2,col3,col1,col6)"
+        "SELECT PINOTCHILDAGG_EXPR_MIN(0,col5,col5,col1,col2), "
+            + "PINOTCHILDAGG_EXPR_MIN(1,col6,col6,col1,col3),"
+            + "PINOTCHILDAGG_EXPR_MIN(2,col6,col6,col3,col1),"
+            + "PINOTPARENTAGG_EXPR_MIN(1,2,col1,col3,col6),"
+            + "PINOTPARENTAGG_EXPR_MIN(0,2,col1,col2,col5),"
+            + "PINOTPARENTAGG_EXPR_MIN(2,2,col3,col1,col6)"
             + "FROM myTable GROUP BY col3 ORDER BY col3 DESC");
 
     testQueryRewrite("SELECT EXPR_MIN(col5,col1,col2), EXPR_MAX(col5,col1,col2) FROM myTable GROUP BY col3 "
             + "ORDER BY ADD(co1, co3) DESC",
-        "SELECT CHILD_EXPR_MIN(0,col5,col5,col1,col2),"
-            + "CHILD_EXPR_MAX(0,col5,col5,col1,col2),"
-            + "PARENT_EXPR_MIN(0,2,col1,col2,col5), "
-            + "PARENT_EXPR_MAX(0,2,col1,col2,col5) "
+        "SELECT PINOTCHILDAGG_EXPR_MIN(0,col5,col5,col1,col2),"
+            + "PINOTCHILDAGG_EXPR_MAX(0,col5,col5,col1,col2),"
+            + "PINOTPARENTAGG_EXPR_MIN(0,2,col1,col2,col5), "
+            + "PINOTPARENTAGG_EXPR_MAX(0,2,col1,col2,col5) "
             + "FROM myTable GROUP BY col3 ORDER BY ADD(co1, co3) DESC");
   }
 

@@ -36,11 +36,11 @@ public class Utils {
 
   /**
    * Replace all occurrence of a string in originalDataFile and write the replaced content to replacedDataFile.
-   * @param originalDataFile
-   * @param replacedDataFile
-   * @param original
-   * @param replaced
-   * @throws IOException
+   * @param originalDataFile original data file
+   * @param replacedDataFile replaced data file
+   * @param original original string
+   * @param replaced replaced string
+   * @throws IOException if an I/O error occurs
    */
   public static void replaceContent(File originalDataFile, File replacedDataFile, String original, String replaced)
       throws IOException {
@@ -55,6 +55,15 @@ public class Utils {
     ObjectNode payload = JsonUtils.newObjectNode();
     payload.put("sql", query);
     payload.put("queryOptions", "groupByMode=sql;responseFormat=sql");
+
+    return JsonUtils.stringToJsonNode(
+        ControllerTest.sendPostRequest(brokerBaseApiUrl + "/query/sql", payload.toString()));
+  }
+
+  public static JsonNode postMultiStageSqlQuery(String query, String brokerBaseApiUrl) throws Exception {
+    ObjectNode payload = JsonUtils.newObjectNode();
+    payload.put("sql", query);
+    payload.put("queryOptions", "useMultistageEngine=true");
 
     return JsonUtils.stringToJsonNode(
         ControllerTest.sendPostRequest(brokerBaseApiUrl + "/query/sql", payload.toString()));

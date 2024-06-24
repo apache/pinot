@@ -246,6 +246,11 @@ public abstract class BaseBooleanAggregationFunction extends BaseSingleInputAggr
     return intermediateResult;
   }
 
+  @Override
+  public Integer mergeFinalResult(Integer finalResult1, Integer finalResult2) {
+    return merge(finalResult1, finalResult2);
+  }
+
   private int getInt(Integer val) {
     return val == null ? _merger.getDefaultValue() : val;
   }

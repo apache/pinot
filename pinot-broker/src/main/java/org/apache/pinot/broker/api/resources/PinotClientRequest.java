@@ -34,6 +34,7 @@ import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
 import javax.inject.Inject;
@@ -52,6 +53,7 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.StreamingOutput;
 import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.pinot.broker.api.HttpRequesterIdentity;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
@@ -60,6 +62,7 @@ import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
@@ -295,6 +298,7 @@ public class PinotClientRequest {
   private BrokerResponse executeSqlQuery(ObjectNode sqlRequestJson, HttpRequesterIdentity httpRequesterIdentity,
       boolean onlyDql, HttpHeaders httpHeaders, boolean forceUseMultiStage)
       throws Exception {
+    long requestArrivalTimeMs = System.currentTimeMillis();
     SqlNodeAndOptions sqlNodeAndOptions;
     try {
       sqlNodeAndOptions = RequestUtils.parseQuery(sqlRequestJson.get(Request.SQL).asText(), sqlRequestJson);
@@ -311,9 +315,10 @@ public class PinotClientRequest {
     }
     switch (sqlType) {
       case DQL:
-        try (RequestScope requestStatistics = Tracing.getTracer().createRequestScope()) {
-          return _requestHandler.handleRequest(sqlRequestJson, sqlNodeAndOptions, httpRequesterIdentity,
-              requestStatistics, httpHeaders);
+        try (RequestScope requestContext = Tracing.getTracer().createRequestScope()) {
+          requestContext.setRequestArrivalTimeMillis(requestArrivalTimeMs);
+          return _requestHandler.handleRequest(sqlRequestJson, sqlNodeAndOptions, httpRequesterIdentity, requestContext,
+              httpHeaders);
         } catch (Exception e) {
           LOGGER.error("Error handling DQL request:\n{}\nException: {}", sqlRequestJson,
               QueryException.getTruncatedStackTrace(e));
@@ -361,15 +366,16 @@ public class PinotClientRequest {
   static Response getPinotQueryResponse(BrokerResponse brokerResponse)
       throws Exception {
     int queryErrorCodeHeaderValue = -1; // default value of the header.
-
-    if (brokerResponse.getExceptionsSize() != 0) {
+    List<QueryProcessingException> exceptions = brokerResponse.getExceptions();
+    if (!exceptions.isEmpty()) {
       // set the header value as first exception error code value.
-      queryErrorCodeHeaderValue = brokerResponse.getProcessingExceptions().get(0).getErrorCode();
+      queryErrorCodeHeaderValue = exceptions.get(0).getErrorCode();
     }
 
     // returning the Response with OK status and header value.
     return Response.ok()
         .header(PINOT_QUERY_ERROR_CODE_HEADER, queryErrorCodeHeaderValue)
-        .entity(brokerResponse.toJsonString()).build();
+        .entity((StreamingOutput) brokerResponse::toOutputStream).type(MediaType.APPLICATION_JSON)
+        .build();
   }
 }

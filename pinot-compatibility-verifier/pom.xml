@@ -51,6 +51,9 @@
               <jvmSettings>
                 <initialMemorySize>2G</initialMemorySize>
                 <maxMemorySize>2G</maxMemorySize>
+                <extraArguments>
+                  <extraArgument>-Dlog4j2.configurationFile=pinot-compatibility-verifier-log4j2.xml</extraArgument>
+                </extraArguments>
               </jvmSettings>
             </program>
           </programs>

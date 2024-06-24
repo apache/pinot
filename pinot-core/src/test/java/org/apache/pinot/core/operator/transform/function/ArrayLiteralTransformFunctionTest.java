@@ -57,7 +57,7 @@ public class ArrayLiteralTransformFunctionTest {
   public void testIntArrayLiteralTransformFunction() {
     List<ExpressionContext> arrayExpressions = new ArrayList<>();
     for (int i = 0; i < 10; i++) {
-      arrayExpressions.add(ExpressionContext.forLiteralContext(DataType.INT, i));
+      arrayExpressions.add(ExpressionContext.forLiteral(DataType.INT, i));
     }
 
     ArrayLiteralTransformFunction intArray = new ArrayLiteralTransformFunction(arrayExpressions);
@@ -71,7 +71,7 @@ public class ArrayLiteralTransformFunctionTest {
   public void testLongArrayLiteralTransformFunction() {
     List<ExpressionContext> arrayExpressions = new ArrayList<>();
     for (int i = 0; i < 10; i++) {
-      arrayExpressions.add(ExpressionContext.forLiteralContext(DataType.LONG, (long) i));
+      arrayExpressions.add(ExpressionContext.forLiteral(DataType.LONG, (long) i));
     }
 
     ArrayLiteralTransformFunction longArray = new ArrayLiteralTransformFunction(arrayExpressions);
@@ -85,7 +85,7 @@ public class ArrayLiteralTransformFunctionTest {
   public void testFloatArrayLiteralTransformFunction() {
     List<ExpressionContext> arrayExpressions = new ArrayList<>();
     for (int i = 0; i < 10; i++) {
-      arrayExpressions.add(ExpressionContext.forLiteralContext(DataType.FLOAT, (float) i));
+      arrayExpressions.add(ExpressionContext.forLiteral(DataType.FLOAT, (float) i));
     }
 
     ArrayLiteralTransformFunction floatArray = new ArrayLiteralTransformFunction(arrayExpressions);
@@ -99,7 +99,7 @@ public class ArrayLiteralTransformFunctionTest {
   public void testDoubleArrayLiteralTransformFunction() {
     List<ExpressionContext> arrayExpressions = new ArrayList<>();
     for (int i = 0; i < 10; i++) {
-      arrayExpressions.add(ExpressionContext.forLiteralContext(DataType.DOUBLE, (double) i));
+      arrayExpressions.add(ExpressionContext.forLiteral(DataType.DOUBLE, (double) i));
     }
 
     ArrayLiteralTransformFunction doubleArray = new ArrayLiteralTransformFunction(arrayExpressions);
@@ -113,8 +113,7 @@ public class ArrayLiteralTransformFunctionTest {
   public void testStringArrayLiteralTransformFunction() {
     List<ExpressionContext> arrayExpressions = new ArrayList<>();
     for (int i = 0; i < 10; i++) {
-      arrayExpressions.add(
-          ExpressionContext.forLiteralContext(new Literal(Literal._Fields.STRING_VALUE, String.valueOf(i))));
+      arrayExpressions.add(ExpressionContext.forLiteral(new Literal(Literal._Fields.STRING_VALUE, String.valueOf(i))));
     }
 
     ArrayLiteralTransformFunction stringArray = new ArrayLiteralTransformFunction(arrayExpressions);

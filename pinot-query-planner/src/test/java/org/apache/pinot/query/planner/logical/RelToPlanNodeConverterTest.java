@@ -85,7 +85,7 @@ public class RelToPlanNodeConverterTest {
 
     Assert.assertEquals(RelToPlanNodeConverter.convertToColumnDataType(
             new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.DECIMAL, 14, 10)),
-        DataSchema.ColumnDataType.FLOAT);
+        DataSchema.ColumnDataType.DOUBLE);
     Assert.assertEquals(RelToPlanNodeConverter.convertToColumnDataType(
             new BasicSqlType(RelDataTypeSystem.DEFAULT, SqlTypeName.DECIMAL, 30, 10)),
         DataSchema.ColumnDataType.DOUBLE);

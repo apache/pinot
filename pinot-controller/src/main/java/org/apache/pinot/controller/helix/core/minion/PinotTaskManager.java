@@ -430,7 +430,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
         _controllerMetrics.addValueToTableGauge(getCronJobName(tableWithType, taskType),
             ControllerGauge.CRON_SCHEDULER_JOB_SCHEDULED, 1L);
       } catch (Exception e) {
-        LOGGER.error("Failed to parse Cron expression - " + cronExprStr, e);
+        LOGGER.error("Failed to parse Cron expression - {}", cronExprStr, e);
         throw e;
       }
       Date nextRuntime = trigger.getNextFireTime();

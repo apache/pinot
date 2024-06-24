@@ -23,8 +23,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.response.BrokerResponse;
@@ -32,24 +32,34 @@ import org.apache.pinot.common.response.ProcessingException;
 
 
 /**
- * This class implements pinot-broker's response format for any given query.
- * All fields either primitive data types, or native objects (as opposed to JSONObjects).
- *
- * Supports serialization via JSON.
+ * Broker response for multi-stage engine.
+ * TODO: Currently this class cannot be used to deserialize the JSON response.
  */
 @JsonPropertyOrder({
-    "resultTable", "requestId", "stageStats", "brokerId", "exceptions", "numServersQueried", "numServersResponded",
-    "numSegmentsQueried", "numSegmentsProcessed", "numSegmentsMatched", "numConsumingSegmentsQueried",
-    "numConsumingSegmentsProcessed", "numConsumingSegmentsMatched", "numDocsScanned", "numEntriesScannedInFilter",
-    "numEntriesScannedPostFilter", "numGroupsLimitReached", "maxRowsInJoinReached", "totalDocs", "timeUsedMs",
-    "offlineThreadCpuTimeNs", "realtimeThreadCpuTimeNs", "offlineSystemActivitiesCpuTimeNs",
-    "realtimeSystemActivitiesCpuTimeNs", "offlineResponseSerializationCpuTimeNs",
-    "realtimeResponseSerializationCpuTimeNs", "offlineTotalCpuTimeNs", "realtimeTotalCpuTimeNs", "brokerReduceTimeMs",
-    "segmentStatistics", "traceInfo", "partialResult"
+    "resultTable", "numRowsResultSet", "partialResult", "exceptions", "numGroupsLimitReached", "maxRowsInJoinReached",
+    "maxRowsInWindowReached", "timeUsedMs", "stageStats", "maxRowsInOperator", "requestId", "brokerId",
+    "numDocsScanned", "totalDocs", "numEntriesScannedInFilter", "numEntriesScannedPostFilter", "numServersQueried",
+    "numServersResponded", "numSegmentsQueried", "numSegmentsProcessed", "numSegmentsMatched",
+    "numConsumingSegmentsQueried", "numConsumingSegmentsProcessed", "numConsumingSegmentsMatched",
+    "minConsumingFreshnessTimeMs", "numSegmentsPrunedByBroker", "numSegmentsPrunedByServer", "numSegmentsPrunedInvalid",
+    "numSegmentsPrunedByLimit", "numSegmentsPrunedByValue", "brokerReduceTimeMs", "offlineThreadCpuTimeNs",
+    "realtimeThreadCpuTimeNs", "offlineSystemActivitiesCpuTimeNs", "realtimeSystemActivitiesCpuTimeNs",
+    "offlineResponseSerializationCpuTimeNs", "realtimeResponseSerializationCpuTimeNs", "offlineTotalCpuTimeNs",
+    "realtimeTotalCpuTimeNs", "explainPlanNumEmptyFilterSegments", "explainPlanNumMatchAllFilterSegments", "traceInfo"
 })
 public class BrokerResponseNativeV2 implements BrokerResponse {
+  private final StatMap<StatKey> _brokerStats = new StatMap<>(StatKey.class);
+  private final List<QueryProcessingException> _exceptions = new ArrayList<>();
 
-  private ObjectNode _stageStats = null;
+  private ResultTable _resultTable;
+  private int _numRowsResultSet;
+  private boolean _maxRowsInJoinReached;
+  private boolean _maxRowsInWindowReached;
+  private long _timeUsedMs;
+  /**
+   * Statistics for each stage of the query execution.
+   */
+  private ObjectNode _stageStats;
   /**
    * The max number of rows seen at runtime.
    * <p>
@@ -57,48 +67,95 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
    * virtual rows can be generated. For example, in a join query, the number of rows can be more than the number of rows
    * in the table.
    */
-  private long _maxRowsInOperator = 0;
-  private final StatMap<StatKey> _brokerStats = new StatMap<>(StatKey.class);
-  private final List<QueryProcessingException> _processingExceptions;
-  private ResultTable _resultTable;
+  private long _maxRowsInOperator;
   private String _requestId;
   private String _brokerId;
+  private int _numServersQueried;
+  private int _numServersResponded;
+  private long _brokerReduceTimeMs;
 
-  public BrokerResponseNativeV2() {
-    _processingExceptions = new ArrayList<>();
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  @Nullable
+  @Override
+  public ResultTable getResultTable() {
+    return _resultTable;
   }
 
-  public BrokerResponseNativeV2(ProcessingException exception) {
-    this(Collections.singletonList(exception));
-  }
-
-  public BrokerResponseNativeV2(List<ProcessingException> exceptions) {
-    _processingExceptions = new ArrayList<>(exceptions.size());
-    for (ProcessingException exception : exceptions) {
-      _processingExceptions.add(new QueryProcessingException(exception.getErrorCode(), exception.getMessage()));
+  @Override
+  public void setResultTable(@Nullable ResultTable resultTable) {
+    _resultTable = resultTable;
+    // NOTE: Update _numRowsResultSet when setting non-null result table. We might set null result table when user wants
+    //       to hide the result but only show the stats, in which case we should not update _numRowsResultSet.
+    if (resultTable != null) {
+      _numRowsResultSet = resultTable.getRows().size();
     }
   }
 
+  @Override
+  public int getNumRowsResultSet() {
+    return _numRowsResultSet;
+  }
+
+  @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+  @Override
+  public boolean isPartialResult() {
+    return getExceptionsSize() > 0 || isNumGroupsLimitReached() || isMaxRowsInJoinReached();
+  }
+
+  @Override
+  public List<QueryProcessingException> getExceptions() {
+    return _exceptions;
+  }
+
+  public void addException(QueryProcessingException exception) {
+    _exceptions.add(exception);
+  }
+
+  public void addException(ProcessingException exception) {
+    addException(new QueryProcessingException(exception.getErrorCode(), exception.getMessage()));
+  }
+
+  @Override
+  public boolean isNumGroupsLimitReached() {
+    return _brokerStats.getBoolean(StatKey.NUM_GROUPS_LIMIT_REACHED);
+  }
+
+  public void mergeNumGroupsLimitReached(boolean numGroupsLimitReached) {
+    _brokerStats.merge(StatKey.NUM_GROUPS_LIMIT_REACHED, numGroupsLimitReached);
+  }
+
+  @Override
+  public boolean isMaxRowsInJoinReached() {
+    return _maxRowsInJoinReached;
+  }
+
+  public void mergeMaxRowsInJoinReached(boolean maxRowsInJoinReached) {
+    _maxRowsInJoinReached |= maxRowsInJoinReached;
+  }
+
+  @Override
+  public boolean isMaxRowsInWindowReached() {
+    return _maxRowsInWindowReached;
+  }
+
+  public void mergeMaxRowsInWindowReached(boolean maxRowsInWindowReached) {
+    _maxRowsInWindowReached |= maxRowsInWindowReached;
+  }
+
   /**
-   * Get a new empty {@link BrokerResponseNativeV2}.
+   * Returns the stage statistics.
    */
-  public static BrokerResponseNativeV2 empty() {
-    return new BrokerResponseNativeV2();
+  public ObjectNode getStageStats() {
+    return _stageStats;
   }
 
   public void setStageStats(ObjectNode stageStats) {
     _stageStats = stageStats;
   }
 
-  @JsonProperty
-  public ObjectNode getStageStats() {
-    return _stageStats;
-  }
-
   /**
-   * Get the max number of rows seen by a single operator in the query processing chain.
+   * Returns the maximum number of rows seen by a single operator in the query processing chain.
    */
-  @JsonProperty(access = JsonProperty.Access.READ_ONLY)
   public long getMaxRowsInOperator() {
     return _maxRowsInOperator;
   }
@@ -109,17 +166,41 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
 
   @Override
   public long getTimeUsedMs() {
-    return _brokerStats.getLong(StatKey.TIME_USED_MS);
+    return _timeUsedMs;
+  }
+
+  public void setTimeUsedMs(long timeUsedMs) {
+    _timeUsedMs = timeUsedMs;
   }
 
   @Override
-  public void setTimeUsedMs(long timeUsedMs) {
-    _brokerStats.merge(StatKey.TIME_USED_MS, timeUsedMs);
+  public String getRequestId() {
+    return _requestId;
+  }
+
+  @Override
+  public void setRequestId(String requestId) {
+    _requestId = requestId;
+  }
+
+  @Override
+  public String getBrokerId() {
+    return _brokerId;
+  }
+
+  @Override
+  public void setBrokerId(String brokerId) {
+    _brokerId = brokerId;
   }
 
   @Override
   public long getNumDocsScanned() {
     return _brokerStats.getLong(StatKey.NUM_DOCS_SCANNED);
+  }
+
+  @Override
+  public long getTotalDocs() {
+    return _brokerStats.getLong(StatKey.TOTAL_DOCS);
   }
 
   @Override
@@ -130,6 +211,24 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
   @Override
   public long getNumEntriesScannedPostFilter() {
     return _brokerStats.getLong(StatKey.NUM_ENTRIES_SCANNED_POST_FILTER);
+  }
+
+  @Override
+  public int getNumServersQueried() {
+    return _numServersQueried;
+  }
+
+  public void setNumServersQueried(int numServersQueried) {
+    _numServersQueried = numServersQueried;
+  }
+
+  @Override
+  public int getNumServersResponded() {
+    return _numServersResponded;
+  }
+
+  public void setNumServersResponded(int numServersResponded) {
+    _numServersResponded = numServersResponded;
   }
 
   @Override
@@ -168,17 +267,8 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
   }
 
   @Override
-  public long getTotalDocs() {
-    return _brokerStats.getLong(StatKey.TOTAL_DOCS);
-  }
-
-  @Override
-  public boolean isNumGroupsLimitReached() {
-    return _brokerStats.getBoolean(StatKey.NUM_GROUPS_LIMIT_REACHED);
-  }
-
-  public void mergeNumGroupsLimitReached(boolean numGroupsLimitReached) {
-    _brokerStats.merge(StatKey.NUM_GROUPS_LIMIT_REACHED, numGroupsLimitReached);
+  public long getNumSegmentsPrunedByBroker() {
+    return 0;
   }
 
   @Override
@@ -202,95 +292,12 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
   }
 
   @Override
-  public long getExplainPlanNumEmptyFilterSegments() {
-    return _brokerStats.getLong(StatKey.EXPLAIN_PLAN_NUM_EMPTY_FILTER_SEGMENTS);
+  public long getBrokerReduceTimeMs() {
+    return _brokerReduceTimeMs;
   }
 
-  @Override
-  public long getExplainPlanNumMatchAllFilterSegments() {
-    return _brokerStats.getLong(StatKey.EXPLAIN_PLAN_NUM_MATCH_ALL_FILTER_SEGMENTS);
-  }
-
-  @Override
-  public long getOfflineTotalCpuTimeNs() {
-    return getOfflineThreadCpuTimeNs() + getOfflineSystemActivitiesCpuTimeNs()
-        + getOfflineResponseSerializationCpuTimeNs();
-  }
-
-  @Override
-  public long getRealtimeTotalCpuTimeNs() {
-    return getRealtimeThreadCpuTimeNs() + getRealtimeSystemActivitiesCpuTimeNs()
-        + getRealtimeResponseSerializationCpuTimeNs();
-  }
-
-  @Override
-  public void setExceptions(List<ProcessingException> exceptions) {
-    for (ProcessingException exception : exceptions) {
-      _processingExceptions.add(new QueryProcessingException(exception.getErrorCode(), exception.getMessage()));
-    }
-  }
-
-  public void addToExceptions(QueryProcessingException processingException) {
-    _processingExceptions.add(processingException);
-  }
-
-  @Override
-  public int getNumServersQueried() {
-    return _brokerStats.getInt(StatKey.NUM_SERVERS_QUERIED);
-  }
-
-  @Override
-  public void setNumServersQueried(int numServersQueried) {
-    _brokerStats.merge(StatKey.NUM_SERVERS_QUERIED, numServersQueried);
-  }
-
-  @Override
-  public int getNumServersResponded() {
-    return _brokerStats.getInt(StatKey.NUM_SERVERS_RESPONDED);
-  }
-
-  @Override
-  public void setNumServersResponded(int numServersResponded) {
-    _brokerStats.merge(StatKey.NUM_SERVERS_RESPONDED, numServersResponded);
-  }
-
-  @JsonProperty("maxRowsInJoinReached")
-  public boolean isMaxRowsInJoinReached() {
-    return _brokerStats.getBoolean(StatKey.MAX_ROWS_IN_JOIN_REACHED);
-  }
-
-  @JsonProperty("maxRowsInJoinReached")
-  public void mergeMaxRowsInJoinReached(boolean maxRowsInJoinReached) {
-    _brokerStats.merge(StatKey.MAX_ROWS_IN_JOIN_REACHED, maxRowsInJoinReached);
-  }
-
-  @Override
-  public int getExceptionsSize() {
-    return _processingExceptions.size();
-  }
-
-  @Override
-  public void setResultTable(@Nullable ResultTable resultTable) {
-    _resultTable = resultTable;
-  }
-
-  @Nullable
-  @Override
-  @JsonInclude(JsonInclude.Include.NON_NULL)
-  public ResultTable getResultTable() {
-    return _resultTable;
-  }
-
-  @JsonProperty("exceptions")
-  @Override
-  public List<QueryProcessingException> getProcessingExceptions() {
-    return List.of();
-  }
-
-  @JsonProperty(access = JsonProperty.Access.READ_ONLY)
-  @Override
-  public int getNumRowsResultSet() {
-    return BrokerResponse.super.getNumRowsResultSet();
+  public void setBrokerReduceTimeMs(long brokerReduceTimeMs) {
+    _brokerReduceTimeMs = brokerReduceTimeMs;
   }
 
   @Override
@@ -324,59 +331,28 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
   }
 
   @Override
-  public long getNumSegmentsPrunedByBroker() {
-    return _brokerStats.getInt(StatKey.NUM_SEGMENTS_PRUNED_BY_BROKER);
+  public long getExplainPlanNumEmptyFilterSegments() {
+    return 0;
   }
 
   @Override
-  public void setNumSegmentsPrunedByBroker(long numSegmentsPrunedByBroker) {
-    _brokerStats.merge(StatKey.NUM_SEGMENTS_PRUNED_BY_BROKER, (int) numSegmentsPrunedByBroker);
+  public long getExplainPlanNumMatchAllFilterSegments() {
+    return 0;
   }
 
   @Override
-  public String getRequestId() {
-    return _requestId;
+  public Map<String, String> getTraceInfo() {
+    return Map.of();
   }
 
-  @Override
-  public void setRequestId(String requestId) {
-    _requestId = requestId;
+  public void addBrokerStats(StatMap<StatKey> brokerStats) {
+    _brokerStats.merge(brokerStats);
   }
 
-  @Override
-  public String getBrokerId() {
-    return _brokerId;
-  }
-
-  @Override
-  public void setBrokerId(String requestId) {
-    _brokerId = requestId;
-  }
-
-  @Override
-  public long getBrokerReduceTimeMs() {
-    return _brokerStats.getLong(StatKey.BROKER_REDUCE_TIME_MS);
-  }
-
-  @Override
-  public void setBrokerReduceTimeMs(long brokerReduceTimeMs) {
-    _brokerStats.merge(StatKey.BROKER_REDUCE_TIME_MS, brokerReduceTimeMs);
-  }
-
-  @JsonProperty(access = JsonProperty.Access.READ_ONLY)
-  @Override
-  public boolean isPartialResult() {
-    return isNumGroupsLimitReached() || getExceptionsSize() > 0 || isMaxRowsInJoinReached();
-  }
-
-  public void addServerStats(StatMap<StatKey> serverStats) {
-    // Set execution statistics.
-    _brokerStats.merge(serverStats);
-  }
-
+  // NOTE: The following keys should match the keys in the leaf-stage operator.
   public enum StatKey implements StatMap.Key {
-    TIME_USED_MS(StatMap.Type.LONG),
     NUM_DOCS_SCANNED(StatMap.Type.LONG),
+    TOTAL_DOCS(StatMap.Type.LONG),
     NUM_ENTRIES_SCANNED_IN_FILTER(StatMap.Type.LONG),
     NUM_ENTRIES_SCANNED_POST_FILTER(StatMap.Type.LONG),
     NUM_SEGMENTS_QUERIED(StatMap.Type.INT),
@@ -391,23 +367,11 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
         return StatMap.Key.minPositive(value1, value2);
       }
     },
-    TOTAL_DOCS(StatMap.Type.LONG),
-    NUM_GROUPS_LIMIT_REACHED(StatMap.Type.BOOLEAN),
     NUM_SEGMENTS_PRUNED_BY_SERVER(StatMap.Type.INT),
     NUM_SEGMENTS_PRUNED_INVALID(StatMap.Type.INT),
     NUM_SEGMENTS_PRUNED_BY_LIMIT(StatMap.Type.INT),
     NUM_SEGMENTS_PRUNED_BY_VALUE(StatMap.Type.INT),
-    NUM_SERGMENTS_PRUNED_BY_BROKER(StatMap.Type.INT),
-    EXPLAIN_PLAN_NUM_EMPTY_FILTER_SEGMENTS(StatMap.Type.INT),
-    EXPLAIN_PLAN_NUM_MATCH_ALL_FILTER_SEGMENTS(StatMap.Type.INT),
-    THREAD_CPU_TIME_NS(StatMap.Type.LONG),
-    SYSTEM_ACTIVITIES_CPU_TIME_NS(StatMap.Type.LONG),
-    RESPONSE_SER_CPU_TIME_NS(StatMap.Type.LONG),
-    NUM_SEGMENTS_PRUNED_BY_BROKER(StatMap.Type.INT),
-    MAX_ROWS_IN_JOIN_REACHED(StatMap.Type.BOOLEAN),
-    NUM_SERVERS_RESPONDED(StatMap.Type.INT),
-    NUM_SERVERS_QUERIED(StatMap.Type.INT),
-    BROKER_REDUCE_TIME_MS(StatMap.Type.LONG);
+    NUM_GROUPS_LIMIT_REACHED(StatMap.Type.BOOLEAN);
 
     private final StatMap.Type _type;
 

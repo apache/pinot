@@ -39,12 +39,12 @@
     <dependency>
       <groupId>com.azure</groupId>
       <artifactId>azure-storage-file-datalake</artifactId>
-      <version>12.18.4</version>
+      <version>12.19.1</version>
     </dependency>
     <dependency>
       <groupId>com.azure</groupId>
       <artifactId>azure-identity</artifactId>
-      <version>1.12.1</version>
+      <version>1.13.0</version>
     </dependency>
   </dependencies>
   <dependencyManagement>
@@ -52,22 +52,22 @@
       <dependency>
         <groupId>com.azure</groupId>
         <artifactId>azure-core-http-netty</artifactId>
-        <version>1.15.0</version>
+        <version>1.15.1</version>
       </dependency>
       <dependency>
         <groupId>com.azure</groupId>
         <artifactId>azure-core</artifactId>
-        <version>1.49.0</version>
+        <version>1.49.1</version>
       </dependency>
       <dependency>
         <groupId>io.projectreactor</groupId>
         <artifactId>reactor-core</artifactId>
-        <version>3.6.5</version>
+        <version>3.6.7</version>
       </dependency>
       <dependency>
         <groupId>com.microsoft.azure</groupId>
         <artifactId>msal4j</artifactId>
-        <version>1.15.0</version>
+        <version>1.15.1</version>
       </dependency>
       <dependency>
         <groupId>com.nimbusds</groupId>

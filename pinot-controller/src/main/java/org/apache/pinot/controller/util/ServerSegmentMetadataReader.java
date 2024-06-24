@@ -22,6 +22,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.BiMap;
+import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -220,7 +221,8 @@ public class ServerSegmentMetadataReader {
    */
   public List<ValidDocIdsMetadataInfo> getValidDocIdsMetadataFromServer(String tableNameWithType,
       Map<String, List<String>> serverToSegmentsMap, BiMap<String, String> serverToEndpoints,
-      @Nullable List<String> segmentNames, int timeoutMs, String validDocIdsType) {
+      @Nullable List<String> segmentNames, int timeoutMs, String validDocIdsType,
+      int numSegmentsBatchPerServerRequest) {
     List<Pair<String, String>> serverURLsAndBodies = new ArrayList<>();
     for (Map.Entry<String, List<String>> serverToSegments : serverToSegmentsMap.entrySet()) {
       List<String> segmentsForServer = serverToSegments.getValue();
@@ -235,8 +237,12 @@ public class ServerSegmentMetadataReader {
           }
         }
       }
-      serverURLsAndBodies.add(generateValidDocIdsMetadataURL(tableNameWithType, segmentsToQuery, validDocIdsType,
-          serverToEndpoints.get(serverToSegments.getKey())));
+
+      // Number of segments to query per server request. If a table has a lot of segments, then we might send a
+      // huge payload to pinot-server in request. Batching the requests will help in reducing the payload size.
+      Lists.partition(segmentsToQuery, numSegmentsBatchPerServerRequest).forEach(segmentsToQueryBatch ->
+          serverURLsAndBodies.add(generateValidDocIdsMetadataURL(tableNameWithType, segmentsToQueryBatch,
+              validDocIdsType, serverToEndpoints.get(serverToSegments.getKey()))));
     }
 
     BiMap<String, String> endpointsToServers = serverToEndpoints.inverse();
@@ -247,45 +253,45 @@ public class ServerSegmentMetadataReader {
 
     Map<String, String> requestHeaders = Map.of("Content-Type", "application/json");
     CompletionServiceHelper.CompletionServiceResponse serviceResponse =
-        completionServiceHelper.doMultiPostRequest(serverURLsAndBodies, tableNameWithType, false, requestHeaders,
+        completionServiceHelper.doMultiPostRequest(serverURLsAndBodies, tableNameWithType, true, requestHeaders,
             timeoutMs, null);
 
     Map<String, ValidDocIdsMetadataInfo> validDocIdsMetadataInfos = new HashMap<>();
     int failedParses = 0;
-    int returnedServersCount = 0;
+    int returnedServerRequestsCount = 0;
     for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
       try {
         String validDocIdsMetadataList = streamResponse.getValue();
         List<ValidDocIdsMetadataInfo> validDocIdsMetadataInfoList =
             JsonUtils.stringToObject(validDocIdsMetadataList, new TypeReference<ArrayList<ValidDocIdsMetadataInfo>>() {
             });
-        for (ValidDocIdsMetadataInfo validDocIdsMetadataInfo: validDocIdsMetadataInfoList) {
+        for (ValidDocIdsMetadataInfo validDocIdsMetadataInfo : validDocIdsMetadataInfoList) {
           validDocIdsMetadataInfos.put(validDocIdsMetadataInfo.getSegmentName(), validDocIdsMetadataInfo);
         }
-        returnedServersCount++;
+        returnedServerRequestsCount++;
       } catch (Exception e) {
         failedParses++;
-        LOGGER.error("Unable to parse server {} response due to an error: ", streamResponse.getKey(), e);
+        LOGGER.error("Unable to parse {} server-request response due to an error: ", streamResponse.getKey(), e);
       }
     }
 
     if (failedParses != 0) {
-      LOGGER.error("Unable to parse server {} / {} response due to an error: ", failedParses,
+      LOGGER.error("Unable to parse {} / {} server-request responses due to an error: ", failedParses,
           serverURLsAndBodies.size());
     }
 
-    if (returnedServersCount != serverURLsAndBodies.size()) {
-      LOGGER.error("Unable to get validDocIdsMetadata from all servers. Expected: {}, Actual: {}",
-          serverURLsAndBodies.size(), returnedServersCount);
+    if (returnedServerRequestsCount != serverURLsAndBodies.size()) {
+      LOGGER.error("Unable to get validDocIdsMetadata from all server requests. Expected: {}, Actual: {}",
+          serverURLsAndBodies.size(), returnedServerRequestsCount);
     }
 
     if (segmentNames != null && !segmentNames.isEmpty() && segmentNames.size() != validDocIdsMetadataInfos.size()) {
-      LOGGER.error("Unable to get validDocIdsMetadata for all segments. Expected: {}, Actual: {}",
-          segmentNames.size(), validDocIdsMetadataInfos.size());
+      LOGGER.error("Unable to get validDocIdsMetadata for all segments. Expected: {}, Actual: {}", segmentNames.size(),
+          validDocIdsMetadataInfos.size());
     }
 
-    LOGGER.info("Retrieved validDocIds metadata for {} segments from {} servers.", validDocIdsMetadataInfos.size(),
-        returnedServersCount);
+    LOGGER.info("Retrieved validDocIds metadata for {} segments from {} server requests.",
+        validDocIdsMetadataInfos.size(), returnedServerRequestsCount);
     return new ArrayList<>(validDocIdsMetadataInfos.values());
   }
 

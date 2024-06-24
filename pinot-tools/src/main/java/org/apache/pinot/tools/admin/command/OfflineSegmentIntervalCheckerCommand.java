@@ -88,7 +88,7 @@ public class OfflineSegmentIntervalCheckerCommand extends AbstractBaseAdminComma
   @Override
   public boolean execute()
       throws Exception {
-    LOGGER.info("Executing command: " + toString());
+    LOGGER.info("Executing command: {}", toString());
 
     ZKHelixAdmin helixAdmin = new ZKHelixAdmin.Builder().setZkAddress(_zkAddress).build();
     _propertyStore = new ZkHelixPropertyStore<>(_zkAddress, new ZNRecordSerializer(),

@@ -74,9 +74,12 @@ import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.spi.utils.TimeUtils;
+import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
+import org.apache.pinot.spi.utils.retry.RetriableOperationException;
 
 
 @ThreadSafe
@@ -263,10 +266,28 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
    * Method used by RealtimeSegmentManagers to update their partition delays
    *
    * @param ingestionTimeMs Ingestion delay being reported.
+   * @param firstStreamIngestionTimeMs Ingestion time of the first message in the stream.
    * @param partitionGroupId Partition ID for which delay is being updated.
+   * @param offset last offset received for the partition.
+   * @param latestOffset latest upstream offset for the partition.
    */
-  public void updateIngestionDelay(long ingestionTimeMs, long firstStreamIngestionTimeMs, int partitionGroupId) {
-    _ingestionDelayTracker.updateIngestionDelay(ingestionTimeMs, firstStreamIngestionTimeMs, partitionGroupId);
+  public void updateIngestionMetrics(long ingestionTimeMs, long firstStreamIngestionTimeMs,
+      StreamPartitionMsgOffset offset, StreamPartitionMsgOffset latestOffset, int partitionGroupId) {
+    _ingestionDelayTracker.updateIngestionMetrics(ingestionTimeMs, firstStreamIngestionTimeMs, offset, latestOffset,
+        partitionGroupId);
+  }
+
+  /*
+   * Method used during query execution (ServerQueryExecutorV1Impl) to get the current timestamp for the ingestion
+   * delay for a partition
+   *
+   * @param segmentNameStr name of segment for which we want the ingestion delay timestamp.
+   * @return timestamp of the ingestion delay for the partition.
+   */
+  public long getPartitionIngestionTimeMs(String segmentNameStr) {
+    LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
+    int partitionGroupId = segmentName.getPartitionGroupId();
+    return _ingestionDelayTracker.getPartitionIngestionTimeMs(partitionGroupId);
   }
 
   /*
@@ -300,7 +321,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     List<SegmentContext> segmentContexts = new ArrayList<>(selectedSegments.size());
     selectedSegments.forEach(s -> segmentContexts.add(new SegmentContext(s)));
     if (isUpsertEnabled() && !QueryOptionsUtils.isSkipUpsert(queryOptions)) {
-      _tableUpsertMetadataManager.setSegmentContexts(segmentContexts);
+      _tableUpsertMetadataManager.setSegmentContexts(segmentContexts, queryOptions);
     }
     return segmentContexts;
   }
@@ -406,7 +427,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   }
 
   @Override
-  public void addConsumingSegment(String segmentName) {
+  public void addConsumingSegment(String segmentName)
+      throws AttemptsExceededException, RetriableOperationException {
     Preconditions.checkState(!_shutDown,
         "Table data manager is already shut down, cannot add CONSUMING segment: %s to table: %s", segmentName,
         _tableNameWithType);
@@ -424,7 +446,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     }
   }
 
-  private void doAddConsumingSegment(String segmentName) {
+  private void doAddConsumingSegment(String segmentName)
+      throws AttemptsExceededException, RetriableOperationException {
     SegmentZKMetadata zkMetadata = fetchZKMetadata(segmentName);
     if (zkMetadata.getStatus() != Status.IN_PROGRESS) {
       // NOTE: We do not throw exception here because the segment might have just been committed before the state

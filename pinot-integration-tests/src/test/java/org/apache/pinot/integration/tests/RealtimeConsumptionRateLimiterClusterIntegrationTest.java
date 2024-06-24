@@ -158,8 +158,8 @@ public class RealtimeConsumptionRateLimiterClusterIntegrationTest extends BaseRe
         Thread.sleep(1000L);
         long currentCount = getCurrentCountStarResult(tableName);
         double currentRate = (currentCount - startCount) / (double) (System.currentTimeMillis() - startTime) * 1000;
-        LOGGER.info("Second = " + i + ", realtimeRowConsumedMeter = " + realtimeRowConsumedMeter.oneMinuteRate()
-            + ", currentCount = " + currentCount + ", currentRate = " + currentRate);
+        LOGGER.info("Second = {}, realtimeRowConsumedMeter = {}, currentCount = {}, currentRate = {}", i,
+            realtimeRowConsumedMeter.oneMinuteRate(), currentCount, currentRate);
         Assert.assertTrue(realtimeRowConsumedMeter.oneMinuteRate() < SERVER_RATE_LIMIT,
             "Rate should be less than " + SERVER_RATE_LIMIT);
         Assert.assertTrue(currentRate < SERVER_RATE_LIMIT * 1.5, // Put some leeway for the rate calculation
@@ -211,11 +211,11 @@ public class RealtimeConsumptionRateLimiterClusterIntegrationTest extends BaseRe
         double currentRate1 = (currentCount1 - startCount1) / (double) (currentTimeMillis - startTime) * 1000;
         double currentRate2 = (currentCount2 - startCount2) / (double) (currentTimeMillis - startTime) * 1000;
         double currentServerRate = currentRate1 + currentRate2;
-        LOGGER.info("Second = " + i + ", serverRowConsumedMeter = " + serverRowConsumedMeter.oneMinuteRate()
-            + ", currentCount1 = " + currentCount1 + ", currentRate1 = " + currentRate1
-            + ", currentCount2 = " + currentCount2 + ", currentRate2 = " + currentRate2
-            + ", currentServerCount = " + currentServerCount + ", currentServerRate = " + currentServerRate
-        );
+        LOGGER.info(
+            "Second = {}, serverRowConsumedMeter = {}, currentCount1 = {}, currentRate1 = {}, currentCount2 = {}, "
+                + "currentRate2 = {}, currentServerCount = {}, currentServerRate = {}",
+            i, serverRowConsumedMeter.oneMinuteRate(), currentCount1, currentRate1, currentCount2, currentRate2,
+            currentServerCount, currentServerRate);
 
         Assert.assertTrue(serverRowConsumedMeter.oneMinuteRate() < SERVER_RATE_LIMIT,
             "Rate should be less than " + SERVER_RATE_LIMIT + ", serverOneMinuteRate = " + serverRowConsumedMeter

@@ -49,7 +49,7 @@ public class DedupIntegrationTest extends BaseClusterIntegrationTestSet {
     // Start a customized controller with more frequent realtime segment validation
     startController();
     startBroker();
-    startServers(1);
+    startServer();
 
     _avroFiles = unpackAvroData(_tempDir);
     startKafka();

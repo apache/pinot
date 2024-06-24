@@ -29,7 +29,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.net.ssl.SSLContext;
 import org.apache.commons.configuration2.MapConfiguration;
@@ -49,6 +48,8 @@ public class DriverUtils {
   public static final String DRIVER = "pinot";
   public static final Logger LOG = LoggerFactory.getLogger(DriverUtils.class);
   private static final String LIMIT_STATEMENT_REGEX = "\\s(limit)\\s";
+  private static final Pattern LIMIT_STATEMENT_REGEX_PATTERN =
+      Pattern.compile(LIMIT_STATEMENT_REGEX, Pattern.CASE_INSENSITIVE);
 
   // SSL Properties
   public static final String PINOT_JDBC_TLS_PREFIX = "pinot.jdbc.tls";
@@ -62,8 +63,8 @@ public class DriverUtils {
   }
 
   public static SSLContext getSSLContextFromJDBCProps(Properties properties) {
-    TlsConfig tlsConfig = TlsUtils.extractTlsConfig(
-        new PinotConfiguration(new MapConfiguration(properties)), PINOT_JDBC_TLS_PREFIX);
+    TlsConfig tlsConfig =
+        TlsUtils.extractTlsConfig(new PinotConfiguration(new MapConfiguration(properties)), PINOT_JDBC_TLS_PREFIX);
     TlsUtils.installDefaultSSLSocketFactory(tlsConfig);
     return TlsUtils.getSslContext();
   }
@@ -213,9 +214,7 @@ public class DriverUtils {
   }
 
   public static boolean queryContainsLimitStatement(String query) {
-    Pattern pattern = Pattern.compile(LIMIT_STATEMENT_REGEX, Pattern.CASE_INSENSITIVE);
-    Matcher matcher = pattern.matcher(query);
-    return matcher.find();
+    return LIMIT_STATEMENT_REGEX_PATTERN.matcher(query).find();
   }
 
   public static String enableQueryOptions(String sql, Map<String, Object> options) {

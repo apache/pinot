@@ -54,7 +54,7 @@ public class GithubPullRequestSourceGenerator implements PinotSourceDataGenerato
     try {
       _avroSchema = AvroUtils.getAvroSchemaFromPinotSchema(org.apache.pinot.spi.data.Schema.fromFile(schemaFile));
     } catch (Exception e) {
-      LOGGER.error("Got exception while reading Pinot schema from file: [" + schemaFile.getName() + "]");
+      LOGGER.error("Got exception while reading Pinot schema from file: [{}]", schemaFile.getName());
       throw e;
     }
     _gitHubAPICaller = new GitHubAPICaller(personalAccessToken);

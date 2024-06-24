@@ -37,7 +37,6 @@ public class BrokerResponseNativeTest {
     Assert.assertEquals(actual.getNumDocsScanned(), expected.getNumDocsScanned());
     Assert.assertEquals(actual.getTimeUsedMs(), expected.getTimeUsedMs());
     Assert.assertEquals(actual.getResultTable(), expected.getResultTable());
-    Assert.assertEquals(actual.getSegmentStatistics().size(), expected.getSegmentStatistics().size());
   }
 
   @Test
@@ -46,9 +45,9 @@ public class BrokerResponseNativeTest {
     BrokerResponseNative expected = BrokerResponseNative.NO_TABLE_RESULT;
     String brokerString = expected.toJsonString();
     BrokerResponseNative actual = BrokerResponseNative.fromJsonString(brokerString);
-    Assert.assertEquals(actual.getProcessingExceptions().get(0).getErrorCode(),
+    Assert.assertEquals(actual.getExceptions().get(0).getErrorCode(),
         QueryException.BROKER_RESOURCE_MISSING_ERROR.getErrorCode());
-    Assert.assertEquals(actual.getProcessingExceptions().get(0).getMessage(),
+    Assert.assertEquals(actual.getExceptions().get(0).getMessage(),
         QueryException.BROKER_RESOURCE_MISSING_ERROR.getMessage());
   }
 
@@ -57,15 +56,14 @@ public class BrokerResponseNativeTest {
       throws IOException {
     BrokerResponseNative expected = BrokerResponseNative.NO_TABLE_RESULT;
     String errorMsgStr = "Some random string!";
-    QueryProcessingException processingException = new QueryProcessingException(400, errorMsgStr);
-    expected.addToExceptions(processingException);
+    expected.addException(new QueryProcessingException(400, errorMsgStr));
     String brokerString = expected.toJsonString();
     BrokerResponseNative newBrokerResponse = BrokerResponseNative.fromJsonString(brokerString);
-    Assert.assertEquals(newBrokerResponse.getProcessingExceptions().get(0).getErrorCode(),
+    Assert.assertEquals(newBrokerResponse.getExceptions().get(0).getErrorCode(),
         QueryException.BROKER_RESOURCE_MISSING_ERROR.getErrorCode());
-    Assert.assertEquals(newBrokerResponse.getProcessingExceptions().get(0).getMessage(),
+    Assert.assertEquals(newBrokerResponse.getExceptions().get(0).getMessage(),
         QueryException.BROKER_RESOURCE_MISSING_ERROR.getMessage());
-    Assert.assertEquals(newBrokerResponse.getProcessingExceptions().get(1).getErrorCode(), 400);
-    Assert.assertEquals(newBrokerResponse.getProcessingExceptions().get(1).getMessage(), errorMsgStr);
+    Assert.assertEquals(newBrokerResponse.getExceptions().get(1).getErrorCode(), 400);
+    Assert.assertEquals(newBrokerResponse.getExceptions().get(1).getMessage(), errorMsgStr);
   }
 }

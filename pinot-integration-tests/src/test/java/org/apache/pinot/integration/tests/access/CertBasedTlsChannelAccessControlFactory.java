@@ -61,8 +61,9 @@ public class CertBasedTlsChannelAccessControlFactory implements AccessControlFac
         Principal principal = x509.getSubjectX500Principal();
         return _aclPrincipalAllowlist.contains(principal.toString());
       } catch (CertificateException | SSLPeerUnverifiedException e) {
-        _logger.error("Access denied - caught exception while validating access to server, with channelHandlerContext:"
-            + channelHandlerContext, e);
+        _logger.error(
+            "Access denied - caught exception while validating access to server, with channelHandlerContext:{}",
+            channelHandlerContext, e);
         return false;
       }
     }

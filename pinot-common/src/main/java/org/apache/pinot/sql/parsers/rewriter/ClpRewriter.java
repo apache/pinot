@@ -426,8 +426,14 @@ public class ClpRewriter implements QueryRewriter {
     // Add any encoded variables
     int numEncodedVars = 0;
     for (long encodedVar : subquery.getEncodedVars()) {
+      Expression literal;
+      if (encodedVar <= Integer.MAX_VALUE && encodedVar >= Integer.MIN_VALUE) {
+        literal = RequestUtils.getLiteralExpression((int) encodedVar);
+      } else {
+        literal = RequestUtils.getLiteralExpression(encodedVar);
+      }
       subqueryFunctionOperands.add(RequestUtils.getFunctionExpression(SqlKind.EQUALS.name(),
-          RequestUtils.getIdentifierExpression(encodedVarsColumnName), RequestUtils.getLiteralExpression(encodedVar)));
+          RequestUtils.getIdentifierExpression(encodedVarsColumnName), literal));
       numEncodedVars++;
     }
 

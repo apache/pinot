@@ -28,7 +28,6 @@ import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
@@ -42,18 +41,10 @@ public class RequestUtilsTest {
     assertTrue(nullExpr.getLiteral().getNullValue());
   }
 
-  // please check comments inside RequestUtils.getLiteralExpression() for why we need this test
-  @Test
-  public void testGetLiteralExpressionForObject() {
-    Expression literalExpression = RequestUtils.getLiteralExpression(Float.valueOf(0.06f));
-    assertEquals((literalExpression.getLiteral().getDoubleValue()), 0.06);
-  }
-
   @Test
   public void testGetLiteralExpressionForPrimitiveLong() {
     Expression literalExpression = RequestUtils.getLiteralExpression(4500L);
     assertTrue(literalExpression.getLiteral().isSetLongValue());
-    assertFalse(literalExpression.getLiteral().isSetDoubleValue());
     assertEquals(literalExpression.getLiteral().getLongValue(), 4500L);
   }
 

@@ -22,6 +22,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: {{ include "pinot.minion.config" . }}
+  namespace: {{ include "pinot.namespace" . }}
 data:
   pinot-minion.conf: |-
     pinot.minion.port={{ .Values.minion.service.port }}

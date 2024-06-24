@@ -23,6 +23,7 @@ import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.docidsets.EmptyDocIdSet;
+import org.apache.pinot.core.operator.docidsets.MatchAllDocIdSet;
 import org.apache.pinot.core.operator.docidsets.NotDocIdSet;
 import org.apache.pinot.core.operator.docidsets.OrDocIdSet;
 
@@ -102,11 +103,20 @@ public abstract class BaseFilterOperator extends BaseOperator<FilterBlock> {
    * @return document IDs in which the predicate evaluates to false.
    */
   protected BlockDocIdSet getFalses() {
-    if (_nullHandlingEnabled) {
-      return new NotDocIdSet(new OrDocIdSet(Arrays.asList(getTrues(), getNulls()), _numDocs),
-          _numDocs);
-    } else {
-      return new NotDocIdSet(getTrues(), _numDocs);
+    BlockDocIdSet trues = getTrues();
+    if (trues instanceof MatchAllDocIdSet) {
+      return EmptyDocIdSet.getInstance();
     }
+    if (_nullHandlingEnabled) {
+      BlockDocIdSet nulls = getNulls();
+      if (!(nulls instanceof EmptyDocIdSet)) {
+        return new NotDocIdSet(new OrDocIdSet(Arrays.asList(trues, nulls), _numDocs),
+            _numDocs);
+      }
+    }
+    if (trues instanceof EmptyDocIdSet) {
+      return new MatchAllDocIdSet(_numDocs);
+    }
+    return new NotDocIdSet(trues, _numDocs);
   }
 }

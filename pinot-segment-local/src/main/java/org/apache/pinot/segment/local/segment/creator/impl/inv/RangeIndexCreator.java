@@ -423,8 +423,8 @@ public final class RangeIndexCreator implements CombinedInvertedIndexCreator {
     }
     rangeOffsets.append(" ]");
     rangeValues.append(" ]");
-    LOGGER.info("rangeOffsets = " + rangeOffsets);
-    LOGGER.info("rangeValues = " + rangeValues);
+    LOGGER.info("rangeOffsets = {}", rangeOffsets);
+    LOGGER.info("rangeValues = {}", rangeValues);
   }
 
   @Override

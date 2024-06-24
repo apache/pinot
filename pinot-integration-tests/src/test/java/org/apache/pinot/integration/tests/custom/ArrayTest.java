@@ -28,11 +28,13 @@ import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.pinot.core.util.DoubleComparisonUtil;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 @Test(suiteName = "CustomClusterIntegrationTest")
@@ -47,10 +49,36 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
   private static final String STRING_COLUMN = "stringCol";
   private static final String TIMESTAMP_COLUMN = "timestampCol";
   private static final String GROUP_BY_COLUMN = "groupKey";
+  private static final String LONG_ARRAY_COLUMN = "longArrayCol";
+  private static final String DOUBLE_ARRAY_COLUMN = "doubleArrayCol";
 
   @Override
   protected long getCountStarResult() {
     return 1000;
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testArrayAggWithEmptyPredicate(boolean useMultiStageQueryEngine) throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query =
+        String.format("SELECT "
+            + "arrayAgg(boolCol, 'BOOLEAN'), "
+            + "arrayAgg(intCol, 'INT'), "
+            + "arrayAgg(longCol, 'LONG'), "
+            // NOTE: FLOAT array is auto converted to DOUBLE array
+            + (useMultiStageQueryEngine ? "arrayAgg(floatCol, 'DOUBLE'), " : "arrayAgg(floatCol, 'FLOAT'), ")
+            + "arrayAgg(doubleCol, 'DOUBLE'), "
+            + "arrayAgg(stringCol, 'STRING'), "
+            + "arrayAgg(timestampCol, 'TIMESTAMP') "
+            + "FROM %s WHERE intCol < 0 LIMIT %d", getTableName(), getCountStarResult());
+    JsonNode jsonNode = postQuery(query);
+    JsonNode rows = jsonNode.get("resultTable").get("rows");
+    assertEquals(rows.size(), 1);
+    JsonNode row = rows.get(0);
+    assertEquals(row.size(), 7);
+    for (int i = 0; i < 7; i++) {
+      assertEquals(row.get(i).size(), 0);
+    }
   }
 
   @Test(dataProvider = "useBothQueryEngines")
@@ -113,6 +141,220 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
       assertEquals(row.get(4).size(), getCountStarResult() / 10);
       assertEquals(row.get(5).size(), getCountStarResult() / 10);
       assertEquals(row.get(6).size(), getCountStarResult() / 10);
+    }
+  }
+
+  @Test(dataProvider = "useV2QueryEngine")
+  public void testListAggQueries(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query =
+        String.format("SELECT "
+            + "listAgg(stringCol, ' | ') "
+            + "FROM %s LIMIT %d", getTableName(), getCountStarResult());
+    JsonNode jsonNode = postQuery(query);
+    JsonNode rows = jsonNode.get("resultTable").get("rows");
+    assertEquals(rows.size(), 1);
+    JsonNode row = rows.get(0);
+    assertEquals(row.size(), 1);
+    assertEquals(row.get(0).asText().split(" \\| ").length, getCountStarResult());
+
+    query =
+        String.format("SELECT "
+            + "listAgg(stringCol, ' | ') WITHIN GROUP (ORDER BY stringCol) "
+            + "FROM %s LIMIT %d", getTableName(), getCountStarResult());
+    jsonNode = postQuery(query);
+    rows = jsonNode.get("resultTable").get("rows");
+    assertEquals(rows.size(), 1);
+    row = rows.get(0);
+    assertEquals(row.size(), 1);
+    String[] splits = row.get(0).asText().split(" \\| ");
+    assertEquals(splits.length, getCountStarResult());
+    for (int i = 1; i < splits.length; i++) {
+      assertTrue(splits[i].compareTo(splits[i - 1]) >= 0);
+    }
+
+    query =
+        String.format("SELECT "
+            + "listAgg(cast(doubleCol AS VARCHAR), ' | ') WITHIN GROUP (ORDER BY doubleCol) "
+            + "FROM %s LIMIT %d", getTableName(), getCountStarResult());
+    jsonNode = postQuery(query);
+    rows = jsonNode.get("resultTable").get("rows");
+    assertEquals(rows.size(), 1);
+    row = rows.get(0);
+    assertEquals(row.size(), 1);
+    splits = row.get(0).asText().split(" \\| ");
+    assertEquals(splits.length, getCountStarResult());
+    for (int i = 1; i < splits.length; i++) {
+      assertTrue(Double.parseDouble(splits[i]) >= Double.parseDouble(splits[i - 1]));
+    }
+  }
+
+  @Test(dataProvider = "useV2QueryEngine")
+  public void testListAggGroupByQueries(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query =
+        String.format("SELECT "
+            + "listAgg(stringCol, ' | '), "
+            + "groupKey "
+            + "FROM %s "
+            + "GROUP BY groupKey "
+            + "LIMIT %d", getTableName(), getCountStarResult());
+    JsonNode jsonNode = postQuery(query);
+    JsonNode rows = jsonNode.get("resultTable").get("rows");
+    assertEquals(rows.size(), 10);
+    for (int i = 0; i < 10; i++) {
+      JsonNode row = rows.get(i);
+      assertEquals(row.size(), 2);
+      assertEquals(row.get(0).asText().split(" \\| ").length, getCountStarResult() / 10);
+    }
+
+    query =
+        String.format("SELECT "
+            + "listAgg(stringCol, ' | ') WITHIN GROUP (ORDER BY stringCol), "
+            + "groupKey "
+            + "FROM %s "
+            + "GROUP BY groupKey "
+            + "LIMIT %d", getTableName(), getCountStarResult());
+    jsonNode = postQuery(query);
+    rows = jsonNode.get("resultTable").get("rows");
+    assertEquals(rows.size(), 10);
+    for (int i = 0; i < 10; i++) {
+      JsonNode row = rows.get(i);
+      assertEquals(row.size(), 2);
+      String[] splits = row.get(0).asText().split(" \\| ");
+      assertEquals(splits.length, getCountStarResult() / 10);
+      for (int j = 1; j < splits.length; j++) {
+        assertTrue(splits[j].compareTo(splits[j - 1]) >= 0);
+      }
+    }
+
+    query =
+        String.format("SELECT "
+            + "listAgg(cast(doubleCol AS VARCHAR), ' | ') WITHIN GROUP (ORDER BY doubleCol), "
+            + "groupKey "
+            + "FROM %s "
+            + "GROUP BY groupKey "
+            + "LIMIT %d", getTableName(), getCountStarResult());
+    jsonNode = postQuery(query);
+    rows = jsonNode.get("resultTable").get("rows");
+    assertEquals(rows.size(), 10);
+    for (int i = 0; i < 10; i++) {
+      JsonNode row = rows.get(i);
+      assertEquals(row.size(), 2);
+      String[] splits = row.get(0).asText().split(" \\| ");
+      assertEquals(splits.length, getCountStarResult() / 10);
+      for (int j = 1; j < splits.length; j++) {
+        assertTrue(Double.parseDouble(splits[j]) >= Double.parseDouble(splits[j - 1]));
+      }
+    }
+  }
+
+  @Test(dataProvider = "useV2QueryEngine")
+  public void testListDistinctAggQueries(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query =
+        String.format("SELECT "
+            + "listAgg(DISTINCT stringCol, ' | ') "
+            + "FROM %s LIMIT %d", getTableName(), getCountStarResult());
+    JsonNode jsonNode = postQuery(query);
+    JsonNode rows = jsonNode.get("resultTable").get("rows");
+    assertEquals(rows.size(), 1);
+    JsonNode row = rows.get(0);
+    assertEquals(row.size(), 1);
+    assertEquals(row.get(0).asText().split(" \\| ").length, getCountStarResult() / 10);
+
+    query =
+        String.format("SELECT "
+            + "listAgg(DISTINCT stringCol, ' | ') WITHIN GROUP (ORDER BY stringCol) "
+            + "FROM %s LIMIT %d", getTableName(), getCountStarResult());
+    jsonNode = postQuery(query);
+    rows = jsonNode.get("resultTable").get("rows");
+    assertEquals(rows.size(), 1);
+    row = rows.get(0);
+    assertEquals(row.size(), 1);
+    String[] splits = row.get(0).asText().split(" \\| ");
+    assertEquals(splits.length, getCountStarResult() / 10);
+    for (int j = 1; j < splits.length; j++) {
+      assertTrue(splits[j].compareTo(splits[j - 1]) > 0);
+    }
+
+    query =
+        String.format("SELECT "
+            + "listAgg(DISTINCT cast(doubleCol AS VARCHAR), ' | ') WITHIN GROUP (ORDER BY doubleCol) "
+            + "FROM %s LIMIT %d", getTableName(), getCountStarResult());
+    jsonNode = postQuery(query);
+    rows = jsonNode.get("resultTable").get("rows");
+    assertEquals(rows.size(), 1);
+    row = rows.get(0);
+    assertEquals(row.size(), 1);
+    splits = row.get(0).asText().split(" \\| ");
+    assertEquals(splits.length, getCountStarResult() / 10);
+    for (int j = 1; j < splits.length; j++) {
+      assertTrue(Double.parseDouble(splits[j]) > Double.parseDouble(splits[j - 1]));
+    }
+  }
+
+  @Test(dataProvider = "useV2QueryEngine")
+  public void testListAggDistinctGroupByQueries(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query =
+        String.format("SELECT "
+            + "listAgg(DISTINCT stringCol, ' | '), "
+            + "groupKey "
+            + "FROM %s "
+            + "GROUP BY groupKey "
+            + "LIMIT %d", getTableName(), getCountStarResult());
+    JsonNode jsonNode = postQuery(query);
+    JsonNode rows = jsonNode.get("resultTable").get("rows");
+    assertEquals(rows.size(), 10);
+    for (int i = 0; i < 10; i++) {
+      JsonNode row = rows.get(i);
+      assertEquals(row.size(), 2);
+      assertEquals(row.get(0).asText().split(" \\| ").length, getCountStarResult() / 100);
+    }
+
+    query =
+        String.format("SELECT "
+            + "listAgg(DISTINCT stringCol, ' | ') WITHIN GROUP (ORDER BY stringCol), "
+            + "groupKey "
+            + "FROM %s "
+            + "GROUP BY groupKey "
+            + "LIMIT %d", getTableName(), getCountStarResult());
+    jsonNode = postQuery(query);
+    rows = jsonNode.get("resultTable").get("rows");
+    assertEquals(rows.size(), 10);
+    for (int i = 0; i < 10; i++) {
+      JsonNode row = rows.get(i);
+      assertEquals(row.size(), 2);
+      String[] splits = row.get(0).asText().split(" \\| ");
+      assertEquals(splits.length, getCountStarResult() / 100);
+      for (int j = 1; j < splits.length; j++) {
+        assertTrue(splits[j].compareTo(splits[j - 1]) > 0);
+      }
+    }
+
+    query =
+        String.format("SELECT "
+            + "listAgg(DISTINCT cast(doubleCol AS VARCHAR), ' | ') WITHIN GROUP (ORDER BY doubleCol), "
+            + "groupKey "
+            + "FROM %s "
+            + "GROUP BY groupKey "
+            + "LIMIT %d", getTableName(), getCountStarResult());
+    jsonNode = postQuery(query);
+    rows = jsonNode.get("resultTable").get("rows");
+    assertEquals(rows.size(), 10);
+    for (int i = 0; i < 10; i++) {
+      JsonNode row = rows.get(i);
+      assertEquals(row.size(), 2);
+      String[] splits = row.get(0).asText().split(" \\| ");
+      assertEquals(splits.length, getCountStarResult() / 100);
+      for (int j = 1; j < splits.length; j++) {
+        assertTrue(Double.parseDouble(splits[j]) > Double.parseDouble(splits[j - 1]));
+      }
     }
   }
 
@@ -246,6 +488,35 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
   }
 
   @Test(dataProvider = "useBothQueryEngines")
+  public void testArraySum(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query = String.format("SELECT sumArrayLong(%s), sumArrayDouble(%s) FROM %s", LONG_ARRAY_COLUMN,
+        DOUBLE_ARRAY_COLUMN, getTableName());
+    JsonNode result = postQuery(query).get("resultTable");
+    JsonNode columnDataTypesNode = result.get("dataSchema").get("columnDataTypes");
+    assertEquals(columnDataTypesNode.get(0).textValue(), "LONG_ARRAY");
+    assertEquals(columnDataTypesNode.get(1).textValue(), "DOUBLE_ARRAY");
+    JsonNode rows = result.get("rows");
+    assertEquals(rows.size(), 1);
+    JsonNode row = rows.get(0);
+    assertEquals(row.size(), 2);
+    JsonNode entry0 = row.get(0);
+    assertEquals(entry0.size(), 4);
+    assertEquals(entry0.get(0).longValue(), 0L);
+    assertEquals(entry0.get(1).longValue(), 1000L);
+    assertEquals(entry0.get(2).longValue(), 2000L);
+    assertEquals(entry0.get(3).longValue(), 3000L);
+    JsonNode entry1 = row.get(1);
+    assertEquals(entry1.size(), 4);
+    assertEquals(entry1.get(0).doubleValue(), 0.0);
+    // Compare double values:
+    assertEquals(DoubleComparisonUtil.doubleCompare(entry1.get(1).doubleValue(), 100.0, 0.00000000001), 0);
+    assertEquals(DoubleComparisonUtil.doubleCompare(entry1.get(2).doubleValue(), 200.0, 0.00000000001), 0);
+    assertEquals(DoubleComparisonUtil.doubleCompare(entry1.get(3).doubleValue(), 300.0, 0.00000000001), 0);
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
   public void testFloatArrayLiteral(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
@@ -326,6 +597,8 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
         .addSingleValueDimension(STRING_COLUMN, FieldSpec.DataType.STRING)
         .addSingleValueDimension(TIMESTAMP_COLUMN, FieldSpec.DataType.TIMESTAMP)
         .addSingleValueDimension(GROUP_BY_COLUMN, FieldSpec.DataType.STRING)
+        .addMultiValueDimension(LONG_ARRAY_COLUMN, FieldSpec.DataType.LONG)
+        .addMultiValueDimension(DOUBLE_ARRAY_COLUMN, FieldSpec.DataType.DOUBLE)
         .build();
   }
 
@@ -355,6 +628,12 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
             null, null),
         new org.apache.avro.Schema.Field(GROUP_BY_COLUMN,
             org.apache.avro.Schema.create(org.apache.avro.Schema.Type.STRING),
+            null, null),
+        new org.apache.avro.Schema.Field(LONG_ARRAY_COLUMN,
+            org.apache.avro.Schema.createArray(org.apache.avro.Schema.create(org.apache.avro.Schema.Type.LONG)),
+            null, null),
+        new org.apache.avro.Schema.Field(DOUBLE_ARRAY_COLUMN,
+            org.apache.avro.Schema.createArray(org.apache.avro.Schema.create(org.apache.avro.Schema.Type.DOUBLE)),
             null, null)
     ));
 
@@ -377,6 +656,8 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
               record.put(STRING_COLUMN, RandomStringUtils.random(finalI));
               record.put(TIMESTAMP_COLUMN, finalI);
               record.put(GROUP_BY_COLUMN, String.valueOf(finalI % 10));
+              record.put(LONG_ARRAY_COLUMN, ImmutableList.of(0, 1, 2, 3));
+              record.put(DOUBLE_ARRAY_COLUMN, ImmutableList.of(0.0, 0.1, 0.2, 0.3));
               return record;
             }
         ));

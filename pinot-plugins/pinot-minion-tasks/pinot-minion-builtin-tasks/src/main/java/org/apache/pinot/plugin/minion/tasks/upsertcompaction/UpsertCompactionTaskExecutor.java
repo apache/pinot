@@ -36,6 +36,7 @@ import org.apache.pinot.segment.local.segment.readers.CompactedPinotSegmentRecor
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.Schema;
 import org.roaringbitmap.RoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -99,7 +100,8 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
 
     try (CompactedPinotSegmentRecordReader compactedRecordReader = new CompactedPinotSegmentRecordReader(indexDir,
         validDocIds)) {
-      SegmentGeneratorConfig config = getSegmentGeneratorConfig(workingDir, tableConfig, segmentMetadata, segmentName);
+      SegmentGeneratorConfig config = getSegmentGeneratorConfig(workingDir, tableConfig, segmentMetadata, segmentName,
+          getSchema(tableNameWithType));
       SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
       driver.init(config, compactedRecordReader);
       driver.build();
@@ -117,8 +119,8 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
   }
 
   private static SegmentGeneratorConfig getSegmentGeneratorConfig(File workingDir, TableConfig tableConfig,
-      SegmentMetadataImpl segmentMetadata, String segmentName) {
-    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, segmentMetadata.getSchema());
+      SegmentMetadataImpl segmentMetadata, String segmentName, Schema schema) {
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
     config.setOutDir(workingDir.getPath());
     config.setSegmentName(segmentName);
     // Keep index creation time the same as original segment because both segments use the same raw data.

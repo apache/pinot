@@ -73,8 +73,8 @@ public class QueryOptimizerTest {
     assertEquals(secondChildFunction.getOperator(), FilterKind.AND.name());
     List<Expression> secondChildChildren = secondChildFunction.getOperands();
     assertEquals(secondChildChildren.size(), 3);
-    assertEquals(secondChildChildren.get(0), getEqFilterExpression("long", 5L));
-    assertEquals(secondChildChildren.get(1), getEqFilterExpression("float", 9f));
+    assertEquals(secondChildChildren.get(0), getEqFilterExpression("long", 5));
+    assertEquals(secondChildChildren.get(1), getEqFilterExpression("float", 9));
     assertEquals(secondChildChildren.get(2), getEqFilterExpression("double", 7.5));
   }
 
@@ -95,7 +95,7 @@ public class QueryOptimizerTest {
     List<Expression> children = filterFunction.getOperands();
     assertEquals(children.size(), 3);
     assertEquals(children.get(0), getEqFilterExpression("int", 1));
-    checkInFilterFunction(children.get(1).getFunctionCall(), "long", Arrays.asList(2L, 3L, 4L));
+    checkInFilterFunction(children.get(1).getFunctionCall(), "long", Arrays.asList(2, 3, 4));
 
     Function thirdChildFunction = children.get(2).getFunctionCall();
     assertEquals(thirdChildFunction.getOperator(), FilterKind.OR.name());
@@ -152,7 +152,7 @@ public class QueryOptimizerTest {
     assertEquals(secondChildFunction.getOperator(), FilterKind.AND.name());
     List<Expression> secondChildChildren = secondChildFunction.getOperands();
     assertEquals(secondChildChildren.size(), 2);
-    assertEquals(secondChildChildren.get(0), getEqFilterExpression("float", 6f));
+    assertEquals(secondChildChildren.get(0), getEqFilterExpression("float", 6));
     assertEquals(secondChildChildren.get(1), getRangeFilterExpression("float", "[6.0\0006.5)"));
 
     // Range filter on multi-value column should not be merged ([-5, 10] can match this filter)
@@ -387,16 +387,16 @@ public class QueryOptimizerTest {
   private static String getRangeString(FilterKind filterKind, List<Expression> operands) {
     switch (filterKind) {
       case GREATER_THAN:
-        return Range.LOWER_EXCLUSIVE + operands.get(1).getLiteral().getFieldValue().toString() + Range.UPPER_UNBOUNDED;
+        return Range.LOWER_EXCLUSIVE + RequestUtils.getLiteralString(operands.get(1)) + Range.UPPER_UNBOUNDED;
       case GREATER_THAN_OR_EQUAL:
-        return Range.LOWER_INCLUSIVE + operands.get(1).getLiteral().getFieldValue().toString() + Range.UPPER_UNBOUNDED;
+        return Range.LOWER_INCLUSIVE + RequestUtils.getLiteralString(operands.get(1)) + Range.UPPER_UNBOUNDED;
       case LESS_THAN:
-        return Range.LOWER_UNBOUNDED + operands.get(1).getLiteral().getFieldValue().toString() + Range.UPPER_EXCLUSIVE;
+        return Range.LOWER_UNBOUNDED + RequestUtils.getLiteralString(operands.get(1)) + Range.UPPER_EXCLUSIVE;
       case LESS_THAN_OR_EQUAL:
-        return Range.LOWER_UNBOUNDED + operands.get(1).getLiteral().getFieldValue().toString() + Range.UPPER_INCLUSIVE;
+        return Range.LOWER_UNBOUNDED + RequestUtils.getLiteralString(operands.get(1)) + Range.UPPER_INCLUSIVE;
       case BETWEEN:
-        return Range.LOWER_INCLUSIVE + operands.get(1).getLiteral().getFieldValue().toString() + Range.DELIMITER
-            + operands.get(2).getLiteral().getFieldValue().toString() + Range.UPPER_INCLUSIVE;
+        return Range.LOWER_INCLUSIVE + RequestUtils.getLiteralString(operands.get(1)) + Range.DELIMITER
+            + RequestUtils.getLiteralString(operands.get(2)) + Range.UPPER_INCLUSIVE;
       case RANGE:
         return operands.get(1).getLiteral().getStringValue();
       default:

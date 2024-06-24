@@ -33,11 +33,24 @@ import org.testng.annotations.Test;
 
 @Test(groups = "stateless")
 public class StaleInstancesCleanupTaskStatelessTest extends ControllerTest {
+
+  @Override
+  protected void overrideControllerConf(Map<String, Object> properties) {
+    properties.put(ControllerConf.ControllerPeriodicTasksConf.STALE_INSTANCES_CLEANUP_TASK_INSTANCES_RETENTION_PERIOD,
+        "1s");
+  }
+
   @BeforeClass
-  public void setup()
+  public void setUp()
       throws Exception {
     startZk();
     startController();
+  }
+
+  @AfterClass
+  public void tearDown() {
+    stopController();
+    stopZk();
   }
 
   @Test
@@ -47,7 +60,7 @@ public class StaleInstancesCleanupTaskStatelessTest extends ControllerTest {
     StaleInstancesCleanupTask staleInstancesCleanupTask = _controllerStarter.getStaleInstancesCleanupTask();
     staleInstancesCleanupTask.runTask(new Properties());
     Assert.assertEquals(MetricValueUtils.getGlobalGaugeValue(_controllerStarter.getControllerMetrics(),
-            ControllerGauge.DROPPED_BROKER_INSTANCES), 0);
+        ControllerGauge.DROPPED_BROKER_INSTANCES), 0);
     addFakeBrokerInstancesToAutoJoinHelixCluster(3, true);
     Assert.assertEquals(MetricValueUtils.getGlobalGaugeValue(_controllerStarter.getControllerMetrics(),
         ControllerGauge.DROPPED_BROKER_INSTANCES), 0);
@@ -122,22 +135,5 @@ public class StaleInstancesCleanupTaskStatelessTest extends ControllerTest {
     staleInstancesCleanupTask.runTask(new Properties());
     Assert.assertEquals(MetricValueUtils.getGlobalGaugeValue(_controllerStarter.getControllerMetrics(),
         ControllerGauge.DROPPED_MINION_INSTANCES), 3);
-  }
-
-  @Override
-  public Map<String, Object> getDefaultControllerConfiguration() {
-    Map<String, Object> properties = super.getDefaultControllerConfiguration();
-    // Override the cleanup before deletion period so that test can avoid stuck failure
-    properties.put(ControllerConf.ControllerPeriodicTasksConf.
-        MINION_INSTANCES_CLEANUP_TASK_MIN_OFFLINE_TIME_BEFORE_DELETION_PERIOD, "1s");
-    properties.put(ControllerConf.ControllerPeriodicTasksConf.
-        STALE_INSTANCES_CLEANUP_TASK_INSTANCES_RETENTION_PERIOD, "1s");
-    return properties;
-  }
-
-  @AfterClass
-  public void teardown() {
-    stopController();
-    stopZk();
   }
 }

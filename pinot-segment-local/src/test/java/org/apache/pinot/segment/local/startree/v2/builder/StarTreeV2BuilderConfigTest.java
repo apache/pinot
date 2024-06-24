@@ -23,19 +23,16 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.Constants;
-import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.segment.spi.index.startree.AggregationSpec;
-import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
 import org.apache.pinot.spi.config.table.StarTreeAggregationConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -136,33 +133,29 @@ public class StarTreeV2BuilderConfigTest {
 
   @Test
   public void testBuildFromIndexConfig() {
-    List<StarTreeAggregationConfig> aggregationConfigs =
-        List.of(new StarTreeAggregationConfig("m1", "SUM", CompressionCodec.LZ4));
+    List<StarTreeAggregationConfig> aggregationConfigs = List.of(new StarTreeAggregationConfig("m1", "SUM"));
     StarTreeIndexConfig starTreeIndexConfig = new StarTreeIndexConfig(List.of("d1"), null, null, aggregationConfigs, 1);
     StarTreeV2BuilderConfig builderConfig = StarTreeV2BuilderConfig.fromIndexConfig(starTreeIndexConfig);
-    assertEquals(builderConfig.getMaxLeafRecords(), 1);
     assertEquals(builderConfig.getDimensionsSplitOrder(), List.of("d1"));
-    assertEquals(builderConfig.getFunctionColumnPairs(),
-        Set.of(new AggregationFunctionColumnPair(AggregationFunctionType.SUM, "m1")));
     assertTrue(builderConfig.getSkipStarNodeCreationForDimensions().isEmpty());
-    assertEquals(builderConfig.getAggregationSpecs().values(),
-        Collections.singleton(new AggregationSpec(ChunkCompressionType.LZ4)));
+    assertEquals(builderConfig.getAggregationSpecs(),
+        Map.of(new AggregationFunctionColumnPair(AggregationFunctionType.SUM, "m1"), AggregationSpec.DEFAULT));
+    assertEquals(builderConfig.getMaxLeafRecords(), 1);
   }
 
   @Test
   public void testAggregationSpecUniqueness() {
     List<StarTreeAggregationConfig> aggregationConfigs =
-        List.of(new StarTreeAggregationConfig("m1", "distinctCountThetaSketch", CompressionCodec.LZ4),
-            new StarTreeAggregationConfig("m1", "distinctCountRawThetaSketch", CompressionCodec.LZ4));
+        List.of(new StarTreeAggregationConfig("m1", "distinctCountThetaSketch"),
+            new StarTreeAggregationConfig("m1", "distinctCountRawThetaSketch"));
     StarTreeIndexConfig starTreeIndexConfig = new StarTreeIndexConfig(List.of("d1"), null, null, aggregationConfigs, 1);
     StarTreeV2BuilderConfig builderConfig = StarTreeV2BuilderConfig.fromIndexConfig(starTreeIndexConfig);
-    assertEquals(builderConfig.getMaxLeafRecords(), 1);
     assertEquals(builderConfig.getDimensionsSplitOrder(), List.of("d1"));
-    assertEquals(builderConfig.getFunctionColumnPairs(),
-        Set.of(new AggregationFunctionColumnPair(AggregationFunctionType.DISTINCTCOUNTTHETASKETCH, "m1")));
     assertTrue(builderConfig.getSkipStarNodeCreationForDimensions().isEmpty());
-    assertEquals(builderConfig.getAggregationSpecs().values(),
-        Collections.singleton(new AggregationSpec(ChunkCompressionType.LZ4)));
+    assertEquals(builderConfig.getAggregationSpecs(),
+        Map.of(new AggregationFunctionColumnPair(AggregationFunctionType.DISTINCTCOUNTTHETASKETCH, "m1"),
+            AggregationSpec.DEFAULT));
+    assertEquals(builderConfig.getMaxLeafRecords(), 1);
   }
 
   @Test
@@ -171,12 +164,12 @@ public class StarTreeV2BuilderConfigTest {
     StarTreeIndexConfig starTreeIndexConfig =
         new StarTreeIndexConfig(List.of("d1"), null, functionColumnPairs, null, 1);
     StarTreeV2BuilderConfig builderConfig = StarTreeV2BuilderConfig.fromIndexConfig(starTreeIndexConfig);
-    assertEquals(builderConfig.getMaxLeafRecords(), 1);
     assertEquals(builderConfig.getDimensionsSplitOrder(), List.of("d1"));
-    assertEquals(builderConfig.getFunctionColumnPairs(),
-        Set.of(new AggregationFunctionColumnPair(AggregationFunctionType.DISTINCTCOUNTTHETASKETCH, "m1")));
     assertTrue(builderConfig.getSkipStarNodeCreationForDimensions().isEmpty());
-    assertEquals(builderConfig.getAggregationSpecs().values(), Collections.singleton(AggregationSpec.DEFAULT));
+    assertEquals(builderConfig.getAggregationSpecs(),
+        Map.of(new AggregationFunctionColumnPair(AggregationFunctionType.DISTINCTCOUNTTHETASKETCH, "m1"),
+            AggregationSpec.DEFAULT));
+    assertEquals(builderConfig.getMaxLeafRecords(), 1);
   }
 
   private ColumnMetadata getColumnMetadata(String column, boolean hasDictionary, int cardinality) {

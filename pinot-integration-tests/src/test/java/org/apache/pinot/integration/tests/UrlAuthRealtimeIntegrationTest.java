@@ -97,50 +97,41 @@ public class UrlAuthRealtimeIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @Override
-  public Map<String, Object> getDefaultControllerConfiguration() {
-    Map<String, Object> conf = BasicAuthTestUtils.addControllerConfiguration(super.getDefaultControllerConfiguration());
-    conf.put("controller.segment.fetcher.auth.provider.class", AUTH_PROVIDER_CLASS);
-    conf.put("controller.segment.fetcher.auth.url", AUTH_URL);
-    conf.put("controller.segment.fetcher.auth.prefix", AUTH_PREFIX);
-
-    return conf;
+  protected void overrideControllerConf(Map<String, Object> properties) {
+    BasicAuthTestUtils.addControllerConfiguration(properties);
+    properties.put("controller.segment.fetcher.auth.provider.class", AUTH_PROVIDER_CLASS);
+    properties.put("controller.segment.fetcher.auth.url", AUTH_URL);
+    properties.put("controller.segment.fetcher.auth.prefix", AUTH_PREFIX);
   }
 
   @Override
-  protected PinotConfiguration getDefaultBrokerConfiguration() {
-    PinotConfiguration conf = BasicAuthTestUtils.addBrokerConfiguration(super.getDefaultBrokerConfiguration().toMap());
-    // no customization yet
-
-    return conf;
+  protected void overrideBrokerConf(PinotConfiguration brokerConf) {
+    BasicAuthTestUtils.addBrokerConfiguration(brokerConf);
   }
 
   @Override
-  protected PinotConfiguration getDefaultServerConfiguration() {
-    PinotConfiguration conf = BasicAuthTestUtils.addServerConfiguration(super.getDefaultServerConfiguration().toMap());
-    conf.setProperty("pinot.server.segment.fetcher.auth.provider.class", AUTH_PROVIDER_CLASS);
-    conf.setProperty("pinot.server.segment.fetcher.auth.url", AUTH_URL);
-    conf.setProperty("pinot.server.segment.fetcher.auth.prefix", AUTH_PREFIX);
-    conf.setProperty("pinot.server.segment.uploader.auth.provider.class", AUTH_PROVIDER_CLASS);
-    conf.setProperty("pinot.server.segment.uploader.auth.url", AUTH_URL);
-    conf.setProperty("pinot.server.segment.uploader.auth.prefix", AUTH_PREFIX);
-    conf.setProperty("pinot.server.instance.auth.provider.class", AUTH_PROVIDER_CLASS);
-    conf.setProperty("pinot.server.instance.auth.url", AUTH_URL);
-    conf.setProperty("pinot.server.instance.auth.prefix", AUTH_PREFIX);
-
-    return conf;
+  protected void overrideServerConf(PinotConfiguration serverConf) {
+    BasicAuthTestUtils.addServerConfiguration(serverConf);
+    serverConf.setProperty("pinot.server.segment.fetcher.auth.provider.class", AUTH_PROVIDER_CLASS);
+    serverConf.setProperty("pinot.server.segment.fetcher.auth.url", AUTH_URL);
+    serverConf.setProperty("pinot.server.segment.fetcher.auth.prefix", AUTH_PREFIX);
+    serverConf.setProperty("pinot.server.segment.uploader.auth.provider.class", AUTH_PROVIDER_CLASS);
+    serverConf.setProperty("pinot.server.segment.uploader.auth.url", AUTH_URL);
+    serverConf.setProperty("pinot.server.segment.uploader.auth.prefix", AUTH_PREFIX);
+    serverConf.setProperty("pinot.server.instance.auth.provider.class", AUTH_PROVIDER_CLASS);
+    serverConf.setProperty("pinot.server.instance.auth.url", AUTH_URL);
+    serverConf.setProperty("pinot.server.instance.auth.prefix", AUTH_PREFIX);
   }
 
   @Override
-  protected PinotConfiguration getDefaultMinionConfiguration() {
-    PinotConfiguration conf = BasicAuthTestUtils.addMinionConfiguration(super.getDefaultMinionConfiguration().toMap());
-    conf.setProperty("segment.fetcher.auth.provider.class", AUTH_PROVIDER_CLASS);
-    conf.setProperty("segment.fetcher.auth.url", AUTH_URL_PREFIXED);
-    conf.setProperty("segment.fetcher.auth.prefix", AUTH_PREFIX);
-    conf.setProperty("task.auth.provider.class", AUTH_PROVIDER_CLASS);
-    conf.setProperty("task.auth.url", AUTH_URL_PREFIXED);
-    conf.setProperty("task.auth.prefix", AUTH_PREFIX);
-
-    return conf;
+  protected void overrideMinionConf(PinotConfiguration minionConf) {
+    BasicAuthTestUtils.addMinionConfiguration(minionConf);
+    minionConf.setProperty("segment.fetcher.auth.provider.class", AUTH_PROVIDER_CLASS);
+    minionConf.setProperty("segment.fetcher.auth.url", AUTH_URL_PREFIXED);
+    minionConf.setProperty("segment.fetcher.auth.prefix", AUTH_PREFIX);
+    minionConf.setProperty("task.auth.provider.class", AUTH_PROVIDER_CLASS);
+    minionConf.setProperty("task.auth.url", AUTH_URL_PREFIXED);
+    minionConf.setProperty("task.auth.prefix", AUTH_PREFIX);
   }
 
   @Override

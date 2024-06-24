@@ -20,12 +20,14 @@ package org.apache.pinot.common.function.scalar;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import org.apache.calcite.linq4j.function.Strict;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
 
 /**
  * Arithmetic scalar functions.
  */
+@Strict
 public class ArithmeticFunctions {
   private ArithmeticFunctions() {
   }

@@ -40,7 +40,9 @@ import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexInputRef;
+import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
+import org.apache.calcite.sql.SqlAggFunction;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.tools.RelBuilderFactory;
@@ -92,7 +94,7 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
     // Perform all validations
     validateWindows(window);
 
-    Window.Group windowGroup = window.groups.get(0);
+    Window.Group windowGroup = updateLiteralArgumentsInWindowGroup(window);
     if (windowGroup.keys.isEmpty() && windowGroup.orderKeys.getKeys().isEmpty()) {
       // Empty OVER()
       // Add a single Exchange for empty OVER() since no sort is required
@@ -111,7 +113,8 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
       PinotLogicalExchange exchange = PinotLogicalExchange.create(windowInput,
           RelDistributions.hash(Collections.emptyList()));
       call.transformTo(
-          LogicalWindow.create(window.getTraitSet(), exchange, window.constants, window.getRowType(), window.groups));
+          LogicalWindow.create(window.getTraitSet(), exchange, window.constants, window.getRowType(),
+              List.of(windowGroup)));
     } else if (windowGroup.keys.isEmpty() && !windowGroup.orderKeys.getKeys().isEmpty()) {
       // Only ORDER BY
       // Add a LogicalSortExchange with collation on the order by key(s) and an empty hash partition key
@@ -121,7 +124,7 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
       PinotLogicalSortExchange sortExchange = PinotLogicalSortExchange.create(windowInput,
           RelDistributions.hash(Collections.emptyList()), windowGroup.orderKeys, false, true);
       call.transformTo(LogicalWindow.create(window.getTraitSet(), sortExchange, window.constants, window.getRowType(),
-          window.groups));
+          List.of(windowGroup)));
     } else {
       // All other variants
       // Assess whether this is a PARTITION BY only query or not (includes queries of the type where PARTITION BY and
@@ -134,7 +137,7 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
         PinotLogicalExchange exchange = PinotLogicalExchange.create(windowInput,
             RelDistributions.hash(windowGroup.keys.toList()));
         call.transformTo(LogicalWindow.create(window.getTraitSet(), exchange, window.constants, window.getRowType(),
-            window.groups));
+            List.of(windowGroup)));
       } else {
         // PARTITION BY and ORDER BY on different key(s)
         // Add a LogicalSortExchange hashed on the partition by keys and collation based on order by keys
@@ -145,9 +148,59 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
         PinotLogicalSortExchange sortExchange = PinotLogicalSortExchange.create(windowInput,
             RelDistributions.hash(windowGroup.keys.toList()), windowGroup.orderKeys, false, true);
         call.transformTo(LogicalWindow.create(window.getTraitSet(), sortExchange, window.constants, window.getRowType(),
-            window.groups));
+            List.of(windowGroup)));
       }
     }
+  }
+
+  private Window.Group updateLiteralArgumentsInWindowGroup(Window window) {
+    Window.Group oldWindowGroup = window.groups.get(0);
+    int windowInputSize = window.getInput().getRowType().getFieldCount();
+    ImmutableList<Window.RexWinAggCall> oldAggCalls = oldWindowGroup.aggCalls;
+    List<Window.RexWinAggCall> newAggCallWindow = new ArrayList<>(oldAggCalls.size());
+    boolean aggCallChanged = false;
+    for (Window.RexWinAggCall oldAggCall : oldAggCalls) {
+      boolean changed = false;
+      List<RexNode> oldAggCallArgList = oldAggCall.getOperands();
+      List<RexNode> rexList = new ArrayList<>(oldAggCallArgList.size());
+      for (RexNode rexNode : oldAggCallArgList) {
+        RexNode newRexNode = rexNode;
+        if (rexNode instanceof RexInputRef) {
+          RexInputRef inputRef = (RexInputRef) rexNode;
+          int inputRefIndex = inputRef.getIndex();
+          // If the input reference is greater than the window input size, it is a reference to the constants
+          if (inputRefIndex >= windowInputSize) {
+            newRexNode = window.constants.get(inputRefIndex - windowInputSize);
+            changed = true;
+            aggCallChanged = true;
+          } else {
+            RelNode windowInputRelNode = ((HepRelVertex) window.getInput()).getCurrentRel();
+            if (windowInputRelNode instanceof LogicalProject) {
+              RexNode inputRefRexNode = ((LogicalProject) windowInputRelNode).getProjects().get(inputRefIndex);
+              if (inputRefRexNode instanceof RexLiteral) {
+                // If the input reference is a literal, replace it with the literal value
+                newRexNode = inputRefRexNode;
+                changed = true;
+                aggCallChanged = true;
+              }
+            }
+          }
+        }
+        rexList.add(newRexNode);
+      }
+      if (changed) {
+        newAggCallWindow.add(
+            new Window.RexWinAggCall((SqlAggFunction) oldAggCall.getOperator(), oldAggCall.type, rexList,
+                oldAggCall.ordinal, oldAggCall.distinct, oldAggCall.ignoreNulls));
+      } else {
+        newAggCallWindow.add(oldAggCall);
+      }
+    }
+    if (aggCallChanged) {
+      return new Window.Group(oldWindowGroup.keys, oldWindowGroup.isRows, oldWindowGroup.lowerBound,
+          oldWindowGroup.upperBound, oldWindowGroup.orderKeys, newAggCallWindow);
+    }
+    return oldWindowGroup;
   }
 
   private void validateWindows(Window window) {

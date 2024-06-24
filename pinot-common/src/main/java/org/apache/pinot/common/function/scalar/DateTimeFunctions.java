@@ -21,6 +21,7 @@ package org.apache.pinot.common.function.scalar;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
+import org.apache.calcite.linq4j.function.Strict;
 import org.apache.pinot.common.function.DateTimePatternHandler;
 import org.apache.pinot.common.function.DateTimeUtils;
 import org.apache.pinot.common.function.TimeZoneKey;
@@ -69,6 +70,7 @@ import org.joda.time.chrono.ISOChronology;
  *     }]
  *   </code>
  */
+@Strict
 public class DateTimeFunctions {
   private DateTimeFunctions() {
   }

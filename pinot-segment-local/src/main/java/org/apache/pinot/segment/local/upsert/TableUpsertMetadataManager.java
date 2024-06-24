@@ -53,6 +53,6 @@ public interface TableUpsertMetadataManager extends Closeable {
    */
   Map<Integer, Long> getPartitionToPrimaryKeyCount();
 
-  default void setSegmentContexts(List<SegmentContext> segmentContexts) {
+  default void setSegmentContexts(List<SegmentContext> segmentContexts, Map<String, String> queryOptions) {
   }
 }

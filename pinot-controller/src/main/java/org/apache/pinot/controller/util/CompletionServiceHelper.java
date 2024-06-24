@@ -129,13 +129,20 @@ public class CompletionServiceHelper {
         int statusCode = multiHttpRequestResponse.getResponse().getStatusLine().getStatusCode();
         if (statusCode >= 300) {
           String reason = multiHttpRequestResponse.getResponse().getStatusLine().getReasonPhrase();
-          LOGGER.error("Server: {} returned error: {}, reason: {}", instance, statusCode, reason);
+          LOGGER.error("Server: {} returned error: {}, reason: {} for uri: {}", instance, statusCode, reason, uri);
           completionServiceResponse._failedResponseCount++;
           continue;
         }
         String responseString = EntityUtils.toString(multiHttpRequestResponse.getResponse().getEntity());
-        completionServiceResponse._httpResponses
-            .put(multiRequestPerServer ? uri.toString() : instance, responseString);
+        String key = multiRequestPerServer ? uri.toString() : instance;
+        // If there are multiple requests to the same server with the same URI but different payloads,
+        // we append a count value to the key to ensure each response is uniquely identified.
+        // Otherwise, the map will store only the last response, overwriting previous ones.
+        if (multiRequestPerServer) {
+          int count = completionServiceResponse._instanceToRequestCount.compute(key, (k, v) -> v == null ? 1 : v + 1);
+          key = key + "__" + count;
+        }
+        completionServiceResponse._httpResponses.put(key, responseString);
       } catch (Exception e) {
         String reason = useCase == null ? "" : String.format(" in '%s'", useCase);
         LOGGER.error("Connection error {}. Details: {}", reason, e.getMessage());
@@ -151,10 +158,10 @@ public class CompletionServiceHelper {
       }
     }
 
-    int numServersResponded = completionServiceResponse._httpResponses.size();
-    if (numServersResponded != size) {
-      LOGGER.warn("Finished reading information for table: {} with {}/{} server responses", tableNameWithType,
-          numServersResponded, size);
+    int numServerRequestsResponded = completionServiceResponse._httpResponses.size();
+    if (numServerRequestsResponded != size) {
+      LOGGER.warn("Finished reading information for table: {} with {}/{} server-request responses", tableNameWithType,
+          numServerRequestsResponded, size);
     } else {
       LOGGER.info("Finished reading information for table: {}", tableNameWithType);
     }
@@ -180,10 +187,13 @@ public class CompletionServiceHelper {
     public Map<String, String> _httpResponses;
     // Number of failures encountered when requesting
     public int _failedResponseCount;
+    // Map of instance to count of requests
+    public Map<String, Integer> _instanceToRequestCount;
 
     public CompletionServiceResponse() {
       _httpResponses = new HashMap<>();
       _failedResponseCount = 0;
+      _instanceToRequestCount = new HashMap<>();
     }
   }
 }

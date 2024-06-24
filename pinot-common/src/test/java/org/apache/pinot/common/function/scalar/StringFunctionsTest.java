@@ -138,4 +138,29 @@ public class StringFunctionsTest {
     assertEquals(StringFunctions.uniqueNgrams(input, maxGram), expectedExactNGram);
     assertEquals(StringFunctions.uniqueNgrams(input, minGram, maxGram), expectedNGram);
   }
+
+  @Test
+  public void encodeUrl() {
+    assertEquals(StringFunctions.encodeUrl(""), "");
+    assertEquals(StringFunctions.encodeUrl("a"), "a");
+    assertEquals(StringFunctions.encodeUrl("A"), "A");
+    assertEquals(StringFunctions.encodeUrl(" "), "+");
+    assertEquals(StringFunctions.encodeUrl("?"), "%3F");
+    assertEquals(StringFunctions.encodeUrl("/"), "%2F");
+    assertEquals(StringFunctions.encodeUrl("&"), "%26");
+    assertEquals(StringFunctions.encodeUrl(":"), "%3A");
+    assertEquals(StringFunctions.encodeUrl("="), "%3D");
+    assertEquals(StringFunctions.encodeUrl("@"), "%40");
+
+    assertEquals(StringFunctions.encodeUrl(
+        "http://localhost:8080/hello?a=b"), "http%3A%2F%2Flocalhost%3A8080%2Fhello%3Fa%3Db");
+
+    // CHECKSTYLE:OFF
+    assertEquals(StringFunctions.encodeUrl(
+        "http://localhost:8080/hello?paramWithSpace=a b"), "http%3A%2F%2Flocalhost%3A8080%2Fhello%3FparamWithSpace%3Da+b");
+    // CHECKSTYLE:ON
+
+    assertEquals(StringFunctions.encodeUrl(
+        "https://localhost:8080/hello?a=b"), "https%3A%2F%2Flocalhost%3A8080%2Fhello%3Fa%3Db");
+  }
 }

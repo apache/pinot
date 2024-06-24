@@ -18,33 +18,36 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
-import com.google.common.collect.ImmutableList;
 import java.util.List;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.query.planner.plannode.FilterNode;
+import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockTestUtils;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.mockito.Mock;
-import org.mockito.Mockito;
-import org.mockito.MockitoAnnotations;
-import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
+
+import static org.mockito.Mockito.when;
+import static org.mockito.MockitoAnnotations.openMocks;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 public class FilterOperatorTest {
   private AutoCloseable _mocks;
   @Mock
-  private MultiStageOperator _upstreamOperator;
+  private MultiStageOperator _input;
 
   @BeforeMethod
   public void setUp() {
-    _mocks = MockitoAnnotations.openMocks(this);
+    _mocks = openMocks(this);
   }
 
   @AfterMethod
@@ -55,66 +58,50 @@ public class FilterOperatorTest {
 
   @Test
   public void shouldPropagateUpstreamErrorBlock() {
-    Mockito.when(_upstreamOperator.nextBlock())
-        .thenReturn(TransferableBlockUtils.getErrorTransferableBlock(new Exception("filterError")));
-    RexExpression booleanLiteral = new RexExpression.Literal(ColumnDataType.BOOLEAN, 1);
+    when(_input.nextBlock()).thenReturn(TransferableBlockUtils.getErrorTransferableBlock(new Exception("filterError")));
     DataSchema inputSchema = new DataSchema(new String[]{"boolCol"}, new ColumnDataType[]{
         ColumnDataType.BOOLEAN
     });
-    FilterOperator op =
-        new FilterOperator(OperatorTestUtil.getTracingContext(), _upstreamOperator, inputSchema, booleanLiteral);
-    TransferableBlock errorBlock = op.getNextBlock();
-    Assert.assertTrue(errorBlock.isErrorBlock());
-    Assert.assertTrue(errorBlock.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains("filterError"));
+    FilterOperator operator = getOperator(inputSchema, RexExpression.Literal.TRUE);
+    TransferableBlock block = operator.getNextBlock();
+    assertTrue(block.isErrorBlock());
+    assertTrue(block.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains("filterError"));
   }
 
   @Test
   public void shouldPropagateUpstreamEOS() {
-    RexExpression booleanLiteral = new RexExpression.Literal(ColumnDataType.BOOLEAN, 1);
     DataSchema inputSchema = new DataSchema(new String[]{"intCol"}, new ColumnDataType[]{
         ColumnDataType.INT
     });
-    Mockito.when(_upstreamOperator.nextBlock())
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
-    FilterOperator op =
-        new FilterOperator(OperatorTestUtil.getTracingContext(), _upstreamOperator, inputSchema, booleanLiteral);
-    TransferableBlock dataBlock = op.getNextBlock();
-    Assert.assertTrue(dataBlock.isEndOfStreamBlock());
+    when(_input.nextBlock()).thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    FilterOperator operator = getOperator(inputSchema, RexExpression.Literal.TRUE);
+    TransferableBlock block = operator.getNextBlock();
+    assertTrue(block.isEndOfStreamBlock());
   }
 
   @Test
   public void shouldHandleTrueBooleanLiteralFilter() {
-    RexExpression booleanLiteral = new RexExpression.Literal(ColumnDataType.BOOLEAN, 1);
     DataSchema inputSchema = new DataSchema(new String[]{"intCol"}, new ColumnDataType[]{
         ColumnDataType.INT
     });
-    Mockito.when(_upstreamOperator.nextBlock())
-        .thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{0}, new Object[]{1}))
+    when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{0}, new Object[]{1}))
         .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
-    FilterOperator op =
-        new FilterOperator(OperatorTestUtil.getTracingContext(), _upstreamOperator, inputSchema, booleanLiteral);
-    TransferableBlock dataBlock = op.getNextBlock();
-    Assert.assertFalse(dataBlock.isErrorBlock());
-    List<Object[]> result = dataBlock.getContainer();
-    Assert.assertEquals(result.size(), 2);
-    Assert.assertEquals(result.get(0)[0], 0);
-    Assert.assertEquals(result.get(1)[0], 1);
+    FilterOperator operator = getOperator(inputSchema, RexExpression.Literal.TRUE);
+    List<Object[]> resultRows = operator.getNextBlock().getContainer();
+    assertEquals(resultRows.size(), 2);
+    assertEquals(resultRows.get(0), new Object[]{0});
+    assertEquals(resultRows.get(1), new Object[]{1});
   }
 
   @Test
   public void shouldHandleFalseBooleanLiteralFilter() {
-    RexExpression booleanLiteral = new RexExpression.Literal(ColumnDataType.BOOLEAN, 0);
     DataSchema inputSchema = new DataSchema(new String[]{"intCol"}, new ColumnDataType[]{
         ColumnDataType.INT
     });
-    Mockito.when(_upstreamOperator.nextBlock())
-        .thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{1}, new Object[]{2}));
-    FilterOperator op =
-        new FilterOperator(OperatorTestUtil.getTracingContext(), _upstreamOperator, inputSchema, booleanLiteral);
-    TransferableBlock dataBlock = op.getNextBlock();
-    Assert.assertFalse(dataBlock.isErrorBlock());
-    List<Object[]> result = dataBlock.getContainer();
-    Assert.assertTrue(result.isEmpty());
+    when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{1}, new Object[]{2}));
+    FilterOperator operator = getOperator(inputSchema, RexExpression.Literal.FALSE);
+    List<Object[]> resultRows = operator.getNextBlock().getContainer();
+    assertTrue(resultRows.isEmpty());
   }
 
   @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = "Filter operand must "
@@ -124,11 +111,8 @@ public class FilterOperatorTest {
     DataSchema inputSchema = new DataSchema(new String[]{"intCol"}, new ColumnDataType[]{
         ColumnDataType.INT
     });
-    Mockito.when(_upstreamOperator.nextBlock())
-        .thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{1}, new Object[]{2}));
-    FilterOperator op =
-        new FilterOperator(OperatorTestUtil.getTracingContext(), _upstreamOperator, inputSchema, booleanLiteral);
-    op.getNextBlock();
+    when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{1}, new Object[]{2}));
+    getOperator(inputSchema, booleanLiteral);
   }
 
   @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = "Filter operand must "
@@ -138,10 +122,8 @@ public class FilterOperatorTest {
     DataSchema inputSchema = new DataSchema(new String[]{"intCol"}, new ColumnDataType[]{
         ColumnDataType.INT
     });
-    Mockito.when(_upstreamOperator.nextBlock())
-        .thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{1}, new Object[]{2}));
-    FilterOperator op = new FilterOperator(OperatorTestUtil.getTracingContext(), _upstreamOperator, inputSchema, ref0);
-    op.getNextBlock();
+    when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{1}, new Object[]{2}));
+    getOperator(inputSchema, ref0);
   }
 
   @Test
@@ -150,15 +132,11 @@ public class FilterOperatorTest {
     DataSchema inputSchema = new DataSchema(new String[]{"intCol", "boolCol"}, new ColumnDataType[]{
         ColumnDataType.INT, ColumnDataType.BOOLEAN
     });
-    Mockito.when(_upstreamOperator.nextBlock())
-        .thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{1, 1}, new Object[]{2, 0}));
-    FilterOperator op = new FilterOperator(OperatorTestUtil.getTracingContext(), _upstreamOperator, inputSchema, ref1);
-    TransferableBlock dataBlock = op.getNextBlock();
-    Assert.assertFalse(dataBlock.isErrorBlock());
-    List<Object[]> result = dataBlock.getContainer();
-    Assert.assertEquals(result.size(), 1);
-    Assert.assertEquals(result.get(0)[0], 1);
-    Assert.assertEquals(result.get(0)[1], 1);
+    when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{1, 1}, new Object[]{2, 0}));
+    FilterOperator operator = getOperator(inputSchema, ref1);
+    List<Object[]> resultRows = operator.getNextBlock().getContainer();
+    assertEquals(resultRows.size(), 1);
+    assertEquals(resultRows.get(0), new Object[]{1, 1});
   }
 
   @Test
@@ -166,19 +144,14 @@ public class FilterOperatorTest {
     DataSchema inputSchema = new DataSchema(new String[]{"boolCol0", "boolCol1"}, new ColumnDataType[]{
         ColumnDataType.BOOLEAN, ColumnDataType.BOOLEAN
     });
-    Mockito.when(_upstreamOperator.nextBlock())
-        .thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{1, 1}, new Object[]{0, 0}, new Object[]{1, 0}));
-    RexExpression.FunctionCall andCall = new RexExpression.FunctionCall(SqlKind.AND, ColumnDataType.BOOLEAN, "AND",
-        ImmutableList.of(new RexExpression.InputRef(0), new RexExpression.InputRef(1)));
-
-    FilterOperator op =
-        new FilterOperator(OperatorTestUtil.getTracingContext(), _upstreamOperator, inputSchema, andCall);
-    TransferableBlock dataBlock = op.getNextBlock();
-    Assert.assertFalse(dataBlock.isErrorBlock());
-    List<Object[]> result = dataBlock.getContainer();
-    Assert.assertEquals(result.size(), 1);
-    Assert.assertEquals(result.get(0)[0], 1);
-    Assert.assertEquals(result.get(0)[1], 1);
+    when(_input.nextBlock()).thenReturn(
+        OperatorTestUtil.block(inputSchema, new Object[]{1, 1}, new Object[]{0, 0}, new Object[]{1, 0}));
+    RexExpression.FunctionCall andCall = new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.AND.name(),
+        List.of(new RexExpression.InputRef(0), new RexExpression.InputRef(1)));
+    FilterOperator operator = getOperator(inputSchema, andCall);
+    List<Object[]> resultRows = operator.getNextBlock().getContainer();
+    assertEquals(resultRows.size(), 1);
+    assertEquals(resultRows.get(0), new Object[]{1, 1});
   }
 
   @Test
@@ -186,21 +159,15 @@ public class FilterOperatorTest {
     DataSchema inputSchema = new DataSchema(new String[]{"boolCol0", "boolCol1"}, new ColumnDataType[]{
         ColumnDataType.BOOLEAN, ColumnDataType.BOOLEAN
     });
-    Mockito.when(_upstreamOperator.nextBlock())
-        .thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{1, 1}, new Object[]{0, 0}, new Object[]{1, 0}));
-    RexExpression.FunctionCall orCall = new RexExpression.FunctionCall(SqlKind.OR, ColumnDataType.BOOLEAN, "OR",
-        ImmutableList.of(new RexExpression.InputRef(0), new RexExpression.InputRef(1)));
-
-    FilterOperator op =
-        new FilterOperator(OperatorTestUtil.getTracingContext(), _upstreamOperator, inputSchema, orCall);
-    TransferableBlock dataBlock = op.getNextBlock();
-    Assert.assertFalse(dataBlock.isErrorBlock());
-    List<Object[]> result = dataBlock.getContainer();
-    Assert.assertEquals(result.size(), 2);
-    Assert.assertEquals(result.get(0)[0], 1);
-    Assert.assertEquals(result.get(0)[1], 1);
-    Assert.assertEquals(result.get(1)[0], 1);
-    Assert.assertEquals(result.get(1)[1], 0);
+    when(_input.nextBlock()).thenReturn(
+        OperatorTestUtil.block(inputSchema, new Object[]{1, 1}, new Object[]{0, 0}, new Object[]{1, 0}));
+    RexExpression.FunctionCall orCall = new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.OR.name(),
+        List.of(new RexExpression.InputRef(0), new RexExpression.InputRef(1)));
+    FilterOperator operator = getOperator(inputSchema, orCall);
+    List<Object[]> resultRows = operator.getNextBlock().getContainer();
+    assertEquals(resultRows.size(), 2);
+    assertEquals(resultRows.get(0), new Object[]{1, 1});
+    assertEquals(resultRows.get(1), new Object[]{1, 0});
   }
 
   @Test
@@ -208,19 +175,15 @@ public class FilterOperatorTest {
     DataSchema inputSchema = new DataSchema(new String[]{"boolCol0", "boolCol1"}, new ColumnDataType[]{
         ColumnDataType.BOOLEAN, ColumnDataType.BOOLEAN
     });
-    Mockito.when(_upstreamOperator.nextBlock())
-        .thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{1, 1}, new Object[]{0, 0}, new Object[]{1, 0}));
-    RexExpression.FunctionCall notCall = new RexExpression.FunctionCall(SqlKind.NOT, ColumnDataType.BOOLEAN, "NOT",
-        ImmutableList.of(new RexExpression.InputRef(0)));
-
-    FilterOperator op =
-        new FilterOperator(OperatorTestUtil.getTracingContext(), _upstreamOperator, inputSchema, notCall);
-    TransferableBlock dataBlock = op.getNextBlock();
-    Assert.assertFalse(dataBlock.isErrorBlock());
-    List<Object[]> result = dataBlock.getContainer();
-    Assert.assertEquals(result.size(), 1);
-    Assert.assertEquals(result.get(0)[0], 0);
-    Assert.assertEquals(result.get(0)[1], 0);
+    when(_input.nextBlock()).thenReturn(
+        OperatorTestUtil.block(inputSchema, new Object[]{1, 1}, new Object[]{0, 0}, new Object[]{1, 0}));
+    RexExpression.FunctionCall notCall = new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.NOT.name(),
+        List.of(new RexExpression.InputRef(0)));
+    FilterOperator operator = getOperator(inputSchema, notCall);
+    List<Object[]> resultRows = operator.getNextBlock().getContainer();
+    assertEquals(resultRows.size(), 1);
+    assertEquals(resultRows.get(0)[0], 0);
+    assertEquals(resultRows.get(0)[1], 0);
   }
 
   @Test
@@ -228,19 +191,15 @@ public class FilterOperatorTest {
     DataSchema inputSchema = new DataSchema(new String[]{"int0", "int1"}, new ColumnDataType[]{
         ColumnDataType.INT, ColumnDataType.INT
     });
-    Mockito.when(_upstreamOperator.nextBlock())
-        .thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{1, 2}, new Object[]{3, 2}, new Object[]{1, 1}));
+    when(_input.nextBlock()).thenReturn(
+        OperatorTestUtil.block(inputSchema, new Object[]{1, 2}, new Object[]{3, 2}, new Object[]{1, 1}));
     RexExpression.FunctionCall greaterThan =
-        new RexExpression.FunctionCall(SqlKind.GREATER_THAN, ColumnDataType.BOOLEAN, "greaterThan",
-            ImmutableList.of(new RexExpression.InputRef(0), new RexExpression.InputRef(1)));
-    FilterOperator op =
-        new FilterOperator(OperatorTestUtil.getTracingContext(), _upstreamOperator, inputSchema, greaterThan);
-    TransferableBlock dataBlock = op.getNextBlock();
-    Assert.assertFalse(dataBlock.isErrorBlock());
-    List<Object[]> result = dataBlock.getContainer();
-    List<Object[]> expectedResult = ImmutableList.of(new Object[]{3, 2});
-    Assert.assertEquals(result.size(), expectedResult.size());
-    Assert.assertEquals(result.get(0), expectedResult.get(0));
+        new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.GREATER_THAN.name(),
+            List.of(new RexExpression.InputRef(0), new RexExpression.InputRef(1)));
+    FilterOperator operator = getOperator(inputSchema, greaterThan);
+    List<Object[]> resultRows = operator.getNextBlock().getContainer();
+    assertEquals(resultRows.size(), 1);
+    assertEquals(resultRows.get(0), new Object[]{3, 2});
   }
 
   @Test
@@ -248,32 +207,32 @@ public class FilterOperatorTest {
     DataSchema inputSchema = new DataSchema(new String[]{"string1"}, new ColumnDataType[]{
         ColumnDataType.STRING
     });
-    Mockito.when(_upstreamOperator.nextBlock())
-        .thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{"starTree"}, new Object[]{"treeStar"}));
+    when(_input.nextBlock()).thenReturn(
+        OperatorTestUtil.block(inputSchema, new Object[]{"starTree"}, new Object[]{"treeStar"}));
     RexExpression.FunctionCall startsWith =
-        new RexExpression.FunctionCall(SqlKind.OTHER, ColumnDataType.BOOLEAN, "startsWith",
-            ImmutableList.of(new RexExpression.InputRef(0), new RexExpression.Literal(ColumnDataType.STRING, "star")));
-    FilterOperator op =
-        new FilterOperator(OperatorTestUtil.getTracingContext(), _upstreamOperator, inputSchema, startsWith);
-    TransferableBlock dataBlock = op.getNextBlock();
-    Assert.assertFalse(dataBlock.isErrorBlock());
-    List<Object[]> result = dataBlock.getContainer();
-    List<Object[]> expectedResult = ImmutableList.of(new Object[]{"starTree"});
-    Assert.assertEquals(result.size(), expectedResult.size());
-    Assert.assertEquals(result.get(0), expectedResult.get(0));
+        new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.STARTS_WITH.name(),
+            List.of(new RexExpression.InputRef(0), new RexExpression.Literal(ColumnDataType.STRING, "star")));
+    FilterOperator operator = getOperator(inputSchema, startsWith);
+    List<Object[]> resultRows = operator.getNextBlock().getContainer();
+    assertEquals(resultRows.size(), 1);
+    assertEquals(resultRows.get(0), new Object[]{"starTree"});
   }
 
   @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = "Cannot find function "
       + "with name: startsWithError")
-  public void shouldThrowOnUnfoundFunction() {
+  public void shouldThrowOnInvalidFunction() {
     DataSchema inputSchema = new DataSchema(new String[]{"string1"}, new ColumnDataType[]{
         ColumnDataType.STRING
     });
-    Mockito.when(_upstreamOperator.nextBlock())
-        .thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{"starTree"}, new Object[]{"treeStar"}));
-    RexExpression.FunctionCall startsWith =
-        new RexExpression.FunctionCall(SqlKind.OTHER, ColumnDataType.BOOLEAN, "startsWithError",
-            ImmutableList.of(new RexExpression.InputRef(0), new RexExpression.Literal(ColumnDataType.STRING, "star")));
-    new FilterOperator(OperatorTestUtil.getTracingContext(), _upstreamOperator, inputSchema, startsWith);
+    when(_input.nextBlock()).thenReturn(
+        OperatorTestUtil.block(inputSchema, new Object[]{"starTree"}, new Object[]{"treeStar"}));
+    RexExpression.FunctionCall startsWith = new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, "startsWithError",
+        List.of(new RexExpression.InputRef(0), new RexExpression.Literal(ColumnDataType.STRING, "star")));
+    getOperator(inputSchema, startsWith);
+  }
+
+  private FilterOperator getOperator(DataSchema schema, RexExpression condition) {
+    return new FilterOperator(OperatorTestUtil.getTracingContext(), _input,
+        new FilterNode(-1, schema, PlanNode.NodeHint.EMPTY, List.of(), condition));
   }
 }

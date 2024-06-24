@@ -18,8 +18,11 @@
  */
 package org.apache.pinot.common.response;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.util.List;
+import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
@@ -32,34 +35,6 @@ import org.apache.pinot.spi.utils.JsonUtils;
 public interface BrokerResponse {
 
   /**
-   * Set exceptions caught during request handling, into the broker response.
-   */
-  void setExceptions(List<ProcessingException> exceptions);
-
-  void addToExceptions(QueryProcessingException processingException);
-
-  /**
-   * Set the number of servers got queried by the broker.
-   *
-   * @param numServersQueried number of servers got queried.
-   */
-  void setNumServersQueried(int numServersQueried);
-
-  /**
-   * Set the number of servers responded to the broker.
-   *
-   * @param numServersResponded number of servers responded.
-   */
-  void setNumServersResponded(int numServersResponded);
-
-  long getTimeUsedMs();
-
-  /**
-   * Set the total time used in request handling, into the broker response.
-   */
-  void setTimeUsedMs(long timeUsedMs);
-
-  /**
    * Convert the broker response to JSON String.
    */
   default String toJsonString()
@@ -68,69 +43,50 @@ public interface BrokerResponse {
   }
 
   /**
-   * Returns the number of servers queried.
+   * Write the object JSON to the output stream.
    */
-  int getNumServersQueried();
+  default void toOutputStream(OutputStream outputStream)
+      throws IOException {
+    JsonUtils.objectToOutputStream(this, outputStream);
+  }
 
   /**
-   * Returns the number of servers responded.
+   * Returns the result table.
    */
-  int getNumServersResponded();
+  @Nullable
+  ResultTable getResultTable();
 
   /**
-   * Get number of documents scanned while processing the query.
+   * Sets the result table. We expose this method to allow modifying the results on the client side, e.g. hiding the
+   * results and only showing the stats.
    */
-  long getNumDocsScanned();
+  void setResultTable(@Nullable ResultTable resultTable);
 
   /**
-   * Get number of entries scanned in filter phase while processing the query.
+   * Returns the number of rows in the result table.
    */
-  long getNumEntriesScannedInFilter();
+  int getNumRowsResultSet();
 
   /**
-   * Get number of entries scanned post filter phase while processing the query.
+   * Returns whether the query doesn't guarantee to have the complete result due to exceptions or limits.
    */
-  long getNumEntriesScannedPostFilter();
+  boolean isPartialResult();
 
   /**
-   * Get the number of segments queried by the broker after broker side pruning
+   * Returns the processing exceptions encountered during the query execution.
    */
-  long getNumSegmentsQueried();
+  List<QueryProcessingException> getExceptions();
 
-  /**
-   * Get the number of segments processed by server after server side pruning
-   */
-  long getNumSegmentsProcessed();
+  @Deprecated
+  @JsonIgnore
+  default List<QueryProcessingException> getProcessingExceptions() {
+    return getExceptions();
+  }
 
-  /**
-   * Get number of segments that had at least one matching document
-   */
-  long getNumSegmentsMatched();
-
-  /**
-   * Get number of consuming segments that were queried.
-   */
-  long getNumConsumingSegmentsQueried();
-
-  /**
-   * Get number of consuming segments processed by server after server side pruning
-   */
-  long getNumConsumingSegmentsProcessed();
-
-  /**
-   * Get number of consuming segments that had at least one matching document
-   */
-  long getNumConsumingSegmentsMatched();
-
-  /**
-   * Get the minimum freshness timestamp across consuming segments that were queried
-   */
-  long getMinConsumingFreshnessTimeMs();
-
-  /**
-   * Get total number of documents within the table hit.
-   */
-  long getTotalDocs();
+  @JsonIgnore
+  default int getExceptionsSize() {
+    return getExceptions().size();
+  }
 
   /**
    * Returns whether the number of groups limit has been reached.
@@ -143,69 +99,172 @@ public interface BrokerResponse {
   boolean isMaxRowsInJoinReached();
 
   /**
-   * Get number of exceptions recorded in the response.
+   * Returns whether the limit for max rows in window has been reached.
    */
-  int getExceptionsSize();
+  boolean isMaxRowsInWindowReached();
 
   /**
-   * set the result table.
-   * @param resultTable result table to be set.
+   * Returns the total time used for query execution in milliseconds.
    */
-  void setResultTable(@Nullable ResultTable resultTable);
+  long getTimeUsedMs();
 
   /**
-   * Get the result table.
-   * @return result table.
+   * Returns the request ID of the query.
    */
-  @Nullable
-  ResultTable getResultTable();
+  String getRequestId();
 
   /**
-   * Get the list of exceptions
+   * Sets the request ID of the query.
    */
-  List<QueryProcessingException> getProcessingExceptions();
+  void setRequestId(String requestId);
 
   /**
-   * Get the total number of rows in result set
+   * Returns the broker ID that handled the query.
    */
-  default int getNumRowsResultSet() {
-    ResultTable resultTable = getResultTable();
-    return resultTable == null ? 0 : resultTable.getRows().size();
-  }
+  String getBrokerId();
 
   /**
-   * Get the thread cpu time used against offline table in request handling, from the broker response.
+   * Sets the broker ID that handled the query.
+   */
+  void setBrokerId(String brokerId);
+
+  /**
+   * Returns the number of documents selected (matching the filter) for the query.
+   */
+  long getNumDocsScanned();
+
+  /**
+   * Returns the total number of documents within the table(s) hit.
+   */
+  long getTotalDocs();
+
+  /**
+   * Returns the number of entries scanned in filter phase while processing the query.
+   */
+  long getNumEntriesScannedInFilter();
+
+  /**
+   * Returns the number of entries scanned post filter phase while processing the query.
+   */
+  long getNumEntriesScannedPostFilter();
+
+  /**
+   * Returns the number of servers queried.
+   */
+  int getNumServersQueried();
+
+  /**
+   * Returns the number of servers responded.
+   */
+  int getNumServersResponded();
+
+  /**
+   * Returns the number of segments queried by the broker after broker side pruning.
+   */
+  long getNumSegmentsQueried();
+
+  /**
+   * Returns the number of segments processed by server after server side pruning.
+   */
+  long getNumSegmentsProcessed();
+
+  /**
+   * Returns the number of segments that had at least one matching document.
+   */
+  long getNumSegmentsMatched();
+
+  /**
+   * Returns the number of consuming segments queried by the broker after broker side pruning.
+   */
+  long getNumConsumingSegmentsQueried();
+
+  /**
+   * Returns the number of consuming segments processed by server after server side pruning.
+   */
+  long getNumConsumingSegmentsProcessed();
+
+  /**
+   * Returns the number of consuming segments that had at least one matching document.
+   */
+  long getNumConsumingSegmentsMatched();
+
+  /**
+   * Returns the minimum freshness timestamp across consuming segments that were queried.
+   *
+   * The freshness timestamp for a segment is the largest event ingestion timestamp if provided by the stream, or the
+   * index timestamp of the last message.
+   */
+  long getMinConsumingFreshnessTimeMs();
+
+  /**
+   * Returns the number of segments pruned on the broker side.
+   */
+  long getNumSegmentsPrunedByBroker();
+
+  /**
+   * Returns the number of segments pruned on the server side.
+   */
+  long getNumSegmentsPrunedByServer();
+
+  /**
+   * Returns the number of segments pruned due to invalid data or schema.
+   *
+   * This value is always lower or equal than {@link #getNumSegmentsPrunedByServer()}
+   */
+  long getNumSegmentsPrunedInvalid();
+
+  /**
+   * Returns the number of segments pruned by applying the limit optimization.
+   *
+   * This value is always lower or equal than {@link #getNumSegmentsPrunedByServer()}
+   */
+  long getNumSegmentsPrunedByLimit();
+
+  /**
+   * Returns the number of segments pruned applying value optimizations, like bloom filters.
+   *
+   * This value is always lower or equal than {@link #getNumSegmentsPrunedByServer()}
+   */
+  long getNumSegmentsPrunedByValue();
+
+  /**
+   * Returns the time used to reduce the server responses into the final response in milliseconds.
+   */
+  long getBrokerReduceTimeMs();
+
+  /**
+   * Returns the thread cpu time used for query execution against offline table in nanoseconds.
    */
   long getOfflineThreadCpuTimeNs();
 
   /**
-   * Get the thread cpu time used against realtime table in request handling, from the broker response.
+   * Returns the thread cpu time used for query execution against real-time table in nanoseconds.
    */
   long getRealtimeThreadCpuTimeNs();
 
   /**
-   * Get the system activities cpu time used against offline table in request handling, from the broker response.
+   * Returns the cpu time used for system activities against offline table in nanoseconds.
    */
   long getOfflineSystemActivitiesCpuTimeNs();
 
   /**
-   * Get the system activities cpu time used against realtime table in request handling, from the broker response.
+   * Returns the cpu time used for system activities against real-time table in nanoseconds.
    */
   long getRealtimeSystemActivitiesCpuTimeNs();
 
   /**
-   * Get the response serialization cpu time used against offline table in request handling, from the broker response.
+   * Returns the cpu time used for response serialization against offline table in nanoseconds.
    */
   long getOfflineResponseSerializationCpuTimeNs();
 
   /**
-   * Get the response serialization cpu time used against realtime table in request handling, from the broker response.
+   * Returns the cpu time used for response serialization against real-time table in nanoseconds.
    */
   long getRealtimeResponseSerializationCpuTimeNs();
 
   /**
-   * Get the total cpu time(thread cpu time + system activities cpu time + response serialization cpu time) used
-   * against offline table in request handling, from the broker response.
+   * Returns the total cpu time (query execution + system activities + response serialization) used against offline
+   * table in nanoseconds.
    */
   default long getOfflineTotalCpuTimeNs() {
     return getOfflineThreadCpuTimeNs() + getOfflineSystemActivitiesCpuTimeNs()
@@ -213,8 +272,8 @@ public interface BrokerResponse {
   }
 
   /**
-   * Get the total cpu time(thread cpu time + system activities cpu time + response serialization cpu time) used
-   * against realtime table in request handling, from the broker response.
+   * Returns the total cpu time (query execution + system activities + response serialization) used against real-time
+   * table in nanoseconds.
    */
   default long getRealtimeTotalCpuTimeNs() {
     return getRealtimeThreadCpuTimeNs() + getRealtimeSystemActivitiesCpuTimeNs()
@@ -222,74 +281,17 @@ public interface BrokerResponse {
   }
 
   /**
-   * Get the total number of segments pruned on the Broker side
-   */
-  long getNumSegmentsPrunedByBroker();
-
-  /**
-   * Set the total number of segments pruned on the Broker side
-   */
-  void setNumSegmentsPrunedByBroker(long numSegmentsPrunedByBroker);
-
-  /**
-   * Get the total number of segments pruned on the Server side
-   */
-  long getNumSegmentsPrunedByServer();
-
-  /**
-   * Get the total number of segments pruned due to invalid data or schema.
-   *
-   * This value is always lower or equal than {@link #getNumSegmentsPrunedByServer()}
-   */
-  long getNumSegmentsPrunedInvalid();
-
-  /**
-   * Get the total number of segments pruned by applying the limit optimization.
-   *
-   * This value is always lower or equal than {@link #getNumSegmentsPrunedByServer()}
-   */
-  long getNumSegmentsPrunedByLimit();
-
-  /**
-   * Get the total number of segments pruned applying value optimizations, like bloom filters.
-   *
-   * This value is always lower or equal than {@link #getNumSegmentsPrunedByServer()}
-   */
-  long getNumSegmentsPrunedByValue();
-
-  /**
-   * Get the total number of segments with an EmptyFilterOperator when Explain Plan is called
+   * Returns the total number of segments with an EmptyFilterOperator when Explain Plan is called.
    */
   long getExplainPlanNumEmptyFilterSegments();
 
   /**
-   * Get the total number of segments with a MatchAllFilterOperator when Explain Plan is called
+   * Returns the total number of segments with a MatchAllFilterOperator when Explain Plan is called.
    */
   long getExplainPlanNumMatchAllFilterSegments();
 
   /**
-   * get request ID for the query
+   * Returns the trace info for the query execution when tracing is enabled, empty map otherwise.
    */
-  String getRequestId();
-
-  /**
-   * set request ID generated by broker
-   */
-  void setRequestId(String requestId);
-
-  /**
-   * get broker ID of the processing broker
-   */
-  String getBrokerId();
-
-  /**
-   * set broker ID of the processing broker
-   */
-  void setBrokerId(String requestId);
-
-  long getBrokerReduceTimeMs();
-
-  void setBrokerReduceTimeMs(long brokerReduceTimeMs);
-
-  boolean isPartialResult();
+  Map<String, String> getTraceInfo();
 }
