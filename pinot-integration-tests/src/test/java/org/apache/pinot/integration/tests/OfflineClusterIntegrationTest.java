@@ -1491,7 +1491,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   public void testDefaultColumns(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    notSupportedInV2();
     long numTotalDocs = getCountStarResult();
 
     reloadWithExtraColumns();
@@ -1500,7 +1499,11 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(queryResponse.get("resultTable").get("dataSchema").get("columnNames").size(), 103);
 
     testNewAddedColumns();
-    testExpressionOverride();
+
+    // The multi-stage query engine doesn't support expression overrides currently
+    if (!useMultiStageQueryEngine()) {
+      testExpressionOverride();
+    }
 
     reloadWithMissingColumns();
     queryResponse = postQuery(SELECT_STAR_QUERY);
@@ -1692,66 +1695,126 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     String h2Query = "SELECT COUNT(*) FROM mytable";
     String pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedIntMetric = 1";
     testQuery(pinotQuery, h2Query);
+
     pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedLongMetric = 1";
     testQuery(pinotQuery, h2Query);
+
     pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedFloatMetric = 0";
     testQuery(pinotQuery, h2Query);
+
     pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedDoubleMetric = 0";
     testQuery(pinotQuery, h2Query);
+
     pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedBigDecimalMetric = 0";
     testQuery(pinotQuery, h2Query);
-    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedBytesMetric = ''";
+
+    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedBytesMetric = "
+        + (useMultiStageQueryEngine() ? "X''" : "''");
     testQuery(pinotQuery, h2Query);
-    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedMVIntDimension < 0";
+
+    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE "
+        + (useMultiStageQueryEngine() ? "arrayToMV(NewAddedMVIntDimension)" : "NewAddedMVIntDimension") + " < 0";
     testQuery(pinotQuery, h2Query);
-    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedMVLongDimension < 0";
+
+    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE "
+        + (useMultiStageQueryEngine() ? "arrayToMV(NewAddedMVLongDimension)" : "NewAddedMVLongDimension") + " < 0";
     testQuery(pinotQuery, h2Query);
-    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedMVFloatDimension < 0.0";
+
+    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE "
+        + (useMultiStageQueryEngine() ? "arrayToMV(NewAddedMVFloatDimension)" : "NewAddedMVFloatDimension") + " < 0.0";
     testQuery(pinotQuery, h2Query);
-    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedMVDoubleDimension < 0.0";
+
+    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE "
+        + (useMultiStageQueryEngine() ? "arrayToMV(NewAddedMVDoubleDimension)" : "NewAddedMVDoubleDimension")
+        + " < 0.0";
     testQuery(pinotQuery, h2Query);
-    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedMVBooleanDimension = false";
+
+    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE "
+        + (useMultiStageQueryEngine() ? "arrayToMV(NewAddedMVBooleanDimension)" : "NewAddedMVBooleanDimension")
+        + " = false";
     testQuery(pinotQuery, h2Query);
-    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedMVTimestampDimension = 0";
+
+    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE "
+        + (useMultiStageQueryEngine()
+        ? "arrayToMV(CAST(NewAddedMVTimestampDimension AS BIGINT ARRAY))"
+        : "NewAddedMVTimestampDimension")
+        + " = 0";
     testQuery(pinotQuery, h2Query);
-    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedMVStringDimension = 'null'";
+
+    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE "
+        + (useMultiStageQueryEngine() ? "arrayToMV(NewAddedMVStringDimension)" : "NewAddedMVStringDimension")
+        + " = 'null'";
     testQuery(pinotQuery, h2Query);
+
     pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedSVJSONDimension = 'null'";
     testQuery(pinotQuery, h2Query);
-    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedSVBytesDimension = ''";
+
+    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedSVBytesDimension = "
+        + (useMultiStageQueryEngine() ? "X''" : "''");
     testQuery(pinotQuery, h2Query);
 
     pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedDerivedHoursSinceEpoch = 392232";
     h2Query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch = 16343";
     testQuery(pinotQuery, h2Query);
-    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedDerivedTimestamp = 1411862400000";
+
+    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE "
+        + (useMultiStageQueryEngine() ? "CAST(NewAddedDerivedTimestamp AS BIGINT)" : "NewAddedDerivedTimestamp")
+        + " = 1411862400000";
     h2Query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch = 16341";
     testQuery(pinotQuery, h2Query);
+
     pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedDerivedSVBooleanDimension = true";
     h2Query = "SELECT COUNT(*) FROM mytable WHERE ActualElapsedTime > 0";
     testQuery(pinotQuery, h2Query);
-    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedDerivedMVStringDimension = 'CA'";
+
+    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE "
+        + (useMultiStageQueryEngine()
+        ? "arrayToMV(NewAddedDerivedMVStringDimension)"
+        : "NewAddedDerivedMVStringDimension")
+        + " = 'CA'";
     h2Query = "SELECT COUNT(*) FROM mytable WHERE DestState = 'CA'";
     testQuery(pinotQuery, h2Query);
+
     pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedRawDerivedStringDimension = 'Washington, DC'";
     h2Query = "SELECT COUNT(*) FROM mytable WHERE DestCityName = 'CD ,notgnihsaW'";
     testQuery(pinotQuery, h2Query);
-    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedRawDerivedMVIntDimension = 332";
+
+    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE "
+        + (useMultiStageQueryEngine()
+        ? "arrayToMV(NewAddedRawDerivedMVIntDimension)"
+        : "NewAddedRawDerivedMVIntDimension")
+        + " = 332";
     h2Query = "SELECT COUNT(*) FROM mytable WHERE ActualElapsedTime = 332";
     testQuery(pinotQuery, h2Query);
-    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedDerivedMVDoubleDimension = 110.0";
+
+    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE "
+        + (useMultiStageQueryEngine()
+        ? "arrayToMV(NewAddedDerivedMVDoubleDimension)"
+        : "NewAddedDerivedMVDoubleDimension")
+        + " = 110.0";
     h2Query = "SELECT COUNT(*) FROM mytable WHERE ArrDelayMinutes = 110.0";
     testQuery(pinotQuery, h2Query);
 
-    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE DivAirportSeqIDs > 1100000";
+    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE "
+        + (useMultiStageQueryEngine() ? "arrayToMV(DivAirportSeqIDs)" : "DivAirportSeqIDs")
+        + " > 1100000";
     JsonNode response = postQuery(pinotQuery);
     JsonNode rows = response.get("resultTable").get("rows");
     long count = rows.get(0).get(0).asLong();
-    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedDerivedDivAirportSeqIDs > 1100000";
+    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE "
+        + (useMultiStageQueryEngine()
+        ? "arrayToMV(NewAddedDerivedDivAirportSeqIDs)"
+        : "NewAddedDerivedDivAirportSeqIDs")
+        + " > 1100000";
     response = postQuery(pinotQuery);
     rows = response.get("resultTable").get("rows");
     assertEquals(rows.get(0).get(0).asLong(), count);
-    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE CAST(NewAddedDerivedDivAirportSeqIDsString AS INT) > 1100000";
+
+    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE "
+        + (useMultiStageQueryEngine()
+        ? "arrayToMV(NewAddedDerivedDivAirportSeqIDsString)"
+        : "CAST(NewAddedDerivedDivAirportSeqIDsString AS INT)")
+        + " > 1100000";
     response = postQuery(pinotQuery);
     rows = response.get("resultTable").get("rows");
     assertEquals(rows.get(0).get(0).asLong(), count);
@@ -1760,19 +1823,25 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     pinotQuery = "SELECT SUM(NewAddedIntMetric) FROM mytable WHERE DaysSinceEpoch <= 16312";
     h2Query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch <= 16312";
     testQuery(pinotQuery, h2Query);
+
     pinotQuery = "SELECT SUM(NewAddedIntMetric) FROM mytable WHERE DaysSinceEpoch > 16312";
     h2Query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch > 16312";
     testQuery(pinotQuery, h2Query);
+
     pinotQuery = "SELECT SUM(NewAddedLongMetric) FROM mytable WHERE DaysSinceEpoch <= 16312";
     h2Query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch <= 16312";
     testQuery(pinotQuery, h2Query);
+
     pinotQuery = "SELECT SUM(NewAddedLongMetric) FROM mytable WHERE DaysSinceEpoch > 16312";
     h2Query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch > 16312";
     testQuery(pinotQuery, h2Query);
 
     // Test other query forms with new added columns
     pinotQuery =
-        "SELECT NewAddedMVStringDimension, SUM(NewAddedFloatMetric) FROM mytable GROUP BY NewAddedMVStringDimension";
+        "SELECT "
+            + (useMultiStageQueryEngine() ? "arrayToMV(NewAddedMVStringDimension)" : "NewAddedMVStringDimension")
+            + ", SUM(NewAddedFloatMetric) FROM mytable GROUP BY "
+            + (useMultiStageQueryEngine() ? "arrayToMV(NewAddedMVStringDimension)" : "NewAddedMVStringDimension");
     response = postQuery(pinotQuery);
     rows = response.get("resultTable").get("rows");
     assertEquals(rows.size(), 1);
@@ -1780,16 +1849,26 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(row.size(), 2);
     assertEquals(row.get(0).asText(), "null");
     assertEquals(row.get(1).asDouble(), 0.0);
+
+    // The multi-stage query engine doesn't support BIG_DECIMAL data type currently.
+    if (!useMultiStageQueryEngine()) {
+      pinotQuery =
+          "SELECT NewAddedSVBytesDimension, SUM(NewAddedBigDecimalMetric) FROM mytable "
+              + "GROUP BY NewAddedSVBytesDimension";
+      response = postQuery(pinotQuery);
+      rows = response.get("resultTable").get("rows");
+      assertEquals(rows.size(), 1);
+      row = rows.get(0);
+      assertEquals(row.size(), 2);
+      assertEquals(row.get(0).asText(), "");
+      assertEquals(row.get(1).asDouble(), 0.0);
+    }
+
     pinotQuery =
-        "SELECT NewAddedSVBytesDimension, SUM(NewAddedBigDecimalMetric) FROM mytable GROUP BY NewAddedSVBytesDimension";
-    response = postQuery(pinotQuery);
-    rows = response.get("resultTable").get("rows");
-    assertEquals(rows.size(), 1);
-    row = rows.get(0);
-    assertEquals(row.size(), 2);
-    assertEquals(row.get(0).asText(), "");
-    assertEquals(row.get(1).asDouble(), 0.0);
-    pinotQuery = "SELECT NewAddedMVLongDimension, SUM(NewAddedIntMetric) FROM mytable GROUP BY NewAddedMVLongDimension";
+        "SELECT "
+            + (useMultiStageQueryEngine() ? "arrayToMV(NewAddedMVLongDimension)" : "NewAddedMVLongDimension")
+            + ", SUM(NewAddedIntMetric) FROM mytable GROUP BY "
+            + (useMultiStageQueryEngine() ? "arrayToMV(NewAddedMVLongDimension)" : "NewAddedMVLongDimension");
     response = postQuery(pinotQuery);
     rows = response.get("resultTable").get("rows");
     assertEquals(rows.size(), 1);
@@ -1797,7 +1876,13 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(row.size(), 2);
     assertEquals(row.get(0).asLong(), Long.MIN_VALUE);
     assertEquals(row.get(1).asDouble(), numTotalDocsInDouble);
-    String newAddedDimensions =
+
+    String newAddedDimensions = useMultiStageQueryEngine()
+        ? "arrayToMV(NewAddedMVIntDimension), arrayToMV(NewAddedMVLongDimension), arrayToMV(NewAddedMVFloatDimension), "
+            + "arrayToMV(NewAddedMVDoubleDimension), arrayToMV(NewAddedMVBooleanDimension), "
+            + "arrayToMV(NewAddedMVTimestampDimension), arrayToMV(NewAddedMVStringDimension), "
+            + "NewAddedSVJSONDimension, NewAddedSVBytesDimension"
+        :
         "NewAddedMVIntDimension, NewAddedMVLongDimension, NewAddedMVFloatDimension, NewAddedMVDoubleDimension, "
             + "NewAddedMVBooleanDimension, NewAddedMVTimestampDimension, NewAddedMVStringDimension, "
             + "NewAddedSVJSONDimension, NewAddedSVBytesDimension";
@@ -1917,7 +2002,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   public void testGroupByUDF(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    notSupportedInV2();
     String query = "SELECT timeConvert(DaysSinceEpoch,'DAYS','SECONDS'), COUNT(*) FROM mytable "
         + "GROUP BY timeConvert(DaysSinceEpoch,'DAYS','SECONDS') ORDER BY COUNT(*) DESC";
     JsonNode response = postQuery(query);
@@ -2040,8 +2124,13 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(row.get(0).asInt(), 2);
     assertEquals(row.get(1).asLong(), 2);
 
-    query = "SELECT valueIn(DivAirports,'DFW','ORD'), COUNT(*) FROM mytable "
-        + "GROUP BY valueIn(DivAirports,'DFW','ORD') ORDER BY COUNT(*) DESC";
+    if (useMultiStageQueryEngine()) {
+      query = "SELECT arrayToMV(valueIn(DivAirports,'DFW','ORD')), COUNT(*) FROM mytable "
+          + "GROUP BY arrayToMV(valueIn(DivAirports,'DFW','ORD')) ORDER BY COUNT(*) DESC";
+    } else {
+      query = "SELECT valueIn(DivAirports,'DFW','ORD'), COUNT(*) FROM mytable "
+          + "GROUP BY valueIn(DivAirports,'DFW','ORD') ORDER BY COUNT(*) DESC";
+    }
     response = postQuery(query);
     resultTable = response.get("resultTable");
     dataSchema = resultTable.get("dataSchema");

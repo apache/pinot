@@ -55,7 +55,9 @@ import org.testng.annotations.Test;
 
 
 /**
- * Integration test for heap size based server query killing, this works only for xmx4G
+ * Integration test for heap size based server query killing, this works only for xmx4G.
+ * <p>
+ * Query killing isn't currently supported in the v2 multi-stage query engine so these tests only run on the v1 engine.
  */
 public class OfflineClusterMemBasedServerQueryKillingTest extends BaseClusterIntegrationTestSet {
   public static final String STRING_DIM_SV1 = "stringDimSV1";
