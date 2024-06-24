@@ -139,6 +139,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
   protected HelixManager _helixManager;
   protected HelixAdmin _helixAdmin;
   protected ServerInstance _serverInstance;
+  protected AccessControlFactory _accessControlFactory;
   protected AdminApiApplication _adminApiApplication;
   protected ServerQueriesDisabledTracker _serverQueriesDisabledTracker;
   protected RealtimeLuceneIndexRefreshState _realtimeLuceneIndexRefreshState;
@@ -572,9 +573,8 @@ public abstract class BaseServerStarter implements ServiceStartable {
     String accessControlFactoryClass =
         _serverConf.getProperty(Server.ACCESS_CONTROL_FACTORY_CLASS, Server.DEFAULT_ACCESS_CONTROL_FACTORY_CLASS);
     LOGGER.info("Using class: {} as the AccessControlFactory", accessControlFactoryClass);
-    AccessControlFactory accessControlFactory;
     try {
-      accessControlFactory = PluginManager.get().createInstance(accessControlFactoryClass);
+      _accessControlFactory = PluginManager.get().createInstance(accessControlFactoryClass);
     } catch (Exception e) {
       throw new RuntimeException(
           "Caught exception while creating new AccessControlFactory instance using class '" + accessControlFactoryClass
@@ -593,7 +593,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
     ServerSegmentCompletionProtocolHandler.init(
         _serverConf.subset(SegmentCompletionProtocol.PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER));
     ServerConf serverConf = new ServerConf(_serverConf);
-    _serverInstance = new ServerInstance(serverConf, _helixManager, accessControlFactory);
+    _serverInstance = new ServerInstance(serverConf, _helixManager, _accessControlFactory);
     ServerMetrics serverMetrics = _serverInstance.getServerMetrics();
 
     InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
@@ -617,8 +617,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
     // Start restlet server for admin API endpoint
     LOGGER.info("Starting server admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));
-    _adminApiApplication = new AdminApiApplication(_serverInstance, accessControlFactory, _serverConf);
-    registerExtraComponents(_adminApiApplication);
+    _adminApiApplication = createServerApp();
     _adminApiApplication.start(_listenerConfigs);
 
     // Init QueryRewriterFactory
@@ -933,12 +932,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
     PinotCrypterFactory.init(pinotCrypterConfig);
   }
 
-  /**
-   * This method is called after initialization of BrokerAdminApiApplication object
-   * and before calling start to allow custom broker starters to register additional
-   * components.
-   * @param adminApiApplication is the application
-   */
-  protected void registerExtraComponents(AdminApiApplication adminApiApplication) {
+  protected AdminApiApplication createServerApp() {
+    return new AdminApiApplication(_serverInstance, _accessControlFactory, _serverConf);
   }
 }

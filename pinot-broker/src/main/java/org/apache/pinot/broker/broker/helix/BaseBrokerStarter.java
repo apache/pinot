@@ -346,9 +346,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       _sqlQueryExecutor = new SqlQueryExecutor(_spectatorHelixManager);
     }
     LOGGER.info("Starting broker admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));
-    _brokerAdminApplication =
-        new BrokerAdminApiApplication(_routingManager, _brokerRequestHandler, _brokerMetrics, _brokerConf,
-            _sqlQueryExecutor, _serverRoutingStatsManager, _accessControlFactory, _spectatorHelixManager);
+    _brokerAdminApplication = getBrokerAdminApp();
     registerExtraComponents(_brokerAdminApplication);
     _brokerAdminApplication.start(_listenerConfigs);
 
@@ -413,6 +411,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   }
 
   /**
+   * @deprecated Use {@link #getBrokerAdminApp()} instead.
    * This method is called after initialization of BrokerAdminApiApplication object
    * and before calling start to allow custom broker starters to register additional
    * components.
@@ -599,5 +598,10 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
 
   public BrokerRequestHandler getBrokerRequestHandler() {
     return _brokerRequestHandler;
+  }
+
+  protected BrokerAdminApiApplication getBrokerAdminApp() {
+    return new BrokerAdminApiApplication(_routingManager, _brokerRequestHandler, _brokerMetrics, _brokerConf,
+        _sqlQueryExecutor, _serverRoutingStatsManager, _accessControlFactory, _spectatorHelixManager);
   }
 }
