@@ -31,6 +31,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
@@ -100,6 +101,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   private TreeMap<String, ColumnIndexCreationInfo> _indexCreationInfoMap;
   private SegmentCreator _indexCreator;
   private SegmentIndexCreationInfo _segmentIndexCreationInfo;
+  private SegmentCreationDataSource _dataSource;
   private Schema _dataSchema;
   private RecordEnricherPipeline _recordEnricherPipeline;
   private TransformPipeline _transformPipeline;
@@ -197,10 +199,8 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       _config.setConsumerDir(((RealtimeSegmentSegmentCreationDataSource) dataSource).getConsumerDir());
     }
 
-    // Initialize stats collection
-    _segmentStats = dataSource.gatherStats(
-        new StatsCollectorConfig(config.getTableConfig(), _dataSchema, config.getSegmentPartitionConfig()));
-    _totalDocs = _segmentStats.getTotalDocCount();
+    // For stats collection
+    _dataSource = dataSource;
 
     // Initialize index creation
     _segmentIndexCreationInfo = new SegmentIndexCreationInfo();
@@ -246,7 +246,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       throws Exception {
     // Count the number of documents and gather per-column statistics
     LOGGER.debug("Start building StatsCollector!");
-    buildIndexCreationInfo();
+    collectStatsAndIndexCreationInfo();
     LOGGER.info("Finished building StatsCollector!");
     LOGGER.info("Collected stats for {} documents", _totalDocs);
 
@@ -323,7 +323,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       throws Exception {
     // Count the number of documents and gather per-column statistics
     LOGGER.debug("Start building StatsCollector!");
-    buildIndexCreationInfo();
+    collectStatsAndIndexCreationInfo();
     LOGGER.info("Finished building StatsCollector!");
     LOGGER.info("Collected stats for {} documents", _totalDocs);
 
@@ -434,9 +434,9 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     // Persist creation metadata to disk
     persistCreationMeta(segmentOutputDir, crc, creationTime);
 
-    LOGGER.info("Driver, record read time (in ns) : {}", _totalRecordReadTimeNs);
-    LOGGER.info("Driver, stats collector time (in ns) : {}", _totalStatsCollectorTimeNs);
-    LOGGER.info("Driver, indexing time (in ns) : {}", _totalIndexTimeNs);
+    LOGGER.info("Driver, record read time (in ms) : {}", TimeUnit.NANOSECONDS.toMillis(_totalRecordReadTimeNs));
+    LOGGER.info("Driver, stats collector time (in ms) : {}", TimeUnit.NANOSECONDS.toMillis(_totalStatsCollectorTimeNs));
+    LOGGER.info("Driver, indexing time (in ms) : {}", TimeUnit.NANOSECONDS.toMillis(_totalIndexTimeNs));
   }
 
   private void updatePostSegmentCreationIndexes(File indexDir)
@@ -530,9 +530,14 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   /**
    * Complete the stats gathering process and store the stats information in indexCreationInfoMap.
    */
-  void buildIndexCreationInfo()
-      throws Exception {
+  void collectStatsAndIndexCreationInfo() throws Exception {
     long statsCollectorStartTime = System.nanoTime();
+
+    // Initialize stats collection
+    _segmentStats = _dataSource.gatherStats(
+        new StatsCollectorConfig(_config.getTableConfig(), _dataSchema, _config.getSegmentPartitionConfig()));
+    _totalDocs = _segmentStats.getTotalDocCount();
+
     Set<String> varLengthDictionaryColumns = new HashSet<>(_config.getVarLengthDictionaryColumns());
     Set<String> rawIndexCreationColumns = _config.getRawIndexCreationColumns();
     Set<String> rawIndexCompressionTypeKeys = _config.getRawIndexCompressionType().keySet();
