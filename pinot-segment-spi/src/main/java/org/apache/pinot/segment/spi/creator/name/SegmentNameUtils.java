@@ -40,4 +40,29 @@ public class SegmentNameUtils {
       throw new IllegalArgumentException("Invalid partial or full segment name: " + partialOrFullSegmentName);
     }
   }
+
+  /**
+   * A util to extract the table name from a segment name.
+   * @param segmentName
+   * @return table name extracted from semgent name
+   */
+  public static String getTableNameFromSegmentName(String segmentName) {
+    return segmentName.substring(0, segmentName.indexOf("__"));
+  }
+
+  /**
+   * A util to extract the partition number from a segment name.
+   * @param segmentName
+   * @return partition number extracted from segment name, or -1 if partition is not a valid integer
+   */
+  public static int getPartitionFromSegmentName(String segmentName) {
+    int start = segmentName.indexOf("__") + 2;
+    int end = segmentName.indexOf("__", start);
+    String partition = segmentName.substring(start, end);
+    try {
+      return Integer.parseInt(partition);
+    } catch (NumberFormatException e) {
+      return -1;
+    }
+  }
 }

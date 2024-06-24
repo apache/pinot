@@ -31,6 +31,7 @@ import org.apache.lucene.search.SearcherManager;
 import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
 import org.apache.pinot.segment.local.utils.LuceneTextIndexUtils;
+import org.apache.pinot.segment.spi.creator.name.SegmentNameUtils;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.apache.pinot.segment.spi.index.mutable.MutableTextIndex;
 import org.roaringbitmap.IntIterator;
@@ -82,8 +83,9 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
               false /* commitOnClose */, false, null, null, config);
       IndexWriter indexWriter = _indexCreator.getIndexWriter();
       _searcherManager = new SearcherManager(indexWriter, false, false, null);
-      _refreshListener = new RealtimeLuceneRefreshListener(getTableName(), segmentName, column, getPartition(),
-          _indexCreator::getNumDocs);
+      _refreshListener =
+          new RealtimeLuceneRefreshListener(SegmentNameUtils.getTableNameFromSegmentName(segmentName), segmentName,
+              column, SegmentNameUtils.getPartitionFromSegmentName(segmentName), _indexCreator::getNumDocs);
       _searcherManager.addListener(_refreshListener);
       _analyzer = _indexCreator.getIndexWriter().getConfig().getAnalyzer();
       _enablePrefixSuffixMatchingInPhraseQueries = config.isEnablePrefixSuffixMatchingInPhraseQueries();
@@ -208,24 +210,6 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
       LOGGER.error("Failed while closing the realtime text index for column {}, exception {}", _column, e.getMessage());
       throw new RuntimeException(e);
     }
-  }
-
-  /**
-   * Returns the partition from a segment name, or zero if partition is not a valid integer
-   */
-  private int getPartition() {
-    int start = _segmentName.indexOf("__") + 2;
-    int end = _segmentName.indexOf("__", start);
-    String partition = _segmentName.substring(start, end);
-    try {
-      return Integer.parseInt(partition);
-    } catch (NumberFormatException e) {
-      return 0;
-    }
-  }
-
-  private String getTableName() {
-    return _segmentName.substring(0, _segmentName.indexOf("__"));
   }
 
   public SearcherManager getSearcherManager() {
