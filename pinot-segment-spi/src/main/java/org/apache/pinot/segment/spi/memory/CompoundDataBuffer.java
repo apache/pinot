@@ -20,6 +20,7 @@ package org.apache.pinot.segment.spi.memory;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.BufferOverflowException;
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -113,7 +114,9 @@ public class CompoundDataBuffer implements DataBuffer {
         return result;
       }
     }
-    return _bufferOffsets.length - 1;
+    int result = _bufferOffsets.length - 1;
+    _lastBufferIndex = result;
+    return result;
   }
 
   private ByteBuffer copy(long offset, int length) {
@@ -138,14 +141,13 @@ public class CompoundDataBuffer implements DataBuffer {
 
       remaining -= toCopy;
     }
-    return ByteBuffer.wrap(result)
-        .order(_order);
+    return ByteBuffer.wrap(result).order(_order);
   }
 
   @Override
   public void readFrom(long offset, byte[] input, int srcOffset, int size) {
     if (offset + size > _size) {
-      throw new BufferUnderflowException();
+      throw new BufferOverflowException();
     }
 
     int bufferIndex = getBufferIndex(offset);
@@ -166,7 +168,7 @@ public class CompoundDataBuffer implements DataBuffer {
   @Override
   public void readFrom(long offset, ByteBuffer input) {
     if (offset + input.remaining() > _size) {
-      throw new BufferUnderflowException();
+      throw new BufferOverflowException();
     }
 
     int startLimit = input.limit();
@@ -191,7 +193,7 @@ public class CompoundDataBuffer implements DataBuffer {
   public void readFrom(long offset, File file, long srcOffset, long size)
       throws IOException {
     if (offset + size > _size) {
-      throw new BufferUnderflowException();
+      throw new BufferOverflowException();
     }
 
     int bufferIndex = getBufferIndex(offset);

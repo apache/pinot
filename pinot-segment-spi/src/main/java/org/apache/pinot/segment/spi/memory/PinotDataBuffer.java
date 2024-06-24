@@ -234,9 +234,7 @@ public abstract class PinotDataBuffer implements DataBuffer {
     }
     DIRECT_BUFFER_COUNT.getAndIncrement();
     DIRECT_BUFFER_USAGE.getAndAdd(size);
-    synchronized (BUFFER_CONTEXT_MAP) {
-      BUFFER_CONTEXT_MAP.put(buffer, new BufferContext(BufferContext.Type.DIRECT, size, null, description));
-    }
+    BUFFER_CONTEXT_MAP.put(buffer, new BufferContext(BufferContext.Type.DIRECT, size, null, description));
     return buffer;
   }
 
@@ -258,10 +256,8 @@ public abstract class PinotDataBuffer implements DataBuffer {
     }
     DIRECT_BUFFER_COUNT.getAndIncrement();
     DIRECT_BUFFER_USAGE.getAndAdd(size);
-    synchronized (BUFFER_CONTEXT_MAP) {
-      BUFFER_CONTEXT_MAP.put(buffer,
-          new BufferContext(BufferContext.Type.DIRECT, size, file.getAbsolutePath().intern(), description));
-    }
+    BUFFER_CONTEXT_MAP.put(buffer,
+        new BufferContext(BufferContext.Type.DIRECT, size, file.getAbsolutePath().intern(), description));
     return buffer;
   }
 
@@ -293,10 +289,8 @@ public abstract class PinotDataBuffer implements DataBuffer {
     }
     MMAP_BUFFER_COUNT.getAndIncrement();
     MMAP_BUFFER_USAGE.getAndAdd(size);
-    synchronized (BUFFER_CONTEXT_MAP) {
-      BUFFER_CONTEXT_MAP.put(buffer,
-          new BufferContext(BufferContext.Type.MMAP, size, file.getAbsolutePath().intern(), description));
-    }
+    BUFFER_CONTEXT_MAP.put(buffer,
+        new BufferContext(BufferContext.Type.MMAP, size, file.getAbsolutePath().intern(), description));
     return buffer;
   }
 
@@ -339,13 +333,11 @@ public abstract class PinotDataBuffer implements DataBuffer {
   }
 
   public static List<String> getBufferInfo() {
-    synchronized (BUFFER_CONTEXT_MAP) {
-      List<String> bufferInfo = new ArrayList<>(BUFFER_CONTEXT_MAP.size());
-      for (BufferContext bufferContext : BUFFER_CONTEXT_MAP.values()) {
-        bufferInfo.add(bufferContext.toString());
-      }
-      return bufferInfo;
+    List<String> bufferInfo = new ArrayList<>(BUFFER_CONTEXT_MAP.size());
+    for (BufferContext bufferContext : BUFFER_CONTEXT_MAP.values()) {
+      bufferInfo.add(bufferContext.toString());
     }
+    return bufferInfo;
   }
 
   private static String getBufferStats() {
@@ -368,9 +360,7 @@ public abstract class PinotDataBuffer implements DataBuffer {
       throws IOException {
     if (_closeable) {
       BufferContext bufferContext;
-      synchronized (BUFFER_CONTEXT_MAP) {
-        bufferContext = BUFFER_CONTEXT_MAP.remove(this);
-      }
+      bufferContext = BUFFER_CONTEXT_MAP.remove(this);
       if (bufferContext != null) {
         if (bufferContext._type == BufferContext.Type.DIRECT) {
           DIRECT_BUFFER_COUNT.getAndDecrement();
