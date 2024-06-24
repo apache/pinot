@@ -300,11 +300,11 @@ public class NoDictionaryInPredicateEvaluatorTest {
 
     InPredicate inPredicate = new InPredicate(COLUMN_EXPRESSION, jsonValues);
     PredicateEvaluator inPredicateEvaluator =
-        InPredicateEvaluatorFactory.newRawValueBasedEvaluator(inPredicate, FieldSpec.DataType.STRING);
+        InPredicateEvaluatorFactory.newRawValueBasedEvaluator(inPredicate, FieldSpec.DataType.JSON);
 
     NotInPredicate notInPredicate = new NotInPredicate(COLUMN_EXPRESSION, jsonValues);
     PredicateEvaluator notInPredicateEvaluator =
-        NotInPredicateEvaluatorFactory.newRawValueBasedEvaluator(notInPredicate, FieldSpec.DataType.STRING);
+        NotInPredicateEvaluatorFactory.newRawValueBasedEvaluator(notInPredicate, FieldSpec.DataType.JSON);
 
     for (String value : jsonValueSet) {
       Assert.assertTrue(inPredicateEvaluator.applySV(value));
