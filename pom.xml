@@ -176,7 +176,7 @@
     <joda-time.version>2.12.7</joda-time.version>
     <janino.version>3.1.12</janino.version>
     <testng.version>7.10.2</testng.version>
-    <woodstox.version>6.6.2</woodstox.version>
+    <woodstox.version>7.0.0</woodstox.version>
     <sslcontext.kickstart.version>8.3.6</sslcontext.kickstart.version>
 
     <confluent.version>7.6.1</confluent.version>
