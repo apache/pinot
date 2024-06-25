@@ -606,6 +606,11 @@ public class DataFetcher {
               valueBuffer[i] = BytesUtils.toHexString(_reader.getBytes(docIds[i], readerContext));
             }
             break;
+          case MAP:
+            for (int i = 0; i < length; i++) {
+              valueBuffer[i] = _reader.getString(docIds[i], readerContext);
+            }
+            break;
           default:
             throw new IllegalStateException();
         }

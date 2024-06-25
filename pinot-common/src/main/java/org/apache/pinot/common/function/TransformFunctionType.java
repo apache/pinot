@@ -285,6 +285,12 @@ public enum TransformFunctionType {
 
   ARRAY_VALUE_CONSTRUCTOR("arrayValueConstructor", "array_value_constructor"),
 
+  // MAP Functions
+  ITEM("item",
+      ReturnTypes.cascade(opBinding -> opBinding.getOperandType(0).getComponentType(),
+          SqlTypeTransforms.FORCE_NULLABLE),
+      OperandTypes.family(ImmutableList.of(SqlTypeFamily.MAP, SqlTypeFamily.STRING))),
+
   // Trigonometry
   SIN("sin"),
   COS("cos"),

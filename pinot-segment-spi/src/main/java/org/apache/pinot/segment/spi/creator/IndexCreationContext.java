@@ -90,6 +90,11 @@ public interface IndexCreationContext {
    */
   boolean isTextCommitOnClose();
 
+  /**
+   * Returns an abstraction representing the detailed statistics about a column.
+   *
+   * @return
+   */
   ColumnStatistics getColumnStatistics();
   /**
    * This flags whether the index creation is done during realtime segment conversion

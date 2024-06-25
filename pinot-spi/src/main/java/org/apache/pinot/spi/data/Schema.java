@@ -121,6 +121,7 @@ public final class Schema implements Serializable {
           case TIMESTAMP:
           case STRING:
           case JSON:
+          case MAP:
           case BYTES:
             break;
           default:

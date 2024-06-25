@@ -46,6 +46,7 @@ import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProvide
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.DictionaryIndexConfig;
+import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
@@ -55,6 +56,7 @@ import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
+import org.apache.pinot.spi.config.table.MapIndexConfig;
 import org.apache.pinot.spi.config.table.SegmentZKPropsConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -73,7 +75,6 @@ import static org.testng.Assert.assertTrue;
 
 
 public class RealtimeSegmentConverterTest {
-
   private static final String STRING_COLUMN1 = "string_col1";
   private static final String STRING_COLUMN2 = "string_col2";
   private static final String STRING_COLUMN3 = "string_col3";
@@ -84,6 +85,7 @@ public class RealtimeSegmentConverterTest {
   private static final String LONG_COLUMN4 = "long_col4";
   private static final String MV_INT_COLUMN = "mv_col";
   private static final String DATE_TIME_COLUMN = "date_time_col";
+  private static final String MAP_COLUMN = "map_col";
 
   private static final File TMP_DIR =
       new File(FileUtils.getTempDirectory(), RealtimeSegmentConverterTest.class.getName());
@@ -407,6 +409,110 @@ public class RealtimeSegmentConverterTest {
     testSegment(rows, indexDir, tableConfig, segmentMetadata);
   }
 
+  @Test
+  public void testMapColumnIndexed()
+      throws Exception {
+    File tmpDir = new File(TMP_DIR, "tmp_" + System.currentTimeMillis());
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable")
+            .setTimeColumnName(DATE_TIME_COLUMN)
+            .setNoDictionaryColumns(List.of(MAP_COLUMN))
+            .setColumnMajorSegmentBuilderEnabled(true)
+            .build();
+
+    Schema schema = new Schema.SchemaBuilder()
+        .addSingleValueDimension(MAP_COLUMN, FieldSpec.DataType.MAP)
+        .addDateTime(DATE_TIME_COLUMN, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .build();
+
+    String tableNameWithType = tableConfig.getTableName();
+    String segmentName = "testTable__0__0__123456map";
+    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+
+    MapIndexConfig mapConfig = new MapIndexConfig();
+    mapConfig.setDynamicallyCreateDenseKeys(true);
+    RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder =
+        new RealtimeSegmentConfig
+            .Builder()
+            .setTableNameWithType(tableNameWithType).setSegmentName(segmentName)
+            .setStreamName(tableNameWithType).setSchema(schema).setTimeColumnName(DATE_TIME_COLUMN).setCapacity(1000)
+            .setAvgNumMultiValues(3)
+            .setSegmentZKMetadata(getSegmentZKMetadata(segmentName)).setOffHeap(true)
+            .setMemoryManager(new DirectMemoryManager(segmentName))
+            .setIndex(MAP_COLUMN, StandardIndexes.forward(),
+                new ForwardIndexConfig
+                    .Builder(ForwardIndexConfig.DEFAULT)
+                    .withMapIndexConfig(mapConfig)
+                    .build())
+            .setStatsHistory(RealtimeSegmentStatsHistory.deserialzeFrom(new File(tmpDir, "stats")))
+            .setConsumerDir(new File(tmpDir, "consumerDir").getAbsolutePath());
+
+    // create mutable segment impl
+    MutableSegmentImpl mutableSegmentImpl = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), null);
+    List<GenericRow> rows = generateTestData();
+
+    for (GenericRow row : rows) {
+      mutableSegmentImpl.index(row, null);
+    }
+
+    File outputDir = new File(tmpDir, "outputDir");
+    SegmentZKPropsConfig segmentZKPropsConfig = new SegmentZKPropsConfig();
+    segmentZKPropsConfig.setStartOffset("1");
+    segmentZKPropsConfig.setEndOffset("100");
+    ColumnIndicesForRealtimeTable cdc =
+        new ColumnIndicesForRealtimeTable(null /*indexingConfig.getSortedColumn().get(0)*/,
+            indexingConfig.getInvertedIndexColumns(), null, null,
+            indexingConfig.getNoDictionaryColumns(), indexingConfig.getVarLengthDictionaryColumns());
+    RealtimeSegmentConverter converter =
+        new RealtimeSegmentConverter(mutableSegmentImpl, segmentZKPropsConfig, outputDir.getAbsolutePath(), schema,
+            tableNameWithType, tableConfig, segmentName, cdc, false);
+    converter.build(SegmentVersion.v3, null);
+
+    File indexDir = new File(outputDir, segmentName);
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
+    assertEquals(segmentMetadata.getVersion(), SegmentVersion.v3);
+    assertEquals(segmentMetadata.getTotalDocs(), rows.size());
+    assertEquals(segmentMetadata.getTimeColumn(), DATE_TIME_COLUMN);
+    assertEquals(segmentMetadata.getTimeUnit(), TimeUnit.MILLISECONDS);
+
+    long expectedStartTime = (long) rows.get(0).getValue(DATE_TIME_COLUMN);
+    assertEquals(segmentMetadata.getStartTime(), expectedStartTime);
+    long expectedEndTime = (long) rows.get(rows.size() - 1).getValue(DATE_TIME_COLUMN);
+    assertEquals(segmentMetadata.getEndTime(), expectedEndTime);
+
+    assertTrue(segmentMetadata.getAllColumns().containsAll(schema.getColumnNames()));
+    assertEquals(segmentMetadata.getStartOffset(), "1");
+    assertEquals(segmentMetadata.getEndOffset(), "100");
+
+    testSegmentWithMap(rows, indexDir, tableConfig, segmentMetadata);
+  }
+
+  private void testSegmentWithMap(List<GenericRow> rows, File indexDir,
+      TableConfig tableConfig, SegmentMetadataImpl segmentMetadata)
+      throws IOException {
+    SegmentLocalFSDirectory segmentDir = new SegmentLocalFSDirectory(indexDir, segmentMetadata, ReadMode.mmap);
+    SegmentDirectory.Reader segmentReader = segmentDir.createReader();
+
+    Map<String, ColumnIndexContainer> indexContainerMap = new HashMap<>();
+    Map<String, ColumnMetadata> columnMetadataMap = segmentMetadata.getColumnMetadataMap();
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(null, tableConfig);
+    for (Map.Entry<String, ColumnMetadata> entry : columnMetadataMap.entrySet()) {
+      indexContainerMap.put(entry.getKey(),
+          new PhysicalColumnIndexContainer(segmentReader, entry.getValue(), indexLoadingConfig));
+    }
+    ImmutableSegmentImpl segmentFile = new ImmutableSegmentImpl(segmentDir, segmentMetadata, indexContainerMap, null);
+
+    GenericRow readRow = new GenericRow();
+    int docId = 0;
+    for (GenericRow row : rows) {
+      segmentFile.getRecord(docId, readRow);
+      assertEquals(readRow.getValue(DATE_TIME_COLUMN), row.getValue(DATE_TIME_COLUMN));
+      assertEquals(readRow.getValue(MAP_COLUMN), row.getValue(MAP_COLUMN));
+
+      docId += 1;
+    }
+  }
+
   private void testSegment(List<GenericRow> rows, File indexDir,
       TableConfig tableConfig, SegmentMetadataImpl segmentMetadata)
       throws IOException {
@@ -578,6 +684,7 @@ public class RealtimeSegmentConverterTest {
       row.putValue(LONG_COLUMN2, 66L + i);
       row.putValue(LONG_COLUMN3, 65L + i);
       row.putValue(LONG_COLUMN4, 64L + i);
+      row.putValue(MAP_COLUMN, Map.of("foo", i, "barry", 10000 + i));
       List<Integer> intList = new ArrayList<>();
       intList.add(100 + i);
       intList.add(200 + i);

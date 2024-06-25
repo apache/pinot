@@ -39,6 +39,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.stats.DoubleColumnPre
 import org.apache.pinot.segment.local.segment.creator.impl.stats.FloatColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.IntColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.LongColumnPreIndexStatsCollector;
+import org.apache.pinot.segment.local.segment.creator.impl.stats.MapColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.StringColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
 import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexType;
@@ -1018,6 +1019,9 @@ public class ForwardIndexHandler extends BaseIndexHandler {
         break;
       case BIG_DECIMAL:
         statsCollector = new BigDecimalColumnPreIndexStatsCollector(column, statsCollectorConfig);
+        break;
+      case MAP:
+        statsCollector = new MapColumnPreIndexStatsCollector(column, statsCollectorConfig);
         break;
       default:
         throw new IllegalStateException("Unsupported storedType=" + storedType.toString() + " for column=" + column);

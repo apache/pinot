@@ -151,6 +151,8 @@ public class PinotSegmentColumnReader implements Closeable {
             return _forwardIndexReader.getString(docId, _forwardIndexReaderContext);
           case BYTES:
             return _forwardIndexReader.getBytes(docId, _forwardIndexReaderContext);
+          case MAP:
+            return _forwardIndexReader.getMap(docId, _forwardIndexReaderContext);
           default:
             throw new IllegalStateException("Unsupported SV type: " + storedType);
         }
