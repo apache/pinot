@@ -61,6 +61,11 @@ public interface TableDataManager {
   String getInstanceId();
 
   /**
+   * @return boolean value to see if committing empty segments is allowed or not during realtime ingestion
+   */
+  boolean isAllowEmptySegmentCommit();
+
+  /**
    * Returns the config for the instance data manager.
    */
   InstanceDataManagerConfig getInstanceDataManagerConfig();
