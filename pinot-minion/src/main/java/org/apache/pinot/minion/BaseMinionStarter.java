@@ -280,7 +280,7 @@ public abstract class BaseMinionStarter implements ServiceStartable {
     minionContext.setHelixPropertyStore(_helixManager.getHelixPropertyStore());
     minionContext.setHelixManager(_helixManager);
     LOGGER.info("Starting minion admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));
-    _minionAdminApplication = new MinionAdminApiApplication(_instanceId, _config);
+    _minionAdminApplication = createMinionAdminApp();
     _minionAdminApplication.start(_listenerConfigs);
 
     // Initialize health check callback
@@ -346,5 +346,9 @@ public abstract class BaseMinionStarter implements ServiceStartable {
       LOGGER.warn("Failed to clean up Minion data directory: {}", MinionContext.getInstance().getDataDir(), e);
     }
     LOGGER.info("Pinot minion stopped");
+  }
+
+  protected MinionAdminApiApplication createMinionAdminApp() {
+    return new MinionAdminApiApplication(_instanceId, _config);
   }
 }
