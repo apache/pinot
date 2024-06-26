@@ -89,6 +89,7 @@ import org.apache.pinot.controller.api.resources.InvalidControllerConfigExceptio
 import org.apache.pinot.controller.helix.RealtimeConsumerMonitor;
 import org.apache.pinot.controller.helix.SegmentStatusChecker;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.PinotHelixResourceManagerFactory;
 import org.apache.pinot.controller.helix.core.cleanup.StaleInstancesCleanupTask;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
@@ -243,7 +244,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
       _adminApp = new ControllerAdminApiApplication(_config);
       // Do not use this before the invocation of {@link PinotHelixResourceManager::start()}, which happens in {@link
       // ControllerStarter::start()}
-      _helixResourceManager = new PinotHelixResourceManager(_config);
+      _helixResourceManager = PinotHelixResourceManagerFactory.create(_config);
       // This executor service is used to do async tasks from multiget util or table rebalancing.
       _executorService =
           Executors.newCachedThreadPool(new ThreadFactoryBuilder().setNameFormat("async-task-thread-%d").build());

@@ -272,6 +272,9 @@ public class ControllerConf extends PinotConfiguration {
   private static final String JERSEY_ADMIN_API_PORT = "jersey.admin.api.port";
   private static final String JERSEY_ADMIN_IS_PRIMARY = "jersey.admin.isprimary";
   public static final String ACCESS_CONTROL_FACTORY_CLASS = "controller.admin.access.control.factory.class";
+  public static final String PINOT_HELIX_RESOURCE_MANAGER_CLASS = "controller.pinot.helix.resource.manager.class";
+  public static final String DEFAULT_PINOT_HELIX_RESOURCE_MANAGER_CLASS =
+      "org/apache/pinot/controller/helix/core/PinotHelixResourceManager";
   public static final String ACCESS_CONTROL_USERNAME = "access.control.init.username";
   public static final String ACCESS_CONTROL_PASSWORD = "access.control.init.password";
   public static final String LINEAGE_MANAGER_CLASS = "controller.lineage.manager.class";
@@ -861,6 +864,10 @@ public class ControllerConf extends PinotConfiguration {
 
   public String getAccessControlFactoryClass() {
     return getProperty(ACCESS_CONTROL_FACTORY_CLASS, DEFAULT_ACCESS_CONTROL_FACTORY_CLASS);
+  }
+
+  public String getPinotHelixResourceManagerClass() {
+    return getProperty(PINOT_HELIX_RESOURCE_MANAGER_CLASS, DEFAULT_PINOT_HELIX_RESOURCE_MANAGER_CLASS);
   }
 
   public void setAccessControlFactoryClass(String accessControlFactoryClass) {

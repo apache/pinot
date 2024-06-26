@@ -215,7 +215,7 @@ public class PinotHelixResourceManager {
 
   private final String _helixZkURL;
   private final String _helixClusterName;
-  private final String _dataDir;
+  protected final String _dataDir;
   private final boolean _isSingleTenantCluster;
   private final boolean _enableBatchMessageMode;
   private final int _deletedSegmentsRetentionInDays;
