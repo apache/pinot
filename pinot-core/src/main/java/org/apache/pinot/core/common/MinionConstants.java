@@ -174,5 +174,11 @@ public class MinionConstants {
      * number of segments to query in one batch to fetch valid doc id metadata, by default 500
      */
     public static final String NUM_SEGMENTS_BATCH_PER_SERVER_REQUEST = "numSegmentsBatchPerServerRequest";
+
+    /**
+     * skip crc mismatch as deepstore copies are not updated during schema / index changes
+     * so it's natural for crc to mismatch.
+     */
+    public static final String SKIP_CRC_MISMATCH = "skipCrcMismatch";
   }
 }

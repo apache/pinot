@@ -75,12 +75,37 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
     String originalSegmentCrcFromTaskGenerator = configs.get(MinionConstants.ORIGINAL_SEGMENT_CRC_KEY);
     String crcFromDeepStorageSegment = segmentMetadata.getCrc();
     String crcFromValidDocIdsBitmap = validDocIdsBitmapResponse.getSegmentCrc();
-    if (!originalSegmentCrcFromTaskGenerator.equals(crcFromDeepStorageSegment)
-        || !originalSegmentCrcFromTaskGenerator.equals(crcFromValidDocIdsBitmap)) {
-      LOGGER.warn("CRC mismatch for segment: {}, expected: {}, actual crc from server: {}", segmentName,
-          crcFromDeepStorageSegment, validDocIdsBitmapResponse.getSegmentCrc());
-      return new SegmentConversionResult.Builder().setTableNameWithType(tableNameWithType).setSegmentName(segmentName)
-          .build();
+    if (!originalSegmentCrcFromTaskGenerator.equals(crcFromValidDocIdsBitmap)) {
+      // In this scenario, the segment is refreshed or reloaded (due to a schema or index change) between the
+      // task generation and task execution phases. It is safer to skip this segment for this execution cycle.
+      // However, we prefer to return it as a task error state so that if this issue occurs in consecutive runs,
+      // we can identify and address such scenarios.
+      String message = String.format("CRC mismatch for segment: %s, expected value based on task generator: %s, "
+          + "actual crc from validDocIdsBitmapResponse: %s", segmentName, originalSegmentCrcFromTaskGenerator,
+          crcFromValidDocIdsBitmap);
+      LOGGER.error(message);
+      throw new IllegalStateException(message);
+    }
+
+    if (!originalSegmentCrcFromTaskGenerator.equals(crcFromDeepStorageSegment)) {
+      // We are introducing a skipCrcMismatch option because deepstore copies are not refreshed after schema or
+      // indexing changes, leading to natural CRC mismatches. If skipCrcMismatch enabled, we can allow all
+      // segments to be processed once and then disable it again. However, we should develop an intelligent way
+      // to detect this situation in a self-serve manner.
+      // Additionally, if skipCrcMismatch is disabled and a CRC mismatch is found, we will mark it as a task-fail error
+      // instead of marking the task as a success. Otherwise the segment would continue to be picked up in subsequent
+      // compaction cycles without any execution being actually carried out.
+      boolean skipCrcMismatch =
+          Boolean.parseBoolean(configs.get(MinionConstants.UpsertCompactionTask.SKIP_CRC_MISMATCH));
+      String message = String.format("CRC mismatch for segment: %s, "
+          + "expected value based on task generator: %s, actual crc based on deepstore / server metadata copy: %s",
+          segmentName, originalSegmentCrcFromTaskGenerator, crcFromDeepStorageSegment);
+      if (skipCrcMismatch) {
+        LOGGER.warn(message);
+      } else {
+        LOGGER.error(message);
+        throw new IllegalStateException(message);
+      }
     }
 
     RoaringBitmap validDocIds = RoaringBitmapUtils.deserialize(validDocIdsBitmapResponse.getBitmap());
