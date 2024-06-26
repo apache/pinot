@@ -600,8 +600,9 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   }
 
   protected BrokerAdminApiApplication createBrokerAdminApp() {
-    BrokerAdminApiApplication brokerAdminApiApplication = new BrokerAdminApiApplication(_routingManager, _brokerRequestHandler, _brokerMetrics, _brokerConf,
-        _sqlQueryExecutor, _serverRoutingStatsManager, _accessControlFactory, _spectatorHelixManager);
+    BrokerAdminApiApplication brokerAdminApiApplication =
+        new BrokerAdminApiApplication(_routingManager, _brokerRequestHandler, _brokerMetrics, _brokerConf,
+            _sqlQueryExecutor, _serverRoutingStatsManager, _accessControlFactory, _spectatorHelixManager);
     registerExtraComponents(brokerAdminApiApplication);
     return brokerAdminApiApplication;
   }
