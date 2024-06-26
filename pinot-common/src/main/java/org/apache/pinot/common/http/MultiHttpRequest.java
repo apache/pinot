@@ -111,8 +111,7 @@ public class MultiHttpRequest {
 
     HttpClientBuilder httpClientBuilder =
         HttpClients.custom().setConnectionManager(_connectionManager)
-            // The `setSSLSocketFactory` has to be set after `setConnectionManager` due to the bug described here:
-            // https://github.com/apache/pinot/issues/13431#issuecomment-2178323975
+            // The `setSSLSocketFactory` has to be set after `setConnectionManager` due to a bug
             .setSSLSocketFactory(TlsUtils.buildConnectionSocketFactory())
             .setDefaultRequestConfig(defaultRequestConfig);
 
