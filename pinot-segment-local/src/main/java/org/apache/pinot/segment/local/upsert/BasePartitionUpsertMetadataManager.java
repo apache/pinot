@@ -760,10 +760,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   }
 
   protected void removeSegment(IndexSegment segment, MutableRoaringBitmap validDocIds) {
-    if (validDocIds == null || validDocIds.isEmpty()) {
-      return;
-    }
-    _logger.info("Removing {} primary keys for segment: {}", validDocIds.getCardinality(), segment.getSegmentName());
     try (UpsertUtils.PrimaryKeyReader primaryKeyReader = new UpsertUtils.PrimaryKeyReader(segment,
         _primaryKeyColumns)) {
       removeSegment(segment, UpsertUtils.getPrimaryKeyIterator(primaryKeyReader, validDocIds));
@@ -823,6 +819,12 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
 
     MutableRoaringBitmap validDocIds =
         segment.getValidDocIds() != null ? segment.getValidDocIds().getMutableRoaringBitmap() : null;
+    if (validDocIds == null || validDocIds.isEmpty()) {
+      _logger.info("Skip removing segment without valid docs: {}", segmentName);
+      return;
+    }
+
+    _logger.info("Removing {} primary keys for segment: {}", validDocIds.getCardinality(), segmentName);
     removeSegment(segment, validDocIds);
 
     // Update metrics
