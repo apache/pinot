@@ -347,7 +347,6 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     }
     LOGGER.info("Starting broker admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));
     _brokerAdminApplication = createBrokerAdminApp();
-    registerExtraComponents(_brokerAdminApplication);
     _brokerAdminApplication.start(_listenerConfigs);
 
     LOGGER.info("Initializing cluster change mediator");
@@ -601,7 +600,9 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   }
 
   protected BrokerAdminApiApplication createBrokerAdminApp() {
-    return new BrokerAdminApiApplication(_routingManager, _brokerRequestHandler, _brokerMetrics, _brokerConf,
+    BrokerAdminApiApplication brokerAdminApiApplication = new BrokerAdminApiApplication(_routingManager, _brokerRequestHandler, _brokerMetrics, _brokerConf,
         _sqlQueryExecutor, _serverRoutingStatsManager, _accessControlFactory, _spectatorHelixManager);
+    registerExtraComponents(brokerAdminApiApplication);
+    return brokerAdminApiApplication;
   }
 }
