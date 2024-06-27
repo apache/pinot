@@ -38,6 +38,7 @@ import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentConfig;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentStatsHistory;
+import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneIndexRefreshManager;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndexSearcherPool;
 import org.apache.pinot.segment.local.segment.index.column.PhysicalColumnIndexContainer;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
@@ -495,6 +496,7 @@ public class RealtimeSegmentConverterTest {
 
     // create mutable segment impl
     RealtimeLuceneTextIndexSearcherPool.init(1);
+    RealtimeLuceneIndexRefreshManager.init(1, 10);
     MutableSegmentImpl mutableSegmentImpl = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), null);
     List<GenericRow> rows = generateTestDataForReusePath();
 

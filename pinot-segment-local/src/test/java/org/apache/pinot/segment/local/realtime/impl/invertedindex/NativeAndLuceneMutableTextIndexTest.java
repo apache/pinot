@@ -73,6 +73,7 @@ public class NativeAndLuceneMutableTextIndexTest {
   @BeforeClass
   public void setUp()
       throws Exception {
+    RealtimeLuceneIndexRefreshManager.init(1, 10);
     ServerMetrics.register(mock(ServerMetrics.class));
     TextIndexConfig config =
         new TextIndexConfig(false, null, null, false, false, null, null, true, 500, null, false, false, 0);
@@ -101,7 +102,7 @@ public class NativeAndLuceneMutableTextIndexTest {
     searcherManagers.add(_realtimeLuceneMVTextIndex.getSearcherManager());
     try {
       for (SearcherManager searcherManager : searcherManagers) {
-        searcherManager.maybeRefresh();
+        searcherManager.maybeRefreshBlocking();
       }
     } catch (Exception e) {
       throw new RuntimeException(e);
