@@ -16,12 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.request;
+package org.apache.pinot.common.response.broker;
 
 import java.io.IOException;
 import org.apache.pinot.common.exception.QueryException;
-import org.apache.pinot.common.response.broker.BrokerResponseNative;
-import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

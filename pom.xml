@@ -130,7 +130,7 @@
 
     <!-- Configuration for Packaging -->
     <shade.prefix>org.apache.pinot.shaded</shade.prefix>
-    <maven-jar-plugin.version>3.4.1</maven-jar-plugin.version>
+    <maven-jar-plugin.version>3.4.2</maven-jar-plugin.version>
     <maven-shade-plugin.version>3.6.0</maven-shade-plugin.version>
     <shade.phase.prop>none</shade.phase.prop>
 
@@ -172,11 +172,11 @@
     <audienceannotations.version>0.15.0</audienceannotations.version>
     <clp-ffi.version>0.4.4</clp-ffi.version>
     <stax2-api.version>4.2.2</stax2-api.version>
-    <aws.sdk.version>2.26.3</aws.sdk.version>
+    <aws.sdk.version>2.26.7</aws.sdk.version>
     <joda-time.version>2.12.7</joda-time.version>
     <janino.version>3.1.12</janino.version>
     <testng.version>7.10.2</testng.version>
-    <woodstox.version>6.6.2</woodstox.version>
+    <woodstox.version>7.0.0</woodstox.version>
     <sslcontext.kickstart.version>8.3.6</sslcontext.kickstart.version>
 
     <confluent.version>7.6.1</confluent.version>
@@ -197,9 +197,7 @@
     <commons-net.version>3.11.1</commons-net.version>
     <commons-validator.version>1.9.0</commons-validator.version>
     <!-- Legacy Apache Commons Libraries -->
-    <commons-lang.version>2.6</commons-lang.version>
     <commons-collections.version>3.2.2</commons-collections.version>
-    <commons-math.version>2.2</commons-math.version>
 
     <!-- Java EE Libraries -->
     <!-- Include both newer jakarta ones and older javax ones, but not migrate to Jakarta EE yet -->
@@ -225,7 +223,7 @@
     <!-- Google Libraries -->
     <protobuf.version>3.25.3</protobuf.version>
     <grpc.version>1.64.0</grpc.version>
-    <google.cloud.libraries.version>26.41.0</google.cloud.libraries.version>
+    <google.cloud.libraries.version>26.42.0</google.cloud.libraries.version>
     <google.auto-service.version>1.1.1</google.auto-service.version>
     <google.errorprone.version>2.28.0</google.errorprone.version>
     <google.j2objc.version>3.0.0</google.j2objc.version>
@@ -438,7 +436,7 @@
       <dependency>
         <groupId>org.roaringbitmap</groupId>
         <artifactId>RoaringBitmap</artifactId>
-        <version>1.0.6</version>
+        <version>1.1.0</version>
       </dependency>
       <dependency>
         <groupId>com.101tec</groupId>
@@ -726,19 +724,9 @@
       </dependency>
       <!-- Legacy Apache Commons Libraries -->
       <dependency>
-        <groupId>commons-lang</groupId>
-        <artifactId>commons-lang</artifactId>
-        <version>${commons-lang.version}</version>
-      </dependency>
-      <dependency>
         <groupId>commons-collections</groupId>
         <artifactId>commons-collections</artifactId>
         <version>${commons-collections.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.commons</groupId>
-        <artifactId>commons-math</artifactId>
-        <version>${commons-math.version}</version>
       </dependency>
 
       <!-- Java EE Libraries -->
@@ -1407,7 +1395,7 @@
       <dependency>
         <groupId>net.openhft</groupId>
         <artifactId>posix</artifactId>
-        <version>2.26ea0</version>
+        <version>2.26ea1</version>
       </dependency>
       <dependency>
         <groupId>net.openhft</groupId>
@@ -1653,7 +1641,7 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-dependency-plugin</artifactId>
-          <version>3.7.0</version>
+          <version>3.7.1</version>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
