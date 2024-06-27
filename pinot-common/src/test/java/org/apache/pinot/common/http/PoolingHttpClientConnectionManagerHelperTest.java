@@ -19,26 +19,24 @@
 package org.apache.pinot.common.http;
 
 import org.apache.http.config.Registry;
-import org.apache.http.config.RegistryBuilder;
 import org.apache.http.conn.socket.ConnectionSocketFactory;
 import org.apache.http.conn.socket.PlainConnectionSocketFactory;
-import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
-import org.apache.pinot.common.utils.tls.TlsUtils;
+import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.testng.annotations.Test;
 
+import static org.testng.Assert.*;
 
-public class PoolingHttpClientConnectionManagerHelper {
+public class PoolingHttpClientConnectionManagerHelperTest {
 
-  private PoolingHttpClientConnectionManagerHelper() {
-  }
+  @Test
+  public void itBuildsCorrectRegistry() {
+    Registry<ConnectionSocketFactory> socketFactoryRegistry =
+        PoolingHttpClientConnectionManagerHelper.getSocketFactoryRegistry();
 
-  public static Registry<ConnectionSocketFactory> getSocketFactoryRegistry() {
-    return RegistryBuilder.<ConnectionSocketFactory>create()
-        .register(CommonConstants.HTTP_PROTOCOL, PlainConnectionSocketFactory.getSocketFactory())
-        .register(CommonConstants.HTTPS_PROTOCOL, TlsUtils.buildConnectionSocketFactory()).build();
-  }
-
-  public static PoolingHttpClientConnectionManager createWithSocketFactory() {
-    return new PoolingHttpClientConnectionManager(getSocketFactoryRegistry());
+    assertNotNull(socketFactoryRegistry.lookup(CommonConstants.HTTP_PROTOCOL));
+    assertNotNull(socketFactoryRegistry.lookup(CommonConstants.HTTPS_PROTOCOL));
+    assertTrue(socketFactoryRegistry.lookup(CommonConstants.HTTP_PROTOCOL) instanceof PlainConnectionSocketFactory);
+    assertTrue(socketFactoryRegistry.lookup(CommonConstants.HTTPS_PROTOCOL) instanceof SSLConnectionSocketFactory);
   }
 }
