@@ -25,7 +25,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import org.apache.commons.io.FileUtils;
-import org.apache.lucene.search.SearcherManager;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.apache.pinot.util.TestUtils;
