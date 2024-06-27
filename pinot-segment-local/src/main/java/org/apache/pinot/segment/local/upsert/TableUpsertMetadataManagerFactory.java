@@ -83,8 +83,14 @@ public class TableUpsertMetadataManagerFactory {
                 metadataManagerClass, tableNameWithType), e);
       }
     } else {
-      LOGGER.info("Creating ConcurrentMapTableUpsertMetadataManager for table: {}", tableNameWithType);
-      metadataManager = new ConcurrentMapTableUpsertMetadataManager();
+      if (upsertConfig.isEnableConsistentDeletes()) {
+        LOGGER.info("Creating ConcurrentMapTableUpsertMetadataManagerForConsistentDeletes for table: {}",
+            tableNameWithType);
+        metadataManager = new ConcurrentMapTableUpsertMetadataManagerForConsistentDeletes();
+      } else {
+        LOGGER.info("Creating ConcurrentMapTableUpsertMetadataManager for table: {}", tableNameWithType);
+        metadataManager = new ConcurrentMapTableUpsertMetadataManager();
+      }
     }
 
     return metadataManager;
