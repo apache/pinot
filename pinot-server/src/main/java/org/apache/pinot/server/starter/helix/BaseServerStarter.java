@@ -72,7 +72,7 @@ import org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManage
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
-import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneIndexRefreshState;
+import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneIndexRefreshManager;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndexSearcherPool;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.server.access.AccessControlFactory;
@@ -142,8 +142,8 @@ public abstract class BaseServerStarter implements ServiceStartable {
   protected AccessControlFactory _accessControlFactory;
   protected AdminApiApplication _adminApiApplication;
   protected ServerQueriesDisabledTracker _serverQueriesDisabledTracker;
-  protected RealtimeLuceneIndexRefreshState _realtimeLuceneIndexRefreshState;
   protected RealtimeLuceneTextIndexSearcherPool _realtimeLuceneTextIndexSearcherPool;
+  protected RealtimeLuceneIndexRefreshManager _realtimeLuceneTextIndexRefreshManager;
   protected PinotEnvironmentProvider _pinotEnvironmentProvider;
   protected volatile boolean _isServerReadyToServeQueries = false;
 
@@ -587,6 +587,15 @@ public abstract class BaseServerStarter implements ServiceStartable {
         _serverConf.getProperty(ResourceManager.QUERY_WORKER_CONFIG_KEY, ResourceManager.DEFAULT_QUERY_WORKER_THREADS);
     _realtimeLuceneTextIndexSearcherPool = RealtimeLuceneTextIndexSearcherPool.init(queryWorkerThreads);
 
+    // Initialize RealtimeLuceneIndexRefreshManager with max refresh threads and min refresh interval configs
+    LOGGER.info("Initializing lucene refresh manager");
+    int luceneMaxRefreshThreads =
+        _serverConf.getProperty(Server.LUCENE_MAX_REFRESH_THREADS, Server.DEFAULT_LUCENE_MAX_REFRESH_THREADS);
+    int luceneMinRefreshIntervalDuration =
+        _serverConf.getProperty(Server.LUCENE_MIN_REFRESH_INTERVAL_MS, Server.DEFAULT_LUCENE_MIN_REFRESH_INTERVAL_MS);
+    _realtimeLuceneTextIndexRefreshManager =
+        RealtimeLuceneIndexRefreshManager.init(luceneMaxRefreshThreads, luceneMinRefreshIntervalDuration);
+
     LOGGER.info("Initializing server instance and registering state model factory");
     Utils.logVersions();
     ControllerLeaderLocator.create(_helixManager);
@@ -684,9 +693,6 @@ public abstract class BaseServerStarter implements ServiceStartable {
     _serverQueriesDisabledTracker =
         new ServerQueriesDisabledTracker(_helixClusterName, _instanceId, _helixManager, serverMetrics);
     _serverQueriesDisabledTracker.start();
-
-    _realtimeLuceneIndexRefreshState = RealtimeLuceneIndexRefreshState.getInstance();
-    _realtimeLuceneIndexRefreshState.start();
   }
 
   /**
@@ -718,9 +724,6 @@ public abstract class BaseServerStarter implements ServiceStartable {
     }
     if (_serverQueriesDisabledTracker != null) {
       _serverQueriesDisabledTracker.stop();
-    }
-    if (_realtimeLuceneIndexRefreshState != null) {
-      _realtimeLuceneIndexRefreshState.stop();
     }
     try {
       // Close PinotFS after all data managers are shutdown. Otherwise, segments which are being committed will not
