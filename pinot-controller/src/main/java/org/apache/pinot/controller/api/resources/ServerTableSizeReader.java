@@ -25,7 +25,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
-import org.apache.http.conn.HttpClientConnectionManager;
+import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.common.restlet.resources.SegmentSizeInfo;
 import org.apache.pinot.common.restlet.resources.TableSizeInfo;
 import org.apache.pinot.controller.util.CompletionServiceHelper;

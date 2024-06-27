@@ -20,7 +20,7 @@ package org.apache.pinot.common.http;
 
 import java.io.IOException;
 import java.net.URI;
-import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
 
 
 public class MultiHttpRequestResponse implements AutoCloseable {

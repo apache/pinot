@@ -26,10 +26,12 @@ import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
+import org.apache.hc.client5.http.io.HttpClientConnectionManager;
+import org.apache.hc.core5.http.io.SocketConfig;
+import org.apache.hc.core5.util.Timeout;
 import org.apache.helix.HelixManager;
-import org.apache.http.config.SocketConfig;
-import org.apache.http.conn.HttpClientConnectionManager;
-import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
 import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -88,7 +90,8 @@ public class BrokerAdminApiApplication extends ResourceConfig {
     PoolingHttpClientConnectionManager connMgr = new PoolingHttpClientConnectionManager();
     int timeoutMs = (int) brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_TIMEOUT_MS,
         CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS);
-    connMgr.setDefaultSocketConfig(SocketConfig.custom().setSoTimeout(timeoutMs).build());
+    connMgr.setDefaultSocketConfig(
+        SocketConfig.custom().setSoTimeout(Timeout.of(timeoutMs, TimeUnit.MILLISECONDS)).build());
     Instant startTime = Instant.now();
     register(new AbstractBinder() {
       @Override
@@ -134,8 +137,8 @@ public class BrokerAdminApiApplication extends ResourceConfig {
     }
 
     if (_swaggerBrokerEnabled) {
-      PinotReflectionUtils.runWithLock(() ->
-          SwaggerSetupUtils.setupSwagger("Broker", _brokerResourcePackages, _useHttps, "/", _httpServer));
+      PinotReflectionUtils.runWithLock(
+          () -> SwaggerSetupUtils.setupSwagger("Broker", _brokerResourcePackages, _useHttps, "/", _httpServer));
     } else {
       LOGGER.info("Hiding Swagger UI for Broker, by {}", CommonConstants.Broker.CONFIG_OF_SWAGGER_BROKER_ENABLED);
     }
