@@ -38,7 +38,6 @@ import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
@@ -105,10 +104,6 @@ public class DummyTableUpsertMetadataManager extends BaseTableUpsertMetadataMana
 
     @Override
     protected void removeSegment(IndexSegment segment, MutableRoaringBitmap validDocIds) {
-    }
-
-    @Override
-    protected void removeSegment(IndexSegment segment, Iterator<PrimaryKey> primaryKeyIterator) {
     }
 
     @Override
