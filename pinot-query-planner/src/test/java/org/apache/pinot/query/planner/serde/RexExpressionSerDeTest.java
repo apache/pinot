@@ -21,7 +21,7 @@ package org.apache.pinot.query.planner.serde;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Random;
-import org.apache.commons.lang.RandomStringUtils;
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.spi.utils.BooleanUtils;

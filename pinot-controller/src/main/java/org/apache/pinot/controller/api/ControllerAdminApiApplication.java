@@ -122,4 +122,8 @@ public class ControllerAdminApiApplication extends ResourceConfig {
       }
     }
   }
+
+  public HttpServer getHttpServer() {
+    return _httpServer;
+  }
 }

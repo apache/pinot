@@ -62,7 +62,7 @@ public abstract class BasePinotLBuffer extends PinotDataBuffer {
   }
 
   @Override
-  public void copyTo(long offset, PinotDataBuffer buffer, long destOffset, long size) {
+  public void copyTo(long offset, DataBuffer buffer, long destOffset, long size) {
     if (buffer instanceof BasePinotLBuffer) {
       _buffer.copyTo(offset, ((BasePinotLBuffer) buffer)._buffer, destOffset, size);
     } else {

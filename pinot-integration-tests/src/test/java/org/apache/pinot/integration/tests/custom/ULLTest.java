@@ -27,7 +27,7 @@ import java.util.Base64;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
-import org.apache.commons.lang.math.RandomUtils;
+import org.apache.commons.lang3.RandomUtils;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.segment.local.utils.UltraLogLogUtils;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -139,7 +139,7 @@ public class ULLTest extends CustomDataQueryClusterIntegrationTest {
       for (int i = 0; i < getCountStarResult(); i++) {
         // create avro record
         GenericData.Record record = new GenericData.Record(avroSchema);
-        record.put(ID, RandomUtils.nextInt(10));
+        record.put(ID, RandomUtils.nextInt(0, 10));
         record.put(COLUMN, ByteBuffer.wrap(getRandomRawValue()));
         // add avro record to file
         fileWriter.append(record);
