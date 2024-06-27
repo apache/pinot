@@ -21,7 +21,7 @@ package org.apache.pinot.spi.eventlistener.query;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Sets;
 import java.util.Set;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
