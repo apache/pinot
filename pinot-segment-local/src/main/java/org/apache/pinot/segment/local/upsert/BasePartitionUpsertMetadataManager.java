@@ -770,7 +770,10 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     }
   }
 
-  protected abstract void removeSegment(IndexSegment segment, Iterator<PrimaryKey> primaryKeyIterator);
+  protected void removeSegment(IndexSegment segment, Iterator<PrimaryKey> primaryKeyIterator) {
+    throw new UnsupportedOperationException("Both removeSegment(segment, validDocID) and "
+        + "removeSegment(segment, pkIterator) are not implemented. Implement one of them to support removal.");
+  }
 
   @Override
   public void removeSegment(IndexSegment segment) {
