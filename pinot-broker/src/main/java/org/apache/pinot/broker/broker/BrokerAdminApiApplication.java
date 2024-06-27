@@ -163,4 +163,8 @@ public class BrokerAdminApiApplication extends ResourceConfig {
     LOGGER.info("Shutting down executor service");
     _executorService.shutdownNow();
   }
+
+  public HttpServer getHttpServer() {
+    return _httpServer;
+  }
 }

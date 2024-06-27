@@ -28,6 +28,7 @@ import org.apache.lucene.queryparser.classic.QueryParser;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.SearcherManager;
+import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
 import org.apache.pinot.segment.local.utils.LuceneTextIndexUtils;
@@ -55,6 +56,7 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
   private final String _column;
   private final String _segmentName;
   private boolean _enablePrefixSuffixMatchingInPhraseQueries = false;
+  private final RealtimeLuceneRefreshListener _refreshListener;
 
   /**
    * Created by {@link MutableSegmentImpl}
@@ -81,6 +83,11 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
               false /* commitOnClose */, false, null, null, config);
       IndexWriter indexWriter = _indexCreator.getIndexWriter();
       _searcherManager = new SearcherManager(indexWriter, false, false, null);
+
+      LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
+      _refreshListener = new RealtimeLuceneRefreshListener(llcSegmentName.getTableName(), segmentName, column,
+          llcSegmentName.getPartitionGroupId(), _indexCreator::getNumDocs);
+      _searcherManager.addListener(_refreshListener);
       _analyzer = _indexCreator.getIndexWriter().getConfig().getAnalyzer();
       _enablePrefixSuffixMatchingInPhraseQueries = config.isEnablePrefixSuffixMatchingInPhraseQueries();
     } catch (Exception e) {
@@ -197,6 +204,7 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
     try {
       _searcherManager.close();
       _searcherManager = null;
+      _refreshListener.close(); // clean up metrics prior to closing _indexCreator, as they contain a reference to it
       _indexCreator.close();
       _analyzer.close();
     } catch (Exception e) {

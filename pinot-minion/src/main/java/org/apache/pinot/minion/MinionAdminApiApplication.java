@@ -95,4 +95,8 @@ public class MinionAdminApiApplication extends ResourceConfig {
       _httpServer.shutdownNow();
     }
   }
+
+  public HttpServer getHttpServer() {
+    return _httpServer;
+  }
 }

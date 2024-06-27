@@ -22,7 +22,7 @@ import java.security.KeyStore;
 import java.util.Optional;
 import javax.net.ssl.SSLContext;
 import nl.altindag.ssl.SSLFactory;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

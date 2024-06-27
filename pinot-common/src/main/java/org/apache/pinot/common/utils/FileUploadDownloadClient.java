@@ -35,7 +35,7 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import javax.net.ssl.SSLContext;
 import javax.ws.rs.core.Response;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpHeaders;
