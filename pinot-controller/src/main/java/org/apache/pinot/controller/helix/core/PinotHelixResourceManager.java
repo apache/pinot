@@ -215,7 +215,7 @@ public class PinotHelixResourceManager {
 
   private final String _helixZkURL;
   private final String _helixClusterName;
-  private final String _dataDir;
+  protected final String _dataDir;
   private final boolean _isSingleTenantCluster;
   private final boolean _enableBatchMessageMode;
   private final int _deletedSegmentsRetentionInDays;
@@ -223,7 +223,7 @@ public class PinotHelixResourceManager {
 
   private HelixManager _helixZkManager;
   private HelixAdmin _helixAdmin;
-  private ZkHelixPropertyStore<ZNRecord> _propertyStore;
+  protected ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private HelixDataAccessor _helixDataAccessor;
   private Builder _keyBuilder;
   private ControllerMetrics _controllerMetrics;
