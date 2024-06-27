@@ -77,6 +77,7 @@ import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.roaringbitmap.PeekableIntIterator;
@@ -758,7 +759,21 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     }
   }
 
-  protected abstract void removeSegment(IndexSegment segment, MutableRoaringBitmap validDocIds);
+  protected void removeSegment(IndexSegment segment, MutableRoaringBitmap validDocIds) {
+    try (UpsertUtils.PrimaryKeyReader primaryKeyReader = new UpsertUtils.PrimaryKeyReader(segment,
+        _primaryKeyColumns)) {
+      removeSegment(segment, UpsertUtils.getPrimaryKeyIterator(primaryKeyReader, validDocIds));
+    } catch (Exception e) {
+      throw new RuntimeException(
+          String.format("Caught exception while removing segment: %s, table: %s", segment.getSegmentName(),
+              _tableNameWithType), e);
+    }
+  }
+
+  protected void removeSegment(IndexSegment segment, Iterator<PrimaryKey> primaryKeyIterator) {
+    throw new UnsupportedOperationException("Both removeSegment(segment, validDocID) and "
+        + "removeSegment(segment, pkIterator) are not implemented. Implement one of them to support removal.");
+  }
 
   @Override
   public void removeSegment(IndexSegment segment) {
