@@ -29,7 +29,7 @@ import java.sql.Statement;
 import java.util.Collections;
 import java.util.Objects;
 import java.util.Set;
-import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.pinot.client.ResultSetGroup;
