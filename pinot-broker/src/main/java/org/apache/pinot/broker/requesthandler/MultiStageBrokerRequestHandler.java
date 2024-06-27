@@ -289,7 +289,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       LOGGER.warn("Error encountered while collecting multi-stage stats", e);
       brokerResponse.setStageStats(JsonNodeFactory.instance.objectNode().put(
           "error",
-          "Error encountered while collecting multi-stage stats - " + e.getClass().getName() + ": " + e.getMessage())
+          "Error encountered while collecting multi-stage stats - " + e)
       );
     }
   }
