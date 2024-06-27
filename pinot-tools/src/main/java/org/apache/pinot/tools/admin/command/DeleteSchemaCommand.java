@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.tools.admin.command;
 
-import java.util.Arrays;
-import java.util.Collections;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.spi.utils.NetUtils;
@@ -29,14 +27,11 @@ import picocli.CommandLine;
 
 
 @CommandLine.Command(name = "DeleteSchema")
-public class DeleteSchemaCommand extends AbstractExecuteBaseAdminCommand {
+public class DeleteSchemaCommand extends AbstractDatabaseBaseAdminCommand {
   private static final Logger LOGGER = LoggerFactory.getLogger(DeleteSchemaCommand.class);
 
   @CommandLine.Option(names = {"-schemaName"}, required = true, description = "Schema name.")
   private String _schemaName = null;
-
-  @CommandLine.Option(names = {"-exec"}, required = false, description = "Execute the command.")
-  private boolean _exec;
 
   @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true, description = "Print "
       + "this message.")
@@ -61,7 +56,7 @@ public class DeleteSchemaCommand extends AbstractExecuteBaseAdminCommand {
   public String toString() {
     String retString =
         ("DeleteSchema -controllerProtocol " + _controllerProtocol + " -controllerHost " + _controllerHost
-            + " -controllerPort " + _controllerPort + " -headers " + Arrays.toString(_headers)
+            + " -controllerPort " + _controllerPort + " -database " + _database
             + " -schemaName " + _schemaName + " -user " + _user + " -password "
             + "[hidden]");
 
@@ -95,8 +90,9 @@ public class DeleteSchemaCommand extends AbstractExecuteBaseAdminCommand {
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
       fileUploadDownloadClient.getHttpClient().sendDeleteRequest(
           FileUploadDownloadClient.getDeleteSchemaURI(_controllerProtocol, _controllerHost,
-              Integer.parseInt(_controllerPort), _schemaName), getHeadersAsMap(Collections.emptyList()),
-          AuthProviderUtils.makeAuthProvider(_authProvider, _authTokenUrl, _authToken, _user, _password));
+              Integer.parseInt(_controllerPort), _schemaName), getHeadersAsMap(),
+              AuthProviderUtils.makeAuthProvider(_authProvider, _authTokenUrl, _authToken,
+              _user, _password));
     } catch (Exception e) {
       LOGGER.error("Got Exception while deleting Pinot Schema: {}", _schemaName, e);
       return false;

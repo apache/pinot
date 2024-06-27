@@ -22,9 +22,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.concurrent.Callable;
-import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.spi.config.TableConfigs;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -43,7 +41,7 @@ import picocli.CommandLine;
  *
  */
 @CommandLine.Command(name = "AddTable")
-public class AddTableCommand extends AbstractExecuteBaseAdminCommand {
+public class AddTableCommand extends AbstractDatabaseBaseAdminCommand {
   private static final Logger LOGGER = LoggerFactory.getLogger(AddTableCommand.class);
 
   @CommandLine.Option(names = {"-tableConfigFile", "-tableConf", "-tableConfig", "-filePath"}, description = "Path to"
@@ -93,7 +91,7 @@ public class AddTableCommand extends AbstractExecuteBaseAdminCommand {
   public String toString() {
     return "AddTable -tableConfigFile " + _tableConfigFile + " -offlineTableConfigFile " + _offlineTableConfigFile
         + " -realtimeTableConfigFile " + _realtimeTableConfigFile + " -schemaFile " + _schemaFile
-        + " -headers " + Arrays.toString(_headers) + " -controllerProtocol " + _controllerProtocol + " -controllerHost "
+        + " -database " + _database + " -controllerProtocol " + _controllerProtocol + " -controllerHost "
         + _controllerHost + " -controllerPort "
         + _controllerPort + " -user " + _user + " -password [hidden]" + (_exec ? " -exec" : "");
   }
@@ -126,11 +124,7 @@ public class AddTableCommand extends AbstractExecuteBaseAdminCommand {
       throws IOException {
     String res = AbstractBaseAdminCommand.sendRequest("POST",
         ControllerRequestURLBuilder.baseUrl(_controllerAddress).forTableConfigsCreate(), node.toString(),
-        getHeaders(
-            AuthProviderUtils.makeAuthHeaders(
-              AuthProviderUtils.makeAuthProvider(_authProvider, _authTokenUrl, _authToken, _user, _password))
-        ),
-        makeTrustAllSSLContext());
+        getHeaders(), makeTrustAllSSLContext());
     LOGGER.info(res);
     return res.contains("successfully added");
   }
@@ -139,11 +133,7 @@ public class AddTableCommand extends AbstractExecuteBaseAdminCommand {
       throws IOException {
     String res = AbstractBaseAdminCommand.sendRequest("PUT",
         ControllerRequestURLBuilder.baseUrl(_controllerAddress).forTableConfigsUpdate(tableName), node.toString(),
-        getHeaders(
-            AuthProviderUtils.makeAuthHeaders(
-              AuthProviderUtils.makeAuthProvider(_authProvider, _authTokenUrl, _authToken, _user, _password))
-        ),
-        makeTrustAllSSLContext());
+        getHeaders(), makeTrustAllSSLContext());
     LOGGER.info(res);
     return res.contains("TableConfigs updated");
   }

@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.tools.admin.command;
 
-import java.util.Arrays;
-import java.util.Collections;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.spi.auth.AuthProvider;
@@ -30,7 +28,7 @@ import picocli.CommandLine;
 
 
 @CommandLine.Command(name = "DeleteTable")
-public class DeleteTableCommand extends AbstractExecuteBaseAdminCommand {
+public class DeleteTableCommand extends AbstractDatabaseBaseAdminCommand {
   private static final Logger LOGGER = LoggerFactory.getLogger(DeleteTableCommand.class);
 
   @CommandLine.Option(names = {"-tableName"}, required = true, description = "Name of the table to delete.")
@@ -72,7 +70,7 @@ public class DeleteTableCommand extends AbstractExecuteBaseAdminCommand {
     String retString =
         ("DeleteTable -tableName " + _tableName + " -type " + _type + " -retention " + _retention
             + " -controllerProtocol " + _controllerProtocol + " -controllerHost " + _controllerHost
-            + " -headers " + Arrays.toString(_headers)
+            + " -database " + _database
             + " -controllerPort " + _controllerPort + " -user " + _user + " -password " + "[hidden]");
     return ((_exec) ? (retString + " -exec") : retString);
   }
@@ -113,9 +111,9 @@ public class DeleteTableCommand extends AbstractExecuteBaseAdminCommand {
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
       fileUploadDownloadClient.getHttpClient().sendDeleteRequest(FileUploadDownloadClient
           .getDeleteTableURI(_controllerProtocol, _controllerHost, Integer.parseInt(_controllerPort),
-              _tableName, _type, _retention), getHeadersAsMap(Collections.emptyList()),
+              _tableName, _type, _retention), getHeadersAsMap(),
               AuthProviderUtils.makeAuthProvider(_authProvider,
-          _authTokenUrl, _authToken, _user, _password));
+              _authTokenUrl, _authToken, _user, _password));
     } catch (Exception e) {
       LOGGER.error("Got Exception while deleting Pinot Table: {}", _tableName, e);
       return false;

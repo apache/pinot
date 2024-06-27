@@ -21,9 +21,7 @@ package org.apache.pinot.tools.admin.command;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.net.URI;
-import java.util.Arrays;
 import java.util.Collections;
-import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.data.Schema;
@@ -34,7 +32,7 @@ import picocli.CommandLine;
 
 
 @CommandLine.Command(name = "AddSchema")
-public class AddSchemaCommand extends AbstractExecuteBaseAdminCommand {
+public class AddSchemaCommand extends AbstractDatabaseBaseAdminCommand {
   private static final Logger LOGGER = LoggerFactory.getLogger(AddSchemaCommand.class);
 
   @CommandLine.Option(names = {"-schemaFile"}, required = true, description = "Path to schema file.")
@@ -48,8 +46,8 @@ public class AddSchemaCommand extends AbstractExecuteBaseAdminCommand {
       + "the schema exists.")
   private boolean _force = false;
 
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
-      description = "Print this message.")
+  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true, description = "Print "
+      + "this message.")
   private boolean _help = false;
 
   private AuthProvider _authProvider;
@@ -72,9 +70,8 @@ public class AddSchemaCommand extends AbstractExecuteBaseAdminCommand {
   @Override
   public String toString() {
     String retString = ("AddSchema -controllerProtocol " + _controllerProtocol + " -controllerHost " + _controllerHost
-        + " -controllerPort " + _controllerPort + " -headers " + Arrays.toString(_headers) + " -schemaFile "
-        + _schemaFile + " -override " + _override + " _force "
-        + _force + " -user " + _user + " -password " + "[hidden]");
+        + " -controllerPort " + _controllerPort + " -database " + _database + " -schemaFile " + _schemaFile
+        + " -override " + _override + " _force " + _force + " -user " + _user + " -password " + "[hidden]");
 
     return ((_exec) ? (retString + " -exec") : retString);
   }
@@ -119,14 +116,11 @@ public class AddSchemaCommand extends AbstractExecuteBaseAdminCommand {
 
     Schema schema = Schema.fromFile(schemaFile);
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
-      URI schemaURI = FileUploadDownloadClient
-          .getUploadSchemaURI(_controllerProtocol, _controllerHost, Integer.parseInt(_controllerPort));
+      URI schemaURI = FileUploadDownloadClient.getUploadSchemaURI(_controllerProtocol, _controllerHost,
+          Integer.parseInt(_controllerPort));
       schemaURI = new URI(schemaURI + "?override=" + _override + "&force=" + _force);
-      fileUploadDownloadClient.addSchema(schemaURI,
-          schema.getSchemaName(), schemaFile, getHeaders(
-              AuthProviderUtils.makeAuthHeaders(
-                      AuthProviderUtils.makeAuthProvider(_authProvider, _authTokenUrl, _authToken, _user, _password))
-          ), Collections.emptyList());
+      fileUploadDownloadClient.addSchema(schemaURI, schema.getSchemaName(), schemaFile, getHeaders(),
+          Collections.emptyList());
     } catch (Exception e) {
       LOGGER.error("Got Exception to upload Pinot Schema: {}", schema.getSchemaName(), e);
       return false;

@@ -24,6 +24,7 @@ import java.util.stream.Collectors;
 import javax.net.ssl.SSLContext;
 import org.apache.http.Header;
 import org.apache.http.message.BasicHeader;
+import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.utils.ClientSSLContextGenerator;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -32,7 +33,7 @@ import org.apache.pinot.tools.Command;
 import picocli.CommandLine;
 
 
-public abstract class AbstractExecuteBaseAdminCommand extends AbstractBaseAdminCommand implements Command {
+public abstract class AbstractDatabaseBaseAdminCommand extends AbstractBaseAdminCommand implements Command {
   @CommandLine.Option(names = {"-controllerHost"}, required = false, description = "Host name for controller.")
   protected String _controllerHost;
 
@@ -63,41 +64,41 @@ public abstract class AbstractExecuteBaseAdminCommand extends AbstractBaseAdminC
       + " controller certification validation.")
   private boolean _skipControllerCertValidation = false;
 
-  @CommandLine.Parameters(paramLabel = "-headers", description = "Additional headers to send.")
-  protected String[] _headers;
+  @CommandLine.Option(names = { "-database" }, required = false, description = "Corresponding database.")
+  protected String _database;
 
-  public AbstractExecuteBaseAdminCommand setControllerHost(String controllerHost) {
+  public AbstractDatabaseBaseAdminCommand setControllerHost(String controllerHost) {
     _controllerHost = controllerHost;
     return this;
   }
 
-  public AbstractExecuteBaseAdminCommand setControllerPort(String controllerPort) {
+  public AbstractDatabaseBaseAdminCommand setControllerPort(String controllerPort) {
     _controllerPort = controllerPort;
     return this;
   }
 
-  public AbstractExecuteBaseAdminCommand setControllerProtocol(String controllerProtocol) {
+  public AbstractDatabaseBaseAdminCommand setControllerProtocol(String controllerProtocol) {
     _controllerProtocol = controllerProtocol;
     return this;
   }
 
-  public AbstractExecuteBaseAdminCommand setUser(String user) {
+  public AbstractDatabaseBaseAdminCommand setUser(String user) {
     _user = user;
     return this;
   }
 
-  public AbstractExecuteBaseAdminCommand setPassword(String password) {
+  public AbstractDatabaseBaseAdminCommand setPassword(String password) {
     _password = password;
     return this;
   }
 
-  public AbstractExecuteBaseAdminCommand setAuthProvider(AuthProvider authProvider) {
+  public AbstractDatabaseBaseAdminCommand setAuthProvider(AuthProvider authProvider) {
     _authProvider = authProvider;
     return this;
   }
 
-  public AbstractExecuteBaseAdminCommand setHeaders(List<String> headers) {
-    _headers = headers.toArray(new String[headers.size()]);
+  public AbstractDatabaseBaseAdminCommand setDatabase(String database) {
+    _database = database;
     return this;
   }
 
@@ -110,24 +111,18 @@ public abstract class AbstractExecuteBaseAdminCommand extends AbstractBaseAdminC
     }
   }
 
-  protected List<Header> getHeaders(List<Header> headers) {
-    if (_headers != null) {
-      for (String header : _headers) {
-        String[] pair = header.split("=");
-        if (pair.length == 2) {
-          BasicHeader database = new BasicHeader(pair[0], pair[1]);
-          headers.add(database);
-        }
-      }
-    }
+  protected List<Header> getHeaders() {
+    List<Header> headers = AuthProviderUtils.makeAuthHeaders(
+        AuthProviderUtils.makeAuthProvider(_authProvider, _authTokenUrl, _authToken, _user, _password));
+    headers.add(new BasicHeader("database", _database));
     return headers;
   }
 
-  protected Map<String, String> getHeadersAsMap(List<Header> headers) {
-    return getHeaders(headers).stream().collect(Collectors.toMap(Header::getName, Header::getValue));
+  protected Map<String, String> getHeadersAsMap() {
+    return getHeaders().stream().collect(Collectors.toMap(Header::getName, Header::getValue));
   }
 
-  public AbstractExecuteBaseAdminCommand setExecute(boolean exec) {
+  public AbstractDatabaseBaseAdminCommand setExecute(boolean exec) {
     _exec = exec;
     return this;
   }
