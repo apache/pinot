@@ -59,7 +59,6 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
   private static final double DEFAULT_INVALID_RECORDS_THRESHOLD_PERCENT = 0.0;
   private static final long DEFAULT_INVALID_RECORDS_THRESHOLD_COUNT = 1;
   private static final int DEFAULT_NUM_SEGMENTS_BATCH_PER_SERVER_REQUEST = 500;
-  private static final String DEFAULT_SKIP_CRC_MISMATCH = "false";
 
   public static class SegmentSelectionResult {
 
@@ -165,8 +164,6 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
             String.format("deleteRecordColumn must be provided for " + "UpsertCompactionTask with validDocIdsType = %s",
                 validDocIdsType));
       }
-      String skipCrcMismatch = taskConfigs.getOrDefault(UpsertCompactionTask.SKIP_CRC_MISMATCH,
-          DEFAULT_SKIP_CRC_MISMATCH);
 
       List<ValidDocIdsMetadataInfo> validDocIdsMetadataList =
           serverSegmentMetadataReader.getValidDocIdsMetadataFromServer(tableNameWithType, serverToSegments,
@@ -202,7 +199,6 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
         configs.put(MinionConstants.UPLOAD_URL_KEY, _clusterInfoAccessor.getVipUrl() + "/segments");
         configs.put(MinionConstants.ORIGINAL_SEGMENT_CRC_KEY, String.valueOf(segment.getCrc()));
         configs.put(UpsertCompactionTask.VALID_DOC_IDS_TYPE, validDocIdsType.toString());
-        configs.put(UpsertCompactionTask.SKIP_CRC_MISMATCH, String.valueOf(skipCrcMismatch));
         pinotTaskConfigs.add(new PinotTaskConfig(UpsertCompactionTask.TASK_TYPE, configs));
         numTasks++;
       }

@@ -25,12 +25,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.model.ExternalView;
-import org.apache.helix.model.InstanceConfig;
-import org.apache.pinot.common.restlet.resources.ValidDocIdsBitmapResponse;
-import org.apache.pinot.common.utils.config.InstanceUtils;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
-import org.apache.pinot.controller.util.ServerSegmentMetadataReader;
-import org.apache.pinot.minion.MinionContext;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -141,32 +136,6 @@ public class MinionTaskUtils {
       return dirInStr + DEFAULT_DIR_PATH_TERMINATOR;
     }
     return dirInStr;
-  }
-
-  public static ValidDocIdsBitmapResponse getValidDocIdsBitmap(String tableNameWithType, String segmentName,
-      String validDocIdsType, MinionContext minionContext) {
-    HelixAdmin helixAdmin = minionContext.getHelixManager().getClusterManagmentTool();
-    String clusterName = minionContext.getHelixManager().getClusterName();
-
-    List<String> servers = getServers(segmentName, tableNameWithType, helixAdmin, clusterName);
-    for (String server : servers) {
-      InstanceConfig instanceConfig = helixAdmin.getInstanceConfig(clusterName, server);
-      String endpoint = InstanceUtils.getServerAdminEndpoint(instanceConfig);
-
-      // We only need aggregated table size and the total number of docs/rows. Skipping column related stats, by
-      // passing an empty list.
-      ServerSegmentMetadataReader serverSegmentMetadataReader = new ServerSegmentMetadataReader();
-      try {
-        return serverSegmentMetadataReader.getValidDocIdsBitmapFromServer(tableNameWithType, segmentName, endpoint,
-            validDocIdsType, 60_000);
-      } catch (Exception e) {
-        LOGGER.warn(
-            String.format("Unable to retrieve validDocIds bitmap for segment: %s from endpoint: %s", segmentName,
-                endpoint), e);
-      }
-    }
-    throw new IllegalStateException(
-        String.format("Unable to retrieve validDocIds bitmap for segment: %s from servers: %s", segmentName, servers));
   }
 
   public static List<String> getServers(String segmentName, String tableNameWithType, HelixAdmin helixAdmin,
