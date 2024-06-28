@@ -117,6 +117,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   protected Cache<String, String> _recentlyDeletedSegments;
 
   protected volatile boolean _shutDown;
+  protected boolean _allowEmptySegmentCommit;
 
   @Override
   public void init(InstanceDataManagerConfig instanceDataManagerConfig, HelixManager helixManager,
@@ -183,6 +184,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
       _segmentDownloadSemaphore = null;
     }
     _logger = LoggerFactory.getLogger(_tableNameWithType + "-" + getClass().getSimpleName());
+    _allowEmptySegmentCommit = instanceDataManagerConfig.isAllowEmptySegmentCommit();
 
     doInit();
 
@@ -194,6 +196,11 @@ public abstract class BaseTableDataManager implements TableDataManager {
   @Override
   public String getInstanceId() {
     return _instanceId;
+  }
+
+  @Override
+  public boolean isAllowEmptySegmentCommit() {
+    return _allowEmptySegmentCommit;
   }
 
   @Override

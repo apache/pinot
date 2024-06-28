@@ -34,9 +34,8 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
+import org.apache.pinot.controller.helix.core.retention.strategy.CompositeRetentionStrategy;
 import org.apache.pinot.controller.helix.core.retention.strategy.RetentionStrategy;
-import org.apache.pinot.controller.helix.core.retention.strategy.TimeRetentionStrategy;
-import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -97,23 +96,12 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     LOGGER.info("Start managing retention for table: {}", tableNameWithType);
 
     // For offline tables, ensure that the segmentPushType is APPEND.
-    SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
     String segmentPushType = IngestionConfigUtils.getBatchSegmentIngestionType(tableConfig);
     if (tableConfig.getTableType() == TableType.OFFLINE && !"APPEND".equalsIgnoreCase(segmentPushType)) {
       LOGGER.info("Segment push type is not APPEND for table: {}, skip managing retention", tableNameWithType);
       return;
     }
-    String retentionTimeUnit = validationConfig.getRetentionTimeUnit();
-    String retentionTimeValue = validationConfig.getRetentionTimeValue();
-    RetentionStrategy retentionStrategy;
-    try {
-      retentionStrategy = new TimeRetentionStrategy(TimeUnit.valueOf(retentionTimeUnit.toUpperCase()),
-          Long.parseLong(retentionTimeValue));
-    } catch (Exception e) {
-      LOGGER.warn("Invalid retention time: {} {} for table: {}, skip", retentionTimeUnit, retentionTimeValue,
-          tableNameWithType);
-      return;
-    }
+    RetentionStrategy retentionStrategy = new CompositeRetentionStrategy(tableConfig);
 
     // Scan all segment ZK metadata and purge segments if necessary
     if (TableNameBuilder.isOfflineTableResource(tableNameWithType)) {
