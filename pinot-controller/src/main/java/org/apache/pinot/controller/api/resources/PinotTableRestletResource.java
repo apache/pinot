@@ -47,6 +47,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
@@ -677,14 +678,30 @@ public class PinotTableRestletResource {
         if (dryRunResult.getStatus() == RebalanceResult.Status.DONE) {
           // If dry-run succeeded, run rebalance asynchronously
           rebalanceConfig.setDryRun(false);
-          _executorService.submit(() -> {
+          Future<RebalanceResult> rebalanceResultFuture = _executorService.submit(() -> {
             try {
-              _pinotHelixResourceManager.rebalanceTable(tableNameWithType, rebalanceConfig, rebalanceJobId, true);
+              return _pinotHelixResourceManager.rebalanceTable(
+                  tableNameWithType, rebalanceConfig, rebalanceJobId, true);
             } catch (Throwable t) {
-              LOGGER.error("Caught exception/error while rebalancing table: {}", tableNameWithType, t);
+              String errorMsg = String.format("Caught exception/error while rebalancing table: %s", tableNameWithType);
+              LOGGER.error(errorMsg, t);
+              return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED, errorMsg, null, null, null);
             }
           });
-          waitForJobIdToPersist(dryRunResult.getJobId(), tableNameWithType);
+          boolean isJobIdPersisted = waitForJobIdToPersist(dryRunResult.getJobId(), tableNameWithType);
+
+          // It's possible the dryRun indicates a rebalance is needed, but next rebalance is not.
+          // In that case, we never persist the jobId, but will already have a rebalanceResult.
+          // Return the actual rebalanceResult in this case.
+          if (!isJobIdPersisted && rebalanceResultFuture.isDone()) {
+            try {
+              return rebalanceResultFuture.get();
+            } catch (Throwable ignored) {
+              // Ignore any errors here. Errors will have already been logged
+              // in the submitted future.
+            }
+          }
+
           return new RebalanceResult(dryRunResult.getJobId(), RebalanceResult.Status.IN_PROGRESS,
               "In progress, check controller logs for updates", dryRunResult.getInstanceAssignment(),
               dryRunResult.getTierInstanceAssignment(), dryRunResult.getSegmentAssignment());
@@ -703,13 +720,15 @@ public class PinotTableRestletResource {
    * Tables with 100k+ segments take up to a few seconds for the jobId to persist. This ensures the jobId is present
    * before returning the jobId to the caller, so they can correctly poll the jobId.
    */
-  public void waitForJobIdToPersist(String jobId, String tableNameWithType) {
+  public boolean waitForJobIdToPersist(String jobId, String tableNameWithType) {
     try {
       // This retry policy waits at most for 7.5s to 15s in total. This is chosen to cover typical delays for tables
       // with many segments and avoid excessive HTTP request timeouts.
       RetryPolicies.exponentialBackoffRetryPolicy(5, 500L, 2.0).attempt(() -> getControllerJobMetadata(jobId) != null);
+      return true;
     } catch (Exception e) {
       LOGGER.warn("waiting for jobId not successful while rebalancing table: {}", tableNameWithType);
+      return false;
     }
   }
 
