@@ -702,6 +702,14 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
     }
   }
 
+  @Override
+  protected void nonLeaderCleanup(List<String> tableNamesWithType) {
+    LOGGER.info("Cleaning up all task generators for tables that the controller is not the leader for.");
+    for (String taskType : _taskGeneratorRegistry.getAllTaskTypes()) {
+      _taskGeneratorRegistry.getTaskGenerator(taskType).nonLeaderCleanUp(tableNamesWithType);
+    }
+  }
+
   @Nullable
   public Scheduler getScheduler() {
     return _scheduler;
