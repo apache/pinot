@@ -155,4 +155,9 @@ public class DatabaseUtils {
     String database = databaseFromHeaders != null ? databaseFromHeaders : databaseFromOptions;
     return Objects.requireNonNullElse(database, CommonConstants.DEFAULT_DATABASE);
   }
+
+  public static String extractDatabaseFromTableName(String tableName) {
+    String[] split = StringUtils.split(tableName, '.');
+    return split.length == 1 ? CommonConstants.DEFAULT_DATABASE : split[0];
+  }
 }
