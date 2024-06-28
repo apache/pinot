@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.api.resources;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiKeyAuthDefinition;
 import io.swagger.annotations.ApiOperation;
@@ -27,6 +28,8 @@ import io.swagger.annotations.ApiResponses;
 import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.Executor;
 import javax.inject.Inject;
 import javax.ws.rs.GET;
@@ -48,6 +51,9 @@ import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -112,5 +118,43 @@ public class TableSize {
       throw new ControllerApplicationException(LOGGER, "Table " + tableName + " not found", Response.Status.NOT_FOUND);
     }
     return tableSizeDetails;
+  }
+
+  @GET
+  @Path("/tables/{tableName}/sizeQuotaInfo")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_SIZE)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Get table quota size info", notes = "Compare table size with the storage quota limits. "
+      + "Table size is the size of untarred segments including replication")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 404, message = "Table not found"),
+      @ApiResponse(code = 500, message = "Internal server error")
+  })
+  public TableSizeQuotaInfo getTableSizeQuotaInfo(
+      @ApiParam(value = "Table name with type", required = true, example = "myTable_REALTIME | myTable_OFFLINE")
+      @PathParam("tableName") String tableName, @Context HttpHeaders headers) {
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
+    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
+    TableSizeReader.TableSizeDetails tableSizeDetails = getTableSize(tableName, headers);
+    TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableName);
+    long storageQuota = -1;
+    if (tableConfig != null && tableConfig.getQuotaConfig() != null) {
+      storageQuota = tableConfig.getQuotaConfig().getStorageInBytes();
+    }
+    TableSizeReader.TableSubTypeSizeDetails sizeDetails = TableType.REALTIME.equals(tableType)
+        ? tableSizeDetails._realtimeSegments
+        : tableSizeDetails._offlineSegments;
+    TableSizeQuotaInfo quotaInfo = new TableSizeQuotaInfo();
+    quotaInfo._quotaReached = storageQuota <= sizeDetails._estimatedSizeInBytes;
+    quotaInfo._metadata.put("tableSizeInBytes", String.valueOf(sizeDetails._estimatedSizeInBytes));
+    quotaInfo._metadata.put("tableQuotaInBytes", String.valueOf(storageQuota));
+    return quotaInfo;
+  }
+
+  static class TableSizeQuotaInfo {
+    @JsonProperty("quotaReached")
+    boolean _quotaReached;
+    @JsonProperty("metadata")
+    final Map<String, String> _metadata = new HashMap<>();
   }
 }

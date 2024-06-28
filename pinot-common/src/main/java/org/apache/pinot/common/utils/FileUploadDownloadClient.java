@@ -70,6 +70,8 @@ import org.apache.pinot.spi.utils.retry.RetryPolicies;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.spi.utils.CommonConstants.Server.SegmentCompletionProtocol.DEFAULT_OTHER_REQUESTS_TIMEOUT;
+
 
 /**
  * The <code>FileUploadDownloadClient</code> class provides methods to upload schema/segment, download segment or send
@@ -1129,6 +1131,14 @@ public class FileUploadDownloadClient implements AutoCloseable {
       throws IOException, HttpErrorStatusException {
     return HttpClient.wrapAndThrowHttpException(
         _httpClient.sendRequest(getSegmentCompletionProtocolRequest(uri, headers, parameters, socketTimeoutMs)));
+  }
+
+  public SimpleHttpResponse sendStorageQuotaCheckRequest(String url, String tableName, @Nullable List<Header> headers)
+      throws IOException, HttpErrorStatusException, URISyntaxException {
+    URI uri = new URI(String.format("%s/tables/%s/sizeQuotaInfo", url, tableName));
+    return HttpClient.wrapAndThrowHttpException(
+        _httpClient.sendRequest(getSegmentCompletionProtocolRequest(uri, headers, null,
+            DEFAULT_OTHER_REQUESTS_TIMEOUT)));
   }
 
   /**

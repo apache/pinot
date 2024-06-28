@@ -722,6 +722,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           }
         }
 
+        while (quotaCheck()) {
+          Thread.sleep(RealtimeTableDataManager.STORAGE_QUOTA_CHECK_INTERVAL_MS);
+        }
+
         while (!_state.isFinal()) {
           if (_state.shouldConsume()) {
             consumeLoop();  // Consume until we reached the end criteria, or we are stopped.
@@ -1256,6 +1260,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       params.withMemoryUsedBytes(_memoryManager.getTotalAllocatedBytes());
     }
     return _protocolHandler.segmentConsumed(params);
+  }
+
+  private boolean quotaCheck() {
+    return _protocolHandler.checkTableStorageQuotaReached(_tableConfig.getTableName());
   }
 
   private void removeSegmentFile() {
