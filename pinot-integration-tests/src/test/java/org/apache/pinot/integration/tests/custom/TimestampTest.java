@@ -190,6 +190,7 @@ public class TimestampTest extends CustomDataQueryClusterIntegrationTest {
         + "YEAR_OF_WEEK(tsBase), YEAR_OF_WEEK(tsHalfDayAfter),\n"
         + "MONTH_OF_YEAR(tsBase), MONTH_OF_YEAR(tsHalfDayAfter),\n"
         + "WEEK_OF_YEAR(tsBase), WEEK_OF_YEAR(tsHalfDayAfter),\n"
+        + "WEEK(tsBase), WEEK(tsHalfDayAfter),\n"
         + "DAY_OF_YEAR(tsBase), DAY_OF_YEAR(tsHalfDayAfter),\n"
         + "DAY_OF_MONTH(tsBase), DAY_OF_MONTH(tsHalfDayAfter),\n"
         + "DAY_OF_WEEK(tsBase), DAY_OF_WEEK(tsHalfDayAfter),\n"
@@ -228,6 +229,8 @@ public class TimestampTest extends CustomDataQueryClusterIntegrationTest {
           jsonNode.get("resultTable").get("rows").get(i).get(25).asInt());
       assertEquals(jsonNode.get("resultTable").get("rows").get(i).get(26).asInt(),
           jsonNode.get("resultTable").get("rows").get(i).get(27).asInt());
+      assertEquals(jsonNode.get("resultTable").get("rows").get(i).get(28).asInt(),
+          jsonNode.get("resultTable").get("rows").get(i).get(29).asInt());
     }
   }
 

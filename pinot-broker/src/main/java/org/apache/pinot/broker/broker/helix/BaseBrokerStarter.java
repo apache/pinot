@@ -26,7 +26,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixConstants.ChangeType;
 import org.apache.helix.HelixDataAccessor;
@@ -346,10 +346,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       _sqlQueryExecutor = new SqlQueryExecutor(_spectatorHelixManager);
     }
     LOGGER.info("Starting broker admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));
-    _brokerAdminApplication =
-        new BrokerAdminApiApplication(_routingManager, _brokerRequestHandler, _brokerMetrics, _brokerConf,
-            _sqlQueryExecutor, _serverRoutingStatsManager, _accessControlFactory, _spectatorHelixManager);
-    registerExtraComponents(_brokerAdminApplication);
+    _brokerAdminApplication = createBrokerAdminApp();
     _brokerAdminApplication.start(_listenerConfigs);
 
     LOGGER.info("Initializing cluster change mediator");
@@ -413,6 +410,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   }
 
   /**
+   * @deprecated Use {@link #createBrokerAdminApp()} instead.
    * This method is called after initialization of BrokerAdminApiApplication object
    * and before calling start to allow custom broker starters to register additional
    * components.
@@ -599,5 +597,13 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
 
   public BrokerRequestHandler getBrokerRequestHandler() {
     return _brokerRequestHandler;
+  }
+
+  protected BrokerAdminApiApplication createBrokerAdminApp() {
+    BrokerAdminApiApplication brokerAdminApiApplication =
+        new BrokerAdminApiApplication(_routingManager, _brokerRequestHandler, _brokerMetrics, _brokerConf,
+            _sqlQueryExecutor, _serverRoutingStatsManager, _accessControlFactory, _spectatorHelixManager);
+    registerExtraComponents(brokerAdminApiApplication);
+    return brokerAdminApiApplication;
   }
 }

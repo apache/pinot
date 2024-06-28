@@ -19,6 +19,7 @@
 package org.apache.pinot.broker.requesthandler;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -30,7 +31,7 @@ import javax.annotation.Nullable;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.pinot.broker.api.AccessControl;
 import org.apache.pinot.broker.api.RequesterIdentity;
@@ -79,6 +80,8 @@ import org.slf4j.LoggerFactory;
 
 public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(MultiStageBrokerRequestHandler.class);
+
+  private static final int NUM_UNAVAILABLE_SEGMENTS_TO_LOG = 10;
 
   private final WorkerManager _workerManager;
   private final QueryDispatcher _queryDispatcher;
@@ -241,9 +244,11 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     for (Map.Entry<String, Set<String>> entry : dispatchableSubPlan.getTableToUnavailableSegmentsMap().entrySet()) {
       String tableName = entry.getKey();
       Set<String> unavailableSegments = entry.getValue();
-      numUnavailableSegments += unavailableSegments.size();
+      int unavailableSegmentsInSubPlan = unavailableSegments.size();
+      numUnavailableSegments += unavailableSegmentsInSubPlan;
       brokerResponse.addException(QueryException.getException(QueryException.SERVER_SEGMENT_MISSING_ERROR,
-          String.format("Find unavailable segments: %s for table: %s", unavailableSegments, tableName)));
+          String.format("Found %d unavailable segments for table %s: %s", unavailableSegmentsInSubPlan, tableName,
+              toSizeLimitedString(unavailableSegments, NUM_UNAVAILABLE_SEGMENTS_TO_LOG))));
     }
     requestContext.setNumUnavailableSegments(numUnavailableSegments);
 
@@ -267,17 +272,25 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
   private void fillOldBrokerResponseStats(BrokerResponseNativeV2 brokerResponse,
       List<MultiStageQueryStats.StageStats.Closed> queryStats, DispatchableSubPlan dispatchableSubPlan) {
-    List<DispatchablePlanFragment> stagePlans = dispatchableSubPlan.getQueryStageList();
-    List<PlanNode> planNodes = new ArrayList<>(stagePlans.size());
-    for (DispatchablePlanFragment stagePlan : stagePlans) {
-      planNodes.add(stagePlan.getPlanFragment().getFragmentRoot());
-    }
-    MultiStageStatsTreeBuilder treeBuilder = new MultiStageStatsTreeBuilder(planNodes, queryStats);
-    brokerResponse.setStageStats(treeBuilder.jsonStatsByStage(0));
-    for (MultiStageQueryStats.StageStats.Closed stageStats : queryStats) {
-      if (stageStats != null) { // for example pipeline breaker may not have stats
-        stageStats.forEach((type, stats) -> type.mergeInto(brokerResponse, stats));
+    try {
+      List<DispatchablePlanFragment> stagePlans = dispatchableSubPlan.getQueryStageList();
+      List<PlanNode> planNodes = new ArrayList<>(stagePlans.size());
+      for (DispatchablePlanFragment stagePlan : stagePlans) {
+        planNodes.add(stagePlan.getPlanFragment().getFragmentRoot());
       }
+      MultiStageStatsTreeBuilder treeBuilder = new MultiStageStatsTreeBuilder(planNodes, queryStats);
+      brokerResponse.setStageStats(treeBuilder.jsonStatsByStage(0));
+      for (MultiStageQueryStats.StageStats.Closed stageStats : queryStats) {
+        if (stageStats != null) { // for example pipeline breaker may not have stats
+          stageStats.forEach((type, stats) -> type.mergeInto(brokerResponse, stats));
+        }
+      }
+    } catch (Exception e) {
+      LOGGER.warn("Error encountered while collecting multi-stage stats", e);
+      brokerResponse.setStageStats(JsonNodeFactory.instance.objectNode().put(
+          "error",
+          "Error encountered while collecting multi-stage stats - " + e)
+      );
     }
   }
 
@@ -358,5 +371,16 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       Map<String, Integer> serverResponses) {
     // TODO: Support query cancellation for multi-stage engine
     throw new UnsupportedOperationException();
+  }
+
+  /**
+   * Returns the string representation of the Set of Strings with a limit on the number of elements.
+   * @param setOfStrings Set of strings
+   * @param limit Limit on the number of elements
+   * @return String representation of the set of the form [a,b,c...].
+   */
+  private static String toSizeLimitedString(Set<String> setOfStrings, int limit) {
+    return setOfStrings.stream().limit(limit)
+        .collect(Collectors.joining(", ", "[", setOfStrings.size() > limit ? "...]" : "]"));
   }
 }
