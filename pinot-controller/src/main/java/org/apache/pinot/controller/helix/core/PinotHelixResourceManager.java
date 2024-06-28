@@ -355,6 +355,15 @@ public class PinotHelixResourceManager {
   }
 
   /**
+   * Get the data directory path.
+   *
+   * @return Data directory path
+   */
+  public String getDataDir() {
+    return _dataDir;
+  }
+
+  /**
    * Get the segment deletion manager.
    *
    * @return Segment deletion manager
