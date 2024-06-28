@@ -28,6 +28,18 @@ import org.apache.calcite.rex.RexUtil;
 import org.apache.calcite.tools.RelBuilderFactory;
 
 
+/**
+ * Rule to expand search condition in filter.
+ * <p>
+ * For example, the filter condition:
+ * <p>
+ *   <code>SEARCH(col1, Sarg[[1..2)])</code>
+ * </p>
+ * Is expanded to:
+ * <p>
+ *   <code>AND(>=(col1, 1), <(col1, 2))</code>
+ *
+ */
 public class PinotFilterExpandSearchRule extends RelOptRule {
   public static final PinotFilterExpandSearchRule INSTANCE =
       new PinotFilterExpandSearchRule(PinotRuleUtils.PINOT_REL_FACTORY);
