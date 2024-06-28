@@ -50,6 +50,11 @@ public final class DataBlockUtils {
   }
 
   @VisibleForTesting
+  public static DataBlockSerde getSerde(DataBlockSerde.Version version) {
+    return SERDES.get(version);
+  }
+
+  @VisibleForTesting
   public static void setSerde(DataBlockSerde.Version version, DataBlockSerde serde) {
     SERDES.put(version, serde);
   }

@@ -230,7 +230,10 @@ public class ZeroCopyDataBlockSerde implements DataBlockSerde {
 
   private Map<Integer, String> deserializeExceptions(PinotInputStream stream, Header header)
       throws IOException {
-    stream.seek(header._exceptionsLength);
+    if (header._exceptionsLength == 0) {
+      return new HashMap<>();
+    }
+    stream.seek(Header.BYTES);
     int numExceptions = stream.readInt();
     Map<Integer, String> exceptions = new HashMap<>(HashUtil.getHashMapCapacity(numExceptions));
     for (int i = 0; i < numExceptions; i++) {
@@ -250,6 +253,9 @@ public class ZeroCopyDataBlockSerde implements DataBlockSerde {
 
   private String[] deserializeDictionary(PinotInputStream stream, Header header)
       throws IOException {
+    if (header._dictionaryLength == 0) {
+      return null;
+    }
     stream.seek(header._dictionaryStart);
 
     int dictionarySize = stream.readInt();
@@ -262,6 +268,9 @@ public class ZeroCopyDataBlockSerde implements DataBlockSerde {
 
   private DataSchema deserializeDataSchema(PinotInputStream stream, Header header)
       throws IOException {
+    if (header._dataSchemaLength == 0) {
+      return null;
+    }
     stream.seek(header._dataSchemaStart);
     return DataSchema.fromBytes(stream);
   }
