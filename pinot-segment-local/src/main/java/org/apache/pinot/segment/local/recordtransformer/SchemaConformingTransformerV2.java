@@ -28,8 +28,10 @@ import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.metrics.ServerGauge;
@@ -132,12 +134,14 @@ public class SchemaConformingTransformerV2 implements RecordTransformer {
   private static final int MAXIMUM_LUCENE_DOCUMENT_SIZE = 32766;
   private static final String MIN_DOCUMENT_LENGTH_DESCRIPTION =
       "key length + `:` + shingle index overlap length + one non-overlap char";
+  private static final List<String> MERGED_TEXT_INDEX_SUFFIX_TO_EXCLUDE = Arrays.asList("_logtype", "_dictionaryVars",
+      "_encodedVars");
 
   private final boolean _continueOnError;
   private final SchemaConformingTransformerV2Config _transformerConfig;
   private final DataType _indexableExtrasFieldType;
   private final DataType _unindexableExtrasFieldType;
-  private final DimensionFieldSpec _mergedTextIndexFieldSpec;
+  private final List<DimensionFieldSpec> _mergedTextIndexFieldsSpec;
   @Nullable
   ServerMetrics _serverMetrics = null;
   private SchemaTreeNode _schemaTree;
@@ -154,7 +158,7 @@ public class SchemaConformingTransformerV2 implements RecordTransformer {
       _transformerConfig = null;
       _indexableExtrasFieldType = null;
       _unindexableExtrasFieldType = null;
-      _mergedTextIndexFieldSpec = null;
+      _mergedTextIndexFieldsSpec = null;
       return;
     }
 
@@ -168,7 +172,9 @@ public class SchemaConformingTransformerV2 implements RecordTransformer {
     _unindexableExtrasFieldType =
         unindexableExtrasFieldName == null ? null : SchemaConformingTransformer.getAndValidateExtrasFieldType(schema,
             unindexableExtrasFieldName);
-    _mergedTextIndexFieldSpec = schema.getDimensionSpec(_transformerConfig.getMergedTextIndexField());
+    _mergedTextIndexFieldsSpec = _transformerConfig.getMergedTextIndexFields().stream()
+        .map(schema::getDimensionSpec)
+        .collect(Collectors.toList());
     _tableName = tableConfig.getTableName();
     _schemaTree = validateSchemaAndCreateTree(schema, _transformerConfig);
     _serverMetrics = ServerMetrics.get();
@@ -188,6 +194,20 @@ public class SchemaConformingTransformerV2 implements RecordTransformer {
     String unindexableExtrasFieldName = transformerConfig.getUnindexableExtrasField();
     if (null != unindexableExtrasFieldName) {
       SchemaConformingTransformer.getAndValidateExtrasFieldType(schema, indexableExtrasFieldName);
+    }
+
+    Map<String, String> columnNameToJsonKeyPathMap = transformerConfig.getColumnNameToJsonKeyPathMap();
+    for (Map.Entry<String, String> entry : columnNameToJsonKeyPathMap.entrySet()) {
+      String columnName = entry.getKey();
+      FieldSpec fieldSpec = schema.getFieldSpecFor(entry.getKey());
+      Preconditions.checkState(null != fieldSpec, "Field '%s' doesn't exist in schema", columnName);
+    }
+    Set<String> preserveFieldNames = transformerConfig.getFieldPathsToPreserveInput();
+    for (String preserveFieldName : preserveFieldNames) {
+      Preconditions.checkState(
+          columnNameToJsonKeyPathMap.values().contains(preserveFieldName)
+              || schema.getFieldSpecFor(preserveFieldName) != null,
+          "Preserved path '%s' doesn't exist in columnNameToJsonKeyPathMap or schema", preserveFieldName);
     }
 
     validateSchemaAndCreateTree(schema, transformerConfig);
@@ -265,7 +285,7 @@ public class SchemaConformingTransformerV2 implements RecordTransformer {
           currentNode = childNode;
         }
       }
-      currentNode.setColumn(jsonKeyPathToColumnNameMap.get(field));
+      currentNode.setColumn(jsonKeyPathToColumnNameMap.get(field), schema);
     }
 
     return rootNode;
@@ -301,12 +321,18 @@ public class SchemaConformingTransformerV2 implements RecordTransformer {
           extraFieldsContainer.getUnindexableExtras(), outputRecord);
 
       // Generate merged text index
-      if (null != _mergedTextIndexFieldSpec && !mergedTextIndexMap.isEmpty()) {
+      if (null != _mergedTextIndexFieldsSpec && !_mergedTextIndexFieldsSpec.isEmpty()
+          && !mergedTextIndexMap.isEmpty()) {
         List<String> luceneDocuments = getLuceneDocumentsFromMergedTextIndexMap(mergedTextIndexMap);
-        if (_mergedTextIndexFieldSpec.isSingleValueField()) {
-          outputRecord.putValue(_transformerConfig.getMergedTextIndexField(), String.join(" ", luceneDocuments));
-        } else {
-          outputRecord.putValue(_transformerConfig.getMergedTextIndexField(), luceneDocuments);
+        for (DimensionFieldSpec mergedTextIndexFieldSpec : _mergedTextIndexFieldsSpec) {
+          if (mergedTextIndexFieldSpec == null) {
+            continue;
+          }
+          if (mergedTextIndexFieldSpec.isSingleValueField()) {
+            outputRecord.putValue(mergedTextIndexFieldSpec.getName(), String.join(" ", luceneDocuments));
+          } else {
+            outputRecord.putValue(mergedTextIndexFieldSpec.getName(), luceneDocuments);
+          }
         }
       }
     } catch (Exception e) {
@@ -382,10 +408,6 @@ public class SchemaConformingTransformerV2 implements RecordTransformer {
     }
 
     String keyJsonPath = String.join(".", jsonPath);
-    if (_transformerConfig.getFieldPathsToPreserveInput().contains(keyJsonPath)) {
-      outputRecord.putValue(keyJsonPath, value);
-      return extraFieldsContainer;
-    }
 
     Set<String> fieldPathsToDrop = _transformerConfig.getFieldPathsToDrop();
     if (null != fieldPathsToDrop && fieldPathsToDrop.contains(keyJsonPath)) {
@@ -393,8 +415,22 @@ public class SchemaConformingTransformerV2 implements RecordTransformer {
     }
 
     SchemaTreeNode currentNode = parentNode == null ? null : parentNode.getChild(key);
+    if (_transformerConfig.getFieldPathsToPreserveInput().contains(keyJsonPath)) {
+      if (currentNode != null) {
+        outputRecord.putValue(currentNode.getColumnName(), currentNode.getValue(value));
+      } else {
+        outputRecord.putValue(keyJsonPath, value);
+      }
+      return extraFieldsContainer;
+    }
     String unindexableFieldSuffix = _transformerConfig.getUnindexableFieldSuffix();
     isIndexable = isIndexable && (null == unindexableFieldSuffix || !key.endsWith(unindexableFieldSuffix));
+
+    // return in advance to truncate the subtree if nothing left to be added
+    if (currentNode == null && !storeIndexableExtras && !storeUnindexableExtras) {
+      return extraFieldsContainer;
+    }
+
     if (!(value instanceof Map)) {
       // leaf node
       if (!isIndexable) {
@@ -406,11 +442,13 @@ public class SchemaConformingTransformerV2 implements RecordTransformer {
           if (_transformerConfig.getFieldsToDoubleIngest().contains(keyJsonPath)) {
             extraFieldsContainer.addIndexableEntry(key, value);
           }
-          mergedTextIndexMap.put(keyJsonPath, value);
+          mergedTextIndexMap.put(currentNode.getColumnName(), value);
         } else {
           // Out of schema
           if (storeIndexableExtras) {
-            extraFieldsContainer.addIndexableEntry(key, value);
+            if (!_transformerConfig.getFieldPathsToSkipStorage().contains(keyJsonPath)) {
+              extraFieldsContainer.addIndexableEntry(key, value);
+            }
             mergedTextIndexMap.put(keyJsonPath, value);
           }
         }
@@ -473,7 +511,8 @@ public class SchemaConformingTransformerV2 implements RecordTransformer {
     _serverMetrics.setValueOfTableGauge(_tableName, ServerGauge.REALTIME_MERGED_TEXT_IDX_DOCUMENT_AVG_LEN,
         _mergedTextIndexDocumentBytesCount / _mergedTextIndexDocumentCount);
 
-    indexDocuments.add(val + ":" + key);
+    addKeyValueToDocuments(indexDocuments, key, val, _transformerConfig.isReverseTextIndexKeyValueOrder(),
+        _transformerConfig.isOptimizeCaseInsensitiveSearch());
   }
 
   /**
@@ -533,27 +572,26 @@ public class SchemaConformingTransformerV2 implements RecordTransformer {
 
     if (shingleIndexOverlapLength >= valLength) {
       if (_logger.isDebugEnabled()) {
-        _logger.warn(
-            "The shingleIndexOverlapLength {} is longer than the value length {}. Shingling will not be applied since "
-                + "only one document will be generated.", shingleIndexOverlapLength, valLength);
+        _logger.warn("The shingleIndexOverlapLength " + shingleIndexOverlapLength + " is longer than the value length "
+            + valLength + ". Shingling will not be applied since only one document will be generated.");
       }
       generateTextIndexLuceneDocument(kv, shingleIndexDocuments, shingleIndexMaxLength);
       return;
     }
 
     if (minDocumentLength > MAXIMUM_LUCENE_DOCUMENT_SIZE) {
-      _logger.debug("The minimum document length {} (" + MIN_DOCUMENT_LENGTH_DESCRIPTION
-          + ")  exceeds the limit of maximum Lucene document size " + MAXIMUM_LUCENE_DOCUMENT_SIZE
-          + ". Value will be truncated and shingling will not be applied.", minDocumentLength);
+      _logger.debug("The minimum document length " + minDocumentLength + " (" + MIN_DOCUMENT_LENGTH_DESCRIPTION + ") "
+          + " exceeds the limit of maximum Lucene document size " + MAXIMUM_LUCENE_DOCUMENT_SIZE + ". Value will be "
+          + "truncated and shingling will not be applied.");
       generateTextIndexLuceneDocument(kv, shingleIndexDocuments, shingleIndexMaxLength);
       return;
     }
 
     // This logging becomes expensive if user accidentally sets a very low shingleIndexMaxLength
     if (shingleIndexMaxLength < minDocumentLength) {
-      _logger.debug("The shingleIndexMaxLength {} is smaller than the minimum document length {} ("
-          + MIN_DOCUMENT_LENGTH_DESCRIPTION + "). Increasing the shingleIndexMaxLength to maximum Lucene document size "
-          + MAXIMUM_LUCENE_DOCUMENT_SIZE + ".", shingleIndexMaxLength, minDocumentLength);
+      _logger.debug("The shingleIndexMaxLength " + shingleIndexMaxLength + " is smaller than the minimum document "
+          + "length " + minDocumentLength + " (" + MIN_DOCUMENT_LENGTH_DESCRIPTION + "). Increasing the "
+          + "shingleIndexMaxLength to maximum Lucene document size " + MAXIMUM_LUCENE_DOCUMENT_SIZE + ".");
       shingleIndexMaxLength = MAXIMUM_LUCENE_DOCUMENT_SIZE;
     }
 
@@ -610,8 +648,8 @@ public class SchemaConformingTransformerV2 implements RecordTransformer {
         .filter(kv -> !_transformerConfig.getMergedTextIndexPathToExclude().contains(kv.getKey())).filter(
         kv -> !base64ValueFilter(kv.getValue().toString().getBytes(),
             _transformerConfig.getMergedTextIndexBinaryDocumentDetectionMinLength())).filter(
-        kv -> _transformerConfig.getMergedTextIndexSuffixToExclude().stream()
-            .anyMatch(suffix -> !kv.getKey().endsWith(suffix))).forEach(kv -> {
+        kv -> !MERGED_TEXT_INDEX_SUFFIX_TO_EXCLUDE.stream()
+            .anyMatch(suffix -> kv.getKey().endsWith(suffix))).forEach(kv -> {
       if (null == mergedTextIndexShinglingOverlapLength) {
         generateTextIndexLuceneDocument(kv, luceneDocuments, mergedTextIndexDocumentMaxLength);
       } else {
@@ -620,6 +658,26 @@ public class SchemaConformingTransformerV2 implements RecordTransformer {
       }
     });
     return luceneDocuments;
+  }
+
+  private void addKeyValueToDocuments(List<String> documents, String key, String value, boolean addInReverseOrder,
+      boolean addCaseInsensitiveVersion) {
+    addKeyValueToDocumentWithOrder(documents, key, value, addInReverseOrder);
+
+    // To optimize the case insensitive search, add the lower case version if applicable
+    // Note that we only check the value as Key is always case-sensitive search
+    if (addCaseInsensitiveVersion && value.chars().anyMatch(Character::isUpperCase)) {
+      addKeyValueToDocumentWithOrder(documents, key, value.toLowerCase(Locale.ENGLISH), addInReverseOrder);
+    }
+  }
+
+  private void addKeyValueToDocumentWithOrder(List<String> documents, String key, String value,
+      boolean addInReverseOrder) {
+    if (addInReverseOrder) {
+      documents.add(value + ":" + key);
+    } else {
+      documents.add(key + ":" + value);
+    }
   }
 }
 
@@ -661,11 +719,12 @@ class SchemaTreeNode {
     return _isColumn;
   }
 
-  public void setColumn(String columnName) {
+  public void setColumn(String columnName, Schema schema) {
     if (columnName == null) {
       _columnName = getJsonKeyPath();
     } else {
       _columnName = columnName;
+      _fieldSpec = schema.getFieldSpecFor(columnName);
     }
     _isColumn = true;
   }
@@ -711,6 +770,9 @@ class SchemaTreeNode {
         }
         if (value instanceof Object[]) {
           return JsonUtils.objectToString(Arrays.asList((Object[]) value));
+        }
+        if (value instanceof Map) {
+          return JsonUtils.objectToString(value);
         }
       } catch (JsonProcessingException e) {
         return value.toString();
