@@ -46,6 +46,7 @@ import {
   QuerySchemas,
   TableType,
   InstanceState, SegmentMetadata,
+  SchemaInfo
 } from 'Models';
 
 const headers = {
@@ -73,6 +74,9 @@ export const putTable = (name: string, params: string): Promise<AxiosResponse<Op
 export const getSchemaList = (): Promise<AxiosResponse<QuerySchemas>> =>
   baseApi.get(`/schemas`);
 
+export const getSchemaInfo = (): Promise<AxiosResponse<SchemaInfo[]>> =>
+  baseApi.get(`/schemas/info`);
+
 export const getSchema = (name: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.get(`/schemas/${name}`);
 
@@ -89,8 +93,8 @@ export const putSchema = (name: string, params: string, reload?: boolean): Promi
 export const getSegmentMetadata = (tableName: string, segmentName: string): Promise<AxiosResponse<SegmentMetadata>> =>
   baseApi.get(`/segments/${tableName}/${segmentName}/metadata?columns=*`);
 
-export const getTableSize = (name: string): Promise<AxiosResponse<TableSize>> =>
-  baseApi.get(`/tables/${name}/size`);
+export const getTableSize = (name: string, detailed: boolean): Promise<AxiosResponse<TableSize>> =>
+  baseApi.get(`/tables/${name}/size?detailed=${detailed}`);
 
 export const getIdealState = (name: string): Promise<AxiosResponse<IdealState>> =>
   baseApi.get(`/tables/${name}/idealstate`);
@@ -127,6 +131,9 @@ export const getTaskTypes = (): Promise<AxiosResponse<OperationResponse>> =>
 
 export const getTaskTypeTasks = (taskType: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.get(`/tasks/${taskType}/tasks`, { headers: { ...headers, Accept: 'application/json' } });
+
+export const getTaskTypeTasksCount = (taskType: string): Promise<AxiosResponse<number>> =>
+  baseApi.get(`/tasks/${taskType}/tasks/count`, { headers: { ...headers, Accept: 'application/json' } });
 
 export const getTaskTypeState = (taskType: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.get(`/tasks/${taskType}/state`, { headers: { ...headers, Accept: 'application/json' } });

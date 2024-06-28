@@ -186,6 +186,15 @@ public class ConsumingSegmentInfoReaderStatelessTest {
     return subset;
   }
 
+  private Map<String, Integer> subsetOfServerSegmentsCount(String... servers) {
+    Map<String, Integer> subset = new HashMap<>();
+    for (String server : servers) {
+      subset.put(server, _serverMap.get(server)._consumerInfos.stream().map(SegmentConsumerInfo::getSegmentName)
+          .collect(Collectors.toList()).size());
+    }
+    return subset;
+  }
+
   private BiMap<String, String> serverEndpoints(String... servers) {
     BiMap<String, String> endpoints = HashBiMap.create(servers.length);
     for (String server : servers) {
@@ -197,6 +206,8 @@ public class ConsumingSegmentInfoReaderStatelessTest {
   private void mockSetup(final String[] servers, final Set<String> consumingSegments)
       throws InvalidConfigException {
     when(_helix.getServerToSegmentsMap(anyString())).thenAnswer(invocationOnMock -> subsetOfServerSegments(servers));
+    when(_helix.getServerToSegmentsCountMap(anyString())).thenAnswer(
+        invocationOnMock -> subsetOfServerSegmentsCount(servers));
     when(_helix.getServers(anyString(), anyString())).thenAnswer(
         invocationOnMock -> new TreeSet<>(Arrays.asList(servers)));
     when(_helix.getDataInstanceAdminEndpoints(ArgumentMatchers.anySet())).thenAnswer(
