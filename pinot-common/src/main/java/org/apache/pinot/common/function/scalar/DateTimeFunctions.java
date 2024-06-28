@@ -1259,4 +1259,9 @@ public class DateTimeFunctions {
     }
     return results;
   }
+
+  @ScalarFunction
+  public static int extract(String interval, long timestamp) {
+    return DateTimeUtils.extract(DateTimeUtils.ExtractFieldType.valueOf(interval), timestamp);
+  }
 }
