@@ -37,6 +37,7 @@ import org.apache.avro.Schema;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
+import org.apache.avro.generic.GenericRecordBuilder;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.function.scalar.StringFunctions;
@@ -80,6 +81,7 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
   private static final String JSON_COLUMN_2 = "jsonColumn2"; // for testing ENUM
   private static final String JSON_COLUMN_3 = "jsonColumn3"; // for testing FIXED
   private static final String JSON_COLUMN_4 = "jsonColumn4"; // for testing BYTES
+  private static final String JSON_COLUMN_5 = "jsonColumn5"; // for testing ARRAY of MAPS
   private static final String STRING_COLUMN = "stringColumn";
   private static final org.apache.pinot.spi.data.Schema SCHEMA =
       new org.apache.pinot.spi.data.Schema.SchemaBuilder().addSingleValueDimension(INT_COLUMN, FieldSpec.DataType.INT)
@@ -87,6 +89,7 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
           .addSingleValueDimension(JSON_COLUMN_2, FieldSpec.DataType.JSON)
           .addSingleValueDimension(JSON_COLUMN_3, FieldSpec.DataType.JSON)
           .addSingleValueDimension(JSON_COLUMN_4, FieldSpec.DataType.JSON)
+          .addSingleValueDimension(JSON_COLUMN_5, FieldSpec.DataType.JSON)
           .addSingleValueDimension(STRING_COLUMN, FieldSpec.DataType.STRING).build();
   private static final TableConfig TABLE_CONFIG =
       new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
@@ -111,7 +114,7 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
 
   /** @return {@link GenericRow} representing a row in Pinot table. */
   private static GenericRow createTableRecord(int intValue, String stringValue, Object jsonValue,
-      GenericData.EnumSymbol enumValue, GenericData.Fixed fixedValue, byte[] bytesValue) {
+      GenericData.EnumSymbol enumValue, GenericData.Fixed fixedValue, byte[] bytesValue, List<Object> arrayValue) {
     GenericRow record = new GenericRow();
     record.putValue(INT_COLUMN, intValue);
     record.putValue(STRING_COLUMN, stringValue);
@@ -119,6 +122,7 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
     record.putValue(JSON_COLUMN_2, enumValue);
     record.putValue(JSON_COLUMN_3, fixedValue);
     record.putValue(JSON_COLUMN_4, ByteBuffer.wrap(bytesValue));
+    record.putValue(JSON_COLUMN_5, arrayValue);
     return record;
   }
 
@@ -135,6 +139,13 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
     fields.add(new Field("id", create(Type.INT)));
     fields.add(new Field("name", create(Type.STRING)));
     return createRecord("record", "doc", JsonIngestionFromAvroQueriesTest.class.getCanonicalName(), false, fields);
+  }
+
+  private static Schema createJson5RecordSchema() {
+    List<Field> fields = new ArrayList<>();
+    fields.add(new Field("timestamp", create(Type.LONG)));
+    fields.add(new Field("data", createMap(create(Type.STRING))));
+    return createRecord("record", "doc", "JsonIngestionFromAvroQueriesTest$Json5", false, fields);
   }
 
   private static GenericData.Record createRecordField(String k1, int v1, String k2, String v2) {
@@ -163,41 +174,65 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
         new Field(INT_COLUMN, createUnion(Lists.newArrayList(create(Type.INT), create(Type.NULL))), null, null),
         new Field(STRING_COLUMN, createUnion(Lists.newArrayList(create(Type.STRING), create(Type.NULL))), null, null),
         new Field(JSON_COLUMN_1,
-            createUnion(createArray(create(Type.STRING)), createMap(create(Type.STRING)), createRecordSchema(),
-                create(Type.STRING), create(Type.NULL))), new Field(JSON_COLUMN_2, enumSchema),
+            createUnion(
+                createArray(create(Type.STRING)),
+                createMap(create(Type.STRING)),
+                createRecordSchema(),
+                create(Type.STRING),
+                create(Type.NULL))),
+        new Field(JSON_COLUMN_2, enumSchema),
         new Field(JSON_COLUMN_3, fixedSchema),
-        new Field(JSON_COLUMN_4, create(Type.BYTES)));
+        new Field(JSON_COLUMN_4, create(Type.BYTES)),
+        new Field(JSON_COLUMN_5, createArray(createJson5RecordSchema()))
+    );
     avroSchema.setFields(fields);
     List<GenericRow> inputRecords = new ArrayList<>();
     // Insert ARRAY
     inputRecords.add(
         createTableRecord(1, "daffy duck", Arrays.asList("this", "is", "a", "test"), createEnumField(enumSchema, "UP"),
-            createFixedField(fixedSchema, 1), new byte[] {0, 0, 0, 1}));
+            createFixedField(fixedSchema, 1), new byte[] {0, 0, 0, 1}, Arrays.asList(
+                new GenericRecordBuilder(createJson5RecordSchema())
+                    .set("timestamp", 1719390721)
+                    .set("data", createMapField(new Pair[]{Pair.of("a", "1"), Pair.of("b", "2")})).build())));
 
     // Insert MAP
     inputRecords.add(
         createTableRecord(2, "mickey mouse", createMapField(new Pair[]{Pair.of("a", "1"), Pair.of("b", "2")}),
-            createEnumField(enumSchema, "DOWN"), createFixedField(fixedSchema, 2), new byte[] {0, 0, 0, 2}));
+            createEnumField(enumSchema, "DOWN"), createFixedField(fixedSchema, 2), new byte[] {0, 0, 0, 2},
+            Arrays.asList(new GenericRecordBuilder(createJson5RecordSchema()).set("timestamp", 1719390722)
+                    .set("data", createMapField(new Pair[]{Pair.of("a", "2"), Pair.of("b", "4")})).build())));
+
     inputRecords.add(
         createTableRecord(3, "donald duck", createMapField(new Pair[]{Pair.of("a", "1"), Pair.of("b", "2")}),
-            createEnumField(enumSchema, "UP"), createFixedField(fixedSchema, 3), new byte[] {0, 0, 0, 3}));
+            createEnumField(enumSchema, "UP"), createFixedField(fixedSchema, 3), new byte[] {0, 0, 0, 3}, Arrays.asList(
+                new GenericRecordBuilder(createJson5RecordSchema()).set("timestamp", 1719390723)
+                    .set("data", createMapField(new Pair[]{Pair.of("a", "3"), Pair.of("b", "6")})).build())));
+
     inputRecords.add(
         createTableRecord(4, "scrooge mcduck", createMapField(new Pair[]{Pair.of("a", "1"), Pair.of("b", "2")}),
-            createEnumField(enumSchema, "LEFT"), createFixedField(fixedSchema, 4), new byte[] {0, 0, 0, 4}));
+            createEnumField(enumSchema, "LEFT"), createFixedField(fixedSchema, 4), new byte[] {0, 0, 0, 4},
+            Arrays.asList(new GenericRecordBuilder(createJson5RecordSchema()).set("timestamp", 1719390724)
+                    .set("data", createMapField(new Pair[]{Pair.of("a", "4"), Pair.of("b", "8")})).build())));
 
     // insert RECORD
     inputRecords.add(createTableRecord(5, "minney mouse", createRecordField("id", 1, "name", "minney"),
-        createEnumField(enumSchema, "RIGHT"), createFixedField(fixedSchema, 5), new byte[] {0, 0, 0, 5}));
+        createEnumField(enumSchema, "RIGHT"), createFixedField(fixedSchema, 5), new byte[] {0, 0, 0, 5}, Arrays.asList(
+            new GenericRecordBuilder(createJson5RecordSchema()).set("timestamp", 1719390725)
+                .set("data", createMapField(new Pair[]{Pair.of("a", "5"), Pair.of("b", "10")})).build())));
 
     // Insert simple Java String (gets converted into JSON value)
     inputRecords.add(
         createTableRecord(6, "pluto", "test", createEnumField(enumSchema, "DOWN"), createFixedField(fixedSchema, 6),
-            new byte[] {0, 0, 0, 6}));
+            new byte[] {0, 0, 0, 6}, Arrays.asList(
+                new GenericRecordBuilder(createJson5RecordSchema()).set("timestamp", 1719390726)
+                    .set("data", createMapField(new Pair[]{Pair.of("a", "6"), Pair.of("b", "12")})).build())));
 
     // Insert JSON string (gets converted into JSON document)
     inputRecords.add(
         createTableRecord(7, "scooby doo", "{\"name\":\"scooby\",\"id\":7}", createEnumField(enumSchema, "UP"),
-            createFixedField(fixedSchema, 7), new byte[] {0, 0, 0, 7}));
+            createFixedField(fixedSchema, 7), new byte[] {0, 0, 0, 7}, Arrays.asList(
+                new GenericRecordBuilder(createJson5RecordSchema()).set("timestamp", 1719390727)
+                    .set("data", createMapField(new Pair[]{Pair.of("a", "7"), Pair.of("b", "14")})).build())));
 
     try (DataFileWriter<GenericData.Record> fileWriter = new DataFileWriter<>(new GenericDatumWriter<>(avroSchema))) {
       fileWriter.create(avroSchema, AVRO_DATA_FILE);
@@ -209,6 +244,7 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
         record.put(JSON_COLUMN_2, inputRecord.getValue(JSON_COLUMN_2));
         record.put(JSON_COLUMN_3, inputRecord.getValue(JSON_COLUMN_3));
         record.put(JSON_COLUMN_4, inputRecord.getValue(JSON_COLUMN_4));
+        record.put(JSON_COLUMN_5, inputRecord.getValue(JSON_COLUMN_5));
         fileWriter.append(record);
       }
     }
@@ -223,6 +259,7 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
     set.add(JSON_COLUMN_2);
     set.add(JSON_COLUMN_3);
     set.add(JSON_COLUMN_4);
+    set.add(JSON_COLUMN_5);
     AvroRecordReader avroRecordReader = new AvroRecordReader();
     avroRecordReader.init(AVRO_DATA_FILE, set, null);
     return avroRecordReader;
@@ -334,6 +371,31 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
   @Test
   public void testSimpleSelectOnBytesJsonColumn() {
     testByteArray("select jsonColumn4 FROM testTable");
+  }
+
+  @Test
+  public void testComplexSelectOnJsonColumn() {
+    Operator<SelectionResultsBlock> operator = getOperator(
+        "select jsonColumn5 FROM testTable");
+    SelectionResultsBlock block = operator.nextBlock();
+    Collection<Object[]> rows = block.getRows();
+    Assert.assertEquals(block.getDataSchema().getColumnDataType(0), DataSchema.ColumnDataType.JSON);
+
+    List<String> expecteds = Arrays.asList(
+        "[[{\"data\":{\"a\":\"1\",\"b\":\"2\"},\"timestamp\":1719390721}]]",
+        "[[{\"data\":{\"a\":\"2\",\"b\":\"4\"},\"timestamp\":1719390722}]]",
+        "[[{\"data\":{\"a\":\"3\",\"b\":\"6\"},\"timestamp\":1719390723}]]",
+        "[[{\"data\":{\"a\":\"4\",\"b\":\"8\"},\"timestamp\":1719390724}]]",
+        "[[{\"data\":{\"a\":\"5\",\"b\":\"10\"},\"timestamp\":1719390725}]]",
+        "[[{\"data\":{\"a\":\"6\",\"b\":\"12\"},\"timestamp\":1719390726}]]",
+        "[[{\"data\":{\"a\":\"7\",\"b\":\"14\"},\"timestamp\":1719390727}]]");
+
+    int index = 0;
+    Iterator<Object[]> iterator = rows.iterator();
+    while (iterator.hasNext()) {
+      Object[] row = iterator.next();
+      Assert.assertEquals(Arrays.toString(row), expecteds.get(index++));
+    }
   }
 
   private void testByteArray(String query) {
