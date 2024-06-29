@@ -39,6 +39,7 @@ import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
+import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -109,7 +110,10 @@ public class MultiHttpRequest {
             .build(); // setting the socket
 
     HttpClientBuilder httpClientBuilder =
-        HttpClients.custom().setConnectionManager(_connectionManager).setDefaultRequestConfig(defaultRequestConfig);
+        HttpClients.custom().setConnectionManager(_connectionManager)
+            // The `setSSLSocketFactory` has to be set after `setConnectionManager` due to a bug
+            .setSSLSocketFactory(TlsUtils.buildConnectionSocketFactory())
+            .setDefaultRequestConfig(defaultRequestConfig);
 
     CompletionService<MultiHttpRequestResponse> completionService = new ExecutorCompletionService<>(_executor);
     CloseableHttpClient client = httpClientBuilder.build();

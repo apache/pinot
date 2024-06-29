@@ -32,8 +32,8 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
-import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.pinot.common.exception.InvalidConfigException;
+import org.apache.pinot.common.http.PoolingHttpClientConnectionManagerHelper;
 import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
 import org.apache.pinot.common.lineage.SegmentLineageUtils;
@@ -96,8 +96,8 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
 
     _waitForPushTimeSeconds = config.getStatusCheckerWaitForPushTimeInSeconds();
     _tableSizeReader =
-        new TableSizeReader(executorService, new PoolingHttpClientConnectionManager(), _controllerMetrics,
-            _pinotHelixResourceManager, leadControllerManager);
+        new TableSizeReader(executorService, PoolingHttpClientConnectionManagerHelper.createWithSocketFactory(),
+            _controllerMetrics, _pinotHelixResourceManager, leadControllerManager);
   }
 
   @Override
