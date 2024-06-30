@@ -24,9 +24,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Random;
+import org.apache.commons.rng.UniformRandomProvider;
 import org.apache.pinot.segment.local.utils.nativefst.builder.FSTBuilder;
 import org.apache.pinot.segment.local.utils.nativefst.utils.RegexpMatcher;
+import org.apache.pinot.spi.utils.RandomUtils;
 import org.roaringbitmap.RoaringBitmapWriter;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
@@ -47,7 +48,7 @@ class FSTTestUtils {
    */
   public static byte[][] generateRandom(int count, MinMax length, MinMax alphabet) {
     byte[][] input = new byte[count][];
-    Random rnd = new Random();
+    UniformRandomProvider rnd = RandomUtils.getRandomProvider();
     for (int i = 0; i < count; i++) {
       input[i] = randomByteSequence(rnd, length, alphabet);
     }
@@ -58,7 +59,7 @@ class FSTTestUtils {
   /**
    * Generate a random string.
    */
-  private static byte[] randomByteSequence(Random rnd, MinMax length, MinMax alphabet) {
+  private static byte[] randomByteSequence(UniformRandomProvider rnd, MinMax length, MinMax alphabet) {
     byte[] bytes = new byte[length._min + rnd.nextInt(length.range())];
     for (int i = 0; i < bytes.length; i++) {
       bytes[i] = (byte) (alphabet._min + rnd.nextInt(alphabet.range()));

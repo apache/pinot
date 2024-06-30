@@ -26,11 +26,11 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Random;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.RandomUtils;
 
 
 public class ArrayBasedGlobalDictionaries implements GlobalDictionaries {
@@ -368,7 +368,6 @@ public class ArrayBasedGlobalDictionaries implements GlobalDictionaries {
   private ByteArray[] generateDerivedByteValuesForGD(OrigAndDerivedValueHolder valueHolder) {
     int cardinality = valueHolder._index;
     ByteArray[] values = new ByteArray[cardinality];
-    Random random = new Random();
     for (int i = 0; i < cardinality; i++) {
       ByteArray byteArray = (ByteArray) valueHolder._origValues[i];
       if (byteArray == null || byteArray.length() == 0) {
@@ -376,7 +375,7 @@ public class ArrayBasedGlobalDictionaries implements GlobalDictionaries {
       } else {
         int origValLength = byteArray.length();
         byte[] generated = new byte[origValLength];
-        random.nextBytes(generated);
+        RandomUtils.getRandomProvider().nextBytes(generated);
         values[i] = new ByteArray(generated);
       }
     }

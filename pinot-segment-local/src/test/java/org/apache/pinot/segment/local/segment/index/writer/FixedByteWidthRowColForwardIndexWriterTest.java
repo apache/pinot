@@ -21,12 +21,13 @@ package org.apache.pinot.segment.local.segment.index.writer;
 import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
-import java.util.Random;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.rng.UniformRandomProvider;
 import org.apache.pinot.segment.local.io.reader.impl.FixedByteSingleValueMultiColReader;
 import org.apache.pinot.segment.local.io.writer.impl.FixedByteSingleValueMultiColWriter;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.spi.utils.RandomUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -44,7 +45,7 @@ public class FixedByteWidthRowColForwardIndexWriterTest {
     int[] columnSizes = new int[]{4};
     FixedByteSingleValueMultiColWriter writer = new FixedByteSingleValueMultiColWriter(file, rows, cols, columnSizes);
     int[] data = new int[rows];
-    Random r = new Random();
+    UniformRandomProvider r = RandomUtils.getRandomProvider();
     for (int i = 0; i < rows; i++) {
       data[i] = r.nextInt();
       writer.setInt(i, 0, data[i]);
@@ -72,7 +73,7 @@ public class FixedByteWidthRowColForwardIndexWriterTest {
     final int[] columnSizes = new int[]{4};
     FixedByteSingleValueMultiColWriter writer = new FixedByteSingleValueMultiColWriter(wfile, rows, cols, columnSizes);
     final float[] data = new float[rows];
-    Random r = new Random();
+    UniformRandomProvider r = RandomUtils.getRandomProvider();
     for (int i = 0; i < rows; i++) {
       data[i] = r.nextFloat();
       writer.setFloat(i, 0, data[i]);
@@ -100,7 +101,7 @@ public class FixedByteWidthRowColForwardIndexWriterTest {
     final int[] columnSizes = new int[]{8};
     FixedByteSingleValueMultiColWriter writer = new FixedByteSingleValueMultiColWriter(wfile, rows, cols, columnSizes);
     final double[] data = new double[rows];
-    Random r = new Random();
+    UniformRandomProvider r = RandomUtils.getRandomProvider();
     for (int i = 0; i < rows; i++) {
       data[i] = r.nextDouble();
       writer.setDouble(i, 0, data[i]);
@@ -128,7 +129,7 @@ public class FixedByteWidthRowColForwardIndexWriterTest {
     final int[] columnSizes = new int[]{8};
     FixedByteSingleValueMultiColWriter writer = new FixedByteSingleValueMultiColWriter(wfile, rows, cols, columnSizes);
     final long[] data = new long[rows];
-    Random r = new Random();
+    UniformRandomProvider r = RandomUtils.getRandomProvider();
     for (int i = 0; i < rows; i++) {
       data[i] = r.nextLong();
       writer.setLong(i, 0, data[i]);
@@ -156,7 +157,7 @@ public class FixedByteWidthRowColForwardIndexWriterTest {
     int[] columnSizes = new int[]{4, 4};
     FixedByteSingleValueMultiColWriter writer = new FixedByteSingleValueMultiColWriter(file, rows, cols, columnSizes);
     int[][] data = new int[rows][cols];
-    Random r = new Random();
+    UniformRandomProvider r = RandomUtils.getRandomProvider();
     for (int i = 0; i < rows; i++) {
       for (int j = 0; j < cols; j++) {
         data[i][j] = r.nextInt();

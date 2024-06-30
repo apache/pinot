@@ -27,7 +27,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
-import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingDeque;
@@ -37,6 +36,7 @@ import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.math.stat.descriptive.DescriptiveStatistics;
 import org.apache.pinot.common.auth.AuthProviderUtils;
+import org.apache.pinot.spi.utils.RandomUtils;
 import org.apache.pinot.tools.AbstractBaseCommand;
 import org.apache.pinot.tools.Command;
 import org.slf4j.Logger;
@@ -766,10 +766,9 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
         }
       case RESAMPLE:
         Preconditions.checkArgument(queryCount > 0, "Query count must be positive for RESAMPLE mode");
-        Random random = new Random(0); // anything deterministic will do
         List<String> resampledQueries = new ArrayList<>(queryCount);
         for (int i = 0; i < queryCount; i++) {
-          resampledQueries.add(queries.get(random.nextInt(numQueries)));
+          resampledQueries.add(queries.get(RandomUtils.getRandomProvider().nextInt(numQueries)));
         }
         return resampledQueries;
       default:

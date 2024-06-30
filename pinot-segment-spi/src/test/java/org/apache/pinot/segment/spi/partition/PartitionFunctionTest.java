@@ -21,8 +21,9 @@ package org.apache.pinot.segment.spi.partition;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Random;
+import org.apache.commons.rng.UniformRandomProvider;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.RandomUtils;
 import org.testng.annotations.Test;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -48,7 +49,7 @@ public class PartitionFunctionTest {
   @Test
   public void testModulo() {
     long seed = System.currentTimeMillis();
-    Random random = new Random(seed);
+    UniformRandomProvider random = RandomUtils.getRandomProvider(seed);
 
     for (int i = 0; i < NUM_ROUNDS; i++) {
       int numPartitions = random.nextInt(MAX_NUM_PARTITIONS) + 1;
@@ -90,7 +91,7 @@ public class PartitionFunctionTest {
   @Test
   public void testMurmurPartitioner() {
     long seed = System.currentTimeMillis();
-    Random random = new Random(seed);
+    UniformRandomProvider random = RandomUtils.getRandomProvider(seed);
 
     for (int i = 0; i < NUM_ROUNDS; i++) {
       int numPartitions = random.nextInt(MAX_NUM_PARTITIONS) + 1;
@@ -120,7 +121,7 @@ public class PartitionFunctionTest {
   @Test
   public void testMurmur3Partitioner() {
     long seed = System.currentTimeMillis();
-    Random random = new Random(seed);
+    UniformRandomProvider random = RandomUtils.getRandomProvider(seed);
 
     for (int i = 0; i < NUM_ROUNDS; i++) {
       int numPartitions = random.nextInt(MAX_NUM_PARTITIONS) + 1;
@@ -292,7 +293,7 @@ public class PartitionFunctionTest {
   @Test
   public void testByteArrayPartitioner() {
     long seed = System.currentTimeMillis();
-    Random random = new Random(seed);
+    UniformRandomProvider random = RandomUtils.getRandomProvider(seed);
 
     for (int i = 0; i < NUM_ROUNDS; i++) {
       int numPartitions = random.nextInt(MAX_NUM_PARTITIONS) + 1;
@@ -313,7 +314,7 @@ public class PartitionFunctionTest {
   @Test
   public void testHashCodePartitioner() {
     long seed = System.currentTimeMillis();
-    Random random = new Random(seed);
+    UniformRandomProvider random = RandomUtils.getRandomProvider(seed);
 
     for (int i = 0; i < NUM_ROUNDS; i++) {
       int numPartitions = random.nextInt(MAX_NUM_PARTITIONS) + 1;
@@ -398,7 +399,7 @@ public class PartitionFunctionTest {
     };
 
     long seed = 100;
-    Random random = new Random(seed);
+    UniformRandomProvider random = RandomUtils.getRandomProvider(seed);
 
     // Generate the same values as above - 10 random values of size 7, using {@link Random::nextBytes} with seed 100
     // Apply {@link MurmurPartitionFunction::murmur2
@@ -525,7 +526,7 @@ public class PartitionFunctionTest {
 
   private void testPartitionFunction(PartitionFunction partitionFunction, int[] expectedPartitions) {
     long seed = 100;
-    Random random = new Random(seed);
+    UniformRandomProvider random = RandomUtils.getRandomProvider(seed);
 
     // Generate 10 random String values of size 7, using {@link Random::nextBytes} with seed 100
     // Apply given partition function
@@ -540,7 +541,7 @@ public class PartitionFunctionTest {
 
   private void testMurmur3Hash(int hashSeed, int[] expectedHashValues, boolean useX64) {
     long seed = 100;
-    Random random = new Random(seed);
+    UniformRandomProvider random = RandomUtils.getRandomProvider(seed);
 
     // Generate 10 random String values of size 7, using {@link Random::nextBytes} with seed 100
     // Apply given partition function

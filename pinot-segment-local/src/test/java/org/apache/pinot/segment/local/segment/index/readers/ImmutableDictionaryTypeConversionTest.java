@@ -22,8 +22,8 @@ import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import java.io.File;
 import java.math.BigDecimal;
 import java.util.Arrays;
-import java.util.Random;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.rng.UniformRandomProvider;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentDictionaryCreator;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
@@ -35,6 +35,7 @@ import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.FALFInterner;
+import org.apache.pinot.spi.utils.RandomUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -49,7 +50,7 @@ public class ImmutableDictionaryTypeConversionTest {
   private static final FALFInterner<byte[]> BYTE_INTERNER = new FALFInterner<>(128, Arrays::hashCode);
 
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "ImmutableDictionaryTypeConversionTest");
-  private static final Random RANDOM = new Random();
+  private static final UniformRandomProvider RANDOM = RandomUtils.getRandomProvider();
   private static final String INT_COLUMN_NAME = "intColumn";
   private static final String LONG_COLUMN_NAME = "longColumn";
   private static final String FLOAT_COLUMN_NAME = "floatColumn";

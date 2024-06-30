@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.spi.utils;
 
-import java.util.Random;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -28,7 +27,6 @@ public class ArrayCopyUtilsTest {
   private static final int ARRAY_LENGTH = 100;
   private static final int BUFFER_LENGTH = 95;
   private static final int COPY_LENGTH = 90;
-  private static final Random RANDOM = new Random();
 
   private static final int[] INT_ARRAY = new int[ARRAY_LENGTH];
   private static final long[] LONG_ARRAY = new long[ARRAY_LENGTH];
@@ -44,7 +42,7 @@ public class ArrayCopyUtilsTest {
   @BeforeClass
   public void setUp() {
     for (int i = 0; i < ARRAY_LENGTH; i++) {
-      int value = RANDOM.nextInt();
+      int value = RandomUtils.getRandomProvider().nextInt();
       INT_ARRAY[i] = value;
       LONG_ARRAY[i] = value;
       FLOAT_ARRAY[i] = value;

@@ -21,7 +21,8 @@ package org.apache.pinot.segment.spi.memory;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.util.Random;
+import org.apache.commons.rng.UniformRandomProvider;
+import org.apache.pinot.spi.utils.RandomUtils;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
@@ -186,7 +187,7 @@ public class PagedPinotOutputStreamTest {
   @Test
   void writeLargeByteArray()
       throws IOException {
-    Random r = new Random(42);
+    UniformRandomProvider r = RandomUtils.getRandomProvider(42);
     byte[] bytes = new byte[_pageSize + 1];
     r.nextBytes(bytes);
 
@@ -202,7 +203,7 @@ public class PagedPinotOutputStreamTest {
   @Test
   void writeSmallByteArray()
       throws IOException {
-    Random r = new Random(42);
+    UniformRandomProvider r = RandomUtils.getRandomProvider(42);
     byte[] bytes = new byte[_pageSize / 2];
     r.nextBytes(bytes);
 
@@ -218,7 +219,7 @@ public class PagedPinotOutputStreamTest {
   @Test
   void writeLargeDataInput()
       throws IOException {
-    Random r = new Random(42);
+    UniformRandomProvider r = RandomUtils.getRandomProvider(42);
     byte[] bytes = new byte[_pageSize + 1];
     r.nextBytes(bytes);
 
@@ -234,7 +235,7 @@ public class PagedPinotOutputStreamTest {
   @Test
   void writeSmallDataInput()
       throws IOException {
-    Random r = new Random(42);
+    UniformRandomProvider r = RandomUtils.getRandomProvider(42);
     byte[] bytes = new byte[_pageSize / 2];
     r.nextBytes(bytes);
 

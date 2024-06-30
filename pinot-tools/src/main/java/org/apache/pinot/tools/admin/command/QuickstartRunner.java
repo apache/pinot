@@ -27,13 +27,13 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.tenant.TenantRole;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.RandomUtils;
 import org.apache.pinot.tools.BootstrapTableTool;
 import org.apache.pinot.tools.QuickstartTableRequest;
 import org.slf4j.Logger;
@@ -42,7 +42,6 @@ import org.slf4j.LoggerFactory;
 
 public class QuickstartRunner {
   private static final Logger LOGGER = LoggerFactory.getLogger(QuickstartRunner.class.getName());
-  private static final Random RANDOM = new Random();
   private static final String CLUSTER_NAME = "QuickStartCluster";
 
   private static final int ZK_PORT = 2123;
@@ -242,7 +241,7 @@ public class QuickstartRunner {
 
   public JsonNode runQuery(String query, Map<String, String> additionalOptions)
       throws Exception {
-    int brokerPort = _brokerPorts.get(RANDOM.nextInt(_brokerPorts.size()));
+    int brokerPort = _brokerPorts.get(RandomUtils.getRandomProvider().nextInt(_brokerPorts.size()));
     return JsonUtils.stringToJsonNode(
         new PostQueryCommand().setBrokerPort(String.valueOf(brokerPort)).setAuthProvider(_authProvider)
             .setAdditionalOptions(additionalOptions).setQuery(query).run());

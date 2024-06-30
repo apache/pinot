@@ -31,7 +31,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
-import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.avro.SchemaBuilder;
@@ -39,6 +38,7 @@ import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.commons.rng.UniformRandomProvider;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
@@ -56,6 +56,7 @@ import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.RandomUtils;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -495,16 +496,16 @@ public class PinotDataAndQueryAnonymizer {
 
   private Object generateDerivedRandomValueHelper(Object origValue, FieldSpec.DataType dataType) {
     // origValue is used only for STRING and BYTES to get the length
-    Random random = new Random();
+    UniformRandomProvider rng = RandomUtils.getRandomProvider();
     switch (dataType) {
       case INT:
-        return random.nextInt();
+        return rng.nextInt();
       case LONG:
-        return random.nextLong();
+        return rng.nextLong();
       case FLOAT:
-        return FLOAT_BASE_VALUE + random.nextFloat();
+        return FLOAT_BASE_VALUE + rng.nextFloat();
       case DOUBLE:
-        return DOUBLE_BASE_VALUE + random.nextDouble();
+        return DOUBLE_BASE_VALUE + rng.nextDouble();
       case STRING:
         String val = (String) origValue;
         if (val == null || val.equals("") || val.equals(" ") || val.equals("null")) {
@@ -522,7 +523,7 @@ public class PinotDataAndQueryAnonymizer {
           return value;
         }
         byte[] derived = new byte[value.length];
-        random.nextBytes(derived);
+        rng.nextBytes(derived);
         return derived;
       default:
         // we should not be here as during schema read step

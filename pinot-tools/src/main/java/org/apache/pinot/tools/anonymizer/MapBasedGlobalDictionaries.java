@@ -25,13 +25,13 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.Random;
 import java.util.Set;
 import java.util.TreeMap;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.RandomUtils;
 
 
 public class MapBasedGlobalDictionaries implements GlobalDictionaries {
@@ -263,7 +263,6 @@ public class MapBasedGlobalDictionaries implements GlobalDictionaries {
     Iterator<Map.Entry<Object, DerivedValue>> sortedIterator = sortedMap.entrySet().iterator();
     int cardinality = sortedMap.size();
     ByteArray[] values = new ByteArray[cardinality];
-    Random random = new Random();
     int i = 0;
     while (sortedIterator.hasNext()) {
       Map.Entry<Object, DerivedValue> entry = sortedIterator.next();
@@ -273,7 +272,7 @@ public class MapBasedGlobalDictionaries implements GlobalDictionaries {
       } else {
         int origValLength = byteArray.length();
         byte[] generated = new byte[origValLength];
-        random.nextBytes(generated);
+        RandomUtils.getRandomProvider().nextBytes(generated);
         values[i++] = new ByteArray(generated);
       }
     }
