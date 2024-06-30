@@ -23,7 +23,6 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -223,10 +222,10 @@ public class CommonsConfigurationUtils {
   }
 
   private static Object mapValue(String key, Configuration configuration) {
-    // For multi-value config, convert it to a single comma connected string value.
+    // For multi-value config, override it with the last seen value
     // For single-value config, return its raw property, unless it needs interpolation.
     return Optional.of(configuration.getStringArray(key)).filter(values -> values.length > 1)
-        .<Object>map(values -> Arrays.stream(values).collect(Collectors.joining(","))).orElseGet(() -> {
+        .<Object>map(values -> values[values.length - 1]).orElseGet(() -> {
           Object rawProperty = configuration.getProperty(key);
           if (!needInterpolate(rawProperty)) {
             return rawProperty;
