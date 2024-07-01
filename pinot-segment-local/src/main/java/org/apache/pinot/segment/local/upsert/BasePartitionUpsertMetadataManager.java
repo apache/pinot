@@ -309,8 +309,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         }
       }
     }
-    _logger.info("Preloaded segments from partition: {} of table: {} for fast upsert metadata recovery", _partitionId,
-        _tableNameWithType);
+    _logger.info("Preloaded {} segments from partition: {} of table: {} for fast upsert metadata recovery",
+        futures.size(), _partitionId, _tableNameWithType);
   }
 
   private String getInstanceId(TableDataManager tableDataManager) {
