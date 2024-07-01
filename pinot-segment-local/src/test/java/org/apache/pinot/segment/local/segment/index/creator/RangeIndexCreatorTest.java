@@ -35,6 +35,7 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.segment.spi.V1Constants.Indexes.BITMAP_RANGE_INDEX_FILE_EXTENSION;
@@ -45,13 +46,18 @@ import static org.testng.Assert.assertNull;
 
 public class RangeIndexCreatorTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "RangeIndexCreatorTest");
-  private static final UniformRandomProvider RANDOM = RandomNumberUtils.getRandomProvider(42);
   private static final String COLUMN_NAME = "testColumn";
+  private UniformRandomProvider _random = RandomNumberUtils.getRandomProvider(42);
 
   @BeforeClass
   public void setUp()
       throws IOException {
     FileUtils.forceMkdir(INDEX_DIR);
+  }
+
+  @BeforeMethod
+  public void initializeRandomSeed() {
+    _random = RandomNumberUtils.getRandomProvider(42);
   }
 
   @Test
@@ -167,7 +173,7 @@ public class RangeIndexCreatorTest {
       case INT:
         if (numValuesPerEntry == 1) {
           for (int i = 0; i < numDocs; i++) {
-            int value = RANDOM.nextInt();
+            int value = _random.nextInt();
             ((int[]) values)[i] = value;
             creator.add(value);
           }
@@ -175,7 +181,7 @@ public class RangeIndexCreatorTest {
           int[] intValues = new int[numValuesPerEntry];
           for (int i = 0; i < numDocs; i++) {
             for (int j = 0; j < numValuesPerEntry; j++) {
-              int value = RANDOM.nextInt();
+              int value = _random.nextInt();
               intValues[j] = value;
               ((int[]) values)[i * numValuesPerEntry + j] = value;
             }
@@ -186,7 +192,7 @@ public class RangeIndexCreatorTest {
       case LONG:
         if (numValuesPerEntry == 1) {
           for (int i = 0; i < numDocs; i++) {
-            long value = RANDOM.nextLong();
+            long value = _random.nextLong();
             ((long[]) values)[i] = value;
             creator.add(value);
           }
@@ -194,7 +200,7 @@ public class RangeIndexCreatorTest {
           long[] longValues = new long[numValuesPerEntry];
           for (int i = 0; i < numDocs; i++) {
             for (int j = 0; j < numValuesPerEntry; j++) {
-              long value = RANDOM.nextLong();
+              long value = _random.nextLong();
               longValues[j] = value;
               ((long[]) values)[i * numValuesPerEntry + j] = value;
             }
@@ -205,7 +211,7 @@ public class RangeIndexCreatorTest {
       case FLOAT:
         if (numValuesPerEntry == 1) {
           for (int i = 0; i < numDocs; i++) {
-            float value = RANDOM.nextFloat();
+            float value = _random.nextFloat();
             ((float[]) values)[i] = value;
             creator.add(value);
           }
@@ -213,7 +219,7 @@ public class RangeIndexCreatorTest {
           float[] floatValues = new float[numValuesPerEntry];
           for (int i = 0; i < numDocs; i++) {
             for (int j = 0; j < numValuesPerEntry; j++) {
-              float value = RANDOM.nextFloat();
+              float value = _random.nextFloat();
               floatValues[j] = value;
               ((float[]) values)[i * numValuesPerEntry + j] = value;
             }
@@ -224,7 +230,7 @@ public class RangeIndexCreatorTest {
       case DOUBLE:
         if (numValuesPerEntry == 1) {
           for (int i = 0; i < numDocs; i++) {
-            double value = RANDOM.nextDouble();
+            double value = _random.nextDouble();
             ((double[]) values)[i] = value;
             creator.add(value);
           }
@@ -232,7 +238,7 @@ public class RangeIndexCreatorTest {
           double[] doubleValues = new double[numValuesPerEntry];
           for (int i = 0; i < numDocs; i++) {
             for (int j = 0; j < numValuesPerEntry; j++) {
-              double value = RANDOM.nextDouble();
+              double value = _random.nextDouble();
               doubleValues[j] = value;
               ((double[]) values)[i * numValuesPerEntry + j] = value;
             }
