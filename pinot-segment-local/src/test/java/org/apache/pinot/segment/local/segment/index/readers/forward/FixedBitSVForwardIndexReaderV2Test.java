@@ -26,7 +26,7 @@ import org.apache.commons.rng.UniformRandomProvider;
 import org.apache.pinot.segment.local.io.util.PinotDataBitSetV2;
 import org.apache.pinot.segment.local.io.writer.impl.FixedBitSVForwardIndexWriter;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
-import org.apache.pinot.spi.utils.RandomUtils;
+import org.apache.pinot.spi.utils.RandomNumberUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -39,7 +39,7 @@ public class FixedBitSVForwardIndexReaderV2Test {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "FixedBitIntReaderTest");
   private static final int NUM_VALUES = 99_999;
   private static final int NUM_DOC_IDS = PinotDataBitSetV2.MAX_DOC_PER_CALL;
-  private static final UniformRandomProvider RANDOM = RandomUtils.getRandomProvider();
+  private static final UniformRandomProvider RANDOM = RandomNumberUtils.getRandomProvider();
 
   private final int[][] _sequentialDocIds = new int[32][NUM_DOC_IDS];
   private final int[] _sparseDocIds = new int[NUM_DOC_IDS];

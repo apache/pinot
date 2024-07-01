@@ -31,7 +31,7 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.ByteArray;
-import org.apache.pinot.spi.utils.RandomUtils;
+import org.apache.pinot.spi.utils.RandomNumberUtils;
 
 
 public class MapBasedGlobalDictionaries implements GlobalDictionaries {
@@ -272,7 +272,7 @@ public class MapBasedGlobalDictionaries implements GlobalDictionaries {
       } else {
         int origValLength = byteArray.length();
         byte[] generated = new byte[origValLength];
-        RandomUtils.getRandomProvider().nextBytes(generated);
+        RandomNumberUtils.getRandomProvider().nextBytes(generated);
         values[i++] = new ByteArray(generated);
       }
     }

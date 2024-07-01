@@ -19,9 +19,10 @@
 package org.apache.pinot.controller.recommender.data.generator;
 
 import com.google.common.base.Preconditions;
-import java.util.Random;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.rng.UniformRandomProvider;
+import org.apache.pinot.spi.utils.RandomNumberUtils;
 
 
 /**
@@ -33,7 +34,7 @@ public class StringGenerator implements Generator {
   private static final int DEFAULT_LENGTH_OF_EACH_STRING = 10;
 
   private final int _cardinality;
-  private final Random _rand;
+  private final UniformRandomProvider _rand;
   private final double _numberOfValuesPerEntry;
 
   private final String _initialValue;
@@ -52,7 +53,7 @@ public class StringGenerator implements Generator {
     Preconditions.checkState(initValueSize >= 0,
         String.format("Cannot generate %d unique string with length %d", _cardinality, lengthOfEachString));
     _initialValue = RandomStringUtils.randomAlphabetic(initValueSize);
-    _rand = new Random(System.currentTimeMillis());
+    _rand = RandomNumberUtils.getRandomProvider(System.currentTimeMillis());
   }
 
   @Override

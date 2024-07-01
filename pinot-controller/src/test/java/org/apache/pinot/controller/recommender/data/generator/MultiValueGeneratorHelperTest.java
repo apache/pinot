@@ -20,8 +20,8 @@
 package org.apache.pinot.controller.recommender.data.generator;
 
 import java.util.Arrays;
-import java.util.Random;
 import java.util.function.Supplier;
+import org.apache.commons.rng.UniformRandomProvider;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
@@ -34,7 +34,7 @@ public class MultiValueGeneratorHelperTest {
   @Test
   public void testGenerateMultiValueEntries() {
 
-    Random rand = mock(Random.class);
+    UniformRandomProvider rand = mock(UniformRandomProvider.class);
     when(rand.nextInt()).thenReturn(10, 20, 30, 40, 50, 60, 70);
     when(rand.nextDouble()).thenReturn(0.4);
     Supplier<Object> next = rand::nextInt;

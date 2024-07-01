@@ -24,7 +24,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.ExponentialMovingAverage;
@@ -33,6 +32,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.RandomNumberUtils;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
@@ -274,7 +274,6 @@ public class AdaptiveServerSelectorTest {
     // iteration. Every iteration increases the number of inflight requests but decides with the flip of a coin
     // to decrement the number of request on the server. Verify if NumInFlightReqSelector chooses the best server
     // during every iteration.
-    Random rand = new Random();
     for (int ii = 0; ii < 1000; ii++) {
       serverRankingWithVal = selector.fetchAllServerRankingsWithScores();
 
@@ -295,7 +294,7 @@ public class AdaptiveServerSelectorTest {
       int numReq = numInflightReqMap.get(selectedServer) + 1;
       numInflightReqMap.put(selectedServer, numReq);
 
-      if (rand.nextBoolean()) {
+      if (RandomNumberUtils.getRandomProvider().nextBoolean()) {
         serverRoutingStatsManager.recordStatsUponResponseArrival(-1, selectedServer, 1);
         numReq = numInflightReqMap.get(selectedServer) - 1;
         numInflightReqMap.put(selectedServer, numReq);
@@ -325,7 +324,6 @@ public class AdaptiveServerSelectorTest {
 
     LatencySelector selector = new LatencySelector(serverRoutingStatsManager);
     Map<String, ExponentialMovingAverage> latencyMap = new HashMap<>();
-    Random rand = new Random();
 
     // TEST 1: Try to fetch the best server when stats are not populated yet.
 
@@ -432,7 +430,7 @@ public class AdaptiveServerSelectorTest {
       }
 
       // Route the request to the best server.
-      int latencyMs = rand.nextInt(20);
+      int latencyMs = RandomNumberUtils.getRandomProvider().nextInt(20);
       selectedServer = serverRankingWithVal.get(0).getLeft();
       serverRoutingStatsManager.recordStatsUponResponseArrival(-1, selectedServer, latencyMs);
       latencyMap.get(selectedServer).compute(latencyMs);
@@ -556,7 +554,6 @@ public class AdaptiveServerSelectorTest {
     // Test 4: Simulate server selection code. Pick the best server using HybridSelector during every iteration.
     // Every iteration updates latency and numInFlightRequests for a server. Verify if HybridSelector picks the best
     // server in every iteration.
-    Random rand = new Random();
     for (int ii = 0; ii < 1000; ii++) {
       serverRankingWithVal = selector.fetchAllServerRankingsWithScores();
 
@@ -574,7 +571,7 @@ public class AdaptiveServerSelectorTest {
       serverRoutingStatsManager.recordStatsForQuerySubmission(-1, selectedServer);
       waitForStatsUpdate(serverRoutingStatsManager, ++taskCount);
 
-      if (rand.nextBoolean()) {
+      if (RandomNumberUtils.getRandomProvider().nextBoolean()) {
         serverRoutingStatsManager.recordStatsUponResponseArrival(-1, selectedServer, 1);
         waitForStatsUpdate(serverRoutingStatsManager, ++taskCount);
       }

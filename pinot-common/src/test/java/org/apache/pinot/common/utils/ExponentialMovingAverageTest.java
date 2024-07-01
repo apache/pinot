@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.common.utils;
 
-import java.util.Random;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import org.apache.pinot.spi.utils.RandomNumberUtils;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -43,9 +43,8 @@ public class ExponentialMovingAverageTest {
       throws InterruptedException {
     // Test 1. Set warmupDurationMs to 5 seconds.
     ExponentialMovingAverage average = new ExponentialMovingAverage(0.5, -1, 5000, 0.0, _executorService);
-    Random rand = new Random();
     for (int ii = 0; ii < 10; ii++) {
-      average.compute(rand.nextDouble());
+      average.compute(RandomNumberUtils.getRandomProvider().nextDouble());
       assertEquals(average.getAverage(), 0.0, "Iteration=" + ii);
     }
     Thread.sleep(5000);

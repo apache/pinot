@@ -33,7 +33,7 @@ import org.apache.pinot.spi.config.tenant.TenantRole;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.spi.utils.RandomUtils;
+import org.apache.pinot.spi.utils.RandomNumberUtils;
 import org.apache.pinot.tools.BootstrapTableTool;
 import org.apache.pinot.tools.QuickstartTableRequest;
 import org.slf4j.Logger;
@@ -241,7 +241,7 @@ public class QuickstartRunner {
 
   public JsonNode runQuery(String query, Map<String, String> additionalOptions)
       throws Exception {
-    int brokerPort = _brokerPorts.get(RandomUtils.getRandomProvider().nextInt(_brokerPorts.size()));
+    int brokerPort = _brokerPorts.get(RandomNumberUtils.getRandomProvider().nextInt(_brokerPorts.size()));
     return JsonUtils.stringToJsonNode(
         new PostQueryCommand().setBrokerPort(String.valueOf(brokerPort)).setAuthProvider(_authProvider)
             .setAdditionalOptions(additionalOptions).setQuery(query).run());

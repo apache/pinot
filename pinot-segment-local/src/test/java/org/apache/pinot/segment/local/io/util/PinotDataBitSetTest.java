@@ -20,15 +20,16 @@ package org.apache.pinot.segment.local.io.util;
 
 import java.io.IOException;
 import java.nio.ByteOrder;
-import java.util.Random;
+import org.apache.commons.rng.UniformRandomProvider;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.spi.utils.RandomNumberUtils;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 
 
 public class PinotDataBitSetTest {
-  private static final Random RANDOM = new Random();
+  private static final UniformRandomProvider RANDOM = RandomNumberUtils.getRandomProvider();
   private static final int NUM_ITERATIONS = 1000;
 
   @Test

@@ -22,11 +22,12 @@ import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.clearspring.analytics.stream.cardinality.HyperLogLogPlus;
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.Random;
+import org.apache.commons.rng.UniformRandomProvider;
 import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.segment.local.realtime.impl.forward.FixedByteSVMutableForwardIndex;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.RandomNumberUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -50,9 +51,9 @@ public class FixedByteSVMutableForwardIndexTest {
   @Test
   public void testDictId()
       throws IOException {
-    Random r = new Random();
+    UniformRandomProvider r = RandomNumberUtils.getRandomProvider();
     final long seed = r.nextLong();
-    r = new Random(seed);
+    r = RandomNumberUtils.getRandomProvider(seed);
     int rows = 10;
     for (int div = 1; div <= rows / 2; div++) {
       try {
@@ -64,7 +65,7 @@ public class FixedByteSVMutableForwardIndexTest {
     }
   }
 
-  private void testDictId(final Random random, final int rows, final int div)
+  private void testDictId(final UniformRandomProvider random, final int rows, final int div)
       throws IOException {
     FixedByteSVMutableForwardIndex readerWriter;
     readerWriter = new FixedByteSVMutableForwardIndex(true, DataType.INT, rows / div, _memoryManager, "Int");
@@ -119,16 +120,16 @@ public class FixedByteSVMutableForwardIndexTest {
   public void testBytes()
       throws IOException {
     int rows = 10;
-    Random r = new Random();
+    UniformRandomProvider r = RandomNumberUtils.getRandomProvider();
     final long seed = r.nextLong();
-    r = new Random(seed);
+    r = RandomNumberUtils.getRandomProvider(seed);
     for (int div = 1; div <= rows / 2; div++) {
       testBytes(r, rows, div);
       testBytesHLLPlus(r, rows, div);
     }
   }
 
-  private void testBytes(final Random random, final int rows, final int div)
+  private void testBytes(final UniformRandomProvider random, final int rows, final int div)
       throws IOException {
     int hllLog2M12Size = 2740;
     int log2m = 12;
@@ -187,7 +188,7 @@ public class FixedByteSVMutableForwardIndexTest {
     readerWriter.close();
   }
 
-  private void testBytesHLLPlus(final Random random, final int rows, final int div)
+  private void testBytesHLLPlus(final UniformRandomProvider random, final int rows, final int div)
       throws IOException {
     int hllPlusSize = 2741;
     int p = 12;
@@ -250,15 +251,15 @@ public class FixedByteSVMutableForwardIndexTest {
   public void testLong()
       throws IOException {
     int rows = 10;
-    Random r = new Random();
+    UniformRandomProvider r = RandomNumberUtils.getRandomProvider();
     final long seed = r.nextLong();
-    r = new Random(seed);
+    r = RandomNumberUtils.getRandomProvider(seed);
     for (int div = 1; div <= rows / 2; div++) {
       testLong(r, rows, div);
     }
   }
 
-  private void testLong(final Random random, final int rows, final int div)
+  private void testLong(final UniformRandomProvider random, final int rows, final int div)
       throws IOException {
     FixedByteSVMutableForwardIndex readerWriter;
     readerWriter = new FixedByteSVMutableForwardIndex(false, DataType.LONG, rows / div, _memoryManager, "Long");

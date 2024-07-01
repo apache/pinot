@@ -24,7 +24,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.rng.UniformRandomProvider;
-import org.apache.pinot.spi.utils.RandomUtils;
+import org.apache.pinot.spi.utils.RandomNumberUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
@@ -36,7 +36,7 @@ import org.testng.annotations.BeforeMethod;
  */
 public class PinotDataBufferTestBase {
 
-  protected static final UniformRandomProvider RANDOM = RandomUtils.getRandomProvider();
+  protected static final UniformRandomProvider RANDOM = RandomNumberUtils.getRandomProvider();
   protected ExecutorService _executorService;
   protected static final File TEMP_FILE = new File(FileUtils.getTempDirectory(), "PinotDataBufferTest");
   protected static final int FILE_OFFSET = 10;      // Not page-aligned

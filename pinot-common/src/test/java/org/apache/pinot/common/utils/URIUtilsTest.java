@@ -22,8 +22,9 @@ import java.net.URI;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Random;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.commons.rng.UniformRandomProvider;
+import org.apache.pinot.spi.utils.RandomNumberUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -77,7 +78,7 @@ public class URIUtilsTest {
   public void testEncodeDecode() {
     int numRounds = 1000;
     int maxPartLength = 10;
-    Random random = new Random();
+    UniformRandomProvider random = RandomNumberUtils.getRandomProvider();
     for (int i = 0; i < numRounds; i++) {
       String randomString = RandomStringUtils.random(random.nextInt(maxPartLength + 1));
       assertEquals(URIUtils.decode(URIUtils.encode(randomString)), randomString);

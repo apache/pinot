@@ -21,7 +21,7 @@ package org.apache.pinot.broker.queryquota;
 import com.google.common.util.concurrent.Uninterruptibles;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
+import org.apache.pinot.spi.utils.RandomNumberUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -81,7 +81,6 @@ public class HitCounterTest {
 
   @Test
   public void testConcurrency() {
-    Random random = new Random();
     // Run the test 3 times
     for (int k = 0; k < 3; k++) {
       long startTime = System.currentTimeMillis();
@@ -89,7 +88,7 @@ public class HitCounterTest {
       int numHitsPerThread = 200000;
       int expectedHitCount = numThreads * numHitsPerThread;
       // Randomly set the time range.
-      int timeRangeInSecond = random.nextInt(100) + 10;
+      int timeRangeInSecond = RandomNumberUtils.getRandomProvider().nextInt(100) + 10;
       HitCounter hitCounter = new HitCounter(timeRangeInSecond);
       List<Thread> threadList = new ArrayList<>();
 

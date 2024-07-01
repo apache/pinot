@@ -29,7 +29,6 @@ import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.util.Collections;
 import java.util.List;
-import java.util.Random;
 import org.apache.commons.io.IOUtils;
 import org.apache.http.Header;
 import org.apache.http.HttpStatus;
@@ -39,6 +38,7 @@ import org.apache.pinot.common.utils.FileUploadDownloadClient.FileUploadType;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.RandomNumberUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -48,7 +48,7 @@ import org.testng.annotations.Test;
 @Test
 public class FileUploadDownloadClientTest {
   private static final String TEST_HOST = "localhost";
-  private static final int TEST_PORT = new Random().nextInt(10000) + 10000;
+  private static final int TEST_PORT = RandomNumberUtils.getRandomProvider().nextInt(10000) + 10000;
   private static final String TEST_URI = "http://testhost/segments/testSegment";
   private static final String TEST_CRYPTER = "testCrypter";
   private HttpServer _testServer;

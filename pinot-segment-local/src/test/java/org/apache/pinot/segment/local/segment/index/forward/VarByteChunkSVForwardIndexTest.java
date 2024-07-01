@@ -23,10 +23,10 @@ import java.io.IOException;
 import java.net.URL;
 import java.nio.ByteOrder;
 import java.nio.file.Files;
-import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.rng.UniformRandomProvider;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriter;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueVarByteRawIndexCreator;
 import org.apache.pinot.segment.local.segment.index.readers.forward.ChunkReaderContext;
@@ -35,6 +35,7 @@ import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.memory.PinotByteBuffer;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.RandomNumberUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -95,7 +96,7 @@ public class VarByteChunkSVForwardIndexTest {
   public void test(ChunkCompressionType compressionType)
       throws Exception {
     String[] expected = new String[NUM_ENTRIES];
-    Random random = new Random();
+    UniformRandomProvider random = RandomNumberUtils.getRandomProvider();;
 
     File outFileFourByte = new File(TEST_FILE);
     File outFileEightByte = new File(TEST_FILE + "8byte");
@@ -225,7 +226,7 @@ public class VarByteChunkSVForwardIndexTest {
   private void testLargeVarcharHelper(ChunkCompressionType compressionType, int numChars, int numDocs)
       throws Exception {
     String[] expected = new String[numDocs];
-    Random random = new Random();
+    UniformRandomProvider random = RandomNumberUtils.getRandomProvider();;
 
     File outFile = new File(TEST_FILE);
     FileUtils.deleteQuietly(outFile);

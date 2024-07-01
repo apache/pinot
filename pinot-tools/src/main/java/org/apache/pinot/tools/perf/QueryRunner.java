@@ -36,7 +36,7 @@ import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.math.stat.descriptive.DescriptiveStatistics;
 import org.apache.pinot.common.auth.AuthProviderUtils;
-import org.apache.pinot.spi.utils.RandomUtils;
+import org.apache.pinot.spi.utils.RandomNumberUtils;
 import org.apache.pinot.tools.AbstractBaseCommand;
 import org.apache.pinot.tools.Command;
 import org.slf4j.Logger;
@@ -768,7 +768,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
         Preconditions.checkArgument(queryCount > 0, "Query count must be positive for RESAMPLE mode");
         List<String> resampledQueries = new ArrayList<>(queryCount);
         for (int i = 0; i < queryCount; i++) {
-          resampledQueries.add(queries.get(RandomUtils.getRandomProvider().nextInt(numQueries)));
+          resampledQueries.add(queries.get(RandomNumberUtils.getRandomProvider().nextInt(numQueries)));
         }
         return resampledQueries;
       default:

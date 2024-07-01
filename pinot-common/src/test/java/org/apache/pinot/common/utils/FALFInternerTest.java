@@ -21,8 +21,9 @@ package org.apache.pinot.common.utils;
 import com.google.common.collect.Interner;
 import com.google.common.collect.Interners;
 import java.util.Objects;
-import java.util.Random;
+import org.apache.commons.rng.UniformRandomProvider;
 import org.apache.pinot.spi.utils.FALFInterner;
+import org.apache.pinot.spi.utils.RandomNumberUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -30,7 +31,7 @@ import org.testng.annotations.Test;
 public class FALFInternerTest {
   @Test
   public void testInterningByteBuffers() {
-    Random random = new Random(1);
+    UniformRandomProvider random = RandomNumberUtils.getRandomProvider(1);
 
     int nUniqueObjs = 1024;
     int nTotalObjs = 8 * nUniqueObjs;
@@ -75,7 +76,7 @@ public class FALFInternerTest {
    */
   @Test
   public void benchmarkingTest() {
-    Random random = new Random(1);
+    UniformRandomProvider random = RandomNumberUtils.getRandomProvider(1);
 
     int nUniqueObjs = 1024;
     int nTotalObjs = 8 * nUniqueObjs;

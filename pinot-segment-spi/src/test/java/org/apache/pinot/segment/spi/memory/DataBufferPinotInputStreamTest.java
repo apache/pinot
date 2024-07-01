@@ -23,7 +23,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import org.apache.commons.rng.UniformRandomProvider;
-import org.apache.pinot.spi.utils.RandomUtils;
+import org.apache.pinot.spi.utils.RandomNumberUtils;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
@@ -39,7 +39,7 @@ public class DataBufferPinotInputStreamTest {
 
   @BeforeMethod
   public void setUp() {
-    UniformRandomProvider r = RandomUtils.getRandomProvider(42);
+    UniformRandomProvider r = RandomNumberUtils.getRandomProvider(42);
 
     byte[] buffer = new byte[BUFFER_SIZE];
     r.nextBytes(buffer);

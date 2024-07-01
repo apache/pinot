@@ -24,11 +24,11 @@ import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Random;
 import java.util.UUID;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.rng.UniformRandomProvider;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueVarByteRawIndexCreator;
 import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexReaderFactory;
 import org.apache.pinot.segment.spi.V1Constants.Indexes;
@@ -37,6 +37,7 @@ import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.RandomNumberUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -94,7 +95,7 @@ public class MultiValueVarByteRawIndexCreatorTest {
     int numDocs = 1000;
     File file = new File(OUTPUT_DIR, column + Indexes.RAW_MV_FORWARD_INDEX_FILE_EXTENSION);
     List<String[]> inputs = new ArrayList<>();
-    Random random = new Random();
+    UniformRandomProvider random = RandomNumberUtils.getRandomProvider();
     int maxTotalLength = 0;
     int maxElements = 0;
     for (int i = 0; i < numDocs; i++) {
@@ -146,7 +147,7 @@ public class MultiValueVarByteRawIndexCreatorTest {
     int numDocs = 1000;
     File file = new File(OUTPUT_DIR, column + Indexes.RAW_MV_FORWARD_INDEX_FILE_EXTENSION);
     List<byte[][]> inputs = new ArrayList<>();
-    Random random = new Random();
+    UniformRandomProvider random = RandomNumberUtils.getRandomProvider();
     int maxTotalLength = 0;
     int maxElements = 0;
     for (int i = 0; i < numDocs; i++) {

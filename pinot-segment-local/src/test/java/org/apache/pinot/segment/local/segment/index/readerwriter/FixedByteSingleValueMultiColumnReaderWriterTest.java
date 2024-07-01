@@ -24,7 +24,7 @@ import org.apache.commons.rng.UniformRandomProvider;
 import org.apache.pinot.segment.local.io.readerwriter.impl.FixedByteSingleValueMultiColumnReaderWriter;
 import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
-import org.apache.pinot.spi.utils.RandomUtils;
+import org.apache.pinot.spi.utils.RandomNumberUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -53,7 +53,7 @@ public class FixedByteSingleValueMultiColumnReaderWriterTest {
     _readerWriter =
         new FixedByteSingleValueMultiColumnReaderWriter(NUM_ROWS_PER_CHUNK, COLUMN_SIZES_IN_BYTES, _memoryManager,
             "test");
-    _random = RandomUtils.getRandomProvider(System.nanoTime());
+    _random = RandomNumberUtils.getRandomProvider(System.nanoTime());
   }
 
   @AfterClass

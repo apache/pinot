@@ -35,7 +35,7 @@ import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.FALFInterner;
-import org.apache.pinot.spi.utils.RandomUtils;
+import org.apache.pinot.spi.utils.RandomNumberUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -50,7 +50,7 @@ public class ImmutableDictionaryTypeConversionTest {
   private static final FALFInterner<byte[]> BYTE_INTERNER = new FALFInterner<>(128, Arrays::hashCode);
 
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "ImmutableDictionaryTypeConversionTest");
-  private static final UniformRandomProvider RANDOM = RandomUtils.getRandomProvider();
+  private static final UniformRandomProvider RANDOM = RandomNumberUtils.getRandomProvider();
   private static final String INT_COLUMN_NAME = "intColumn";
   private static final String LONG_COLUMN_NAME = "longColumn";
   private static final String FLOAT_COLUMN_NAME = "floatColumn";

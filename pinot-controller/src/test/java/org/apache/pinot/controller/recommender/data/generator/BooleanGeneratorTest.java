@@ -20,7 +20,7 @@
 package org.apache.pinot.controller.recommender.data.generator;
 
 import java.util.List;
-import java.util.Random;
+import org.apache.commons.rng.UniformRandomProvider;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
@@ -32,7 +32,7 @@ public class BooleanGeneratorTest {
 
   @Test
   public void testNext() {
-    Random random = mock(Random.class);
+    UniformRandomProvider random = mock(UniformRandomProvider.class);
     when(random.nextBoolean()).thenReturn(false, true, false, false, true, true, false, true, false, true);
 
     // long generator
@@ -48,7 +48,7 @@ public class BooleanGeneratorTest {
 
   @Test
   public void testNextMultiValued() {
-    Random random = mock(Random.class);
+    UniformRandomProvider random = mock(UniformRandomProvider.class);
     when(random.nextBoolean())
         .thenReturn(false, true, false, false, false, true, true, true, true, false, true, false, false, true, true,
             false, false, false, true, true, false, true, true, true);

@@ -20,11 +20,12 @@ package org.apache.pinot.segment.local.segment.index.forward.mutable;
 
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.Random;
+import org.apache.commons.rng.UniformRandomProvider;
 import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.segment.local.realtime.impl.forward.FixedByteMVMutableForwardIndex;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.utils.RandomNumberUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -47,7 +48,7 @@ public class FixedByteMVMutableForwardIndexTest {
 
   @Test
   public void testIntArray() {
-    Random r = new Random();
+    UniformRandomProvider r = RandomNumberUtils.getRandomProvider();
     final long seed = r.nextLong();
     try {
       testIntArray(seed, true);
@@ -79,7 +80,7 @@ public class FixedByteMVMutableForwardIndexTest {
         new FixedByteMVMutableForwardIndex(maxNumberOfMultiValuesPerRow, 2, rows / 2, columnSizeInBytes, _memoryManager,
             "IntArray", isDictionaryEncoded, FieldSpec.DataType.INT);
 
-    Random r = new Random(seed);
+    UniformRandomProvider r = RandomNumberUtils.getRandomProvider(seed);
     int[][] data = new int[rows][];
     for (int i = 0; i < rows; i++) {
       data[i] = new int[r.nextInt(maxNumberOfMultiValuesPerRow)];
@@ -107,7 +108,7 @@ public class FixedByteMVMutableForwardIndexTest {
     readerWriter = new FixedByteMVMutableForwardIndex(multiValuesPerRow, multiValuesPerRow, multiValuesPerRow * 2,
         columnSizeInBytes, _memoryManager, "IntArrayFixedSize", isDictionaryEncoded, FieldSpec.DataType.INT);
 
-    Random r = new Random(seed);
+    UniformRandomProvider r = RandomNumberUtils.getRandomProvider(seed);
     int[][] data = new int[rows][];
     for (int i = 0; i < rows; i++) {
       data[i] = new int[multiValuesPerRow];
@@ -131,7 +132,7 @@ public class FixedByteMVMutableForwardIndexTest {
     final int maxNumberOfMultiValuesPerRow = 5;
     int rows = 1000;
     int columnSizeInBytes = Integer.BYTES;
-    Random r = new Random(seed);
+    UniformRandomProvider r = RandomNumberUtils.getRandomProvider(seed);
     readerWriter =
         new FixedByteMVMutableForwardIndex(maxNumberOfMultiValuesPerRow, 3, r.nextInt(rows) + 1, columnSizeInBytes,
             _memoryManager, "ZeroSize", isDictionaryEncoded, FieldSpec.DataType.INT);
@@ -158,8 +159,8 @@ public class FixedByteMVMutableForwardIndexTest {
     readerWriter.close();
   }
 
-  private FixedByteMVMutableForwardIndex createReaderWriter(FieldSpec.DataType dataType, Random r, int rows,
-      int maxNumberOfMultiValuesPerRow, boolean isDictionaryEncoded) {
+  private FixedByteMVMutableForwardIndex createReaderWriter(FieldSpec.DataType dataType, UniformRandomProvider r,
+      int rows, int maxNumberOfMultiValuesPerRow, boolean isDictionaryEncoded) {
     final int avgMultiValueCount = r.nextInt(maxNumberOfMultiValuesPerRow) + 1;
     final int rowCountPerChunk = r.nextInt(rows) + 1;
 
@@ -168,7 +169,7 @@ public class FixedByteMVMutableForwardIndexTest {
   }
 
   private long generateSeed() {
-    Random r = new Random();
+    UniformRandomProvider r = RandomNumberUtils.getRandomProvider();;
     return r.nextLong();
   }
 
@@ -182,7 +183,7 @@ public class FixedByteMVMutableForwardIndexTest {
   private void testLongArray(boolean isDictionaryEncoded)
       throws IOException {
     final long seed = generateSeed();
-    Random r = new Random(seed);
+    UniformRandomProvider r = RandomNumberUtils.getRandomProvider(seed);
     int rows = 1000;
     final int maxNumberOfMultiValuesPerRow = r.nextInt(100) + 1;
     FixedByteMVMutableForwardIndex readerWriter =
@@ -220,7 +221,7 @@ public class FixedByteMVMutableForwardIndexTest {
   private void testFloatArray(boolean isDictoinaryEncoded)
       throws IOException {
     final long seed = generateSeed();
-    Random r = new Random(seed);
+    UniformRandomProvider r = RandomNumberUtils.getRandomProvider(seed);
     int rows = 1000;
     final int maxNumberOfMultiValuesPerRow = r.nextInt(100) + 1;
     FixedByteMVMutableForwardIndex readerWriter =
@@ -258,7 +259,7 @@ public class FixedByteMVMutableForwardIndexTest {
   private void testDoubleArray(boolean isDictonaryEncoded)
       throws IOException {
     final long seed = generateSeed();
-    Random r = new Random(seed);
+    UniformRandomProvider r = RandomNumberUtils.getRandomProvider(seed);
     int rows = 1000;
     final int maxNumberOfMultiValuesPerRow = r.nextInt(100) + 1;
     FixedByteMVMutableForwardIndex readerWriter =

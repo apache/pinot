@@ -25,8 +25,8 @@ import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Random;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.rng.UniformRandomProvider;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -34,6 +34,7 @@ import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.RandomNumberUtils;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -46,7 +47,7 @@ import static org.apache.pinot.spi.data.FieldSpec.DataType.*;
  */
 public class FieldSpecTest {
   private static final long RANDOM_SEED = System.currentTimeMillis();
-  private static final Random RANDOM = new Random(RANDOM_SEED);
+  private static final UniformRandomProvider RANDOM = RandomNumberUtils.getRandomProvider(RANDOM_SEED);
   private static final String ERROR_MESSAGE = "Random seed is: " + RANDOM_SEED;
 
   /**
@@ -399,7 +400,7 @@ public class FieldSpecTest {
     StringBuilder jsonString = new StringBuilder();
     jsonString.append('{');
     for (int i = length; i > 0; i--) {
-      jsonString.append(fields[indices.remove(RANDOM.nextInt(i))]);
+      jsonString.append(fields[indices.remove(RandomNumberUtils.getRandomProvider().nextInt(i))]);
       if (i != 1) {
         jsonString.append(',');
       }

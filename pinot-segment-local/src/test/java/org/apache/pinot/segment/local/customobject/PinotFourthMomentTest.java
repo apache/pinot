@@ -19,8 +19,9 @@
 
 package org.apache.pinot.segment.local.customobject;
 
-import java.util.Random;
 import java.util.stream.IntStream;
+import org.apache.commons.rng.UniformRandomProvider;
+import org.apache.pinot.spi.utils.RandomNumberUtils;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -31,7 +32,7 @@ public class PinotFourthMomentTest {
   @Test
   public void shouldCombineMoments() {
     // Given:
-    Random r = new Random();
+    UniformRandomProvider r = RandomNumberUtils.getRandomProvider();
     double[] xs = IntStream.generate(r::nextInt)
         .limit(100)
         .mapToDouble(i -> (double) i)
@@ -56,7 +57,7 @@ public class PinotFourthMomentTest {
   @Test
   public void shouldCombineLeftEmptyMoments() {
     // Given:
-    Random r = new Random();
+    UniformRandomProvider r = RandomNumberUtils.getRandomProvider();
     double[] xs = IntStream.generate(r::nextInt)
         .limit(100)
         .mapToDouble(i -> (double) i)
@@ -79,7 +80,7 @@ public class PinotFourthMomentTest {
   @Test
   public void shouldCombineRightEmptyMoments() {
     // Given:
-    Random r = new Random();
+    UniformRandomProvider r = RandomNumberUtils.getRandomProvider();
     double[] xs = IntStream.generate(r::nextInt)
         .limit(100)
         .mapToDouble(i -> (double) i)

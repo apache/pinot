@@ -21,16 +21,15 @@ package org.apache.pinot.spi.utils;
 import org.apache.commons.rng.UniformRandomProvider;
 import org.apache.commons.rng.simple.RandomSource;
 
-
-public class RandomUtils {
-  private RandomUtils() {
+public class RandomNumberUtils {
+  private RandomNumberUtils() {
   }
 
   public static UniformRandomProvider getRandomProvider() {
-    return RandomSource.MT.create();
+    return RandomSource.JDK.create();
   }
 
   public static UniformRandomProvider getRandomProvider(Object seed) {
-    return RandomSource.MT.create(seed);
+    return RandomSource.JDK.create(seed);
   }
 }

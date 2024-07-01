@@ -23,9 +23,9 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.rng.UniformRandomProvider;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
@@ -36,6 +36,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.RandomNumberUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.joda.time.DateTime;
@@ -60,7 +61,7 @@ public class SegmentGenerationWithTimeColumnTest {
   private static final int NUM_ROWS = 10000;
 
   private long _seed = System.nanoTime();
-  private Random _random = new Random(_seed);
+  private UniformRandomProvider _random = RandomNumberUtils.getRandomProvider(_seed);
 
   private long _validMinTime = TimeUtils.getValidMinTimeMillis();
   private long _validMaxTime = TimeUtils.getValidMaxTimeMillis();
@@ -81,7 +82,7 @@ public class SegmentGenerationWithTimeColumnTest {
     _maxTime = Long.MIN_VALUE;
     FileUtils.deleteQuietly(new File(SEGMENT_DIR_NAME));
     // allow tests to fix the seed by restoring it here
-    _random.setSeed(_seed);
+    _random = RandomNumberUtils.getRandomProvider(_seed);
   }
 
   @Test
@@ -168,14 +169,14 @@ public class SegmentGenerationWithTimeColumnTest {
   @Test
   public void testSimpleDateSegmentGenerationNewWithDegenerateSeed()
       throws Exception {
-    _random.setSeed(255672780506968L);
+    _random = RandomNumberUtils.getRandomProvider(255672780506968L);
     testSimpleDateSegmentGenerationNewNoTimeZone();
   }
 
   @Test
   public void testEpochDateSegmentGenerationWithDegenerateSeed()
       throws Exception {
-    _random.setSeed(255672780506968L);
+    _random = RandomNumberUtils.getRandomProvider(255672780506968L);
     testEpochDateSegmentGeneration();
   }
 

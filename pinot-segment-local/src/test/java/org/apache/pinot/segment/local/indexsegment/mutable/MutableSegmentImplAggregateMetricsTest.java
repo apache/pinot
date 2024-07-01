@@ -23,9 +23,9 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
-import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.commons.rng.UniformRandomProvider;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
@@ -33,6 +33,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
+import org.apache.pinot.spi.utils.RandomNumberUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -91,7 +92,7 @@ public class MutableSegmentImplAggregateMetricsTest {
       throws Exception {
     String[] stringValues = new String[10];
     Float[] floatValues = new Float[10];
-    Random random = new Random();
+    UniformRandomProvider random = RandomNumberUtils.getRandomProvider();
     for (int i = 0; i < stringValues.length; i++) {
       stringValues[i] = RandomStringUtils.random(10);
       floatValues[i] = random.nextFloat() * 10f;

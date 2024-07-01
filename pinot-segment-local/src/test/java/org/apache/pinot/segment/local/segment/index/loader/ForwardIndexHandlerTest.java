@@ -30,13 +30,13 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 import java.util.Set;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.rng.UniformRandomProvider;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
 import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexType;
@@ -67,6 +67,7 @@ import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.utils.RandomNumberUtils;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.mockito.Mockito;
@@ -428,7 +429,7 @@ public class ForwardIndexHandlerTest {
 
     // Generate random data
     int rowLength = 1000;
-    Random random = new Random();
+    UniformRandomProvider random = RandomNumberUtils.getRandomProvider();
     String[] tempStringRows = new String[rowLength];
     Integer[] tempIntRows = new Integer[rowLength];
     Long[] tempLongRows = new Long[rowLength];
@@ -719,7 +720,7 @@ public class ForwardIndexHandlerTest {
     SegmentDirectory.Writer writer = segmentLocalFSDirectory.createWriter();
 
     // TEST1: Change compression
-    Random rand = new Random();
+    UniformRandomProvider rand = RandomNumberUtils.getRandomProvider();
 
     // Create new tableConfig with the modified fieldConfigs.
     List<FieldConfig> fieldConfigs = new ArrayList<>(_tableConfig.getFieldConfigList());
@@ -993,7 +994,7 @@ public class ForwardIndexHandlerTest {
     // TEST1: Try to change compression type for a forward index disabled column and enable forward index for it
     List<FieldConfig> fieldConfigs = new ArrayList<>(_tableConfig.getFieldConfigList());
     int randIdx;
-    Random rand = new Random();
+    UniformRandomProvider rand = RandomNumberUtils.getRandomProvider();
     String name;
 
     do {
@@ -1258,7 +1259,7 @@ public class ForwardIndexHandlerTest {
     SegmentDirectory.Writer writer = segmentLocalFSDirectory.createWriter();
 
     List<FieldConfig> fieldConfigs = new ArrayList<>(_tableConfig.getFieldConfigList());
-    Random rand = new Random();
+    UniformRandomProvider rand = RandomNumberUtils.getRandomProvider();
     int randomIdx = rand.nextInt(RAW_COMPRESSION_TYPES.size());
     CompressionCodec newCompressionType = RAW_COMPRESSION_TYPES.get(randomIdx);
 
@@ -1338,7 +1339,7 @@ public class ForwardIndexHandlerTest {
     SegmentDirectory.Writer writer = segmentLocalFSDirectory.createWriter();
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(null, _tableConfig);
 
-    Random rand = new Random();
+    UniformRandomProvider rand = RandomNumberUtils.getRandomProvider();
     String col1;
     do {
       col1 = _noDictionaryColumns.get(rand.nextInt(_noDictionaryColumns.size()));
@@ -1497,7 +1498,7 @@ public class ForwardIndexHandlerTest {
     SegmentDirectory.Writer writer = segmentLocalFSDirectory.createWriter();
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(null, _tableConfig);
 
-    Random rand = new Random();
+    UniformRandomProvider rand = RandomNumberUtils.getRandomProvider();
     String col1 =
         DICT_ENABLED_COLUMNS_WITH_FORWARD_INDEX.get(rand.nextInt(DICT_ENABLED_COLUMNS_WITH_FORWARD_INDEX.size()));
     indexLoadingConfig.addForwardIndexDisabledColumns(col1);
@@ -1626,7 +1627,7 @@ public class ForwardIndexHandlerTest {
     SegmentDirectory.Writer writer = segmentLocalFSDirectory.createWriter();
 
     // Column 1
-    Random rand = new Random();
+    UniformRandomProvider rand = RandomNumberUtils.getRandomProvider();
     int randomIdx = rand.nextInt(DICT_ENABLED_COLUMNS_WITH_FORWARD_INDEX.size());
     String column1 = DICT_ENABLED_COLUMNS_WITH_FORWARD_INDEX.get(randomIdx);
     indexLoadingConfig.addNoDictionaryColumns(column1);
@@ -1678,7 +1679,7 @@ public class ForwardIndexHandlerTest {
     SegmentDirectory.Writer writer = segmentLocalFSDirectory.createWriter();
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(null, _tableConfig);
 
-    Random rand = new Random();
+    UniformRandomProvider rand = RandomNumberUtils.getRandomProvider();
     String col1 = RAW_LZ4_INDEX_COLUMNS.get(rand.nextInt(RAW_LZ4_INDEX_COLUMNS.size()));
     indexLoadingConfig.addForwardIndexDisabledColumns(col1);
     indexLoadingConfig.removeNoDictionaryColumns(col1);
@@ -1907,7 +1908,7 @@ public class ForwardIndexHandlerTest {
     SegmentDirectory.Writer writer = segmentLocalFSDirectory.createWriter();
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(null, _tableConfig);
 
-    Random rand = new Random();
+    UniformRandomProvider rand = RandomNumberUtils.getRandomProvider();
     // Remove from forward index list but keep the inverted index enabled
     String col1 = SV_FORWARD_INDEX_DISABLED_COLUMNS.get(rand.nextInt(SV_FORWARD_INDEX_DISABLED_COLUMNS.size()));
     indexLoadingConfig.removeForwardIndexDisabledColumns(col1);
@@ -1951,7 +1952,7 @@ public class ForwardIndexHandlerTest {
     SegmentDirectory.Writer writer = segmentLocalFSDirectory.createWriter();
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(null, _tableConfig);
 
-    Random rand = new Random();
+    UniformRandomProvider rand = RandomNumberUtils.getRandomProvider();
     // Remove from forward index list but keep the inverted index enabled
     String column = MV_FORWARD_INDEX_DISABLED_DUPLICATES_COLUMNS.get(
         rand.nextInt(MV_FORWARD_INDEX_DISABLED_DUPLICATES_COLUMNS.size()));
@@ -2028,7 +2029,7 @@ public class ForwardIndexHandlerTest {
     SegmentDirectory.Writer writer = segmentLocalFSDirectory.createWriter();
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(null, _tableConfig);
 
-    Random rand = new Random();
+    UniformRandomProvider rand = RandomNumberUtils.getRandomProvider();
     String col1 = SV_FORWARD_INDEX_DISABLED_COLUMNS.get(rand.nextInt(SV_FORWARD_INDEX_DISABLED_COLUMNS.size()));
     indexLoadingConfig.removeForwardIndexDisabledColumns(col1);
     indexLoadingConfig.removeInvertedIndexColumns(col1);
@@ -2075,7 +2076,7 @@ public class ForwardIndexHandlerTest {
     SegmentDirectory.Writer writer = segmentLocalFSDirectory.createWriter();
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(null, _tableConfig);
 
-    Random rand = new Random();
+    UniformRandomProvider rand = RandomNumberUtils.getRandomProvider();
     // Remove from forward index list but keep the inverted index enabled
     String column = MV_FORWARD_INDEX_DISABLED_DUPLICATES_COLUMNS.get(
         rand.nextInt(MV_FORWARD_INDEX_DISABLED_DUPLICATES_COLUMNS.size()));
@@ -2263,7 +2264,7 @@ public class ForwardIndexHandlerTest {
     SegmentDirectory.Writer writer = segmentLocalFSDirectory.createWriter();
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(null, _tableConfig);
 
-    Random rand = new Random();
+    UniformRandomProvider rand = RandomNumberUtils.getRandomProvider();
     // Add column to range index list. Must be a numerical type.
     String column;
     do {

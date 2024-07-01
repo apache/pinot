@@ -42,7 +42,7 @@ public class ArrayCopyUtilsTest {
   @BeforeClass
   public void setUp() {
     for (int i = 0; i < ARRAY_LENGTH; i++) {
-      int value = RandomUtils.getRandomProvider().nextInt();
+      int value = RandomNumberUtils.getRandomProvider().nextInt();
       INT_ARRAY[i] = value;
       LONG_ARRAY[i] = value;
       FLOAT_ARRAY[i] = value;

@@ -19,8 +19,9 @@
 package org.apache.pinot.segment.local.io.util;
 
 import java.nio.ByteOrder;
-import java.util.Random;
+import org.apache.commons.rng.UniformRandomProvider;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.spi.utils.RandomNumberUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -41,7 +42,7 @@ public class PinotDataBitSetV2Test {
     int cardinality = 3;
     int rows = 10000;
     int[] forwardIndex = new int[rows];
-    Random random = new Random();
+    UniformRandomProvider random = RandomNumberUtils.getRandomProvider();
 
     for (int i = 0; i < rows; i++) {
       forwardIndex[i] = random.nextInt(cardinality);
@@ -179,7 +180,7 @@ public class PinotDataBitSetV2Test {
     int cardinality = 11;
     int rows = 10000;
     int[] forwardIndex = new int[rows];
-    Random random = new Random();
+    UniformRandomProvider random = RandomNumberUtils.getRandomProvider();
 
     for (int i = 0; i < rows; i++) {
       forwardIndex[i] = random.nextInt(cardinality);
@@ -286,7 +287,7 @@ public class PinotDataBitSetV2Test {
     int cardinality = 190;
     int rows = 10000;
     int[] forwardIndex = new int[rows];
-    Random random = new Random();
+    UniformRandomProvider random = RandomNumberUtils.getRandomProvider();
 
     for (int i = 0; i < rows; i++) {
       forwardIndex[i] = random.nextInt(cardinality);
@@ -355,7 +356,7 @@ public class PinotDataBitSetV2Test {
     int cardinality = 40000;
     int rows = 100000;
     int[] forwardIndex = new int[rows];
-    Random random = new Random();
+    UniformRandomProvider random = RandomNumberUtils.getRandomProvider();
 
     for (int i = 0; i < rows; i++) {
       forwardIndex[i] = random.nextInt(cardinality);
@@ -421,7 +422,7 @@ public class PinotDataBitSetV2Test {
       int[] forwardIndex) {
     int docId = startDocId;
     int[] docIds = new int[batchLength];
-    Random random = new Random();
+    UniformRandomProvider random = RandomNumberUtils.getRandomProvider();
     for (int i = 0; i < batchLength; i++) {
       docId = docId + 1 + random.nextInt(gaps);
       docIds[i] = docId;

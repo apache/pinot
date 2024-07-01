@@ -20,14 +20,14 @@ package org.apache.pinot.spi.utils.retry;
 
 import com.google.common.base.Preconditions;
 import org.apache.commons.rng.UniformRandomProvider;
-import org.apache.pinot.spi.utils.RandomUtils;
+import org.apache.pinot.spi.utils.RandomNumberUtils;
 
 
 /**
  * Delay policy with random delay between attempts.
  */
 public class RandomDelayRetryPolicy extends BaseRetryPolicy {
-  private final static UniformRandomProvider RANDOM = RandomUtils.getRandomProvider(System.currentTimeMillis());
+  private final static UniformRandomProvider RANDOM = RandomNumberUtils.getRandomProvider(System.currentTimeMillis());
   private final long _minDelayMs;
   private final long _maxDelayMs;
 

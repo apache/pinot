@@ -19,8 +19,8 @@
 package org.apache.pinot.broker.requesthandler;
 
 import java.util.List;
-import java.util.Random;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.rng.UniformRandomProvider;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.broker.AllowAllAccessControlFactory;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -31,6 +31,7 @@ import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsMa
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListenerFactory;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.RandomNumberUtils;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -44,7 +45,7 @@ import static org.testng.Assert.assertTrue;
 
 public class LiteralOnlyBrokerRequestTest {
   private static final AccessControlFactory ACCESS_CONTROL_FACTORY = new AllowAllAccessControlFactory();
-  private static final Random RANDOM = new Random(System.currentTimeMillis());
+  private static final UniformRandomProvider RANDOM = RandomNumberUtils.getRandomProvider(System.currentTimeMillis());
   private static final long ONE_HOUR_IN_MS = TimeUnit.HOURS.toMillis(1);
 
   @BeforeClass
@@ -171,7 +172,7 @@ public class LiteralOnlyBrokerRequestTest {
         new SingleConnectionBrokerRequestHandler(new PinotConfiguration(), "testBrokerId", null, ACCESS_CONTROL_FACTORY,
             null, null, null, null, mock(ServerRoutingStatsManager.class));
 
-    long randNum = RANDOM.nextLong();
+    long randNum = RandomNumberUtils.getRandomProvider().nextLong();
     byte[] randBytes = new byte[12];
     RANDOM.nextBytes(randBytes);
     String ranStr = BytesUtils.toHexString(randBytes);

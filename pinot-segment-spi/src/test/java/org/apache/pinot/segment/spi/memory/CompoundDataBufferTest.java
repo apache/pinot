@@ -28,7 +28,7 @@ import java.nio.ByteOrder;
 import java.nio.file.Files;
 import java.util.Arrays;
 import org.apache.commons.rng.UniformRandomProvider;
-import org.apache.pinot.spi.utils.RandomUtils;
+import org.apache.pinot.spi.utils.RandomNumberUtils;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -54,7 +54,7 @@ public class CompoundDataBufferTest {
 
   @DataProvider
   Object[][] thingsToWrite() {
-    UniformRandomProvider r = RandomUtils.getRandomProvider(42);
+    UniformRandomProvider r = RandomNumberUtils.getRandomProvider(42);
     byte[] bytes = new byte[BUFFER_SIZE];
     r.nextBytes(bytes);
     return new Object[][] {
@@ -189,7 +189,7 @@ public class CompoundDataBufferTest {
 
   @Test
   void readWriteByteBuffer() {
-    UniformRandomProvider r = RandomUtils.getRandomProvider(42);
+    UniformRandomProvider r = RandomNumberUtils.getRandomProvider(42);
     byte[] bytes = new byte[BUFFER_SIZE];
 
     int position = positionToWriteTwoBuffer(bytes.length);
@@ -205,7 +205,7 @@ public class CompoundDataBufferTest {
   @Test
   void readWriteFile()
       throws IOException {
-    UniformRandomProvider r = RandomUtils.getRandomProvider(42);
+    UniformRandomProvider r = RandomNumberUtils.getRandomProvider(42);
     byte[] bytes = new byte[BUFFER_SIZE];
 
     int position = positionToWriteTwoBuffer(bytes.length);
@@ -230,7 +230,7 @@ public class CompoundDataBufferTest {
 
   @Test
   void testViewTotal() {
-    UniformRandomProvider r = RandomUtils.getRandomProvider(42);
+    UniformRandomProvider r = RandomNumberUtils.getRandomProvider(42);
     byte[] bytes1 = new byte[BUFFER_SIZE];
     r.nextBytes(bytes1);
 
@@ -252,7 +252,7 @@ public class CompoundDataBufferTest {
 
   @Test
   void testViewSeveralBuffers() {
-    UniformRandomProvider r = RandomUtils.getRandomProvider(42);
+    UniformRandomProvider r = RandomNumberUtils.getRandomProvider(42);
     byte[] bytes1 = new byte[BUFFER_SIZE];
     r.nextBytes(bytes1);
 
@@ -285,7 +285,7 @@ public class CompoundDataBufferTest {
 
   @Test
   void testViewOneBuffer() {
-    UniformRandomProvider r = RandomUtils.getRandomProvider(42);
+    UniformRandomProvider r = RandomNumberUtils.getRandomProvider(42);
     byte[] bytes1 = new byte[BUFFER_SIZE];
     r.nextBytes(bytes1);
 
@@ -300,7 +300,7 @@ public class CompoundDataBufferTest {
 
   @Test
   void testCopyOrViewOneBuffer() {
-    UniformRandomProvider r = RandomUtils.getRandomProvider(42);
+    UniformRandomProvider r = RandomNumberUtils.getRandomProvider(42);
     byte[] bytes1 = new byte[BUFFER_SIZE];
     r.nextBytes(bytes1);
 

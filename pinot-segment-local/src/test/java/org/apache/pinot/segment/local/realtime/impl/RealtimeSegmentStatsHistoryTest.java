@@ -20,8 +20,9 @@ package org.apache.pinot.segment.local.realtime.impl;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.Random;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.rng.UniformRandomProvider;
+import org.apache.pinot.spi.utils.RandomNumberUtils;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -280,7 +281,7 @@ public class RealtimeSegmentStatsHistoryTest {
     private final int _numIterations;
     private final long _avgSleepTimeMs;
     private final int _sleepVariationMs;
-    private final Random _random = new Random();
+    private final UniformRandomProvider _random = RandomNumberUtils.getRandomProvider();
 
     private static final int MAX_AVGLEN = 200;
     private static final int MAX_CARDINALITY = 50000;

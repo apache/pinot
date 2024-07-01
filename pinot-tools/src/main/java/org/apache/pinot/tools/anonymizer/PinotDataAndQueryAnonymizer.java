@@ -56,7 +56,7 @@ import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.utils.RandomUtils;
+import org.apache.pinot.spi.utils.RandomNumberUtils;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -496,7 +496,7 @@ public class PinotDataAndQueryAnonymizer {
 
   private Object generateDerivedRandomValueHelper(Object origValue, FieldSpec.DataType dataType) {
     // origValue is used only for STRING and BYTES to get the length
-    UniformRandomProvider rng = RandomUtils.getRandomProvider();
+    UniformRandomProvider rng = RandomNumberUtils.getRandomProvider();
     switch (dataType) {
       case INT:
         return rng.nextInt();

@@ -43,7 +43,7 @@ import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
-import org.apache.pinot.spi.utils.RandomUtils;
+import org.apache.pinot.spi.utils.RandomNumberUtils;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -294,7 +294,7 @@ public class KafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
 
   protected URL makeRandomUrl(String reference)
       throws MalformedURLException {
-    int randomInteger = RandomUtils.getRandomProvider().nextInt(_schemaRegistryUrls.length);
+    int randomInteger = RandomNumberUtils.getRandomProvider().nextInt(_schemaRegistryUrls.length);
     return new URL(_schemaRegistryUrls[randomInteger] + reference);
   }
 

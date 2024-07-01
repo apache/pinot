@@ -18,13 +18,14 @@
  */
 package org.apache.pinot.segment.local.realtime.impl.nullvalue;
 
-import java.util.Random;
+import org.apache.commons.rng.UniformRandomProvider;
+import org.apache.pinot.spi.utils.RandomNumberUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
 public class MutableNullValueVectorTest {
-  private static final Random RANDOM = new Random();
+  private static final UniformRandomProvider RANDOM = RandomNumberUtils.getRandomProvider();
   private static final int NUM_DOCS = 100;
   private static final int MAX_DOC_ID = 10000;
 

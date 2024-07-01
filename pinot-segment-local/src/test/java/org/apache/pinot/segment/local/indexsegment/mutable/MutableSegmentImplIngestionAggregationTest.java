@@ -28,8 +28,8 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 import java.util.Set;
+import org.apache.commons.rng.UniformRandomProvider;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.segment.local.aggregator.DistinctCountHLLValueAggregator;
@@ -39,6 +39,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
+import org.apache.pinot.spi.utils.RandomNumberUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -149,7 +150,7 @@ public class MutableSegmentImplIngestionAggregationTest {
             INVERTED_INDEX_SET, Collections.singletonList(new AggregationConfig(m1, "SUM(metric)")));
 
     long seed = 2;
-    Random random = new Random(seed);
+    UniformRandomProvider random = RandomNumberUtils.getRandomProvider(seed);
     StreamMessageMetadata defaultMetadata = new StreamMessageMetadata(System.currentTimeMillis(), null);
 
     // Generate random int to prevent overflow
@@ -260,7 +261,7 @@ public class MutableSegmentImplIngestionAggregationTest {
         TIME_COLUMN1) + KEY_SEPARATOR + row.getValue(TIME_COLUMN2);
   }
 
-  private GenericRow getRow(Random random, Integer multiplicationFactor) {
+  private GenericRow getRow(UniformRandomProvider random, Integer multiplicationFactor) {
     GenericRow row = new GenericRow();
 
     row.putValue(DIMENSION_1, random.nextInt(2 * multiplicationFactor));
@@ -311,7 +312,7 @@ public class MutableSegmentImplIngestionAggregationTest {
       throws Exception {
     List<Metric> metrics = new ArrayList<>();
 
-    Random random = new Random(seed);
+    UniformRandomProvider random = RandomNumberUtils.getRandomProvider(seed);
     StreamMessageMetadata defaultMetadata = new StreamMessageMetadata(System.currentTimeMillis(), null);
 
     HashMap<String, HyperLogLog> hllMap = new HashMap<>();
@@ -355,7 +356,7 @@ public class MutableSegmentImplIngestionAggregationTest {
       throws Exception {
     List<Metric> metrics = new ArrayList<>();
 
-    Random random = new Random(seed);
+    UniformRandomProvider random = RandomNumberUtils.getRandomProvider(seed);
     StreamMessageMetadata defaultMetadata = new StreamMessageMetadata(System.currentTimeMillis(), null);
 
     HashMap<String, BigDecimal> bdMap = new HashMap<>();
@@ -400,7 +401,7 @@ public class MutableSegmentImplIngestionAggregationTest {
     List<List<Metric>> metrics = new ArrayList<>();
     Set<String> keys = new HashSet<>();
 
-    Random random = new Random(seed);
+    UniformRandomProvider random = RandomNumberUtils.getRandomProvider(seed);
     StreamMessageMetadata defaultMetadata = new StreamMessageMetadata(System.currentTimeMillis(), new GenericRow());
 
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -465,7 +466,7 @@ public class MutableSegmentImplIngestionAggregationTest {
     Schema schema = getSchemaBuilder().addMetric(m1, FieldSpec.DataType.BIG_DECIMAL).build();
 
     int seed = 1;
-    Random random = new Random(seed);
+    UniformRandomProvider random = RandomNumberUtils.getRandomProvider(seed);
     StreamMessageMetadata defaultMetadata = new StreamMessageMetadata(System.currentTimeMillis(), null);
 
     MutableSegmentImpl mutableSegmentImpl =
@@ -484,7 +485,7 @@ public class MutableSegmentImplIngestionAggregationTest {
     mutableSegmentImpl.destroy();
   }
 
-  private BigDecimal generateRandomBigDecimal(Random random, int maxPrecision, int scale) {
+  private BigDecimal generateRandomBigDecimal(UniformRandomProvider random, int maxPrecision, int scale) {
     int precision = 1 + random.nextInt(maxPrecision);
 
     String s = "";
