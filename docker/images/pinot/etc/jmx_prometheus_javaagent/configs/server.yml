@@ -74,6 +74,14 @@ rules:
     table: "$1$3"
     tableType: "$4"
     partition: "$5"
+- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.realtimeIngestionOffsetLag\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\.(\\w+)\"><>(\\w+)"
+  name: "pinot_server_realtimeIngestionOffsetLag_$6"
+  cache: true
+  labels:
+    database: "$2"
+    table: "$1$3"
+    tableType: "$4"
+    partition: "$5"
 - pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.llcSimultaneousSegmentBuilds\"><>(\\w+)"
   name: "pinot_server_llcSimultaneousSegmentBuilds_$1"
   cache: true
@@ -151,8 +159,8 @@ rules:
   cache: true
   labels:
     version: "$2"
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.upsertValidDocSnapshotCount\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\.(\\w+)\"><>(\\w+)"
-  name: "pinot_server_upsertValidDocSnapshotCount_$6"
+- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.upsertValidDocIdSnapshotCount\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\.(\\w+)\"><>(\\w+)"
+  name: "pinot_server_upsertValidDocIdSnapshotCount_$6"
   cache: true
   labels:
     database: "$2"
