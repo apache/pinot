@@ -19,7 +19,6 @@
 package org.apache.pinot.common.broker;
 
 import java.util.List;
-import org.apache.commons.lang.NotImplementedException;
 
 
 public interface BrokerSelector {
@@ -31,7 +30,7 @@ public interface BrokerSelector {
   String selectBroker(String... tableNames);
 
   default BrokerInfo selectBrokerInfo(String... tableName) {
-   throw new NotImplementedException();
+   throw new UnsupportedOperationException("selectBrokerInfo has not been implemented.");
   }
 
   /**
