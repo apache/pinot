@@ -225,10 +225,8 @@ public class ServerSegmentMetadataReader {
       @Nullable List<String> segmentNames, int timeoutMs, String validDocIdsType,
       int numSegmentsBatchPerServerRequest) {
     return getSegmentToValidDocIdsMetadataFromServer(tableNameWithType, serverToSegmentsMap, serverToEndpoints,
-        segmentNames, timeoutMs, validDocIdsType, numSegmentsBatchPerServerRequest)
-        .values().stream().filter(list -> list != null && !list.isEmpty())
-        .map(list -> list.get(0))
-        .collect(Collectors.toList());
+        segmentNames, timeoutMs, validDocIdsType, numSegmentsBatchPerServerRequest).values().stream()
+        .filter(list -> list != null && !list.isEmpty()).map(list -> list.get(0)).collect(Collectors.toList());
   }
 
   /**
@@ -259,9 +257,10 @@ public class ServerSegmentMetadataReader {
 
       // Number of segments to query per server request. If a table has a lot of segments, then we might send a
       // huge payload to pinot-server in request. Batching the requests will help in reducing the payload size.
-      Lists.partition(segmentsToQuery, numSegmentsBatchPerServerRequest).forEach(segmentsToQueryBatch ->
-          serverURLsAndBodies.add(generateValidDocIdsMetadataURL(tableNameWithType, segmentsToQueryBatch,
-              validDocIdsType, serverToEndpoints.get(serverToSegments.getKey()))));
+      Lists.partition(segmentsToQuery, numSegmentsBatchPerServerRequest).forEach(
+          segmentsToQueryBatch -> serverURLsAndBodies.add(
+              generateValidDocIdsMetadataURL(tableNameWithType, segmentsToQueryBatch, validDocIdsType,
+                  serverToEndpoints.get(serverToSegments.getKey()))));
     }
 
     BiMap<String, String> endpointsToServers = serverToEndpoints.inverse();
@@ -284,12 +283,9 @@ public class ServerSegmentMetadataReader {
         List<ValidDocIdsMetadataInfo> validDocIdsMetadataInfoList =
             JsonUtils.stringToObject(validDocIdsMetadataList, new TypeReference<ArrayList<ValidDocIdsMetadataInfo>>() {
             });
-        for (ValidDocIdsMetadataInfo validDocIdsMetadataInfo: validDocIdsMetadataInfoList) {
-          String segmentName = validDocIdsMetadataInfo.getSegmentName();
-          List<ValidDocIdsMetadataInfo> presentValidDocIdsMetadataInfo =
-              validDocIdsMetadataInfos.computeIfAbsent(segmentName, k -> new ArrayList<>());
-          presentValidDocIdsMetadataInfo.add(validDocIdsMetadataInfo);
-          validDocIdsMetadataInfos.put(segmentName, presentValidDocIdsMetadataInfo);
+        for (ValidDocIdsMetadataInfo validDocIdsMetadataInfo : validDocIdsMetadataInfoList) {
+          validDocIdsMetadataInfos.computeIfAbsent(validDocIdsMetadataInfo.getSegmentName(), k -> new ArrayList<>())
+              .add(validDocIdsMetadataInfo);
         }
         returnedServerRequestsCount++;
       } catch (Exception e) {
