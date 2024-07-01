@@ -22,6 +22,7 @@ import org.apache.pinot.connector.spark.common.Logging
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.types.{DataTypes, StructField, StructType}
 
+
 /**
  * Example object to test connector with all of features.
  * To run this class, first of all,
@@ -30,184 +31,26 @@ import org.apache.spark.sql.types.{DataTypes, StructField, StructType}
 object ExampleSparkPinotConnectorTest extends Logging {
 
   def main(args: Array[String]): Unit = {
-    implicit val spark: SparkSession = SparkSession
+    val spark: SparkSession = SparkSession
       .builder()
       .appName("spark-pinot-connector-test")
-      .master("local")
+      //.master("local")
       .getOrCreate()
-
-    readOffline()
-    readHybrid()
-    readHybridWithSpecificSchema()
-    readHybridWithFilters()
-    readHybridViaGrpc()
-    readRealtimeViaGrpc()
-    readRealtimeWithFilterViaGrpc()
-    readHybridWithFiltersViaGrpc()
-    readRealtimeWithSelectionColumns()
-    applyJustSomeFilters()
-  }
-
-  def readOffline()(implicit spark: SparkSession): Unit = {
-    import spark.implicits._
-    log.info("## Reading `airlineStats_OFFLINE` table... ##")
+    import spark.implicits._  
     val data = spark.read
-      .format("pinot")
-      .option("table", "airlineStats")
-      .option("tableType", "offline")
-      .load()
+  .format("pinot")
+  .option("table", "workflowEvents")
+  .option("tableType", "REALTIME")
+  .option("controller", "a7fb11413d1654898aa0a1b40d3c0921-7193d974e9e64501.elb.us-east-1.amazonaws.com:80")
+  .option("broker", "a9ffe252f10244776b63ae7516b6ea24-cbd1083916d6d938.elb.us-east-1.amazonaws.com:80")
+  .option("useGrpcServer", "true")
+  .load()
+  //.filter($"DestStateName" === "Florida")
+  data.show(10)
+  //println(data.count())
+  data.write.format("json").mode("Overwrite")
+  .save("file:///var/pinot/minion/data/temp")
 
-    data.show()
-  }
-
-  def readHybrid()(implicit spark: SparkSession): Unit = {
-    log.info("## Reading `airlineStats_OFFLINE and airlineStats_REALTIME` tables... ##")
-    val data = spark.read
-      .format("pinot")
-      .option("table", "airlineStats")
-      .option("tableType", "hybrid")
-      .load()
-
-    data.show()
-  }
-
-  def readHybridWithSpecificSchema()(implicit spark: SparkSession): Unit = {
-    log.info("## Reading `airlineStats_OFFLINE and airlineStats_REALTIME` tables with specific schema... ##")
-    val schema = StructType(
-      Seq(
-        StructField("Distance", DataTypes.IntegerType),
-        StructField("AirlineID", DataTypes.IntegerType),
-        StructField("DaysSinceEpoch", DataTypes.IntegerType),
-        StructField("DestStateName", DataTypes.StringType),
-        StructField("Origin", DataTypes.StringType),
-        StructField("Carrier", DataTypes.StringType)
-      )
-    )
-
-    val data = spark.read
-      .format("pinot")
-      .option("table", "airlineStats")
-      .option("tableType", "HYBRID")
-      .schema(schema)
-      .load()
-
-    data.show()
-  }
-
-  def readOfflineWithFilters()(implicit spark: SparkSession): Unit = {
-    import spark.implicits._
-    log.info("## Reading `airlineStats_OFFLINE` table with filter push down... ##")
-    val data = spark.read
-      .format("pinot")
-      .option("table", "airlineStats")
-      .option("tableType", "OFFLINE")
-      .load()
-      .filter($"AirlineID" === 19805)
-      .filter($"DestStateName" === "Florida")
-      .filter($"DaysSinceEpoch".isin(16101, 16084, 16074))
-      .filter($"Origin" === "ORD")
-
-    data.show()
-  }
-
-  def readHybridWithFilters()(implicit spark: SparkSession): Unit = {
-    import spark.implicits._
-    log.info("## Reading `airlineStats_OFFLINE and airlineStats_REALTIME` tables with filter push down... ##")
-    // should return 1 data, because connector ensure that the overlap
-    // between realtime and offline segment data is queried exactly once
-    val data = spark.read
-      .format("pinot")
-      .option("table", "airlineStats")
-      .option("tableType", "hybrid")
-      .load()
-      .filter($"AirlineID" === 19805)
-      .filter($"DestStateName" === "Florida")
-      .filter($"DaysSinceEpoch".isin(16101, 16084, 16074))
-      .filter($"Origin" === "ORD")
-
-    data.show()
-  }
-
-  def readRealtimeWithSelectionColumns()(implicit spark: SparkSession): Unit = {
-    import spark.implicits._
-    log.info("## Reading `airlineStats_REALTIME` table with column push down... ##")
-    val data = spark.read
-      .format("pinot")
-      .option("table", "airlineStats")
-      .option("tableType", "realtime")
-      .load()
-      .select($"FlightNum", $"Origin", $"DestStateName")
-
-    data.show()
-  }
-
-  def readHybridViaGrpc()(implicit spark: SparkSession): Unit = {
-    log.info("## Reading `airlineStats` table... ##")
-    val data = spark.read
-      .format("pinot")
-      .option("table", "airlineStats")
-      .option("tableType", "hybrid")
-      .option("useGrpcServer", "true")
-      .load()
-
-    data.show()
-  }
-
-  def readRealtimeViaGrpc()(implicit spark: SparkSession): Unit = {
-    log.info("## Reading `airlineStats_REALTIME` table... ##")
-    val data = spark.read
-      .format("pinot")
-      .option("table", "airlineStats")
-      .option("tableType", "realtime")
-      .option("useGrpcServer", "true")
-      .load()
-
-    data.show()
-  }
-
-  def readRealtimeWithFilterViaGrpc()(implicit spark: SparkSession): Unit = {
-    import spark.implicits._
-    log.info("## Reading `airlineStats_REALTIME` table... ##")
-    val data = spark.read
-      .format("pinot")
-      .option("table", "airlineStats")
-      .option("tableType", "realtime")
-      .option("useGrpcServer", "true")
-      .load()
-      .filter($"DestWac" === 5)
-      .select($"FlightNum", $"Origin", $"DestStateName")
-
-    data.show()
-  }
-
-  def readHybridWithFiltersViaGrpc()(implicit spark: SparkSession): Unit = {
-    import spark.implicits._
-    log.info("## Reading `airlineStats_OFFLINE` table with filter push down... ##")
-    val data = spark.read
-      .format("pinot")
-      .option("table", "airlineStats")
-      .option("tableType", "hybrid")
-      .option("useGrpcServer", "true")
-      .load()
-      .filter($"DestStateName" === "Florida")
-
-    data.show()
-  }
-
-
-  def applyJustSomeFilters()(implicit spark: SparkSession): Unit = {
-    import spark.implicits._
-    log.info("## Reading `airlineStats_OFFLINE and airlineStats_REALTIME` tables with filter push down... ##")
-    val data = spark.read
-      .format("pinot")
-      .option("table", "airlineStats")
-      .option("tableType", "hybrid")
-      .load()
-      .filter($"DestStateName" === "Florida")
-      .filter($"Origin" === "ORD")
-      .select($"DestStateName", $"Origin", $"Distance", $"AirlineID")
-
-    data.show()
   }
 
 }
