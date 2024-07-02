@@ -18,20 +18,46 @@
  */
 package org.apache.pinot.common.datablock;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.EnumMap;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.segment.spi.memory.CompoundDataBuffer;
+import org.apache.pinot.segment.spi.memory.DataBuffer;
+import org.apache.pinot.segment.spi.memory.PinotByteBuffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 public final class DataBlockUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(DataBlockUtils.class);
+  private static final EnumMap<DataBlockSerde.Version, DataBlockSerde> SERDES;
+
+  static {
+    SERDES = new EnumMap<>(DataBlockSerde.Version.class);
+    SERDES.put(DataBlockSerde.Version.V1_V2, new ZeroCopyDataBlockSerde());
+  }
+
+  @VisibleForTesting
+  public static DataBlockSerde getSerde(DataBlockSerde.Version version) {
+    return SERDES.get(version);
+  }
+
+  @VisibleForTesting
+  public static void setSerde(DataBlockSerde.Version version, DataBlockSerde serde) {
+    SERDES.put(version, serde);
+  }
 
   private DataBlockUtils() {
   }
@@ -78,21 +104,70 @@ public final class DataBlockUtils {
     return DataBlock.Type.fromOrdinal(versionType >> VERSION_TYPE_SHIFT);
   }
 
-  public static DataBlock getDataBlock(ByteBuffer byteBuffer)
+  public static List<ByteBuffer> serialize(DataBlock dataBlock)
       throws IOException {
-    int versionType = readVersionType(byteBuffer);
-    int version = getVersion(versionType);
-    DataBlock.Type type = getType(versionType);
-    switch (type) {
-      case COLUMNAR:
-        return new ColumnarDataBlock(byteBuffer);
-      case ROW:
-        return new RowDataBlock(byteBuffer);
-      case METADATA:
-        return MetadataBlock.deserialize(byteBuffer, version);
-      default:
-        throw new UnsupportedOperationException("Unsupported data table version: " + version + " with type: " + type);
+    return serialize(DataBlockSerde.Version.V1_V2, dataBlock);
+  }
+
+  @VisibleForTesting
+  public static List<ByteBuffer> serialize(DataBlockSerde.Version version, DataBlock dataBlock)
+      throws IOException {
+
+    DataBlockSerde dataBlockSerde = SERDES.get(version);
+    if (dataBlockSerde == null) {
+      throw new UnsupportedOperationException("Unsupported data block version: " + version);
     }
+
+    DataBlock.Type dataBlockType = dataBlock.getDataBlockType();
+    int firstInt = version.getVersion() + (dataBlockType.ordinal() << DataBlockUtils.VERSION_TYPE_SHIFT);
+
+    DataBuffer dataBuffer = dataBlockSerde.serialize(dataBlock.asRaw(), firstInt);
+
+    int readFirstByte;
+    if (dataBuffer.order() != ByteOrder.BIG_ENDIAN) {
+      readFirstByte = dataBuffer.view(0, 4, ByteOrder.BIG_ENDIAN).getInt(0);
+    } else {
+      readFirstByte = dataBuffer.getInt(0);
+    }
+    Preconditions.checkState(readFirstByte == firstInt, "Illegal serialization by {}. "
+        + "The first integer should be {} but is {} instead", dataBuffer.getClass().getName(), firstInt, readFirstByte);
+
+    ArrayList<ByteBuffer> result = new ArrayList<>();
+    dataBuffer.appendAsByteBuffers(result);
+    return result;
+  }
+
+  public static DataBlock deserialize(ByteBuffer buffer)
+      throws IOException {
+    return deserialize(PinotByteBuffer.wrap(buffer));
+  }
+
+  public static DataBlock deserialize(List<ByteBuffer> buffers)
+      throws IOException {
+    List<DataBuffer> dataBuffers = buffers.stream()
+        .map(PinotByteBuffer::wrap)
+        .collect(Collectors.toList());
+    try (CompoundDataBuffer compoundBuffer = new CompoundDataBuffer(dataBuffers, ByteOrder.BIG_ENDIAN, false)) {
+      return deserialize(compoundBuffer);
+    }
+  }
+
+  public static DataBlock deserialize(ByteBuffer[] buffers)
+      throws IOException {
+    try (CompoundDataBuffer compoundBuffer = new CompoundDataBuffer(buffers, ByteOrder.BIG_ENDIAN, false)) {
+      return deserialize(compoundBuffer);
+    }
+  }
+
+  public static DataBlock deserialize(DataBuffer buffer)
+      throws IOException {
+    int versionAndSubVersion = buffer.getInt(0);
+    int version = getVersion(versionAndSubVersion);
+    DataBlockSerde dataBlockSerde = SERDES.get(DataBlockSerde.Version.fromInt(version));
+
+    DataBlock.Type type = getType(versionAndSubVersion);
+
+    return dataBlockSerde.deserialize(buffer, 0, type);
   }
 
   /**

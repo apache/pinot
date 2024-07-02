@@ -20,11 +20,14 @@ package org.apache.pinot.common.datablock;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.ByteBuffer;
+import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -36,13 +39,19 @@ public interface DataBlock {
 
   int getNumberOfRows();
 
+  int getNumberOfColumns();
+
   void addException(ProcessingException processingException);
 
   void addException(int errCode, String errMsg);
 
   Map<Integer, String> getExceptions();
 
-  byte[] toBytes()
+  /**
+   * This is basically a wrap on top of {@link DataBlockUtils#serialize(DataBlock)} but implementations can catch
+   * the result so messages sent to more than one receiving mailbox don't need to be serialized as many times.
+   */
+  List<ByteBuffer> serialize()
       throws IOException;
 
   // --------------------------------------------------------------------------
@@ -80,6 +89,10 @@ public interface DataBlock {
   @Nullable
   RoaringBitmap getNullRowIds(int colId);
 
+  Type getDataBlockType();
+
+  Raw asRaw();
+
   enum Type {
     ROW(0),
     COLUMNAR(1),
@@ -103,5 +116,45 @@ public interface DataBlock {
           throw new IllegalArgumentException("Invalid ordinal: " + ordinal);
       }
     }
+  }
+
+  /**
+   * A raw representation of the block.
+   * <p>
+   * Do not confuse this with the serialized form of the block. This is a representation of the block in memory and
+   * it is completely dependent on the current Pinot version. That means that this representation can change between
+   * Pinot versions.
+   * <p>
+   * The {@link DataBlockSerde} is responsible for serializing and deserializing this raw representation into a binary
+   * format that is compatible with the other Pinot versions.
+   */
+  interface Raw {
+    int getNumberOfRows();
+
+    int getNumberOfColumns();
+
+    @Nullable
+    Map<Integer, String> getExceptions();
+
+    @Nullable
+    String[] getStringDictionary();
+
+    @Nullable
+    DataSchema getDataSchema();
+
+    /**
+     * The actual content is different depending on whether this is a row-based or columnar data block.
+     */
+    @Nullable
+    DataBuffer getFixedData();
+
+    /**
+     * The actual content is different depending on whether this is a row-based or columnar data block.
+     */
+    @Nullable
+    DataBuffer getVarSizeData();
+
+    @Nullable
+    List<DataBuffer> getStatsByStage();
   }
 }

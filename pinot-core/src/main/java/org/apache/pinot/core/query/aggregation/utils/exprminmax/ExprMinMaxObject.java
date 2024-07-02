@@ -20,10 +20,9 @@
 package org.apache.pinot.core.query.aggregation.utils.exprminmax;
 
 import com.google.common.base.Preconditions;
-import java.io.ByteArrayOutputStream;
-import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -33,6 +32,7 @@ import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.datablock.DataBlockBuilder;
 import org.apache.pinot.core.query.aggregation.utils.ParentAggregationFunctionResultObject;
+import org.apache.pinot.segment.spi.memory.CompoundDataBuffer;
 
 
 public class ExprMinMaxObject implements ParentAggregationFunctionResultObject {
@@ -99,9 +99,9 @@ public class ExprMinMaxObject implements ParentAggregationFunctionResultObject {
     _mutable = false;
     _isNull = byteBuffer.getInt() == ObjectNullState.NULL.getState();
     byteBuffer = byteBuffer.slice();
-    _immutableMeasuringKeys = DataBlockUtils.getDataBlock(byteBuffer);
+    _immutableMeasuringKeys = DataBlockUtils.deserialize(byteBuffer);
     byteBuffer = byteBuffer.slice();
-    _immutableProjectionVals = DataBlockUtils.getDataBlock(byteBuffer);
+    _immutableProjectionVals = DataBlockUtils.deserialize(byteBuffer);
 
     _measuringSchema = _immutableMeasuringKeys.getDataSchema();
     _projectionSchema = _immutableProjectionVals.getDataSchema();
@@ -124,22 +124,36 @@ public class ExprMinMaxObject implements ParentAggregationFunctionResultObject {
   @Nonnull
   public byte[] toBytes()
       throws IOException {
-    ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-    DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
+    ByteBuffer header = ByteBuffer.allocate(2 * Integer.BYTES)
+        .order(ByteOrder.BIG_ENDIAN);
     if (_isNull) {
       // serialize the null object with schemas
-      dataOutputStream.writeInt(ObjectNullState.NULL.getState());
+      header.putInt(ObjectNullState.NULL.getState());
       _immutableMeasuringKeys = DataBlockBuilder.buildFromRows(Collections.emptyList(), _measuringSchema);
       _immutableProjectionVals = DataBlockBuilder.buildFromRows(Collections.emptyList(), _projectionSchema);
     } else {
-      dataOutputStream.writeInt(ObjectNullState.NON_NULL.getState());
+      header.putInt(ObjectNullState.NON_NULL.getState());
       _immutableMeasuringKeys =
           DataBlockBuilder.buildFromRows(Collections.singletonList(_extremumMeasuringKeys), _measuringSchema);
       _immutableProjectionVals = DataBlockBuilder.buildFromRows(_extremumProjectionValues, _projectionSchema);
     }
-    dataOutputStream.write(_immutableMeasuringKeys.toBytes());
-    dataOutputStream.write(_immutableProjectionVals.toBytes());
-    return byteArrayOutputStream.toByteArray();
+    List<ByteBuffer> measuringKeys = DataBlockUtils.serialize(_immutableMeasuringKeys);
+    List<ByteBuffer> projectionVals = DataBlockUtils.serialize(_immutableProjectionVals);
+
+    CompoundDataBuffer compoundDataBuffer = new CompoundDataBuffer.Builder(ByteOrder.BIG_ENDIAN)
+        .addBuffer(header)
+        .addBuffers(measuringKeys)
+        .addBuffers(projectionVals)
+        .build();
+
+    long size = compoundDataBuffer.size();
+    Preconditions.checkState(size <= Integer.MAX_VALUE, "Data size is too large: %s", size);
+    int sizeInt = (int) size;
+    byte[] bytes = new byte[sizeInt];
+
+    compoundDataBuffer.copyTo(0, bytes, 0, sizeInt);
+
+    return bytes;
   }
 
   /**

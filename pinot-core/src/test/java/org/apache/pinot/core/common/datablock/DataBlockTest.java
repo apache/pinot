@@ -121,7 +121,9 @@ public class DataBlockTest {
     rows.add(row);
     DataSchema dataSchema = new DataSchema(new String[]{"intArray"}, new ColumnDataType[]{ColumnDataType.INT_ARRAY});
     DataBlock dataBlock = DataBlockBuilder.buildFromRows(rows, dataSchema);
-    int[] intArray = DataBlockUtils.getDataBlock(ByteBuffer.wrap(dataBlock.toBytes())).getIntArray(0, 0);
+    List<ByteBuffer> serialize = dataBlock.serialize();
+    DataBlock deserialized = DataBlockUtils.deserialize(serialize);
+    int[] intArray = deserialized.getIntArray(0, 0);
     Assert.assertEquals(intArray.length, 0);
   }
 }
