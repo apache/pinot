@@ -16,13 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.client.utils;
+package org.apache.pinot.common.broker;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import org.apache.pinot.client.ExternalViewReader;
 
 
 public class BrokerSelectorUtils {
@@ -36,8 +35,9 @@ public class BrokerSelectorUtils {
    * @param brokerData: map holding data for table hosting on brokers.
    * @return list of common brokers hosting all the tables.
    */
-  public static List<String> getTablesCommonBrokers(List<String> tableNames, Map<String, List<String>> brokerData) {
-    List<List<String>> tablesBrokersList = new ArrayList<>();
+  public static List<BrokerInfo> getTablesCommonBrokers(List<String> tableNames,
+      Map<String, List<BrokerInfo>> brokerData) {
+    List<List<BrokerInfo>> tablesBrokersList = new ArrayList<>();
     for (String name: tableNames) {
       String tableName = getTableNameWithoutSuffix(name);
       int idx = tableName.indexOf('.');
@@ -57,7 +57,7 @@ public class BrokerSelectorUtils {
       return null;
     }
 
-    List<String> commonBrokers = tablesBrokersList.get(0);
+    List<BrokerInfo> commonBrokers = tablesBrokersList.get(0);
     for (int i = 1; i < tablesBrokersList.size(); i++) {
       commonBrokers.retainAll(tablesBrokersList.get(i));
     }

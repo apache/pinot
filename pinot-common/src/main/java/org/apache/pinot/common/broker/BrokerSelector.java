@@ -16,9 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.client;
+package org.apache.pinot.common.broker;
 
 import java.util.List;
+
 
 public interface BrokerSelector {
   /**
@@ -27,6 +28,10 @@ public interface BrokerSelector {
    * @return
    */
   String selectBroker(String... tableNames);
+
+  default BrokerInfo selectBrokerInfo(String... tableName) {
+   throw new UnsupportedOperationException("selectBrokerInfo has not been implemented.");
+  }
 
   /**
    * Returns list of all brokers.

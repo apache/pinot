@@ -23,6 +23,8 @@ import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.CompletableFuture;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.broker.BrokerSelector;
+import org.apache.pinot.common.broker.SimpleBrokerSelector;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;

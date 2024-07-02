@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.client;
+package org.apache.pinot.common.broker;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -35,7 +35,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.zip.GZIPInputStream;
+import javax.validation.constraints.NotNull;
 import org.I0Itec.zkclient.ZkClient;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
@@ -56,7 +58,7 @@ public class ExternalViewReader {
   public static final String KEY_SIMPLE_FIELDS = "simpleFields";
   public static final String KEY_HELIX_HOST = "HELIX_HOST";
   public static final String KEY_HELIX_PORT = "HELIX_PORT";
-
+  public static final String KEY_BROKER_ID = "id";
   private ZkClient _zkClient;
 
   @VisibleForTesting
@@ -96,49 +98,60 @@ public class ExternalViewReader {
     return brokerUrls;
   }
 
-  @VisibleForTesting
-  String getHostPort(String brokerName) {
+  private BrokerInfo getBrokerInfoFromName(String brokerName) {
+    String[] splitItems = brokerName.split("_");
+    if (splitItems.length < 3) {
+      throw new RuntimeException("Wrong BrokerName format " + brokerName);
+    }
+    String hostName = splitItems[1];
+    int port = Integer.parseInt(splitItems[splitItems.length - 1]);
+    return new BrokerInfo(brokerName, hostName, port);
+  }
+
+  @NotNull
+  BrokerInfo getBrokerInfo(String brokerName) {
     // Turn Broker_12.34.56.78_1234 into 12.34.56.78:1234, try InstanceConfig first, naming convention as backup
+    BrokerInfo brokerInfoFromName = getBrokerInfoFromName(brokerName);
     try {
       byte[] znStrBytes = _zkClient.readData(BROKER_INSTANCE_PATH + "/" + brokerName, true);
       if (znStrBytes != null) {
         JsonNode record = OBJECT_READER.readTree(new String(znStrBytes, StandardCharsets.UTF_8));
         if (record != null) {
+          String brokerId = record.get(KEY_BROKER_ID).asText();
           JsonNode simpleFields = record.get(KEY_SIMPLE_FIELDS);
           if (simpleFields != null) {
             JsonNode hostNameNode = simpleFields.get(KEY_HELIX_HOST);
             JsonNode tlsPortNode = simpleFields.get(KEY_PINOT_TLS_PORT);
             JsonNode helixPortNode = simpleFields.get(KEY_HELIX_PORT);
-            String[] splitItems = brokerName.split("_");
-            if (splitItems.length < 3) {
-              throw new RuntimeException("Wrong BrokerName format " + brokerName);
-            }
-            String hostName = splitItems[1];
-            if (hostNameNode != null && !Strings.isNullOrEmpty(hostNameNode.asText())) {
-              hostName = hostNameNode.asText();
-            }
-            if (tlsPortNode != null && !Strings.isNullOrEmpty(tlsPortNode.asText()) && _preferTlsPort) {
-              return hostName + ":" + tlsPortNode.asText();
-            }
-            if (helixPortNode != null && !Strings.isNullOrEmpty(helixPortNode.asText())) {
-              return hostName + ":" + helixPortNode.asText();
-            }
-            return hostName + ":" + splitItems[splitItems.length - 1];
+
+            String hostName =
+                hostNameNode != null && !Strings.isNullOrEmpty(hostNameNode.asText()) ? hostNameNode.asText()
+                    : brokerInfoFromName.getHostname();
+            int tlsPort = tlsPortNode != null && !Strings.isNullOrEmpty(tlsPortNode.asText()) ? tlsPortNode.asInt()
+                : brokerInfoFromName.getTlsPort();
+            int port = helixPortNode != null && !Strings.isNullOrEmpty(helixPortNode.asText()) ? helixPortNode.asInt()
+                : brokerInfoFromName.getPort();
+            return new BrokerInfo(brokerId, hostName, port, tlsPort);
           }
         }
       }
     } catch (JsonProcessingException ex) {
       LOGGER.error("Failed to read broker instance config for {}. Return by naming convention", brokerName, ex);
     }
-    return brokerName.replace("Broker_", "").replace("_", ":");
+    return brokerInfoFromName;
+  }
+
+  @VisibleForTesting
+  String getHostPort(String brokerName) {
+    return getBrokerInfo(brokerName).getHostPort(_preferTlsPort);
   }
 
   protected ByteArrayInputStream getInputStream(byte[] brokerResourceNodeData) {
     return new ByteArrayInputStream(brokerResourceNodeData);
   }
 
-  public Map<String, List<String>> getTableToBrokersMap() {
-    Map<String, Set<String>> brokerUrlsMap = new HashMap<>();
+  public Map<String, List<BrokerInfo>> getTableToBrokerInfosMap() {
+    Map<String, List<BrokerInfo>> brokerInfosMap = new HashMap<>();
     try {
       byte[] brokerResourceNodeData = _zkClient.readData(BROKER_EXTERNAL_VIEW_PATH, true);
       brokerResourceNodeData = unpackZnodeIfNecessary(brokerResourceNodeData);
@@ -150,24 +163,32 @@ public class ExternalViewReader {
         Entry<String, JsonNode> resourceEntry = resourceEntries.next();
         String resourceName = resourceEntry.getKey();
         String tableName = resourceName.replace(OFFLINE_SUFFIX, "").replace(REALTIME_SUFFIX, "");
-        Set<String> brokerUrls = brokerUrlsMap.computeIfAbsent(tableName, k -> new HashSet<>());
+        Set<BrokerInfo> brokerInfoSet = new HashSet<>();
         JsonNode resource = resourceEntry.getValue();
         Iterator<Entry<String, JsonNode>> brokerEntries = resource.fields();
         while (brokerEntries.hasNext()) {
           Entry<String, JsonNode> brokerEntry = brokerEntries.next();
           String brokerName = brokerEntry.getKey();
           if (brokerName.startsWith("Broker_") && "ONLINE".equals(brokerEntry.getValue().asText())) {
-            brokerUrls.add(getHostPort(brokerName));
+            brokerInfoSet.add(getBrokerInfo(brokerName));
           }
         }
+        brokerInfosMap.put(tableName, new ArrayList<>(brokerInfoSet));
       }
     } catch (Exception e) {
       LOGGER.warn("Exception while reading External view from zookeeper", e);
       // ignore
     }
+
+    return brokerInfosMap;
+  }
+
+  public Map<String, List<String>> getTableToBrokersMap() {
     Map<String, List<String>> tableToBrokersMap = new HashMap<>();
-    for (Entry<String, Set<String>> entry : brokerUrlsMap.entrySet()) {
-      tableToBrokersMap.put(entry.getKey(), new ArrayList<>(entry.getValue()));
+    Map<String, List<BrokerInfo>> tableToBrokerInfosMap = getTableToBrokerInfosMap();
+    for (Entry<String, List<BrokerInfo>> entry : tableToBrokerInfosMap.entrySet()) {
+      tableToBrokersMap.put(entry.getKey(),
+          entry.getValue().stream().map(b -> b.getHostPort(_preferTlsPort)).collect(Collectors.toList()));
     }
     return tableToBrokersMap;
   }

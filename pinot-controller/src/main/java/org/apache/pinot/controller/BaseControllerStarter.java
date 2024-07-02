@@ -58,6 +58,8 @@ import org.apache.http.config.SocketConfig;
 import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.pinot.common.Utils;
+import org.apache.pinot.common.broker.BrokerSelector;
+import org.apache.pinot.common.broker.CommonTenantBrokerSelector;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
@@ -193,6 +195,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   protected PoolingHttpClientConnectionManager _connectionManager;
   protected TenantRebalancer _tenantRebalancer;
   protected ExecutorService _tenantRebalanceExecutorService;
+  protected BrokerSelector _brokerSelector;
 
   @Override
   public void init(PinotConfiguration pinotConfiguration)
@@ -251,6 +254,10 @@ public abstract class BaseControllerStarter implements ServiceStartable {
           Executors.newCachedThreadPool(new ThreadFactoryBuilder().setNameFormat("tenant-rebalance-thread-%d").build());
       _tenantRebalancer = new DefaultTenantRebalancer(_helixResourceManager, _tenantRebalanceExecutorService);
     }
+
+    LOGGER.info("Using CommonTenantBrokerSelector with Zookeeper: {} and cluster name: {}", _helixZkURL,
+        _helixClusterName);
+    _brokerSelector = new CommonTenantBrokerSelector(String.format("%s/%s", _helixZkURL, _helixClusterName));
 
     // Initialize the table config tuner registry.
     TableConfigTunerRegistry.init(_config.getTableConfigTunerPackages());
@@ -531,6 +538,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         bind(_pinotLLCRealtimeSegmentManager).to(PinotLLCRealtimeSegmentManager.class);
         bind(_tenantRebalancer).to(TenantRebalancer.class);
         bind(controllerStartTime).named(ControllerAdminApiApplication.START_TIME);
+        bind(_brokerSelector).to(BrokerSelector.class);
         String loggerRootDir = _config.getProperty(CommonConstants.Controller.CONFIG_OF_LOGGER_ROOT_DIR);
         if (loggerRootDir != null) {
           bind(new LocalLogFileServer(loggerRootDir)).to(LogFileServer.class);
