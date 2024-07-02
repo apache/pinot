@@ -29,7 +29,6 @@ import java.util.Random;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.commons.lang3.RandomUtils;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.operator.query.SelectionOnlyOperator;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
@@ -46,6 +45,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.utils.RandomNumberUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -229,8 +229,8 @@ public class NoDictionaryCompressionQueriesTest extends BaseQueriesTest {
         tempLongRows[i] = 1001L;
       } else {
         tempStringRows[i] = RandomStringUtils.random(random.nextInt(100), true, true);
-        tempIntRows[i] = RandomUtils.nextInt(0, rowLength);
-        tempLongRows[i] = RandomUtils.nextLong(0, rowLength);
+        tempIntRows[i] = RandomNumberUtils.getRandomProvider().nextInt(0, rowLength);
+        tempLongRows[i] = RandomNumberUtils.getRandomProvider().nextLong(0, rowLength);
       }
     }
 
