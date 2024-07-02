@@ -401,6 +401,7 @@ public class PinotSegmentUploadDownloadRestletResource {
       throw e;
     } catch (Exception e) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR, 1L);
+      _controllerMetrics.addMeteredTableValue(tableName, ControllerMeter.CONTROLLER_TABLE_SEGMENT_UPLOAD_ERROR, 1L);
       throw new ControllerApplicationException(LOGGER, "Exception while uploading segment: " + e.getMessage(),
           Response.Status.INTERNAL_SERVER_ERROR, e);
     } finally {
