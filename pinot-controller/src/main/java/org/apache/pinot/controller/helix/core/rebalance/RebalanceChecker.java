@@ -187,7 +187,13 @@ public class RebalanceChecker extends ControllerPeriodicTask<Void> {
     // The attemptId starts from 1, so minus one as the exponent.
     double minDelayMs = initDelayMs * Math.pow(RETRY_DELAY_SCALE_FACTOR, attemptId - 1);
     double maxDelayMs = minDelayMs * RETRY_DELAY_SCALE_FACTOR;
-    return RandomNumberUtils.getRandomProvider().nextLong((long) minDelayMs, (long) maxDelayMs);
+    // If minDelayMs == maxDelayMs, then no need to call nextLong.
+    // Also, it throws exception in the case where origin and bound are equal.
+    if (minDelayMs == maxDelayMs) {
+      return (long) minDelayMs;
+    } else {
+      return RandomNumberUtils.getRandomProvider().nextLong((long) minDelayMs, (long) maxDelayMs);
+    }
   }
 
   private static void abortExistingJobs(String tableNameWithType, PinotHelixResourceManager pinotHelixResourceManager) {
