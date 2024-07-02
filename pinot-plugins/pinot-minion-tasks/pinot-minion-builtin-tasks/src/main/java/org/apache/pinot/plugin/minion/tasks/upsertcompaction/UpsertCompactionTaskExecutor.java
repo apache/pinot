@@ -23,9 +23,7 @@ import java.util.Collections;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
-import org.apache.pinot.common.restlet.resources.ValidDocIdsBitmapResponse;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
-import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.plugin.minion.tasks.BaseSingleSegmentConversionExecutor;
@@ -45,6 +43,27 @@ import org.slf4j.LoggerFactory;
 public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExecutor {
   private static final Logger LOGGER = LoggerFactory.getLogger(UpsertCompactionTaskExecutor.class);
 
+  private static SegmentGeneratorConfig getSegmentGeneratorConfig(File workingDir, TableConfig tableConfig,
+      SegmentMetadataImpl segmentMetadata, String segmentName, Schema schema) {
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
+    config.setOutDir(workingDir.getPath());
+    config.setSegmentName(segmentName);
+    // Keep index creation time the same as original segment because both segments use the same raw data.
+    // This way, for REFRESH case, when new segment gets pushed to controller, we can use index creation time to
+    // identify if the new pushed segment has newer data than the existing one.
+    config.setCreationTime(String.valueOf(segmentMetadata.getIndexCreationTime()));
+
+    // The time column type info is not stored in the segment metadata.
+    // Keep segment start/end time to properly handle time column type other than EPOCH (e.g.SIMPLE_FORMAT).
+    if (segmentMetadata.getTimeInterval() != null) {
+      config.setTimeColumnName(tableConfig.getValidationConfig().getTimeColumnName());
+      config.setStartTime(Long.toString(segmentMetadata.getStartTime()));
+      config.setEndTime(Long.toString(segmentMetadata.getEndTime()));
+      config.setSegmentTimeUnit(segmentMetadata.getTimeUnit());
+    }
+    return config;
+  }
+
   @Override
   protected SegmentConversionResult convert(PinotTaskConfig pinotTaskConfig, File indexDir, File workingDir)
       throws Exception {
@@ -60,31 +79,19 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
 
     String validDocIdsTypeStr =
         configs.getOrDefault(MinionConstants.UpsertCompactionTask.VALID_DOC_IDS_TYPE, ValidDocIdsType.SNAPSHOT.name());
-    ValidDocIdsType validDocIdsType = ValidDocIdsType.valueOf(validDocIdsTypeStr.toUpperCase());
-    ValidDocIdsBitmapResponse validDocIdsBitmapResponse =
-        MinionTaskUtils.getValidDocIdsBitmap(tableNameWithType, segmentName, validDocIdsType.toString(),
-            MINION_CONTEXT);
-
-    // Check crc from the downloaded segment against the crc returned from the server along with the valid doc id
-    // bitmap. If this doesn't match, this means that we are hitting the race condition where the segment has been
-    // uploaded successfully while the server is still reloading the segment. Reloading can take a while when the
-    // offheap upsert is used because we will need to delete & add all primary keys.
-    // `BaseSingleSegmentConversionExecutor.executeTask()` already checks for the crc from the task generator
-    // against the crc from the current segment zk metadata, so we don't need to check that here.
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
     String originalSegmentCrcFromTaskGenerator = configs.get(MinionConstants.ORIGINAL_SEGMENT_CRC_KEY);
     String crcFromDeepStorageSegment = segmentMetadata.getCrc();
-    String crcFromValidDocIdsBitmap = validDocIdsBitmapResponse.getSegmentCrc();
-    if (!originalSegmentCrcFromTaskGenerator.equals(crcFromDeepStorageSegment)
-        || !originalSegmentCrcFromTaskGenerator.equals(crcFromValidDocIdsBitmap)) {
-      LOGGER.warn("CRC mismatch for segment: {}, expected: {}, actual crc from server: {}", segmentName,
-          crcFromDeepStorageSegment, validDocIdsBitmapResponse.getSegmentCrc());
-      return new SegmentConversionResult.Builder().setTableNameWithType(tableNameWithType).setSegmentName(segmentName)
-          .build();
+    RoaringBitmap validDocIds =
+        MinionTaskUtils.getValidDocIdFromServerMatchingCrc(tableNameWithType, segmentName, validDocIdsTypeStr,
+            MINION_CONTEXT, originalSegmentCrcFromTaskGenerator, crcFromDeepStorageSegment);
+    if (validDocIds == null) {
+      // no valid crc match found or no validDocIds obtained from all servers
+      // error out the task instead of silently failing so that we can track it via task-error metrics
+      LOGGER.error("No validDocIds found from all servers. They either failed to download or did not match crc from"
+          + "segment copy obtained from deepstore / servers.");
+      throw new IllegalStateException("No valid validDocIds found from all servers.");
     }
-
-    RoaringBitmap validDocIds = RoaringBitmapUtils.deserialize(validDocIdsBitmapResponse.getBitmap());
-
     if (validDocIds.isEmpty()) {
       // prevents empty segment generation
       LOGGER.info("validDocIds is empty, skip the task. Table: {}, segment: {}", tableNameWithType, segmentName);
@@ -116,27 +123,6 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
     LOGGER.info("Finished task: {} with configs: {}. Total time: {}ms", taskType, configs, (endMillis - startMillis));
 
     return result;
-  }
-
-  private static SegmentGeneratorConfig getSegmentGeneratorConfig(File workingDir, TableConfig tableConfig,
-      SegmentMetadataImpl segmentMetadata, String segmentName, Schema schema) {
-    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
-    config.setOutDir(workingDir.getPath());
-    config.setSegmentName(segmentName);
-    // Keep index creation time the same as original segment because both segments use the same raw data.
-    // This way, for REFRESH case, when new segment gets pushed to controller, we can use index creation time to
-    // identify if the new pushed segment has newer data than the existing one.
-    config.setCreationTime(String.valueOf(segmentMetadata.getIndexCreationTime()));
-
-    // The time column type info is not stored in the segment metadata.
-    // Keep segment start/end time to properly handle time column type other than EPOCH (e.g.SIMPLE_FORMAT).
-    if (segmentMetadata.getTimeInterval() != null) {
-      config.setTimeColumnName(tableConfig.getValidationConfig().getTimeColumnName());
-      config.setStartTime(Long.toString(segmentMetadata.getStartTime()));
-      config.setEndTime(Long.toString(segmentMetadata.getEndTime()));
-      config.setSegmentTimeUnit(segmentMetadata.getTimeUnit());
-    }
-    return config;
   }
 
   @Override
