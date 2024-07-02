@@ -152,6 +152,13 @@ public interface TableDataManager {
       throws Exception;
 
   /**
+   * Offloads a segment from table like the method {@link #offloadSegment(String)}, but this method doesn't take
+   * segment lock internally to allow separate threads to manage segment offloading w/o the risk of deadlocks.
+   */
+  void offloadSegmentUnsafe(String segmentName)
+      throws Exception;
+
+  /**
    * Reloads an existing immutable segment for the table, which can be an OFFLINE or REALTIME table.
    * A new segment may be downloaded if the local one has a different CRC; or can be forced to download
    * if forceDownload flag is true. This operation is conducted within a failure handling framework
