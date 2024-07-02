@@ -93,6 +93,4 @@ public class ZeroCopyDataBlockSerdeTest {
     assertEquals(deserialized.getExceptions(), block.getExceptions(), "Unexpected exceptions");
     assertEquals(deserialized, block, "Unexpected data");
   }
-
-
 }

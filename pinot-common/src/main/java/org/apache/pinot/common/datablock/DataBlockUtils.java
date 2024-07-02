@@ -129,9 +129,8 @@ public final class DataBlockUtils {
     } else {
       readFirstByte = dataBuffer.getInt(0);
     }
-    Preconditions.checkState(readFirstByte == firstInt, "Illegal serialization by "
-        + dataBuffer.getClass().getName() + ". The first integer should be " + firstInt + " but is " + readFirstByte
-        + " instead");
+    Preconditions.checkState(readFirstByte == firstInt, "Illegal serialization by {}. "
+        + "The first integer should be {} but is {} instead", dataBuffer.getClass().getName(), firstInt, readFirstByte);
 
     ArrayList<ByteBuffer> result = new ArrayList<>();
     dataBuffer.appendAsByteBuffers(result);

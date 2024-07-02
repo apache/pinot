@@ -88,7 +88,7 @@ public class MetadataBlock extends BaseDataBlock {
 
   @Override
   protected int getOffsetInFixedBuffer(int rowId, int colId) {
-    throw new UnsupportedOperationException("Metadata block uses JSON encoding for field access");
+    throw new UnsupportedOperationException("Not supported in metadata block");
   }
 
   public enum MetadataBlockType {
