@@ -31,14 +31,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import javax.annotation.Nullable;
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.output.UnsynchronizedByteArrayOutputStream;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.datatable.DataTableImplV3;
 import org.apache.pinot.common.datatable.DataTableUtils;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.apache.pinot.segment.spi.memory.PinotByteBuffer;
 import org.apache.pinot.segment.spi.memory.PinotInputStream;
@@ -123,10 +121,10 @@ public abstract class BaseDataBlock implements DataBlock, DataBlock.Raw {
 
   public BaseDataBlock(int numRows, DataSchema dataSchema, String[] stringDictionary,
       DataBuffer fixedSizeData, DataBuffer variableSizeData) {
-    Preconditions.checkArgument(fixedSizeData.size() <= Integer.MAX_VALUE, "Fixed size data too large ("
-        + fixedSizeData.size() + " bytes");
-    Preconditions.checkArgument(variableSizeData.size() <= Integer.MAX_VALUE, "Variable size data too large ("
-        + variableSizeData.size() + " bytes");
+    Preconditions.checkArgument(fixedSizeData.size() <= Integer.MAX_VALUE, "Fixed size data too large ({} bytes",
+        fixedSizeData.size());
+    Preconditions.checkArgument(variableSizeData.size() <= Integer.MAX_VALUE, "Variable size data too large ({} bytes",
+        variableSizeData.size());
     _numRows = numRows;
     _dataSchema = dataSchema;
     _numColumns = dataSchema.size();
@@ -201,6 +199,7 @@ public abstract class BaseDataBlock implements DataBlock, DataBlock.Raw {
 
   @Override
   public BigDecimal getBigDecimal(int rowId, int colId) {
+    // TODO: Add a allocation free deserialization mechanism.
     int offsetInFixed = getOffsetInFixedBuffer(rowId, colId);
     int size = _fixedSizeData.getInt(offsetInFixed + 4);
     int offsetInVar = _fixedSizeData.getInt(offsetInFixed);
@@ -409,118 +408,6 @@ public abstract class BaseDataBlock implements DataBlock, DataBlock.Raw {
       _serialized = DataBlockUtils.serialize(this);
     }
     return _serialized;
-  }
-
-  private void writeLeadingSections(DataOutputStream dataOutputStream)
-      throws IOException {
-    dataOutputStream.writeInt(getDataBlockVersionType());
-    dataOutputStream.writeInt(_numRows);
-    dataOutputStream.writeInt(_numColumns);
-    int dataOffset = HEADER_SIZE;
-
-    // Write exceptions section offset(START|SIZE).
-    dataOutputStream.writeInt(dataOffset);
-    byte[] exceptionsBytes;
-    exceptionsBytes = serializeExceptions();
-    dataOutputStream.writeInt(exceptionsBytes.length);
-    dataOffset += exceptionsBytes.length;
-
-    // Write dictionary map section offset(START|SIZE).
-    dataOutputStream.writeInt(dataOffset);
-    byte[] dictionaryBytes = null;
-    if (_stringDictionary != null) {
-      dictionaryBytes = serializeStringDictionary();
-      dataOutputStream.writeInt(dictionaryBytes.length);
-      dataOffset += dictionaryBytes.length;
-    } else {
-      dataOutputStream.writeInt(0);
-    }
-
-    // Write data schema section offset(START|SIZE).
-    dataOutputStream.writeInt(dataOffset);
-    byte[] dataSchemaBytes = null;
-    if (_dataSchema != null) {
-      dataSchemaBytes = _dataSchema.toBytes();
-      dataOutputStream.writeInt(dataSchemaBytes.length);
-      dataOffset += dataSchemaBytes.length;
-    } else {
-      dataOutputStream.writeInt(0);
-    }
-
-    // Write fixed size data section offset(START|SIZE).
-    dataOutputStream.writeInt(dataOffset);
-    if (_fixedSizeData != null) {
-      dataOutputStream.writeInt((int) _fixedSizeData.size());
-      dataOffset += (int) _fixedSizeData.size();
-    } else {
-      dataOutputStream.writeInt(0);
-    }
-
-    // Write variable size data section offset(START|SIZE).
-    dataOutputStream.writeInt(dataOffset);
-    if (_variableSizeData != null) {
-      dataOutputStream.writeInt((int) _variableSizeData.size());
-    } else {
-      dataOutputStream.writeInt(0);
-    }
-
-    // Write actual data.
-    // Write exceptions bytes.
-    dataOutputStream.write(exceptionsBytes);
-    // Write dictionary map bytes.
-    if (dictionaryBytes != null) {
-      dataOutputStream.write(dictionaryBytes);
-    }
-    // Write data schema bytes.
-    if (dataSchemaBytes != null) {
-      dataOutputStream.write(dataSchemaBytes);
-    }
-    // Write fixed size data bytes.
-    if (_fixedSizeData != null) {
-      try (PinotInputStream inputStream = _fixedSizeData.openInputStream()) {
-        IOUtils.copy(inputStream, dataOutputStream);
-      }
-    }
-    // Write variable size data bytes.
-    if (_variableSizeData != null) {
-      try (PinotInputStream inputStream = _variableSizeData.openInputStream()) {
-        IOUtils.copy(inputStream, dataOutputStream);
-      }
-    }
-  }
-
-  private byte[] serializeExceptions()
-      throws IOException {
-    if (_errCodeToExceptionMap.isEmpty()) {
-      return new byte[4];
-    }
-    UnsynchronizedByteArrayOutputStream byteArrayOutputStream = new UnsynchronizedByteArrayOutputStream(1024);
-    DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
-
-    dataOutputStream.writeInt(_errCodeToExceptionMap.size());
-
-    for (Map.Entry<Integer, String> entry : _errCodeToExceptionMap.entrySet()) {
-      int key = entry.getKey();
-      String value = entry.getValue();
-      byte[] valueBytes = value.getBytes(UTF_8);
-      dataOutputStream.writeInt(key);
-      dataOutputStream.writeInt(valueBytes.length);
-      dataOutputStream.write(valueBytes);
-    }
-
-    return byteArrayOutputStream.toByteArray();
-  }
-
-  private Map<Integer, String> deserializeExceptions(ByteBuffer buffer)
-      throws IOException {
-    int numExceptions = buffer.getInt();
-    Map<Integer, String> exceptions = new HashMap<>(HashUtil.getHashMapCapacity(numExceptions));
-    for (int i = 0; i < numExceptions; i++) {
-      int errCode = buffer.getInt();
-      String errMessage = DataTableUtils.decodeString(buffer);
-      exceptions.put(errCode, errMessage);
-    }
-    return exceptions;
   }
 
   @Override
