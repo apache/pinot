@@ -27,10 +27,10 @@ import java.nio.ByteBuffer;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
-import org.apache.commons.lang3.RandomUtils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
+import org.apache.pinot.spi.utils.RandomNumberUtils;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -90,7 +90,7 @@ public class SumPrecisionTest extends CustomDataQueryClusterIntegrationTest {
       for (int i = 0; i < getCountStarResult(); i++) {
         // create avro record
         GenericData.Record record = new GenericData.Record(avroSchema);
-        record.put(DIM_NAME, "dim" + (RandomUtils.nextInt() % dimCardinality));
+        record.put(DIM_NAME, "dim" + (RandomNumberUtils.getRandomProvider().nextInt() % dimCardinality));
         BigDecimal bigDecimalValue = bigDecimalBase.add(BigDecimal.valueOf(i));
 
         record.put(MET_BIG_DECIMAL_BYTES, ByteBuffer.wrap(BigDecimalUtils.serialize(bigDecimalValue)));

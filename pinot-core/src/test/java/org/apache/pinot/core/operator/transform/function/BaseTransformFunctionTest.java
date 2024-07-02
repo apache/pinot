@@ -36,7 +36,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.commons.lang3.RandomUtils;
+import org.apache.commons.rng.UniformRandomProvider;
 import org.apache.pinot.core.operator.DocIdSetOperator;
 import org.apache.pinot.core.operator.ProjectionOperator;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
@@ -58,6 +58,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.RandomNumberUtils;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.roaringbitmap.RoaringBitmap;
@@ -203,9 +204,10 @@ public abstract class BaseTransformFunctionTest {
         _doubleMV2Values[i][j] = 1.0;
       }
 
+      UniformRandomProvider randomProvider = RandomNumberUtils.getRandomProvider();
       for (int j = 0; j < VECTOR_DIM_SIZE; j++) {
-        _vector1Values[i][j] = Math.abs(RandomUtils.nextFloat(0.0f, 1.0f));
-        _vector2Values[i][j] = Math.abs(RandomUtils.nextFloat(0.0f, 1.0f));
+        _vector1Values[i][j] = Math.abs(randomProvider.nextFloat(0.0f, 1.0f));
+        _vector2Values[i][j] = Math.abs(randomProvider.nextFloat(0.0f, 1.0f));
       }
 
       // Time in the past year

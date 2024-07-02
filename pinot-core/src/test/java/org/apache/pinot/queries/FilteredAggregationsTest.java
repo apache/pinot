@@ -27,7 +27,6 @@ import java.util.List;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.commons.lang3.RandomUtils;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -43,6 +42,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.utils.RandomNumberUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -116,7 +116,7 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
       row.putValue(INT_COL_NAME, i);
       row.putValue(NO_INDEX_INT_COL_NAME, i);
       row.putValue(STATIC_INT_COL_NAME, 10);
-      row.putValue(BOOLEAN_COL_NAME, RandomUtils.nextBoolean());
+      row.putValue(BOOLEAN_COL_NAME, RandomNumberUtils.getRandomProvider().nextBoolean());
       row.putValue(STRING_COL_NAME, RandomStringUtils.randomAlphabetic(4));
       rows.add(row);
     }

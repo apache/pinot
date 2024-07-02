@@ -25,7 +25,6 @@ import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.commons.lang3.RandomUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
@@ -35,6 +34,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.RandomNumberUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
@@ -106,7 +106,7 @@ public class SegmentGenerationWithMultipleRecordsTest {
   private GenericRow getRandomArrayElement() {
     GenericRow element = new GenericRow();
     element.putValue(SUB_COLUMN_1, RandomStringUtils.randomAlphabetic(4));
-    element.putValue(SUB_COLUMN_2, RandomUtils.nextLong());
+    element.putValue(SUB_COLUMN_2, RandomNumberUtils.getRandomProvider().nextLong());
     return element;
   }
 }
