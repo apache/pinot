@@ -21,19 +21,18 @@ package org.apache.pinot.plugin.provider;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.http.HttpEntity;
-import org.apache.http.HttpStatus;
-import org.apache.http.StatusLine;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.hc.client5.http.classic.methods.HttpGet;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
+import org.apache.hc.core5.http.HttpEntity;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.mockito.Mock;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import static org.apache.http.HttpStatus.SC_NOT_FOUND;
+import static org.apache.hc.core5.http.HttpStatus.SC_NOT_FOUND;
+import static org.apache.hc.core5.http.HttpStatus.SC_OK;
 import static org.apache.pinot.plugin.provider.AzureEnvironmentProvider.IMDS_ENDPOINT;
 import static org.apache.pinot.plugin.provider.AzureEnvironmentProvider.MAX_RETRY;
 import static org.mockito.Mockito.*;
@@ -53,8 +52,6 @@ public class AzureEnvironmentProviderTest {
   private CloseableHttpClient _mockHttpClient;
   @Mock
   private CloseableHttpResponse _mockHttpResponse;
-  @Mock
-  private StatusLine _mockStatusLine;
   @Mock
   private HttpEntity _mockHttpEntity;
 
@@ -80,14 +77,13 @@ public class AzureEnvironmentProviderTest {
     String failureDomain = _azureEnvironmentProviderWithParams.getFailureDomain();
     Assert.assertEquals(failureDomain, "36");
     verify(_mockHttpClient, times(1)).execute(any(HttpGet.class));
-    verify(_mockHttpResponse, times(1)).getStatusLine();
-    verify(_mockStatusLine, times(1)).getStatusCode();
+    verify(_mockHttpResponse, times(1)).getCode();
     verify(_mockHttpResponse, times(1)).getEntity();
-    verifyNoMoreInteractions(_mockHttpClient, _mockHttpResponse, _mockStatusLine);
+    verifyNoMoreInteractions(_mockHttpClient, _mockHttpResponse);
   }
 
-  @Test(expectedExceptions = IllegalArgumentException.class,
-      expectedExceptionsMessageRegExp = "\\[AzureEnvironmentProvider\\]: imdsEndpoint should not be " + "null or empty")
+  @Test(expectedExceptions = IllegalArgumentException.class, expectedExceptionsMessageRegExp =
+      "\\[AzureEnvironmentProvider\\]: imdsEndpoint should not be " + "null or empty")
   public void testInvalidIMDSEndpoint() {
     Map<String, Object> map = _pinotConfiguration.toMap();
     map.put(MAX_RETRY, "3");
@@ -96,9 +92,8 @@ public class AzureEnvironmentProviderTest {
     _azureEnvironmentProvider.init(pinotConfiguration);
   }
 
-  @Test(expectedExceptions = IllegalArgumentException.class,
-      expectedExceptionsMessageRegExp = "\\[AzureEnvironmentProvider\\]: maxRetry cannot be less than "
-          + "or equal to 0")
+  @Test(expectedExceptions = IllegalArgumentException.class, expectedExceptionsMessageRegExp =
+      "\\[AzureEnvironmentProvider\\]: maxRetry cannot be less than " + "or equal to 0")
   public void testInvalidRetryCount() {
     Map<String, Object> map = _pinotConfiguration.toMap();
     map.put(MAX_RETRY, "0");
@@ -106,20 +101,20 @@ public class AzureEnvironmentProviderTest {
     _azureEnvironmentProvider.init(pinotConfiguration);
   }
 
-  @Test(expectedExceptions = NullPointerException.class,
-      expectedExceptionsMessageRegExp = "\\[AzureEnvironmentProvider\\]: Closeable Http Client cannot be " + "null")
+  @Test(expectedExceptions = NullPointerException.class, expectedExceptionsMessageRegExp =
+      "\\[AzureEnvironmentProvider\\]: Closeable Http Client cannot be " + "null")
   public void testInvalidHttpClient() {
     new AzureEnvironmentProvider(3, IMDS_ENDPOINT_VALUE, null);
   }
 
-  @Test(expectedExceptions = RuntimeException.class,
-      expectedExceptionsMessageRegExp = "\\[AzureEnvironmentProvider\\]: Compute node is missing in the payload. "
+  @Test(expectedExceptions = RuntimeException.class, expectedExceptionsMessageRegExp =
+      "\\[AzureEnvironmentProvider\\]: Compute node is missing in the payload. "
           + "Cannot retrieve failure domain information")
   public void testMissingComputeNodeResponse()
       throws IOException {
     mockUtil();
-    when(_mockHttpEntity.getContent())
-        .thenReturn(getClass().getClassLoader().getResourceAsStream(IMDS_RESPONSE_WITHOUT_COMPUTE_INFO));
+    when(_mockHttpEntity.getContent()).thenReturn(
+        getClass().getClassLoader().getResourceAsStream(IMDS_RESPONSE_WITHOUT_COMPUTE_INFO));
     _azureEnvironmentProviderWithParams.getFailureDomain();
   }
 
@@ -129,8 +124,8 @@ public class AzureEnvironmentProviderTest {
   public void testMissingFaultDomainResponse()
       throws IOException {
     mockUtil();
-    when(_mockHttpEntity.getContent())
-        .thenReturn(getClass().getClassLoader().getResourceAsStream(IMDS_RESPONSE_WITHOUT_FAULT_DOMAIN_INFO));
+    when(_mockHttpEntity.getContent()).thenReturn(
+        getClass().getClassLoader().getResourceAsStream(IMDS_RESPONSE_WITHOUT_FAULT_DOMAIN_INFO));
     _azureEnvironmentProviderWithParams.getFailureDomain();
   }
 
@@ -140,7 +135,7 @@ public class AzureEnvironmentProviderTest {
   public void testIMDSCallFailure()
       throws IOException {
     mockUtil();
-    when(_mockStatusLine.getStatusCode()).thenReturn(SC_NOT_FOUND);
+    when(_mockHttpResponse.getCode()).thenReturn(SC_NOT_FOUND);
     _azureEnvironmentProviderWithParams.getFailureDomain();
   }
 
@@ -148,8 +143,7 @@ public class AzureEnvironmentProviderTest {
   private void mockUtil()
       throws IOException {
     when(_mockHttpClient.execute(any(HttpGet.class))).thenReturn(_mockHttpResponse);
-    when(_mockHttpResponse.getStatusLine()).thenReturn(_mockStatusLine);
-    when(_mockStatusLine.getStatusCode()).thenReturn(HttpStatus.SC_OK);
+    when(_mockHttpResponse.getCode()).thenReturn(SC_OK);
     when(_mockHttpResponse.getEntity()).thenReturn(_mockHttpEntity);
   }
 }

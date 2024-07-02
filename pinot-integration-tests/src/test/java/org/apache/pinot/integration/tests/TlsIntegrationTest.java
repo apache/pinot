@@ -35,16 +35,19 @@ import java.util.Properties;
 import java.util.stream.Collectors;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
+import org.apache.hc.client5.http.classic.methods.HttpGet;
+import org.apache.hc.client5.http.classic.methods.HttpPost;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
+import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
+import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder;
+import org.apache.hc.client5.http.io.HttpClientConnectionManager;
+import org.apache.hc.client5.http.ssl.SSLConnectionSocketFactory;
+import org.apache.hc.core5.http.Header;
+import org.apache.hc.core5.http.io.entity.StringEntity;
+import org.apache.hc.core5.http.message.BasicHeader;
+import org.apache.hc.core5.ssl.SSLContextBuilder;
 import org.apache.helix.model.InstanceConfig;
-import org.apache.http.Header;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.entity.StringEntity;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClientBuilder;
-import org.apache.http.message.BasicHeader;
-import org.apache.http.ssl.SSLContextBuilder;
 import org.apache.pinot.client.Connection;
 import org.apache.pinot.client.ConnectionFactory;
 import org.apache.pinot.client.JsonAsyncHttpPinotClientTransportFactory;
@@ -322,7 +325,7 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
       throws Exception {
     try (CloseableHttpClient client = makeClient(JKS, TLS_STORE_JKS, TLS_STORE_JKS);
         CloseableHttpResponse response = client.execute(makeGetTables(_externalControllerPort))) {
-      Assert.assertEquals(response.getStatusLine().getStatusCode(), 200);
+      Assert.assertEquals(response.getCode(), 200);
       JsonNode tables = JsonUtils.inputStreamToJsonNode(response.getEntity().getContent()).get("tables");
       Assert.assertEquals(tables.size(), 1);
       Assert.assertEquals(tables.get(0).textValue(), "mytable");
@@ -347,7 +350,7 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
       throws Exception {
     try (CloseableHttpClient client = makeClient(PKCS_12, TLS_STORE_PKCS_12, TLS_STORE_PKCS_12);
         CloseableHttpResponse response = client.execute(makeGetTables(_internalControllerPort))) {
-      Assert.assertEquals(response.getStatusLine().getStatusCode(), 200);
+      Assert.assertEquals(response.getCode(), 200);
       JsonNode tables = JsonUtils.inputStreamToJsonNode(response.getEntity().getContent()).get("tables");
       Assert.assertEquals(tables.size(), 1);
       Assert.assertEquals(tables.get(0).textValue(), "mytable");
@@ -385,7 +388,7 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
       throws Exception {
     try (CloseableHttpClient client = makeClient(JKS, TLS_STORE_EMPTY_JKS, TLS_STORE_JKS);
         CloseableHttpResponse response = client.execute(makeQueryBroker(_externalBrokerPort))) {
-      Assert.assertEquals(response.getStatusLine().getStatusCode(), 200);
+      Assert.assertEquals(response.getCode(), 200);
       JsonNode resultTable = JsonUtils.inputStreamToJsonNode(response.getEntity().getContent()).get("resultTable");
       Assert.assertTrue(resultTable.get("rows").get(0).get(0).longValue() > 100000);
     }
@@ -409,7 +412,7 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
       throws Exception {
     try (CloseableHttpClient client = makeClient(PKCS_12, TLS_STORE_PKCS_12, TLS_STORE_PKCS_12);
         CloseableHttpResponse response = client.execute(makeQueryBroker(_internalBrokerPort))) {
-      Assert.assertEquals(response.getStatusLine().getStatusCode(), 200);
+      Assert.assertEquals(response.getCode(), 200);
       JsonNode resultTable = JsonUtils.inputStreamToJsonNode(response.getEntity().getContent()).get("resultTable");
       Assert.assertTrue(resultTable.get("rows").get(0).get(0).longValue() > 100000);
     }
@@ -449,7 +452,7 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
     request.setEntity(new StringEntity("{\"sql\":\"SELECT count(*) FROM mytable\"}"));
     try (CloseableHttpClient client = makeClient(JKS, TLS_STORE_JKS, TLS_STORE_JKS);
         CloseableHttpResponse response = client.execute(request)) {
-      Assert.assertEquals(response.getStatusLine().getStatusCode(), 200);
+      Assert.assertEquals(response.getCode(), 200);
       JsonNode resultTable = JsonUtils.inputStreamToJsonNode(response.getEntity().getContent()).get("resultTable");
       Assert.assertTrue(resultTable.get("rows").get(0).get(0).longValue() > 100000);
     }
@@ -560,7 +563,13 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
     sslContextBuilder.setKeyStoreType(keyStoreType);
     sslContextBuilder.loadKeyMaterial(keyStoreUrl, PASSWORD_CHAR, PASSWORD_CHAR);
     sslContextBuilder.loadTrustMaterial(trustStoreUrl, PASSWORD_CHAR);
-    return HttpClientBuilder.create().setSSLContext(sslContextBuilder.build()).build();
+
+    SSLConnectionSocketFactory sslConnectionSocketFactory = new SSLConnectionSocketFactory(sslContextBuilder.build());
+    HttpClientConnectionManager cm = PoolingHttpClientConnectionManagerBuilder.create()
+        .setSSLSocketFactory(sslConnectionSocketFactory)
+        .build();
+
+    return HttpClientBuilder.create().setConnectionManager(cm).build();
   }
 
   private static HttpGet makeGetTables(int port) {

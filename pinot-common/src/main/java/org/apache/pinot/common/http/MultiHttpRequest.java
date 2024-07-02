@@ -19,26 +19,29 @@
 package org.apache.pinot.common.http;
 
 import java.io.IOException;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletionService;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorCompletionService;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.http.client.config.RequestConfig;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.client.methods.HttpRequestBase;
-import org.apache.http.conn.HttpClientConnectionManager;
-import org.apache.http.entity.StringEntity;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClientBuilder;
-import org.apache.http.impl.client.HttpClients;
-import org.apache.http.util.EntityUtils;
+import org.apache.hc.client5.http.classic.methods.HttpGet;
+import org.apache.hc.client5.http.classic.methods.HttpPost;
+import org.apache.hc.client5.http.classic.methods.HttpUriRequestBase;
+import org.apache.hc.client5.http.config.RequestConfig;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
+import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
+import org.apache.hc.client5.http.impl.classic.HttpClients;
+import org.apache.hc.client5.http.io.HttpClientConnectionManager;
+import org.apache.hc.core5.http.io.entity.EntityUtils;
+import org.apache.hc.core5.http.io.entity.StringEntity;
+import org.apache.hc.core5.util.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -100,12 +103,13 @@ public class MultiHttpRequest {
    * @return instance of CompletionService. Completion service will provide
    *   results as they arrive. The order is NOT same as the order of URLs
    */
-  public <T extends HttpRequestBase> CompletionService<MultiHttpRequestResponse> execute(
+  public <T extends HttpUriRequestBase> CompletionService<MultiHttpRequestResponse> execute(
       List<Pair<String, String>> urlsAndRequestBodies, @Nullable Map<String, String> requestHeaders, int timeoutMs,
       String httpMethodName, Function<String, T> httpRequestBaseSupplier) {
     // Create global request configuration
+    Timeout timeout = Timeout.of(timeoutMs, TimeUnit.MILLISECONDS);
     RequestConfig defaultRequestConfig =
-        RequestConfig.custom().setConnectionRequestTimeout(timeoutMs).setSocketTimeout(timeoutMs)
+        RequestConfig.custom().setConnectionRequestTimeout(timeout).setResponseTimeout(timeout)
             .build(); // setting the socket
 
     HttpClientBuilder httpClientBuilder =
@@ -117,18 +121,19 @@ public class MultiHttpRequest {
       completionService.submit(() -> {
         String url = pair.getLeft();
         String body = pair.getRight();
-        HttpRequestBase httpMethod = httpRequestBaseSupplier.apply(url);
+        HttpUriRequestBase httpMethod = httpRequestBaseSupplier.apply(url);
         // If the http method is POST, set the request body
         if (httpMethod instanceof HttpPost) {
           ((HttpPost) httpMethod).setEntity(new StringEntity(body));
         }
         if (requestHeaders != null) {
-          requestHeaders.forEach(((HttpRequestBase) httpMethod)::setHeader);
+          requestHeaders.forEach(((HttpUriRequestBase) httpMethod)::setHeader);
         }
         CloseableHttpResponse response = null;
         try {
           response = client.execute(httpMethod);
-          return new MultiHttpRequestResponse(httpMethod.getURI(), response);
+          httpMethod.setAbsoluteRequestUri(true);
+          return new MultiHttpRequestResponse(URI.create(httpMethod.getRequestUri()), response);
         } catch (IOException ex) {
           if (response != null) {
             String error = EntityUtils.toString(response.getEntity());

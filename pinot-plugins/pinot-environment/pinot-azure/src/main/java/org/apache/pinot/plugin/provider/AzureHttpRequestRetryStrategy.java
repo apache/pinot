@@ -16,33 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.http;
+package org.apache.pinot.plugin.provider;
 
-import java.io.IOException;
-import java.net.URI;
-import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
+import org.apache.hc.client5.http.impl.DefaultHttpRequestRetryStrategy;
+import org.apache.hc.core5.util.TimeValue;
 
 
-public class MultiHttpRequestResponse implements AutoCloseable {
-  private final URI _uri;
-  private final CloseableHttpResponse _response;
-
-  public MultiHttpRequestResponse(URI uri, CloseableHttpResponse response) {
-    _uri = uri;
-    _response = response;
-  }
-
-  public URI getURI() {
-    return _uri;
-  }
-
-  public CloseableHttpResponse getResponse() {
-    return _response;
-  }
-
-  @Override
-  public void close()
-      throws IOException {
-    _response.close();
+public class AzureHttpRequestRetryStrategy extends DefaultHttpRequestRetryStrategy {
+  public AzureHttpRequestRetryStrategy(
+      final int maxRetries) {
+    super(maxRetries, TimeValue.ofSeconds(1));
   }
 }
