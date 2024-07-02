@@ -1810,8 +1810,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private void updateIngestionMetrics(RowMetadata metadata) {
     if (metadata != null) {
       try {
-        StreamPartitionMsgOffset latestOffset =
-            _partitionMetadataProvider.fetchStreamPartitionOffset(OffsetCriteria.LARGEST_OFFSET_CRITERIA, 5000);
+        StreamPartitionMsgOffset latestOffset = fetchLatestStreamOffset(5000);
         _realtimeTableDataManager.updateIngestionMetrics(metadata.getRecordIngestionTimeMs(),
             metadata.getFirstStreamRecordIngestionTimeMs(), metadata.getOffset(), latestOffset, _partitionGroupId);
       } catch (Exception e) {
