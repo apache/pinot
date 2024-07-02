@@ -616,8 +616,10 @@ public class PinotTaskRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Authenticate(AccessType.UPDATE)
   @ApiOperation("Schedule tasks and return a map from task type to task name scheduled")
-  public Map<String, String> scheduleTasks(@ApiParam(value = "Task type") @QueryParam("taskType") String taskType,
-      @ApiParam(value = "Table name (with type suffix)") @QueryParam("tableName") String tableName,
+  @Nullable
+  public Map<String, String> scheduleTasks(
+      @ApiParam(value = "Task type") @QueryParam("taskType") @Nullable String taskType,
+      @ApiParam(value = "Table name (with type suffix)") @QueryParam("tableName") @Nullable String tableName,
       @ApiParam(value = "Minion Instance tag to schedule the task explicitly on") @QueryParam("minionInstanceTag")
       @Nullable String minionInstanceTag, @Context HttpHeaders headers) {
     String database = headers != null ? headers.getHeaderString(DATABASE) : DEFAULT_DATABASE;
@@ -632,8 +634,9 @@ public class PinotTaskRestletResource {
       Map<String, List<String>> allTaskNames = tableName != null ? _pinotTaskManager.scheduleAllTasksForTable(
           DatabaseUtils.translateTableName(tableName, headers), minionInstanceTag)
           : _pinotTaskManager.scheduleAllTasksForDatabase(database, minionInstanceTag);
-      return allTaskNames.entrySet().stream()
+      Map<String, String> result = allTaskNames.entrySet().stream().filter(entry -> entry.getValue() != null)
           .collect(Collectors.toMap(Map.Entry::getKey, entry -> String.join(",", entry.getValue())));
+      return result.isEmpty() ? null : result;
     }
   }
 
