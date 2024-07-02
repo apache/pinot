@@ -222,7 +222,8 @@ public class IndexedTableTest {
       d1.add((String) iterator.next().getValues()[0]);
     }
     for (String s : evicted) {
-      Assert.assertFalse(d1.contains(s));
+      Assert.assertFalse(d1.contains(s), "Expected '" + s + "' to be evicted, but it was found in the "
+          + "indexed table");
     }
   }
 
@@ -282,5 +283,60 @@ public class IndexedTableTest {
     indexedTable.finish(false);
 
     checkEvicted(indexedTable, "f", "g");
+  }
+
+  @Test
+  public void testAdaptiveTrimThreshold() {
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
+        "SELECT SUM(m1), MAX(m2) FROM testTable GROUP BY d1, d2, d3 ORDER BY SUM(m1)");
+    DataSchema dataSchema = new DataSchema(new String[]{"d1", "d2", "d3", "sum(m1)", "max(m2)"}, new ColumnDataType[]{
+        ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE
+    });
+    IndexedTable indexedTable = new SimpleIndexedTable(dataSchema, queryContext, 5, 5, 6);
+
+    // Insert 7 records. Ensure that no trimming has been done since the trim threshold should adapt to be at least
+    // twice the trim size to avoid excessive trimming
+    indexedTable.upsert(getRecord(new Object[]{"a", 1, 10d, 10d, 100d}));
+    indexedTable.upsert(getRecord(new Object[]{"b", 2, 20d, 10d, 200d}));
+    indexedTable.upsert(getRecord(new Object[]{"a", 1, 10d, 10d, 100d}));
+    indexedTable.upsert(getRecord(new Object[]{"a", 1, 10d, 10d, 100d}));
+    Assert.assertEquals(indexedTable.size(), 2);
+
+    indexedTable.upsert(getRecord(new Object[]{"c", 3, 30d, 10d, 300d}));
+    indexedTable.upsert(getRecord(new Object[]{"d", 4, 40d, 10d, 400d}));
+    indexedTable.upsert(getRecord(new Object[]{"e", 5, 50d, 10d, 500d}));
+    Assert.assertEquals(indexedTable.size(), 5);
+
+    indexedTable.upsert(getRecord(new Object[]{"c", 3, 30d, 10d, 300d}));
+    indexedTable.upsert(getRecord(new Object[]{"d", 4, 40d, 10d, 400d}));
+    indexedTable.upsert(getRecord(new Object[]{"e", 5, 50d, 10d, 500d}));
+    Assert.assertEquals(indexedTable.size(), 5);
+
+    // No resizing / trimming should be done yet
+    indexedTable.upsert(getRecord(new Object[]{"f", 6, 60d, 10d, 600d}));
+    indexedTable.upsert(getRecord(new Object[]{"g", 7, 70d, 10d, 700d}));
+    Assert.assertEquals(indexedTable.size(), 7);
+
+    // Insert 3 more records - this should reach the trim threshold and trigger trimming
+    indexedTable.upsert(getRecord(new Object[]{"h", 8, 80d, 10d, 800d}));
+    indexedTable.upsert(getRecord(new Object[]{"i", 9, 90d, 10d, 900d}));
+    indexedTable.upsert(getRecord(new Object[]{"j", 10, 100d, 20d, 1000d}));
+    Assert.assertEquals(indexedTable.size(), 5);
+
+    indexedTable.finish(false);
+    // The 5 keys with the largest aggregated values for SUM(m1) should be evicted
+    checkEvicted(indexedTable, "a", "c", "d", "e", "j");
+  }
+
+  @Test
+  public void testAdaptiveTrimThresholdMaxValue() {
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
+        "SELECT SUM(m1), MAX(m2) FROM testTable GROUP BY d1, d2, d3 ORDER BY SUM(m1)");
+    DataSchema dataSchema = new DataSchema(new String[]{"d1", "d2", "d3", "sum(m1)", "max(m2)"}, new ColumnDataType[]{
+        ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE
+    });
+    IndexedTable indexedTable = new SimpleIndexedTable(dataSchema, queryContext, 1234567890, 1234567890, 1234567890);
+    // If 2 * trimSize exceeds the max integer value, the trim threshold should be bounded to the max integer value
+    Assert.assertEquals(indexedTable._trimThreshold, Integer.MAX_VALUE);
   }
 }
