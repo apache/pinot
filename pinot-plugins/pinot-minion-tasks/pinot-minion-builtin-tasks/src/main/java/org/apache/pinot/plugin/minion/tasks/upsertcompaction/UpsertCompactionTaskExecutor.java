@@ -82,15 +82,18 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
     String originalSegmentCrcFromTaskGenerator = configs.get(MinionConstants.ORIGINAL_SEGMENT_CRC_KEY);
     String crcFromDeepStorageSegment = segmentMetadata.getCrc();
-    RoaringBitmap validDocIds =
-        MinionTaskUtils.getValidDocIdFromServerMatchingCrc(tableNameWithType, segmentName, validDocIdsTypeStr,
-            MINION_CONTEXT, originalSegmentCrcFromTaskGenerator, crcFromDeepStorageSegment);
+    RoaringBitmap validDocIds = originalSegmentCrcFromTaskGenerator.equals(crcFromDeepStorageSegment)
+        ? MinionTaskUtils.getValidDocIdFromServerMatchingCrc(tableNameWithType, segmentName, validDocIdsTypeStr,
+        MINION_CONTEXT, originalSegmentCrcFromTaskGenerator) : null;
     if (validDocIds == null) {
       // no valid crc match found or no validDocIds obtained from all servers
       // error out the task instead of silently failing so that we can track it via task-error metrics
-      LOGGER.error("No validDocIds found from all servers. They either failed to download or did not match crc from"
-          + "segment copy obtained from deepstore / servers.");
-      throw new IllegalStateException("No valid validDocIds found from all servers.");
+      String message = String.format("No validDocIds found from all servers. They either failed to download "
+              + "or did not match crc fromsegment copy obtained from deepstore / servers. "
+              + "OriginalSegmentCrcFromTaskGenerator: %s, crcFromDeepStorageSegment: %s",
+          originalSegmentCrcFromTaskGenerator, crcFromDeepStorageSegment);
+      LOGGER.error(message);
+      throw new IllegalStateException(message);
     }
     if (validDocIds.isEmpty()) {
       // prevents empty segment generation

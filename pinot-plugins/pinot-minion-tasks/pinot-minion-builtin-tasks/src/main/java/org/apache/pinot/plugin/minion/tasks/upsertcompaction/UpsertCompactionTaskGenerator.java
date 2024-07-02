@@ -76,7 +76,7 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
       // check if segment is part of completed segments
       if (!completedSegmentsMap.containsKey(segmentName)) {
         LOGGER.warn("Segment {} is not found in the completed segments list, skipping it for compaction", segmentName);
-        break;
+        continue;
       }
       SegmentZKMetadata segment = completedSegmentsMap.get(segmentName);
       for (ValidDocIdsMetadataInfo validDocIdsMetadata : validDocIdsMetadataInfoMap.get(segmentName)) {

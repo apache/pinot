@@ -186,12 +186,11 @@ public class MinionTaskUtils {
 
   /**
    * Returns the validDocID bitmap from the server whose local segment crc matches both crc of ZK metadata and
-   * deepstore copy.
+   * deepstore copy (expectedCrc).
    */
   @Nullable
   public static RoaringBitmap getValidDocIdFromServerMatchingCrc(String tableNameWithType, String segmentName,
-      String validDocIdsType, MinionContext minionContext, String originalSegmentCrcFromTaskGenerator,
-      String crcFromDeepStorageSegment) {
+      String validDocIdsType, MinionContext minionContext, String expectedCrc) {
     String clusterName = minionContext.getHelixManager().getClusterName();
     HelixAdmin helixAdmin = minionContext.getHelixManager().getClusterManagmentTool();
     RoaringBitmap validDocIds = null;
@@ -222,22 +221,12 @@ public class MinionTaskUtils {
       // `BaseSingleSegmentConversionExecutor.executeTask()` already checks for the crc from the task generator
       // against the crc from the current segment zk metadata, so we don't need to check that here.
       String crcFromValidDocIdsBitmap = validDocIdsBitmapResponse.getSegmentCrc();
-      if (!originalSegmentCrcFromTaskGenerator.equals(crcFromValidDocIdsBitmap)) {
+      if (!expectedCrc.equals(crcFromValidDocIdsBitmap)) {
         // In this scenario, we are hitting the other replica of the segment which did not commit to ZK or deepstore.
         // We will skip processing this bitmap to query other server to confirm if there is a valid matching CRC.
         String message = String.format("CRC mismatch for segment: %s, expected value based on task generator: %s, "
-                + "actual crc from validDocIdsBitmapResponse from endpoint %s: %s", segmentName,
-            originalSegmentCrcFromTaskGenerator, endpoint, crcFromValidDocIdsBitmap);
-        LOGGER.warn(message);
-        continue;
-      }
-      if (!crcFromValidDocIdsBitmap.equals(crcFromDeepStorageSegment)) {
-        // Deepstore copies might not always have the same CRC as that from the server we queried for ValidDocIdsBitmap
-        // It can happen due to CRC mismatch issues due to replicas diverging, lucene index issues.
-        String message = String.format(
-            "CRC mismatch for segment: %s, " + "expected crc from validDocIdsBitmapResponse from endpoint %s: %s, "
-                + "actual crc based on deepstore / server metadata copy: %s", segmentName, endpoint,
-            crcFromValidDocIdsBitmap, crcFromDeepStorageSegment);
+                + "actual crc from validDocIdsBitmapResponse from endpoint %s: %s", segmentName, expectedCrc, endpoint,
+            crcFromValidDocIdsBitmap);
         LOGGER.warn(message);
         continue;
       }
