@@ -16,31 +16,20 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.realtime.impl.nullvalue;
+package org.apache.pinot.spi.utils;
 
 import org.apache.commons.rng.UniformRandomProvider;
-import org.apache.pinot.spi.utils.RandomNumberUtils;
-import org.testng.Assert;
-import org.testng.annotations.Test;
+import org.apache.commons.rng.simple.RandomSource;
 
+public class RandomNumberUtils {
+  private RandomNumberUtils() {
+  }
 
-public class MutableNullValueVectorTest {
-  private static final UniformRandomProvider RANDOM = RandomNumberUtils.getRandomProvider();
-  private static final int NUM_DOCS = 100;
-  private static final int MAX_DOC_ID = 10000;
+  public static UniformRandomProvider getRandomProvider() {
+    return RandomSource.JDK.create();
+  }
 
-  private final MutableNullValueVector _nullValueVector = new MutableNullValueVector();
-
-  @Test
-  public void testMutableNullValueVector() {
-    int[] docIds = new int[NUM_DOCS];
-    for (int i = 0; i < NUM_DOCS; i++) {
-      int docId = RANDOM.nextInt(MAX_DOC_ID);
-      _nullValueVector.setNull(docId);
-      docIds[i] = docId;
-    }
-    for (int i = 0; i < NUM_DOCS; i++) {
-      Assert.assertTrue(_nullValueVector.isNull(docIds[i]));
-    }
+  public static UniformRandomProvider getRandomProvider(Object seed) {
+    return RandomSource.JDK.create(seed);
   }
 }

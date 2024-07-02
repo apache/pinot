@@ -25,9 +25,9 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Random;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.rng.UniformRandomProvider;
 import org.apache.pinot.segment.local.realtime.impl.geospatial.MutableH3Index;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.geospatial.OffHeapH3IndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.geospatial.OnHeapH3IndexCreator;
@@ -44,6 +44,7 @@ import org.apache.pinot.segment.spi.index.reader.H3IndexReader;
 import org.apache.pinot.segment.spi.index.reader.H3IndexResolution;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.utils.RandomNumberUtils;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Point;
 import org.testng.Assert;
@@ -58,7 +59,7 @@ import static org.testng.Assert.assertTrue;
 
 public class H3IndexTest {
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "H3IndexCreatorTest");
-  private static final Random RANDOM = new Random();
+  private static final UniformRandomProvider RANDOM = RandomNumberUtils.getRandomProvider();
 
   @BeforeClass
   public void setUp()

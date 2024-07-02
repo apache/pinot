@@ -25,9 +25,9 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.commons.rng.UniformRandomProvider;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexReaderFactory;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
@@ -52,6 +52,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.RandomNumberUtils;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.StringUtil;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
@@ -83,7 +84,7 @@ public class RawIndexCreatorTest {
   private static final String STRING_MV_COLUMN = "stringMVColumn";
   private static final String BYTES_MV_COLUMN = "bytesMVColumn";
 
-  Random _random;
+  UniformRandomProvider _random;
   private RecordReader _recordReader;
   SegmentDirectory _segmentDirectory;
   private SegmentDirectory.Reader _segmentReader;
@@ -109,7 +110,7 @@ public class RawIndexCreatorTest {
 
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("test").build();
 
-    _random = new Random(System.nanoTime());
+    _random = RandomNumberUtils.getRandomProvider(System.nanoTime());
     _recordReader = buildIndex(tableConfig, schema);
   }
 
@@ -332,7 +333,7 @@ public class RawIndexCreatorTest {
    * @param dataType Data type for which to generate the random value
    * @return Random value for the data type
    */
-  public static Object getRandomValue(Random random, DataType dataType) {
+  public static Object getRandomValue(UniformRandomProvider random, DataType dataType) {
     switch (dataType) {
       case INT:
         return random.nextInt();

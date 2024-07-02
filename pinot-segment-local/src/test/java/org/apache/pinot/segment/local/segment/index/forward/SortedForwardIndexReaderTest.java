@@ -19,10 +19,11 @@
 package org.apache.pinot.segment.local.segment.index.forward;
 
 import java.io.File;
-import java.util.Random;
+import org.apache.commons.rng.UniformRandomProvider;
 import org.apache.pinot.segment.local.io.writer.impl.FixedByteSingleValueMultiColWriter;
 import org.apache.pinot.segment.local.segment.index.readers.sorted.SortedIndexReaderImpl;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.spi.utils.RandomNumberUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -40,7 +41,7 @@ public class SortedForwardIndexReaderTest {
     int[] columnSizes = new int[]{4, 4};
     FixedByteSingleValueMultiColWriter writer =
         new FixedByteSingleValueMultiColWriter(file, cardinality, columnSizes.length, columnSizes);
-    Random random = new Random();
+    UniformRandomProvider random = RandomNumberUtils.getRandomProvider();;
     int[] startDocIdArray = new int[cardinality];
     int[] endDocIdArray = new int[cardinality];
     int prevEnd = -1;

@@ -21,10 +21,11 @@ package org.apache.pinot.broker.routing.adaptiveserverselector;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Random;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.commons.rng.UniformRandomProvider;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
+import org.apache.pinot.spi.utils.RandomNumberUtils;
 
 
 /**
@@ -36,11 +37,11 @@ import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsMa
  */
 public class LatencySelector implements AdaptiveServerSelector {
   private final ServerRoutingStatsManager _serverRoutingStatsManager;
-  private final Random _random;
+  private final UniformRandomProvider _random;
 
   public LatencySelector(ServerRoutingStatsManager serverRoutingStatsManager) {
     _serverRoutingStatsManager = serverRoutingStatsManager;
-    _random = new Random();
+    _random = RandomNumberUtils.getRandomProvider();
   }
 
   @Override

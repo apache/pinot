@@ -20,7 +20,7 @@
 package org.apache.pinot.controller.recommender.data.generator;
 
 import java.util.List;
-import java.util.Random;
+import org.apache.commons.rng.UniformRandomProvider;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.testng.annotations.Test;
 
@@ -34,7 +34,7 @@ public class NumberGeneratorTest {
 
   @Test
   public void testNext() {
-    Random random = mock(Random.class);
+    UniformRandomProvider random = mock(UniformRandomProvider.class);
     when(random.nextInt(anyInt())).thenReturn(10); // initial value
     int cardinality = 5;
     double numValuesPerEntry = 1.0;
@@ -68,7 +68,7 @@ public class NumberGeneratorTest {
 
   @Test
   public void testNextMultiValued() {
-    Random random = mock(Random.class);
+    UniformRandomProvider random = mock(UniformRandomProvider.class);
     when(random.nextInt(anyInt())).thenReturn(10); // initial value
     when(random.nextDouble()).thenReturn(0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9); // for MV generation
     int cardinality = 5;

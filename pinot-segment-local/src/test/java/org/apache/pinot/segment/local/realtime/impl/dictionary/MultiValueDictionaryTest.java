@@ -19,11 +19,12 @@
 package org.apache.pinot.segment.local.realtime.impl.dictionary;
 
 import java.nio.charset.StandardCharsets;
-import java.util.Random;
+import org.apache.commons.rng.UniformRandomProvider;
 import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.segment.local.realtime.impl.forward.FixedByteMVMutableForwardIndex;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.utils.RandomNumberUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -57,7 +58,7 @@ public class MultiValueDictionaryTest {
             NROWS / 3, Integer.BYTES, new DirectMemoryManager("test"), "indexer",
             true, FieldSpec.DataType.INT)) {
       // Insert rows into the indexer and dictionary
-      Random random = new Random(seed);
+      UniformRandomProvider random = RandomNumberUtils.getRandomProvider(seed);
       for (int row = 0; row < NROWS; row++) {
         int numValues = Math.abs(random.nextInt()) % MAX_N_VALUES;
         Long[] values = new Long[numValues];
@@ -70,7 +71,7 @@ public class MultiValueDictionaryTest {
       }
 
       // Read back rows and make sure that the values are good.
-      random = new Random(seed);
+      random = RandomNumberUtils.getRandomProvider(seed);
       int[] dictIds = new int[MAX_N_VALUES];
       for (int row = 0; row < NROWS; row++) {
         int numValues = indexer.getDictIdMV(row, dictIds);
@@ -93,7 +94,7 @@ public class MultiValueDictionaryTest {
             NROWS / 3, Integer.BYTES, new DirectMemoryManager("test"), "indexer",
             false, FieldSpec.DataType.INT)) {
       // Insert rows into the indexer
-      Random random = new Random(seed);
+      UniformRandomProvider random = RandomNumberUtils.getRandomProvider(seed);
       for (int row = 0; row < NROWS; row++) {
         int numValues = Math.abs(random.nextInt()) % MAX_N_VALUES;
         int[] values = new int[numValues];
@@ -104,7 +105,7 @@ public class MultiValueDictionaryTest {
       }
 
       // Read back rows and make sure that the values are good.
-      random = new Random(seed);
+      random = RandomNumberUtils.getRandomProvider(seed);
       int[] intValues = new int[MAX_N_VALUES];
       for (int row = 0; row < NROWS; row++) {
         int numValues = indexer.getIntMV(row, intValues);
@@ -126,7 +127,7 @@ public class MultiValueDictionaryTest {
         NROWS / 3, Long.BYTES, new DirectMemoryManager("test"), "indexer",
         false, FieldSpec.DataType.LONG)) {
       // Insert rows into the indexer
-      Random random = new Random(seed);
+      UniformRandomProvider random = RandomNumberUtils.getRandomProvider(seed);
       for (int row = 0; row < NROWS; row++) {
         int numValues = Math.abs(random.nextInt()) % MAX_N_VALUES;
         long[] values = new long[numValues];
@@ -137,7 +138,7 @@ public class MultiValueDictionaryTest {
       }
 
       // Read back rows and make sure that the values are good.
-      random = new Random(seed);
+      random = RandomNumberUtils.getRandomProvider(seed);
       long[] longValues = new long[MAX_N_VALUES];
       for (int row = 0; row < NROWS; row++) {
         int numValues = indexer.getLongMV(row, longValues);
@@ -159,7 +160,7 @@ public class MultiValueDictionaryTest {
         NROWS / 3, Float.BYTES, new DirectMemoryManager("test"), "indexer",
         false, FieldSpec.DataType.FLOAT)) {
       // Insert rows into the indexer
-      Random random = new Random(seed);
+      UniformRandomProvider random = RandomNumberUtils.getRandomProvider(seed);
       for (int row = 0; row < NROWS; row++) {
         int numValues = Math.abs(random.nextInt()) % MAX_N_VALUES;
         float[] values = new float[numValues];
@@ -170,7 +171,7 @@ public class MultiValueDictionaryTest {
       }
 
       // Read back rows and make sure that the values are good.
-      random = new Random(seed);
+      random = RandomNumberUtils.getRandomProvider(seed);
       float[] floatValues = new float[MAX_N_VALUES];
       for (int row = 0; row < NROWS; row++) {
         int numValues = indexer.getFloatMV(row, floatValues);
@@ -192,7 +193,7 @@ public class MultiValueDictionaryTest {
         NROWS / 3, Double.BYTES, new DirectMemoryManager("test"), "indexer",
         false, FieldSpec.DataType.DOUBLE)) {
       // Insert rows into the indexer
-      Random random = new Random(seed);
+      UniformRandomProvider random = RandomNumberUtils.getRandomProvider(seed);
       for (int row = 0; row < NROWS; row++) {
         int numValues = Math.abs(random.nextInt()) % MAX_N_VALUES;
         double[] values = new double[numValues];
@@ -203,7 +204,7 @@ public class MultiValueDictionaryTest {
       }
 
       // Read back rows and make sure that the values are good.
-      random = new Random(seed);
+      random = RandomNumberUtils.getRandomProvider(seed);
       double[] doubleValues = new double[MAX_N_VALUES];
       for (int row = 0; row < NROWS; row++) {
         int numValues = indexer.getDoubleMV(row, doubleValues);
@@ -225,7 +226,7 @@ public class MultiValueDictionaryTest {
         NROWS / 3, 24, new DirectMemoryManager("test"), "indexer",
         false, FieldSpec.DataType.STRING)) {
       // Insert rows into the indexer
-      Random random = new Random(seed);
+      UniformRandomProvider random = RandomNumberUtils.getRandomProvider(seed);
       for (int row = 0; row < NROWS; row++) {
         int numValues = Math.abs(random.nextInt()) % MAX_N_VALUES;
         String[] values = new String[numValues];
@@ -237,7 +238,7 @@ public class MultiValueDictionaryTest {
       }
 
       // Read back rows and make sure that the values are good.
-      random = new Random(seed);
+      random = RandomNumberUtils.getRandomProvider(seed);
       String[] stringValues = new String[MAX_N_VALUES];
       for (int row = 0; row < NROWS; row++) {
         final int curRow = row;
@@ -255,7 +256,7 @@ public class MultiValueDictionaryTest {
         NROWS / 3, 24, new DirectMemoryManager("test"), "indexer",
         false, FieldSpec.DataType.BYTES)) {
       // Insert rows into the indexer
-      Random random = new Random(seed);
+      UniformRandomProvider random = RandomNumberUtils.getRandomProvider(seed);
       for (int row = 0; row < NROWS; row++) {
         int numValues = Math.abs(random.nextInt()) % MAX_N_VALUES;
         byte[][] values = new byte[numValues][];
@@ -267,7 +268,7 @@ public class MultiValueDictionaryTest {
       }
 
       // Read back rows and make sure that the values are good.
-      random = new Random(seed);
+      random = RandomNumberUtils.getRandomProvider(seed);
       byte[][] byteValues = new byte[MAX_N_VALUES][];
       for (int row = 0; row < NROWS; row++) {
         final int curRow = row;

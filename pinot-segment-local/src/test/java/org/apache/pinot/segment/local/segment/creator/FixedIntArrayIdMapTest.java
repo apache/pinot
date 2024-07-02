@@ -21,11 +21,12 @@ package org.apache.pinot.segment.local.segment.creator;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 import java.io.IOException;
-import java.util.Random;
+import org.apache.commons.rng.UniformRandomProvider;
 import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.segment.local.utils.FixedIntArrayOffHeapIdMap;
 import org.apache.pinot.segment.local.utils.IdMap;
 import org.apache.pinot.spi.utils.FixedIntArray;
+import org.apache.pinot.spi.utils.RandomNumberUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -40,7 +41,7 @@ public class FixedIntArrayIdMapTest {
   private static final int NUM_COLUMNS = 3;
   private static final int INITIAL_CARDINALITY = 23;
   private static final int ON_HEAP_CACHE_SIZE = 10;
-  private static final Random RANDOM = new Random();
+  private static final UniformRandomProvider RANDOM = RandomNumberUtils.getRandomProvider();
 
   private DirectMemoryManager _memoryManager;
   private IdMap<FixedIntArray> _idMap;

@@ -25,17 +25,18 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Random;
 import java.util.SplittableRandom;
 import java.util.UUID;
 import java.util.stream.IntStream;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.rng.UniformRandomProvider;
 import org.apache.pinot.segment.local.segment.index.readers.forward.ChunkReaderContext;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.RandomNumberUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
@@ -146,7 +147,7 @@ public class VarByteChunkSVForwardIndexWriterTest {
 
   private static List<String[]> generateStringArrays(int count, int[] lengths, int maxElementCount) {
     Iterator<String> strings = generateStrings(lengths[0], lengths[1]);
-    Random random = new Random();
+    UniformRandomProvider random = RandomNumberUtils.getRandomProvider();
     List<String[]> stringArrays = new ArrayList<>(count);
     for (int i = 0; i < count; i++) {
       String[] array = new String[random.nextInt(maxElementCount)];

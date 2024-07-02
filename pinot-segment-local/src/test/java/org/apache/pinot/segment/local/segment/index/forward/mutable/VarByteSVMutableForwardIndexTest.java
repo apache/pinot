@@ -19,12 +19,13 @@
 package org.apache.pinot.segment.local.segment.index.forward.mutable;
 
 import java.io.IOException;
-import java.util.Random;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.commons.rng.UniformRandomProvider;
 import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.segment.local.realtime.impl.forward.VarByteSVMutableForwardIndex;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.RandomNumberUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -57,7 +58,7 @@ public class VarByteSVMutableForwardIndexTest {
     try (VarByteSVMutableForwardIndex readerWriter = new VarByteSVMutableForwardIndex(DataType.STRING, _memoryManager,
         "StringColumn", initialCapacity, estimatedAvgStringLength)) {
       int rows = 1000;
-      Random random = new Random();
+      UniformRandomProvider random = RandomNumberUtils.getRandomProvider();
       String[] data = new String[rows];
 
       for (int i = 0; i < rows; i++) {
@@ -81,7 +82,7 @@ public class VarByteSVMutableForwardIndexTest {
     try (VarByteSVMutableForwardIndex readerWriter = new VarByteSVMutableForwardIndex(DataType.STRING, _memoryManager,
         "StringColumn", initialCapacity, estimatedAvgStringLength)) {
       int rows = 1000;
-      Random random = new Random();
+      UniformRandomProvider random = RandomNumberUtils.getRandomProvider();
       String[] data = new String[rows];
 
       for (int i = 0; i < rows; i++) {

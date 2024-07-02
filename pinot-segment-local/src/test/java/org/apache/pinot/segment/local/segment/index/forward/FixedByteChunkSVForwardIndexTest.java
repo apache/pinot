@@ -21,9 +21,9 @@ package org.apache.pinot.segment.local.segment.index.forward;
 import java.io.File;
 import java.net.URL;
 import java.util.Arrays;
-import java.util.Random;
 import java.util.stream.IntStream;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.rng.UniformRandomProvider;
 import org.apache.pinot.segment.local.io.writer.impl.FixedByteChunkForwardIndexWriter;
 import org.apache.pinot.segment.local.segment.index.readers.forward.ChunkReaderContext;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedByteChunkSVForwardIndexReader;
@@ -32,6 +32,7 @@ import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.RandomNumberUtils;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -50,7 +51,7 @@ public class FixedByteChunkSVForwardIndexTest {
   private static final int NUM_VALUES = 10009;
   private static final int NUM_DOCS_PER_CHUNK = 5003;
   private static final String TEST_FILE = System.getProperty("java.io.tmpdir") + File.separator + "FixedByteSVRTest";
-  private static final Random RANDOM = new Random();
+  private static final UniformRandomProvider RANDOM = RandomNumberUtils.getRandomProvider();
 
   @DataProvider(name = "combinations")
   public static Object[][] combinations() {

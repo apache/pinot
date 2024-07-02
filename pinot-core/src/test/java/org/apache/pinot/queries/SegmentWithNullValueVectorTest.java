@@ -27,11 +27,11 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.rng.UniformRandomProvider;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.request.InstanceRequest;
@@ -61,6 +61,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.RandomNumberUtils;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -86,7 +87,7 @@ public class SegmentWithNullValueVectorTest {
   private static final int NUM_ROWS = 10001;
   private static final long LONG_VALUE_THRESHOLD = 100;
 
-  private Random _random;
+  private UniformRandomProvider _random;
   private Schema _schema;
   private ImmutableSegment _segment;
 
@@ -128,7 +129,7 @@ public class SegmentWithNullValueVectorTest {
 
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setNullHandlingEnabled(true).build();
-    _random = new Random(System.nanoTime());
+    _random = RandomNumberUtils.getRandomProvider(System.nanoTime());
     buildIndex(tableConfig, _schema);
 
     _segment =

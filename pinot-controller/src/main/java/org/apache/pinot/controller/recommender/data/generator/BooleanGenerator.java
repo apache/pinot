@@ -19,7 +19,8 @@
 package org.apache.pinot.controller.recommender.data.generator;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.util.Random;
+import org.apache.commons.rng.UniformRandomProvider;
+import org.apache.pinot.spi.utils.RandomNumberUtils;
 
 
 public class BooleanGenerator implements Generator {
@@ -27,14 +28,14 @@ public class BooleanGenerator implements Generator {
   private static final double DEFAULT_NUMBER_OF_VALUES_PER_ENTRY = 1;
 
   private final double _numberOfValuesPerEntry;
-  private final Random _random;
+  private final UniformRandomProvider _random;
 
   public BooleanGenerator(Double numberOfValuesPerEntry) {
-    this(numberOfValuesPerEntry, new Random(System.currentTimeMillis()));
+    this(numberOfValuesPerEntry, RandomNumberUtils.getRandomProvider(System.currentTimeMillis()));
   }
 
   @VisibleForTesting
-  BooleanGenerator(Double numberOfValuesPerEntry, Random random) {
+  BooleanGenerator(Double numberOfValuesPerEntry, UniformRandomProvider random) {
     _numberOfValuesPerEntry =
         numberOfValuesPerEntry != null ? numberOfValuesPerEntry : DEFAULT_NUMBER_OF_VALUES_PER_ENTRY;
     _random = random;

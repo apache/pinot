@@ -21,12 +21,13 @@ package org.apache.pinot.segment.local.realtime.impl.dictionary;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import org.apache.commons.rng.UniformRandomProvider;
 import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
+import org.apache.pinot.spi.utils.RandomNumberUtils;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -39,7 +40,7 @@ public class OffHeapMutableBytesStoreTest {
   private static final int NUM_VALUES = 100_000;
   private static final int MAX_NUM_BYTES_PER_VALUE = 512;
   private static final long RANDOM_SEED = System.currentTimeMillis();
-  private static final Random RANDOM = new Random(RANDOM_SEED);
+  private static final UniformRandomProvider RANDOM = RandomNumberUtils.getRandomProvider(RANDOM_SEED);
 
   private final PinotDataBufferMemoryManager _memoryManager = new DirectMemoryManager("testSegment");
   private final byte[][] _values = new byte[NUM_VALUES][];

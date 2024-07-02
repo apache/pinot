@@ -20,8 +20,9 @@ package org.apache.pinot.controller.recommender.data.generator;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import java.util.Random;
+import org.apache.commons.rng.UniformRandomProvider;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.RandomNumberUtils;
 
 
 /**
@@ -36,23 +37,23 @@ public class NumberGenerator implements Generator {
   private final double _numberOfValuesPerEntry;
 
   private final int _initialValue;
-  private final Random _random;
+  private final UniformRandomProvider _random;
 
   private int _counter = 0;
 
   public NumberGenerator(Integer cardinality, DataType type, Double numberOfValuesPerEntry) {
-    this(cardinality, type, numberOfValuesPerEntry, new Random(System.currentTimeMillis()));
+    this(cardinality, type, numberOfValuesPerEntry, RandomNumberUtils.getRandomProvider(System.currentTimeMillis()));
   }
 
   @VisibleForTesting
-  NumberGenerator(Integer cardinality, DataType type, Double numberOfValuesPerEntry, Random random) {
+  NumberGenerator(Integer cardinality, DataType type, Double numberOfValuesPerEntry, UniformRandomProvider random) {
     _cardinality = cardinality;
     _numberOfValuesPerEntry =
         numberOfValuesPerEntry != null ? numberOfValuesPerEntry : DEFAULT_NUMBER_OF_VALUES_PER_ENTRY;
     Preconditions.checkState(_numberOfValuesPerEntry >= 1,
         "Number of values per entry (should be >= 1): " + _numberOfValuesPerEntry);
     _columnType = type;
-    _random = random;
+    _random = RandomNumberUtils.getRandomProvider();
     _initialValue = random.nextInt(100);
   }
 

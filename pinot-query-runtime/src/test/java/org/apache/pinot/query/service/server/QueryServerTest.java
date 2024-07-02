@@ -27,8 +27,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Random;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.rng.UniformRandomProvider;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.proto.Worker;
@@ -48,6 +48,7 @@ import org.apache.pinot.query.runtime.QueryRunner;
 import org.apache.pinot.query.testutils.QueryTestUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.EqualityUtils;
+import org.apache.pinot.spi.utils.RandomNumberUtils;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -60,7 +61,7 @@ import static org.testng.Assert.assertTrue;
 
 
 public class QueryServerTest extends QueryTestSet {
-  private static final Random RANDOM_REQUEST_ID_GEN = new Random();
+  private static final UniformRandomProvider RANDOM_REQUEST_ID_GEN = RandomNumberUtils.getRandomProvider();
   private static final int QUERY_SERVER_COUNT = 2;
   private static final String KEY_OF_SERVER_INSTANCE_HOST = "pinot.query.runner.server.hostname";
   private static final String KEY_OF_SERVER_INSTANCE_PORT = "pinot.query.runner.server.port";

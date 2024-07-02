@@ -22,9 +22,10 @@ import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.RandomAccessFile;
-import java.util.Random;
+import org.apache.commons.rng.UniformRandomProvider;
 import org.apache.pinot.segment.local.io.reader.impl.FixedByteSingleValueMultiColReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.spi.utils.RandomNumberUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -42,7 +43,7 @@ public class FixedByteWidthRowColDataFileReaderTest {
 
     DataOutputStream dos = new DataOutputStream(new FileOutputStream(f));
     int[] data = new int[100];
-    Random r = new Random();
+    UniformRandomProvider r = RandomNumberUtils.getRandomProvider();
     for (int i = 0; i < data.length; i++) {
       data[i] = r.nextInt();
       dos.writeInt(data[i]);
@@ -74,7 +75,7 @@ public class FixedByteWidthRowColDataFileReaderTest {
     int numRows = 100;
     int numCols = 2;
     int[][] colData = new int[numRows][numCols];
-    Random r = new Random();
+    UniformRandomProvider r = RandomNumberUtils.getRandomProvider();
 
     for (int i = 0; i < numRows; i++) {
       colData[i] = new int[numCols];

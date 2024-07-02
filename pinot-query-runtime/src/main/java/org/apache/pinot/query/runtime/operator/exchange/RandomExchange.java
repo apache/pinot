@@ -20,11 +20,12 @@ package org.apache.pinot.query.runtime.operator.exchange;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.util.List;
-import java.util.Random;
 import java.util.function.IntFunction;
+import org.apache.commons.rng.UniformRandomProvider;
 import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.runtime.blocks.BlockSplitter;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.spi.utils.RandomNumberUtils;
 
 
 /**
@@ -32,7 +33,7 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
  * is not round-robin, but rather truly random block distribution).
  */
 class RandomExchange extends BlockExchange {
-  private static final Random RANDOM = new Random();
+  private static final UniformRandomProvider RANDOM = RandomNumberUtils.getRandomProvider();
 
   private final IntFunction<Integer> _rand;
 

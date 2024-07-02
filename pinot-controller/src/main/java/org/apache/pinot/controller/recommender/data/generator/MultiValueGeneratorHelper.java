@@ -21,8 +21,8 @@ package org.apache.pinot.controller.recommender.data.generator;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
 import java.util.function.Supplier;
+import org.apache.commons.rng.UniformRandomProvider;
 
 
 /**
@@ -40,7 +40,7 @@ public class MultiValueGeneratorHelper {
    * @param nextItemFunc function to get the next random item
    * @return
    */
-  public static List<Object> generateMultiValueEntries(double numberOfValuesPerEntry, Random rand,
+  public static List<Object> generateMultiValueEntries(double numberOfValuesPerEntry, UniformRandomProvider rand,
       Supplier<Object> nextItemFunc) {
     List<Object> entries = new ArrayList<>();
     int i = 0;

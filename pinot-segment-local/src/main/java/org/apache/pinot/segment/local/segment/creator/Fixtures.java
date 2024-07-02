@@ -20,11 +20,12 @@
 package org.apache.pinot.segment.local.segment.creator;
 
 import com.google.common.collect.ImmutableList;
-import java.util.Random;
+import org.apache.commons.rng.UniformRandomProvider;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.RandomNumberUtils;
 
 
 public class Fixtures {
@@ -110,7 +111,7 @@ public class Fixtures {
   }
 
   public static GenericRow createSingleRow(long randomSeed) {
-    Random rand = new Random(randomSeed);
+    UniformRandomProvider rand = RandomNumberUtils.getRandomProvider(randomSeed);
     int colValue = rand.nextInt(Integer.MAX_VALUE);
     GenericRow retVal = new GenericRow();
     retVal.putValue("m", colValue);
@@ -121,7 +122,7 @@ public class Fixtures {
   }
 
   public static GenericRow createInvalidSingleRow(long randomSeed) {
-    Random rand = new Random(randomSeed);
+    UniformRandomProvider rand = RandomNumberUtils.getRandomProvider(randomSeed);
     int colValue = rand.nextInt(Integer.MAX_VALUE);
     GenericRow retVal = new GenericRow();
     retVal.putValue("m", colValue + "_d_" + colValue);
@@ -132,7 +133,7 @@ public class Fixtures {
   }
 
   public static GenericRow createMultipleRow(long randomSeed) {
-    Random rand = new Random(randomSeed);
+    UniformRandomProvider rand = RandomNumberUtils.getRandomProvider(randomSeed);
     GenericRow firstRow = createSingleRow(randomSeed);
     GenericRow secondRow = createSingleRow(rand.nextInt(Integer.MAX_VALUE));
     GenericRow thirdRow = createSingleRow(rand.nextInt(Integer.MAX_VALUE));
@@ -142,7 +143,7 @@ public class Fixtures {
   }
 
   public static GenericRow createMultipleRowPartialFailure(long randomSeed) {
-    Random rand = new Random(randomSeed);
+    UniformRandomProvider rand = RandomNumberUtils.getRandomProvider(randomSeed);
     GenericRow firstRow = createSingleRow(randomSeed);
     GenericRow secondRow = createInvalidSingleRow(rand.nextInt(Integer.MAX_VALUE));
     GenericRow thirdRow = createSingleRow(rand.nextInt(Integer.MAX_VALUE));

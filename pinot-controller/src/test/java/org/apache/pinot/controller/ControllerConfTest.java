@@ -22,9 +22,10 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.commons.rng.UniformRandomProvider;
+import org.apache.pinot.spi.utils.RandomNumberUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -56,7 +57,7 @@ public class ControllerConfTest {
           SEGMENT_RELOCATOR_FREQUENCY_PERIOD, SEGMENT_LEVEL_VALIDATION_INTERVAL_PERIOD,
           STATUS_CHECKER_WAIT_FOR_PUSH_TIME_PERIOD);
 
-  private static final Random RAND = new Random();
+  private static final UniformRandomProvider RAND = RandomNumberUtils.getRandomProvider();
 
   /**
    * When config contains: 1. Both deprecated config and the corresponding new config. 2. All new

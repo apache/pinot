@@ -20,12 +20,13 @@ package org.apache.pinot.segment.local.segment.index.forward;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.Random;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.rng.UniformRandomProvider;
 import org.apache.pinot.segment.local.io.writer.impl.FixedBitMVEntryDictForwardIndexWriter;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBitMVEntryDictForwardIndexReader;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.spi.utils.RandomNumberUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -39,7 +40,7 @@ public class FixedBitMVEntryDictForwardIndexTest {
       new File(TEMP_DIR, "testColumn" + V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION);
   private static final int NUM_DOCS = 1000;
   private static final int MAX_NUM_VALUES_PER_MV_ENTRY = 3;
-  private static final Random RANDOM = new Random();
+  private static final UniformRandomProvider RANDOM = RandomNumberUtils.getRandomProvider();
 
   @BeforeClass
   public void setUp()

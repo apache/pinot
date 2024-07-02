@@ -27,11 +27,11 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Random;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.rng.UniformRandomProvider;
 import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
 import org.apache.pinot.segment.local.aggregator.PercentileTDigestValueAggregator;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
@@ -52,6 +52,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.RandomNumberUtils;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.AfterClass;
@@ -85,7 +86,7 @@ public class SegmentGenerationWithBytesTypeTest {
   private static final String FIXED_BYTES_NO_DICT_COLUMN = "fixedBytesNoDict";
   private static final String VARIABLE_BYTES_COLUMN = "variableBytes";
 
-  private Random _random;
+  private UniformRandomProvider _random;
   private List<GenericRow> _rows;
   private TableConfig _tableConfig;
   private Schema _schema;
@@ -97,7 +98,7 @@ public class SegmentGenerationWithBytesTypeTest {
   @BeforeClass
   public void setUp()
       throws Exception {
-    _random = new Random(System.nanoTime());
+    _random = RandomNumberUtils.getRandomProvider(System.nanoTime());
     _rows = generateRows();
     _tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("test").build();
     _schema = new Schema.SchemaBuilder().setSchemaName("test")

@@ -24,10 +24,11 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
+import org.apache.commons.rng.UniformRandomProvider;
 import org.apache.helix.HelixManager;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
+import org.apache.pinot.spi.utils.RandomNumberUtils;
 import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
@@ -81,12 +82,12 @@ public class ServiceStatusTest {
 
   private static final String CHARS_IN_RANDOM_TABLE_NAME =
       "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-  private static Random _random;
+  private static UniformRandomProvider _random;
 
   @BeforeClass
   public void setUp() {
     long seed = System.currentTimeMillis();
-    _random = new Random(seed);
+    _random = RandomNumberUtils.getRandomProvider(seed);
     // Printing to sysout so that we can re-generate failure cases.
     System.out.println(ServiceStatusTest.class.getSimpleName() + ":Using random number seed " + seed);
   }
@@ -229,7 +230,7 @@ public class ServiceStatusTest {
 
   private void testMultipleResourcesAndPercent(double percentReady) {
     final long now = System.currentTimeMillis();
-    _random = new Random(now);
+    _random = RandomNumberUtils.getRandomProvider(now);
     final String clusterName = "noSuchCluster";
     final List<String> tables = new ArrayList<>();
     final int tableCount = 2500 + _random.nextInt(100);

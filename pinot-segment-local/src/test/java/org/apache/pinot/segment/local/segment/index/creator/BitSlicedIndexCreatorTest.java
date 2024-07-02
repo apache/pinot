@@ -21,11 +21,11 @@ package org.apache.pinot.segment.local.segment.index.creator;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.Random;
 import java.util.function.DoubleSupplier;
 import java.util.function.LongSupplier;
 import java.util.stream.IntStream;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.rng.UniformRandomProvider;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.BitSlicedRangeIndexCreator;
 import org.apache.pinot.segment.local.segment.index.readers.BitSlicedRangeIndexReader;
 import org.apache.pinot.segment.spi.ColumnMetadata;
@@ -33,6 +33,7 @@ import org.apache.pinot.segment.spi.index.metadata.ColumnMetadataImpl;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.utils.RandomNumberUtils;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.annotations.AfterClass;
@@ -373,21 +374,21 @@ public class BitSlicedIndexCreatorTest {
     NORMAL {
       @Override
       public DoubleSupplier createDouble(double... params) {
-        Random random = new Random(SEED);
-        return () -> random.nextGaussian() * params[1] + params[0];
+        UniformRandomProvider random = RandomNumberUtils.getRandomProvider(SEED);
+        return () -> random.nextDouble() * params[1] + params[0];
       }
     },
     UNIFORM {
       @Override
       public DoubleSupplier createDouble(double... params) {
-        Random random = new Random(SEED);
+        UniformRandomProvider random = RandomNumberUtils.getRandomProvider(SEED);
         return () -> (params[1] - params[0]) * random.nextDouble() + params[0];
       }
     },
     EXP {
       @Override
       public DoubleSupplier createDouble(double... params) {
-        Random random = new Random(SEED);
+        UniformRandomProvider random = RandomNumberUtils.getRandomProvider(SEED);
         return () -> -(Math.log(random.nextDouble()) / params[0]);
       }
     };

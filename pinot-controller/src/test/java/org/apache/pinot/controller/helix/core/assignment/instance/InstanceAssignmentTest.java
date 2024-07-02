@@ -26,8 +26,8 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Random;
 import java.util.Set;
+import org.apache.commons.rng.UniformRandomProvider;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.log4j.Level;
 import org.apache.log4j.LogManager;
@@ -47,6 +47,7 @@ import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.table.assignment.InstanceReplicaGroupPartitionConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceTagPoolConfig;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.AssignmentStrategy;
+import org.apache.pinot.spi.utils.RandomNumberUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
 
@@ -342,7 +343,7 @@ public class InstanceAssignmentTest {
     System.setOut(o);
     for (int iter = 0; iter < loopCount; iter++) {
       System.out.printf("_____________________________ITERATION:%d________________________________%n", iter);
-      Random random1 = new Random();
+      UniformRandomProvider random1 = RandomNumberUtils.getRandomProvider();
       int numTargetReplicaGroups = random1.nextInt(7) + 1;
       int numExistingReplicaGroups = random1.nextInt(7) + 1;
       int numPreConfiguredInstancesPerReplicaGroup = random1.nextInt(10) + 5;
