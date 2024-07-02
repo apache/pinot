@@ -632,8 +632,9 @@ public class PinotTaskRestletResource {
       Map<String, List<String>> allTaskNames = tableName != null ? _pinotTaskManager.scheduleAllTasksForTable(
           DatabaseUtils.translateTableName(tableName, headers), minionInstanceTag)
           : _pinotTaskManager.scheduleAllTasksForDatabase(database, minionInstanceTag);
-      return allTaskNames.entrySet().stream()
+      Map<String, String> result = allTaskNames.entrySet().stream().filter(entry -> entry.getValue() != null)
           .collect(Collectors.toMap(Map.Entry::getKey, entry -> String.join(",", entry.getValue())));
+      return result.isEmpty() ? null : result;
     }
   }
 
