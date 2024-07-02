@@ -23,11 +23,11 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.TimeUnit;
 import net.jpountz.lz4.LZ4Factory;
-import org.apache.commons.lang3.RandomUtils;
 import org.apache.pinot.segment.local.io.compression.ChunkCompressorFactory;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.ChunkCompressor;
 import org.apache.pinot.segment.spi.compression.ChunkDecompressor;
+import org.apache.pinot.spi.utils.RandomNumberUtils;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -107,7 +107,7 @@ public class BenchmarkNoDictionaryLongCompression {
       //Generate Random Long
       _uncompressedLong = ByteBuffer.allocateDirect(_rowLength * Long.BYTES);
       for (int i = 0; i < _rowLength; i++) {
-        _uncompressedLong.putLong(RandomUtils.nextLong());
+        _uncompressedLong.putLong(RandomNumberUtils.getRandomProvider().nextLong());
       }
       _uncompressedLong.flip();
     }
