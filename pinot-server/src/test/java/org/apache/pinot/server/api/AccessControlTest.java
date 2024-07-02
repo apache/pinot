@@ -78,8 +78,9 @@ public class AccessControlTest {
 
     PinotConfiguration serverConf = new PinotConfiguration();
     String hostname = serverConf.getProperty(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST,
-        serverConf.getProperty(CommonConstants.Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false)
-            ? NetUtils.getHostnameOrAddress() : NetUtils.getHostAddress());
+        serverConf.getProperty(CommonConstants.Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY,
+            CommonConstants.Helix.DEFAULT_SET_INSTANCE_ID_TO_HOSTNAME_KEY) ? NetUtils.getHostnameOrAddress()
+            : NetUtils.getHostAddress());
     int port = serverConf.getProperty(CommonConstants.Helix.KEY_OF_SERVER_NETTY_PORT,
         CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT);
     serverConf.setProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_ID,

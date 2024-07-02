@@ -261,7 +261,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
 
   private void inferHostnameIfNeeded(ControllerConf config) {
     if (config.getControllerHost() == null) {
-      if (config.getProperty(CommonConstants.Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false)) {
+      if (config.getProperty(CommonConstants.Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY,
+          CommonConstants.Helix.DEFAULT_SET_INSTANCE_ID_TO_HOSTNAME_KEY)) {
         final String inferredHostname = NetUtils.getHostnameOrAddress();
         if (inferredHostname != null) {
           config.setControllerHost(inferredHostname);

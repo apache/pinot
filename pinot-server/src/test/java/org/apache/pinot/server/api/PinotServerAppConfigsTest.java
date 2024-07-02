@@ -47,8 +47,9 @@ public class PinotServerAppConfigsTest extends BaseResourceTest {
       throws JsonProcessingException, SocketException, UnknownHostException {
     PinotConfiguration expectedServerConf = new PinotConfiguration();
     String hostname = expectedServerConf.getProperty(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST,
-        expectedServerConf.getProperty(CommonConstants.Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false)
-            ? NetUtils.getHostnameOrAddress() : NetUtils.getHostAddress());
+        expectedServerConf.getProperty(CommonConstants.Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY,
+            CommonConstants.Helix.DEFAULT_SET_INSTANCE_ID_TO_HOSTNAME_KEY) ? NetUtils.getHostnameOrAddress()
+            : NetUtils.getHostAddress());
     int port = expectedServerConf.getProperty(CommonConstants.Helix.KEY_OF_SERVER_NETTY_PORT,
         CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT);
     expectedServerConf.setProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_ID,

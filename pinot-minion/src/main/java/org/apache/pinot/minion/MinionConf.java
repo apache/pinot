@@ -49,8 +49,9 @@ public class MinionConf extends PinotConfiguration {
   public String getHostName()
       throws Exception {
     return getProperty(CommonConstants.Helix.KEY_OF_MINION_HOST,
-        getProperty(CommonConstants.Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false) ? NetUtils
-            .getHostnameOrAddress() : NetUtils.getHostAddress());
+        getProperty(CommonConstants.Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY,
+            CommonConstants.Helix.DEFAULT_SET_INSTANCE_ID_TO_HOSTNAME_KEY) ? NetUtils.getHostnameOrAddress()
+            : NetUtils.getHostAddress());
   }
 
   public int getPort() {

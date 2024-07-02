@@ -72,7 +72,7 @@ public class ServerStarterIntegrationTest extends ControllerTest {
   @Test
   public void testDefaultServerConf()
       throws Exception {
-    String expectedHost = NetUtils.getHostAddress();
+    String expectedHost = NetUtils.getHostnameOrAddress();
     String expectedInstanceId = PREFIX_OF_SERVER_INSTANCE + expectedHost + "_" + DEFAULT_SERVER_NETTY_PORT;
     verifyInstanceConfig(new PinotConfiguration(), expectedInstanceId, expectedHost, DEFAULT_SERVER_NETTY_PORT);
   }
@@ -84,7 +84,7 @@ public class ServerStarterIntegrationTest extends ControllerTest {
     String expectedInstanceId = PREFIX_OF_SERVER_INSTANCE + expectedHost + "_" + DEFAULT_SERVER_NETTY_PORT;
 
     Map<String, Object> properties = new HashMap<>();
-    properties.put(SET_INSTANCE_ID_TO_HOSTNAME_KEY, true);
+    properties.put(SET_INSTANCE_ID_TO_HOSTNAME_KEY, DEFAULT_SET_INSTANCE_ID_TO_HOSTNAME_KEY);
 
     verifyInstanceConfig(new PinotConfiguration(properties), expectedInstanceId, expectedHost,
         DEFAULT_SERVER_NETTY_PORT);
@@ -97,7 +97,7 @@ public class ServerStarterIntegrationTest extends ControllerTest {
     String customInstanceId = CUSTOM_INSTANCE_ID + "_" + System.currentTimeMillis();
     properties.put(CONFIG_OF_INSTANCE_ID, customInstanceId);
 
-    verifyInstanceConfig(new PinotConfiguration(properties), customInstanceId, NetUtils.getHostAddress(),
+    verifyInstanceConfig(new PinotConfiguration(properties), customInstanceId, NetUtils.getHostnameOrAddress(),
         DEFAULT_SERVER_NETTY_PORT);
   }
 
@@ -116,7 +116,7 @@ public class ServerStarterIntegrationTest extends ControllerTest {
   @Test
   public void testCustomPort()
       throws Exception {
-    String expectedHost = NetUtils.getHostAddress();
+    String expectedHost = NetUtils.getHostnameOrAddress();
     int customPort = NetUtils.findOpenPort(CUSTOM_PORT);
     String expectedInstanceId = PREFIX_OF_SERVER_INSTANCE + expectedHost + "_" + customPort;
 

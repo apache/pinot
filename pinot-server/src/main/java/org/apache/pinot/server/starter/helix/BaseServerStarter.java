@@ -163,8 +163,8 @@ public abstract class BaseServerStarter implements ServiceStartable {
     setupHelixSystemProperties();
     _listenerConfigs = ListenerConfigUtil.buildServerAdminConfigs(_serverConf);
     _hostname = _serverConf.getProperty(Helix.KEY_OF_SERVER_NETTY_HOST,
-        _serverConf.getProperty(Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false) ? NetUtils.getHostnameOrAddress()
-            : NetUtils.getHostAddress());
+        _serverConf.getProperty(Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, Helix.DEFAULT_SET_INSTANCE_ID_TO_HOSTNAME_KEY)
+            ? NetUtils.getHostnameOrAddress() : NetUtils.getHostAddress());
     // Override multi-stage query runner hostname if not set explicitly
     if (!_serverConf.containsKey(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME)) {
       _serverConf.setProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME, _hostname);
