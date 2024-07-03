@@ -27,6 +27,8 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.exception.DatabaseConflictException;
 import org.apache.pinot.spi.utils.CommonConstants;
 
+import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
+
 
 public class DatabaseUtils {
   private DatabaseUtils() {
@@ -94,7 +96,7 @@ public class DatabaseUtils {
    * and it does not match with the 'database' header
    */
   public static String translateTableName(String tableName, @Nullable HttpHeaders headers, boolean ignoreCase) {
-    String database = headers != null ? headers.getHeaderString(CommonConstants.DATABASE) : null;
+    String database = headers != null ? headers.getHeaderString(DATABASE) : null;
     return translateTableName(tableName, database, ignoreCase);
   }
 
@@ -145,8 +147,8 @@ public class DatabaseUtils {
    */
   public static String extractDatabaseFromQueryRequest(
       @Nullable Map<String, String> queryOptions, @Nullable HttpHeaders headers) {
-    String databaseFromOptions = queryOptions == null ? null : queryOptions.get(CommonConstants.DATABASE);
-    String databaseFromHeaders = headers == null ? null : headers.getHeaderString(CommonConstants.DATABASE);
+    String databaseFromOptions = queryOptions == null ? null : queryOptions.get(DATABASE);
+    String databaseFromHeaders = headers == null ? null : headers.getHeaderString(DATABASE);
     if (databaseFromHeaders != null && databaseFromOptions != null
         && !databaseFromOptions.equals(databaseFromHeaders)) {
       throw new DatabaseConflictException("Database context mismatch : from headers '" + databaseFromHeaders
@@ -159,5 +161,10 @@ public class DatabaseUtils {
   public static String extractDatabaseFromTableName(String tableName) {
     String[] split = StringUtils.split(tableName, '.');
     return split.length == 1 ? CommonConstants.DEFAULT_DATABASE : split[0];
+  }
+
+  public static String extractDatabaseFromHttpHeaders(HttpHeaders headers) {
+    String databaseName = headers.getHeaderString(DATABASE);
+    return databaseName == null ? CommonConstants.DEFAULT_DATABASE : databaseName;
   }
 }
