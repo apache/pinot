@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.query.optimizer.filter;
 
-import java.util.Collections;
 import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.HashMap;
