@@ -25,8 +25,8 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Random;
 import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
@@ -45,7 +45,6 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
-import org.apache.pinot.spi.utils.RandomNumberUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -216,11 +215,11 @@ public class NoDictionaryCompressionQueriesTest extends BaseQueriesTest {
 
     //Generate random data
     int rowLength = 1000;
-    Random random = new Random();
     String[] tempStringRows = new String[rowLength];
     Integer[] tempIntRows = new Integer[rowLength];
     Long[] tempLongRows = new Long[rowLength];
 
+    ThreadLocalRandom random = ThreadLocalRandom.current();
     for (int i = 0; i < rowLength; i++) {
       //Adding a fixed value to check for filter queries
       if (i % 10 == 0) {
@@ -229,8 +228,8 @@ public class NoDictionaryCompressionQueriesTest extends BaseQueriesTest {
         tempLongRows[i] = 1001L;
       } else {
         tempStringRows[i] = RandomStringUtils.random(random.nextInt(100), true, true);
-        tempIntRows[i] = RandomNumberUtils.getRandomProvider().nextInt(0, rowLength);
-        tempLongRows[i] = RandomNumberUtils.getRandomProvider().nextLong(0, rowLength);
+        tempIntRows[i] = random.nextInt(0, rowLength);
+        tempLongRows[i] = random.nextLong(0, rowLength);
       }
     }
 

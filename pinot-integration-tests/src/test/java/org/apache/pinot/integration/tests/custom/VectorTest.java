@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.stream.IntStream;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
@@ -36,7 +37,6 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.utils.RandomNumberUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
 
@@ -331,8 +331,9 @@ public class VectorTest extends CustomDataQueryClusterIntegrationTest {
 
   private float[] createRandomVector(int vectorDimSize) {
     float[] vector = new float[vectorDimSize];
-    IntStream.range(0, vectorDimSize).forEach(i -> vector[i] =
-        RandomNumberUtils.getRandomProvider().nextFloat(0.0f, 1.0f));
+    float range = 1.0f - 0.0f;
+    Random random = new Random();
+    IntStream.range(0, vectorDimSize).forEach(i -> vector[i] = random.nextFloat() * range + 0.0f);
     return vector;
   }
 

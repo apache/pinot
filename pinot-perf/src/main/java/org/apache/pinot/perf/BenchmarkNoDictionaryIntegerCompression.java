@@ -21,13 +21,13 @@ package org.apache.pinot.perf;
 import com.github.luben.zstd.Zstd;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import net.jpountz.lz4.LZ4Factory;
 import org.apache.pinot.segment.local.io.compression.ChunkCompressorFactory;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.ChunkCompressor;
 import org.apache.pinot.segment.spi.compression.ChunkDecompressor;
-import org.apache.pinot.spi.utils.RandomNumberUtils;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -107,8 +107,9 @@ public class BenchmarkNoDictionaryIntegerCompression {
     private void generateRandomIntegerBuffer() {
       //Generate Random Int
       _uncompressedInt = ByteBuffer.allocateDirect(_rowLength * Integer.BYTES);
+      Random random = new Random();
       for (int i = 0; i < _rowLength; i++) {
-        _uncompressedInt.putInt(RandomNumberUtils.getRandomProvider().nextInt());
+        _uncompressedInt.putInt(random.nextInt());
       }
       _uncompressedInt.flip();
     }
