@@ -27,6 +27,7 @@
     <groupId>org.apache</groupId>
     <artifactId>apache</artifactId>
     <version>32</version>
+    <relativePath></relativePath>
   </parent>
 
   <groupId>org.apache.pinot</groupId>
@@ -172,7 +173,7 @@
     <audienceannotations.version>0.15.0</audienceannotations.version>
     <clp-ffi.version>0.4.4</clp-ffi.version>
     <stax2-api.version>4.2.2</stax2-api.version>
-    <aws.sdk.version>2.26.11</aws.sdk.version>
+    <aws.sdk.version>2.26.13</aws.sdk.version>
     <joda-time.version>2.12.7</joda-time.version>
     <janino.version>3.1.12</janino.version>
     <testng.version>7.10.2</testng.version>
@@ -414,7 +415,7 @@
       <dependency>
         <groupId>org.checkerframework</groupId>
         <artifactId>checker-qual</artifactId>
-        <version>3.44.0</version>
+        <version>3.45.0</version>
       </dependency>
       <dependency>
         <groupId>org.codehaus.groovy</groupId>
@@ -1841,7 +1842,7 @@
         <plugin>
           <groupId>net.alchim31.maven</groupId>
           <artifactId>scala-maven-plugin</artifactId>
-          <version>4.9.1</version>
+          <version>4.9.2</version>
           <executions>
             <execution>
               <id>add-source</id>
@@ -2257,7 +2258,7 @@
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>versions-maven-plugin</artifactId>
-        <version>2.16.2</version>
+        <version>2.17.0</version>
       </plugin>
       <plugin>
         <artifactId>maven-shade-plugin</artifactId>

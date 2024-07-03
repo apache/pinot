@@ -1682,25 +1682,38 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     return _idleTimer.getTimeSinceEventLastConsumedMs();
   }
 
+  public StreamPartitionMsgOffset fetchLatestStreamOffset(long maxWaitTimeMs, boolean useDebugLog) {
+    return fetchStreamOffset(OffsetCriteria.LARGEST_OFFSET_CRITERIA, maxWaitTimeMs, useDebugLog);
+  }
+
   public StreamPartitionMsgOffset fetchLatestStreamOffset(long maxWaitTimeMs) {
-    return fetchStreamOffset(OffsetCriteria.LARGEST_OFFSET_CRITERIA, maxWaitTimeMs);
+    return fetchLatestStreamOffset(maxWaitTimeMs, false);
+  }
+
+  public StreamPartitionMsgOffset fetchEarliestStreamOffset(long maxWaitTimeMs, boolean useDebugLog) {
+    return fetchStreamOffset(OffsetCriteria.SMALLEST_OFFSET_CRITERIA, maxWaitTimeMs, useDebugLog);
   }
 
   public StreamPartitionMsgOffset fetchEarliestStreamOffset(long maxWaitTimeMs) {
-    return fetchStreamOffset(OffsetCriteria.SMALLEST_OFFSET_CRITERIA, maxWaitTimeMs);
+    return fetchEarliestStreamOffset(maxWaitTimeMs, false);
   }
 
-  private StreamPartitionMsgOffset fetchStreamOffset(OffsetCriteria offsetCriteria, long maxWaitTimeMs) {
+  private StreamPartitionMsgOffset fetchStreamOffset(OffsetCriteria offsetCriteria, long maxWaitTimeMs,
+      boolean useDebugLog) {
     if (_partitionMetadataProvider == null) {
       createPartitionMetadataProvider("Fetch latest stream offset");
     }
     try {
       return _partitionMetadataProvider.fetchStreamPartitionOffset(offsetCriteria, maxWaitTimeMs);
     } catch (Exception e) {
-      _segmentLogger.warn(
-          String.format(
-              "Cannot fetch stream offset with criteria %s for clientId %s and partitionGroupId %d with maxWaitTime %d",
-              offsetCriteria, _clientId, _partitionGroupId, maxWaitTimeMs), e);
+      String logMessage = String.format(
+          "Cannot fetch stream offset with criteria %s for clientId %s and partitionGroupId %d with maxWaitTime %d",
+          offsetCriteria, _clientId, _partitionGroupId, maxWaitTimeMs);
+      if (!useDebugLog) {
+        _segmentLogger.warn(logMessage, e);
+      } else {
+        _segmentLogger.debug(logMessage, e);
+      }
     }
     return null;
   }
@@ -1810,8 +1823,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private void updateIngestionMetrics(RowMetadata metadata) {
     if (metadata != null) {
       try {
-        StreamPartitionMsgOffset latestOffset =
-            _partitionMetadataProvider.fetchStreamPartitionOffset(OffsetCriteria.LARGEST_OFFSET_CRITERIA, 5000);
+        StreamPartitionMsgOffset latestOffset = fetchLatestStreamOffset(5000, true);
         _realtimeTableDataManager.updateIngestionMetrics(metadata.getRecordIngestionTimeMs(),
             metadata.getFirstStreamRecordIngestionTimeMs(), metadata.getOffset(), latestOffset, _partitionGroupId);
       } catch (Exception e) {
