@@ -317,8 +317,10 @@ public class PinotHelixTaskResourceManager {
   public synchronized Set<String> getTasks(String taskType) {
     String helixJobQueueName = getHelixJobQueueName(taskType);
     WorkflowConfig workflowConfig = _taskDriver.getWorkflowConfig(helixJobQueueName);
-    Preconditions.checkArgument(workflowConfig != null, "Task queue: %s for task type: %s does not exist",
-        helixJobQueueName, taskType);
+    if (workflowConfig == null) {
+      LOGGER.error("Task queue: {} for task type: {} does not exist", helixJobQueueName, taskType);
+      return Collections.emptySet();
+    }
     Set<String> helixJobs = workflowConfig.getJobDag().getAllNodes();
     Set<String> tasks = new HashSet<>(helixJobs.size());
     for (String helixJobName : helixJobs) {
