@@ -117,22 +117,28 @@ public class V1MetadataBlock extends BaseDataBlock {
 
     try (PinotInputStream stream = dataBuffer.openInputStream()) {
       // Read header.
-      long skipped = stream.skip(11 * Integer.BYTES); // metadata we don't care about
-      assert skipped == 11 * Integer.BYTES;
-      int variableSizeDataStart = stream.readInt();
-      int variableSizeDataLength = stream.readInt();
+      ZeroCopyDataBlockSerde.Header header = ZeroCopyDataBlockSerde.Header.deserialize(stream);
 
       // Read metadata.
       stream.readInt();
 
       Contents contents;
-      if (variableSizeDataLength > 0) {
-        stream.seek(variableSizeDataStart);
+      if (header.getVariableSizeDataLength() > 0) {
+        stream.seek(header.getVariableSizeDataStart());
         contents = JSON.readValue((InputStream) stream, Contents.class);
       } else {
         contents = new Contents();
       }
-      return new V1MetadataBlock(contents);
+      V1MetadataBlock v1MetadataBlock = new V1MetadataBlock(contents);
+
+      if (header._exceptionsLength > 0) {
+        Map<Integer, String> exceptions = ZeroCopyDataBlockSerde.deserializeExceptions(stream, header);
+        for (Map.Entry<Integer, String> exceptionByCode : exceptions.entrySet()) {
+          v1MetadataBlock.addException(exceptionByCode.getKey(), exceptionByCode.getValue());
+        }
+      }
+
+      return v1MetadataBlock;
     }
   }
 

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.datablock;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.DataInput;
 import java.io.IOException;
@@ -117,7 +118,7 @@ public class ZeroCopyDataBlockSerde implements DataBlockSerde {
     }
   }
 
-  private void serializeDictionary(DataBlock.Raw dataBlock, PinotOutputStream into)
+  private static void serializeDictionary(DataBlock.Raw dataBlock, PinotOutputStream into)
       throws IOException {
     String[] stringDictionary = dataBlock.getStringDictionary();
     if (stringDictionary == null) {
@@ -131,7 +132,7 @@ public class ZeroCopyDataBlockSerde implements DataBlockSerde {
     }
   }
 
-  private void serializeDataSchema(DataBlock.Raw dataBlock, PinotOutputStream into)
+  private static void serializeDataSchema(DataBlock.Raw dataBlock, PinotOutputStream into)
       throws IOException {
     DataSchema dataSchema = dataBlock.getDataSchema();
     if (dataSchema == null) {
@@ -143,7 +144,7 @@ public class ZeroCopyDataBlockSerde implements DataBlockSerde {
     into.write(bytes);
   }
 
-  private void serializeMetadata(DataBlock.Raw dataBlock, PinotOutputStream into, Header header)
+  private static void serializeMetadata(DataBlock.Raw dataBlock, PinotOutputStream into, Header header)
       throws IOException {
     header._metadataStart = (int) into.getCurrentOffset();
     if (!(dataBlock instanceof MetadataBlock)) {
@@ -206,7 +207,7 @@ public class ZeroCopyDataBlockSerde implements DataBlockSerde {
     }
   }
 
-  private List<DataBuffer> deserializeMetadata(DataBuffer buffer, Header header) {
+  private static List<DataBuffer> deserializeMetadata(DataBuffer buffer, Header header) {
     long currentOffset = header._metadataStart;
     int statsSize = buffer.getInt(currentOffset);
     currentOffset += Integer.BYTES;
@@ -228,12 +229,13 @@ public class ZeroCopyDataBlockSerde implements DataBlockSerde {
     return stats;
   }
 
-  private Map<Integer, String> deserializeExceptions(PinotInputStream stream, Header header)
+  @VisibleForTesting
+  static Map<Integer, String> deserializeExceptions(PinotInputStream stream, Header header)
       throws IOException {
     if (header._exceptionsLength == 0) {
       return new HashMap<>();
     }
-    stream.seek(Header.BYTES);
+    stream.seek(header.getExceptionsStart());
     int numExceptions = stream.readInt();
     Map<Integer, String> exceptions = new HashMap<>(HashUtil.getHashMapCapacity(numExceptions));
     for (int i = 0; i < numExceptions; i++) {
@@ -251,10 +253,10 @@ public class ZeroCopyDataBlockSerde implements DataBlockSerde {
     return buffer.view(offset, offset + length, ByteOrder.BIG_ENDIAN);
   }
 
-  private String[] deserializeDictionary(PinotInputStream stream, Header header)
+  private static String[] deserializeDictionary(PinotInputStream stream, Header header)
       throws IOException {
     if (header._dictionaryLength == 0) {
-      return null;
+      return new String[0];
     }
     stream.seek(header._dictionaryStart);
 
@@ -266,7 +268,7 @@ public class ZeroCopyDataBlockSerde implements DataBlockSerde {
     return stringDictionary;
   }
 
-  private DataSchema deserializeDataSchema(PinotInputStream stream, Header header)
+  private static DataSchema deserializeDataSchema(PinotInputStream stream, Header header)
       throws IOException {
     if (header._dataSchemaLength == 0) {
       return null;
@@ -380,6 +382,62 @@ public class ZeroCopyDataBlockSerde implements DataBlockSerde {
       _fixedSizeDataStart = _dataSchemaStart + _dataSchemaLength;
       _variableSizeDataStart = _fixedSizeDataStart + _fixedSizeDataLength;
       _metadataStart = _variableSizeDataStart + _variableSizeDataLength;
+    }
+
+    public int getFirstInt() {
+      return _firstInt;
+    }
+
+    public int getNumRows() {
+      return _numRows;
+    }
+
+    public int getNumColumns() {
+      return _numColumns;
+    }
+
+    public int getExceptionsStart() {
+      return Header.BYTES; // exceptions are always codified after the end of the header
+    }
+
+    public int getExceptionsLength() {
+      return _exceptionsLength;
+    }
+
+    public int getDictionaryStart() {
+      return _dictionaryStart;
+    }
+
+    public int getDictionaryLength() {
+      return _dictionaryLength;
+    }
+
+    public int getDataSchemaStart() {
+      return _dataSchemaStart;
+    }
+
+    public int getDataSchemaLength() {
+      return _dataSchemaLength;
+    }
+
+    public int getFixedSizeDataStart() {
+      return _fixedSizeDataStart;
+    }
+
+    public int getFixedSizeDataLength() {
+      return _fixedSizeDataLength;
+    }
+
+    public int getVariableSizeDataStart() {
+      return _variableSizeDataStart;
+    }
+
+    public int getVariableSizeDataLength() {
+      return _variableSizeDataLength;
+    }
+
+    public int getMetadataStart() {
+      return _metadataStart;
     }
   }
 }
