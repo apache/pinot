@@ -99,9 +99,9 @@ public class ExprMinMaxObject implements ParentAggregationFunctionResultObject {
     _mutable = false;
     _isNull = byteBuffer.getInt() == ObjectNullState.NULL.getState();
     byteBuffer = byteBuffer.slice();
-    _immutableMeasuringKeys = DataBlockUtils.deserialize(byteBuffer);
+    _immutableMeasuringKeys = DataBlockUtils.readFrom(byteBuffer);
     byteBuffer = byteBuffer.slice();
-    _immutableProjectionVals = DataBlockUtils.deserialize(byteBuffer);
+    _immutableProjectionVals = DataBlockUtils.readFrom(byteBuffer);
 
     _measuringSchema = _immutableMeasuringKeys.getDataSchema();
     _projectionSchema = _immutableProjectionVals.getDataSchema();
@@ -124,15 +124,14 @@ public class ExprMinMaxObject implements ParentAggregationFunctionResultObject {
   @Nonnull
   public byte[] toBytes()
       throws IOException {
-    ByteBuffer header = ByteBuffer.allocate(2 * Integer.BYTES)
-        .order(ByteOrder.BIG_ENDIAN);
+    int header;
     if (_isNull) {
       // serialize the null object with schemas
-      header.putInt(ObjectNullState.NULL.getState());
+      header = ObjectNullState.NULL.getState();
       _immutableMeasuringKeys = DataBlockBuilder.buildFromRows(Collections.emptyList(), _measuringSchema);
       _immutableProjectionVals = DataBlockBuilder.buildFromRows(Collections.emptyList(), _projectionSchema);
     } else {
-      header.putInt(ObjectNullState.NON_NULL.getState());
+      header = ObjectNullState.NON_NULL.getState();
       _immutableMeasuringKeys =
           DataBlockBuilder.buildFromRows(Collections.singletonList(_extremumMeasuringKeys), _measuringSchema);
       _immutableProjectionVals = DataBlockBuilder.buildFromRows(_extremumProjectionValues, _projectionSchema);
@@ -141,17 +140,23 @@ public class ExprMinMaxObject implements ParentAggregationFunctionResultObject {
     List<ByteBuffer> projectionVals = DataBlockUtils.serialize(_immutableProjectionVals);
 
     CompoundDataBuffer compoundDataBuffer = new CompoundDataBuffer.Builder(ByteOrder.BIG_ENDIAN)
-        .addBuffer(header)
         .addBuffers(measuringKeys)
         .addBuffers(projectionVals)
         .build();
 
-    long size = compoundDataBuffer.size();
+    long size = 4 + compoundDataBuffer.size();
     Preconditions.checkState(size <= Integer.MAX_VALUE, "Data size is too large: %s", size);
     int sizeInt = (int) size;
     byte[] bytes = new byte[sizeInt];
 
-    compoundDataBuffer.copyTo(0, bytes, 0, sizeInt);
+    ByteBuffer buffer = ByteBuffer.wrap(bytes)
+        .order(ByteOrder.BIG_ENDIAN);
+    buffer.putInt(header);
+    compoundDataBuffer.copyTo(0, bytes, 4, sizeInt - 4);
+
+    ExprMinMaxObject exprMinMaxObject = fromBytes(bytes);
+    assert exprMinMaxObject._immutableMeasuringKeys.equals(_immutableMeasuringKeys);
+    assert exprMinMaxObject._immutableProjectionVals.equals(_immutableProjectionVals);
 
     return bytes;
   }

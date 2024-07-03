@@ -28,6 +28,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.LongConsumer;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.segment.spi.memory.CompoundDataBuffer;
@@ -175,10 +177,15 @@ public class ZeroCopyDataBlockSerde implements DataBlockSerde {
   }
 
   @Override
-  public DataBlock deserialize(DataBuffer buffer, long offset, DataBlock.Type type)
+  public DataBlock deserialize(DataBuffer buffer, long offset, DataBlock.Type type,
+      @Nullable LongConsumer finalOffsetConsumer)
       throws IOException {
     try (PinotInputStream stream = buffer.openInputStream(offset)) {
       Header header = Header.deserialize(stream);
+
+      if (finalOffsetConsumer != null) {
+        finalOffsetConsumer.accept(offset + calculateEndOffset(buffer, header));
+      }
 
       switch (type) {
         case COLUMNAR:
@@ -227,6 +234,23 @@ public class ZeroCopyDataBlockSerde implements DataBlockSerde {
       }
     }
     return stats;
+  }
+
+  private long calculateEndOffset(DataBuffer buffer, Header header) {
+    long currentOffset = header._metadataStart;
+    int statsSize = buffer.getInt(currentOffset);
+    currentOffset += Integer.BYTES;
+
+    for (int i = 0; i < statsSize; i++) {
+      boolean isPresent = buffer.getByte(currentOffset) != 0;
+      currentOffset += Byte.BYTES;
+      if (isPresent) {
+        int length = buffer.getInt(currentOffset);
+        currentOffset += Integer.BYTES;
+        currentOffset += length;
+      }
+    }
+    return currentOffset;
   }
 
   @VisibleForTesting

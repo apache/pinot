@@ -19,6 +19,8 @@
 package org.apache.pinot.common.datablock;
 
 import java.io.IOException;
+import java.util.function.LongConsumer;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
 
 
@@ -51,9 +53,16 @@ public interface DataBlockSerde {
    * @param offset the offset in the buffer where the data starts. The first integer is reserved to store version and
    *               type and should not be trusted by the implementation. Use the type parameter instead.
    * @param type   the type of data block.
+   * @param finalOffsetConsumer A consumer that will be called after the data block is deserialized. The consumer will
+   *                            receive the offset where the data block ends.
    */
-  DataBlock deserialize(DataBuffer buffer, long offset, DataBlock.Type type)
+  DataBlock deserialize(DataBuffer buffer, long offset, DataBlock.Type type, @Nullable LongConsumer finalOffsetConsumer)
       throws IOException;
+
+  default DataBlock deserialize(DataBuffer buffer, long offset, DataBlock.Type type)
+      throws IOException {
+    return deserialize(buffer, offset, type, null);
+  }
 
   Version getVersion();
 

@@ -28,7 +28,9 @@ import java.util.Collections;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.LongConsumer;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
@@ -137,11 +139,25 @@ public final class DataBlockUtils {
     return result;
   }
 
-  public static DataBlock deserialize(ByteBuffer buffer)
+  /**
+   * Reads a data block from the given byte buffer.
+   * @param buffer the buffer to read from. The data will be read at the buffer's current position. This position will
+   *               be updated to point to the end of the data block.
+   */
+  public static DataBlock readFrom(ByteBuffer buffer)
       throws IOException {
-    return deserialize(PinotByteBuffer.wrap(buffer));
+    return deserialize(PinotByteBuffer.wrap(buffer), buffer.position(), newOffset -> {
+      if (newOffset > Integer.MAX_VALUE) {
+        throw new IllegalStateException("Data block is too large");
+      }
+      buffer.position((int) newOffset);
+    });
   }
 
+  /**
+   * Deserialize a list of byte buffers into a data block.
+   * Contrary to {@link #readFrom(ByteBuffer)}, the given buffers will not be modified.
+   */
   public static DataBlock deserialize(List<ByteBuffer> buffers)
       throws IOException {
     List<DataBuffer> dataBuffers = buffers.stream()
@@ -152,6 +168,10 @@ public final class DataBlockUtils {
     }
   }
 
+  /**
+   * Deserialize a list of byte buffers into a data block.
+   * Contrary to {@link #readFrom(ByteBuffer)}, the given buffers will not be modified.
+   */
   public static DataBlock deserialize(ByteBuffer[] buffers)
       throws IOException {
     try (CompoundDataBuffer compoundBuffer = new CompoundDataBuffer(buffers, ByteOrder.BIG_ENDIAN, false)) {
@@ -159,15 +179,33 @@ public final class DataBlockUtils {
     }
   }
 
+  /**
+   * Deserialize a list of byte buffers into a data block.
+   * <p>
+   * Data will be read from the first byte of the buffer. Use {@link #deserialize(DataBuffer, long, LongConsumer)}
+   * in case it is needed to read from a different position.
+   */
   public static DataBlock deserialize(DataBuffer buffer)
       throws IOException {
-    int versionAndSubVersion = buffer.getInt(0);
+    return deserialize(buffer, 0, null);
+  }
+
+  /**
+   * Deserialize a list of byte buffers into a data block.
+   * @param buffer the buffer to read from.
+   * @param offset the offset in the buffer where the data starts.
+   * @param finalOffsetConsumer An optional consumer that will be called after the data block is deserialized.
+   *                            The consumer will receive the offset where the data block ends.
+   */
+  public static DataBlock deserialize(DataBuffer buffer, long offset, @Nullable LongConsumer finalOffsetConsumer)
+      throws IOException {
+    int versionAndSubVersion = buffer.getInt(offset);
     int version = getVersion(versionAndSubVersion);
     DataBlockSerde dataBlockSerde = SERDES.get(DataBlockSerde.Version.fromInt(version));
 
     DataBlock.Type type = getType(versionAndSubVersion);
 
-    return dataBlockSerde.deserialize(buffer, 0, type);
+    return dataBlockSerde.deserialize(buffer, 0, type, finalOffsetConsumer);
   }
 
   /**
