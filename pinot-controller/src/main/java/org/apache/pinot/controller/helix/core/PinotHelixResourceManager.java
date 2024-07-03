@@ -102,6 +102,7 @@ import org.apache.pinot.common.lineage.LineageEntryState;
 import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
 import org.apache.pinot.common.lineage.SegmentLineageUtils;
+import org.apache.pinot.common.messages.DatabaseConfigRefreshMessage;
 import org.apache.pinot.common.messages.RoutingTableRebuildMessage;
 import org.apache.pinot.common.messages.RunPeriodicTaskMessage;
 import org.apache.pinot.common.messages.SegmentRefreshMessage;
@@ -154,6 +155,7 @@ import org.apache.pinot.controller.helix.core.rebalance.ZkBasedTableRebalanceObs
 import org.apache.pinot.controller.helix.core.util.ZKMetadataUtils;
 import org.apache.pinot.controller.helix.starter.HelixConfig;
 import org.apache.pinot.segment.spi.SegmentMetadata;
+import org.apache.pinot.spi.config.DatabaseConfig;
 import org.apache.pinot.spi.config.instance.Instance;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableStats;
@@ -1639,6 +1641,21 @@ public class PinotHelixResourceManager {
     LOGGER.info("Successfully add user:{}", usernamePrefix);
   }
 
+  public void addDatabaseConfig(DatabaseConfig databaseConfig) {
+    if (!ZKMetadataProvider.createDatabaseConfig(_propertyStore, databaseConfig)) {
+      throw new RuntimeException("Failed to create database config for database: " + databaseConfig.getId());
+    }
+    sendDatabaseConfigRefreshMessage(databaseConfig.getId());
+  }
+
+  public void updateDatabaseConfig(DatabaseConfig databaseConfig) {
+    if (!ZKMetadataProvider.setDatabaseConfig(_propertyStore, databaseConfig)) {
+      throw new RuntimeException(
+          "Failed to update database config in Zookeeper for database: " + databaseConfig.getId());
+    }
+    sendDatabaseConfigRefreshMessage(databaseConfig.getId());
+  }
+
   /**
    * Performs validations of table config and adds the table to zookeeper
    * @throws InvalidTableConfigException if validations fail
@@ -2755,6 +2772,25 @@ public class PinotHelixResourceManager {
     }
   }
 
+  private void sendDatabaseConfigRefreshMessage(String databaseId) {
+    DatabaseConfigRefreshMessage databaseConfigRefreshMessage = new DatabaseConfigRefreshMessage(databaseId);
+
+    // Send database config refresh message to brokers
+    Criteria recipientCriteria = new Criteria();
+    recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
+    recipientCriteria.setInstanceName("%");
+    recipientCriteria.setResource(Helix.BROKER_RESOURCE_INSTANCE);
+    recipientCriteria.setSessionSpecific(true);
+    // Send message with no callback and infinite timeout on the recipient
+    int numMessagesSent =
+        _helixZkManager.getMessagingService().send(recipientCriteria, databaseConfigRefreshMessage, null, -1);
+    if (numMessagesSent > 0) {
+      LOGGER.info("Sent {} database config refresh messages to brokers for database: {}", numMessagesSent, databaseId);
+    } else {
+      LOGGER.warn("No database config refresh message sent to brokers for database: {}", databaseId);
+    }
+  }
+
   private void sendRoutingTableRebuildMessage(String tableNameWithType) {
     RoutingTableRebuildMessage routingTableRebuildMessage = new RoutingTableRebuildMessage(tableNameWithType);
 
@@ -2980,6 +3016,17 @@ public class PinotHelixResourceManager {
   @Nullable
   public ExternalView getTableExternalView(String tableNameWithType) {
     return _helixAdmin.getResourceExternalView(_helixClusterName, tableNameWithType);
+  }
+
+  /**
+   * Get the database config for the given database name.
+   *
+   * @param databaseName database name with type suffix
+   * @return Database config
+   */
+  @Nullable
+  public DatabaseConfig getDatabaseConfig(String databaseName) {
+    return ZKMetadataProvider.getDatabaseConfig(_propertyStore, databaseName);
   }
 
   /**

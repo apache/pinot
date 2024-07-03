@@ -45,6 +45,7 @@ import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.spi.config.DatabaseConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -256,17 +257,21 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
 
   private void createOrUpdateDatabaseRateLimiter(List<String> databaseNames) {
     double databaseQpsQuota = _defaultQpsQuotaForDatabase;
-    if (databaseQpsQuota < 0) {
-      for (String databaseName : databaseNames) {
-        buildEmptyOrResetRateLimiterInDatabaseQueryQuotaEntity(databaseName);
-      }
-      return;
-    }
     ExternalView brokerResource = HelixHelper
         .getExternalViewForResource(_helixManager.getClusterManagmentTool(), _helixManager.getClusterName(),
             CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
     int onlineBrokers = HelixHelper.getOnlineInstanceFromExternalView(brokerResource).size();
     for (String databaseName : databaseNames) {
+      DatabaseConfig databaseConfig =
+          ZKMetadataProvider.getDatabaseConfig(_helixManager.getHelixPropertyStore(), databaseName);
+      if (databaseConfig != null && databaseConfig.getQuotaConfig() != null
+          && databaseConfig.getQuotaConfig().getMaxQPS() != -1) {
+        databaseQpsQuota = databaseConfig.getQuotaConfig().getMaxQPS();
+      }
+      if (databaseQpsQuota < 0) {
+        buildEmptyOrResetRateLimiterInDatabaseQueryQuotaEntity(databaseName);
+        continue;
+      }
       double perBrokerQpsQuota = databaseQpsQuota / onlineBrokers;
       QueryQuotaEntity queryQuotaEntity = new QueryQuotaEntity(RateLimiter.create(perBrokerQpsQuota),
           new HitCounter(ONE_SECOND_TIME_RANGE_IN_SECOND), new MaxHitRateTracker(ONE_MINUTE_TIME_RANGE_IN_SECOND),
