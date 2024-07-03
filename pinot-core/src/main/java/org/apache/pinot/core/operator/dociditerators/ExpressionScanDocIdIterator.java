@@ -104,6 +104,9 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
   @Override
   public int advance(int targetDocId) {
     if (targetDocId < _blockEndDocId) {
+      if (_docIdIterator == null) {
+        return Constants.EOF;
+      }
       // Search the current block first
       _docIdIterator.advanceIfNeeded(targetDocId);
       if (_docIdIterator.hasNext()) {
