@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.core.query.optimizer.filter;
 
+import java.util.Collections;
+import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -138,6 +140,17 @@ public class TextMatchFilterOptimizer implements FilterOptimizer {
         for (Expression expression : entry.getValue()) {
           if (expression.getFunctionCall().getOperator().equals(FilterKind.NOT.name())) {
             Expression operand = expression.getFunctionCall().getOperands().get(0);
+
+            // Lucene special case: if `OR NOT`, skip optimizing as NOT cannot be used with just one term
+            if (operator.equals(FilterKind.OR.name())) {
+              Expression textMatchExpression = RequestUtils.getFunctionExpression(FilterKind.TEXT_MATCH.name());
+              textMatchExpression.getFunctionCall().setOperands(
+                  Arrays.asList(operand.getFunctionCall().getOperands().get(0),
+                      operand.getFunctionCall().getOperands().get(1)));
+              newChildren.add(RequestUtils.getFunctionExpression(FilterKind.NOT.name(), textMatchExpression));
+              continue;
+            }
+
             literals.add(FilterKind.NOT.name() + SPACE + operand.getFunctionCall().getOperands().get(1).getLiteral()
                 .getStringValue());
             continue;
