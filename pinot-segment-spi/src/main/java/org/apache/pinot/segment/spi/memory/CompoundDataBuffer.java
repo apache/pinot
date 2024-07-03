@@ -532,8 +532,9 @@ public class CompoundDataBuffer implements DataBuffer {
   public ImmutableRoaringBitmap viewAsRoaringBitmap(long offset, int length) {
     int bufferIndex = getBufferIndex(offset);
     DataBuffer buffer = _buffers[bufferIndex];
-    if (length < buffer.size()) {
-      return buffer.viewAsRoaringBitmap(offset, length);
+    long inBufferIndex = offset - _bufferOffsets[bufferIndex];
+    if (inBufferIndex + length < buffer.size()) {
+      return buffer.viewAsRoaringBitmap(inBufferIndex, length);
     } else {
       ByteBuffer copy = copy(offset, length);
       return new ImmutableRoaringBitmap(copy);
