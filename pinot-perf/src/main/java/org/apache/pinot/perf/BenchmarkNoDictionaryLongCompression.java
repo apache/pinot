@@ -105,7 +105,7 @@ public class BenchmarkNoDictionaryLongCompression {
 
     private void generateRandomLongBuffer() {
       //Generate Random Long
-      Random random =  new Random();
+      Random random = new Random();
       _uncompressedLong = ByteBuffer.allocateDirect(_rowLength * Long.BYTES);
       for (int i = 0; i < _rowLength; i++) {
         _uncompressedLong.putLong(random.nextLong());
