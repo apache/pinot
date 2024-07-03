@@ -64,8 +64,12 @@ public abstract class AbstractDatabaseBaseAdminCommand extends AbstractBaseAdmin
       + " controller certification validation.")
   private boolean _skipControllerCertValidation = false;
 
-  @CommandLine.Option(names = { "-database" }, required = false, description = "Corresponding database.")
+  @CommandLine.Option(names = {"-database"}, required = false, description = "Corresponding database.")
   protected String _database;
+
+  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true, description = "Print "
+      + "this message.")
+  private boolean _help = false;
 
   public AbstractDatabaseBaseAdminCommand setControllerHost(String controllerHost) {
     _controllerHost = controllerHost;
@@ -125,5 +129,20 @@ public abstract class AbstractDatabaseBaseAdminCommand extends AbstractBaseAdmin
   public AbstractDatabaseBaseAdminCommand setExecute(boolean exec) {
     _exec = exec;
     return this;
+  }
+
+  @Override
+  public boolean getHelp() {
+    return _help;
+  }
+
+  @Override
+  public String toString() {
+    String retString =
+        (" -controllerProtocol " + _controllerProtocol + " -controllerHost " + _controllerHost + " -controllerPort "
+            + _controllerPort + " -controllerProtocol " + _controllerProtocol + " -database " + _database + " -user "
+            + _user + " -password " + "[hidden]");
+
+    return ((_exec) ? (retString + " -exec") : retString);
   }
 }

@@ -67,12 +67,8 @@ public class DeleteTableCommand extends AbstractDatabaseBaseAdminCommand {
 
   @Override
   public String toString() {
-    String retString =
-        ("DeleteTable -tableName " + _tableName + " -type " + _type + " -retention " + _retention
-            + " -controllerProtocol " + _controllerProtocol + " -controllerHost " + _controllerHost
-            + " -database " + _database
-            + " -controllerPort " + _controllerPort + " -user " + _user + " -password " + "[hidden]");
-    return ((_exec) ? (retString + " -exec") : retString);
+    return (getName() + " -tableName " + _tableName + " -type " + _type + " -retention " + _retention
+        + super.toString());
   }
 
   @Override
@@ -109,11 +105,10 @@ public class DeleteTableCommand extends AbstractDatabaseBaseAdminCommand {
 
     LOGGER.info("Executing command: {}", toString());
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
-      fileUploadDownloadClient.getHttpClient().sendDeleteRequest(FileUploadDownloadClient
-          .getDeleteTableURI(_controllerProtocol, _controllerHost, Integer.parseInt(_controllerPort),
-              _tableName, _type, _retention), getHeadersAsMap(),
-              AuthProviderUtils.makeAuthProvider(_authProvider,
-              _authTokenUrl, _authToken, _user, _password));
+      fileUploadDownloadClient.getHttpClient().sendDeleteRequest(
+          FileUploadDownloadClient.getDeleteTableURI(_controllerProtocol, _controllerHost,
+              Integer.parseInt(_controllerPort), _tableName, _type, _retention), getHeadersAsMap(),
+          AuthProviderUtils.makeAuthProvider(_authProvider, _authTokenUrl, _authToken, _user, _password));
     } catch (Exception e) {
       LOGGER.error("Got Exception while deleting Pinot Table: {}", _tableName, e);
       return false;

@@ -33,15 +33,6 @@ public class DeleteSchemaCommand extends AbstractDatabaseBaseAdminCommand {
   @CommandLine.Option(names = {"-schemaName"}, required = true, description = "Schema name.")
   private String _schemaName = null;
 
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true, description = "Print "
-      + "this message.")
-  private boolean _help = false;
-
-  @Override
-  public boolean getHelp() {
-    return _help;
-  }
-
   @Override
   public String description() {
     return "Delete schema specified via name";
@@ -54,13 +45,7 @@ public class DeleteSchemaCommand extends AbstractDatabaseBaseAdminCommand {
 
   @Override
   public String toString() {
-    String retString =
-        ("DeleteSchema -controllerProtocol " + _controllerProtocol + " -controllerHost " + _controllerHost
-            + " -controllerPort " + _controllerPort + " -database " + _database
-            + " -schemaName " + _schemaName + " -user " + _user + " -password "
-            + "[hidden]");
-
-    return ((_exec) ? (retString + " -exec") : retString);
+    return (getName() + " -schemaName " + _schemaName + super.toString());
   }
 
   @Override
@@ -71,7 +56,6 @@ public class DeleteSchemaCommand extends AbstractDatabaseBaseAdminCommand {
     _schemaName = schemaName;
     return this;
   }
-
 
   @Override
   public boolean execute()
@@ -91,8 +75,7 @@ public class DeleteSchemaCommand extends AbstractDatabaseBaseAdminCommand {
       fileUploadDownloadClient.getHttpClient().sendDeleteRequest(
           FileUploadDownloadClient.getDeleteSchemaURI(_controllerProtocol, _controllerHost,
               Integer.parseInt(_controllerPort), _schemaName), getHeadersAsMap(),
-              AuthProviderUtils.makeAuthProvider(_authProvider, _authTokenUrl, _authToken,
-              _user, _password));
+          AuthProviderUtils.makeAuthProvider(_authProvider, _authTokenUrl, _authToken, _user, _password));
     } catch (Exception e) {
       LOGGER.error("Got Exception while deleting Pinot Schema: {}", _schemaName, e);
       return false;

@@ -23,7 +23,6 @@ import java.io.FileNotFoundException;
 import java.net.URI;
 import java.util.Collections;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
-import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.slf4j.Logger;
@@ -46,17 +45,6 @@ public class AddSchemaCommand extends AbstractDatabaseBaseAdminCommand {
       + "the schema exists.")
   private boolean _force = false;
 
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true, description = "Print "
-      + "this message.")
-  private boolean _help = false;
-
-  private AuthProvider _authProvider;
-
-  @Override
-  public boolean getHelp() {
-    return _help;
-  }
-
   @Override
   public String description() {
     return "Add schema specified in the schema file to the controller";
@@ -69,11 +57,10 @@ public class AddSchemaCommand extends AbstractDatabaseBaseAdminCommand {
 
   @Override
   public String toString() {
-    String retString = ("AddSchema -controllerProtocol " + _controllerProtocol + " -controllerHost " + _controllerHost
-        + " -controllerPort " + _controllerPort + " -database " + _database + " -schemaFile " + _schemaFile
-        + " -override " + _override + " _force " + _force + " -user " + _user + " -password " + "[hidden]");
+    String retString = (getName() + " -schemaFile " + _schemaFile + " -override " + _override + " _force " + _force
+        + super.toString());
 
-    return ((_exec) ? (retString + " -exec") : retString);
+    return retString;
   }
 
   @Override

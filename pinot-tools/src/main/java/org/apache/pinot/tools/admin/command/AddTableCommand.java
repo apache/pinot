@@ -66,16 +66,7 @@ public class AddTableCommand extends AbstractDatabaseBaseAdminCommand {
       + "creating new one")
   private boolean _update = false;
 
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true, description = "Print "
-      + "this message.")
-  private boolean _help = false;
-
   private String _controllerAddress;
-
-  @Override
-  public boolean getHelp() {
-    return _help;
-  }
 
   @Override
   public String getName() {
@@ -89,11 +80,12 @@ public class AddTableCommand extends AbstractDatabaseBaseAdminCommand {
 
   @Override
   public String toString() {
-    return "AddTable -tableConfigFile " + _tableConfigFile + " -offlineTableConfigFile " + _offlineTableConfigFile
-        + " -realtimeTableConfigFile " + _realtimeTableConfigFile + " -schemaFile " + _schemaFile
-        + " -database " + _database + " -controllerProtocol " + _controllerProtocol + " -controllerHost "
-        + _controllerHost + " -controllerPort "
-        + _controllerPort + " -user " + _user + " -password [hidden]" + (_exec ? " -exec" : "");
+    String retString =
+        (getName() + " -tableConfigFile " + _tableConfigFile + " -offlineTableConfigFile " + _offlineTableConfigFile
+            + " -realtimeTableConfigFile " + _realtimeTableConfigFile + " -schemaFile " + _schemaFile
+            + super.toString());
+
+    return retString;
   }
 
   @Override
@@ -123,8 +115,8 @@ public class AddTableCommand extends AbstractDatabaseBaseAdminCommand {
   public boolean sendTableCreationRequest(JsonNode node)
       throws IOException {
     String res = AbstractBaseAdminCommand.sendRequest("POST",
-        ControllerRequestURLBuilder.baseUrl(_controllerAddress).forTableConfigsCreate(), node.toString(),
-        getHeaders(), makeTrustAllSSLContext());
+        ControllerRequestURLBuilder.baseUrl(_controllerAddress).forTableConfigsCreate(), node.toString(), getHeaders(),
+        makeTrustAllSSLContext());
     LOGGER.info(res);
     return res.contains("successfully added");
   }
