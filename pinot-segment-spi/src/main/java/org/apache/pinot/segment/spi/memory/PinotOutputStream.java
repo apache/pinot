@@ -107,8 +107,9 @@ public abstract class PinotOutputStream extends OutputStream implements DataOutp
    * this method instead of the one in {@link DataOutput} to write strings.
    */
   public void writeInt4String(String v) throws IOException {
-    writeInt(v.length());
-    write(v.getBytes(StandardCharsets.UTF_8));
+    byte[] bytes = v.getBytes(StandardCharsets.UTF_8);
+    writeInt(bytes.length);
+    write(bytes);
   }
 
   @Override
