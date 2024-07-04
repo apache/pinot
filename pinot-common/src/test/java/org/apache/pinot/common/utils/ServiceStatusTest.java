@@ -28,6 +28,7 @@ import java.util.Random;
 import org.apache.helix.HelixManager;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
@@ -134,10 +135,21 @@ public class ServiceStatusTest {
     callback.setExternalView(new ExternalView(TABLE_NAME));
     assertEquals(callback.getServiceStatus(), ServiceStatus.Status.GOOD);
 
-    // No external view = STARTING
+    // No external view, and ideal state shows this instance is assigned a segment of the resource = STARTING
     callback = buildTestISEVCallback();
-    callback.setIdealState(new IdealState(TABLE_NAME));
+    ZNRecord znRecord = new ZNRecord(TABLE_NAME);
+    znRecord.setSimpleField("REBALANCE_MODE", "CUSTOMIZED");
+    znRecord.setMapField("segment1", Map.of(INSTANCE_NAME, "ONLINE"));
+    callback.setIdealState(new IdealState(znRecord));
     assertEquals(callback.getServiceStatus(), ServiceStatus.Status.STARTING);
+
+    // No external view, and ideal state shows this instance is not assigned a segment of the resource = GOOD
+    callback = buildTestISEVCallback();
+    znRecord = new ZNRecord(TABLE_NAME);
+    znRecord.setSimpleField("REBALANCE_MODE", "CUSTOMIZED");
+    znRecord.setMapField("segment1", Map.of("otherServerInstance", "ONLINE"));
+    callback.setIdealState(new IdealState(znRecord));
+    assertEquals(callback.getServiceStatus(), ServiceStatus.Status.GOOD);
 
     // Empty ideal state + empty external view = GOOD
     callback = buildTestISEVCallback();

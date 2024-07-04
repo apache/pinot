@@ -434,6 +434,30 @@ public class ServiceStatus {
         return new StatusDescriptionPair(Status.GOOD, STATUS_DESCRIPTION_NONE);
       }
 
+      // Cache ideal state status to avoid reading it twice
+      Map<String, String> partitionToIdealStateStatusMap = new HashMap<>();
+      Set<String> partitionSet = idealState.getPartitionSet();
+
+      // Check that at least one partition is assigned in the ideal state, since if no partitions are assigned
+      // then consider the resource status GOOD. This check is needed to handle the case where the resource no
+      // longer exists on the server (i.e., last segment on the server was removed), but it still exists in the
+      // ideal state
+      boolean atLeastOnePartitionAssigned = false;
+      for (String partitionName : partitionSet) {
+        String idealStateStatus = idealState.getInstanceStateMap(partitionName).get(_instanceName);
+        partitionToIdealStateStatusMap.put(partitionName, idealStateStatus);
+
+        // Skip this partition if it is not assigned to this instance or if the instance should be offline
+        if (idealStateStatus != null && !"OFFLINE".equals(idealStateStatus)) {
+          atLeastOnePartitionAssigned = true;
+          break;
+        }
+      }
+      if (!atLeastOnePartitionAssigned) {
+        return new StatusDescriptionPair(Status.GOOD, STATUS_DESCRIPTION_NONE);
+      }
+
+      // At least one partition is assigned, so if the helix state is null, then status is STARTING
       T helixState = getState(resourceName);
       if (helixState == null) {
         return new StatusDescriptionPair(Status.STARTING, STATUS_DESCRIPTION_NO_HELIX_STATE);
@@ -443,8 +467,8 @@ public class ServiceStatus {
       // external view or went to ERROR state (which means that we tried to load the segments/resources but failed for
       // some reason)
       Map<String, String> partitionStateMap = getPartitionStateMap(helixState);
-      for (String partitionName : idealState.getPartitionSet()) {
-        String idealStateStatus = idealState.getInstanceStateMap(partitionName).get(_instanceName);
+      for (String partitionName : partitionSet) {
+        String idealStateStatus = partitionToIdealStateStatusMap.get(partitionName);
 
         // Skip this partition if it is not assigned to this instance or if the instance should be offline
         if (idealStateStatus == null || "OFFLINE".equals(idealStateStatus)) {
