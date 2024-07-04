@@ -26,21 +26,22 @@ import org.apache.pinot.spi.config.table.QuotaConfig;
 
 public class DatabaseConfig extends BaseJsonConfig {
   public static final String QUOTA_CONFIG_KEY = "quota";
-  private String _id;
+  public static final String DATABASE_NAME_KEY = "databaseName";
+  private String _databaseName;
   @JsonPropertyDescription("Resource quota associated with this database")
   private QuotaConfig _quotaConfig;
 
-  public DatabaseConfig(String id, QuotaConfig quotaConfig) {
-    _id = id;
+  public DatabaseConfig(String databaseName, QuotaConfig quotaConfig) {
+    _databaseName = databaseName;
     _quotaConfig = quotaConfig;
   }
 
-  public String getId() {
-    return _id;
+  public String getDatabaseName() {
+    return _databaseName;
   }
 
-  public void setId(String id) {
-    _id = id;
+  public void setDatabaseName(String databaseName) {
+    _databaseName = databaseName;
   }
 
   @JsonProperty(QUOTA_CONFIG_KEY)

@@ -121,6 +121,7 @@ public class BrokerUserDefinedMessageHandlerFactory implements MessageHandlerFac
       // TODO: Fetch the table config here and pass it into the managers, or consider merging these 2 managers
       _routingManager.buildRouting(_tableNameWithType);
       _queryQuotaManager.initOrUpdateTableQueryQuota(_tableNameWithType);
+      // only create the rate limiter if not present. This message has no reason to update the database rate limiter
       _queryQuotaManager.createDatabaseRateLimiter(DatabaseUtils.extractDatabaseFromTableName(_tableNameWithType));
       HelixTaskResult result = new HelixTaskResult();
       result.setSuccess(true);
@@ -135,17 +136,19 @@ public class BrokerUserDefinedMessageHandlerFactory implements MessageHandlerFac
   }
 
   private class RefreshDatabaseConfigMessageHandler extends MessageHandler {
-    final String _databaseId;
+    final String _databaseName;
 
     RefreshDatabaseConfigMessageHandler(DatabaseConfigRefreshMessage databaseConfigRefreshMessage,
         NotificationContext context) {
       super(databaseConfigRefreshMessage, context);
-      _databaseId = databaseConfigRefreshMessage.getDatabaseId();
+      _databaseName = databaseConfigRefreshMessage.getDatabaseName();
     }
 
     @Override
     public HelixTaskResult handleMessage() {
-      _queryQuotaManager.updateDatabaseRateLimiter(_databaseId);
+      // only update the existing rate limiter.
+      // Database rate limiter creation should only be done through table based change triggers
+      _queryQuotaManager.updateDatabaseRateLimiter(_databaseName);
       HelixTaskResult result = new HelixTaskResult();
       result.setSuccess(true);
       return result;
@@ -154,7 +157,7 @@ public class BrokerUserDefinedMessageHandlerFactory implements MessageHandlerFac
     @Override
     public void onError(Exception e, ErrorCode code, ErrorType type) {
       LOGGER.error("Got error while refreshing database config for database: {} (error code: {}, error type: {})",
-          _databaseId, code, type, e);
+          _databaseName, code, type, e);
     }
   }
 

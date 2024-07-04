@@ -1641,19 +1641,27 @@ public class PinotHelixResourceManager {
     LOGGER.info("Successfully add user:{}", usernamePrefix);
   }
 
+  /**
+   * Creates database config and sends out a database config refresh message.
+   * @param databaseConfig database config to be created
+   */
   public void addDatabaseConfig(DatabaseConfig databaseConfig) {
     if (!ZKMetadataProvider.createDatabaseConfig(_propertyStore, databaseConfig)) {
-      throw new RuntimeException("Failed to create database config for database: " + databaseConfig.getId());
+      throw new RuntimeException("Failed to create database config for database: " + databaseConfig.getDatabaseName());
     }
-    sendDatabaseConfigRefreshMessage(databaseConfig.getId());
+    sendDatabaseConfigRefreshMessage(databaseConfig.getDatabaseName());
   }
 
+  /**
+   * Updates database config and sends out a database config refresh message.
+   * @param databaseConfig database config to be created
+   */
   public void updateDatabaseConfig(DatabaseConfig databaseConfig) {
     if (!ZKMetadataProvider.setDatabaseConfig(_propertyStore, databaseConfig)) {
       throw new RuntimeException(
-          "Failed to update database config in Zookeeper for database: " + databaseConfig.getId());
+          "Failed to update database config in Zookeeper for database: " + databaseConfig.getDatabaseName());
     }
-    sendDatabaseConfigRefreshMessage(databaseConfig.getId());
+    sendDatabaseConfigRefreshMessage(databaseConfig.getDatabaseName());
   }
 
   /**
@@ -2772,8 +2780,8 @@ public class PinotHelixResourceManager {
     }
   }
 
-  private void sendDatabaseConfigRefreshMessage(String databaseId) {
-    DatabaseConfigRefreshMessage databaseConfigRefreshMessage = new DatabaseConfigRefreshMessage(databaseId);
+  private void sendDatabaseConfigRefreshMessage(String databaseName) {
+    DatabaseConfigRefreshMessage databaseConfigRefreshMessage = new DatabaseConfigRefreshMessage(databaseName);
 
     // Send database config refresh message to brokers
     Criteria recipientCriteria = new Criteria();
@@ -2785,9 +2793,9 @@ public class PinotHelixResourceManager {
     int numMessagesSent =
         _helixZkManager.getMessagingService().send(recipientCriteria, databaseConfigRefreshMessage, null, -1);
     if (numMessagesSent > 0) {
-      LOGGER.info("Sent {} database config refresh messages to brokers for database: {}", numMessagesSent, databaseId);
+      LOGGER.info("Sent {} database config refresh messages to brokers for database: {}", numMessagesSent, databaseName);
     } else {
-      LOGGER.warn("No database config refresh message sent to brokers for database: {}", databaseId);
+      LOGGER.warn("No database config refresh message sent to brokers for database: {}", databaseName);
     }
   }
 
@@ -3021,7 +3029,7 @@ public class PinotHelixResourceManager {
   /**
    * Get the database config for the given database name.
    *
-   * @param databaseName database name with type suffix
+   * @param databaseName database name
    * @return Database config
    */
   @Nullable

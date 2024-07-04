@@ -122,8 +122,8 @@ public class PinotDatabaseRestletResource {
   }
 
   /**
-   * API to create a table. Before adding, validations will be done (min number of replicas,
-   * checking offline and realtime table configs match, checking for tenants existing)
+   * API to update the quota configs for database
+   * If database config is not present it will be created implicitly
    */
   @POST
   @Produces(MediaType.APPLICATION_JSON)

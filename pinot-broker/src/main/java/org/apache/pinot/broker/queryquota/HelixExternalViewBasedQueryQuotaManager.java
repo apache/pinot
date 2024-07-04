@@ -248,6 +248,10 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
     }
   }
 
+  /**
+   * Updates the database rate limiter if it already exists. Will not create a new database rate limiter.
+   * @param databaseName database name for which rate limiter needs to be updated
+   */
   public void updateDatabaseRateLimiter(String databaseName) {
     if (!_databaseRateLimiterMap.containsKey(databaseName)) {
       return;
@@ -260,6 +264,8 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
     ExternalView brokerResource = HelixHelper
         .getExternalViewForResource(_helixManager.getClusterManagmentTool(), _helixManager.getClusterName(),
             CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
+    // Tables in database can span across broker tags as we don't maintain a broker tag to database mapping as of now.
+    // Hence, we consider all online brokers for the rate distribution.
     int onlineBrokers = HelixHelper.getOnlineInstanceFromExternalView(brokerResource).size();
     for (String databaseName : databaseNames) {
       DatabaseConfig databaseConfig =
@@ -280,6 +286,10 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
     }
   }
 
+  /**
+   * Creates a new database rate limiter. Will not update the database rate limiter if it already exists.
+   * @param databaseName database name for which rate limiter needs to be created
+   */
   public void createDatabaseRateLimiter(String databaseName) {
     if (_databaseRateLimiterMap.containsKey(databaseName)) {
       return;
