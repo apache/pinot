@@ -21,7 +21,8 @@ package org.apache.pinot.core.segment.processing.genericrow;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
-public interface GenericRowRecordReader {
-  GenericRowRecordReader getRecordReaderForRange(int startRowId, int endRowId);
+public interface GenericRowMapperOutputRecordReader {
+  GenericRowMapperOutputRecordReader getRecordReaderForRange(int startRowId, int endRowId);
   void read(int rowId, GenericRow buffer);
+  int compare(int rowId1, int rowId2);
 }

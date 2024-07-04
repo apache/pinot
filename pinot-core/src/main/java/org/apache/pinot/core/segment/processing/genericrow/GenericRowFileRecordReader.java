@@ -30,7 +30,7 @@ import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 /**
  * Record reader for the GenericRow file.
  */
-public class GenericRowFileRecordReader implements RecordReader, GenericRowRecordReader {
+public class GenericRowFileRecordReader implements RecordReader, GenericRowMapperOutputRecordReader {
   private final GenericRowFileReader _fileReader;
   private final int _startRowId;
   private final int _endRowId;

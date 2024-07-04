@@ -85,7 +85,7 @@ public class GenericRowFileReader implements GenericRowReader, Closeable {
   /**
    * Returns a record reader for the rows within the file. Records are sorted if sort order is configured.
    */
-  public GenericRowFileRecordReader getRecordReader() {
+  public GenericRowMapperOutputRecordReader getRecordReader() {
     return new GenericRowFileRecordReader(this);
   }
 

@@ -23,14 +23,13 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.arrow.vector.types.pojo.Schema;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
 public class GenericRowReaderFactory {
   // Enum for various GenericRowFileReaders to be added.
   public enum GenericRowReaderType {
-    ArrowFileGenericRowReader, GenericRowFileReader;
+    GenericRowFileReader;
     // Add more Readers here.
 
     private static final Map<String, GenericRowReaderType> VALUE_MAP = new HashMap<>();
@@ -54,16 +53,6 @@ public class GenericRowReaderFactory {
   private GenericRowReaderFactory() {
   }
 
-  private static ArrowFileGenericRowReader createArrowFileGenericRowReader(Map<String, Object> params) {
-    List<File> dataFiles = (List<File>) params.get("dataFiles");
-    List<File> sortColumnFiles = (List<File>) params.get("sortColumnFiles");
-    List<Integer> chunkRowCounts = (List<Integer>) params.get("chunkRowCounts");
-    Schema arrowSchema = (Schema) params.get("arrowSchema");
-    int totalNumRows = (int) params.get("totalNumRows");
-
-    return new ArrowFileGenericRowReader(dataFiles, sortColumnFiles, chunkRowCounts, arrowSchema, totalNumRows);
-  }
-
   private static GenericRowFileReader createGenericRowFileReader(Map<String, Object> params)
       throws IOException {
     File offsetFile = (File) params.get("offsetFile");
@@ -79,8 +68,6 @@ public class GenericRowReaderFactory {
       throws IOException {
     GenericRowReaderType readerType = GenericRowReaderType.fromString(readerName);
     switch (readerType) {
-      case ArrowFileGenericRowReader:
-        return createArrowFileGenericRowReader(params);
       case GenericRowFileReader:
         return createGenericRowFileReader(params);
       default:

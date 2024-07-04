@@ -18,10 +18,15 @@
  */
 package org.apache.pinot.core.segment.processing.genericrow;
 
-import org.apache.pinot.spi.data.readers.RecordReader;
+import java.io.IOException;
+import org.apache.pinot.spi.data.readers.GenericRow;
 
 
 public interface GenericRowReader {
-  RecordReader getRecordReader();
+  GenericRowMapperOutputRecordReader getRecordReader();
   int getNumSortFields();
+  int getNumRows();
+  void read(int rowId, GenericRow buffer);
+  void close()
+      throws IOException;
 }
