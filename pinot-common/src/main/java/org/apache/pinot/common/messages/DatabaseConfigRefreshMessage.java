@@ -29,20 +29,19 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 public class DatabaseConfigRefreshMessage extends Message {
   public static final String REFRESH_DATABASE_CONFIG_MSG_SUB_TYPE = "REFRESH_DATABASE_CONFIG";
 
-  private static final String DATABASE_ID_KEY = "id";
+  private static final String DATABASE_NAME_KEY = "databaseName";
 
   /**
    * Constructor for the sender.
    */
-  public DatabaseConfigRefreshMessage(String databaseId) {
+  public DatabaseConfigRefreshMessage(String databaseName) {
     super(MessageType.USER_DEFINE_MSG, UUID.randomUUID().toString());
     setMsgSubType(REFRESH_DATABASE_CONFIG_MSG_SUB_TYPE);
     // Give it infinite time to process the message, as long as session is alive
     setExecutionTimeout(-1);
     // Set the Pinot specific fields
-    // NOTE: DO NOT use Helix field "PARTITION_NAME" because it can be overridden by Helix while sending the message
     ZNRecord znRecord = getRecord();
-    znRecord.setSimpleField(DATABASE_ID_KEY, databaseId);
+    znRecord.setSimpleField(DATABASE_NAME_KEY, databaseName);
   }
 
   /**
@@ -55,7 +54,7 @@ public class DatabaseConfigRefreshMessage extends Message {
     }
   }
 
-  public String getDatabaseId() {
-    return getRecord().getSimpleField(DATABASE_ID_KEY);
+  public String getDatabaseName() {
+    return getRecord().getSimpleField(DATABASE_NAME_KEY);
   }
 }

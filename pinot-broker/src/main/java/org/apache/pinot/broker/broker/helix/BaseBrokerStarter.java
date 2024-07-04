@@ -217,6 +217,15 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   }
 
   /**
+   * Adds a cluster config change handler to handle Helix cluster config change callbacks.
+   * <p>NOTE: all change handlers will be run in a single thread, so any slow change handler can block other change
+   * handlers from running. For slow change handler, make it asynchronous.
+   */
+  public void addClusterConfigChangeHandler(ClusterChangeHandler clusterConfigChangeHandler) {
+    _clusterConfigChangeHandlers.add(clusterConfigChangeHandler);
+  }
+
+  /**
    * Adds a live instance change handler to handle Helix live instance change callbacks.
    * <p>NOTE: all change handlers will be run in a single thread, so any slow change handler can block other change
    * handlers from running. For slow change handler, make it asynchronous.
@@ -352,6 +361,9 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     _brokerAdminApplication.start(_listenerConfigs);
 
     LOGGER.info("Initializing cluster change mediator");
+    for (ClusterChangeHandler clusterConfigChangeHandler : _clusterConfigChangeHandlers) {
+      clusterConfigChangeHandler.init(_spectatorHelixManager);
+    }
     _clusterConfigChangeHandlers.add(queryQuotaManager);
     for (ClusterChangeHandler idealStateChangeHandler : _idealStateChangeHandlers) {
       idealStateChangeHandler.init(_spectatorHelixManager);
