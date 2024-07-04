@@ -50,10 +50,6 @@
       <artifactId>pinot-segment-spi</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.xerial.larray</groupId>
-      <artifactId>larray-mmap</artifactId>
-    </dependency>
-    <dependency>
       <groupId>com.uber</groupId>
       <artifactId>h3</artifactId>
     </dependency>

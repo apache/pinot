@@ -618,11 +618,6 @@
         <artifactId>snakeyaml</artifactId>
         <version>2.2</version>
       </dependency>
-      <dependency>
-        <groupId>org.xerial.larray</groupId>
-        <artifactId>larray-mmap</artifactId>
-        <version>0.4.1</version>
-      </dependency>
       <!-- Transitive dependencies with inconsistent version numbers -->
       <dependency>
         <groupId>org.apache.zookeeper</groupId>
