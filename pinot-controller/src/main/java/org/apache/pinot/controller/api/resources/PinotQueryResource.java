@@ -49,7 +49,7 @@ import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.broker.BrokerInfo;
-import org.apache.pinot.common.broker.BrokerSelector;
+import org.apache.pinot.common.broker.BrokerInfoSelector;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
@@ -96,7 +96,7 @@ public class PinotQueryResource {
   ControllerConf _controllerConf;
 
   @Inject
-  BrokerSelector _brokerSelector;
+  BrokerInfoSelector _brokerInfoSelector;
 
   @POST
   @Path("sql")
@@ -218,7 +218,7 @@ public class PinotQueryResource {
     }
     BrokerInfo brokerInfo;
     if (!tableNames.isEmpty()) {
-      brokerInfo = _brokerSelector.selectBrokerInfo(tableNames.toArray(new String[0]));
+      brokerInfo = _brokerInfoSelector.selectBrokerInfo(tableNames.toArray(new String[0]));
       if (brokerInfo == null) {
         // No common broker found for table tenants
         LOGGER.error("Unable to find a common broker instance for table tenants. Tables: {}", tableNames);
@@ -227,7 +227,7 @@ public class PinotQueryResource {
       }
     } else {
       // TODO fail these queries going forward. Added this logic to take care of tautologies like BETWEEN 0 and -1.
-      brokerInfo = _brokerSelector.selectBrokerInfo();
+      brokerInfo = _brokerInfoSelector.selectBrokerInfo();
       LOGGER.error("Unable to find table name from SQL {} thus dispatching to random broker.", query);
     }
     //TODO: Check if broker is online. Or is ExternalView up to date on liveness of the broker?
@@ -276,7 +276,7 @@ public class PinotQueryResource {
     }
 
     // Get brokers for the resource table.
-    BrokerInfo brokerInfo = _brokerSelector.selectBrokerInfo(rawTableName);
+    BrokerInfo brokerInfo = _brokerInfoSelector.selectBrokerInfo(rawTableName);
     return sendRequestToBroker(query, brokerInfo, traceEnabled, queryOptions, httpHeaders);
   }
 

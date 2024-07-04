@@ -29,10 +29,6 @@ public interface BrokerSelector {
    */
   String selectBroker(String... tableNames);
 
-  default BrokerInfo selectBrokerInfo(String... tableName) {
-   throw new UnsupportedOperationException("selectBrokerInfo has not been implemented.");
-  }
-
   /**
    * Returns list of all brokers.
    */

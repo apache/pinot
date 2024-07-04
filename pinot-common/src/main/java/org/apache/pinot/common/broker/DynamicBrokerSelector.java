@@ -19,7 +19,6 @@
 package org.apache.pinot.common.broker;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -36,24 +35,22 @@ import org.I0Itec.zkclient.serialize.BytesPushThroughSerializer;
 /**
  * Maintains a mapping between table name and list of brokers
  */
-public class DynamicBrokerSelector implements BrokerSelector, IZkDataListener {
+public class DynamicBrokerSelector extends BrokerInfoSelector implements IZkDataListener {
   protected static final Random RANDOM = new Random();
 
   protected final AtomicReference<Map<String, List<BrokerInfo>>> _tableToBrokerListMapRef = new AtomicReference<>();
   protected final AtomicReference<List<BrokerInfo>> _allBrokerListRef = new AtomicReference<>();
   protected final ZkClient _zkClient;
   protected final ExternalViewReader _evReader;
-  protected final List<String> _brokerList;
-  protected final boolean _preferTlsPort;
+
   //The preferTlsPort will be mapped to client config in the future, when we support full TLS
   public DynamicBrokerSelector(String zkServers, boolean preferTlsPort) {
+    super(preferTlsPort);
     _zkClient = getZkClient(zkServers);
     _zkClient.setZkSerializer(new BytesPushThroughSerializer());
     _zkClient.waitUntilConnected(60, TimeUnit.SECONDS);
     _zkClient.subscribeDataChanges(ExternalViewReader.BROKER_EXTERNAL_VIEW_PATH, this);
     _evReader = getEvReader(_zkClient, preferTlsPort);
-    _brokerList = ImmutableList.of(zkServers);
-    _preferTlsPort = preferTlsPort;
     refresh();
   }
   public DynamicBrokerSelector(String zkServers) {
@@ -105,19 +102,9 @@ public class DynamicBrokerSelector implements BrokerSelector, IZkDataListener {
     return null;
   }
 
-  @Nullable
   @Override
-  public String selectBroker(String... tableNames) {
-    BrokerInfo brokerInfo = selectBrokerInfo(tableNames);
-    if (brokerInfo != null) {
-      return brokerInfo.getHostPort(_preferTlsPort);
-    }
-    return null;
-  }
-
-  @Override
-  public List<String> getBrokers() {
-    return _brokerList;
+  public List<BrokerInfo> getBrokerInfoList() {
+    return _allBrokerListRef.get();
   }
 
   @Override

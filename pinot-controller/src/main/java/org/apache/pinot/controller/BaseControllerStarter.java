@@ -59,7 +59,7 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.task.TaskDriver;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.Utils;
-import org.apache.pinot.common.broker.BrokerSelector;
+import org.apache.pinot.common.broker.BrokerInfoSelector;
 import org.apache.pinot.common.broker.CommonTenantBrokerSelector;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.function.FunctionRegistry;
@@ -200,7 +200,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   protected ExecutorService _tenantRebalanceExecutorService;
   protected TableSizeReader _tableSizeReader;
   protected StorageQuotaChecker _storageQuotaChecker;
-  protected BrokerSelector _brokerSelector;
+  protected BrokerInfoSelector _brokerInfoSelector;
 
   @Override
   public void init(PinotConfiguration pinotConfiguration)
@@ -262,7 +262,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
 
     LOGGER.info("Using CommonTenantBrokerSelector with Zookeeper: {} and cluster name: {}", _helixZkURL,
         _helixClusterName);
-    _brokerSelector = new CommonTenantBrokerSelector(String.format("%s/%s", _helixZkURL, _helixClusterName));
+    _brokerInfoSelector = new CommonTenantBrokerSelector(String.format("%s/%s", _helixZkURL, _helixClusterName));
 
     // Initialize the table config tuner registry.
     TableConfigTunerRegistry.init(_config.getTableConfigTunerPackages());
@@ -552,7 +552,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         bind(_tableSizeReader).to(TableSizeReader.class);
         bind(_storageQuotaChecker).to(StorageQuotaChecker.class);
         bind(controllerStartTime).named(ControllerAdminApiApplication.START_TIME);
-        bind(_brokerSelector).to(BrokerSelector.class);
+        bind(_brokerInfoSelector).to(BrokerInfoSelector.class);
         String loggerRootDir = _config.getProperty(CommonConstants.Controller.CONFIG_OF_LOGGER_ROOT_DIR);
         if (loggerRootDir != null) {
           bind(new LocalLogFileServer(loggerRootDir)).to(LogFileServer.class);
