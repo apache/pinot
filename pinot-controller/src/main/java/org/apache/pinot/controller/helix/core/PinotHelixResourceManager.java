@@ -2793,7 +2793,8 @@ public class PinotHelixResourceManager {
     int numMessagesSent =
         _helixZkManager.getMessagingService().send(recipientCriteria, databaseConfigRefreshMessage, null, -1);
     if (numMessagesSent > 0) {
-      LOGGER.info("Sent {} database config refresh messages to brokers for database: {}", numMessagesSent, databaseName);
+      LOGGER.info("Sent {} database config refresh messages to brokers for database: {}", numMessagesSent,
+          databaseName);
     } else {
       LOGGER.warn("No database config refresh message sent to brokers for database: {}", databaseName);
     }
