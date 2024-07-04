@@ -20,7 +20,6 @@ package org.apache.pinot.common.broker;
 
 import java.util.List;
 
-
 public interface BrokerSelector {
   /**
    * Returns the broker address in the form host:port
