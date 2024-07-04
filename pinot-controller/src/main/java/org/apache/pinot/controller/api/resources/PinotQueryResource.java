@@ -292,7 +292,7 @@ public class PinotQueryResource {
 
     // Validate data access
     AccessControl accessControl = _accessControlFactory.create();
-    if (!accessControl.hasDataAccess(httpHeaders, rawTableName)) {
+    if (!accessControl.hasAccess(rawTableName, AccessType.READ, httpHeaders, null)) {
       return QueryException.ACCESS_DENIED_ERROR.toString();
     }
 

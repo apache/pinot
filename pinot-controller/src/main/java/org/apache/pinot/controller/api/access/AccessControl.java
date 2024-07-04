@@ -32,21 +32,6 @@ public interface AccessControl extends FineGrainedAccessControl {
   String WORKFLOW_BASIC = "BASIC";
 
   /**
-   * Return whether the client has data access to the given table.
-   *
-   * Note: This method is only used fore read access. It's being deprecated and its usage will be replaced by
-   * `hasAccess` method with AccessType.READ.
-   *
-   * @param httpHeaders HTTP headers containing requester identity
-   * @param tableName Name of the table to be accessed
-   * @return Whether the client has data access to the table
-   */
-  @Deprecated
-  default boolean hasDataAccess(HttpHeaders httpHeaders, String tableName) {
-    return hasAccess(tableName, AccessType.READ, httpHeaders, null);
-  }
-
-  /**
    * Return whether the client has permission to the given table
    *
    * @param tableName name of the table to be accessed
