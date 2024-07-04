@@ -72,7 +72,6 @@ public class BrokerInfo {
     return String.format("%s:%s", _hostname, preferTlsPort && _tlsPort > 0 ? _tlsPort : _port);
   }
 
-  // equals only uses Instance ID to check for equality.
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -82,12 +81,12 @@ public class BrokerInfo {
       return false;
     }
     BrokerInfo that = (BrokerInfo) o;
-    return Objects.equals(getInstanceId(), that.getInstanceId());
+    return getPort() == that.getPort() && getTlsPort() == that.getTlsPort() && Objects.equals(getInstanceId(),
+        that.getInstanceId()) && Objects.equals(getHostname(), that.getHostname());
   }
 
-  // hashCode only uses Instance ID to generate the hash.
   @Override
   public int hashCode() {
-    return Objects.hash(getInstanceId());
+    return Objects.hash(getInstanceId(), getHostname(), getPort(), getTlsPort());
   }
 }
