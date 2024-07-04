@@ -615,11 +615,15 @@ public class PinotTaskRestletResource {
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.CREATE_TASK)
   @Produces(MediaType.APPLICATION_JSON)
   @Authenticate(AccessType.UPDATE)
-  @ApiOperation("Schedule tasks and return a map from task type to task name scheduled")
+  @ApiOperation("Schedule tasks and return a map from task type to task name scheduled. If task type is missing, "
+      + "schedules all tasks. If table name is missing, schedules tasks for all tables in the database. If database "
+      + "is missing in headers, uses default.")
   @Nullable
   public Map<String, String> scheduleTasks(
-      @ApiParam(value = "Task type") @QueryParam("taskType") @Nullable String taskType,
-      @ApiParam(value = "Table name (with type suffix)") @QueryParam("tableName") @Nullable String tableName,
+      @ApiParam(value = "Task type. If missing, schedules all tasks.") @QueryParam("taskType") @Nullable
+      String taskType,
+      @ApiParam(value = "Table name (with type suffix). If missing, schedules tasks for all tables in the database.")
+      @QueryParam("tableName") @Nullable String tableName,
       @ApiParam(value = "Minion Instance tag to schedule the task explicitly on") @QueryParam("minionInstanceTag")
       @Nullable String minionInstanceTag, @Context HttpHeaders headers) {
     String database = headers != null ? headers.getHeaderString(DATABASE) : DEFAULT_DATABASE;
