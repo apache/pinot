@@ -1074,6 +1074,12 @@
         <artifactId>hadoop-client-runtime</artifactId>
         <version>${hadoop.version}</version>
         <scope>provided</scope>
+        <exclusions>
+          <exclusion>
+            <groupId>commons-logging</groupId>
+            <artifactId>commons-logging</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <!-- Solve the dependency converge issue within hadoop libraries -->
       <dependency>
