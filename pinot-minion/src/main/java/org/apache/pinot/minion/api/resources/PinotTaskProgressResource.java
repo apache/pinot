@@ -42,6 +42,8 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.metrics.MinionGauge;
+import org.apache.pinot.common.metrics.MinionMetrics;
 import org.apache.pinot.minion.event.MinionEventObserver;
 import org.apache.pinot.minion.event.MinionEventObservers;
 import org.apache.pinot.minion.event.MinionTaskState;
@@ -62,6 +64,7 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
 @Path("/")
 public class PinotTaskProgressResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotTaskProgressResource.class);
+  private final MinionMetrics _minionMetrics = MinionMetrics.get();
 
   @GET
   @Path("/tasks/subtask/progress")
@@ -140,6 +143,29 @@ public class PinotTaskProgressResource {
                   StringUtils.isEmpty(subTaskState) ? "NOT_SPECIFIED" : subTaskState,
                   e.getMessage()))
           .build());
+    }
+  }
+
+  @GET
+  @Path("/tasks/active/count")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation("Get active task execution count on the minion instance")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error")
+  })
+  public ActiveTasksCountPayload getActiveTasksCount() {
+    return new ActiveTasksCountPayload(_minionMetrics.getGaugeValue(MinionGauge.NUMBER_OF_TASKS));
+  }
+
+  private static class ActiveTasksCountPayload {
+    private final long _activeTasksCount;
+
+    public ActiveTasksCountPayload(long activeTasksCount) {
+      _activeTasksCount = activeTasksCount;
+    }
+
+    public long getActiveTasksCount() {
+      return _activeTasksCount;
     }
   }
 }
