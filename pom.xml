@@ -1069,6 +1069,12 @@
         <version>${hadoop.version}</version>
         <scope>provided</scope>
       </dependency>
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-client-runtime</artifactId>
+        <version>${hadoop.version}</version>
+        <scope>provided</scope>
+      </dependency>
       <!-- Solve the dependency converge issue within hadoop libraries -->
       <dependency>
         <groupId>ch.qos.reload4j</groupId>
