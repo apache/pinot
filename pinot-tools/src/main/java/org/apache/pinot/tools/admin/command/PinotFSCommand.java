@@ -5,11 +5,15 @@ import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.ingestion.batch.spec.PinotFSSpec;
 import org.apache.pinot.tools.Command;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
-import java.io.*;
-import org.slf4j.*;
+
 import org.yaml.snakeyaml.Yaml;
+
+import java.io.File;
+import java.io.InputStream;
 import java.net.URI;
 
 @CommandLine.Command(name = "PinotFS")
@@ -20,7 +24,9 @@ public class PinotFSCommand extends AbstractBaseAdminCommand implements Command 
             description = "Filesystem spec file")
     private String _fsSpecString;
 
-    @CommandLine.Option(names = {"-command"}, description = "The PinotFS command to execute (init, mkdir, delete, move, copy, exists, length, listFiles, copyToLocal, copyFromLocal, isDirectory, lastModified, touch, open)", required = true)
+    @CommandLine.Option(names = {"-command"}, description = "The PinotFS command to execute (init, mkdir, delete, "
+            + "move, copy, exists, length, listFiles, copyToLocal, copyFromLocal, isDirectory, lastModified, touch, "
+            + "open)", required = true)
     private String _command;
 
     @CommandLine.Option(names = {"-uri", "-sourceUri"}, description = "Source URI for the command.")
@@ -29,16 +35,20 @@ public class PinotFSCommand extends AbstractBaseAdminCommand implements Command 
     @CommandLine.Option(names = {"-destUri"}, description = "Destination URI for the command.")
     private String _destUri;
 
-    @CommandLine.Option(names = {"-filePath"}, description = "Local file path for copyToLocal and copyFromLocal commands.")
+    @CommandLine.Option(names = {"-filePath"}, description = "Local file path for copyToLocal "
+            + "and copyFromLocal commands.")
     private String _filePath;
 
-    @CommandLine.Option(names = {"-recursive"}, description = "Recursive flag for listFiles command.", defaultValue = "false")
+    @CommandLine.Option(names = {"-recursive"}, description = "Recursive flag for listFiles "
+            + "command.", defaultValue = "false")
     private boolean _recursive;
 
-    @CommandLine.Option(names = {"-overwrite"}, description = "Overwrite flag for move command.", defaultValue = "false")
+    @CommandLine.Option(names = {"-overwrite"}, description = "Overwrite flag for move command.",
+            defaultValue = "false")
     private boolean _overwrite;
 
-    @CommandLine.Option(names = {"-forceDelete"}, description = "Force delete flag for delete command.", defaultValue = "false")
+    @CommandLine.Option(names = {"-forceDelete"}, description = "Force delete flag for delete command.",
+            defaultValue = "false")
     private boolean _forceDelete;
 
     @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, description = "Print this message.", help = true)
@@ -227,4 +237,3 @@ public class PinotFSCommand extends AbstractBaseAdminCommand implements Command 
         CommandLine.usage(new PinotFSCommand(), System.out);
     }
 }
-
