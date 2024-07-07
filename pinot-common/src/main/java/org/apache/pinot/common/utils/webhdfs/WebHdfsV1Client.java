@@ -76,13 +76,14 @@ public class WebHdfsV1Client {
     HttpPut firstPutReq = new HttpPut(firstPutReqString);
     try {
       LOGGER.info("Trying to send request: {}.", firstPutReqString);
-      CloseableHttpResponse response = _httpClient.execute(firstPutReq);
-      int firstResponseCode = response.getCode();
-      if (firstResponseCode != 307) {
-        LOGGER.error(String.format("Failed to execute the first PUT request to upload segment to webhdfs: %s. "
-                + "Expected response code 307, but get %s. Response body: %s", firstPutReqString, firstResponseCode,
-            EntityUtils.toString(response.getEntity())));
-        return false;
+      try (CloseableHttpResponse response = _httpClient.execute(firstPutReq)) {
+        int firstResponseCode = response.getCode();
+        if (firstResponseCode != 307) {
+          LOGGER.error(String.format("Failed to execute the first PUT request to upload segment to webhdfs: %s. "
+                  + "Expected response code 307, but get %s. Response body: %s", firstPutReqString, firstResponseCode,
+              EntityUtils.toString(response.getEntity())));
+          return false;
+        }
       }
     } catch (Exception e) {
       LOGGER.error(
@@ -99,14 +100,15 @@ public class WebHdfsV1Client {
 
     try {
       LOGGER.info("Trying to send request: {}.", redirectedReqString);
-      CloseableHttpResponse redirectResponse = _httpClient.execute(redirectedReq);
-      int redirectedResponseCode = redirectResponse.getCode();
-      if (redirectedResponseCode != 201) {
-        LOGGER.error(String.format("Failed to execute the redirected PUT request to upload segment to webhdfs: %s. "
-                + "Expected response code 201, but get %s. Response: %s", redirectedReqString, redirectedResponseCode,
-            EntityUtils.toString(redirectResponse.getEntity())));
+      try (CloseableHttpResponse redirectResponse = _httpClient.execute(redirectedReq)) {
+        int redirectedResponseCode = redirectResponse.getCode();
+        if (redirectedResponseCode != 201) {
+          LOGGER.error(String.format("Failed to execute the redirected PUT request to upload segment to webhdfs: %s. "
+                  + "Expected response code 201, but get %s. Response: %s", redirectedReqString, redirectedResponseCode,
+              EntityUtils.toString(redirectResponse.getEntity())));
+        }
+        return true;
       }
-      return true;
     } catch (Exception e) {
       LOGGER.error(String
               .format("Failed to execute the redirected request to upload segment to webhdfs: %s.",
