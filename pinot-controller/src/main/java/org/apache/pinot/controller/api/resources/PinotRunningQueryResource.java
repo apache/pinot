@@ -137,19 +137,20 @@ public class PinotRunningQueryResource {
           String.format("%s://%s:%d/query/%d?verbose=%b", protocol, broker.getHostName(), port, queryId, verbose));
       Map<String, String> requestHeaders = createRequestHeaders(httpHeaders);
       requestHeaders.forEach(deleteMethod::setHeader);
-      CloseableHttpResponse response = client.execute(deleteMethod);
-      int status = response.getCode();
-      String responseContent = EntityUtils.toString(response.getEntity());
-      if (status == 200) {
-        return responseContent;
+      try (CloseableHttpResponse response = client.execute(deleteMethod)) {
+        int status = response.getCode();
+        String responseContent = EntityUtils.toString(response.getEntity());
+        if (status == 200) {
+          return responseContent;
+        }
+        if (status == 404) {
+          throw new WebApplicationException(Response.status(Response.Status.NOT_FOUND)
+              .entity(String.format("Query: %s not found on the broker: %s", queryId, brokerId)).build());
+        }
+        throw new WebApplicationException(Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(
+            String.format("Failed to cancel query: %s on the broker: %s with unexpected status=%d and resp='%s'",
+                queryId, brokerId, status, responseContent)).build());
       }
-      if (status == 404) {
-        throw new WebApplicationException(Response.status(Response.Status.NOT_FOUND)
-            .entity(String.format("Query: %s not found on the broker: %s", queryId, brokerId)).build());
-      }
-      throw new WebApplicationException(Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(
-          String.format("Failed to cancel query: %s on the broker: %s with unexpected status=%d and resp='%s'", queryId,
-              brokerId, status, responseContent)).build());
     } catch (WebApplicationException e) {
       throw e;
     } catch (Exception e) {
