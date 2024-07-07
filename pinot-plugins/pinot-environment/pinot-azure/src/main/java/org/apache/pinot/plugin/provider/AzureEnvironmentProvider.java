@@ -27,11 +27,13 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hc.client5.http.HttpRequestRetryStrategy;
 import org.apache.hc.client5.http.classic.methods.HttpGet;
 import org.apache.hc.client5.http.config.RequestConfig;
+import org.apache.hc.client5.http.impl.DefaultHttpRequestRetryStrategy;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.core5.http.HttpStatus;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
+import org.apache.hc.core5.util.TimeValue;
 import org.apache.hc.core5.util.Timeout;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.environmentprovider.PinotEnvironmentProvider;
@@ -72,7 +74,7 @@ public class AzureEnvironmentProvider implements PinotEnvironmentProvider {
         RequestConfig.custom().setConnectTimeout(Timeout.of(connectionTimeoutMillis, TimeUnit.MILLISECONDS))
             .setResponseTimeout(Timeout.of(requestTimeoutMillis, TimeUnit.MILLISECONDS)).build();
 
-    final HttpRequestRetryStrategy httpRequestRetry = new AzureHttpRequestRetryStrategy(_maxRetry);
+    final HttpRequestRetryStrategy httpRequestRetry = new DefaultHttpRequestRetryStrategy(_maxRetry, TimeValue.ofSeconds(1));
 
     _closeableHttpClient =
         HttpClients.custom().setDefaultRequestConfig(requestConfig).setRetryStrategy(httpRequestRetry).build();
