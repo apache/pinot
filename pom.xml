@@ -2088,10 +2088,14 @@
                 <!-- Pinot-Druid Benchmark (not part of the distribution) -->
                 <exclude>contrib/**</exclude>
 
+                <!-- Pinot Docs (not part of the distribution) -->
+                <exclude>docs/**</exclude>
+
                 <!-- Top level files -->
                 <exclude>HEADER</exclude>
                 <exclude>LICENSE*</exclude>
                 <exclude>NOTICE*</exclude>
+                <exclude>.gitmodules</exclude>
                 <exclude>.trivyignore</exclude>
                 <exclude>doap_Pinot.rdf</exclude>
 
@@ -2212,6 +2216,9 @@
             <exclude>**/*.*rc</exclude>
             <exclude>**/src/main/resources/*.*rc</exclude>
 
+            <!-- Docs Submodule -->
+            <exclude>docs/**</exclude>
+
             <!-- IDE files -->
             <exclude>**/*.iml</exclude>
             <exclude>**/maven-eclipse.xml</exclude>
@@ -2223,6 +2230,7 @@
             <!-- Docker and Kubernetes (not part of the distribution) -->
             <exclude>helm/**</exclude>
             <exclude>docker/**</exclude>
+            <exclude>.gitmodules</exclude>
             <exclude>.trivyignore</exclude>
 
             <!-- Pinot-Druid Benchmark (not part of the distribution) -->
