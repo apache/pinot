@@ -688,17 +688,18 @@ public class PinotTableRestletResource {
               return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED, errorMsg, null, null, null);
             }
           });
-          boolean isJobIdPersisted = waitForJobIdToPersist(dryRunResult.getJobId(), tableNameWithType);
+          boolean isJobIdPersisted = waitForRebalanceToPersist(
+              dryRunResult.getJobId(), tableNameWithType, rebalanceResultFuture);
 
-          // It's possible the dryRun indicates a rebalance is needed, but next rebalance is not.
-          // In that case, we never persist the jobId, but will already have a rebalanceResult.
-          // Return the actual rebalanceResult in this case.
-          if (!isJobIdPersisted && rebalanceResultFuture.isDone()) {
+          if (rebalanceResultFuture.isDone()) {
             try {
               return rebalanceResultFuture.get();
-            } catch (Throwable ignored) {
-              // Ignore any errors here. Errors will have already been logged
-              // in the submitted future.
+            } catch (Throwable t) {
+              if (!isJobIdPersisted) {
+                // If the jobId is not persisted, we return the exception to indicate the rebalance failed.
+                // Otherwise, polling the job id return NOT_FOUND indefinitely.
+                throw new ControllerApplicationException(LOGGER, t.getMessage(), Response.Status.INTERNAL_SERVER_ERROR);
+              }
             }
           }
 
@@ -716,15 +717,17 @@ public class PinotTableRestletResource {
   }
 
   /**
-   * Waits for jobId to be persisted using a retry policy.
+   * Waits for jobId to be persisted or the rebalance to complete using a retry policy.
    * Tables with 100k+ segments take up to a few seconds for the jobId to persist. This ensures the jobId is present
    * before returning the jobId to the caller, so they can correctly poll the jobId.
    */
-  public boolean waitForJobIdToPersist(String jobId, String tableNameWithType) {
+  public boolean waitForRebalanceToPersist(
+      String jobId, String tableNameWithType, Future<RebalanceResult> rebalanceResultFuture) {
     try {
       // This retry policy waits at most for 7.5s to 15s in total. This is chosen to cover typical delays for tables
       // with many segments and avoid excessive HTTP request timeouts.
-      RetryPolicies.exponentialBackoffRetryPolicy(5, 500L, 2.0).attempt(() -> getControllerJobMetadata(jobId) != null);
+      RetryPolicies.exponentialBackoffRetryPolicy(5, 500L, 2.0).attempt(() ->
+          getControllerJobMetadata(jobId) != null || rebalanceResultFuture.isDone());
       return true;
     } catch (Exception e) {
       LOGGER.warn("waiting for jobId not successful while rebalancing table: {}", tableNameWithType);
