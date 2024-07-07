@@ -99,8 +99,9 @@ public class DruidThroughput {
           try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
             while (System.currentTimeMillis() < endTime) {
               long startTime = System.currentTimeMillis();
-              CloseableHttpResponse httpResponse = httpClient.execute(httpPosts[RANDOM.nextInt(numQueries)]);
-              httpResponse.close();
+              try (CloseableHttpResponse httpResponse = httpClient.execute(httpPosts[RANDOM.nextInt(numQueries)])) {
+                // httpResponse will be auto closed
+              }
               long responseTime = System.currentTimeMillis() - startTime;
               counter.getAndIncrement();
               totalResponseTime.getAndAdd(responseTime);
