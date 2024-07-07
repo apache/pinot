@@ -74,7 +74,9 @@ public class AzureEnvironmentProvider implements PinotEnvironmentProvider {
         RequestConfig.custom().setConnectTimeout(Timeout.of(connectionTimeoutMillis, TimeUnit.MILLISECONDS))
             .setResponseTimeout(Timeout.of(requestTimeoutMillis, TimeUnit.MILLISECONDS)).build();
 
-    final HttpRequestRetryStrategy httpRequestRetry = new DefaultHttpRequestRetryStrategy(_maxRetry, TimeValue.ofSeconds(1));
+    final HttpRequestRetryStrategy httpRequestRetry = new DefaultHttpRequestRetryStrategy(
+        _maxRetry,
+        TimeValue.ofSeconds(1));
 
     _closeableHttpClient =
         HttpClients.custom().setDefaultRequestConfig(requestConfig).setRetryStrategy(httpRequestRetry).build();

@@ -223,7 +223,8 @@ public class PinotControllerLogger {
       if (authorization != null) {
         requestBuilder.addHeader(HttpHeaders.AUTHORIZATION, authorization);
       }
-      try (CloseableHttpResponse httpResponse = _fileUploadDownloadClient.getHttpClient().execute(requestBuilder.build())) {
+      try (CloseableHttpResponse httpResponse = _fileUploadDownloadClient.getHttpClient()
+          .execute(requestBuilder.build())) {
         if (httpResponse.getCode() >= 400) {
           throw new WebApplicationException(IOUtils.toString(httpResponse.getEntity().getContent(), "UTF-8"),
               Response.Status.fromStatusCode(httpResponse.getCode()));
