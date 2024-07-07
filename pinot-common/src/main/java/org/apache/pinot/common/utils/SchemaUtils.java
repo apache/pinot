@@ -86,19 +86,20 @@ public class SchemaUtils {
     try {
       URL url = new URL(CommonConstants.HTTP_PROTOCOL, host, port, "/schemas/" + schemaName);
       HttpGet httpGet = new HttpGet(url.toString());
-      CloseableHttpResponse response = HTTP_CLIENT.execute(httpGet);
-      int responseCode = response.getCode();
-      String responseString = EntityUtils.toString(response.getEntity());
-      if (responseCode >= 400) {
-        // File not find error code.
-        if (responseCode == 404) {
-          LOGGER.info("Cannot find schema: {} from host: {}, port: {}", schemaName, host, port);
-        } else {
-          LOGGER.warn("Got error response code: {}, response: {}", responseCode, response);
+      try (CloseableHttpResponse response = HTTP_CLIENT.execute(httpGet)) {
+        int responseCode = response.getCode();
+        String responseString = EntityUtils.toString(response.getEntity());
+        if (responseCode >= 400) {
+          // File not find error code.
+          if (responseCode == 404) {
+            LOGGER.info("Cannot find schema: {} from host: {}, port: {}", schemaName, host, port);
+          } else {
+            LOGGER.warn("Got error response code: {}, response: {}", responseCode, response);
+          }
+          return null;
         }
-        return null;
+        return Schema.fromString(responseString);
       }
-      return Schema.fromString(responseString);
     } catch (Exception e) {
       LOGGER.error("Caught exception while getting the schema: {} from host: {}, port: {}", schemaName, host, port, e);
       return null;
@@ -121,14 +122,15 @@ public class SchemaUtils {
       HttpEntity requestEntity =
           MultipartEntityBuilder.create().addTextBody(schema.getSchemaName(), schema.toSingleLineJsonString()).build();
       httpPost.setEntity(requestEntity);
-      CloseableHttpResponse response = HTTP_CLIENT.execute(httpPost);
-      int responseCode = response.getCode();
-      if (responseCode >= 400) {
-        String responseString = IOUtils.toString(response.getEntity().getContent(), Charset.defaultCharset());
-        LOGGER.warn("Got error response code: {}, response: {}", responseCode, responseString);
-        return false;
+      try (CloseableHttpResponse response = HTTP_CLIENT.execute(httpPost)) {
+        int responseCode = response.getCode();
+        if (responseCode >= 400) {
+          String responseString = IOUtils.toString(response.getEntity().getContent(), Charset.defaultCharset());
+          LOGGER.warn("Got error response code: {}, response: {}", responseCode, responseString);
+          return false;
+        }
+        return true;
       }
-      return true;
     } catch (Exception e) {
       LOGGER.error("Caught exception while posting the schema: {} to host: {}, port: {}", schema.getSchemaName(), host,
           port, e);
@@ -149,14 +151,15 @@ public class SchemaUtils {
     try {
       URL url = new URL(CommonConstants.HTTP_PROTOCOL, host, port, "/schemas/" + schemaName);
       HttpDelete httpDelete = new HttpDelete(url.toString());
-      CloseableHttpResponse response = HTTP_CLIENT.execute(httpDelete);
-      int responseCode = response.getCode();
-      if (responseCode >= 400) {
-        String responseString = EntityUtils.toString(response.getEntity());
-        LOGGER.warn("Got error response code: {}, response: {}", responseCode, responseString);
-        return false;
+      try (CloseableHttpResponse response = HTTP_CLIENT.execute(httpDelete)) {
+        int responseCode = response.getCode();
+        if (responseCode >= 400) {
+          String responseString = EntityUtils.toString(response.getEntity());
+          LOGGER.warn("Got error response code: {}, response: {}", responseCode, responseString);
+          return false;
+        }
+        return true;
       }
-      return true;
     } catch (Exception e) {
       LOGGER.error("Caught exception while getting the schema: {} from host: {}, port: {}", schemaName, host, port, e);
       return false;
