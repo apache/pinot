@@ -20,8 +20,6 @@ package org.apache.pinot.controller.helix;
 
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.AccessOption;
 import org.apache.helix.model.ExternalView;
@@ -61,7 +59,6 @@ import static org.testng.Assert.assertFalse;
 
 
 public class SegmentStatusCheckerTest {
-  private final ExecutorService _executorService = Executors.newFixedThreadPool(1);
 
   private SegmentStatusChecker _segmentStatusChecker;
   private PinotHelixResourceManager _helixResourceManager;
@@ -145,7 +142,7 @@ public class SegmentStatusCheckerTest {
     _controllerMetrics = new ControllerMetrics(_metricsRegistry);
     _segmentStatusChecker =
         new SegmentStatusChecker(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics,
-            _executorService);
+            _tableSizeReader);
     _segmentStatusChecker.setTableSizeReader(_tableSizeReader);
     _segmentStatusChecker.start();
     _segmentStatusChecker.run();
@@ -237,7 +234,7 @@ public class SegmentStatusCheckerTest {
     _controllerMetrics = new ControllerMetrics(_metricsRegistry);
     _segmentStatusChecker =
         new SegmentStatusChecker(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics,
-            _executorService);
+            _tableSizeReader);
     _segmentStatusChecker.setTableSizeReader(_tableSizeReader);
     _segmentStatusChecker.start();
     _segmentStatusChecker.run();
@@ -336,7 +333,7 @@ public class SegmentStatusCheckerTest {
     _controllerMetrics = new ControllerMetrics(_metricsRegistry);
     _segmentStatusChecker =
         new SegmentStatusChecker(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics,
-            _executorService);
+            _tableSizeReader);
     _segmentStatusChecker.setTableSizeReader(_tableSizeReader);
     _segmentStatusChecker.start();
     _segmentStatusChecker.run();
@@ -395,7 +392,7 @@ public class SegmentStatusCheckerTest {
     _controllerMetrics = new ControllerMetrics(_metricsRegistry);
     _segmentStatusChecker =
         new SegmentStatusChecker(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics,
-            _executorService);
+            _tableSizeReader);
     _segmentStatusChecker.setTableSizeReader(_tableSizeReader);
     _segmentStatusChecker.start();
     _segmentStatusChecker.run();
@@ -440,7 +437,7 @@ public class SegmentStatusCheckerTest {
     _controllerMetrics = new ControllerMetrics(_metricsRegistry);
     _segmentStatusChecker =
         new SegmentStatusChecker(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics,
-            _executorService);
+            _tableSizeReader);
     _segmentStatusChecker.setTableSizeReader(_tableSizeReader);
     _segmentStatusChecker.start();
     _segmentStatusChecker.run();
@@ -534,7 +531,7 @@ public class SegmentStatusCheckerTest {
     _controllerMetrics = new ControllerMetrics(_metricsRegistry);
     _segmentStatusChecker =
         new SegmentStatusChecker(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics,
-            _executorService);
+            _tableSizeReader);
     _segmentStatusChecker.setTableSizeReader(_tableSizeReader);
     _segmentStatusChecker.start();
     _segmentStatusChecker.run();
@@ -591,7 +588,7 @@ public class SegmentStatusCheckerTest {
     _controllerMetrics = new ControllerMetrics(_metricsRegistry);
     _segmentStatusChecker =
         new SegmentStatusChecker(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics,
-            _executorService);
+            _tableSizeReader);
     _segmentStatusChecker.setTableSizeReader(_tableSizeReader);
     _segmentStatusChecker.start();
     _segmentStatusChecker.run();
@@ -643,7 +640,7 @@ public class SegmentStatusCheckerTest {
     _controllerMetrics = new ControllerMetrics(_metricsRegistry);
     _segmentStatusChecker =
         new SegmentStatusChecker(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics,
-            _executorService);
+            null);
 
     // verify state before test
     assertEquals(MetricValueUtils.getGlobalGaugeValue(_controllerMetrics, ControllerGauge.DISABLED_TABLE_COUNT), 0);
@@ -684,7 +681,7 @@ public class SegmentStatusCheckerTest {
     _controllerMetrics = new ControllerMetrics(_metricsRegistry);
     _segmentStatusChecker =
         new SegmentStatusChecker(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics,
-            _executorService);
+            null);
 
     // verify state before test
     assertFalse(MetricValueUtils.globalGaugeExists(_controllerMetrics, ControllerGauge.DISABLED_TABLE_COUNT));
@@ -756,7 +753,7 @@ public class SegmentStatusCheckerTest {
     _controllerMetrics = new ControllerMetrics(_metricsRegistry);
     _segmentStatusChecker =
         new SegmentStatusChecker(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics,
-            _executorService);
+            _tableSizeReader);
     _segmentStatusChecker.setTableSizeReader(_tableSizeReader);
     _segmentStatusChecker.start();
     _segmentStatusChecker.run();
@@ -803,7 +800,7 @@ public class SegmentStatusCheckerTest {
     _controllerMetrics = new ControllerMetrics(_metricsRegistry);
     _segmentStatusChecker =
         new SegmentStatusChecker(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics,
-            _executorService);
+            _tableSizeReader);
     _segmentStatusChecker.setTableSizeReader(_tableSizeReader);
     _segmentStatusChecker.start();
     _segmentStatusChecker.run();

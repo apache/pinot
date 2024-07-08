@@ -25,9 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
-import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -89,15 +87,13 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
    */
   public SegmentStatusChecker(PinotHelixResourceManager pinotHelixResourceManager,
       LeadControllerManager leadControllerManager, ControllerConf config, ControllerMetrics controllerMetrics,
-      ExecutorService executorService) {
+      TableSizeReader tableSizeReader) {
     super("SegmentStatusChecker", config.getStatusCheckerFrequencyInSeconds(),
         config.getStatusCheckerInitialDelayInSeconds(), pinotHelixResourceManager, leadControllerManager,
         controllerMetrics);
 
     _waitForPushTimeSeconds = config.getStatusCheckerWaitForPushTimeInSeconds();
-    _tableSizeReader =
-        new TableSizeReader(executorService, new PoolingHttpClientConnectionManager(), _controllerMetrics,
-            _pinotHelixResourceManager, leadControllerManager);
+    _tableSizeReader = tableSizeReader;
   }
 
   @Override
