@@ -26,16 +26,16 @@ import java.util.Map;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
-public class GenericRowReaderFactory {
+public class MapperOutputReaderFactory {
   // Enum for various GenericRowFileReaders to be added.
-  public enum GenericRowReaderType {
+  public enum MapperOutputReaderType {
     GenericRowFileReader;
     // Add more Readers here.
 
-    private static final Map<String, GenericRowReaderType> VALUE_MAP = new HashMap<>();
+    private static final Map<String, MapperOutputReaderType> VALUE_MAP = new HashMap<>();
 
-    public static GenericRowReaderType fromString(String name) {
-      GenericRowReaderType readerType = VALUE_MAP.get(name.toLowerCase());
+    public static MapperOutputReaderType fromString(String name) {
+      MapperOutputReaderType readerType = VALUE_MAP.get(name.toLowerCase());
 
       if (readerType == null) {
         throw new IllegalArgumentException("No enum constant for: " + name);
@@ -44,13 +44,13 @@ public class GenericRowReaderFactory {
     }
 
     static {
-      for (GenericRowReaderType genericRowReaderType : GenericRowReaderType.values()) {
-        VALUE_MAP.put(genericRowReaderType.name().toLowerCase(), genericRowReaderType);
+      for (MapperOutputReaderType mapperOutputReaderType : MapperOutputReaderType.values()) {
+        VALUE_MAP.put(mapperOutputReaderType.name().toLowerCase(), mapperOutputReaderType);
       }
     }
   }
 
-  private GenericRowReaderFactory() {
+  private MapperOutputReaderFactory() {
   }
 
   private static GenericRowFileReader createGenericRowFileReader(Map<String, Object> params)
@@ -64,9 +64,9 @@ public class GenericRowReaderFactory {
     return new GenericRowFileReader(offsetFile, dataFile, fieldSpecs, includeNullFields, numSortFields);
   }
 
-  public static GenericRowReader getGenericRowReader(String readerName, Map<String, Object> params)
+  public static MapperOutputReader getMapperOutputReader(String readerName, Map<String, Object> params)
       throws IOException {
-    GenericRowReaderType readerType = GenericRowReaderType.fromString(readerName);
+    MapperOutputReaderType readerType = MapperOutputReaderType.fromString(readerName);
     switch (readerType) {
       case GenericRowFileReader:
         return createGenericRowFileReader(params);

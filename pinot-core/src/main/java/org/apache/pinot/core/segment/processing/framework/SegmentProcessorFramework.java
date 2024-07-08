@@ -29,7 +29,7 @@ import java.util.function.Consumer;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileManager;
 import org.apache.pinot.core.segment.processing.genericrow.GenericRowMapperOutputRecordReader;
-import org.apache.pinot.core.segment.processing.genericrow.GenericRowReader;
+import org.apache.pinot.core.segment.processing.genericrow.MapperOutputReader;
 import org.apache.pinot.core.segment.processing.mapper.SegmentMapper;
 import org.apache.pinot.core.segment.processing.reducer.Reducer;
 import org.apache.pinot.core.segment.processing.reducer.ReducerFactory;
@@ -272,7 +272,7 @@ public class SegmentProcessorFramework {
       String partitionId = entry.getKey();
       GenericRowFileManager fileManager = entry.getValue();
       try {
-        GenericRowReader fileReader = fileManager.getFileReader();
+        MapperOutputReader fileReader = fileManager.getFileReader();
         int numRows = fileReader.getNumRows();
         int numSortFields = fileReader.getNumSortFields();
         LOGGER.info("Start creating segments on partition: {}, numRows: {}, numSortFields: {}", partitionId, numRows,

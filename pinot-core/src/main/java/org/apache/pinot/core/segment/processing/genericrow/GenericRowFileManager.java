@@ -42,7 +42,7 @@ public class GenericRowFileManager {
   private final int _numSortFields;
 
   private GenericRowFileWriter _fileWriter;
-  private GenericRowReader _fileReader;
+  private MapperOutputReader _fileReader;
 
   public GenericRowFileManager(File outputDir, List<FieldSpec> fieldSpecs, boolean includeNullFields,
       int numSortFields) {
@@ -101,7 +101,7 @@ public class GenericRowFileManager {
   /**
    * Returns the file reader. Creates one if not exists.
    */
-  public GenericRowReader getFileReader()
+  public MapperOutputReader getFileReader()
       throws IOException {
     if (_fileReader == null) {
       Preconditions.checkState(_offsetFile.exists(), "Record offset file: %s does not exist", _offsetFile);
@@ -112,7 +112,7 @@ public class GenericRowFileManager {
       params.put("fieldSpecs", _fieldSpecs);
       params.put("includeNullFields", _includeNullFields);
       params.put("numSortFields", _numSortFields);
-      _fileReader = GenericRowReaderFactory.getGenericRowReader("GenericRowFileReader", params);
+      _fileReader = MapperOutputReaderFactory.getMapperOutputReader("GenericRowFileReader", params);
     }
     return _fileReader;
   }

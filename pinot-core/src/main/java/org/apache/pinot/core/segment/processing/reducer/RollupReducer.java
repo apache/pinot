@@ -28,7 +28,7 @@ import org.apache.pinot.core.segment.processing.aggregator.ValueAggregatorFactor
 import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileManager;
 import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileWriter;
 import org.apache.pinot.core.segment.processing.genericrow.GenericRowMapperOutputRecordReader;
-import org.apache.pinot.core.segment.processing.genericrow.GenericRowReader;
+import org.apache.pinot.core.segment.processing.genericrow.MapperOutputReader;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.FieldType;
@@ -77,7 +77,7 @@ public class RollupReducer implements Reducer {
     LOGGER.info("Start reducing on partition: {}", _partitionId);
     long reduceStartTimeMs = System.currentTimeMillis();
 
-    GenericRowReader fileReader = _fileManager.getFileReader();
+    MapperOutputReader fileReader = _fileManager.getFileReader();
     int numRows = fileReader.getNumRows();
     int numSortFields = fileReader.getNumSortFields();
     LOGGER.info("Start sorting on numRows: {}, numSortFields: {}", numRows, numSortFields);

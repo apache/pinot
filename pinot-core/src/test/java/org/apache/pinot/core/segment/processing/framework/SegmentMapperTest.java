@@ -28,7 +28,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileManager;
-import org.apache.pinot.core.segment.processing.genericrow.GenericRowReader;
+import org.apache.pinot.core.segment.processing.genericrow.MapperOutputReader;
 import org.apache.pinot.core.segment.processing.mapper.SegmentMapper;
 import org.apache.pinot.core.segment.processing.partitioner.PartitionerConfig;
 import org.apache.pinot.core.segment.processing.partitioner.PartitionerFactory;
@@ -163,7 +163,7 @@ public class SegmentMapperTest {
       assertEquals(fileNames[1], GenericRowFileManager.OFFSET_FILE_NAME);
 
       GenericRowFileManager fileManager = entry.getValue();
-      GenericRowReader fileReader = fileManager.getFileReader();
+      MapperOutputReader fileReader = fileManager.getFileReader();
       int numRows = fileReader.getNumRows();
       List<Object[]> expectedRecords = partitionToRecords.get(partition);
       assertEquals(numRows, expectedRecords.size());

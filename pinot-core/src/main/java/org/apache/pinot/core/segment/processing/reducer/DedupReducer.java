@@ -23,7 +23,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileManager;
 import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileWriter;
 import org.apache.pinot.core.segment.processing.genericrow.GenericRowMapperOutputRecordReader;
-import org.apache.pinot.core.segment.processing.genericrow.GenericRowReader;
+import org.apache.pinot.core.segment.processing.genericrow.MapperOutputReader;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -65,7 +65,7 @@ public class DedupReducer implements Reducer {
     LOGGER.info("Start reducing on partition: {}", _partitionId);
     long reduceStartTimeMs = System.currentTimeMillis();
 
-    GenericRowReader fileReader = _fileManager.getFileReader();
+    MapperOutputReader fileReader = _fileManager.getFileReader();
     int numRows = fileReader.getNumRows();
     int numSortFields = fileReader.getNumSortFields();
     LOGGER.info("Start sorting on numRows: {}, numSortFields: {}", numRows, numSortFields);

@@ -22,7 +22,7 @@ import java.io.IOException;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
-public interface GenericRowReader {
+public interface MapperOutputReader {
   GenericRowMapperOutputRecordReader getRecordReader();
   int getNumSortFields();
   int getNumRows();
