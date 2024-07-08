@@ -468,7 +468,8 @@ public class ServiceStatus {
       // some reason)
       Map<String, String> partitionStateMap = getPartitionStateMap(helixState);
       for (String partitionName : partitionSet) {
-        String idealStateStatus = partitionToIdealStateStatusMap.get(partitionName);
+        String idealStateStatus = partitionToIdealStateStatusMap.getOrDefault(partitionName,
+            idealState.getInstanceStateMap(partitionName).get(_instanceName));
 
         // Skip this partition if it is not assigned to this instance or if the instance should be offline
         if (idealStateStatus == null || "OFFLINE".equals(idealStateStatus)) {
