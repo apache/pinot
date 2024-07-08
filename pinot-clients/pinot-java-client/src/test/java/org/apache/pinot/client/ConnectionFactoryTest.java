@@ -54,7 +54,9 @@ public class ConnectionFactoryTest {
       }
 
       @Override
-      public List<BrokerInfo> getBrokerInfoList() {return ImmutableList.of(givenBrokerInfo);}
+      public List<BrokerInfo> getBrokerInfoList() {
+        return ImmutableList.of(givenBrokerInfo);
+      }
     });
 
     PinotClientTransport pinotClientTransport = Mockito.mock(PinotClientTransport.class);
