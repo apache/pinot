@@ -59,13 +59,11 @@ import org.apache.helix.PropertyKey;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.exception.InvalidConfigException;
-import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.restlet.resources.SegmentConsumerInfo;
 import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.common.restlet.resources.SegmentServerDebugInfo;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.controller.ControllerConf;
-import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.api.debug.TableDebugInfo;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -119,13 +117,10 @@ public class DebugResource {
   HttpClientConnectionManager _connectionManager;
 
   @Inject
-  ControllerMetrics _controllerMetrics;
-
-  @Inject
   ControllerConf _controllerConf;
 
   @Inject
-  LeadControllerManager _leadControllerManager;
+  TableSizeReader _tableSizeReader;
 
   @GET
   @Path("tables/{tableName}")
@@ -241,12 +236,9 @@ public class DebugResource {
   }
 
   private TableDebugInfo.TableSizeSummary getTableSize(String tableNameWithType) {
-    TableSizeReader tableSizeReader =
-        new TableSizeReader(_executor, _connectionManager, _controllerMetrics, _pinotHelixResourceManager,
-            _leadControllerManager);
     TableSizeReader.TableSizeDetails tableSizeDetails;
     try {
-      tableSizeDetails = tableSizeReader
+      tableSizeDetails = _tableSizeReader
           .getTableSizeDetails(tableNameWithType, _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
     } catch (Throwable t) {
       tableSizeDetails = null;
