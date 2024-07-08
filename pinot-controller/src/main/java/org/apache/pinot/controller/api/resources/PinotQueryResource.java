@@ -70,6 +70,7 @@ import org.apache.pinot.core.auth.ManualAuthorization;
 import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.catalog.PinotCatalog;
+import org.apache.pinot.query.parser.utils.ParserUtils;
 import org.apache.pinot.query.type.TypeFactory;
 import org.apache.pinot.query.type.TypeSystem;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -275,22 +276,17 @@ public class PinotQueryResource {
       tableName = _pinotHelixResourceManager.getActualTableName(inputTableName, database);
     } catch (Exception e) {
       LOGGER.error("Caught exception while compiling query: {}", query, e);
-      try {
-        // try to compile the query using multi-stage engine and suggest using it if it succeeds.
-        LOGGER.info("Trying to compile query {} using multi-stage engine", query);
-        QueryEnvironment queryEnvironment = new QueryEnvironment(new TypeFactory(new TypeSystem()),
-            CalciteSchemaBuilder.asRootSchema(new PinotCatalog(database, _pinotHelixResourceManager.getTableCache()),
-                database), null, null);
-        queryEnvironment.getTableNamesForQuery(query);
-        LOGGER.info("Successfully compiled query using multi-stage engine: {}", query);
+
+      // Check if the query is a v2 supported query
+      if (ParserUtils.canCompileQueryUsingV2Engine(query, CalciteSchemaBuilder.asRootSchema(
+          new PinotCatalog(database, _pinotHelixResourceManager.getTableCache()), database))) {
         return QueryException.getException(QueryException.SQL_PARSING_ERROR, new Exception(
-            "It seems that the query is only supported by the multi-stage engine, please try it by checking the "
-                + "\"Use Multi-Stage Engine\" box above")).toString();
-      } catch (Exception multipleTablesPassingException) {
-        LOGGER.error("Caught exception while compiling query using multi-stage engine: {}",
-            query, multipleTablesPassingException);
+            "It seems that the query is only supported by the multi-stage query engine, please retry the query using "
+                + "the multi-stage query engine "
+                + "(https://docs.pinot.apache.org/developers/advanced/v2-multi-stage-query-engine)")).toString();
+      } else {
+        return QueryException.getException(QueryException.SQL_PARSING_ERROR, e).toString();
       }
-      return QueryException.getException(QueryException.SQL_PARSING_ERROR, e).toString();
     }
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
 
