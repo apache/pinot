@@ -43,9 +43,9 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.http.client.methods.HttpDelete;
-import org.apache.http.conn.HttpClientConnectionManager;
-import org.apache.http.util.EntityUtils;
+import org.apache.hc.client5.http.classic.methods.HttpDelete;
+import org.apache.hc.client5.http.io.HttpClientConnectionManager;
+import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.pinot.broker.api.AccessControl;
 import org.apache.pinot.broker.api.RequesterIdentity;
 import org.apache.pinot.broker.broker.AccessControlFactory;
@@ -203,7 +203,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         // requests. The completion order is different from serverUrls, thus use uri in the response.
         httpRequestResponse = completionService.take().get();
         URI uri = httpRequestResponse.getURI();
-        int status = httpRequestResponse.getResponse().getStatusLine().getStatusCode();
+        int status = httpRequestResponse.getResponse().getCode();
         // Unexpected server responses are collected and returned as exception.
         if (status != 200 && status != 404) {
           String responseString = EntityUtils.toString(httpRequestResponse.getResponse().getEntity());
