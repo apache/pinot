@@ -71,9 +71,9 @@ public abstract class IndexedTable extends BaseTable {
       int trimSize, int trimThreshold, Map<Key, Record> lookupMap) {
     super(dataSchema);
 
-    Preconditions.checkArgument(resultSize > 0, "Result size should be a non-zero positive integer");
-    Preconditions.checkArgument(trimSize > 0, "Trim size should be a non-zero positive integer");
-    Preconditions.checkArgument(trimThreshold > 0, "Trim threshold should be a non-zero positive integer");
+    Preconditions.checkArgument(resultSize >= 0, "Result size can't be negative");
+    Preconditions.checkArgument(trimSize >= 0, "Trim size can't be negative");
+    Preconditions.checkArgument(trimThreshold >= 0, "Trim threshold can't be negative");
 
     _lookupMap = lookupMap;
     _hasFinalInput = hasFinalInput;
