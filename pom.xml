@@ -244,6 +244,8 @@
     <bouncycastle.version>1.78.1</bouncycastle.version>
     <aircompressor.version>0.27</aircompressor.version>
     <jna.version>5.14.0</jna.version>
+
+    <arrow.version>16.1.0</arrow.version>
   </properties>
 
   <profiles>
@@ -1567,6 +1569,17 @@
         <groupId>io.airlift</groupId>
         <artifactId>aircompressor</artifactId>
         <version>${aircompressor.version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>org.apache.arrow</groupId>
+        <artifactId>arrow-vector</artifactId>
+        <version>${arrow.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.arrow</groupId>
+        <artifactId>arrow-memory-netty</artifactId>
+        <version>${arrow.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
