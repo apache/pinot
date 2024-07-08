@@ -67,7 +67,7 @@ public class ConnectionFactoryTest {
             pinotClientTransport);
 
     // Check that the broker list has the right length and has the same servers
-    Assert.assertEquals(connection.getBrokerList(), ImmutableList.of("localhost:2345"));
+    Assert.assertEquals(connection.getBrokerList(), ImmutableList.of(givenBrokerInfo.getHostPort(false)));
   }
 
   @Test
