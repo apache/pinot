@@ -476,11 +476,6 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         new PinotLLCRealtimeSegmentManager(_helixResourceManager, _config, _controllerMetrics);
     // TODO: Need to put this inside HelixResourceManager when HelixControllerLeadershipManager is removed.
     _helixResourceManager.registerPinotLLCRealtimeSegmentManager(_pinotLLCRealtimeSegmentManager);
-    _tableSizeReader =
-        new TableSizeReader(_executorService, _connectionManager, _controllerMetrics, _helixResourceManager,
-            _leadControllerManager);
-    _storageQuotaChecker = new StorageQuotaChecker(_tableSizeReader, _controllerMetrics, _leadControllerManager,
-        _helixResourceManager);
     _segmentCompletionManager =
         new SegmentCompletionManager(_helixParticipantManager, _pinotLLCRealtimeSegmentManager, _controllerMetrics,
             _leadControllerManager, _config.getSegmentCommitTimeoutSeconds());
@@ -492,6 +487,11 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         SocketConfig.custom()
             .setSoTimeout(Timeout.of(_config.getServerAdminRequestTimeoutSeconds() * 1000, TimeUnit.MILLISECONDS))
             .build());
+    _tableSizeReader =
+        new TableSizeReader(_executorService, _connectionManager, _controllerMetrics, _helixResourceManager,
+            _leadControllerManager);
+    _storageQuotaChecker = new StorageQuotaChecker(_tableSizeReader, _controllerMetrics, _leadControllerManager,
+        _helixResourceManager);
 
     // Setting up periodic tasks
     List<PeriodicTask> controllerPeriodicTasks = setupControllerPeriodicTasks();
