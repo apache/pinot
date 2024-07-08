@@ -21,9 +21,11 @@ package org.apache.pinot.common.broker;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
@@ -75,11 +77,11 @@ public class DynamicBrokerSelector extends BrokerInfoSelector implements IZkData
   private void refresh() {
     Map<String, List<BrokerInfo>> tableToBrokerListMap = _evReader.getTableToBrokerInfosMap();
     _tableToBrokerListMapRef.set(tableToBrokerListMap);
-    List<BrokerInfo> brokerList = new ArrayList<>();
-    for (List<BrokerInfo> brokerInfoSet : tableToBrokerListMap.values()) {
-      brokerList.addAll(brokerInfoSet);
+    Set<BrokerInfo> brokerInfoSet = new HashSet<>();
+    for (List<BrokerInfo> brokerInfoList : tableToBrokerListMap.values()) {
+      brokerInfoSet.addAll(brokerInfoList);
     }
-    _allBrokerListRef.set(brokerList);
+    _allBrokerListRef.set(new ArrayList<>(brokerInfoSet));
   }
 
   @Nullable
