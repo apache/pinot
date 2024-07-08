@@ -3472,6 +3472,13 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     testQuery("SELECT BOOL_OR(CAST(Diverted AS BOOLEAN)) FROM mytable");
   }
 
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testGroupByAggregationWithLimitZero(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    testQuery("SELECT Origin, SUM(ArrDelay) FROM mytable GROUP BY Origin LIMIT 0");
+  }
+
   private String buildSkipIndexesOption(String columnsAndIndexes) {
     return "SET " + SKIP_INDEXES + "='" + columnsAndIndexes + "'; ";
   }
