@@ -231,6 +231,7 @@ public class MinionTaskUtils {
         continue;
       }
       validDocIds = RoaringBitmapUtils.deserialize(validDocIdsBitmapResponse.getBitmap());
+      break;
     }
     return validDocIds;
   }

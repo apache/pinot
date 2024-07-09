@@ -257,10 +257,9 @@ public class ServerSegmentMetadataReader {
 
       // Number of segments to query per server request. If a table has a lot of segments, then we might send a
       // huge payload to pinot-server in request. Batching the requests will help in reducing the payload size.
-      Lists.partition(segmentsToQuery, numSegmentsBatchPerServerRequest).forEach(
-          segmentsToQueryBatch -> serverURLsAndBodies.add(
-              generateValidDocIdsMetadataURL(tableNameWithType, segmentsToQueryBatch, validDocIdsType,
-                  serverToEndpoints.get(serverToSegments.getKey()))));
+      Lists.partition(segmentsToQuery, numSegmentsBatchPerServerRequest).forEach(segmentsToQueryBatch ->
+          serverURLsAndBodies.add(generateValidDocIdsMetadataURL(tableNameWithType, segmentsToQueryBatch,
+              validDocIdsType, serverToEndpoints.get(serverToSegments.getKey()))));
     }
 
     BiMap<String, String> endpointsToServers = serverToEndpoints.inverse();

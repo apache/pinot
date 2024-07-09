@@ -60,6 +60,153 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
   private static final long DEFAULT_INVALID_RECORDS_THRESHOLD_COUNT = 1;
   private static final int DEFAULT_NUM_SEGMENTS_BATCH_PER_SERVER_REQUEST = 500;
 
+  public static class SegmentSelectionResult {
+
+    private final List<SegmentZKMetadata> _segmentsForCompaction;
+
+    private final List<String> _segmentsForDeletion;
+
+    SegmentSelectionResult(List<SegmentZKMetadata> segmentsForCompaction, List<String> segmentsForDeletion) {
+      _segmentsForCompaction = segmentsForCompaction;
+      _segmentsForDeletion = segmentsForDeletion;
+    }
+
+    public List<SegmentZKMetadata> getSegmentsForCompaction() {
+      return _segmentsForCompaction;
+    }
+
+    public List<String> getSegmentsForDeletion() {
+      return _segmentsForDeletion;
+    }
+  }
+
+  @Override
+  public String getTaskType() {
+    return MinionConstants.UpsertCompactionTask.TASK_TYPE;
+  }
+
+  @Override
+  public List<PinotTaskConfig> generateTasks(List<TableConfig> tableConfigs) {
+    String taskType = MinionConstants.UpsertCompactionTask.TASK_TYPE;
+    List<PinotTaskConfig> pinotTaskConfigs = new ArrayList<>();
+    for (TableConfig tableConfig : tableConfigs) {
+      if (!validate(tableConfig)) {
+        LOGGER.warn("Validation failed for table {}. Skipping..", tableConfig.getTableName());
+        continue;
+      }
+
+      String tableNameWithType = tableConfig.getTableName();
+      LOGGER.info("Start generating task configs for table: {}", tableNameWithType);
+
+      if (tableConfig.getTaskConfig() == null) {
+        LOGGER.warn("Task config is null for table: {}", tableNameWithType);
+        continue;
+      }
+
+      Map<String, String> taskConfigs = tableConfig.getTaskConfig().getConfigsForTaskType(taskType);
+      List<SegmentZKMetadata> allSegments = _clusterInfoAccessor.getSegmentsZKMetadata(tableNameWithType);
+
+      // Get completed segments and filter out the segments based on the buffer time configuration
+      List<SegmentZKMetadata> completedSegments =
+          getCompletedSegments(taskConfigs, allSegments, System.currentTimeMillis());
+
+      if (completedSegments.isEmpty()) {
+        LOGGER.info("No completed segments were eligible for compaction for table: {}", tableNameWithType);
+        continue;
+      }
+
+      // Only schedule 1 task of this type, per table
+      Map<String, TaskState> incompleteTasks =
+          TaskGeneratorUtils.getIncompleteTasks(taskType, tableNameWithType, _clusterInfoAccessor);
+      if (!incompleteTasks.isEmpty()) {
+        LOGGER.warn("Found incomplete tasks: {} for same table: {} and task type: {}. Skipping task generation.",
+            incompleteTasks.keySet(), tableNameWithType, taskType);
+        continue;
+      }
+
+      // get server to segment mappings
+      PinotHelixResourceManager pinotHelixResourceManager = _clusterInfoAccessor.getPinotHelixResourceManager();
+      Map<String, List<String>> serverToSegments = pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType);
+      BiMap<String, String> serverToEndpoints;
+      try {
+        serverToEndpoints = pinotHelixResourceManager.getDataInstanceAdminEndpoints(serverToSegments.keySet());
+      } catch (InvalidConfigException e) {
+        throw new RuntimeException(e);
+      }
+
+      ServerSegmentMetadataReader serverSegmentMetadataReader =
+          new ServerSegmentMetadataReader(_clusterInfoAccessor.getExecutor(),
+              _clusterInfoAccessor.getConnectionManager());
+
+      // By default, we use 'snapshot' for validDocIdsType. This means that we will use the validDocIds bitmap from
+      // the snapshot from Pinot segment. This will require 'enableSnapshot' from UpsertConfig to be set to true.
+      String validDocIdsTypeStr =
+          taskConfigs.getOrDefault(UpsertCompactionTask.VALID_DOC_IDS_TYPE, ValidDocIdsType.SNAPSHOT.toString());
+      ValidDocIdsType validDocIdsType = ValidDocIdsType.valueOf(validDocIdsTypeStr.toUpperCase());
+
+      // Number of segments to query per server request. If a table has a lot of segments, then we might send a
+      // huge payload to pinot-server in request. Batching the requests will help in reducing the payload size.
+      int numSegmentsBatchPerServerRequest =
+          Integer.parseInt(taskConfigs.getOrDefault(UpsertCompactionTask.NUM_SEGMENTS_BATCH_PER_SERVER_REQUEST,
+              String.valueOf(DEFAULT_NUM_SEGMENTS_BATCH_PER_SERVER_REQUEST)));
+
+      // Validate that the snapshot is enabled if validDocIdsType is validDocIdsSnapshot
+      if (validDocIdsType == ValidDocIdsType.SNAPSHOT) {
+        UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
+        Preconditions.checkNotNull(upsertConfig, "UpsertConfig must be provided for UpsertCompactionTask");
+        Preconditions.checkState(upsertConfig.isEnableSnapshot(), String.format(
+            "'enableSnapshot' from UpsertConfig must be enabled for UpsertCompactionTask with validDocIdsType = %s",
+            validDocIdsType));
+      } else if (validDocIdsType == ValidDocIdsType.IN_MEMORY_WITH_DELETE) {
+        UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
+        Preconditions.checkNotNull(upsertConfig, "UpsertConfig must be provided for UpsertCompactionTask");
+        Preconditions.checkNotNull(upsertConfig.getDeleteRecordColumn(),
+            String.format("deleteRecordColumn must be provided for " + "UpsertCompactionTask with validDocIdsType = %s",
+                validDocIdsType));
+      }
+
+      Map<String, List<ValidDocIdsMetadataInfo>> validDocIdsMetadataList =
+          serverSegmentMetadataReader.getSegmentToValidDocIdsMetadataFromServer(tableNameWithType, serverToSegments,
+              serverToEndpoints, null, 60_000, validDocIdsType.toString(), numSegmentsBatchPerServerRequest);
+
+      Map<String, SegmentZKMetadata> completedSegmentsMap =
+          completedSegments.stream().collect(Collectors.toMap(SegmentZKMetadata::getSegmentName, Function.identity()));
+
+      SegmentSelectionResult segmentSelectionResult =
+          processValidDocIdsMetadata(taskConfigs, completedSegmentsMap, validDocIdsMetadataList);
+
+      if (!segmentSelectionResult.getSegmentsForDeletion().isEmpty()) {
+        pinotHelixResourceManager.deleteSegments(tableNameWithType, segmentSelectionResult.getSegmentsForDeletion(),
+            "0d");
+        LOGGER.info(
+            "Deleted segments containing only invalid records for table: {}, number of segments to be deleted: {}",
+            tableNameWithType, segmentSelectionResult.getSegmentsForDeletion());
+      }
+
+      int numTasks = 0;
+      int maxTasks = getMaxTasks(taskType, tableNameWithType, taskConfigs);
+      for (SegmentZKMetadata segment : segmentSelectionResult.getSegmentsForCompaction()) {
+        if (numTasks == maxTasks) {
+          break;
+        }
+        if (StringUtils.isBlank(segment.getDownloadUrl())) {
+          LOGGER.warn("Skipping segment {} for task {} as download url is empty", segment.getSegmentName(), taskType);
+          continue;
+        }
+        Map<String, String> configs = new HashMap<>(getBaseTaskConfigs(tableConfig,
+            List.of(segment.getSegmentName())));
+        configs.put(MinionConstants.DOWNLOAD_URL_KEY, segment.getDownloadUrl());
+        configs.put(MinionConstants.UPLOAD_URL_KEY, _clusterInfoAccessor.getVipUrl() + "/segments");
+        configs.put(MinionConstants.ORIGINAL_SEGMENT_CRC_KEY, String.valueOf(segment.getCrc()));
+        configs.put(UpsertCompactionTask.VALID_DOC_IDS_TYPE, validDocIdsType.toString());
+        pinotTaskConfigs.add(new PinotTaskConfig(UpsertCompactionTask.TASK_TYPE, configs));
+        numTasks++;
+      }
+      LOGGER.info("Finished generating {} tasks configs for table: {}", numTasks, tableNameWithType);
+    }
+    return pinotTaskConfigs;
+  }
+
   @VisibleForTesting
   public static SegmentSelectionResult processValidDocIdsMetadata(Map<String, String> taskConfigs,
       Map<String, SegmentZKMetadata> completedSegmentsMap,
@@ -157,151 +304,5 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
       return false;
     }
     return true;
-  }
-
-  @Override
-  public String getTaskType() {
-    return MinionConstants.UpsertCompactionTask.TASK_TYPE;
-  }
-
-  @Override
-  public List<PinotTaskConfig> generateTasks(List<TableConfig> tableConfigs) {
-    String taskType = MinionConstants.UpsertCompactionTask.TASK_TYPE;
-    List<PinotTaskConfig> pinotTaskConfigs = new ArrayList<>();
-    for (TableConfig tableConfig : tableConfigs) {
-      if (!validate(tableConfig)) {
-        LOGGER.warn("Validation failed for table {}. Skipping..", tableConfig.getTableName());
-        continue;
-      }
-
-      String tableNameWithType = tableConfig.getTableName();
-      LOGGER.info("Start generating task configs for table: {}", tableNameWithType);
-
-      if (tableConfig.getTaskConfig() == null) {
-        LOGGER.warn("Task config is null for table: {}", tableNameWithType);
-        continue;
-      }
-
-      Map<String, String> taskConfigs = tableConfig.getTaskConfig().getConfigsForTaskType(taskType);
-      List<SegmentZKMetadata> allSegments = _clusterInfoAccessor.getSegmentsZKMetadata(tableNameWithType);
-
-      // Get completed segments and filter out the segments based on the buffer time configuration
-      List<SegmentZKMetadata> completedSegments =
-          getCompletedSegments(taskConfigs, allSegments, System.currentTimeMillis());
-
-      if (completedSegments.isEmpty()) {
-        LOGGER.info("No completed segments were eligible for compaction for table: {}", tableNameWithType);
-        continue;
-      }
-
-      // Only schedule 1 task of this type, per table
-      Map<String, TaskState> incompleteTasks =
-          TaskGeneratorUtils.getIncompleteTasks(taskType, tableNameWithType, _clusterInfoAccessor);
-      if (!incompleteTasks.isEmpty()) {
-        LOGGER.warn("Found incomplete tasks: {} for same table: {} and task type: {}. Skipping task generation.",
-            incompleteTasks.keySet(), tableNameWithType, taskType);
-        continue;
-      }
-
-      // get server to segment mappings
-      PinotHelixResourceManager pinotHelixResourceManager = _clusterInfoAccessor.getPinotHelixResourceManager();
-      Map<String, List<String>> serverToSegments = pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType);
-      BiMap<String, String> serverToEndpoints;
-      try {
-        serverToEndpoints = pinotHelixResourceManager.getDataInstanceAdminEndpoints(serverToSegments.keySet());
-      } catch (InvalidConfigException e) {
-        throw new RuntimeException(e);
-      }
-
-      ServerSegmentMetadataReader serverSegmentMetadataReader =
-          new ServerSegmentMetadataReader(_clusterInfoAccessor.getExecutor(),
-              _clusterInfoAccessor.getConnectionManager());
-
-      // By default, we use 'snapshot' for validDocIdsType. This means that we will use the validDocIds bitmap from
-      // the snapshot from Pinot segment. This will require 'enableSnapshot' from UpsertConfig to be set to true.
-      String validDocIdsTypeStr =
-          taskConfigs.getOrDefault(UpsertCompactionTask.VALID_DOC_IDS_TYPE, ValidDocIdsType.SNAPSHOT.toString());
-      ValidDocIdsType validDocIdsType = ValidDocIdsType.valueOf(validDocIdsTypeStr.toUpperCase());
-
-      // Number of segments to query per server request. If a table has a lot of segments, then we might send a
-      // huge payload to pinot-server in request. Batching the requests will help in reducing the payload size.
-      int numSegmentsBatchPerServerRequest = Integer.parseInt(
-          taskConfigs.getOrDefault(UpsertCompactionTask.NUM_SEGMENTS_BATCH_PER_SERVER_REQUEST,
-              String.valueOf(DEFAULT_NUM_SEGMENTS_BATCH_PER_SERVER_REQUEST)));
-
-      // Validate that the snapshot is enabled if validDocIdsType is validDocIdsSnapshot
-      if (validDocIdsType == ValidDocIdsType.SNAPSHOT) {
-        UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
-        Preconditions.checkNotNull(upsertConfig, "UpsertConfig must be provided for UpsertCompactionTask");
-        Preconditions.checkState(upsertConfig.isEnableSnapshot(), String.format(
-            "'enableSnapshot' from UpsertConfig must be enabled for UpsertCompactionTask with validDocIdsType = %s",
-            validDocIdsType));
-      } else if (validDocIdsType == ValidDocIdsType.IN_MEMORY_WITH_DELETE) {
-        UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
-        Preconditions.checkNotNull(upsertConfig, "UpsertConfig must be provided for UpsertCompactionTask");
-        Preconditions.checkNotNull(upsertConfig.getDeleteRecordColumn(),
-            String.format("deleteRecordColumn must be provided for " + "UpsertCompactionTask with validDocIdsType = %s",
-                validDocIdsType));
-      }
-
-      Map<String, List<ValidDocIdsMetadataInfo>> validDocIdsMetadataList =
-          serverSegmentMetadataReader.getSegmentToValidDocIdsMetadataFromServer(tableNameWithType, serverToSegments,
-              serverToEndpoints, null, 60_000, validDocIdsType.toString(), numSegmentsBatchPerServerRequest);
-
-      Map<String, SegmentZKMetadata> completedSegmentsMap =
-          completedSegments.stream().collect(Collectors.toMap(SegmentZKMetadata::getSegmentName, Function.identity()));
-
-      SegmentSelectionResult segmentSelectionResult =
-          processValidDocIdsMetadata(taskConfigs, completedSegmentsMap, validDocIdsMetadataList);
-
-      if (!segmentSelectionResult.getSegmentsForDeletion().isEmpty()) {
-        pinotHelixResourceManager.deleteSegments(tableNameWithType, segmentSelectionResult.getSegmentsForDeletion(),
-            "0d");
-        LOGGER.info(
-            "Deleted segments containing only invalid records for table: {}, number of segments to be deleted: {}",
-            tableNameWithType, segmentSelectionResult.getSegmentsForDeletion());
-      }
-
-      int numTasks = 0;
-      int maxTasks = getMaxTasks(taskType, tableNameWithType, taskConfigs);
-      for (SegmentZKMetadata segment : segmentSelectionResult.getSegmentsForCompaction()) {
-        if (numTasks == maxTasks) {
-          break;
-        }
-        if (StringUtils.isBlank(segment.getDownloadUrl())) {
-          LOGGER.warn("Skipping segment {} for task {} as download url is empty", segment.getSegmentName(), taskType);
-          continue;
-        }
-        Map<String, String> configs = new HashMap<>(getBaseTaskConfigs(tableConfig, List.of(segment.getSegmentName())));
-        configs.put(MinionConstants.DOWNLOAD_URL_KEY, segment.getDownloadUrl());
-        configs.put(MinionConstants.UPLOAD_URL_KEY, _clusterInfoAccessor.getVipUrl() + "/segments");
-        configs.put(MinionConstants.ORIGINAL_SEGMENT_CRC_KEY, String.valueOf(segment.getCrc()));
-        configs.put(UpsertCompactionTask.VALID_DOC_IDS_TYPE, validDocIdsType.toString());
-        pinotTaskConfigs.add(new PinotTaskConfig(UpsertCompactionTask.TASK_TYPE, configs));
-        numTasks++;
-      }
-      LOGGER.info("Finished generating {} tasks configs for table: {}", numTasks, tableNameWithType);
-    }
-    return pinotTaskConfigs;
-  }
-
-  public static class SegmentSelectionResult {
-
-    private final List<SegmentZKMetadata> _segmentsForCompaction;
-
-    private final List<String> _segmentsForDeletion;
-
-    SegmentSelectionResult(List<SegmentZKMetadata> segmentsForCompaction, List<String> segmentsForDeletion) {
-      _segmentsForCompaction = segmentsForCompaction;
-      _segmentsForDeletion = segmentsForDeletion;
-    }
-
-    public List<SegmentZKMetadata> getSegmentsForCompaction() {
-      return _segmentsForCompaction;
-    }
-
-    public List<String> getSegmentsForDeletion() {
-      return _segmentsForDeletion;
-    }
   }
 }
