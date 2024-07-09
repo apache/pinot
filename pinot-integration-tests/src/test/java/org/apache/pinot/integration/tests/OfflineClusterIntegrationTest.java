@@ -1837,8 +1837,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     testQuery(pinotQuery, h2Query);
 
     // Test other query forms with new added columns
+
+    // Explicitly disable null handling because group by MV isn't supported with null handling enabled currently
     pinotQuery =
-        "SELECT "
+        "SET enableNullHandling=false; SELECT "
             + (useMultiStageQueryEngine() ? "arrayToMV(NewAddedMVStringDimension)" : "NewAddedMVStringDimension")
             + ", SUM(NewAddedFloatMetric) FROM mytable GROUP BY "
             + (useMultiStageQueryEngine() ? "arrayToMV(NewAddedMVStringDimension)" : "NewAddedMVStringDimension");
@@ -1864,8 +1866,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       assertEquals(row.get(1).asDouble(), 0.0);
     }
 
+    // Explicitly disable null handling because group by MV isn't supported with null handling enabled currently
     pinotQuery =
-        "SELECT "
+        "SET enableNullHandling=false; SELECT "
             + (useMultiStageQueryEngine() ? "arrayToMV(NewAddedMVLongDimension)" : "NewAddedMVLongDimension")
             + ", SUM(NewAddedIntMetric) FROM mytable GROUP BY "
             + (useMultiStageQueryEngine() ? "arrayToMV(NewAddedMVLongDimension)" : "NewAddedMVLongDimension");
@@ -1886,7 +1889,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         "NewAddedMVIntDimension, NewAddedMVLongDimension, NewAddedMVFloatDimension, NewAddedMVDoubleDimension, "
             + "NewAddedMVBooleanDimension, NewAddedMVTimestampDimension, NewAddedMVStringDimension, "
             + "NewAddedSVJSONDimension, NewAddedSVBytesDimension";
-    pinotQuery = "SELECT " + newAddedDimensions + ", SUM(NewAddedIntMetric), SUM(NewAddedLongMetric), "
+
+    // Explicitly disable null handling because group by MV isn't supported with null handling enabled currently
+    pinotQuery = "SET enableNullHandling=false; SELECT " + newAddedDimensions
+        + ", SUM(NewAddedIntMetric), SUM(NewAddedLongMetric), "
         + "SUM(NewAddedFloatMetric), SUM(NewAddedDoubleMetric) FROM mytable GROUP BY " + newAddedDimensions;
     response = postQuery(pinotQuery);
     rows = response.get("resultTable").get("rows");
@@ -3275,8 +3281,11 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
   private void testNonScanAggregationQuery(String pinotQuery, @Nullable String h2Query)
       throws Exception {
-    testQuery(pinotQuery, h2Query != null ? h2Query : pinotQuery);
-    JsonNode response = postQuery(pinotQuery);
+    // The NonScanBasedAggregationOperator isn't used if null handling is enabled
+    // Null handling is disabled by default in the v1 query engine and enabled by default in the v2 query engine
+    // We explicitly disable null handling here to get the same behavior across both the engines
+    testQuery("SET enableNullHandling=false; " + pinotQuery, h2Query != null ? h2Query : pinotQuery);
+    JsonNode response = postQuery("SET enableNullHandling=false; " + pinotQuery);
     assertEquals(response.get("numEntriesScannedInFilter").asLong(), 0);
     assertEquals(response.get("numEntriesScannedPostFilter").asLong(), 0);
     assertEquals(response.get("numDocsScanned").asLong(), response.get("totalDocs").asLong());
