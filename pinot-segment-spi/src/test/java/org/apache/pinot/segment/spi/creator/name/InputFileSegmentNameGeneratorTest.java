@@ -29,25 +29,37 @@ public class InputFileSegmentNameGeneratorTest {
 
   @Test
   public void testWithInvalidPath() {
-    validateName("/my/path/to/segmentname.tsv", "my_path_to_segmentname_tsv");
-    validateName("hdfs:///my/path/to/segmentname.tsv", "my_path_to_segmentname_tsv");
+    validateCSVFileName("/my/path/to/segmentname.tsv", "my_path_to_segmentname_tsv");
+    validateCSVFileName("hdfs:///my/path/to/segmentname.tsv", "my_path_to_segmentname_tsv");
   }
 
   @Test
   public void testWithHDFSPath() {
-    validateName("hdfs:///my/path/to/segmentname.csv", "segmentname");
-    validateName("hdfs:/server:9000//my/path/to/segmentname.csv", "segmentname");
+    validateCSVFileName("hdfs:///my/path/to/segmentname.csv", "segmentname");
+    validateCSVFileName("hdfs:/server:9000//my/path/to/segmentname.csv", "segmentname");
   }
 
   @Test
   public void testWithFilePath() {
-    validateName("file:///my/path/to/segmentname.csv", "segmentname");
+    validateCSVFileName("file:///my/path/to/segmentname.csv", "segmentname");
   }
 
-  private void validateName(String inputFileUriAsStr, String segmentName) {
+  @Test
+  public void testWithOptionalPattern() {
+    String pattern = ".+/(\\w+)(\\.csv)?";
+    String template = "${filePathPattern:\\1}";
+    validateName("file:///my/path/to/segmentname.csv", "segmentname", pattern, template);
+    validateName("file:///my/path/to/segmentname", "segmentname", pattern, template);
+  }
+
+  private void validateCSVFileName(String inputFileUriAsStr, String segmentName) {
+    String pattern = ".+/(.+)\\.csv";
+    String template = "${filePathPattern:\\1}";
+    validateName(inputFileUriAsStr, segmentName, pattern, template);
+  }
+
+  private void validateName(String inputFileUriAsStr, String segmentName, String pattern, String template) {
     try {
-      String pattern = ".+/(.+)\\.csv";
-      String template = "${filePathPattern:\\1}";
       SegmentNameGenerator segmentNameGenerator =
           new InputFileSegmentNameGenerator(pattern, template, inputFileUriAsStr);
       assertEquals(segmentNameGenerator.generateSegmentName(INVALID_SEQUENCE_ID, null, null), segmentName);

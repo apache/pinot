@@ -19,7 +19,7 @@
 
 package org.apache.pinot.segment.local.segment.index.forward;
 
-import org.apache.commons.lang3.ArrayUtils;
+import java.util.Arrays;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV4;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.CLPForwardIndexCreatorV1;
 import org.apache.pinot.segment.local.segment.index.readers.forward.CLPForwardIndexReaderV1;
@@ -89,7 +89,7 @@ public class ForwardIndexReaderFactory extends IndexReaderFactory.Default<Forwar
       if (dataBuffer.size() >= CLPForwardIndexCreatorV1.MAGIC_BYTES.length) {
         byte[] magicBytes = new byte[CLPForwardIndexCreatorV1.MAGIC_BYTES.length];
         dataBuffer.copyTo(0, magicBytes);
-        if (ArrayUtils.isEquals(magicBytes, CLPForwardIndexCreatorV1.MAGIC_BYTES)) {
+        if (Arrays.equals(magicBytes, CLPForwardIndexCreatorV1.MAGIC_BYTES)) {
           return new CLPForwardIndexReaderV1(dataBuffer, metadata.getTotalDocs());
         }
       }

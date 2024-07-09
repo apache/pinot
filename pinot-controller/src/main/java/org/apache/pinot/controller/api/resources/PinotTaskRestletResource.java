@@ -63,10 +63,10 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriInfo;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
+import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.task.TaskPartitionState;
 import org.apache.helix.task.TaskState;
-import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.minion.BaseTaskGeneratorInfo;
 import org.apache.pinot.common.minion.TaskManagerStatusCache;
@@ -616,8 +616,10 @@ public class PinotTaskRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Authenticate(AccessType.UPDATE)
   @ApiOperation("Schedule tasks and return a map from task type to task name scheduled")
-  public Map<String, String> scheduleTasks(@ApiParam(value = "Task type") @QueryParam("taskType") String taskType,
-      @ApiParam(value = "Table name (with type suffix)") @QueryParam("tableName") String tableName,
+  @Nullable
+  public Map<String, String> scheduleTasks(
+      @ApiParam(value = "Task type") @QueryParam("taskType") @Nullable String taskType,
+      @ApiParam(value = "Table name (with type suffix)") @QueryParam("tableName") @Nullable String tableName,
       @ApiParam(value = "Minion Instance tag to schedule the task explicitly on") @QueryParam("minionInstanceTag")
       @Nullable String minionInstanceTag, @Context HttpHeaders headers) {
     String database = headers != null ? headers.getHeaderString(DATABASE) : DEFAULT_DATABASE;
@@ -632,8 +634,9 @@ public class PinotTaskRestletResource {
       Map<String, List<String>> allTaskNames = tableName != null ? _pinotTaskManager.scheduleAllTasksForTable(
           DatabaseUtils.translateTableName(tableName, headers), minionInstanceTag)
           : _pinotTaskManager.scheduleAllTasksForDatabase(database, minionInstanceTag);
-      return allTaskNames.entrySet().stream()
+      Map<String, String> result = allTaskNames.entrySet().stream().filter(entry -> entry.getValue() != null)
           .collect(Collectors.toMap(Map.Entry::getKey, entry -> String.join(",", entry.getValue())));
+      return result.isEmpty() ? null : result;
     }
   }
 

@@ -33,7 +33,7 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/../..</pinot.root>
-    <circe.version>0.14.8</circe.version>
+    <circe.version>0.14.9</circe.version>
     <paranameter.version>2.8</paranameter.version>
     <scalaxml.version>2.3.0</scalaxml.version>
     <scalatest.version>3.2.18</scalatest.version>
@@ -230,14 +230,6 @@
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-yammer</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.httpcomponents</groupId>
-      <artifactId>httpclient</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.httpcomponents</groupId>
-      <artifactId>httpcore</artifactId>
     </dependency>
     <dependency>
       <groupId>io.grpc</groupId>

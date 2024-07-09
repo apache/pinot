@@ -299,7 +299,7 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
 
         //  - PlaceholderScalarFunction registered will throw on intermediate stage, but works on leaf stage.
         //    - checked "Illegal Json Path" as col1 is not actually a json string, but the call is correctly triggered.
-        new Object[]{"SELECT CAST(jsonExtractScalar(col1, 'path', 'INT') AS INT) FROM a", "Illegal Json Path"},
+        new Object[]{"SELECT CAST(jsonExtractScalar(col1, 'path', 'INT') AS INT) FROM a", "Cannot resolve JSON path"},
         //    - checked function cannot be found b/c there's no intermediate stage impl for json_extract_scalar
         new Object[]{"SELECT CAST(json_extract_scalar(a.col1, b.col2, 'INT') AS INT)"
             + "FROM a JOIN b ON a.col1 = b.col1", "Cannot find function with name: JSON_EXTRACT_SCALAR"},
