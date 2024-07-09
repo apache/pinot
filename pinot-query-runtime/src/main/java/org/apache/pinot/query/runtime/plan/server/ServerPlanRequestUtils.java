@@ -216,6 +216,12 @@ public class ServerPlanRequestUtils {
     Map<String, String> queryOptions = new HashMap<>(executionContext.getOpChainMetadata());
     queryOptions.put(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS,
         Long.toString(executionContext.getDeadlineMs() - System.currentTimeMillis()));
+
+    // Null handling is enabled by default only for the multi-stage query engine
+    queryOptions.putIfAbsent(
+        CommonConstants.Broker.Request.QueryOptionKey.ENABLE_NULL_HANDLING,
+        Boolean.toString(true)
+    );
     pinotQuery.setQueryOptions(queryOptions);
   }
 

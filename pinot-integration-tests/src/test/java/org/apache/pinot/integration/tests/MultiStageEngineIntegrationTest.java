@@ -812,6 +812,34 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asInt(), 15482);
   }
 
+  @Test
+  public void testAggregationDefaultValueNull() throws Exception {
+    String sqlQuery = "SELECT MIN(AirTime), MAX(AirTime), SUM(AirTime), AVG(AirTime) "
+        + "FROM mytable WHERE DestCityName = 'INVALID'";
+    JsonNode jsonNode = postQuery(sqlQuery);
+    assertNoError(jsonNode);
+    assertEquals(jsonNode.get("resultTable").get("rows").size(), 1);
+    assertEquals(jsonNode.get("resultTable").get("rows").get(0).size(), 4);
+
+    for (int i = 0; i < 4; i++) {
+      assertTrue(jsonNode.get("resultTable").get("rows").get(0).get(i).isNull());
+    }
+  }
+
+  @Test
+  public void testAggregationDefaultValueNullHandlingDisabled() throws Exception {
+    // Ensure that null handling can be overridden to false if desired
+    String sqlQuery = "SET enableNullHandling=false; SELECT MIN(AirTime), MAX(AirTime)"
+        + "FROM mytable WHERE DestCityName = 'INVALID'";
+    JsonNode jsonNode = postQuery(sqlQuery);
+    assertNoError(jsonNode);
+    assertEquals(jsonNode.get("resultTable").get("rows").size(), 1);
+    assertEquals(jsonNode.get("resultTable").get("rows").get(0).size(), 2);
+
+    assertFalse(jsonNode.get("resultTable").get("rows").get(0).get(0).isNull());
+    assertFalse(jsonNode.get("resultTable").get("rows").get(0).get(1).isNull());
+  }
+
   @Override
   protected String getTableName() {
     return _tableName;
