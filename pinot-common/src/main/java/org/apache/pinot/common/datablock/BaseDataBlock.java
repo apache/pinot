@@ -173,7 +173,8 @@ public abstract class BaseDataBlock implements DataBlock, DataBlock.Raw {
   public int getNumberOfColumns() {
     return _numColumns;
   }
-// --------------------------------------------------------------------------
+
+  // --------------------------------------------------------------------------
   // Fixed sized element access.
   // --------------------------------------------------------------------------
 
