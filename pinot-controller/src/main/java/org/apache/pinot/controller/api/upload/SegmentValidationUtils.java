@@ -18,15 +18,9 @@
  */
 package org.apache.pinot.controller.api.upload;
 
-import java.util.concurrent.Executor;
 import javax.ws.rs.core.Response;
-import org.apache.http.conn.HttpClientConnectionManager;
-import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.ControllerConf;
-import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
-import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
-import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.controller.validation.StorageQuotaChecker;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -65,19 +59,13 @@ public class SegmentValidationUtils {
   }
 
   public static void checkStorageQuota(String segmentName, long segmentSizeInBytes, TableConfig tableConfig,
-      PinotHelixResourceManager resourceManager, ControllerConf controllerConf, ControllerMetrics controllerMetrics,
-      HttpClientConnectionManager connectionManager, Executor executor, LeadControllerManager leadControllerManager) {
+      ControllerConf controllerConf, StorageQuotaChecker quotaChecker) {
     if (!controllerConf.getEnableStorageQuotaCheck()) {
       return;
     }
-    boolean isLeaderForTable = leadControllerManager.isLeaderForTable(tableConfig.getTableName());
-    TableSizeReader tableSizeReader =
-        new TableSizeReader(executor, connectionManager, controllerMetrics, resourceManager, leadControllerManager);
-    StorageQuotaChecker quotaChecker =
-        new StorageQuotaChecker(tableConfig, tableSizeReader, controllerMetrics, isLeaderForTable, resourceManager);
     StorageQuotaChecker.QuotaCheckerResponse response;
     try {
-      response = quotaChecker.isSegmentStorageWithinQuota(segmentName, segmentSizeInBytes,
+      response = quotaChecker.isSegmentStorageWithinQuota(tableConfig, segmentName, segmentSizeInBytes,
           controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER,

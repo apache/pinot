@@ -40,7 +40,6 @@ import java.nio.file.Files;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.Executor;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
@@ -65,7 +64,6 @@ import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
@@ -78,7 +76,6 @@ import org.apache.pinot.common.utils.FileUploadDownloadClient.FileUploadType;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.controller.ControllerConf;
-import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.access.AccessType;
@@ -87,6 +84,7 @@ import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.api.upload.SegmentValidationUtils;
 import org.apache.pinot.controller.api.upload.ZKOperator;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.validation.StorageQuotaChecker;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
@@ -137,16 +135,10 @@ public class PinotSegmentUploadDownloadRestletResource {
   ControllerMetrics _controllerMetrics;
 
   @Inject
-  HttpClientConnectionManager _connectionManager;
-
-  @Inject
-  Executor _executor;
+  StorageQuotaChecker _storageQuotaChecker;
 
   @Inject
   AccessControlFactory _accessControlFactory;
-
-  @Inject
-  LeadControllerManager _leadControllerManager;
 
   @GET
   @Produces(MediaType.APPLICATION_OCTET_STREAM)
@@ -362,8 +354,7 @@ public class PinotSegmentUploadDownloadRestletResource {
         untarredSegmentSizeInBytes = FileUtils.sizeOfDirectory(tempSegmentDir);
       }
       SegmentValidationUtils.checkStorageQuota(segmentName, untarredSegmentSizeInBytes, tableConfig,
-          _pinotHelixResourceManager, _controllerConf, _controllerMetrics, _connectionManager, _executor,
-          _leadControllerManager);
+          _controllerConf, _storageQuotaChecker);
 
       // Encrypt segment
       String crypterNameInTableConfig = tableConfig.getValidationConfig().getCrypterClassName();

@@ -35,27 +35,31 @@ import javax.net.ssl.SSLContext;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.io.IOUtils;
-import org.apache.http.Header;
-import org.apache.http.HttpEntity;
-import org.apache.http.HttpHeaders;
-import org.apache.http.HttpVersion;
-import org.apache.http.NameValuePair;
-import org.apache.http.StatusLine;
-import org.apache.http.client.config.RequestConfig;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.client.methods.HttpPut;
-import org.apache.http.client.methods.HttpUriRequest;
-import org.apache.http.client.methods.RequestBuilder;
-import org.apache.http.conn.ssl.NoopHostnameVerifier;
-import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
-import org.apache.http.entity.ContentType;
-import org.apache.http.entity.StringEntity;
-import org.apache.http.entity.mime.MultipartEntityBuilder;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClientBuilder;
-import org.apache.http.impl.client.HttpClients;
-import org.apache.http.util.EntityUtils;
+import org.apache.hc.client5.http.classic.methods.HttpPost;
+import org.apache.hc.client5.http.classic.methods.HttpPut;
+import org.apache.hc.client5.http.config.RequestConfig;
+import org.apache.hc.client5.http.entity.mime.MultipartEntityBuilder;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
+import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
+import org.apache.hc.client5.http.impl.classic.HttpClients;
+import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
+import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder;
+import org.apache.hc.client5.http.protocol.HttpClientContext;
+import org.apache.hc.client5.http.ssl.NoopHostnameVerifier;
+import org.apache.hc.client5.http.ssl.SSLConnectionSocketFactory;
+import org.apache.hc.core5.http.ClassicHttpRequest;
+import org.apache.hc.core5.http.ContentType;
+import org.apache.hc.core5.http.Header;
+import org.apache.hc.core5.http.HttpEntity;
+import org.apache.hc.core5.http.HttpHeaders;
+import org.apache.hc.core5.http.HttpVersion;
+import org.apache.hc.core5.http.NameValuePair;
+import org.apache.hc.core5.http.ParseException;
+import org.apache.hc.core5.http.io.entity.EntityUtils;
+import org.apache.hc.core5.http.io.entity.StringEntity;
+import org.apache.hc.core5.http.io.support.ClassicRequestBuilder;
+import org.apache.hc.core5.util.Timeout;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.utils.SimpleHttpErrorInfo;
@@ -132,15 +136,14 @@ public class HttpClient implements AutoCloseable {
   public SimpleHttpResponse sendGetRequest(URI uri, @Nullable Map<String, String> headers,
       @Nullable AuthProvider authProvider)
       throws IOException {
-    RequestBuilder requestBuilder = RequestBuilder.get(uri).setVersion(HttpVersion.HTTP_1_1);
+    ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.get(uri).setVersion(HttpVersion.HTTP_1_1);
     AuthProviderUtils.toRequestHeaders(authProvider).forEach(requestBuilder::addHeader);
     if (MapUtils.isNotEmpty(headers)) {
       for (Map.Entry<String, String> header : headers.entrySet()) {
         requestBuilder.addHeader(header.getKey(), header.getValue());
       }
     }
-    setTimeout(requestBuilder, GET_REQUEST_SOCKET_TIMEOUT_MS);
-    return sendRequest(requestBuilder.build());
+    return sendRequest(requestBuilder.build(), GET_REQUEST_SOCKET_TIMEOUT_MS);
   }
 
   /**
@@ -161,15 +164,14 @@ public class HttpClient implements AutoCloseable {
   public SimpleHttpResponse sendDeleteRequest(URI uri, @Nullable Map<String, String> headers,
       @Nullable AuthProvider authProvider)
       throws IOException {
-    RequestBuilder requestBuilder = RequestBuilder.delete(uri).setVersion(HttpVersion.HTTP_1_1);
+    ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.delete(uri).setVersion(HttpVersion.HTTP_1_1);
     AuthProviderUtils.toRequestHeaders(authProvider).forEach(requestBuilder::addHeader);
     if (MapUtils.isNotEmpty(headers)) {
       for (Map.Entry<String, String> header : headers.entrySet()) {
         requestBuilder.addHeader(header.getKey(), header.getValue());
       }
     }
-    setTimeout(requestBuilder, DELETE_REQUEST_SOCKET_TIMEOUT_MS);
-    return sendRequest(requestBuilder.build());
+    return sendRequest(requestBuilder.build(), DELETE_REQUEST_SOCKET_TIMEOUT_MS);
   }
 
   /**
@@ -186,7 +188,7 @@ public class HttpClient implements AutoCloseable {
   public SimpleHttpResponse sendPostRequest(URI uri, @Nullable HttpEntity payload,
       @Nullable Map<String, String> headers, @Nullable AuthProvider authProvider)
       throws IOException {
-    RequestBuilder requestBuilder = RequestBuilder.post(uri).setVersion(HttpVersion.HTTP_1_1);
+    ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.post(uri).setVersion(HttpVersion.HTTP_1_1);
     if (payload != null) {
       requestBuilder.setEntity(payload);
     }
@@ -196,8 +198,7 @@ public class HttpClient implements AutoCloseable {
         requestBuilder.addHeader(header.getKey(), header.getValue());
       }
     }
-    setTimeout(requestBuilder, DEFAULT_SOCKET_TIMEOUT_MS);
-    return sendRequest(requestBuilder.build());
+    return sendRequest(requestBuilder.build(), DEFAULT_SOCKET_TIMEOUT_MS);
   }
 
   /**
@@ -213,7 +214,7 @@ public class HttpClient implements AutoCloseable {
   public SimpleHttpResponse sendPutRequest(URI uri, @Nullable HttpEntity payload, @Nullable Map<String, String> headers,
       @Nullable AuthProvider authProvider)
       throws IOException {
-    RequestBuilder requestBuilder = RequestBuilder.put(uri).setVersion(HttpVersion.HTTP_1_1);
+    ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.put(uri).setVersion(HttpVersion.HTTP_1_1);
     if (payload != null) {
       requestBuilder.setEntity(payload);
     }
@@ -223,8 +224,7 @@ public class HttpClient implements AutoCloseable {
         requestBuilder.addHeader(header.getKey(), header.getValue());
       }
     }
-    setTimeout(requestBuilder, DELETE_REQUEST_SOCKET_TIMEOUT_MS);
-    return sendRequest(requestBuilder.build());
+    return sendRequest(requestBuilder.build(), DELETE_REQUEST_SOCKET_TIMEOUT_MS);
   }
 
   // --------------------------------------------------------------------------
@@ -277,24 +277,35 @@ public class HttpClient implements AutoCloseable {
   // Lower-level request/execute APIs.
   // --------------------------------------------------------------------------
 
-  public SimpleHttpResponse sendRequest(HttpUriRequest request)
+  public SimpleHttpResponse sendRequest(ClassicHttpRequest request)
       throws IOException {
-    try (CloseableHttpResponse response = _httpClient.execute(request)) {
+    return sendRequest(request, DEFAULT_SOCKET_TIMEOUT_MS);
+  }
+
+  public SimpleHttpResponse sendRequest(ClassicHttpRequest request, long socketTimeoutMs)
+      throws IOException {
+
+    RequestConfig requestConfig =
+        RequestConfig.custom().setResponseTimeout(Timeout.ofMilliseconds(socketTimeoutMs)).build();
+    HttpClientContext clientContext = HttpClientContext.create();
+    clientContext.setRequestConfig(requestConfig);
+
+    try (CloseableHttpResponse response = _httpClient.execute(request, clientContext)) {
       if (response.containsHeader(CommonConstants.Controller.HOST_HTTP_HEADER)) {
         String controllerHost = response.getFirstHeader(CommonConstants.Controller.HOST_HTTP_HEADER).getValue();
         String controllerVersion = response.getFirstHeader(CommonConstants.Controller.VERSION_HTTP_HEADER).getValue();
-        LOGGER.info("Sending request: {} to controller: {}, version: {}", request.getURI(), controllerHost,
+        LOGGER.info("Sending request: {} to controller: {}, version: {}", request.getRequestUri(), controllerHost,
             controllerVersion);
       }
-      int statusCode = response.getStatusLine().getStatusCode();
+      int statusCode = response.getCode();
       if (statusCode >= 300) {
         return new SimpleHttpResponse(statusCode, getErrorMessage(request, response));
       }
-      return new SimpleHttpResponse(statusCode, EntityUtils.toString(response.getEntity()));
+      return new SimpleHttpResponse(statusCode, httpEntityToString(response.getEntity()));
     }
   }
 
-  public CloseableHttpResponse execute(HttpUriRequest request)
+  public CloseableHttpResponse execute(ClassicHttpRequest request)
       throws IOException {
     return _httpClient.execute(request);
   }
@@ -321,14 +332,23 @@ public class HttpClient implements AutoCloseable {
       }
     }
     try (CloseableHttpResponse response = _httpClient.execute(post)) {
-      StatusLine statusLine = response.getStatusLine();
-      int statusCode = statusLine.getStatusCode();
+      int statusCode = response.getCode();
       if (statusCode >= 300) {
         return new SimpleHttpResponse(statusCode, getErrorMessage(post, response));
       }
-      return new SimpleHttpResponse(statusCode, EntityUtils.toString(response.getEntity()));
+      return new SimpleHttpResponse(statusCode, httpEntityToString(response.getEntity()));
     }
   }
+
+  private static String httpEntityToString(HttpEntity httpEntity)
+      throws IOException {
+    try {
+      return EntityUtils.toString(httpEntity);
+    } catch (ParseException exception) {
+      throw new RuntimeException(exception);
+    }
+  }
+
   public SimpleHttpResponse sendMultipartPutRequest(String url, String body)
       throws IOException {
     return sendMultipartPutRequest(url, body, null);
@@ -347,12 +367,11 @@ public class HttpClient implements AutoCloseable {
       }
     }
     try (CloseableHttpResponse response = _httpClient.execute(put)) {
-      StatusLine statusLine = response.getStatusLine();
-      int statusCode = statusLine.getStatusCode();
+      int statusCode = response.getCode();
       if (statusCode >= 300) {
         return new SimpleHttpResponse(statusCode, getErrorMessage(put, response));
       }
-      return new SimpleHttpResponse(statusCode, EntityUtils.toString(response.getEntity()));
+      return new SimpleHttpResponse(statusCode, httpEntityToString(response.getEntity()));
     }
   }
 
@@ -374,10 +393,15 @@ public class HttpClient implements AutoCloseable {
    */
   public int downloadFile(URI uri, int socketTimeoutMs, File dest, AuthProvider authProvider, List<Header> httpHeaders)
       throws IOException, HttpErrorStatusException {
-    HttpUriRequest request = getDownloadFileRequest(uri, socketTimeoutMs, authProvider, httpHeaders);
-    try (CloseableHttpResponse response = _httpClient.execute(request)) {
-      StatusLine statusLine = response.getStatusLine();
-      int statusCode = statusLine.getStatusCode();
+    ClassicHttpRequest request = getDownloadFileRequest(uri, authProvider, httpHeaders);
+
+    RequestConfig requestConfig =
+        RequestConfig.custom().setResponseTimeout(Timeout.ofMilliseconds(socketTimeoutMs)).build();
+    HttpClientContext clientContext = HttpClientContext.create();
+    clientContext.setRequestConfig(requestConfig);
+
+    try (CloseableHttpResponse response = _httpClient.execute(request, clientContext)) {
+      int statusCode = response.getCode();
       if (statusCode >= 300) {
         throw new HttpErrorStatusException(HttpClient.getErrorMessage(request, response), statusCode);
       }
@@ -392,8 +416,8 @@ public class HttpClient implements AutoCloseable {
       long contentLength = entity.getContentLength();
       if (contentLength >= 0L) {
         long fileLength = dest.length();
-        Preconditions.checkState(fileLength == contentLength, String
-            .format("While downloading file with uri: %s, file length: %d does not match content length: %d", uri,
+        Preconditions.checkState(fileLength == contentLength,
+            String.format("While downloading file with uri: %s, file length: %d does not match content length: %d", uri,
                 fileLength, contentLength));
       }
 
@@ -418,11 +442,16 @@ public class HttpClient implements AutoCloseable {
   public File downloadUntarFileStreamed(URI uri, int socketTimeoutMs, File dest, AuthProvider authProvider,
       List<Header> httpHeaders, long maxStreamRateInByte)
       throws IOException, HttpErrorStatusException {
-    HttpUriRequest request = getDownloadFileRequest(uri, socketTimeoutMs, authProvider, httpHeaders);
+    ClassicHttpRequest request = getDownloadFileRequest(uri, authProvider, httpHeaders);
     File ret;
-    try (CloseableHttpResponse response = _httpClient.execute(request)) {
-      StatusLine statusLine = response.getStatusLine();
-      int statusCode = statusLine.getStatusCode();
+
+    RequestConfig requestConfig =
+        RequestConfig.custom().setResponseTimeout(Timeout.ofMilliseconds(socketTimeoutMs)).build();
+    HttpClientContext clientContext = HttpClientContext.create();
+    clientContext.setRequestConfig(requestConfig);
+
+    try (CloseableHttpResponse response = _httpClient.execute(request, clientContext)) {
+      int statusCode = response.getCode();
       if (statusCode >= 300) {
         throw new HttpErrorStatusException(HttpClient.getErrorMessage(request, response), statusCode);
       }
@@ -431,8 +460,7 @@ public class HttpClient implements AutoCloseable {
         ret = TarGzCompressionUtils.untarWithRateLimiter(inputStream, dest, maxStreamRateInByte).get(0);
       }
 
-      LOGGER.info("Downloaded from: {} to: {} with rate limiter; Response status code: {}", uri, dest,
-              statusCode);
+      LOGGER.info("Downloaded from: {} to: {} with rate limiter; Response status code: {}", uri, dest, statusCode);
 
       return ret;
     }
@@ -451,7 +479,7 @@ public class HttpClient implements AutoCloseable {
     }
   }
 
-  public static void addHeadersAndParameters(RequestBuilder requestBuilder, @Nullable List<Header> headers,
+  public static void addHeadersAndParameters(ClassicRequestBuilder requestBuilder, @Nullable List<Header> headers,
       @Nullable List<NameValuePair> parameters) {
     if (headers != null) {
       for (Header header : headers) {
@@ -465,34 +493,35 @@ public class HttpClient implements AutoCloseable {
     }
   }
 
-  public static void setTimeout(RequestBuilder requestBuilder, int socketTimeoutMs) {
-    RequestConfig requestConfig = RequestConfig.custom().setSocketTimeout(socketTimeoutMs).build();
-    requestBuilder.setConfig(requestConfig);
-  }
-
   private static CloseableHttpClient buildCloseableHttpClient(HttpClientConfig httpClientConfig,
       SSLConnectionSocketFactory csf) {
-    HttpClientBuilder httpClientBuilder = HttpClients.custom().setSSLSocketFactory(csf);
+    PoolingHttpClientConnectionManager connManager =
+        PoolingHttpClientConnectionManagerBuilder.create().setSSLSocketFactory(csf)
+            .setMaxConnTotal(httpClientConfig.getMaxConnTotal())
+            .setMaxConnPerRoute(httpClientConfig.getMaxConnPerRoute()).build();
+
     if (httpClientConfig.getMaxConnTotal() > 0) {
-      httpClientBuilder.setMaxConnTotal(httpClientConfig.getMaxConnTotal());
+      connManager.setMaxTotal(httpClientConfig.getMaxConnTotal());
     }
     if (httpClientConfig.getMaxConnPerRoute() > 0) {
-      httpClientBuilder.setMaxConnPerRoute(httpClientConfig.getMaxConnPerRoute());
+      connManager.setDefaultMaxPerRoute(httpClientConfig.getMaxConnPerRoute());
     }
+
+    HttpClientBuilder httpClientBuilder = HttpClients.custom().setConnectionManager(connManager);
+
     if (httpClientConfig.isDisableDefaultUserAgent()) {
       httpClientBuilder.disableDefaultUserAgent();
     }
     return httpClientBuilder.build();
   }
 
-  private static String getErrorMessage(HttpUriRequest request, CloseableHttpResponse response) {
+  private static String getErrorMessage(ClassicHttpRequest request, CloseableHttpResponse response) {
     String controllerHost = null;
     String controllerVersion = null;
     if (response.containsHeader(CommonConstants.Controller.HOST_HTTP_HEADER)) {
       controllerHost = response.getFirstHeader(CommonConstants.Controller.HOST_HTTP_HEADER).getValue();
       controllerVersion = response.getFirstHeader(CommonConstants.Controller.VERSION_HTTP_HEADER).getValue();
     }
-    StatusLine statusLine = response.getStatusLine();
     String reason;
     try {
       String entityStr = EntityUtils.toString(response.getEntity());
@@ -505,7 +534,7 @@ public class HttpClient implements AutoCloseable {
       reason = String.format("Failed to get a reason, exception: %s", e);
     }
     String errorMessage = String.format("Got error status code: %d (%s) with reason: \"%s\" while sending request: %s",
-        statusLine.getStatusCode(), statusLine.getReasonPhrase(), reason, request.getURI());
+        response.getCode(), response.getReasonPhrase(), reason, request.getRequestUri());
     if (controllerHost != null) {
       errorMessage =
           String.format("%s to controller: %s, version: %s", errorMessage, controllerHost, controllerVersion);
@@ -513,11 +542,10 @@ public class HttpClient implements AutoCloseable {
     return errorMessage;
   }
 
-  private static HttpUriRequest getDownloadFileRequest(URI uri, int socketTimeoutMs, AuthProvider authProvider,
+  private static ClassicHttpRequest getDownloadFileRequest(URI uri, AuthProvider authProvider,
       List<Header> httpHeaders) {
-    RequestBuilder requestBuilder = RequestBuilder.get(uri).setVersion(HttpVersion.HTTP_1_1);
+    ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.get(uri).setVersion(HttpVersion.HTTP_1_1);
     AuthProviderUtils.toRequestHeaders(authProvider).forEach(requestBuilder::addHeader);
-    HttpClient.setTimeout(requestBuilder, socketTimeoutMs);
     String userInfo = uri.getUserInfo();
     if (userInfo != null) {
       String encoded = Base64.encodeBase64String(userInfo.getBytes(UTF_8));

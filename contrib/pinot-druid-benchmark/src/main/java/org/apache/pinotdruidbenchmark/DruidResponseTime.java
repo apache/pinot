@@ -25,11 +25,11 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.util.Arrays;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.entity.StringEntity;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
+import org.apache.hc.client5.http.classic.methods.HttpPost;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
+import org.apache.hc.client5.http.impl.classic.HttpClients;
+import org.apache.hc.core5.http.io.entity.StringEntity;
 
 
 /**
@@ -92,8 +92,9 @@ public class DruidResponseTime {
         // Warm-up Rounds
         System.out.println("Run " + warmUpRounds + " times to warm up...");
         for (int i = 0; i < warmUpRounds; i++) {
-          CloseableHttpResponse httpResponse = httpClient.execute(httpPost);
-          httpResponse.close();
+          try (CloseableHttpResponse httpResponse = httpClient.execute(httpPost)) {
+            // httpResponse will be auto closed
+          }
           System.out.print('*');
         }
         System.out.println();
@@ -104,8 +105,9 @@ public class DruidResponseTime {
         long totalResponseTime = 0L;
         for (int i = 0; i < testRounds; i++) {
           long startTime = System.currentTimeMillis();
-          CloseableHttpResponse httpResponse = httpClient.execute(httpPost);
-          httpResponse.close();
+          try (CloseableHttpResponse httpResponse = httpClient.execute(httpPost)) {
+              // httpResponse will be auto closed
+          }
           long responseTime = System.currentTimeMillis() - startTime;
           responseTimes[i] = responseTime;
           totalResponseTime += responseTime;
@@ -116,15 +118,16 @@ public class DruidResponseTime {
         // Store result.
         if (resultDir != null) {
           File resultFile = new File(resultDir, queryFile.getName() + ".result");
-          CloseableHttpResponse httpResponse = httpClient.execute(httpPost);
-          try (BufferedInputStream bufferedInputStream = new BufferedInputStream(httpResponse.getEntity().getContent());
-              BufferedWriter bufferedWriter = new BufferedWriter(new FileWriter(resultFile))) {
-            int length;
-            while ((length = bufferedInputStream.read(BYTE_BUFFER)) > 0) {
-              bufferedWriter.write(new String(BYTE_BUFFER, 0, length));
+          try (CloseableHttpResponse httpResponse = httpClient.execute(httpPost)) {
+            try (BufferedInputStream bufferedInputStream = new BufferedInputStream(
+                httpResponse.getEntity().getContent());
+                BufferedWriter bufferedWriter = new BufferedWriter(new FileWriter(resultFile))) {
+              int length;
+              while ((length = bufferedInputStream.read(BYTE_BUFFER)) > 0) {
+                bufferedWriter.write(new String(BYTE_BUFFER, 0, length));
+              }
             }
           }
-          httpResponse.close();
         }
 
         // Process response times.

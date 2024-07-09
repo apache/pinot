@@ -26,7 +26,8 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.StringJoiner;
-import org.apache.http.client.utils.URIBuilder;
+import java.util.StringTokenizer;
+import org.apache.hc.core5.net.URIBuilder;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
@@ -104,7 +105,16 @@ public class URIUtils {
    * The URI builder automatically encodes fields as needed
    */
   public static URI buildURI(String schema, String hostPort, String path, Map<String, String> params) {
-    URIBuilder uriBuilder = new URIBuilder().setScheme(schema).setHost(hostPort).setPath(path);
+    StringTokenizer tokenizer = new StringTokenizer(hostPort, ":");
+    String host = tokenizer.nextToken();
+    String port = null;
+    if (tokenizer.hasMoreTokens()) {
+      port = tokenizer.nextToken();
+    }
+    URIBuilder uriBuilder = new URIBuilder().setScheme(schema).setHost(host).setPath(path);
+    if (port != null) {
+      uriBuilder.setPort(Integer.parseInt(port));
+    }
     for (Map.Entry<String, String> entry : params.entrySet()) {
       uriBuilder.addParameter(entry.getKey(), entry.getValue());
     }
