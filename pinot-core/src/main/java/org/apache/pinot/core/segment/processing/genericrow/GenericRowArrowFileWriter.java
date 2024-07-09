@@ -1,10 +1,6 @@
 package org.apache.pinot.core.segment.processing.genericrow;
 
-import java.io.BufferedOutputStream;
 import java.io.Closeable;
-import java.io.DataOutputStream;
-import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -16,6 +12,9 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import org.apache.arrow.algorithm.sort.DefaultVectorComparators;
+import org.apache.arrow.algorithm.sort.IndexSorter;
+import org.apache.arrow.algorithm.sort.VectorValueComparator;
 import org.apache.arrow.compression.CommonsCompressionFactory;
 import org.apache.arrow.memory.ArrowBuf;
 import org.apache.arrow.memory.BufferAllocator;
@@ -63,6 +62,9 @@ public class GenericRowArrowFileWriter implements Closeable, FileWriter<GenericR
   private long _unsortedBatchByteCount;
   private int _batchNumber;
 
+  private BufferAllocator _allocator;
+
+
   private Map<String, FileMetadata> _fileMetadata = new HashMap<>();
 
   private static class FileMetadata {
@@ -85,6 +87,7 @@ public class GenericRowArrowFileWriter implements Closeable, FileWriter<GenericR
     _sortColumns = sortColumns;
     _baseFileName = baseFileName;
     _batchNumber = 0;
+    _allocator = new RootAllocator(Long.MAX_VALUE);
 
     // Set up compression
     switch (compressionType) {
@@ -363,6 +366,8 @@ public class GenericRowArrowFileWriter implements Closeable, FileWriter<GenericR
   }
 
   private void flushBatch() throws IOException {
+    sortAllColumns();
+
     _sortedWriter.writeBatch();
     _unsortedWriter.writeBatch();
 
@@ -387,6 +392,39 @@ public class GenericRowArrowFileWriter implements Closeable, FileWriter<GenericR
     _unsortedWriter.end();
     _sortedWriter.close();
     _unsortedWriter.close();
+  }
+
+  private void sortAllColumns() {
+    int[] sortIndices = getSortIndices();
+    ArrowUtils.inPlaceSortAll(_sortedVectorRoot, sortIndices);
+    ArrowUtils.inPlaceSortAll(_unsortedVectorRoot, sortIndices);
+  }
+
+  private int[] getSortIndices() {
+    IntVector indices = new IntVector("sort_indices", _allocator);
+    indices.allocateNew(_batchRowCount);
+    indices.setValueCount(_batchRowCount);
+
+    for (int i = 0; i < _batchRowCount; i++) {
+      indices.set(i, i);
+    }
+
+    //TODO: creating this for every batch might have overhead, check if moving to constructor doesn't impact correctness
+    IndexSorter indexSorter = new IndexSorter();
+
+    for (String sortColumn: _sortColumns) {
+      FieldVector sortedVectorRootVector = _sortedVectorRoot.getVector(sortColumn);
+      VectorValueComparator comparator = DefaultVectorComparators.createDefaultComparator(sortedVectorRootVector);
+      indexSorter.sort(sortedVectorRootVector, indices, comparator);
+    }
+
+    int[] sortIndices = new int[_batchRowCount];
+    for (int i = 0; i < _batchRowCount; i++) {
+      sortIndices[i] = indices.get(i);
+    }
+
+    indices.close();
+    return sortIndices;
   }
 
   public Map<String, FileMetadata> getFileMetadata() {
