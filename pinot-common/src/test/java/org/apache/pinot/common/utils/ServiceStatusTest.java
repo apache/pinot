@@ -151,7 +151,7 @@ public class ServiceStatusTest {
     callback.setIdealState(new IdealState(znRecord));
     assertEquals(callback.getServiceStatus(), ServiceStatus.Status.GOOD);
 
-    // No external view, and ideal state shows second segment is still offline = STARTING
+    // Online ideal state, and external view shows second segment is still offline = STARTING
     callback = buildTestISEVCallback();
     znRecord = new ZNRecord(TABLE_NAME);
     znRecord.setSimpleField("REBALANCE_MODE", "CUSTOMIZED");
