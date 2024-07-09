@@ -89,12 +89,12 @@ public abstract class BaseDataBlock implements DataBlock, DataBlock.Raw {
   // _errCodeToExceptionMap stores exceptions as a map of errorCode->errorMessage
   protected Map<Integer, String> _errCodeToExceptionMap;
 
-  protected int _numRows;
-  protected int _numColumns;
-  protected DataSchema _dataSchema;
-  protected String[] _stringDictionary;
-  protected DataBuffer _fixedSizeData;
-  protected DataBuffer _variableSizeData;
+  protected final int _numRows;
+  protected final int _numColumns;
+  protected final DataSchema _dataSchema;
+  protected final String[] _stringDictionary;
+  protected final DataBuffer _fixedSizeData;
+  protected final DataBuffer _variableSizeData;
   @Nullable
   private List<ByteBuffer> _serialized;
 
