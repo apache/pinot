@@ -87,6 +87,13 @@ public interface PinotTaskGenerator {
   }
 
   /**
+   * Performs necessary cleanups (e.g. remove metrics) when the controller leadership changes,
+   * given a list of tables that the current controller isn't the leader for.
+   */
+  default void nonLeaderCleanUp(List<String> tableNamesWithType) {
+  }
+
+  /**
    * Gets the minionInstanceTag for the tableConfig
    */
   default String getMinionInstanceTag(TableConfig tableConfig) {
