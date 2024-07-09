@@ -151,6 +151,19 @@ public class ServiceStatusTest {
     callback.setIdealState(new IdealState(znRecord));
     assertEquals(callback.getServiceStatus(), ServiceStatus.Status.GOOD);
 
+    // No external view, and ideal state shows second segment is still offline = STARTING
+    callback = buildTestISEVCallback();
+    znRecord = new ZNRecord(TABLE_NAME);
+    znRecord.setSimpleField("REBALANCE_MODE", "CUSTOMIZED");
+    znRecord.setMapField("segment1", Map.of(INSTANCE_NAME, "ONLINE"));
+    znRecord.setMapField("segment2", Map.of(INSTANCE_NAME, "ONLINE"));
+    callback.setIdealState(new IdealState(znRecord));
+    ExternalView externalView = new ExternalView(TABLE_NAME);
+    externalView.setState("segment1", INSTANCE_NAME, "ONLINE");
+    externalView.setState("segment2", INSTANCE_NAME, "OFFLINE");
+    callback.setExternalView(externalView);
+    assertEquals(callback.getServiceStatus(), ServiceStatus.Status.STARTING);
+
     // Empty ideal state + empty external view = GOOD
     callback = buildTestISEVCallback();
     callback.setIdealState(new IdealState(TABLE_NAME));
@@ -182,7 +195,7 @@ public class ServiceStatusTest {
     idealState.setPartitionState("mySegment_1", INSTANCE_NAME, "ONLINE");
     idealState.setPartitionState("mySegment_2", INSTANCE_NAME, "OFFLINE");
     callback.setIdealState(idealState);
-    ExternalView externalView = new ExternalView(TABLE_NAME);
+    externalView = new ExternalView(TABLE_NAME);
     externalView.setState("mySegment_1", INSTANCE_NAME, "ONLINE");
     callback.setExternalView(externalView);
     assertEquals(callback.getServiceStatus(), ServiceStatus.Status.GOOD);
