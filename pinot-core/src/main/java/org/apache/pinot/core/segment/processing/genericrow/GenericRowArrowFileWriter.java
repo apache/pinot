@@ -181,80 +181,69 @@ public class GenericRowArrowFileWriter implements Closeable, FileWriter<GenericR
           case INT:
             fieldType = FieldType.nullable(new ArrowType.Int(32, true));
             arrowField = new org.apache.arrow.vector.types.pojo.Field(fieldSpec.getName(), fieldType, null);
-            arrowFields.add(arrowField);
             break;
           case LONG:
             fieldType = FieldType.nullable(new ArrowType.Int(64, true));
             arrowField = new org.apache.arrow.vector.types.pojo.Field(fieldSpec.getName(), fieldType, null);
-            arrowFields.add(arrowField);
             break;
           case FLOAT:
             fieldType = FieldType.nullable(new ArrowType.FloatingPoint(FloatingPointPrecision.SINGLE));
             arrowField = new org.apache.arrow.vector.types.pojo.Field(fieldSpec.getName(), fieldType, null);
-            arrowFields.add(arrowField);
             break;
           case DOUBLE:
             fieldType = FieldType.nullable(new ArrowType.FloatingPoint(FloatingPointPrecision.DOUBLE));
             arrowField = new org.apache.arrow.vector.types.pojo.Field(fieldSpec.getName(), fieldType, null);
-            arrowFields.add(arrowField);
             break;
           case STRING:
             fieldType = FieldType.nullable(new ArrowType.Utf8());
             arrowField = new org.apache.arrow.vector.types.pojo.Field(fieldSpec.getName(), fieldType, null);
-            arrowFields.add(arrowField);
             break;
           case BYTES:
             fieldType = FieldType.nullable(new ArrowType.Binary());
             arrowField = new org.apache.arrow.vector.types.pojo.Field(fieldSpec.getName(), fieldType, null);
-            arrowFields.add(arrowField);
             break;
           default:
             throw new RuntimeException("Unsupported data type: " + storedType);
         }
       } else {
+        FieldType listType = new FieldType(true, new ArrowType.List(), null);
+        FieldType childType;
         switch (storedType) {
           case INT:
-            fieldType = new FieldType(true, new ArrowType.List.Int(32, true), null);
-            arrowField = new org.apache.arrow.vector.types.pojo.Field(fieldSpec.getName(), fieldType, null);
-            arrowFields.add(arrowField);
+            childType = new FieldType(true, new ArrowType.Int(32, true), null);
             break;
           case LONG:
-            fieldType = new FieldType(true, new ArrowType.List.Int(64, true), null);
-            arrowField = new org.apache.arrow.vector.types.pojo.Field(fieldSpec.getName(), fieldType, null);
-            arrowFields.add(arrowField);
+            childType = new FieldType(true, new ArrowType.Int(64, true), null);
             break;
           case FLOAT:
-            fieldType = new FieldType(true, new ArrowType.List.FloatingPoint(FloatingPointPrecision.SINGLE), null);
-            arrowField = new org.apache.arrow.vector.types.pojo.Field(fieldSpec.getName(), fieldType, null);
-            arrowFields.add(arrowField);
+            childType = new FieldType(true, new ArrowType.FloatingPoint(FloatingPointPrecision.SINGLE), null);
             break;
           case DOUBLE:
-            fieldType = new FieldType(true, new ArrowType.List.FloatingPoint(FloatingPointPrecision.DOUBLE), null);
-            arrowField = new org.apache.arrow.vector.types.pojo.Field(fieldSpec.getName(), fieldType, null);
-            arrowFields.add(arrowField);
+            childType = new FieldType(true, new ArrowType.FloatingPoint(FloatingPointPrecision.DOUBLE), null);
             break;
           case STRING:
-            fieldType = new FieldType(true, new ArrowType.List.Utf8(), null);
-            arrowField = new org.apache.arrow.vector.types.pojo.Field(fieldSpec.getName(), fieldType, null);
-            arrowFields.add(arrowField);
+            childType = new FieldType(true, new ArrowType.Utf8(), null);
+            break;
+          case BYTES:
+            childType = new FieldType(true, new ArrowType.Binary(), null);
             break;
           default:
             throw new RuntimeException("Unsupported data type: " + storedType);
         }
+        org.apache.arrow.vector.types.pojo.Field childField = new org.apache.arrow.vector.types.pojo.Field("item", childType, null);
+        List<org.apache.arrow.vector.types.pojo.Field> childFields = Collections.singletonList(childField);
+        arrowField = new org.apache.arrow.vector.types.pojo.Field(fieldSpec.getName(), listType, childFields);
       }
+      arrowFields.add(arrowField);
     }
     return new org.apache.arrow.vector.types.pojo.Schema(arrowFields);
   }
 
   private void fillVectorsFromGenericRow(VectorSchemaRoot sortedRoot, VectorSchemaRoot unsortedRoot, GenericRow row) {
-    List<FieldVector> sortedRootFieldVectors = sortedRoot.getFieldVectors();
-    List<FieldVector> unsortedRootFieldVectors = unsortedRoot.getFieldVectors();
-
-    int count = 0;
     for (FieldSpec fieldSpec : _pinotSchema.getAllFieldSpecs()) {
       FieldVector fieldVector =
-          _sortColumns != null && _sortColumns.contains(fieldSpec.getName()) ? sortedRootFieldVectors.get(count++)
-              : unsortedRootFieldVectors.get(count++);
+          _sortColumns != null && _sortColumns.contains(fieldSpec.getName()) ? sortedRoot.getVector(fieldSpec.getName())
+              : unsortedRoot.getVector(fieldSpec.getName());
 
       byte[] bytes;
       if (fieldSpec.isSingleValueField()) {
@@ -331,11 +320,7 @@ public class GenericRowArrowFileWriter implements Closeable, FileWriter<GenericR
             listWriterString.setPosition(_batchRowCount);
             listWriterString.startList();
             for (Object value : values) {
-              bytes = value.toString().getBytes();
-              BufferAllocator allocator = new RootAllocator(Long.MAX_VALUE);
-              ArrowBuf arrowBuf = allocator.buffer(bytes.length);
-              arrowBuf.writeBytes(bytes);
-              listWriterString.writeVarChar(0, bytes.length, arrowBuf);
+              listWriterString.writeVarChar(value.toString());
             }
             listWriterString.setValueCount(numValues);
             listWriterString.endList();
@@ -345,11 +330,7 @@ public class GenericRowArrowFileWriter implements Closeable, FileWriter<GenericR
             listWriterBytes.setPosition(_batchRowCount);
             listWriterBytes.startList();
             for (Object value : values) {
-              bytes = (byte[]) value;
-              BufferAllocator allocator = new RootAllocator(Long.MAX_VALUE);
-              ArrowBuf arrowBuf = allocator.buffer(bytes.length);
-              arrowBuf.writeBytes(bytes);
-              listWriterBytes.writeVarBinary(0, bytes.length, arrowBuf);
+              listWriterBytes.writeVarBinary((byte[]) value);
             }
             listWriterBytes.setValueCount(numValues);
             listWriterBytes.endList();
@@ -358,13 +339,16 @@ public class GenericRowArrowFileWriter implements Closeable, FileWriter<GenericR
             throw new RuntimeException("Unsupported data type: " + fieldSpec.getDataType().getStoredType());
         }
       }
-      _batchRowCount++;
+      fieldVector.setValueCount(_batchRowCount + 1);
       if (_sortColumns != null && _sortColumns.contains(fieldSpec.getName())) {
         _sortedBatchByteCount += fieldVector.getBufferSize();
       } else {
         _unsortedBatchByteCount += fieldVector.getBufferSize();
       }
     }
+    _batchRowCount++;
+    sortedRoot.setRowCount(_batchRowCount);
+    unsortedRoot.setRowCount(_batchRowCount);
   }
 
 
@@ -376,7 +360,6 @@ public class GenericRowArrowFileWriter implements Closeable, FileWriter<GenericR
 
   public void write(GenericRow genericRow) throws IOException {
     fillVectorsFromGenericRow(_sortedVectorRoot, _unsortedVectorRoot, genericRow);
-    _batchRowCount++;
 
     if (_batchRowCount >= _maxBatchRows ||
         (_sortedBatchByteCount  + _unsortedBatchByteCount) >= _maxBatchBytes) {
