@@ -331,9 +331,10 @@ public class VectorTest extends CustomDataQueryClusterIntegrationTest {
 
   private float[] createRandomVector(int vectorDimSize) {
     float[] vector = new float[vectorDimSize];
-    float range = 1.0f - 0.0f;
     Random random = new Random();
-    IntStream.range(0, vectorDimSize).forEach(i -> vector[i] = random.nextFloat() * range + 0.0f);
+    for (int i = 0; i < vectorDimSize; i++) {
+      vector[i] = random.nextFloat();
+    }
     return vector;
   }
 
