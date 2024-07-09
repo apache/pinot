@@ -220,7 +220,7 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
   private static PinotLogicalAggregate convertAggFromIntermediateInput(RelOptRuleCall call,
       PinotLogicalExchange exchange, AggType aggType) {
     Aggregate aggRel = call.rel(0);
-    RelNode input = PinotRuleUtils.unboxRel(aggRel.getInput());
+    RelNode input = aggRel.getInput();
     List<RexNode> projects = findImmediateProjects(input);
 
     // Create new AggregateCalls from exchange input. Exchange produces results with group keys followed by intermediate
@@ -259,7 +259,7 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
   }
 
   private static List<AggregateCall> buildAggCalls(Aggregate aggRel, AggType aggType) {
-    RelNode input = PinotRuleUtils.unboxRel(aggRel.getInput());
+    RelNode input = aggRel.getInput();
     List<RexNode> projects = findImmediateProjects(input);
     List<AggregateCall> orgAggCalls = aggRel.getAggCallList();
     List<AggregateCall> aggCalls = new ArrayList<>(orgAggCalls.size());
