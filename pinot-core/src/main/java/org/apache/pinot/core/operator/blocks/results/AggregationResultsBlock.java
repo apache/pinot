@@ -68,7 +68,7 @@ public class AggregationResultsBlock extends BaseResultsBlock {
 
   @Override
   public int getNumRows() {
-    return 1;
+    return _queryContext.getLimit() == 0 ? 0 : 1;
   }
 
   @Override
@@ -108,6 +108,12 @@ public class AggregationResultsBlock extends BaseResultsBlock {
     ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
     int numColumns = columnDataTypes.length;
     DataTableBuilder dataTableBuilder = DataTableBuilderFactory.getDataTableBuilder(dataSchema);
+
+    // For LIMIT 0 queries
+    if (_results.isEmpty()) {
+      return dataTableBuilder.build();
+    }
+
     boolean returnFinalResult = _queryContext.isServerReturnFinalResult();
     if (_queryContext.isNullHandlingEnabled()) {
       RoaringBitmap[] nullBitmaps = new RoaringBitmap[numColumns];
