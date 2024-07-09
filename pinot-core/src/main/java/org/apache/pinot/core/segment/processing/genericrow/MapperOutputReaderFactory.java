@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.core.segment.processing.mapper.MapperOutputReader;
 import org.apache.pinot.spi.data.FieldSpec;
 
 

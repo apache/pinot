@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.segment.processing.genericrow;
+package org.apache.pinot.core.segment.processing.mapper;
 
 import org.apache.pinot.spi.data.readers.GenericRow;
 

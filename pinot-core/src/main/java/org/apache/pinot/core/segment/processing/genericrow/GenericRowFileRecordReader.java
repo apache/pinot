@@ -22,6 +22,7 @@ import it.unimi.dsi.fastutil.Arrays;
 import java.io.File;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.pinot.core.segment.processing.mapper.GenericRowMapperOutputRecordReader;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;

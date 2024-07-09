@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.core.segment.processing.mapper.MapperOutputReader;
 import org.apache.pinot.spi.data.FieldSpec;
 
 

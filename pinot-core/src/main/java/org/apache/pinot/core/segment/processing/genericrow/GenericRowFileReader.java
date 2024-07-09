@@ -23,6 +23,8 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteOrder;
 import java.util.List;
+import org.apache.pinot.core.segment.processing.mapper.GenericRowMapperOutputRecordReader;
+import org.apache.pinot.core.segment.processing.mapper.MapperOutputReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
