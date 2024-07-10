@@ -433,29 +433,10 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     _logger.info("Adding segment: {}, current primary key count: {}", segmentName, getNumPrimaryKeys());
     long startTimeMs = System.currentTimeMillis();
 
-    MutableRoaringBitmap validDocIds;
-    if (_enableSnapshot) {
-      validDocIds = segment.loadValidDocIdsFromSnapshot();
-      if (validDocIds != null && validDocIds.isEmpty()) {
-        _logger.info("Skip adding segment: {} without valid doc, current primary key count: {}",
-            segment.getSegmentName(), getNumPrimaryKeys());
-        segment.enableUpsert(this, new ThreadSafeMutableRoaringBitmap(), null);
-        return;
-      }
-    } else {
-      validDocIds = null;
-      segment.deleteValidDocIdsSnapshot();
-    }
-
     try (UpsertUtils.RecordInfoReader recordInfoReader = new UpsertUtils.RecordInfoReader(segment, _primaryKeyColumns,
         _comparisonColumns, _deleteRecordColumn)) {
-      Iterator<RecordInfo> recordInfoIterator;
-      if (validDocIds != null) {
-        recordInfoIterator = UpsertUtils.getRecordInfoIterator(recordInfoReader, validDocIds);
-      } else {
-        recordInfoIterator =
-            UpsertUtils.getRecordInfoIterator(recordInfoReader, segment.getSegmentMetadata().getTotalDocs());
-      }
+      Iterator<RecordInfo> recordInfoIterator =
+          UpsertUtils.getRecordInfoIterator(recordInfoReader, segment.getSegmentMetadata().getTotalDocs());
       addSegment(segment, null, null, recordInfoIterator);
     } catch (Exception e) {
       throw new RuntimeException(
