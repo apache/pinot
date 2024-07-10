@@ -162,8 +162,11 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
         // For realtime index, use NRTCachingDirectory to reduce the number of open files. This buffers the
         // flushes triggered by the near real-time refresh and writes them to disk when the buffer is full,
         // reducing the number of small writes.
-        _indexDirectory = new NRTCachingDirectory(FSDirectory.open(_indexFile.toPath()),
-            config.getLuceneNRTCachingDirectoryMaxBufferSizeMB(), config.getLuceneNRTCachingDirectoryMaxBufferSizeMB());
+        int bufSize = config.getLuceneNRTCachingDirectoryMaxBufferSizeMB();
+        LOGGER.info(
+            "Using NRTCachingDirectory for realtime lucene index for segment {} and column {} with buffer size: {}MB",
+            segmentIndexDir, column, bufSize);
+        _indexDirectory = new NRTCachingDirectory(FSDirectory.open(_indexFile.toPath()), bufSize, bufSize);
       } else {
         _indexDirectory = FSDirectory.open(_indexFile.toPath());
       }
