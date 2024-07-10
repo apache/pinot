@@ -23,10 +23,10 @@ import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.nio.ByteBuffer;
 import java.util.Base64;
+import java.util.Random;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
-import org.apache.commons.lang3.RandomUtils;
 import org.apache.datasketches.cpc.CpcSketch;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -176,12 +176,13 @@ public class CpcSketchTest extends CustomDataQueryClusterIntegrationTest {
 
     // create avro file
     File avroFile = new File(_tempDir, "data.avro");
+    Random random = new Random();
     try (DataFileWriter<GenericData.Record> fileWriter = new DataFileWriter<>(new GenericDatumWriter<>(avroSchema))) {
       fileWriter.create(avroSchema, avroFile);
       for (int i = 0; i < getCountStarResult(); i++) {
         // create avro record
         GenericData.Record record = new GenericData.Record(avroSchema);
-        record.put(ID, RandomUtils.nextInt(0, 10));
+        record.put(ID, random.nextInt(10));
         record.put(MET_CPC_SKETCH_BYTES, ByteBuffer.wrap(getRandomRawValue()));
         // add avro record to file
         fileWriter.append(record);
