@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.spi.accounting;
 
+import java.util.Collection;
 import javax.annotation.Nullable;
 
 
@@ -74,4 +75,6 @@ public interface ThreadResourceUsageAccountant {
    * @return empty string if N/A
    */
   Exception getErrorStatus();
+
+  Collection<? extends ThreadResourceTracker> getThreadResources();
 }

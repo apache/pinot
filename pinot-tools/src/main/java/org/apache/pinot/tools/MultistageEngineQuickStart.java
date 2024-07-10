@@ -24,6 +24,9 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import org.apache.pinot.core.accounting.PerQueryCPUMemAccountantFactory;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.tools.admin.PinotAdministrator;
 import org.apache.pinot.tools.admin.command.QuickstartRunner;
@@ -287,6 +290,23 @@ public class MultistageEngineQuickStart extends Quickstart {
     printStatus(Quickstart.Color.GREEN, "***************************************************");
     printStatus(Quickstart.Color.YELLOW, "Example query run completed.");
     printStatus(Quickstart.Color.GREEN, "***************************************************");
+
+    ExecutorService service = Executors.newFixedThreadPool(10);
+    for (int i = 0; i < 10; i++) {
+      service.submit(new Runnable() {
+        @Override
+        public void run() {
+          try {
+            while (true) {
+              runner.runQuery(q3, queryOptions);
+              Thread.sleep(10);
+            }
+          } catch (Exception e) {
+            throw new RuntimeException(e);
+          }
+        }
+      });
+    }
   }
 
   @Override
@@ -298,6 +318,22 @@ public class MultistageEngineQuickStart extends Quickstart {
   protected Map<String, Object> getConfigOverrides() {
     Map<String, Object> configOverrides = new HashMap<>();
     configOverrides.put(CommonConstants.Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT, true);
+    configOverrides.put(CommonConstants.Server.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT, true);
+    configOverrides.put(CommonConstants.Broker.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT, true);
+    configOverrides.put(CommonConstants.Broker.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT, true);
+    configOverrides.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING, true);
+    configOverrides.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING, true);
+
+    configOverrides.put(
+        CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "." + CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME,
+        PerQueryCPUMemAccountantFactory.class.getCanonicalName());
+    configOverrides.put(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
+        + CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING, true);
+    configOverrides.put(
+        CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
+            + CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING, false);
+    configOverrides.put(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
+        + CommonConstants.Accounting.CONFIG_OF_OOM_PROTECTION_KILLING_QUERY, true);
     return configOverrides;
   }
 

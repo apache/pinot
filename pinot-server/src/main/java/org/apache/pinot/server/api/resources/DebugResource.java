@@ -26,6 +26,7 @@ import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -52,8 +53,11 @@ import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.server.starter.ServerInstance;
+import org.apache.pinot.spi.accounting.ThreadResourceTracker;
+import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.stream.ConsumerPartitionState;
+import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
@@ -120,6 +124,16 @@ public class DebugResource {
         tableDataManager.releaseSegment(segmentDataManager);
       }
     }
+  }
+
+  @GET
+  @Path("threads/resourceUsage")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Get current resource usage of threads",
+      notes = "This is a debug endpoint, and won't maintain backward compatibility")
+  public Collection<? extends ThreadResourceTracker> getThreadUsage() {
+    ThreadResourceUsageAccountant threadAccountant = Tracing.getThreadAccountant();
+    return threadAccountant.getThreadResources();
   }
 
   private List<SegmentServerDebugInfo> getSegmentServerDebugInfo(String tableNameWithType, TableType tableType) {
