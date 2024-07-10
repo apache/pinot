@@ -448,16 +448,18 @@ public class RealtimeSegmentConverterTest {
   public static Object[][] reuseParams() {
     List<Boolean> enabledColumnMajorSegmentBuildParams = Arrays.asList(false, true);
     String[] sortedColumnParams = new String[]{null, STRING_COLUMN1};
+    List<Boolean> reuseMutableIndex = Arrays.asList(true, false);
+    List<Boolean> enableNRTCachingDirectory = Arrays.asList(true, false);
 
-    return enabledColumnMajorSegmentBuildParams.stream().flatMap(
-            columnMajor -> Arrays.stream(sortedColumnParams).map(sortedColumn -> new Object[]{columnMajor,
-                sortedColumn}))
-        .toArray(Object[][]::new);
+    return enabledColumnMajorSegmentBuildParams.stream().flatMap(columnMajor -> Arrays.stream(sortedColumnParams)
+        .flatMap(sortedColumn -> reuseMutableIndex.stream().flatMap(reuse -> enableNRTCachingDirectory.stream()
+            .map(cache -> new Object[]{columnMajor, sortedColumn, reuse, cache})))).toArray(Object[][]::new);
   }
 
   // Test the realtime segment conversion of a table with an index that reuses mutable index artifacts during conversion
   @Test(dataProvider = "reuseParams")
-  public void testSegmentBuilderWithReuse(boolean columnMajorSegmentBuilder, String sortedColumn)
+  public void testSegmentBuilderWithReuse(boolean columnMajorSegmentBuilder, String sortedColumn,
+      boolean reuseMutableIndex, boolean enableNRTCachingDirectory)
       throws Exception {
     File tmpDir = new File(TMP_DIR, "tmp_" + System.currentTimeMillis());
     FieldConfig textIndexFieldConfig =
@@ -477,7 +479,7 @@ public class RealtimeSegmentConverterTest {
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
     TextIndexConfig textIndexConfig =
         new TextIndexConfig(false, null, null, false, false, Collections.emptyList(), Collections.emptyList(), false,
-            500, null, false, true, true);
+            500, null, false, reuseMutableIndex, enableNRTCachingDirectory);
 
     RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder =
         new RealtimeSegmentConfig.Builder().setTableNameWithType(tableNameWithType).setSegmentName(segmentName)
