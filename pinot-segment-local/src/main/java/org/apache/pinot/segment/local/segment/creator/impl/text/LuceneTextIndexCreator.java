@@ -132,18 +132,18 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
       indexWriterConfig.setCommitOnClose(commit);
       indexWriterConfig.setUseCompoundFile(config.isLuceneUseCompoundFile());
 
+      // For the realtime segment, to reuse mutable index, we should set the two write configs below.
+      // The realtime segment will call .commit() on the IndexWriter when segment conversion occurs.
+      // By default, Lucene will sometimes choose to merge segments in the background, which is problematic because
+      // the lucene index directory's contents is copied to create the immutable segment. If a background merge
+      // occurs during this copy, a FileNotFoundException will be triggered and segment build will fail.
+      //
+      // Also, for the realtime segment, we set the OpenMode to CREATE to ensure that any existing artifacts
+      // will be overwritten. This is necessary because the realtime segment can be created multiple times
+      // during a server crash and restart scenario. If the existing artifacts are appended to, the realtime
+      // query results will be accurate, but after segment conversion the mapping file generated will be loaded
+      // for only the first numDocs lucene docIds, which can cause IndexOutOfBounds errors.
       if (!_commitOnClose && config.isReuseMutableIndex()) {
-        // For the realtime segment, to reuse mutable index, we should set the two write configs below.
-        // The realtime segment will call .commit() on the IndexWriter when segment conversion occurs.
-        // By default, Lucene will sometimes choose to merge segments in the background, which is problematic because
-        // the lucene index directory's contents is copied to create the immutable segment. If a background merge
-        // occurs during this copy, a FileNotFoundException will be triggered and segment build will fail.
-        //
-        // Also, for the realtime segment, we set the OpenMode to CREATE to ensure that any existing artifacts
-        // will be overwritten. This is necessary because the realtime segment can be created multiple times
-        // during a server crash and restart scenario. If the existing artifacts are appended to, the realtime
-        // query results will be accurate, but after segment conversion the mapping file generated will be loaded
-        // for only the first numDocs lucene docIds, which can cause IndexOutOfBounds errors.
         indexWriterConfig.setMergeScheduler(NoMergeScheduler.INSTANCE);
         indexWriterConfig.setOpenMode(IndexWriterConfig.OpenMode.CREATE);
       }
