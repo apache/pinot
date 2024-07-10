@@ -55,6 +55,7 @@ import org.apache.arrow.vector.ipc.message.IpcOption;
 import org.apache.arrow.vector.types.FloatingPointPrecision;
 import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.FieldType;
+import org.apache.arrow.vector.util.Text;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -317,8 +318,8 @@ public class GenericRowArrowFileWriter implements Closeable, FileWriter<GenericR
             break;
           case STRING:
             UnionListWriter listWriterString = ((ListVector) fieldVector).getWriter();
-            listWriterString.setPosition(_batchRowCount);
             listWriterString.startList();
+            listWriterString.setPosition(_batchRowCount);
             for (Object value : values) {
               listWriterString.writeVarChar(value.toString());
             }
@@ -371,7 +372,10 @@ public class GenericRowArrowFileWriter implements Closeable, FileWriter<GenericR
     sortAllColumns();
 
     _sortedWriter.writeBatch();
+    _sortedWriter.end();
+
     _unsortedWriter.writeBatch();
+    _unsortedWriter.end();
 
     String sortedFileName = _baseFileName + "_sorted_" + _batchNumber + ".arrow";
     String unsortedFileName = _baseFileName + "_unsorted_" + _batchNumber + ".arrow";
@@ -390,8 +394,6 @@ public class GenericRowArrowFileWriter implements Closeable, FileWriter<GenericR
     if (_batchRowCount > 0) {
       flushBatch();
     }
-    _sortedWriter.end();
-    _unsortedWriter.end();
     _sortedWriter.close();
     _unsortedWriter.close();
   }
