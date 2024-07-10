@@ -194,7 +194,7 @@ public class MinionTaskUtils {
     String clusterName = minionContext.getHelixManager().getClusterName();
     HelixAdmin helixAdmin = minionContext.getHelixManager().getClusterManagmentTool();
     RoaringBitmap validDocIds = null;
-    List<String> servers = MinionTaskUtils.getServers(segmentName, tableNameWithType, helixAdmin, clusterName);
+    List<String> servers = getServers(segmentName, tableNameWithType, helixAdmin, clusterName);
     for (String server : servers) {
       InstanceConfig instanceConfig = helixAdmin.getInstanceConfig(clusterName, server);
       String endpoint = InstanceUtils.getServerAdminEndpoint(instanceConfig);
