@@ -35,10 +35,12 @@ import org.apache.pinot.spi.config.table.IndexConfig;
 public class TextIndexConfig extends IndexConfig {
   private static final int LUCENE_INDEX_DEFAULT_MAX_BUFFER_SIZE_MB = 500;
   private static final boolean LUCENE_INDEX_DEFAULT_USE_COMPOUND_FILE = true;
+  private static final boolean LUCENE_INDEX_ENABLE_PREFIX_SUFFIX_MATCH_IN_PHRASE_SEARCH = false;
+  private static final boolean LUCENE_INDEX_REUSE_MUTABLE_INDEX = false;
+  private static final boolean LUCENE_INDEX_ENABLE_NRT_CACHING_DIRECTORY = false;
   public static final TextIndexConfig DISABLED =
       new TextIndexConfig(true, null, null, false, false, Collections.emptyList(), Collections.emptyList(), false,
-          LUCENE_INDEX_DEFAULT_MAX_BUFFER_SIZE_MB, null, false);
-  private static final boolean LUCENE_INDEX_ENABLE_PREFIX_SUFFIX_MATCH_IN_PHRASE_SEARCH = false;
+          LUCENE_INDEX_DEFAULT_MAX_BUFFER_SIZE_MB, null, false, false, false);
   private final FSTType _fstType;
   @Nullable
   private final Object _rawValueForTextIndex;
@@ -50,6 +52,8 @@ public class TextIndexConfig extends IndexConfig {
   private final int _luceneMaxBufferSizeMB;
   private final String _luceneAnalyzerClass;
   private final boolean _enablePrefixSuffixMatchingInPhraseQueries;
+  private final boolean _reuseMutableIndex;
+  private final boolean _enableNRTCachingDirectory;
 
   @JsonCreator
   public TextIndexConfig(@JsonProperty("disabled") Boolean disabled, @JsonProperty("fst") FSTType fstType,
@@ -61,7 +65,9 @@ public class TextIndexConfig extends IndexConfig {
       @JsonProperty("luceneUseCompoundFile") Boolean luceneUseCompoundFile,
       @JsonProperty("luceneMaxBufferSizeMB") Integer luceneMaxBufferSizeMB,
       @JsonProperty("luceneAnalyzerClass") String luceneAnalyzerClass,
-      @JsonProperty("enablePrefixSuffixMatchingInPhraseQueries") Boolean enablePrefixSuffixMatchingInPhraseQueries) {
+      @JsonProperty("enablePrefixSuffixMatchingInPhraseQueries") Boolean enablePrefixSuffixMatchingInPhraseQueries,
+      @JsonProperty("reuseMutableIndex") Boolean reuseMutableIndex,
+      @JsonProperty("enableNRTCachingDirectory") Boolean enableNRTCachingDirectory) {
     super(disabled);
     _fstType = fstType;
     _rawValueForTextIndex = rawValueForTextIndex;
@@ -78,6 +84,9 @@ public class TextIndexConfig extends IndexConfig {
     _enablePrefixSuffixMatchingInPhraseQueries =
         enablePrefixSuffixMatchingInPhraseQueries == null ? LUCENE_INDEX_ENABLE_PREFIX_SUFFIX_MATCH_IN_PHRASE_SEARCH
             : enablePrefixSuffixMatchingInPhraseQueries;
+    _reuseMutableIndex = reuseMutableIndex == null ? LUCENE_INDEX_REUSE_MUTABLE_INDEX : reuseMutableIndex;
+    _enableNRTCachingDirectory =
+        enableNRTCachingDirectory == null ? LUCENE_INDEX_ENABLE_NRT_CACHING_DIRECTORY : enableNRTCachingDirectory;
   }
 
   public FSTType getFstType() {
@@ -141,6 +150,14 @@ public class TextIndexConfig extends IndexConfig {
     return _enablePrefixSuffixMatchingInPhraseQueries;
   }
 
+  public boolean isReuseMutableIndex() {
+    return _reuseMutableIndex;
+  }
+
+  public boolean isEnableNRTCachingDirectory() {
+    return _enableNRTCachingDirectory;
+  }
+
   public static abstract class AbstractBuilder {
     @Nullable
     protected FSTType _fstType;
@@ -154,6 +171,8 @@ public class TextIndexConfig extends IndexConfig {
     protected int _luceneMaxBufferSizeMB = LUCENE_INDEX_DEFAULT_MAX_BUFFER_SIZE_MB;
     protected String _luceneAnalyzerClass = FieldConfig.TEXT_INDEX_DEFAULT_LUCENE_ANALYZER_CLASS;
     protected boolean _enablePrefixSuffixMatchingInPhraseQueries = false;
+    protected boolean _reuseMutableIndex = false;
+    protected boolean _enableNRTCachingDirectory = false;
 
     public AbstractBuilder(@Nullable FSTType fstType) {
       _fstType = fstType;
@@ -169,12 +188,14 @@ public class TextIndexConfig extends IndexConfig {
       _luceneMaxBufferSizeMB = other._luceneMaxBufferSizeMB;
       _luceneAnalyzerClass = other._luceneAnalyzerClass;
       _enablePrefixSuffixMatchingInPhraseQueries = other._enablePrefixSuffixMatchingInPhraseQueries;
+      _reuseMutableIndex = other._reuseMutableIndex;
+      _enableNRTCachingDirectory = other._enableNRTCachingDirectory;
     }
 
     public TextIndexConfig build() {
       return new TextIndexConfig(false, _fstType, _rawValueForTextIndex, _enableQueryCache, _useANDForMultiTermQueries,
           _stopWordsInclude, _stopWordsExclude, _luceneUseCompoundFile, _luceneMaxBufferSizeMB, _luceneAnalyzerClass,
-          _enablePrefixSuffixMatchingInPhraseQueries);
+          _enablePrefixSuffixMatchingInPhraseQueries, _reuseMutableIndex, _enableNRTCachingDirectory);
     }
 
     public abstract AbstractBuilder withProperties(@Nullable Map<String, String> textIndexProperties);
@@ -214,6 +235,16 @@ public class TextIndexConfig extends IndexConfig {
       _enablePrefixSuffixMatchingInPhraseQueries = enablePrefixSuffixMatchingInPhraseQueries;
       return this;
     }
+
+    public AbstractBuilder withReuseMutableIndex(boolean reuseMutableIndex) {
+      _reuseMutableIndex = reuseMutableIndex;
+      return this;
+    }
+
+    public AbstractBuilder withEnableNRTCachingDirectory(boolean enableNRTCachingDirectory) {
+      _enableNRTCachingDirectory = enableNRTCachingDirectory;
+      return this;
+    }
   }
 
   @Override
@@ -229,16 +260,21 @@ public class TextIndexConfig extends IndexConfig {
     }
     TextIndexConfig that = (TextIndexConfig) o;
     return _enableQueryCache == that._enableQueryCache && _useANDForMultiTermQueries == that._useANDForMultiTermQueries
-        && _fstType == that._fstType && Objects.equals(_rawValueForTextIndex, that._rawValueForTextIndex)
-        && Objects.equals(_stopWordsInclude, that._stopWordsInclude) && Objects.equals(_stopWordsExclude,
-        that._stopWordsExclude) && _luceneUseCompoundFile == that._luceneUseCompoundFile
-        && _luceneMaxBufferSizeMB == that._luceneMaxBufferSizeMB && _luceneAnalyzerClass == that._luceneAnalyzerClass;
+        && _luceneUseCompoundFile == that._luceneUseCompoundFile
+        && _luceneMaxBufferSizeMB == that._luceneMaxBufferSizeMB
+        && _enablePrefixSuffixMatchingInPhraseQueries == that._enablePrefixSuffixMatchingInPhraseQueries
+        && _reuseMutableIndex == that._reuseMutableIndex
+        && _enableNRTCachingDirectory == that._enableNRTCachingDirectory && _fstType == that._fstType && Objects.equals(
+        _rawValueForTextIndex, that._rawValueForTextIndex) && Objects.equals(_stopWordsInclude, that._stopWordsInclude)
+        && Objects.equals(_stopWordsExclude, that._stopWordsExclude) && Objects.equals(_luceneAnalyzerClass,
+        that._luceneAnalyzerClass);
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(super.hashCode(), _fstType, _rawValueForTextIndex, _enableQueryCache,
         _useANDForMultiTermQueries, _stopWordsInclude, _stopWordsExclude, _luceneUseCompoundFile,
-        _luceneMaxBufferSizeMB, _luceneAnalyzerClass);
+        _luceneMaxBufferSizeMB, _luceneAnalyzerClass, _enablePrefixSuffixMatchingInPhraseQueries, _reuseMutableIndex,
+        _enableNRTCachingDirectory);
   }
 }
