@@ -89,7 +89,7 @@ public class CPUMemThreadLevelAccountingObjects {
       return _currentThreadCPUTimeSampleMS;
     }
 
-    public long getMemoryAllocationBytes() {
+    public long getAllocatedBytes() {
       return _currentThreadMemoryAllocationSampleBytes;
     }
 

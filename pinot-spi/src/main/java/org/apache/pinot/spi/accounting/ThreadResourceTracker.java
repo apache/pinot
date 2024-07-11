@@ -21,13 +21,32 @@ package org.apache.pinot.spi.accounting;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 
 
+/**
+ * Tracks allocated bytes and CPU time by a thread when executing a task of a query.
+ */
 @JsonSerialize
 public interface ThreadResourceTracker {
+  /**
+   * Total execution CPU Time(nanoseconds) of a thread when executing a query task in a server or broker.
+   * @return A long containing the nanoseconds.
+   */
   long getCPUTimeMS();
 
-  long getMemoryAllocationBytes();
+  /**
+   * Allocated bytes for a query task in a server or broker
+   * @return A long containing the number of bytes allocated to execute the query task.
+   */
+  long getAllocatedBytes();
 
+  /**
+   * QueryId of the task the thread is executing.
+   * @return a string containing the query id.
+   */
   String getQueryId();
 
+  /**
+   * TaskId of the task the thread is executing.
+   * @return an int containing the task id.
+   */
   int getTaskId();
 }
