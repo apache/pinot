@@ -23,6 +23,7 @@ import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.MetricValueUtils;
+import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.TableSizeReader;
@@ -31,6 +32,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.eq;
@@ -49,6 +51,14 @@ public class StorageQuotaCheckerTest {
 
   private TableSizeReader _tableSizeReader;
   private StorageQuotaChecker _storageQuotaChecker;
+  private ControllerConf _controllerConf;
+
+  @BeforeClass
+  public void init() {
+    _controllerConf = mock(ControllerConf.class);
+    when(_controllerConf.getServerAdminRequestTimeoutSeconds()).thenReturn(1);
+    when(_controllerConf.getEnableStorageQuotaCheck()).thenReturn(true);
+  }
 
   @Test
   public void testNoQuota()
@@ -58,7 +68,7 @@ public class StorageQuotaCheckerTest {
     _tableSizeReader = mock(TableSizeReader.class);
     ControllerMetrics controllerMetrics = new ControllerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
     _storageQuotaChecker = new StorageQuotaChecker(_tableSizeReader, controllerMetrics,
-        mock(LeadControllerManager.class), mock(PinotHelixResourceManager.class));
+        mock(LeadControllerManager.class), mock(PinotHelixResourceManager.class), _controllerConf);
     tableConfig.setQuotaConfig(null);
     assertTrue(isSegmentWithinQuota(tableConfig));
   }
@@ -72,7 +82,7 @@ public class StorageQuotaCheckerTest {
     _tableSizeReader = mock(TableSizeReader.class);
     ControllerMetrics controllerMetrics = new ControllerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
     _storageQuotaChecker = new StorageQuotaChecker(_tableSizeReader, controllerMetrics,
-        mock(LeadControllerManager.class), mock(PinotHelixResourceManager.class));
+        mock(LeadControllerManager.class), mock(PinotHelixResourceManager.class), _controllerConf);
     tableConfig.setQuotaConfig(null);
     assertTrue(isSegmentWithinQuota(tableConfig));
   }
@@ -85,7 +95,7 @@ public class StorageQuotaCheckerTest {
     _tableSizeReader = mock(TableSizeReader.class);
     ControllerMetrics controllerMetrics = new ControllerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
     _storageQuotaChecker = new StorageQuotaChecker(_tableSizeReader, controllerMetrics,
-        mock(LeadControllerManager.class), mock(PinotHelixResourceManager.class));
+        mock(LeadControllerManager.class), mock(PinotHelixResourceManager.class), _controllerConf);
     tableConfig.setQuotaConfig(new QuotaConfig(null, null));
     assertTrue(isSegmentWithinQuota(tableConfig));
   }
@@ -101,7 +111,7 @@ public class StorageQuotaCheckerTest {
     when(pinotHelixResourceManager.getNumReplicas(eq(tableConfig))).thenReturn(NUM_REPLICAS);
     _storageQuotaChecker =
         new StorageQuotaChecker(_tableSizeReader, controllerMetrics, mock(LeadControllerManager.class),
-            pinotHelixResourceManager);
+            pinotHelixResourceManager, _controllerConf);
     tableConfig.setQuotaConfig(new QuotaConfig("2.8K", null));
 
     // No response from server, should pass without updating metrics
@@ -144,7 +154,7 @@ public class StorageQuotaCheckerTest {
   private boolean isSegmentWithinQuota(TableConfig tableConfig)
       throws InvalidConfigException {
     return _storageQuotaChecker
-        .isSegmentStorageWithinQuota(tableConfig, SEGMENT_NAME, SEGMENT_SIZE_IN_BYTES, 1000)._isSegmentWithinQuota;
+        .isSegmentStorageWithinQuota(tableConfig, SEGMENT_NAME, SEGMENT_SIZE_IN_BYTES)._isSegmentWithinQuota;
   }
 
   public void mockTableSizeResult(long tableSizeInBytes, int numMissingSegments)

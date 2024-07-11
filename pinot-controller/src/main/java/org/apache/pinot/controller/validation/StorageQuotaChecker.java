@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.TableSizeReader;
@@ -43,14 +44,18 @@ public class StorageQuotaChecker {
   private final ControllerMetrics _controllerMetrics;
   private final LeadControllerManager _leadControllerManager;
   private final PinotHelixResourceManager _pinotHelixResourceManager;
+  private final ControllerConf _controllerConf;
+  private final int _timeout;
 
   public StorageQuotaChecker(TableSizeReader tableSizeReader,
       ControllerMetrics controllerMetrics, LeadControllerManager leadControllerManager,
-      PinotHelixResourceManager pinotHelixResourceManager) {
+      PinotHelixResourceManager pinotHelixResourceManager, ControllerConf controllerConf) {
     _tableSizeReader = tableSizeReader;
     _controllerMetrics = controllerMetrics;
     _leadControllerManager = leadControllerManager;
     _pinotHelixResourceManager = pinotHelixResourceManager;
+    _controllerConf = controllerConf;
+    _timeout = controllerConf.getServerAdminRequestTimeoutSeconds() * 1000;
   }
 
   public static class QuotaCheckerResponse {
@@ -75,9 +80,12 @@ public class StorageQuotaChecker {
    * Returns whether the new added segment is within the storage quota.
    */
   public QuotaCheckerResponse isSegmentStorageWithinQuota(TableConfig tableConfig, String segmentName,
-      long segmentSizeInBytes, int timeoutMs)
+      long segmentSizeInBytes)
       throws InvalidConfigException {
-    Preconditions.checkArgument(timeoutMs > 0, "Timeout value must be > 0, input: %s", timeoutMs);
+    if (!_controllerConf.getEnableStorageQuotaCheck()) {
+      return success("Storage quota check is disabled, skipping the check");
+    }
+    Preconditions.checkArgument(_timeout > 0, "Timeout value must be > 0, input: %s", _timeout);
 
     // 1. Read table config
     // 2. read table size from all the servers
@@ -102,7 +110,7 @@ public class StorageQuotaChecker {
     // read table size
     TableSizeReader.TableSubTypeSizeDetails tableSubtypeSize;
     try {
-      tableSubtypeSize = _tableSizeReader.getTableSubtypeSize(tableNameWithType, timeoutMs);
+      tableSubtypeSize = _tableSizeReader.getTableSubtypeSize(tableNameWithType, _timeout);
     } catch (InvalidConfigException e) {
       LOGGER.error("Failed to get table size for table {}", tableNameWithType, e);
       throw e;
@@ -203,6 +211,50 @@ public class StorageQuotaChecker {
       }
       LOGGER.warn(message);
       return failure(message);
+    }
+  }
+
+  public boolean isTableStorageQuotaExceeded(TableConfig tableConfig) {
+    Preconditions.checkArgument(_timeout > 0, "Timeout value must be > 0, input: %s", _timeout);
+
+    // 1. Read table config
+    // 2. read table size from all the servers
+    // 3. is the table size within quota
+    QuotaConfig quotaConfig = tableConfig.getQuotaConfig();
+    int numReplicas = tableConfig.getReplication();
+
+    final String tableNameWithType = tableConfig.getTableName();
+
+    if (quotaConfig == null || quotaConfig.getStorage() == null) {
+      // no quota configuration
+      LOGGER.info("Storage quota is not configured for table: {}, skipping the check", tableNameWithType);
+      return false;
+    }
+
+    long allowedStorageBytes = numReplicas * quotaConfig.getStorageInBytes();
+    _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.TABLE_QUOTA, allowedStorageBytes);
+
+    // read table size
+    TableSizeReader.TableSubTypeSizeDetails tableSubtypeSize;
+    try {
+      tableSubtypeSize = _tableSizeReader.getTableSubtypeSize(tableNameWithType, _timeout);
+    } catch (InvalidConfigException e) {
+      LOGGER.error("Failed to get table size for table {}, skipping the check", tableNameWithType, e);
+      return false;
+    }
+
+    if (tableSubtypeSize._estimatedSizeInBytes == -1) {
+      LOGGER.error("Missing size reports from all servers. Bypassing storage quota check for {}", tableNameWithType);
+      return false;
+    }
+    if (tableSubtypeSize._estimatedSizeInBytes > allowedStorageBytes) {
+      LOGGER.info("Table {} already over quota. Estimated size for all replicas is {}. Configured size for {} is {}",
+          tableNameWithType, DataSizeUtils.fromBytes(tableSubtypeSize._estimatedSizeInBytes), numReplicas,
+          DataSizeUtils.fromBytes(allowedStorageBytes));
+      return true;
+    } else {
+      LOGGER.info("Table storage for {} within the quota limits", tableNameWithType);
+      return false;
     }
   }
 }

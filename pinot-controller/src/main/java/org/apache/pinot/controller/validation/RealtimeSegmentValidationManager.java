@@ -51,6 +51,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
   private final PinotLLCRealtimeSegmentManager _llcRealtimeSegmentManager;
   private final ValidationMetrics _validationMetrics;
   private final ControllerMetrics _controllerMetrics;
+  private final StorageQuotaChecker _storageQuotaChecker;
 
   private final int _segmentLevelValidationIntervalInSeconds;
   private long _lastSegmentLevelValidationRunTimeMs = 0L;
@@ -60,13 +61,14 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
 
   public RealtimeSegmentValidationManager(ControllerConf config, PinotHelixResourceManager pinotHelixResourceManager,
       LeadControllerManager leadControllerManager, PinotLLCRealtimeSegmentManager llcRealtimeSegmentManager,
-      ValidationMetrics validationMetrics, ControllerMetrics controllerMetrics) {
+      ValidationMetrics validationMetrics, ControllerMetrics controllerMetrics, StorageQuotaChecker quotaChecker) {
     super("RealtimeSegmentValidationManager", config.getRealtimeSegmentValidationFrequencyInSeconds(),
         config.getRealtimeSegmentValidationManagerInitialDelaySeconds(), pinotHelixResourceManager,
         leadControllerManager, controllerMetrics);
     _llcRealtimeSegmentManager = llcRealtimeSegmentManager;
     _validationMetrics = validationMetrics;
     _controllerMetrics = controllerMetrics;
+    _storageQuotaChecker = quotaChecker;
 
     _segmentLevelValidationIntervalInSeconds = config.getSegmentLevelValidationIntervalInSeconds();
     Preconditions.checkState(_segmentLevelValidationIntervalInSeconds > 0);
@@ -108,8 +110,20 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
     if (context._runSegmentLevelValidation) {
       runSegmentLevelValidation(tableConfig, streamConfig);
     }
+
+    // IS is updated in below cases
+    // Case 1 -> Table is exceeding storage quota but IS still has "isQuotaExceeded" as false
+    // This will help prevent consuming segment creation through this task upon manual zk changes to
+    // "isQuotaExceeded" in IS.
+    // Case 2 -> Table is within quota limits now but IS still has "isQuotaExceeded" as true
+    // This will help resume the table consumption once the quota is available due to either quota increase or
+    // segment deletion.
+    // In which case we need to pass "recreateDeletedConsumingSegment" as true to "ensureAllPartitionsConsuming" below.
+    boolean idealStateUpdated = _llcRealtimeSegmentManager.updateStorageQuotaExceededInIdealState(tableNameWithType,
+        _storageQuotaChecker.isTableStorageQuotaExceeded(tableConfig));
+
     _llcRealtimeSegmentManager.ensureAllPartitionsConsuming(tableConfig, streamConfig,
-        context._recreateDeletedConsumingSegment, context._offsetCriteria);
+        context._recreateDeletedConsumingSegment || idealStateUpdated, context._offsetCriteria);
   }
 
   private void runSegmentLevelValidation(TableConfig tableConfig, StreamConfig streamConfig) {
