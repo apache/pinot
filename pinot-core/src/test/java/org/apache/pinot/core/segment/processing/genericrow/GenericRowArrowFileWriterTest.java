@@ -35,26 +35,25 @@ import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.util.*;
 
+
 public class GenericRowArrowFileWriterTest {
 
   @Test
-  public void testGenericRowArrowFileWriter() throws IOException {
+  public void testGenericRowArrowFileWriter()
+      throws IOException {
     // Create a sample Pinot schema
-    Schema pinotSchema = new Schema.SchemaBuilder()
-        .addSingleValueDimension("id", FieldSpec.DataType.INT)
-        .addSingleValueDimension("name", FieldSpec.DataType.STRING)
-        .addMetric("score", FieldSpec.DataType.FLOAT)
-        .addMultiValueDimension("tags", FieldSpec.DataType.STRING)
-        .build();
+    Schema pinotSchema = new Schema.SchemaBuilder().addSingleValueDimension("id", FieldSpec.DataType.INT)
+        .addSingleValueDimension("name", FieldSpec.DataType.STRING).addMetric("score", FieldSpec.DataType.FLOAT)
+        .addMultiValueDimension("tags", FieldSpec.DataType.STRING).build();
 
     // Set up the writer
     String baseFileName = "test_output";
     int maxBatchRows = 5;
     long maxBatchBytes = 1024 * 1024; // 1MB
     Set<String> sortColumns = new HashSet<>(Arrays.asList("id", "score"));
-    GenericRowArrowFileWriter writer = new GenericRowArrowFileWriter(
-        baseFileName, pinotSchema, maxBatchRows, maxBatchBytes, sortColumns,
-        GenericRowArrowFileWriter.ArrowCompressionType.NONE, null);
+    GenericRowArrowFileWriter writer =
+        new GenericRowArrowFileWriter(baseFileName, pinotSchema, maxBatchRows, maxBatchBytes, sortColumns,
+            GenericRowArrowFileWriter.ArrowCompressionType.NONE, null);
 
     // Create and write sample data
     List<GenericRow> testData = createTestData();
@@ -65,8 +64,8 @@ public class GenericRowArrowFileWriterTest {
 
     // Verify the output
     verifyArrowFile(baseFileName + "_sorted_0.arrow", pinotSchema, sortColumns, testData);
-    verifyArrowFile(baseFileName + "_unsorted_0.arrow", pinotSchema,
-        new HashSet<>(Arrays.asList("name", "tags")), testData);
+    verifyArrowFile(baseFileName + "_unsorted_0.arrow", pinotSchema, new HashSet<>(Arrays.asList("name", "tags")),
+        testData);
 
     // Clean up
     new File(baseFileName + "_sorted_0.arrow").delete();
@@ -92,10 +91,13 @@ public class GenericRowArrowFileWriterTest {
     return row;
   }
 
-  private void verifyArrowFile(String fileName, Schema pinotSchema, Set<String> columnsToVerify, List<GenericRow> expectedData) throws IOException {
+  private void verifyArrowFile(String fileName, Schema pinotSchema, Set<String> columnsToVerify,
+      List<GenericRow> expectedData)
+      throws IOException {
     try (FileInputStream fileInputStream = new FileInputStream(fileName);
         FileChannel fileChannel = fileInputStream.getChannel();
-        ArrowFileReader reader = new ArrowFileReader(new SeekableReadChannel(fileChannel), new RootAllocator(Long.MAX_VALUE))) {
+        ArrowFileReader reader = new ArrowFileReader(new SeekableReadChannel(fileChannel),
+            new RootAllocator(Long.MAX_VALUE))) {
 
       reader.loadNextBatch();
       VectorSchemaRoot root = reader.getVectorSchemaRoot();
@@ -116,15 +118,24 @@ public class GenericRowArrowFileWriterTest {
           FieldVector vector = root.getVector(columnName);
           Object actualValue = getVectorValue(vector, i);
           Object expectedValue = sortedExpectedData.get(i).getValue(columnName);
-          Assert.assertEquals(actualValue, expectedValue,
-              "Mismatch in column " + columnName + " at row " + i);
+          Assert.assertEquals(actualValue, expectedValue, "Mismatch in column " + columnName + " at row " + i);
         }
       }
     }
   }
 
   private void verifyVectorType(FieldVector vector, FieldSpec fieldSpec) {
-    switch (fieldSpec.getDataType().getStoredType()) {
+    if (fieldSpec.isSingleValueField()) {
+      verifyPrimitiveDataType(vector, fieldSpec.getDataType().getStoredType());
+    } else {
+      Assert.assertTrue(vector instanceof ListVector);
+      FieldVector dataVector = ((ListVector) vector).getDataVector();
+      verifyPrimitiveDataType(dataVector, fieldSpec.getDataType().getStoredType());
+    }
+  }
+
+  private static void verifyPrimitiveDataType(FieldVector vector, FieldSpec.DataType dataType) {
+    switch (dataType) {
       case INT:
         Assert.assertTrue(vector instanceof IntVector);
         break;
@@ -141,7 +152,7 @@ public class GenericRowArrowFileWriterTest {
         Assert.assertTrue(vector instanceof VarCharVector);
         break;
       default:
-        Assert.fail("Unsupported data type: " + fieldSpec.getDataType().getStoredType());
+        Assert.fail("Unsupported data type: " + dataType);
     }
   }
 
@@ -163,12 +174,44 @@ public class GenericRowArrowFileWriterTest {
   }
 
   private Object getListVectorValue(ListVector listVector, int index) {
-    List<Object> values = new ArrayList<>();
     int start = listVector.getOffsetBuffer().getInt(index * ListVector.OFFSET_WIDTH);
     int end = listVector.getOffsetBuffer().getInt((index + 1) * ListVector.OFFSET_WIDTH);
-    for (int i = start; i < end; i++) {
-      values.add(getVectorValue(listVector.getDataVector(), i));
+    int length = end - start;
+
+    FieldVector dataVector = listVector.getDataVector();
+
+    if (dataVector instanceof IntVector) {
+      int[] result = new int[length];
+      for (int i = 0; i < length; i++) {
+        result[i] = ((IntVector) dataVector).get(start + i);
+      }
+      return result;
+    } else if (dataVector instanceof BigIntVector) {
+      long[] result = new long[length];
+      for (int i = 0; i < length; i++) {
+        result[i] = ((BigIntVector) dataVector).get(start + i);
+      }
+      return result;
+    } else if (dataVector instanceof Float4Vector) {
+      float[] result = new float[length];
+      for (int i = 0; i < length; i++) {
+        result[i] = ((Float4Vector) dataVector).get(start + i);
+      }
+      return result;
+    } else if (dataVector instanceof Float8Vector) {
+      double[] result = new double[length];
+      for (int i = 0; i < length; i++) {
+        result[i] = ((Float8Vector) dataVector).get(start + i);
+      }
+      return result;
+    } else if (dataVector instanceof VarCharVector) {
+      String[] result = new String[length];
+      for (int i = 0; i < length; i++) {
+        result[i] = new String(((VarCharVector) dataVector).get(start + i));
+      }
+      return result;
     }
-    return values.toArray();
+
+    throw new UnsupportedOperationException("Unsupported vector type: " + dataVector.getClass().getSimpleName());
   }
 }

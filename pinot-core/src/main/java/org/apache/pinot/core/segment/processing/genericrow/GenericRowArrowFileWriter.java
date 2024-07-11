@@ -34,7 +34,6 @@ import org.apache.arrow.algorithm.sort.DefaultVectorComparators;
 import org.apache.arrow.algorithm.sort.IndexSorter;
 import org.apache.arrow.algorithm.sort.VectorValueComparator;
 import org.apache.arrow.compression.CommonsCompressionFactory;
-import org.apache.arrow.memory.ArrowBuf;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.RootAllocator;
 import org.apache.arrow.vector.BigIntVector;
@@ -55,7 +54,6 @@ import org.apache.arrow.vector.ipc.message.IpcOption;
 import org.apache.arrow.vector.types.FloatingPointPrecision;
 import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.FieldType;
-import org.apache.arrow.vector.util.Text;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -80,9 +78,8 @@ public class GenericRowArrowFileWriter implements Closeable, FileWriter<GenericR
   private long _sortedBatchByteCount;
   private long _unsortedBatchByteCount;
   private int _batchNumber;
-
   private BufferAllocator _allocator;
-
+  private Map<String, UnionListWriter> _listWriters = new HashMap<>();
 
   private Map<String, FileMetadata> _fileMetadata = new HashMap<>();
 
@@ -92,14 +89,12 @@ public class GenericRowArrowFileWriter implements Closeable, FileWriter<GenericR
   }
 
   public enum ArrowCompressionType {
-    NONE,
-    LZ4_FRAME,
-    ZSTD
+    NONE, LZ4_FRAME, ZSTD
   }
 
   public GenericRowArrowFileWriter(String baseFileName, Schema pinotSchema, int maxBatchRows, long maxBatchBytes,
-      Set<String> sortColumns, ArrowCompressionType compressionType,
-      Integer compressionLevel) throws IOException {
+      Set<String> sortColumns, ArrowCompressionType compressionType, Integer compressionLevel)
+      throws IOException {
     _pinotSchema = pinotSchema;
     _maxBatchRows = maxBatchRows;
     _maxBatchBytes = maxBatchBytes;
@@ -134,14 +129,15 @@ public class GenericRowArrowFileWriter implements Closeable, FileWriter<GenericR
     initNewBatch();
   }
 
-
-  private void initNewBatch() throws IOException {
+  private void initNewBatch()
+      throws IOException {
     BufferAllocator allocator = new RootAllocator(Long.MAX_VALUE);
 
+    resetListWriters();
+
     org.apache.arrow.vector.types.pojo.Schema sortedSchema = getArrowSchemaFromPinotSchema(_pinotSchema, _sortColumns);
-    org.apache.arrow.vector.types.pojo.Schema unsortedSchema = getArrowSchemaFromPinotSchema(_pinotSchema, _pinotSchema.getColumnNames().stream()
-        .filter(col -> !_sortColumns.contains(col))
-        .collect(Collectors.toSet()));
+    org.apache.arrow.vector.types.pojo.Schema unsortedSchema = getArrowSchemaFromPinotSchema(_pinotSchema,
+        _pinotSchema.getColumnNames().stream().filter(col -> !_sortColumns.contains(col)).collect(Collectors.toSet()));
 
     _sortedVectorRoot = VectorSchemaRoot.create(sortedSchema, allocator);
     _unsortedVectorRoot = VectorSchemaRoot.create(unsortedSchema, allocator);
@@ -149,12 +145,11 @@ public class GenericRowArrowFileWriter implements Closeable, FileWriter<GenericR
     String sortedFileName = _baseFileName + "_sorted_" + _batchNumber + ".arrow";
     String unsortedFileName = _baseFileName + "_unsorted_" + _batchNumber + ".arrow";
 
-    _sortedWriter = new ArrowFileWriter(_sortedVectorRoot, null,
-        new FileOutputStream(sortedFileName).getChannel(), Collections.emptyMap(),
-        IpcOption.DEFAULT, _compressionFactory, _codecType, _compressionLevel);
-    _unsortedWriter = new ArrowFileWriter(_unsortedVectorRoot, null,
-        new FileOutputStream(unsortedFileName).getChannel(), Collections.emptyMap(),
-        IpcOption.DEFAULT, _compressionFactory, _codecType, _compressionLevel);
+    _sortedWriter = new ArrowFileWriter(_sortedVectorRoot, null, new FileOutputStream(sortedFileName).getChannel(),
+        Collections.emptyMap(), IpcOption.DEFAULT, _compressionFactory, _codecType, _compressionLevel);
+    _unsortedWriter =
+        new ArrowFileWriter(_unsortedVectorRoot, null, new FileOutputStream(unsortedFileName).getChannel(),
+            Collections.emptyMap(), IpcOption.DEFAULT, _compressionFactory, _codecType, _compressionLevel);
 
     _sortedWriter.start();
     _unsortedWriter.start();
@@ -167,7 +162,8 @@ public class GenericRowArrowFileWriter implements Closeable, FileWriter<GenericR
     _fileMetadata.put(unsortedFileName, new FileMetadata());
   }
 
-  private org.apache.arrow.vector.types.pojo.Schema getArrowSchemaFromPinotSchema(Schema pinotSchema, @Nullable Set<String> columns) {
+  private org.apache.arrow.vector.types.pojo.Schema getArrowSchemaFromPinotSchema(Schema pinotSchema,
+      @Nullable Set<String> columns) {
     List<org.apache.arrow.vector.types.pojo.Field> arrowFields = new ArrayList<>();
 
     for (FieldSpec fieldSpec : pinotSchema.getAllFieldSpecs()) {
@@ -231,7 +227,8 @@ public class GenericRowArrowFileWriter implements Closeable, FileWriter<GenericR
           default:
             throw new RuntimeException("Unsupported data type: " + storedType);
         }
-        org.apache.arrow.vector.types.pojo.Field childField = new org.apache.arrow.vector.types.pojo.Field("item", childType, null);
+        org.apache.arrow.vector.types.pojo.Field childField =
+            new org.apache.arrow.vector.types.pojo.Field("item", childType, null);
         List<org.apache.arrow.vector.types.pojo.Field> childFields = Collections.singletonList(childField);
         arrowField = new org.apache.arrow.vector.types.pojo.Field(fieldSpec.getName(), listType, childFields);
       }
@@ -272,75 +269,50 @@ public class GenericRowArrowFileWriter implements Closeable, FileWriter<GenericR
           default:
             throw new RuntimeException("Unsupported data type: " + fieldSpec.getDataType().getStoredType());
         }
+
+        fieldVector.setValueCount(_batchRowCount + 1);
       } else {
         Object[] values = (Object[]) row.getValue(fieldSpec.getName());
-        int numValues = values.length;
+        UnionListWriter listWriter =
+            _listWriters.computeIfAbsent(fieldSpec.getName(), k -> ((ListVector) fieldVector).getWriter());
+        listWriter.startList();
         switch (fieldSpec.getDataType().getStoredType()) {
           case INT:
-            UnionListWriter listWriter = ((ListVector) fieldVector).getWriter();
-            listWriter.setPosition(_batchRowCount);
-            listWriter.startList();
             for (Object value : values) {
               listWriter.writeInt((Integer) value);
             }
-            listWriter.setValueCount(numValues);
-            listWriter.endList();
             break;
           case LONG:
-            UnionListWriter listWriterLong = ((ListVector) fieldVector).getWriter();
-            listWriterLong.setPosition(_batchRowCount);
-            listWriterLong.startList();
             for (Object value : values) {
-              listWriterLong.writeBigInt((Long) value);
+              listWriter.writeBigInt((Long) value);
             }
-            listWriterLong.setValueCount(numValues);
-            listWriterLong.endList();
             break;
           case FLOAT:
-            UnionListWriter listWriterFloat = ((ListVector) fieldVector).getWriter();
-            listWriterFloat.setPosition(_batchRowCount);
-            listWriterFloat.startList();
             for (Object value : values) {
-              listWriterFloat.writeFloat4((Float) value);
+              listWriter.writeFloat4((Float) value);
             }
-            listWriterFloat.setValueCount(numValues);
-            listWriterFloat.endList();
             break;
           case DOUBLE:
-            UnionListWriter listWriterDouble = ((ListVector) fieldVector).getWriter();
-            listWriterDouble.setPosition(_batchRowCount);
-            listWriterDouble.startList();
             for (Object value : values) {
-              listWriterDouble.writeFloat8((Double) value);
+              listWriter.writeFloat8((Double) value);
             }
-            listWriterDouble.setValueCount(numValues);
-            listWriterDouble.endList();
             break;
           case STRING:
-            UnionListWriter listWriterString = ((ListVector) fieldVector).getWriter();
-            listWriterString.startList();
-            listWriterString.setPosition(_batchRowCount);
             for (Object value : values) {
-              listWriterString.writeVarChar(value.toString());
+              listWriter.writeVarChar(value.toString());
             }
-            listWriterString.setValueCount(numValues);
-            listWriterString.endList();
             break;
           case BYTES:
-            UnionListWriter listWriterBytes = ((ListVector) fieldVector).getWriter();
-            listWriterBytes.setPosition(_batchRowCount);
-            listWriterBytes.startList();
             for (Object value : values) {
-              listWriterBytes.writeVarBinary((byte[]) value);
+              listWriter.writeVarBinary((byte[]) value);
             }
-            listWriterBytes.setValueCount(numValues);
-            listWriterBytes.endList();
             break;
           default:
             throw new RuntimeException("Unsupported data type: " + fieldSpec.getDataType().getStoredType());
         }
+        listWriter.endList();
+        listWriter.setValueCount(_batchRowCount + 1);
       }
-      fieldVector.setValueCount(_batchRowCount + 1);
       if (_sortColumns != null && _sortColumns.contains(fieldSpec.getName())) {
         _sortedBatchByteCount += fieldVector.getBufferSize();
       } else {
@@ -352,23 +324,31 @@ public class GenericRowArrowFileWriter implements Closeable, FileWriter<GenericR
     unsortedRoot.setRowCount(_batchRowCount);
   }
 
+  private void resetListWriters() {
+    for (UnionListWriter writer : _listWriters.values()) {
+      writer.setValueCount(0);
+    }
+    _listWriters.clear();
+  }
 
   @Override
-  public long writeData(GenericRow genericRow) throws IOException {
+  public long writeData(GenericRow genericRow)
+      throws IOException {
     write(genericRow);
     return (_sortedBatchByteCount + _unsortedBatchByteCount);
   }
 
-  public void write(GenericRow genericRow) throws IOException {
+  public void write(GenericRow genericRow)
+      throws IOException {
     fillVectorsFromGenericRow(_sortedVectorRoot, _unsortedVectorRoot, genericRow);
 
-    if (_batchRowCount >= _maxBatchRows ||
-        (_sortedBatchByteCount  + _unsortedBatchByteCount) >= _maxBatchBytes) {
+    if (_batchRowCount >= _maxBatchRows || (_sortedBatchByteCount + _unsortedBatchByteCount) >= _maxBatchBytes) {
       flushBatch();
     }
   }
 
-  private void flushBatch() throws IOException {
+  private void flushBatch()
+      throws IOException {
     sortAllColumns();
 
     _sortedWriter.writeBatch();
@@ -390,7 +370,8 @@ public class GenericRowArrowFileWriter implements Closeable, FileWriter<GenericR
   }
 
   @Override
-  public void close() throws IOException {
+  public void close()
+      throws IOException {
     if (_batchRowCount > 0) {
       flushBatch();
     }
@@ -400,8 +381,8 @@ public class GenericRowArrowFileWriter implements Closeable, FileWriter<GenericR
 
   private void sortAllColumns() {
     int[] sortIndices = getSortIndices();
-    ArrowUtils.inPlaceSortAll(_sortedVectorRoot, sortIndices);
-    ArrowUtils.inPlaceSortAll(_unsortedVectorRoot, sortIndices);
+    ArrowSortUtils.inPlaceSortAll(_sortedVectorRoot, sortIndices);
+    ArrowSortUtils.inPlaceSortAll(_unsortedVectorRoot, sortIndices);
   }
 
   private int[] getSortIndices() {
@@ -416,7 +397,7 @@ public class GenericRowArrowFileWriter implements Closeable, FileWriter<GenericR
     //TODO: creating this for every batch might have overhead, check if moving to constructor doesn't impact correctness
     IndexSorter indexSorter = new IndexSorter();
 
-    for (String sortColumn: _sortColumns) {
+    for (String sortColumn : _sortColumns) {
       FieldVector sortedVectorRootVector = _sortedVectorRoot.getVector(sortColumn);
       VectorValueComparator comparator = DefaultVectorComparators.createDefaultComparator(sortedVectorRootVector);
       indexSorter.sort(sortedVectorRootVector, indices, comparator);
