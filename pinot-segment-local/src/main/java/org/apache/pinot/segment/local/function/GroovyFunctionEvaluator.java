@@ -58,8 +58,10 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
   private final int _numArguments;
   private final Binding _binding;
   private final Script _script;
+  private final String _expression;
 
   public GroovyFunctionEvaluator(String closure) {
+    _expression = closure;
     Matcher matcher = GROOVY_FUNCTION_PATTERN.matcher(closure);
     Preconditions.checkState(matcher.matches(), "Invalid transform expression: %s", closure);
     String arguments = matcher.group(ARGUMENTS_GROUP_NAME);
@@ -109,5 +111,10 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
       _binding.setVariable(_arguments.get(i), values[i]);
     }
     return _script.run();
+  }
+
+  @Override
+  public String toString() {
+    return _expression;
   }
 }

@@ -25,6 +25,7 @@ import java.io.File;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -393,7 +394,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
           }
 
           try {
-            createDerivedColumnV1Indices(column, functionEvaluator, argumentsMetadata);
+            createDerivedColumnV1Indices(column, functionEvaluator, argumentsMetadata, errorOnFailure);
             return true;
           } catch (Exception e) {
             LOGGER.error("Caught exception while creating derived column: {} with transform function: {}", column,
@@ -556,7 +557,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
    *   - Support forward index disabled derived column
    */
   private void createDerivedColumnV1Indices(String column, FunctionEvaluator functionEvaluator,
-      List<ColumnMetadata> argumentsMetadata)
+      List<ColumnMetadata> argumentsMetadata, boolean errorOnFailure)
       throws Exception {
     // Initialize value readers for all arguments
     int numArguments = argumentsMetadata.size();
@@ -570,6 +571,12 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     if (isNullable(fieldSpec)) {
       nullValueVectorCreator = new NullValueVectorCreator(_indexDir, fieldSpec.getName());
     }
+
+    // Just log the first function evaluation error
+    int functionEvaluateErrorCount = 0;
+    Exception functionEvalError = null;
+    Object[] inputValuesWithError = null;
+
     try {
       // Calculate the values for the derived column
       Object[] inputValues = new Object[numArguments];
@@ -580,7 +587,23 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         for (int j = 0; j < numArguments; j++) {
           inputValues[j] = valueReaders.get(j).getValue(i);
         }
-        Object outputValue = functionEvaluator.evaluate(inputValues);
+
+        Object outputValue = null;
+        try {
+          outputValue = functionEvaluator.evaluate(inputValues);
+        } catch (Exception e) {
+          if (!errorOnFailure) {
+            LOGGER.debug("Encountered an exception while evaluating function {} for derived column {} with "
+                    + "arguments: {}", functionEvaluator, column, Arrays.toString(inputValues), e);
+            functionEvaluateErrorCount++;
+            if (functionEvalError == null) {
+              functionEvalError = e;
+              inputValuesWithError = Arrays.copyOf(inputValues, inputValues.length);
+            }
+          } else {
+            throw e;
+          }
+        }
 
         if (outputValue == null) {
           outputValue = fieldSpec.getDefaultNullValue();
@@ -595,6 +618,12 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         }
 
         outputValues[i] = outputValue;
+      }
+
+      if (functionEvaluateErrorCount > 0) {
+        LOGGER.warn("Caught {} exceptions while evaluating derived column: {} with function: {}. The first input value "
+                + "tuple that led to an error is: {}", functionEvaluateErrorCount, column, functionEvaluator,
+            Arrays.toString(inputValuesWithError), functionEvalError);
       }
 
       if (nullValueVectorCreator != null) {

@@ -39,8 +39,12 @@
     },
     {
       "dataType": "STRING",
-      "name": "newNullableStringSVDimension",
-      "defaultNullValue": "null"
+      "name": "newNullReturnStringSVDimension",
+      "defaultNullValue": "nil"
+    },
+    {
+      "dataType": "LONG",
+      "name": "newWrongArgDateTruncDerivedColumn"
     }
   ]
 }
