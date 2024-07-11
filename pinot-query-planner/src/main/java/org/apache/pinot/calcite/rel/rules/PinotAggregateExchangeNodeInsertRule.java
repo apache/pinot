@@ -36,12 +36,17 @@ import org.apache.calcite.rel.hint.RelHint;
 import org.apache.calcite.rel.logical.LogicalAggregate;
 import org.apache.calcite.rel.rules.AggregateExtractProjectRule;
 import org.apache.calcite.rel.rules.AggregateReduceFunctionsRule;
+import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.SqlAggFunction;
+import org.apache.calcite.sql.SqlFunctionCategory;
+import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.type.OperandTypes;
 import org.apache.calcite.sql.type.ReturnTypes;
+import org.apache.calcite.sql.type.SqlOperandTypeChecker;
+import org.apache.calcite.sql.type.SqlReturnTypeInference;
 import org.apache.calcite.tools.RelBuilder;
 import org.apache.calcite.tools.RelBuilderFactory;
 import org.apache.calcite.util.ImmutableBitSet;
@@ -54,7 +59,7 @@ import org.apache.pinot.calcite.rel.hint.PinotHintStrategyTable;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalAggregate;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalExchange;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalSortExchange;
-import org.apache.pinot.calcite.sql.PinotSqlAggFunction;
+import org.apache.pinot.common.function.sql.PinotSqlAggFunction;
 import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
@@ -294,42 +299,37 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
   //   - argList is replaced with rexList
   private static AggregateCall buildAggCall(RelNode input, AggregateCall orgAggCall, List<RexNode> rexList,
       int numGroups, AggType aggType) {
-    String functionName = orgAggCall.getAggregation().getName();
+    SqlAggFunction orgAggFunction = orgAggCall.getAggregation();
+    String functionName = orgAggFunction.getName();
+    SqlKind kind = orgAggFunction.getKind();
+    SqlFunctionCategory functionCategory = orgAggFunction.getFunctionType();
     if (orgAggCall.isDistinct()) {
-      if (functionName.equals("COUNT")) {
+      if (kind == SqlKind.COUNT) {
         functionName = "DISTINCTCOUNT";
-      } else if (functionName.equals("LISTAGG")) {
+        kind = SqlKind.OTHER_FUNCTION;
+        functionCategory = SqlFunctionCategory.USER_DEFINED_FUNCTION;
+      } else if (kind == SqlKind.LISTAGG) {
         rexList.add(input.getCluster().getRexBuilder().makeLiteral(true));
       }
     }
-    AggregationFunctionType functionType = AggregationFunctionType.getAggregationFunctionType(functionName);
-    SqlAggFunction sqlAggFunction;
-    switch (aggType) {
-      case DIRECT:
-        sqlAggFunction = new PinotSqlAggFunction(functionName, null, functionType.getSqlKind(),
-            ReturnTypes.explicit(orgAggCall.getType()), null, functionType.getOperandTypeChecker(),
-            functionType.getSqlFunctionCategory());
-        break;
-      case LEAF:
-        sqlAggFunction = new PinotSqlAggFunction(functionName, null, functionType.getSqlKind(),
-            functionType.getIntermediateReturnTypeInference(), null, functionType.getOperandTypeChecker(),
-            functionType.getSqlFunctionCategory());
-        break;
-      case INTERMEDIATE:
-        sqlAggFunction = new PinotSqlAggFunction(functionName, null, functionType.getSqlKind(),
-            functionType.getIntermediateReturnTypeInference(), null, OperandTypes.ANY,
-            functionType.getSqlFunctionCategory());
-        break;
-      case FINAL:
-        sqlAggFunction = new PinotSqlAggFunction(functionName, null, functionType.getSqlKind(),
-            ReturnTypes.explicit(orgAggCall.getType()), null, OperandTypes.ANY, functionType.getSqlFunctionCategory());
-        break;
-      default:
-        throw new IllegalStateException("Unsupported AggType: " + aggType);
+    SqlReturnTypeInference returnTypeInference = null;
+    RelDataType returnType = null;
+    // Override the intermediate result type inference if it is provided
+    if (aggType.isOutputIntermediateFormat()) {
+      AggregationFunctionType functionType = AggregationFunctionType.getAggregationFunctionType(functionName);
+      returnTypeInference = functionType.getIntermediateReturnTypeInference();
     }
+    if (returnTypeInference == null) {
+      returnType = orgAggCall.getType();
+      returnTypeInference = ReturnTypes.explicit(returnType);
+    }
+    SqlOperandTypeChecker operandTypeChecker =
+        aggType.isInputIntermediateFormat() ? OperandTypes.ANY : orgAggFunction.getOperandTypeChecker();
+    SqlAggFunction sqlAggFunction =
+        new PinotSqlAggFunction(functionName, kind, returnTypeInference, operandTypeChecker, functionCategory);
     return AggregateCall.create(sqlAggFunction, false, orgAggCall.isApproximate(), orgAggCall.ignoreNulls(), rexList,
         ImmutableList.of(), aggType.isInputIntermediateFormat() ? -1 : orgAggCall.filterArg, orgAggCall.distinctKeys,
-        orgAggCall.collation, numGroups, input, null, null);
+        orgAggCall.collation, numGroups, input, returnType, null);
   }
 
   @Nullable

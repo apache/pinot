@@ -18,10 +18,9 @@
  */
 package org.apache.pinot.core.data.function;
 
-import java.lang.reflect.Method;
 import java.util.Collections;
-import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.segment.local.function.InbuiltFunctionEvaluator;
+import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -30,7 +29,6 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
-import static org.testng.Assert.fail;
 
 
 public class InbuiltFunctionEvaluatorTest {
@@ -127,11 +125,7 @@ public class InbuiltFunctionEvaluatorTest {
   }
 
   @Test
-  public void testStateSharedBetweenRowsForExecution()
-      throws Exception {
-    MyFunc myFunc = new MyFunc();
-    Method method = myFunc.getClass().getDeclaredMethod("appendToStringAndReturn", String.class);
-    FunctionRegistry.registerFunction(method, false, false, false);
+  public void testStateSharedBetweenRowsForExecution() {
     String expression = "appendToStringAndReturn('test ')";
     InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(expression);
     assertTrue(evaluator.getArguments().isEmpty());
@@ -158,24 +152,11 @@ public class InbuiltFunctionEvaluatorTest {
     }
   }
 
-  @Test
-  public void testPlaceholderFunctionShouldNotBeRegistered()
-      throws Exception {
-    GenericRow row = new GenericRow();
-    row.putValue("testColumn", "testValue");
-    String expression = "text_match(testColumn, 'pattern')";
-    try {
-      InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(expression);
-      evaluator.evaluate(row);
-      fail();
-    } catch (Throwable t) {
-      assertTrue(t.getMessage().contains("text_match"));
-    }
-  }
-
+  @SuppressWarnings("unused")
   public static class MyFunc {
     String _baseString = "";
 
+    @ScalarFunction
     public String appendToStringAndReturn(String addedString) {
       _baseString += addedString;
       return _baseString;

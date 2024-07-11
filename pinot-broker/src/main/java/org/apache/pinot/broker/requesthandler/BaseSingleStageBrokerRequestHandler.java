@@ -52,7 +52,6 @@ import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.querylog.QueryLogger;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.broker.routing.BrokerRoutingManager;
-import org.apache.pinot.calcite.jdbc.CalciteSchemaBuilder;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.http.MultiHttpRequest;
@@ -84,7 +83,6 @@ import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.util.GapfillUtils;
-import org.apache.pinot.query.catalog.PinotCatalog;
 import org.apache.pinot.query.parser.utils.ParserUtils;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.config.table.FieldConfig;
@@ -264,8 +262,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         // Check if the query is a v2 supported query
         Map<String, String> queryOptions = sqlNodeAndOptions.getOptions();
         String database = DatabaseUtils.extractDatabaseFromQueryRequest(queryOptions, httpHeaders);
-        if (ParserUtils.canCompileQueryUsingV2Engine(query, CalciteSchemaBuilder.asRootSchema(
-            new PinotCatalog(database, _tableCache), database))) {
+        if (ParserUtils.canCompileWithMultiStageEngine(query, database, _tableCache)) {
           return new BrokerResponseNative(QueryException.getException(QueryException.SQL_PARSING_ERROR, new Exception(
               "It seems that the query is only supported by the multi-stage query engine, please retry the query using "
                   + "the multi-stage query engine "
@@ -398,8 +395,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         if (StringUtils.isNotBlank(failureMessage)) {
           failureMessage = "Reason: " + failureMessage;
         }
-        throw new WebApplicationException("Permission denied." + failureMessage,
-            Response.Status.FORBIDDEN);
+        throw new WebApplicationException("Permission denied." + failureMessage, Response.Status.FORBIDDEN);
       }
 
       // Get the tables hit by the request

@@ -169,6 +169,10 @@
       <groupId>org.apache.calcite</groupId>
       <artifactId>calcite-babel</artifactId>
     </dependency>
+    <dependency>
+      <groupId>org.immutables</groupId>
+      <artifactId>value-annotations</artifactId>
+    </dependency>
 
     <!-- Jersey Libraries -->
     <dependency>

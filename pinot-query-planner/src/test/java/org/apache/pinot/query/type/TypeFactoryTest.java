@@ -39,8 +39,7 @@ import org.testng.annotations.Test;
 
 
 public class TypeFactoryTest {
-  private static final TypeSystem TYPE_SYSTEM = new TypeSystem();
-  private static final JavaTypeFactory TYPE_FACTORY = new TestJavaTypeFactoryImpl(TYPE_SYSTEM);
+  private static final JavaTypeFactory TYPE_FACTORY = new TestJavaTypeFactoryImpl();
 
   @DataProvider(name = "relDataTypeConversion")
   public Iterator<Object[]> relDataTypeConversion() {
@@ -120,7 +119,7 @@ public class TypeFactoryTest {
   @Test(dataProvider = "relDataTypeConversion")
   public void testScalarTypes(FieldSpec.DataType dataType, RelDataType scalarType, RelDataType arrayType,
       boolean columnNullMode) {
-    TypeFactory typeFactory = new TypeFactory(TYPE_SYSTEM);
+    TypeFactory typeFactory = new TypeFactory();
     Schema testSchema = new Schema.SchemaBuilder()
         .addSingleValueDimension("col", dataType)
         .setEnableColumnBasedNullHandling(columnNullMode)
@@ -135,7 +134,7 @@ public class TypeFactoryTest {
   @Test(dataProvider = "relDataTypeConversion")
   public void testNullableScalarTypes(FieldSpec.DataType dataType, RelDataType scalarType, RelDataType arrayType,
       boolean columnNullMode) {
-    TypeFactory typeFactory = new TypeFactory(TYPE_SYSTEM);
+    TypeFactory typeFactory = new TypeFactory();
     Schema testSchema = new Schema.SchemaBuilder()
         .addDimensionField("col", dataType, field -> field.setNullable(true))
         .setEnableColumnBasedNullHandling(columnNullMode)
@@ -154,7 +153,7 @@ public class TypeFactoryTest {
   @Test(dataProvider = "relDataTypeConversion")
   public void testNotNullableScalarTypes(FieldSpec.DataType dataType, RelDataType scalarType, RelDataType arrayType,
       boolean columnNullMode) {
-    TypeFactory typeFactory = new TypeFactory(TYPE_SYSTEM);
+    TypeFactory typeFactory = new TypeFactory();
     Schema testSchema = new Schema.SchemaBuilder()
         .addDimensionField("col", dataType, field -> field.setNullable(false))
         .setEnableColumnBasedNullHandling(columnNullMode)
@@ -173,7 +172,7 @@ public class TypeFactoryTest {
   @Test(dataProvider = "relDataTypeConversion")
   public void testArrayTypes(FieldSpec.DataType dataType, RelDataType scalarType, RelDataType arrayType,
       boolean columnNullMode) {
-    TypeFactory typeFactory = new TypeFactory(TYPE_SYSTEM);
+    TypeFactory typeFactory = new TypeFactory();
     Schema testSchema = new Schema.SchemaBuilder()
         .addMultiValueDimension("col", dataType)
         .setEnableColumnBasedNullHandling(columnNullMode)
@@ -192,7 +191,7 @@ public class TypeFactoryTest {
   @Test(dataProvider = "relDataTypeConversion")
   public void testNullableArrayTypes(FieldSpec.DataType dataType, RelDataType scalarType, RelDataType arrayType,
       boolean columnNullMode) {
-    TypeFactory typeFactory = new TypeFactory(TYPE_SYSTEM);
+    TypeFactory typeFactory = new TypeFactory();
     Schema testSchema = new Schema.SchemaBuilder()
         .addDimensionField("col", dataType, field -> {
           field.setNullable(true);
@@ -214,7 +213,7 @@ public class TypeFactoryTest {
   @Test(dataProvider = "relDataTypeConversion")
   public void testNotNullableArrayTypes(FieldSpec.DataType dataType, RelDataType scalarType, RelDataType arrayType,
       boolean columnNullMode) {
-    TypeFactory typeFactory = new TypeFactory(TYPE_SYSTEM);
+    TypeFactory typeFactory = new TypeFactory();
     Schema testSchema = new Schema.SchemaBuilder()
         .addDimensionField("col", dataType, field -> {
           field.setNullable(false);
@@ -233,7 +232,7 @@ public class TypeFactoryTest {
 
   @Test
   public void testRelDataTypeConversion() {
-    TypeFactory typeFactory = new TypeFactory(TYPE_SYSTEM);
+    TypeFactory typeFactory = new TypeFactory();
     Schema testSchema = new Schema.SchemaBuilder().addSingleValueDimension("INT_COL", FieldSpec.DataType.INT)
         .addSingleValueDimension("LONG_COL", FieldSpec.DataType.LONG)
         .addSingleValueDimension("FLOAT_COL", FieldSpec.DataType.FLOAT)
@@ -253,54 +252,54 @@ public class TypeFactoryTest {
     for (RelDataTypeField field : fieldList) {
       switch (field.getName()) {
         case "INT_COL":
-          BasicSqlType intBasicSqlType = new BasicSqlType(TYPE_SYSTEM, SqlTypeName.INTEGER);
+          BasicSqlType intBasicSqlType = new BasicSqlType(TypeSystem.INSTANCE, SqlTypeName.INTEGER);
           Assert.assertEquals(field.getType(), intBasicSqlType);
           checkPrecisionScale(field, intBasicSqlType);
           break;
         case "LONG_COL":
-          BasicSqlType bigIntBasicSqlType = new BasicSqlType(TYPE_SYSTEM, SqlTypeName.BIGINT);
+          BasicSqlType bigIntBasicSqlType = new BasicSqlType(TypeSystem.INSTANCE, SqlTypeName.BIGINT);
           Assert.assertEquals(field.getType(), bigIntBasicSqlType);
           checkPrecisionScale(field, bigIntBasicSqlType);
           break;
         case "FLOAT_COL":
         case "DOUBLE_COL":
-          BasicSqlType doubleBasicSqlType = new BasicSqlType(TYPE_SYSTEM, SqlTypeName.DOUBLE);
+          BasicSqlType doubleBasicSqlType = new BasicSqlType(TypeSystem.INSTANCE, SqlTypeName.DOUBLE);
           Assert.assertEquals(field.getType(), doubleBasicSqlType);
           checkPrecisionScale(field, doubleBasicSqlType);
           break;
         case "STRING_COL":
         case "JSON_COL":
           Assert.assertEquals(field.getType(),
-              TYPE_FACTORY.createTypeWithCharsetAndCollation(new BasicSqlType(TYPE_SYSTEM, SqlTypeName.VARCHAR),
+              TYPE_FACTORY.createTypeWithCharsetAndCollation(new BasicSqlType(TypeSystem.INSTANCE, SqlTypeName.VARCHAR),
                   StandardCharsets.UTF_8, SqlCollation.IMPLICIT));
           break;
         case "BYTES_COL":
-          Assert.assertEquals(field.getType(), new BasicSqlType(TYPE_SYSTEM, SqlTypeName.VARBINARY));
+          Assert.assertEquals(field.getType(), new BasicSqlType(TypeSystem.INSTANCE, SqlTypeName.VARBINARY));
           break;
         case "INT_ARRAY_COL":
           Assert.assertEquals(field.getType(),
-              new ArraySqlType(new BasicSqlType(TYPE_SYSTEM, SqlTypeName.INTEGER), false));
+              new ArraySqlType(new BasicSqlType(TypeSystem.INSTANCE, SqlTypeName.INTEGER), false));
           break;
         case "LONG_ARRAY_COL":
           Assert.assertEquals(field.getType(),
-              new ArraySqlType(new BasicSqlType(TYPE_SYSTEM, SqlTypeName.BIGINT), false));
+              new ArraySqlType(new BasicSqlType(TypeSystem.INSTANCE, SqlTypeName.BIGINT), false));
           break;
         case "FLOAT_ARRAY_COL":
           Assert.assertEquals(field.getType(),
-              new ArraySqlType(new BasicSqlType(TYPE_SYSTEM, SqlTypeName.REAL), false));
+              new ArraySqlType(new BasicSqlType(TypeSystem.INSTANCE, SqlTypeName.REAL), false));
           break;
         case "DOUBLE_ARRAY_COL":
           Assert.assertEquals(field.getType(),
-              new ArraySqlType(new BasicSqlType(TYPE_SYSTEM, SqlTypeName.DOUBLE), false));
+              new ArraySqlType(new BasicSqlType(TypeSystem.INSTANCE, SqlTypeName.DOUBLE), false));
           break;
         case "STRING_ARRAY_COL":
           Assert.assertEquals(field.getType(), new ArraySqlType(
-              TYPE_FACTORY.createTypeWithCharsetAndCollation(new BasicSqlType(TYPE_SYSTEM, SqlTypeName.VARCHAR),
+              TYPE_FACTORY.createTypeWithCharsetAndCollation(new BasicSqlType(TypeSystem.INSTANCE, SqlTypeName.VARCHAR),
                   StandardCharsets.UTF_8, SqlCollation.IMPLICIT), false));
           break;
         case "BYTES_ARRAY_COL":
           Assert.assertEquals(field.getType(),
-              new ArraySqlType(new BasicSqlType(TYPE_SYSTEM, SqlTypeName.VARBINARY), false));
+              new ArraySqlType(new BasicSqlType(TypeSystem.INSTANCE, SqlTypeName.VARBINARY), false));
           break;
         default:
           Assert.fail("Unexpected column name: " + field.getName());
@@ -310,8 +309,8 @@ public class TypeFactoryTest {
   }
 
   private static class TestJavaTypeFactoryImpl extends JavaTypeFactoryImpl {
-    public TestJavaTypeFactoryImpl(TypeSystem typeSystem) {
-      super(typeSystem);
+    public TestJavaTypeFactoryImpl() {
+      super(TypeSystem.INSTANCE);
     }
 
     @Override
