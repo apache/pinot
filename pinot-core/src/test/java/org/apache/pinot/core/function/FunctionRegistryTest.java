@@ -21,20 +21,17 @@ package org.apache.pinot.core.function;
 import java.util.EnumSet;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.function.TransformFunctionType;
-import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.sql.FilterKind;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 
 // NOTE: Keep this test in pinot-core to include all built-in scalar functions.
-// TODO: Consider breaking this test into multiple tests.
-public class FunctionDefinitionRegistryTest {
+public class FunctionRegistryTest {
   // TODO: Support these functions
   private static final EnumSet<TransformFunctionType> IGNORED_TRANSFORM_FUNCTION_TYPES = EnumSet.of(
       // Special placeholder functions without implementation
@@ -89,18 +86,5 @@ public class FunctionDefinitionRegistryTest {
     assertNull(FunctionRegistry.lookupFunctionInfo("testscalarfunction", 2));
     assertNull(FunctionRegistry.lookupFunctionInfo("testfunc1", 1));
     assertNull(FunctionRegistry.lookupFunctionInfo("testfunc2", 1));
-  }
-
-  @Test
-  public void testIsAggFunc() {
-    assertTrue(AggregationFunctionType.isAggregationFunction("count"));
-    assertTrue(AggregationFunctionType.isAggregationFunction("percentileRawEstMV"));
-    assertTrue(AggregationFunctionType.isAggregationFunction("PERCENTILERAWESTMV"));
-    assertTrue(AggregationFunctionType.isAggregationFunction("percentilerawestmv"));
-    assertTrue(AggregationFunctionType.isAggregationFunction("percentile_raw_est_mv"));
-    assertTrue(AggregationFunctionType.isAggregationFunction("PERCENTILE_RAW_EST_MV"));
-    assertTrue(AggregationFunctionType.isAggregationFunction("PERCENTILEEST90"));
-    assertTrue(AggregationFunctionType.isAggregationFunction("percentileest90"));
-    assertFalse(AggregationFunctionType.isAggregationFunction("toEpochSeconds"));
   }
 }

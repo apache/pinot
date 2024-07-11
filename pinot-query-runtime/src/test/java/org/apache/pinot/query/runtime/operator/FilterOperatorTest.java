@@ -218,8 +218,12 @@ public class FilterOperatorTest {
     assertEquals(resultRows.get(0), new Object[]{"starTree"});
   }
 
-  @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = "Cannot find function "
-      + "with name: startsWithError")
+  //@formatter:off
+  @Test(
+      expectedExceptions = IllegalArgumentException.class,
+      expectedExceptionsMessageRegExp = "Unsupported function: startsWithError"
+  )
+  //@formatter:on
   public void shouldThrowOnInvalidFunction() {
     DataSchema inputSchema = new DataSchema(new String[]{"string1"}, new ColumnDataType[]{
         ColumnDataType.STRING

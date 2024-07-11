@@ -44,7 +44,28 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Registry for scalar functions.
- * <p>TODO: Merge FunctionRegistry and FunctionDefinitionRegistry to provide one single registry for all functions.
+ *
+ * <p>To plug in a class:
+ * <ul>
+ *   <li>It should be annotated with {@link ScalarFunction}</li>
+ *   <li>It should implement {@link PinotScalarFunction}</li>
+ *   <li>It should be public and has an empty constructor</li>
+ *   <li>It should be under the package of name '*.function.*'</li>
+ * </ul>
+ * <p>To plug in a method:
+ * <ul>
+ *   <li>It should be annotated with {@link ScalarFunction}</li>
+ *   <li>It should be public</li>
+ *   <li>It should be either static, or within a class with an empty constructor</li>
+ *   <li>It should be within a class under the package of name '*.function.*'</li>
+ * </ul>
+ * <p>Multiple methods with different number of arguments can be registered under the same canonical name. Otherwise,
+ * each canonical name can only be registered once.
+ * <p>Class implementing {@link PinotScalarFunction} gives finer control on return type inference and operand type
+ * check, and allows polymorphism based on the argument types.
+ * <p>Method is easier to implement but has less control. If different return type inference or operand type check is
+ * desired over the default java class inference, they can be directly registered into {@code PinotOperatorTable}.
+ * <p>The package name convention is used to reduce the time of class scanning.
  */
 public class FunctionRegistry {
   private FunctionRegistry() {
@@ -57,15 +78,6 @@ public class FunctionRegistry {
 
   private static final int VAR_ARG_KEY = -1;
 
-  /**
-   * Registers the scalar functions via reflection.
-   * NOTE:
-   * - To plug in a class, the class should be annotated with {@link ScalarFunction}, implement
-   *   {@link PinotScalarFunction}, and be under the package of name '*.function.*'.
-   * - To plug in a method, the method should be annotated with {@link ScalarFunction}, and be inside a class under the
-   *   package of name '*.function.*'.
-   * - The package name convention is used to reduce the time of class scanning.
-   */
   static {
     long startTimeMs = System.currentTimeMillis();
 

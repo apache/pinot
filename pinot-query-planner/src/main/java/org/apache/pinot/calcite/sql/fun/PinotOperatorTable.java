@@ -48,15 +48,17 @@ import org.checkerframework.checker.nullness.qual.Nullable;
 
 
 /**
- * {@link PinotOperatorTable} defines the {@link SqlOperator} overrides on top of the {@link SqlStdOperatorTable}.
- *
- * <p>The main purpose of this Pinot specific SQL operator table is to
+ * This class defines all the {@link SqlOperator}s allowed by Pinot.
+ * <p>It contains the following types of operators:
  * <ul>
- *   <li>Ensure that any specific SQL validation rules can apply with Pinot override entirely over Calcite's.</li>
- *   <li>Ability to create customer operators that are not function and cannot use
- *     {@link org.apache.calcite.prepare.Prepare.CatalogReader} to override</li>
- *   <li>Still maintain minimum customization and benefit from Calcite's original operator table setting.</li>
+ *   <li>Standard operators from {@link SqlStdOperatorTable}</li>
+ *   <li>Custom aggregation functions from {@link AggregationFunctionType}</li>
+ *   <li>Custom transform functions from {@link TransformFunctionType}</li>
+ *   <li>Custom scalar functions from {@link FunctionRegistry}</li>
+ *   <li>Other custom operators directly registered</li>
  * </ul>
+ * <p>The core method is {@link #lookupOperatorOverloads} which is used to look up the {@link SqlOperator} with the
+ * {@link SqlIdentifier} during query parsing.
  */
 @SuppressWarnings("unused") // unused fields are accessed by reflection
 public class PinotOperatorTable implements SqlOperatorTable {

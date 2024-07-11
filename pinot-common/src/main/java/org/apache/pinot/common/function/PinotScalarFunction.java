@@ -25,7 +25,8 @@ import org.apache.pinot.spi.annotations.ScalarFunction;
 
 
 /**
- * Provides finer control to the scalar functions annotated with {@link ScalarFunction}.
+ * Provides finer control to the scalar functions annotated with {@link ScalarFunction}
+ * <p>See more details in {@link FunctionRegistry}.
  */
 public interface PinotScalarFunction {
 

@@ -126,6 +126,7 @@ public class InbuiltFunctionEvaluatorTest {
 
   @Test
   public void testStateSharedBetweenRowsForExecution() {
+    // This function is auto registered with @ScalarFunction annotation under MyFunc class
     String expression = "appendToStringAndReturn('test ')";
     InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(expression);
     assertTrue(evaluator.getArguments().isEmpty());

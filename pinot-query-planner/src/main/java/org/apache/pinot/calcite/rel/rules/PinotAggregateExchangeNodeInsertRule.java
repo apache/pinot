@@ -319,6 +319,8 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
       AggregationFunctionType functionType = AggregationFunctionType.getAggregationFunctionType(functionName);
       returnTypeInference = functionType.getIntermediateReturnTypeInference();
     }
+    // When the output is not intermediate format, or intermediate result type inference is not provided (intermediate
+    // result type the same as final result type), use the explicit return type
     if (returnTypeInference == null) {
       returnType = orgAggCall.getType();
       returnTypeInference = ReturnTypes.explicit(returnType);
