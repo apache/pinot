@@ -234,6 +234,7 @@
 
     <!-- Solve conflict across dependencies -->
     <kotlin.stdlib.version>1.9.24</kotlin.stdlib.version>
+    <jetbrains.annotations.version>24.1.0</jetbrains.annotations.version>
     <jetbrains.annotations.version>13.0</jetbrains.annotations.version>
     <kotlin.stdlib.version>2.0.0</kotlin.stdlib.version>
     <okio.version>3.9.0</okio.version>
