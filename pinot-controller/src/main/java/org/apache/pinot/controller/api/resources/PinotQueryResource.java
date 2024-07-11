@@ -230,7 +230,6 @@ public class PinotQueryResource {
       brokerInfo = _brokerInfoSelector.selectBrokerInfo();
       LOGGER.error("Unable to find table name from SQL {} thus dispatching to random broker.", query);
     }
-    //TODO: Check if broker is online. Or is ExternalView up to date on liveness of the broker?
     return sendRequestToBroker(query, brokerInfo, traceEnabled, queryOptions, httpHeaders);
   }
 
