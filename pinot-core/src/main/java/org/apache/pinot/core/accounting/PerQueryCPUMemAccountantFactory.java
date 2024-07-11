@@ -170,6 +170,12 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       return _threadEntriesMap.values();
     }
 
+    /**
+     * This function aggregates resource usage from all active threads and groups by queryId.
+     * It is inspired by {@link PerQueryCPUMemResourceUsageAccountant::aggregate}. The major difference is that
+     * it only reads from thread entries and does not update them.
+     * @return A map of query id, QueryResourceTracker.
+     */
     @Override
     public Map<String, ? extends QueryResourceTracker> getQueryResources() {
       HashMap<String, AggregatedStats> ret = new HashMap<>();
