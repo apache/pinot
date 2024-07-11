@@ -289,8 +289,8 @@ public class PinotBrokerDebug {
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get current resource usage of queries in this service", notes = "This is a debug endpoint, "
       + "and won't maintain backward compatibility")
-  public Map<String, ? extends QueryResourceTracker> getQueryUsage() {
+  public Collection<? extends QueryResourceTracker> getQueryUsage() {
     ThreadResourceUsageAccountant threadAccountant = Tracing.getThreadAccountant();
-    return threadAccountant.getQueryResources();
+    return threadAccountant.getQueryResources().values();
   }
 }

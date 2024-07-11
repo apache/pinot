@@ -493,6 +493,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
         return _queryId;
       }
 
+      @Override
       public long getAllocatedBytes() {
         return _allocatedBytes;
       }
