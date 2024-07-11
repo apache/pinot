@@ -36,16 +36,38 @@ object ExampleSparkPinotConnectorTest extends Logging {
       .master("local")
       .getOrCreate()
 
-    readOffline()
-    readHybrid()
-    readHybridWithSpecificSchema()
-    readHybridWithFilters()
-    readHybridViaGrpc()
-    readRealtimeViaGrpc()
-    readRealtimeWithFilterViaGrpc()
-    readHybridWithFiltersViaGrpc()
-    readRealtimeWithSelectionColumns()
-    applyJustSomeFilters()
+      writeOffline()
+
+
+//    readOffline()
+//    readHybrid()
+//    readHybridWithSpecificSchema()
+//    readHybridWithFilters()
+//    readHybridViaGrpc()
+//    readRealtimeViaGrpc()
+//    readRealtimeWithFilterViaGrpc()
+//    readHybridWithFiltersViaGrpc()
+//    readRealtimeWithSelectionColumns()
+//    applyJustSomeFilters()
+  }
+
+  def writeOffline()(implicit spark: SparkSession): Unit = {
+    log.info("Writing some data to a Pinot table...")
+    // create sample data
+    val data = Seq(
+          ("ORD", "Florida", 1000),
+          ("ORD", "Florida", 1000),
+          ("ORD", "Florida", 1000),
+    )
+
+    val airports = spark.createDataFrame(data)
+      .toDF("airport", "state", "distance")
+
+    airports.write.format("pinot")
+      .mode("append")
+      .option("table", "airlineStats")
+      .option("tableType", "offline")
+      .save()
   }
 
   def readOffline()(implicit spark: SparkSession): Unit = {
