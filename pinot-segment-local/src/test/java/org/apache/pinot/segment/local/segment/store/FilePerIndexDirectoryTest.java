@@ -202,7 +202,7 @@ public class FilePerIndexDirectoryTest {
   public void testRemoveTextIndices()
       throws IOException {
     TextIndexConfig config =
-            new TextIndexConfig(false, null, null, false, false, null, null, true, 500, null, false);
+        new TextIndexConfig(false, null, null, false, false, null, null, true, 500, null, false, false, 0);
     try (FilePerIndexDirectory fpi = new FilePerIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap);
         LuceneTextIndexCreator fooCreator = new LuceneTextIndexCreator("foo", TEMP_DIR, true, false, null, null,
             config);
@@ -266,7 +266,7 @@ public class FilePerIndexDirectoryTest {
   public void testGetColumnIndices()
       throws IOException {
     TextIndexConfig config =
-            new TextIndexConfig(false, null, null, false, false, null, null, true, 500, null, false);
+        new TextIndexConfig(false, null, null, false, false, null, null, true, 500, null, false, false, 0);
     // Write sth to buffers and flush them to index files on disk
     try (FilePerIndexDirectory fpi = new FilePerIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap);
         LuceneTextIndexCreator fooCreator = new LuceneTextIndexCreator("foo", TEMP_DIR, true, false, null, null,
@@ -293,17 +293,15 @@ public class FilePerIndexDirectoryTest {
     }
 
     // Need segmentMetadata to tell the full set of columns in this segment.
-    when(_segmentMetadata.getAllColumns())
-        .thenReturn(new TreeSet<>(Arrays.asList("col1", "col2", "col3", "col4", "col5", "foo", "bar")));
+    when(_segmentMetadata.getAllColumns()).thenReturn(
+        new TreeSet<>(Arrays.asList("col1", "col2", "col3", "col4", "col5", "foo", "bar")));
     try (FilePerIndexDirectory fpi = new FilePerIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap)) {
-      assertEquals(fpi.getColumnsWithIndex(StandardIndexes.forward()),
-          new HashSet<>(Arrays.asList("col1", "col3")));
+      assertEquals(fpi.getColumnsWithIndex(StandardIndexes.forward()), new HashSet<>(Arrays.asList("col1", "col3")));
       assertEquals(fpi.getColumnsWithIndex(StandardIndexes.dictionary()),
           new HashSet<>(Collections.singletonList("col2")));
       assertEquals(fpi.getColumnsWithIndex(StandardIndexes.inverted()),
           new HashSet<>(Collections.singletonList("col4")));
-      assertEquals(fpi.getColumnsWithIndex(StandardIndexes.h3()),
-          new HashSet<>(Collections.singletonList("col5")));
+      assertEquals(fpi.getColumnsWithIndex(StandardIndexes.h3()), new HashSet<>(Collections.singletonList("col5")));
       assertEquals(fpi.getColumnsWithIndex(StandardIndexes.text()), new HashSet<>(Arrays.asList("foo", "bar")));
 
       fpi.removeIndex("col1", StandardIndexes.forward());
@@ -318,8 +316,7 @@ public class FilePerIndexDirectoryTest {
       assertEquals(fpi.getColumnsWithIndex(StandardIndexes.inverted()),
           new HashSet<>(Collections.singletonList("col4")));
       assertEquals(fpi.getColumnsWithIndex(StandardIndexes.h3()), new HashSet<>(Collections.emptySet()));
-      assertEquals(fpi.getColumnsWithIndex(StandardIndexes.text()),
-          new HashSet<>(Collections.singletonList("bar")));
+      assertEquals(fpi.getColumnsWithIndex(StandardIndexes.text()), new HashSet<>(Collections.singletonList("bar")));
     }
   }
 }

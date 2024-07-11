@@ -65,7 +65,7 @@ public class LuceneMutableTextIndexTest {
   public void setUp()
       throws Exception {
     TextIndexConfig config =
-            new TextIndexConfig(false, null, null, false, false, null, null, true, 500, null, false);
+        new TextIndexConfig(false, null, null, false, false, null, null, true, 500, null, false, false, 0);
     _realtimeLuceneTextIndex =
         new RealtimeLuceneTextIndex(TEXT_COLUMN_NAME, INDEX_DIR, "table__0__1__20240602T0014Z", config);
     String[][] documents = getTextData();
