@@ -18,9 +18,14 @@
  */
 package org.apache.pinot.core.segment.processing.genericrow;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.Closeable;
+import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -54,29 +59,33 @@ import org.apache.arrow.vector.ipc.message.IpcOption;
 import org.apache.arrow.vector.types.FloatingPointPrecision;
 import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.FieldType;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.JsonUtils;
 
 
 public class GenericRowArrowFileWriter implements Closeable, FileWriter<GenericRow> {
-
+  public static final String SORT_COLUMNS_DATA_DIR = "sort_columns";
+  public static final String NON_SORT_COLUMNS_DATA_DIR = "non_sort_columns";
+  public static final String CHUNK_METADATA_JSON_FILE = "chunk_metadata.json";
+  private final String _outputDir;
   private final Schema _pinotSchema;
   private final int _maxBatchRows;
   private final long _maxBatchBytes;
   private final Set<String> _sortColumns;
-  private final String _baseFileName;
   private final CompressionCodec.Factory _compressionFactory;
   private final CompressionUtil.CodecType _codecType;
   private final Optional<Integer> _compressionLevel;
 
-  private VectorSchemaRoot _sortedVectorRoot;
-  private VectorSchemaRoot _unsortedVectorRoot;
-  private ArrowFileWriter _sortedWriter;
-  private ArrowFileWriter _unsortedWriter;
+  private VectorSchemaRoot _sortColumnsVectorRoot;
+  private VectorSchemaRoot _nonSortColumnsVectorRoot;
+  private ArrowFileWriter _sortColumnsWriter;
+  private ArrowFileWriter _nonSortColumnsWriter;
   private int _batchRowCount;
-  private long _sortedBatchByteCount;
-  private long _unsortedBatchByteCount;
+  private long _sortColumnsBatchByteCount;
+  private long _nonSortColumnsBatchByteCount;
   private int _batchNumber;
   private BufferAllocator _allocator;
   private Map<String, UnionListWriter> _listWriters = new HashMap<>();
@@ -84,22 +93,33 @@ public class GenericRowArrowFileWriter implements Closeable, FileWriter<GenericR
   private Map<String, FileMetadata> _fileMetadata = new HashMap<>();
 
   private static class FileMetadata {
-    int rowCount;
-    long byteCount;
+    @JsonProperty("rowCount")
+    public int rowCount;
+
+    @JsonProperty("byteCount")
+    public long byteCount;
+
+    // Default constructor for Jackson
+    public FileMetadata() {}
+
+    public FileMetadata(int rowCount, long byteCount) {
+      this.rowCount = rowCount;
+      this.byteCount = byteCount;
+    }
   }
 
   public enum ArrowCompressionType {
     NONE, LZ4_FRAME, ZSTD
   }
 
-  public GenericRowArrowFileWriter(String baseFileName, Schema pinotSchema, int maxBatchRows, long maxBatchBytes,
+  public GenericRowArrowFileWriter(String outputDir, Schema pinotSchema, int maxBatchRows, long maxBatchBytes,
       Set<String> sortColumns, ArrowCompressionType compressionType, Integer compressionLevel)
       throws IOException {
+    _outputDir = outputDir;
     _pinotSchema = pinotSchema;
     _maxBatchRows = maxBatchRows;
     _maxBatchBytes = maxBatchBytes;
     _sortColumns = sortColumns;
-    _baseFileName = baseFileName;
     _batchNumber = 0;
     _allocator = new RootAllocator(Long.MAX_VALUE);
 
@@ -135,31 +155,39 @@ public class GenericRowArrowFileWriter implements Closeable, FileWriter<GenericR
 
     resetListWriters();
 
-    org.apache.arrow.vector.types.pojo.Schema sortedSchema = getArrowSchemaFromPinotSchema(_pinotSchema, _sortColumns);
-    org.apache.arrow.vector.types.pojo.Schema unsortedSchema = getArrowSchemaFromPinotSchema(_pinotSchema,
+    org.apache.arrow.vector.types.pojo.Schema sortColumnsSchema = getArrowSchemaFromPinotSchema(_pinotSchema, _sortColumns);
+    org.apache.arrow.vector.types.pojo.Schema nonSortColumnsSchema = getArrowSchemaFromPinotSchema(_pinotSchema,
         _pinotSchema.getColumnNames().stream().filter(col -> !_sortColumns.contains(col)).collect(Collectors.toSet()));
 
-    _sortedVectorRoot = VectorSchemaRoot.create(sortedSchema, allocator);
-    _unsortedVectorRoot = VectorSchemaRoot.create(unsortedSchema, allocator);
+    _sortColumnsVectorRoot = VectorSchemaRoot.create(sortColumnsSchema, allocator);
+    _nonSortColumnsVectorRoot = VectorSchemaRoot.create(nonSortColumnsSchema, allocator);
 
-    String sortedFileName = _baseFileName + "_sorted_" + _batchNumber + ".arrow";
-    String unsortedFileName = _baseFileName + "_unsorted_" + _batchNumber + ".arrow";
+    String sortColFileName =
+        StringUtils.join(new String[]{_outputDir, SORT_COLUMNS_DATA_DIR, _batchNumber + ".arrow"},
+            File.separator);
+    String nonSortColFileName =
+        StringUtils.join(new String[]{_outputDir, NON_SORT_COLUMNS_DATA_DIR, _batchNumber + ".arrow"},
+            File.separator);
 
-    _sortedWriter = new ArrowFileWriter(_sortedVectorRoot, null, new FileOutputStream(sortedFileName).getChannel(),
+    // ensure dirs are created
+    new File(_outputDir + File.separator + SORT_COLUMNS_DATA_DIR).mkdirs();
+    new File(_outputDir + File.separator + NON_SORT_COLUMNS_DATA_DIR).mkdirs();
+
+    _sortColumnsWriter = new ArrowFileWriter(_sortColumnsVectorRoot, null, new FileOutputStream(sortColFileName).getChannel(),
         Collections.emptyMap(), IpcOption.DEFAULT, _compressionFactory, _codecType, _compressionLevel);
-    _unsortedWriter =
-        new ArrowFileWriter(_unsortedVectorRoot, null, new FileOutputStream(unsortedFileName).getChannel(),
+    _nonSortColumnsWriter =
+        new ArrowFileWriter(_nonSortColumnsVectorRoot, null, new FileOutputStream(nonSortColFileName).getChannel(),
             Collections.emptyMap(), IpcOption.DEFAULT, _compressionFactory, _codecType, _compressionLevel);
 
-    _sortedWriter.start();
-    _unsortedWriter.start();
+    _sortColumnsWriter.start();
+    _nonSortColumnsWriter.start();
 
     _batchRowCount = 0;
-    _sortedBatchByteCount = 0;
-    _unsortedBatchByteCount = 0;
+    _sortColumnsBatchByteCount = 0;
+    _nonSortColumnsBatchByteCount = 0;
 
-    _fileMetadata.put(sortedFileName, new FileMetadata());
-    _fileMetadata.put(unsortedFileName, new FileMetadata());
+    _fileMetadata.put(sortColFileName, new FileMetadata());
+    _fileMetadata.put(nonSortColFileName, new FileMetadata());
   }
 
   private org.apache.arrow.vector.types.pojo.Schema getArrowSchemaFromPinotSchema(Schema pinotSchema,
@@ -237,11 +265,11 @@ public class GenericRowArrowFileWriter implements Closeable, FileWriter<GenericR
     return new org.apache.arrow.vector.types.pojo.Schema(arrowFields);
   }
 
-  private void fillVectorsFromGenericRow(VectorSchemaRoot sortedRoot, VectorSchemaRoot unsortedRoot, GenericRow row) {
+  private void fillVectorsFromGenericRow(VectorSchemaRoot sortColumnsRoot, VectorSchemaRoot nonSortColumnsRoot, GenericRow row) {
     for (FieldSpec fieldSpec : _pinotSchema.getAllFieldSpecs()) {
       FieldVector fieldVector =
-          _sortColumns != null && _sortColumns.contains(fieldSpec.getName()) ? sortedRoot.getVector(fieldSpec.getName())
-              : unsortedRoot.getVector(fieldSpec.getName());
+          _sortColumns != null && _sortColumns.contains(fieldSpec.getName()) ? sortColumnsRoot.getVector(fieldSpec.getName())
+              : nonSortColumnsRoot.getVector(fieldSpec.getName());
 
       byte[] bytes;
       if (fieldSpec.isSingleValueField()) {
@@ -314,14 +342,14 @@ public class GenericRowArrowFileWriter implements Closeable, FileWriter<GenericR
         listWriter.setValueCount(_batchRowCount + 1);
       }
       if (_sortColumns != null && _sortColumns.contains(fieldSpec.getName())) {
-        _sortedBatchByteCount += fieldVector.getBufferSize();
+        _sortColumnsBatchByteCount += fieldVector.getBufferSize();
       } else {
-        _unsortedBatchByteCount += fieldVector.getBufferSize();
+        _nonSortColumnsBatchByteCount += fieldVector.getBufferSize();
       }
     }
     _batchRowCount++;
-    sortedRoot.setRowCount(_batchRowCount);
-    unsortedRoot.setRowCount(_batchRowCount);
+    sortColumnsRoot.setRowCount(_batchRowCount);
+    nonSortColumnsRoot.setRowCount(_batchRowCount);
   }
 
   private void resetListWriters() {
@@ -335,14 +363,14 @@ public class GenericRowArrowFileWriter implements Closeable, FileWriter<GenericR
   public long writeData(GenericRow genericRow)
       throws IOException {
     write(genericRow);
-    return (_sortedBatchByteCount + _unsortedBatchByteCount);
+    return (_sortColumnsBatchByteCount + _nonSortColumnsBatchByteCount);
   }
 
   public void write(GenericRow genericRow)
       throws IOException {
-    fillVectorsFromGenericRow(_sortedVectorRoot, _unsortedVectorRoot, genericRow);
+    fillVectorsFromGenericRow(_sortColumnsVectorRoot, _nonSortColumnsVectorRoot, genericRow);
 
-    if (_batchRowCount >= _maxBatchRows || (_sortedBatchByteCount + _unsortedBatchByteCount) >= _maxBatchBytes) {
+    if (_batchRowCount >= _maxBatchRows || (_sortColumnsBatchByteCount + _nonSortColumnsBatchByteCount) >= _maxBatchBytes) {
       flushBatch();
     }
   }
@@ -351,19 +379,19 @@ public class GenericRowArrowFileWriter implements Closeable, FileWriter<GenericR
       throws IOException {
     sortAllColumns();
 
-    _sortedWriter.writeBatch();
-    _sortedWriter.end();
+    _sortColumnsWriter.writeBatch();
+    _sortColumnsWriter.end();
 
-    _unsortedWriter.writeBatch();
-    _unsortedWriter.end();
+    _nonSortColumnsWriter.writeBatch();
+    _nonSortColumnsWriter.end();
 
-    String sortedFileName = _baseFileName + "_sorted_" + _batchNumber + ".arrow";
-    String unsortedFileName = _baseFileName + "_unsorted_" + _batchNumber + ".arrow";
+    String sortColFileName = StringUtils.join(new String[]{_outputDir, SORT_COLUMNS_DATA_DIR, _batchNumber + ".arrow"}, File.separator);
+    String nonSortColFileName = StringUtils.join(new String[]{_outputDir, NON_SORT_COLUMNS_DATA_DIR, _batchNumber + ".arrow"}, File.separator);
 
-    _fileMetadata.get(sortedFileName).rowCount = _batchRowCount;
-    _fileMetadata.get(sortedFileName).byteCount = _sortedBatchByteCount;
-    _fileMetadata.get(unsortedFileName).rowCount = _batchRowCount;
-    _fileMetadata.get(unsortedFileName).byteCount = _unsortedBatchByteCount;
+    _fileMetadata.get(sortColFileName).rowCount = _batchRowCount;
+    _fileMetadata.get(sortColFileName).byteCount = _sortColumnsBatchByteCount;
+    _fileMetadata.get(nonSortColFileName).rowCount = _batchRowCount;
+    _fileMetadata.get(nonSortColFileName).byteCount = _nonSortColumnsBatchByteCount;
 
     _batchNumber++;
     initNewBatch();
@@ -375,14 +403,16 @@ public class GenericRowArrowFileWriter implements Closeable, FileWriter<GenericR
     if (_batchRowCount > 0) {
       flushBatch();
     }
-    _sortedWriter.close();
-    _unsortedWriter.close();
+    _sortColumnsWriter.close();
+    _nonSortColumnsWriter.close();
+
+    writeMetadataAsJson();
   }
 
   private void sortAllColumns() {
     int[] sortIndices = getSortIndices();
-    ArrowSortUtils.inPlaceSortAll(_sortedVectorRoot, sortIndices);
-    ArrowSortUtils.inPlaceSortAll(_unsortedVectorRoot, sortIndices);
+    ArrowSortUtils.inPlaceSortAll(_sortColumnsVectorRoot, sortIndices);
+    ArrowSortUtils.inPlaceSortAll(_nonSortColumnsVectorRoot, sortIndices);
   }
 
   private int[] getSortIndices() {
@@ -398,7 +428,7 @@ public class GenericRowArrowFileWriter implements Closeable, FileWriter<GenericR
     IndexSorter indexSorter = new IndexSorter();
 
     for (String sortColumn : _sortColumns) {
-      FieldVector sortedVectorRootVector = _sortedVectorRoot.getVector(sortColumn);
+      FieldVector sortedVectorRootVector = _sortColumnsVectorRoot.getVector(sortColumn);
       VectorValueComparator comparator = DefaultVectorComparators.createDefaultComparator(sortedVectorRootVector);
       indexSorter.sort(sortedVectorRootVector, indices, comparator);
     }
@@ -414,5 +444,10 @@ public class GenericRowArrowFileWriter implements Closeable, FileWriter<GenericR
 
   public Map<String, FileMetadata> getFileMetadata() {
     return Collections.unmodifiableMap(_fileMetadata);
+  }
+
+  private void writeMetadataAsJson() throws IOException {
+    String metadataFileContent = JsonUtils.objectToString(_fileMetadata);
+    Files.write(Paths.get(_outputDir, CHUNK_METADATA_JSON_FILE), metadataFileContent.getBytes());
   }
 }

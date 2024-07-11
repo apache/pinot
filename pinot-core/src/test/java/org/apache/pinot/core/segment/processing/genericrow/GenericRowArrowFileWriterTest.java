@@ -23,6 +23,7 @@ import org.apache.arrow.vector.*;
 import org.apache.arrow.vector.complex.ListVector;
 import org.apache.arrow.vector.ipc.ArrowFileReader;
 import org.apache.arrow.vector.ipc.SeekableReadChannel;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -34,6 +35,9 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.util.*;
+
+import static org.apache.pinot.core.segment.processing.genericrow.GenericRowArrowFileWriter.NON_SORT_COLUMNS_DATA_DIR;
+import static org.apache.pinot.core.segment.processing.genericrow.GenericRowArrowFileWriter.SORT_COLUMNS_DATA_DIR;
 
 
 public class GenericRowArrowFileWriterTest {
@@ -47,12 +51,13 @@ public class GenericRowArrowFileWriterTest {
         .addMultiValueDimension("tags", FieldSpec.DataType.STRING).build();
 
     // Set up the writer
-    String baseFileName = "test_output";
+    String outputDir = "arrow_dir";
+
     int maxBatchRows = 5;
     long maxBatchBytes = 1024 * 1024; // 1MB
     Set<String> sortColumns = new HashSet<>(Arrays.asList("id", "score"));
     GenericRowArrowFileWriter writer =
-        new GenericRowArrowFileWriter(baseFileName, pinotSchema, maxBatchRows, maxBatchBytes, sortColumns,
+        new GenericRowArrowFileWriter(outputDir, pinotSchema, maxBatchRows, maxBatchBytes, sortColumns,
             GenericRowArrowFileWriter.ArrowCompressionType.NONE, null);
 
     // Create and write sample data
@@ -63,13 +68,16 @@ public class GenericRowArrowFileWriterTest {
     writer.close();
 
     // Verify the output
-    verifyArrowFile(baseFileName + "_sorted_0.arrow", pinotSchema, sortColumns, testData);
-    verifyArrowFile(baseFileName + "_unsorted_0.arrow", pinotSchema, new HashSet<>(Arrays.asList("name", "tags")),
-        testData);
+    String sortColFileName =
+        StringUtils.join(new String[]{outputDir, SORT_COLUMNS_DATA_DIR, "0.arrow"}, File.separator);
+    String nonSortColFileName =
+        StringUtils.join(new String[]{outputDir, NON_SORT_COLUMNS_DATA_DIR, "0.arrow"}, File.separator);
+
+    verifyArrowFile(sortColFileName, pinotSchema, sortColumns, testData);
+    verifyArrowFile(nonSortColFileName, pinotSchema, new HashSet<>(Arrays.asList("name", "tags")), testData);
 
     // Clean up
-    new File(baseFileName + "_sorted_0.arrow").delete();
-    new File(baseFileName + "_unsorted_0.arrow").delete();
+    new File(outputDir).delete();
   }
 
   private List<GenericRow> createTestData() {
