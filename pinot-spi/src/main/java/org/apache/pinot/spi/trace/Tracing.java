@@ -22,7 +22,9 @@ import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
+import org.apache.pinot.spi.accounting.QueryResourceTracker;
 import org.apache.pinot.spi.accounting.ThreadAccountantFactory;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.accounting.ThreadResourceTracker;
@@ -233,6 +235,11 @@ public class Tracing {
     @Override
     public Collection<? extends ThreadResourceTracker> getThreadResources() {
       return Collections.emptyList();
+    }
+
+    @Override
+    public Map<String, ? extends QueryResourceTracker> getQueryResources() {
+      return Collections.emptyMap();
     }
   }
 

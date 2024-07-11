@@ -58,6 +58,7 @@ import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
+import org.apache.pinot.spi.accounting.QueryResourceTracker;
 import org.apache.pinot.spi.accounting.ThreadResourceTracker;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.config.table.TableType;
@@ -281,5 +282,15 @@ public class PinotBrokerDebug {
   public Collection<? extends ThreadResourceTracker> getThreadResourceUsage() {
     ThreadResourceUsageAccountant threadAccountant = Tracing.getThreadAccountant();
     return threadAccountant.getThreadResources();
+  }
+
+  @GET
+  @Path("debug/queries/resourceUsage")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Get current resource usage of queries in this service", notes = "This is a debug endpoint, "
+      + "and won't maintain backward compatibility")
+  public Map<String, ? extends QueryResourceTracker> getQueryUsage() {
+    ThreadResourceUsageAccountant threadAccountant = Tracing.getThreadAccountant();
+    return threadAccountant.getQueryResources();
   }
 }

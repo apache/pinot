@@ -19,6 +19,7 @@
 package org.apache.pinot.spi.accounting;
 
 import java.util.Collection;
+import java.util.Map;
 import javax.annotation.Nullable;
 
 
@@ -77,4 +78,5 @@ public interface ThreadResourceUsageAccountant {
   Exception getErrorStatus();
 
   Collection<? extends ThreadResourceTracker> getThreadResources();
+  Map<String, ? extends QueryResourceTracker> getQueryResources();
 }

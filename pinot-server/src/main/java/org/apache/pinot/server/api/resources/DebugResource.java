@@ -53,6 +53,7 @@ import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.server.starter.ServerInstance;
+import org.apache.pinot.spi.accounting.QueryResourceTracker;
 import org.apache.pinot.spi.accounting.ThreadResourceTracker;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.config.table.TableType;
@@ -134,6 +135,17 @@ public class DebugResource {
   public Collection<? extends ThreadResourceTracker> getThreadUsage() {
     ThreadResourceUsageAccountant threadAccountant = Tracing.getThreadAccountant();
     return threadAccountant.getThreadResources();
+  }
+
+  @GET
+  @Path("queries/resourceUsage")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Get current resource usage of queries in this service",
+      notes = "This is a debug endpoint, and won't maintain backward compatibility")
+  public Collection<? extends QueryResourceTracker> getQueryUsage() {
+    ThreadResourceUsageAccountant threadAccountant = Tracing.getThreadAccountant();
+    Collection<? extends QueryResourceTracker> resources = threadAccountant.getQueryResources().values();
+    return resources;
   }
 
   private List<SegmentServerDebugInfo> getSegmentServerDebugInfo(String tableNameWithType, TableType tableType) {

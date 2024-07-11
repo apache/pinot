@@ -39,6 +39,7 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.spi.accounting.QueryResourceTracker;
 import org.apache.pinot.spi.accounting.ThreadAccountantFactory;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.accounting.ThreadResourceTracker;
@@ -167,6 +168,54 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
     @Override
     public Collection<? extends ThreadResourceTracker> getThreadResources() {
       return _threadEntriesMap.values();
+    }
+
+    @Override
+    public Map<String, ? extends QueryResourceTracker> getQueryResources() {
+      HashMap<String, AggregatedStats> ret = new HashMap<>();
+
+      // for each {pqr, pqw}
+      for (Map.Entry<Thread, CPUMemThreadLevelAccountingObjects.ThreadEntry> entry : _threadEntriesMap.entrySet()) {
+        // sample current usage
+        CPUMemThreadLevelAccountingObjects.ThreadEntry threadEntry = entry.getValue();
+        long currentCPUSample = _isThreadCPUSamplingEnabled ? threadEntry._currentThreadCPUTimeSampleMS : 0;
+        long currentMemSample =
+            _isThreadMemorySamplingEnabled ? threadEntry._currentThreadMemoryAllocationSampleBytes : 0;
+        // sample current running task status
+        CPUMemThreadLevelAccountingObjects.TaskEntry currentTaskStatus = threadEntry.getCurrentThreadTaskStatus();
+        Thread thread = entry.getKey();
+        LOGGER.trace("tid: {}, task: {}", thread.getId(), currentTaskStatus);
+
+        // if current thread is not idle
+        if (currentTaskStatus != null) {
+          // extract query id from queryTask string
+          String queryId = currentTaskStatus.getQueryId();
+          if (queryId != null) {
+            Thread anchorThread = currentTaskStatus.getAnchorThread();
+            boolean isAnchorThread = currentTaskStatus.isAnchorThread();
+            ret.compute(queryId,
+                (k, v) -> v == null ? new AggregatedStats(currentCPUSample, currentMemSample, anchorThread,
+                    isAnchorThread, threadEntry._errorStatus, queryId)
+                    : v.merge(currentCPUSample, currentMemSample, isAnchorThread, threadEntry._errorStatus));
+          }
+        }
+      }
+
+      // if triggered, accumulate stats of finished tasks of each active query
+      for (Map.Entry<String, AggregatedStats> queryIdResult : ret.entrySet()) {
+        String activeQueryId = queryIdResult.getKey();
+        long accumulatedCPUValue =
+            _isThreadCPUSamplingEnabled ? _finishedTaskCPUStatsAggregator.getOrDefault(activeQueryId, 0L) : 0;
+        long concurrentCPUValue =
+            _isThreadCPUSamplingEnabled ? _concurrentTaskCPUStatsAggregator.getOrDefault(activeQueryId, 0L) : 0;
+        long accumulatedMemValue =
+            _isThreadMemorySamplingEnabled ? _finishedTaskMemStatsAggregator.getOrDefault(activeQueryId, 0L) : 0;
+        long concurrentMemValue =
+            _isThreadMemorySamplingEnabled ? _concurrentTaskMemStatsAggregator.getOrDefault(activeQueryId, 0L) : 0;
+        queryIdResult.getValue()
+            .merge(accumulatedCPUValue + concurrentCPUValue, accumulatedMemValue + concurrentMemValue, false, null);
+      }
+      return ret;
     }
 
     @Override
@@ -409,7 +458,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
     /**
      * aggregated usage of a query, _thread is the runner
      */
-    protected static class AggregatedStats {
+    protected static class AggregatedStats implements QueryResourceTracker {
       final String _queryId;
       final Thread _anchorThread;
       boolean _isAnchorThread;
@@ -439,12 +488,18 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
             + '}';
       }
 
-      public long getCpuNS() {
-        return _cpuNS;
+      @Override
+      public String getQueryId() {
+        return _queryId;
       }
 
       public long getAllocatedBytes() {
         return _allocatedBytes;
+      }
+
+      @Override
+      public long getCpuTimeNs() {
+        return _cpuNS;
       }
 
       public Thread getAnchorThread() {
@@ -811,7 +866,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
           }
         } else {
           maxUsageTuple = Collections.max(_aggregatedUsagePerActiveQuery.values(),
-              Comparator.comparing(AggregatedStats::getCpuNS));
+              Comparator.comparing(AggregatedStats::getCpuTimeNs));
           if (_oomKillQueryEnabled) {
             maxUsageTuple._exceptionAtomicReference
                 .set(new RuntimeException(String.format(
@@ -835,12 +890,12 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
           AggregatedStats value = entry.getValue();
           if (value._cpuNS > _cpuTimeBasedKillingThresholdNS) {
             LOGGER.error("Current task status recorded is {}. Query {} got picked because using {} ns of cpu time,"
-                    + " greater than threshold {}", _threadEntriesMap, value._queryId, value.getCpuNS(),
+                    + " greater than threshold {}", _threadEntriesMap, value._queryId, value.getCpuTimeNs(),
                 _cpuTimeBasedKillingThresholdNS);
             value._exceptionAtomicReference.set(new RuntimeException(
                 String.format("Query %s got killed on %s: %s because using %d "
-                        + "CPU time exceeding limit of %d ns CPU time",
-                    value._queryId, _instanceType, _instanceId, value.getCpuNS(), _cpuTimeBasedKillingThresholdNS)));
+                        + "CPU time exceeding limit of %d ns CPU time", value._queryId, _instanceType, _instanceId,
+                    value.getCpuTimeNs(), _cpuTimeBasedKillingThresholdNS)));
             interruptRunnerThread(value.getAnchorThread());
           }
         }

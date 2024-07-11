@@ -22,12 +22,8 @@ import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 
 
 @JsonSerialize
-public interface ThreadResourceTracker {
-  long getCPUTimeMS();
-
-  long getMemoryAllocationBytes();
-
+public interface QueryResourceTracker {
   String getQueryId();
-
-  int getTaskId();
+  long getAllocatedBytes();
+  long getCpuTimeNs();
 }
