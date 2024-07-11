@@ -141,6 +141,8 @@ public class PinotLLCRealtimeSegmentManager {
   @Deprecated
   public static final String IS_TABLE_PAUSED = "isTablePaused";
   public static final String PAUSE_STATE = "pauseState";
+  // simple field in Ideal State representing storage quota breached for the table
+  public static final String IS_QUOTA_EXCEEDED = "isQuotaExceeded";
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotLLCRealtimeSegmentManager.class);
 
   private static final int STARTING_SEQUENCE_NUMBER = 0; // Initial sequence number for new table segments
@@ -544,7 +546,7 @@ public class PinotLLCRealtimeSegmentManager {
     // Step-2
     long startTimeNs2 = System.nanoTime();
     String newConsumingSegmentName = null;
-    if (!isTablePaused(idealState)) {
+    if (!isTablePaused(idealState) && !isStorageQuotaExceeded(idealState)) {
       StreamConfig streamConfig =
           new StreamConfig(tableConfig.getTableName(), IngestionConfigUtils.getStreamConfigMap(tableConfig));
       Set<Integer> partitionIds;
@@ -928,8 +930,9 @@ public class PinotLLCRealtimeSegmentManager {
       assert idealState != null;
       boolean isTableEnabled = idealState.isEnabled();
       boolean isTablePaused = isTablePaused(idealState);
+      boolean isStorageQuotaExceeded = isStorageQuotaExceeded(idealState);
       boolean offsetsHaveToChange = offsetCriteria != null;
-      if (isTableEnabled && !isTablePaused) {
+      if (isTableEnabled && !isTablePaused && !isStorageQuotaExceeded) {
         List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList =
             offsetsHaveToChange
                 ? Collections.emptyList() // offsets from metadata are not valid anymore; fetch for all partitions
@@ -943,8 +946,9 @@ public class PinotLLCRealtimeSegmentManager {
         return ensureAllPartitionsConsuming(tableConfig, streamConfig, idealState, newPartitionGroupMetadataList,
             recreateDeletedConsumingSegment, offsetCriteria);
       } else {
-        LOGGER.info("Skipping LLC segments validation for table: {}, isTableEnabled: {}, isTablePaused: {}",
-            realtimeTableName, isTableEnabled, isTablePaused);
+        LOGGER.info("Skipping LLC segments validation for table: {}, isTableEnabled: {}, isTablePaused: {}, "
+                + "isStorageQuotaExceeded: {}", realtimeTableName, isTableEnabled, isTablePaused,
+            isStorageQuotaExceeded);
         return idealState;
       }
     }, RetryPolicies.exponentialBackoffRetryPolicy(10, 1000L, 1.2f), true);
@@ -975,7 +979,8 @@ public class PinotLLCRealtimeSegmentManager {
             "Exceeded max segment completion time for segment " + committingSegmentName);
       }
       updateInstanceStatesForNewConsumingSegment(idealState.getRecord().getMapFields(), committingSegmentName,
-          isTablePaused(idealState) ? null : newSegmentName, segmentAssignment, instancePartitionsMap);
+          isTablePaused(idealState) || isStorageQuotaExceeded(idealState) ? null : newSegmentName, segmentAssignment,
+          instancePartitionsMap);
       return idealState;
     }, RetryPolicies.exponentialBackoffRetryPolicy(10, 1000L, 1.2f));
   }
@@ -995,12 +1000,16 @@ public class PinotLLCRealtimeSegmentManager {
     String pauseStateStr = idealState.getRecord().getSimpleField(PinotLLCRealtimeSegmentManager.PAUSE_STATE);
     try {
       if (pauseStateStr != null) {
-          return JsonUtils.stringToObject(pauseStateStr, PauseState.class);
+        return JsonUtils.stringToObject(pauseStateStr, PauseState.class);
       }
     } catch (JsonProcessingException e) {
       LOGGER.warn("Unable to parse the pause state from ideal state : {}", pauseStateStr);
     }
     return null;
+  }
+
+  private boolean isStorageQuotaExceeded(IdealState idealState) {
+    return Boolean.parseBoolean(idealState.getRecord().getSimpleField(IS_QUOTA_EXCEEDED));
   }
 
   @VisibleForTesting
@@ -1766,6 +1775,20 @@ public class PinotLLCRealtimeSegmentManager {
     LOGGER.info("Set 'pauseState' to {} in the Ideal State for table {}. "
         + "Also set 'isTablePaused' to {} for backward compatibility.", pauseState, tableNameWithType, pause);
     return updatedIdealState;
+  }
+
+  public boolean updateStorageQuotaExceededInIdealState(String tableNameWithType, boolean quotaExceeded) {
+    IdealState is = getIdealState(tableNameWithType);
+    if (is.getRecord().getBooleanField(IS_QUOTA_EXCEEDED, false) != quotaExceeded) {
+      HelixHelper.updateIdealState(_helixManager, tableNameWithType, idealState -> {
+        ZNRecord znRecord = idealState.getRecord();
+        znRecord.setSimpleField(IS_QUOTA_EXCEEDED, Boolean.valueOf(quotaExceeded).toString());
+        return new IdealState(znRecord);
+      }, RetryPolicies.noDelayRetryPolicy(1));
+      LOGGER.info("Set 'isQuotaExceeded' to {} in the Ideal State for table {}.", quotaExceeded, tableNameWithType);
+      return true;
+    }
+    return false;
   }
 
   private void sendForceCommitMessageToServers(String tableNameWithType, Set<String> consumingSegments) {

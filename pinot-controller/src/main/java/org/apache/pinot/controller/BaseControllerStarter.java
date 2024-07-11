@@ -477,10 +477,6 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         new PinotLLCRealtimeSegmentManager(_helixResourceManager, _config, _controllerMetrics);
     // TODO: Need to put this inside HelixResourceManager when HelixControllerLeadershipManager is removed.
     _helixResourceManager.registerPinotLLCRealtimeSegmentManager(_pinotLLCRealtimeSegmentManager);
-    _segmentCompletionManager =
-        new SegmentCompletionManager(_helixParticipantManager, _pinotLLCRealtimeSegmentManager, _controllerMetrics,
-            _leadControllerManager, _config.getSegmentCommitTimeoutSeconds());
-
     _sqlQueryExecutor = new SqlQueryExecutor(_config.generateVipUrl());
 
     _connectionManager = PoolingHttpClientConnectionManagerHelper.createWithSocketFactory();
@@ -492,7 +488,10 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         new TableSizeReader(_executorService, _connectionManager, _controllerMetrics, _helixResourceManager,
             _leadControllerManager);
     _storageQuotaChecker = new StorageQuotaChecker(_tableSizeReader, _controllerMetrics, _leadControllerManager,
-        _helixResourceManager);
+        _helixResourceManager, _config);
+    _segmentCompletionManager =
+        new SegmentCompletionManager(_helixParticipantManager, _pinotLLCRealtimeSegmentManager, _controllerMetrics,
+            _leadControllerManager, _storageQuotaChecker, _config.getSegmentCommitTimeoutSeconds());
 
     // Setting up periodic tasks
     List<PeriodicTask> controllerPeriodicTasks = setupControllerPeriodicTasks();
@@ -851,7 +850,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     periodicTasks.add(_offlineSegmentIntervalChecker);
     _realtimeSegmentValidationManager =
         new RealtimeSegmentValidationManager(_config, _helixResourceManager, _leadControllerManager,
-            _pinotLLCRealtimeSegmentManager, _validationMetrics, _controllerMetrics);
+            _pinotLLCRealtimeSegmentManager, _validationMetrics, _controllerMetrics, _storageQuotaChecker);
     periodicTasks.add(_realtimeSegmentValidationManager);
     _brokerResourceValidationManager =
         new BrokerResourceValidationManager(_config, _helixResourceManager, _leadControllerManager, _controllerMetrics);
