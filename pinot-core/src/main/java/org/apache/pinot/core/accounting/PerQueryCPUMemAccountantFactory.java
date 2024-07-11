@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.accounting;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryMXBean;
 import java.util.Collection;
@@ -509,6 +510,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
         return _cpuNS;
       }
 
+      @JsonIgnore
       public Thread getAnchorThread() {
         return _anchorThread;
       }
