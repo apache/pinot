@@ -149,7 +149,7 @@
     <javassist.version>3.30.2-GA</javassist.version>
     <swagger.version>1.6.14</swagger.version>
     <swagger-ui.version>5.17.14</swagger-ui.version>
-    <hadoop.version>3.3.6</hadoop.version>
+    <hadoop.version>3.4.0</hadoop.version>
     <jsonpath.version>2.9.0</jsonpath.version>
     <jsonsmart.version>2.5.1</jsonsmart.version>
     <quartz.version>2.3.2</quartz.version>
@@ -233,6 +233,7 @@
     <scala.compat.version>2.12</scala.compat.version>
 
     <!-- Solve conflict across dependencies -->
+    <jetbrains.annotations.version>24.1.0</jetbrains.annotations.version>
     <kotlin.stdlib.version>2.0.0</kotlin.stdlib.version>
     <okio.version>3.9.0</okio.version>
     <kerby.version>2.0.3</kerby.version>
@@ -1489,6 +1490,11 @@
         <groupId>org.jetbrains.kotlin</groupId>
         <artifactId>kotlin-stdlib-common</artifactId>
         <version>${kotlin.stdlib.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.jetbrains</groupId>
+        <artifactId>annotations</artifactId>
+        <version>${jetbrains.annotations.version}</version>
       </dependency>
       <dependency>
         <groupId>com.squareup.okio</groupId>
