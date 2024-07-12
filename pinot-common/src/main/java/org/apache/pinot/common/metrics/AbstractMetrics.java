@@ -495,15 +495,6 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   }
 
   /**
-   * Get the gauge metric value of the provided gauge
-   * @param gauge gauge
-   * @return gauge value
-   */
-  public long getGaugeValue(final G gauge) {
-    return _gaugeValues.get(gauge.getGaugeName()).get();
-  }
-
-  /**
    * Initializes all global meters (such as exceptions count) to zero.
    */
   public void initializeGlobalMeters() {
