@@ -39,6 +39,10 @@ import org.apache.arrow.vector.util.Text;
  * TODO: Find a way to eleminate copying data (if possible use inplace sorting in arrow)
  */
 public class ArrowSortUtils {
+
+  private ArrowSortUtils() {
+  }
+
   public static void inPlaceSortAll(VectorSchemaRoot root, int[] sortIndices) {
     for (FieldVector vector : root.getFieldVectors()) {
       if (vector instanceof IntVector) {

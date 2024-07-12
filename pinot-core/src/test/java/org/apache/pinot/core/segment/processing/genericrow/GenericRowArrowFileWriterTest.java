@@ -18,8 +18,24 @@
  */
 package org.apache.pinot.core.segment.processing.genericrow;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.nio.channels.FileChannel;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import org.apache.arrow.memory.RootAllocator;
-import org.apache.arrow.vector.*;
+import org.apache.arrow.vector.BigIntVector;
+import org.apache.arrow.vector.FieldVector;
+import org.apache.arrow.vector.Float4Vector;
+import org.apache.arrow.vector.Float8Vector;
+import org.apache.arrow.vector.IntVector;
+import org.apache.arrow.vector.VarCharVector;
+import org.apache.arrow.vector.VectorSchemaRoot;
 import org.apache.arrow.vector.complex.ListVector;
 import org.apache.arrow.vector.ipc.ArrowFileReader;
 import org.apache.arrow.vector.ipc.SeekableReadChannel;
@@ -29,12 +45,6 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.testng.Assert;
 import org.testng.annotations.Test;
-
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.nio.channels.FileChannel;
-import java.util.*;
 
 import static org.apache.pinot.core.segment.processing.genericrow.GenericRowArrowFileWriter.NON_SORT_COLUMNS_DATA_DIR;
 import static org.apache.pinot.core.segment.processing.genericrow.GenericRowArrowFileWriter.SORT_COLUMNS_DATA_DIR;
@@ -160,7 +170,7 @@ public class GenericRowArrowFileWriterTest {
         Assert.assertTrue(vector instanceof VarCharVector);
         break;
       default:
-        Assert.fail("Unsupported data type: " + dataType);
+        throw new IllegalArgumentException("Unsupported data type: " + dataType);
     }
   }
 
