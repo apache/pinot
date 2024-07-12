@@ -64,6 +64,4 @@ public class MapFunctions {
         //convert string keys list to string array and return
         return Arrays.copyOf(stringKeysList.toArray(), stringKeysList.size(), String[].class);
     }
-
 }
-

@@ -1,14 +1,9 @@
 package org.apache.pinot.common.function.scalar;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.testng.annotations.Test;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNull;
 
 public class MapFunctionsTest {
 
