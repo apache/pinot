@@ -73,6 +73,8 @@ import org.apache.pinot.query.validate.BytesCastVisitor;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.apache.pinot.sql.parsers.parser.SqlPhysicalExplain;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -81,6 +83,7 @@ import org.apache.pinot.sql.parsers.parser.SqlPhysicalExplain;
  * <p>It provide the higher level entry interface to convert a SQL string into a {@link DispatchableSubPlan}.
  */
 public class QueryEnvironment {
+  private static final Logger LOGGER = LoggerFactory.getLogger(QueryEnvironment.class);
   // Calcite configurations
   private final RelDataTypeFactory _typeFactory;
   private final Prepare.CatalogReader _catalogReader;
@@ -126,7 +129,7 @@ public class QueryEnvironment {
   public QueryPlannerResult planQuery(String sqlQuery, SqlNodeAndOptions sqlNodeAndOptions, long requestId) {
     try (PlannerContext plannerContext = getPlannerContext()) {
       plannerContext.setOptions(sqlNodeAndOptions.getOptions());
-      RelRoot relRoot = compileQuery(sqlNodeAndOptions.getSqlNode(), plannerContext);
+      RelRoot relRoot = compileQuery(sqlNodeAndOptions.getSqlNode(), plannerContext, requestId);
       // TODO: current code only assume one SubPlan per query, but we should support multiple SubPlans per query.
       // Each SubPlan should be able to run independently from Broker then set the results into the dependent
       // SubPlan for further processing.
@@ -155,7 +158,7 @@ public class QueryEnvironment {
     try (PlannerContext plannerContext = getPlannerContext()) {
       SqlExplain explain = (SqlExplain) sqlNodeAndOptions.getSqlNode();
       plannerContext.setOptions(sqlNodeAndOptions.getOptions());
-      RelRoot relRoot = compileQuery(explain.getExplicandum(), plannerContext);
+      RelRoot relRoot = compileQuery(explain.getExplicandum(), plannerContext, requestId);
       if (explain instanceof SqlPhysicalExplain) {
         // get the physical plan for query.
         DispatchableSubPlan dispatchableSubPlan = toDispatchableSubPlan(relRoot, plannerContext, requestId);
@@ -190,7 +193,7 @@ public class QueryEnvironment {
       if (sqlNode.getKind().equals(SqlKind.EXPLAIN)) {
         sqlNode = ((SqlExplain) sqlNode).getExplicandum();
       }
-      RelRoot relRoot = compileQuery(sqlNode, plannerContext);
+      RelRoot relRoot = compileQuery(sqlNode, plannerContext, 0);
       Set<String> tableNames = RelToPlanNodeConverter.getTableNamesFromRelRoot(relRoot.rel);
       return new ArrayList<>(tableNames);
     } catch (Throwable t) {
@@ -230,23 +233,25 @@ public class QueryEnvironment {
   // steps
   // --------------------------------------------------------------------------
 
-  private RelRoot compileQuery(SqlNode sqlNode, PlannerContext plannerContext) {
-    SqlNode validated = validate(sqlNode, plannerContext);
-    RelRoot relation = toRelation(validated, plannerContext);
-    RelNode optimized = optimize(relation, plannerContext);
+  private RelRoot compileQuery(SqlNode sqlNode, PlannerContext plannerContext, long requestId) {
+    SqlNode validated = validate(sqlNode, plannerContext, requestId);
+    RelRoot relation = toRelation(validated, plannerContext, requestId);
+    RelNode optimized = optimize(relation, plannerContext, requestId);
     return relation.withRel(optimized);
   }
 
-  private SqlNode validate(SqlNode sqlNode, PlannerContext plannerContext) {
+  private SqlNode validate(SqlNode sqlNode, PlannerContext plannerContext, long requestId) {
+    LOGGER.debug("Validating query {}:\n{}", requestId, sqlNode);
     SqlNode validated = plannerContext.getValidator().validate(sqlNode);
     if (!validated.getKind().belongsTo(SqlKind.QUERY)) {
       throw new IllegalArgumentException("Unsupported SQL query, failed to validate query:\n" + sqlNode);
     }
     validated.accept(new BytesCastVisitor(plannerContext.getValidator()));
+    LOGGER.debug("Validated query {}:\n{}", requestId, validated);
     return validated;
   }
 
-  private RelRoot toRelation(SqlNode sqlNode, PlannerContext plannerContext) {
+  private RelRoot toRelation(SqlNode sqlNode, PlannerContext plannerContext, long requestId) {
     RexBuilder rexBuilder = new RexBuilder(_typeFactory);
     RelOptCluster cluster = RelOptCluster.create(plannerContext.getRelOptPlanner(), rexBuilder);
     SqlToRelConverter converter =
@@ -272,10 +277,13 @@ public class QueryEnvironment {
     } catch (Throwable e) {
       throw new RuntimeException("Failed to trim unused fields from query:\n" + RelOptUtil.toString(rootNode), e);
     }
+    if (LOGGER.isDebugEnabled()) {
+      LOGGER.debug("Converted query to relational expression " + requestId + ":\n" + rootNode.explain());
+    }
     return relRoot.withRel(rootNode);
   }
 
-  private RelNode optimize(RelRoot relRoot, PlannerContext plannerContext) {
+  private RelNode optimize(RelRoot relRoot, PlannerContext plannerContext, long requestId) {
     // TODO: add support for cost factory
     try {
       RelOptPlanner optPlanner = plannerContext.getRelOptPlanner();
@@ -283,7 +291,11 @@ public class QueryEnvironment {
       RelNode optimized = optPlanner.findBestExp();
       RelOptPlanner traitPlanner = plannerContext.getRelTraitPlanner();
       traitPlanner.setRoot(optimized);
-      return traitPlanner.findBestExp();
+      RelNode bestExp = traitPlanner.findBestExp();
+      if (LOGGER.isDebugEnabled()) {
+        LOGGER.debug("Optimized query {}:\n{}", requestId, RelOptUtil.toString(bestExp));
+      }
+      return bestExp;
     } catch (Throwable e) {
       throw new RuntimeException(
           "Failed to generate a valid execution plan for query:\n" + RelOptUtil.toString(relRoot.rel), e);
