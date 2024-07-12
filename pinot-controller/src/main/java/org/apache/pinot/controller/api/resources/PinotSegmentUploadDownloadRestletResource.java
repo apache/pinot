@@ -158,7 +158,7 @@ public class PinotSegmentUploadDownloadRestletResource {
     boolean hasDataAccess;
     try {
       AccessControl accessControl = _accessControlFactory.create();
-      hasDataAccess = accessControl.hasAccess(tableName, AccessType.READ, httpHeaders, null);
+      hasDataAccess = accessControl.hasAccess(tableName, AccessType.READ, httpHeaders, Actions.Table.DOWNLOAD_SEGMENT);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER,
           "Caught exception while validating access to table: " + tableName, Response.Status.INTERNAL_SERVER_ERROR, e);
