@@ -39,6 +39,7 @@ public class DataTableUtils {
    * @return row size in bytes.
    */
   public static int computeColumnOffsets(DataSchema dataSchema, int[] columnOffsets, int dataTableVersion) {
+    assert dataTableVersion == DataTableFactory.VERSION_4;
     int numColumns = columnOffsets.length;
     assert numColumns == dataSchema.size();
 
@@ -48,26 +49,13 @@ public class DataTableUtils {
       columnOffsets[i] = rowSizeInBytes;
       switch (storedColumnDataTypes[i]) {
         case INT:
-          rowSizeInBytes += 4;
-          break;
-        case LONG:
-          rowSizeInBytes += 8;
-          break;
         case FLOAT:
-          if (dataTableVersion >= DataTableFactory.VERSION_4) {
-            rowSizeInBytes += 4;
-          } else {
-            rowSizeInBytes += 8;
-          }
-          break;
-        case DOUBLE:
-          rowSizeInBytes += 8;
-          break;
         case STRING:
+          // For STRING, we store the dictionary id.
           rowSizeInBytes += 4;
           break;
-        // Object and array. (POSITION|LENGTH)
         default:
+          // This covers LONG, DOUBLE and variable length data types (POSITION|LENGTH).
           rowSizeInBytes += 8;
           break;
       }
