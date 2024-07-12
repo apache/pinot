@@ -96,20 +96,21 @@ public class FilterOperator extends MultiStageOperator {
   @Override
   protected TransferableBlock getNextBlock() {
     TransferableBlock block = _input.nextBlock();
-    if (block.isEndOfStreamBlock()) {
-      if (block.isErrorBlock()) {
-        return block;
-      }
+    if (block.isErrorBlock()) {
+      return block;
+    }
+    if (block.isSuccessfulEndOfStreamBlock()) {
       return updateEosBlock(block, _statMap);
     }
-    List<Object[]> resultRows = new ArrayList<>();
+    assert block.isDataBlock();
+    List<Object[]> rows = new ArrayList<>();
     for (Object[] row : block.getContainer()) {
       Object filterResult = _filterOperand.apply(row);
       if (BooleanUtils.isTrueInternalValue(filterResult)) {
-        resultRows.add(row);
+        rows.add(row);
       }
     }
-    return new TransferableBlock(resultRows, _dataSchema, DataBlock.Type.ROW);
+    return rows.isEmpty() ? getNextBlock() : new TransferableBlock(rows, _dataSchema, DataBlock.Type.ROW);
   }
 
   public enum StatKey implements StatMap.Key {

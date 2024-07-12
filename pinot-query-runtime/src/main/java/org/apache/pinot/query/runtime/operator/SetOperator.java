@@ -108,9 +108,7 @@ public abstract class SetOperator extends MultiStageOperator {
     if (_upstreamErrorBlock != null) {
       return _upstreamErrorBlock;
     }
-    // UNION each left block with the constructed right block set.
-    TransferableBlock leftBlock = _leftChildOperator.nextBlock();
-    return constructResultBlockSet(leftBlock);
+    return constructResultBlockSet();
   }
 
   protected void constructRightBlockSet() {
@@ -132,13 +130,10 @@ public abstract class SetOperator extends MultiStageOperator {
     }
   }
 
-  protected TransferableBlock constructResultBlockSet(TransferableBlock leftBlock) {
-    List<Object[]> rows = new ArrayList<>();
-    // TODO: Other operators keep the first erroneous block, while this keep the last.
-    //  We should decide what is what we want to do and be consistent with that.
-    if (_upstreamErrorBlock != null || leftBlock.isErrorBlock()) {
-      _upstreamErrorBlock = leftBlock;
-      return _upstreamErrorBlock;
+  protected TransferableBlock constructResultBlockSet() {
+    TransferableBlock leftBlock = _leftChildOperator.nextBlock();
+    if (leftBlock.isErrorBlock()) {
+      return leftBlock;
     }
     if (leftBlock.isSuccessfulEndOfStreamBlock()) {
       assert _rightQueryStats != null;
@@ -148,12 +143,14 @@ public abstract class SetOperator extends MultiStageOperator {
       _rightQueryStats.getCurrentStats().concat(leftQueryStats.getCurrentStats());
       return TransferableBlockUtils.getEndOfStreamTransferableBlock(_rightQueryStats);
     }
+    assert leftBlock.isDataBlock();
+    List<Object[]> rows = new ArrayList<>();
     for (Object[] row : leftBlock.getContainer()) {
       if (handleRowMatched(row)) {
         rows.add(row);
       }
     }
-    return new TransferableBlock(rows, _dataSchema, DataBlock.Type.ROW);
+    return rows.isEmpty() ? constructResultBlockSet() : new TransferableBlock(rows, _dataSchema, DataBlock.Type.ROW);
   }
 
   /**
