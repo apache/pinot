@@ -348,6 +348,14 @@ public class CommonConstants {
     public static final String CONFIG_OF_NEW_SEGMENT_EXPIRATION_SECONDS = "pinot.broker.new.segment.expiration.seconds";
     public static final long DEFAULT_VALUE_OF_NEW_SEGMENT_EXPIRATION_SECONDS = TimeUnit.MINUTES.toSeconds(5);
 
+    // If this config is set to true, the broker will check every query executed using the v1 query engine and attempt
+    // to determine whether the query could have successfully been run on the v2 / multi-stage query engine. If not,
+    // a counter metric will be incremented - if this counter remains 0 during regular query workload execution, it
+    // signals that users can potentially migrate their query workload to the multistage query engine.
+    public static final String CONFIG_OF_BROKER_ENABLE_MULTISTAGE_MIGRATION_METRIC
+        = "pinot.broker.enable.multistage.migration.metric";
+    public static final boolean DEFAULT_ENABLE_MULTISTAGE_MIGRATION_METRIC = false;
+
     public static class Request {
       public static final String SQL = "sql";
       public static final String TRACE = "trace";

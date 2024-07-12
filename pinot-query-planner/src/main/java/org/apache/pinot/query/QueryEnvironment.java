@@ -71,6 +71,8 @@ import org.apache.pinot.query.validate.BytesCastVisitor;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.apache.pinot.sql.parsers.parser.SqlPhysicalExplain;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -79,6 +81,7 @@ import org.apache.pinot.sql.parsers.parser.SqlPhysicalExplain;
  * <p>It provide the higher level entry interface to convert a SQL string into a {@link DispatchableSubPlan}.
  */
 public class QueryEnvironment {
+  private static final Logger LOGGER = LoggerFactory.getLogger(QueryEnvironment.class);
   private static final CalciteConnectionConfig CONNECTION_CONFIG;
 
   static {
@@ -128,7 +131,7 @@ public class QueryEnvironment {
   public QueryPlannerResult planQuery(String sqlQuery, SqlNodeAndOptions sqlNodeAndOptions, long requestId) {
     try (PlannerContext plannerContext = getPlannerContext()) {
       plannerContext.setOptions(sqlNodeAndOptions.getOptions());
-      RelRoot relRoot = compileQuery(sqlNodeAndOptions.getSqlNode(), plannerContext);
+      RelRoot relRoot = compileAndOptimizeQuery(sqlNodeAndOptions.getSqlNode(), plannerContext);
       // TODO: current code only assume one SubPlan per query, but we should support multiple SubPlans per query.
       // Each SubPlan should be able to run independently from Broker then set the results into the dependent
       // SubPlan for further processing.
@@ -157,7 +160,7 @@ public class QueryEnvironment {
     try (PlannerContext plannerContext = getPlannerContext()) {
       SqlExplain explain = (SqlExplain) sqlNodeAndOptions.getSqlNode();
       plannerContext.setOptions(sqlNodeAndOptions.getOptions());
-      RelRoot relRoot = compileQuery(explain.getExplicandum(), plannerContext);
+      RelRoot relRoot = compileAndOptimizeQuery(explain.getExplicandum(), plannerContext);
       if (explain instanceof SqlPhysicalExplain) {
         // get the physical plan for query.
         DispatchableSubPlan dispatchableSubPlan = toDispatchableSubPlan(relRoot, plannerContext, requestId);
@@ -192,11 +195,29 @@ public class QueryEnvironment {
       if (sqlNode.getKind().equals(SqlKind.EXPLAIN)) {
         sqlNode = ((SqlExplain) sqlNode).getExplicandum();
       }
-      RelRoot relRoot = compileQuery(sqlNode, plannerContext);
+      RelRoot relRoot = compileAndOptimizeQuery(sqlNode, plannerContext);
       Set<String> tableNames = RelToPlanNodeConverter.getTableNamesFromRelRoot(relRoot.rel);
       return new ArrayList<>(tableNames);
     } catch (Throwable t) {
       throw new RuntimeException("Error composing query plan for: " + sqlQuery, t);
+    }
+  }
+
+  /**
+   * Returns whether the query can be successfully compiled in this query environment
+   */
+  public boolean canCompileQuery(String query) {
+    try (PlannerContext plannerContext = getPlannerContext()) {
+      SqlNode sqlNode = CalciteSqlParser.compileToSqlNodeAndOptions(query).getSqlNode();
+      if (sqlNode.getKind().equals(SqlKind.EXPLAIN)) {
+        sqlNode = ((SqlExplain) sqlNode).getExplicandum();
+      }
+      compileAndOptimizeQuery(sqlNode, plannerContext);
+      LOGGER.debug("Successfully compiled query using the multi-stage query engine: `{}`", query);
+      return true;
+    } catch (Exception e) {
+      LOGGER.warn("Encountered an error while compiling query `{}` using the multi-stage query engine", query, e);
+      return false;
     }
   }
 
@@ -232,7 +253,7 @@ public class QueryEnvironment {
   // steps
   // --------------------------------------------------------------------------
 
-  private RelRoot compileQuery(SqlNode sqlNode, PlannerContext plannerContext) {
+  private RelRoot compileAndOptimizeQuery(SqlNode sqlNode, PlannerContext plannerContext) {
     SqlNode validated = validate(sqlNode, plannerContext);
     RelRoot relation = toRelation(validated, plannerContext);
     RelNode optimized = optimize(relation, plannerContext);

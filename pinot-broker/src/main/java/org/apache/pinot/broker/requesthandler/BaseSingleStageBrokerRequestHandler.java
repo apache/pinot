@@ -136,6 +136,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   protected final int _defaultHllLog2m;
   protected final boolean _enableQueryLimitOverride;
   protected final boolean _enableDistinctCountBitmapOverride;
+  protected final boolean _enableMultistageMigrationMetric;
   protected final int _queryResponseLimit;
   protected final Map<Long, QueryServers> _queriesById;
 
@@ -150,6 +151,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     _enableQueryLimitOverride = _config.getProperty(Broker.CONFIG_OF_ENABLE_QUERY_LIMIT_OVERRIDE, false);
     _enableDistinctCountBitmapOverride =
         _config.getProperty(CommonConstants.Helix.ENABLE_DISTINCT_COUNT_BITMAP_OVERRIDE_KEY, false);
+    _enableMultistageMigrationMetric = _config.getProperty(Broker.CONFIG_OF_BROKER_ENABLE_MULTISTAGE_MIGRATION_METRIC,
+        Broker.DEFAULT_ENABLE_MULTISTAGE_MIGRATION_METRIC);
     _queryResponseLimit =
         config.getProperty(Broker.CONFIG_OF_BROKER_QUERY_RESPONSE_LIMIT, Broker.DEFAULT_BROKER_QUERY_RESPONSE_LIMIT);
     boolean enableQueryCancellation =
@@ -478,7 +481,16 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       }
 
       _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.QUERIES, 1);
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.QUERIES_GLOBAL, 1);
       _brokerMetrics.addValueToTableGauge(rawTableName, BrokerGauge.REQUEST_SIZE, query.length());
+
+      if (!pinotQuery.isExplain() && _enableMultistageMigrationMetric) {
+        // Check if the query is a v2 supported query
+        String database = DatabaseUtils.extractDatabaseFromQueryRequest(sqlNodeAndOptions.getOptions(), httpHeaders);
+        if (!ParserUtils.canCompileWithMultiStageEngine(query, database, _tableCache)) {
+          _brokerMetrics.addMeteredGlobalValue(BrokerMeter.SINGLE_STAGE_QUERIES_INVALID_MULTI_STAGE, 1);
+        }
+      }
 
       // Prepare OFFLINE and REALTIME requests
       BrokerRequest offlineBrokerRequest = null;
