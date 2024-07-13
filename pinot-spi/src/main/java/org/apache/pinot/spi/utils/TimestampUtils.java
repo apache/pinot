@@ -19,9 +19,22 @@
 package org.apache.pinot.spi.utils;
 
 import java.sql.Timestamp;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeFormatterBuilder;
+import java.time.format.DateTimeParseException;
+import java.time.temporal.ChronoField;
 
 
 public class TimestampUtils {
+  private static final DateTimeFormatter DATE_TIME_FORMATTER = new DateTimeFormatterBuilder()
+      .appendPattern("yyyy-MM-dd[ HH:mm[:ss]]")
+      .parseDefaulting(ChronoField.HOUR_OF_DAY, 0)
+      .parseDefaulting(ChronoField.MINUTE_OF_HOUR, 0)
+      .parseDefaulting(ChronoField.SECOND_OF_MINUTE, 0)
+      .toFormatter();
+
   private TimestampUtils() {
   }
 
@@ -30,6 +43,7 @@ public class TimestampUtils {
    * <p>Two formats of timestamp are supported:
    * <ul>
    *   <li>'yyyy-mm-dd hh:mm:ss[.fffffffff]'</li>
+   *   <li>'yyyy-MM-dd[ HH:mm[:ss]]'</li>
    *   <li>Millis since epoch</li>
    * </ul>
    */
@@ -37,11 +51,18 @@ public class TimestampUtils {
     try {
       return Timestamp.valueOf(timestampString);
     } catch (Exception e) {
-      try {
-        return new Timestamp(Long.parseLong(timestampString));
-      } catch (Exception e1) {
-        throw new IllegalArgumentException(String.format("Invalid timestamp: '%s'", timestampString));
-      }
+      // Try the next format
+    }
+    try {
+      return new Timestamp(Long.parseLong(timestampString));
+    } catch (Exception e1) {
+      // Try the next format
+    }
+    try {
+      LocalDateTime dateTime = LocalDateTime.parse(timestampString, DATE_TIME_FORMATTER);
+      return Timestamp.valueOf(dateTime);
+    } catch (DateTimeParseException e) {
+      throw new IllegalArgumentException(String.format("Invalid timestamp: '%s'", timestampString));
     }
   }
 
@@ -50,6 +71,7 @@ public class TimestampUtils {
    * <p>Two formats of timestamp are supported:
    * <ul>
    *   <li>'yyyy-mm-dd hh:mm:ss[.fffffffff]'</li>
+   *   <li>'yyyy-MM-dd[ HH:mm[:ss]]'</li>
    *   <li>Millis since epoch</li>
    * </ul>
    */
@@ -57,11 +79,18 @@ public class TimestampUtils {
     try {
       return Timestamp.valueOf(timestampString).getTime();
     } catch (Exception e) {
-      try {
-        return Long.parseLong(timestampString);
-      } catch (Exception e1) {
-        throw new IllegalArgumentException(String.format("Invalid timestamp: '%s'", timestampString));
-      }
+      // Try the next format
+    }
+    try {
+      return Long.parseLong(timestampString);
+    } catch (Exception e1) {
+      // Try the next format
+    }
+    try {
+      LocalDateTime dateTime = LocalDateTime.parse(timestampString, DATE_TIME_FORMATTER);
+      return dateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
+    } catch (DateTimeParseException e) {
+      throw new IllegalArgumentException(String.format("Invalid timestamp: '%s'", timestampString));
     }
   }
 }
