@@ -68,7 +68,7 @@ public class PhysicalPlanVisitor implements PlanNodeVisitor<MultiStageOperator, 
 
   public static OpChain walkPlanNode(PlanNode node, OpChainExecutionContext context) {
     MultiStageOperator root = node.visit(INSTANCE, context);
-    return new OpChain(context, root);
+    return new OpChain(context, root, context.getParentContext());
   }
 
   private <T extends PlanNode> MultiStageOperator visit(T node, OpChainExecutionContext context) {

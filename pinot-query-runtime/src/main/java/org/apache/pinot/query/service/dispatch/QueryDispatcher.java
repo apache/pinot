@@ -60,7 +60,9 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.MailboxReceiveOperator;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.trace.RequestContext;
+import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -260,9 +262,10 @@ public class QueryDispatcher {
     Preconditions.checkState(workerMetadataList.size() == 1, "Expecting single worker for reduce stage, got: %s",
         workerMetadataList.size());
     StageMetadata stageMetadata = new StageMetadata(0, workerMetadataList, dispatchableStagePlan.getCustomProperties());
+    ThreadExecutionContext parentContext = Tracing.getThreadAccountant().getThreadExecutionContext();
     OpChainExecutionContext opChainExecutionContext =
         new OpChainExecutionContext(mailboxService, requestId, deadlineMs, queryOptions, stageMetadata,
-            workerMetadataList.get(0), null);
+            workerMetadataList.get(0), null, parentContext);
 
     PairList<Integer, String> resultFields = dispatchableSubPlan.getQueryResultFields();
     DataSchema sourceDataSchema = receiveNode.getDataSchema();

@@ -68,6 +68,7 @@ import org.apache.pinot.spi.auth.TableAuthorizationResult;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.DatabaseConflictException;
 import org.apache.pinot.spi.trace.RequestContext;
+import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
@@ -209,6 +210,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       String errorMessage = String.format("Request %d: %s exceeds query quota.", requestId, query);
       return new BrokerResponseNative(QueryException.getException(QueryException.QUOTA_EXCEEDED_ERROR, errorMessage));
     }
+
+    Tracing.ThreadAccountantOps.setupRunner(String.valueOf(requestId));
 
     long executionStartTimeNs = System.nanoTime();
     QueryDispatcher.QueryResult queryResults;

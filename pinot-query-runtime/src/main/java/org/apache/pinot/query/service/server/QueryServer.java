@@ -37,6 +37,8 @@ import org.apache.pinot.query.routing.StagePlan;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.QueryRunner;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
+import org.apache.pinot.spi.accounting.ThreadExecutionContext;
+import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -112,9 +114,12 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     long timeoutMs = Long.parseLong(requestMetadata.get(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS));
     long deadlineMs = System.currentTimeMillis() + timeoutMs;
 
+    Tracing.ThreadAccountantOps.setupRunner(Long.toString(requestId));
+
     List<Worker.StagePlan> protoStagePlans = request.getStagePlanList();
     int numStages = protoStagePlans.size();
     CompletableFuture<?>[] stageSubmissionStubs = new CompletableFuture[numStages];
+    ThreadExecutionContext parentContext = Tracing.getThreadAccountant().getThreadExecutionContext();
     for (int i = 0; i < numStages; i++) {
       Worker.StagePlan protoStagePlan = protoStagePlans.get(i);
       stageSubmissionStubs[i] = CompletableFuture.runAsync(() -> {
@@ -133,7 +138,7 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
         for (int j = 0; j < numWorkers; j++) {
           WorkerMetadata workerMetadata = workerMetadataList.get(j);
           workerSubmissionStubs[j] =
-              CompletableFuture.runAsync(() -> _queryRunner.processQuery(workerMetadata, stagePlan, requestMetadata),
+              CompletableFuture.runAsync(() -> _queryRunner.processQuery(workerMetadata, stagePlan, requestMetadata, parentContext),
                   _querySubmissionExecutorService);
         }
         try {
