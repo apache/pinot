@@ -37,6 +37,7 @@ import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
 import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.query.runtime.plan.PhysicalPlanVisitor;
+import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -68,7 +69,7 @@ public class PipelineBreakerExecutor {
   @Nullable
   public static PipelineBreakerResult executePipelineBreakers(OpChainSchedulerService scheduler,
       MailboxService mailboxService, WorkerMetadata workerMetadata, StagePlan stagePlan,
-      Map<String, String> opChainMetadata, long requestId, long deadlineMs) {
+      Map<String, String> opChainMetadata, long requestId, long deadlineMs, ThreadExecutionContext parentContext) {
     PipelineBreakerContext pipelineBreakerContext = new PipelineBreakerContext();
     PipelineBreakerVisitor.visitPlanRoot(stagePlan.getRootNode(), pipelineBreakerContext);
     if (!pipelineBreakerContext.getPipelineBreakerMap().isEmpty()) {
@@ -78,7 +79,7 @@ public class PipelineBreakerExecutor {
         // see also: MailboxIdUtils TODOs, de-couple mailbox id from query information
         OpChainExecutionContext opChainExecutionContext =
             new OpChainExecutionContext(mailboxService, requestId, deadlineMs, opChainMetadata,
-                stagePlan.getStageMetadata(), workerMetadata, null);
+                stagePlan.getStageMetadata(), workerMetadata, null, parentContext);
         return execute(scheduler, pipelineBreakerContext, opChainExecutionContext);
       } catch (Exception e) {
         LOGGER.error("Caught exception executing pipeline breaker for request: {}, stage: {}", requestId,
@@ -116,7 +117,8 @@ public class PipelineBreakerExecutor {
         new PipelineBreakerOperator(opChainExecutionContext, pipelineWorkerMap);
     CountDownLatch latch = new CountDownLatch(1);
     OpChain pipelineBreakerOpChain =
-        new OpChain(opChainExecutionContext, pipelineBreakerOperator, (id) -> latch.countDown());
+        new OpChain(opChainExecutionContext, pipelineBreakerOperator, (id) -> latch.countDown(),
+            opChainExecutionContext.getParentContext());
     scheduler.register(pipelineBreakerOpChain);
     long timeoutMs = opChainExecutionContext.getDeadlineMs() - System.currentTimeMillis();
     if (latch.await(timeoutMs, TimeUnit.MILLISECONDS)) {
