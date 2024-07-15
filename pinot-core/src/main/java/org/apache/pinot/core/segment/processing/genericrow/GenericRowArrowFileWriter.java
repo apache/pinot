@@ -64,7 +64,8 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.JsonUtils;
 
-
+//TODO: Sorting might be faster if done simply on GenericRow objects instead of Arrow vectors.
+// However, heap memory usage would need to be taken care of in that case
 public class GenericRowArrowFileWriter implements Closeable, FileWriter<GenericRow> {
   public static final String SORT_COLUMNS_DATA_DIR = "sort_columns";
   public static final String NON_SORT_COLUMNS_DATA_DIR = "non_sort_columns";
