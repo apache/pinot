@@ -138,8 +138,8 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
         for (int j = 0; j < numWorkers; j++) {
           WorkerMetadata workerMetadata = workerMetadataList.get(j);
           workerSubmissionStubs[j] =
-              CompletableFuture.runAsync(() -> _queryRunner.processQuery(workerMetadata, stagePlan, requestMetadata, parentContext),
-                  _querySubmissionExecutorService);
+              CompletableFuture.runAsync(() -> _queryRunner.processQuery(workerMetadata, stagePlan, requestMetadata,
+                      parentContext), _querySubmissionExecutorService);
         }
         try {
           CompletableFuture.allOf(workerSubmissionStubs)
