@@ -278,27 +278,33 @@ public class HashJoinOperator extends MultiStageOperator {
       return TransferableBlockUtils.getEndOfStreamTransferableBlock(_leftSideStats);
     }
 
-    TransferableBlock leftBlock = _leftInput.nextBlock();
-    if (leftBlock.isErrorBlock()) {
-      return leftBlock;
-    }
-    if (leftBlock.isDataBlock()) {
+    // Keep reading the input blocks until we find a match row or all blocks are processed.
+    // TODO: Consider batching the rows to improve performance.
+    while (true) {
+      TransferableBlock leftBlock = _leftInput.nextBlock();
+      if (leftBlock.isErrorBlock()) {
+        return leftBlock;
+      }
+      if (leftBlock.isSuccessfulEndOfStreamBlock()) {
+        assert _rightSideStats != null;
+        _leftSideStats = leftBlock.getQueryStats();
+        assert _leftSideStats != null;
+        _leftSideStats.mergeInOrder(_rightSideStats, getOperatorType(), _statMap);
+        if (needUnmatchedRightRows()) {
+          List<Object[]> rows = buildNonMatchRightRows();
+          if (!rows.isEmpty()) {
+            _isTerminated = true;
+            return new TransferableBlock(rows, _resultSchema, DataBlock.Type.ROW);
+          }
+        }
+        return TransferableBlockUtils.getEndOfStreamTransferableBlock(_leftSideStats);
+      }
+      assert leftBlock.isDataBlock();
       List<Object[]> rows = buildJoinedRows(leftBlock);
-      return rows.isEmpty() ? buildJoinedDataBlock() : new TransferableBlock(rows, _resultSchema, DataBlock.Type.ROW);
-    }
-    assert leftBlock.isSuccessfulEndOfStreamBlock();
-    assert _rightSideStats != null;
-    _leftSideStats = leftBlock.getQueryStats();
-    assert _leftSideStats != null;
-    _leftSideStats.mergeInOrder(_rightSideStats, getOperatorType(), _statMap);
-    if (needUnmatchedRightRows()) {
-      List<Object[]> rows = buildNonMatchRightRows();
       if (!rows.isEmpty()) {
-        _isTerminated = true;
         return new TransferableBlock(rows, _resultSchema, DataBlock.Type.ROW);
       }
     }
-    return TransferableBlockUtils.getEndOfStreamTransferableBlock(_leftSideStats);
   }
 
   private List<Object[]> buildJoinedRows(TransferableBlock leftBlock) {

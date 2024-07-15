@@ -131,26 +131,32 @@ public abstract class SetOperator extends MultiStageOperator {
   }
 
   protected TransferableBlock constructResultBlockSet() {
-    TransferableBlock leftBlock = _leftChildOperator.nextBlock();
-    if (leftBlock.isErrorBlock()) {
-      return leftBlock;
-    }
-    if (leftBlock.isSuccessfulEndOfStreamBlock()) {
-      assert _rightQueryStats != null;
-      MultiStageQueryStats leftQueryStats = leftBlock.getQueryStats();
-      assert leftQueryStats != null;
-      _rightQueryStats.mergeInOrder(leftQueryStats, getOperatorType(), _statMap);
-      _rightQueryStats.getCurrentStats().concat(leftQueryStats.getCurrentStats());
-      return TransferableBlockUtils.getEndOfStreamTransferableBlock(_rightQueryStats);
-    }
-    assert leftBlock.isDataBlock();
-    List<Object[]> rows = new ArrayList<>();
-    for (Object[] row : leftBlock.getContainer()) {
-      if (handleRowMatched(row)) {
-        rows.add(row);
+    // Keep reading the input blocks until we find a match row or all blocks are processed.
+    // TODO: Consider batching the rows to improve performance.
+    while (true) {
+      TransferableBlock leftBlock = _leftChildOperator.nextBlock();
+      if (leftBlock.isErrorBlock()) {
+        return leftBlock;
+      }
+      if (leftBlock.isSuccessfulEndOfStreamBlock()) {
+        assert _rightQueryStats != null;
+        MultiStageQueryStats leftQueryStats = leftBlock.getQueryStats();
+        assert leftQueryStats != null;
+        _rightQueryStats.mergeInOrder(leftQueryStats, getOperatorType(), _statMap);
+        _rightQueryStats.getCurrentStats().concat(leftQueryStats.getCurrentStats());
+        return TransferableBlockUtils.getEndOfStreamTransferableBlock(_rightQueryStats);
+      }
+      assert leftBlock.isDataBlock();
+      List<Object[]> rows = new ArrayList<>();
+      for (Object[] row : leftBlock.getContainer()) {
+        if (handleRowMatched(row)) {
+          rows.add(row);
+        }
+      }
+      if (!rows.isEmpty()) {
+        return new TransferableBlock(rows, _dataSchema, DataBlock.Type.ROW);
       }
     }
-    return rows.isEmpty() ? constructResultBlockSet() : new TransferableBlock(rows, _dataSchema, DataBlock.Type.ROW);
   }
 
   /**
