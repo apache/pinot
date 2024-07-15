@@ -46,11 +46,12 @@ public class SegmentProcessorConfig {
   private final Map<String, AggregationFunctionType> _aggregationTypes;
   private final SegmentConfig _segmentConfig;
   private final Consumer<Object> _progressObserver;
+  private final Map<String, String> _taskConfigs;
 
   private SegmentProcessorConfig(TableConfig tableConfig, Schema schema, TimeHandlerConfig timeHandlerConfig,
       List<PartitionerConfig> partitionerConfigs, MergeType mergeType,
       Map<String, AggregationFunctionType> aggregationTypes, SegmentConfig segmentConfig,
-      Consumer<Object> progressObserver) {
+      Consumer<Object> progressObserver, Map<String, String> taskConfigs) {
     TimestampIndexUtils.applyTimestampIndex(tableConfig, schema);
     _tableConfig = tableConfig;
     _schema = schema;
@@ -62,6 +63,7 @@ public class SegmentProcessorConfig {
     _progressObserver = (progressObserver != null) ? progressObserver : p -> {
       // Do nothing.
     };
+    _taskConfigs = taskConfigs;
   }
 
   /**
@@ -117,11 +119,19 @@ public class SegmentProcessorConfig {
     return _progressObserver;
   }
 
+  /**
+   * The task configurations for the SegmentProcessorFramework
+   */
+  public Map<String, String> getTaskConfigs() {
+    return _taskConfigs;
+  }
+
   @Override
   public String toString() {
     return "SegmentProcessorConfig{" + "_tableConfig=" + _tableConfig + ", _schema=" + _schema + ", _timeHandlerConfig="
         + _timeHandlerConfig + ", _partitionerConfigs=" + _partitionerConfigs + ", _mergeType=" + _mergeType
-        + ", _aggregationTypes=" + _aggregationTypes + ", _segmentConfig=" + _segmentConfig + '}';
+        + ", _aggregationTypes=" + _aggregationTypes + ", _segmentConfig=" + _segmentConfig + ", _taskConfigs="
+        + _taskConfigs + '}';
   }
 
   /**
@@ -136,6 +146,7 @@ public class SegmentProcessorConfig {
     private Map<String, AggregationFunctionType> _aggregationTypes;
     private SegmentConfig _segmentConfig;
     private Consumer<Object> _progressObserver;
+    private Map<String, String> _taskConfigs;
 
     public Builder setTableConfig(TableConfig tableConfig) {
       _tableConfig = tableConfig;
@@ -177,6 +188,11 @@ public class SegmentProcessorConfig {
       return this;
     }
 
+    public Builder setTaskConfigs(Map<String, String> taskConfigs) {
+      _taskConfigs = taskConfigs;
+      return this;
+    }
+
     public SegmentProcessorConfig build() {
       Preconditions.checkState(_tableConfig != null, "Must provide table config in SegmentProcessorConfig");
       Preconditions.checkState(_schema != null, "Must provide schema in SegmentProcessorConfig");
@@ -196,8 +212,11 @@ public class SegmentProcessorConfig {
       if (_segmentConfig == null) {
         _segmentConfig = new SegmentConfig.Builder().build();
       }
+      if (_taskConfigs == null) {
+        _taskConfigs = Collections.emptyMap();
+      }
       return new SegmentProcessorConfig(_tableConfig, _schema, _timeHandlerConfig, _partitionerConfigs, _mergeType,
-          _aggregationTypes, _segmentConfig, _progressObserver);
+          _aggregationTypes, _segmentConfig, _progressObserver, _taskConfigs);
     }
   }
 }
