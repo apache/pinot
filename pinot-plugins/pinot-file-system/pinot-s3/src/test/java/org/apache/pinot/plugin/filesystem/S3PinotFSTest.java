@@ -256,7 +256,10 @@ public class S3PinotFSTest {
       }
     }
 
-    _s3PinotFS.delete(URI.create(String.format(FILE_FORMAT, SCHEME, BUCKET, fileToDelete)), false);
+    boolean deleteResult = _s3PinotFS.delete(
+        URI.create(String.format(FILE_FORMAT, SCHEME, BUCKET, fileToDelete)), false);
+
+    Assert.assertTrue(deleteResult);
 
     ListObjectsV2Response listObjectsV2Response =
         _s3Client.listObjectsV2(S3TestUtils.getListObjectRequest(BUCKET, "", true));
@@ -278,7 +281,10 @@ public class S3PinotFSTest {
       createEmptyFile(folderName, fileName);
     }
 
-    _s3PinotFS.delete(URI.create(String.format(FILE_FORMAT, SCHEME, BUCKET, folderName)), true);
+    boolean deleteResult = _s3PinotFS.delete(
+        URI.create(String.format(FILE_FORMAT, SCHEME, BUCKET, folderName)), true);
+
+    Assert.assertTrue(deleteResult);
 
     ListObjectsV2Response listObjectsV2Response =
         _s3Client.listObjectsV2(S3TestUtils.getListObjectRequest(BUCKET, "", true));
