@@ -68,5 +68,12 @@
       <AppenderRef ref="console"/>
     </Logger>
     <AsyncLogger name="org.reflections" level="error" additivity="false"/>
+    <!-- Change level to debug to see the full plan before and after each rule that modifies the plan is applied -->
+    <Logger name="org.apache.calcite.plan.RelOptPlanner" level="info" additivity="false">
+      <!--      Change FULL_PLAN marker from onMatch="ACCEPT" to onMatch='DENY" to not see the full plan before and
+                after each rule that modifies the plan is applied -->
+      <MarkerFilter marker="FULL_PLAN" onMatch="ACCEPT" onMismatch="NEUTRAL"/>
+      <AppenderRef ref="console"/>
+    </Logger>
   </Loggers>
 </Configuration>

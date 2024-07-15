@@ -48,7 +48,7 @@ public class PinotRuleUtils {
 
   public static final SqlToRelConverter.Config PINOT_SQL_TO_REL_CONFIG =
       SqlToRelConverter.config().withHintStrategyTable(PinotHintStrategyTable.PINOT_HINT_STRATEGY_TABLE)
-          .withTrimUnusedFields(true).withExpand(true).withInSubQueryThreshold(Integer.MAX_VALUE)
+          .withTrimUnusedFields(true).withExpand(true)
           .withRelBuilderFactory(PINOT_REL_FACTORY);
 
   public static RelNode unboxRel(RelNode rel) {
