@@ -82,7 +82,6 @@ public class OpChainSchedulerService {
             operatorChain.close();
           }
           Tracing.ThreadAccountantOps.clear();
-
         }
       }
     });
