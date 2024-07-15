@@ -39,17 +39,16 @@ public class OpChain implements AutoCloseable {
   private final Consumer<OpChainId> _finishCallback;
   private final ThreadExecutionContext _parentContext;
 
-  public OpChain(OpChainExecutionContext context, MultiStageOperator root, ThreadExecutionContext parentContext) {
+  public OpChain(OpChainExecutionContext context, MultiStageOperator root) {
     this(context, root, (id) -> {
-    }, parentContext);
+    });
   }
 
-  public OpChain(OpChainExecutionContext context, MultiStageOperator root, Consumer<OpChainId> finishCallback,
-      ThreadExecutionContext parentContext) {
+  public OpChain(OpChainExecutionContext context, MultiStageOperator root, Consumer<OpChainId> finishCallback) {
     _id = context.getId();
     _root = root;
     _finishCallback = finishCallback;
-    _parentContext = parentContext;
+    _parentContext = context.getParentContext();
   }
 
   public OpChainId getId() {

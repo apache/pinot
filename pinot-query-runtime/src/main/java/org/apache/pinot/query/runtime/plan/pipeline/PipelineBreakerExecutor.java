@@ -117,8 +117,7 @@ public class PipelineBreakerExecutor {
         new PipelineBreakerOperator(opChainExecutionContext, pipelineWorkerMap);
     CountDownLatch latch = new CountDownLatch(1);
     OpChain pipelineBreakerOpChain =
-        new OpChain(opChainExecutionContext, pipelineBreakerOperator, (id) -> latch.countDown(),
-            opChainExecutionContext.getParentContext());
+        new OpChain(opChainExecutionContext, pipelineBreakerOperator, (id) -> latch.countDown());
     scheduler.register(pipelineBreakerOpChain);
     long timeoutMs = opChainExecutionContext.getDeadlineMs() - System.currentTimeMillis();
     if (latch.await(timeoutMs, TimeUnit.MILLISECONDS)) {
