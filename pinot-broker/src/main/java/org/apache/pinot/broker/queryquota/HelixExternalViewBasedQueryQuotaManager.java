@@ -60,8 +60,11 @@ import static org.apache.pinot.spi.utils.CommonConstants.Helix.DATABASE_QUERY_RA
 
 /**
  * This class is to support the qps quota feature.
- * It depends on the broker source change to update the dynamic rate limit,
- *  which means it only gets updated when a new table added or a broker restarted.
+ * It allows performing qps quota check at table level and database level
+ * For table level check it depends on the broker source change to update the dynamic rate limit,
+ *  which means it gets updated when a new table added or a broker restarted.
+ * For database level check it depends on the broker as well as cluster config change to update the dynamic rate limit,
+ *  which means it gets updated when the default query quota at cluster config is updated or a broker restarted.
  */
 public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHandler, QueryQuotaManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixExternalViewBasedQueryQuotaManager.class);
@@ -92,7 +95,7 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
     Preconditions.checkState(_helixManager == null, "HelixExternalViewBasedQueryQuotaManager is already initialized");
     _helixManager = helixManager;
     _propertyStore = _helixManager.getHelixPropertyStore();
-    getDefaultQueryQuotaForDatabase();
+    _defaultQpsQuotaForDatabase = getDefaultQueryQuotaForDatabase();
     getQueryQuotaEnabledFlagFromInstanceConfig();
   }
 
@@ -260,7 +263,6 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
   }
 
   private void createOrUpdateDatabaseRateLimiter(List<String> databaseNames) {
-    double databaseQpsQuota = _defaultQpsQuotaForDatabase;
     ExternalView brokerResource = HelixHelper
         .getExternalViewForResource(_helixManager.getClusterManagmentTool(), _helixManager.getClusterName(),
             CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
@@ -268,12 +270,7 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
     // Hence, we consider all online brokers for the rate distribution.
     int onlineBrokers = HelixHelper.getOnlineInstanceFromExternalView(brokerResource).size();
     for (String databaseName : databaseNames) {
-      DatabaseConfig databaseConfig =
-          ZKMetadataProvider.getDatabaseConfig(_helixManager.getHelixPropertyStore(), databaseName);
-      if (databaseConfig != null && databaseConfig.getQuotaConfig() != null
-          && databaseConfig.getQuotaConfig().getMaxQPS() != -1) {
-        databaseQpsQuota = databaseConfig.getQuotaConfig().getMaxQPS();
-      }
+      double databaseQpsQuota = getEffectiveQueryQuotaOnDatabase(databaseName);
       if (databaseQpsQuota < 0) {
         buildEmptyOrResetRateLimiterInDatabaseQueryQuotaEntity(databaseName);
         continue;
@@ -284,6 +281,22 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
           onlineBrokers, databaseQpsQuota, -1);
       _databaseRateLimiterMap.put(databaseName, queryQuotaEntity);
     }
+  }
+
+  /**
+   * Utility to get the effective query quota being imposed on a database.
+   * It is computed based on the default quota set at cluster config and override set at database config
+   * @param databaseName database name to get the query quota on.
+   * @return effective query quota limit being applied
+   */
+  private double getEffectiveQueryQuotaOnDatabase(String databaseName) {
+    DatabaseConfig databaseConfig =
+        ZKMetadataProvider.getDatabaseConfig(_helixManager.getHelixPropertyStore(), databaseName);
+    if (databaseConfig != null && databaseConfig.getQuotaConfig() != null
+        && databaseConfig.getQuotaConfig().getMaxQPS() != -1) {
+      return databaseConfig.getQuotaConfig().getMaxQPS();
+    }
+    return _defaultQpsQuotaForDatabase;
   }
 
   /**
@@ -571,18 +584,18 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
    */
   public void processQueryRateLimitingClusterConfigChange() {
     double oldDatabaseQpsQuota = _defaultQpsQuotaForDatabase;
-    getDefaultQueryQuotaForDatabase();
+    _defaultQpsQuotaForDatabase = getDefaultQueryQuotaForDatabase();
     if (oldDatabaseQpsQuota == _defaultQpsQuotaForDatabase) {
       return;
     }
     createOrUpdateDatabaseRateLimiter(new ArrayList<>(_databaseRateLimiterMap.keySet()));
   }
 
-  private void getDefaultQueryQuotaForDatabase() {
+  private double getDefaultQueryQuotaForDatabase() {
     HelixAdmin helixAdmin = _helixManager.getClusterManagmentTool();
     HelixConfigScope configScope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER)
         .forCluster(_helixManager.getClusterName()).build();
-    _defaultQpsQuotaForDatabase = Double.parseDouble(
+    return Double.parseDouble(
         helixAdmin.getConfig(configScope, Collections.singletonList(DATABASE_QUERY_RATE_LIMIT))
             .getOrDefault(DATABASE_QUERY_RATE_LIMIT, "-1"));
   }

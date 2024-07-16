@@ -462,7 +462,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       }
 
       // Validate QPS quota
-      String database = DatabaseUtils.extractDatabaseFromTableName(tableName);
+      String database = DatabaseUtils.extractDatabaseFromFullyQualifiedTableName(tableName);
       if (!_queryQuotaManager.acquireDatabase(database)) {
         String errorMessage =
             String.format("Request %d: %s exceeds query quota for database: %s", requestId, query, database);

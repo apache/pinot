@@ -122,7 +122,8 @@ public class BrokerUserDefinedMessageHandlerFactory implements MessageHandlerFac
       _routingManager.buildRouting(_tableNameWithType);
       _queryQuotaManager.initOrUpdateTableQueryQuota(_tableNameWithType);
       // only create the rate limiter if not present. This message has no reason to update the database rate limiter
-      _queryQuotaManager.createDatabaseRateLimiter(DatabaseUtils.extractDatabaseFromTableName(_tableNameWithType));
+      _queryQuotaManager.createDatabaseRateLimiter(
+          DatabaseUtils.extractDatabaseFromFullyQualifiedTableName(_tableNameWithType));
       HelixTaskResult result = new HelixTaskResult();
       result.setSuccess(true);
       return result;

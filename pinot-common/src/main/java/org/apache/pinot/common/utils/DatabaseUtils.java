@@ -158,8 +158,12 @@ public class DatabaseUtils {
     return Objects.requireNonNullElse(database, CommonConstants.DEFAULT_DATABASE);
   }
 
-  public static String extractDatabaseFromTableName(String tableName) {
-    String[] split = StringUtils.split(tableName, '.');
+  /**
+   * Extract the database name from the prefix of fully qualified table name.
+   * If no prefix is present "default" database is returned
+   */
+  public static String extractDatabaseFromFullyQualifiedTableName(String fullyQualifiedTableName) {
+    String[] split = StringUtils.split(fullyQualifiedTableName, '.');
     return split.length == 1 ? CommonConstants.DEFAULT_DATABASE : split[0];
   }
 

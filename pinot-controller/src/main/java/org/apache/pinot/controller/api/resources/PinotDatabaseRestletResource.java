@@ -27,6 +27,7 @@ import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
@@ -41,6 +42,9 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.helix.HelixAdmin;
+import org.apache.helix.model.HelixConfigScope;
+import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -55,6 +59,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
+import static org.apache.pinot.spi.utils.CommonConstants.Helix.DATABASE_QUERY_RATE_LIMIT;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
 
@@ -174,7 +179,12 @@ public class PinotDatabaseRestletResource {
     if (databaseConfig != null) {
       return databaseConfig.getQuotaConfig();
     }
-    return new QuotaConfig(null, null);
+    HelixAdmin helixAdmin = _pinotHelixResourceManager.getHelixAdmin();
+    HelixConfigScope configScope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER)
+        .forCluster(_pinotHelixResourceManager.getHelixClusterName()).build();
+    String defaultQueryQuota = helixAdmin.getConfig(configScope, Collections.singletonList(DATABASE_QUERY_RATE_LIMIT))
+            .getOrDefault(DATABASE_QUERY_RATE_LIMIT, null);
+    return new QuotaConfig(null, defaultQueryQuota);
   }
 }
 
