@@ -42,8 +42,8 @@ public class FunctionDefinitionRegistryTest {
   private static final List<String> IGNORED_FUNCTION_NAMES = ImmutableList.of(
       // Geo functions are defined in pinot-core
       "geotoh3",
-      // ArrayToMV and ArrayValueConstructor are placeholder functions without implementation
-      "arraytomv", "arrayvalueconstructor",
+      // ArrayToMV, ArrayValueConstructor and GenerateArray are placeholder functions without implementation
+      "arraytomv", "arrayvalueconstructor", "generatearray",
       // Scalar function
       "scalar",
       // Functions without scalar function counterpart as of now

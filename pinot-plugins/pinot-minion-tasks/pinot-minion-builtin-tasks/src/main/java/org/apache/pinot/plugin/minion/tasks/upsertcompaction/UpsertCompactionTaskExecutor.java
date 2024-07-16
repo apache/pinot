@@ -23,9 +23,7 @@ import java.util.Collections;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
-import org.apache.pinot.common.restlet.resources.ValidDocIdsBitmapResponse;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
-import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.plugin.minion.tasks.BaseSingleSegmentConversionExecutor;
@@ -60,31 +58,28 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
 
     String validDocIdsTypeStr =
         configs.getOrDefault(MinionConstants.UpsertCompactionTask.VALID_DOC_IDS_TYPE, ValidDocIdsType.SNAPSHOT.name());
-    ValidDocIdsType validDocIdsType = ValidDocIdsType.valueOf(validDocIdsTypeStr.toUpperCase());
-    ValidDocIdsBitmapResponse validDocIdsBitmapResponse =
-        MinionTaskUtils.getValidDocIdsBitmap(tableNameWithType, segmentName, validDocIdsType.toString(),
-            MINION_CONTEXT);
-
-    // Check crc from the downloaded segment against the crc returned from the server along with the valid doc id
-    // bitmap. If this doesn't match, this means that we are hitting the race condition where the segment has been
-    // uploaded successfully while the server is still reloading the segment. Reloading can take a while when the
-    // offheap upsert is used because we will need to delete & add all primary keys.
-    // `BaseSingleSegmentConversionExecutor.executeTask()` already checks for the crc from the task generator
-    // against the crc from the current segment zk metadata, so we don't need to check that here.
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
     String originalSegmentCrcFromTaskGenerator = configs.get(MinionConstants.ORIGINAL_SEGMENT_CRC_KEY);
     String crcFromDeepStorageSegment = segmentMetadata.getCrc();
-    String crcFromValidDocIdsBitmap = validDocIdsBitmapResponse.getSegmentCrc();
-    if (!originalSegmentCrcFromTaskGenerator.equals(crcFromDeepStorageSegment)
-        || !originalSegmentCrcFromTaskGenerator.equals(crcFromValidDocIdsBitmap)) {
-      LOGGER.warn("CRC mismatch for segment: {}, expected: {}, actual crc from server: {}", segmentName,
-          crcFromDeepStorageSegment, validDocIdsBitmapResponse.getSegmentCrc());
-      return new SegmentConversionResult.Builder().setTableNameWithType(tableNameWithType).setSegmentName(segmentName)
-          .build();
+    if (!originalSegmentCrcFromTaskGenerator.equals(crcFromDeepStorageSegment)) {
+      String message = String.format("Crc mismatched between ZK and deepstore copy of segment: %s. Expected crc "
+              + "from ZK: %s, crc from deepstore: %s", segmentName, originalSegmentCrcFromTaskGenerator,
+          crcFromDeepStorageSegment);
+      LOGGER.error(message);
+      throw new IllegalStateException(message);
     }
-
-    RoaringBitmap validDocIds = RoaringBitmapUtils.deserialize(validDocIdsBitmapResponse.getBitmap());
-
+    RoaringBitmap validDocIds =
+        MinionTaskUtils.getValidDocIdFromServerMatchingCrc(tableNameWithType, segmentName, validDocIdsTypeStr,
+            MINION_CONTEXT, originalSegmentCrcFromTaskGenerator);
+    if (validDocIds == null) {
+      // no valid crc match found or no validDocIds obtained from all servers
+      // error out the task instead of silently failing so that we can track it via task-error metrics
+      String message = String.format("No validDocIds found from all servers. They either failed to download "
+              + "or did not match crc from segment copy obtained from deepstore / servers. " + "Expected crc: %s",
+          originalSegmentCrcFromTaskGenerator);
+      LOGGER.error(message);
+      throw new IllegalStateException(message);
+    }
     if (validDocIds.isEmpty()) {
       // prevents empty segment generation
       LOGGER.info("validDocIds is empty, skip the task. Table: {}, segment: {}", tableNameWithType, segmentName);

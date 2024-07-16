@@ -149,7 +149,7 @@
     <javassist.version>3.30.2-GA</javassist.version>
     <swagger.version>1.6.14</swagger.version>
     <swagger-ui.version>5.17.14</swagger-ui.version>
-    <hadoop.version>3.3.6</hadoop.version>
+    <hadoop.version>3.4.0</hadoop.version>
     <jsonpath.version>2.9.0</jsonpath.version>
     <jsonsmart.version>2.5.1</jsonsmart.version>
     <quartz.version>2.3.2</quartz.version>
@@ -173,7 +173,7 @@
     <audienceannotations.version>0.15.0</audienceannotations.version>
     <clp-ffi.version>0.4.4</clp-ffi.version>
     <stax2-api.version>4.2.2</stax2-api.version>
-    <aws.sdk.version>2.26.19</aws.sdk.version>
+    <aws.sdk.version>2.26.20</aws.sdk.version>
     <joda-time.version>2.12.7</joda-time.version>
     <janino.version>3.1.12</janino.version>
     <testng.version>7.10.2</testng.version>
@@ -221,7 +221,7 @@
 
     <!-- Google Libraries -->
     <protobuf.version>3.25.3</protobuf.version>
-    <grpc.version>1.65.0</grpc.version>
+    <grpc.version>1.65.1</grpc.version>
     <google.cloud.libraries.version>26.43.0</google.cloud.libraries.version>
     <google.auto-service.version>1.1.1</google.auto-service.version>
     <google.errorprone.version>2.28.0</google.errorprone.version>
@@ -233,6 +233,7 @@
     <scala.compat.version>2.12</scala.compat.version>
 
     <!-- Solve conflict across dependencies -->
+    <jetbrains.annotations.version>24.1.0</jetbrains.annotations.version>
     <kotlin.stdlib.version>2.0.0</kotlin.stdlib.version>
     <okio.version>3.9.0</okio.version>
     <kerby.version>2.0.3</kerby.version>
@@ -1491,6 +1492,11 @@
         <version>${kotlin.stdlib.version}</version>
       </dependency>
       <dependency>
+        <groupId>org.jetbrains</groupId>
+        <artifactId>annotations</artifactId>
+        <version>${jetbrains.annotations.version}</version>
+      </dependency>
+      <dependency>
         <groupId>com.squareup.okio</groupId>
         <artifactId>okio</artifactId>
         <version>${okio.version}</version>
@@ -1784,7 +1790,7 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-release-plugin</artifactId>
-          <version>3.1.0</version>
+          <version>3.1.1</version>
           <dependencies>
             <dependency>
               <groupId>org.apache.maven.scm</groupId>
@@ -2271,7 +2277,7 @@
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>versions-maven-plugin</artifactId>
-        <version>2.17.0</version>
+        <version>2.17.1</version>
       </plugin>
       <plugin>
         <artifactId>maven-shade-plugin</artifactId>
@@ -2380,7 +2386,7 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-project-info-reports-plugin</artifactId>
-        <version>3.6.1</version>
+        <version>3.6.2</version>
         <configuration>
           <dependencyLocationsEnabled>false</dependencyLocationsEnabled>
         </configuration>
