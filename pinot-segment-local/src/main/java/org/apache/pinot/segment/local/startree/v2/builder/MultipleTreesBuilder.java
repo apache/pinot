@@ -127,8 +127,22 @@ public class MultipleTreesBuilder implements Closeable {
       throws Exception {
     List<StarTreeV2Metadata> starTreeMetadataList = new SegmentMetadataImpl(_indexDir).getStarTreeV2MetadataList();
     if (starTreeMetadataList == null) {
+      LOGGER.error("No existing star-tree. Building all new start-trees.");
       return null;
     }
+
+    // log the existing and incoming star-tree configs
+    StringBuilder starTreeConfigsDiff = new StringBuilder();
+    starTreeConfigsDiff.append("Existing star-tree configs :");
+    for (StarTreeV2Metadata startree : starTreeMetadataList) {
+      starTreeConfigsDiff.append("\n").append(StarTreeV2BuilderConfig.fromMetadata(startree));
+    }
+    starTreeConfigsDiff.append("\n").append("Updated star-tree configs :");
+    for (StarTreeV2BuilderConfig startree : _builderConfigs) {
+      starTreeConfigsDiff.append("\n").append(startree);
+    }
+    LOGGER.error(starTreeConfigsDiff.toString());
+
     try {
       _separatorTempDir = new File(_segmentDirectory, StarTreeV2Constants.EXISTING_STAR_TREE_TEMP_DIR);
       FileUtils.forceMkdir(_separatorTempDir);
