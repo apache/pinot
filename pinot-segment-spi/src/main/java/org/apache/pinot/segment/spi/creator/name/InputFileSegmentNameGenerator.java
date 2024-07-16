@@ -86,7 +86,11 @@ public class InputFileSegmentNameGenerator implements SegmentNameGenerator {
     } else {
       segmentName = _segmentNameTemplate;
       for (int i = 1; i <= m.groupCount(); i++) {
-        segmentName = segmentName.replace(String.format(PARAMETER_TEMPLATE, i), m.group(i));
+        String value = m.group(i);
+        if (value == null) {
+          value = "";
+        }
+        segmentName = segmentName.replace(String.format(PARAMETER_TEMPLATE, i), value);
       }
     }
     return _appendUUIDToSegmentName ? JOINER.join(segmentName, UUID.randomUUID()) : segmentName;

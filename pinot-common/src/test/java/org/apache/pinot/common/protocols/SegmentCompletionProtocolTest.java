@@ -114,7 +114,7 @@ public class SegmentCompletionProtocolTest {
     String url = segmentCommitStartRequest.getUrl("localhost:8080", "http");
     Assert.assertEquals(url,
     // CHECKSTYLE:OFF
-        "http://localhost:8080/segmentCommitStart?extraTimeSec=3000&segmentSizeBytes=5000&reason=%7B%22type%22%3A%22ROW_LIMIT%22%2C+%22value%22%3A1000%7D&buildTimeMillis=1000&streamPartitionMsgOffset=%7B%22shardId-000000000001%22%3A%2249615238429973311938200772279310862572716999467690098706%22%7D&instance=Server_localhost_8099&waitTimeMillis=2000&offset=-1&name=foo%25%25__0__0__12345Z&location=s3%3A%2F%2Fmy.bucket%2Fsegment&rowCount=6000&memoryUsedBytes=4000");
+        "http://localhost:8080/segmentCommitStart?extraTimeSec=3000&segmentSizeBytes=5000&reason=%7B%22type%22%3A%22ROW_LIMIT%22%2C%20%22value%22%3A1000%7D&buildTimeMillis=1000&streamPartitionMsgOffset=%7B%22shardId-000000000001%22%3A%2249615238429973311938200772279310862572716999467690098706%22%7D&instance=Server_localhost_8099&waitTimeMillis=2000&offset=-1&name=foo%25%25__0__0__12345Z&location=s3%3A%2F%2Fmy.bucket%2Fsegment&rowCount=6000&memoryUsedBytes=4000");
     // CHECKSTYLE:ON
 
     paramsMap = Arrays.stream(url.split("\\?")[1].split("&"))
@@ -125,7 +125,7 @@ public class SegmentCompletionProtocolTest {
     Assert.assertEquals(paramsMap.get(SegmentCompletionProtocol.PARAM_INSTANCE_ID),
         URIUtils.encode("Server_localhost_8099"));
     Assert.assertEquals(paramsMap.get(SegmentCompletionProtocol.PARAM_REASON),
-        URIUtils.encode("{\"type\":\"ROW_LIMIT\", \"value\":1000}"));
+        "%7B%22type%22%3A%22ROW_LIMIT%22%2C%20%22value%22%3A1000%7D");
     Assert.assertEquals(paramsMap.get(SegmentCompletionProtocol.PARAM_BUILD_TIME_MILLIS), "1000");
     Assert.assertEquals(paramsMap.get(SegmentCompletionProtocol.PARAM_WAIT_TIME_MILLIS), "2000");
     Assert.assertEquals(paramsMap.get(SegmentCompletionProtocol.PARAM_EXTRA_TIME_SEC), "3000");

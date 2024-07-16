@@ -88,8 +88,17 @@ public class SegmentUtilsTest {
     String segmentName = "uploaded__table_name__3__100__1716185755000";
 
     try {
+      // Check the util method that gets segmentZKMetadata via HelixManager for partition id.
       Integer partitionId =
           SegmentUtils.getRealtimeSegmentPartitionId(segmentName, "realtimeTableName", null, "partitionColumn");
+      assertEquals(partitionId, 3);
+    } catch (Exception e) {
+      fail("Exception should not be thrown");
+    }
+
+    try {
+      // Check the util method that has segmentZKMetadata passed in directly for partition id.
+      Integer partitionId = SegmentUtils.getRealtimeSegmentPartitionId(segmentName, null, "partitionColumn");
       assertEquals(partitionId, 3);
     } catch (Exception e) {
       fail("Exception should not be thrown");

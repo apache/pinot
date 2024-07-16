@@ -507,8 +507,16 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
   public void testQueryExceptions()
       throws Exception {
     testQueryException("POTATO", QueryException.SQL_PARSING_ERROR_CODE);
-    testQueryException("SELECT COUNT(*) FROM potato", QueryException.TABLE_DOES_NOT_EXIST_ERROR_CODE);
-    testQueryException("SELECT POTATO(ArrTime) FROM mytable", QueryException.QUERY_EXECUTION_ERROR_CODE);
+
+    // Ideally, we should attempt to unify the error codes returned by the two query engines if possible
+    testQueryException("SELECT COUNT(*) FROM potato",
+        useMultiStageQueryEngine()
+            ? QueryException.QUERY_PLANNING_ERROR_CODE : QueryException.TABLE_DOES_NOT_EXIST_ERROR_CODE);
+
+    testQueryException("SELECT POTATO(ArrTime) FROM mytable",
+        useMultiStageQueryEngine()
+            ? QueryException.QUERY_PLANNING_ERROR_CODE : QueryException.QUERY_EXECUTION_ERROR_CODE);
+
     testQueryException("SELECT COUNT(*) FROM mytable where ArrTime = 'potato'",
         QueryException.QUERY_EXECUTION_ERROR_CODE);
   }

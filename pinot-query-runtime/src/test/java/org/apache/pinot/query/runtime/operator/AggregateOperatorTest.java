@@ -118,7 +118,7 @@ public class AggregateOperatorTest {
     AggregateOperator operator = getOperator(resultSchema, aggCalls, filterArgs, groupKeys);
 
     // When:
-    List<Object[]> resultRows = operator.getNextBlock().getContainer();
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
 
     // Then:
     assertEquals(resultRows.size(), 1);
@@ -141,7 +141,7 @@ public class AggregateOperatorTest {
     AggregateOperator operator = getOperator(resultSchema, aggCalls, filterArgs, groupKeys);
 
     // When:
-    List<Object[]> resultRows = operator.getNextBlock().getContainer();
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
 
     // Then:
     assertEquals(resultRows.size(), 1);
@@ -168,7 +168,7 @@ public class AggregateOperatorTest {
     AggregateOperator operator = getOperator(resultSchema, aggCalls, filterArgs, groupKeys);
 
     // When:
-    List<Object[]> resultRows = operator.getNextBlock().getContainer();
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
 
     // Then:
     assertEquals(resultRows.size(), 1);
@@ -188,7 +188,7 @@ public class AggregateOperatorTest {
     DataSchema resultSchema = new DataSchema(new String[]{"group", "sum"}, new ColumnDataType[]{STRING, DOUBLE});
     AggregateOperator operator = getOperator(resultSchema, aggCalls, filterArgs, groupKeys);
 
-    List<Object[]> resultRows = operator.getNextBlock().getContainer();
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
     assertEquals(resultRows.size(), 2);
     if (resultRows.get(0)[0].equals("Aa")) {
       assertEquals(resultRows.get(0), new Object[]{"Aa", 1.0});

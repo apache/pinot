@@ -74,5 +74,9 @@
       <groupId>org.apache.orc</groupId>
       <artifactId>orc-core</artifactId>
     </dependency>
+    <dependency>
+      <groupId>com.google.protobuf</groupId>
+      <artifactId>protobuf-java</artifactId>
+    </dependency>
   </dependencies>
 </project>

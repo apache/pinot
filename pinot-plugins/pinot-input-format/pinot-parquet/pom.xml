@@ -52,6 +52,11 @@
       <scope>${hadoop.dependencies.scope}</scope>
     </dependency>
     <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-client-runtime</artifactId>
+      <scope>${hadoop.dependencies.scope}</scope>
+    </dependency>
+    <dependency>
       <groupId>org.codehaus.woodstox</groupId>
       <artifactId>stax2-api</artifactId>
     </dependency>

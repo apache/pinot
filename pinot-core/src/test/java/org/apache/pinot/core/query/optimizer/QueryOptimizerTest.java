@@ -293,6 +293,11 @@ public class QueryOptimizerTest {
             + "AND TEXT_MATCH(string2, 'foo2') AND TEXT_MATCH(string2, 'bar2')",
         "SELECT * FROM testTable WHERE TEXT_MATCH(string1, '(foo1 AND bar1)') AND TEXT_MATCH(string2, '(foo2 AND "
             + "bar2)')");
+    testQuery("SELECT * FROM testTable WHERE TEXT_MATCH(string, 'foo') OR NOT TEXT_MATCH(string, 'bar')",
+        "SELECT * FROM testTable WHERE NOT TEXT_MATCH(string, 'bar') OR TEXT_MATCH(string, 'foo')");
+    testQuery(
+        "select * from testTable where intCol > 1 AND (text_match(string, 'foo') OR NOT text_match(string, 'bar'))",
+        "select * from testTable where intCol > 1 AND (NOT text_match(string, 'bar') OR text_match(string, 'foo'))");
     testCannotOptimizeQuery("SELECT * FROM testTable WHERE TEXT_MATCH(string1, 'foo') OR TEXT_MATCH(string2, 'bar')");
     testCannotOptimizeQuery(
         "SELECT * FROM testTable WHERE int = 1 AND TEXT_MATCH(string, 'foo') OR TEXT_MATCH(string, 'bar')");

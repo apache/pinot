@@ -40,7 +40,6 @@ import java.nio.file.Files;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.Executor;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
@@ -62,10 +61,9 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.StreamingOutput;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
@@ -78,7 +76,6 @@ import org.apache.pinot.common.utils.FileUploadDownloadClient.FileUploadType;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.controller.ControllerConf;
-import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.access.AccessType;
@@ -87,6 +84,7 @@ import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.api.upload.SegmentValidationUtils;
 import org.apache.pinot.controller.api.upload.ZKOperator;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.validation.StorageQuotaChecker;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
@@ -117,7 +115,8 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
     @Authorization(value = DATABASE)})
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = {
     @ApiKeyAuthDefinition(name = HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER,
-        key = SWAGGER_AUTHORIZATION_KEY),
+        key = SWAGGER_AUTHORIZATION_KEY,
+        description = "The format of the key is  ```\"Basic <token>\" or \"Bearer <token>\"```"),
     @ApiKeyAuthDefinition(name = DATABASE, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = DATABASE,
         description = "Database context passed through http header. If no context is provided 'default' database "
             + "context will be considered.")}))
@@ -137,16 +136,10 @@ public class PinotSegmentUploadDownloadRestletResource {
   ControllerMetrics _controllerMetrics;
 
   @Inject
-  HttpClientConnectionManager _connectionManager;
-
-  @Inject
-  Executor _executor;
+  StorageQuotaChecker _storageQuotaChecker;
 
   @Inject
   AccessControlFactory _accessControlFactory;
-
-  @Inject
-  LeadControllerManager _leadControllerManager;
 
   @GET
   @Produces(MediaType.APPLICATION_OCTET_STREAM)
@@ -166,7 +159,7 @@ public class PinotSegmentUploadDownloadRestletResource {
     boolean hasDataAccess;
     try {
       AccessControl accessControl = _accessControlFactory.create();
-      hasDataAccess = accessControl.hasDataAccess(httpHeaders, tableName);
+      hasDataAccess = accessControl.hasAccess(tableName, AccessType.READ, httpHeaders, Actions.Table.DOWNLOAD_SEGMENT);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER,
           "Caught exception while validating access to table: " + tableName, Response.Status.INTERNAL_SERVER_ERROR, e);
@@ -362,8 +355,7 @@ public class PinotSegmentUploadDownloadRestletResource {
         untarredSegmentSizeInBytes = FileUtils.sizeOfDirectory(tempSegmentDir);
       }
       SegmentValidationUtils.checkStorageQuota(segmentName, untarredSegmentSizeInBytes, tableConfig,
-          _pinotHelixResourceManager, _controllerConf, _controllerMetrics, _connectionManager, _executor,
-          _leadControllerManager);
+          _controllerConf, _storageQuotaChecker);
 
       // Encrypt segment
       String crypterNameInTableConfig = tableConfig.getValidationConfig().getCrypterClassName();
@@ -401,6 +393,7 @@ public class PinotSegmentUploadDownloadRestletResource {
       throw e;
     } catch (Exception e) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR, 1L);
+      _controllerMetrics.addMeteredTableValue(tableName, ControllerMeter.CONTROLLER_TABLE_SEGMENT_UPLOAD_ERROR, 1L);
       throw new ControllerApplicationException(LOGGER, "Exception while uploading segment: " + e.getMessage(),
           Response.Status.INTERNAL_SERVER_ERROR, e);
     } finally {

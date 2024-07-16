@@ -205,7 +205,7 @@ public class NonNativePinotDataBuffer extends PinotDataBuffer {
   }
 
   @Override
-  public void copyTo(long offset, PinotDataBuffer buffer, long destOffset, long size) {
+  public void copyTo(long offset, DataBuffer buffer, long destOffset, long size) {
     _nativeBuffer.copyTo(offset, buffer, destOffset, size);
   }
 

@@ -22,21 +22,19 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
-import java.io.InterruptedIOException;
-import java.net.UnknownHostException;
-import javax.net.ssl.SSLException;
-import org.apache.commons.lang.StringUtils;
-import org.apache.http.HttpEntityEnclosingRequest;
-import org.apache.http.HttpStatus;
-import org.apache.http.StatusLine;
-import org.apache.http.client.HttpRequestRetryHandler;
-import org.apache.http.client.config.RequestConfig;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.client.protocol.HttpClientContext;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
-import org.apache.http.util.EntityUtils;
+import java.util.concurrent.TimeUnit;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.hc.client5.http.HttpRequestRetryStrategy;
+import org.apache.hc.client5.http.classic.methods.HttpGet;
+import org.apache.hc.client5.http.config.RequestConfig;
+import org.apache.hc.client5.http.impl.DefaultHttpRequestRetryStrategy;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
+import org.apache.hc.client5.http.impl.classic.HttpClients;
+import org.apache.hc.core5.http.HttpStatus;
+import org.apache.hc.core5.http.io.entity.EntityUtils;
+import org.apache.hc.core5.util.TimeValue;
+import org.apache.hc.core5.util.Timeout;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.environmentprovider.PinotEnvironmentProvider;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -72,17 +70,16 @@ public class AzureEnvironmentProvider implements PinotEnvironmentProvider {
     int connectionTimeoutMillis = Integer.parseInt(pinotConfiguration.getProperty(CONNECTION_TIMEOUT_MILLIS));
     int requestTimeoutMillis = Integer.parseInt(pinotConfiguration.getProperty(REQUEST_TIMEOUT_MILLIS));
 
-    final RequestConfig requestConfig = RequestConfig.custom().setConnectTimeout(connectionTimeoutMillis)
-        .setConnectionRequestTimeout(requestTimeoutMillis).build();
+    final RequestConfig requestConfig =
+        RequestConfig.custom().setConnectTimeout(Timeout.of(connectionTimeoutMillis, TimeUnit.MILLISECONDS))
+            .setResponseTimeout(Timeout.of(requestTimeoutMillis, TimeUnit.MILLISECONDS)).build();
 
-    final HttpRequestRetryHandler httpRequestRetryHandler =
-        (iOException, executionCount, httpContext) -> !(executionCount >= _maxRetry
-            || iOException instanceof InterruptedIOException || iOException instanceof UnknownHostException
-            || iOException instanceof SSLException || HttpClientContext.adapt(httpContext)
-            .getRequest() instanceof HttpEntityEnclosingRequest);
+    final HttpRequestRetryStrategy httpRequestRetry = new DefaultHttpRequestRetryStrategy(
+        _maxRetry,
+        TimeValue.ofSeconds(1));
 
     _closeableHttpClient =
-        HttpClients.custom().setDefaultRequestConfig(requestConfig).setRetryHandler(httpRequestRetryHandler).build();
+        HttpClients.custom().setDefaultRequestConfig(requestConfig).setRetryStrategy(httpRequestRetry).build();
   }
 
   // Constructor for test purposes.
@@ -90,8 +87,8 @@ public class AzureEnvironmentProvider implements PinotEnvironmentProvider {
   public AzureEnvironmentProvider(int maxRetry, String imdsEndpoint, CloseableHttpClient closeableHttpClient) {
     _maxRetry = maxRetry;
     _imdsEndpoint = imdsEndpoint;
-    _closeableHttpClient = Preconditions
-        .checkNotNull(closeableHttpClient, "[AzureEnvironmentProvider]: Closeable Http Client cannot be null");
+    _closeableHttpClient = Preconditions.checkNotNull(closeableHttpClient,
+        "[AzureEnvironmentProvider]: Closeable Http Client cannot be null");
   }
 
   /**
@@ -140,19 +137,20 @@ public class AzureEnvironmentProvider implements PinotEnvironmentProvider {
       if (closeableHttpResponse == null) {
         throw new RuntimeException("[AzureEnvironmentProvider]: Response is null. Please verify the imds endpoint");
       }
-      final StatusLine statusLine = closeableHttpResponse.getStatusLine();
-      final int statusCode = statusLine.getStatusCode();
+      final int statusCode = closeableHttpResponse.getCode();
       if (statusCode != HttpStatus.SC_OK) {
-        final String errorMsg = String
-            .format("[AzureEnvironmentProvider]: Failed to retrieve azure instance metadata. Response Status code: %s",
-                statusCode);
+        final String errorMsg = String.format(
+            "[AzureEnvironmentProvider]: Failed to retrieve azure instance metadata. Response Status code: %s",
+            statusCode);
         throw new RuntimeException(errorMsg);
       }
       return EntityUtils.toString(closeableHttpResponse.getEntity());
-    } catch (IOException ex) {
-      throw new RuntimeException(String
-          .format("[AzureEnvironmentProvider]: Failed to retrieve metadata from Azure Instance Metadata Service %s",
-              _imdsEndpoint), ex);
+    } catch (RuntimeException ex) {
+      throw ex;
+    } catch (Exception ex) {
+      throw new RuntimeException(String.format(
+          "[AzureEnvironmentProvider]: Failed to retrieve metadata from Azure Instance Metadata Service %s",
+          _imdsEndpoint), ex);
     }
   }
 }

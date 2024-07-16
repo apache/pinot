@@ -18,11 +18,11 @@
 #
 
 {{- if .Values.controller.external.enabled }}
----
 apiVersion: v1
 kind: Service
 metadata:
   name: {{ template "pinot.controller.external" . }}
+  namespace: {{ include "pinot.namespace" . }}
   annotations:
 {{ toYaml .Values.controller.external.annotations | indent 4 }}
   labels:

@@ -22,6 +22,7 @@ apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
   name: {{ include "pinot.broker.fullname" . }}
+  namespace: {{ include "pinot.namespace" . }}
 spec:
   {{- if .Values.broker.pdb.minAvailable }}
   minAvailable: {{ .Values.broker.pdb.minAvailable }}

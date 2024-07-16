@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.datatable;
 
+import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
@@ -26,23 +27,13 @@ public class DataTableFactory {
   private DataTableFactory() {
   }
 
-  public static final int VERSION_2 = 2;
-  public static final int VERSION_3 = 3;
   public static final int VERSION_4 = 4;
 
   public static DataTable getDataTable(ByteBuffer byteBuffer)
       throws IOException {
     int version = byteBuffer.getInt();
-    switch (version) {
-      case VERSION_2:
-        return new DataTableImplV2(byteBuffer);
-      case VERSION_3:
-        return new DataTableImplV3(byteBuffer);
-      case VERSION_4:
-        return new DataTableImplV4(byteBuffer);
-      default:
-        throw new IllegalStateException("Unsupported data table version: " + version);
-    }
+    Preconditions.checkState(version == VERSION_4, "Unsupported data table version: %s", version);
+    return new DataTableImplV4(byteBuffer);
   }
 
   public static DataTable getDataTable(byte[] bytes)

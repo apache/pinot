@@ -43,6 +43,9 @@ public class NotDocIdIterator implements BlockDocIdIterator {
 
   @Override
   public int next() {
+    if (_nextDocId >= _numDocs) {
+      return Constants.EOF;
+    }
     while (_nextDocId == _nextNonMatchingDocId) {
       _nextDocId++;
       int nextNonMatchingDocId = _childDocIdIterator.next();

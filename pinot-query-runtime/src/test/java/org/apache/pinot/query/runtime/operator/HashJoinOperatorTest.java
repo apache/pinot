@@ -242,8 +242,7 @@ public class HashJoinOperatorTest {
         });
     HashJoinOperator operator =
         getOperator(leftSchema, resultSchema, JoinRelType.INNER, List.of(0), List.of(0), List.of());
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
-    assertTrue(resultRows.isEmpty());
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock());
   }
 
   @Test

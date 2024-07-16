@@ -51,6 +51,7 @@ import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.JoinOver
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 /**
  * This basic {@code BroadcastJoinOperator} implement a basic broadcast join algorithm.
  * This algorithm assumes that the broadcast table has to fit in memory since we are not supporting any spilling.
@@ -85,20 +86,13 @@ public class HashJoinOperator extends MultiStageOperator {
   private final MultiStageOperator _leftInput;
   private final MultiStageOperator _rightInput;
   private final JoinRelType _joinType;
+  private final KeySelector<?> _leftKeySelector;
+  private final KeySelector<?> _rightKeySelector;
   private final DataSchema _resultSchema;
   private final int _leftColumnSize;
   private final int _resultColumnSize;
   private final List<TransformOperand> _nonEquiEvaluators;
-  private boolean _isHashTableBuilt;
   private final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
-
-  // Used by non-inner join.
-  // Needed to indicate we have finished processing all results after returning last block.
-  // TODO: Remove this special handling by fixing data block EOS abstraction or operator's invariant.
-  private boolean _isTerminated;
-  private TransferableBlock _upstreamErrorBlock;
-  private final KeySelector<?> _leftKeySelector;
-  private final KeySelector<?> _rightKeySelector;
 
   // Below are specific parameters to protect the hash table from growing too large.
   // Once the hash table reaches the limit, we will throw exception or break the right table build process.
@@ -113,9 +107,14 @@ public class HashJoinOperator extends MultiStageOperator {
    */
   private final JoinOverFlowMode _joinOverflowMode;
 
+  private boolean _isHashTableBuilt;
   private int _currentRowsInHashTable;
+  private TransferableBlock _upstreamErrorBlock;
   private MultiStageQueryStats _leftSideStats;
   private MultiStageQueryStats _rightSideStats;
+  // Used by non-inner join.
+  // Needed to indicate we have finished processing all results after returning last block.
+  private boolean _isTerminated;
 
   public HashJoinOperator(OpChainExecutionContext context, MultiStageOperator leftInput, DataSchema leftSchema,
       MultiStageOperator rightInput, JoinNode node) {
@@ -138,7 +137,6 @@ public class HashJoinOperator extends MultiStageOperator {
     for (RexExpression nonEquiCondition : nonEquiConditions) {
       _nonEquiEvaluators.add(TransformOperandFactory.getTransformOperand(nonEquiCondition, _resultSchema));
     }
-    _isHashTableBuilt = false;
     _broadcastRightTable = new HashMap<>();
     if (needUnmatchedRightRows()) {
       _matchedRightRows = new HashMap<>();
@@ -209,10 +207,6 @@ public class HashJoinOperator extends MultiStageOperator {
   @Override
   protected TransferableBlock getNextBlock()
       throws ProcessingException {
-    if (_isTerminated) {
-      assert _leftSideStats != null;
-      return TransferableBlockUtils.getEndOfStreamTransferableBlock(_leftSideStats);
-    }
     if (!_isHashTableBuilt) {
       // Build JOIN hash table
       buildBroadcastHashTable();
@@ -220,9 +214,7 @@ public class HashJoinOperator extends MultiStageOperator {
     if (_upstreamErrorBlock != null) {
       return _upstreamErrorBlock;
     }
-    TransferableBlock leftBlock = _leftInput.nextBlock();
-    // JOIN each left block with the constructed right hash table.
-    return buildJoinedDataBlock(leftBlock);
+    return buildJoinedDataBlock();
   }
 
   private void buildBroadcastHashTable()
@@ -280,58 +272,51 @@ public class HashJoinOperator extends MultiStageOperator {
     _statMap.merge(StatKey.TIME_BUILDING_HASH_TABLE_MS, System.currentTimeMillis() - startTime);
   }
 
-  private TransferableBlock buildJoinedDataBlock(TransferableBlock leftBlock) {
-    if (leftBlock.isErrorBlock()) {
-      _upstreamErrorBlock = leftBlock;
-      return _upstreamErrorBlock;
-    }
-    if (leftBlock.isSuccessfulEndOfStreamBlock()) {
-      assert _rightSideStats != null;
-      _leftSideStats = leftBlock.getQueryStats();
+  private TransferableBlock buildJoinedDataBlock() {
+    if (_isTerminated) {
       assert _leftSideStats != null;
-      _leftSideStats.mergeInOrder(_rightSideStats, getOperatorType(), _statMap);
+      return TransferableBlockUtils.getEndOfStreamTransferableBlock(_leftSideStats);
+    }
 
-      if (!needUnmatchedRightRows()) {
-        return TransferableBlockUtils.getEndOfStreamTransferableBlock(_leftSideStats);
+    // Keep reading the input blocks until we find a match row or all blocks are processed.
+    // TODO: Consider batching the rows to improve performance.
+    while (true) {
+      TransferableBlock leftBlock = _leftInput.nextBlock();
+      if (leftBlock.isErrorBlock()) {
+        return leftBlock;
       }
-      // TODO: Moved to a different function.
-      // Return remaining non-matched rows for non-inner join.
-      List<Object[]> returnRows = new ArrayList<>();
-      for (Map.Entry<Object, ArrayList<Object[]>> entry : _broadcastRightTable.entrySet()) {
-        List<Object[]> rightRows = entry.getValue();
-        BitSet matchedIndices = _matchedRightRows.get(entry.getKey());
-        if (matchedIndices == null) {
-          for (Object[] rightRow : rightRows) {
-            returnRows.add(joinRow(null, rightRow));
-          }
-        } else {
-          int numRightRows = rightRows.size();
-          int unmatchedIndex = 0;
-          while ((unmatchedIndex = matchedIndices.nextClearBit(unmatchedIndex)) < numRightRows) {
-            returnRows.add(joinRow(null, rightRows.get(unmatchedIndex++)));
+      if (leftBlock.isSuccessfulEndOfStreamBlock()) {
+        assert _rightSideStats != null;
+        _leftSideStats = leftBlock.getQueryStats();
+        assert _leftSideStats != null;
+        _leftSideStats.mergeInOrder(_rightSideStats, getOperatorType(), _statMap);
+        if (needUnmatchedRightRows()) {
+          List<Object[]> rows = buildNonMatchRightRows();
+          if (!rows.isEmpty()) {
+            _isTerminated = true;
+            return new TransferableBlock(rows, _resultSchema, DataBlock.Type.ROW);
           }
         }
+        return TransferableBlockUtils.getEndOfStreamTransferableBlock(_leftSideStats);
       }
-      _isTerminated = true;
-      return new TransferableBlock(returnRows, _resultSchema, DataBlock.Type.ROW);
+      assert leftBlock.isDataBlock();
+      List<Object[]> rows = buildJoinedRows(leftBlock);
+      if (!rows.isEmpty()) {
+        return new TransferableBlock(rows, _resultSchema, DataBlock.Type.ROW);
+      }
     }
-    List<Object[]> rows;
+  }
+
+  private List<Object[]> buildJoinedRows(TransferableBlock leftBlock) {
     switch (_joinType) {
-      case SEMI: {
-        rows = buildJoinedDataBlockSemi(leftBlock);
-        break;
-      }
-      case ANTI: {
-        rows = buildJoinedDataBlockAnti(leftBlock);
-        break;
-      }
+      case SEMI:
+        return buildJoinedDataBlockSemi(leftBlock);
+      case ANTI:
+        return buildJoinedDataBlockAnti(leftBlock);
       default: { // INNER, LEFT, RIGHT, FULL
-        rows = buildJoinedDataBlockDefault(leftBlock);
-        break;
+        return buildJoinedDataBlockDefault(leftBlock);
       }
     }
-    // TODO: Rows can be empty here. Consider fetching another left block instead of returning empty block.
-    return new TransferableBlock(rows, _resultSchema, DataBlock.Type.ROW);
   }
 
   private List<Object[]> buildJoinedDataBlockSemi(TransferableBlock leftBlock) {
@@ -396,6 +381,26 @@ public class HashJoinOperator extends MultiStageOperator {
       // ANTI-JOIN only checks non-existence of the key
       if (!_broadcastRightTable.containsKey(key)) {
         rows.add(joinRow(leftRow, null));
+      }
+    }
+    return rows;
+  }
+
+  private List<Object[]> buildNonMatchRightRows() {
+    List<Object[]> rows = new ArrayList<>();
+    for (Map.Entry<Object, ArrayList<Object[]>> entry : _broadcastRightTable.entrySet()) {
+      List<Object[]> rightRows = entry.getValue();
+      BitSet matchedIndices = _matchedRightRows.get(entry.getKey());
+      if (matchedIndices == null) {
+        for (Object[] rightRow : rightRows) {
+          rows.add(joinRow(null, rightRow));
+        }
+      } else {
+        int numRightRows = rightRows.size();
+        int unmatchedIndex = 0;
+        while ((unmatchedIndex = matchedIndices.nextClearBit(unmatchedIndex)) < numRightRows) {
+          rows.add(joinRow(null, rightRows.get(unmatchedIndex++)));
+        }
       }
     }
     return rows;

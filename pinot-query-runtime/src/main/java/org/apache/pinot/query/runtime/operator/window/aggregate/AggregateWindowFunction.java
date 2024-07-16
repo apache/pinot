@@ -18,26 +18,33 @@
  */
 package org.apache.pinot.query.runtime.operator.window.aggregate;
 
+import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.operator.utils.AggregationUtils;
+import org.apache.pinot.query.runtime.operator.utils.AggregationUtils.Merger;
 import org.apache.pinot.query.runtime.operator.window.WindowFunction;
 
 
 public class AggregateWindowFunction extends WindowFunction {
-  private final AggregationUtils.Merger _merger;
+  private final Merger _merger;
 
   public AggregateWindowFunction(RexExpression.FunctionCall aggCall, DataSchema inputSchema,
       List<RelFieldCollation> collations, boolean partitionByOnly) {
     super(aggCall, inputSchema, collations, partitionByOnly);
-    _merger = AggregationUtils.Accumulator.MERGERS.get(aggCall.getFunctionName()).apply(_dataType);
+    String functionName = aggCall.getFunctionName();
+    Function<ColumnDataType, Merger> mergerCreator = AggregationUtils.Accumulator.MERGERS.get(functionName);
+    Preconditions.checkArgument(mergerCreator != null, "Unsupported aggregate function: %s", functionName);
+    _merger = mergerCreator.apply(_dataType);
   }
 
   @Override

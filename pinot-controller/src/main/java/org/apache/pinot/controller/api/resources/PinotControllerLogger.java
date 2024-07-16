@@ -48,11 +48,11 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriBuilder;
-import org.apache.commons.collections.MapUtils;
+import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.io.IOUtils;
-import org.apache.http.HttpVersion;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.RequestBuilder;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
+import org.apache.hc.core5.http.HttpVersion;
+import org.apache.hc.core5.http.io.support.ClassicRequestBuilder;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.LoggerUtils;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
@@ -74,7 +74,8 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
  */
 @Api(tags = "Logger", authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY)})
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = @ApiKeyAuthDefinition(name =
-    HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = SWAGGER_AUTHORIZATION_KEY)))
+    HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = SWAGGER_AUTHORIZATION_KEY,
+    description = "The format of the key is  ```\"Basic <token>\" or \"Bearer <token>\"```")))
 @Path("/")
 public class PinotControllerLogger {
 
@@ -214,7 +215,7 @@ public class PinotControllerLogger {
     try {
       URI uri = UriBuilder.fromUri(getInstanceBaseUri(instanceName)).path("/loggers/download")
           .queryParam("filePath", filePath).build();
-      RequestBuilder requestBuilder = RequestBuilder.get(uri).setVersion(HttpVersion.HTTP_1_1);
+      ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.get(uri).setVersion(HttpVersion.HTTP_1_1);
       if (MapUtils.isNotEmpty(headers)) {
         for (Map.Entry<String, String> header : headers.entrySet()) {
           requestBuilder.addHeader(header.getKey(), header.getValue());
@@ -223,16 +224,18 @@ public class PinotControllerLogger {
       if (authorization != null) {
         requestBuilder.addHeader(HttpHeaders.AUTHORIZATION, authorization);
       }
-      CloseableHttpResponse httpResponse = _fileUploadDownloadClient.getHttpClient().execute(requestBuilder.build());
-      if (httpResponse.getStatusLine().getStatusCode() >= 400) {
-        throw new WebApplicationException(IOUtils.toString(httpResponse.getEntity().getContent(), "UTF-8"),
-            Response.Status.fromStatusCode(httpResponse.getStatusLine().getStatusCode()));
+      try (CloseableHttpResponse httpResponse = _fileUploadDownloadClient.getHttpClient()
+          .execute(requestBuilder.build())) {
+        if (httpResponse.getCode() >= 400) {
+          throw new WebApplicationException(IOUtils.toString(httpResponse.getEntity().getContent(), "UTF-8"),
+              Response.Status.fromStatusCode(httpResponse.getCode()));
+        }
+        Response.ResponseBuilder builder = Response.ok();
+        builder.entity(httpResponse.getEntity().getContent());
+        builder.contentLocation(uri);
+        builder.header(HttpHeaders.CONTENT_LENGTH, httpResponse.getEntity().getContentLength());
+        return builder.build();
       }
-      Response.ResponseBuilder builder = Response.ok();
-      builder.entity(httpResponse.getEntity().getContent());
-      builder.contentLocation(uri);
-      builder.header(HttpHeaders.CONTENT_LENGTH, httpResponse.getEntity().getContentLength());
-      return builder.build();
     } catch (IOException e) {
       throw new WebApplicationException(e, Response.Status.INTERNAL_SERVER_ERROR);
     }

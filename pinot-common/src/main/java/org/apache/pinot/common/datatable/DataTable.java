@@ -35,8 +35,6 @@ import org.roaringbitmap.RoaringBitmap;
  * Data table is used to transfer data from server to broker.
  */
 public interface DataTable {
-  // TODO: remove this when we stop supporting DataTable V2.
-  String EXCEPTION_METADATA_KEY = "Exception";
 
   void addException(ProcessingException processingException);
 

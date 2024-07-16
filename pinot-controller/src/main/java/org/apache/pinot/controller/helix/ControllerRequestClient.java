@@ -21,10 +21,12 @@ package org.apache.pinot.controller.helix;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import java.io.IOException;
+import java.net.URI;
 import java.net.URISyntaxException;
-import java.net.URL;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
@@ -48,10 +50,17 @@ import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 public class ControllerRequestClient {
   private final HttpClient _httpClient;
   private final ControllerRequestURLBuilder _controllerRequestURLBuilder;
+  private final Map<String, String> _headers;
 
   public ControllerRequestClient(ControllerRequestURLBuilder controllerRequestUrlBuilder, HttpClient httpClient) {
+    this(controllerRequestUrlBuilder, httpClient, Collections.emptyMap());
+  }
+
+  public ControllerRequestClient(ControllerRequestURLBuilder controllerRequestUrlBuilder, HttpClient httpClient,
+      Map<String, String> headers) {
     _controllerRequestURLBuilder = controllerRequestUrlBuilder;
     _httpClient = httpClient;
+    _headers = headers;
   }
 
   public ControllerRequestURLBuilder getControllerRequestURLBuilder() {
@@ -64,7 +73,8 @@ public class ControllerRequestClient {
       throws IOException {
     String url = _controllerRequestURLBuilder.forSchemaCreate();
     try {
-      HttpClient.wrapAndThrowHttpException(_httpClient.sendMultipartPostRequest(url, schema.toSingleLineJsonString()));
+      HttpClient.wrapAndThrowHttpException(
+          _httpClient.sendMultipartPostRequest(url, schema.toSingleLineJsonString(), _headers));
     } catch (HttpErrorStatusException e) {
       throw new IOException(e);
     }
@@ -74,7 +84,8 @@ public class ControllerRequestClient {
       throws IOException {
     String url = _controllerRequestURLBuilder.forSchemaGet(schemaName);
     try {
-      SimpleHttpResponse resp = HttpClient.wrapAndThrowHttpException(_httpClient.sendGetRequest(new URL(url).toURI()));
+      SimpleHttpResponse resp =
+          HttpClient.wrapAndThrowHttpException(_httpClient.sendGetRequest(new URI(url), _headers));
       return Schema.fromString(resp.getResponse());
     } catch (HttpErrorStatusException | URISyntaxException e) {
       throw new IOException(e);
@@ -85,7 +96,8 @@ public class ControllerRequestClient {
       throws IOException {
     String url = _controllerRequestURLBuilder.forSchemaUpdate(schema.getSchemaName());
     try {
-      HttpClient.wrapAndThrowHttpException(_httpClient.sendMultipartPutRequest(url, schema.toSingleLineJsonString()));
+      HttpClient.wrapAndThrowHttpException(
+          _httpClient.sendMultipartPutRequest(url, schema.toSingleLineJsonString(), _headers));
     } catch (HttpErrorStatusException e) {
       throw new IOException(e);
     }
@@ -95,7 +107,7 @@ public class ControllerRequestClient {
       throws IOException {
     String url = _controllerRequestURLBuilder.forSchemaDelete(schemaName);
     try {
-      HttpClient.wrapAndThrowHttpException(_httpClient.sendDeleteRequest(new URL(url).toURI()));
+      HttpClient.wrapAndThrowHttpException(_httpClient.sendDeleteRequest(new URI(url), _headers));
     } catch (HttpErrorStatusException | URISyntaxException e) {
       throw new IOException(e);
     }
@@ -104,8 +116,9 @@ public class ControllerRequestClient {
   public void addTableConfig(TableConfig tableConfig)
       throws IOException {
     try {
-      HttpClient.wrapAndThrowHttpException(_httpClient.sendJsonPostRequest(new URL(
-          _controllerRequestURLBuilder.forTableCreate()).toURI(), tableConfig.toJsonString()));
+      HttpClient.wrapAndThrowHttpException(
+          _httpClient.sendJsonPostRequest(new URI(_controllerRequestURLBuilder.forTableCreate()),
+              tableConfig.toJsonString(), _headers));
     } catch (HttpErrorStatusException | URISyntaxException e) {
       throw new IOException(e);
     }
@@ -114,9 +127,9 @@ public class ControllerRequestClient {
   public void updateTableConfig(TableConfig tableConfig)
       throws IOException {
     try {
-      HttpClient.wrapAndThrowHttpException(_httpClient.sendJsonPutRequest(new URL(
-              _controllerRequestURLBuilder.forUpdateTableConfig(tableConfig.getTableName())).toURI(),
-          tableConfig.toJsonString()));
+      HttpClient.wrapAndThrowHttpException(_httpClient.sendJsonPutRequest(
+          new URI(_controllerRequestURLBuilder.forUpdateTableConfig(tableConfig.getTableName())),
+          tableConfig.toJsonString(), _headers));
     } catch (HttpErrorStatusException | URISyntaxException e) {
       throw new IOException(e);
     }
@@ -125,8 +138,9 @@ public class ControllerRequestClient {
   public void deleteTable(String tableNameWithType)
       throws IOException {
     try {
-      HttpClient.wrapAndThrowHttpException(_httpClient.sendDeleteRequest(new URL(
-          _controllerRequestURLBuilder.forTableDelete(tableNameWithType)).toURI()));
+      HttpClient.wrapAndThrowHttpException(
+          _httpClient.sendDeleteRequest(new URI(_controllerRequestURLBuilder.forTableDelete(tableNameWithType)),
+              _headers));
     } catch (HttpErrorStatusException | URISyntaxException e) {
       throw new IOException(e);
     }
@@ -136,7 +150,7 @@ public class ControllerRequestClient {
       throws IOException {
     try {
       SimpleHttpResponse response = HttpClient.wrapAndThrowHttpException(
-          _httpClient.sendGetRequest(new URL(_controllerRequestURLBuilder.forTableGet(tableName)).toURI()));
+          _httpClient.sendGetRequest(new URI(_controllerRequestURLBuilder.forTableGet(tableName)), _headers));
       return JsonUtils.jsonNodeToObject(JsonUtils.stringToJsonNode(response.getResponse()).get(tableType.toString()),
           TableConfig.class);
     } catch (HttpErrorStatusException | URISyntaxException e) {
@@ -148,7 +162,7 @@ public class ControllerRequestClient {
       throws IOException {
     try {
       SimpleHttpResponse response = HttpClient.wrapAndThrowHttpException(
-          _httpClient.sendGetRequest(new URL(_controllerRequestURLBuilder.forTableSize(tableName)).toURI()));
+          _httpClient.sendGetRequest(new URI(_controllerRequestURLBuilder.forTableSize(tableName)), _headers));
       return Long.parseLong(JsonUtils.stringToJsonNode(response.getResponse()).get("reportedSizeInBytes").asText());
     } catch (HttpErrorStatusException | URISyntaxException e) {
       throw new IOException(e);
@@ -158,8 +172,8 @@ public class ControllerRequestClient {
   public void resetTable(String tableNameWithType, String targetInstance)
       throws IOException {
     try {
-      HttpClient.wrapAndThrowHttpException(_httpClient.sendJsonPostRequest(new URL(
-          _controllerRequestURLBuilder.forTableReset(tableNameWithType, targetInstance)).toURI(), null));
+      HttpClient.wrapAndThrowHttpException(_httpClient.sendJsonPostRequest(
+          new URI(_controllerRequestURLBuilder.forTableReset(tableNameWithType, targetInstance)), null, _headers));
     } catch (HttpErrorStatusException | URISyntaxException e) {
       throw new IOException(e);
     }
@@ -168,8 +182,9 @@ public class ControllerRequestClient {
   public void resetSegment(String tableNameWithType, String segmentName, String targetInstance)
       throws IOException {
     try {
-      HttpClient.wrapAndThrowHttpException(_httpClient.sendJsonPostRequest(new URL(
-          _controllerRequestURLBuilder.forSegmentReset(tableNameWithType, segmentName, targetInstance)).toURI(), null));
+      HttpClient.wrapAndThrowHttpException(_httpClient.sendJsonPostRequest(
+          new URI(_controllerRequestURLBuilder.forSegmentReset(tableNameWithType, segmentName, targetInstance)), null,
+          _headers));
     } catch (HttpErrorStatusException | URISyntaxException e) {
       throw new IOException(e);
     }
@@ -178,9 +193,8 @@ public class ControllerRequestClient {
   public String reloadTable(String tableName, TableType tableType, boolean forceDownload)
       throws IOException {
     try {
-      SimpleHttpResponse simpleHttpResponse =
-          HttpClient.wrapAndThrowHttpException(_httpClient.sendJsonPostRequest(new URL(
-          _controllerRequestURLBuilder.forTableReload(tableName, tableType, forceDownload)).toURI(), null));
+      SimpleHttpResponse simpleHttpResponse = HttpClient.wrapAndThrowHttpException(_httpClient.sendJsonPostRequest(
+          new URI(_controllerRequestURLBuilder.forTableReload(tableName, tableType, forceDownload)), null, _headers));
       return simpleHttpResponse.getResponse();
     } catch (HttpErrorStatusException | URISyntaxException e) {
       throw new IOException(e);
@@ -190,8 +204,8 @@ public class ControllerRequestClient {
   public void reloadSegment(String tableName, String segmentName, boolean forceReload)
       throws IOException {
     try {
-      HttpClient.wrapAndThrowHttpException(_httpClient.sendJsonPostRequest(new URL(
-          _controllerRequestURLBuilder.forSegmentReload(tableName, segmentName, forceReload)).toURI(), null));
+      HttpClient.wrapAndThrowHttpException(_httpClient.sendJsonPostRequest(
+          new URI(_controllerRequestURLBuilder.forSegmentReload(tableName, segmentName, forceReload)), null, _headers));
     } catch (HttpErrorStatusException | URISyntaxException e) {
       throw new IOException(e);
     }
@@ -201,7 +215,8 @@ public class ControllerRequestClient {
       throws IOException {
     String url = _controllerRequestURLBuilder.forSegmentListAPI(tableName, tableType, excludeReplacedSegments);
     try {
-      SimpleHttpResponse resp = HttpClient.wrapAndThrowHttpException(_httpClient.sendGetRequest(new URL(url).toURI()));
+      SimpleHttpResponse resp =
+          HttpClient.wrapAndThrowHttpException(_httpClient.sendGetRequest(new URI(url), _headers));
       // Example response: (list of map from table type to segments)
       // [{"REALTIME":["mytable__0__0__20221012T1952Z","mytable__1__0__20221012T1952Z"]}]
       JsonNode jsonNode = JsonUtils.stringToJsonNode(resp.getResponse());
@@ -222,7 +237,7 @@ public class ControllerRequestClient {
       throws IOException {
     try {
       HttpClient.wrapAndThrowHttpException(_httpClient.sendDeleteRequest(
-          new URL(_controllerRequestURLBuilder.forSegmentDelete(tableName, segmentName)).toURI()));
+          new URI(_controllerRequestURLBuilder.forSegmentDelete(tableName, segmentName)), _headers));
     } catch (HttpErrorStatusException | URISyntaxException e) {
       throw new IOException(e);
     }
@@ -231,8 +246,8 @@ public class ControllerRequestClient {
   public void deleteSegments(String tableName, TableType tableType)
       throws IOException {
     try {
-      HttpClient.wrapAndThrowHttpException(_httpClient.sendDeleteRequest(new URL(
-          _controllerRequestURLBuilder.forSegmentDeleteAll(tableName, tableType.toString())).toURI()));
+      HttpClient.wrapAndThrowHttpException(_httpClient.sendDeleteRequest(
+          new URI(_controllerRequestURLBuilder.forSegmentDeleteAll(tableName, tableType.toString())), _headers));
     } catch (HttpErrorStatusException | URISyntaxException e) {
       throw new IOException(e);
     }
@@ -241,8 +256,9 @@ public class ControllerRequestClient {
   public PauseStatus pauseConsumption(String tableName)
       throws IOException {
     try {
-      SimpleHttpResponse response = HttpClient.wrapAndThrowHttpException(_httpClient.sendJsonPostRequest(new URL(
-          _controllerRequestURLBuilder.forPauseConsumption(tableName)).toURI(), null));
+      SimpleHttpResponse response = HttpClient.wrapAndThrowHttpException(
+          _httpClient.sendJsonPostRequest(new URI(_controllerRequestURLBuilder.forPauseConsumption(tableName)), null,
+              _headers));
       return JsonUtils.stringToObject(response.getResponse(), PauseStatus.class);
     } catch (HttpErrorStatusException | URISyntaxException e) {
       throw new IOException(e);
@@ -252,8 +268,9 @@ public class ControllerRequestClient {
   public PauseStatus resumeConsumption(String tableName)
       throws IOException {
     try {
-      SimpleHttpResponse response = HttpClient.wrapAndThrowHttpException(_httpClient.sendJsonPostRequest(new URL(
-          _controllerRequestURLBuilder.forResumeConsumption(tableName)).toURI(), null));
+      SimpleHttpResponse response = HttpClient.wrapAndThrowHttpException(
+          _httpClient.sendJsonPostRequest(new URI(_controllerRequestURLBuilder.forResumeConsumption(tableName)), null,
+              _headers));
       return JsonUtils.stringToObject(response.getResponse(), PauseStatus.class);
     } catch (HttpErrorStatusException | URISyntaxException e) {
       throw new IOException(e);
@@ -263,8 +280,8 @@ public class ControllerRequestClient {
   public PauseStatus getPauseStatus(String tableName)
       throws IOException {
     try {
-      SimpleHttpResponse response = HttpClient.wrapAndThrowHttpException(_httpClient.sendGetRequest(new URL(
-          _controllerRequestURLBuilder.forPauseStatus(tableName)).toURI()));
+      SimpleHttpResponse response = HttpClient.wrapAndThrowHttpException(
+          _httpClient.sendGetRequest(new URI(_controllerRequestURLBuilder.forPauseStatus(tableName)), _headers));
       return JsonUtils.stringToObject(response.getResponse(), PauseStatus.class);
     } catch (HttpErrorStatusException | URISyntaxException e) {
       throw new IOException(e);
@@ -274,9 +291,9 @@ public class ControllerRequestClient {
   public void createBrokerTenant(String tenantName, int numBrokers)
       throws IOException {
     try {
-      HttpClient.wrapAndThrowHttpException(_httpClient.sendJsonPostRequest(new URL(
-              _controllerRequestURLBuilder.forTenantCreate()).toURI(),
-          getBrokerTenantRequestPayload(tenantName, numBrokers)));
+      HttpClient.wrapAndThrowHttpException(
+          _httpClient.sendJsonPostRequest(new URI(_controllerRequestURLBuilder.forTenantCreate()),
+              getBrokerTenantRequestPayload(tenantName, numBrokers), _headers));
     } catch (HttpErrorStatusException | URISyntaxException e) {
       throw new IOException(e);
     }
@@ -285,9 +302,9 @@ public class ControllerRequestClient {
   public void updateBrokerTenant(String tenantName, int numBrokers)
       throws IOException {
     try {
-      HttpClient.wrapAndThrowHttpException(_httpClient.sendJsonPutRequest(new URL(
-              _controllerRequestURLBuilder.forTenantCreate()).toURI(),
-          getBrokerTenantRequestPayload(tenantName, numBrokers)));
+      HttpClient.wrapAndThrowHttpException(
+          _httpClient.sendJsonPutRequest(new URI(_controllerRequestURLBuilder.forTenantCreate()),
+              getBrokerTenantRequestPayload(tenantName, numBrokers), _headers));
     } catch (HttpErrorStatusException | URISyntaxException e) {
       throw new IOException(e);
     }
@@ -296,8 +313,9 @@ public class ControllerRequestClient {
   public void deleteBrokerTenant(String tenantName)
       throws IOException {
     try {
-      HttpClient.wrapAndThrowHttpException(_httpClient.sendDeleteRequest(new URL(
-              _controllerRequestURLBuilder.forBrokerTenantDelete(tenantName)).toURI()));
+      HttpClient.wrapAndThrowHttpException(
+          _httpClient.sendDeleteRequest(new URI(_controllerRequestURLBuilder.forBrokerTenantDelete(tenantName)),
+              _headers));
     } catch (HttpErrorStatusException | URISyntaxException e) {
       throw new IOException(e);
     }
@@ -306,9 +324,9 @@ public class ControllerRequestClient {
   public void createServerTenant(String tenantName, int numOfflineServers, int numRealtimeServers)
       throws IOException {
     try {
-      HttpClient.wrapAndThrowHttpException(_httpClient.sendJsonPostRequest(new URL(
-              _controllerRequestURLBuilder.forTenantCreate()).toURI(),
-          getServerTenantRequestPayload(tenantName, numOfflineServers, numRealtimeServers)));
+      HttpClient.wrapAndThrowHttpException(
+          _httpClient.sendJsonPostRequest(new URI(_controllerRequestURLBuilder.forTenantCreate()),
+              getServerTenantRequestPayload(tenantName, numOfflineServers, numRealtimeServers), _headers));
     } catch (HttpErrorStatusException | URISyntaxException e) {
       throw new IOException(e);
     }
@@ -317,9 +335,9 @@ public class ControllerRequestClient {
   public void updateServerTenant(String tenantName, int numOfflineServers, int numRealtimeServers)
       throws IOException {
     try {
-      HttpClient.wrapAndThrowHttpException(_httpClient.sendJsonPutRequest(new URL(
-              _controllerRequestURLBuilder.forTenantCreate()).toURI(),
-          getServerTenantRequestPayload(tenantName, numOfflineServers, numRealtimeServers)));
+      HttpClient.wrapAndThrowHttpException(
+          _httpClient.sendJsonPutRequest(new URI(_controllerRequestURLBuilder.forTenantCreate()),
+              getServerTenantRequestPayload(tenantName, numOfflineServers, numRealtimeServers), _headers));
     } catch (HttpErrorStatusException | URISyntaxException e) {
       throw new IOException(e);
     }
@@ -328,8 +346,8 @@ public class ControllerRequestClient {
   public void runPeriodicTask(String taskName)
       throws IOException {
     try {
-      HttpClient.wrapAndThrowHttpException(_httpClient.sendGetRequest(new URL(
-          _controllerRequestURLBuilder.forPeriodTaskRun(taskName)).toURI()));
+      HttpClient.wrapAndThrowHttpException(
+          _httpClient.sendGetRequest(new URI(_controllerRequestURLBuilder.forPeriodTaskRun(taskName)), _headers));
     } catch (HttpErrorStatusException | URISyntaxException e) {
       throw new IOException(e);
     }

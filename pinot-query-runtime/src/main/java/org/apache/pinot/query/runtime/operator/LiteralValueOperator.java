@@ -38,15 +38,15 @@ public class LiteralValueOperator extends MultiStageOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(LiteralValueOperator.class);
 
   private final DataSchema _dataSchema;
-  private final TransferableBlock _rexLiteralBlock;
+  private final List<List<RexExpression.Literal>> _literalRows;
   private boolean _isLiteralBlockReturned;
   private final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
 
   public LiteralValueOperator(OpChainExecutionContext context, ValueNode node) {
     super(context);
     _dataSchema = node.getDataSchema();
-    _rexLiteralBlock = constructBlock(node.getLiteralRows());
-    // only return a single literal block when it is the 1st virtual server. otherwise, result will be duplicated.
+    _literalRows = node.getLiteralRows();
+    // Only return a single literal block when it is the 1st virtual server. Otherwise, result will be duplicated.
     _isLiteralBlockReturned = context.getId().getVirtualServerId() != 0;
   }
 
@@ -73,9 +73,9 @@ public class LiteralValueOperator extends MultiStageOperator {
 
   @Override
   protected TransferableBlock getNextBlock() {
-    if (!_isLiteralBlockReturned && !_isEarlyTerminated) {
+    if (!_isLiteralBlockReturned && !_isEarlyTerminated && !_literalRows.isEmpty()) {
       _isLiteralBlockReturned = true;
-      return _rexLiteralBlock;
+      return constructBlock();
     } else {
       return createEosBlock();
     }
@@ -91,9 +91,9 @@ public class LiteralValueOperator extends MultiStageOperator {
     return Type.LITERAL;
   }
 
-  private TransferableBlock constructBlock(List<List<RexExpression.Literal>> literalRows) {
-    List<Object[]> blockContent = new ArrayList<>();
-    for (List<RexExpression.Literal> row : literalRows) {
+  private TransferableBlock constructBlock() {
+    List<Object[]> blockContent = new ArrayList<>(_literalRows.size());
+    for (List<RexExpression.Literal> row : _literalRows) {
       Object[] values = new Object[_dataSchema.size()];
       for (int i = 0; i < _dataSchema.size(); i++) {
         values[i] = row.get(i).getValue();

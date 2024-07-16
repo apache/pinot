@@ -21,6 +21,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: {{ include "pinot.broker.config" . }}
+  namespace: {{ include "pinot.namespace" . }}
 data:
   pinot-broker.conf: |-
     pinot.broker.client.queryPort={{ .Values.broker.service.port }}

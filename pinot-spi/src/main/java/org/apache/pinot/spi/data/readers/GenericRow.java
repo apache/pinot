@@ -156,6 +156,17 @@ public class GenericRow implements Serializable {
   }
 
   /**
+   * @return a deep copy of the generic row for the given fields
+   */
+  public GenericRow copy(List<String> fieldsToCopy) {
+    GenericRow copy = new GenericRow();
+    for (String field : fieldsToCopy) {
+      copy.putValue(field, copy(getValue(field)));
+    }
+    return copy;
+  }
+
+  /**
    * @return a deep copy of the object.
    */
   private Object copy(Object value) {
@@ -174,6 +185,9 @@ public class GenericRow implements Serializable {
       }
       return list;
     } else if (value.getClass().isArray()) {
+      if (value instanceof byte[]) {
+        return ((byte[]) value).clone();
+      }
       Object[] array = new Object[((Object[]) value).length];
       int idx = 0;
       for (Object object : (Object[]) value) {

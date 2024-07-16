@@ -34,6 +34,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletionService;
 import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
 import javax.inject.Inject;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
@@ -48,14 +49,15 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hc.client5.http.classic.methods.HttpDelete;
+import org.apache.hc.client5.http.config.RequestConfig;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
+import org.apache.hc.client5.http.impl.classic.HttpClients;
+import org.apache.hc.client5.http.io.HttpClientConnectionManager;
+import org.apache.hc.core5.http.io.entity.EntityUtils;
+import org.apache.hc.core5.util.Timeout;
 import org.apache.helix.model.InstanceConfig;
-import org.apache.http.client.config.RequestConfig;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpDelete;
-import org.apache.http.conn.HttpClientConnectionManager;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
-import org.apache.http.util.EntityUtils;
 import org.apache.pinot.common.http.MultiHttpRequest;
 import org.apache.pinot.common.http.MultiHttpRequestResponse;
 import org.apache.pinot.controller.ControllerConf;
@@ -71,11 +73,13 @@ import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
 
-@Api(tags = Constants.QUERY_TAG, authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY),
-    @Authorization(value = DATABASE)})
+@Api(tags = Constants.QUERY_TAG, authorizations = {
+    @Authorization(value = SWAGGER_AUTHORIZATION_KEY), @Authorization(value = DATABASE)
+})
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = {
     @ApiKeyAuthDefinition(name = HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER,
-        key = SWAGGER_AUTHORIZATION_KEY),
+        key = SWAGGER_AUTHORIZATION_KEY,
+        description = "The format of the key is  ```\"Basic <token>\" or \"Bearer <token>\"```"),
     @ApiKeyAuthDefinition(name = DATABASE, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = DATABASE,
         description = "Database context passed through http header. If no context is provided 'default' database "
             + "context will be considered.")}))
@@ -112,30 +116,29 @@ public class PinotRunningQueryResource {
       @ApiParam(value = "Timeout for servers to respond the cancel request") @QueryParam("timeoutMs")
       @DefaultValue("3000") int timeoutMs,
       @ApiParam(value = "Return verbose responses for troubleshooting") @QueryParam("verbose") @DefaultValue("false")
-          boolean verbose, @Context HttpHeaders httpHeaders) {
+      boolean verbose, @Context HttpHeaders httpHeaders) {
     InstanceConfig broker = _pinotHelixResourceManager.getHelixInstanceConfig(brokerId);
     if (broker == null) {
       throw new WebApplicationException(
           Response.status(Response.Status.BAD_REQUEST).entity("Unknown broker: " + brokerId).build());
     }
     try {
-      RequestConfig defaultRequestConfig = RequestConfig.custom()
-          .setConnectionRequestTimeout(timeoutMs)
-          .setSocketTimeout(timeoutMs).build();
+      Timeout timeout = Timeout.of(timeoutMs, TimeUnit.MILLISECONDS);
+      RequestConfig defaultRequestConfig =
+          RequestConfig.custom().setConnectionRequestTimeout(timeout).setResponseTimeout(timeout).build();
 
-      CloseableHttpClient client = HttpClients.custom().setConnectionManager(_httpConnMgr)
-          .setDefaultRequestConfig(defaultRequestConfig).build();
+      CloseableHttpClient client =
+          HttpClients.custom().setConnectionManager(_httpConnMgr).setDefaultRequestConfig(defaultRequestConfig).build();
 
       String protocol = _controllerConf.getControllerBrokerProtocol();
       int portOverride = _controllerConf.getControllerBrokerPortOverride();
       int port = portOverride > 0 ? portOverride : Integer.parseInt(broker.getPort());
       HttpDelete deleteMethod = new HttpDelete(
           String.format("%s://%s:%d/query/%d?verbose=%b", protocol, broker.getHostName(), port, queryId, verbose));
-      try {
-        Map<String, String> requestHeaders = createRequestHeaders(httpHeaders);
-        requestHeaders.forEach(deleteMethod::setHeader);
-        CloseableHttpResponse response = client.execute(deleteMethod);
-        int status = response.getStatusLine().getStatusCode();
+      Map<String, String> requestHeaders = createRequestHeaders(httpHeaders);
+      requestHeaders.forEach(deleteMethod::setHeader);
+      try (CloseableHttpResponse response = client.execute(deleteMethod)) {
+        int status = response.getCode();
         String responseContent = EntityUtils.toString(response.getEntity());
         if (status == 200) {
           return responseContent;
@@ -144,18 +147,16 @@ public class PinotRunningQueryResource {
           throw new WebApplicationException(Response.status(Response.Status.NOT_FOUND)
               .entity(String.format("Query: %s not found on the broker: %s", queryId, brokerId)).build());
         }
-        throw new WebApplicationException(Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(String
-            .format("Failed to cancel query: %s on the broker: %s with unexpected status=%d and resp='%s'", queryId,
-                brokerId, status, responseContent)).build());
-      } finally {
-        deleteMethod.releaseConnection();
+        throw new WebApplicationException(Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(
+            String.format("Failed to cancel query: %s on the broker: %s with unexpected status=%d and resp='%s'",
+                queryId, brokerId, status, responseContent)).build());
       }
     } catch (WebApplicationException e) {
       throw e;
     } catch (Exception e) {
-      throw new WebApplicationException(Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(String
-          .format("Failed to cancel query: %s on the broker: %s due to error: %s", queryId, brokerId, e.getMessage()))
-          .build());
+      throw new WebApplicationException(Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(
+          String.format("Failed to cancel query: %s on the broker: %s due to error: %s", queryId, brokerId,
+              e.getMessage())).build());
     }
   }
 
@@ -170,10 +171,10 @@ public class PinotRunningQueryResource {
   })
   public Map<String, Map<String, String>> getRunningQueries(
       @ApiParam(value = "Timeout for brokers to return running queries") @QueryParam("timeoutMs") @DefaultValue("3000")
-          int timeoutMs, @Context HttpHeaders httpHeaders) {
+      int timeoutMs, @Context HttpHeaders httpHeaders) {
     try {
-      Map<String, List<InstanceInfo>> tableBrokers = _pinotHelixResourceManager.getTableToLiveBrokersMapping(
-          httpHeaders.getHeaderString(DATABASE));
+      Map<String, List<InstanceInfo>> tableBrokers =
+          _pinotHelixResourceManager.getTableToLiveBrokersMapping(httpHeaders.getHeaderString(DATABASE));
       Map<String, InstanceInfo> brokers = new HashMap<>();
       tableBrokers.values().forEach(list -> list.forEach(info -> brokers.putIfAbsent(getInstanceKey(info), info)));
       return getRunningQueries(brokers, timeoutMs, createRequestHeaders(httpHeaders));
@@ -184,7 +185,8 @@ public class PinotRunningQueryResource {
   }
 
   private Map<String, Map<String, String>> getRunningQueries(Map<String, InstanceInfo> brokers, int timeoutMs,
-      Map<String, String> requestHeaders) throws Exception {
+      Map<String, String> requestHeaders)
+      throws Exception {
     String protocol = _controllerConf.getControllerBrokerProtocol();
     int portOverride = _controllerConf.getControllerBrokerPortOverride();
     List<String> brokerUrls = new ArrayList<>();
@@ -203,12 +205,12 @@ public class PinotRunningQueryResource {
         // The completion order is different from brokerUrls, thus use uri in the response.
         httpRequestResponse = completionService.take().get();
         URI uri = httpRequestResponse.getURI();
-        int status = httpRequestResponse.getResponse().getStatusLine().getStatusCode();
+        int status = httpRequestResponse.getResponse().getCode();
         String responseString = EntityUtils.toString(httpRequestResponse.getResponse().getEntity());
         // Unexpected server responses are collected and returned as exception.
         if (status != 200) {
-          throw new Exception(String.format("Unexpected status=%d and response='%s' from uri='%s'", status,
-              responseString, uri));
+          throw new Exception(
+              String.format("Unexpected status=%d and response='%s' from uri='%s'", status, responseString, uri));
         }
         queriesByBroker.put(brokers.get(getInstanceKey(uri)).getInstanceName(),
             JsonUtils.stringToObject(responseString, Map.class));

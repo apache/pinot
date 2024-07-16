@@ -446,6 +446,22 @@ public abstract class BaseTableDataManager implements TableDataManager {
     }
   }
 
+  @Override
+  public void offloadSegmentUnsafe(String segmentName) {
+    if (_shutDown) {
+      _logger.info("Table data manager is already shut down, skipping offloading segment: {} unsafe", segmentName);
+      return;
+    }
+    _logger.info("Offloading segment: {} unsafe", segmentName);
+    try {
+      doOffloadSegment(segmentName);
+    } catch (Exception e) {
+      addSegmentError(segmentName,
+          new SegmentErrorInfo(System.currentTimeMillis(), "Caught exception while offloading segment unsafe", e));
+      throw e;
+    }
+  }
+
   protected void doOffloadSegment(String segmentName) {
     SegmentDataManager segmentDataManager = unregisterSegment(segmentName);
     if (segmentDataManager != null) {

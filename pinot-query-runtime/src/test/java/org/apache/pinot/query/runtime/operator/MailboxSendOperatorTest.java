@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeoutException;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.WorkerMetadata;
@@ -104,8 +105,7 @@ public class MailboxSendOperatorTest {
   public void shouldNotSendErrorBlockWhenTimedOut()
       throws Exception {
     // Given:
-    TransferableBlock dataBlock =
-        OperatorTestUtil.block(new DataSchema(new String[]{}, new DataSchema.ColumnDataType[]{}));
+    TransferableBlock dataBlock = getDummyDataBlock();
     when(_input.nextBlock()).thenReturn(dataBlock);
     doThrow(new TimeoutException()).when(_exchange).send(any());
 
@@ -141,10 +141,8 @@ public class MailboxSendOperatorTest {
   public void shouldSendDataBlock()
       throws Exception {
     // Given:
-    TransferableBlock dataBlock1 =
-        OperatorTestUtil.block(new DataSchema(new String[]{}, new DataSchema.ColumnDataType[]{}));
-    TransferableBlock dataBlock2 =
-        OperatorTestUtil.block(new DataSchema(new String[]{}, new DataSchema.ColumnDataType[]{}));
+    TransferableBlock dataBlock1 = getDummyDataBlock();
+    TransferableBlock dataBlock2 = getDummyDataBlock();
     TransferableBlock eosBlock =
         TransferableBlockUtils.getEndOfStreamTransferableBlock(MultiStageQueryStats.emptyStats(SENDER_STAGE_ID));
     when(_input.nextBlock()).thenReturn(dataBlock1, dataBlock2, eosBlock);
@@ -183,8 +181,7 @@ public class MailboxSendOperatorTest {
   public void shouldEarlyTerminateWhenUpstreamWhenIndicated()
       throws Exception {
     // Given:
-    TransferableBlock dataBlock =
-        OperatorTestUtil.block(new DataSchema(new String[]{}, new DataSchema.ColumnDataType[]{}));
+    TransferableBlock dataBlock = getDummyDataBlock();
     when(_input.nextBlock()).thenReturn(dataBlock);
     doReturn(true).when(_exchange).send(any());
 
@@ -202,5 +199,10 @@ public class MailboxSendOperatorTest {
         new OpChainExecutionContext(_mailboxService, 123L, Long.MAX_VALUE, Map.of(), stageMetadata, workerMetadata,
             null);
     return new MailboxSendOperator(context, _input, statMap -> _exchange);
+  }
+
+  private static TransferableBlock getDummyDataBlock() {
+    return OperatorTestUtil.block(new DataSchema(new String[]{"intCol"}, new ColumnDataType[]{ColumnDataType.INT}),
+        new Object[]{1});
   }
 }

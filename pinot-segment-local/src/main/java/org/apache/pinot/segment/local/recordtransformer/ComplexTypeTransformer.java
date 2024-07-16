@@ -98,7 +98,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
 
   public ComplexTypeTransformer(TableConfig tableConfig) {
     this(parseFieldsToUnnest(tableConfig), parseDelimiter(tableConfig),
-            parseCollectionNotUnnestedToJson(tableConfig), parsePrefixesToRename(tableConfig), tableConfig);
+        parseCollectionNotUnnestedToJson(tableConfig), parsePrefixesToRename(tableConfig), tableConfig);
   }
 
   @VisibleForTesting
@@ -163,7 +163,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
 
   private static Map<String, String> parsePrefixesToRename(TableConfig tableConfig) {
     if (tableConfig.getIngestionConfig() != null && tableConfig.getIngestionConfig().getComplexTypeConfig() != null
-            && tableConfig.getIngestionConfig().getComplexTypeConfig().getPrefixesToRename() != null) {
+        && tableConfig.getIngestionConfig().getComplexTypeConfig().getPrefixesToRename() != null) {
       return tableConfig.getIngestionConfig().getComplexTypeConfig().getPrefixesToRename();
     } else {
       return Collections.emptyMap();
@@ -173,10 +173,20 @@ public class ComplexTypeTransformer implements RecordTransformer {
   @Override
   public GenericRow transform(GenericRow record) {
     try {
+      GenericRow originalRow = _fieldsToUnnest.isEmpty() ? null : record.copy(_fieldsToUnnest);
       flattenMap(record, new ArrayList<>(record.getFieldToValueMap().keySet()));
-      for (String collection : _fieldsToUnnest) {
-        unnestCollection(record, collection);
+      for (String field : _fieldsToUnnest) {
+        unnestCollection(record, field);
       }
+      Object unnestedRows = record.getValue(GenericRow.MULTIPLE_RECORDS_KEY);
+      if (originalRow != null && unnestedRows instanceof Collection) {
+        for (GenericRow unnestedRow : (Collection<GenericRow>) unnestedRows) {
+          for (String field : _fieldsToUnnest) {
+            unnestedRow.putValue(field, originalRow.getValue(field));
+          }
+        }
+      }
+
       renamePrefixes(record);
     } catch (Exception e) {
       if (!_continueOnError) {
@@ -207,7 +217,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
   }
 
   private void unnestCollection(GenericRow record, String column, List<GenericRow> list) {
-    Object value = record.removeValue(column);
+    Object value = record.getValue(column);
     if (value == null) {
       // use the record itself
       list.add(record);
@@ -329,7 +339,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
           String newName = replacementPrefix + remainingColumnName;
           if (newName.isEmpty() || record.getValue(newName) != null) {
             throw new RuntimeException(
-                    String.format("Name conflict after attempting to rename field %s to %s", field, newName));
+                String.format("Name conflict after attempting to rename field %s to %s", field, newName));
           }
           record.putValue(newName, value);
         }
@@ -366,7 +376,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
       Object value = map.get(field);
       String concatName = concat(path, field);
       if (value instanceof Map) {
-        Map<String, Object> innerMap = (Map<String, Object>) map.remove(field);
+        Map<String, Object> innerMap = (Map<String, Object>) value;
         List<String> innerMapFields = new ArrayList<>();
         for (Map.Entry<String, Object> innerEntry : new ArrayList<>(innerMap.entrySet())) {
           Object innerValue = innerEntry.getValue();

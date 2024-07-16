@@ -309,6 +309,10 @@
         "sql": "SET enableNullHandling=true; SELECT strCol1, intCol1, nIntCol1, nnIntCol1, strCol2, nStrCol2, nnStrCol2 FROM {tbl1} WHERE nStrCol2 IS NULL AND nIntCol1 IS NOT NULL",
         "h2Sql": "SELECT strCol1, intCol1, nIntCol1, nnIntCol1, strCol2, nStrCol2, 'null' FROM {tbl1} WHERE nStrCol2 IS NULL AND nIntCol1 IS NOT NULL"
       },
+      {
+        "description": "window function with NULL handling",
+        "sql": "SET enableNullHandling=true; SELECT SUM(intCol1) OVER() FROM {tbl1}"
+      },
 
       {
         "description": "Leaf stages should not return nulls",

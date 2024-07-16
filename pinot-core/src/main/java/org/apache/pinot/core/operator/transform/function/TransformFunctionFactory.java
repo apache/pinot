@@ -299,6 +299,13 @@ public class TransformFunctionFactory {
               ArrayLiteralTransformFunction::new);
         }
 
+        // Check if the function is GenerateArray transform function
+        if (functionName.equalsIgnoreCase(GenerateArrayTransformFunction.FUNCTION_NAME)) {
+          return queryContext.getOrComputeSharedValue(GenerateArrayTransformFunction.class,
+              expression.getFunction().getArguments(),
+              GenerateArrayTransformFunction::new);
+        }
+
         TransformFunction transformFunction;
         Class<? extends TransformFunction> transformFunctionClass = TRANSFORM_FUNCTION_MAP.get(functionName);
         if (transformFunctionClass != null) {

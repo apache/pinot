@@ -256,7 +256,10 @@ public class S3PinotFSTest {
       }
     }
 
-    _s3PinotFS.delete(URI.create(String.format(FILE_FORMAT, SCHEME, BUCKET, fileToDelete)), false);
+    boolean deleteResult = _s3PinotFS.delete(
+        URI.create(String.format(FILE_FORMAT, SCHEME, BUCKET, fileToDelete)), false);
+
+    Assert.assertTrue(deleteResult);
 
     ListObjectsV2Response listObjectsV2Response =
         _s3Client.listObjectsV2(S3TestUtils.getListObjectRequest(BUCKET, "", true));
@@ -278,7 +281,10 @@ public class S3PinotFSTest {
       createEmptyFile(folderName, fileName);
     }
 
-    _s3PinotFS.delete(URI.create(String.format(FILE_FORMAT, SCHEME, BUCKET, folderName)), true);
+    boolean deleteResult = _s3PinotFS.delete(
+        URI.create(String.format(FILE_FORMAT, SCHEME, BUCKET, folderName)), true);
+
+    Assert.assertTrue(deleteResult);
 
     ListObjectsV2Response listObjectsV2Response =
         _s3Client.listObjectsV2(S3TestUtils.getListObjectRequest(BUCKET, "", true));
@@ -410,6 +416,37 @@ public class S3PinotFSTest {
     HeadObjectResponse headObjectResponse =
         _s3Client.headObject(S3TestUtils.getHeadObjectRequest(BUCKET, folderName + "/"));
     Assert.assertTrue(headObjectResponse.sdkHttpResponse().isSuccessful());
+  }
+
+  @Test
+  public void testMoveFile()
+      throws Exception {
+
+    String fileName = "file-to-move";
+    int fileSize = 5000;
+
+    File file = new File(TEMP_FILE, fileName);
+
+    try {
+      createDummyFile(file, fileSize);
+      URI sourceUri = URI.create(String.format(FILE_FORMAT, SCHEME, BUCKET, fileName));
+
+      _s3PinotFS.copyFromLocalFile(file, sourceUri);
+
+      URI targetUri = URI.create(String.format(FILE_FORMAT, SCHEME, BUCKET, "move-target"));
+
+      boolean moveResult = _s3PinotFS.move(sourceUri, targetUri, false);
+      Assert.assertTrue(moveResult);
+
+      Assert.assertFalse(_s3PinotFS.exists(sourceUri));
+      Assert.assertTrue(_s3PinotFS.exists(targetUri));
+
+      HeadObjectResponse headObjectResponse =
+          _s3Client.headObject(S3TestUtils.getHeadObjectRequest(BUCKET, "move-target"));
+      Assert.assertEquals(headObjectResponse.contentLength(), fileSize);
+    } finally {
+      FileUtils.deleteQuietly(file);
+    }
   }
 
   private static void createDummyFile(File file, int size)

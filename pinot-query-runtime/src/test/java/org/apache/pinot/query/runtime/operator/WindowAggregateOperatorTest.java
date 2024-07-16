@@ -27,7 +27,6 @@ import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.exception.QueryException;
-import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.data.table.Key;
@@ -270,8 +269,7 @@ public class WindowAggregateOperatorTest {
   }
 
   @Test
-  public void testRankDenseRankRankingFunctions()
-      throws ProcessingException {
+  public void testRankDenseRankRankingFunctions() {
     // Given:
     DataSchema inputSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, STRING});
     // Input should be in sorted order on the order by key as SortExchange will handle pre-sorting the data
@@ -294,7 +292,7 @@ public class WindowAggregateOperatorTest {
             Integer.MIN_VALUE, 0);
 
     // When:
-    List<Object[]> resultRows = operator.getNextBlock().getContainer();
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
 
     // Then:
     verifyResultRows(resultRows, keys,
@@ -308,8 +306,7 @@ public class WindowAggregateOperatorTest {
   }
 
   @Test
-  public void testRowNumberRankingFunction()
-      throws ProcessingException {
+  public void testRowNumberRankingFunction() {
     // Given:
     DataSchema inputSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, STRING});
     // Input should be in sorted order on the order by key as SortExchange will handle pre-sorting the data
@@ -330,7 +327,7 @@ public class WindowAggregateOperatorTest {
             Integer.MIN_VALUE, 0);
 
     // When:
-    List<Object[]> resultRows = operator.getNextBlock().getContainer();
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
 
     // Then:
     verifyResultRows(resultRows, keys, Map.of(1, List.<Object[]>of(new Object[]{1, "foo", 1L}), 2,
@@ -340,8 +337,7 @@ public class WindowAggregateOperatorTest {
   }
 
   @Test
-  public void testNonEmptyOrderByKeysNotMatchingPartitionByKeys()
-      throws ProcessingException {
+  public void testNonEmptyOrderByKeysNotMatchingPartitionByKeys() {
     // Given:
     DataSchema inputSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, STRING});
     // Input should be in sorted order on the order by key as SortExchange will handle pre-sorting the data
@@ -360,7 +356,7 @@ public class WindowAggregateOperatorTest {
             Integer.MIN_VALUE, Integer.MAX_VALUE);
 
     // When:
-    List<Object[]> resultRows = operator.getNextBlock().getContainer();
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
 
     // Then:
     verifyResultRows(resultRows, keys, Map.of(1, List.<Object[]>of(new Object[]{1, "foo", 1.0}), 2,

@@ -18,11 +18,11 @@
 #
 
 {{- if .Values.broker.external.enabled }}
----
 apiVersion: v1
 kind: Service
 metadata:
   name: {{ template "pinot.broker.external" . }}
+  namespace: {{ include "pinot.namespace" . }}
   annotations:
 {{ toYaml .Values.broker.external.annotations | indent 4 }}
   labels:

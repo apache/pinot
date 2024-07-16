@@ -23,10 +23,12 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsBitmapResponse;
+import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.common.utils.config.InstanceUtils;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
 import org.apache.pinot.controller.util.ServerSegmentMetadataReader;
@@ -42,6 +44,7 @@ import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.roaringbitmap.RoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -143,32 +146,6 @@ public class MinionTaskUtils {
     return dirInStr;
   }
 
-  public static ValidDocIdsBitmapResponse getValidDocIdsBitmap(String tableNameWithType, String segmentName,
-      String validDocIdsType, MinionContext minionContext) {
-    HelixAdmin helixAdmin = minionContext.getHelixManager().getClusterManagmentTool();
-    String clusterName = minionContext.getHelixManager().getClusterName();
-
-    List<String> servers = getServers(segmentName, tableNameWithType, helixAdmin, clusterName);
-    for (String server : servers) {
-      InstanceConfig instanceConfig = helixAdmin.getInstanceConfig(clusterName, server);
-      String endpoint = InstanceUtils.getServerAdminEndpoint(instanceConfig);
-
-      // We only need aggregated table size and the total number of docs/rows. Skipping column related stats, by
-      // passing an empty list.
-      ServerSegmentMetadataReader serverSegmentMetadataReader = new ServerSegmentMetadataReader();
-      try {
-        return serverSegmentMetadataReader.getValidDocIdsBitmapFromServer(tableNameWithType, segmentName, endpoint,
-            validDocIdsType, 60_000);
-      } catch (Exception e) {
-        LOGGER.warn(
-            String.format("Unable to retrieve validDocIds bitmap for segment: %s from endpoint: %s", segmentName,
-                endpoint), e);
-      }
-    }
-    throw new IllegalStateException(
-        String.format("Unable to retrieve validDocIds bitmap for segment: %s from servers: %s", segmentName, servers));
-  }
-
   public static List<String> getServers(String segmentName, String tableNameWithType, HelixAdmin helixAdmin,
       String clusterName) {
     ExternalView externalView = helixAdmin.getResourceExternalView(clusterName, tableNameWithType);
@@ -205,5 +182,57 @@ public class MinionTaskUtils {
       }
     }
     return defaultValue;
+  }
+
+  /**
+   * Returns the validDocID bitmap from the server whose local segment crc matches both crc of ZK metadata and
+   * deepstore copy (expectedCrc).
+   */
+  @Nullable
+  public static RoaringBitmap getValidDocIdFromServerMatchingCrc(String tableNameWithType, String segmentName,
+      String validDocIdsType, MinionContext minionContext, String expectedCrc) {
+    String clusterName = minionContext.getHelixManager().getClusterName();
+    HelixAdmin helixAdmin = minionContext.getHelixManager().getClusterManagmentTool();
+    RoaringBitmap validDocIds = null;
+    List<String> servers = getServers(segmentName, tableNameWithType, helixAdmin, clusterName);
+    for (String server : servers) {
+      InstanceConfig instanceConfig = helixAdmin.getInstanceConfig(clusterName, server);
+      String endpoint = InstanceUtils.getServerAdminEndpoint(instanceConfig);
+
+      // We only need aggregated table size and the total number of docs/rows. Skipping column related stats, by
+      // passing an empty list.
+      ServerSegmentMetadataReader serverSegmentMetadataReader = new ServerSegmentMetadataReader();
+      ValidDocIdsBitmapResponse validDocIdsBitmapResponse;
+      try {
+        validDocIdsBitmapResponse =
+            serverSegmentMetadataReader.getValidDocIdsBitmapFromServer(tableNameWithType, segmentName, endpoint,
+                validDocIdsType, 60_000);
+      } catch (Exception e) {
+        LOGGER.warn(
+            String.format("Unable to retrieve validDocIds bitmap for segment: %s from endpoint: %s", segmentName,
+                endpoint), e);
+        continue;
+      }
+
+      // Check crc from the downloaded segment against the crc returned from the server along with the valid doc id
+      // bitmap. If this doesn't match, this means that we are hitting the race condition where the segment has been
+      // uploaded successfully while the server is still reloading the segment. Reloading can take a while when the
+      // offheap upsert is used because we will need to delete & add all primary keys.
+      // `BaseSingleSegmentConversionExecutor.executeTask()` already checks for the crc from the task generator
+      // against the crc from the current segment zk metadata, so we don't need to check that here.
+      String crcFromValidDocIdsBitmap = validDocIdsBitmapResponse.getSegmentCrc();
+      if (!expectedCrc.equals(crcFromValidDocIdsBitmap)) {
+        // In this scenario, we are hitting the other replica of the segment which did not commit to ZK or deepstore.
+        // We will skip processing this bitmap to query other server to confirm if there is a valid matching CRC.
+        String message = String.format("CRC mismatch for segment: %s, expected value based on task generator: %s, "
+                + "actual crc from validDocIdsBitmapResponse from endpoint %s: %s", segmentName, expectedCrc, endpoint,
+            crcFromValidDocIdsBitmap);
+        LOGGER.warn(message);
+        continue;
+      }
+      validDocIds = RoaringBitmapUtils.deserialize(validDocIdsBitmapResponse.getBitmap());
+      break;
+    }
+    return validDocIds;
   }
 }

@@ -29,7 +29,6 @@ import java.util.Random;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.commons.lang3.RandomUtils;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.operator.query.SelectionOnlyOperator;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
@@ -216,11 +215,11 @@ public class NoDictionaryCompressionQueriesTest extends BaseQueriesTest {
 
     //Generate random data
     int rowLength = 1000;
-    Random random = new Random();
     String[] tempStringRows = new String[rowLength];
     Integer[] tempIntRows = new Integer[rowLength];
     Long[] tempLongRows = new Long[rowLength];
 
+    Random random = new Random();
     for (int i = 0; i < rowLength; i++) {
       //Adding a fixed value to check for filter queries
       if (i % 10 == 0) {
@@ -229,8 +228,8 @@ public class NoDictionaryCompressionQueriesTest extends BaseQueriesTest {
         tempLongRows[i] = 1001L;
       } else {
         tempStringRows[i] = RandomStringUtils.random(random.nextInt(100), true, true);
-        tempIntRows[i] = RandomUtils.nextInt(0, rowLength);
-        tempLongRows[i] = RandomUtils.nextLong(0, rowLength);
+        tempIntRows[i] = random.nextInt(rowLength);
+        tempLongRows[i] = (long) random.nextInt(rowLength);
       }
     }
 

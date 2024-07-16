@@ -33,8 +33,8 @@ import java.util.concurrent.CompletionService;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
-import org.apache.http.util.EntityUtils;
+import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
+import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
@@ -210,7 +210,7 @@ public class MultiHttpRequestTest {
     int timeouts = 0;
     for (int i = 0; i < size; i++) {
       try (MultiHttpRequestResponse httpRequestResponse = completionService.take().get()) {
-        if (httpRequestResponse.getResponse().getStatusLine().getStatusCode() >= 300) {
+        if (httpRequestResponse.getResponse().getCode() >= 300) {
           errors++;
           Assert.assertEquals(EntityUtils.toString(httpRequestResponse.getResponse().getEntity()), ERROR_MSG);
         } else {

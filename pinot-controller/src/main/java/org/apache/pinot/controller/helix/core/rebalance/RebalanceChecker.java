@@ -28,7 +28,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
-import org.apache.commons.lang3.RandomUtils;
+import java.util.concurrent.ThreadLocalRandom;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
@@ -187,7 +187,10 @@ public class RebalanceChecker extends ControllerPeriodicTask<Void> {
     // The attemptId starts from 1, so minus one as the exponent.
     double minDelayMs = initDelayMs * Math.pow(RETRY_DELAY_SCALE_FACTOR, attemptId - 1);
     double maxDelayMs = minDelayMs * RETRY_DELAY_SCALE_FACTOR;
-    return RandomUtils.nextLong((long) minDelayMs, (long) maxDelayMs);
+    if (maxDelayMs > minDelayMs) {
+      return ThreadLocalRandom.current().nextLong((long) minDelayMs, (long) maxDelayMs);
+    }
+    return (long) minDelayMs;
   }
 
   private static void abortExistingJobs(String tableNameWithType, PinotHelixResourceManager pinotHelixResourceManager) {

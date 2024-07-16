@@ -150,7 +150,7 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
     String[] valuesFromIndex = _jsonIndexReader.getValuesSV(valueBlock.getDocIds(), valueBlock.getNumDocs(),
         getValueToMatchingDocsMap(), false);
     for (int i = 0; i < numDocs; i++) {
-      String value = valuesFromIndex[inputDocIds[i]];
+      String value = valuesFromIndex[i];
       if (value == null) {
         if (_defaultValue != null) {
           _intValuesSV[i] = (int) _defaultValue;

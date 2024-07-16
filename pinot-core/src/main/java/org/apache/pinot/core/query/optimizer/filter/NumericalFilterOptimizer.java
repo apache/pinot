@@ -395,6 +395,13 @@ public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
       String targetTypeLiteral =
           expression.getFunctionCall().getOperands().get(1).getLiteral().getStringValue().toUpperCase();
       DataType dataType;
+
+      // Strip out _ARRAY suffix that can be used to represent an MV field type since the semantics here will be the
+      // same as that for the equivalent SV field of the same type
+      if (targetTypeLiteral.endsWith("_ARRAY")) {
+        targetTypeLiteral = targetTypeLiteral.substring(0, targetTypeLiteral.length() - 6);
+      }
+
       if ("INTEGER".equals(targetTypeLiteral)) {
         dataType = DataType.INT;
       } else if ("VARCHAR".equals(targetTypeLiteral)) {

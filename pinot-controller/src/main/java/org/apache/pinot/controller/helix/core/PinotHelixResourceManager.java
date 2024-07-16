@@ -58,7 +58,7 @@ import javax.ws.rs.BadRequestException;
 import javax.ws.rs.ClientErrorException;
 import javax.ws.rs.NotFoundException;
 import javax.ws.rs.core.Response;
-import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.AccessOption;
@@ -352,6 +352,15 @@ public class PinotHelixResourceManager {
    */
   public String getHelixClusterName() {
     return _helixClusterName;
+  }
+
+  /**
+   * Get the data directory path.
+   *
+   * @return Data directory path
+   */
+  public String getDataDir() {
+    return _dataDir;
   }
 
   /**

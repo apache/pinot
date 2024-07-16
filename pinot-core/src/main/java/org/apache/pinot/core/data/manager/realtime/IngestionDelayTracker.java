@@ -195,6 +195,10 @@ public class IngestionDelayTracker {
     StreamPartitionMsgOffset currentOffset = offset._offset;
     StreamPartitionMsgOffset latestOffset = offset._latestOffset;
 
+    if (currentOffset == null || latestOffset == null) {
+      return 0;
+    }
+
     // Compute aged delay for current partition
     // TODO: Support other types of offsets
     if (!(currentOffset instanceof LongMsgOffset && latestOffset instanceof LongMsgOffset)) {

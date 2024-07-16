@@ -88,6 +88,26 @@ public class UpsertUtils {
     };
   }
 
+  /**
+   * Returns an iterator of {@link PrimaryKey} for the valid documents from the segment.
+   */
+  public static Iterator<PrimaryKey> getPrimaryKeyIterator(PrimaryKeyReader primaryKeyReader,
+      MutableRoaringBitmap validDocIds) {
+    return new Iterator<>() {
+      private final PeekableIntIterator _docIdIterator = validDocIds.getIntIterator();
+
+      @Override
+      public boolean hasNext() {
+        return _docIdIterator.hasNext();
+      }
+
+      @Override
+      public PrimaryKey next() {
+        return primaryKeyReader.getPrimaryKey(_docIdIterator.next());
+      }
+    };
+  }
+
   public static class RecordInfoReader implements Closeable {
     private final PrimaryKeyReader _primaryKeyReader;
     private final ComparisonColumnReader _comparisonColumnReader;

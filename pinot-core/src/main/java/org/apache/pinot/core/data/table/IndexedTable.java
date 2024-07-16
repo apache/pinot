@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.data.table;
 
+import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
@@ -30,6 +31,8 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -37,6 +40,8 @@ import org.apache.pinot.core.query.request.context.QueryContext;
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
 public abstract class IndexedTable extends BaseTable {
+  private static final Logger LOGGER = LoggerFactory.getLogger(IndexedTable.class);
+
   protected final Map<Key, Record> _lookupMap;
   protected final boolean _hasFinalInput;
   protected final int _resultSize;
@@ -65,6 +70,11 @@ public abstract class IndexedTable extends BaseTable {
   protected IndexedTable(DataSchema dataSchema, boolean hasFinalInput, QueryContext queryContext, int resultSize,
       int trimSize, int trimThreshold, Map<Key, Record> lookupMap) {
     super(dataSchema);
+
+    Preconditions.checkArgument(resultSize >= 0, "Result size can't be negative");
+    Preconditions.checkArgument(trimSize >= 0, "Trim size can't be negative");
+    Preconditions.checkArgument(trimThreshold >= 0, "Trim threshold can't be negative");
+
     _lookupMap = lookupMap;
     _hasFinalInput = hasFinalInput;
     _resultSize = resultSize;
@@ -78,10 +88,17 @@ public abstract class IndexedTable extends BaseTable {
       // GROUP BY with ORDER BY
       _hasOrderBy = true;
       _tableResizer = new TableResizer(dataSchema, hasFinalInput, queryContext);
-      // NOTE: trimSize is bounded by trimThreshold/2 to protect the server from using too much memory.
-      // TODO: Re-evaluate it as it can lead to in-accurate results
-      _trimSize = Math.min(trimSize, trimThreshold / 2);
-      _trimThreshold = trimThreshold;
+      _trimSize = trimSize;
+      // trimThreshold is lower bounded by (2 * trimSize) in order to avoid excessive trimming. We don't modify trimSize
+      // in order to maintain the desired accuracy
+      if (trimSize > trimThreshold / 2) {
+        // Handle potential overflow
+        _trimThreshold = (2 * trimSize) > 0 ? 2 * trimSize : Integer.MAX_VALUE;
+        LOGGER.debug("Overriding group trim threshold to {}, since the configured value {} is less than twice the "
+            + "trim size ({})", _trimThreshold, trimThreshold, trimSize);
+      } else {
+        _trimThreshold = trimThreshold;
+      }
     } else {
       // GROUP BY without ORDER BY
       // NOTE: The indexed table stops accepting records once the map size reaches resultSize, and there is no

@@ -41,7 +41,6 @@ import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
-import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.QueryServerEnclosure;
 import org.apache.pinot.query.mailbox.MailboxService;
@@ -249,7 +248,6 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
   public void tearDown() {
     // Restore the original default timezone
     TimeZone.setDefault(_currentSystemTimeZone);
-    DataTableBuilderFactory.setDataTableVersion(DataTableBuilderFactory.DEFAULT_VERSION);
     for (QueryServerEnclosure server : _servers.values()) {
       server.shutDown();
     }

@@ -36,7 +36,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * This {@code SortedMailboxReceiveOperator} receives data from a {@link ReceivingMailbox} and serve it out from the
- * {@link MultiStageOperator#getNextBlock()}()} API in a sorted manner.
+ * {@link #nextBlock()} API in a sorted manner.
  *
  *  TODO: Once sorting on the {@code MailboxSendOperator} is available, modify this to use a k-way merge instead of
  *        resorting via the PriorityQueue.

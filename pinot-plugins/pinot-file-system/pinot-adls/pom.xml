@@ -44,7 +44,7 @@
     <dependency>
       <groupId>com.azure</groupId>
       <artifactId>azure-identity</artifactId>
-      <version>1.12.2</version>
+      <version>1.13.0</version>
     </dependency>
   </dependencies>
   <dependencyManagement>
@@ -62,16 +62,12 @@
       <dependency>
         <groupId>io.projectreactor</groupId>
         <artifactId>reactor-core</artifactId>
-        <version>3.6.7</version>
+        <version>3.6.8</version>
       </dependency>
       <dependency>
         <groupId>com.microsoft.azure</groupId>
         <artifactId>msal4j</artifactId>
-        <version>1.15.1</version>
-      </dependency>
-      <dependency>
-        <groupId>com.nimbusds</groupId>
-        <artifactId>nimbus-jose-jwt</artifactId>
+        <version>1.16.1</version>
       </dependency>
     </dependencies>
   </dependencyManagement>

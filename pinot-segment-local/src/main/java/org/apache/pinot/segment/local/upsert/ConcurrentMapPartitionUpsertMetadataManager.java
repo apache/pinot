@@ -37,7 +37,6 @@ import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
-import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
@@ -168,27 +167,16 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
   }
 
   @Override
-  protected void removeSegment(IndexSegment segment, MutableRoaringBitmap validDocIds) {
-    assert !validDocIds.isEmpty();
-
-    PrimaryKey primaryKey = new PrimaryKey(new Object[_primaryKeyColumns.size()]);
-    PeekableIntIterator iterator = validDocIds.getIntIterator();
-    try (
-        UpsertUtils.PrimaryKeyReader primaryKeyReader = new UpsertUtils.PrimaryKeyReader(segment, _primaryKeyColumns)) {
-      while (iterator.hasNext()) {
-        primaryKeyReader.getPrimaryKey(iterator.next(), primaryKey);
-        _primaryKeyToRecordLocationMap.computeIfPresent(HashUtils.hashPrimaryKey(primaryKey, _hashFunction),
-            (pk, recordLocation) -> {
-              if (recordLocation.getSegment() == segment) {
-                return null;
-              }
-              return recordLocation;
-            });
-      }
-    } catch (Exception e) {
-      throw new RuntimeException(
-          String.format("Caught exception while removing segment: %s, table: %s", segment.getSegmentName(),
-              _tableNameWithType), e);
+  protected void removeSegment(IndexSegment segment, Iterator<PrimaryKey> primaryKeyIterator) {
+    while (primaryKeyIterator.hasNext()) {
+      PrimaryKey primaryKey = primaryKeyIterator.next();
+      _primaryKeyToRecordLocationMap.computeIfPresent(HashUtils.hashPrimaryKey(primaryKey, _hashFunction),
+          (pk, recordLocation) -> {
+        if (recordLocation.getSegment() == segment) {
+          return null;
+        }
+        return recordLocation;
+      });
     }
   }
 
