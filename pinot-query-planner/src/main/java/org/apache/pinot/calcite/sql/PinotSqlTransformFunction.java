@@ -35,12 +35,6 @@ public class PinotSqlTransformFunction extends SqlFunction {
 
   public PinotSqlTransformFunction(String name, SqlKind kind, @Nullable SqlReturnTypeInference returnTypeInference,
       @Nullable SqlOperandTypeInference operandTypeInference, @Nullable SqlOperandTypeChecker operandTypeChecker,
-      SqlFunctionCategory category) {
-    this(name, kind, returnTypeInference, operandTypeInference, operandTypeChecker, category, false);
-  }
-
-  public PinotSqlTransformFunction(String name, SqlKind kind, @Nullable SqlReturnTypeInference returnTypeInference,
-      @Nullable SqlOperandTypeInference operandTypeInference, @Nullable SqlOperandTypeChecker operandTypeChecker,
       SqlFunctionCategory category, boolean isDeterministic) {
     super(name, kind, returnTypeInference, operandTypeInference, operandTypeChecker, category);
     _isDeterministic = isDeterministic;
