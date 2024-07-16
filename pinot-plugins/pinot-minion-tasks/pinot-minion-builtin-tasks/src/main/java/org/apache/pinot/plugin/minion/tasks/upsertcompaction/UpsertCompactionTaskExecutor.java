@@ -43,6 +43,27 @@ import org.slf4j.LoggerFactory;
 public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExecutor {
   private static final Logger LOGGER = LoggerFactory.getLogger(UpsertCompactionTaskExecutor.class);
 
+  private static SegmentGeneratorConfig getSegmentGeneratorConfig(File workingDir, TableConfig tableConfig,
+      SegmentMetadataImpl segmentMetadata, String segmentName, Schema schema) {
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
+    config.setOutDir(workingDir.getPath());
+    config.setSegmentName(segmentName);
+    // Keep index creation time the same as original segment because both segments use the same raw data.
+    // This way, for REFRESH case, when new segment gets pushed to controller, we can use index creation time to
+    // identify if the new pushed segment has newer data than the existing one.
+    config.setCreationTime(String.valueOf(segmentMetadata.getIndexCreationTime()));
+
+    // The time column type info is not stored in the segment metadata.
+    // Keep segment start/end time to properly handle time column type other than EPOCH (e.g.SIMPLE_FORMAT).
+    if (segmentMetadata.getTimeInterval() != null) {
+      config.setTimeColumnName(tableConfig.getValidationConfig().getTimeColumnName());
+      config.setStartTime(Long.toString(segmentMetadata.getStartTime()));
+      config.setEndTime(Long.toString(segmentMetadata.getEndTime()));
+      config.setSegmentTimeUnit(segmentMetadata.getTimeUnit());
+    }
+    return config;
+  }
+
   @Override
   protected SegmentConversionResult convert(PinotTaskConfig pinotTaskConfig, File indexDir, File workingDir)
       throws Exception {
@@ -111,27 +132,6 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
     LOGGER.info("Finished task: {} with configs: {}. Total time: {}ms", taskType, configs, (endMillis - startMillis));
 
     return result;
-  }
-
-  private static SegmentGeneratorConfig getSegmentGeneratorConfig(File workingDir, TableConfig tableConfig,
-      SegmentMetadataImpl segmentMetadata, String segmentName, Schema schema) {
-    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
-    config.setOutDir(workingDir.getPath());
-    config.setSegmentName(segmentName);
-    // Keep index creation time the same as original segment because both segments use the same raw data.
-    // This way, for REFRESH case, when new segment gets pushed to controller, we can use index creation time to
-    // identify if the new pushed segment has newer data than the existing one.
-    config.setCreationTime(String.valueOf(segmentMetadata.getIndexCreationTime()));
-
-    // The time column type info is not stored in the segment metadata.
-    // Keep segment start/end time to properly handle time column type other than EPOCH (e.g.SIMPLE_FORMAT).
-    if (segmentMetadata.getTimeInterval() != null) {
-      config.setTimeColumnName(tableConfig.getValidationConfig().getTimeColumnName());
-      config.setStartTime(Long.toString(segmentMetadata.getStartTime()));
-      config.setEndTime(Long.toString(segmentMetadata.getEndTime()));
-      config.setSegmentTimeUnit(segmentMetadata.getTimeUnit());
-    }
-    return config;
   }
 
   @Override

@@ -108,6 +108,15 @@ public class UpsertUtils {
     };
   }
 
+  static Object getValue(PinotSegmentColumnReader columnReader, int docId) {
+    Object value = columnReader.getValue(docId);
+    return value instanceof byte[] ? new ByteArray((byte[]) value) : value;
+  }
+
+  public interface ComparisonColumnReader extends Closeable {
+    Comparable getComparisonValue(int docId);
+  }
+
   public static class RecordInfoReader implements Closeable {
     private final PrimaryKeyReader _primaryKeyReader;
     private final ComparisonColumnReader _comparisonColumnReader;
@@ -131,8 +140,8 @@ public class UpsertUtils {
     public RecordInfo getRecordInfo(int docId) {
       PrimaryKey primaryKey = _primaryKeyReader.getPrimaryKey(docId);
       Comparable comparisonValue = _comparisonColumnReader.getComparisonValue(docId);
-      boolean deleteRecord = _deleteRecordColumnReader != null
-          && BooleanUtils.toBoolean(_deleteRecordColumnReader.getValue(docId));
+      boolean deleteRecord =
+          _deleteRecordColumnReader != null && BooleanUtils.toBoolean(_deleteRecordColumnReader.getValue(docId));
       return new RecordInfo(primaryKey, docId, comparisonValue, deleteRecord);
     }
 
@@ -178,15 +187,6 @@ public class UpsertUtils {
         primaryKeyColumnReader.close();
       }
     }
-  }
-
-  static Object getValue(PinotSegmentColumnReader columnReader, int docId) {
-    Object value = columnReader.getValue(docId);
-    return value instanceof byte[] ? new ByteArray((byte[]) value) : value;
-  }
-
-  public interface ComparisonColumnReader extends Closeable {
-    Comparable getComparisonValue(int docId);
   }
 
   public static class SingleComparisonColumnReader implements UpsertUtils.ComparisonColumnReader {
