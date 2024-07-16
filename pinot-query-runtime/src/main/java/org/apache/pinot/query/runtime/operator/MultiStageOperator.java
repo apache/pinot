@@ -66,6 +66,10 @@ public abstract class MultiStageOperator
 
   public abstract void registerExecution(long time, int numRows);
 
+  protected void sampleResourceUsage(int totalProcessedRows) {
+    Tracing.ThreadAccountantOps.samplePeriodically(totalProcessedRows);
+  }
+
   /**
    * Returns the next block from the operator. It should return non-empty data blocks followed by an end-of-stream (EOS)
    * block when all the data is processed, or an error block if an error occurred. After it returns EOS or error block,
