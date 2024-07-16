@@ -107,8 +107,18 @@ public enum TransformFunctionType {
   ARRAY_TO_MV("arrayToMV",
       ReturnTypes.cascade(opBinding -> positionalComponentReturnType(opBinding, 0), SqlTypeTransforms.FORCE_NULLABLE),
       OperandTypes.family(SqlTypeFamily.ARRAY), "array_to_mv") {
+
     @Override
     public boolean isDeterministic() {
+      // ARRAY_TO_MV is not deterministic. In fact, it has no implementation
+      // We need to explicitly set it as not deterministic in order to do not let Calcite to optimize expressions like
+      // `ARRAY_TO_MV(RandomAirports) = 'MFR' and ARRAY_TO_MV(RandomAirports) = 'GTR'` as `false`.
+      // If the function were deterministic, its value would never be MFR and GTR at the same time, so Calcite is
+      // smart enough to know there is no value that satisfies the condition.
+      // In fact what ARRAY_TO_MV does is just to trick Calcite typesystem, but then what the leaf stage executor
+      // receives is `RandomAirports = 'MFR' and RandomAirports = 'GTR'`, which in the V1 semantics means:
+      // true if and only if RandomAirports contains a value equal to 'MFR' and RandomAirports contains a value equal
+      // to 'GTR'
       return false;
     }
   },
