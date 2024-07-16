@@ -142,33 +142,4 @@ public class PinotTaskProgressResource {
           .build());
     }
   }
-
-  @GET
-  @Path("/tasks/subtask/activeCount")
-  @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation("Get active task execution count on the minion instance")
-  @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error")
-  })
-  public ActiveTasksCountPayload getActiveTasksCount() {
-    long activeTasks = 0;
-    for (MinionEventObserver observer : MinionEventObservers.getInstance().getMinionEventObservers().values()) {
-      if (observer.getTaskState().equals(MinionTaskState.IN_PROGRESS)) {
-        activeTasks++;
-      }
-    }
-    return new ActiveTasksCountPayload(activeTasks);
-  }
-
-  private static class ActiveTasksCountPayload {
-    private final long _activeTasksCount;
-
-    public ActiveTasksCountPayload(long activeTasksCount) {
-      _activeTasksCount = activeTasksCount;
-    }
-
-    public long getActiveTasksCount() {
-      return _activeTasksCount;
-    }
-  }
 }
