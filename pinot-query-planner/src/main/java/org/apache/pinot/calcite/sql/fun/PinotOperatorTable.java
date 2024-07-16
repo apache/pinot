@@ -149,7 +149,7 @@ public class PinotOperatorTable extends SqlStdOperatorTable {
       PinotSqlTransformFunction sqlTransformFunction =
           new PinotSqlTransformFunction(functionName.toUpperCase(Locale.ROOT), functionType.getSqlKind(),
               functionType.getReturnTypeInference(), null, functionType.getOperandTypeChecker(),
-              functionType.getSqlFunctionCategory());
+              functionType.getSqlFunctionCategory(), functionType.isDeterministic());
       if (notRegistered(sqlTransformFunction)) {
         register(sqlTransformFunction);
       }
