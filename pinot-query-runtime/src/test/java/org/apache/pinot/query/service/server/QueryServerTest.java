@@ -29,6 +29,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.common.config.GrpcConfig;
+import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.proto.Worker;
@@ -76,7 +78,8 @@ public class QueryServerTest extends QueryTestSet {
     for (int i = 0; i < QUERY_SERVER_COUNT; i++) {
       int availablePort = QueryTestUtils.getAvailablePort();
       QueryRunner queryRunner = mock(QueryRunner.class);
-      QueryServer queryServer = new QueryServer(availablePort, queryRunner);
+      TlsConfig tlsConfig = mock(TlsConfig.class);
+      QueryServer queryServer = new QueryServer(availablePort, queryRunner,tlsConfig);
       queryServer.start();
       _queryServerMap.put(availablePort, queryServer);
       _queryRunnerMap.put(availablePort, queryRunner);
