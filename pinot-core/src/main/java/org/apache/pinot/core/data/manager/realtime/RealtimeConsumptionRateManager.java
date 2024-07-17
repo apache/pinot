@@ -64,6 +64,11 @@ public class RealtimeConsumptionRateManager {
   // stream config object is required for fetching the partition count from the stream
   private final LoadingCache<StreamConfig, Integer> _streamConfigToTopicPartitionCountMap;
   private volatile boolean _isThrottlingAllowed = false;
+  private int _paritionCount;
+  private double _topicRateLimit;
+  private double _partitionRateLimit;
+
+  private double _serverRateLimit;
 
   @VisibleForTesting
   RealtimeConsumptionRateManager(LoadingCache<StreamConfig, Integer> streamConfigToTopicPartitionCountMap) {
@@ -87,11 +92,11 @@ public class RealtimeConsumptionRateManager {
     double serverRateLimit =
         serverConfig.getProperty(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT,
             CommonConstants.Server.DEFAULT_SERVER_CONSUMPTION_RATE_LIMIT);
+    setServerRateLimit(serverRateLimit);
     if (serverRateLimit <= 0) {
       LOGGER.warn("Invalid server consumption rate limit: {}, throttling is disabled", serverRateLimit);
       _serverRateLimiter = NOOP_RATE_LIMITER;
     } else {
-      LOGGER.info("A server consumption rate limiter is set up with rate limit: {}", serverRateLimit);
       MetricEmitter metricEmitter = new MetricEmitter(serverMetrics, SERVER_CONSUMPTION_RATE_METRIC_KEY_NAME);
       _serverRateLimiter = new RateLimiterImpl(serverRateLimit, metricEmitter);
     }
@@ -102,6 +107,38 @@ public class RealtimeConsumptionRateManager {
     return _serverRateLimiter;
   }
 
+  public double getTopicRateLimit() {
+    return _topicRateLimit;
+  }
+
+  public void setTopicRateLimit(double topicRateLimit) {
+    _topicRateLimit = topicRateLimit;
+  }
+
+  public double getPartitionRateLimit() {
+    return _partitionRateLimit;
+  }
+
+  public void setPartitionRateLimit(double partitionRateLimit) {
+    _partitionRateLimit = partitionRateLimit;
+  }
+
+  public int getParitionCount() {
+    return _paritionCount;
+  }
+
+  public void setParitionCount(int paritionCount) {
+    _paritionCount = paritionCount;
+  }
+
+  public double getServerRateLimit() {
+    return _serverRateLimit;
+  }
+
+  public void setServerRateLimit(double serverRateLimit) {
+    _serverRateLimit = serverRateLimit;
+  }
+
   public ConsumptionRateLimiter createRateLimiter(StreamConfig streamConfig, String tableName,
       ServerMetrics serverMetrics, String metricKeyName) {
     if (streamConfig.getTopicConsumptionRateLimit().isEmpty()) {
@@ -110,15 +147,15 @@ public class RealtimeConsumptionRateManager {
     int partitionCount;
     try {
       partitionCount = _streamConfigToTopicPartitionCountMap.get(streamConfig);
+      setParitionCount(partitionCount);
     } catch (ExecutionException e) {
       // Exception here means for some reason, partition count cannot be fetched from stream!
       throw new RuntimeException(e);
     }
     double topicRateLimit = streamConfig.getTopicConsumptionRateLimit().get();
+    setTopicRateLimit(topicRateLimit);
     double partitionRateLimit = topicRateLimit / partitionCount;
-    LOGGER.info("A consumption rate limiter is set up for topic {} in table {} with rate limit: {} "
-            + "(topic rate limit: {}, partition count: {})", streamConfig.getTopicName(), tableName, partitionRateLimit,
-        topicRateLimit, partitionCount);
+    setPartitionRateLimit(partitionRateLimit);
     MetricEmitter metricEmitter = new MetricEmitter(serverMetrics, metricKeyName);
     return new RateLimiterImpl(partitionRateLimit, metricEmitter);
   }
