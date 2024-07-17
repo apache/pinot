@@ -23,10 +23,10 @@ import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.nio.ByteBuffer;
 import java.util.Base64;
+import java.util.Random;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
-import org.apache.commons.lang3.RandomUtils;
 import org.apache.datasketches.tuple.Intersection;
 import org.apache.datasketches.tuple.Sketch;
 import org.apache.datasketches.tuple.aninteger.IntegerSketch;
@@ -293,10 +293,11 @@ public class TupleSketchTest extends CustomDataQueryClusterIntegrationTest {
     File avroFile = new File(_tempDir, "data.avro");
     try (DataFileWriter<GenericData.Record> fileWriter = new DataFileWriter<>(new GenericDatumWriter<>(avroSchema))) {
       fileWriter.create(avroSchema, avroFile);
+      Random random = new Random();
       for (int i = 0; i < getCountStarResult(); i++) {
         // create avro record
         GenericData.Record record = new GenericData.Record(avroSchema);
-        record.put(ID, RandomUtils.nextInt(0, 10));
+        record.put(ID, random.nextInt(10));
         record.put(MET_TUPLE_SKETCH_BYTES, ByteBuffer.wrap(getRandomRawValue()));
         // add avro record to file
         fileWriter.append(record);

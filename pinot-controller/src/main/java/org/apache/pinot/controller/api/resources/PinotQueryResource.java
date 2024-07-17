@@ -66,6 +66,7 @@ import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.ManualAuthorization;
 import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
 import org.apache.pinot.query.QueryEnvironment;
@@ -292,7 +293,7 @@ public class PinotQueryResource {
 
     // Validate data access
     AccessControl accessControl = _accessControlFactory.create();
-    if (!accessControl.hasDataAccess(httpHeaders, rawTableName)) {
+    if (!accessControl.hasAccess(rawTableName, AccessType.READ, httpHeaders, Actions.Table.QUERY)) {
       return QueryException.ACCESS_DENIED_ERROR.toString();
     }
 

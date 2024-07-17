@@ -447,17 +447,21 @@ public class RealtimeSegmentConverterTest {
   @DataProvider
   public static Object[][] reuseParams() {
     List<Boolean> enabledColumnMajorSegmentBuildParams = Arrays.asList(false, true);
-    String[] sortedColumnParams = new String[]{null, STRING_COLUMN1};
+    List<String> sortedColumnParams = Arrays.asList(null, STRING_COLUMN1);
+    List<Boolean> reuseMutableIndex = Arrays.asList(true, false);
+    List<Integer> luceneNRTCachingDirectoryMaxBufferSizeMB = Arrays.asList(0, 5);
 
-    return enabledColumnMajorSegmentBuildParams.stream().flatMap(
-            columnMajor -> Arrays.stream(sortedColumnParams).map(sortedColumn -> new Object[]{columnMajor,
-                sortedColumn}))
+    return enabledColumnMajorSegmentBuildParams.stream().flatMap(columnMajor -> sortedColumnParams.stream().flatMap(
+            sortedColumn -> reuseMutableIndex.stream().flatMap(
+                reuseIndex -> luceneNRTCachingDirectoryMaxBufferSizeMB.stream()
+                    .map(cacheSize -> new Object[]{columnMajor, sortedColumn, reuseIndex, cacheSize}))))
         .toArray(Object[][]::new);
   }
 
   // Test the realtime segment conversion of a table with an index that reuses mutable index artifacts during conversion
   @Test(dataProvider = "reuseParams")
-  public void testSegmentBuilderWithReuse(boolean columnMajorSegmentBuilder, String sortedColumn)
+  public void testSegmentBuilderWithReuse(boolean columnMajorSegmentBuilder, String sortedColumn,
+      boolean reuseMutableIndex, int luceneNRTCachingDirectoryMaxBufferSizeMB)
       throws Exception {
     File tmpDir = new File(TMP_DIR, "tmp_" + System.currentTimeMillis());
     FieldConfig textIndexFieldConfig =
@@ -477,7 +481,7 @@ public class RealtimeSegmentConverterTest {
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
     TextIndexConfig textIndexConfig =
         new TextIndexConfig(false, null, null, false, false, Collections.emptyList(), Collections.emptyList(), false,
-            500, null, false);
+            500, null, false, reuseMutableIndex, luceneNRTCachingDirectoryMaxBufferSizeMB);
 
     RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder =
         new RealtimeSegmentConfig.Builder().setTableNameWithType(tableNameWithType).setSegmentName(segmentName)

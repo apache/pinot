@@ -113,9 +113,6 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
     _textColumn = column;
     _commitOnClose = commit;
 
-    // to reuse the mutable index, it must be (1) not the realtime index, i.e. commit is set to false
-    // and (2) happens during realtime segment conversion
-    _reuseMutableIndex = commit && realtimeConversion;
     String luceneAnalyzerClass = config.getLuceneAnalyzerClass();
     try {
       // segment generation is always in V1 and later we convert (as part of post creation processing)
@@ -135,22 +132,25 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
       indexWriterConfig.setCommitOnClose(commit);
       indexWriterConfig.setUseCompoundFile(config.isLuceneUseCompoundFile());
 
-      // For the realtime segment, prevent background merging. The realtime segment will call .commit()
-      // on the IndexWriter when segment conversion occurs. By default, Lucene will sometimes choose to
-      // merge segments in the background, which is problematic because the lucene index directory's
-      // contents is copied to create the immutable segment. If a background merge occurs during this
-      // copy, a FileNotFoundException will be triggered and segment build will fail.
+      // For the realtime segment, to reuse mutable index, we should set the two write configs below.
+      // The realtime segment will call .commit() on the IndexWriter when segment conversion occurs.
+      // By default, Lucene will sometimes choose to merge segments in the background, which is problematic because
+      // the lucene index directory's contents is copied to create the immutable segment. If a background merge
+      // occurs during this copy, a FileNotFoundException will be triggered and segment build will fail.
       //
       // Also, for the realtime segment, we set the OpenMode to CREATE to ensure that any existing artifacts
       // will be overwritten. This is necessary because the realtime segment can be created multiple times
       // during a server crash and restart scenario. If the existing artifacts are appended to, the realtime
       // query results will be accurate, but after segment conversion the mapping file generated will be loaded
       // for only the first numDocs lucene docIds, which can cause IndexOutOfBounds errors.
-      if (!_commitOnClose) {
+      if (!_commitOnClose && config.isReuseMutableIndex()) {
         indexWriterConfig.setMergeScheduler(NoMergeScheduler.INSTANCE);
         indexWriterConfig.setOpenMode(IndexWriterConfig.OpenMode.CREATE);
       }
 
+      // to reuse the mutable index, it must be (1) not the realtime index, i.e. commit is set to true
+      // and (2) happens during realtime segment conversion
+      _reuseMutableIndex = config.isReuseMutableIndex() && commit && realtimeConversion;
       if (_reuseMutableIndex) {
         LOGGER.info("Reusing the realtime lucene index for segment {} and column {}", segmentIndexDir, column);
         indexWriterConfig.setOpenMode(IndexWriterConfig.OpenMode.CREATE_OR_APPEND);
@@ -158,15 +158,17 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
         return;
       }
 
-      if (_commitOnClose) {
-        _indexDirectory = FSDirectory.open(_indexFile.toPath());
-      } else {
+      if (!_commitOnClose && config.getLuceneNRTCachingDirectoryMaxBufferSizeMB() > 0) {
         // For realtime index, use NRTCachingDirectory to reduce the number of open files. This buffers the
         // flushes triggered by the near real-time refresh and writes them to disk when the buffer is full,
         // reducing the number of small writes.
-        _indexDirectory =
-            new NRTCachingDirectory(FSDirectory.open(_indexFile.toPath()), config.getLuceneMaxBufferSizeMB(),
-                config.getLuceneMaxBufferSizeMB());
+        int bufSize = config.getLuceneNRTCachingDirectoryMaxBufferSizeMB();
+        LOGGER.info(
+            "Using NRTCachingDirectory for realtime lucene index for segment {} and column {} with buffer size: {}MB",
+            segmentIndexDir, column, bufSize);
+        _indexDirectory = new NRTCachingDirectory(FSDirectory.open(_indexFile.toPath()), bufSize, bufSize);
+      } else {
+        _indexDirectory = FSDirectory.open(_indexFile.toPath());
       }
       _indexWriter = new IndexWriter(_indexDirectory, indexWriterConfig);
     } catch (ReflectiveOperationException e) {

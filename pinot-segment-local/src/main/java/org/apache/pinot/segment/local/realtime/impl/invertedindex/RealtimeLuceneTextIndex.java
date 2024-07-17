@@ -55,6 +55,7 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
   private Analyzer _analyzer;
   private final String _column;
   private final String _segmentName;
+  private final boolean _reuseMutableIndex;
   private boolean _enablePrefixSuffixMatchingInPhraseQueries = false;
   private final RealtimeLuceneRefreshListener _refreshListener;
 
@@ -90,6 +91,7 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
       _searcherManager.addListener(_refreshListener);
       _analyzer = _indexCreator.getIndexWriter().getConfig().getAnalyzer();
       _enablePrefixSuffixMatchingInPhraseQueries = config.isEnablePrefixSuffixMatchingInPhraseQueries();
+      _reuseMutableIndex = config.isReuseMutableIndex();
     } catch (Exception e) {
       LOGGER.error("Failed to instantiate realtime Lucene index reader for column {}, exception {}", column,
           e.getMessage());
@@ -152,8 +154,7 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
         }
       }
     };
-    Future<MutableRoaringBitmap> searchFuture =
-        SEARCHER_POOL.getExecutorService().submit(searchCallable);
+    Future<MutableRoaringBitmap> searchFuture = SEARCHER_POOL.getExecutorService().submit(searchCallable);
     try {
       return searchFuture.get();
     } catch (InterruptedException e) {
@@ -163,7 +164,7 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
       throw new RuntimeException("TEXT_MATCH query interrupted while querying the consuming segment");
     } catch (Exception e) {
       LOGGER.error("Failed while searching the realtime text index for segment {}, column {}, search query {},"
-              + " exception {}", _segmentName, _column, searchQuery, e.getMessage());
+          + " exception {}", _segmentName, _column, searchQuery, e.getMessage());
       throw new RuntimeException(e);
     }
   }
@@ -190,6 +191,9 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
 
   @Override
   public void commit() {
+    if (!_reuseMutableIndex) {
+      return;
+    }
     try {
       _indexCreator.getIndexWriter().commit();
     } catch (Exception e) {

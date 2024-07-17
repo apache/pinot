@@ -25,7 +25,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.response.broker.ResultTable;
-import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.QueryServerEnclosure;
 import org.apache.pinot.query.mailbox.MailboxService;
@@ -143,7 +142,6 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
 
   @AfterClass
   public void tearDown() {
-    DataTableBuilderFactory.setDataTableVersion(DataTableBuilderFactory.DEFAULT_VERSION);
     for (QueryServerEnclosure server : _servers.values()) {
       server.shutDown();
     }

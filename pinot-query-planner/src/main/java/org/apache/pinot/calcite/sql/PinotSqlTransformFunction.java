@@ -31,10 +31,17 @@ import org.checkerframework.checker.nullness.qual.Nullable;
  * Pinot SqlAggFunction class to register the Pinot aggregation functions with the Calcite operator table.
  */
 public class PinotSqlTransformFunction extends SqlFunction {
+  private final boolean _isDeterministic;
 
   public PinotSqlTransformFunction(String name, SqlKind kind, @Nullable SqlReturnTypeInference returnTypeInference,
       @Nullable SqlOperandTypeInference operandTypeInference, @Nullable SqlOperandTypeChecker operandTypeChecker,
-      SqlFunctionCategory category) {
+      SqlFunctionCategory category, boolean isDeterministic) {
     super(name, kind, returnTypeInference, operandTypeInference, operandTypeChecker, category);
+    _isDeterministic = isDeterministic;
+  }
+
+  @Override
+  public boolean isDeterministic() {
+    return _isDeterministic;
   }
 }

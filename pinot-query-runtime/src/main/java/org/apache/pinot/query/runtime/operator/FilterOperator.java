@@ -95,21 +95,28 @@ public class FilterOperator extends MultiStageOperator {
 
   @Override
   protected TransferableBlock getNextBlock() {
-    TransferableBlock block = _input.nextBlock();
-    if (block.isEndOfStreamBlock()) {
+    // Keep reading the input blocks until we find a match row or all blocks are processed.
+    // TODO: Consider batching the rows to improve performance.
+    while (true) {
+      TransferableBlock block = _input.nextBlock();
       if (block.isErrorBlock()) {
         return block;
       }
-      return updateEosBlock(block, _statMap);
-    }
-    List<Object[]> resultRows = new ArrayList<>();
-    for (Object[] row : block.getContainer()) {
-      Object filterResult = _filterOperand.apply(row);
-      if (BooleanUtils.isTrueInternalValue(filterResult)) {
-        resultRows.add(row);
+      if (block.isSuccessfulEndOfStreamBlock()) {
+        return updateEosBlock(block, _statMap);
+      }
+      assert block.isDataBlock();
+      List<Object[]> rows = new ArrayList<>();
+      for (Object[] row : block.getContainer()) {
+        Object filterResult = _filterOperand.apply(row);
+        if (BooleanUtils.isTrueInternalValue(filterResult)) {
+          rows.add(row);
+        }
+      }
+      if (!rows.isEmpty()) {
+        return new TransferableBlock(rows, _dataSchema, DataBlock.Type.ROW);
       }
     }
-    return new TransferableBlock(resultRows, _dataSchema, DataBlock.Type.ROW);
   }
 
   public enum StatKey implements StatMap.Key {

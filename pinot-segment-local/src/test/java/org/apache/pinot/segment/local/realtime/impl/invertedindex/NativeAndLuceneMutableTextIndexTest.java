@@ -75,7 +75,7 @@ public class NativeAndLuceneMutableTextIndexTest {
       throws Exception {
     ServerMetrics.register(mock(ServerMetrics.class));
     TextIndexConfig config =
-        new TextIndexConfig(false, null, null, false, false, null, null, true, 500, null, false);
+        new TextIndexConfig(false, null, null, false, false, null, null, true, 500, null, false, false, 0);
     _realtimeLuceneTextIndex =
         new RealtimeLuceneTextIndex(TEXT_COLUMN_NAME, INDEX_DIR, "table__0__1__20240602T0014Z", config);
     _nativeMutableTextIndex = new NativeMutableTextIndex(TEXT_COLUMN_NAME);

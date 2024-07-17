@@ -121,9 +121,7 @@ public class PinotQueryRuleSets {
   public static final Collection<RelOptRule> PINOT_POST_RULES = ImmutableList.of(
       // Evaluate the Literal filter nodes
       CoreRules.FILTER_REDUCE_EXPRESSIONS,
-      // Expand all SEARCH nodes to simplified filter nodes. SEARCH nodes get created for queries with range
-      // predicates, in-clauses, etc.
-      PinotFilterExpandSearchRule.INSTANCE,
+      // TODO: Merge the following 2 rules into a single rule
       // add an extra exchange for sort
       PinotSortExchangeNodeInsertRule.INSTANCE,
       // copy exchanges down, this must be done after SortExchangeNodeInsertRule
@@ -139,6 +137,13 @@ public class PinotQueryRuleSets {
       PinotJoinToDynamicBroadcastRule.INSTANCE,
 
       // remove exchanges when there's duplicates
-      PinotExchangeEliminationRule.INSTANCE
+      PinotExchangeEliminationRule.INSTANCE,
+
+      // Expand all SEARCH nodes to simplified filter nodes. SEARCH nodes get created for queries with range predicates,
+      // in-clauses, etc.
+      // NOTE: Keep this rule at the end because it can potentially create a lot of predicates joined by OR/AND for IN/
+      //       NOT IN clause, which can be expensive to process in other rules.
+      // TODO: Consider removing this rule and directly handle SEARCH in RexExpressionUtils.
+      PinotFilterExpandSearchRule.INSTANCE
   );
 }

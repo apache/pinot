@@ -31,6 +31,7 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Aggregate;
 import org.apache.calcite.rel.core.AggregateCall;
 import org.apache.calcite.rel.core.Project;
+import org.apache.calcite.rel.core.Union;
 import org.apache.calcite.rel.hint.RelHint;
 import org.apache.calcite.rel.logical.LogicalAggregate;
 import org.apache.calcite.rel.rules.AggregateExtractProjectRule;
@@ -219,8 +220,8 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
   private static PinotLogicalAggregate convertAggFromIntermediateInput(RelOptRuleCall call,
       PinotLogicalExchange exchange, AggType aggType) {
     Aggregate aggRel = call.rel(0);
-    RelNode input = PinotRuleUtils.unboxRel(aggRel.getInput());
-    List<RexNode> projects = (input instanceof Project) ? ((Project) input).getProjects() : null;
+    RelNode input = aggRel.getInput();
+    List<RexNode> projects = findImmediateProjects(input);
 
     // Create new AggregateCalls from exchange input. Exchange produces results with group keys followed by intermediate
     // aggregate results.
@@ -258,8 +259,8 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
   }
 
   private static List<AggregateCall> buildAggCalls(Aggregate aggRel, AggType aggType) {
-    RelNode input = PinotRuleUtils.unboxRel(aggRel.getInput());
-    List<RexNode> projects = (input instanceof Project) ? ((Project) input).getProjects() : null;
+    RelNode input = aggRel.getInput();
+    List<RexNode> projects = findImmediateProjects(input);
     List<AggregateCall> orgAggCalls = aggRel.getAggCallList();
     List<AggregateCall> aggCalls = new ArrayList<>(orgAggCalls.size());
     for (AggregateCall orgAggCall : orgAggCalls) {
@@ -329,5 +330,16 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
     return AggregateCall.create(sqlAggFunction, false, orgAggCall.isApproximate(), orgAggCall.ignoreNulls(), rexList,
         ImmutableList.of(), aggType.isInputIntermediateFormat() ? -1 : orgAggCall.filterArg, orgAggCall.distinctKeys,
         orgAggCall.collation, numGroups, input, null, null);
+  }
+
+  @Nullable
+  private static List<RexNode> findImmediateProjects(RelNode relNode) {
+    relNode = PinotRuleUtils.unboxRel(relNode);
+    if (relNode instanceof Project) {
+      return ((Project) relNode).getProjects();
+    } else if (relNode instanceof Union) {
+      return findImmediateProjects(relNode.getInput(0));
+    }
+    return null;
   }
 }
