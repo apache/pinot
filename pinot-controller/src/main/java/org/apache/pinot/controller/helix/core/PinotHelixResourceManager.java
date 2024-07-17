@@ -76,6 +76,7 @@ import org.apache.helix.PropertyPathBuilder;
 import org.apache.helix.api.listeners.BatchMode;
 import org.apache.helix.api.listeners.InstanceConfigChangeListener;
 import org.apache.helix.api.listeners.PreFetch;
+import org.apache.helix.constants.InstanceConstants;
 import org.apache.helix.model.CurrentState;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.HelixConfigScope;
@@ -3165,7 +3166,9 @@ public class PinotHelixResourceManager {
       return PinotResourceManagerResponse.failure("Instance " + instanceName + " not found");
     }
 
-    _helixAdmin.enableInstance(_helixClusterName, instanceName, enableInstance);
+    InstanceConstants.InstanceOperation instanceOperation = enableInstance ? InstanceConstants.InstanceOperation.ENABLE
+        : InstanceConstants.InstanceOperation.DISABLE;
+    _helixAdmin.setInstanceOperation(_helixClusterName, instanceName, instanceOperation);
     long intervalWaitTimeMs = 500L;
     long deadline = System.currentTimeMillis() + timeOutMs;
     String offlineState = SegmentStateModel.OFFLINE;
