@@ -289,15 +289,17 @@ public class IngestionDelayTracker {
       // Only publish the metric if supported by the underlying stream. If not supported the stream
       // returns Long.MIN_VALUE
       if (ingestionTimeMs >= 0) {
+        long ingestionDelayMs = getPartitionIngestionDelayMs(partitionGroupId);
         _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionGroupId, ServerGauge.REALTIME_INGESTION_DELAY_MS,
-            () -> getPartitionIngestionDelayMs(partitionGroupId));
+            () -> ingestionDelayMs);
       }
       if (firstStreamIngestionTimeMs >= 0) {
+        long endToEndIngestionDelayMs = getPartitionEndToEndIngestionDelayMs(partitionGroupId);
         // Only publish this metric when creation time is supported by the underlying stream
         // When this timestamp is not supported it always returns the value Long.MIN_VALUE
         _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionGroupId,
             ServerGauge.END_TO_END_REALTIME_INGESTION_DELAY_MS,
-            () -> getPartitionEndToEndIngestionDelayMs(partitionGroupId));
+            () -> endToEndIngestionDelayMs);
       }
     }
   }
