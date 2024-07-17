@@ -55,7 +55,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-
 /**
  * {@link QueryServer} is the GRPC server that accepts query plan requests sent from {@link QueryDispatcher}.
  */
@@ -93,12 +92,14 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
       if (_server == null) {
         if (_tlsConfig == null) {
           try {
-            _server = ServerBuilder.forPort(_port).addService(this).maxInboundMessageSize(MAX_INBOUND_MESSAGE_SIZE).build();
-          }catch (Exception e) {
+            _server =
+                ServerBuilder.forPort(_port).addService(this).maxInboundMessageSize(MAX_INBOUND_MESSAGE_SIZE).build();
+          } catch (Exception e) {
             throw new RuntimeException("Failed to start secure QueryServer", e);
           }
-        }else {
-          _server = NettyServerBuilder.forPort(_port).addService(this).sslContext(buildSslContext(_tlsConfig)).maxInboundMessageSize(MAX_INBOUND_MESSAGE_SIZE).build();
+        } else {
+          _server = NettyServerBuilder.forPort(_port).addService(this).sslContext(buildSslContext(_tlsConfig))
+              .maxInboundMessageSize(MAX_INBOUND_MESSAGE_SIZE).build();
         }
         LOGGER.info("Initialized QueryServer on port: {}", _port);
       }
@@ -216,13 +217,13 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     // we always return completed even if cancel attempt fails, server will self clean up in this case.
     responseObserver.onCompleted();
   }
+
   private SslContext buildSslContext(TlsConfig tlsConfig) {
     LOGGER.info("Building gRPC SSL context");
     SslContext sslContext = CLIENT_SSL_CONTEXTS_CACHE.computeIfAbsent(tlsConfig.hashCode(), tlsConfigHashCode -> {
       try {
-        SSLFactory sslFactory =
-            RenewableTlsUtils.createSSLFactoryAndEnableAutoRenewalWhenUsingFileStores(
-                tlsConfig, PinotInsecureMode::isPinotInInsecureMode);
+        SSLFactory sslFactory = RenewableTlsUtils.createSSLFactoryAndEnableAutoRenewalWhenUsingFileStores(tlsConfig,
+            PinotInsecureMode::isPinotInInsecureMode);
         SslContextBuilder sslContextBuilder = SslContextBuilder.forClient();
         sslFactory.getKeyManagerFactory().ifPresent(sslContextBuilder::keyManager);
         sslFactory.getTrustManagerFactory().ifPresent(sslContextBuilder::trustManager);
@@ -240,4 +241,3 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     return sslContext;
   }
 }
-
