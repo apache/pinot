@@ -158,11 +158,6 @@ public class V1MetadataBlock extends BaseDataBlock {
   }
 
   @Override
-  public int getDataBlockVersionType() {
-    return VERSION + (Type.METADATA.ordinal() << DataBlockUtils.VERSION_TYPE_SHIFT);
-  }
-
-  @Override
   protected int getOffsetInFixedBuffer(int rowId, int colId) {
     throw new UnsupportedOperationException("Metadata block uses JSON encoding for field access");
   }

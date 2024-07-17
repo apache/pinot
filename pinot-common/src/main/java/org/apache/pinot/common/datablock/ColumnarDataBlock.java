@@ -56,11 +56,6 @@ public class ColumnarDataBlock extends BaseDataBlock {
   }
 
   @Override
-  protected int getDataBlockVersionType() {
-    return VERSION + (Type.COLUMNAR.ordinal() << DataBlockUtils.VERSION_TYPE_SHIFT);
-  }
-
-  @Override
   protected int getOffsetInFixedBuffer(int rowId, int colId) {
     return _cumulativeColumnOffsetSizeInBytes[colId] + _columnSizeInBytes[colId] * rowId;
   }

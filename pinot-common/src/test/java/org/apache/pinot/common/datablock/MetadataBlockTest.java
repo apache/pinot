@@ -235,11 +235,6 @@ public class MetadataBlockTest {
     }
 
     @Override
-    protected int getDataBlockVersionType() {
-      return MetadataBlock.VERSION + (Type.METADATA.ordinal() << DataBlockUtils.VERSION_TYPE_SHIFT);
-    }
-
-    @Override
     protected int getOffsetInFixedBuffer(int rowId, int colId) {
       return 0;
     }

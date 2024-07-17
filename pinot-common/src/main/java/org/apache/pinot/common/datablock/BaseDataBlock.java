@@ -132,17 +132,6 @@ public abstract class BaseDataBlock implements DataBlock, DataBlock.Raw {
     _errCodeToExceptionMap = new HashMap<>();
   }
 
-  @Override
-  public int getVersion() {
-    return 0;
-  }
-
-  /**
-   * Return the int serialized form of the data block version and type.
-   * @return
-   */
-  protected abstract int getDataBlockVersionType();
-
   /**
    * return the offset in {@code _fixedSizeDataBytes} of the row/column ID.
    * @param rowId row ID

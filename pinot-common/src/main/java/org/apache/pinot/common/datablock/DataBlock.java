@@ -58,8 +58,6 @@ public interface DataBlock {
   // The following APIs are copied from {@link DataTable} and will be deprecated soon.
   // --------------------------------------------------------------------------
 
-  int getVersion();
-
   int getInt(int rowId, int colId);
 
   long getLong(int rowId, int colId);
