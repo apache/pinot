@@ -20,25 +20,34 @@ package org.apache.pinot.spi.config.table;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
 public class DedupConfig extends BaseJsonConfig {
+  @JsonPropertyDescription("Whether dedup is enabled or not.")
   private final boolean _dedupEnabled;
+  @JsonPropertyDescription("Function to hash the primary key.")
   private final HashFunction _hashFunction;
+  @JsonPropertyDescription("Custom class for dedup metadata manager.")
   private final String _metadataManagerClass;
+  @JsonPropertyDescription("Whether to use TTL for dedup metadata cleanup, it uses the same unit as the time column.")
+  private final double _metadataTTL;
 
   public DedupConfig(@JsonProperty(value = "dedupEnabled", required = true) boolean dedupEnabled,
       @JsonProperty(value = "hashFunction") HashFunction hashFunction) {
-    this(dedupEnabled, hashFunction, null);
+    this(dedupEnabled, hashFunction, null, 0);
   }
+
   @JsonCreator
   public DedupConfig(@JsonProperty(value = "dedupEnabled", required = true) boolean dedupEnabled,
       @JsonProperty(value = "hashFunction") HashFunction hashFunction,
-      @JsonProperty(value = "metadataManagerClass") String metadataManagerClass
+      @JsonProperty(value = "metadataManagerClass") String metadataManagerClass,
+      @JsonProperty(value = "metadataTTL") double metadataTTL
   ) {
     _dedupEnabled = dedupEnabled;
     _hashFunction = hashFunction == null ? HashFunction.NONE : hashFunction;
     _metadataManagerClass = metadataManagerClass;
+    _metadataTTL = metadataTTL;
   }
 
   public HashFunction getHashFunction() {
@@ -51,5 +60,9 @@ public class DedupConfig extends BaseJsonConfig {
 
   public String getMetadataManagerClass() {
     return _metadataManagerClass;
+  }
+
+  public double getMetadataTTL() {
+    return _metadataTTL;
   }
 }
