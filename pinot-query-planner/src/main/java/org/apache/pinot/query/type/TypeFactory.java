@@ -21,10 +21,8 @@ package org.apache.pinot.query.type;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
-import java.util.function.Predicate;
 import org.apache.calcite.jdbc.JavaTypeFactoryImpl;
 import org.apache.calcite.rel.type.RelDataType;
-import org.apache.calcite.rel.type.RelDataTypeSystem;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -41,44 +39,34 @@ import org.apache.pinot.spi.data.Schema;
  * upgrading Calcite versions.
  */
 public class TypeFactory extends JavaTypeFactoryImpl {
-  private static final Charset DEFAULT_CHARSET = StandardCharsets.UTF_8;
 
-  public TypeFactory(RelDataTypeSystem typeSystem) {
-    super(typeSystem);
+  public TypeFactory() {
+    super(TypeSystem.INSTANCE);
   }
 
   @Override
   public Charset getDefaultCharset() {
-    return DEFAULT_CHARSET;
+    return StandardCharsets.UTF_8;
   }
 
   public RelDataType createRelDataTypeFromSchema(Schema schema) {
     Builder builder = new Builder(this);
-    Predicate<FieldSpec> isNullable;
-    if (schema.isEnableColumnBasedNullHandling()) {
-      isNullable = FieldSpec::isNullable;
-    } else {
-      isNullable = fieldSpec -> false;
-    }
-    for (Map.Entry<String, FieldSpec> e : schema.getFieldSpecMap().entrySet()) {
-      builder.add(e.getKey(), toRelDataType(e.getValue(), isNullable));
+    boolean enableNullHandling = schema.isEnableColumnBasedNullHandling();
+    for (Map.Entry<String, FieldSpec> entry : schema.getFieldSpecMap().entrySet()) {
+      builder.add(entry.getKey(), toRelDataType(entry.getValue(), enableNullHandling));
     }
     return builder.build();
   }
 
-  private RelDataType toRelDataType(FieldSpec fieldSpec, Predicate<FieldSpec> isNullable) {
+  private RelDataType toRelDataType(FieldSpec fieldSpec, boolean enableNullHandling) {
     RelDataType type = createSqlType(getSqlTypeName(fieldSpec));
-    boolean isArray = !fieldSpec.isSingleValueField();
-    if (isArray) {
+    if (!fieldSpec.isSingleValueField()) {
       type = createArrayType(type, -1);
     }
-    if (isNullable.test(fieldSpec)) {
-      type = createTypeWithNullability(type, true);
-    }
-    return type;
+    return enableNullHandling && fieldSpec.isNullable() ? createTypeWithNullability(type, true) : type;
   }
 
-  private SqlTypeName getSqlTypeName(FieldSpec fieldSpec) {
+  private static SqlTypeName getSqlTypeName(FieldSpec fieldSpec) {
     switch (fieldSpec.getDataType()) {
       case INT:
         return SqlTypeName.INTEGER;

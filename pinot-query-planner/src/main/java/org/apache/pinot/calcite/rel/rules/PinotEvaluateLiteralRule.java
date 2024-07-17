@@ -38,6 +38,7 @@ import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexShuttle;
+import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.type.ArraySqlType;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.tools.RelBuilderFactory;
@@ -45,6 +46,8 @@ import org.apache.calcite.util.NlsString;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionInvoker;
 import org.apache.pinot.common.function.FunctionRegistry;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.query.planner.logical.RelToPlanNodeConverter;
 import org.apache.pinot.spi.utils.TimestampUtils;
 import org.apache.pinot.sql.parsers.SqlCompilationException;
 
@@ -130,11 +133,9 @@ public class PinotEvaluateLiteralRule {
     public RexNode visitCall(RexCall call) {
       RexCall visitedCall = (RexCall) super.visitCall(call);
       // Check if all operands are RexLiteral
-      if (visitedCall.operands.stream().allMatch(operand ->
-          operand instanceof RexLiteral
-              || (operand instanceof RexCall && ((RexCall) operand).getOperands().stream()
-                  .allMatch(op -> op instanceof RexLiteral))
-      )) {
+      if (visitedCall.operands.stream().allMatch(
+          operand -> operand instanceof RexLiteral || (operand instanceof RexCall && ((RexCall) operand).getOperands()
+              .stream().allMatch(op -> op instanceof RexLiteral)))) {
         return evaluateLiteralOnlyFunction(visitedCall, _rexBuilder);
       } else {
         return visitedCall;
@@ -147,38 +148,39 @@ public class PinotEvaluateLiteralRule {
    * itself (RexCall) if it cannot be evaluated.
    */
   private static RexNode evaluateLiteralOnlyFunction(RexCall rexCall, RexBuilder rexBuilder) {
-    String functionName = PinotRuleUtils.extractFunctionName(rexCall);
     List<RexNode> operands = rexCall.getOperands();
-    assert operands.stream().allMatch(operand -> operand instanceof RexLiteral
-        || (operand instanceof RexCall && ((RexCall) operand).getOperands().stream()
-        .allMatch(op -> op instanceof RexLiteral)));
-    int numOperands = operands.size();
-    FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(functionName, numOperands);
-    if (functionInfo == null) {
-      // Function cannot be evaluated
-      return rexCall;
-    }
-    Object[] arguments = new Object[numOperands];
-    for (int i = 0; i < numOperands; i++) {
+    assert operands.stream().allMatch(
+        operand -> operand instanceof RexLiteral || (operand instanceof RexCall && ((RexCall) operand).getOperands()
+            .stream().allMatch(op -> op instanceof RexLiteral)));
+    int numArguments = operands.size();
+    ColumnDataType[] argumentTypes = new ColumnDataType[numArguments];
+    Object[] arguments = new Object[numArguments];
+    for (int i = 0; i < numArguments; i++) {
       RexNode rexNode = operands.get(i);
-      if (rexNode instanceof RexCall
-          && ((RexCall) rexNode).getOperator().getName().equalsIgnoreCase("CAST")) {
-        // this must be a cast function
-        RexCall operand = (RexCall) rexNode;
-        arguments[i] = getLiteralValue((RexLiteral) operand.getOperands().get(0));
+      RexLiteral rexLiteral;
+      if (rexNode instanceof RexCall && ((RexCall) rexNode).getOperator().getKind() == SqlKind.CAST) {
+        rexLiteral = (RexLiteral) ((RexCall) rexNode).getOperands().get(0);
       } else if (rexNode instanceof RexLiteral) {
-        arguments[i] = getLiteralValue((RexLiteral) rexNode);
+        rexLiteral = (RexLiteral) rexNode;
       } else {
         // Function operands cannot be evaluated, skip
         return rexCall;
       }
+      argumentTypes[i] = RelToPlanNodeConverter.convertToColumnDataType(rexLiteral.getType());
+      arguments[i] = getLiteralValue(rexLiteral);
+    }
+    String canonicalName = FunctionRegistry.canonicalize(PinotRuleUtils.extractFunctionName(rexCall));
+    FunctionInfo functionInfo = FunctionRegistry.lookupFunctionInfo(canonicalName, argumentTypes);
+    if (functionInfo == null) {
+      // Function cannot be evaluated
+      return rexCall;
     }
     RelDataType rexNodeType = rexCall.getType();
     Object resultValue;
     try {
       FunctionInvoker invoker = new FunctionInvoker(functionInfo);
       if (functionInfo.getMethod().isVarArgs()) {
-        resultValue = invoker.invoke(new Object[] {arguments});
+        resultValue = invoker.invoke(new Object[]{arguments});
       } else {
         invoker.convertTypes(arguments);
         resultValue = invoker.invoke(arguments);
@@ -188,8 +190,8 @@ public class PinotEvaluateLiteralRule {
         if (componentType != null) {
           if (Objects.requireNonNull(componentType.getSqlTypeName()) == SqlTypeName.CHAR) {
             // Calcite uses CHAR for STRING, but we need to use VARCHAR for STRING
-            rexNodeType = rexBuilder.getTypeFactory().createArrayType(
-                rexBuilder.getTypeFactory().createSqlType(SqlTypeName.VARCHAR), -1);
+            rexNodeType = rexBuilder.getTypeFactory()
+                .createArrayType(rexBuilder.getTypeFactory().createSqlType(SqlTypeName.VARCHAR), -1);
           }
         }
       }

@@ -21,9 +21,9 @@ package org.apache.pinot.query.planner.logical;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
+import javax.annotation.Nullable;
 import org.apache.calcite.rex.RexNode;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.checkerframework.checker.nullness.qual.Nullable;
 
 
 /**

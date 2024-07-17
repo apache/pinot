@@ -19,6 +19,7 @@
 package org.apache.pinot.calcite.rel.logical;
 
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
@@ -27,7 +28,6 @@ import org.apache.calcite.rel.core.AggregateCall;
 import org.apache.calcite.rel.hint.RelHint;
 import org.apache.calcite.util.ImmutableBitSet;
 import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
-import org.checkerframework.checker.nullness.qual.Nullable;
 
 
 public class PinotLogicalAggregate extends Aggregate {

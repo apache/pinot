@@ -154,6 +154,7 @@
     <jsonsmart.version>2.5.1</jsonsmart.version>
     <quartz.version>2.3.2</quartz.version>
     <calcite.version>1.37.0</calcite.version>
+    <immutables.version>2.10.1</immutables.version>
     <lucene.version>9.11.1</lucene.version>
     <reflections.version>0.10.2</reflections.version>
     <dynatrace.hash4j.version>0.17.0</dynatrace.hash4j.version>
@@ -1217,6 +1218,7 @@
         <artifactId>json-smart</artifactId>
         <version>${jsonsmart.version}</version>
       </dependency>
+
       <dependency>
         <groupId>org.apache.calcite</groupId>
         <artifactId>calcite-core</artifactId>
@@ -1245,6 +1247,13 @@
         <artifactId>calcite-babel</artifactId>
         <version>${calcite.version}</version>
       </dependency>
+      <!-- Required by Calcite -->
+      <dependency>
+        <groupId>org.immutables</groupId>
+        <artifactId>value-annotations</artifactId>
+        <version>${immutables.version}</version>
+      </dependency>
+
       <dependency>
         <groupId>org.codehaus.janino</groupId>
         <artifactId>janino</artifactId>

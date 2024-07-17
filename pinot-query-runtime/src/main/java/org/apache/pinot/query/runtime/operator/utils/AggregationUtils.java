@@ -178,8 +178,8 @@ public class AggregationUtils {
         "MIN", cdt -> AggregationUtils::mergeMin,
         "MAX", cdt -> AggregationUtils::mergeMax,
         "COUNT", cdt -> new AggregationUtils.MergeCounts(),
-        "BOOL_AND", cdt -> AggregationUtils::mergeBoolAnd,
-        "BOOL_OR", cdt -> AggregationUtils::mergeBoolOr
+        "BOOLAND", cdt -> AggregationUtils::mergeBoolAnd,
+        "BOOLOR", cdt -> AggregationUtils::mergeBoolOr
     );
     //@formatter:on
 
