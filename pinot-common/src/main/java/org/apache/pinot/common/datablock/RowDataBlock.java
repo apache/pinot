@@ -46,7 +46,6 @@ public class RowDataBlock extends BaseDataBlock {
     if (_dataSchema != null) {
       _columnOffsets = new int[_numColumns];
       _rowSizeInBytes = DataBlockUtils.computeColumnOffsets(_dataSchema, _columnOffsets);
-      _fixDataSize = _numRows * _rowSizeInBytes;
     }
   }
 
