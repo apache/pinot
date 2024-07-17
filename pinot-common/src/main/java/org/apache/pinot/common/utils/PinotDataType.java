@@ -901,12 +901,34 @@ public enum PinotDataType {
     public boolean[] convert(Object value, PinotDataType sourceType) {
       return sourceType.toBooleanArray(value);
     }
+
+    @Override
+    public Integer[] toInternal(Object value) {
+      boolean[] booleanArray = (boolean[]) value;
+      int length = booleanArray.length;
+      Integer[] intArray = new Integer[length];
+      for (int i = 0; i < length; i++) {
+        intArray[i] = booleanArray[i] ? 1 : 0;
+      }
+      return intArray;
+    }
   },
 
   TIMESTAMP_ARRAY {
     @Override
     public Object convert(Object value, PinotDataType sourceType) {
       return sourceType.toTimestampArray(value);
+    }
+
+    @Override
+    public Long[] toInternal(Object value) {
+      Timestamp[] timestampArray = (Timestamp[]) value;
+      int length = timestampArray.length;
+      Long[] longArray = new Long[length];
+      for (int i = 0; i < length; i++) {
+        longArray[i] = timestampArray[i].getTime();
+      }
+      return longArray;
     }
   },
 
@@ -1272,6 +1294,8 @@ public enum PinotDataType {
    * <ul>
    *   <li>BOOLEAN -> int</li>
    *   <li>TIMESTAMP -> long</li>
+   *   <li>BOOLEAN_ARRAY -> int[]</li>
+   *   <li>TIMESTAMP_ARRAY -> long[]</li>
    * </ul>
    */
   public Object toInternal(Object value) {
