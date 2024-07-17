@@ -19,7 +19,6 @@
 package org.apache.pinot.server.worker;
 
 import org.apache.helix.HelixManager;
-import org.apache.pinot.common.config.GrpcConfig;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
