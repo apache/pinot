@@ -33,6 +33,7 @@ import org.apache.pinot.core.auth.BasicAuthUtils;
 import org.apache.pinot.core.auth.ZkBasicAuthPrincipal;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.glassfish.grizzly.http.server.Request;
 
 
 /**
@@ -79,14 +80,14 @@ public class ZkBasicAuthAccessControlFactory implements AccessControlFactory {
     }
 
     @Override
-    public boolean hasAccess(String tableName, AccessType accessType, HttpHeaders httpHeaders, String endpointUrl) {
+    public boolean hasAccess(String tableName, AccessType accessType, HttpHeaders httpHeaders, String endpointUrl, Request request) {
       return getPrincipal(httpHeaders).filter(
           p -> p.hasTable(TableNameBuilder.extractRawTableName(tableName))
               && p.hasPermission(Objects.toString(accessType))).isPresent();
     }
 
     @Override
-    public boolean hasAccess(AccessType accessType, HttpHeaders httpHeaders, String endpointUrl) {
+    public boolean hasAccess(AccessType accessType, HttpHeaders httpHeaders, String endpointUrl, Request request) {
       return getPrincipal(httpHeaders).isPresent();
     }
 

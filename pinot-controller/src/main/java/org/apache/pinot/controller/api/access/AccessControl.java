@@ -23,6 +23,7 @@ import javax.ws.rs.core.HttpHeaders;
 import org.apache.pinot.core.auth.FineGrainedAccessControl;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
+import org.glassfish.grizzly.http.server.Request;
 
 
 @InterfaceAudience.Public
@@ -34,14 +35,47 @@ public interface AccessControl extends FineGrainedAccessControl {
   /**
    * Return whether the client has permission to the given table
    *
+   * @deprecated Use the methods that accept a request parameter instead
+   *
    * @param tableName name of the table to be accessed
    * @param accessType type of the access
    * @param httpHeaders HTTP headers containing requester identity
    * @param endpointUrl the request url for which this access control is called
    * @return whether the client has permission
    */
+  @Deprecated
+  default boolean hasAccess(@Nullable String tableName, AccessType accessType, HttpHeaders httpHeaders,
+                        @Nullable String endpointUrl) {
+    return hasAccess(tableName, accessType, httpHeaders, endpointUrl, null);
+  }
+
+  /**
+   * Return whether the client has permission to access the endpoints with are not table level
+   *
+   * @deprecated Use the methods that accept a request parameter instead
+   *
+   * @param accessType type of the access
+   * @param httpHeaders HTTP headers
+   * @param endpointUrl the request url for which this access control is called
+   * @return whether the client has permission
+   */
+  @Deprecated
+  default boolean hasAccess(AccessType accessType, HttpHeaders httpHeaders, @Nullable String endpointUrl) {
+    return hasAccess(null, accessType, httpHeaders, endpointUrl, null);
+  }
+
+  /**
+   * Return whether the client has permission to the given table
+   *
+   * @param tableName name of the table to be accessed
+   * @param accessType type of the access
+   * @param httpHeaders HTTP headers containing requester identity
+   * @param endpointUrl the request url for which this access control is called
+   * @param request the request for which this access control is called
+   * @return whether the client has permission
+   */
   boolean hasAccess(@Nullable String tableName, AccessType accessType, HttpHeaders httpHeaders,
-      @Nullable String endpointUrl);
+      @Nullable String endpointUrl, @Nullable Request request);
 
   /**
    * Return whether the client has permission to access the endpoints with are not table level
@@ -49,10 +83,12 @@ public interface AccessControl extends FineGrainedAccessControl {
    * @param accessType type of the access
    * @param httpHeaders HTTP headers
    * @param endpointUrl the request url for which this access control is called
+   * @param request the request for which this access control is called
    * @return whether the client has permission
    */
-  default boolean hasAccess(AccessType accessType, HttpHeaders httpHeaders, @Nullable String endpointUrl) {
-    return hasAccess(null, accessType, httpHeaders, endpointUrl);
+  default boolean hasAccess(AccessType accessType, HttpHeaders httpHeaders, @Nullable String endpointUrl,
+                            @Nullable Request request) {
+    return hasAccess(null, accessType, httpHeaders, endpointUrl, request);
   }
 
   /**

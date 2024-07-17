@@ -29,6 +29,7 @@ import javax.ws.rs.core.HttpHeaders;
 import org.apache.pinot.core.auth.BasicAuthPrincipal;
 import org.apache.pinot.core.auth.BasicAuthUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.glassfish.grizzly.http.server.Request;
 
 
 /**
@@ -77,13 +78,13 @@ public class BasicAuthAccessControlFactory implements AccessControlFactory {
     }
 
     @Override
-    public boolean hasAccess(String tableName, AccessType accessType, HttpHeaders httpHeaders, String endpointUrl) {
+    public boolean hasAccess(String tableName, AccessType accessType, HttpHeaders httpHeaders, String endpointUrl, Request request) {
       return getPrincipal(httpHeaders)
           .filter(p -> p.hasTable(tableName) && p.hasPermission(Objects.toString(accessType))).isPresent();
     }
 
     @Override
-    public boolean hasAccess(AccessType accessType, HttpHeaders httpHeaders, String endpointUrl) {
+    public boolean hasAccess(AccessType accessType, HttpHeaders httpHeaders, String endpointUrl, Request request) {
       if (getPrincipal(httpHeaders).isEmpty()) {
         throw new NotAuthorizedException("Basic");
       }
