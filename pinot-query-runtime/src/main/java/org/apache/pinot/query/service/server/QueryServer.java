@@ -20,17 +20,28 @@ package org.apache.pinot.query.service.server;
 
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
+import io.grpc.netty.shaded.io.grpc.netty.GrpcSslContexts;
+import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder;
+import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext;
+import io.grpc.netty.shaded.io.netty.handler.ssl.SslContextBuilder;
+import io.grpc.netty.shaded.io.netty.handler.ssl.SslProvider;
 import io.grpc.stub.StreamObserver;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import javax.net.ssl.SSLException;
+import nl.altindag.ssl.SSLFactory;
+import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.utils.NamedThreadFactory;
+import org.apache.pinot.common.utils.tls.PinotInsecureMode;
+import org.apache.pinot.common.utils.tls.RenewableTlsUtils;
 import org.apache.pinot.query.routing.QueryPlanSerDeUtils;
 import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.StagePlan;
@@ -44,6 +55,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+
 /**
  * {@link QueryServer} is the GRPC server that accepts query plan requests sent from {@link QueryDispatcher}.
  */
@@ -52,9 +64,14 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   // TODO: Inbound messages can get quite large because we send the entire stage metadata map in each call.
   // See https://github.com/apache/pinot/issues/10331
   private static final int MAX_INBOUND_MESSAGE_SIZE = 64 * 1024 * 1024;
+  // the key is the hashCode of the TlsConfig, the value is the SslContext
+  // We don't use TlsConfig as the map key because the TlsConfig is mutable, which means the hashCode can change. If the
+  // hashCode changes and the map is resized, the SslContext of the old hashCode will be lost.
+  private static final Map<Integer, SslContext> CLIENT_SSL_CONTEXTS_CACHE = new ConcurrentHashMap<>();
 
   private final int _port;
   private final QueryRunner _queryRunner;
+  private final TlsConfig _tlsConfig;
   // query submission service is only used for plan submission for now.
   // TODO: with complex query submission logic we should allow asynchronous query submission return instead of
   //   directly return from submission response observer.
@@ -62,9 +79,10 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
 
   private Server _server = null;
 
-  public QueryServer(int port, QueryRunner queryRunner) {
+  public QueryServer(int port, QueryRunner queryRunner, TlsConfig tlsConfig) {
     _port = port;
     _queryRunner = queryRunner;
+    _tlsConfig = tlsConfig;
     _querySubmissionExecutorService =
         Executors.newCachedThreadPool(new NamedThreadFactory("query_submission_executor_on_" + _port + "_port"));
   }
@@ -73,7 +91,15 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     LOGGER.info("Starting QueryServer");
     try {
       if (_server == null) {
-        _server = ServerBuilder.forPort(_port).addService(this).maxInboundMessageSize(MAX_INBOUND_MESSAGE_SIZE).build();
+        if (_tlsConfig == null) {
+          try {
+            _server = ServerBuilder.forPort(_port).addService(this).maxInboundMessageSize(MAX_INBOUND_MESSAGE_SIZE).build();
+          }catch (Exception e) {
+            throw new RuntimeException("Failed to start secure QueryServer", e);
+          }
+        }else {
+          _server = NettyServerBuilder.forPort(_port).addService(this).sslContext(buildSslContext(_tlsConfig)).maxInboundMessageSize(MAX_INBOUND_MESSAGE_SIZE).build();
+        }
         LOGGER.info("Initialized QueryServer on port: {}", _port);
       }
       _queryRunner.start();
@@ -190,4 +216,28 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     // we always return completed even if cancel attempt fails, server will self clean up in this case.
     responseObserver.onCompleted();
   }
+  private SslContext buildSslContext(TlsConfig tlsConfig) {
+    LOGGER.info("Building gRPC SSL context");
+    SslContext sslContext = CLIENT_SSL_CONTEXTS_CACHE.computeIfAbsent(tlsConfig.hashCode(), tlsConfigHashCode -> {
+      try {
+        SSLFactory sslFactory =
+            RenewableTlsUtils.createSSLFactoryAndEnableAutoRenewalWhenUsingFileStores(
+                tlsConfig, PinotInsecureMode::isPinotInInsecureMode);
+        SslContextBuilder sslContextBuilder = SslContextBuilder.forClient();
+        sslFactory.getKeyManagerFactory().ifPresent(sslContextBuilder::keyManager);
+        sslFactory.getTrustManagerFactory().ifPresent(sslContextBuilder::trustManager);
+        if (tlsConfig.getSslProvider() != null) {
+          sslContextBuilder =
+              GrpcSslContexts.configure(sslContextBuilder, SslProvider.valueOf(tlsConfig.getSslProvider()));
+        } else {
+          sslContextBuilder = GrpcSslContexts.configure(sslContextBuilder);
+        }
+        return sslContextBuilder.build();
+      } catch (SSLException e) {
+        throw new RuntimeException("Failed to build gRPC SSL context", e);
+      }
+    });
+    return sslContext;
+  }
 }
+
