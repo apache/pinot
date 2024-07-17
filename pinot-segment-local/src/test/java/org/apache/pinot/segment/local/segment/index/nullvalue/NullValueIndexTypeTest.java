@@ -22,7 +22,6 @@ import org.apache.pinot.segment.local.segment.index.AbstractSerdeIndexContract;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -48,7 +47,7 @@ public class NullValueIndexTypeTest {
   public static class ConfTest extends AbstractSerdeIndexContract {
 
     protected void assertEquals(IndexConfig expected) {
-      Assert.assertEquals(getActualConfig("dimStr", StandardIndexes.nullValueVector()), expected);
+      checkConfigsMatch(StandardIndexes.nullValueVector(), "dimStr", expected);
     }
 
     @Test(dataProvider = "provideCases", dataProviderClass = NullValueIndexTypeTest.class)

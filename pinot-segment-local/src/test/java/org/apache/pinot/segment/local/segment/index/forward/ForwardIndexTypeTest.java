@@ -32,7 +32,6 @@ import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -82,7 +81,7 @@ public class ForwardIndexTypeTest {
   public static class ConfTest extends AbstractSerdeIndexContract {
 
     protected void assertEquals(ForwardIndexConfig expected) {
-      Assert.assertEquals(getActualConfig("dimInt", StandardIndexes.forward()), expected);
+      checkConfigsMatch(StandardIndexes.forward(), "dimInt", expected);
     }
 
     @Test
