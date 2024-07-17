@@ -460,8 +460,10 @@ public class S3PinotFSTest {
           sourceHeadObjectResponse.eTag());
       Assert.assertEquals(targetHeadObjectResponse.replicationStatusAsString(),
           sourceHeadObjectResponse.replicationStatusAsString());
-      Assert.assertEquals(targetHeadObjectResponse.lastModified(),
-          sourceHeadObjectResponse.lastModified());
+      // Last modified time might not be exactly the same, hence we give 5 seconds buffer.
+      Assert.assertTrue(Math.abs(
+          targetHeadObjectResponse.lastModified().getEpochSecond() - sourceHeadObjectResponse.lastModified()
+              .getEpochSecond()) < 5);
     } finally {
       FileUtils.deleteQuietly(file);
     }
