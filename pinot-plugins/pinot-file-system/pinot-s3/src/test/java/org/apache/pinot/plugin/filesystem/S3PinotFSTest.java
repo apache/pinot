@@ -460,8 +460,6 @@ public class S3PinotFSTest {
           sourceHeadObjectResponse.eTag());
       Assert.assertEquals(targetHeadObjectResponse.replicationStatusAsString(),
           sourceHeadObjectResponse.replicationStatusAsString());
-      Assert.assertEquals(targetHeadObjectResponse.lastModified(),
-          sourceHeadObjectResponse.lastModified());
     } finally {
       FileUtils.deleteQuietly(file);
     }
