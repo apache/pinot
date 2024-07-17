@@ -122,7 +122,8 @@ public class KinesisStreamMetadataProviderTest {
     when(_kinesisConnectionHandler.getShards()).thenReturn(ImmutableList.of(shard0, shard1));
     when(_streamConsumerFactory.createPartitionGroupConsumer(stringCapture.capture(),
         partitionGroupMetadataCapture.capture())).thenReturn(_partitionGroupConsumer);
-    when(_partitionGroupConsumer.fetchMessages(checkpointArgs.capture(), intArguments.capture())).thenReturn(
+    when(_partitionGroupConsumer.fetchMessages(checkpointArgs.capture(),
+        true, intArguments.capture())).thenReturn(
         new KinesisMessageBatch(new ArrayList<>(), kinesisPartitionGroupOffset, true));
 
     List<PartitionGroupMetadata> result =
@@ -161,7 +162,8 @@ public class KinesisStreamMetadataProviderTest {
     when(_kinesisConnectionHandler.getShards()).thenReturn(ImmutableList.of(shard0, shard1));
     when(_streamConsumerFactory.createPartitionGroupConsumer(stringCapture.capture(),
         partitionGroupMetadataCapture.capture())).thenReturn(_partitionGroupConsumer);
-    when(_partitionGroupConsumer.fetchMessages(checkpointArgs.capture(), intArguments.capture())).thenReturn(
+    when(_partitionGroupConsumer.fetchMessages(checkpointArgs.capture(),
+        true, intArguments.capture())).thenReturn(
         new KinesisMessageBatch(new ArrayList<>(), kinesisPartitionGroupOffset, true));
 
     List<PartitionGroupMetadata> result =

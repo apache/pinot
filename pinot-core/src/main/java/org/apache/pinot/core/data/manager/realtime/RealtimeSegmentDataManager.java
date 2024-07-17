@@ -439,7 +439,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       // Update _currentOffset upon return from this method
       MessageBatch messageBatch;
       try {
-        messageBatch = _partitionGroupConsumer.fetchMessages(_currentOffset, _streamConfig.getFetchTimeoutMillis());
+        messageBatch =
+            _partitionGroupConsumer.fetchMessages(_currentOffset, _segmentZKMetadata.isStartOffsetInclusive(),
+                _streamConfig.getFetchTimeoutMillis());
         //track realtime rows fetched on a table level. This included valid + invalid rows
         _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.REALTIME_ROWS_FETCHED,
             messageBatch.getUnfilteredMessageCount());
@@ -1013,6 +1015,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       SegmentZKPropsConfig segmentZKPropsConfig = new SegmentZKPropsConfig();
       segmentZKPropsConfig.setStartOffset(_segmentZKMetadata.getStartOffset());
       segmentZKPropsConfig.setEndOffset(_currentOffset.toString());
+      segmentZKPropsConfig.setIsStartOffsetInclusive(false);
       // let's convert the segment now
       RealtimeSegmentConverter converter =
           new RealtimeSegmentConverter(_realtimeSegment, segmentZKPropsConfig, tempSegmentFolder.getAbsolutePath(),

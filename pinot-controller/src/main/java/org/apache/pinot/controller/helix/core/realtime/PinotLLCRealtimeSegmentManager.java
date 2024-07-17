@@ -568,7 +568,7 @@ public class PinotLLCRealtimeSegmentManager {
             committingLLCSegment.getSequenceNumber() + 1, newSegmentCreationTimeMs);
         createNewSegmentZKMetadata(tableConfig, streamConfig, newLLCSegment, newSegmentCreationTimeMs,
             committingSegmentDescriptor, committingSegmentZKMetadata, instancePartitions, partitionIds.size(),
-            numReplicas);
+            numReplicas, false);
         newConsumingSegmentName = newLLCSegment.getSegmentName();
       }
     }
@@ -678,7 +678,7 @@ public class PinotLLCRealtimeSegmentManager {
   private void createNewSegmentZKMetadata(TableConfig tableConfig, StreamConfig streamConfig,
       LLCSegmentName newLLCSegmentName, long creationTimeMs, CommittingSegmentDescriptor committingSegmentDescriptor,
       @Nullable SegmentZKMetadata committingSegmentZKMetadata, InstancePartitions instancePartitions, int numPartitions,
-      int numReplicas) {
+      int numReplicas, boolean isNewPartitionGroup) {
     String realtimeTableName = tableConfig.getTableName();
     String segmentName = newLLCSegmentName.getSegmentName();
     String startOffset = committingSegmentDescriptor.getNextOffset();
@@ -693,6 +693,12 @@ public class PinotLLCRealtimeSegmentManager {
     // Leave maxOffset as null.
     newSegmentZKMetadata.setNumReplicas(numReplicas);
     newSegmentZKMetadata.setStatus(Status.IN_PROGRESS);
+
+    if (isNewPartitionGroup) {
+      newSegmentZKMetadata.setStartOffsetInclusive(false);
+    } else {
+      newSegmentZKMetadata.setStartOffsetInclusive(true);
+    }
 
     // Add the partition metadata if available
     SegmentPartitionMetadata partitionMetadata =
@@ -1180,7 +1186,8 @@ public class PinotLLCRealtimeSegmentManager {
                   new CommittingSegmentDescriptor(latestSegmentName,
                       (offsetFactory.create(latestSegmentZKMetadata.getEndOffset()).toString()), 0);
               createNewSegmentZKMetadata(tableConfig, streamConfig, newLLCSegmentName, currentTimeMs,
-                  committingSegmentDescriptor, latestSegmentZKMetadata, instancePartitions, numPartitions, numReplicas);
+                  committingSegmentDescriptor, latestSegmentZKMetadata, instancePartitions, numPartitions, numReplicas,
+                  false);
               updateInstanceStatesForNewConsumingSegment(instanceStatesMap, latestSegmentName, newSegmentName,
                   segmentAssignment, instancePartitionsMap);
             } else { // partition group reached end of life
@@ -1305,7 +1312,7 @@ public class PinotLLCRealtimeSegmentManager {
     CommittingSegmentDescriptor committingSegmentDescriptor =
         new CommittingSegmentDescriptor(latestSegmentZKMetadata.getSegmentName(), startOffset.toString(), 0);
     createNewSegmentZKMetadata(tableConfig, streamConfig, newLLCSegmentName, currentTimeMs, committingSegmentDescriptor,
-        latestSegmentZKMetadata, instancePartitions, numPartitions, numReplicas);
+        latestSegmentZKMetadata, instancePartitions, numPartitions, numReplicas, false);
     String newSegmentName = newLLCSegmentName.getSegmentName();
     updateInstanceStatesForNewConsumingSegment(instanceStatesMap, null, newSegmentName, segmentAssignment,
         instancePartitionsMap);
@@ -1370,7 +1377,7 @@ public class PinotLLCRealtimeSegmentManager {
 
     CommittingSegmentDescriptor committingSegmentDescriptor = new CommittingSegmentDescriptor(null, startOffset, 0);
     createNewSegmentZKMetadata(tableConfig, streamConfig, newLLCSegmentName, creationTimeMs,
-        committingSegmentDescriptor, null, instancePartitions, numPartitions, numReplicas);
+        committingSegmentDescriptor, null, instancePartitions, numPartitions, numReplicas, true);
 
     return newSegmentName;
   }

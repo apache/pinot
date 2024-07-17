@@ -101,6 +101,8 @@ public interface SegmentMetadata {
 
   String getEndOffset();
 
+  boolean isStartOffsetInclusive();
+
   default NavigableSet<String> getAllColumns() {
     return getSchema().getColumnNames();
   }

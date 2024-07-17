@@ -130,7 +130,7 @@ public class KafkaPartitionLevelConsumerTest {
 
     // test default value
     KafkaPartitionLevelConsumer kafkaSimpleStreamConsumer = new KafkaPartitionLevelConsumer(clientId, streamConfig, 0);
-    kafkaSimpleStreamConsumer.fetchMessages(new LongMsgOffset(12345L), 10000);
+    kafkaSimpleStreamConsumer.fetchMessages(new LongMsgOffset(12345L), true, 10000);
 
     assertEquals(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_BUFFER_SIZE_DEFAULT,
         kafkaSimpleStreamConsumer.getKafkaPartitionLevelStreamConfig().getKafkaBufferSize());
@@ -146,7 +146,7 @@ public class KafkaPartitionLevelConsumerTest {
     streamConfigMap.put("stream.kafka.socket.timeout", "1000");
     streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
     kafkaSimpleStreamConsumer = new KafkaPartitionLevelConsumer(clientId, streamConfig, 0);
-    kafkaSimpleStreamConsumer.fetchMessages(new LongMsgOffset(12345L), 10000);
+    kafkaSimpleStreamConsumer.fetchMessages(new LongMsgOffset(12345L), true, 10000);
     assertEquals(100, kafkaSimpleStreamConsumer.getKafkaPartitionLevelStreamConfig().getKafkaBufferSize());
     assertEquals(1000, kafkaSimpleStreamConsumer.getKafkaPartitionLevelStreamConfig().getKafkaSocketTimeout());
   }
@@ -205,7 +205,7 @@ public class KafkaPartitionLevelConsumerTest {
     int partition = 0;
     KafkaPartitionLevelConsumer kafkaSimpleStreamConsumer =
         new KafkaPartitionLevelConsumer(clientId, streamConfig, partition);
-    kafkaSimpleStreamConsumer.fetchMessages(new LongMsgOffset(12345L), 10000);
+    kafkaSimpleStreamConsumer.fetchMessages(new LongMsgOffset(12345L), true, 10000);
   }
 
   @Test
@@ -279,7 +279,7 @@ public class KafkaPartitionLevelConsumerTest {
               new LongMsgOffset(NUM_MSG_PRODUCED_PER_PARTITION), "CONSUMING"));
 
       // Test consume a large batch, only 500 records will be returned.
-      MessageBatch messageBatch = consumer.fetchMessages(new LongMsgOffset(0), 10000);
+      MessageBatch messageBatch = consumer.fetchMessages(new LongMsgOffset(0), true, 10000);
       assertEquals(messageBatch.getMessageCount(), 500);
       assertEquals(messageBatch.getUnfilteredMessageCount(), 500);
       for (int i = 0; i < 500; i++) {
@@ -301,7 +301,7 @@ public class KafkaPartitionLevelConsumerTest {
       assertEquals(messageBatch.getLastMessageMetadata().getNextOffset().toString(), "500");
 
       // Test second half batch
-      messageBatch = consumer.fetchMessages(new LongMsgOffset(500), 10000);
+      messageBatch = consumer.fetchMessages(new LongMsgOffset(500), true, 10000);
       assertEquals(messageBatch.getMessageCount(), 500);
       assertEquals(messageBatch.getUnfilteredMessageCount(), 500);
       for (int i = 0; i < 500; i++) {
@@ -323,7 +323,7 @@ public class KafkaPartitionLevelConsumerTest {
       assertEquals(messageBatch.getLastMessageMetadata().getNextOffset().toString(), "1000");
 
       // Some random range
-      messageBatch = consumer.fetchMessages(new LongMsgOffset(10), 10000);
+      messageBatch = consumer.fetchMessages(new LongMsgOffset(10), true, 10000);
       assertEquals(messageBatch.getMessageCount(), 500);
       assertEquals(messageBatch.getUnfilteredMessageCount(), 500);
       for (int i = 0; i < 500; i++) {
@@ -345,7 +345,7 @@ public class KafkaPartitionLevelConsumerTest {
       assertEquals(messageBatch.getLastMessageMetadata().getNextOffset().toString(), "510");
 
       // Some random range
-      messageBatch = consumer.fetchMessages(new LongMsgOffset(610), 10000);
+      messageBatch = consumer.fetchMessages(new LongMsgOffset(610), true, 10000);
       assertEquals(messageBatch.getMessageCount(), 390);
       assertEquals(messageBatch.getUnfilteredMessageCount(), 390);
       for (int i = 0; i < 390; i++) {
@@ -391,7 +391,7 @@ public class KafkaPartitionLevelConsumerTest {
             new LongMsgOffset(NUM_MSG_PRODUCED_PER_PARTITION), "CONSUMING"));
 
     // Start offset has expired. Automatically reset to earliest available and fetch whatever available
-    MessageBatch messageBatch = consumer.fetchMessages(new LongMsgOffset(0), 10000);
+    MessageBatch messageBatch = consumer.fetchMessages(new LongMsgOffset(0), true, 10000);
     assertEquals(messageBatch.getMessageCount(), 500);
     assertEquals(messageBatch.getUnfilteredMessageCount(), 500);
     for (int i = 0; i < 500; i++) {

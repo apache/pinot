@@ -19,12 +19,14 @@
 package org.apache.pinot.spi.config.table;
 
 // TODO Possibly redundant class. Use SegmentZKMetadata throughout?
+
 /**
  * ZK properties that are to be logged into segment's metadata.properties
  */
 public class SegmentZKPropsConfig {
   private String _startOffset;
   private String _endOffset;
+  private boolean _isStartOffsetInclusive;
 
   public String getStartOffset() {
     return _startOffset;
@@ -40,5 +42,13 @@ public class SegmentZKPropsConfig {
 
   public void setEndOffset(String endOffset) {
     _endOffset = endOffset;
+  }
+
+  public boolean isStartOffsetInclusive() {
+    return _isStartOffsetInclusive;
+  }
+
+  public void setIsStartOffsetInclusive(boolean isStartOffsetInclusive) {
+    _isStartOffsetInclusive = isStartOffsetInclusive;
   }
 }

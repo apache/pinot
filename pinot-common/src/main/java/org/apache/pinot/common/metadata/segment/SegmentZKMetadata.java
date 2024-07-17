@@ -323,6 +323,19 @@ public class SegmentZKMetadata implements ZKMetadata {
     setValue(Segment.Realtime.END_OFFSET, endOffset);
   }
 
+  public boolean isStartOffsetInclusive() {
+    String value = _simpleFields.get(Segment.Realtime.IS_START_OFFSET_INCLUSIVE);
+    if (value != null) {
+      return Boolean.parseBoolean(value);
+    } else {
+      return false;
+    }
+  }
+
+  public void setStartOffsetInclusive(boolean isStartOffsetInclusive) {
+    setValue(Segment.Realtime.IS_START_OFFSET_INCLUSIVE, String.valueOf(isStartOffsetInclusive));
+  }
+
   public int getNumReplicas() {
     return _znRecord.getIntField(Segment.Realtime.NUM_REPLICAS, -1);
   }

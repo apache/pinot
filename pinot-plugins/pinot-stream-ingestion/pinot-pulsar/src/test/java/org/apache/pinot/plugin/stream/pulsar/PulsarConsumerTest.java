@@ -212,8 +212,8 @@ public class PulsarConsumerTest {
     MessageId startMessageId = startIndex == 0 ? MessageId.earliest : messageIds.get(startIndex);
     int numMessagesFetched = startIndex;
     while (numMessagesFetched < NUM_RECORDS_PER_PARTITION) {
-      PulsarMessageBatch messageBatch =
-          consumer.fetchMessages(new MessageIdStreamOffset(startMessageId), CONSUMER_FETCH_TIMEOUT_MILLIS);
+      PulsarMessageBatch messageBatch = consumer.fetchMessages(new MessageIdStreamOffset(startMessageId),
+          true, CONSUMER_FETCH_TIMEOUT_MILLIS);
       int messageCount = messageBatch.getMessageCount();
       assertFalse(messageBatch.isEndOfPartitionGroup());
       for (int i = 0; i < messageCount; i++) {
