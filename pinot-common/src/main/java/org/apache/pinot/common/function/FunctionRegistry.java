@@ -186,6 +186,9 @@ public class FunctionRegistry {
 
   /**
    * Returns {@code true} if the given canonical name is registered, {@code false} otherwise.
+   *
+   * TODO: Consider adding a way to look up the usage of a function for better error message when there is no matching
+   *       FunctionInfo.
    */
   public static boolean contains(String canonicalName) {
     return FUNCTION_MAP.containsKey(canonicalName);
