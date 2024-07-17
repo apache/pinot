@@ -35,6 +35,7 @@ import org.apache.calcite.schema.Table;
 import org.apache.pinot.calcite.jdbc.CalciteSchemaBuilder;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.utils.DatabaseUtils;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 import static java.util.Objects.requireNonNull;
@@ -77,8 +78,10 @@ public class PinotCatalog implements Schema {
     String tableName = _tableCache.getActualTableName(physicalTableName);
     Preconditions.checkArgument(tableName != null, String.format("Table does not exist: '%s'", physicalTableName));
     org.apache.pinot.spi.data.Schema schema = _tableCache.getSchema(tableName);
+    // TODO: This is not correct!
+    TableConfig tableConfig = _tableCache.getTableConfig(tableName + "_OFFLINE");
     Preconditions.checkArgument(schema != null, String.format("Could not find schema for table: '%s'", tableName));
-    return new PinotTable(schema);
+    return new PinotTable(schema, tableConfig);
   }
 
   /**

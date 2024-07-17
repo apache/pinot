@@ -26,7 +26,9 @@ import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.schema.ScannableTable;
 import org.apache.calcite.schema.impl.AbstractTable;
 import org.apache.pinot.query.type.TypeFactory;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.TimestampIndexUtils;
 
 
 /**
@@ -36,10 +38,11 @@ import org.apache.pinot.spi.data.Schema;
  * {@link RelDataType} of the table to the planner.
  */
 public class PinotTable extends AbstractTable implements ScannableTable {
-  private Schema _schema;
+  private final Schema _schema;
 
-  public PinotTable(Schema schema) {
-    _schema = schema;
+  public PinotTable(Schema schema, TableConfig tableConfig) {
+    _schema = schema.clone();
+    TimestampIndexUtils.applyTimestampIndex(tableConfig, _schema);
   }
 
   @Override
