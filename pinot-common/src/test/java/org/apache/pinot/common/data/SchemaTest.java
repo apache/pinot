@@ -25,6 +25,8 @@ import java.math.BigDecimal;
 import java.net.URL;
 import java.sql.Timestamp;
 import java.util.concurrent.TimeUnit;
+import nl.jqno.equalsverifier.EqualsVerifier;
+import nl.jqno.equalsverifier.Warning;
 import org.apache.pinot.common.utils.SchemaUtils;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
@@ -512,5 +514,12 @@ public class SchemaTest {
     Assert.assertTrue(newSchema.isBackwardCompatibleWith(oldSchema));
     Assert.assertEquals(newSchema.getFieldSpecFor("svBoolean").getDataType(), FieldSpec.DataType.BOOLEAN);
     Assert.assertEquals(newSchema.getFieldSpecFor("svBooleanWithDefault").getDataType(), FieldSpec.DataType.BOOLEAN);
+  }
+
+  @Test
+  public void equalsVerifier() {
+    EqualsVerifier.configure().suppress(Warning.NONFINAL_FIELDS).forClass(Schema.class)
+        .withIgnoredFields("_fieldSpecMap", "_dimensionNames", "_metricNames", "_dateTimeNames", "_hasJSONColumn")
+        .verify();
   }
 }
