@@ -91,6 +91,7 @@ public abstract class BaseDataBlock implements DataBlock, DataBlock.Raw {
 
   protected final int _numRows;
   protected final int _numColumns;
+  protected int _fixDataSize;
   protected final DataSchema _dataSchema;
   protected final String[] _stringDictionary;
   protected final DataBuffer _fixedSizeData;
@@ -111,6 +112,7 @@ public abstract class BaseDataBlock implements DataBlock, DataBlock.Raw {
     _numRows = numRows;
     _dataSchema = dataSchema;
     _numColumns = dataSchema == null ? 0 : dataSchema.size();
+    _fixDataSize = 0;
     _stringDictionary = stringDictionary;
     _fixedSizeData = PinotByteBuffer.wrap(ByteBuffer.wrap(fixedSizeDataBytes));
     _variableSizeData = PinotByteBuffer.wrap(ByteBuffer.wrap(variableSizeDataBytes));
@@ -126,6 +128,7 @@ public abstract class BaseDataBlock implements DataBlock, DataBlock.Raw {
     _numRows = numRows;
     _dataSchema = dataSchema;
     _numColumns = dataSchema.size();
+    _fixDataSize = 0;
     _stringDictionary = stringDictionary;
     _fixedSizeData = fixedSizeData;
     _variableSizeData = variableSizeData;
@@ -321,7 +324,7 @@ public abstract class BaseDataBlock implements DataBlock, DataBlock.Raw {
   @Override
   public RoaringBitmap getNullRowIds(int colId) {
     // _fixedSizeData stores two ints per col's null bitmap: offset, and length.
-    int position = colId * Integer.BYTES * 2;
+    int position = _fixDataSize + colId * Integer.BYTES * 2;
     if (_fixedSizeData == null || position >= _fixedSizeData.size()) {
       return null;
     }
