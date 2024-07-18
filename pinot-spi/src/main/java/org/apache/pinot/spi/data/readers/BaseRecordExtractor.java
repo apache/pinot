@@ -33,6 +33,8 @@ import javax.annotation.Nullable;
  */
 public abstract class BaseRecordExtractor<T> implements RecordExtractor<T> {
 
+  protected boolean _differentiateNullAndEmptyForMV = false;
+
   /**
    * Converts the field value to either a single value (string, number, byte[]), multi value (Object[]) or a Map.
    * Returns {@code null} if the value is an empty array/collection/map.
@@ -106,7 +108,9 @@ public abstract class BaseRecordExtractor<T> implements RecordExtractor<T> {
   @Nullable
   protected Object convertMultiValue(Object value) {
     Collection collection = (Collection) value;
-    if (collection.isEmpty()) {
+    if (_differentiateNullAndEmptyForMV && collection.isEmpty()) {
+      return new Object[0];
+    } else if (collection.isEmpty()) {
       return null;
     }
 
