@@ -534,35 +534,4 @@ public class DictionariesTest {
         throw new IllegalArgumentException("Illegal data type for stats builder: " + dataType);
     }
   }
-
-  @Test
-  public void clpStatsCollectorTest() {
-    Schema schema = new Schema();
-    schema.addField(new DimensionFieldSpec("column1", DataType.STRING, true));
-    List<FieldConfig> fieldConfigList = new ArrayList<>();
-    fieldConfigList.add(new FieldConfig("column1", FieldConfig.EncodingType.RAW, Collections.EMPTY_LIST,
-        FieldConfig.CompressionCodec.CLP, Collections.EMPTY_MAP));
-    _tableConfig.setFieldConfigList(fieldConfigList);
-    StatsCollectorConfig statsCollectorConfig = new StatsCollectorConfig(_tableConfig, schema, null);
-    StringColumnPreIndexStatsCollector statsCollector =
-        new StringColumnPreIndexStatsCollector("column1", statsCollectorConfig);
-
-    List<String> logLines = new ArrayList<>();
-    logLines.add(
-        "2023/10/26 00:03:10.168 INFO [PropertyCache] [HelixController-pipeline-default-pinot-(4a02a32c_DEFAULT)] "
-            + "Event pinot::DEFAULT::4a02a32c_DEFAULT : Refreshed 35 property LiveInstance took 5 ms. Selective: true");
-    logLines.add(
-        "2023/10/26 00:03:10.169 INFO [PropertyCache] [HelixController-pipeline-default-pinot-(4a02a32d_DEFAULT)] "
-            + "Event pinot::DEFAULT::4a02a32d_DEFAULT : Refreshed 81 property LiveInstance took 4 ms. Selective: true");
-
-    for (String logLine : logLines) {
-      statsCollector.collect(logLine);
-    }
-    statsCollector.seal();
-
-    Assert.assertNotNull(statsCollector.getCLPStats());
-
-    // Same log line format
-    Assert.assertEquals(statsCollector.getCLPStats().getSortedLogTypeValues().length, 1);
-  }
 }

@@ -248,6 +248,78 @@
   </properties>
 
   <profiles>
+    <!--build profile for linux-aarch64. We exclude certain tests as they use runtime JNI bindings not supported for linux-aarch64-->
+    <profile>
+      <id>linux-aarch64</id>
+      <activation>
+        <!--os info is taken from the output of mvn -version-->
+        <os>
+          <name>linux</name>
+          <arch>aarch64</arch>
+        </os>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <version>${surefire.version}</version>
+            <configuration>
+              <excludes>
+                <!--we exclude these tests as CLP doesn't support osx/aarch64 yet. See: https://github.com/y-scope/clp-ffi-java/issues/46-->
+                <exclude>**/ClpTransformFunctionsTest.java</exclude>
+                <exclude>**/ClpRewriterTest.java</exclude>
+                <exclude>**/CLPEncodingRealtimeIntegrationTest.java</exclude>
+                <exclude>**/CLPForwardIndexCreatorTest.java</exclude>
+                <exclude>**/CLPDictionariesTest.java</exclude>
+                <exclude>**/CLPLogRecordExtractorTest.java</exclude>
+                <exclude>**/CLPMutableForwardIndexTest.java</exclude>
+              </excludes>
+              <systemPropertyVariables>
+                <os.arch>aarch64</os.arch>
+              </systemPropertyVariables>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <!--build profile for osx-aarch64. We exclude certain tests as they use runtime JNI bindings not supported for linux-aarch64-->
+    <profile>
+      <id>osx-aarch64</id>
+      <activation>
+        <!--os info is taken from the output of mvn -version-->
+        <os>
+          <name>mac os x</name>
+          <arch>aarch64</arch>
+        </os>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <version>${surefire.version}</version>
+            <configuration>
+              <excludes>
+                <exclude>**/PinotLArrayByteBufferTest.java</exclude>
+                <exclude>**/PinotDefaultByteBufferTest.java</exclude>
+                <!--we exclude these tests as CLP doesn't support osx/aarch64 yet. See: https://github.com/y-scope/clp-ffi-java/issues/46-->
+                <exclude>**/ClpTransformFunctionsTest.java</exclude>
+                <exclude>**/ClpRewriterTest.java</exclude>
+                <exclude>**/CLPEncodingRealtimeIntegrationTest.java</exclude>
+                <exclude>**/CLPForwardIndexCreatorTest.java</exclude>
+                <exclude>**/CLPDictionariesTest.java</exclude>
+                <exclude>**/CLPLogRecordExtractorTest.java</exclude>
+                <exclude>**/CLPMutableForwardIndexTest.java</exclude>
+              </excludes>
+              <systemPropertyVariables>
+                <os.arch>aarch64</os.arch>
+              </systemPropertyVariables>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
     <profile>
       <id>github-actions</id>
       <activation>
