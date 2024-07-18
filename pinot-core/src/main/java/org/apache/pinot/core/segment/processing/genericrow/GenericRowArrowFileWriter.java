@@ -19,12 +19,16 @@
 package org.apache.pinot.core.segment.processing.genericrow;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.channels.Channels;
+import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -58,6 +62,7 @@ import org.apache.arrow.vector.ipc.message.IpcOption;
 import org.apache.arrow.vector.types.FloatingPointPrecision;
 import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.FieldType;
+import org.apache.commons.io.input.BufferedFileChannelInputStream;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -78,6 +83,8 @@ public class GenericRowArrowFileWriter implements Closeable, FileWriter<GenericR
   private final CompressionCodec.Factory _compressionFactory;
   private final CompressionUtil.CodecType _codecType;
   private final Optional<Integer> _compressionLevel;
+  private final ByteArrayOutputStream _sortColumnsChannel = new ByteArrayOutputStream();
+  private final ByteArrayOutputStream _nonSortColumnsChannel = new ByteArrayOutputStream();
 
   private VectorSchemaRoot _sortColumnsVectorRoot;
   private VectorSchemaRoot _nonSortColumnsVectorRoot;
@@ -152,19 +159,6 @@ public class GenericRowArrowFileWriter implements Closeable, FileWriter<GenericR
 
   private void initNewBatch()
       throws IOException {
-    BufferAllocator allocator = new RootAllocator(Long.MAX_VALUE);
-
-    resetListWriters();
-
-    org.apache.arrow.vector.types.pojo.Schema sortColumnsSchema =
-        getArrowSchemaFromPinotSchema(_pinotSchema, _sortColumns);
-    org.apache.arrow.vector.types.pojo.Schema nonSortColumnsSchema =
-        getArrowSchemaFromPinotSchema(_pinotSchema, _pinotSchema.getColumnNames().stream()
-            .filter(col -> !_sortColumns.contains(col))
-            .collect(Collectors.toSet()));
-
-    _sortColumnsVectorRoot = VectorSchemaRoot.create(sortColumnsSchema, allocator);
-    _nonSortColumnsVectorRoot = VectorSchemaRoot.create(nonSortColumnsSchema, allocator);
 
     String sortColFileName =
         StringUtils.join(new String[]{_outputDir, SORT_COLUMNS_DATA_DIR, _batchNumber + ".arrow"},
@@ -174,15 +168,55 @@ public class GenericRowArrowFileWriter implements Closeable, FileWriter<GenericR
             File.separator);
 
     // ensure dirs are created
-    new File(_outputDir + File.separator + SORT_COLUMNS_DATA_DIR).mkdirs();
-    new File(_outputDir + File.separator + NON_SORT_COLUMNS_DATA_DIR).mkdirs();
+    if (_batchNumber == 0) {
+      new File(_outputDir + File.separator + SORT_COLUMNS_DATA_DIR).mkdirs();
+      new File(_outputDir + File.separator + NON_SORT_COLUMNS_DATA_DIR).mkdirs();
+    }
+
+    if (_sortColumnsChannel.size() > 0) {
+      _sortColumnsChannel.writeTo(new FileOutputStream(sortColFileName));
+      _sortColumnsChannel.reset();
+    }
+
+    if (_nonSortColumnsChannel.size() > 0) {
+      _nonSortColumnsChannel.writeTo(new FileOutputStream(nonSortColFileName));
+      _nonSortColumnsChannel.reset();
+    }
+
+    resetListWriters();
+
+    if (_sortColumnsVectorRoot == null && _nonSortColumnsVectorRoot == null) {
+      org.apache.arrow.vector.types.pojo.Schema sortColumnsSchema =
+          getArrowSchemaFromPinotSchema(_pinotSchema, _sortColumns);
+      org.apache.arrow.vector.types.pojo.Schema nonSortColumnsSchema = getArrowSchemaFromPinotSchema(_pinotSchema,
+          _pinotSchema.getColumnNames().stream().filter(col -> !_sortColumns.contains(col)).collect(Collectors.toSet()));
+
+      _sortColumnsVectorRoot = VectorSchemaRoot.create(sortColumnsSchema, _allocator);
+      _nonSortColumnsVectorRoot = VectorSchemaRoot.create(nonSortColumnsSchema, _allocator);
+    } else {
+      _sortColumnsVectorRoot.clear();
+      _nonSortColumnsVectorRoot.clear();
+    }
+
+    for (FieldVector vector : _sortColumnsVectorRoot.getFieldVectors()) {
+      vector.setInitialCapacity(_maxBatchRows);
+      vector.allocateNew();
+    }
+    for (FieldVector vector : _nonSortColumnsVectorRoot.getFieldVectors()) {
+      vector.setInitialCapacity(_maxBatchRows);
+      vector.allocateNew();
+    }
+
+//    FileChannel _sortColumnsChannel = FileChannel.open(Paths.get(sortColFileName), StandardOpenOption.CREATE, StandardOpenOption.WRITE);
+//    FileChannel _nonSortColumnsChannel = FileChannel.open(Paths.get(nonSortColFileName), StandardOpenOption.CREATE, StandardOpenOption.WRITE);
 
     _sortColumnsWriter =
-        new ArrowFileWriter(_sortColumnsVectorRoot, null, new FileOutputStream(sortColFileName).getChannel(),
+        new ArrowFileWriter(_sortColumnsVectorRoot, null, Channels.newChannel(_sortColumnsChannel),
             Collections.emptyMap(), IpcOption.DEFAULT, _compressionFactory, _codecType, _compressionLevel);
     _nonSortColumnsWriter =
-        new ArrowFileWriter(_nonSortColumnsVectorRoot, null, new FileOutputStream(nonSortColFileName).getChannel(),
+        new ArrowFileWriter(_nonSortColumnsVectorRoot, null, Channels.newChannel(_nonSortColumnsChannel),
             Collections.emptyMap(), IpcOption.DEFAULT, _compressionFactory, _codecType, _compressionLevel);
+
 
     _sortColumnsWriter.start();
     _nonSortColumnsWriter.start();
@@ -413,6 +447,10 @@ public class GenericRowArrowFileWriter implements Closeable, FileWriter<GenericR
     _sortColumnsWriter.close();
     _nonSortColumnsWriter.close();
 
+    _sortColumnsVectorRoot.close();
+    _nonSortColumnsVectorRoot.close();
+
+    _allocator.close();
     writeMetadataAsJson();
   }
 
