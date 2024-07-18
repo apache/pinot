@@ -21,11 +21,18 @@ package org.apache.pinot.controller.util;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
 import com.google.common.collect.BiMap;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import javax.annotation.Nonnegative;
 import javax.annotation.Nonnull;
@@ -35,7 +42,9 @@ import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.restlet.resources.DatabaseSizeInfo;
 import org.apache.pinot.common.restlet.resources.SegmentSizeInfo;
+import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.api.resources.ServerTableSizeReader;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -52,20 +61,32 @@ public class TableSizeReader {
   private static final Logger LOGGER = LoggerFactory.getLogger(TableSizeReader.class);
   public static final long DEFAULT_SIZE_WHEN_MISSING_OR_ERROR = -1L;
 
-  private final Executor _executor;
-  private final HttpClientConnectionManager _connectionManager;
   private final PinotHelixResourceManager _helixResourceManager;
   private final ControllerMetrics _controllerMetrics;
   private final LeadControllerManager _leadControllerManager;
+  private final ServerTableSizeReader _serverTableSizeReader;
+  private final LoadingCache<String, Long> _databaseSizeBytes;
 
   public TableSizeReader(Executor executor, HttpClientConnectionManager connectionManager,
       ControllerMetrics controllerMetrics, PinotHelixResourceManager helixResourceManager,
-      LeadControllerManager leadControllerManager) {
-    _executor = executor;
-    _connectionManager = connectionManager;
+      LeadControllerManager leadControllerManager, ControllerConf controllerConf) {
     _controllerMetrics = controllerMetrics;
     _helixResourceManager = helixResourceManager;
     _leadControllerManager = leadControllerManager;
+    _serverTableSizeReader = new ServerTableSizeReader(executor, connectionManager, controllerConf);
+    _databaseSizeBytes = CacheBuilder.newBuilder()
+        .refreshAfterWrite(Duration.ofMinutes(5))
+        .build(new CacheLoader<>() {
+          @Override
+          public Long load(String key)
+              throws Exception {
+            Set<String> allServers = new HashSet<>(helixResourceManager.getAllServerInstances());
+            BiMap<String, String> endpoints = _helixResourceManager.getDataInstanceAdminEndpoints(allServers);
+            return _serverTableSizeReader.getDatabaseSizeInfoFromServers(endpoints, key).values().stream()
+                    .map(DatabaseSizeInfo::getDiskSizeInBytes)
+                    .reduce(0L, Long::sum);
+          }
+        });
   }
 
   /**
@@ -162,6 +183,19 @@ public class TableSizeReader {
     return tableSizeDetails;
   }
 
+  /**
+   * Get the database size which consists of the size of table segments under the database across all servers
+   * @return database size. 0 if unable to fetch the database size
+   */
+  public long getDatabaseSizeBytes(String databaseName) {
+    try {
+      return _databaseSizeBytes.get(databaseName);
+    } catch (ExecutionException e) {
+      LOGGER.error("Unable to fetch database size from servers for database " + databaseName, e);
+      return 0;
+    }
+  }
+
   private void emitMetrics(String tableNameWithType, ControllerGauge controllerGauge, long value) {
     if (_leadControllerManager.isLeaderForTable(tableNameWithType)) {
       _controllerMetrics.setValueOfTableGauge(tableNameWithType, controllerGauge, value);
@@ -244,10 +278,9 @@ public class TableSizeReader {
   public TableSubTypeSizeDetails getTableSubtypeSize(String tableNameWithType, int timeoutMs)
       throws InvalidConfigException {
     Map<String, List<String>> serverToSegmentsMap = _helixResourceManager.getServerToSegmentsMap(tableNameWithType);
-    ServerTableSizeReader serverTableSizeReader = new ServerTableSizeReader(_executor, _connectionManager);
     BiMap<String, String> endpoints = _helixResourceManager.getDataInstanceAdminEndpoints(serverToSegmentsMap.keySet());
     Map<String, List<SegmentSizeInfo>> serverToSegmentSizeInfoListMap =
-        serverTableSizeReader.getSegmentSizeInfoFromServers(endpoints, tableNameWithType, timeoutMs);
+        _serverTableSizeReader.getSegmentSizeInfoFromServers(endpoints, tableNameWithType, timeoutMs);
 
     TableSubTypeSizeDetails subTypeSizeDetails = new TableSubTypeSizeDetails();
     Map<String, SegmentSizeDetails> segmentToSizeDetailsMap = subTypeSizeDetails._segments;

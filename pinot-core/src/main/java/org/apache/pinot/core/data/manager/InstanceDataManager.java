@@ -194,4 +194,11 @@ public interface InstanceDataManager {
    * @param isServerReadyToServeQueries supplier to retrieve state of server.
    */
   void setSupplierOfIsServerReadyToServeQueries(Supplier<Boolean> isServerReadyToServeQueries);
+
+  /**
+   * Returns the total size of the tables under the provided database in bytes.
+   *
+   * @return Size of the database in bytes
+   */
+  long getDatabaseSizeBytes(String databaseName);
 }

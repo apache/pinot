@@ -502,6 +502,11 @@ public class PinotHelixResourceManager {
         .collect(Collectors.toList());
   }
 
+  public List<String> getAllServerInstances() {
+    return HelixHelper.getAllInstances(_helixAdmin, _helixClusterName).stream().filter(InstanceTypeUtils::isServer)
+        .collect(Collectors.toList());
+  }
+
   public List<InstanceConfig> getAllBrokerInstanceConfigs() {
     return HelixHelper.getInstanceConfigs(_helixZkManager).stream()
         .filter(instance -> InstanceTypeUtils.isBroker(instance.getId())).collect(Collectors.toList());
