@@ -72,24 +72,8 @@ public class TypeFactory extends JavaTypeFactoryImpl {
         return SqlTypeName.INTEGER;
       case LONG:
         return SqlTypeName.BIGINT;
-      // Map float and double to the same RelDataType so that queries like
-      // `select count(*) from table where aFloatColumn = 0.05` works correctly in multi-stage query engine.
-      //
-      // If float and double are mapped to different RelDataType,
-      // `select count(*) from table where aFloatColumn = 0.05` will be converted to
-      // `select count(*) from table where CAST(aFloatColumn as "DOUBLE") = 0.05`. While casting
-      // from float to double does not always produce the same double value as the original float value, this leads to
-      // wrong query result.
-      //
-      // With float and double mapped to the same RelDataType, the behavior in multi-stage query engine will be the same
-      // as the query in v1 query engine.
       case FLOAT:
-        if (fieldSpec.isSingleValueField()) {
-          return SqlTypeName.DOUBLE;
-        } else {
-          // TODO: This may be wrong. The reason why we want to use DOUBLE in single value float may also apply here
-          return SqlTypeName.REAL;
-        }
+        return SqlTypeName.REAL;
       case DOUBLE:
         return SqlTypeName.DOUBLE;
       case BOOLEAN:
@@ -97,13 +81,12 @@ public class TypeFactory extends JavaTypeFactoryImpl {
       case TIMESTAMP:
         return SqlTypeName.TIMESTAMP;
       case STRING:
+      case JSON:
         return SqlTypeName.VARCHAR;
       case BYTES:
         return SqlTypeName.VARBINARY;
       case BIG_DECIMAL:
         return SqlTypeName.DECIMAL;
-      case JSON:
-        return SqlTypeName.VARCHAR;
       case LIST:
         // TODO: support LIST, MV column should go fall into this category.
       case STRUCT:

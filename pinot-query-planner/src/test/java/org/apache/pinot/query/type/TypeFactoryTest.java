@@ -47,7 +47,6 @@ public class TypeFactoryTest {
 
     for (FieldSpec.DataType dataType : FieldSpec.DataType.values()) {
       RelDataType basicType;
-      RelDataType arrayType = null;
       switch (dataType) {
         case INT: {
           basicType = TYPE_FACTORY.createSqlType(SqlTypeName.INTEGER);
@@ -57,20 +56,8 @@ public class TypeFactoryTest {
           basicType = TYPE_FACTORY.createSqlType(SqlTypeName.BIGINT);
           break;
         }
-        // Map float and double to the same RelDataType so that queries like
-        // `select count(*) from table where aFloatColumn = 0.05` works correctly in multi-stage query engine.
-        //
-        // If float and double are mapped to different RelDataType,
-        // `select count(*) from table where aFloatColumn = 0.05` will be converted to
-        // `select count(*) from table where CAST(aFloatColumn as "DOUBLE") = 0.05`. While casting
-        // from float to double does not always produce the same double value as the original float value, this leads to
-        // wrong query result.
-        //
-        // With float and double mapped to the same RelDataType, the behavior in multi-stage query engine will be the
-        // same as the query in v1 query engine.
         case FLOAT: {
-          basicType = TYPE_FACTORY.createSqlType(SqlTypeName.DOUBLE);
-          arrayType = TYPE_FACTORY.createSqlType(SqlTypeName.REAL);
+          basicType = TYPE_FACTORY.createSqlType(SqlTypeName.REAL);
           break;
         }
         case DOUBLE: {
@@ -107,18 +94,14 @@ public class TypeFactoryTest {
           String message = String.format("Unsupported type: %s ", dataType);
           throw new UnsupportedOperationException(message);
       }
-      if (arrayType == null) {
-        arrayType = basicType;
-      }
-      cases.add(new Object[]{dataType, basicType, arrayType, true});
-      cases.add(new Object[]{dataType, basicType, arrayType, false});
+      cases.add(new Object[]{dataType, basicType, true});
+      cases.add(new Object[]{dataType, basicType, false});
     }
     return cases.iterator();
   }
 
   @Test(dataProvider = "relDataTypeConversion")
-  public void testScalarTypes(FieldSpec.DataType dataType, RelDataType scalarType, RelDataType arrayType,
-      boolean columnNullMode) {
+  public void testScalarTypes(FieldSpec.DataType dataType, RelDataType scalarType, boolean columnNullMode) {
     TypeFactory typeFactory = new TypeFactory();
     Schema testSchema = new Schema.SchemaBuilder()
         .addSingleValueDimension("col", dataType)
@@ -132,8 +115,7 @@ public class TypeFactoryTest {
   }
 
   @Test(dataProvider = "relDataTypeConversion")
-  public void testNullableScalarTypes(FieldSpec.DataType dataType, RelDataType scalarType, RelDataType arrayType,
-      boolean columnNullMode) {
+  public void testNullableScalarTypes(FieldSpec.DataType dataType, RelDataType scalarType, boolean columnNullMode) {
     TypeFactory typeFactory = new TypeFactory();
     Schema testSchema = new Schema.SchemaBuilder()
         .addDimensionField("col", dataType, field -> field.setNullable(true))
@@ -151,8 +133,7 @@ public class TypeFactoryTest {
 
 
   @Test(dataProvider = "relDataTypeConversion")
-  public void testNotNullableScalarTypes(FieldSpec.DataType dataType, RelDataType scalarType, RelDataType arrayType,
-      boolean columnNullMode) {
+  public void testNotNullableScalarTypes(FieldSpec.DataType dataType, RelDataType scalarType, boolean columnNullMode) {
     TypeFactory typeFactory = new TypeFactory();
     Schema testSchema = new Schema.SchemaBuilder()
         .addDimensionField("col", dataType, field -> field.setNullable(false))
@@ -170,8 +151,7 @@ public class TypeFactoryTest {
   }
 
   @Test(dataProvider = "relDataTypeConversion")
-  public void testArrayTypes(FieldSpec.DataType dataType, RelDataType scalarType, RelDataType arrayType,
-      boolean columnNullMode) {
+  public void testArrayTypes(FieldSpec.DataType dataType, RelDataType arrayType, boolean columnNullMode) {
     TypeFactory typeFactory = new TypeFactory();
     Schema testSchema = new Schema.SchemaBuilder()
         .addMultiValueDimension("col", dataType)
@@ -189,8 +169,7 @@ public class TypeFactoryTest {
   }
 
   @Test(dataProvider = "relDataTypeConversion")
-  public void testNullableArrayTypes(FieldSpec.DataType dataType, RelDataType scalarType, RelDataType arrayType,
-      boolean columnNullMode) {
+  public void testNullableArrayTypes(FieldSpec.DataType dataType, RelDataType arrayType, boolean columnNullMode) {
     TypeFactory typeFactory = new TypeFactory();
     Schema testSchema = new Schema.SchemaBuilder()
         .addDimensionField("col", dataType, field -> {
@@ -211,8 +190,7 @@ public class TypeFactoryTest {
   }
 
   @Test(dataProvider = "relDataTypeConversion")
-  public void testNotNullableArrayTypes(FieldSpec.DataType dataType, RelDataType scalarType, RelDataType arrayType,
-      boolean columnNullMode) {
+  public void testNotNullableArrayTypes(FieldSpec.DataType dataType, RelDataType arrayType, boolean columnNullMode) {
     TypeFactory typeFactory = new TypeFactory();
     Schema testSchema = new Schema.SchemaBuilder()
         .addDimensionField("col", dataType, field -> {
@@ -262,6 +240,10 @@ public class TypeFactoryTest {
           checkPrecisionScale(field, bigIntBasicSqlType);
           break;
         case "FLOAT_COL":
+          BasicSqlType realBasicSqlType = new BasicSqlType(TypeSystem.INSTANCE, SqlTypeName.REAL);
+          Assert.assertEquals(field.getType(), realBasicSqlType);
+          checkPrecisionScale(field, realBasicSqlType);
+          break;
         case "DOUBLE_COL":
           BasicSqlType doubleBasicSqlType = new BasicSqlType(TypeSystem.INSTANCE, SqlTypeName.DOUBLE);
           Assert.assertEquals(field.getType(), doubleBasicSqlType);
