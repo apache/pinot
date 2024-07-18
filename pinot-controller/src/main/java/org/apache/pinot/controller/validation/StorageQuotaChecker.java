@@ -56,6 +56,7 @@ public class StorageQuotaChecker {
     _pinotHelixResourceManager = pinotHelixResourceManager;
     _controllerConf = controllerConf;
     _timeout = controllerConf.getServerAdminRequestTimeoutSeconds() * 1000;
+    Preconditions.checkArgument(_timeout > 0, "Timeout value must be > 0, input: %s", _timeout);
   }
 
   public static class QuotaCheckerResponse {
@@ -85,7 +86,6 @@ public class StorageQuotaChecker {
     if (!_controllerConf.getEnableStorageQuotaCheck()) {
       return success("Storage quota check is disabled, skipping the check");
     }
-    Preconditions.checkArgument(_timeout > 0, "Timeout value must be > 0, input: %s", _timeout);
 
     // 1. Read table config
     // 2. read table size from all the servers
@@ -121,7 +121,10 @@ public class StorageQuotaChecker {
       return success("Missing size reports from all servers. Bypassing storage quota check for " + tableNameWithType);
     }
 
-    if (tableSubtypeSize._missingSegments > 0) {
+    // The logic inside this if block is applicable for missing segments as well as
+    // when we are checking the quota for only existing segments (segmentSizeInBytes == 0)
+    // as in both cases quota is checked across existing segments estimated size alone
+    if (segmentSizeInBytes == 0 || tableSubtypeSize._missingSegments > 0) {
       if (tableSubtypeSize._estimatedSizeInBytes > allowedStorageBytes) {
         return failure("Table " + tableNameWithType + " already over quota. Estimated size for all replicas is "
             + DataSizeUtils.fromBytes(tableSubtypeSize._estimatedSizeInBytes) + ". Configured size for " + numReplicas
@@ -214,46 +217,15 @@ public class StorageQuotaChecker {
     }
   }
 
+  /**
+   * Checks whether the table is within the storage quota.
+   * @return true if storage quota is exceeded by the table, else false.
+   */
   public boolean isTableStorageQuotaExceeded(TableConfig tableConfig) {
-    Preconditions.checkArgument(_timeout > 0, "Timeout value must be > 0, input: %s", _timeout);
-
-    // 1. Read table config
-    // 2. read table size from all the servers
-    // 3. is the table size within quota
-    QuotaConfig quotaConfig = tableConfig.getQuotaConfig();
-    int numReplicas = tableConfig.getReplication();
-
-    final String tableNameWithType = tableConfig.getTableName();
-
-    if (quotaConfig == null || quotaConfig.getStorage() == null) {
-      // no quota configuration
-      LOGGER.info("Storage quota is not configured for table: {}, skipping the check", tableNameWithType);
-      return false;
-    }
-
-    long allowedStorageBytes = numReplicas * quotaConfig.getStorageInBytes();
-    _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.TABLE_QUOTA, allowedStorageBytes);
-
-    // read table size
-    TableSizeReader.TableSubTypeSizeDetails tableSubtypeSize;
     try {
-      tableSubtypeSize = _tableSizeReader.getTableSubtypeSize(tableNameWithType, _timeout);
+      return !isSegmentStorageWithinQuota(tableConfig, null, 0)._isSegmentWithinQuota;
     } catch (InvalidConfigException e) {
-      LOGGER.error("Failed to get table size for table {}, skipping the check", tableNameWithType, e);
-      return false;
-    }
-
-    if (tableSubtypeSize._estimatedSizeInBytes == -1) {
-      LOGGER.error("Missing size reports from all servers. Bypassing storage quota check for {}", tableNameWithType);
-      return false;
-    }
-    if (tableSubtypeSize._estimatedSizeInBytes > allowedStorageBytes) {
-      LOGGER.info("Table {} already over quota. Estimated size for all replicas is {}. Configured size for {} is {}",
-          tableNameWithType, DataSizeUtils.fromBytes(tableSubtypeSize._estimatedSizeInBytes), numReplicas,
-          DataSizeUtils.fromBytes(allowedStorageBytes));
-      return true;
-    } else {
-      LOGGER.info("Table storage for {} within the quota limits", tableNameWithType);
+      // skip the check upon exception
       return false;
     }
   }
