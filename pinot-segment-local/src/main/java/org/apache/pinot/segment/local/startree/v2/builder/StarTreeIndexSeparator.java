@@ -36,12 +36,16 @@ import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
  * The {@code StarTreeIndexSeparator} pulls out the individual star-trees from the common star-tree index file
  */
 public class StarTreeIndexSeparator implements Closeable {
+  private static final Logger LOGGER = LoggerFactory.getLogger(StarTreeIndexSeparator.class);
+
   private final List<Map<StarTreeIndexMapUtils.IndexKey, StarTreeIndexMapUtils.IndexValue>> _indexMapList;
   private final List<StarTreeV2BuilderConfig> _builderConfigList;
   private final List<Integer> _numDocsList;
@@ -57,10 +61,15 @@ public class StarTreeIndexSeparator implements Closeable {
     int numStarTrees = starTreeMetadataList.size();
     _builderConfigList = new ArrayList<>(numStarTrees);
     _numDocsList = new ArrayList<>(numStarTrees);
+    StringBuilder logExistingStarTrees = new StringBuilder();
+    logExistingStarTrees.append("Existing star-tree configs :");
     for (StarTreeV2Metadata starTreeMetadata : starTreeMetadataList) {
-      _builderConfigList.add(StarTreeV2BuilderConfig.fromMetadata(starTreeMetadata));
+      StarTreeV2BuilderConfig config = StarTreeV2BuilderConfig.fromMetadata(starTreeMetadata);
+      _builderConfigList.add(config);
+      logExistingStarTrees.append("\n").append(config);
       _numDocsList.add(starTreeMetadata.getNumDocs());
     }
+    LOGGER.debug(logExistingStarTrees.toString());
     _indexFileChannel = new RandomAccessFile(indexFile, "r").getChannel();
   }
 
@@ -77,8 +86,10 @@ public class StarTreeIndexSeparator implements Closeable {
       throws IOException {
     int treeIndex = _builderConfigList.indexOf(builderConfig);
     if (treeIndex == -1) {
+      LOGGER.info("No existing star-tree found for config: {}", builderConfig);
       return -1;
     }
+    LOGGER.info("Separating star-tree for config: {}", builderConfig);
     separate(starTreeOutputDir, treeIndex);
     return _numDocsList.get(treeIndex);
   }
