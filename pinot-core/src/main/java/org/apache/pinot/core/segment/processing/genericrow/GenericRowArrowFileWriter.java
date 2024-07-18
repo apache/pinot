@@ -19,11 +19,15 @@
 package org.apache.pinot.core.segment.processing.genericrow;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.io.BufferedOutputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.MappedByteBuffer;
+import java.nio.channels.AsynchronousFileChannel;
 import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
 import java.nio.file.Files;
@@ -36,6 +40,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.arrow.algorithm.sort.DefaultVectorComparators;
@@ -174,12 +179,16 @@ public class GenericRowArrowFileWriter implements Closeable, FileWriter<GenericR
     }
 
     if (_sortColumnsChannel.size() > 0) {
-      _sortColumnsChannel.writeTo(new FileOutputStream(sortColFileName));
+      try (BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(sortColFileName))) {
+        _sortColumnsChannel.writeTo(bos);
+      }
       _sortColumnsChannel.reset();
     }
 
     if (_nonSortColumnsChannel.size() > 0) {
-      _nonSortColumnsChannel.writeTo(new FileOutputStream(nonSortColFileName));
+      try (BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(nonSortColFileName))) {
+        _nonSortColumnsChannel.writeTo(bos);
+      }
       _nonSortColumnsChannel.reset();
     }
 
