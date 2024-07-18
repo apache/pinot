@@ -27,17 +27,27 @@ import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
  */
 public class AvroRecordExtractorConfig implements RecordExtractorConfig {
   private boolean _enableLogicalTypes = false;
+  private boolean _differentiateNullAndEmptyForMV = false;
 
   @Override
   public void init(Map<String, String> props) {
     _enableLogicalTypes = Boolean.parseBoolean(props.get("enableLogicalTypes"));
+    _differentiateNullAndEmptyForMV = Boolean.parseBoolean(props.get("differentiateNullAndEmptyForMV"));
   }
 
   public boolean isEnableLogicalTypes() {
     return _enableLogicalTypes;
   }
 
+  public boolean isDifferentiateNullAndEmptyForMV() {
+    return _differentiateNullAndEmptyForMV;
+  }
+
   public void setEnableLogicalTypes(boolean enableLogicalTypes) {
     _enableLogicalTypes = enableLogicalTypes;
+  }
+
+  public void setDifferentiateNullAndEmptyForMV(boolean differentiateNullAndEmptyForMV) {
+    _differentiateNullAndEmptyForMV = differentiateNullAndEmptyForMV;
   }
 }
