@@ -221,7 +221,7 @@ public class HashJoinOperator extends MultiStageOperator {
       throws ProcessingException {
     long startTime = System.currentTimeMillis();
     TransferableBlock rightBlock = _rightInput.nextBlock();
-    int totalProcessedRows = 0;
+    long totalProcessedRows = 0;
     while (!TransferableBlockUtils.isEndOfStream(rightBlock)) {
       List<Object[]> container = rightBlock.getContainer();
       // Row based overflow check.

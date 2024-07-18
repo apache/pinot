@@ -61,7 +61,7 @@ public class MailboxReceiveOperator extends BaseMailboxReceiveOperator {
     if (block.isSuccessfulEndOfStreamBlock()) {
       updateEosBlock(block, _statMap);
     } else if (block.isDataBlock()) {
-      sampleResourceUsage(_statMap.getInt(StatKey.EMITTED_ROWS) + block.getNumRows());
+      sampleResourceUsage(_statMap.getLong(StatKey.EMITTED_ROWS) + block.getNumRows());
     }
     return block;
   }

@@ -156,7 +156,7 @@ public class SortOperator extends MultiStageOperator {
 
   private TransferableBlock consumeInputBlocks() {
     TransferableBlock block = _input.nextBlock();
-    int totalProcessedRows = 0;
+    long totalProcessedRows = 0;
     while (block.isDataBlock()) {
       List<Object[]> container = block.getContainer();
       if (_priorityQueue == null) {

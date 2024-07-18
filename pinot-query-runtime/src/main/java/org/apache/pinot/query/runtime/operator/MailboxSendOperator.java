@@ -143,7 +143,7 @@ public class MailboxSendOperator extends MultiStageOperator {
           earlyTerminate();
         }
       }
-      sampleResourceUsage(_statMap.getInt(StatKey.EMITTED_ROWS) + block.getNumRows());
+      sampleResourceUsage(_statMap.getLong(StatKey.EMITTED_ROWS) + block.getNumRows());
       return block;
     } catch (QueryCancelledException e) {
       LOGGER.debug("Query was cancelled! for opChain: {}", _context.getId());
