@@ -31,6 +31,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.spi.metrics.PinotGauge;
 import org.apache.pinot.spi.metrics.PinotMeter;
@@ -499,6 +500,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    * @param gaugeName gauge name
    * @return gauge value. If gauge is not present return null.
    */
+  @Nullable
   public Long getGaugeValue(final String gaugeName) {
     AtomicLong value = _gaugeValues.get(gaugeName);
     return value != null ? value.get() : null;
