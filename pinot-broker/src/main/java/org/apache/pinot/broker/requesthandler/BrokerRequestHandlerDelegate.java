@@ -71,6 +71,9 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
   public BrokerResponse handleRequest(JsonNode request, @Nullable SqlNodeAndOptions sqlNodeAndOptions,
       @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext, @Nullable HttpHeaders httpHeaders)
       throws Exception {
+    if (requestContext.getRequestArrivalTimeMillis() == 0) {
+      requestContext.setRequestArrivalTimeMillis(System.currentTimeMillis());
+    }
     // Parse the query if needed
     if (sqlNodeAndOptions == null) {
       try {
