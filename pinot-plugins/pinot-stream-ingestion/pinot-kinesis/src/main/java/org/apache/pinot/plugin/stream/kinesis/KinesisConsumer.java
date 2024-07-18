@@ -63,7 +63,16 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
 
   @Override
   public synchronized KinesisMessageBatch fetchMessages(StreamPartitionMsgOffset startMsgOffset, int timeoutMs) {
-    KinesisPartitionGroupOffset startOffset = (KinesisPartitionGroupOffset) startMsgOffset;
+    try {
+      return getKinesisMessageBatch((KinesisPartitionGroupOffset) startMsgOffset);
+    } catch (ProvisionedThroughputExceededException pte) {
+      LOGGER.debug("Provisioned throughput exceeded while fetching messages from Kinesis stream: {}", pte.getMessage());
+      return new KinesisMessageBatch(List.of(), (KinesisPartitionGroupOffset) startMsgOffset, false);
+    }
+  }
+
+  private KinesisMessageBatch getKinesisMessageBatch(KinesisPartitionGroupOffset startMsgOffset) {
+    KinesisPartitionGroupOffset startOffset = startMsgOffset;
     String shardId = startOffset.getShardId();
     String startSequenceNumber = startOffset.getSequenceNumber();
     // Get the shard iterator
@@ -122,7 +131,7 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
         } catch (InterruptedException e) {
           throw new RuntimeException(e);
         }
-        _currentSecond++;
+        _currentSecond = (int) TimeUnit.MILLISECONDS.toSeconds(System.currentTimeMillis());
         _numRequestsInCurrentSecond = 1;
       } else {
         _numRequestsInCurrentSecond++;
