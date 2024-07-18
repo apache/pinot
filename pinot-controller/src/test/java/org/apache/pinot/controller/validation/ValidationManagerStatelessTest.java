@@ -19,6 +19,7 @@
 package org.apache.pinot.controller.validation;
 
 import org.apache.helix.HelixAdmin;
+import org.apache.helix.constants.InstanceConstants;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.utils.config.TagNameUtils;
@@ -83,7 +84,7 @@ public class ValidationManagerStatelessTest extends ControllerTest {
     // called
     final String brokerId = "Broker_localhost_2";
     InstanceConfig instanceConfig = new InstanceConfig(brokerId);
-    instanceConfig.setInstanceEnabled(true);
+    instanceConfig.setInstanceOperation(InstanceConstants.InstanceOperation.ENABLE);
     instanceConfig.setHostName("Broker_localhost");
     instanceConfig.setPort("2");
     helixAdmin.addInstance(getHelixClusterName(), instanceConfig);
