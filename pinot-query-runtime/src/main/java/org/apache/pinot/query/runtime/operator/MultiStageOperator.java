@@ -66,7 +66,7 @@ public abstract class MultiStageOperator
 
   public abstract void registerExecution(long time, int numRows);
 
-  protected void sampleResourceUsage(int totalProcessedRows) {
+  protected void sampleResourceUsage(long totalProcessedRows) {
     Tracing.ThreadAccountantOps.samplePeriodically(totalProcessedRows);
   }
 

@@ -171,7 +171,7 @@ public class AggregateOperator extends MultiStageOperator {
    */
   private TransferableBlock consumeGroupBy() {
     TransferableBlock block = _input.nextBlock();
-    int totalProcessedRows = 0;
+    long totalProcessedRows = 0;
     while (block.isDataBlock()) {
       _groupByExecutor.processBlock(block);
       totalProcessedRows += block.getNumRows();

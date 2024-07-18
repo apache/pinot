@@ -321,7 +321,7 @@ public class Tracing {
     }
 
     // Sample memory usage every time after processing 8192 keys
-    public static void samplePeriodically(int totalProcessedRows) {
+    public static void samplePeriodically(long totalProcessedRows) {
       if ((totalProcessedRows & MAX_ENTRIES_KEYS_MERGED_PER_INTERRUPTION_CHECK_MASK) == 0) {
         sample();
       }

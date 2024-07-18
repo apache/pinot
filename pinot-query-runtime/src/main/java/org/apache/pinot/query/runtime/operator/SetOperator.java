@@ -113,7 +113,7 @@ public abstract class SetOperator extends MultiStageOperator {
 
   protected void constructRightBlockSet() {
     TransferableBlock block = _rightChildOperator.nextBlock();
-    int totalProcessedRows = 0;
+    long totalProcessedRows = 0;
     while (!block.isEndOfStreamBlock()) {
       if (block.getType() != DataBlock.Type.METADATA) {
         for (Object[] row : block.getContainer()) {
