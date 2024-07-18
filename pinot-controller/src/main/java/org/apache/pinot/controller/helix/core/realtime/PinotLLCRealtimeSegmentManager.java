@@ -1777,14 +1777,26 @@ public class PinotLLCRealtimeSegmentManager {
     return updatedIdealState;
   }
 
+  /**
+   * Updates the table IS property 'isQuotaExceeded' based on provided 'quotaExceeded'.
+   * Will be a no op in case the IS already has the same value.
+   * @param tableNameWithType table on which to update the IS
+   * @param quotaExceeded boolean indicating whether table has exceeded the quota limits
+   * @return true if the IS was successfully updated for the table. Returns false in case of no op or the update fails.
+   */
   public boolean updateStorageQuotaExceededInIdealState(String tableNameWithType, boolean quotaExceeded) {
     IdealState is = getIdealState(tableNameWithType);
     if (is.getRecord().getBooleanField(IS_QUOTA_EXCEEDED, false) != quotaExceeded) {
-      HelixHelper.updateIdealState(_helixManager, tableNameWithType, idealState -> {
+      is = HelixHelper.updateIdealState(_helixManager, tableNameWithType, idealState -> {
         ZNRecord znRecord = idealState.getRecord();
         znRecord.setSimpleField(IS_QUOTA_EXCEEDED, Boolean.valueOf(quotaExceeded).toString());
         return new IdealState(znRecord);
       }, RetryPolicies.noDelayRetryPolicy(1));
+      if (is == null) {
+        LOGGER.error("Failed to set 'isQuotaExceeded' to {} in the Ideal State for table {}.", quotaExceeded,
+            tableNameWithType);
+        return false;
+      }
       LOGGER.info("Set 'isQuotaExceeded' to {} in the Ideal State for table {}.", quotaExceeded, tableNameWithType);
       return true;
     }
