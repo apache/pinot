@@ -20,7 +20,7 @@
 # Joins
 SELECT COUNT(*) FROM FeatureTest1 ft1 INNER JOIN FeatureTest2 ft2 ON ft1.stringDimSV1 = ft2.stringDimSV1 WHERE ft1.generationNumber = __GENERATION_NUMBER__ AND ft2.generationNumber = __GENERATION_NUMBER__
 SELECT ft1.stringDimSV1, COUNT(ft1.stringDimSV1) FROM FeatureTest1 ft1 INNER JOIN FeatureTest2 ft2 ON ft1.stringDimSV1 = ft2.stringDimSV1 WHERE ft1.generationNumber = __GENERATION_NUMBER__ AND ft2.generationNumber = __GENERATION_NUMBER__ GROUP BY ft1.stringDimSV1
-SELECT ft1.stringDimSV2, SUM(ft1.floatMetric1) FROM FeatureTest1 ft1 INNER JOIN FeatureTest2 ft2 ON ft1.stringDimSV1 = ft2.stringDimSV1 WHERE ft1.generationNumber = __GENERATION_NUMBER__ AND ft2.generationNumber = __GENERATION_NUMBER__ GROUP BY ft1.stringDimSV2
+SELECT ft1.stringDimSV2, SUM(ft1.doubleMetric1) FROM FeatureTest1 ft1 INNER JOIN FeatureTest2 ft2 ON ft1.stringDimSV1 = ft2.stringDimSV1 WHERE ft1.generationNumber = __GENERATION_NUMBER__ AND ft2.generationNumber = __GENERATION_NUMBER__ GROUP BY ft1.stringDimSV2
 SELECT ft1.stringDimSV1 FROM FeatureTest1 ft1 WHERE ft1.generationNumber = __GENERATION_NUMBER__ AND EXISTS (SELECT 1 FROM FeatureTest2 ft2 WHERE ft2.generationNumber = __GENERATION_NUMBER__ AND ft2.stringDimSV2 = ft1.stringDimSV1)
 
 # Set operations
