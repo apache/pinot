@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.TableSizeReader;
@@ -98,6 +99,16 @@ public class StorageQuotaChecker {
 
     long allowedStorageBytes = numReplicas * quotaConfig.getStorageInBytes();
     _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.TABLE_QUOTA, allowedStorageBytes);
+
+    // Temporary hardcoded value
+    // populate the right storage quota once database quota config pr is merged
+    int storageQuotaBytes = 100000;
+    // read database size
+    String databaseName = DatabaseUtils.extractDatabaseFromFullyQualifiedTableName(tableNameWithType);
+    long dbSize = _tableSizeReader.getDatabaseSizeBytes(databaseName);
+    if (dbSize + segmentSizeInBytes > storageQuotaBytes) {
+      return failure("Database storage quota exceeded for database " + databaseName);
+    }
 
     // read table size
     TableSizeReader.TableSubTypeSizeDetails tableSubtypeSize;
