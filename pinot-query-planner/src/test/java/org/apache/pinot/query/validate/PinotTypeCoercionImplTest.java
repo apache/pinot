@@ -164,7 +164,6 @@ public class PinotTypeCoercionImplTest extends QueryEnvironmentTestBase {
         // ALLOW CAST of INT -> VARCHAR
         new Object[]{"SELECT * FROM a where col1 > CAST(5 AS VARCHAR)"},
         new Object[]{"SELECT * FROM a where col1 BETWEEN CAST(5 AS VARCHAR) AND CAST(8 AS VARCHAR)"},
-
     };
   }
 
@@ -244,7 +243,6 @@ public class PinotTypeCoercionImplTest extends QueryEnvironmentTestBase {
 
         //Allow Cast of INT -> VARCHAR
         new Object[]{"SELECT a.col1, c.col3 from a join c ON a.col1 < CAST(c.col3 as VARCHAR)"},
-
     };
   }
 
