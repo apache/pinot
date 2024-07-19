@@ -160,6 +160,11 @@ public class PinotTypeCoercionImplTest extends QueryEnvironmentTestBase {
         new Object[]{"SELECT * FROM a where CAST(col1 as INT) BETWEEN 5 AND 8"},
         new Object[]{"SELECT * FROM a where 5 BETWEEN CAST(col1 as INT) AND 8"},
         new Object[]{"SELECT * FROM a where 5 BETWEEN 8 AND CAST(col1 as INT)"},
+
+        // ALLOW CAST of INT -> VARCHAR
+        new Object[]{"SELECT * FROM a where col1 > CAST(5 AS VARCHAR)"},
+        new Object[]{"SELECT * FROM a where col1 BETWEEN CAST(5 AS VARCHAR) AND CAST(8 AS VARCHAR)"},
+
     };
   }
 
@@ -198,11 +203,53 @@ public class PinotTypeCoercionImplTest extends QueryEnvironmentTestBase {
         new Object[]{"SELECT 5 > CAST(col1 as INT) - 1 FROM a"},
         new Object[]{"SELECT 5 > CAST(col1 as INT) * 1 FROM a"},
         new Object[]{"SELECT 5 > CAST(col1 as INT) / 1 FROM a"},
+
+        //Allow Cast of INT -> VARCHAR
+        new Object[]{"SELECT col1 > CAST(5 AS VARCHAR) FROM a"},
     };
   }
 
   @Test(dataProvider = "explicitCastCharToIntInProject")
   public void testExplicitCastCharToIntInProject(String query) {
+    Assert.assertNotNull(_queryEnvironment.planQuery(query));
+  }
+
+  @DataProvider(name = "implicitCastCharToIntOnClause")
+  protected Object[][] provideQueriesWithOnClause() {
+    return new Object[][]{
+        new Object[]{"SELECT a.col1, c.col3 from a join c ON a.col1 = c.col3"},
+        new Object[]{"SELECT a.col1, c.col3 from a join c ON a.col1 != c.col3"},
+        new Object[]{"SELECT a.col1, c.col3 from a join c ON a.col1 > c.col3"},
+        new Object[]{"SELECT a.col1, c.col3 from a join c ON a.col1 >= c.col3"},
+        new Object[]{"SELECT a.col1, c.col3 from a join c ON a.col1 <= c.col3"},
+        new Object[]{"SELECT a.col1, c.col3 from a join c ON a.col1 < c.col3"},
+    };
+  }
+
+  @Test(dataProvider = "implicitCastCharToIntOnClause", expectedExceptions = RuntimeException.class,
+      expectedExceptionsMessageRegExp = ".*Cannot apply .+ to arguments of type .*")
+  public void testImplicitCastCharToIntOnClause(String query) {
+    _queryEnvironment.planQuery(query);
+  }
+
+  @DataProvider(name = "explicitCastCharToIntOnClause")
+  protected Object[][] provideQueriesWithExplicitCastOnClause() {
+    return new Object[][]{
+        new Object[]{"SELECT a.col1, c.col3 from a join c ON CAST(a.col1 as INT) = c.col3"},
+        new Object[]{"SELECT a.col1, c.col3 from a join c ON CAST(a.col1 as INT) != c.col3"},
+        new Object[]{"SELECT a.col1, c.col3 from a join c ON CAST(a.col1 as INT) > c.col3"},
+        new Object[]{"SELECT a.col1, c.col3 from a join c ON CAST(a.col1 as INT) >= c.col3"},
+        new Object[]{"SELECT a.col1, c.col3 from a join c ON CAST(a.col1 as INT) <= c.col3"},
+        new Object[]{"SELECT a.col1, c.col3 from a join c ON CAST(a.col1 as INT) < c.col3"},
+
+        //Allow Cast of INT -> VARCHAR
+        new Object[]{"SELECT a.col1, c.col3 from a join c ON a.col1 < CAST(c.col3 as VARCHAR)"},
+
+    };
+  }
+
+  @Test(dataProvider = "explicitCastCharToIntOnClause")
+  public void testExplicitCastCharToIntOnClause(String query) {
     Assert.assertNotNull(_queryEnvironment.planQuery(query));
   }
 }
