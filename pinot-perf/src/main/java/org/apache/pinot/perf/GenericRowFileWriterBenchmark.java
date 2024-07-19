@@ -77,8 +77,8 @@ public class GenericRowFileWriterBenchmark {
     Schema pinotSchema = createSampleSchema();
     Set<String> sortColumns = new HashSet<>(Arrays.asList("id", "timestamp"));
 
-    _arrowWriter = new GenericRowArrowFileWriter(_tempDirArrow.getAbsolutePath(), pinotSchema, 1000, 1024 * 1024,
-        sortColumns, GenericRowArrowFileWriter.ArrowCompressionType.ZSTD, null);
+    _arrowWriter = new GenericRowArrowFileWriter(_tempDirArrow.getAbsolutePath(), pinotSchema, 100000, 2 * 1024 * 1024 * 1024L,
+        sortColumns, GenericRowArrowFileWriter.ArrowCompressionType.NONE, null);
 
     File offsetFile = new File(_tempDirStandard, "offset.dat");
     File dataFile = new File(_tempDirStandard, "data.dat");

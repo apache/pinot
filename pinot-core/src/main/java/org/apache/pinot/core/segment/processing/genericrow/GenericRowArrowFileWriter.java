@@ -19,28 +19,27 @@
 package org.apache.pinot.core.segment.processing.genericrow;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.tdunning.math.stats.Sort;
 import java.io.BufferedOutputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.MappedByteBuffer;
-import java.nio.channels.AsynchronousFileChannel;
 import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.Future;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.arrow.algorithm.sort.DefaultVectorComparators;
@@ -67,7 +66,6 @@ import org.apache.arrow.vector.ipc.message.IpcOption;
 import org.apache.arrow.vector.types.FloatingPointPrecision;
 import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.FieldType;
-import org.apache.commons.io.input.BufferedFileChannelInputStream;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -104,6 +102,48 @@ public class GenericRowArrowFileWriter implements Closeable, FileWriter<GenericR
 
   private Map<String, FileMetadata> _fileMetadata = new HashMap<>();
 
+  private List<List<Object>> _sortColumnValues;
+
+  private Map<String, ColumnInfo> columnInfoMap;
+
+  private static class ColumnInfo {
+    final FieldVector _fieldVector;
+    final boolean _isSortColumn;
+
+    ColumnInfo(FieldVector fieldVector, boolean isSortColumn) {
+      this._fieldVector = fieldVector;
+      this._isSortColumn = isSortColumn;
+    }
+  }
+
+  private static class SortEntry implements Comparable<SortEntry> {
+    int index;
+    List<Object> sortValues;
+
+    SortEntry(int index, List<Object> sortValues) {
+      this.index = index;
+      this.sortValues = sortValues;
+    }
+
+    @Override
+    public int compareTo(SortEntry other) {
+      for (int i = 0; i < sortValues.size(); i++) {
+        int cmp = compareValues(sortValues.get(i), other.sortValues.get(i));
+        if (cmp != 0) {
+          return cmp;
+        }
+      }
+      return Integer.compare(index, other.index);
+    }
+
+    private int compareValues(Object o1, Object o2) {
+      if (o1 instanceof Comparable) {
+        return ((Comparable) o1).compareTo(o2);
+      }
+      return 0; // Default to equality for non-comparable types
+    }
+  }
+
   private static class FileMetadata {
     @JsonProperty("rowCount")
     public int _rowCount;
@@ -135,6 +175,7 @@ public class GenericRowArrowFileWriter implements Closeable, FileWriter<GenericR
     _sortColumns = sortColumns;
     _batchNumber = 0;
     _allocator = new RootAllocator(Long.MAX_VALUE);
+    _sortColumnValues = new ArrayList<>();
 
     // Set up compression
     switch (compressionType) {
@@ -164,6 +205,7 @@ public class GenericRowArrowFileWriter implements Closeable, FileWriter<GenericR
 
   private void initNewBatch()
       throws IOException {
+    _sortColumnValues.clear();
 
     String sortColFileName =
         StringUtils.join(new String[]{_outputDir, SORT_COLUMNS_DATA_DIR, _batchNumber + ".arrow"},
@@ -178,19 +220,20 @@ public class GenericRowArrowFileWriter implements Closeable, FileWriter<GenericR
       new File(_outputDir + File.separator + NON_SORT_COLUMNS_DATA_DIR).mkdirs();
     }
 
-    if (_sortColumnsChannel.size() > 0) {
-      try (BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(sortColFileName))) {
-        _sortColumnsChannel.writeTo(bos);
-      }
-      _sortColumnsChannel.reset();
-    }
-
-    if (_nonSortColumnsChannel.size() > 0) {
-      try (BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(nonSortColFileName))) {
-        _nonSortColumnsChannel.writeTo(bos);
-      }
-      _nonSortColumnsChannel.reset();
-    }
+    // THis is faster but consumes lots of memory
+//    if (_sortColumnsChannel.size() > 0) {
+//      try (BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(sortColFileName))) {
+//        _sortColumnsChannel.writeTo(bos);
+//      }
+//      _sortColumnsChannel.reset();
+//    }
+//
+//    if (_nonSortColumnsChannel.size() > 0) {
+//      try (BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(nonSortColFileName))) {
+//        _nonSortColumnsChannel.writeTo(bos);
+//      }
+//      _nonSortColumnsChannel.reset();
+//    }
 
     resetListWriters();
 
@@ -207,23 +250,27 @@ public class GenericRowArrowFileWriter implements Closeable, FileWriter<GenericR
       _nonSortColumnsVectorRoot.clear();
     }
 
-    for (FieldVector vector : _sortColumnsVectorRoot.getFieldVectors()) {
-      vector.setInitialCapacity(_maxBatchRows);
-      vector.allocateNew();
-    }
-    for (FieldVector vector : _nonSortColumnsVectorRoot.getFieldVectors()) {
-      vector.setInitialCapacity(_maxBatchRows);
-      vector.allocateNew();
-    }
+    // Thought this would make code faster with preallocations but Naah, removing it
+//    for (FieldVector vector : _sortColumnsVectorRoot.getFieldVectors()) {
+//      vector.setInitialCapacity(_maxBatchRows);
+//      vector.allocateNew();
+//    }
+//    for (FieldVector vector : _nonSortColumnsVectorRoot.getFieldVectors()) {
+//      vector.setInitialCapacity(_maxBatchRows);
+//      vector.allocateNew();
+//    }
 
-//    FileChannel _sortColumnsChannel = FileChannel.open(Paths.get(sortColFileName), StandardOpenOption.CREATE, StandardOpenOption.WRITE);
-//    FileChannel _nonSortColumnsChannel = FileChannel.open(Paths.get(nonSortColFileName), StandardOpenOption.CREATE, StandardOpenOption.WRITE);
+    initializeColumnInfo();
+
+    FileChannel sortColumnsChannel = FileChannel.open(Paths.get(sortColFileName), StandardOpenOption.CREATE, StandardOpenOption.WRITE);
+    FileChannel nonSortColumnsChannel = FileChannel.open(Paths.get(nonSortColFileName), StandardOpenOption.CREATE, StandardOpenOption.WRITE);
+    int bufferSize = 8 * 1024 * 1024; // 8MB buffer
 
     _sortColumnsWriter =
-        new ArrowFileWriter(_sortColumnsVectorRoot, null, Channels.newChannel(_sortColumnsChannel),
+        new ArrowFileWriter(_sortColumnsVectorRoot, null, Channels.newChannel(new BufferedOutputStream(Channels.newOutputStream(sortColumnsChannel), bufferSize)),
             Collections.emptyMap(), IpcOption.DEFAULT, _compressionFactory, _codecType, _compressionLevel);
     _nonSortColumnsWriter =
-        new ArrowFileWriter(_nonSortColumnsVectorRoot, null, Channels.newChannel(_nonSortColumnsChannel),
+        new ArrowFileWriter(_nonSortColumnsVectorRoot, null, Channels.newChannel(new BufferedOutputStream(Channels.newOutputStream(nonSortColumnsChannel), bufferSize)),
             Collections.emptyMap(), IpcOption.DEFAULT, _compressionFactory, _codecType, _compressionLevel);
 
 
@@ -313,34 +360,51 @@ public class GenericRowArrowFileWriter implements Closeable, FileWriter<GenericR
     return new org.apache.arrow.vector.types.pojo.Schema(arrowFields);
   }
 
+  private void initializeColumnInfo() {
+    columnInfoMap = new HashMap<>();
+    for (FieldSpec fieldSpec : _pinotSchema.getAllFieldSpecs()) {
+      String fieldName = fieldSpec.getName();
+      boolean isSortColumn = _sortColumns.contains(fieldName);
+      FieldVector fieldVector = isSortColumn ? _sortColumnsVectorRoot.getVector(fieldName) : _nonSortColumnsVectorRoot.getVector(fieldName);
+      columnInfoMap.put(fieldName, new ColumnInfo(fieldVector, isSortColumn));
+    }
+  }
+
   private void fillVectorsFromGenericRow(VectorSchemaRoot sortColumnsRoot, VectorSchemaRoot nonSortColumnsRoot,
       GenericRow row) {
+    List<Object> currentRowSortValues = new ArrayList<>(_sortColumns.size());
+
     for (FieldSpec fieldSpec : _pinotSchema.getAllFieldSpecs()) {
-      FieldVector fieldVector =
-          _sortColumns != null && _sortColumns.contains(fieldSpec.getName()) ? sortColumnsRoot.getVector(
-              fieldSpec.getName()) : nonSortColumnsRoot.getVector(fieldSpec.getName());
+      Object fieldValue = row.getValue(fieldSpec.getName());
+      ColumnInfo columnInfo = columnInfoMap.get(fieldSpec.getName());
+
+      if (columnInfo._isSortColumn) {
+        currentRowSortValues.add(fieldValue);
+      }
+
+      FieldVector fieldVector = columnInfo._fieldVector;
 
       byte[] bytes;
       if (fieldSpec.isSingleValueField()) {
         switch (fieldSpec.getDataType().getStoredType()) {
           case INT:
-            ((IntVector) fieldVector).setSafe(_batchRowCount, (Integer) row.getValue(fieldSpec.getName()));
+            ((IntVector) fieldVector).setSafe(_batchRowCount, (Integer) fieldValue);
             break;
           case LONG:
-            ((BigIntVector) fieldVector).setSafe(_batchRowCount, (Long) row.getValue(fieldSpec.getName()));
+            ((BigIntVector) fieldVector).setSafe(_batchRowCount, (Long) fieldValue);
             break;
           case FLOAT:
-            ((Float4Vector) fieldVector).setSafe(_batchRowCount, (Float) row.getValue(fieldSpec.getName()));
+            ((Float4Vector) fieldVector).setSafe(_batchRowCount, (Float) fieldValue);
             break;
           case DOUBLE:
-            ((Float8Vector) fieldVector).setSafe(_batchRowCount, (Double) row.getValue(fieldSpec.getName()));
+            ((Float8Vector) fieldVector).setSafe(_batchRowCount, (Double) fieldValue);
             break;
           case STRING:
-            bytes = row.getValue(fieldSpec.getName()).toString().getBytes();
+            bytes = fieldValue.toString().getBytes();
             ((VarCharVector) fieldVector).setSafe(_batchRowCount, bytes, 0, bytes.length);
             break;
           case BYTES:
-            bytes = (byte[]) row.getValue(fieldSpec.getName());
+            bytes = (byte[]) fieldValue;
             ((VarBinaryVector) fieldVector).setSafe(_batchRowCount, bytes, 0, bytes.length);
             break;
           default:
@@ -349,7 +413,7 @@ public class GenericRowArrowFileWriter implements Closeable, FileWriter<GenericR
 
         fieldVector.setValueCount(_batchRowCount + 1);
       } else {
-        Object[] values = (Object[]) row.getValue(fieldSpec.getName());
+        Object[] values = (Object[]) fieldValue;
         UnionListWriter listWriter =
             _listWriters.computeIfAbsent(fieldSpec.getName(), k -> ((ListVector) fieldVector).getWriter());
         listWriter.startList();
@@ -396,9 +460,8 @@ public class GenericRowArrowFileWriter implements Closeable, FileWriter<GenericR
         _nonSortColumnsBatchByteCount += fieldVector.getBufferSize();
       }
     }
+    _sortColumnValues.add(currentRowSortValues);
     _batchRowCount++;
-    sortColumnsRoot.setRowCount(_batchRowCount);
-    nonSortColumnsRoot.setRowCount(_batchRowCount);
   }
 
   private void resetListWriters() {
@@ -427,6 +490,9 @@ public class GenericRowArrowFileWriter implements Closeable, FileWriter<GenericR
 
   private void flushBatch()
       throws IOException {
+    _sortColumnsVectorRoot.setRowCount(_batchRowCount);
+    _nonSortColumnsVectorRoot.setRowCount(_batchRowCount);
+
     sortAllColumns();
 
     _sortColumnsWriter.writeBatch();
@@ -434,6 +500,9 @@ public class GenericRowArrowFileWriter implements Closeable, FileWriter<GenericR
 
     _nonSortColumnsWriter.writeBatch();
     _nonSortColumnsWriter.end();
+
+    _sortColumnsVectorRoot.setRowCount(0);
+    _nonSortColumnsVectorRoot.setRowCount(0);
 
     String sortColFileName =
         StringUtils.join(new String[]{_outputDir, SORT_COLUMNS_DATA_DIR, _batchNumber + ".arrow"}, File.separator);
@@ -465,34 +534,51 @@ public class GenericRowArrowFileWriter implements Closeable, FileWriter<GenericR
 
   private void sortAllColumns() {
     int[] sortIndices = getSortIndices();
-    ArrowSortUtils.inPlaceSortAll(_sortColumnsVectorRoot, sortIndices);
-    ArrowSortUtils.inPlaceSortAll(_nonSortColumnsVectorRoot, sortIndices);
+    CompletableFuture<Void> sortFuture1 = CompletableFuture.runAsync(() ->
+        ArrowSortUtils.inPlaceSortAll(_sortColumnsVectorRoot, sortIndices));
+    CompletableFuture<Void> sortFuture2 = CompletableFuture.runAsync(() ->
+        ArrowSortUtils.inPlaceSortAll(_nonSortColumnsVectorRoot, sortIndices));
+    CompletableFuture.allOf(sortFuture1, sortFuture2).join();
   }
 
   private int[] getSortIndices() {
-    IntVector indices = new IntVector("sort_indices", _allocator);
-    indices.allocateNew(_batchRowCount);
-    indices.setValueCount(_batchRowCount);
+//    IntVector indices = new IntVector("sort_indices", _allocator);
+//    indices.allocateNew(_batchRowCount);
+//    indices.setValueCount(_batchRowCount);
+//
+//    for (int i = 0; i < _batchRowCount; i++) {
+//      indices.set(i, i);
+//    }
+//
+//    //TODO: creating this for every batch might have overhead, check if moving to constructor doesn't impact correctness
+//    IndexSorter indexSorter = new IndexSorter();
+//
+//    for (String sortColumn : _sortColumns) {
+//      FieldVector sortedVectorRootVector = _sortColumnsVectorRoot.getVector(sortColumn);
+//      VectorValueComparator comparator = DefaultVectorComparators.createDefaultComparator(sortedVectorRootVector);
+//      indexSorter.sort(sortedVectorRootVector, indices, comparator);
+//    }
+//
+//    int[] sortIndices = new int[_batchRowCount];
+//    for (int i = 0; i < _batchRowCount; i++) {
+//      sortIndices[i] = indices.get(i);
+//    }
+//
+//    indices.close();
+//    return sortIndices;
 
+    SortEntry[] sortEntries = new SortEntry[_batchRowCount];
     for (int i = 0; i < _batchRowCount; i++) {
-      indices.set(i, i);
+      sortEntries[i] = new SortEntry(i, _sortColumnValues.get(i));
     }
 
-    //TODO: creating this for every batch might have overhead, check if moving to constructor doesn't impact correctness
-    IndexSorter indexSorter = new IndexSorter();
-
-    for (String sortColumn : _sortColumns) {
-      FieldVector sortedVectorRootVector = _sortColumnsVectorRoot.getVector(sortColumn);
-      VectorValueComparator comparator = DefaultVectorComparators.createDefaultComparator(sortedVectorRootVector);
-      indexSorter.sort(sortedVectorRootVector, indices, comparator);
-    }
+    Arrays.parallelSort(sortEntries);
 
     int[] sortIndices = new int[_batchRowCount];
     for (int i = 0; i < _batchRowCount; i++) {
-      sortIndices[i] = indices.get(i);
+      sortIndices[i] = sortEntries[i].index;
     }
 
-    indices.close();
     return sortIndices;
   }
 
