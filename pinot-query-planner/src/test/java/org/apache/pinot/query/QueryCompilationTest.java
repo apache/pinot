@@ -385,6 +385,12 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     assertEquals(tableNames.get(0), "a");
   }
 
+  @Test(expectedExceptions = RuntimeException.class)
+  public void testDuplicateWithAlias() {
+    String query = "WITH tmp AS (SELECT * FROM a LIMIT 1), tmp AS (SELECT * FROM a LIMIT 2) SELECT * FROM tmp";
+    _queryEnvironment.getTableNamesForQuery(query);
+  }
+
   // --------------------------------------------------------------------------
   // Test Utils.
   // --------------------------------------------------------------------------
