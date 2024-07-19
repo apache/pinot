@@ -416,7 +416,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
   private Object[][] provideQueriesWithException() {
     return new Object[][]{
         // wrong table is being used after JOIN
-        new Object[]{"SELECT b.col1 - a.col3 FROM a JOIN c ON a.col1 = c.col3", "Table 'b' not found"},
+        new Object[]{"SELECT b.col1 - a.col3 FROM a JOIN c ON CAST(a.col1 as INT) = c.col3", "Table 'b' not found"},
         // non-agg column not being grouped
         new Object[]{"SELECT a.col1, SUM(a.col3) FROM a", "'a.col1' is not being grouped"},
         // empty IN clause fails compilation
