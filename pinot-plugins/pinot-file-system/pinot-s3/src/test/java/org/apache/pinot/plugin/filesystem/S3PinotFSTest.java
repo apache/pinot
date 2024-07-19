@@ -433,6 +433,9 @@ public class S3PinotFSTest {
 
       _s3PinotFS.copyFromLocalFile(file, sourceUri);
 
+      HeadObjectResponse sourceHeadObjectResponse =
+          _s3Client.headObject(S3TestUtils.getHeadObjectRequest(BUCKET, fileName));
+
       URI targetUri = URI.create(String.format(FILE_FORMAT, SCHEME, BUCKET, "move-target"));
 
       boolean moveResult = _s3PinotFS.move(sourceUri, targetUri, false);
@@ -441,9 +444,26 @@ public class S3PinotFSTest {
       Assert.assertFalse(_s3PinotFS.exists(sourceUri));
       Assert.assertTrue(_s3PinotFS.exists(targetUri));
 
-      HeadObjectResponse headObjectResponse =
+      HeadObjectResponse targetHeadObjectResponse =
           _s3Client.headObject(S3TestUtils.getHeadObjectRequest(BUCKET, "move-target"));
-      Assert.assertEquals(headObjectResponse.contentLength(), fileSize);
+      Assert.assertEquals(targetHeadObjectResponse.contentLength(),
+          fileSize);
+      Assert.assertEquals(targetHeadObjectResponse.storageClass(),
+          sourceHeadObjectResponse.storageClass());
+      Assert.assertEquals(targetHeadObjectResponse.archiveStatus(),
+          sourceHeadObjectResponse.archiveStatus());
+      Assert.assertEquals(targetHeadObjectResponse.contentType(),
+          sourceHeadObjectResponse.contentType());
+      Assert.assertEquals(targetHeadObjectResponse.expiresString(),
+          sourceHeadObjectResponse.expiresString());
+      Assert.assertEquals(targetHeadObjectResponse.eTag(),
+          sourceHeadObjectResponse.eTag());
+      Assert.assertEquals(targetHeadObjectResponse.replicationStatusAsString(),
+          sourceHeadObjectResponse.replicationStatusAsString());
+      // Last modified time might not be exactly the same, hence we give 5 seconds buffer.
+      Assert.assertTrue(Math.abs(
+          targetHeadObjectResponse.lastModified().getEpochSecond() - sourceHeadObjectResponse.lastModified()
+              .getEpochSecond()) < 5);
     } finally {
       FileUtils.deleteQuietly(file);
     }

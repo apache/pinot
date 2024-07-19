@@ -154,6 +154,7 @@
     <jsonsmart.version>2.5.1</jsonsmart.version>
     <quartz.version>2.3.2</quartz.version>
     <calcite.version>1.37.0</calcite.version>
+    <immutables.version>2.10.1</immutables.version>
     <lucene.version>9.11.1</lucene.version>
     <reflections.version>0.10.2</reflections.version>
     <dynatrace.hash4j.version>0.17.0</dynatrace.hash4j.version>
@@ -180,12 +181,12 @@
     <woodstox.version>7.0.0</woodstox.version>
     <sslcontext.kickstart.version>8.3.6</sslcontext.kickstart.version>
 
-    <confluent.version>7.6.1</confluent.version>
+    <confluent.version>7.6.2</confluent.version>
     <pulsar.version>3.3.0</pulsar.version>
     <flink.version>1.19.1</flink.version>
 
     <!-- Apache Commons Libraries -->
-    <commons-lang3.version>3.14.0</commons-lang3.version>
+    <commons-lang3.version>3.15.0</commons-lang3.version>
     <commons-collections4.version>4.4</commons-collections4.version>
     <commons-text.version>1.12.0</commons-text.version>
     <commons-compress.version>1.26.2</commons-compress.version>
@@ -193,7 +194,7 @@
     <commons-csv.version>1.11.0</commons-csv.version>
     <commons-configuration2.version>2.11.0</commons-configuration2.version>
     <commons-io.version>2.16.1</commons-io.version>
-    <commons-codec.version>1.17.0</commons-codec.version>
+    <commons-codec.version>1.17.1</commons-codec.version>
     <commons-cli.version>1.8.0</commons-cli.version>
     <commons-net.version>3.11.1</commons-net.version>
     <commons-validator.version>1.9.0</commons-validator.version>
@@ -224,7 +225,7 @@
     <grpc.version>1.65.1</grpc.version>
     <google.cloud.libraries.version>26.43.0</google.cloud.libraries.version>
     <google.auto-service.version>1.1.1</google.auto-service.version>
-    <google.errorprone.version>2.28.0</google.errorprone.version>
+    <google.errorprone.version>2.29.1</google.errorprone.version>
     <google.j2objc.version>3.0.0</google.j2objc.version>
     <google.jsr305.version>3.0.2</google.jsr305.version>
 
@@ -237,7 +238,7 @@
     <kotlin.stdlib.version>2.0.0</kotlin.stdlib.version>
     <okio.version>3.9.0</okio.version>
     <kerby.version>2.0.3</kerby.version>
-    <jline.version>3.26.2</jline.version>
+    <jline.version>3.26.3</jline.version>
     <wildfly.version>2.0.0</wildfly.version>
     <jettison.version>1.5.4</jettison.version>
     <eclipse.jetty.version>9.4.55.v20240627</eclipse.jetty.version>
@@ -436,7 +437,7 @@
       <dependency>
         <groupId>org.roaringbitmap</groupId>
         <artifactId>RoaringBitmap</artifactId>
-        <version>1.2.0</version>
+        <version>1.2.1</version>
       </dependency>
       <dependency>
         <groupId>com.101tec</groupId>
@@ -543,10 +544,6 @@
         <artifactId>helix-core</artifactId>
         <version>${helix.version}</version>
         <exclusions>
-          <exclusion>
-            <groupId>com.github.sgroschupf</groupId>
-            <artifactId>zkclient</artifactId>
-          </exclusion>
           <exclusion>
             <groupId>org.jboss.netty</groupId>
             <artifactId>netty</artifactId>
@@ -1217,6 +1214,7 @@
         <artifactId>json-smart</artifactId>
         <version>${jsonsmart.version}</version>
       </dependency>
+
       <dependency>
         <groupId>org.apache.calcite</groupId>
         <artifactId>calcite-core</artifactId>
@@ -1245,6 +1243,13 @@
         <artifactId>calcite-babel</artifactId>
         <version>${calcite.version}</version>
       </dependency>
+      <!-- Required by Calcite -->
+      <dependency>
+        <groupId>org.immutables</groupId>
+        <artifactId>value-annotations</artifactId>
+        <version>${immutables.version}</version>
+      </dependency>
+
       <dependency>
         <groupId>org.codehaus.janino</groupId>
         <artifactId>janino</artifactId>
@@ -1344,7 +1349,7 @@
       <dependency>
         <groupId>com.h2database</groupId>
         <artifactId>h2</artifactId>
-        <version>2.2.224</version>
+        <version>2.3.230</version>
       </dependency>
       <dependency>
         <groupId>com.github.jnr</groupId>

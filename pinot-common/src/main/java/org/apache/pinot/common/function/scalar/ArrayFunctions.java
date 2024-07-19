@@ -25,7 +25,6 @@ import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
 import java.math.BigDecimal;
 import java.util.Arrays;
-import org.apache.calcite.linq4j.function.SemiStrict;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
@@ -34,7 +33,6 @@ import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
 /**
  * Inbuilt array scalar functions. See {@link ArrayUtils} for details.
  */
-@SemiStrict
 public class ArrayFunctions {
   private ArrayFunctions() {
   }

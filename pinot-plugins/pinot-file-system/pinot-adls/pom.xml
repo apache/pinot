@@ -44,7 +44,7 @@
     <dependency>
       <groupId>com.azure</groupId>
       <artifactId>azure-identity</artifactId>
-      <version>1.13.0</version>
+      <version>1.13.1</version>
     </dependency>
   </dependencies>
   <dependencyManagement>
@@ -52,12 +52,12 @@
       <dependency>
         <groupId>com.azure</groupId>
         <artifactId>azure-core-http-netty</artifactId>
-        <version>1.15.1</version>
+        <version>1.15.2</version>
       </dependency>
       <dependency>
         <groupId>com.azure</groupId>
         <artifactId>azure-core</artifactId>
-        <version>1.49.1</version>
+        <version>1.50.0</version>
       </dependency>
       <dependency>
         <groupId>io.projectreactor</groupId>

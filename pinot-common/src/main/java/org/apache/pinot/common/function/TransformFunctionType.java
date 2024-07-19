@@ -18,15 +18,12 @@
  */
 package org.apache.pinot.common.function;
 
-import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
-import org.apache.calcite.sql.SqlFunctionCategory;
-import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlOperatorBinding;
 import org.apache.calcite.sql.type.OperandTypes;
 import org.apache.calcite.sql.type.ReturnTypes;
@@ -70,7 +67,6 @@ public enum TransformFunctionType {
   GREATEST("greatest"),
 
   // predicate functions
-  // there's no need to register these functions b/c Calcite parser doesn't allow explicit function parsing
   EQUALS("equals"),
   NOT_EQUALS("not_equals"),
   GREATER_THAN("greater_than"),
@@ -81,7 +77,6 @@ public enum TransformFunctionType {
   NOT_IN("not_in"),
 
   // null handling functions, they never return null
-  // there's no need for alternative name b/c Calcite parser doesn't allow non-parentese representation
   IS_TRUE("is_true"),
   IS_NOT_TRUE("is_not_true"),
   IS_FALSE("is_false"),
@@ -103,187 +98,118 @@ public enum TransformFunctionType {
   // date type conversion functions
   CAST("cast"),
 
-  // object type
-  ARRAY_TO_MV("arrayToMV",
-      ReturnTypes.cascade(opBinding -> positionalComponentReturnType(opBinding, 0), SqlTypeTransforms.FORCE_NULLABLE),
-      OperandTypes.family(SqlTypeFamily.ARRAY), "array_to_mv"),
-
-  // string functions
+  // JSON extract functions
   JSON_EXTRACT_SCALAR("jsonExtractScalar",
-      ReturnTypes.cascade(opBinding -> positionalReturnTypeInferenceFromStringLiteral(opBinding, 2,
-          SqlTypeName.VARCHAR), SqlTypeTransforms.FORCE_NULLABLE),
-      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER,
-          SqlTypeFamily.CHARACTER), ordinal -> ordinal > 2), "json_extract_scalar"),
-  JSON_EXTRACT_INDEX("jsonExtractIndex",
-      ReturnTypes.cascade(opBinding -> positionalReturnTypeInferenceFromStringLiteral(opBinding, 2,
-          SqlTypeName.VARCHAR), SqlTypeTransforms.FORCE_NULLABLE),
-      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER,
-          SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER), ordinal -> ordinal > 2), "json_extract_index"),
-
-  JSON_EXTRACT_KEY("jsonExtractKey", ReturnTypes.TO_ARRAY,
-      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER)), "json_extract_key"),
-
-  // date time functions
-  TIME_CONVERT("timeConvert",
-      ReturnTypes.BIGINT_FORCE_NULLABLE,
-      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER)),
-      "time_convert"),
-
-  DATE_TIME_CONVERT("dateTimeConvert",
-      ReturnTypes.cascade(
-          opBinding -> dateTimeConverterReturnTypeInference(opBinding),
-          SqlTypeTransforms.FORCE_NULLABLE),
-      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER,
-          SqlTypeFamily.CHARACTER)), "date_time_convert"),
-
-  DATE_TIME_CONVERT_WINDOW_HOP("dateTimeConvertWindowHop", ReturnTypes.TO_ARRAY, OperandTypes.family(
-      ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER,
-          SqlTypeFamily.CHARACTER)), "date_time_convert_window_hop"),
-
-  DATE_TRUNC("dateTrunc",
-      ReturnTypes.BIGINT_FORCE_NULLABLE,
+      opBinding -> positionalReturnTypeInferenceFromStringLiteral(opBinding, 2, SqlTypeName.VARCHAR),
       OperandTypes.family(
-          ImmutableList.of(SqlTypeFamily.CHARACTER, SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER,
-              SqlTypeFamily.CHARACTER),
-          ordinal -> ordinal > 1), "date_trunc"),
+          List.of(SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER),
+          i -> i == 3)),
+  JSON_EXTRACT_INDEX("jsonExtractIndex",
+      opBinding -> positionalReturnTypeInferenceFromStringLiteral(opBinding, 2, SqlTypeName.VARCHAR),
+      OperandTypes.family(
+          List.of(SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER,
+              SqlTypeFamily.CHARACTER), i -> i > 2)),
+  JSON_EXTRACT_KEY("jsonExtractKey", ReturnTypes.TO_ARRAY,
+      OperandTypes.family(List.of(SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER))),
 
-  FROM_DATE_TIME("fromDateTime", ReturnTypes.TIMESTAMP_NULLABLE,
-      OperandTypes.family(ImmutableList.of(SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER),
-          ordinal -> ordinal > 1), "from_date_time"),
-
-  TO_DATE_TIME("toDateTime", ReturnTypes.VARCHAR_2000_NULLABLE,
-      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER),
-          ordinal -> ordinal > 1), "to_date_time"),
-
-  TIMESTAMP_ADD("timestampAdd", ReturnTypes.TIMESTAMP_NULLABLE,
-      OperandTypes.family(ImmutableList.of(SqlTypeFamily.CHARACTER, SqlTypeFamily.NUMERIC, SqlTypeFamily.ANY)),
-      "timestamp_add", "dateAdd", "date_add"),
-
-  TIMESTAMP_DIFF("timestampDiff", ReturnTypes.BIGINT_NULLABLE,
-      OperandTypes.family(ImmutableList.of(SqlTypeFamily.CHARACTER, SqlTypeFamily.ANY, SqlTypeFamily.ANY)),
-      "timestamp_diff", "dateDiff", "date_diff"),
-
+  // Date time functions
+  TIME_CONVERT("timeConvert", ReturnTypes.BIGINT,
+      OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER))),
+  DATE_TIME_CONVERT("dateTimeConvert", TransformFunctionType::dateTimeConverterReturnTypeInference, OperandTypes.family(
+      List.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER))),
+  DATE_TIME_CONVERT_WINDOW_HOP("dateTimeConvertWindowHop",
+      ReturnTypes.cascade(TransformFunctionType::dateTimeConverterReturnTypeInference, SqlTypeTransforms.TO_ARRAY),
+      OperandTypes.family(
+          List.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER,
+              SqlTypeFamily.CHARACTER))),
+  DATE_TRUNC("dateTrunc", ReturnTypes.BIGINT, OperandTypes.family(
+      List.of(SqlTypeFamily.CHARACTER, SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER,
+          SqlTypeFamily.CHARACTER), i -> i > 1)),
   YEAR("year"),
-  YEAR_OF_WEEK("yearOfWeek", "year_of_week", "yow"),
+  YEAR_OF_WEEK("yearOfWeek", "yow"),
   QUARTER("quarter"),
-  MONTH_OF_YEAR("monthOfYear", "month_of_year", "month"),
-  WEEK_OF_YEAR("weekOfYear", "week_of_year", "week"),
-  DAY_OF_YEAR("dayOfYear", "day_of_year", "doy"),
-  DAY_OF_MONTH("dayOfMonth", "day_of_month", "day"),
-  DAY_OF_WEEK("dayOfWeek", "day_of_week", "dow"),
+  MONTH_OF_YEAR("monthOfYear", "month"),
+  WEEK_OF_YEAR("weekOfYear", "week"),
+  DAY_OF_YEAR("dayOfYear", "doy"),
+  DAY_OF_MONTH("dayOfMonth", "day"),
+  DAY_OF_WEEK("dayOfWeek", "dow"),
   HOUR("hour"),
   MINUTE("minute"),
   SECOND("second"),
   MILLISECOND("millisecond"),
-
   EXTRACT("extract"),
 
-  // string functions
-  SPLIT("split", ReturnTypes.TO_ARRAY, OperandTypes.family(
-      ImmutableList.of(SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER, SqlTypeFamily.INTEGER),
-      ordinal -> ordinal > 1), "split", "string_to_array"),
-
-  // array functions
+  // Array functions
   // The only column accepted by "cardinality" function is multi-value array, thus putting "cardinality" as alias.
   // TODO: once we support other types of multiset, we should make CARDINALITY its own function
-  ARRAY_LENGTH("arrayLength", ReturnTypes.INTEGER, OperandTypes.family(SqlTypeFamily.ARRAY), "array_length",
-      "cardinality"),
-  ARRAY_AVERAGE("arrayAverage", ReturnTypes.DOUBLE, OperandTypes.family(SqlTypeFamily.ARRAY), "array_average"),
-  ARRAY_MIN("arrayMin", ReturnTypes.cascade(opBinding -> positionalComponentReturnType(opBinding, 0),
-      SqlTypeTransforms.FORCE_NULLABLE), OperandTypes.family(SqlTypeFamily.ARRAY), "array_min"),
-  ARRAY_MAX("arrayMax", ReturnTypes.cascade(opBinding -> positionalComponentReturnType(opBinding, 0),
-      SqlTypeTransforms.FORCE_NULLABLE), OperandTypes.family(SqlTypeFamily.ARRAY), "array_max"),
-  ARRAY_SUM("arraySum", ReturnTypes.DOUBLE, OperandTypes.family(SqlTypeFamily.ARRAY), "array_sum"),
-  ARRAY_SUM_INT("arraySumInt", ReturnTypes.INTEGER, OperandTypes.family(SqlTypeFamily.ARRAY), "array_sum_int"),
-  ARRAY_SUM_LONG("arraySumLong", ReturnTypes.BIGINT, OperandTypes.family(SqlTypeFamily.ARRAY), "array_sum_long"),
+  ARRAY_LENGTH("arrayLength", ReturnTypes.INTEGER, OperandTypes.ARRAY, "cardinality"),
+  ARRAY_AVERAGE("arrayAverage", ReturnTypes.DOUBLE, OperandTypes.ARRAY),
+  ARRAY_MIN("arrayMin", TransformFunctionType::componentType, OperandTypes.ARRAY),
+  ARRAY_MAX("arrayMax", TransformFunctionType::componentType, OperandTypes.ARRAY),
+  ARRAY_SUM("arraySum", ReturnTypes.DOUBLE, OperandTypes.ARRAY),
+  ARRAY_SUM_INT("arraySumInt", ReturnTypes.INTEGER, OperandTypes.ARRAY),
+  ARRAY_SUM_LONG("arraySumLong", ReturnTypes.BIGINT, OperandTypes.ARRAY),
 
-  VALUE_IN("valueIn", ReturnTypes.ARG0_FORCE_NULLABLE, OperandTypes.variadic(SqlOperandCountRanges.from(2)),
-      "value_in"),
-  MAP_VALUE("mapValue", ReturnTypes.cascade(opBinding ->
-      opBinding.getOperandType(2).getComponentType(), SqlTypeTransforms.FORCE_NULLABLE),
-      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.ANY, SqlTypeFamily.ANY)),
-      "map_value"),
-
-  // special functions
-  IN_ID_SET("inIdSet", "in_id_set"),
+  // Special functions
+  VALUE_IN("valueIn", ReturnTypes.ARG0, OperandTypes.variadic(SqlOperandCountRanges.from(2))),
+  MAP_VALUE("mapValue",
+      ReturnTypes.cascade(opBinding -> positionalComponentType(opBinding, 2), SqlTypeTransforms.FORCE_NULLABLE),
+      OperandTypes.family(List.of(SqlTypeFamily.ARRAY, SqlTypeFamily.ANY, SqlTypeFamily.ARRAY))),
+  IN_ID_SET("inIdSet", ReturnTypes.BOOLEAN, OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER)),
   LOOKUP("lookUp"),
   GROOVY("groovy"),
-
-  // CLP functions
-  CLP_DECODE("clpDecode", ReturnTypes.VARCHAR_2000_NULLABLE, OperandTypes.family(
-      ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.ANY, SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER),
-      ordinal -> ordinal > 2), "clp_decode"),
-  CLP_ENCODED_VARS_MATCH("clpEncodedVarsMatch", ReturnTypes.BOOLEAN_NOT_NULL, OperandTypes.family(
-      ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER),
-      ordinal -> ordinal > 2), "clp_encoded_vars_match"),
-
-  // Regexp functions
-  REGEXP_EXTRACT("regexpExtract", "regexp_extract"),
-  REGEXP_REPLACE("regexpReplace",
-      ReturnTypes.VARCHAR_2000_NULLABLE,
-      OperandTypes.family(
-          ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER,
-              SqlTypeFamily.INTEGER, SqlTypeFamily.INTEGER, SqlTypeFamily.CHARACTER),
-          ordinal -> ordinal > 2),
-      "regexp_replace"),
-
-  // Special type for annotation based scalar functions
   SCALAR("scalar"),
 
+  // CLP functions
+  CLP_DECODE("clpDecode", ReturnTypes.VARCHAR_NULLABLE,
+      OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.ARRAY, SqlTypeFamily.ARRAY, SqlTypeFamily.CHARACTER),
+          i -> i == 3)),
+  CLP_ENCODED_VARS_MATCH("clpEncodedVarsMatch", ReturnTypes.BOOLEAN_NOT_NULL,
+      OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.ARRAY, SqlTypeFamily.CHARACTER, SqlTypeFamily.INTEGER)),
+
+  // Regexp functions
+  REGEXP_EXTRACT("regexpExtract", ReturnTypes.VARCHAR_NULLABLE, OperandTypes.family(
+      List.of(SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER, SqlTypeFamily.INTEGER, SqlTypeFamily.CHARACTER),
+      i -> i > 1)),
+
   // Geo constructors
-  ST_GEOG_FROM_TEXT("ST_GeogFromText", ReturnTypes.explicit(SqlTypeName.VARBINARY), OperandTypes.STRING),
-  ST_GEOM_FROM_TEXT("ST_GeomFromText", ReturnTypes.explicit(SqlTypeName.VARBINARY), OperandTypes.STRING),
-  ST_GEOG_FROM_WKB("ST_GeogFromWKB", ReturnTypes.explicit(SqlTypeName.VARBINARY), OperandTypes.BINARY),
-  ST_GEOM_FROM_WKB("ST_GeomFromWKB", ReturnTypes.explicit(SqlTypeName.VARBINARY), OperandTypes.BINARY),
-  ST_POINT("ST_Point", ReturnTypes.explicit(SqlTypeName.VARBINARY),
-      OperandTypes.family(ImmutableList.of(SqlTypeFamily.NUMERIC, SqlTypeFamily.NUMERIC, SqlTypeFamily.ANY),
-          ordinal -> ordinal > 1 && ordinal < 4), "stPoint"),
-  ST_POLYGON("ST_Polygon", ReturnTypes.explicit(SqlTypeName.VARBINARY), OperandTypes.STRING, "stPolygon"),
+  ST_GEOG_FROM_TEXT("ST_GeogFromText", ReturnTypes.VARBINARY, OperandTypes.CHARACTER),
+  ST_GEOM_FROM_TEXT("ST_GeomFromText", ReturnTypes.VARBINARY, OperandTypes.CHARACTER),
+  ST_GEOG_FROM_WKB("ST_GeogFromWKB", ReturnTypes.VARBINARY, OperandTypes.BINARY),
+  ST_GEOM_FROM_WKB("ST_GeomFromWKB", ReturnTypes.VARBINARY, OperandTypes.BINARY),
+  ST_POINT("ST_Point", ReturnTypes.VARBINARY,
+      OperandTypes.family(List.of(SqlTypeFamily.NUMERIC, SqlTypeFamily.NUMERIC, SqlTypeFamily.ANY), i -> i == 2)),
+  ST_POLYGON("ST_Polygon", ReturnTypes.VARBINARY, OperandTypes.CHARACTER),
 
   // Geo measurements
-  ST_AREA("ST_Area", ReturnTypes.DOUBLE_NULLABLE, OperandTypes.BINARY, "stArea"),
-  ST_DISTANCE("ST_Distance", ReturnTypes.DOUBLE_NULLABLE,
-      OperandTypes.family(ImmutableList.of(SqlTypeFamily.BINARY, SqlTypeFamily.BINARY)), "stDistance"),
-  ST_GEOMETRY_TYPE("ST_GeometryType", ReturnTypes.VARCHAR_2000_NULLABLE, OperandTypes.BINARY, "stGeometryType"),
+  ST_AREA("ST_Area", ReturnTypes.DOUBLE, OperandTypes.BINARY),
+  ST_DISTANCE("ST_Distance", ReturnTypes.DOUBLE, OperandTypes.BINARY_BINARY),
+  ST_GEOMETRY_TYPE("ST_GeometryType", ReturnTypes.VARCHAR, OperandTypes.BINARY),
 
   // Geo outputs
-  ST_AS_BINARY("ST_AsBinary", ReturnTypes.explicit(SqlTypeName.VARBINARY), OperandTypes.BINARY, "stAsBinary"),
-  ST_AS_TEXT("ST_AsText", ReturnTypes.VARCHAR_2000_NULLABLE, OperandTypes.BINARY, "stAsText"),
+  ST_AS_BINARY("ST_AsBinary", ReturnTypes.VARBINARY, OperandTypes.BINARY),
+  ST_AS_TEXT("ST_AsText", ReturnTypes.VARCHAR, OperandTypes.BINARY),
 
   // Geo relationship
-  ST_CONTAINS("ST_Contains", ReturnTypes.INTEGER,
-      OperandTypes.family(ImmutableList.of(SqlTypeFamily.BINARY, SqlTypeFamily.BINARY)), "stContains"),
-  ST_EQUALS("ST_Equals", ReturnTypes.INTEGER,
-      OperandTypes.family(ImmutableList.of(SqlTypeFamily.BINARY, SqlTypeFamily.BINARY)), "stEquals"),
-  ST_WITHIN("ST_Within", ReturnTypes.INTEGER,
-      OperandTypes.family(ImmutableList.of(SqlTypeFamily.BINARY, SqlTypeFamily.BINARY)), "stWithin"),
+  // TODO: Revisit whether we should return BOOLEAN instead
+  ST_CONTAINS("ST_Contains", ReturnTypes.INTEGER, OperandTypes.BINARY_BINARY),
+  ST_EQUALS("ST_Equals", ReturnTypes.INTEGER, OperandTypes.BINARY_BINARY),
+  ST_WITHIN("ST_Within", ReturnTypes.INTEGER, OperandTypes.BINARY_BINARY),
 
   // Geo indexing
-  GEO_TO_H3("geoToH3", ReturnTypes.explicit(SqlTypeName.BIGINT),
-      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.NUMERIC, SqlTypeFamily.NUMERIC),
-          ordinal -> ordinal > 1 && ordinal < 4), "geo_to_h3"),
+  GEO_TO_H3("geoToH3", ReturnTypes.BIGINT,
+      OperandTypes.or(OperandTypes.family(SqlTypeFamily.BINARY, SqlTypeFamily.INTEGER),
+          OperandTypes.family(SqlTypeFamily.NUMERIC, SqlTypeFamily.NUMERIC, SqlTypeFamily.INTEGER))),
 
   // Vector functions
   // TODO: Once VECTOR type is defined, we should update here.
-  COSINE_DISTANCE("cosineDistance", ReturnTypes.explicit(SqlTypeName.DOUBLE),
-      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ARRAY, SqlTypeFamily.ARRAY, SqlTypeFamily.NUMERIC),
-          ordinal -> ordinal > 1 && ordinal < 4), "cosine_distance"),
-  INNER_PRODUCT("innerProduct", ReturnTypes.explicit(SqlTypeName.DOUBLE),
-      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ARRAY, SqlTypeFamily.ARRAY)), "inner_product"),
-  L1_DISTANCE("l1Distance", ReturnTypes.explicit(SqlTypeName.DOUBLE),
-      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ARRAY, SqlTypeFamily.ARRAY)), "l1_distance"),
-  L2_DISTANCE("l2Distance", ReturnTypes.explicit(SqlTypeName.DOUBLE),
-      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ARRAY, SqlTypeFamily.ARRAY)), "l2_distance"),
-  VECTOR_DIMS("vectorDims", ReturnTypes.explicit(SqlTypeName.INTEGER),
-      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ARRAY)), "vector_dims"),
-  VECTOR_NORM("vectorNorm", ReturnTypes.explicit(SqlTypeName.DOUBLE),
-      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ARRAY)), "vector_norm"),
-
-  VECTOR_SIMILARITY("vectorSimilarity", ReturnTypes.BOOLEAN_NOT_NULL,
-      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ARRAY, SqlTypeFamily.ANY, SqlTypeFamily.NUMERIC),
-          ordinal -> ordinal > 1 && ordinal < 4), "vector_similarity"),
-
-  ARRAY_VALUE_CONSTRUCTOR("arrayValueConstructor", "array_value_constructor"),
+  COSINE_DISTANCE("cosineDistance", ReturnTypes.DOUBLE,
+      OperandTypes.family(List.of(SqlTypeFamily.ARRAY, SqlTypeFamily.ARRAY, SqlTypeFamily.NUMERIC), id -> id == 2)),
+  INNER_PRODUCT("innerProduct", ReturnTypes.DOUBLE, OperandTypes.ARRAY_ARRAY),
+  L1_DISTANCE("l1Distance", ReturnTypes.DOUBLE, OperandTypes.ARRAY_ARRAY),
+  L2_DISTANCE("l2Distance", ReturnTypes.DOUBLE, OperandTypes.ARRAY_ARRAY),
+  VECTOR_DIMS("vectorDims", ReturnTypes.INTEGER, OperandTypes.ARRAY),
+  VECTOR_NORM("vectorNorm", ReturnTypes.DOUBLE, OperandTypes.ARRAY),
 
   // Trigonometry
   SIN("sin"),
@@ -301,49 +227,41 @@ public enum TransformFunctionType {
   RADIANS("radians");
 
   private final String _name;
-  private final List<String> _alternativeNames;
-  private final SqlKind _sqlKind;
+  private final List<String> _names;
   private final SqlReturnTypeInference _returnTypeInference;
   private final SqlOperandTypeChecker _operandTypeChecker;
-  private final SqlFunctionCategory _sqlFunctionCategory;
 
   TransformFunctionType(String name, String... alternativeNames) {
-    this(name, null, null, null, null, alternativeNames);
+    this(name, null, null, alternativeNames);
   }
 
-  TransformFunctionType(String name, SqlReturnTypeInference returnTypeInference,
-      SqlOperandTypeChecker operandTypeChecker, String... alternativeNames) {
-    this(name, SqlKind.OTHER_FUNCTION, returnTypeInference, operandTypeChecker,
-        SqlFunctionCategory.USER_DEFINED_FUNCTION, alternativeNames);
-  }
-
-  /**
-   * Constructor to use for transform functions which are supported in both v1 and multistage engines
-   */
-  TransformFunctionType(String name, SqlKind sqlKind, SqlReturnTypeInference returnTypeInference,
-      SqlOperandTypeChecker operandTypeChecker, SqlFunctionCategory sqlFunctionCategory, String... alternativeNames) {
+  TransformFunctionType(String name, @Nullable SqlReturnTypeInference returnTypeInference,
+      @Nullable SqlOperandTypeChecker operandTypeChecker, String... alternativeNames) {
     _name = name;
-    List<String> all = new ArrayList<>(alternativeNames.length + 2);
-    all.add(name);
-    all.add(name());
-    all.addAll(Arrays.asList(alternativeNames));
-    _alternativeNames = Collections.unmodifiableList(all);
-    _sqlKind = sqlKind;
+    int numAlternativeNames = alternativeNames.length;
+    if (numAlternativeNames == 0) {
+      _names = List.of(name);
+    } else {
+      List<String> names = new ArrayList<>(numAlternativeNames + 1);
+      names.add(name);
+      names.addAll(Arrays.asList(alternativeNames));
+      _names = List.copyOf(names);
+    }
     _returnTypeInference = returnTypeInference;
     _operandTypeChecker = operandTypeChecker;
-    _sqlFunctionCategory = sqlFunctionCategory;
   }
 
   public String getName() {
     return _name;
   }
 
-  public List<String> getAlternativeNames() {
-    return _alternativeNames;
+  public List<String> getNames() {
+    return _names;
   }
 
-  public SqlKind getSqlKind() {
-    return _sqlKind;
+  @Deprecated
+  public List<String> getAlternativeNames() {
+    return _names;
   }
 
   public SqlReturnTypeInference getReturnTypeInference() {
@@ -354,10 +272,6 @@ public enum TransformFunctionType {
     return _operandTypeChecker;
   }
 
-  public SqlFunctionCategory getSqlFunctionCategory() {
-    return _sqlFunctionCategory;
-  }
-
   /** Returns the optional explicit returning type specification. */
   private static RelDataType positionalReturnTypeInferenceFromStringLiteral(SqlOperatorBinding opBinding, int pos) {
     return positionalReturnTypeInferenceFromStringLiteral(opBinding, pos, SqlTypeName.ANY);
@@ -365,25 +279,24 @@ public enum TransformFunctionType {
 
   private static RelDataType positionalReturnTypeInferenceFromStringLiteral(SqlOperatorBinding opBinding, int pos,
       SqlTypeName defaultSqlType) {
-    if (opBinding.getOperandCount() > pos
-        && opBinding.isOperandLiteral(pos, false)) {
+    if (opBinding.getOperandCount() > pos && opBinding.isOperandLiteral(pos, false)) {
       String operandType = opBinding.getOperandLiteralValue(pos, String.class).toUpperCase();
       return inferTypeFromStringLiteral(operandType, opBinding.getTypeFactory());
     }
     return opBinding.getTypeFactory().createSqlType(defaultSqlType);
   }
 
-  private static RelDataType positionalComponentReturnType(SqlOperatorBinding opBinding, int pos) {
-    if (opBinding.getOperandCount() > pos) {
-      return opBinding.getOperandType(pos).getComponentType();
-    }
-    throw new IllegalArgumentException("Invalid number of arguments for function " + opBinding.getOperator().getName());
+  private static RelDataType componentType(SqlOperatorBinding opBinding) {
+    return opBinding.getOperandType(0).getComponentType();
+  }
+
+  private static RelDataType positionalComponentType(SqlOperatorBinding opBinding, int pos) {
+    return opBinding.getOperandType(pos).getComponentType();
   }
 
   private static RelDataType dateTimeConverterReturnTypeInference(SqlOperatorBinding opBinding) {
     int outputFormatPos = 2;
-    if (opBinding.getOperandCount() > outputFormatPos
-        && opBinding.isOperandLiteral(outputFormatPos, false)) {
+    if (opBinding.getOperandCount() > outputFormatPos && opBinding.isOperandLiteral(outputFormatPos, false)) {
       String outputFormatStr = opBinding.getOperandLiteralValue(outputFormatPos, String.class);
       DateTimeFormatSpec dateTimeFormatSpec = new DateTimeFormatSpec(outputFormatStr);
       if ((dateTimeFormatSpec.getTimeFormat() == DateTimeFieldSpec.TimeFormat.EPOCH) || (
