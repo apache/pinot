@@ -159,7 +159,7 @@ public class Validator extends SqlValidatorImpl {
     for (SqlNode sqlWithItem : with.withList) {
       for (String name : ((SqlWithItem) sqlWithItem).name.names) {
         if (withNames.contains(name)) {
-          throw new RuntimeException("Duplicate alias in WITH: '" + name + "'");
+          throw new RuntimeException("Duplicate alias in WITH: '" + name + "' at " + sqlWithItem.getParserPosition());
         }
         withNames.add(name);
       }
