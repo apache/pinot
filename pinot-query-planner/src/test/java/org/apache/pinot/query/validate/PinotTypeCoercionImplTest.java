@@ -35,6 +35,8 @@ public class PinotTypeCoercionImplTest extends QueryEnvironmentTestBase {
         new Object[]{"SELECT * FROM a where col1 < 5"},
         new Object[]{"SELECT * FROM a where col1 <= 5"},
         new Object[]{"SELECT * FROM a where col1 = 5"},
+        new Object[]{"SELECT * FROM a where col1 != 5"},
+
 
         // INTEGER BINARY_COMPARISON VARCHAR
         new Object[]{"SELECT * FROM a where 5 > col1"},
@@ -42,6 +44,7 @@ public class PinotTypeCoercionImplTest extends QueryEnvironmentTestBase {
         new Object[]{"SELECT * FROM a where 5 < col1"},
         new Object[]{"SELECT * FROM a where 5 <= col1"},
         new Object[]{"SELECT * FROM a where 5 = col1"},
+        new Object[]{"SELECT * FROM a where 5 != col1"},
 
         // (VARCHAR ARITHMETIC_OP INTEGER)
         new Object[]{"SELECT * FROM a where col1 + 1 > 5"},
@@ -54,6 +57,14 @@ public class PinotTypeCoercionImplTest extends QueryEnvironmentTestBase {
         new Object[]{"SELECT * FROM a where 5 > col1 - 1"},
         new Object[]{"SELECT * FROM a where 5 > col1 * 1"},
         new Object[]{"SELECT * FROM a where 5 > col1 / 1"},
+
+        // Constants
+        new Object[]{"SELECT * FROM a where '10' > 5"},
+        new Object[]{"SELECT * FROM a where '10' >= 5"},
+        new Object[]{"SELECT * FROM a where '10' < 5"},
+        new Object[]{"SELECT * FROM a where '10' <= 5"},
+        new Object[]{"SELECT * FROM a where '10' = 5"},
+        new Object[]{"SELECT * FROM a where '10' != 5"},
 
         // BETWEEN
         new Object[]{"SELECT * FROM a where col1 BETWEEN 5 AND 8"},
@@ -77,6 +88,7 @@ public class PinotTypeCoercionImplTest extends QueryEnvironmentTestBase {
         new Object[]{"SELECT col1 < 5 FROM a"},
         new Object[]{"SELECT col1 <= 5 FROM a"},
         new Object[]{"SELECT col1 < 5 FROM a"},
+        new Object[]{"SELECT col1 != 5 FROM a"},
 
         // INTEGER BINARY_COMPARISON VARCHAR
         new Object[]{"SELECT 5 > col1 FROM a"},
@@ -84,6 +96,7 @@ public class PinotTypeCoercionImplTest extends QueryEnvironmentTestBase {
         new Object[]{"SELECT 5 < col1 FROM a"},
         new Object[]{"SELECT 5 <= col1 FROM a"},
         new Object[]{"SELECT 5 = col1 FROM a"},
+        new Object[]{"SELECT 5 != col1 FROM a"},
 
         // (VARCHAR ARITHMETIC_OP INTEGER)
         new Object[]{"SELECT col1 + 1 > 5 FROM a"},
@@ -114,6 +127,7 @@ public class PinotTypeCoercionImplTest extends QueryEnvironmentTestBase {
         new Object[]{"SELECT * FROM a where CAST(col1 as INT) < 5"},
         new Object[]{"SELECT * FROM a where CAST(col1 as INT) <= 5"},
         new Object[]{"SELECT * FROM a where CAST(col1 as INT) = 5"},
+        new Object[]{"SELECT * FROM a where CAST(col1 as INT) != 5"},
 
         // INTEGER BINARY_COMPARISON VARCHAR
         new Object[]{"SELECT * FROM a where 5 > CAST(col1 as INT)"},
@@ -134,9 +148,17 @@ public class PinotTypeCoercionImplTest extends QueryEnvironmentTestBase {
         new Object[]{"SELECT * FROM a where 5 > CAST(col1 as INT) * 1"},
         new Object[]{"SELECT* FROM a where 5 > CAST(col1 as INT) / 1"},
 
+        // Constants
+        new Object[]{"SELECT * FROM a where CAST('10' as INT) > 5"},
+        new Object[]{"SELECT * FROM a where CAST('10' as INT) >= 5"},
+        new Object[]{"SELECT * FROM a where CAST('10' as INT) < 5"},
+        new Object[]{"SELECT * FROM a where CAST('10' as INT) <= 5"},
+        new Object[]{"SELECT * FROM a where CAST('10' as INT) = 5"},
+        new Object[]{"SELECT * FROM a where CAST('10' as INT) != 5"},
+
         // BETWEEN
         new Object[]{"SELECT * FROM a where CAST(col1 as INT) BETWEEN 5 AND 8"},
-        new Object[]{"SELECT * FROM a where 5 BETWEEN " + "CAST(col1 as INT) AND 8"},
+        new Object[]{"SELECT * FROM a where 5 BETWEEN CAST(col1 as INT) AND 8"},
         new Object[]{"SELECT * FROM a where 5 BETWEEN 8 AND CAST(col1 as INT)"},
     };
   }
@@ -154,7 +176,8 @@ public class PinotTypeCoercionImplTest extends QueryEnvironmentTestBase {
         new Object[]{"SELECT CAST(col1 as INT) >= 5 FROM a"},
         new Object[]{"SELECT CAST(col1 as INT) < 5 FROM a"},
         new Object[]{"SELECT CAST(col1 as INT) <= 5 FROM a"},
-        new Object[]{"SELECT CAST(col1 as INT) < 5 FROM a"},
+        new Object[]{"SELECT CAST(col1 as INT) = 5 FROM a"},
+        new Object[]{"SELECT CAST(col1 as INT) != 5 FROM a"},
 
         // INTEGER BINARY_COMPARISON VARCHAR
         new Object[]{"SELECT 5 > CAST(col1 as INT) FROM a"},
@@ -162,18 +185,19 @@ public class PinotTypeCoercionImplTest extends QueryEnvironmentTestBase {
         new Object[]{"SELECT 5 < CAST(col1 as INT) FROM a"},
         new Object[]{"SELECT 5 <= CAST(col1 as INT) FROM a"},
         new Object[]{"SELECT 5 = CAST(col1 as INT) FROM a"},
+        new Object[]{"SELECT 5 != CAST(col1 as INT) FROM a"},
 
         // (VARCHAR ARITHMETIC_OP INTEGER)
         new Object[]{"SELECT CAST(col1 as INT) + 1 > 5 FROM a"},
-        new Object[]{"SELECT CAST(col1 as INT) - 1 > 5 FROM "
-        + "a"}, new Object[]{"SELECT CAST(col1 as INT) * 1 > 5 FROM a"},
+        new Object[]{"SELECT CAST(col1 as INT) - 1 > 5 FROM a"},
+        new Object[]{"SELECT CAST(col1 as INT) * 1 > 5 FROM a"},
         new Object[]{"SELECT CAST(col1 as INT) / 1 > 5 FROM a"},
 
         // (INTEGER ARITHMETIC_OP VARCHAR)
         new Object[]{"SELECT 5 > CAST(col1 as INT) + 1 FROM a"},
         new Object[]{"SELECT 5 > CAST(col1 as INT) - 1 FROM a"},
         new Object[]{"SELECT 5 > CAST(col1 as INT) * 1 FROM a"},
-        new Object[]{"SELECT 5 > CAST(col1 as INT) /1 FROM a"},
+        new Object[]{"SELECT 5 > CAST(col1 as INT) / 1 FROM a"},
     };
   }
 

@@ -64,8 +64,8 @@ public class PinotTypeCoercionImpl extends TypeCoercionImpl {
       final RelDataType type1 = binding.getOperandType(0);
       final RelDataType type2 = binding.getOperandType(1);
 
-      if ((SqlTypeUtil.isAtomic(type1) && SqlTypeUtil.isCharacter(type2)) || (SqlTypeUtil.isCharacter(type1)
-          && SqlTypeUtil.isAtomic(type2))) {
+      if ((SqlTypeUtil.isNumeric(type1) && SqlTypeUtil.isCharacter(type2)) || (SqlTypeUtil.isCharacter(type1)
+          && SqlTypeUtil.isNumeric(type2))) {
         throw binding.newValidationSignatureError();
       }
     }
@@ -76,7 +76,7 @@ public class PinotTypeCoercionImpl extends TypeCoercionImpl {
           .collect(Collectors.toList());
       final RelDataType commonType = commonTypeForComparison(operandTypes);
       final boolean hasCharCol = operandTypes.stream().anyMatch(SqlTypeUtil::isCharacter);
-      if (commonType != null && SqlTypeUtil.isAtomic(commonType) && hasCharCol) {
+      if (commonType != null && SqlTypeUtil.isNumeric(commonType) && hasCharCol) {
         throw binding.newValidationSignatureError();
       }
     }
