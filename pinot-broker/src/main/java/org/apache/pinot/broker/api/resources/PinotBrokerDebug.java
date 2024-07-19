@@ -287,6 +287,7 @@ public class PinotBrokerDebug {
   @GET
   @Path("debug/queries/resourceUsage")
   @Produces(MediaType.APPLICATION_JSON)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.DEBUG_RESOURCE_USAGE)
   @ApiOperation(value = "Get current resource usage of queries in this service", notes = "This is a debug endpoint, "
       + "and won't maintain backward compatibility")
   public Collection<? extends QueryResourceTracker> getQueryUsage() {
