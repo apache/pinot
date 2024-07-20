@@ -1085,9 +1085,16 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     rows = resultTable.get("rows");
     assertEquals(rows.size(), 10);
 
-    // non-string identifier used in a filter
-    sqlQuery = "SELECT fromUtf8(fromBase64(toBase64(toUtf8(AirlineID)))), AirlineID FROM mytable WHERE "
-        + "fromUtf8(fromBase64(toBase64(toUtf8(AirlineID)))) = AirlineID LIMIT 10";
+    // non-string identifier used in a filter.
+    // Implicit cast of varchar to int is not allowed in multi-stage. Change query based on engine.
+    if (useMultiStageQueryEngine) {
+      sqlQuery = "SELECT fromUtf8(fromBase64(toBase64(toUtf8(AirlineID)))), AirlineID FROM mytable WHERE "
+          + "fromUtf8(fromBase64(toBase64(toUtf8(AirlineID)))) = CAST(AirlineID as VARCHAR) LIMIT 10";
+    } else {
+      sqlQuery = "SELECT fromUtf8(fromBase64(toBase64(toUtf8(AirlineID)))), AirlineID FROM mytable WHERE "
+          + "fromUtf8(fromBase64(toBase64(toUtf8(AirlineID)))) = AirlineID LIMIT 10";
+    }
+
     response = postQuery(sqlQuery);
     resultTable = response.get("resultTable");
     dataSchema = resultTable.get("dataSchema");
@@ -1143,9 +1150,17 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     testQuery("SELECT SUM(10) FROM mytable");
     testQuery("SELECT ArrDelay + 10 FROM mytable");
-    testQuery("SELECT ArrDelay + '10' FROM mytable");
+    if (useMultiStageQueryEngine) {
+      testQuery("SELECT ArrDelay + CAST('10' as INT) FROM mytable");
+    } else {
+      testQuery("SELECT ArrDelay + '10' FROM mytable");
+    }
     testQuery("SELECT SUM(ArrDelay + 10) FROM mytable");
-    testQuery("SELECT SUM(ArrDelay + '10') FROM mytable");
+    if (useMultiStageQueryEngine) {
+      testQuery("SELECT SUM(ArrDelay + CAST('10' AS INT)) FROM mytable");
+    } else {
+      testQuery("SELECT SUM(ArrDelay + '10') FROM mytable");
+    }
   }
 
   @Test
@@ -1809,7 +1824,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     pinotQuery = "SELECT COUNT(*) FROM mytable WHERE "
         + (useMultiStageQueryEngine()
-        ? "arrayToMV(NewAddedDerivedDivAirportSeqIDsString)"
+        ? "CAST(arrayToMV(NewAddedDerivedDivAirportSeqIDsString) AS INT)"
         : "CAST(NewAddedDerivedDivAirportSeqIDsString AS INT)")
         + " > 1100000";
     response = postQuery(pinotQuery);
