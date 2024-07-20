@@ -517,7 +517,11 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
         useMultiStageQueryEngine()
             ? QueryException.QUERY_PLANNING_ERROR_CODE : QueryException.QUERY_EXECUTION_ERROR_CODE);
 
-    testQueryException("SELECT COUNT(*) FROM mytable where ArrTime = 'potato'",
+    // Implicit cast VARCHAR to INT is disabled in V2. So test them separately.
+    String queryV1 = "SELECT COUNT(*) FROM mytable where ArrTime = 'potato'";
+    String queryV2 = "SELECT COUNT(*) FROM mytable where ArrTime = CAST('potato' AS INT)";
+
+    testQueryException(useMultiStageQueryEngine() ? queryV2 : queryV1,
         QueryException.QUERY_EXECUTION_ERROR_CODE);
   }
 

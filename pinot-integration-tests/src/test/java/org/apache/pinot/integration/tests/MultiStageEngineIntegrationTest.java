@@ -558,7 +558,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
 
     // non-string identifier used in a filter
     sqlQuery = "SELECT fromUtf8(fromBase64(toBase64(toUtf8(AirlineID)))), AirlineID FROM mytable WHERE "
-        + "fromUtf8(fromBase64(toBase64(toUtf8(AirlineID)))) = AirlineID LIMIT 10";
+        + "fromUtf8(fromBase64(toBase64(toUtf8(AirlineID)))) = CAST(AirlineID as VARCHAR) LIMIT 10";
     response = postQuery(sqlQuery);
     resultTable = response.get("resultTable");
     dataSchema = resultTable.get("dataSchema");
