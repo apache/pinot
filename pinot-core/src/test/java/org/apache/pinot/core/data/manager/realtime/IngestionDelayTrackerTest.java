@@ -16,7 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.pinot.core.data.manager.realtime;
 
 import java.time.Clock;
@@ -24,6 +23,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.testng.Assert;
@@ -228,6 +228,34 @@ public class IngestionDelayTrackerTest {
       Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionTimeMs(
           partitionGroupId), Long.MIN_VALUE);
     }
+  }
+
+  @Test
+  public void testStopTrackingIngestionDelayWithSegment() {
+    IngestionDelayTracker ingestionDelayTracker = createTracker();
+    // Use fixed clock so samples don't age
+    Instant now = Instant.now();
+    ZoneId zoneId = ZoneId.systemDefault();
+    Clock clock = Clock.fixed(now, zoneId);
+    ingestionDelayTracker.setClock(clock);
+
+    String segmentName = new LLCSegmentName("testTable", 0, 0, 0).getSegmentName();
+    long ingestionTimeMs = clock.millis() - 10;
+    ingestionDelayTracker.updateIngestionMetrics(segmentName, 0, ingestionTimeMs, ingestionTimeMs, null, null);
+    Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionDelayMs(0), 10);
+    Assert.assertEquals(ingestionDelayTracker.getPartitionEndToEndIngestionDelayMs(0), 10);
+    Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionTimeMs(0), ingestionTimeMs);
+
+    ingestionDelayTracker.stopTrackingPartitionIngestionDelay(segmentName);
+    Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionDelayMs(0), 0);
+    Assert.assertEquals(ingestionDelayTracker.getPartitionEndToEndIngestionDelayMs(0), 0);
+    Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionTimeMs(0), Long.MIN_VALUE);
+
+    // Should not update metrics for removed segment
+    ingestionDelayTracker.updateIngestionMetrics(segmentName, 0, ingestionTimeMs, ingestionTimeMs, null, null);
+    Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionDelayMs(0), 0);
+    Assert.assertEquals(ingestionDelayTracker.getPartitionEndToEndIngestionDelayMs(0), 0);
+    Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionTimeMs(0), Long.MIN_VALUE);
   }
 
   @Test
