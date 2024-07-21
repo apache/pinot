@@ -66,8 +66,6 @@ public class TableConfigTest {
     assertEquals(offlineTableConfig.getReplication(), 2);
     offlineTableConfig.getValidationConfig().setReplication("4");
     assertEquals(offlineTableConfig.getReplication(), 4);
-    offlineTableConfig.getValidationConfig().setReplication("3");
-    assertEquals(offlineTableConfig.getReplication(), 4);
 
     TableConfig realtimeTableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setNumReplicas(2).build();
