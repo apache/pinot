@@ -1428,7 +1428,7 @@ public final class TableConfigUtils {
     if (replication < defaultTableMinReplicas) {
       LOGGER.info("Creating table with minimum replication factor of: {} instead of requested replication: {}",
           defaultTableMinReplicas, replication);
-      validationConfig.setReplicasPerPartition(null);
+      validationConfig.setReplication(null);
       validationConfig.setReplication(String.valueOf(defaultTableMinReplicas));
     }
   }
