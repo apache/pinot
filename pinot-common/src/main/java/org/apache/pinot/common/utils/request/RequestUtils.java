@@ -35,12 +35,14 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.SqlNumericLiteral;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
@@ -48,6 +50,7 @@ import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.Identifier;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request;
@@ -343,21 +346,124 @@ public class RequestUtils {
       case BINARY_VALUE:
         return literal.getBinaryValue();
       case INT_ARRAY_VALUE:
-        return literal.getIntArrayValue().stream().mapToInt(Integer::intValue).toArray();
+        return getIntArrayValue(literal);
       case LONG_ARRAY_VALUE:
-        return literal.getLongArrayValue().stream().mapToLong(Long::longValue).toArray();
+        return getLongArrayValue(literal);
       case FLOAT_ARRAY_VALUE:
-        List<Integer> floatList = literal.getFloatArrayValue();
-        int numFloats = floatList.size();
-        float[] floatArray = new float[numFloats];
-        for (int i = 0; i < numFloats; i++) {
-          floatArray[i] = Float.intBitsToFloat(floatList.get(i));
-        }
-        return floatArray;
+        return getFloatArrayValue(literal);
       case DOUBLE_ARRAY_VALUE:
-        return literal.getDoubleArrayValue().stream().mapToDouble(Double::doubleValue).toArray();
+        return getDoubleArrayValue(literal);
       case STRING_ARRAY_VALUE:
-        return literal.getStringArrayValue().toArray(new String[0]);
+        return getStringArrayValue(literal);
+      default:
+        throw new IllegalStateException("Unsupported field type: " + type);
+    }
+  }
+
+  private static int[] getIntArrayValue(Literal literal) {
+    List<Integer> intList = literal.getIntArrayValue();
+    int numInts = intList.size();
+    int[] intArray = new int[numInts];
+    for (int i = 0; i < numInts; i++) {
+      intArray[i] = intList.get(i);
+    }
+    return intArray;
+  }
+
+  private static long[] getLongArrayValue(Literal literal) {
+    List<Long> longList = literal.getLongArrayValue();
+    int numLongs = longList.size();
+    long[] longArray = new long[numLongs];
+    for (int i = 0; i < numLongs; i++) {
+      longArray[i] = longList.get(i);
+    }
+    return longArray;
+  }
+
+  private static float[] getFloatArrayValue(Literal literal) {
+    List<Integer> floatList = literal.getFloatArrayValue();
+    int numFloats = floatList.size();
+    float[] floatArray = new float[numFloats];
+    for (int i = 0; i < numFloats; i++) {
+      floatArray[i] = Float.intBitsToFloat(floatList.get(i));
+    }
+    return floatArray;
+  }
+
+  private static double[] getDoubleArrayValue(Literal literal) {
+    List<Double> doubleList = literal.getDoubleArrayValue();
+    int numDoubles = doubleList.size();
+    double[] doubleArray = new double[numDoubles];
+    for (int i = 0; i < numDoubles; i++) {
+      doubleArray[i] = doubleList.get(i);
+    }
+    return doubleArray;
+  }
+
+  private static String[] getStringArrayValue(Literal literal) {
+    return literal.getStringArrayValue().toArray(new String[0]);
+  }
+
+  public static void getLiteralTypeAndValue(Literal literal, ColumnDataType[] types,
+      Object[] values, int index) {
+    Literal._Fields type = literal.getSetField();
+    switch (type) {
+      case NULL_VALUE:
+        types[index] = ColumnDataType.UNKNOWN;
+        values[index] = null;
+        break;
+      case BOOL_VALUE:
+        types[index] = ColumnDataType.BOOLEAN;
+        values[index] = literal.getBoolValue();
+        break;
+      case INT_VALUE:
+        types[index] = ColumnDataType.INT;
+        values[index] = literal.getIntValue();
+        break;
+      case LONG_VALUE:
+        types[index] = ColumnDataType.LONG;
+        values[index] = literal.getLongValue();
+        break;
+      case FLOAT_VALUE:
+        types[index] = ColumnDataType.FLOAT;
+        values[index] = Float.intBitsToFloat(literal.getFloatValue());
+        break;
+      case DOUBLE_VALUE:
+        types[index] = ColumnDataType.DOUBLE;
+        values[index] = literal.getDoubleValue();
+        break;
+      case BIG_DECIMAL_VALUE:
+        types[index] = ColumnDataType.BIG_DECIMAL;
+        values[index] = BigDecimalUtils.deserialize(literal.getBigDecimalValue());
+        break;
+      case STRING_VALUE:
+        types[index] = ColumnDataType.STRING;
+        values[index] = literal.getStringValue();
+        break;
+      case BINARY_VALUE:
+        types[index] = ColumnDataType.BYTES;
+        values[index] = literal.getBinaryValue();
+        break;
+      case INT_ARRAY_VALUE:
+        types[index] = ColumnDataType.INT_ARRAY;
+        values[index] = getIntArrayValue(literal);
+        break;
+      case LONG_ARRAY_VALUE:
+        types[index] = ColumnDataType.LONG_ARRAY;
+        values[index] = getLongArrayValue(literal);
+        break;
+      case FLOAT_ARRAY_VALUE:
+        types[index] = ColumnDataType.FLOAT_ARRAY;
+        values[index] = getFloatArrayValue(literal);
+        break;
+      case DOUBLE_ARRAY_VALUE:
+        types[index] = ColumnDataType.DOUBLE_ARRAY;
+        values[index] = getDoubleArrayValue(literal);
+        break;
+      case STRING_ARRAY_VALUE:
+        types[index] = ColumnDataType.STRING_ARRAY;
+        values[index] = getStringArrayValue(literal);
+        break;
       default:
         throw new IllegalStateException("Unsupported field type: " + type);
     }
