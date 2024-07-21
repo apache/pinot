@@ -22,10 +22,17 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Collections;
+import java.util.List;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.spi.config.table.DedupConfig;
+import org.apache.pinot.spi.config.table.HashFunction;
+import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.TierConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.DataProvider;
@@ -76,5 +83,30 @@ public class TableConfigTest {
     assertEquals(realtimeTableConfig.getReplication(), 4);
     realtimeTableConfig.getValidationConfig().setReplicasPerPartition("3");
     assertEquals(realtimeTableConfig.getReplication(), 3);
+  }
+
+  @Test
+  public void testCopyConstructor() {
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setContinueOnError(true);
+    ingestionConfig.setRowTimeValueCheck(true);
+    ingestionConfig.setSegmentTimeValueCheck(false);
+
+    TableConfig config = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(RAW_TABLE_NAME)
+        .setAggregateMetrics(true)
+        .setRetentionTimeValue("5")
+        .setRetentionTimeUnit("DAYS")
+        .setNumReplicas(2)
+        .setDedupConfig(new DedupConfig(true, HashFunction.MD5))
+        .setIngestionConfig(ingestionConfig)
+        .setQueryConfig(new QueryConfig(2000L, true, false, Collections.emptyMap(), 100_000L, 100_000L))
+        .setTierConfigList(List.of(new TierConfig("name", "type", null, null, "storageType", null, null, null)))
+        .build();
+
+    TableConfig copy = new TableConfig(config);
+
+    assertEquals(config, copy);
+    assertEquals(config.toJsonString(), copy.toJsonString());
   }
 }
