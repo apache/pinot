@@ -265,16 +265,6 @@
             <artifactId>maven-surefire-plugin</artifactId>
             <version>${surefire.version}</version>
             <configuration>
-              <excludes>
-                <!--we exclude these tests as CLP doesn't support osx/aarch64 yet. See: https://github.com/y-scope/clp-ffi-java/issues/46-->
-                <exclude>**/ClpTransformFunctionsTest.java</exclude>
-                <exclude>**/ClpRewriterTest.java</exclude>
-                <exclude>**/CLPEncodingRealtimeIntegrationTest.java</exclude>
-                <exclude>**/CLPForwardIndexCreatorTest.java</exclude>
-                <exclude>**/CLPDictionariesTest.java</exclude>
-                <exclude>**/CLPLogRecordExtractorTest.java</exclude>
-                <exclude>**/CLPMutableForwardIndexTest.java</exclude>
-              </excludes>
               <systemPropertyVariables>
                 <os.arch>aarch64</os.arch>
               </systemPropertyVariables>
@@ -301,16 +291,6 @@
             <version>${surefire.version}</version>
             <configuration>
               <excludes>
-                <exclude>**/PinotLArrayByteBufferTest.java</exclude>
-                <exclude>**/PinotDefaultByteBufferTest.java</exclude>
-                <!--we exclude these tests as CLP doesn't support osx/aarch64 yet. See: https://github.com/y-scope/clp-ffi-java/issues/46-->
-                <exclude>**/ClpTransformFunctionsTest.java</exclude>
-                <exclude>**/ClpRewriterTest.java</exclude>
-                <exclude>**/CLPEncodingRealtimeIntegrationTest.java</exclude>
-                <exclude>**/CLPForwardIndexCreatorTest.java</exclude>
-                <exclude>**/CLPDictionariesTest.java</exclude>
-                <exclude>**/CLPLogRecordExtractorTest.java</exclude>
-                <exclude>**/CLPMutableForwardIndexTest.java</exclude>
               </excludes>
               <systemPropertyVariables>
                 <os.arch>aarch64</os.arch>
