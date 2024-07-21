@@ -26,6 +26,7 @@ public class MinionConstants {
 
   public static final String TABLE_NAME_KEY = "tableName";
   public static final String SEGMENT_NAME_KEY = "segmentName";
+  public static final String OPERATOR_KEY = "operator";
   public static final String DOWNLOAD_URL_KEY = "downloadURL";
   public static final String UPLOAD_URL_KEY = "uploadURL";
   public static final String DOT_SEPARATOR = ".";
@@ -70,6 +71,10 @@ public class MinionConstants {
     public static final String TASK_TYPE = "PurgeTask";
     public static final String LAST_PURGE_TIME_THREESOLD_PERIOD = "lastPurgeTimeThresholdPeriod";
     public static final String DEFAULT_LAST_PURGE_TIME_THRESHOLD_PERIOD = "14d";
+  }
+
+  public static class SegmentDeletionTask {
+    public static final String TASK_TYPE = "SegmentDeletionTask";
   }
 
   // Common config keys for segment merge tasks.

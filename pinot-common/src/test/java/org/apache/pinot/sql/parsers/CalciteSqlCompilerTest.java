@@ -24,7 +24,12 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import org.apache.calcite.sql.SqlBasicCall;
+import org.apache.calcite.sql.SqlDelete;
+import org.apache.calcite.sql.SqlIdentifier;
+import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNumericLiteral;
+import org.apache.calcite.sql.SqlOperator;
 import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
@@ -3004,6 +3009,40 @@ public class CalciteSqlCompilerTest {
     ;
     Assert.assertTrue(sqlNodeAndOptions.getSqlNode() instanceof SqlInsertFromFile);
     Assert.assertEquals(sqlNodeAndOptions.getSqlType(), PinotSqlType.DML);
+  }
+
+  @Test
+  public void shouldParseDeleteFromTableWhereSegmentNameEquals() {
+    String customSql = "DELETE FROM mytable WHERE $segmentName = 'mySegmentName'";
+    SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(customSql);
+
+    Assert.assertTrue(sqlNodeAndOptions.getSqlNode() instanceof SqlDelete);
+    Assert.assertEquals(sqlNodeAndOptions.getSqlType(), PinotSqlType.DML);
+
+    SqlDelete delete = (SqlDelete) sqlNodeAndOptions.getSqlNode();
+    SqlIdentifier targetTable = (SqlIdentifier) delete.getTargetTable();
+    Assert.assertEquals(targetTable.toString(), "mytable");
+    SqlBasicCall condition = (SqlBasicCall) delete.getCondition();
+    Assert.assertEquals(condition.toString(), "`$segmentName` = 'mySegmentName'");
+    SqlOperator operator = condition.getOperator();
+    Assert.assertEquals(operator.getKind(), SqlKind.EQUALS);
+  }
+
+  @Test
+  public void shouldParseDeleteFromTableWhereSegmentNameLike() {
+    String customSql = "DELETE FROM mytable WHERE $segmentName LIKE 'mySegmentNamePattern'";
+    SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(customSql);
+
+    Assert.assertTrue(sqlNodeAndOptions.getSqlNode() instanceof SqlDelete);
+    Assert.assertEquals(sqlNodeAndOptions.getSqlType(), PinotSqlType.DML);
+
+    SqlDelete delete = (SqlDelete) sqlNodeAndOptions.getSqlNode();
+    SqlIdentifier targetTable = (SqlIdentifier) delete.getTargetTable();
+    Assert.assertEquals(targetTable.toString(), "mytable");
+    SqlBasicCall condition = (SqlBasicCall) delete.getCondition();
+    Assert.assertEquals(condition.toString(), "`$segmentName` LIKE 'mySegmentNamePattern'");
+    SqlOperator operator = condition.getOperator();
+    Assert.assertEquals(operator.getKind(), SqlKind.LIKE);
   }
 
   @Test
