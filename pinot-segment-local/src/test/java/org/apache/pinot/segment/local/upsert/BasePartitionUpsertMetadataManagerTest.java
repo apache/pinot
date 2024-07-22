@@ -369,19 +369,19 @@ public class BasePartitionUpsertMetadataManagerTest {
       latch.await();
       return validDocIds01;
     });
-    upsertMetadataManager.trackSegment(seg01);
+    upsertMetadataManager.trackSegmentForUpsertView(seg01);
     segmentQueryableDocIdsMap.put(seg01, validDocIds01);
 
     IndexSegment seg02 = mock(IndexSegment.class);
     ThreadSafeMutableRoaringBitmap validDocIds02 = createThreadSafeMutableRoaringBitmap(11);
     when(seg02.getValidDocIds()).thenReturn(validDocIds02);
-    upsertMetadataManager.trackSegment(seg02);
+    upsertMetadataManager.trackSegmentForUpsertView(seg02);
     segmentQueryableDocIdsMap.put(seg02, validDocIds02);
 
     IndexSegment seg03 = mock(IndexSegment.class);
     ThreadSafeMutableRoaringBitmap validDocIds03 = createThreadSafeMutableRoaringBitmap(12);
     when(seg03.getValidDocIds()).thenReturn(validDocIds03);
-    upsertMetadataManager.trackSegment(seg03);
+    upsertMetadataManager.trackSegmentForUpsertView(seg03);
     segmentQueryableDocIdsMap.put(seg03, validDocIds03);
 
     List<SegmentContext> segmentContexts = new ArrayList<>();
@@ -449,19 +449,19 @@ public class BasePartitionUpsertMetadataManagerTest {
       latch.await();
       return validDocIds01;
     });
-    upsertMetadataManager.trackSegment(seg01);
+    upsertMetadataManager.trackSegmentForUpsertView(seg01);
     segmentQueryableDocIdsMap.put(seg01, validDocIds01);
 
     IndexSegment seg02 = mock(IndexSegment.class);
     ThreadSafeMutableRoaringBitmap validDocIds02 = createThreadSafeMutableRoaringBitmap(11);
     when(seg02.getValidDocIds()).thenReturn(validDocIds02);
-    upsertMetadataManager.trackSegment(seg02);
+    upsertMetadataManager.trackSegmentForUpsertView(seg02);
     segmentQueryableDocIdsMap.put(seg02, validDocIds02);
 
     IndexSegment seg03 = mock(IndexSegment.class);
     ThreadSafeMutableRoaringBitmap validDocIds03 = createThreadSafeMutableRoaringBitmap(12);
     when(seg03.getValidDocIds()).thenReturn(validDocIds03);
-    upsertMetadataManager.trackSegment(seg03);
+    upsertMetadataManager.trackSegmentForUpsertView(seg03);
     segmentQueryableDocIdsMap.put(seg03, validDocIds03);
 
     List<SegmentContext> segmentContexts = new ArrayList<>();
@@ -561,25 +561,23 @@ public class BasePartitionUpsertMetadataManagerTest {
     DummyPartitionUpsertMetadataManager upsertMetadataManager =
         new DummyPartitionUpsertMetadataManager("myTable", 0, upsertContext);
 
-    CountDownLatch latch = new CountDownLatch(1);
     Map<IndexSegment, ThreadSafeMutableRoaringBitmap> segmentQueryableDocIdsMap = new HashMap<>();
     IndexSegment seg01 = mock(IndexSegment.class);
     ThreadSafeMutableRoaringBitmap validDocIds01 = createThreadSafeMutableRoaringBitmap(10);
-    AtomicBoolean called = new AtomicBoolean(false);
     when(seg01.getValidDocIds()).thenReturn(validDocIds01);
-    upsertMetadataManager.trackSegment(seg01);
+    upsertMetadataManager.trackSegmentForUpsertView(seg01);
     segmentQueryableDocIdsMap.put(seg01, validDocIds01);
 
     IndexSegment seg02 = mock(IndexSegment.class);
     ThreadSafeMutableRoaringBitmap validDocIds02 = createThreadSafeMutableRoaringBitmap(11);
     when(seg02.getValidDocIds()).thenReturn(validDocIds02);
-    upsertMetadataManager.trackSegment(seg02);
+    upsertMetadataManager.trackSegmentForUpsertView(seg02);
     segmentQueryableDocIdsMap.put(seg02, validDocIds02);
 
     IndexSegment seg03 = mock(IndexSegment.class);
     ThreadSafeMutableRoaringBitmap validDocIds03 = createThreadSafeMutableRoaringBitmap(12);
     when(seg03.getValidDocIds()).thenReturn(validDocIds03);
-    upsertMetadataManager.trackSegment(seg03);
+    upsertMetadataManager.trackSegmentForUpsertView(seg03);
     segmentQueryableDocIdsMap.put(seg03, validDocIds03);
 
     RecordInfo recordInfo = new RecordInfo(null, 5, null, false);

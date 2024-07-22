@@ -1327,7 +1327,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       return true;
     }
     Set<IndexSegment> currentSegments = currentView.keySet();
-    return _upsertViewTrackedSegments.containsAll(currentSegments) && currentSegments.containsAll(
+    return !_upsertViewTrackedSegments.containsAll(currentSegments) || !currentSegments.containsAll(
         _upsertViewTrackedSegments);
   }
 
