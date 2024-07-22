@@ -40,8 +40,7 @@ public interface AccessControl extends FineGrainedAccessControl {
    * @param endpointUrl the request url for which this access control is called
    * @return whether the client has permission
    */
-  boolean hasAccess(@Nullable String tableName, AccessType accessType, HttpHeaders httpHeaders,
-      String endpointUrl);
+  boolean hasAccess(@Nullable String tableName, AccessType accessType, HttpHeaders httpHeaders, String endpointUrl);
 
   /**
    * Return whether the client has permission to access the endpoints with are not table level
