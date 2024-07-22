@@ -46,7 +46,7 @@ public class DataManipulationStatementParserTest {
   }
 
   @Test
-  public void testInvalidDeleteSegmentStatement_missing_where_clause() {
+  public void testInvalidDeleteSegmentStatementMissingWhereClause() {
     String sql = "DELETE FROM mytable";
     SqlNodeAndOptions nodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sql);
     try {
@@ -58,7 +58,7 @@ public class DataManipulationStatementParserTest {
   }
 
   @Test
-  public void testInvalidDeleteSegmentStatement_missing_segment_name() {
+  public void testInvalidDeleteSegmentStatementMissingSegmentName() {
     String sql = "DELETE FROM mytable WHERE a = b";
     SqlNodeAndOptions nodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sql);
     try {

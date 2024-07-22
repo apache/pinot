@@ -33,10 +33,12 @@ public class DeleteSegmentStatementTest {
       throws Exception {
     String deleteFromSql = "DELETE FROM \"baseballStats\"\n"
         + "WHERE $segmentName = 'foobar';";
-    DeleteSegmentStatement deleteSegmentStatement = DeleteSegmentStatement.parse(CalciteSqlParser.compileToSqlNodeAndOptions(deleteFromSql));
+    DeleteSegmentStatement deleteSegmentStatement =
+        DeleteSegmentStatement.parse(CalciteSqlParser.compileToSqlNodeAndOptions(deleteFromSql));
     Assert.assertEquals(deleteSegmentStatement.getTable(), "baseballStats");
     Assert.assertEquals(deleteSegmentStatement.getExecutionType(), DataManipulationStatement.ExecutionType.MINION);
-    Assert.assertEquals(deleteSegmentStatement.getResultSchema(), new DataSchema(new String[]{"tableName", "taskJobName"},
+    Assert.assertEquals(deleteSegmentStatement.getResultSchema(),
+        new DataSchema(new String[]{"tableName", "taskJobName"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING}));
     Assert.assertEquals(deleteSegmentStatement.getQueryOptions(),
         Map.of("segmentName", "'foobar'", "operator", "="));
@@ -53,10 +55,12 @@ public class DeleteSegmentStatementTest {
       throws Exception {
     String deleteFromSql = "DELETE FROM \"baseballStats\"\n"
         + "WHERE $segmentName LIKE 'mySegment';";
-    DeleteSegmentStatement deleteSegmentStatement = DeleteSegmentStatement.parse(CalciteSqlParser.compileToSqlNodeAndOptions(deleteFromSql));
+    DeleteSegmentStatement deleteSegmentStatement =
+        DeleteSegmentStatement.parse(CalciteSqlParser.compileToSqlNodeAndOptions(deleteFromSql));
     Assert.assertEquals(deleteSegmentStatement.getTable(), "baseballStats");
     Assert.assertEquals(deleteSegmentStatement.getExecutionType(), DataManipulationStatement.ExecutionType.MINION);
-    Assert.assertEquals(deleteSegmentStatement.getResultSchema(), new DataSchema(new String[]{"tableName", "taskJobName"},
+    Assert.assertEquals(deleteSegmentStatement.getResultSchema(),
+        new DataSchema(new String[]{"tableName", "taskJobName"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING}));
     Assert.assertEquals(deleteSegmentStatement.getQueryOptions(),
         Map.of("segmentName", "'mySegment'", "operator", "LIKE"));
@@ -72,7 +76,8 @@ public class DeleteSegmentStatementTest {
   public void testDeleteStatementMissingWhereClause() {
     String deleteFromSql = "DELETE FROM \"baseballStats\"\n";
     try {
-      DeleteSegmentStatement.parse(CalciteSqlParser.compileToSqlNodeAndOptions(deleteFromSql));
+      DeleteSegmentStatement.parse(
+          CalciteSqlParser.compileToSqlNodeAndOptions(deleteFromSql));
       Assert.fail("expected exception was not thrown");
     } catch (Exception ex) {
       Assert.assertEquals(ex.getMessage(), "missing WHERE clause");
