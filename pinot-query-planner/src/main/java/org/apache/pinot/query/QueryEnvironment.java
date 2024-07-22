@@ -131,7 +131,7 @@ public class QueryEnvironment {
   public QueryPlannerResult planQuery(String sqlQuery, SqlNodeAndOptions sqlNodeAndOptions, long requestId) {
     try (PlannerContext plannerContext = getPlannerContext()) {
       plannerContext.setOptions(sqlNodeAndOptions.getOptions());
-      RelRoot relRoot = compileAndOptimizeQuery(sqlNodeAndOptions.getSqlNode(), plannerContext);
+      RelRoot relRoot = compileQuery(sqlNodeAndOptions.getSqlNode(), plannerContext);
       // TODO: current code only assume one SubPlan per query, but we should support multiple SubPlans per query.
       // Each SubPlan should be able to run independently from Broker then set the results into the dependent
       // SubPlan for further processing.
@@ -160,7 +160,7 @@ public class QueryEnvironment {
     try (PlannerContext plannerContext = getPlannerContext()) {
       SqlExplain explain = (SqlExplain) sqlNodeAndOptions.getSqlNode();
       plannerContext.setOptions(sqlNodeAndOptions.getOptions());
-      RelRoot relRoot = compileAndOptimizeQuery(explain.getExplicandum(), plannerContext);
+      RelRoot relRoot = compileQuery(explain.getExplicandum(), plannerContext);
       if (explain instanceof SqlPhysicalExplain) {
         // get the physical plan for query.
         DispatchableSubPlan dispatchableSubPlan = toDispatchableSubPlan(relRoot, plannerContext, requestId);
@@ -195,7 +195,7 @@ public class QueryEnvironment {
       if (sqlNode.getKind().equals(SqlKind.EXPLAIN)) {
         sqlNode = ((SqlExplain) sqlNode).getExplicandum();
       }
-      RelRoot relRoot = compileAndOptimizeQuery(sqlNode, plannerContext);
+      RelRoot relRoot = compileQuery(sqlNode, plannerContext);
       Set<String> tableNames = RelToPlanNodeConverter.getTableNamesFromRelRoot(relRoot.rel);
       return new ArrayList<>(tableNames);
     } catch (Throwable t) {
@@ -212,7 +212,7 @@ public class QueryEnvironment {
       if (sqlNode.getKind().equals(SqlKind.EXPLAIN)) {
         sqlNode = ((SqlExplain) sqlNode).getExplicandum();
       }
-      compileAndOptimizeQuery(sqlNode, plannerContext);
+      compileQuery(sqlNode, plannerContext);
       LOGGER.debug("Successfully compiled query using the multi-stage query engine: `{}`", query);
       return true;
     } catch (Exception e) {
@@ -253,7 +253,7 @@ public class QueryEnvironment {
   // steps
   // --------------------------------------------------------------------------
 
-  private RelRoot compileAndOptimizeQuery(SqlNode sqlNode, PlannerContext plannerContext) {
+  private RelRoot compileQuery(SqlNode sqlNode, PlannerContext plannerContext) {
     SqlNode validated = validate(sqlNode, plannerContext);
     RelRoot relation = toRelation(validated, plannerContext);
     RelNode optimized = optimize(relation, plannerContext);

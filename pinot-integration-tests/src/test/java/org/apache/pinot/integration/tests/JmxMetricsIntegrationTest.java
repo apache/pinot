@@ -24,6 +24,7 @@ import java.lang.management.ManagementFactory;
 import java.util.Hashtable;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicLong;
 import javax.management.MBeanServer;
 import javax.management.ObjectName;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -47,6 +48,7 @@ public class JmxMetricsIntegrationTest extends BaseClusterIntegrationTestSet {
   private static final int NUM_BROKERS = 1;
   private static final int NUM_SERVERS = 1;
 
+  private static final MBeanServer MBEAN_SERVER = ManagementFactory.getPlatformMBeanServer();
   private static final String PINOT_JMX_METRICS_DOMAIN = "\"org.apache.pinot.common.metrics\"";
   private static final String BROKER_METRICS_TYPE = "\"BrokerMetrics\"";
 
@@ -87,12 +89,10 @@ public class JmxMetricsIntegrationTest extends BaseClusterIntegrationTestSet {
         new Hashtable<>(Map.of("type", BROKER_METRICS_TYPE,
             "name", "\"pinot.broker.queriesGlobal\"")));
 
-    MBeanServer mBeanServer = ManagementFactory.getPlatformMBeanServer();
-
     // Some queries are run during setup to ensure that all the docs are loaded
-    long initialQueryCount = (Long) mBeanServer.getAttribute(queriesGlobalMetric, "Count");
+    long initialQueryCount = (Long) MBEAN_SERVER.getAttribute(queriesGlobalMetric, "Count");
     assertTrue(initialQueryCount > 0L);
-    assertEquals((Long) mBeanServer.getAttribute(multiStageMigrationMetric, "Count"), 0L);
+    assertEquals((Long) MBEAN_SERVER.getAttribute(multiStageMigrationMetric, "Count"), 0L);
 
     postQuery("SELECT COUNT(*) FROM mytable");
 
@@ -122,8 +122,20 @@ public class JmxMetricsIntegrationTest extends BaseClusterIntegrationTestSet {
     response = postQuery("SELECT AirTime, AirTime FROM mytable ORDER BY AirTime");
     assertFalse(response.get("resultTable").get("rows").isEmpty());
 
-    assertEquals((Long) mBeanServer.getAttribute(multiStageMigrationMetric, "Count"), 6L);
-    assertEquals((Long) mBeanServer.getAttribute(queriesGlobalMetric, "Count"), initialQueryCount + 8L);
+    assertEquals((Long) MBEAN_SERVER.getAttribute(queriesGlobalMetric, "Count"), initialQueryCount + 8L);
+
+    AtomicLong multiStageMigrationMetricValue = new AtomicLong();
+    TestUtils.waitForCondition((aVoid) -> {
+      try {
+        multiStageMigrationMetricValue.set((Long) MBEAN_SERVER.getAttribute(multiStageMigrationMetric, "Count"));
+        return multiStageMigrationMetricValue.get() == 6L;
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }, 5000, "Expected value of MBean 'pinot.broker.singleStageQueriesInvalidMultiStage' to be: "
+        + 6L + "; actual value: " + multiStageMigrationMetricValue.get());
+
+    assertEquals((Long) MBEAN_SERVER.getAttribute(multiStageMigrationMetric, "Count"), 6L);
   }
 
   @Override
