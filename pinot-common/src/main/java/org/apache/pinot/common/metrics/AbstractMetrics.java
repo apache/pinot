@@ -451,7 +451,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     setValueOfGauge(value, gaugeName);
   }
 
-  private void setValueOfGauge(long value, String gaugeName) {
+  protected void setValueOfGauge(long value, String gaugeName) {
     AtomicLong gaugeValue = _gaugeValues.get(gaugeName);
     if (gaugeValue == null) {
       synchronized (_gaugeValues) {
