@@ -55,8 +55,8 @@ public class MultiSegmentDataManager extends SegmentDataManager {
   @Override
   public synchronized boolean increaseReferenceCount() {
     boolean anyDone = false;
-    for (SegmentDataManager _segmentDataManager : _segmentDataManagers) {
-      if (_segmentDataManager.increaseReferenceCount()) {
+    for (SegmentDataManager segmentDataManager : _segmentDataManagers) {
+      if (segmentDataManager.increaseReferenceCount()) {
         anyDone = true;
       }
     }
@@ -66,8 +66,8 @@ public class MultiSegmentDataManager extends SegmentDataManager {
   @Override
   public synchronized boolean decreaseReferenceCount() {
     boolean anyDone = false;
-    for (SegmentDataManager _segmentDataManager : _segmentDataManagers) {
-      if (_segmentDataManager.decreaseReferenceCount()) {
+    for (SegmentDataManager segmentDataManager : _segmentDataManagers) {
+      if (segmentDataManager.decreaseReferenceCount()) {
         anyDone = true;
       }
     }
@@ -82,9 +82,9 @@ public class MultiSegmentDataManager extends SegmentDataManager {
   @Override
   public List<IndexSegment> getSegments() {
     List<IndexSegment> segments = new ArrayList<>(_segmentDataManagers.size());
-    for (SegmentDataManager _segmentDataManager : _segmentDataManagers) {
-      if (_segmentDataManager.getReferenceCount() > 0) {
-        segments.add(_segmentDataManager.getSegment());
+    for (SegmentDataManager segmentDataManager : _segmentDataManagers) {
+      if (segmentDataManager.getReferenceCount() > 0) {
+        segments.add(segmentDataManager.getSegment());
       }
     }
     return segments;
@@ -92,18 +92,18 @@ public class MultiSegmentDataManager extends SegmentDataManager {
 
   @Override
   public void doOffload() {
-    for (SegmentDataManager _segmentDataManager : _segmentDataManagers) {
-      if (_segmentDataManager.getReferenceCount() == 0) {
-        _segmentDataManager.offload();
+    for (SegmentDataManager segmentDataManager : _segmentDataManagers) {
+      if (segmentDataManager.getReferenceCount() == 0) {
+        segmentDataManager.offload();
       }
     }
   }
 
   @Override
   protected void doDestroy() {
-    for (SegmentDataManager _segmentDataManager : _segmentDataManagers) {
-      if (_segmentDataManager.getReferenceCount() == 0) {
-        _segmentDataManager.destroy();
+    for (SegmentDataManager segmentDataManager : _segmentDataManagers) {
+      if (segmentDataManager.getReferenceCount() == 0) {
+        segmentDataManager.destroy();
       }
     }
   }
