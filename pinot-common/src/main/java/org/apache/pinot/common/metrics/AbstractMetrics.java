@@ -787,8 +787,10 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    * @param gaugeName gauge name
    */
   public void removeGauge(final String gaugeName) {
-    _gaugeValues.remove(gaugeName);
-    removeGaugeFromMetricRegistry(gaugeName);
+    synchronized (_gaugeValues) {
+      _gaugeValues.remove(gaugeName);
+      removeGaugeFromMetricRegistry(gaugeName);
+    }
   }
 
   public void removeTableMeter(final String tableName, final M meter) {
