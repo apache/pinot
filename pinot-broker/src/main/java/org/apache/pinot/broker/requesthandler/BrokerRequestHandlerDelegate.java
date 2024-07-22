@@ -71,6 +71,10 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
   public BrokerResponse handleRequest(JsonNode request, @Nullable SqlNodeAndOptions sqlNodeAndOptions,
       @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext, @Nullable HttpHeaders httpHeaders)
       throws Exception {
+    // Pinot installations may either use PinotClientRequest or this class in order to process a query that
+    // arrives via their custom container. The custom code may add its own overhead in either pre-processing
+    // or post-processing stages, and should be measured independently.
+    // In order to accommodate for both code paths, we set the request arrival time only if it is not already set.
     if (requestContext.getRequestArrivalTimeMillis() <= 0) {
       requestContext.setRequestArrivalTimeMillis(System.currentTimeMillis());
     }
