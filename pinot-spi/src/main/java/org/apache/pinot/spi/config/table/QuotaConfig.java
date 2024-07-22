@@ -36,7 +36,7 @@ public class QuotaConfig extends BaseJsonConfig {
   private static final double INVALID_MAX_QPS = -1.0;
 
 
-  @JsonPropertyDescription("Storage allocated for this table/database, e.g. \"10G\"")
+  @JsonPropertyDescription("Storage allocated for this table, e.g. \"10G\"")
   private final String _storage;
 
   private final String _maxQueriesPerSecond;
