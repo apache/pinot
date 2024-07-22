@@ -50,7 +50,7 @@ public class RealtimeLuceneIndexRefreshManager {
   private final int _maxParallelism;
   // delay between refresh iterations
   private int _delayMs;
-  // partitioned lists of SearcherManagerHolders, each is gets its own thread for refreshing. SearcherManagerHolders
+  // partitioned lists of SearcherManagerHolders, each gets its own thread for refreshing. SearcherManagerHolders
   // are added to the list with the smallest size to roughly balance the load across threads
   private final List<List<SearcherManagerHolder>> _partitionedListsOfSearchers;
   private static RealtimeLuceneIndexRefreshManager _singletonInstance;

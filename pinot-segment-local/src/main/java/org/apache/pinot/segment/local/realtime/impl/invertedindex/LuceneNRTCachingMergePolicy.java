@@ -33,6 +33,10 @@ import org.apache.lucene.store.NRTCachingDirectory;
  * LuceneNRTCachingMergePolicy is a best-effort policy to generate merges for segments that are fully in memory,
  * at the time of SegmentInfo selection. It does not consider segments that have been flushed to disk eligible
  * for merging.
+ * <p>
+ * Each refresh creates a small Lucene segment. Increasing the frequency of refreshes to reduce indexing lag results
+ * in a large number of small segments, and high disk IO ops for merging them. By using this best-effort merge policy
+ * the small ops can be avoided since the segments are in memory when merged.
  */
 public class LuceneNRTCachingMergePolicy extends TieredMergePolicy {
   private final NRTCachingDirectory _nrtCachingDirectory;
