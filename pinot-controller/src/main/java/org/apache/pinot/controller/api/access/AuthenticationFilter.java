@@ -103,7 +103,7 @@ public class AuthenticationFilter implements ContainerRequestFilter {
       tableName = DatabaseUtils.translateTableName(tableName, _httpHeaders);
     }
     AccessType accessType = extractAccessType(endpointMethod);
-    AccessControlUtils.validatePermission(tableName, accessType, _httpHeaders, endpointUrl, accessControl);
+    AccessControlUtils.validatePermission(tableName, accessType, _httpHeaders, endpointUrl, request, accessControl);
 
     FineGrainedAuthUtils.validateFineGrainedAuth(endpointMethod, uriInfo, _httpHeaders, accessControl);
   }

@@ -26,6 +26,7 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.glassfish.grizzly.http.server.Request;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,17 +51,18 @@ public final class AccessControlUtils {
    * @param accessControl AccessControl object which does the actual validation
    */
   public static void validatePermission(@Nullable String tableName, AccessType accessType,
-      @Nullable HttpHeaders httpHeaders, @Nullable String endpointUrl, AccessControl accessControl) {
+                                        @Nullable HttpHeaders httpHeaders, @Nullable String endpointUrl,
+                                        @Nullable Request request, AccessControl accessControl) {
     String userMessage = getUserMessage(tableName, accessType, endpointUrl);
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
 
     try {
       if (rawTableName == null) {
-        if (accessControl.hasAccess(accessType, httpHeaders, endpointUrl)) {
+        if (accessControl.hasAccess(accessType, httpHeaders, endpointUrl, request)) {
           return;
         }
       } else {
-        if (accessControl.hasAccess(rawTableName, accessType, httpHeaders, endpointUrl)) {
+        if (accessControl.hasAccess(rawTableName, accessType, httpHeaders, endpointUrl, request)) {
           return;
         }
       }
