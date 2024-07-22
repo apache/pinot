@@ -35,6 +35,8 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   @Deprecated
   private String _segmentPushType;
   private String _replication;
+  @Deprecated // Use _replication instead
+  private String _replicasPerPartition;
   @Deprecated // Schema name should be the same as raw table name
   private String _schemaName;
   private String _timeColumnName;
@@ -139,6 +141,27 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   }
 
   /**
+   * Try to Use {@link TableConfig#getReplication()}
+   * @deprecated Use _replication instead
+   *
+   * Will be deleted in future version of Pinot
+   */
+  @Deprecated
+  public String getReplicasPerPartition() {
+    return _replicasPerPartition;
+  }
+
+  /**
+   * Try to Use {@link SegmentsValidationAndRetentionConfig#setReplication(String)}
+   *
+   * Will be deleted in future version of Pinot
+   */
+  @Deprecated
+  public void setReplicasPerPartition(String replicasPerPartition) {
+    _replicasPerPartition = replicasPerPartition;
+  }
+
+  /**
    * @deprecated Schema name should be the same as raw table name
    */
   @Deprecated
@@ -174,6 +197,17 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   @JsonIgnore
   public int getReplicationNumber() {
     return Integer.parseInt(_replication);
+  }
+
+  /**
+   * Try to Use {@link TableConfig#getReplication()}
+   *
+   * Will be deleted in future version of Pinot
+   */
+  @Deprecated
+  @JsonIgnore
+  public int getReplicasPerPartitionNumber() {
+    return Integer.parseInt(_replicasPerPartition);
   }
 
   public String getPeerSegmentDownloadScheme() {
