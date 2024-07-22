@@ -434,7 +434,7 @@ public class TableConfig extends BaseJsonConfig {
   public int getReplication() {
     if (_tableType == TableType.REALTIME) {
       // Use replicasPerPartition for real-time table if exists
-      String replicasPerPartition = _validationConfig.getReplication();
+      String replicasPerPartition = _validationConfig.getReplicasPerPartition();
       if (replicasPerPartition != null) {
         return Integer.parseInt(replicasPerPartition);
       }
