@@ -95,7 +95,7 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
             _server =
                 ServerBuilder.forPort(_port).addService(this).maxInboundMessageSize(MAX_INBOUND_MESSAGE_SIZE).build();
           } catch (Exception e) {
-            throw new RuntimeException("Failed to start secure QueryServer", e);
+            throw new RuntimeException("Failed to start  QueryServer", e);
           }
         } else {
           _server = NettyServerBuilder.forPort(_port).addService(this).sslContext(buildSslContext(_tlsConfig))
