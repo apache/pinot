@@ -112,6 +112,11 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
   }
 
   @Override
+  public UpsertConfig.ConsistencyMode getUpsertConsistencyMode() {
+    return _consistencyMode;
+  }
+
+  @Override
   public boolean isEnablePreload() {
     return _enablePreload;
   }

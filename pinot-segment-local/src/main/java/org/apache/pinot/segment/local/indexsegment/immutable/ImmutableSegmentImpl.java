@@ -265,6 +265,9 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   public void destroy() {
     String segmentName = getSegmentName();
     LOGGER.info("Trying to destroy segment : {}", segmentName);
+    if (_partitionUpsertMetadataManager != null) {
+      _partitionUpsertMetadataManager.untrackSegmentForUpsertView(this);
+    }
     // StarTreeIndexContainer refers to other column index containers, so close it firstly.
     if (_starTreeIndexContainer != null) {
       try {
