@@ -21,15 +21,43 @@ package org.apache.pinot.spi.utils;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
-import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoField;
 
 
 public class TimestampUtils {
-  private static final DateTimeFormatter DATE_TIME_FORMATTER = new DateTimeFormatterBuilder()
-      .appendPattern("yyyy-MM-dd[ HH:mm[:ss]]")
+  private static final DateTimeFormatter UNIVERSAL_DATE_TIME_FORMATTER = new DateTimeFormatterBuilder()
+      // Date part
+      .appendPattern("yyyy-MM-dd")
+      // Optional time part starting with 'T'
+      .optionalStart()
+      .appendLiteral('T')
+      .appendPattern("HH:mm")
+      .optionalStart()
+      .appendLiteral(':')
+      .appendPattern("ss")
+      .optionalEnd()
+      .optionalStart()
+      .appendFraction(ChronoField.NANO_OF_SECOND, 1, 9, true)
+      .optionalEnd()
+      .optionalEnd()
+      // Optional space-separated time part
+      .optionalStart()
+      .appendLiteral(' ')
+      .appendPattern("HH:mm")
+      .optionalStart()
+      .appendLiteral(':')
+      .appendPattern("ss")
+      .optionalEnd()
+      .optionalStart()
+      .appendFraction(ChronoField.NANO_OF_SECOND, 1, 9, true)
+      .optionalEnd()
+      .optionalEnd()
+      // Time zone handling, allows parsing of 'Z', '+hh:mm', '-hh:mm'
+      .appendOptional(DateTimeFormatter.ofPattern("XXX"))
+      // Default values for missing time components
       .parseDefaulting(ChronoField.HOUR_OF_DAY, 0)
       .parseDefaulting(ChronoField.MINUTE_OF_HOUR, 0)
       .parseDefaulting(ChronoField.SECOND_OF_MINUTE, 0)
@@ -40,11 +68,12 @@ public class TimestampUtils {
 
   /**
    * Parses the given timestamp string into {@link Timestamp}.
-   * <p>Two formats of timestamp are supported:
+   * <p>Below formats of timestamp are supported:
    * <ul>
    *   <li>'yyyy-mm-dd hh:mm:ss[.fffffffff]'</li>
    *   <li>'yyyy-MM-dd[ HH:mm[:ss]]'</li>
    *   <li>Millis since epoch</li>
+   *   <li>ISO8601 format</li>
    * </ul>
    */
   public static Timestamp toTimestamp(String timestampString) {
@@ -55,24 +84,29 @@ public class TimestampUtils {
     }
     try {
       return new Timestamp(Long.parseLong(timestampString));
-    } catch (Exception e1) {
+    } catch (Exception e) {
+    }
+    try {
+      return Timestamp.from(ZonedDateTime.parse(timestampString, UNIVERSAL_DATE_TIME_FORMATTER).toInstant());
+    } catch (Exception e) {
       // Try the next format
     }
     try {
-      LocalDateTime dateTime = LocalDateTime.parse(timestampString, DATE_TIME_FORMATTER);
+      LocalDateTime dateTime = LocalDateTime.parse(timestampString, UNIVERSAL_DATE_TIME_FORMATTER);
       return Timestamp.valueOf(dateTime);
-    } catch (DateTimeParseException e) {
+    } catch (Exception e) {
       throw new IllegalArgumentException(String.format("Invalid timestamp: '%s'", timestampString));
     }
   }
 
   /**
    * Parses the given timestamp string into millis since epoch.
-   * <p>Two formats of timestamp are supported:
+   * <p>Below formats of timestamp are supported:
    * <ul>
    *   <li>'yyyy-mm-dd hh:mm:ss[.fffffffff]'</li>
    *   <li>'yyyy-MM-dd[ HH:mm[:ss]]'</li>
    *   <li>Millis since epoch</li>
+   *   <li>ISO8601 format</li>
    * </ul>
    */
   public static long toMillisSinceEpoch(String timestampString) {
@@ -83,13 +117,18 @@ public class TimestampUtils {
     }
     try {
       return Long.parseLong(timestampString);
-    } catch (Exception e1) {
+    } catch (Exception e) {
       // Try the next format
     }
     try {
-      LocalDateTime dateTime = LocalDateTime.parse(timestampString, DATE_TIME_FORMATTER);
+      return ZonedDateTime.parse(timestampString, UNIVERSAL_DATE_TIME_FORMATTER).toInstant().toEpochMilli();
+    } catch (Exception e) {
+      // Try the next format
+    }
+    try {
+      LocalDateTime dateTime = LocalDateTime.parse(timestampString, UNIVERSAL_DATE_TIME_FORMATTER);
       return dateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
-    } catch (DateTimeParseException e) {
+    } catch (Exception e) {
       throw new IllegalArgumentException(String.format("Invalid timestamp: '%s'", timestampString));
     }
   }
