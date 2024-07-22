@@ -262,7 +262,7 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
     createOrUpdateDatabaseRateLimiter(Collections.singletonList(databaseName));
   }
 
-  private void createOrUpdateDatabaseRateLimiter(List<String> databaseNames) {
+  public void createOrUpdateDatabaseRateLimiter(List<String> databaseNames) {
     ExternalView brokerResource = HelixHelper
         .getExternalViewForResource(_helixManager.getClusterManagmentTool(), _helixManager.getClusterName(),
             CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
@@ -462,6 +462,11 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
   }
 
   @VisibleForTesting
+  public int getDatabaseRateLimiterMapSize() {
+    return _databaseRateLimiterMap.size();
+  }
+
+  @VisibleForTesting
   public QueryQuotaEntity getRateLimiterForTable(String tableNameWithType) {
     return _rateLimiterMap.get(tableNameWithType);
   }
@@ -469,6 +474,16 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
   @VisibleForTesting
   public void cleanUpRateLimiterMap() {
     _rateLimiterMap.clear();
+  }
+
+  @VisibleForTesting
+  public void cleanUpDatabaseRateLimiterMap() {
+    _databaseRateLimiterMap.clear();
+  }
+
+  @VisibleForTesting
+  public void reloadPropertyStore() {
+    _propertyStore = _helixManager.getHelixPropertyStore();
   }
 
   /**
