@@ -1558,6 +1558,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
             .setIngestionAggregationConfigs(IngestionConfigUtils.getAggregationConfigs(tableConfig))
             .setNullHandlingEnabled(_nullHandlingEnabled)
             .setConsumerDir(consumerDir).setUpsertMode(tableConfig.getUpsertMode())
+            .setUpsertConsistencyMode(tableConfig.getUpsertConsistencyMode())
             .setPartitionUpsertMetadataManager(partitionUpsertMetadataManager)
             .setPartitionDedupMetadataManager(partitionDedupMetadataManager)
             .setUpsertComparisonColumns(tableConfig.getUpsertComparisonColumns())

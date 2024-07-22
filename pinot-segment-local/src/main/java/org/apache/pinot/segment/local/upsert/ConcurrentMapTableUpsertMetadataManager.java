@@ -20,8 +20,10 @@ package org.apache.pinot.segment.local.upsert;
 
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
@@ -58,6 +60,26 @@ public class ConcurrentMapTableUpsertMetadataManager extends BaseTableUpsertMeta
         (partitionID, upsertMetadataManager) -> partitionToPrimaryKeyCount.put(partitionID,
             upsertMetadataManager.getNumPrimaryKeys()));
     return partitionToPrimaryKeyCount;
+  }
+
+  @Override
+  public void lockTrackedSegmentsForContexts() {
+    _partitionMetadataManagerMap.forEach(
+        (partitionID, upsertMetadataManager) -> upsertMetadataManager.lockTrackedSegmentsForContexts());
+  }
+
+  @Override
+  public void unlockTrackedSegmentsForContexts() {
+    _partitionMetadataManagerMap.forEach(
+        (partitionID, upsertMetadataManager) -> upsertMetadataManager.unlockTrackedSegmentsForContexts());
+  }
+
+  @Override
+  public Set<String> getOptionalSegments() {
+    Set<String> optionalSegments = new HashSet<>();
+    _partitionMetadataManagerMap.forEach(
+        (partitionID, upsertMetadataManager) -> optionalSegments.addAll(upsertMetadataManager.getOptionalSegments()));
+    return optionalSegments;
   }
 
   @Override

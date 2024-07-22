@@ -60,6 +60,7 @@ public class RealtimeSegmentConfig {
   private final boolean _aggregateMetrics;
   private final boolean _nullHandlingEnabled;
   private final UpsertConfig.Mode _upsertMode;
+  private final UpsertConfig.ConsistencyMode _upsertConsistencyMode;
   private final List<String> _upsertComparisonColumns;
   private final String _upsertDeleteRecordColumn;
   private final String _upsertOutOfOrderRecordColumn;
@@ -73,12 +74,12 @@ public class RealtimeSegmentConfig {
   // TODO: Clean up this constructor. Most of these things can be extracted from tableConfig.
   private RealtimeSegmentConfig(String tableNameWithType, String segmentName, String streamName, Schema schema,
       String timeColumnName, int capacity, int avgNumMultiValues, Map<String, FieldIndexConfigs> indexConfigByCol,
-      SegmentZKMetadata segmentZKMetadata, boolean offHeap,
-      PinotDataBufferMemoryManager memoryManager, RealtimeSegmentStatsHistory statsHistory, String partitionColumn,
-      PartitionFunction partitionFunction, int partitionId, boolean aggregateMetrics, boolean nullHandlingEnabled,
-      String consumerDir, UpsertConfig.Mode upsertMode, List<String> upsertComparisonColumns,
-      String upsertDeleteRecordColumn, String upsertOutOfOrderRecordColumn, boolean upsertDropOutOfOrderRecord,
-      PartitionUpsertMetadataManager partitionUpsertMetadataManager,
+      SegmentZKMetadata segmentZKMetadata, boolean offHeap, PinotDataBufferMemoryManager memoryManager,
+      RealtimeSegmentStatsHistory statsHistory, String partitionColumn, PartitionFunction partitionFunction,
+      int partitionId, boolean aggregateMetrics, boolean nullHandlingEnabled, String consumerDir,
+      UpsertConfig.Mode upsertMode, UpsertConfig.ConsistencyMode upsertConsistencyMode,
+      List<String> upsertComparisonColumns, String upsertDeleteRecordColumn, String upsertOutOfOrderRecordColumn,
+      boolean upsertDropOutOfOrderRecord, PartitionUpsertMetadataManager partitionUpsertMetadataManager,
       PartitionDedupMetadataManager partitionDedupMetadataManager, List<FieldConfig> fieldConfigList,
       List<AggregationConfig> ingestionAggregationConfigs) {
     _tableNameWithType = tableNameWithType;
@@ -100,6 +101,7 @@ public class RealtimeSegmentConfig {
     _nullHandlingEnabled = nullHandlingEnabled;
     _consumerDir = consumerDir;
     _upsertMode = upsertMode != null ? upsertMode : UpsertConfig.Mode.NONE;
+    _upsertConsistencyMode = upsertConsistencyMode != null ? upsertConsistencyMode : UpsertConfig.ConsistencyMode.NONE;
     _upsertComparisonColumns = upsertComparisonColumns;
     _upsertDeleteRecordColumn = upsertDeleteRecordColumn;
     _upsertOutOfOrderRecordColumn = upsertOutOfOrderRecordColumn;
@@ -186,6 +188,10 @@ public class RealtimeSegmentConfig {
     return _upsertMode;
   }
 
+  public UpsertConfig.ConsistencyMode getUpsertConsistencyMode() {
+    return _upsertConsistencyMode;
+  }
+
   public boolean isDedupEnabled() {
     return _partitionDedupMetadataManager != null;
   }
@@ -242,6 +248,7 @@ public class RealtimeSegmentConfig {
     private boolean _nullHandlingEnabled = false;
     private String _consumerDir;
     private UpsertConfig.Mode _upsertMode;
+    private UpsertConfig.ConsistencyMode _upsertConsistencyMode;
     private List<String> _upsertComparisonColumns;
     private String _upsertDeleteRecordColumn;
     private String _upsertOutOfOrderRecordColumn;
@@ -376,6 +383,11 @@ public class RealtimeSegmentConfig {
       return this;
     }
 
+    public Builder setUpsertConsistencyMode(UpsertConfig.ConsistencyMode upsertConsistencyMode) {
+      _upsertConsistencyMode = upsertConsistencyMode;
+      return this;
+    }
+
     public Builder setUpsertComparisonColumns(List<String> upsertComparisonColumns) {
       _upsertComparisonColumns = upsertComparisonColumns;
       return this;
@@ -425,8 +437,8 @@ public class RealtimeSegmentConfig {
       return new RealtimeSegmentConfig(_tableNameWithType, _segmentName, _streamName, _schema, _timeColumnName,
           _capacity, _avgNumMultiValues, Collections.unmodifiableMap(indexConfigByCol), _segmentZKMetadata, _offHeap,
           _memoryManager, _statsHistory, _partitionColumn, _partitionFunction, _partitionId, _aggregateMetrics,
-          _nullHandlingEnabled, _consumerDir, _upsertMode, _upsertComparisonColumns, _upsertDeleteRecordColumn,
-          _upsertOutOfOrderRecordColumn, _upsertDropOutOfOrderRecord,
+          _nullHandlingEnabled, _consumerDir, _upsertMode, _upsertConsistencyMode, _upsertComparisonColumns,
+          _upsertDeleteRecordColumn, _upsertOutOfOrderRecordColumn, _upsertDropOutOfOrderRecord,
           _partitionUpsertMetadataManager, _partitionDedupMetadataManager, _fieldConfigList,
           _ingestionAggregationConfigs);
     }
