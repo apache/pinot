@@ -18,6 +18,10 @@
  */
 package org.apache.pinot.common.metrics;
 
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.IntStream;
 import org.apache.pinot.plugin.metrics.yammer.YammerMetricsRegistry;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
@@ -45,6 +49,35 @@ public class AbstractMetricsTest {
     Assert.assertEquals(MetricValueUtils.getGaugeValue(controllerMetrics, metricName), 2);
 
     // remove gauge
+    controllerMetrics.removeGauge(metricName);
+    Assert.assertTrue(controllerMetrics.getMetricsRegistry().allMetrics().isEmpty());
+  }
+
+  @Test
+  public void testUpdateAndRemoveGauge()
+      throws InterruptedException {
+    PinotConfiguration pinotConfiguration = new PinotConfiguration();
+    pinotConfiguration.setProperty(CONFIG_OF_METRICS_FACTORY_CLASS_NAME,
+        "org.apache.pinot.plugin.metrics.yammer.YammerMetricsFactory");
+    PinotMetricUtils.init(pinotConfiguration);
+    ControllerMetrics controllerMetrics = new ControllerMetrics(new YammerMetricsRegistry());
+    String metricName = "test";
+
+    // update and remove gauge simultaneously
+    ExecutorService service = Executors.newFixedThreadPool(3);
+    IntStream.range(0, 100).forEach(i -> {
+      if (i % 5 == 0) {
+        service.submit(() -> controllerMetrics.removeGauge(metricName));
+      }
+      service.submit(() -> controllerMetrics.setValueOfGauge(i, metricName));
+    });
+    service.shutdown();
+    service.awaitTermination(1, TimeUnit.MINUTES);
+
+    // The gauge should be present in both map and metrics-registry
+    Assert.assertNotNull(controllerMetrics.getGaugeValue(metricName));
+    Assert.assertFalse(controllerMetrics.getMetricsRegistry().allMetrics().isEmpty());
+
     controllerMetrics.removeGauge(metricName);
     Assert.assertTrue(controllerMetrics.getMetricsRegistry().allMetrics().isEmpty());
   }
