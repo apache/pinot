@@ -1359,6 +1359,16 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       if (!forceRefresh && skipUpsertViewRefresh(upsertViewFreshnessMs) && current != null) {
         return;
       }
+      if (_logger.isDebugEnabled()) {
+        if (current == null) {
+          _logger.debug("Current upsert view is still null");
+        } else {
+          current.forEach((segment, bitmap) -> _logger.debug(
+              "Current upsert view of segment: {}, type: {}, ref: {}, total: {}, valid: {}", segment.getSegmentName(),
+              (segment instanceof ImmutableSegment ? "imm" : "mut"), segment.hashCode(),
+              segment.getSegmentMetadata().getTotalDocs(), bitmap.getCardinality()));
+        }
+      }
       Map<IndexSegment, MutableRoaringBitmap> updated = new HashMap<>();
       for (IndexSegment segment : _upsertViewTrackedSegments) {
         // Update bitmap for segment updated since last refresh or not in the view yet. This also handles segments
@@ -1366,11 +1376,28 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         // any bitmaps as their docs simply lost all the upsert comparisons with the existing docs.
         if (current == null || current.get(segment) == null || _updatedSegmentsSinceLastRefresh.contains(segment)) {
           updated.put(segment, UpsertUtils.getQueryableDocIdsSnapshotFromSegment(segment, true));
+          if (_logger.isDebugEnabled()) {
+            _logger.debug("Update upsert view of segment: {}, type: {}, ref: {}, total: {}, valid: {}, reason: {}",
+                segment.getSegmentName(), (segment instanceof ImmutableSegment ? "imm" : "mut"), segment.hashCode(),
+                segment.getSegmentMetadata().getTotalDocs(), updated.get(segment).getCardinality(),
+                current == null || current.get(segment) == null ? "no view yet" : "bitmap updated");
+          }
         } else {
           updated.put(segment, current.get(segment));
+          if (_logger.isDebugEnabled()) {
+            _logger.debug("Reuse upsert view of segment: {}, type: {}, ref: {}, total: {}, valid: {}",
+                segment.getSegmentName(), (segment instanceof ImmutableSegment ? "imm" : "mut"), segment.hashCode(),
+                segment.getSegmentMetadata().getTotalDocs(), updated.get(segment).getCardinality());
+          }
         }
       }
       // Swap in the new consistent set of bitmaps.
+      if (_logger.isDebugEnabled()) {
+        updated.forEach((segment, bitmap) -> _logger.debug(
+            "Updated upsert view of segment: {}, type: {}, ref: {}, total: {}, valid: {}", segment.getSegmentName(),
+            (segment instanceof ImmutableSegment ? "imm" : "mut"), segment.hashCode(),
+            segment.getSegmentMetadata().getTotalDocs(), bitmap.getCardinality()));
+      }
       _segmentQueryableDocIdsMap = updated;
       _updatedSegmentsSinceLastRefresh.clear();
       _lastUpsertViewRefreshTimeMs = System.currentTimeMillis();
