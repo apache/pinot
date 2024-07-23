@@ -32,8 +32,9 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
+import org.apache.commons.lang3.JavaVersion;
+import org.apache.commons.lang3.SystemUtils;
 import org.apache.pinot.segment.spi.memory.unsafe.UnsafePinotBufferFactory;
-import org.apache.pinot.segment.spi.utils.JavaVersion;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
@@ -167,11 +168,11 @@ public abstract class PinotDataBuffer implements DataBuffer {
     String factoryClassName;
     factoryClassName = System.getenv("PINOT_BUFFER_LIBRARY");
     if (factoryClassName == null) {
-      if (JavaVersion.VERSION < 16) {
-        LOGGER.info("Using LArray as buffer on JVM version {}", JavaVersion.VERSION);
+      if (SystemUtils.isJavaVersionAtMost(JavaVersion.JAVA_15)) {
+        LOGGER.info("Using LArray as buffer on JVM version {}", SystemUtils.JAVA_SPECIFICATION_VERSION);
         factoryClassName = LArrayPinotBufferFactory.class.getCanonicalName();
       } else {
-        LOGGER.info("Using Unsafe as buffer on JVM version {}", JavaVersion.VERSION);
+        LOGGER.info("Using Unsafe as buffer on JVM version {}", SystemUtils.JAVA_SPECIFICATION_VERSION);
         factoryClassName = UnsafePinotBufferFactory.class.getCanonicalName();
       }
     }

@@ -16,29 +16,26 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.spi.memory;
+package org.apache.pinot.common.utils;
 
-import org.apache.commons.lang3.JavaVersion;
-import org.apache.commons.lang3.SystemUtils;
-import org.testng.SkipException;
-import org.testng.annotations.BeforeClass;
+import com.google.auto.service.AutoService;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
+import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.executor.ExecutorServiceProvider;
 
-
-public class PinotLArrayByteBufferTest extends PinotDataBufferTest {
-  public PinotLArrayByteBufferTest() {
-    super(new LArrayPinotBufferFactory());
+@AutoService(ExecutorServiceProvider.class)
+public class VirtualExecutorServiceProvider implements ExecutorServiceProvider {
+  @Override
+  public String id() {
+    return "virtual";
   }
 
   @Override
-  protected boolean prioritizeByteBuffer() {
-    return false;
-  }
+  public ExecutorService create(PinotConfiguration conf, String confPrefix, String baseName) {
+    ThreadFactory threadFactory =  Thread.ofVirtual().name(baseName).factory();
 
-  @BeforeClass
-  public void abortOnModernJava() {
-    if (SystemUtils.isJavaVersionAtLeast(JavaVersion.JAVA_16)) {
-      throw new SkipException("Skipping LArray tests because they cannot run in Java "
-          + SystemUtils.JAVA_SPECIFICATION_VERSION);
-    }
+    return Executors.newThreadPerTaskExecutor(threadFactory);
   }
 }
