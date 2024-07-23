@@ -66,8 +66,10 @@ public abstract class MultiStageOperator
 
   public abstract void registerExecution(long time, int numRows);
 
-  protected void sampleResourceUsage(long totalProcessedRows) {
-    Tracing.ThreadAccountantOps.samplePeriodically(totalProcessedRows);
+  // Samples resource usage of the operator. The operator should call this function for every block of data or
+  // assuming the block holds 10000 rows or more.
+  protected void sampleResourceUsage() {
+    Tracing.ThreadAccountantOps.sample();
   }
 
   /**

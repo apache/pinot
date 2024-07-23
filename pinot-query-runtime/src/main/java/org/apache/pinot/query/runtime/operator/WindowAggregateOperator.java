@@ -243,7 +243,6 @@ public class WindowAggregateOperator extends MultiStageOperator {
   private TransferableBlock computeBlocks()
       throws ProcessingException {
     TransferableBlock block = _input.nextBlock();
-    long totalProcessedRows = 0;
     while (block.isDataBlock()) {
       List<Object[]> container = block.getContainer();
       int containerSize = container.size();
@@ -270,8 +269,7 @@ public class WindowAggregateOperator extends MultiStageOperator {
         _partitionRows.computeIfAbsent(key, k -> new ArrayList<>()).add(row);
       }
       _numRows += containerSize;
-      totalProcessedRows += block.getNumRows();
-      sampleResourceUsage(totalProcessedRows);
+      sampleResourceUsage();
       block = _input.nextBlock();
     }
     // Early termination if the block is an error block
