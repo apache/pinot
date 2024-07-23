@@ -54,6 +54,8 @@ import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.ingestion.DecodeTransformIndexModeConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
@@ -181,7 +183,7 @@ public class RealtimeSegmentDataManagerTest {
     segmentDataManager._consumeOffsets.add(endOffset);
     final SegmentCompletionProtocol.Response response = new SegmentCompletionProtocol.Response(
         new SegmentCompletionProtocol.Response.Params().withStatus(
-                SegmentCompletionProtocol.ControllerResponseStatus.HOLD)
+            SegmentCompletionProtocol.ControllerResponseStatus.HOLD)
             .withStreamPartitionMsgOffset(endOffset.toString()));
     // And then never consume as long as we get a hold response, 100 times.
     for (int i = 0; i < 100; i++) {
@@ -298,9 +300,8 @@ public class RealtimeSegmentDataManagerTest {
   public void testCommitAfterCatchupWithPeriodOffset()
       throws Exception {
     TableConfig tableConfig = createTableConfig();
-    tableConfig.getIndexingConfig().getStreamConfigs().put(
-        StreamConfigProperties.constructStreamProperty(StreamConfigProperties.STREAM_CONSUMER_OFFSET_CRITERIA,
-            "fakeStream"), "2d");
+    tableConfig.getIndexingConfig().getStreamConfigs().put(StreamConfigProperties
+        .constructStreamProperty(StreamConfigProperties.STREAM_CONSUMER_OFFSET_CRITERIA, "fakeStream"), "2d");
     FakeRealtimeSegmentDataManager segmentDataManager =
         createFakeSegmentManager(false, new TimeSupplier(), null, null, tableConfig);
     RealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
@@ -788,8 +789,18 @@ public class RealtimeSegmentDataManagerTest {
   }
 
   @Test
-  public void testShouldNotSkipUnfilteredMessagesIfNotIndexedAndTimeThresholdIsReached()
-      throws Exception {
+  public void testConsumeLoop() throws Exception {
+    TableConfig tableConfig = createTableConfig();
+    tableConfig.setIngestionConfig(new IngestionConfig());
+    for (DecodeTransformIndexModeConfig mode : DecodeTransformIndexModeConfig.values()) {
+      tableConfig.getIngestionConfig().setDecodeTransformIndexModeConfig(mode);
+      testShouldNotSkipUnfilteredMessagesIfNotIndexedAndRowCountThresholdIsReachedWithConfig(tableConfig);
+      testShouldNotSkipUnfilteredMessagesIfNotIndexedAndTimeThresholdIsReachedWithConfig(tableConfig);
+    }
+  }
+
+  public void testShouldNotSkipUnfilteredMessagesIfNotIndexedAndTimeThresholdIsReachedWithConfig(
+      TableConfig tableConfig) throws Exception {
     final int segmentTimeThresholdMins = 10;
     TimeSupplier timeSupplier = new TimeSupplier() {
       @Override
@@ -804,7 +815,8 @@ public class RealtimeSegmentDataManagerTest {
       }
     };
     try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager(true, timeSupplier,
-        String.valueOf(FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS * 2), segmentTimeThresholdMins + "m", null)) {
+        String.valueOf(FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS * 2),
+        segmentTimeThresholdMins + "m", tableConfig)) {
       segmentDataManager._stubConsumeLoop = false;
       segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.INITIAL_CONSUMING);
 
@@ -833,13 +845,13 @@ public class RealtimeSegmentDataManagerTest {
     }
   }
 
-  @Test
-  public void testShouldNotSkipUnfilteredMessagesIfNotIndexedAndRowCountThresholdIsReached()
-      throws Exception {
+  public void testShouldNotSkipUnfilteredMessagesIfNotIndexedAndRowCountThresholdIsReachedWithConfig(
+      TableConfig tableConfig) throws Exception {
     final int segmentTimeThresholdMins = 10;
     TimeSupplier timeSupplier = new TimeSupplier();
     try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager(true, timeSupplier,
-        String.valueOf(FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS), segmentTimeThresholdMins + "m", null)) {
+        String.valueOf(FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS),
+        segmentTimeThresholdMins + "m", tableConfig)) {
       segmentDataManager._stubConsumeLoop = false;
       segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.INITIAL_CONSUMING);
 
@@ -1140,10 +1152,20 @@ public class RealtimeSegmentDataManagerTest {
       try {
         Field field = RealtimeSegmentDataManager.class.getDeclaredField(fieldName);
         field.setAccessible(true);
-        field.setInt(this, value);
+        if (field.getType().equals(int.class)) {
+          field.setInt(this, value);
+        } else if (field.getType().equals(AtomicInteger.class)) {
+          AtomicInteger atomicIntInstance = (AtomicInteger) field.get(this);
+          Method setMethod = AtomicInteger.class.getMethod("set", int.class);
+          setMethod.invoke(atomicIntInstance, value);
+        }
       } catch (NoSuchFieldException e) {
         Assert.fail();
       } catch (IllegalAccessException e) {
+        Assert.fail();
+      } catch (NoSuchMethodException e) {
+        Assert.fail();
+      } catch (InvocationTargetException e) {
         Assert.fail();
       }
     }
