@@ -34,7 +34,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import javax.net.ssl.SSLException;
 import nl.altindag.ssl.SSLFactory;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.exception.QueryException;
