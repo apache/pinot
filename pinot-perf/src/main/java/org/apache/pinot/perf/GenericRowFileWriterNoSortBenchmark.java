@@ -55,6 +55,7 @@ import org.openjdk.jmh.runner.RunnerException;
 import org.openjdk.jmh.runner.options.Options;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 
+
 @State(Scope.Thread)
 @BenchmarkMode(Mode.Throughput)
 @OutputTimeUnit(TimeUnit.SECONDS)
@@ -62,7 +63,7 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
     + ".enable_unsafe_memory_access=true"})
 @Warmup(iterations = 0, time = 5)
 @Measurement(iterations = 1, time = 5)
-public class GenericRowFileWriterBenchmark {
+public class GenericRowFileWriterNoSortBenchmark {
 
   private GenericRowArrowFileWriter _arrowWriter;
   private GenericRowFileWriter _standardWriter;
@@ -75,7 +76,7 @@ public class GenericRowFileWriterBenchmark {
     _tempDirArrow = Files.createTempDirectory("arrow-benchmark").toFile();
     _tempDirStandard = Files.createTempDirectory("standard-benchmark").toFile();
     Schema pinotSchema = createSampleSchema();
-    Set<String> sortColumns = new HashSet<>(Arrays.asList("id", "timestamp"));
+    Set<String> sortColumns = null;
 
     _arrowWriter = new GenericRowArrowFileWriter(_tempDirArrow.getAbsolutePath(), pinotSchema, 100000, 2 * 1024 * 1024 * 1024L,
         sortColumns, GenericRowArrowFileWriter.ArrowCompressionType.NONE, null, false);
@@ -118,7 +119,7 @@ public class GenericRowFileWriterBenchmark {
 
   public static void main(String[] args) throws RunnerException {
     Options opt = new OptionsBuilder()
-        .include(GenericRowFileWriterBenchmark.class.getSimpleName())
+        .include(GenericRowFileWriterNoSortBenchmark.class.getSimpleName())
         .addProfiler(AsyncProfiler.class, "event=wall;output=flamegraph")
         .build();
 

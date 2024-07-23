@@ -224,8 +224,6 @@ public class GenericRowArrowFileWriter implements Closeable, FileWriter<GenericR
 
     writer.start();
 
-    _fileMetadata.put(fileName, new FileMetadata());
-
     return writer;
   }
 
