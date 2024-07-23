@@ -171,11 +171,9 @@ public class AggregateOperator extends MultiStageOperator {
    */
   private TransferableBlock consumeGroupBy() {
     TransferableBlock block = _input.nextBlock();
-    long totalProcessedRows = 0;
     while (block.isDataBlock()) {
       _groupByExecutor.processBlock(block);
-      totalProcessedRows += block.getNumRows();
-      sampleResourceUsage(totalProcessedRows);
+      sampleResourceUsage();
       block = _input.nextBlock();
     }
     return block;
@@ -188,11 +186,9 @@ public class AggregateOperator extends MultiStageOperator {
    */
   private TransferableBlock consumeAggregation() {
     TransferableBlock block = _input.nextBlock();
-    int totalProcessedRows = 0;
     while (block.isDataBlock()) {
       _aggregationExecutor.processBlock(block);
-      totalProcessedRows += block.getNumRows();
-      sampleResourceUsage(totalProcessedRows);
+      sampleResourceUsage();
       block = _input.nextBlock();
     }
     return block;

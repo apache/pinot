@@ -27,6 +27,7 @@ import org.apache.pinot.core.util.trace.TraceRunnable;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.operator.OpChainId;
+import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.trace.Tracing;
 import org.slf4j.Logger;
@@ -53,7 +54,8 @@ public class OpChainSchedulerService {
         Throwable thrown = null;
         try {
           ThreadResourceUsageProvider threadResourceUsageProvider = new ThreadResourceUsageProvider();
-          Tracing.ThreadAccountantOps.setupWorker(operatorChain.getId().getStageId(), threadResourceUsageProvider,
+          Tracing.ThreadAccountantOps.setupWorker(operatorChain.getId().getStageId(),
+              ThreadExecutionContext.TaskType.MSE, threadResourceUsageProvider,
               operatorChain.getParentContext());
           LOGGER.trace("({}): Executing", operatorChain);
           TransferableBlock result = operatorChain.getRoot().nextBlock();
