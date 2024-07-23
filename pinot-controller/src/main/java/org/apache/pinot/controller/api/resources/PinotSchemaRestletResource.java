@@ -240,7 +240,7 @@ public class PinotSchemaRestletResource {
     validateSchemaName(schema);
     String schemaName = DatabaseUtils.translateTableName(schema.getSchemaName(), httpHeaders);
     schema.setSchemaName(schemaName);
-    checkPermissionAndAccess(schemaName, request, httpHeaders);
+    checkPermissionAndAccess(schemaName, request, httpHeaders, AccessType.CREATE, Actions.Table.CREATE_SCHEMA);
     SuccessResponse successResponse = addSchema(schema, override, force);
     return new ConfigSuccessResponse(successResponse.getStatus(), schemaAndUnrecognizedProps.getRight());
   }
@@ -271,7 +271,7 @@ public class PinotSchemaRestletResource {
     validateSchemaName(schema);
     String schemaName = DatabaseUtils.translateTableName(schema.getSchemaName(), httpHeaders);
     schema.setSchemaName(schemaName);
-    checkPermissionAndAccess(schemaName, request, httpHeaders);
+    checkPermissionAndAccess(schemaName, request, httpHeaders, AccessType.CREATE, Actions.Table.CREATE_SCHEMA);
     SuccessResponse successResponse = addSchema(schema, override, force);
     return new ConfigSuccessResponse(successResponse.getStatus(), schemaAndUnrecognizedProperties.getRight());
   }
@@ -296,7 +296,7 @@ public class PinotSchemaRestletResource {
     String schemaName = DatabaseUtils.translateTableName(schema.getSchemaName(), httpHeaders);
     schema.setSchemaName(schemaName);
     validateSchemaInternal(schema);
-    checkPermissionAndAccess(schemaName, request, httpHeaders);
+    checkPermissionAndAccess(schemaName, request, httpHeaders, AccessType.READ, Actions.Table.VALIDATE_SCHEMA);
     ObjectNode response = schema.toJsonObject();
     response.set("unrecognizedProperties", JsonUtils.objectToJsonNode(schemaAndUnrecognizedProps.getRight()));
     try {
@@ -326,7 +326,7 @@ public class PinotSchemaRestletResource {
     String schemaName = DatabaseUtils.translateTableName(schema.getSchemaName(), httpHeaders);
     schema.setSchemaName(schemaName);
     validateSchemaInternal(schema);
-    checkPermissionAndAccess(schemaName, request, httpHeaders);
+    checkPermissionAndAccess(schemaName, request, httpHeaders, AccessType.READ, Actions.Table.VALIDATE_SCHEMA);
     ObjectNode response = schema.toJsonObject();
     response.set("unrecognizedProperties", JsonUtils.objectToJsonNode(schemaAndUnrecognizedProps.getRight()));
     try {
@@ -541,13 +541,16 @@ public class PinotSchemaRestletResource {
    *                used to extract the endpoint URL.
    * @param httpHeaders The {@link HttpHeaders} associated with the request,
    *                    used for authorization and other header-based access control checks.
+   * @param accessType The type of access being requested (e.g., CREATE, READ, UPDATE, DELETE).
+   * @param action The specific action being checked against the access control policies.
    * @throws ControllerApplicationException if the user does not have the required permissions or access.
    */
-  private void checkPermissionAndAccess(String schemaName, Request request, HttpHeaders httpHeaders) {
+  private void checkPermissionAndAccess(String schemaName, Request request, HttpHeaders httpHeaders,
+      AccessType accessType, String action) {
     String endpointUrl = request.getRequestURL().toString();
     AccessControl accessControl = _accessControlFactory.create();
-    AccessControlUtils.validatePermission(schemaName, AccessType.CREATE, httpHeaders, endpointUrl, accessControl);
-    if (!accessControl.hasAccess(httpHeaders, TargetType.TABLE, schemaName, Actions.Table.CREATE_SCHEMA)) {
+    AccessControlUtils.validatePermission(schemaName, accessType, httpHeaders, endpointUrl, accessControl);
+    if (!accessControl.hasAccess(httpHeaders, TargetType.TABLE, schemaName, action)) {
       throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
     }
   }
