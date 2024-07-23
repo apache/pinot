@@ -39,6 +39,7 @@ import org.apache.arrow.vector.VectorSchemaRoot;
 import org.apache.arrow.vector.complex.ListVector;
 import org.apache.arrow.vector.ipc.ArrowFileReader;
 import org.apache.arrow.vector.ipc.SeekableReadChannel;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -62,13 +63,15 @@ public class GenericRowArrowFileWriterTest {
 
     // Set up the writer
     String outputDir = "arrow_dir";
+    // clear output directory
+    FileUtils.deleteDirectory(new File(outputDir));
 
     int maxBatchRows = 5;
     long maxBatchBytes = 1024 * 1024; // 1MB
     Set<String> sortColumns = new HashSet<>(Arrays.asList("id", "score"));
     GenericRowArrowFileWriter writer =
         new GenericRowArrowFileWriter(outputDir, pinotSchema, maxBatchRows, maxBatchBytes, sortColumns,
-            GenericRowArrowFileWriter.ArrowCompressionType.NONE, null);
+            GenericRowArrowFileWriter.ArrowCompressionType.NONE, null, false);
 
     // Create and write sample data
     List<GenericRow> testData = createTestData();
@@ -83,8 +86,49 @@ public class GenericRowArrowFileWriterTest {
     String nonSortColFileName =
         StringUtils.join(new String[]{outputDir, NON_SORT_COLUMNS_DATA_DIR, "0.arrow"}, File.separator);
 
-    verifyArrowFile(sortColFileName, pinotSchema, sortColumns, testData);
-    verifyArrowFile(nonSortColFileName, pinotSchema, new HashSet<>(Arrays.asList("name", "tags")), testData);
+    verifyArrowFile(sortColFileName, pinotSchema, sortColumns, testData, true);
+    verifyArrowFile(nonSortColFileName, pinotSchema, new HashSet<>(Arrays.asList("name", "tags")), testData, true);
+
+    // Clean up
+    new File(outputDir).delete();
+  }
+
+  @Test
+  public void testGenericRowArrowFileWriterNoSort()
+      throws IOException {
+    // Create a sample Pinot schema
+    Schema pinotSchema = new Schema.SchemaBuilder().addSingleValueDimension("id", FieldSpec.DataType.INT)
+        .addSingleValueDimension("name", FieldSpec.DataType.STRING).addMetric("score", FieldSpec.DataType.FLOAT)
+        .addMultiValueDimension("tags", FieldSpec.DataType.STRING).build();
+
+    // Set up the writer
+    String outputDir = "arrow_dir";
+    // clear output directory
+    FileUtils.deleteDirectory(new File(outputDir));
+
+    int maxBatchRows = 5;
+    long maxBatchBytes = 1024 * 1024; // 1MB
+    Set<String> sortColumns = new HashSet<>();
+    GenericRowArrowFileWriter writer =
+        new GenericRowArrowFileWriter(outputDir, pinotSchema, maxBatchRows, maxBatchBytes, sortColumns,
+            GenericRowArrowFileWriter.ArrowCompressionType.NONE, null, false);
+
+    // Create and write sample data
+    List<GenericRow> testData = createTestData();
+    for (GenericRow row : testData) {
+      writer.writeData(row);
+    }
+    writer.close();
+
+    // Verify the output
+    String sortColFileName =
+        StringUtils.join(new String[]{outputDir, SORT_COLUMNS_DATA_DIR, "0.arrow"}, File.separator);
+    String nonSortColFileName =
+        StringUtils.join(new String[]{outputDir, NON_SORT_COLUMNS_DATA_DIR, "0.arrow"}, File.separator);
+
+    Assert.assertFalse(new File(sortColFileName).exists(), "Arrow file does not exist: " + sortColFileName);
+
+    verifyArrowFile(nonSortColFileName, pinotSchema, pinotSchema.getColumnNames(), testData, false);
 
     // Clean up
     new File(outputDir).delete();
@@ -110,8 +154,11 @@ public class GenericRowArrowFileWriterTest {
   }
 
   private void verifyArrowFile(String fileName, Schema pinotSchema, Set<String> columnsToVerify,
-      List<GenericRow> expectedData)
+      List<GenericRow> expectedData, boolean verifySorting)
       throws IOException {
+    //verify if file exists
+    Assert.assertTrue(new File(fileName).exists(), "Arrow file does not exist: " + fileName);
+
     try (FileInputStream fileInputStream = new FileInputStream(fileName);
         FileChannel fileChannel = fileInputStream.getChannel();
         ArrowFileReader reader = new ArrowFileReader(new SeekableReadChannel(fileChannel),
@@ -129,7 +176,10 @@ public class GenericRowArrowFileWriterTest {
 
       // Verify data
       List<GenericRow> sortedExpectedData = new ArrayList<>(expectedData);
-      sortedExpectedData.sort(Comparator.comparingInt(row -> (Integer) row.getValue("id")));
+
+      if (verifySorting) {
+        sortedExpectedData.sort(Comparator.comparingInt(row -> (Integer) row.getValue("id")));
+      }
 
       for (int i = 0; i < root.getRowCount(); i++) {
         for (String columnName : columnsToVerify) {
