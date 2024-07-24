@@ -104,7 +104,7 @@ public class ResourceManagerAccountingTest {
       int finalK = k;
       rm.getQueryRunners().submit(() -> {
         String queryId = "q" + finalK;
-        Tracing.ThreadAccountantOps.setupRunner(queryId, ThreadExecutionContext.TaskType.SSE);
+        Tracing.ThreadAccountantOps.setupRunner(queryId);
         Thread thread = Thread.currentThread();
         CountDownLatch countDownLatch = new CountDownLatch(10);
         ThreadExecutionContext threadExecutionContext = Tracing.getThreadAccountant().getThreadExecutionContext();
@@ -112,8 +112,7 @@ public class ResourceManagerAccountingTest {
           int finalJ = j;
           rm.getQueryWorkers().submit(() -> {
             ThreadResourceUsageProvider threadResourceUsageProvider = new ThreadResourceUsageProvider();
-            Tracing.ThreadAccountantOps.setupWorker(finalJ, ThreadExecutionContext.TaskType.SSE,
-                threadResourceUsageProvider,
+            Tracing.ThreadAccountantOps.setupWorker(finalJ, threadResourceUsageProvider,
                 threadExecutionContext);
             for (int i = 0; i < (finalJ + 1) * 10; i++) {
               Tracing.ThreadAccountantOps.sample();
@@ -166,7 +165,7 @@ public class ResourceManagerAccountingTest {
       int finalK = k;
       rm.getQueryRunners().submit(() -> {
         String queryId = "q" + finalK;
-        Tracing.ThreadAccountantOps.setupRunner(queryId, ThreadExecutionContext.TaskType.UNKNOWN);
+        Tracing.ThreadAccountantOps.setupRunner(queryId);
         Thread thread = Thread.currentThread();
         CountDownLatch countDownLatch = new CountDownLatch(10);
         ThreadExecutionContext threadExecutionContext = Tracing.getThreadAccountant().getThreadExecutionContext();
@@ -174,8 +173,7 @@ public class ResourceManagerAccountingTest {
           int finalJ = j;
           rm.getQueryWorkers().submit(() -> {
             ThreadResourceUsageProvider threadResourceUsageProvider = new ThreadResourceUsageProvider();
-            Tracing.ThreadAccountantOps.setupWorker(finalJ, ThreadExecutionContext.TaskType.SSE,
-                threadResourceUsageProvider,
+            Tracing.ThreadAccountantOps.setupWorker(finalJ, threadResourceUsageProvider,
                 threadExecutionContext);
             long[][] a = new long[1000][];
             for (int i = 0; i < (finalJ + 1) * 10; i++) {
@@ -296,7 +294,7 @@ public class ResourceManagerAccountingTest {
     for (int i = 0; i < 100; i++) {
       int finalI = i;
       rm.getQueryRunners().submit(() -> {
-        Tracing.ThreadAccountantOps.setupRunner("testSelectQueryId" + finalI, ThreadExecutionContext.TaskType.SSE);
+        Tracing.ThreadAccountantOps.setupRunner("testSelectQueryId" + finalI);
         try {
           SelectionOperatorUtils.getDataTableFromRows(rows, dataSchema, false).toBytes();
         } catch (EarlyTerminationException e) {
@@ -363,7 +361,7 @@ public class ResourceManagerAccountingTest {
     for (int i = 0; i < 100; i++) {
       int finalI = i;
       rm.getQueryRunners().submit(() -> {
-        Tracing.ThreadAccountantOps.setupRunner("testGroupByQueryId" + finalI, ThreadExecutionContext.TaskType.SSE);
+        Tracing.ThreadAccountantOps.setupRunner("testGroupByQueryId" + finalI);
         try {
           groupByResultsBlock.getDataTable().toBytes();
         } catch (EarlyTerminationException e) {
@@ -441,7 +439,7 @@ public class ResourceManagerAccountingTest {
 
       // test mutable json index .getMatchingFlattenedDocsMap()
       rm.getQueryRunners().submit(() -> {
-        Tracing.ThreadAccountantOps.setupRunner("testJsonExtractIndexId1", ThreadExecutionContext.TaskType.SSE);
+        Tracing.ThreadAccountantOps.setupRunner("testJsonExtractIndexId1");
         try {
           mutableJsonIndex.getMatchingFlattenedDocsMap("key", null);
         } catch (EarlyTerminationException e) {
@@ -456,7 +454,7 @@ public class ResourceManagerAccountingTest {
       File indexFile = new File(indexDir, colName + V1Constants.Indexes.JSON_INDEX_FILE_EXTENSION);
       AtomicBoolean immutableEarlyTerminationOccurred = new AtomicBoolean(false);
       rm.getQueryRunners().submit(() -> {
-        Tracing.ThreadAccountantOps.setupRunner("testJsonExtractIndexId2", ThreadExecutionContext.TaskType.SSE);
+        Tracing.ThreadAccountantOps.setupRunner("testJsonExtractIndexId2");
         try {
           try (PinotDataBuffer offHeapDataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(indexFile);
               ImmutableJsonIndexReader offHeapIndexReader = new ImmutableJsonIndexReader(offHeapDataBuffer, 1000000)) {
@@ -506,7 +504,7 @@ public class ResourceManagerAccountingTest {
       int finalK = k;
       futures[finalK] = rm.getQueryRunners().submit(() -> {
         String queryId = "q" + finalK;
-        Tracing.ThreadAccountantOps.setupRunner(queryId, ThreadExecutionContext.TaskType.SSE);
+        Tracing.ThreadAccountantOps.setupRunner(queryId);
         Thread thread = Thread.currentThread();
         CountDownLatch countDownLatch = new CountDownLatch(10);
         Future[] futuresThread = new Future[10];
@@ -515,8 +513,7 @@ public class ResourceManagerAccountingTest {
           int finalJ = j;
           futuresThread[j] = rm.getQueryWorkers().submit(() -> {
             ThreadResourceUsageProvider threadResourceUsageProvider = new ThreadResourceUsageProvider();
-            Tracing.ThreadAccountantOps.setupWorker(finalJ, ThreadExecutionContext.TaskType.SSE,
-                threadResourceUsageProvider,
+            Tracing.ThreadAccountantOps.setupWorker(finalJ, threadResourceUsageProvider,
                 threadExecutionContext);
             long[][] a = new long[1000][];
             for (int i = 0; i < (finalK + 1) * 80; i++) {
