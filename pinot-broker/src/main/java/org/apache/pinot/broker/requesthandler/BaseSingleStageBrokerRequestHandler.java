@@ -89,7 +89,6 @@ import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.util.GapfillUtils;
 import org.apache.pinot.query.parser.utils.ParserUtils;
-import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
@@ -285,7 +284,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     LOGGER.debug("SQL query for request {}: {}", requestId, query);
 
     //Start instrumentation context. This must not be moved further below interspersed into the code.
-    Tracing.ThreadAccountantOps.setupRunner(String.valueOf(requestId), ThreadExecutionContext.TaskType.SSE);
+    Tracing.ThreadAccountantOps.setupRunner(String.valueOf(requestId));
 
     try {
       // Parse the query if needed

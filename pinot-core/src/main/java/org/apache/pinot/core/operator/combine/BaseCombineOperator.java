@@ -103,8 +103,7 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
         public void runJob() {
           ThreadResourceUsageProvider threadResourceUsageProvider = new ThreadResourceUsageProvider();
 
-          Tracing.ThreadAccountantOps.setupWorker(taskId, ThreadExecutionContext.TaskType.SSE,
-              threadResourceUsageProvider, parentContext);
+          Tracing.ThreadAccountantOps.setupWorker(taskId, threadResourceUsageProvider, parentContext);
 
           // Register the task to the phaser
           // NOTE: If the phaser is terminated (returning negative value) when trying to register the task, that means

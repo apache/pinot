@@ -260,10 +260,19 @@ public class Tracing {
     private ThreadAccountantOps() {
     }
 
+    public static void setupRunner(String queryId) {
+      setupRunner(queryId, ThreadExecutionContext.TaskType.SSE);
+    }
+
     public static void setupRunner(String queryId, ThreadExecutionContext.TaskType taskType) {
       Tracing.getThreadAccountant().setThreadResourceUsageProvider(new ThreadResourceUsageProvider());
       Tracing.getThreadAccountant()
           .createExecutionContext(queryId, CommonConstants.Accounting.ANCHOR_TASK_ID, taskType, null);
+    }
+
+    public static void setupWorker(int taskId, ThreadResourceUsageProvider threadResourceUsageProvider,
+        ThreadExecutionContext threadExecutionContext) {
+      setupWorker(taskId, ThreadExecutionContext.TaskType.SSE, threadResourceUsageProvider, threadExecutionContext);
     }
 
     public static void setupWorker(int taskId, ThreadExecutionContext.TaskType taskType,

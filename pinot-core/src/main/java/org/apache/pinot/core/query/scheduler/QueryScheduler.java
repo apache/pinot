@@ -41,7 +41,6 @@ import org.apache.pinot.core.query.logger.ServerQueryLogger;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.request.context.TimerContext;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
-import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.exception.QueryCancelledException;
@@ -135,7 +134,7 @@ public abstract class QueryScheduler {
   protected byte[] processQueryAndSerialize(ServerQueryRequest queryRequest, ExecutorService executorService) {
 
     //Start instrumentation context. This must not be moved further below interspersed into the code.
-    Tracing.ThreadAccountantOps.setupRunner(queryRequest.getQueryId(), ThreadExecutionContext.TaskType.SSE);
+    Tracing.ThreadAccountantOps.setupRunner(queryRequest.getQueryId());
 
     _latestQueryTime.accumulate(System.currentTimeMillis());
     InstanceResponseBlock instanceResponse;
