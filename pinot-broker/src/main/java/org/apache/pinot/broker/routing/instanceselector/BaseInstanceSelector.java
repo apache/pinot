@@ -90,6 +90,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
   final AdaptiveServerSelector _adaptiveServerSelector;
   final Clock _clock;
   final boolean _useFixedReplica;
+  final long _newSegmentExpirationTimeInSeconds;
   final int _tableNameHashForFixedReplicaRouting;
 
   // These 3 variables are the cached states to help accelerate the change processing
@@ -104,13 +105,14 @@ abstract class BaseInstanceSelector implements InstanceSelector {
 
   BaseInstanceSelector(String tableNameWithType, ZkHelixPropertyStore<ZNRecord> propertyStore,
       BrokerMetrics brokerMetrics, @Nullable AdaptiveServerSelector adaptiveServerSelector, Clock clock,
-      boolean useFixedReplica) {
+      boolean useFixedReplica, long newSegmentExpirationTimeInSeconds) {
     _tableNameWithType = tableNameWithType;
     _propertyStore = propertyStore;
     _brokerMetrics = brokerMetrics;
     _adaptiveServerSelector = adaptiveServerSelector;
     _clock = clock;
     _useFixedReplica = useFixedReplica;
+    _newSegmentExpirationTimeInSeconds = newSegmentExpirationTimeInSeconds;
     // Using raw table name to ensure queries spanning across REALTIME and OFFLINE tables are routed to the same
     // instance
     // Math.abs(Integer.MIN_VALUE) = Integer.MIN_VALUE, so we use & 0x7FFFFFFF to get a positive value
@@ -170,7 +172,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
       }
       SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(record);
       long creationTimeMs = SegmentUtils.getSegmentCreationTimeMs(segmentZKMetadata);
-      if (InstanceSelector.isNewSegment(creationTimeMs, currentTimeMs)) {
+      if (InstanceSelector.isNewSegment(creationTimeMs, currentTimeMs, _newSegmentExpirationTimeInSeconds * 1000)) {
         newSegmentCreationTimeMap.put(segmentZKMetadata.getSegmentName(), creationTimeMs);
       }
     }
@@ -400,7 +402,8 @@ abstract class BaseInstanceSelector implements InstanceSelector {
       long creationTimeMs = 0;
       if (newSegmentState != null) {
         // It was a new segment before, check the creation time and segment state to see if it is still a new segment
-        if (InstanceSelector.isNewSegment(newSegmentState.getCreationTimeMs(), currentTimeMs)) {
+        if (InstanceSelector.isNewSegment(newSegmentState.getCreationTimeMs(), currentTimeMs,
+            _newSegmentExpirationTimeInSeconds * 1000)) {
           creationTimeMs = newSegmentState.getCreationTimeMs();
         }
       } else if (!_oldSegmentCandidatesMap.containsKey(segment)) {

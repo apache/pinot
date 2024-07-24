@@ -93,7 +93,8 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
     indexingConfig.setSegmentPartitionConfig(new SegmentPartitionConfig(
         Collections.singletonMap(PARTITION_COLUMN, new ColumnPartitionConfig("murmur", 2))));
     tableConfig.setRoutingConfig(
-        new RoutingConfig(null, Collections.singletonList(RoutingConfig.PARTITION_SEGMENT_PRUNER_TYPE), null, false));
+        new RoutingConfig(null, Collections.singletonList(RoutingConfig.PARTITION_SEGMENT_PRUNER_TYPE), null,
+            false, null));
     addTableConfig(tableConfig);
 
     // Push data into Kafka (only ingest the first Avro file)

@@ -63,10 +63,17 @@ public class InstanceSelectorFactory {
     RoutingConfig routingConfig = tableConfig.getRoutingConfig();
     boolean useFixedReplica = brokerConfig.getProperty(CommonConstants.Broker.CONFIG_OF_USE_FIXED_REPLICA,
         CommonConstants.Broker.DEFAULT_USE_FIXED_REPLICA);
+    long newSegmentExpirationTimeInSeconds =
+        brokerConfig.getProperty(CommonConstants.Broker.CONFIG_OF_NEW_SEGMENT_EXPIRATION_SECONDS,
+        CommonConstants.Broker.DEFAULT_VALUE_OF_NEW_SEGMENT_EXPIRATION_SECONDS);
     if (routingConfig != null) {
       if (routingConfig.getUseFixedReplica() != null) {
         // table config overrides broker config
         useFixedReplica = routingConfig.getUseFixedReplica();
+      }
+      if (routingConfig.getNewSegmentExpirationTimeInSeconds() != null) {
+        // table config overrides broker config
+        newSegmentExpirationTimeInSeconds = routingConfig.getNewSegmentExpirationTimeInSeconds();
       }
       if (RoutingConfig.REPLICA_GROUP_INSTANCE_SELECTOR_TYPE.equalsIgnoreCase(routingConfig.getInstanceSelectorType())
           || (tableConfig.getTableType() == TableType.OFFLINE && LEGACY_REPLICA_GROUP_OFFLINE_ROUTING.equalsIgnoreCase(
@@ -74,22 +81,22 @@ public class InstanceSelectorFactory {
           && LEGACY_REPLICA_GROUP_REALTIME_ROUTING.equalsIgnoreCase(routingConfig.getRoutingTableBuilderName()))) {
         LOGGER.info("Using ReplicaGroupInstanceSelector for table: {}", tableNameWithType);
         return new ReplicaGroupInstanceSelector(tableNameWithType, propertyStore, brokerMetrics, adaptiveServerSelector,
-            clock, useFixedReplica);
+            clock, useFixedReplica, newSegmentExpirationTimeInSeconds);
       }
       if (RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE.equalsIgnoreCase(
           routingConfig.getInstanceSelectorType())) {
         LOGGER.info("Using StrictReplicaGroupInstanceSelector for table: {}", tableNameWithType);
         return new StrictReplicaGroupInstanceSelector(tableNameWithType, propertyStore, brokerMetrics,
-            adaptiveServerSelector, clock, useFixedReplica);
+            adaptiveServerSelector, clock, useFixedReplica, newSegmentExpirationTimeInSeconds);
       }
       if (RoutingConfig.MULTI_STAGE_REPLICA_GROUP_SELECTOR_TYPE.equalsIgnoreCase(
           routingConfig.getInstanceSelectorType())) {
         LOGGER.info("Using {} for table: {}", routingConfig.getInstanceSelectorType(), tableNameWithType);
         return new MultiStageReplicaGroupSelector(tableNameWithType, propertyStore, brokerMetrics,
-            adaptiveServerSelector, clock, useFixedReplica);
+            adaptiveServerSelector, clock, useFixedReplica, newSegmentExpirationTimeInSeconds);
       }
     }
     return new BalancedInstanceSelector(tableNameWithType, propertyStore, brokerMetrics, adaptiveServerSelector, clock,
-        useFixedReplica);
+        useFixedReplica, newSegmentExpirationTimeInSeconds);
   }
 }
