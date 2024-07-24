@@ -434,30 +434,26 @@ public class ServiceStatus {
         return new StatusDescriptionPair(Status.GOOD, STATUS_DESCRIPTION_NONE);
       }
 
-      // Cache ideal state status to avoid reading it twice
-      Map<String, String> partitionToIdealStateStatusMap = new HashMap<>();
-      Set<String> partitionSet = idealState.getPartitionSet();
+      // Get ideal state partitions for all instances
+      Map<String, Map<String, String>> idealStateMapFields = idealState.getRecord().getMapFields();
+      if (idealStateMapFields == null || idealStateMapFields.isEmpty()) {
+        return new StatusDescriptionPair(Status.GOOD, STATUS_DESCRIPTION_NONE); // Resource has no partitions
+      }
 
-      // Check that at least one partition is assigned in the ideal state, since if no partitions are assigned
-      // then consider the resource status GOOD. This check is needed to handle the case where the resource no
-      // longer exists on the server (i.e., last segment on the server was removed), but it still exists in the
-      // ideal state
-      boolean atLeastOnePartitionAssigned = false;
-      for (String partitionName : partitionSet) {
-        String idealStateStatus = idealState.getInstanceStateMap(partitionName).get(_instanceName);
-        partitionToIdealStateStatusMap.put(partitionName, idealStateStatus);
-
-        // Skip this partition if it is not assigned to this instance or if the instance should be offline
-        if (idealStateStatus != null && !"OFFLINE".equals(idealStateStatus)) {
-          atLeastOnePartitionAssigned = true;
-          break;
+      // Collect all partitions that are assigned to this instance
+      Map<String, String> instanceStateMap = new HashMap<>();
+      for (Map.Entry<String, Map<String, String>> partition : idealStateMapFields.entrySet()) {
+        if (partition.getValue().containsKey(_instanceName)) {
+          instanceStateMap.put(partition.getKey(), partition.getValue().get(_instanceName));
         }
       }
-      if (!atLeastOnePartitionAssigned) {
+
+      // Resource has no partitions assigned to this instance, so the resource status is GOOD
+      if (instanceStateMap.isEmpty()) {
         return new StatusDescriptionPair(Status.GOOD, STATUS_DESCRIPTION_NONE);
       }
 
-      // At least one partition is assigned, so if the helix state is null, then status is STARTING
+      // Null EV or CS, when resource has assigned partitions, means that the service status is STARTING
       T helixState = getState(resourceName);
       if (helixState == null) {
         return new StatusDescriptionPair(Status.STARTING, STATUS_DESCRIPTION_NO_HELIX_STATE);
@@ -467,9 +463,9 @@ public class ServiceStatus {
       // external view or went to ERROR state (which means that we tried to load the segments/resources but failed for
       // some reason)
       Map<String, String> partitionStateMap = getPartitionStateMap(helixState);
-      for (String partitionName : partitionSet) {
-        String idealStateStatus = partitionToIdealStateStatusMap.getOrDefault(partitionName,
-            idealState.getInstanceStateMap(partitionName).get(_instanceName));
+      for (Map.Entry<String, String> entry : instanceStateMap.entrySet()) {
+        String partitionName = entry.getKey();
+        String idealStateStatus = entry.getValue();
 
         // Skip this partition if it is not assigned to this instance or if the instance should be offline
         if (idealStateStatus == null || "OFFLINE".equals(idealStateStatus)) {
