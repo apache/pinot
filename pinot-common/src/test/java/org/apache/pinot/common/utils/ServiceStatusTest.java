@@ -129,11 +129,11 @@ public class ServiceStatusTest {
   @Test
   public void testIdealStateMatch() {
     TestIdealStateAndExternalViewMatchServiceStatusCallback callback;
-//
-//    // No ideal state = GOOD
-//    callback = buildTestISEVCallback();
-//    callback.setExternalView(new ExternalView(TABLE_NAME));
-//    assertEquals(callback.getServiceStatus(), ServiceStatus.Status.GOOD);
+
+    // No ideal state = GOOD
+    callback = buildTestISEVCallback();
+    callback.setExternalView(new ExternalView(TABLE_NAME));
+    assertEquals(callback.getServiceStatus(), ServiceStatus.Status.GOOD);
 
     // No external view, and ideal state shows this instance is assigned a segment of the resource = STARTING
     callback = buildTestISEVCallback();
