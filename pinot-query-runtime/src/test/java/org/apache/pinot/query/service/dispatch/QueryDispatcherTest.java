@@ -27,7 +27,6 @@ import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
-import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
@@ -61,8 +60,7 @@ public class QueryDispatcherTest extends QueryTestSet {
     for (int i = 0; i < QUERY_SERVER_COUNT; i++) {
       int availablePort = QueryTestUtils.getAvailablePort();
       QueryRunner queryRunner = Mockito.mock(QueryRunner.class);
-      TlsConfig tlsConfig = Mockito.mock(TlsConfig.class);
-      QueryServer queryServer = Mockito.spy(new QueryServer(availablePort, queryRunner, tlsConfig));
+      QueryServer queryServer = Mockito.spy(new QueryServer(availablePort, queryRunner, null));
       queryServer.start();
       _queryServerMap.put(availablePort, queryServer);
     }
