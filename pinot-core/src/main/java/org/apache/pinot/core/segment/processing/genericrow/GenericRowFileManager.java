@@ -29,7 +29,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 /**
  * Manager for generic row files.
  */
-public class GenericRowFileManager {
+public class GenericRowFileManager implements FileManager {
   public static final String OFFSET_FILE_NAME = "record.offset";
   public static final String DATA_FILE_NAME = "record.data";
 
@@ -75,21 +75,26 @@ public class GenericRowFileManager {
   /**
    * Returns the file writer. Creates one if not exists.
    */
-  public GenericRowFileWriter getFileWriter()
-      throws IOException {
-    if (_fileWriter == null) {
-      Preconditions.checkState(!_offsetFile.exists(), "Record offset file: %s already exists", _offsetFile);
-      Preconditions.checkState(!_dataFile.exists(), "Record data file: %s already exists", _dataFile);
-      _fileWriter = new GenericRowFileWriter(_offsetFile, _dataFile, _fieldSpecs, _includeNullFields);
+  @Override
+  public GenericRowFileWriter getFileWriter() {
+    try {
+      if (_fileWriter == null) {
+        Preconditions.checkState(!_offsetFile.exists(), "Record offset file: %s already exists", _offsetFile);
+        Preconditions.checkState(!_dataFile.exists(), "Record data file: %s already exists", _dataFile);
+        _fileWriter = new GenericRowFileWriter(_offsetFile, _dataFile, _fieldSpecs, _includeNullFields);
+      }
+      return _fileWriter;
+    } catch (IOException e) {
+      throw new RuntimeException("Caught exception while creating file writer", e);
     }
-    return _fileWriter;
   }
 
   /**
    * Closes the file writer.
    */
+  @Override
   public void closeFileWriter()
-      throws IOException {
+      throws Exception {
     if (_fileWriter != null) {
       _fileWriter.close();
       _fileWriter = null;
@@ -99,6 +104,7 @@ public class GenericRowFileManager {
   /**
    * Returns the file reader. Creates one if not exists.
    */
+  @Override
   public GenericRowFileReader getFileReader()
       throws IOException {
     if (_fileReader == null) {
@@ -112,8 +118,9 @@ public class GenericRowFileManager {
   /**
    * Closes the file reader.
    */
+  @Override
   public void closeFileReader()
-      throws IOException {
+      throws Exception {
     if (_fileReader != null) {
       _fileReader.close();
       _fileReader = null;
@@ -124,7 +131,7 @@ public class GenericRowFileManager {
    * Cleans up the files.
    */
   public void cleanUp()
-      throws IOException {
+      throws Exception {
     closeFileWriter();
     closeFileReader();
     FileUtils.deleteQuietly(_offsetFile);
