@@ -66,7 +66,8 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
     try {
       return getKinesisMessageBatch((KinesisPartitionGroupOffset) startMsgOffset);
     } catch (ProvisionedThroughputExceededException pte) {
-      LOGGER.debug("Provisioned throughput exceeded while fetching messages from Kinesis stream: {}", pte.getMessage());
+      LOGGER.error("Rate limit exceeded while fetching messages from Kinesis stream: {} with threshold: {}",
+          pte.getMessage(), _config.getRpsLimit());
       return new KinesisMessageBatch(List.of(), (KinesisPartitionGroupOffset) startMsgOffset, false);
     }
   }

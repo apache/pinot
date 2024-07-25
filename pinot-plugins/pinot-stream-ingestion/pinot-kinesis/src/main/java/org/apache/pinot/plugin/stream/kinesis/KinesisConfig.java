@@ -75,6 +75,7 @@ public class KinesisConfig {
   // This limit is enforced by Kinesis and is not configurable.
   // We are setting it to 1 to avoid hitting the limit  in a replicated setup,
   // where multiple replicas are fetching from the same shard.
+  // see - https://docs.aws.amazon.com/kinesis/latest/APIReference/API_GetRecords.html
   public static final String DEFAULT_RPS_LIMIT = "1";
 
   private final String _streamTopicName;
