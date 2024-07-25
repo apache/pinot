@@ -45,6 +45,8 @@ import static org.testng.Assert.assertTrue;
 
 public class StorageQuotaCheckerTest {
   private static final String OFFLINE_TABLE_NAME = "testTable_OFFLINE";
+
+  private static final String REALTIME_TABLE_NAME = "testTable_REALTIME";
   private static final String SEGMENT_NAME = "testSegment";
   private static final long SEGMENT_SIZE_IN_BYTES = 1024;
   private static final int NUM_REPLICAS = 2;
@@ -88,6 +90,34 @@ public class StorageQuotaCheckerTest {
   }
 
   @Test
+  public void testRealtimeTable()
+      throws InvalidConfigException {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(REALTIME_TABLE_NAME)
+        .setNumReplicas(NUM_REPLICAS).build();
+    _tableSizeReader = mock(TableSizeReader.class);
+    ControllerMetrics controllerMetrics = new ControllerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
+    PinotHelixResourceManager pinotHelixResourceManager = mock(PinotHelixResourceManager.class);
+    when(pinotHelixResourceManager.getNumReplicas(eq(tableConfig))).thenReturn(NUM_REPLICAS);
+    _storageQuotaChecker =
+        new StorageQuotaChecker(_tableSizeReader, controllerMetrics, mock(LeadControllerManager.class),
+            pinotHelixResourceManager, _controllerConf);
+
+    tableConfig.setQuotaConfig(new QuotaConfig(null, null));
+    assertFalse(_storageQuotaChecker.isTableStorageQuotaExceeded(tableConfig));
+
+    tableConfig.setQuotaConfig(new QuotaConfig("2.8K", null));
+
+    // Within quota but with missing segments, should pass without updating metrics
+    mockTableSizeResult(REALTIME_TABLE_NAME, 4 * 1024, 1);
+    assertFalse(_storageQuotaChecker.isTableStorageQuotaExceeded(tableConfig));
+
+
+    // Exceed quota and with missing segments, should fail without updating metrics
+    mockTableSizeResult(REALTIME_TABLE_NAME, 8 * 1024, 1);
+    assertTrue(_storageQuotaChecker.isTableStorageQuotaExceeded(tableConfig));
+  }
+
+  @Test
   public void testNoStorageQuotaConfig()
       throws InvalidConfigException {
     TableConfig tableConfig =
@@ -115,14 +145,14 @@ public class StorageQuotaCheckerTest {
     tableConfig.setQuotaConfig(new QuotaConfig("2.8K", null));
 
     // No response from server, should pass without updating metrics
-    mockTableSizeResult(-1, 0);
+    mockTableSizeResult(OFFLINE_TABLE_NAME, -1, 0);
     assertTrue(isSegmentWithinQuota(tableConfig));
     assertFalse(
         MetricValueUtils.tableGaugeExists(controllerMetrics, OFFLINE_TABLE_NAME,
             ControllerGauge.OFFLINE_TABLE_ESTIMATED_SIZE));
 
     // Within quota but with missing segments, should pass without updating metrics
-    mockTableSizeResult(4 * 1024, 1);
+    mockTableSizeResult(OFFLINE_TABLE_NAME, 4 * 1024, 1);
     assertTrue(isSegmentWithinQuota(tableConfig));
     assertFalse(
         MetricValueUtils.tableGaugeExists(controllerMetrics, OFFLINE_TABLE_NAME,
@@ -130,21 +160,21 @@ public class StorageQuotaCheckerTest {
 
 
     // Exceed quota and with missing segments, should fail without updating metrics
-    mockTableSizeResult(8 * 1024, 1);
+    mockTableSizeResult(OFFLINE_TABLE_NAME, 8 * 1024, 1);
     assertFalse(isSegmentWithinQuota(tableConfig));
     assertFalse(
         MetricValueUtils.tableGaugeExists(controllerMetrics, OFFLINE_TABLE_NAME,
             ControllerGauge.OFFLINE_TABLE_ESTIMATED_SIZE));
 
     // Within quota without missing segments, should pass and update metrics
-    mockTableSizeResult(3 * 1024, 0);
+    mockTableSizeResult(OFFLINE_TABLE_NAME, 3 * 1024, 0);
     assertTrue(isSegmentWithinQuota(tableConfig));
     assertEquals(
         MetricValueUtils.getTableGaugeValue(controllerMetrics, OFFLINE_TABLE_NAME,
             ControllerGauge.OFFLINE_TABLE_ESTIMATED_SIZE), 3 * 1024);
 
     // Exceed quota without missing segments, should fail and update metrics
-    mockTableSizeResult(4 * 1024, 0);
+    mockTableSizeResult(OFFLINE_TABLE_NAME, 4 * 1024, 0);
     assertFalse(isSegmentWithinQuota(tableConfig));
     assertEquals(
         MetricValueUtils.getTableGaugeValue(controllerMetrics, OFFLINE_TABLE_NAME,
@@ -157,12 +187,12 @@ public class StorageQuotaCheckerTest {
         .isSegmentStorageWithinQuota(tableConfig, SEGMENT_NAME, SEGMENT_SIZE_IN_BYTES)._isSegmentWithinQuota;
   }
 
-  public void mockTableSizeResult(long tableSizeInBytes, int numMissingSegments)
+  public void mockTableSizeResult(String tableName, long tableSizeInBytes, int numMissingSegments)
       throws InvalidConfigException {
     TableSizeReader.TableSubTypeSizeDetails tableSizeResult = new TableSizeReader.TableSubTypeSizeDetails();
     tableSizeResult._estimatedSizeInBytes = tableSizeInBytes;
     tableSizeResult._segments = Collections.emptyMap();
     tableSizeResult._missingSegments = numMissingSegments;
-    when(_tableSizeReader.getTableSubtypeSize(OFFLINE_TABLE_NAME, 1000)).thenReturn(tableSizeResult);
+    when(_tableSizeReader.getTableSubtypeSize(tableName, 1000)).thenReturn(tableSizeResult);
   }
 }
