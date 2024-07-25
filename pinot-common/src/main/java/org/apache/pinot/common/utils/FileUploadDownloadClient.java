@@ -113,6 +113,7 @@ public class FileUploadDownloadClient implements AutoCloseable {
   private static final String SCHEMA_PATH = "/schemas";
   private static final String OLD_SEGMENT_PATH = "/segments";
   private static final String SEGMENT_PATH = "/v2/segments";
+  private static final String SEGMENT_UPLOAD_BATCH_PATH = "/v3/segments";
   private static final String TABLES_PATH = "/tables";
   private static final String TYPE_DELIMITER = "type=";
   private static final String START_REPLACE_SEGMENTS_PATH = "/startReplaceSegments";
@@ -363,6 +364,12 @@ public class FileUploadDownloadClient implements AutoCloseable {
   public static URI getUploadSegmentURI(URI controllerURI)
       throws URISyntaxException {
     return getURI(controllerURI.getScheme(), controllerURI.getHost(), controllerURI.getPort(), SEGMENT_PATH);
+  }
+
+  public static URI getUploadSegmentBatchURI(URI controllerURI)
+      throws URISyntaxException {
+    return getURI(controllerURI.getScheme(), controllerURI.getHost(), controllerURI.getPort(),
+        SEGMENT_UPLOAD_BATCH_PATH);
   }
 
   public static URI getStartReplaceSegmentsURI(URI controllerURI, String rawTableName, String tableType,
