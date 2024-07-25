@@ -108,8 +108,10 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
   public void testDatabaseQueryQuotaWithTableQueryQuota()
       throws Exception {
     addQueryQuotaToDatabaseConfig(25);
+    // table quota within database quota. Queries should fail upon table quota (10 qps) breach
     addQueryQuotaToTableConfig(10);
     testQueryRate(10);
+    // table quota more than database quota. Queries should fail upon database quota (25 qps) breach
     addQueryQuotaToTableConfig(50);
     testQueryRate(25);
   }
@@ -117,13 +119,23 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
   @Test
   public void testDatabaseQueryQuotaWithTableQueryQuotaWithExtraBroker()
       throws Exception {
-    addQueryQuotaToDatabaseConfig(25);
-    addQueryQuotaToTableConfig(10);
-    BaseBrokerStarter brokerStarter = startOneBroker(2);
-    testQueryRate(10);
-    addQueryQuotaToTableConfig(50);
-    testQueryRate(25);
-    brokerStarter.stop();
+    BaseBrokerStarter brokerStarter = null;
+    try {
+      addQueryQuotaToDatabaseConfig(25);
+      addQueryQuotaToTableConfig(10);
+      // Add one more broker such that quota gets distributed equally among them
+      brokerStarter = startOneBroker(2);
+      // to allow change propagation to QueryQuotaManager
+      Thread.sleep(1000);
+      testQueryRate(10);
+      // drop table level quota so that database quota comes into effect
+      addQueryQuotaToTableConfig(null);
+      testQueryRate(25);
+    } finally {
+      if (brokerStarter != null) {
+        brokerStarter.stop();
+      }
+    }
   }
 
   /**
@@ -163,7 +175,7 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
     TableConfig tableConfig = getOfflineTableConfig();
     tableConfig.setQuotaConfig(new QuotaConfig(null, maxQps == null ? null : maxQps.toString()));
     updateTableConfig(tableConfig);
-    // to ensure change is propagated to QueryQuotaManager
+    // to allow change propagation to QueryQuotaManager
     Thread.sleep(1000);
   }
 
@@ -174,7 +186,7 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
         url += "?maxQueriesPerSecond=" + maxQps;
     }
     HttpClient.wrapAndThrowHttpException(_httpClient.sendPostRequest(new URI(url), null, null));
-    // to ensure change is propagated to QueryQuotaManager
+    // to allow change propagation to QueryQuotaManager
     Thread.sleep(1000);
   }
 
@@ -188,7 +200,7 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
       HttpClient.wrapAndThrowHttpException(
           _httpClient.sendJsonPostRequest(new URI(_controllerRequestURLBuilder.forClusterConfigs()), payload));
     }
-    // to ensure change is propagated to QueryQuotaManager
+    // to allow change propagation to QueryQuotaManager
     Thread.sleep(1000);
   }
 }
