@@ -181,7 +181,7 @@ public class SortOperator extends MultiStageOperator {
         for (Object[] row : container) {
           SelectionOperatorUtils.addToPriorityQueue(row, _priorityQueue, _numRowsToKeep);
         }
-        sampleResourceUsage();
+        sampleAndCheckInterruption();
       }
       block = _input.nextBlock();
     }

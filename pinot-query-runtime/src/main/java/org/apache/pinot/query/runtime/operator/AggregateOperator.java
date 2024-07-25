@@ -173,7 +173,7 @@ public class AggregateOperator extends MultiStageOperator {
     TransferableBlock block = _input.nextBlock();
     while (block.isDataBlock()) {
       _groupByExecutor.processBlock(block);
-      sampleResourceUsage();
+      sampleAndCheckInterruption();
       block = _input.nextBlock();
     }
     return block;
@@ -188,7 +188,7 @@ public class AggregateOperator extends MultiStageOperator {
     TransferableBlock block = _input.nextBlock();
     while (block.isDataBlock()) {
       _aggregationExecutor.processBlock(block);
-      sampleResourceUsage();
+      sampleAndCheckInterruption();
       block = _input.nextBlock();
     }
     return block;

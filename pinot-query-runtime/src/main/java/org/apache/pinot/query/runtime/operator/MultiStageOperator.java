@@ -68,8 +68,11 @@ public abstract class MultiStageOperator
 
   // Samples resource usage of the operator. The operator should call this function for every block of data or
   // assuming the block holds 10000 rows or more.
-  protected void sampleResourceUsage() {
+  protected void sampleAndCheckInterruption() {
     Tracing.ThreadAccountantOps.sample();
+    if (Tracing.ThreadAccountantOps.isInterrupted()) {
+      earlyTerminate();
+    }
   }
 
   /**
