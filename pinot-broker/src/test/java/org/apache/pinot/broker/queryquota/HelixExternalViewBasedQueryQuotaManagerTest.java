@@ -518,7 +518,7 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
     runQueries(TABLE_MAX_QPS * 2, true);
   }
 
-  // keep the qps 50 to ensure that the time lost between 2 query runs on top of the sleepMillis
+  // try to keep the qps below 50 to ensure that the time lost between 2 query runs on top of the sleepMillis
   // is not comparable to sleepMillis, else the actual qps would end being lot lower than required qps
   private void runQueries(double qps, boolean shouldFail)
       throws InterruptedException {
