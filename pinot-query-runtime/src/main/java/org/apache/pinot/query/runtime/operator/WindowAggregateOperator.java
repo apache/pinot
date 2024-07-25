@@ -269,7 +269,7 @@ public class WindowAggregateOperator extends MultiStageOperator {
         _partitionRows.computeIfAbsent(key, k -> new ArrayList<>()).add(row);
       }
       _numRows += containerSize;
-      sampleResourceUsage();
+      sampleAndCheckInterruption();
       block = _input.nextBlock();
     }
     // Early termination if the block is an error block
