@@ -50,6 +50,6 @@ class PinotTable(name: String, schema: StructType) extends Table with SupportsRe
   }
 
   override def newWriteBuilder(info: LogicalWriteInfo): WriteBuilder = {
-    new PinotWriteBuilder(null)
+    new PinotWriteBuilder(null, info)
   }
 }
