@@ -37,8 +37,7 @@ object ExampleSparkPinotConnectorTest extends Logging {
       .getOrCreate()
 
       writeOffline()
-
-
+    
 //    readOffline()
 //    readHybrid()
 //    readHybridWithSpecificSchema()
@@ -55,19 +54,27 @@ object ExampleSparkPinotConnectorTest extends Logging {
     log.info("Writing some data to a Pinot table...")
     // create sample data
     val data = Seq(
-          ("ORD", "Florida", 1000),
-          ("ORD", "Florida", 1000),
-          ("ORD", "Florida", 1000),
+          ("ORD", "Florida", 1000, true, 1722025994),
+          ("ORD", "Florida", 1000, false, 1722025994),
+          ("ORD", "Florida", 1000, false, 1722025994),
+          ("NYC", "New York", 20, true, 1722025994),
     )
 
     val airports = spark.createDataFrame(data)
-      .toDF("airport", "state", "distance")
+      .toDF("airport", "state", "distance", "active", "ts")
+      .repartition(2)
 
     airports.write.format("pinot")
       .mode("append")
       .option("table", "airlineStats")
-      .option("tableType", "offline")
-      .save()
+      .option("tableType", "OFFLINE")
+      .option("mode", "tar") // probably unnecessary
+      .option("segmentFormat", "mysegment_%d")
+      .option("timeColumnName", "ts")
+      .save("myPath")
+
+
+
   }
 
   def readOffline()(implicit spark: SparkSession): Unit = {

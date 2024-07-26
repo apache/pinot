@@ -1,105 +1,143 @@
 package org.apache.pinot.connector.spark.v3.datasource
 
+import org.apache.commons.io.FileUtils
+import org.apache.pinot.common.utils.TarGzCompressionUtils
 import org.apache.spark.sql.connector.write.{DataWriter, PhysicalWriteInfo, WriterCommitMessage}
-import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.pinot.segment.local.segment.creator.impl.SegmentColumnarIndexCreator
+import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig
 import org.apache.pinot.spi.config.table.{IndexingConfig, SegmentsValidationAndRetentionConfig, TableConfig, TableCustomConfig, TenantConfig}
 import org.apache.pinot.spi.data.readers.GenericRow
-import org.apache.pinot.spi.data.{FieldSpec, Schema}
-import org.apache.pinot.spi.data.Schema.SchemaBuilder
+import org.apache.pinot.spi.data.Schema
+import org.apache.pinot.spi.ingestion.batch.spec.{Constants, SegmentGenerationTaskSpec}
+import org.apache.pinot.spi.utils.DataSizeUtils
+import org.apache.spark.sql.catalyst
+import org.apache.spark.sql.types.StructType
 
 import java.io.File
-import java.nio.file.Files;
 
-class PinotDataWriter[InternalRow](physicalWriteInfo: PhysicalWriteInfo,
+class PinotDataWriter[InternalRow](
+                                    physicalWriteInfo: PhysicalWriteInfo,
                                     partitionId: Int,
-                                    taskId: Long)
+                                    taskId: Long,
+                                    tableName: String,
+                                    segmentNameFormat: String,
+                                    savePath: String,
+                                    writeSchema: StructType,
+                                    pinotSchema: Schema,
+                                  )
   extends DataWriter[org.apache.spark.sql.catalyst.InternalRow] with AutoCloseable {
 
-  println("PinotDataWriter created with writeInfo: " + physicalWriteInfo + ", partitionId: " + partitionId + ", taskId: " + taskId)
+  println("PinotDataWriter created with " +
+    "physicalWriteInfo: " + physicalWriteInfo +
+    ", partitionId: " + partitionId + ", taskId: " + taskId)
 
-  val indexingConfig = new IndexingConfig
-  val segmentsValidationAndRetentionConfig = new SegmentsValidationAndRetentionConfig();
-  private val tableConfig =
-    new TableConfig(
-      "myTable",
-      "OFFLINE",
-      segmentsValidationAndRetentionConfig,
-      new TenantConfig(null, null, null),
-      indexingConfig,
-      new TableCustomConfig(null),
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      false,
-      null,
-      null,
-      null);
+  private val bufferedRecordReader = new PinotBufferedRecordReader()
+  private var tableConfig: TableConfig = null
+  private var segmentGeneratorConfig: SegmentGeneratorConfig = null
 
-  private val schema = new SchemaBuilder()
-    .addSingleValueDimension("column1", FieldSpec.DataType.STRING)
-    .addSingleValueDimension("column2", FieldSpec.DataType.STRING)
-    .addMetric("column3", FieldSpec.DataType.INT)
-    .build()
-
-  // initialize
-  private val segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema)
-  segmentGeneratorConfig.setTableName("testTable")
-  segmentGeneratorConfig.setSegmentName("segmentName")
-  segmentGeneratorConfig.setOutDir("tempDir" + partitionId.toString + taskId.toString)
-  segmentGeneratorConfig.setRecordReaderPath("recordReaderPath")
-
-  // pick a random integer
-  val randint = scala.util.Random.nextInt(1000000)
-  val tempDir = Files.createTempDirectory("pinotSegmentTempDir" + randint.toString).toFile
-  println("Temp dir: " + tempDir.getAbsolutePath)
-
-  // Check if has star tree
-  private val indexCreator = new SegmentColumnarIndexCreator();
-  indexCreator.setSegmentName("mySegment")
-  indexCreator.init(
-    segmentGeneratorConfig,
-    null,
-    null,
-    schema,
-    tempDir,
-    null)
-
-  override def write(record: org.apache.spark.sql.catalyst.InternalRow): Unit = {
-    indexCreator.indexRow(internalRowToGenericRow(record))
-  }
-
-  def internalRowToGenericRow(record: org.apache.spark.sql.catalyst.InternalRow): GenericRow = {
-    val gr = new GenericRow()
-
-    gr.putValue("column1", record.getString(0))
-    gr.putValue("column2", record.getString(1))
-    gr.putValue("column3", record.getInt(2))
-
-    gr
+  override def write(record: catalyst.InternalRow): Unit = {
+    bufferedRecordReader.write(internalRowToGenericRow(record))
   }
 
   override def commit(): WriterCommitMessage = {
-    indexCreator.seal()
-    indexCreator.close()
+    initSegmentCreator()
+
+    val driver = new SegmentIndexCreationDriverImpl()
+    driver.init(segmentGeneratorConfig, bufferedRecordReader)
+    driver.build()
+
+    // tar segment
+    val segmentTarFile = tarSegmentDir(segmentGeneratorConfig.getSegmentName)
+    printf("Segment tar file: %s", segmentTarFile.getAbsolutePath)
 
     new SuccessWriterCommitMessage
   }
 
-  override def abort(): Unit = {}
+  override def abort(): Unit = {
+    println("Abort called")
+  }
 
-  override def close(): Unit = {}
+  override def close(): Unit = {
+    println("Close called")
+  }
+
+  private def initSegmentCreator(): Unit = {
+    val indexingConfig = new IndexingConfig
+    val segmentsValidationAndRetentionConfig = new SegmentsValidationAndRetentionConfig();
+    tableConfig =
+      new TableConfig(
+        tableName,
+        "OFFLINE",
+        segmentsValidationAndRetentionConfig,
+        new TenantConfig(null, null, null),
+        indexingConfig,
+        new TableCustomConfig(null),
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        false,
+        null,
+        null,
+        null);
+
+    segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, pinotSchema)
+    segmentGeneratorConfig.setTableName(tableName)
+    segmentGeneratorConfig.setSegmentName(segmentNameFormat.format(partitionId))
+    segmentGeneratorConfig.setOutDir(savePath)
+  }
+
+  private def internalRowToGenericRow(record: catalyst.InternalRow): GenericRow = {
+    val gr = new GenericRow()
+
+    writeSchema.fields.zipWithIndex foreach { case(field, idx) =>
+      field.dataType match {
+        case org.apache.spark.sql.types.StringType =>
+          gr.putValue(field.name, record.getString(idx))
+        case org.apache.spark.sql.types.IntegerType =>
+          gr.putValue(field.name, record.getInt(idx))
+        case org.apache.spark.sql.types.LongType =>
+          gr.putValue(field.name, record.getLong(idx))
+        case org.apache.spark.sql.types.FloatType =>
+          gr.putValue(field.name, record.getFloat(idx))
+        case org.apache.spark.sql.types.DoubleType =>
+          gr.putValue(field.name, record.getDouble(idx))
+        case org.apache.spark.sql.types.BooleanType =>
+          gr.putValue(field.name, record.getBoolean(idx))
+        case org.apache.spark.sql.types.ByteType =>
+          gr.putValue(field.name, record.getByte(idx))
+        case org.apache.spark.sql.types.ShortType =>
+          gr.putValue(field.name, record.getShort(idx))
+        case org.apache.spark.sql.types.BinaryType =>
+          gr.putValue(field.name, record.getBinary(idx))
+        case _ =>
+          throw new UnsupportedOperationException("Unsupported data type")
+      }
+    }
+    gr
+  }
+
+  private def tarSegmentDir(segmentName: String): File = {
+    val localOutputTempDir = savePath
+    val localSegmentDir = new File(localOutputTempDir, segmentName)
+    val segmentTarFileName = segmentName + Constants.TAR_GZ_FILE_EXT
+    val localSegmentTarFile = new File(localOutputTempDir, segmentTarFileName)
+    printf("Tarring segment from: {} to: {}", localSegmentDir, localSegmentTarFile)
+    TarGzCompressionUtils.createTarGzFile(localSegmentDir, localSegmentTarFile)
+    val uncompressedSegmentSize = FileUtils.sizeOf(localSegmentDir)
+    val compressedSegmentSize = FileUtils.sizeOf(localSegmentTarFile)
+    printf("Size for segment: {}, uncompressed: {}, compressed: {}", segmentName, DataSizeUtils.fromBytes(uncompressedSegmentSize), DataSizeUtils.fromBytes(compressedSegmentSize))
+    localSegmentTarFile
+  }
+
 }
 
-class SuccessWriterCommitMessage extends WriterCommitMessage {
-  def writerCommitMessage: String = "Commit successful"
-}
+class SuccessWriterCommitMessage extends WriterCommitMessage {}
+

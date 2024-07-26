@@ -4,15 +4,16 @@ import org.apache.spark.sql.connector.write.{BatchWrite, LogicalWriteInfo, Suppo
 import org.apache.spark.sql.sources.Filter
 
 class PinotWriteBuilder(
-                         filters: Array[Filter]
+                         filters: Array[Filter],
+                       logicalWriteInfo: LogicalWriteInfo,
                        )
   extends WriteBuilder with SupportsOverwrite {
 
   override def build(): Write = {
-    new PinotWrite()
+    new PinotWrite(logicalWriteInfo)
   }
 
   override def overwrite(filters: Array[Filter]): WriteBuilder = {
-    new PinotWriteBuilder(filters)
+    new PinotWriteBuilder(filters, logicalWriteInfo)
   }
 }
