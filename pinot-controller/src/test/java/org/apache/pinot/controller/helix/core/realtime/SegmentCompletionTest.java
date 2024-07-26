@@ -1378,7 +1378,7 @@ public class SegmentCompletionTest {
 
     protected MockPinotLLCRealtimeSegmentManager(PinotHelixResourceManager pinotHelixResourceManager,
         ControllerMetrics controllerMetrics) {
-      super(pinotHelixResourceManager, CONTROLLER_CONF, controllerMetrics);
+      super(pinotHelixResourceManager, CONTROLLER_CONF, createMockStorageQuotaChecker(), controllerMetrics);
     }
 
     @Override
@@ -1428,7 +1428,7 @@ public class SegmentCompletionTest {
     protected MockSegmentCompletionManager(HelixManager helixManager, PinotLLCRealtimeSegmentManager segmentManager,
         boolean isLeader, ControllerMetrics controllerMetrics) {
       super(helixManager, segmentManager, controllerMetrics,
-          new LeadControllerManager("localhost_1234", helixManager, controllerMetrics), createMockStorageQuotaChecker(),
+          new LeadControllerManager("localhost_1234", helixManager, controllerMetrics),
           SegmentCompletionProtocol.getDefaultMaxSegmentCommitTimeSeconds());
 
       _isLeader = isLeader;

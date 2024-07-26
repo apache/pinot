@@ -36,7 +36,6 @@ import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.realtime.segment.CommittingSegmentDescriptor;
-import org.apache.pinot.controller.validation.StorageQuotaChecker;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
@@ -79,7 +78,6 @@ public class SegmentCompletionManager {
   private final PinotLLCRealtimeSegmentManager _segmentManager;
   private final ControllerMetrics _controllerMetrics;
   private final LeadControllerManager _leadControllerManager;
-  private final StorageQuotaChecker _storageQuotaChecker;
 
   // Half hour max commit time for all segments
   private static final int MAX_COMMIT_TIME_FOR_ALL_SEGMENTS_SECONDS = 1800;
@@ -93,12 +91,11 @@ public class SegmentCompletionManager {
 
   public SegmentCompletionManager(HelixManager helixManager, PinotLLCRealtimeSegmentManager segmentManager,
       ControllerMetrics controllerMetrics, LeadControllerManager leadControllerManager,
-      StorageQuotaChecker storageQuotaChecker, int segmentCommitTimeoutSeconds) {
+      int segmentCommitTimeoutSeconds) {
     _helixManager = helixManager;
     _segmentManager = segmentManager;
     _controllerMetrics = controllerMetrics;
     _leadControllerManager = leadControllerManager;
-    _storageQuotaChecker = storageQuotaChecker;
     SegmentCompletionProtocol.setMaxSegmentCommitTimeMs(
         TimeUnit.MILLISECONDS.convert(segmentCommitTimeoutSeconds, TimeUnit.SECONDS));
   }
@@ -1043,13 +1040,6 @@ public class SegmentCompletionManager {
       }
       _logger.info("Committing segment {} at offset {} winner {}", _segmentName.getSegmentName(), offset, instanceId);
       _state = State.COMMITTING;
-
-      TableConfig tableConfig = _segmentManager.getTableConfig(_realtimeTableName);
-      // Update table IS based on storage quota breach so that new consuming segment is not created in case of breach
-      if (_segmentCompletionManager._storageQuotaChecker.isTableStorageQuotaExceeded(tableConfig)) {
-        _segmentManager.updateStorageQuotaExceededInIdealState(_realtimeTableName, true);
-      }
-
       // In case of splitCommit, the segment is uploaded to a unique file name indicated by segmentLocation,
       // so we need to move the segment file to its permanent location first before committing the metadata.
       // The committingSegmentDescriptor is then updated with the permanent segment location to be saved in metadata
