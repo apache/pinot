@@ -22,6 +22,7 @@ import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.spi.config.instance.InstanceType;
 
 
@@ -343,6 +344,9 @@ public class CommonConstants {
     // If both "server.response.size" and "query.response.size" are set, then the "server.response.size" takes
     // precedence over "query.response.size" (i.e., "query.response.size" will be ignored).
     public static final String CONFIG_OF_MAX_SERVER_RESPONSE_SIZE_BYTES = "pinot.broker.max.server.response.size.bytes";
+
+    public static final String CONFIG_OF_NEW_SEGMENT_EXPIRATION_SECONDS = "pinot.broker.new.segment.expiration.seconds";
+    public static final long DEFAULT_VALUE_OF_NEW_SEGMENT_EXPIRATION_SECONDS = TimeUnit.MINUTES.toSeconds(5);
 
     public static class Request {
       public static final String SQL = "sql";
