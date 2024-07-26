@@ -726,6 +726,11 @@ public class CommonConstants {
 
     public static final String CONFIG_OF_REALTIME_SEGMENT_CONSUMER_CLIENT_ID_SUFFIX = "consumer.client.id.suffix";
 
+    public static final String LUCENE_MAX_REFRESH_THREADS = "pinot.server.lucene.max.refresh.threads";
+    public static final int DEFAULT_LUCENE_MAX_REFRESH_THREADS = 1;
+    public static final String LUCENE_MIN_REFRESH_INTERVAL_MS = "pinot.server.lucene.min.refresh.interval.ms";
+    public static final int DEFAULT_LUCENE_MIN_REFRESH_INTERVAL_MS = 10;
+
     public static class SegmentCompletionProtocol {
       public static final String PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER = "pinot.server.segment.uploader";
 

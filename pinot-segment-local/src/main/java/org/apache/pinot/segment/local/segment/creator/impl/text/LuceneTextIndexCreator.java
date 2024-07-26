@@ -36,11 +36,11 @@ import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
-import org.apache.lucene.index.NoMergeScheduler;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.store.NRTCachingDirectory;
+import org.apache.pinot.segment.local.realtime.impl.invertedindex.LuceneNRTCachingMergePolicy;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndex;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentColumnarIndexCreator;
 import org.apache.pinot.segment.local.segment.index.text.AbstractTextIndexCreator;
@@ -132,19 +132,12 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
       indexWriterConfig.setCommitOnClose(commit);
       indexWriterConfig.setUseCompoundFile(config.isLuceneUseCompoundFile());
 
-      // For the realtime segment, to reuse mutable index, we should set the two write configs below.
-      // The realtime segment will call .commit() on the IndexWriter when segment conversion occurs.
-      // By default, Lucene will sometimes choose to merge segments in the background, which is problematic because
-      // the lucene index directory's contents is copied to create the immutable segment. If a background merge
-      // occurs during this copy, a FileNotFoundException will be triggered and segment build will fail.
-      //
       // Also, for the realtime segment, we set the OpenMode to CREATE to ensure that any existing artifacts
       // will be overwritten. This is necessary because the realtime segment can be created multiple times
       // during a server crash and restart scenario. If the existing artifacts are appended to, the realtime
       // query results will be accurate, but after segment conversion the mapping file generated will be loaded
       // for only the first numDocs lucene docIds, which can cause IndexOutOfBounds errors.
       if (!_commitOnClose && config.isReuseMutableIndex()) {
-        indexWriterConfig.setMergeScheduler(NoMergeScheduler.INSTANCE);
         indexWriterConfig.setOpenMode(IndexWriterConfig.OpenMode.CREATE);
       }
 
@@ -166,7 +159,9 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
         LOGGER.info(
             "Using NRTCachingDirectory for realtime lucene index for segment {} and column {} with buffer size: {}MB",
             segmentIndexDir, column, bufSize);
-        _indexDirectory = new NRTCachingDirectory(FSDirectory.open(_indexFile.toPath()), bufSize, bufSize);
+        NRTCachingDirectory dir = new NRTCachingDirectory(FSDirectory.open(_indexFile.toPath()), bufSize, bufSize);
+        indexWriterConfig.setMergePolicy(new LuceneNRTCachingMergePolicy(dir));
+        _indexDirectory = dir;
       } else {
         _indexDirectory = FSDirectory.open(_indexFile.toPath());
       }

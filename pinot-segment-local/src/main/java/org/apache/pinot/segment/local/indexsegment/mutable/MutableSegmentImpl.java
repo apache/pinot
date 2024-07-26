@@ -51,8 +51,6 @@ import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentConfig;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentStatsHistory;
 import org.apache.pinot.segment.local.realtime.impl.dictionary.BaseOffHeapMutableDictionary;
-import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneIndexRefreshState;
-import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndex;
 import org.apache.pinot.segment.local.realtime.impl.nullvalue.MutableNullValueVector;
 import org.apache.pinot.segment.local.segment.index.datasource.ImmutableDataSource;
 import org.apache.pinot.segment.local.segment.index.datasource.MutableDataSource;
@@ -158,8 +156,6 @@ public class MutableSegmentImpl implements MutableSegment {
   // default message metadata
   private volatile long _lastIndexedTimeMs = Long.MIN_VALUE;
   private volatile long _latestIngestionTimeMs = Long.MIN_VALUE;
-
-  private RealtimeLuceneIndexRefreshState.RealtimeLuceneReaders _realtimeLuceneReaders;
 
   private final PartitionDedupMetadataManager _partitionDedupMetadataManager;
 
@@ -347,17 +343,6 @@ public class MutableSegmentImpl implements MutableSegment {
         }
       }
 
-      // TODO - this logic is in the wrong place and belongs in a Lucene-specific submodule,
-      //  it is beyond the scope of realtime index pluggability to do this refactoring, so realtime
-      //  text indexes remain statically defined. Revisit this after this refactoring has been done.
-      MutableIndex textIndex = mutableIndexes.get(StandardIndexes.text());
-      if (textIndex instanceof RealtimeLuceneTextIndex) {
-        if (_realtimeLuceneReaders == null) {
-          _realtimeLuceneReaders = new RealtimeLuceneIndexRefreshState.RealtimeLuceneReaders(_segmentName);
-        }
-        _realtimeLuceneReaders.addReader((RealtimeLuceneTextIndex) textIndex);
-      }
-
       Pair<String, ValueAggregator> columnAggregatorPair =
           metricsAggregators.getOrDefault(column, Pair.of(column, null));
       String sourceColumn = columnAggregatorPair.getLeft();
@@ -366,13 +351,6 @@ public class MutableSegmentImpl implements MutableSegment {
       _indexContainerMap.put(column,
           new IndexContainer(fieldSpec, partitionFunction, partitions, new ValuesInfo(), mutableIndexes, dictionary,
               nullValueVector, sourceColumn, valueAggregator));
-    }
-
-    // TODO separate concerns: this logic does not belong here
-    if (_realtimeLuceneReaders != null) {
-      // add the realtime lucene index readers to the global queue for refresh task to pick up
-      RealtimeLuceneIndexRefreshState realtimeLuceneIndexRefreshState = RealtimeLuceneIndexRefreshState.getInstance();
-      realtimeLuceneIndexRefreshState.addRealtimeReadersToQueue(_realtimeLuceneReaders);
     }
 
     _partitionDedupMetadataManager = config.getPartitionDedupMetadataManager();
@@ -990,19 +968,6 @@ public class MutableSegmentImpl implements MutableSegment {
         segmentStats.setMemUsedBytes(totalMemBytes);
         segmentStats.setNumSeconds(numSeconds);
         _statsHistory.addSegmentStats(segmentStats);
-      }
-    }
-
-    // Stop the text index refresh before closing the indexes
-    if (_realtimeLuceneReaders != null) {
-      // set this to true as a way of signalling the refresh task thread to
-      // not attempt refresh on this segment here onwards
-      _realtimeLuceneReaders.getLock().lock();
-      try {
-        _realtimeLuceneReaders.setSegmentDestroyed();
-        _realtimeLuceneReaders.clearRealtimeReaderList();
-      } finally {
-        _realtimeLuceneReaders.getLock().unlock();
       }
     }
 
