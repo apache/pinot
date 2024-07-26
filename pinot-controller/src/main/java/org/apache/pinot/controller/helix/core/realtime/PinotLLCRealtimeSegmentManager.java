@@ -81,6 +81,7 @@ import org.apache.pinot.controller.helix.core.realtime.segment.FlushThresholdUpd
 import org.apache.pinot.controller.helix.core.retention.strategy.RetentionStrategy;
 import org.apache.pinot.controller.helix.core.retention.strategy.TimeRetentionStrategy;
 import org.apache.pinot.controller.validation.RealtimeSegmentValidationManager;
+import org.apache.pinot.controller.validation.StorageQuotaChecker;
 import org.apache.pinot.core.data.manager.realtime.SegmentCompletionUtils;
 import org.apache.pinot.core.util.PeerServerSegmentFinder;
 import org.apache.pinot.segment.spi.ColumnMetadata;
@@ -174,6 +175,7 @@ public class PinotLLCRealtimeSegmentManager {
   private final HelixManager _helixManager;
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private final PinotHelixResourceManager _helixResourceManager;
+  private final StorageQuotaChecker _storageQuotaChecker;
   private final String _clusterName;
   private final ControllerConf _controllerConf;
   private final ControllerMetrics _controllerMetrics;
@@ -190,11 +192,12 @@ public class PinotLLCRealtimeSegmentManager {
   private volatile boolean _isStopping = false;
 
   public PinotLLCRealtimeSegmentManager(PinotHelixResourceManager helixResourceManager, ControllerConf controllerConf,
-      ControllerMetrics controllerMetrics) {
+      StorageQuotaChecker storageQuotaChecker, ControllerMetrics controllerMetrics) {
     _helixAdmin = helixResourceManager.getHelixAdmin();
     _helixManager = helixResourceManager.getHelixZkManager();
     _propertyStore = helixResourceManager.getPropertyStore();
     _helixResourceManager = helixResourceManager;
+    _storageQuotaChecker = storageQuotaChecker;
     _clusterName = helixResourceManager.getHelixClusterName();
     _controllerConf = controllerConf;
     _controllerMetrics = controllerMetrics;
@@ -546,6 +549,11 @@ public class PinotLLCRealtimeSegmentManager {
     // Step-2
     long startTimeNs2 = System.nanoTime();
     String newConsumingSegmentName = null;
+
+    // Update table IS based on storage quota breach so that new consuming segment is not created in case of breach
+    if (_storageQuotaChecker.isTableStorageQuotaExceeded(tableConfig)) {
+      updateStorageQuotaExceededInIdealState(realtimeTableName, true);
+    }
     if (!isTablePaused(idealState) && !isStorageQuotaExceeded(idealState)) {
       StreamConfig streamConfig =
           new StreamConfig(tableConfig.getTableName(), IngestionConfigUtils.getStreamConfigMap(tableConfig));
