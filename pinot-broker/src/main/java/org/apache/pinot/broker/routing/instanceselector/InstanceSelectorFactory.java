@@ -71,10 +71,6 @@ public class InstanceSelectorFactory {
         // table config overrides broker config
         useFixedReplica = routingConfig.getUseFixedReplica();
       }
-      if (routingConfig.getNewSegmentExpirationTimeInSeconds() != null) {
-        // table config overrides broker config
-        newSegmentExpirationTimeInSeconds = routingConfig.getNewSegmentExpirationTimeInSeconds();
-      }
       if (RoutingConfig.REPLICA_GROUP_INSTANCE_SELECTOR_TYPE.equalsIgnoreCase(routingConfig.getInstanceSelectorType())
           || (tableConfig.getTableType() == TableType.OFFLINE && LEGACY_REPLICA_GROUP_OFFLINE_ROUTING.equalsIgnoreCase(
           routingConfig.getRoutingTableBuilderName())) || (tableConfig.getTableType() == TableType.REALTIME
