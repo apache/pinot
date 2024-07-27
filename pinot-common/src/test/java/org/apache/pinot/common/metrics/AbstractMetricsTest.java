@@ -62,7 +62,7 @@ public class AbstractMetricsTest {
       PinotMetricUtils.init(pinotConfiguration);
       Assert.fail("Expected exception thrown");
     } catch (Exception e) {
-      Assert.assertTrue( e instanceof RuntimeException, "Expected RuntimeException");
+      Assert.assertTrue(e instanceof RuntimeException, "Expected RuntimeException");
     }
   }
 
