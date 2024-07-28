@@ -430,8 +430,8 @@ public class SchemaConformingTransformerV2 implements RecordTransformer {
   }
 
   /**
-   * Generate an Lucene document based on the provided key-value pair.
-   * The index document follows this format: "val:key".
+   * Generate a Lucene document based on the provided key-value pair.
+   * The index document follows this format: "val" + jsonKeyValueSeparator + "key".
    * @param kv                               used to generate text index documents
    * @param indexDocuments                   a list to store the generated index documents
    * @param mergedTextIndexDocumentMaxLength which we enforce via truncation during document generation
@@ -472,8 +472,7 @@ public class SchemaConformingTransformerV2 implements RecordTransformer {
     _mergedTextIndexDocumentCount += 1;
     _serverMetrics.setValueOfTableGauge(_tableName, ServerGauge.REALTIME_MERGED_TEXT_IDX_DOCUMENT_AVG_LEN,
         _mergedTextIndexDocumentBytesCount / _mergedTextIndexDocumentCount);
-
-    indexDocuments.add(val + ":" + key);
+    indexDocuments.add(val + _transformerConfig.getJsonKeyValueSeparator() + key);
   }
 
   /**

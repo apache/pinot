@@ -86,6 +86,9 @@ public class SchemaConformingTransformerV2Config extends BaseJsonConfig {
   @JsonPropertyDescription("Dedicated fields to double ingest into json_data column")
   private Set<String> _fieldsToDoubleIngest = new HashSet<>();
 
+  @JsonPropertyDescription("Separator between key and value in json used in the Lucene index. Default is ':'.")
+  private String _jsonKeyValueSeparator;
+
   @JsonCreator
   public SchemaConformingTransformerV2Config(
       @JsonProperty("enableIndexableExtras") @Nullable Boolean enableIndexableExtras,
@@ -101,7 +104,8 @@ public class SchemaConformingTransformerV2Config extends BaseJsonConfig {
       @JsonProperty("mergedTextIndexBinaryDocumentDetectionMinLength")
       @Nullable Integer mergedTextIndexBinaryDocumentDetectionMinLength,
       @JsonProperty("mergedTextIndexPathToExclude") @Nullable Set<String> mergedTextIndexPathToExclude,
-      @JsonProperty("fieldsToDoubleIngest") @Nullable Set<String> fieldsToDoubleIngest
+      @JsonProperty("fieldsToDoubleIngest") @Nullable Set<String> fieldsToDoubleIngest,
+      @JsonProperty("jsonKeyValueSeparator") @Nullable String jsonKeyValueSeparator
   ) {
     setEnableIndexableExtras(enableIndexableExtras);
     setIndexableExtrasField(indexableExtrasField);
@@ -117,6 +121,7 @@ public class SchemaConformingTransformerV2Config extends BaseJsonConfig {
     setMergedTextIndexBinaryDocumentDetectionMinLength(mergedTextIndexBinaryDocumentDetectionMinLength);
     setMergedTextIndexPathToExclude(mergedTextIndexPathToExclude);
     setFieldsToDoubleIngest(fieldsToDoubleIngest);
+    setJsonKeyValueSeparator(jsonKeyValueSeparator);
   }
 
   public SchemaConformingTransformerV2Config setEnableIndexableExtras(Boolean enableIndexableExtras) {
@@ -249,5 +254,13 @@ public class SchemaConformingTransformerV2Config extends BaseJsonConfig {
   public SchemaConformingTransformerV2Config setFieldsToDoubleIngest(Set<String> fieldsToDoubleIngest) {
     _fieldsToDoubleIngest = fieldsToDoubleIngest == null ? _fieldsToDoubleIngest : fieldsToDoubleIngest;
     return this;
+  }
+
+  public String getJsonKeyValueSeparator() {
+    return _jsonKeyValueSeparator;
+  }
+
+  public void setJsonKeyValueSeparator(String jsonKeyValueSeparator) {
+    _jsonKeyValueSeparator = jsonKeyValueSeparator == null ? ":" : jsonKeyValueSeparator;
   }
 }
