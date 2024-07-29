@@ -132,7 +132,7 @@ public class PinotRelDistributionTraitRule extends RelOptRule {
         }
       } catch (Exception e) {
         // ... skip;
-        LOGGER.debug("Failed to derive distribution from input for node: {}", node, e);
+        LOGGER.warn("Failed to derive distribution from input for node: {}", node, e);
       }
     } else if (node instanceof LogicalFilter) {
       assert inputs.size() == 1;
