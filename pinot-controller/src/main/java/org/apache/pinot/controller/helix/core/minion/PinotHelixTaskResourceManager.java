@@ -312,13 +312,13 @@ public class PinotHelixTaskResourceManager {
    * Get all tasks for the given task type.
    *
    * @param taskType Task type
-   * @return Set of task names
+   * @return Set of task names. Null for invalid task type.
    */
+  @Nullable
   public synchronized Set<String> getTasks(String taskType) {
     String helixJobQueueName = getHelixJobQueueName(taskType);
     WorkflowConfig workflowConfig = _taskDriver.getWorkflowConfig(helixJobQueueName);
     if (workflowConfig == null) {
-      LOGGER.info("Task queue: {} for task type: {} does not exist", helixJobQueueName, taskType);
       return null;
     }
     Set<String> helixJobs = workflowConfig.getJobDag().getAllNodes();
