@@ -91,6 +91,7 @@ import org.apache.pinot.query.parser.utils.ParserUtils;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
+import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
@@ -630,6 +631,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       long routingStartTimeNs = System.nanoTime();
       Map<ServerInstance, Pair<List<String>, List<String>>> offlineRoutingTable = null;
       Map<ServerInstance, Pair<List<String>, List<String>>> realtimeRoutingTable = null;
+      String offlineRoutingPolicy = null;
+      String realtimeRoutingPolicy = null;
       List<String> unavailableSegments = new ArrayList<>();
       int numPrunedSegmentsTotal = 0;
       if (offlineBrokerRequest != null) {
@@ -641,6 +644,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
               routingTable.getServerInstanceToSegmentsMap();
           if (!serverInstanceToSegmentsMap.isEmpty()) {
             offlineRoutingTable = serverInstanceToSegmentsMap;
+            offlineRoutingPolicy = getRoutingPolicy(offlineTableConfig);
           } else {
             offlineBrokerRequest = null;
           }
@@ -658,6 +662,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
               routingTable.getServerInstanceToSegmentsMap();
           if (!serverInstanceToSegmentsMap.isEmpty()) {
             realtimeRoutingTable = serverInstanceToSegmentsMap;
+            realtimeRoutingPolicy = getRoutingPolicy(realtimeTableConfig);
           } else {
             realtimeBrokerRequest = null;
           }
@@ -672,12 +677,22 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       List<ProcessingException> exceptions = new ArrayList<>();
       if (numUnavailableSegments > 0) {
         String errorMessage;
-        if (numUnavailableSegments > MAX_UNAVAILABLE_SEGMENTS_TO_PRINT_IN_QUERY_EXCEPTION) {
-          errorMessage = String.format("%d segments unavailable, sampling %d: %s", numUnavailableSegments,
-              MAX_UNAVAILABLE_SEGMENTS_TO_PRINT_IN_QUERY_EXCEPTION,
-              unavailableSegments.subList(0, MAX_UNAVAILABLE_SEGMENTS_TO_PRINT_IN_QUERY_EXCEPTION));
+        String routingPolicy;
+        if (offlineRoutingPolicy != null && realtimeRoutingPolicy != null) {
+          routingPolicy = String.format("%s [realtime], %s [offline]", realtimeRoutingPolicy, offlineRoutingPolicy);
+        } else if (offlineRoutingPolicy != null) {
+          routingPolicy = offlineRoutingPolicy;
         } else {
-          errorMessage = String.format("%d segments unavailable: %s", numUnavailableSegments, unavailableSegments);
+          routingPolicy = realtimeRoutingPolicy;
+        }
+        if (numUnavailableSegments > MAX_UNAVAILABLE_SEGMENTS_TO_PRINT_IN_QUERY_EXCEPTION) {
+          errorMessage =
+              String.format("%d segments unavailable, sampling %d: %s, with routing policy: %s", numUnavailableSegments,
+                  MAX_UNAVAILABLE_SEGMENTS_TO_PRINT_IN_QUERY_EXCEPTION,
+                  unavailableSegments.subList(0, MAX_UNAVAILABLE_SEGMENTS_TO_PRINT_IN_QUERY_EXCEPTION), routingPolicy);
+        } else {
+          errorMessage = String.format("%d segments unavailable: %s, with routing policy: %s", numUnavailableSegments,
+              unavailableSegments, routingPolicy);
         }
         exceptions.add(QueryException.getException(QueryException.BROKER_SEGMENT_UNAVAILABLE_ERROR, errorMessage));
         _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_UNAVAILABLE_SEGMENTS, 1);
@@ -834,6 +849,15 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     } finally {
       Tracing.ThreadAccountantOps.clear();
     }
+  }
+
+  private static String getRoutingPolicy(TableConfig tableConfig) {
+    RoutingConfig routingConfig = tableConfig.getRoutingConfig();
+    if (routingConfig == null) {
+      return RoutingConfig.DEFAULT_INSTANCE_SELECTOR_TYPE;
+    }
+    String selectorType = routingConfig.getInstanceSelectorType();
+    return selectorType != null ? selectorType : RoutingConfig.DEFAULT_INSTANCE_SELECTOR_TYPE;
   }
 
   private BrokerResponseNative getEmptyBrokerOnlyResponse(PinotQuery pinotQuery, RequestContext requestContext,
