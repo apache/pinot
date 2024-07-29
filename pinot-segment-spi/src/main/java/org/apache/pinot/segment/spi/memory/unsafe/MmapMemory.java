@@ -28,6 +28,8 @@ import java.lang.reflect.Method;
 import java.nio.channels.FileChannel;
 import java.util.List;
 import java.util.function.BiConsumer;
+import jnr.ffi.LibraryLoader;
+import jnr.ffi.types.size_t;
 import net.openhft.chronicle.core.Jvm;
 import net.openhft.chronicle.core.OS;
 import net.openhft.posix.MSyncFlag;
@@ -124,6 +126,16 @@ public class MmapMemory implements Memory {
     });
     private final long _address;
     private final UnmapFun _unmapFun;
+    private static final LibC LIB_C;
+    static {
+      LibC libC = null;
+      try {
+        libC = LibraryLoader.create(LibC.class).failImmediately().load("c");
+      } catch (Throwable ignored) {
+        LOGGER.info("Could not load JNR C Library, madvise will not be used for mmap memory.");
+      }
+      LIB_C = libC;
+    }
 
     public MapSection(long address, UnmapFun unmapFun) {
       _address = address;
@@ -136,6 +148,39 @@ public class MmapMemory implements Memory {
 
     public UnmapFun getUnmapFun() {
       return _unmapFun;
+    }
+
+    /**
+     * Call posix_madvise (if available) at the address aligned start of MapSection for size bytes
+     *
+     * Internally posix_madvise operates on pages, so unaligned size would affect all remaining bytes on the page.
+     * _address is expected to be page aligned.
+     * In the future, it may be helpful to expose this to upstream consumers as a "hint()" abstraction in cases where
+     * advice other than MADV_RANDOM perform better (particularly sequential reads on slow filesystems).
+     *
+     * Errors during advise are ignored since this is considered a nice-to-have step.
+     *
+     * @param size Size of the region to set advice for.
+     * @param advice Specific advice to apply (see the LibC interface for options)
+     */
+    protected void madvise(long size, int advice) {
+      if (LIB_C != null) {
+        LIB_C.posix_madvise(_address, size, advice);
+      }
+    }
+
+    protected void madvise(long size) {
+      String defaultAdvice = System.getenv("PINOT_MMAP_ADVICE");
+      if (defaultAdvice == null) {
+        madvise(size, LibC.POSIX_MADV_RANDOM);
+      } else {
+        try {
+          int advice = Integer.parseInt(defaultAdvice);
+          madvise(size, advice);
+        } catch (NumberFormatException ignored) {
+          LOGGER.warn("Invalid value specified for PINOT_MMAP_ADVICE. Expects a posix compatible integer");
+        }
+      }
     }
   }
 
@@ -218,6 +263,7 @@ public class MmapMemory implements Memory {
         long mapSize = size + pagePosition;
 
         MapSection map0Section = map0(fc, readOnly, mapPosition, mapSize);
+        map0Section.madvise(mapSize);
         return new MapSection(map0Section.getAddress() + pagePosition, map0Section.getUnmapFun());
       } catch (InvocationTargetException | IllegalAccessException e) {
         throw new RuntimeException("Cannot map file " + file + " from address " + offset + " with size " + size, e);
@@ -369,4 +415,17 @@ public class MmapMemory implements Memory {
   private interface Finder<C> {
     C tryFind() throws NoSuchMethodException, ClassNotFoundException;
   }
+
+  // CHECKSTYLE:OFF
+  protected interface LibC {
+    public static final int POSIX_MADV_NORMAL = 0; /* No further special treatment */
+    public static final int POSIX_MADV_RANDOM = 1; /* Expect random page references */
+    public static final int POSIX_MADV_SEQUENTIAL = 2; /* Expect sequential page references */
+    public static final int POSIX_MADV_WILLNEED = 3; /* Will need these pages */
+    public static final int POSIX_MADV_DONTNEED = 4; /* Don't need these pages */
+
+    @SuppressWarnings({"UnusedReturnValue"})
+    int posix_madvise(@size_t long address, @size_t long size, int advice);
+  }
+  // CHECKSTYLE:ON
 }
