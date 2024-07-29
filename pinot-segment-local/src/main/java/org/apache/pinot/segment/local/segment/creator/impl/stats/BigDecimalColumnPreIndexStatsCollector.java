@@ -51,7 +51,9 @@ public class BigDecimalColumnPreIndexStatsCollector extends AbstractColumnStatis
       int length = BigDecimalUtils.byteSize(value);
       addressSorted(value);
       if (_values.add(value)) {
-        updatePartition(value);
+        if (isPartitionEnabled()) {
+          updatePartition(value.toPlainString());
+        }
         _minLength = Math.min(_minLength, length);
         _maxLength = Math.max(_maxLength, length);
         _maxRowLength = _maxLength;

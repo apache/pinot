@@ -20,12 +20,16 @@ package org.apache.pinot.segment.local.segment.index.forward;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.io.writer.impl.FixedBitMVForwardIndexWriter;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBitMVForwardIndexReader;
 import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -82,6 +86,22 @@ public class FixedBitMVForwardIndexTest {
           int numValues = reader.getDictIdMV(i, valueBuffer, readerContext);
           for (int j = 0; j < numValues; j++) {
             assertEquals(valueBuffer[j], valuesArray[i][j]);
+          }
+        }
+      }
+
+      // Byte range test
+      try (PinotDataBuffer dataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(INDEX_FILE);
+          FixedBitMVForwardIndexReader reader = new FixedBitMVForwardIndexReader(dataBuffer, NUM_DOCS, totalNumValues,
+              numBitsPerValue); FixedBitMVForwardIndexReader.Context readerContext = reader.createContext()) {
+        Assert.assertTrue(reader.isBufferByteRangeInfoSupported());
+        Assert.assertFalse(reader.isFixedOffsetMappingType());
+        List<ForwardIndexReader.ByteRange> rangeList = new ArrayList<>();
+        for (int i = 0; i < NUM_DOCS; i++) {
+          try {
+            reader.recordDocIdByteRanges(i, readerContext, rangeList);
+          } catch (Exception e) {
+            Assert.fail("Should not throw exception when calling recordDocIdByteRanges()", e);
           }
         }
       }

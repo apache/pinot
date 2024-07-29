@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.controller.api.resources;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiKeyAuthDefinition;
@@ -42,12 +41,14 @@ import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.helix.model.IdealState;
-import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
+import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -63,12 +64,19 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
 
-@Api(tags = Constants.TABLE_TAG, authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY)})
-@SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = @ApiKeyAuthDefinition(name =
-    HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = SWAGGER_AUTHORIZATION_KEY)))
+@Api(tags = Constants.TABLE_TAG, authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY),
+    @Authorization(value = DATABASE)})
+@SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = {
+    @ApiKeyAuthDefinition(name = HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER,
+        key = SWAGGER_AUTHORIZATION_KEY,
+        description = "The format of the key is  ```\"Basic <token>\" or \"Bearer <token>\"```"),
+    @ApiKeyAuthDefinition(name = DATABASE, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = DATABASE,
+        description = "Database context passed through http header. If no context is provided 'default' database "
+            + "context will be considered.")}))
 @Path("/")
 public class PinotRealtimeTableResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotRealtimeTableResource.class);
@@ -94,9 +102,11 @@ public class PinotRealtimeTableResource {
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Pause consumption of a realtime table", notes = "Pause the consumption of a realtime table")
   public Response pauseConsumption(
-      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName) {
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
+      @Context HttpHeaders headers) {
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
     String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
-    validate(tableNameWithType);
+    validateTable(tableNameWithType);
     try {
       return Response.ok(_pinotLLCRealtimeSegmentManager.pauseConsumption(tableNameWithType)).build();
     } catch (Exception e) {
@@ -110,17 +120,27 @@ public class PinotRealtimeTableResource {
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Resume consumption of a realtime table", notes =
       "Resume the consumption for a realtime table. ConsumeFrom parameter indicates from which offsets "
-          + "consumption should resume. If consumeFrom parameter is not provided, consumption continues based on the "
-          + "offsets in segment ZK metadata, and in case the offsets are already gone, the first available offsets are "
-          + "picked to minimize the data loss.")
+          + "consumption should resume. Recommended value is 'lastConsumed', which indicates consumption should "
+          + "continue based on the offsets in segment ZK metadata, and in case the offsets are already gone, the first "
+          + "available offsets are picked to minimize the data loss.")
   public Response resumeConsumption(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "smallest | largest") @QueryParam("consumeFrom") String consumeFrom) {
+      @ApiParam(
+          value = "lastConsumed (safer) | smallest (repeat rows) | largest (miss rows)",
+          allowableValues = "lastConsumed, smallest, largest",
+          defaultValue = "lastConsumed"
+      )
+      @QueryParam("consumeFrom") String consumeFrom, @Context HttpHeaders headers) {
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
     String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
-    validate(tableNameWithType);
+    validateTable(tableNameWithType);
+    if ("lastConsumed".equalsIgnoreCase(consumeFrom)) {
+      consumeFrom = null;
+    }
     if (consumeFrom != null && !consumeFrom.equalsIgnoreCase("smallest") && !consumeFrom.equalsIgnoreCase("largest")) {
       throw new ControllerApplicationException(LOGGER,
-          String.format("consumeFrom param '%s' is not valid.", consumeFrom), Response.Status.BAD_REQUEST);
+          String.format("consumeFrom param '%s' is not valid. Valid values are 'lastConsumed', 'smallest' and "
+                  + "'largest'.", consumeFrom), Response.Status.BAD_REQUEST);
     }
     try {
       return Response.ok(_pinotLLCRealtimeSegmentManager.resumeConsumption(tableNameWithType, consumeFrom)).build();
@@ -137,19 +157,34 @@ public class PinotRealtimeTableResource {
       notes = "Force commit the current segments in consuming state and restart consumption. "
           + "This should be used after schema/table config changes. "
           + "Please note that this is an asynchronous operation, "
-          + "and 200 response does not mean it has actually been done already")
+          + "and 200 response does not mean it has actually been done already."
+          + "If specific partitions or consuming segments are provided, "
+          + "only those partitions or consuming segments will be force committed.")
   public Map<String, String> forceCommit(
-      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName)
-      throws JsonProcessingException {
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "Comma separated list of partition group IDs to be committed") @QueryParam("partitions")
+      String partitionGroupIds,
+      @ApiParam(value = "Comma separated list of consuming segments to be committed") @QueryParam("segments")
+      String consumingSegments, @Context HttpHeaders headers) {
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
+    if (partitionGroupIds != null && consumingSegments != null) {
+      throw new ControllerApplicationException(LOGGER, "Cannot specify both partitions and segments to commit",
+          Response.Status.BAD_REQUEST);
+    }
+    long startTimeMs = System.currentTimeMillis();
     String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
-    validate(tableNameWithType);
+    validateTable(tableNameWithType);
     Map<String, String> response = new HashMap<>();
     try {
-      Set<String> consumingSegmentsForceCommitted = _pinotLLCRealtimeSegmentManager.forceCommit(tableNameWithType);
+      Set<String> consumingSegmentsForceCommitted =
+          _pinotLLCRealtimeSegmentManager.forceCommit(tableNameWithType, partitionGroupIds, consumingSegments);
       response.put("forceCommitStatus", "SUCCESS");
       try {
         String jobId = UUID.randomUUID().toString();
-        _pinotHelixResourceManager.addNewForceCommitJob(tableNameWithType, jobId, consumingSegmentsForceCommitted);
+        if (!_pinotHelixResourceManager.addNewForceCommitJob(tableNameWithType, jobId, startTimeMs,
+                consumingSegmentsForceCommitted)) {
+          throw new IllegalStateException("Failed to update table jobs ZK metadata");
+        }
         response.put("jobMetaZKWriteStatus", "SUCCESS");
         response.put("forceCommitJobId", jobId);
       } catch (Exception e) {
@@ -205,9 +240,11 @@ public class PinotRealtimeTableResource {
   @ApiOperation(value = "Return pause status of a realtime table",
       notes = "Return pause status of a realtime table along with list of consuming segments.")
   public Response getPauseStatus(
-      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName) {
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
+      @Context HttpHeaders headers) {
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
     String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
-    validate(tableNameWithType);
+    validateTable(tableNameWithType);
     try {
       return Response.ok().entity(_pinotLLCRealtimeSegmentManager.getPauseStatus(tableNameWithType)).build();
     } catch (Exception e) {
@@ -229,7 +266,9 @@ public class PinotRealtimeTableResource {
   })
   public ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap getConsumingSegmentsInfo(
       @ApiParam(value = "Realtime table name with or without type", required = true,
-          example = "myTable | myTable_REALTIME") @PathParam("tableName") String realtimeTableName) {
+          example = "myTable | myTable_REALTIME") @PathParam("tableName") String realtimeTableName,
+      @Context HttpHeaders headers) {
+    realtimeTableName = DatabaseUtils.translateTableName(realtimeTableName, headers);
     try {
       TableType tableType = TableNameBuilder.getTableTypeFromTableName(realtimeTableName);
       if (TableType.OFFLINE == tableType) {
@@ -247,7 +286,7 @@ public class PinotRealtimeTableResource {
     }
   }
 
-  private void validate(String tableNameWithType) {
+  private void validateTable(String tableNameWithType) {
     IdealState idealState = _pinotHelixResourceManager.getTableIdealState(tableNameWithType);
     if (idealState == null) {
       throw new ControllerApplicationException(LOGGER, String.format("Table %s not found!", tableNameWithType),

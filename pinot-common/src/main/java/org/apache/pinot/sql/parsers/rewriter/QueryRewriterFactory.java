@@ -33,10 +33,14 @@ public class QueryRewriterFactory {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryRewriterFactory.class);
 
+  // NOTE:
+  //   OrdinalsUpdater must be applied after AliasApplier because OrdinalsUpdater can put the select expression
+  //   (reference) into the group-by list, but the alias should not be applied to the reference.
+  //   E.g. SELECT a + 1 AS a FROM table GROUP BY 1
   public static final List<String> DEFAULT_QUERY_REWRITERS_CLASS_NAMES =
       ImmutableList.of(CompileTimeFunctionsInvoker.class.getName(), SelectionsRewriter.class.getName(),
-          PredicateComparisonRewriter.class.getName(), OrdinalsUpdater.class.getName(),
-          AliasApplier.class.getName(), NonAggregationGroupByToDistinctQueryRewriter.class.getName());
+          PredicateComparisonRewriter.class.getName(), AliasApplier.class.getName(), OrdinalsUpdater.class.getName(),
+          NonAggregationGroupByToDistinctQueryRewriter.class.getName());
 
   public static void init(String queryRewritersClassNamesStr) {
     List<String> queryRewritersClassNames =

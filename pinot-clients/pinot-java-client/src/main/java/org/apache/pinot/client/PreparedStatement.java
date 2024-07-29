@@ -35,11 +35,6 @@ public class PreparedStatement {
     _parameters = new String[getQuestionMarkCount(query)];
   }
 
-  @Deprecated
-  PreparedStatement(Connection connection, Request request) {
-    this(connection, request.getQuery());
-  }
-
   private int getQuestionMarkCount(String query) {
     int questionMarkCount = 0;
     int index = query.indexOf('?');

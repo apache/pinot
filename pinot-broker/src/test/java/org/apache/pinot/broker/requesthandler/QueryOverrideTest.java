@@ -19,9 +19,11 @@
 package org.apache.pinot.broker.requesthandler;
 
 import com.google.common.collect.ImmutableSet;
+import java.io.IOException;
 import java.util.Arrays;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.request.RequestUtils;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.testng.annotations.Test;
 
@@ -48,7 +50,7 @@ public class QueryOverrideTest {
 
   private void testLimitOverride(String query, int expectedLimit) {
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
-    BaseBrokerRequestHandler.handleQueryLimitOverride(pinotQuery, QUERY_LIMIT);
+    BaseSingleStageBrokerRequestHandler.handleQueryLimitOverride(pinotQuery, QUERY_LIMIT);
     assertEquals(pinotQuery.getLimit(), expectedLimit);
   }
 
@@ -56,11 +58,30 @@ public class QueryOverrideTest {
   public void testDistinctCountOverride() {
     String query = "SELECT DISTINCT_COUNT(col1) FROM myTable";
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
-    BaseBrokerRequestHandler.handleSegmentPartitionedDistinctCountOverride(pinotQuery, ImmutableSet.of("col2", "col3"));
+    BaseSingleStageBrokerRequestHandler.handleSegmentPartitionedDistinctCountOverride(pinotQuery,
+        ImmutableSet.of("col2", "col3"));
     assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "distinctcount");
-    BaseBrokerRequestHandler.handleSegmentPartitionedDistinctCountOverride(pinotQuery,
+    BaseSingleStageBrokerRequestHandler.handleSegmentPartitionedDistinctCountOverride(pinotQuery,
         ImmutableSet.of("col1", "col2", "col3"));
     assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "segmentpartitioneddistinctcount");
+  }
+
+  @Test
+  public void testDistinctMultiValuedOverride()
+      throws IOException {
+    String query1 = "SELECT DISTINCT_COUNT(col1) FROM myTable";
+    PinotQuery pinotQuery1 = CalciteSqlParser.compileToPinotQuery(query1);
+    String query2 = "SELECT DISTINCT_COUNT(col2) FROM myTable";
+    PinotQuery pinotQuery2 = CalciteSqlParser.compileToPinotQuery(query2);
+    Schema tableSchema = Schema.fromString("{\"schemaName\":\"testSchema\","
+        + "\"dimensionFieldSpecs\":[ {\"name\":\"col2\",\"dataType\":\"LONG\",\"singleValueField\":\"false\"},"
+        + "{\"name\":\"col3\",\"dataType\":\"LONG\",\"singleValueField\":\"false\"}],"
+        + "\"dateTimeFieldSpecs\":[{\"name\":\"dt1\",\"dataType\":\"INT\",\"format\":\"x:HOURS:EPOCH\","
+        + "\"granularity\":\"1:HOURS\"}]}");
+    BaseSingleStageBrokerRequestHandler.handleDistinctMultiValuedOverride(pinotQuery1, tableSchema);
+    assertEquals(pinotQuery1.getSelectList().get(0).getFunctionCall().getOperator(), "distinctcount");
+    BaseSingleStageBrokerRequestHandler.handleDistinctMultiValuedOverride(pinotQuery2, tableSchema);
+    assertEquals(pinotQuery2.getSelectList().get(0).getFunctionCall().getOperator(), "distinctcountmv");
   }
 
   @Test
@@ -69,7 +90,7 @@ public class QueryOverrideTest {
       String query = "SELECT DISTINCT_COUNT(col1) FROM myTable GROUP BY col2 HAVING DISTINCT_COUNT(col1) > 10 "
           + "ORDER BY DISTINCT_COUNT(col1) DESC";
       PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
-      BaseBrokerRequestHandler.handleApproximateFunctionOverride(pinotQuery);
+      BaseSingleStageBrokerRequestHandler.handleApproximateFunctionOverride(pinotQuery);
       assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "distinctcountsmarthll");
       assertEquals(
           pinotQuery.getOrderByList().get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(),
@@ -80,22 +101,22 @@ public class QueryOverrideTest {
 
       query = "SELECT DISTINCT_COUNT_MV(col1) FROM myTable";
       pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
-      BaseBrokerRequestHandler.handleApproximateFunctionOverride(pinotQuery);
+      BaseSingleStageBrokerRequestHandler.handleApproximateFunctionOverride(pinotQuery);
       assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "distinctcountsmarthll");
 
       query = "SELECT DISTINCT col1 FROM myTable";
       pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
-      BaseBrokerRequestHandler.handleApproximateFunctionOverride(pinotQuery);
+      BaseSingleStageBrokerRequestHandler.handleApproximateFunctionOverride(pinotQuery);
       assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "distinct");
 
       query = "SELECT DISTINCT_COUNT_HLL(col1) FROM myTable";
       pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
-      BaseBrokerRequestHandler.handleApproximateFunctionOverride(pinotQuery);
+      BaseSingleStageBrokerRequestHandler.handleApproximateFunctionOverride(pinotQuery);
       assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "distinctcounthll");
 
       query = "SELECT DISTINCT_COUNT_BITMAP(col1) FROM myTable";
       pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
-      BaseBrokerRequestHandler.handleApproximateFunctionOverride(pinotQuery);
+      BaseSingleStageBrokerRequestHandler.handleApproximateFunctionOverride(pinotQuery);
       assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "distinctcountbitmap");
     }
 
@@ -103,7 +124,7 @@ public class QueryOverrideTest {
         "SELECT PERCENTILE_MV(col1, 95) FROM myTable", "SELECT PERCENTILE95(col1) FROM myTable",
         "SELECT PERCENTILE95MV(col1) FROM myTable")) {
       PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
-      BaseBrokerRequestHandler.handleApproximateFunctionOverride(pinotQuery);
+      BaseSingleStageBrokerRequestHandler.handleApproximateFunctionOverride(pinotQuery);
       assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "percentilesmarttdigest");
       assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(1),
           RequestUtils.getLiteralExpression(95));
@@ -111,12 +132,12 @@ public class QueryOverrideTest {
     {
       String query = "SELECT PERCENTILE_TDIGEST(col1, 95) FROM myTable";
       PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
-      BaseBrokerRequestHandler.handleApproximateFunctionOverride(pinotQuery);
+      BaseSingleStageBrokerRequestHandler.handleApproximateFunctionOverride(pinotQuery);
       assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "percentiletdigest");
 
       query = "SELECT PERCENTILE_EST(col1, 95) FROM myTable";
       pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
-      BaseBrokerRequestHandler.handleApproximateFunctionOverride(pinotQuery);
+      BaseSingleStageBrokerRequestHandler.handleApproximateFunctionOverride(pinotQuery);
       assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "percentileest");
     }
   }

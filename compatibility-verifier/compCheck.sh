@@ -46,20 +46,32 @@ cmdName=`basename $0`
 source `dirname $0`/utils.inc
 
 function cleanupControllerDirs() {
-  local dirName=$(grep -F controller.data.dir ${CONTROLLER_CONF} | awk '{print $3}')
-  if [ ! -z "$dirName" ]; then
-    ${RM} -rf ${dirName}
+  local dirName=$(grep -F controller.data.dir "${CONTROLLER_CONF}" | awk '{print $3}')
+  if [ -n "$dirName" ]; then
+    ${RM} -rf "${dirName}"
   fi
 }
 
 function cleanupServerDirs() {
-  local dirName=$(grep -F pinot.server.instance.dataDir ${SERVER_CONF} | awk '{print $3}')
-  if [ ! -z "$dirName" ]; then
-    ${RM} -rf ${dirName}
+  local dirName=$(grep -F pinot.server.instance.dataDir "${SERVER_CONF}" | awk '{print $3}')
+  if [ -n "$dirName" ]; then
+    ${RM} -rf "${dirName}"
   fi
-  dirName=$(grep -F pinot.server.instance.segmentTarDir ${SERVER_CONF} | awk '{print $3}')
-  if [ ! -z "$dirName" ]; then
-    ${RM} -rf ${dirName}
+  dirName=$(grep -F pinot.server.instance.segmentTarDir "${SERVER_CONF}" | awk '{print $3}')
+  if [ -n "$dirName" ]; then
+    ${RM} -rf "${dirName}"
+  fi
+
+  # Cleanup directories for server 2 if a second server is configured
+  if [ -f "${SERVER_CONF_2}" ]; then
+    local dirName=$(grep -F pinot.server.instance.dataDir "${SERVER_CONF_2}" | awk '{print $3}')
+      if [ -n "$dirName" ]; then
+        ${RM} -rf "${dirName}"
+      fi
+      dirName=$(grep -F pinot.server.instance.segmentTarDir "${SERVER_CONF_2}" | awk '{print $3}')
+      if [ -n "$dirName" ]; then
+        ${RM} -rf "${dirName}"
+      fi
   fi
 }
 
@@ -78,9 +90,9 @@ function waitForZkReady() {
   status=1
   while [ $status -ne 0 ]; do
     sleep 1
-    echo Checking port ${ZK_PORT} for zk ready
+    echo "Checking port ${ZK_PORT} for zk ready"
     echo x | nc localhost ${ZK_PORT} 1>/dev/null 2>&1
-    status=$(echo $?)
+    status=$?
   done
 }
 
@@ -88,9 +100,9 @@ function waitForControllerReady() {
   status=1
   while [ $status -ne 0 ]; do
     sleep 1
-    echo Checking port ${CONTROLLER_PORT} for controller ready
+    echo "Checking port ${CONTROLLER_PORT} for controller ready"
     curl localhost:${CONTROLLER_PORT}/health 1>/dev/null 2>&1
-    status=$(echo $?)
+    status=$?
   done
 }
 
@@ -98,9 +110,9 @@ function waitForKafkaReady() {
   status=1
   while [ $status -ne 0 ]; do
     sleep 1
-    echo Checking port 19092 for kafka ready
+    echo "Checking port 19092 for kafka ready"
     echo x | nc localhost 19092 1>/dev/null 2>&1
-    status=$(echo $?)
+    status=$?
   done
 }
 
@@ -108,9 +120,9 @@ function waitForBrokerReady() {
   local status=1
   while [ $status -ne 0 ]; do
     sleep 1
-    echo Checking port ${BROKER_QUERY_PORT} for broker ready
+    echo "Checking port ${BROKER_QUERY_PORT} for broker ready"
     curl localhost:${BROKER_QUERY_PORT}/debug/routingTable 1>/dev/null 2>&1
-    status=$(echo $?)
+    status=$?
   done
 }
 
@@ -118,15 +130,31 @@ function waitForServerReady() {
   local status=1
   while [ $status -ne 0 ]; do
     sleep 1
-    echo Checking port ${SERVER_ADMIN_PORT} for server ready
+    echo "Checking port ${SERVER_ADMIN_PORT} for server ready"
     curl localhost:${SERVER_ADMIN_PORT}/health 1>/dev/null 2>&1
-    status=$(echo $?)
+    status=$?
+  done
+}
+
+function waitForServer2Ready() {
+  local status=1
+  while [ $status -ne 0 ]; do
+    sleep 1
+    echo "Checking port ${SERVER_2_ADMIN_PORT} for server ready"
+    curl localhost:${SERVER_2_ADMIN_PORT}/health 1>/dev/null 2>&1
+    status=$?
   done
 }
 
 function waitForClusterReady() {
   waitForBrokerReady
   waitForServerReady
+
+  # Check second server if configured
+  if [ -f "${SERVER_CONF_2}" ]; then
+      waitForServer2Ready
+  fi
+
   waitForKafkaReady
 }
 
@@ -164,6 +192,9 @@ function startService() {
   elif [ "$serviceName" = "server" ]; then
     ./pinot-admin.sh StartServer ${configFileArg} 1>${LOG_DIR}/server.${logCount}.log 2>&1 &
     echo $! >${PID_DIR}/server.pid
+  elif [ "$serviceName" = "server2" ]; then
+    ./pinot-admin.sh StartServer ${configFileArg} 1>${LOG_DIR}/server2.${logCount}.log 2>&1 &
+        echo $! >${PID_DIR}/server2.pid
   elif [ "$serviceName" = "kafka" ]; then
     ./pinot-admin.sh StartKafka -zkAddress localhost:${ZK_PORT}/kafka 1>${LOG_DIR}/kafka.${logCount}.log 2>&1 &
     echo $! >${PID_DIR}/kafka.pid
@@ -207,6 +238,12 @@ function startServices() {
   waitForControllerReady
   startService broker "$dirName" "$BROKER_CONF"
   startService server "$dirName" "$SERVER_CONF"
+
+  # Start second server if configured
+  if [ -f "${SERVER_CONF_2}" ]; then
+    startService server2 "$dirName" "$SERVER_CONF_2"
+  fi
+
   startService kafka "$dirName" "unused"
   echo "Cluster started."
   waitForClusterReady
@@ -217,8 +254,20 @@ function stopServices() {
   stopService controller
   stopService broker
   stopService server
+
+  # Stop second server if configured
+  if [ -f "${SERVER_CONF_2}" ]; then
+    stopService server2
+  fi
+
   stopService zookeeper
   stopService kafka
+  echo "Controller logs:"
+  cat ${LOG_DIR}/controller.*.log
+  echo "Broker logs:"
+  cat ${LOG_DIR}/broker.*.log
+  echo "Server logs:"
+  cat ${LOG_DIR}/server.*.log
   echo "Cluster stopped."
 }
 
@@ -248,23 +297,50 @@ function setupControllerVariables() {
 function setupBrokerVariables() {
   if [ -f ${BROKER_CONF} ]; then
     local port=$(grep -F pinot.broker.client.queryPort ${BROKER_CONF} | awk '{print $3}')
-    if [ ! -z "$port" ]; then
+    if [ -n "$port" ]; then
       BROKER_QUERY_PORT=$port
     fi
   fi
 }
 
 function setupServerVariables() {
-  if [ -f ${SERVER_CONF} ]; then
+  if [ -f "${SERVER_CONF}" ]; then
     local port
-    port=$(grep -F pinot.server.adminapi.port ${SERVER_CONF} | awk '{print $3}')
-    if [ ! -z "$port" ]; then
+    port=$(grep -F pinot.server.adminapi.port "${SERVER_CONF}" | awk '{print $3}')
+    if [ -n "$port" ]; then
       SERVER_ADMIN_PORT=$port
     fi
-    port=$(grep -F pinot.server.netty.port ${SERVER_CONF} | awk '{print $3}')
-    if [ ! -z "$port" ]; then
+    port=$(grep -F pinot.server.netty.port "${SERVER_CONF}" | awk '{print $3}')
+    if [ -n "$port" ]; then
       SERVER_NETTY_PORT=$port
     fi
+    port=$(grep -F pinot.server.grpc.port "${SERVER_CONF}" | awk '{print $3}')
+    if [ -n "$port" ]; then
+      SERVER_GRPC_PORT=$port
+    fi
+  fi
+
+  if [ -f "${SERVER_CONF_2}" ]; then
+    local port
+    port=$(grep -F pinot.server.adminapi.port "${SERVER_CONF_2}" | awk '{print $3}')
+    if [ -n "$port" ]; then
+      SERVER_2_ADMIN_PORT=$port
+    fi
+    port=$(grep -F pinot.server.netty.port "${SERVER_CONF_2}" | awk '{print $3}')
+    if [ -n "$port" ]; then
+      SERVER_2_NETTY_PORT=$port
+    fi
+    port=$(grep -F pinot.server.grpc.port "${SERVER_CONF_2}" | awk '{print $3}')
+    if [ -n "$port" ]; then
+      SERVER_2_GRPC_PORT=$port
+    fi
+  fi
+}
+
+function checkPortAvailable() {
+  if lsof -t -i:"$1" -s TCP:LISTEN; then
+    echo "Port number $1 not available. Check any existing process that may be using this port."
+    return 1
   fi
 }
 
@@ -314,6 +390,7 @@ COMPAT_TESTER_PATH="pinot-compatibility-verifier/target/pinot-compatibility-veri
 BROKER_CONF=${testSuiteDir}/config/BrokerConfig.properties
 CONTROLLER_CONF=${testSuiteDir}/config/ControllerConfig.properties
 SERVER_CONF=${testSuiteDir}/config/ServerConfig.properties
+SERVER_CONF_2=${testSuiteDir}/config/ServerConfig2.properties
 
 cleanupControllerDirs
 cleanupServerDirs
@@ -322,7 +399,11 @@ BROKER_QUERY_PORT=8099
 ZK_PORT=2181
 CONTROLLER_PORT=9000
 SERVER_ADMIN_PORT=8097
+SERVER_2_ADMIN_PORT=9097
 SERVER_NETTY_PORT=8098
+SERVER_2_NETTY_PORT=9098
+SERVER_GRPC_PORT=8090
+SERVER_2_GRPC_PORT=9090
 
 PID_DIR=${workingDir}/pids
 LOG_DIR=${workingDir}/logs
@@ -344,9 +425,9 @@ newTargetDir="$workingDir"/newTargetDir
 setupCompatTester
 
 # check that the default ports are open
-if [ "$(lsof -t -i:${SERVER_ADMIN_PORT} -s TCP:LISTEN)" ] || [ "$(lsof -t -i:${SERVER_NETTY_PORT} -sTCP:LISTEN)" ] || [ "$(lsof -t -i:${BROKER_QUERY_PORT} -sTCP:LISTEN)" ] ||
-  [ "$(lsof -t -i:${CONTROLLER_PORT} -sTCP:LISTEN)" ] || [ "$(lsof -t -i:${ZK_PORT} -sTCP:LISTEN)" ]; then
-  echo "Cannot start the components since the default ports are not open. Check any existing process that may be using the default ports."
+if ! checkPortAvailable ${SERVER_ADMIN_PORT} || ! checkPortAvailable ${SERVER_NETTY_PORT} || ! checkPortAvailable ${SERVER_GRPC_PORT} ||
+  ! checkPortAvailable ${BROKER_QUERY_PORT} || ! checkPortAvailable ${CONTROLLER_PORT} || ! checkPortAvailable ${ZK_PORT} ||
+  { [ -f "${SERVER_CONF_2}" ] && { ! checkPortAvailable ${SERVER_2_ADMIN_PORT} || ! checkPortAvailable ${SERVER_2_NETTY_PORT} || ! checkPortAvailable ${SERVER_2_GRPC_PORT}; } ; }; then
   exit 1
 fi
 
@@ -363,10 +444,11 @@ if [ -f $testSuiteDir/pre-controller-upgrade.yaml ]; then
     if [ $keepClusterOnFailure == "false" ]; then
       stopServices
     fi
-    echo Failed before controller upgrade
+    echo "Failed before controller upgrade"
     exit 1
   fi
 fi
+
 echo "Upgrading controller"
 stopService controller
 startService controller "$newTargetDir" "$CONTROLLER_CONF"
@@ -380,14 +462,16 @@ if [ -f $testSuiteDir/pre-broker-upgrade.yaml ]; then
     if [ $keepClusterOnFailure == "false" ]; then
       stopServices
     fi
-    echo Failed before broker upgrade
+    echo "Failed before broker upgrade"
     exit 1
   fi
 fi
+
 echo "Upgrading broker"
 stopService broker
 startService broker "$newTargetDir" "$BROKER_CONF"
 waitForBrokerReady
+
 if [ -f $testSuiteDir/pre-server-upgrade.yaml ]; then
   echo "Running tests after broker upgrade"
   genNum=$((genNum+1))
@@ -396,14 +480,16 @@ if [ -f $testSuiteDir/pre-server-upgrade.yaml ]; then
     if [ $keepClusterOnFailure == "false" ]; then
       stopServices
     fi
-    echo Failed before server upgrade
+    echo "Failed before server upgrade"
     exit 1
   fi
 fi
+
 echo "Upgrading server"
 stopService server
 startService server "$newTargetDir" "$SERVER_CONF"
 waitForServerReady
+
 if [ -f $testSuiteDir/post-server-upgrade.yaml ]; then
   echo "Running tests after server upgrade"
   genNum=$((genNum+1))
@@ -412,8 +498,47 @@ if [ -f $testSuiteDir/post-server-upgrade.yaml ]; then
     if [ $keepClusterOnFailure == "false" ]; then
       stopServices
     fi
-    echo Failed after server upgrade
+    echo "Failed after server upgrade"
     exit 1
+  fi
+fi
+
+if [ -f "${SERVER_CONF_2}" ]; then
+  echo "Upgrading server 2"
+  stopService server2
+  startService server2 "$newTargetDir" "$SERVER_CONF_2"
+  waitForServer2Ready
+
+  if [ -f $testSuiteDir/post-server-2-upgrade.yaml ]; then
+    echo "Running tests after server 2 upgrade"
+    genNum=$((genNum+1))
+    $COMPAT_TESTER $testSuiteDir/post-server-2-upgrade.yaml $genNum
+    if [ $? -ne 0 ]; then
+      if [ $keepClusterOnFailure == "false" ]; then
+        stopServices
+      fi
+      echo "Failed after server 2 upgrade"
+      exit 1
+    fi
+  fi
+
+  echo "Downgrading server 2"
+  # Upgrade completed, now do a rollback
+  stopService server2
+  startService server2 "$oldTargetDir" "$SERVER_CONF_2"
+  waitForServer2Ready
+
+  if [ -f $testSuiteDir/post-server-2-rollback.yaml ]; then
+    echo "Running tests after server 2 downgrade"
+    genNum=$((genNum+1))
+    $COMPAT_TESTER $testSuiteDir/post-server-2-rollback.yaml $genNum
+    if [ $? -ne 0 ]; then
+      if [ $keepClusterOnFailure == "false" ]; then
+        stopServices
+      fi
+      echo "Failed after server 2 downgrade"
+      exit 1
+    fi
   fi
 fi
 
@@ -422,6 +547,7 @@ echo "Downgrading server"
 stopService server
 startService server "$oldTargetDir" "$SERVER_CONF"
 waitForServerReady
+
 if [ -f $testSuiteDir/post-server-rollback.yaml ]; then
   echo "Running tests after server downgrade"
   genNum=$((genNum+1))
@@ -430,14 +556,16 @@ if [ -f $testSuiteDir/post-server-rollback.yaml ]; then
     if [ $keepClusterOnFailure == "false" ]; then
       stopServices
     fi
-    echo Failed after server downgrade
+    echo "Failed after server downgrade"
     exit 1
   fi
 fi
+
 echo "Downgrading broker"
 stopService broker
 startService broker "$oldTargetDir" "$BROKER_CONF"
 waitForBrokerReady
+
 if [ -f $testSuiteDir/post-broker-rollback.yaml ]; then
   echo "Running tests after broker downgrade"
   genNum=$((genNum+1))
@@ -446,15 +574,17 @@ if [ -f $testSuiteDir/post-broker-rollback.yaml ]; then
     if [ $keepClusterOnFailure == "false" ]; then
       stopServices
     fi
-    echo Failed after broker downgrade
+    echo "Failed after broker downgrade"
     exit 1
   fi
 fi
+
 echo "Downgrading controller"
 stopService controller
 startService controller "$oldTargetDir" "$CONTROLLER_CONF"
 waitForControllerReady
 waitForControllerReady
+
 if [ -f $testSuiteDir/post-controller-rollback.yaml ]; then
   echo "Running tests after controller downgrade"
   genNum=$((genNum+1))
@@ -463,10 +593,11 @@ if [ -f $testSuiteDir/post-controller-rollback.yaml ]; then
     if [ $keepClusterOnFailure == "false" ]; then
       stopServices
     fi
-    echo Failed after controller downgrade
+    echo "Failed after controller downgrade"
     exit 1
   fi
 fi
+
 stopServices
 
 echo "All tests passed"

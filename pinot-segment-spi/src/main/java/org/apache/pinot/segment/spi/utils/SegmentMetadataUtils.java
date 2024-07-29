@@ -21,7 +21,8 @@ package org.apache.pinot.segment.spi.utils;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.util.Map;
-import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.commons.configuration2.PropertiesConfiguration;
+import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
@@ -32,22 +33,24 @@ public class SegmentMetadataUtils {
   private SegmentMetadataUtils() {
   }
 
-  public static PropertiesConfiguration getPropertiesConfiguration(File indexDir) {
+  public static PropertiesConfiguration getPropertiesConfiguration(File indexDir)
+      throws ConfigurationException {
     File metadataFile = SegmentDirectoryPaths.findMetadataFile(indexDir);
     Preconditions.checkNotNull(metadataFile, "Cannot find segment metadata file under directory: %s", indexDir);
     return CommonsConfigurationUtils.fromFile(metadataFile);
   }
 
-  public static PropertiesConfiguration getPropertiesConfiguration(SegmentMetadata segmentMetadata) {
+  public static PropertiesConfiguration getPropertiesConfiguration(SegmentMetadata segmentMetadata)
+      throws ConfigurationException {
     File indexDir = segmentMetadata.getIndexDir();
     Preconditions.checkState(indexDir != null, "Cannot get PropertiesConfiguration from in-memory segment: %s",
         segmentMetadata.getName());
     return getPropertiesConfiguration(indexDir);
   }
 
-  public static void savePropertiesConfiguration(PropertiesConfiguration propertiesConfiguration) {
-    File metadataFile = propertiesConfiguration.getFile();
-    Preconditions.checkState(metadataFile != null, "Cannot save PropertiesConfiguration not loaded from file");
+  public static void savePropertiesConfiguration(PropertiesConfiguration propertiesConfiguration, File indexDir) {
+    File metadataFile = SegmentDirectoryPaths.findMetadataFile(indexDir);
+    Preconditions.checkState(metadataFile != null, "Cannot find segment metadata file under directory: %s", indexDir);
     CommonsConfigurationUtils.saveToFile(propertiesConfiguration, metadataFile);
   }
 
@@ -59,7 +62,7 @@ public class SegmentMetadataUtils {
     for (Map.Entry<String, String> entry : metadataProperties.entrySet()) {
       propertiesConfiguration.setProperty(entry.getKey(), entry.getValue());
     }
-    SegmentMetadataUtils.savePropertiesConfiguration(propertiesConfiguration);
+    savePropertiesConfiguration(propertiesConfiguration, segmentMetadata.getIndexDir());
     segmentDirectory.reloadMetadata();
     return segmentDirectory.getSegmentMetadata();
   }

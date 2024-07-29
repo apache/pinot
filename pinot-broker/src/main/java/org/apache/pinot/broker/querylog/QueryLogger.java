@@ -25,7 +25,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.broker.api.RequesterIdentity;
-import org.apache.pinot.broker.requesthandler.BaseBrokerRequestHandler;
+import org.apache.pinot.broker.requesthandler.BaseSingleStageBrokerRequestHandler.ServerStats;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.trace.RequestContext;
@@ -45,6 +45,7 @@ import static org.apache.pinot.spi.utils.CommonConstants.Broker;
 public class QueryLogger {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryLogger.class);
+  private static final QueryLogEntry[] QUERY_LOG_ENTRY_VALUES = QueryLogEntry.values();
 
   private final int _maxQueryLengthToLog;
   private final RateLimiter _logRateLimiter;
@@ -82,13 +83,14 @@ public class QueryLogger {
     }
 
     final StringBuilder queryLogBuilder = new StringBuilder();
-    for (QueryLogEntry value : QueryLogEntry.values()) {
+    for (QueryLogEntry value : QUERY_LOG_ENTRY_VALUES) {
       value.format(queryLogBuilder, this, params);
       queryLogBuilder.append(',');
     }
 
     // always log the query last - don't add this to the QueryLogEntry enum
-    queryLogBuilder.append("query=").append(StringUtils.substring(params._query, 0, _maxQueryLengthToLog));
+    queryLogBuilder.append("query=")
+        .append(StringUtils.substring(params._requestContext.getQuery(), 0, _maxQueryLengthToLog));
     _logger.info(queryLogBuilder.toString());
 
     if (_droppedLogRateLimiter.tryAcquire()) {
@@ -97,7 +99,7 @@ public class QueryLogger {
       long numDroppedLogsSinceLastLog = _numDroppedLogs.getAndSet(0);
       if (numDroppedLogsSinceLastLog > 0) {
         _logger.warn("{} logs were dropped. (log max rate per second: {})", numDroppedLogsSinceLastLog,
-            _droppedLogRateLimiter.getRate());
+            _logRateLimiter.getRate());
       }
     }
   }
@@ -111,35 +113,26 @@ public class QueryLogger {
   }
 
   private boolean shouldForceLog(QueryLogParams params) {
-    return params._response.isNumGroupsLimitReached() || params._response.getExceptionsSize() > 0
-        || params._timeUsedMs > TimeUnit.SECONDS.toMillis(1);
+    return params._response.isPartialResult() || params._response.getTimeUsedMs() > TimeUnit.SECONDS.toMillis(1);
   }
 
   public static class QueryLogParams {
-    final long _requestId;
-    final String _query;
-    final RequestContext _requestContext;
-    final String _table;
-    final int _numUnavailableSegments;
+    private final RequestContext _requestContext;
+    private final String _table;
+    private final BrokerResponse _response;
     @Nullable
-    final BaseBrokerRequestHandler.ServerStats _serverStats;
-    final BrokerResponse _response;
-    final long _timeUsedMs;
+    private final RequesterIdentity _identity;
     @Nullable
-    final RequesterIdentity _requester;
+    private final ServerStats _serverStats;
 
-    public QueryLogParams(long requestId, String query, RequestContext requestContext, String table,
-        int numUnavailableSegments, @Nullable BaseBrokerRequestHandler.ServerStats serverStats, BrokerResponse response,
-        long timeUsedMs, @Nullable RequesterIdentity requester) {
-      _requestId = requestId;
-      _query = query;
-      _table = table;
-      _timeUsedMs = timeUsedMs;
+    public QueryLogParams(RequestContext requestContext, String table, BrokerResponse response,
+        @Nullable RequesterIdentity identity, @Nullable ServerStats serverStats) {
       _requestContext = requestContext;
-      _requester = requester;
+      // NOTE: Passing table name separately because table name within request context is always raw table name.
+      _table = table;
       _response = response;
+      _identity = identity;
       _serverStats = serverStats;
-      _numUnavailableSegments = numUnavailableSegments;
     }
   }
 
@@ -151,7 +144,8 @@ public class QueryLogger {
     REQUEST_ID("requestId") {
       @Override
       void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
-        builder.append(params._requestId);
+        // NOTE: At this moment, request ID is not available at response yet.
+        builder.append(params._requestContext.getRequestId());
       }
     },
     TABLE("table") {
@@ -163,7 +157,7 @@ public class QueryLogger {
     TIME_MS("timeMs") {
       @Override
       void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
-        builder.append(params._timeUsedMs);
+        builder.append(params._response.getTimeUsedMs());
       }
     },
     DOCS("docs") {
@@ -189,7 +183,8 @@ public class QueryLogger {
             .append(params._response.getNumConsumingSegmentsQueried()).append('/')
             .append(params._response.getNumConsumingSegmentsProcessed()).append('/')
             .append(params._response.getNumConsumingSegmentsMatched()).append('/')
-            .append(params._numUnavailableSegments);
+            // TODO: Consider adding the number of unavailable segments to the response
+            .append(params._requestContext.getNumUnavailableSegments());
       }
     },
     CONSUMING_FRESHNESS_MS("consumingFreshnessTimeMs") {
@@ -214,7 +209,7 @@ public class QueryLogger {
     BROKER_REDUCE_TIME_MS("brokerReduceTimeMs") {
       @Override
       void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
-        builder.append(params._requestContext.getReduceTimeMillis());
+        builder.append(params._response.getBrokerReduceTimeMs());
       }
     },
     EXCEPTIONS("exceptions") {
@@ -254,8 +249,8 @@ public class QueryLogger {
     CLIENT_IP("clientIp") {
       @Override
       void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
-        if (logger._enableIpLogging && params._requester != null) {
-          builder.append(params._requester.getClientIp());
+        if (logger._enableIpLogging && params._identity != null) {
+          builder.append(params._identity.getClientIp());
         } else {
           builder.append(CommonConstants.UNKNOWN);
         }

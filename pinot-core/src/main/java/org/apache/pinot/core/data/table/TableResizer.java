@@ -50,6 +50,7 @@ import org.apache.pinot.spi.utils.ByteArray;
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class TableResizer {
   private final DataSchema _dataSchema;
+  private final boolean _hasFinalInput;
   private final int _numGroupByExpressions;
   private final Map<ExpressionContext, Integer> _groupByExpressionIndexMap;
   private final AggregationFunction[] _aggregationFunctions;
@@ -61,7 +62,12 @@ public class TableResizer {
   private final Comparator<IntermediateRecord> _intermediateRecordComparator;
 
   public TableResizer(DataSchema dataSchema, QueryContext queryContext) {
+    this(dataSchema, false, queryContext);
+  }
+
+  public TableResizer(DataSchema dataSchema, boolean hasFinalInput, QueryContext queryContext) {
     _dataSchema = dataSchema;
+    _hasFinalInput = hasFinalInput;
 
     // NOTE: The data schema will always have group-by expressions in the front, followed by aggregation functions of
     //       the same order as in the query context. This is handled in AggregationGroupByOrderByOperator.
@@ -144,16 +150,20 @@ public class TableResizer {
         expression);
     if (function.getType() == FunctionContext.Type.AGGREGATION) {
       // Aggregation function
-      return new AggregationFunctionExtractor(_aggregationFunctionIndexMap.get(function));
-    } else if (function.getType() == FunctionContext.Type.TRANSFORM
-        && "FILTER".equalsIgnoreCase(function.getFunctionName())) {
+      int index = _aggregationFunctionIndexMap.get(function);
+      // For final aggregate result, we can handle it the same way as group key
+      return _hasFinalInput ? new GroupByExpressionExtractor(_numGroupByExpressions + index)
+          : new AggregationFunctionExtractor(index);
+    } else if (function.getType() == FunctionContext.Type.TRANSFORM && "FILTER".equalsIgnoreCase(
+        function.getFunctionName())) {
+      // Filtered aggregation
       FunctionContext aggregation = function.getArguments().get(0).getFunction();
       ExpressionContext filterExpression = function.getArguments().get(1);
       FilterContext filter = RequestContextUtils.getFilter(filterExpression);
-
-      int functionIndex = _filteredAggregationIndexMap.get(Pair.of(aggregation, filter));
-      AggregationFunction aggregationFunction = _filteredAggregationFunctions.get(functionIndex).getLeft();
-      return new AggregationFunctionExtractor(functionIndex, aggregationFunction);
+      int index = _filteredAggregationIndexMap.get(Pair.of(aggregation, filter));
+      // For final aggregate result, we can handle it the same way as group key
+      return _hasFinalInput ? new GroupByExpressionExtractor(_numGroupByExpressions + index)
+          : new AggregationFunctionExtractor(index, _filteredAggregationFunctions.get(index).getLeft());
     } else {
       // Post-aggregation function
       return new PostAggregationFunctionExtractor(function);

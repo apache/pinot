@@ -17,44 +17,25 @@
  * under the License.
  */
 
-import React, {useState, useEffect} from 'react';
+import React from 'react';
 import { Grid, makeStyles } from '@material-ui/core';
-import { TableData } from 'Models';
-import AppLoader from '../components/AppLoader';
-import PinotMethodUtils from '../utils/PinotMethodUtils';
-import TenantsListing from '../components/Homepage/TenantsListing';
+import TenantsTable from '../components/Homepage/TenantsListing';
 
 const useStyles = makeStyles(() => ({
   gridContainer: {
     padding: 20,
     backgroundColor: 'white',
     maxHeight: 'calc(100vh - 70px)',
-    overflowY: 'auto'
+    overflowY: 'auto',
   },
-
 }));
 
 const TenantsListingPage = () => {
   const classes = useStyles();
 
-  const [fetching, setFetching] = useState(true);
-  const [tenantsData, setTenantsData] = useState<TableData>({ records: [], columns: [] });
-
-  const fetchData = async () => {
-    const tenantsDataResponse = await PinotMethodUtils.getTenantsData();
-    setTenantsData(tenantsDataResponse);
-    setFetching(false);
-  };
-
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  return fetching ? (
-    <AppLoader />
-  ) : (
+  return (
     <Grid item xs className={classes.gridContainer}>
-      <TenantsListing tenantsData={tenantsData} />
+      <TenantsTable />
     </Grid>
   );
 };

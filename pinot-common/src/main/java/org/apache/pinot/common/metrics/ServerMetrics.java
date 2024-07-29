@@ -18,9 +18,11 @@
  */
 package org.apache.pinot.common.metrics;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.concurrent.atomic.AtomicReference;
+import org.apache.pinot.spi.metrics.NoopPinotMetricsRegistry;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Server.DEFAULT_ENABLE_TABLE_LEVEL_METRICS;
@@ -33,13 +35,20 @@ import static org.apache.pinot.spi.utils.CommonConstants.Server.DEFAULT_METRICS_
  */
 public class ServerMetrics extends AbstractMetrics<ServerQueryPhase, ServerMeter, ServerGauge, ServerTimer> {
 
-  private static final AtomicReference<ServerMetrics> SERVER_METRICS_INSTANCE = new AtomicReference<>();
+  private static final ServerMetrics NOOP = new ServerMetrics(new NoopPinotMetricsRegistry());
+
+  private static final AtomicReference<ServerMetrics> SERVER_METRICS_INSTANCE = new AtomicReference<>(NOOP);
 
   /**
    * register the serverMetrics onto this class, so that we don't need to pass it down as a parameter
    */
   public static boolean register(ServerMetrics serverMetrics) {
-    return SERVER_METRICS_INSTANCE.compareAndSet(null, serverMetrics);
+    return SERVER_METRICS_INSTANCE.compareAndSet(NOOP, serverMetrics);
+  }
+
+  @VisibleForTesting
+  public static void deregister() {
+    SERVER_METRICS_INSTANCE.set(NOOP);
   }
 
   /**

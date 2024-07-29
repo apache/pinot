@@ -18,10 +18,9 @@
  */
 package org.apache.pinot.spi.env;
 
+import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Arrays;
@@ -32,9 +31,12 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
-import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.ConfigurationException;
-import org.apache.commons.configuration.PropertiesConfiguration;
+import javax.annotation.Nullable;
+import org.apache.commons.configuration2.Configuration;
+import org.apache.commons.configuration2.PropertiesConfiguration;
+import org.apache.commons.configuration2.convert.LegacyListDelimiterHandler;
+import org.apache.commons.configuration2.ex.ConfigurationException;
+import org.apache.commons.configuration2.io.FileHandler;
 import org.apache.commons.lang3.StringUtils;
 
 
@@ -42,7 +44,97 @@ import org.apache.commons.lang3.StringUtils;
  * Provide utility functions to manipulate Apache Commons {@link Configuration} instances.
  */
 public class CommonsConfigurationUtils {
+  // value to be used to set the global separator for versioned properties configuration.
+  // the value is same of PropertiesConfiguration `DEFAULT_SEPARATOR` constant.
+  public static final String VERSIONED_CONFIG_SEPARATOR = " = ";
+  private static final Character DEFAULT_LIST_DELIMITER = ',';
+  public static final String VERSION_HEADER_IDENTIFIER = "version";
+
+  // usage: default header version of all configurations.
+  // if properties configuration doesn't contain header version, it will be considered as 1
+  public static final String DEFAULT_PROPERTIES_CONFIGURATION_HEADER_VERSION = "1";
+
+  // usage: used in reading segment metadata or other properties configurations with 'VersionedIOFactory' IO Factory.
+  // version signifies that segment metadata or other properties configurations contains keys with no special character.
+  public static final String PROPERTIES_CONFIGURATION_HEADER_VERSION_2 = "2";
+
   private CommonsConfigurationUtils() {
+  }
+
+  /**
+   * Instantiate a {@link PropertiesConfiguration} from an {@link String}.
+   * @param path representing the path of file
+   * @return a {@link PropertiesConfiguration} instance.
+   */
+  public static PropertiesConfiguration fromPath(String path)
+      throws ConfigurationException {
+    return fromPath(path, true, null);
+  }
+
+  /**
+   * Instantiate a {@link PropertiesConfiguration} from an {@link String}.
+   * @param path representing the path of file
+   * @param setDefaultDelimiter representing to set the default list delimiter.
+   * @param ioFactoryKind representing to set IOFactory. It can be null.
+   * @return a {@link PropertiesConfiguration} instance.
+   */
+  public static PropertiesConfiguration fromPath(@Nullable String path, boolean setDefaultDelimiter,
+      @Nullable PropertyIOFactoryKind ioFactoryKind)
+      throws ConfigurationException {
+    PropertiesConfiguration config = createPropertiesConfiguration(setDefaultDelimiter, ioFactoryKind);
+    // if provided path is non-empty, load the existing properties from provided file path
+    if (StringUtils.isNotEmpty(path)) {
+      FileHandler fileHandler = new FileHandler(config);
+      fileHandler.load(path);
+    }
+    return config;
+  }
+
+  /**
+   * Instantiate a {@link PropertiesConfiguration} from an {@link InputStream}.
+   * @param stream containing properties
+   * @return a {@link PropertiesConfiguration} instance.
+   */
+  public static PropertiesConfiguration fromInputStream(InputStream stream)
+      throws ConfigurationException {
+    return fromInputStream(stream, true, PropertyIOFactoryKind.DefaultIOFactory);
+  }
+
+  /**
+   * Instantiate a {@link PropertiesConfiguration} from an {@link InputStream}.
+   * @param stream containing properties
+   * @param setDefaultDelimiter representing to set the default list delimiter.
+   * @param ioFactoryKind representing to set IOFactory. It can be null.
+   * @return a {@link PropertiesConfiguration} instance.
+   */
+  public static PropertiesConfiguration fromInputStream(@Nullable InputStream stream,
+      boolean setDefaultDelimiter, @Nullable PropertyIOFactoryKind ioFactoryKind)
+      throws ConfigurationException {
+    PropertiesConfiguration config = createPropertiesConfiguration(setDefaultDelimiter, ioFactoryKind);
+    // if provided stream is not null, load the existing properties from provided input stream.
+    if (stream != null) {
+      FileHandler fileHandler = new FileHandler(config);
+      fileHandler.load(stream);
+    }
+    return config;
+  }
+
+  /**
+   * Instantiate a Segment Metadata {@link PropertiesConfiguration} from a {@link File}.
+   * @param file containing properties
+   * @param setDefaultDelimiter representing to set the default list delimiter.
+   * @return a {@link PropertiesConfiguration} instance.
+   */
+  public static PropertiesConfiguration getSegmentMetadataFromFile(File file, boolean setDefaultDelimiter)
+      throws ConfigurationException {
+    PropertyIOFactoryKind ioFactoryKind = PropertyIOFactoryKind.DefaultIOFactory;
+
+    // if segment metadata contains version header with value '2', set VersionedIOFactory as IO factory.
+    if (PROPERTIES_CONFIGURATION_HEADER_VERSION_2.equals(getConfigurationHeaderVersion(file))) {
+      ioFactoryKind = PropertyIOFactoryKind.VersionedIOFactory;
+    }
+
+    return fromFile(file, setDefaultDelimiter, ioFactoryKind);
   }
 
   /**
@@ -50,44 +142,66 @@ public class CommonsConfigurationUtils {
    * @param file containing properties
    * @return a {@link PropertiesConfiguration} instance. Empty if file does not exist.
    */
-  public static PropertiesConfiguration fromFile(File file) {
-    try {
-      PropertiesConfiguration propertiesConfiguration = new PropertiesConfiguration();
-
-      // Commons Configuration 1.10 does not support file path containing '%'.
-      // Explicitly providing the input stream on load bypasses the problem.
-      propertiesConfiguration.setFile(file);
-      if (file.exists()) {
-        propertiesConfiguration.load(new FileInputStream(file));
-      }
-
-      return propertiesConfiguration;
-    } catch (ConfigurationException | FileNotFoundException e) {
-      throw new RuntimeException(e);
-    }
+  public static PropertiesConfiguration fromFile(File file)
+      throws ConfigurationException {
+    return fromFile(file, true, PropertyIOFactoryKind.DefaultIOFactory);
   }
 
   /**
-   * Instantiate a {@link PropertiesConfiguration} from an inputstream.
-   * @param inputStream containing properties
+   * Instantiate a {@link PropertiesConfiguration} from a {@link File}.
+   * @param file containing properties
+   * @param setDefaultDelimiter representing to set the default list delimiter.
+   * @param ioFactoryKind representing to set IOFactory. It can be null.
    * @return a {@link PropertiesConfiguration} instance.
    */
-  public static PropertiesConfiguration fromInputStream(InputStream inputStream) {
-    try {
-      PropertiesConfiguration propertiesConfiguration = new PropertiesConfiguration();
-      propertiesConfiguration.load(inputStream);
-      return propertiesConfiguration;
-    } catch (ConfigurationException e) {
-      throw new RuntimeException(e);
+  public static PropertiesConfiguration fromFile(@Nullable File file,
+      boolean setDefaultDelimiter, @Nullable PropertyIOFactoryKind ioFactoryKind)
+      throws ConfigurationException {
+    PropertiesConfiguration config = createPropertiesConfiguration(setDefaultDelimiter, ioFactoryKind);
+    // check if file exists, load the existing properties.
+    if (file != null && file.exists()) {
+      FileHandler fileHandler = new FileHandler(config);
+      fileHandler.load(file);
     }
+    return config;
   }
 
+  /**
+   * save the segment metadata configuration content into the provided file based on the version header.
+   * @param propertiesConfiguration a {@link PropertiesConfiguration} instance.
+   * @param file a {@link File} instance.
+   * @param versionHeader a Nullable {@link String} instance.
+   */
+  public static void saveSegmentMetadataToFile(PropertiesConfiguration propertiesConfiguration, File file,
+      @Nullable String versionHeader) {
+    if (StringUtils.isNotEmpty(versionHeader)) {
+      String header = getVersionHeaderString(versionHeader);
+      propertiesConfiguration.setHeader(header);
+
+      // checks whether the provided versionHeader equals to VersionedIOFactory kind.
+      // if true, set IO factory as VersionedIOFactory
+      if (PROPERTIES_CONFIGURATION_HEADER_VERSION_2.equals(versionHeader)) {
+        // set versioned IOFactory
+        propertiesConfiguration.setIOFactory(PropertyIOFactoryKind.VersionedIOFactory.getInstance());
+        // setting the global separator makes sure the configurations gets written with ' = ' separator.
+        // global separator overrides the separator set at the key level as well.
+        propertiesConfiguration.getLayout().setGlobalSeparator(VERSIONED_CONFIG_SEPARATOR);
+      }
+    }
+    saveToFile(propertiesConfiguration, file);
+  }
+
+  /**
+   * Save the propertiesConfiguration content into the provided file.
+   * @param propertiesConfiguration a {@link PropertiesConfiguration} instance.
+   * @param file a {@link File} instance.
+   */
   public static void saveToFile(PropertiesConfiguration propertiesConfiguration, File file) {
-    // Commons Configuration 1.10 does not support file path containing '%'.
-    // Explicitly providing the output stream for save bypasses the problem.
-    try (FileOutputStream fileOutputStream = new FileOutputStream(file)) {
-      propertiesConfiguration.save(fileOutputStream);
-    } catch (ConfigurationException | IOException e) {
+    FileHandler fileHandler = new FileHandler(propertiesConfiguration);
+    fileHandler.setFile(file);
+    try {
+      fileHandler.save();
+    } catch (ConfigurationException e) {
       throw new RuntimeException(e);
     }
   }
@@ -96,27 +210,14 @@ public class CommonsConfigurationUtils {
     return () -> keys;
   }
 
-  /**
-   * Provides a stream of all the keys found in a {@link Configuration}.
-   * @param configuration to iterate on keys
-   * @return a stream of keys
-   */
   public static Stream<String> getKeysStream(Configuration configuration) {
     return StreamSupport.stream(getIterable(configuration.getKeys()).spliterator(), false);
   }
 
-  /**
-   * Provides a list of all the keys found in a {@link Configuration}.
-   * @param configuration to iterate on keys
-   * @return a list of keys
-   */
   public static List<String> getKeys(Configuration configuration) {
     return getKeysStream(configuration).collect(Collectors.toList());
   }
 
-  /**
-   * @return a key-value {@link Map} found in the provided {@link Configuration}
-   */
   public static Map<String, Object> toMap(Configuration configuration) {
     return getKeysStream(configuration).collect(Collectors.toMap(key -> key, key -> mapValue(key, configuration)));
   }
@@ -179,15 +280,32 @@ public class CommonsConfigurationUtils {
   /**
    * Replaces the special character in the given property value.
    * - Leading/trailing space is prefixed/suffixed with "\0"
-   * - Comma is replaces with "\0\0"
+   * - Comma is replaced with "\0\0"
+   * Returns {@code null} when the given value contains surrogate characters because it is not supported by
+   * {@link PropertiesConfiguration}.
    *
    * Note:
    * - '\0' is not allowed in string values, so we can use it as the replaced character
    * - Escaping comma with backslash doesn't work when comma is preceded by a backslash
    */
+  @Nullable
   public static String replaceSpecialCharacterInPropertyValue(String value) {
-    if (value.isEmpty()) {
+    int length = value.length();
+    if (length == 0) {
       return value;
+    }
+    boolean containsDelimiter = false;
+    for (int i = 0; i < length; i++) {
+      char c = value.charAt(i);
+      if (Character.isSurrogate(c)) {
+        return null;
+      }
+      if (c == DEFAULT_LIST_DELIMITER) {
+        containsDelimiter = true;
+      }
+    }
+    if (containsDelimiter) {
+      value = value.replace(",", "\0\0");
     }
     if (value.charAt(0) == ' ') {
       value = "\0" + value;
@@ -195,7 +313,7 @@ public class CommonsConfigurationUtils {
     if (value.charAt(value.length() - 1) == ' ') {
       value = value + "\0";
     }
-    return value.replace(",", "\0\0");
+    return value;
   }
 
   /**
@@ -213,5 +331,66 @@ public class CommonsConfigurationUtils {
       value = value.substring(0, value.length() - 1);
     }
     return value.replace("\0\0", ",");
+  }
+
+  /**
+   * creates the instance of the {@link org.apache.commons.configuration2.PropertiesConfiguration}
+   * with custom IO factory based on kind {@link org.apache.commons.configuration2.PropertiesConfiguration.IOFactory}
+   * and legacy list delimiter {@link org.apache.commons.configuration2.convert.LegacyListDelimiterHandler}
+   *
+   * @param setDefaultDelimiter sets the default list delimiter.
+   * @param ioFactoryKind IOFactory kind, can be null.
+   * @return PropertiesConfiguration
+   */
+  private static PropertiesConfiguration createPropertiesConfiguration(boolean setDefaultDelimiter,
+     @Nullable PropertyIOFactoryKind ioFactoryKind) {
+    PropertiesConfiguration config = new PropertiesConfiguration();
+
+    // setting IO Reader Factory of the configuration.
+    if (ioFactoryKind != null) {
+      config.setIOFactory(ioFactoryKind.getInstance());
+    }
+
+    // setting the DEFAULT_LIST_DELIMITER
+    if (setDefaultDelimiter) {
+      config.setListDelimiterHandler(new LegacyListDelimiterHandler(DEFAULT_LIST_DELIMITER));
+    }
+
+    return config;
+  }
+
+  /**
+   * checks whether the configuration file first line is version header or not.
+   * @param file configuration file
+   * @return String
+   * @throws ConfigurationException exception.
+   */
+  private static String getConfigurationHeaderVersion(File file)
+      throws ConfigurationException {
+    String versionValue = DEFAULT_PROPERTIES_CONFIGURATION_HEADER_VERSION;
+    if (file.exists()) {
+      try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
+        String fileFirstLine = reader.readLine();
+        // header version is written as a comment and start with '# '
+        String versionHeaderCommentPrefix = String.format("# %s", VERSION_HEADER_IDENTIFIER);
+        // check whether the file has the version header or not
+        if (StringUtils.startsWith(fileFirstLine, versionHeaderCommentPrefix)) {
+          String[] headerKeyValue = StringUtils.splitByWholeSeparator(fileFirstLine, VERSIONED_CONFIG_SEPARATOR, 2);
+          if (headerKeyValue.length == 2) {
+            versionValue = headerKeyValue[1];
+          }
+        }
+      } catch (IOException exception) {
+        throw new ConfigurationException(
+            "Error occurred while reading configuration file " + file.getName(), exception);
+      }
+    }
+    return versionValue;
+  }
+
+  // Returns the version header string based on the version header value provided.
+  // The return statement follow the pattern 'version = <value>'
+  static String getVersionHeaderString(String versionHeaderValue) {
+    return String.format("%s%s%s", VERSION_HEADER_IDENTIFIER, VERSIONED_CONFIG_SEPARATOR, versionHeaderValue);
   }
 }

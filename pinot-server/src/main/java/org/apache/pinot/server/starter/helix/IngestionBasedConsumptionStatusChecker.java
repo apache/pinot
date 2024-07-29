@@ -19,15 +19,16 @@
 
 package org.apache.pinot.server.starter.helix;
 
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
+import java.util.Map;
 import java.util.Set;
-import org.apache.pinot.common.utils.LLCSegmentName;
+import java.util.function.Function;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
-import org.apache.pinot.core.data.manager.realtime.LLRealtimeSegmentDataManager;
+import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
-import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,64 +36,103 @@ import org.slf4j.LoggerFactory;
 public abstract class IngestionBasedConsumptionStatusChecker {
   protected final Logger _logger = LoggerFactory.getLogger(getClass());
 
-  // constructor parameters
-  protected final InstanceDataManager _instanceDataManager;
-  protected final Set<String> _consumingSegments;
+  private final InstanceDataManager _instanceDataManager;
+  private final Map<String, Set<String>> _consumingSegmentsByTable;
+  private final Map<String, Set<String>> _caughtUpSegmentsByTable = new HashMap<>();
+  private final Function<String, Set<String>> _consumingSegmentsSupplier;
 
-  // helper variable
-  private final Set<String> _caughtUpSegments = new HashSet<>();
-
+  /**
+   * Both consumingSegmentsByTable and consumingSegmentsSupplier are provided as it can be costly to get
+   * consumingSegmentsByTable via the supplier, so only use it when any missing segment is detected.
+   */
   public IngestionBasedConsumptionStatusChecker(InstanceDataManager instanceDataManager,
-      Set<String> consumingSegments) {
+      Map<String, Set<String>> consumingSegmentsByTable, Function<String, Set<String>> consumingSegmentsSupplier) {
     _instanceDataManager = instanceDataManager;
-    _consumingSegments = consumingSegments;
+    _consumingSegmentsByTable = consumingSegmentsByTable;
+    _consumingSegmentsSupplier = consumingSegmentsSupplier;
   }
 
-  public int getNumConsumingSegmentsNotReachedIngestionCriteria() {
-    for (String segName : _consumingSegments) {
-      if (_caughtUpSegments.contains(segName)) {
-        continue;
-      }
-      TableDataManager tableDataManager = getTableDataManager(segName);
+  // This might be called by multiple threads, thus synchronized to be correct.
+  public synchronized int getNumConsumingSegmentsNotReachedIngestionCriteria() {
+    // If the checker found any consuming segments are missing or committed for a table, it should reset the set of
+    // consuming segments for the table to continue to monitor the freshness, otherwise the checker might get stuck
+    // on deleted segments or tables, or miss new consuming segments created in the table and get ready prematurely.
+    Set<String> tablesToRefresh = new HashSet<>();
+    Iterator<Map.Entry<String, Set<String>>> itr = _consumingSegmentsByTable.entrySet().iterator();
+    while (itr.hasNext()) {
+      Map.Entry<String, Set<String>> tableSegments = itr.next();
+      String tableNameWithType = tableSegments.getKey();
+      TableDataManager tableDataManager = _instanceDataManager.getTableDataManager(tableNameWithType);
       if (tableDataManager == null) {
-        _logger.info("TableDataManager is not yet setup for segment {}. Will check consumption status later", segName);
+        _logger.info("No tableDataManager for table: {}. Refresh table's consuming segments", tableNameWithType);
+        tablesToRefresh.add(tableNameWithType);
         continue;
       }
-      SegmentDataManager segmentDataManager = null;
-      try {
-        segmentDataManager = tableDataManager.acquireSegment(segName);
+      Set<String> consumingSegments = tableSegments.getValue();
+      Set<String> caughtUpSegments = _caughtUpSegmentsByTable.computeIfAbsent(tableNameWithType, k -> new HashSet<>());
+      for (String segName : consumingSegments) {
+        if (caughtUpSegments.contains(segName)) {
+          continue;
+        }
+        SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segName);
         if (segmentDataManager == null) {
-          _logger.info("SegmentDataManager is not yet setup for segment {}. Will check consumption status later",
-              segName);
+          _logger.info("No segmentDataManager for segment: {} from table: {}. Refresh table's consuming segments",
+              segName, tableNameWithType);
+          tablesToRefresh.add(tableNameWithType);
           continue;
         }
-        if (!(segmentDataManager instanceof LLRealtimeSegmentDataManager)) {
-          // There's a possibility that a consuming segment has converted to a committed segment. If that's the case,
-          // segment data manager will not be of type LLRealtime.
-          _logger.info("Segment {} is already committed and is considered caught up.", segName);
-          _caughtUpSegments.add(segName);
-          continue;
-        }
-
-        LLRealtimeSegmentDataManager rtSegmentDataManager = (LLRealtimeSegmentDataManager) segmentDataManager;
-        if (isSegmentCaughtUp(segName, rtSegmentDataManager)) {
-          _caughtUpSegments.add(segName);
-        }
-      } finally {
-        if (segmentDataManager != null) {
+        try {
+          if (!(segmentDataManager instanceof RealtimeSegmentDataManager)) {
+            // It's possible that the consuming segment has been committed by another server. In this case, we should
+            // get the new consuming segments for the table and continue to monitor their consumption status, until the
+            // current server catches up the consuming segments.
+            _logger.info("Segment: {} from table: {} is already committed. Refresh table's consuming segments.",
+                segName, tableNameWithType);
+            tablesToRefresh.add(tableNameWithType);
+            continue;
+          }
+          RealtimeSegmentDataManager rtSegmentDataManager = (RealtimeSegmentDataManager) segmentDataManager;
+          if (isSegmentCaughtUp(segName, rtSegmentDataManager)) {
+            caughtUpSegments.add(segName);
+          }
+        } finally {
           tableDataManager.releaseSegment(segmentDataManager);
         }
       }
+      int numLaggingSegments = consumingSegments.size() - caughtUpSegments.size();
+      if (numLaggingSegments == 0) {
+        _logger.info("Consuming segments from table: {} have all caught up", tableNameWithType);
+        itr.remove();
+        _caughtUpSegmentsByTable.remove(tableNameWithType);
+      }
     }
-    return _consumingSegments.size() - _caughtUpSegments.size();
+    if (!tablesToRefresh.isEmpty()) {
+      for (String tableNameWithType : tablesToRefresh) {
+        Set<String> updatedConsumingSegments = _consumingSegmentsSupplier.apply(tableNameWithType);
+        if (updatedConsumingSegments == null || updatedConsumingSegments.isEmpty()) {
+          _consumingSegmentsByTable.remove(tableNameWithType);
+          _caughtUpSegmentsByTable.remove(tableNameWithType);
+          _logger.info("Found no consuming segments from table: {}, which is probably removed", tableNameWithType);
+        } else {
+          _consumingSegmentsByTable.put(tableNameWithType, updatedConsumingSegments);
+          _caughtUpSegmentsByTable.computeIfAbsent(tableNameWithType, k -> new HashSet<>())
+              .retainAll(updatedConsumingSegments);
+          _logger.info(
+              "Updated consumingSegments: {} and caughtUpSegments: {} for table: {}, as consuming segments were "
+                  + "missing or committed", updatedConsumingSegments, _caughtUpSegmentsByTable.get(tableNameWithType),
+              tableNameWithType);
+        }
+      }
+    }
+    int numLaggingSegments = 0;
+    for (Map.Entry<String, Set<String>> tableSegments : _consumingSegmentsByTable.entrySet()) {
+      String tableNameWithType = tableSegments.getKey();
+      Set<String> consumingSegments = tableSegments.getValue();
+      Set<String> caughtUpSegments = _caughtUpSegmentsByTable.computeIfAbsent(tableNameWithType, k -> new HashSet<>());
+      numLaggingSegments += consumingSegments.size() - caughtUpSegments.size();
+    }
+    return numLaggingSegments;
   }
 
-  protected abstract boolean isSegmentCaughtUp(String segmentName, LLRealtimeSegmentDataManager rtSegmentDataManager);
-
-  private TableDataManager getTableDataManager(String segmentName) {
-    LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
-    String tableName = llcSegmentName.getTableName();
-    String tableNameWithType = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(tableName);
-    return _instanceDataManager.getTableDataManager(tableNameWithType);
-  }
+  protected abstract boolean isSegmentCaughtUp(String segmentName, RealtimeSegmentDataManager rtSegmentDataManager);
 }

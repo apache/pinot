@@ -18,18 +18,17 @@
  */
 package org.apache.pinot.core.query.aggregation.groupby.utils;
 
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 /**
  * Factory for various implementations for {@link ValueToIdMap}
  */
 public class ValueToIdMapFactory {
-  // Private constructor to prevent instantiating the class.
   private ValueToIdMapFactory() {
   }
 
-  public static ValueToIdMap get(FieldSpec.DataType dataType) {
+  public static ValueToIdMap get(DataType dataType) {
     switch (dataType) {
       case INT:
         return new IntToIdMap();
@@ -39,12 +38,8 @@ public class ValueToIdMapFactory {
         return new FloatToIdMap();
       case DOUBLE:
         return new DoubleToIdMap();
-      case STRING:
-        return new StringToIdMap();
-      case BYTES:
-        return new BytesToIdMap();
       default:
-        throw new IllegalArgumentException("Illegal data type for ValueToIdMapFactory: " + dataType);
+        return new ObjectToIdMap();
     }
   }
 }

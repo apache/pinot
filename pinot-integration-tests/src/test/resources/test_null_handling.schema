@@ -3,22 +3,26 @@
     {
       "dataType": "INT",
       "singleValueField": true,
-      "name": "clientId"
+      "name": "clientId",
+      "notNull": "true"
     },
     {
       "dataType": "STRING",
       "singleValueField": true,
-      "name": "city"
+      "name": "city",
+      "notNull": "true"
     },
     {
       "dataType": "STRING",
       "singleValueField": true,
-      "name": "description"
+      "name": "description",
+      "notNull": "false"
     },
     {
       "dataType": "INT",
       "singleValueField": true,
-      "name": "salary"
+      "name": "salary",
+      "notNull": "false"
     }
   ],
   "timeFieldSpec": {
@@ -28,6 +32,6 @@
       "name": "DaysSinceEpoch"
     }
   },
-  "schemaName": "mytable"
+  "schemaName": "mytable",
+  "enableColumnBasedNullHandling": true
 }
-

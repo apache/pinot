@@ -18,18 +18,16 @@
  */
 package org.apache.pinot.core.query.aggregation.groupby.utils;
 
-import it.unimi.dsi.fastutil.longs.Long2IntMap;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
-import it.unimi.dsi.fastutil.longs.LongList;
 
 
 /**
  * Implementation of {@link ValueToIdMap} for long.
  */
-public class LongToIdMap extends BaseValueToIdMap {
-  Long2IntMap _valueToIdMap;
-  LongList _idToValueMap;
+public class LongToIdMap implements ValueToIdMap {
+  private final Long2IntOpenHashMap _valueToIdMap;
+  private final LongArrayList _idToValueMap;
 
   public LongToIdMap() {
     _valueToIdMap = new Long2IntOpenHashMap();
@@ -39,28 +37,31 @@ public class LongToIdMap extends BaseValueToIdMap {
 
   @Override
   public int put(long value) {
-    int id = _valueToIdMap.get(value);
-    if (id == INVALID_KEY) {
-      id = _idToValueMap.size();
-      _valueToIdMap.put(value, id);
+    int numValues = _valueToIdMap.size();
+    int id = _valueToIdMap.computeIfAbsent(value, k -> numValues);
+    if (id == numValues) {
       _idToValueMap.add(value);
     }
     return id;
   }
 
   @Override
-  public long getLong(int id) {
-    assert id < _idToValueMap.size();
+  public int put(Object value) {
+    return put((long) value);
+  }
+
+  @Override
+  public int getId(long value) {
+    return _valueToIdMap.get(value);
+  }
+
+  @Override
+  public int getId(Object value) {
+    return getId((long) value);
+  }
+
+  @Override
+  public Long get(int id) {
     return _idToValueMap.getLong(id);
-  }
-
-  @Override
-  public String getString(int id) {
-    return Long.toString(getLong(id));
-  }
-
-  @Override
-  public Object get(int id) {
-    return getLong(id);
   }
 }

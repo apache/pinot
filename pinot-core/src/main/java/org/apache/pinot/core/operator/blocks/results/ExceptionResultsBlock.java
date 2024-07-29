@@ -50,18 +50,24 @@ public class ExceptionResultsBlock extends BaseResultsBlock {
 
   @Nullable
   @Override
-  public DataSchema getDataSchema(QueryContext queryContext) {
+  public QueryContext getQueryContext() {
     return null;
   }
 
   @Nullable
   @Override
-  public List<Object[]> getRows(QueryContext queryContext) {
+  public DataSchema getDataSchema() {
+    return null;
+  }
+
+  @Nullable
+  @Override
+  public List<Object[]> getRows() {
     return null;
   }
 
   @Override
-  public DataTable getDataTable(QueryContext queryContext) {
+  public DataTable getDataTable() {
     return DataTableBuilderFactory.getEmptyDataTable();
   }
 }

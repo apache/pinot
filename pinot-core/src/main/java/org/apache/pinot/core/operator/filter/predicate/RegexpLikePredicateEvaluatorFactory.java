@@ -19,10 +19,8 @@
 package org.apache.pinot.core.operator.filter.predicate;
 
 import com.google.common.base.Preconditions;
-import it.unimi.dsi.fastutil.ints.IntArrayList;
-import it.unimi.dsi.fastutil.ints.IntList;
-import java.util.regex.Matcher;
 import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
+import org.apache.pinot.common.utils.regex.Matcher;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
@@ -66,12 +64,9 @@ public class RegexpLikePredicateEvaluatorFactory {
     // Reuse matcher to avoid excessive allocation. This is safe to do because the evaluator is always used
     // within the scope of a single thread.
     final Matcher _matcher;
-    final Dictionary _dictionary;
-    int[] _matchingDictIds;
 
     public DictionaryBasedRegexpLikePredicateEvaluator(RegexpLikePredicate regexpLikePredicate, Dictionary dictionary) {
-      super(regexpLikePredicate);
-      _dictionary = dictionary;
+      super(regexpLikePredicate, dictionary);
       _matcher = regexpLikePredicate.getPattern().matcher("");
     }
 
@@ -91,21 +86,6 @@ public class RegexpLikePredicateEvaluatorFactory {
         }
       }
       return matches;
-    }
-
-    @Override
-    public int[] getMatchingDictIds() {
-      if (_matchingDictIds == null) {
-        IntList matchingDictIds = new IntArrayList();
-        int dictionarySize = _dictionary.length();
-        for (int dictId = 0; dictId < dictionarySize; dictId++) {
-          if (applySV(dictId)) {
-            matchingDictIds.add(dictId);
-          }
-        }
-        _matchingDictIds = matchingDictIds.toIntArray();
-      }
-      return _matchingDictIds;
     }
   }
 

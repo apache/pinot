@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.recordtransformer;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -116,10 +117,13 @@ public class ExpressionTransformer implements RecordTransformer {
     for (Map.Entry<String, FunctionEvaluator> entry : _expressionEvaluators.entrySet()) {
       String column = entry.getKey();
       FunctionEvaluator transformFunctionEvaluator = entry.getValue();
-      // Skip transformation if column value already exist.
-      // NOTE: column value might already exist for OFFLINE data
-      if (record.getValue(column) == null) {
+      Object existingValue = record.getValue(column);
+      if (existingValue == null) {
         try {
+          // Skip transformation if column value already exists
+          // NOTE: column value might already exist for OFFLINE data,
+          // For backward compatibility, The only exception here is that we will override nested field like array,
+          // collection or map since they were not included in the record transformation before.
           record.putValue(column, transformFunctionEvaluator.evaluate(record));
         } catch (Exception e) {
           if (!_continueOnError) {
@@ -129,8 +133,33 @@ public class ExpressionTransformer implements RecordTransformer {
             record.putValue(GenericRow.INCOMPLETE_RECORD_KEY, true);
           }
         }
+      } else if (existingValue.getClass().isArray() || existingValue instanceof Collections
+          || existingValue instanceof Map) {
+        try {
+          Object transformedValue = transformFunctionEvaluator.evaluate(record);
+          // For backward compatibility, The only exception here is that we will override nested field like array,
+          // collection or map since they were not included in the record transformation before.
+          if (!isTypeCompatible(existingValue, transformedValue)) {
+            record.putValue(column, transformedValue);
+          }
+        } catch (Exception e) {
+          LOGGER.debug("Caught exception while evaluation transform function for column: {}", column, e);
+        }
       }
     }
     return record;
+  }
+
+  private boolean isTypeCompatible(Object existingValue, Object transformedValue) {
+    if (transformedValue.getClass() == existingValue.getClass()) {
+      return true;
+    }
+    if (transformedValue instanceof Collections && existingValue instanceof Collections) {
+      return true;
+    }
+    if (transformedValue instanceof Map && existingValue instanceof Map) {
+      return true;
+    }
+    return transformedValue.getClass().isArray() && existingValue.getClass().isArray();
   }
 }

@@ -30,10 +30,10 @@ import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
-import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ArrayCopyUtils;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
+import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
 import org.roaringbitmap.RoaringBitmap;
 import org.testng.annotations.Test;
 
@@ -880,8 +880,7 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
     assertTrue(transformFunction.getResultMetadata().isSingleValue());
     int[] expectedValues = new int[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = _intMVValues[i].length > index ? _intMVValues[i][index]
-          : (Integer) DataSchema.ColumnDataType.INT.getNullPlaceholder();
+      expectedValues[i] = _intMVValues[i].length > index ? _intMVValues[i][index] : NullValuePlaceHolder.INT;
     }
     testTransformFunction(transformFunction, expectedValues);
   }
@@ -898,8 +897,7 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
     assertTrue(transformFunction.getResultMetadata().isSingleValue());
     long[] expectedValues = new long[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = _longMVValues[i].length > index ? _longMVValues[i][index]
-          : (Long) DataSchema.ColumnDataType.LONG.getNullPlaceholder();
+      expectedValues[i] = _longMVValues[i].length > index ? _longMVValues[i][index] : NullValuePlaceHolder.LONG;
     }
     testTransformFunction(transformFunction, expectedValues);
   }
@@ -916,8 +914,7 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
     assertTrue(transformFunction.getResultMetadata().isSingleValue());
     float[] expectedValues = new float[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = _floatMVValues[i].length > index ? _floatMVValues[i][index]
-          : (Float) DataSchema.ColumnDataType.FLOAT.getNullPlaceholder();
+      expectedValues[i] = _floatMVValues[i].length > index ? _floatMVValues[i][index] : NullValuePlaceHolder.FLOAT;
     }
     testTransformFunction(transformFunction, expectedValues);
   }
@@ -934,8 +931,7 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
     assertTrue(transformFunction.getResultMetadata().isSingleValue());
     double[] expectedValues = new double[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = _doubleMVValues[i].length > index ? _doubleMVValues[i][index]
-          : (Double) DataSchema.ColumnDataType.DOUBLE.getNullPlaceholder();
+      expectedValues[i] = _doubleMVValues[i].length > index ? _doubleMVValues[i][index] : NullValuePlaceHolder.DOUBLE;
     }
     testTransformFunction(transformFunction, expectedValues);
   }
@@ -952,10 +948,125 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
     assertTrue(transformFunction.getResultMetadata().isSingleValue());
     String[] expectedValues = new String[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = _stringMVValues[i].length > index ? _stringMVValues[i][index]
-          : (String) DataSchema.ColumnDataType.STRING.getNullPlaceholder();
+      expectedValues[i] = _stringMVValues[i].length > index ? _stringMVValues[i][index] : NullValuePlaceHolder.STRING;
     }
     testTransformFunction(transformFunction, expectedValues);
+  }
+
+  @Test
+  public void testArrayIndexOfAllInt() {
+    ExpressionContext expression = RequestContextUtils.getExpression(
+        String.format("array_indexes_of_int(%s, 0)", INT_MONO_INCREASING_MV_1));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.INT);
+    assertFalse(transformFunction.getResultMetadata().isSingleValue());
+    int[][] expectedValues = new int[NUM_ROWS][];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      int[] expectedValue = {0};
+      expectedValues[i] = expectedValue;
+    }
+    testTransformFunctionMV(transformFunction, expectedValues);
+  }
+
+  @Test
+  public void testArrayIndexOfAllLong() {
+    ExpressionContext expression = RequestContextUtils.getExpression(
+        String.format("array_indexes_of_long(%s, 1)", LONG_MV_COLUMN_2));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.INT);
+    assertFalse(transformFunction.getResultMetadata().isSingleValue());
+    int[][] expectedValues = new int[NUM_ROWS][];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      int len = _longMV2Values[i].length;
+      int[] expectedValue = new int[len];
+      for (int j = 0; j < len; j++) {
+        expectedValue[j] = j;
+      }
+      expectedValues[i] = expectedValue;
+    }
+    testTransformFunctionMV(transformFunction, expectedValues);
+  }
+
+  @Test
+  public void testArrayIndexOfAllFloat() {
+    ExpressionContext expression = RequestContextUtils.getExpression(
+        String.format("array_indexes_of_float(%s, 1.0)", FLOAT_MV_COLUMN_2));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.INT);
+    assertFalse(transformFunction.getResultMetadata().isSingleValue());
+    int[][] expectedValues = new int[NUM_ROWS][];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      int len = _floatMV2Values[i].length;
+      int[] expectedValue = new int[len];
+      for (int j = 0; j < len; j++) {
+        expectedValue[j] = j;
+      }
+      expectedValues[i] = expectedValue;
+    }
+    testTransformFunctionMV(transformFunction, expectedValues);
+  }
+
+  @Test
+  public void testArrayIndexOfAllDouble() {
+    ExpressionContext expression = RequestContextUtils.getExpression(
+        String.format("array_indexes_of_double(%s, 1.0)", DOUBLE_MV_COLUMN_2));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.INT);
+    assertFalse(transformFunction.getResultMetadata().isSingleValue());
+    int[][] expectedValues = new int[NUM_ROWS][];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      int len = _doubleMV2Values[i].length;
+      int[] expectedValue = new int[len];
+      for (int j = 0; j < len; j++) {
+        expectedValue[j] = j;
+      }
+      expectedValues[i] = expectedValue;
+    }
+    testTransformFunctionMV(transformFunction, expectedValues);
+  }
+
+  @Test
+  public void testArrayIndexOfAllString() {
+    ExpressionContext expression = RequestContextUtils.getExpression(
+        String.format("array_indexes_of_string(%s, 'a')", STRING_ALPHANUM_MV_COLUMN_2));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.INT);
+    assertFalse(transformFunction.getResultMetadata().isSingleValue());
+    int[][] expectedValues = new int[NUM_ROWS][];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      int len = _stringAlphaNumericMV2Values[i].length;
+      int[] expectedValue = new int[len];
+      for (int j = 0; j < len; j++) {
+        expectedValue[j] = j;
+      }
+      expectedValues[i] = expectedValue;
+    }
+    testTransformFunctionMV(transformFunction, expectedValues);
+  }
+
+  @Test
+  public void testIntersectIndices() {
+    ExpressionContext expression = RequestContextUtils.getExpression(
+        String.format("intersect_indices(%s, %s)", INT_MONO_INCREASING_MV_1, INT_MONO_INCREASING_MV_2));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.INT);
+    assertFalse(transformFunction.getResultMetadata().isSingleValue());
+    int[][] expectedValues = new int[NUM_ROWS][];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      int len = _intMonoIncreasingMV1Values[i].length;
+      int[] expectedValue = new int[len - 1];
+      for (int j = 0; j < expectedValue.length; j++) {
+        expectedValue[j] = j + 1;
+      }
+      expectedValues[i] = expectedValue;
+    }
+    testTransformFunctionMV(transformFunction, expectedValues);
   }
 
   @Test

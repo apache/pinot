@@ -28,6 +28,10 @@ import org.apache.pinot.core.operator.transform.function.BaseTransformFunction;
 import org.apache.pinot.core.operator.transform.function.LiteralTransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
+import org.apache.pinot.segment.local.utils.GeometrySerializer;
+import org.apache.pinot.segment.local.utils.GeometryUtils;
+import org.locationtech.jts.geom.Coordinate;
+import org.locationtech.jts.geom.Point;
 
 
 /**
@@ -47,6 +51,7 @@ public class StPointFunction extends BaseTransformFunction {
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
+    super.init(arguments, columnContextMap);
     Preconditions.checkArgument(arguments.size() == 2 || arguments.size() == 3,
         "2 or 3 arguments are required for transform function: %s", getName());
     TransformFunction transformFunction = arguments.get(0);
@@ -60,7 +65,7 @@ public class StPointFunction extends BaseTransformFunction {
     if (arguments.size() == 3) {
       transformFunction = arguments.get(2);
       Preconditions.checkArgument(transformFunction instanceof LiteralTransformFunction,
-          "Third argument must be a literal of integer: %s", getName());
+          "Third argument must be a literal of boolean: %s", getName());
       _isGeography = ((LiteralTransformFunction) transformFunction).getBooleanLiteral();
     }
   }
@@ -78,7 +83,11 @@ public class StPointFunction extends BaseTransformFunction {
     double[] firstValues = _firstArgument.transformToDoubleValuesSV(valueBlock);
     double[] secondValues = _secondArgument.transformToDoubleValuesSV(valueBlock);
     for (int i = 0; i < valueBlock.getNumDocs(); i++) {
-      _results[i] = ScalarFunctions.stPoint(firstValues[i], secondValues[i], _isGeography);
+      Point point = GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(firstValues[i], secondValues[i]));
+      if (_isGeography) {
+        GeometryUtils.setGeography(point);
+      }
+      _results[i] = GeometrySerializer.serialize(point);
     }
     return _results;
   }

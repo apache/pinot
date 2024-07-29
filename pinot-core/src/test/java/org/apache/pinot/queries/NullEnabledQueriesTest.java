@@ -32,7 +32,6 @@ import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
@@ -697,8 +696,10 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
         }
         Object[] row = rows.get(index);
         assertEquals(row.length, 3);
-        assertTrue(Math.abs((Double) row[0] - (baseValue.doubleValue() + i)) < 1e-1);
-        assertTrue(Math.abs((Double) row[1] - (baseValue.doubleValue() + i)) < 1e-1);
+
+        double expected = baseValue.doubleValue() + i;
+        assertTrue(Math.abs((Double) row[0] - expected) < 1e-1, "Col 0: Expected " + expected + " found " + row[0]);
+        assertTrue(Math.abs((Double) row[1] - expected) < 1e-1, "Col 1: Expected " + expected + " found " + row[1]);
         assertEquals(row[2], 1);
         i++;
       }
@@ -731,7 +732,6 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
         assertNull(rows.get(rows.size() - 1)[0]);
       }
     }
-    DataTableBuilderFactory.setDataTableVersion(DataTableBuilderFactory.DEFAULT_VERSION);
   }
 
   @AfterClass

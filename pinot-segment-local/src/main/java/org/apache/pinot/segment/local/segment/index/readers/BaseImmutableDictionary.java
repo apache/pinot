@@ -282,34 +282,79 @@ public abstract class BaseImmutableDictionary implements Dictionary {
     return new byte[_numBytesPerValue];
   }
 
-  /**
-   * Returns the dictionary id for the given sorted values.
-   * @param sortedValues
-   * @param dictIds
-   */
   @Override
-  public void getDictIds(List<String> sortedValues, IntSet dictIds) {
-    int valueIdx = 0;
-    int dictIdx = 0;
+  public void getDictIds(List<String> sortedValues, IntSet dictIds, SortedBatchLookupAlgorithm algorithm) {
+    switch (algorithm) {
+      case DIVIDE_BINARY_SEARCH:
+        getDictIdsDivideBinarySearch(sortedValues, 0, sortedValues.size(), 0, _length, dictIds);
+        break;
+      case SCAN:
+        getDictIdsScan(sortedValues, dictIds);
+        break;
+      default:
+        throw new IllegalStateException("Unsupported sorted batch lookup algorithm: " + algorithm);
+    }
+  }
+
+  private void getDictIdsDivideBinarySearch(List<String> sortedValues, int startIndex, int endIndex, int startDictId,
+      int endDictId, IntSet dictIds) {
+    if (startIndex >= endIndex || startDictId >= endDictId) {
+      return;
+    }
+    int midIndex = (startIndex + endIndex) >>> 1;
+    String midValue = sortedValues.get(midIndex);
+    int dictId = binarySearch(midValue, startDictId, endDictId);
+    if (dictId >= 0) {
+      dictIds.add(dictId);
+      getDictIdsDivideBinarySearch(sortedValues, startIndex, midIndex, startDictId, dictId, dictIds);
+      getDictIdsDivideBinarySearch(sortedValues, midIndex + 1, endIndex, dictId + 1, endDictId, dictIds);
+    } else {
+      dictId = -dictId - 1;
+      getDictIdsDivideBinarySearch(sortedValues, startIndex, midIndex, startDictId, dictId, dictIds);
+      getDictIdsDivideBinarySearch(sortedValues, midIndex + 1, endIndex, dictId, endDictId, dictIds);
+    }
+  }
+
+  private int binarySearch(String value, int startDictId, int endDictId) {
+    int low = startDictId;
+    int high = endDictId - 1;
+    byte[] utf8 = value.getBytes(UTF_8);
+    while (low <= high) {
+      int mid = (low + high) >>> 1;
+      int compareResult = _valueReader.compareUtf8Bytes(mid, _numBytesPerValue, utf8);
+      if (compareResult < 0) {
+        low = mid + 1;
+      } else if (compareResult > 0) {
+        high = mid - 1;
+      } else {
+        return mid;
+      }
+    }
+    return -(low + 1);
+  }
+
+  private void getDictIdsScan(List<String> sortedValues, IntSet dictIds) {
+    int valueId = 0;
+    int dictId = 0;
     byte[] utf8 = null;
     boolean needNewUtf8 = true;
-    int sortedValuesSize = sortedValues.size();
+    int numSortedValues = sortedValues.size();
     int dictLength = length();
-    while (valueIdx < sortedValuesSize && dictIdx < dictLength) {
+    while (valueId < numSortedValues && dictId < dictLength) {
       if (needNewUtf8) {
-        utf8 = sortedValues.get(valueIdx).getBytes(StandardCharsets.UTF_8);
+        utf8 = sortedValues.get(valueId).getBytes(StandardCharsets.UTF_8);
       }
-      int comparison = _valueReader.compareUtf8Bytes(dictIdx, _numBytesPerValue, utf8);
+      int comparison = _valueReader.compareUtf8Bytes(dictId, _numBytesPerValue, utf8);
       if (comparison == 0) {
-        dictIds.add(dictIdx);
-        dictIdx++;
-        valueIdx++;
+        dictIds.add(dictId);
+        dictId++;
+        valueId++;
         needNewUtf8 = true;
       } else if (comparison > 0) {
-        valueIdx++;
+        valueId++;
         needNewUtf8 = true;
       } else {
-        dictIdx++;
+        dictId++;
         needNewUtf8 = false;
       }
     }

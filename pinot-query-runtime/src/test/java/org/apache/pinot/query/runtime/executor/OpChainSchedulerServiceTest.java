@@ -18,13 +18,17 @@
  */
 package org.apache.pinot.query.runtime.executor;
 
-import java.util.Collections;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.utils.NamedThreadFactory;
-import org.apache.pinot.query.routing.VirtualServerAddress;
+import org.apache.pinot.query.mailbox.MailboxService;
+import org.apache.pinot.query.routing.StageMetadata;
+import org.apache.pinot.query.routing.WorkerMetadata;
+import org.apache.pinot.query.runtime.blocks.TransferableBlockTestUtils;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
@@ -38,6 +42,8 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 
 public class OpChainSchedulerServiceTest {
@@ -67,9 +73,13 @@ public class OpChainSchedulerServiceTest {
   }
 
   private OpChain getChain(MultiStageOperator operator) {
-    VirtualServerAddress address = new VirtualServerAddress("localhost", 1234, 1);
+    MailboxService mailboxService = mock(MailboxService.class);
+    when(mailboxService.getHostname()).thenReturn("localhost");
+    when(mailboxService.getPort()).thenReturn(1234);
+    WorkerMetadata workerMetadata = new WorkerMetadata(0, ImmutableMap.of(), ImmutableMap.of());
     OpChainExecutionContext context =
-        new OpChainExecutionContext(null, 123L, 1, address, Long.MAX_VALUE, Collections.emptyMap(), null, null);
+        new OpChainExecutionContext(mailboxService, 123L, Long.MAX_VALUE, ImmutableMap.of(),
+            new StageMetadata(0, ImmutableList.of(workerMetadata), ImmutableMap.of()), workerMetadata, null);
     return new OpChain(context, operator);
   }
 
@@ -82,7 +92,7 @@ public class OpChainSchedulerServiceTest {
     CountDownLatch latch = new CountDownLatch(1);
     Mockito.when(_operatorA.nextBlock()).thenAnswer(inv -> {
       latch.countDown();
-      return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+      return TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0);
     });
 
     schedulerService.register(opChain);
@@ -99,7 +109,7 @@ public class OpChainSchedulerServiceTest {
     CountDownLatch latch = new CountDownLatch(1);
     Mockito.when(_operatorA.nextBlock()).thenAnswer(inv -> {
       latch.countDown();
-      return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+      return TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0);
     });
 
     schedulerService.register(opChain);
@@ -114,7 +124,7 @@ public class OpChainSchedulerServiceTest {
     OpChainSchedulerService schedulerService = new OpChainSchedulerService(_executor);
 
     CountDownLatch latch = new CountDownLatch(1);
-    Mockito.when(_operatorA.nextBlock()).thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
+    Mockito.when(_operatorA.nextBlock()).thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
     Mockito.doAnswer(inv -> {
       latch.countDown();
       return null;

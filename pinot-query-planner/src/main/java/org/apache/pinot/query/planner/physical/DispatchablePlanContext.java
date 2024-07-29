@@ -25,14 +25,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.apache.calcite.util.Pair;
+import org.apache.calcite.runtime.PairList;
 import org.apache.pinot.query.context.PlannerContext;
-import org.apache.pinot.query.planner.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.plannode.PlanNode;
-import org.apache.pinot.query.routing.MailboxMetadata;
+import org.apache.pinot.query.routing.MailboxInfos;
 import org.apache.pinot.query.routing.QueryServerInstance;
-import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.routing.WorkerMetadata;
 
@@ -42,14 +40,14 @@ public class DispatchablePlanContext {
 
   private final long _requestId;
   private final Set<String> _tableNames;
-  private final List<Pair<Integer, String>> _resultFields;
+  private final PairList<Integer, String> _resultFields;
 
   private final PlannerContext _plannerContext;
   private final Map<Integer, DispatchablePlanMetadata> _dispatchablePlanMetadataMap;
   private final Map<Integer, PlanNode> _dispatchablePlanStageRootMap;
 
   public DispatchablePlanContext(WorkerManager workerManager, long requestId, PlannerContext plannerContext,
-      List<Pair<Integer, String>> resultFields, Set<String> tableNames) {
+      PairList<Integer, String> resultFields, Set<String> tableNames) {
     _workerManager = workerManager;
     _requestId = requestId;
     _plannerContext = plannerContext;
@@ -72,7 +70,7 @@ public class DispatchablePlanContext {
     return _tableNames;
   }
 
-  public List<Pair<Integer, String>> getResultFields() {
+  public PairList<Integer, String> getResultFields() {
     return _resultFields;
   }
 
@@ -101,7 +99,7 @@ public class DispatchablePlanContext {
           dispatchablePlanMetadata.getWorkerIdToServerInstanceMap();
       Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap =
           dispatchablePlanMetadata.getWorkerIdToSegmentsMap();
-      Map<Integer, Map<Integer, MailboxMetadata>> workerIdToMailboxesMap =
+      Map<Integer, Map<Integer, MailboxInfos>> workerIdToMailboxesMap =
           dispatchablePlanMetadata.getWorkerIdToMailboxesMap();
       Map<QueryServerInstance, List<Integer>> serverInstanceToWorkerIdsMap = new HashMap<>();
       WorkerMetadata[] workerMetadataArray = new WorkerMetadata[workerIdToServerInstanceMap.size()];
@@ -109,13 +107,11 @@ public class DispatchablePlanContext {
         int workerId = serverEntry.getKey();
         QueryServerInstance queryServerInstance = serverEntry.getValue();
         serverInstanceToWorkerIdsMap.computeIfAbsent(queryServerInstance, k -> new ArrayList<>()).add(workerId);
-        WorkerMetadata.Builder workerMetadataBuilder = new WorkerMetadata.Builder().setVirtualServerAddress(
-            new VirtualServerAddress(queryServerInstance, workerId));
+        WorkerMetadata workerMetadata = new WorkerMetadata(workerId, workerIdToMailboxesMap.get(workerId));
         if (workerIdToSegmentsMap != null) {
-          workerMetadataBuilder.addTableSegmentsMap(workerIdToSegmentsMap.get(workerId));
+          workerMetadata.setTableSegmentsMap(workerIdToSegmentsMap.get(workerId));
         }
-        workerMetadataBuilder.putAllMailBoxInfosMap(workerIdToMailboxesMap.get(workerId));
-        workerMetadataArray[workerId] = workerMetadataBuilder.build();
+        workerMetadataArray[workerId] = workerMetadata;
       }
 
       // set the stageMetadata

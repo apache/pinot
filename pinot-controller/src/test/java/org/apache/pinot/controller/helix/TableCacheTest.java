@@ -43,7 +43,6 @@ import static org.testng.Assert.*;
 
 public class TableCacheTest {
   private static final ControllerTest TEST_INSTANCE = ControllerTest.getInstance();
-  private static final String SCHEMA_NAME = "cacheTestSchema";
   private static final String RAW_TABLE_NAME = "cacheTestTable";
   private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(RAW_TABLE_NAME);
   private static final String REALTIME_TABLE_NAME = TableNameBuilder.REALTIME.tableNameWithType(RAW_TABLE_NAME);
@@ -62,8 +61,6 @@ public class TableCacheTest {
       throws Exception {
     TableCache tableCache = new TableCache(TEST_INSTANCE.getPropertyStore(), isCaseInsensitive);
 
-    assertNull(tableCache.getSchema(SCHEMA_NAME));
-    assertNull(tableCache.getColumnNameMap(SCHEMA_NAME));
     assertNull(tableCache.getSchema(RAW_TABLE_NAME));
     assertNull(tableCache.getColumnNameMap(RAW_TABLE_NAME));
     assertNull(tableCache.getTableConfig(OFFLINE_TABLE_NAME));
@@ -71,15 +68,15 @@ public class TableCacheTest {
 
     // Add a schema
     Schema schema =
-        new Schema.SchemaBuilder().setSchemaName(SCHEMA_NAME).addSingleValueDimension("testColumn", DataType.INT)
+        new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME).addSingleValueDimension("testColumn", DataType.INT)
             .build();
     TEST_INSTANCE.getHelixResourceManager().addSchema(schema, false, false);
     // Wait for at most 10 seconds for the callback to add the schema to the cache
-    TestUtils.waitForCondition(aVoid -> tableCache.getSchema(SCHEMA_NAME) != null, 10_000L,
+    TestUtils.waitForCondition(aVoid -> tableCache.getSchema(RAW_TABLE_NAME) != null, 10_000L,
         "Failed to add the schema to the cache");
     // Schema can be accessed by the schema name, but not by the table name because table config is not added yet
     Schema expectedSchema =
-        new Schema.SchemaBuilder().setSchemaName(SCHEMA_NAME).addSingleValueDimension("testColumn", DataType.INT)
+        new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME).addSingleValueDimension("testColumn", DataType.INT)
             .addSingleValueDimension(BuiltInVirtualColumn.DOCID, DataType.INT)
             .addSingleValueDimension(BuiltInVirtualColumn.HOSTNAME, DataType.STRING)
             .addSingleValueDimension(BuiltInVirtualColumn.SEGMENTNAME, DataType.STRING).build();
@@ -88,16 +85,14 @@ public class TableCacheTest {
     expectedColumnMap.put(isCaseInsensitive ? "$docid" : "$docId", "$docId");
     expectedColumnMap.put(isCaseInsensitive ? "$hostname" : "$hostName", "$hostName");
     expectedColumnMap.put(isCaseInsensitive ? "$segmentname" : "$segmentName", "$segmentName");
-    assertEquals(tableCache.getSchema(SCHEMA_NAME), expectedSchema);
-    assertEquals(tableCache.getColumnNameMap(SCHEMA_NAME), expectedColumnMap);
-    assertNull(tableCache.getSchema(RAW_TABLE_NAME));
-    assertNull(tableCache.getColumnNameMap(RAW_TABLE_NAME));
+    assertEquals(tableCache.getSchema(RAW_TABLE_NAME), expectedSchema);
+    assertEquals(tableCache.getColumnNameMap(RAW_TABLE_NAME), expectedColumnMap);
     // Case-insensitive table name are handled based on the table config instead of the schema
     assertNull(tableCache.getActualTableName(RAW_TABLE_NAME));
 
     // Add a table config
     TableConfig tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setSchemaName(SCHEMA_NAME).build();
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
     TEST_INSTANCE.waitForEVToDisappear(tableConfig.getTableName());
     TEST_INSTANCE.getHelixResourceManager().addTable(tableConfig);
     // Wait for at most 10 seconds for the callback to add the table config to the cache
@@ -109,8 +104,6 @@ public class TableCacheTest {
     // It should only add OFFLINE and normal table.
     assertNull(tableCache.getActualTableName(REALTIME_TABLE_NAME));
     // Schema can be accessed by both the schema name and the raw table name
-    assertEquals(tableCache.getSchema(SCHEMA_NAME), expectedSchema);
-    assertEquals(tableCache.getColumnNameMap(SCHEMA_NAME), expectedColumnMap);
     assertEquals(tableCache.getSchema(RAW_TABLE_NAME), expectedSchema);
     assertEquals(tableCache.getColumnNameMap(RAW_TABLE_NAME), expectedColumnMap);
 
@@ -139,18 +132,14 @@ public class TableCacheTest {
     expectedSchema.addField(new DimensionFieldSpec("newColumn", DataType.LONG, true));
     expectedColumnMap.put(isCaseInsensitive ? "newcolumn" : "newColumn", "newColumn");
     TestUtils.waitForCondition(aVoid -> {
-      assertNotNull(tableCache.getSchema(SCHEMA_NAME));
+      assertNotNull(tableCache.getSchema(RAW_TABLE_NAME));
       assertEquals(schemaChangeListener._schemaList.size(), 1);
       return schemaChangeListener._schemaList.get(0).equals(expectedSchema);
     }, 10_000L, "Failed to update the schema in the cache");
     // Schema can be accessed by both the schema name and the raw table name
-    assertEquals(tableCache.getSchema(SCHEMA_NAME), expectedSchema);
-    assertEquals(tableCache.getColumnNameMap(SCHEMA_NAME), expectedColumnMap);
     assertEquals(tableCache.getSchema(RAW_TABLE_NAME), expectedSchema);
     assertEquals(tableCache.getColumnNameMap(RAW_TABLE_NAME), expectedColumnMap);
 
-    // Update the table config and drop the schema name
-    tableConfig.getValidationConfig().setSchemaName(null);
     TEST_INSTANCE.getHelixResourceManager().updateTableConfig(tableConfig);
     // Wait for at most 10 seconds for the callback to update the table config in the cache
     // NOTE:
@@ -166,8 +155,8 @@ public class TableCacheTest {
     // After dropping the schema name from the table config, schema can only be accessed by the schema name, but not by
     // the table name
     assertEquals(tableCache.getTableConfig(OFFLINE_TABLE_NAME), tableConfig);
-    assertNull(tableCache.getSchema(RAW_TABLE_NAME));
-    assertNull(tableCache.getColumnNameMap(RAW_TABLE_NAME));
+    assertNotNull(tableCache.getSchema(RAW_TABLE_NAME));
+    assertNotNull(tableCache.getColumnNameMap(RAW_TABLE_NAME));
     if (isCaseInsensitive) {
       assertEquals(tableCache.getActualTableName(MANGLED_RAW_TABLE_NAME), RAW_TABLE_NAME);
       assertEquals(tableCache.getActualTableName(MANGLED_OFFLINE_TABLE_NAME), OFFLINE_TABLE_NAME);
@@ -178,8 +167,12 @@ public class TableCacheTest {
       assertEquals(tableCache.getActualTableName(OFFLINE_TABLE_NAME), OFFLINE_TABLE_NAME);
     }
     assertNull(tableCache.getActualTableName(REALTIME_TABLE_NAME));
-    assertEquals(tableCache.getSchema(SCHEMA_NAME), expectedSchema);
-    assertEquals(tableCache.getColumnNameMap(SCHEMA_NAME), expectedColumnMap);
+    assertEquals(tableCache.getSchema(RAW_TABLE_NAME), expectedSchema);
+    assertEquals(tableCache.getColumnNameMap(RAW_TABLE_NAME), expectedColumnMap);
+
+    // Wait for external view to appear before deleting the table to prevent external view being created after the
+    // waitForEVToDisappear() call
+    TEST_INSTANCE.waitForEVToAppear(OFFLINE_TABLE_NAME);
 
     // Remove the table config
     TEST_INSTANCE.getHelixResourceManager().deleteOfflineTable(RAW_TABLE_NAME);
@@ -191,25 +184,26 @@ public class TableCacheTest {
         "Failed to remove the table config from the cache");
     assertNull(tableCache.getTableConfig(OFFLINE_TABLE_NAME));
     assertNull(tableCache.getActualTableName(RAW_TABLE_NAME));
-    assertEquals(tableCache.getSchema(SCHEMA_NAME), expectedSchema);
-    assertEquals(tableCache.getColumnNameMap(SCHEMA_NAME), expectedColumnMap);
-    assertNull(tableCache.getSchema(RAW_TABLE_NAME));
-    assertNull(tableCache.getColumnNameMap(RAW_TABLE_NAME));
+    assertEquals(tableCache.getSchema(RAW_TABLE_NAME), expectedSchema);
+    assertEquals(tableCache.getColumnNameMap(RAW_TABLE_NAME), expectedColumnMap);
 
     // Remove the schema
-    TEST_INSTANCE.getHelixResourceManager().deleteSchema(SCHEMA_NAME);
+    TEST_INSTANCE.getHelixResourceManager().deleteSchema(RAW_TABLE_NAME);
     // Wait for at most 10 seconds for the callback to remove the schema from the cache
     // NOTE:
     // - Verify if the callback is fully done by checking the schema change lister because it is the last step of the
     //   callback handling
     TestUtils.waitForCondition(aVoid -> schemaChangeListener._schemaList.isEmpty(), 10_000L,
         "Failed to remove the schema from the cache");
-    assertNull(tableCache.getSchema(SCHEMA_NAME));
-    assertNull(tableCache.getColumnNameMap(SCHEMA_NAME));
+    assertNull(tableCache.getSchema(RAW_TABLE_NAME));
+    assertNull(tableCache.getColumnNameMap(RAW_TABLE_NAME));
     assertNull(tableCache.getSchema(RAW_TABLE_NAME));
     assertNull(tableCache.getColumnNameMap(RAW_TABLE_NAME));
     assertEquals(schemaChangeListener._schemaList.size(), 0);
     assertEquals(tableConfigChangeListener._tableConfigList.size(), 0);
+
+    // Wait for external view to disappear to ensure a clean start for the next test
+    TEST_INSTANCE.waitForEVToDisappear(OFFLINE_TABLE_NAME);
   }
 
   @DataProvider(name = "testTableCacheDataProvider")

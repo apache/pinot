@@ -18,65 +18,37 @@
  */
 package org.apache.pinot.query.planner.plannode;
 
-import com.google.common.base.Preconditions;
 import java.util.List;
-import java.util.stream.Collectors;
-import org.apache.calcite.rel.core.AggregateCall;
-import org.apache.calcite.rel.hint.PinotHintOptions;
-import org.apache.calcite.rel.hint.PinotHintStrategyTable;
-import org.apache.calcite.rel.hint.RelHint;
+import java.util.Objects;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
-import org.apache.pinot.query.planner.logical.RexExpressionUtils;
-import org.apache.pinot.query.planner.serde.ProtoProperties;
 
 
-public class AggregateNode extends AbstractPlanNode {
-  @ProtoProperties
-  private NodeHint _nodeHint;
-  @ProtoProperties
-  private List<RexExpression> _aggCalls;
-  @ProtoProperties
-  private List<Integer> _filterArgIndices;
-  @ProtoProperties
-  private List<RexExpression> _groupSet;
-  @ProtoProperties
-  private AggType _aggType;
+public class AggregateNode extends BasePlanNode {
+  private final List<RexExpression.FunctionCall> _aggCalls;
+  private final List<Integer> _filterArgs;
+  private final List<Integer> _groupKeys;
+  private final AggType _aggType;
 
-  public AggregateNode(int planFragmentId) {
-    super(planFragmentId);
+  public AggregateNode(int stageId, DataSchema dataSchema, NodeHint nodeHint, List<PlanNode> inputs,
+      List<RexExpression.FunctionCall> aggCalls, List<Integer> filterArgs, List<Integer> groupKeys, AggType aggType) {
+    super(stageId, dataSchema, nodeHint, inputs);
+    _aggCalls = aggCalls;
+    _filterArgs = filterArgs;
+    _groupKeys = groupKeys;
+    _aggType = aggType;
   }
 
-  public AggregateNode(int planFragmentId, DataSchema dataSchema, List<AggregateCall> aggCalls,
-      List<RexExpression> groupSet, List<RelHint> relHints) {
-    super(planFragmentId, dataSchema);
-    Preconditions.checkState(areHintsValid(relHints), "invalid sql hint for agg node: {}", relHints);
-    _aggCalls = aggCalls.stream().map(RexExpressionUtils::fromAggregateCall).collect(Collectors.toList());
-    _filterArgIndices = aggCalls.stream().map(c -> c.filterArg).collect(Collectors.toList());
-    _groupSet = groupSet;
-    _nodeHint = new NodeHint(relHints);
-    _aggType = AggType.valueOf(PinotHintStrategyTable.getHintOption(relHints, PinotHintOptions.INTERNAL_AGG_OPTIONS,
-        PinotHintOptions.InternalAggregateOptions.AGG_TYPE));
-  }
-
-  private boolean areHintsValid(List<RelHint> relHints) {
-    return PinotHintStrategyTable.containsHint(relHints, PinotHintOptions.INTERNAL_AGG_OPTIONS);
-  }
-
-  public List<RexExpression> getAggCalls() {
+  public List<RexExpression.FunctionCall> getAggCalls() {
     return _aggCalls;
   }
 
-  public List<Integer> getFilterArgIndices() {
-    return _filterArgIndices;
+  public List<Integer> getFilterArgs() {
+    return _filterArgs;
   }
 
-  public List<RexExpression> getGroupSet() {
-    return _groupSet;
-  }
-
-  public NodeHint getNodeHint() {
-    return _nodeHint;
+  public List<Integer> getGroupKeys() {
+    return _groupKeys;
   }
 
   public AggType getAggType() {
@@ -93,6 +65,27 @@ public class AggregateNode extends AbstractPlanNode {
     return visitor.visitAggregate(this, context);
   }
 
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (!(o instanceof AggregateNode)) {
+      return false;
+    }
+    if (!super.equals(o)) {
+      return false;
+    }
+    AggregateNode that = (AggregateNode) o;
+    return Objects.equals(_aggCalls, that._aggCalls) && Objects.equals(_filterArgs, that._filterArgs) && Objects.equals(
+        _groupKeys, that._groupKeys) && _aggType == that._aggType;
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(super.hashCode(), _aggCalls, _filterArgs, _groupKeys, _aggType);
+  }
+
   /**
    * Aggregation Types: Pinot aggregation functions can perform operation on input data which
    *   (1) directly accumulate from raw input, or
@@ -102,10 +95,12 @@ public class AggregateNode extends AbstractPlanNode {
    *   (2) extract result as final result format.
    */
   public enum AggType {
+    //@formatter:off
     DIRECT(false, false),
     LEAF(false, true),
     INTERMEDIATE(true, true),
     FINAL(true, false);
+    //@formatter:on
 
     private final boolean _isInputIntermediateFormat;
     private final boolean _isOutputIntermediateFormat;

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.realtime.converter.stats;
 
+import java.io.File;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.creator.SegmentCreationDataSource;
@@ -47,5 +48,12 @@ public class RealtimeSegmentSegmentCreationDataSource implements SegmentCreation
   @Override
   public RecordReader getRecordReader() {
     return _recordReader;
+  }
+
+  /**
+   * Returns the consumer directory of the realtime segment
+   */
+  public File getConsumerDir() {
+    return _mutableSegment.getConsumerDir();
   }
 }

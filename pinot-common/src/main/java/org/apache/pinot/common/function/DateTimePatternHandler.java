@@ -47,6 +47,19 @@ public class DateTimePatternHandler {
   }
 
   /**
+   * Converts the dateTimeString of the pattern/timezone and return default value when exception occurs.
+   */
+  public static long parseDateTimeStringToEpochMillis(String dateTimeString, String pattern, String timezoneId,
+      long defaultVal) {
+    try {
+      DateTimeFormatter dateTimeFormatter = getDateTimeFormatter(pattern, timezoneId);
+      return dateTimeFormatter.parseMillis(dateTimeString);
+    } catch (Exception e) {
+      return defaultVal;
+    }
+  }
+
+  /**
    * Converts the millis representing seconds since epoch into a string of passed pattern
    */
   public static String parseEpochMillisToDateTimeString(long millis, String pattern) {

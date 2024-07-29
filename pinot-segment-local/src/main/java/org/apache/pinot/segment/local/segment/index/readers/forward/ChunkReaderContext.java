@@ -20,6 +20,9 @@ package org.apache.pinot.segment.local.segment.index.readers.forward;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.List;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.memory.CleanerUtil;
 
@@ -37,11 +40,23 @@ import org.apache.pinot.segment.spi.memory.CleanerUtil;
  */
 public class ChunkReaderContext implements ForwardIndexReaderContext {
   private final ByteBuffer _chunkBuffer;
+
   private int _chunkId;
+
+  private List<ForwardIndexReader.ByteRange> _ranges;
 
   public ChunkReaderContext(int maxChunkSize) {
     _chunkBuffer = ByteBuffer.allocateDirect(maxChunkSize);
     _chunkId = -1;
+    _ranges = new ArrayList<>();
+  }
+
+  @Override
+  public void close()
+      throws IOException {
+    if (CleanerUtil.UNMAP_SUPPORTED) {
+      CleanerUtil.getCleaner().freeBuffer(_chunkBuffer);
+    }
   }
 
   public ByteBuffer getChunkBuffer() {
@@ -56,11 +71,11 @@ public class ChunkReaderContext implements ForwardIndexReaderContext {
     _chunkId = chunkId;
   }
 
-  @Override
-  public void close()
-      throws IOException {
-    if (CleanerUtil.UNMAP_SUPPORTED) {
-      CleanerUtil.getCleaner().freeBuffer(_chunkBuffer);
-    }
+  public List<ForwardIndexReader.ByteRange> getRanges() {
+    return _ranges;
+  }
+
+  public void setRanges(List<ForwardIndexReader.ByteRange> ranges) {
+    _ranges = ranges;
   }
 }

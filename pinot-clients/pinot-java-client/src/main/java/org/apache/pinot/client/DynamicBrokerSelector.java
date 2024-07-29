@@ -89,7 +89,7 @@ public class DynamicBrokerSelector implements BrokerSelector, IZkDataListener {
   @Nullable
   @Override
   public String selectBroker(String... tableNames) {
-    if (tableNames != null) {
+    if (!(tableNames == null || tableNames.length == 0 || tableNames[0] == null)) {
       // getting list of brokers hosting all the tables.
       List<String> list = BrokerSelectorUtils.getTablesCommonBrokers(Arrays.asList(tableNames),
           _tableToBrokerListMapRef.get());

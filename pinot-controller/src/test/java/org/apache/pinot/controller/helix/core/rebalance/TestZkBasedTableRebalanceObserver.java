@@ -21,8 +21,10 @@ package org.apache.pinot.controller.helix.core.rebalance;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.TreeMap;
+import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentUtils;
+import org.mockito.Mockito;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.ERROR;
@@ -35,14 +37,17 @@ import static org.testng.Assert.assertEquals;
 
 public class TestZkBasedTableRebalanceObserver {
 
+  // This is a test to verify if Zk stats are pushed out correctly
   @Test
-    // This is a test to verify if Zk stats are pushed out correctly
   void testZkObserverTracking() {
     PinotHelixResourceManager pinotHelixResourceManager = mock(PinotHelixResourceManager.class);
     // Mocking this. We will verify using numZkUpdate stat
     when(pinotHelixResourceManager.addControllerJobToZK(any(), any(), any())).thenReturn(true);
+    ControllerMetrics controllerMetrics = Mockito.mock(ControllerMetrics.class);
+    TableRebalanceContext retryCtx = new TableRebalanceContext();
+    retryCtx.setConfig(new RebalanceConfig());
     ZkBasedTableRebalanceObserver observer =
-        new ZkBasedTableRebalanceObserver("dummy", "dummyId", pinotHelixResourceManager);
+        new ZkBasedTableRebalanceObserver("dummy", "dummyId", retryCtx, pinotHelixResourceManager);
     Map<String, Map<String, String>> source = new TreeMap<>();
     Map<String, Map<String, String>> target = new TreeMap<>();
     target.put("segment1",

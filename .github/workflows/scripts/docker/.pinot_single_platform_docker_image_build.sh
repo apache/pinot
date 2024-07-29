@@ -18,6 +18,9 @@
 # under the License.
 #
 
+set -e
+set -x
+
 if [ -z "${DOCKER_IMAGE_NAME}" ]; then
   DOCKER_IMAGE_NAME="apachepinot/pinot"
 fi
@@ -28,39 +31,59 @@ if [ -z "${JDK_VERSION}" ]; then
   JDK_VERSION="11"
 fi
 
-tags=()
-declare -a tags=($(echo ${TAGS} | tr "," " "))
 
 cd ${DOCKER_FILE_BASE_DIR}
 platformTag=${BUILD_PLATFORM/\//-}
-DOCKER_BUILD_TAGS=""
-for tag in "${tags[@]}"; do
-  DOCKER_BUILD_TAGS+=" --tag ${DOCKER_IMAGE_NAME}:${tag}-${BASE_IMAGE_TAG}-${platformTag} "
 
-  if [ "${BASE_IMAGE_TAG}" == "11-amazoncorretto" ]; then
-    if [ "${tag}" == "latest" ]; then
-      DOCKER_BUILD_TAGS+=" --tag ${DOCKER_IMAGE_NAME}:latest-${platformTag} "
-    fi
-  fi
-done
-
-echo "Building docker image for platform: ${BUILD_PLATFORM} with tags: ${DOCKER_BUILD_TAGS}"
+PINOT_BUILD_IMAGE_TAG=${BASE_IMAGE_TAG}-${platformTag}
+echo "Building docker image for platform: ${BUILD_PLATFORM} with tag: pinot-build:${PINOT_BUILD_IMAGE_TAG}"
 docker build \
   --no-cache \
   --platform ${BUILD_PLATFORM} \
-  --file Dockerfile \
+  --file Dockerfile.build \
   --build-arg PINOT_GIT_URL=${PINOT_GIT_URL} \
   --build-arg PINOT_BRANCH=${PINOT_BRANCH} \
   --build-arg JDK_VERSION=${JDK_VERSION} \
-  ${DOCKER_BUILD_TAGS} \
+  --build-arg PINOT_BASE_IMAGE_TAG=${BASE_IMAGE_TAG} \
+  --tag pinot-build:${PINOT_BUILD_IMAGE_TAG} \
   .
 
-for tag in "${tags[@]}"; do
-  docker push ${DOCKER_IMAGE_NAME}:${tag}-${BASE_IMAGE_TAG}-${platformTag}
+tags=()
+declare -a tags=($(echo ${TAGS} | tr "," " "))
 
-  if [ "${BASE_IMAGE_TAG}" == "11-amazoncorretto" ]; then
-    if [ "${tag}" == "latest" ]; then
-      docker push ${DOCKER_IMAGE_NAME}:${tag}-${platformTag}
+runtimeImages=()
+declare -a runtimeImages=($(echo ${RUNTIME_IMAGE_TAGS} | tr "," " "))
+
+
+for runtimeImage in "${runtimeImages[@]}"; do
+  DOCKER_BUILD_TAGS=""
+  for tag in "${tags[@]}"; do
+    DOCKER_BUILD_TAGS+=" --tag ${DOCKER_IMAGE_NAME}:${tag}-${runtimeImage}-${platformTag} "
+
+    if [ "${runtimeImage}" == "11-amazoncorretto" ]; then
+      if [ "${tag}" == "latest" ]; then
+        DOCKER_BUILD_TAGS+=" --tag ${DOCKER_IMAGE_NAME}:latest-${platformTag} "
+      fi
     fi
-  fi
+  done
+
+  echo "Building docker image for platform: ${BUILD_PLATFORM} with tags: ${DOCKER_BUILD_TAGS}"
+  docker build \
+    --no-cache \
+    --platform ${BUILD_PLATFORM} \
+    --file Dockerfile.package \
+    --build-arg PINOT_BUILD_IMAGE_TAG=${PINOT_BUILD_IMAGE_TAG} \
+    --build-arg PINOT_RUNTIME_IMAGE_TAG=${runtimeImage} \
+    ${DOCKER_BUILD_TAGS} \
+    .
+
+  for tag in "${tags[@]}"; do
+    docker push ${DOCKER_IMAGE_NAME}:${tag}-${runtimeImage}-${platformTag}
+
+    if [ "${runtimeImage}" == "11-amazoncorretto" ]; then
+      if [ "${tag}" == "latest" ]; then
+        docker push ${DOCKER_IMAGE_NAME}:${tag}-${platformTag}
+      fi
+    fi
+  done
 done

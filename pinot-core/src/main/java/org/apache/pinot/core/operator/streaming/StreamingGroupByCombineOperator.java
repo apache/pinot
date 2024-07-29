@@ -244,12 +244,14 @@ public class StreamingGroupByCombineOperator extends BaseStreamingCombineOperato
     }
 
     IndexedTable indexedTable = _indexedTable;
-    if (!_queryContext.isServerReturnFinalResult()) {
-      indexedTable.finish(false);
-    } else {
+    if (_queryContext.isServerReturnFinalResult()) {
       indexedTable.finish(true, true);
+    } else if (_queryContext.isServerReturnFinalResultKeyUnpartitioned()) {
+      indexedTable.finish(false, true);
+    } else {
+      indexedTable.finish(false);
     }
-    GroupByResultsBlock mergedBlock = new GroupByResultsBlock(indexedTable);
+    GroupByResultsBlock mergedBlock = new GroupByResultsBlock(indexedTable, _queryContext);
     mergedBlock.setNumGroupsLimitReached(_numGroupsLimitReached);
     mergedBlock.setNumResizes(indexedTable.getNumResizes());
     mergedBlock.setResizeTimeMs(indexedTable.getResizeTimeMs());

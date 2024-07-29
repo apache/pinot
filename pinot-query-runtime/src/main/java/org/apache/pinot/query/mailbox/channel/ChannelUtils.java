@@ -23,5 +23,5 @@ public class ChannelUtils {
   }
 
   public static final String MAILBOX_METADATA_BUFFER_SIZE_KEY = "buffer.size";
-  public static final String MAILBOX_METADATA_BEGIN_OF_STREAM_KEY = "begin.of.stream";
+  public static final String MAILBOX_METADATA_REQUEST_EARLY_TERMINATE = "request.early.terminate";
 }

@@ -21,6 +21,7 @@ package org.apache.pinot.controller.recommender.rules.impl;
 
 import java.util.HashSet;
 import java.util.Set;
+import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.controller.recommender.io.ConfigManager;
 import org.apache.pinot.controller.recommender.io.InputManager;
 import org.apache.pinot.controller.recommender.rules.AbstractRule;
@@ -59,12 +60,13 @@ public class FlagQueryRule extends AbstractRule {
         _output.getFlaggedQueries().add(query, WARNING_TOO_LONG_LIMIT);
       }
 
-      if (queryContext.getFilter() == null) {
+      FilterContext filter = queryContext.getFilter();
+      if (filter == null || filter.isConstant()) {
         //Flag the queries that are not using any filters.
         _output.getFlaggedQueries().add(query, WARNING_NO_FILTERING);
       } else { //Flag the queries that are not using any time filters.
         Set<String> usedCols = new HashSet<>();
-        queryContext.getFilter().getColumns(usedCols);
+        filter.getColumns(usedCols);
         Set<String> timeCols = _input.getTimeColumns();
         if (!timeCols.isEmpty()) {
           usedCols.retainAll(timeCols);

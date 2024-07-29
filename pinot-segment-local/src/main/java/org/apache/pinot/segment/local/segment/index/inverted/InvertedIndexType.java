@@ -21,6 +21,8 @@ package org.apache.pinot.segment.local.segment.index.inverted;
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -61,6 +63,8 @@ public class InvertedIndexType
     extends AbstractIndexType<IndexConfig, InvertedIndexReader, DictionaryBasedInvertedIndexCreator>
     implements ConfigurableFromIndexLoadingConfig<IndexConfig> {
   public static final String INDEX_DISPLAY_NAME = "inverted";
+  private static final List<String> EXTENSIONS =
+      Collections.singletonList(V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION);
 
   protected InvertedIndexType() {
     super(StandardIndexes.INVERTED_ID);
@@ -131,8 +135,8 @@ public class InvertedIndexType
   }
 
   @Override
-  public String getFileExtension(ColumnMetadata columnMetadata) {
-    return V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION;
+  public List<String> getFileExtensions(@Nullable ColumnMetadata columnMetadata) {
+    return EXTENSIONS;
   }
 
   @Override

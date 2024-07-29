@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.core.transport;
 
+import com.google.common.annotations.VisibleForTesting;
 import io.netty.bootstrap.ServerBootstrap;
-import io.netty.channel.Channel;
+import io.netty.buffer.PooledByteBufAllocator;
+import io.netty.buffer.PooledByteBufAllocatorMetric;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
@@ -37,6 +39,8 @@ import io.netty.channel.socket.nio.NioServerSocketChannel;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.config.NettyConfig;
 import org.apache.pinot.common.config.TlsConfig;
+import org.apache.pinot.common.metrics.ServerGauge;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.util.OsCheck;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -55,7 +59,7 @@ public class QueryServer {
   private final EventLoopGroup _workerGroup;
   private final Class<? extends ServerSocketChannel> _channelClass;
   private final ChannelHandler _instanceRequestHandler;
-  private Channel _channel;
+  private ServerSocketChannel _channel;
 
   /**
    * Create an unsecured server instance
@@ -81,16 +85,12 @@ public class QueryServer {
 
     boolean enableNativeTransports = nettyConfig != null && nettyConfig.isNativeTransportsEnabled();
     OsCheck.OSType operatingSystemType = OsCheck.getOperatingSystemType();
-    if (enableNativeTransports
-        && operatingSystemType == OsCheck.OSType.Linux
-        && Epoll.isAvailable()) {
+    if (enableNativeTransports && operatingSystemType == OsCheck.OSType.Linux && Epoll.isAvailable()) {
       _bossGroup = new EpollEventLoopGroup();
       _workerGroup = new EpollEventLoopGroup();
       _channelClass = EpollServerSocketChannel.class;
       LOGGER.info("Using Epoll event loop");
-    } else if (enableNativeTransports
-        && operatingSystemType == OsCheck.OSType.MacOS
-        && KQueue.isAvailable()) {
+    } else if (enableNativeTransports && operatingSystemType == OsCheck.OSType.MacOS && KQueue.isAvailable()) {
       _bossGroup = new KQueueEventLoopGroup();
       _workerGroup = new KQueueEventLoopGroup();
       _channelClass = KQueueServerSocketChannel.class;
@@ -100,11 +100,9 @@ public class QueryServer {
       _workerGroup = new NioEventLoopGroup();
       _channelClass = NioServerSocketChannel.class;
       StringBuilder log = new StringBuilder("Using NIO event loop");
-      if (operatingSystemType == OsCheck.OSType.Linux
-          && enableNativeTransports) {
+      if (operatingSystemType == OsCheck.OSType.Linux && enableNativeTransports) {
         log.append(", as Epoll is not available: ").append(Epoll.unavailabilityCause());
-      } else if (operatingSystemType == OsCheck.OSType.MacOS
-          && enableNativeTransports) {
+      } else if (operatingSystemType == OsCheck.OSType.MacOS && enableNativeTransports) {
         log.append(", as KQueue is not available: ").append(KQueue.unavailabilityCause());
       }
       LOGGER.info(log.toString());
@@ -114,9 +112,21 @@ public class QueryServer {
   public void start() {
     try {
       ServerBootstrap serverBootstrap = new ServerBootstrap();
-      _channel = serverBootstrap.group(_bossGroup, _workerGroup).channel(_channelClass)
+
+      PooledByteBufAllocator bufAllocator = PooledByteBufAllocator.DEFAULT;
+      PooledByteBufAllocatorMetric metric = bufAllocator.metric();
+      ServerMetrics metrics = ServerMetrics.get();
+      metrics.setOrUpdateGlobalGauge(ServerGauge.NETTY_POOLED_USED_DIRECT_MEMORY, metric::usedDirectMemory);
+      metrics.setOrUpdateGlobalGauge(ServerGauge.NETTY_POOLED_USED_HEAP_MEMORY, metric::usedHeapMemory);
+      metrics.setOrUpdateGlobalGauge(ServerGauge.NETTY_POOLED_ARENAS_DIRECT, metric::numDirectArenas);
+      metrics.setOrUpdateGlobalGauge(ServerGauge.NETTY_POOLED_ARENAS_HEAP, metric::numHeapArenas);
+      metrics.setOrUpdateGlobalGauge(ServerGauge.NETTY_POOLED_CACHE_SIZE_SMALL, metric::smallCacheSize);
+      metrics.setOrUpdateGlobalGauge(ServerGauge.NETTY_POOLED_CACHE_SIZE_NORMAL, metric::normalCacheSize);
+      metrics.setOrUpdateGlobalGauge(ServerGauge.NETTY_POOLED_THREADLOCALCACHE, metric::numThreadLocalCaches);
+      metrics.setOrUpdateGlobalGauge(ServerGauge.NETTY_POOLED_CHUNK_SIZE, metric::chunkSize);
+      _channel = (ServerSocketChannel) serverBootstrap.group(_bossGroup, _workerGroup).channel(_channelClass)
           .option(ChannelOption.SO_BACKLOG, 128).childOption(ChannelOption.SO_KEEPALIVE, true)
-          .childHandler(new ChannelInitializer<SocketChannel>() {
+          .option(ChannelOption.ALLOCATOR, bufAllocator).childHandler(new ChannelInitializer<SocketChannel>() {
             @Override
             protected void initChannel(SocketChannel ch) {
               if (_tlsConfig != null) {
@@ -147,5 +157,10 @@ public class QueryServer {
       _workerGroup.shutdownGracefully(0, 0, TimeUnit.SECONDS);
       _bossGroup.shutdownGracefully(0, 0, TimeUnit.SECONDS);
     }
+  }
+
+  @VisibleForTesting
+  ServerSocketChannel getChannel() {
+    return _channel;
   }
 }

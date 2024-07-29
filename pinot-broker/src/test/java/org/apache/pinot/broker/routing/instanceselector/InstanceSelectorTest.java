@@ -22,7 +22,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
-import com.mercateo.test.clock.TestClock;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -48,9 +47,11 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.common.utils.TestClock;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.testng.annotations.AfterMethod;
@@ -108,16 +109,17 @@ public class InstanceSelectorTest {
       Arrays.asList("segment0", "segment1", "segment2", "segment3", "segment4", "segment5", "segment6", "segment7",
           "segment8", "segment9", "segment10", "segment11");
 
-  private void createSegments(List<Pair<String, Long>> segmentPushMillis) {
+  private void createSegments(List<Pair<String, Long>> segmentCreationTimeMsPairs) {
     List<String> segmentZKMetadataPaths = new ArrayList<>();
     List<ZNRecord> zkRecords = new ArrayList<>();
-    for (Pair<String, Long> segment : segmentPushMillis) {
-      SegmentZKMetadata offlineSegmentZKMetadata0 = new SegmentZKMetadata(segment.getLeft());
-      offlineSegmentZKMetadata0.setPushTime(segment.getRight());
+    for (Pair<String, Long> segmentCreationTimeMsPair : segmentCreationTimeMsPairs) {
+      String segment = segmentCreationTimeMsPair.getLeft();
+      long creationTimeMs = segmentCreationTimeMsPair.getRight();
+      SegmentZKMetadata offlineSegmentZKMetadata0 = new SegmentZKMetadata(segment);
+      offlineSegmentZKMetadata0.setCreationTime(creationTimeMs);
       offlineSegmentZKMetadata0.setTimeUnit(TimeUnit.MILLISECONDS);
       ZNRecord record = offlineSegmentZKMetadata0.toZNRecord();
-      segmentZKMetadataPaths.add(
-          ZKMetadataProvider.constructPropertyStorePathForSegment(TABLE_NAME, segment.getLeft()));
+      segmentZKMetadataPaths.add(ZKMetadataProvider.constructPropertyStorePathForSegment(TABLE_NAME, segment));
       zkRecords.add(record);
     }
     when(_propertyStore.get(eq(segmentZKMetadataPaths), any(), anyInt(), anyBoolean())).thenReturn(zkRecords);
@@ -150,28 +152,28 @@ public class InstanceSelectorTest {
   }
 
   private static boolean isReplicaGroupType(String selectorType) {
-    return selectorType.equals(RoutingConfig.REPLICA_GROUP_INSTANCE_SELECTOR_TYPE) || selectorType.equals(
+    return selectorType.equals(REPLICA_GROUP_INSTANCE_SELECTOR_TYPE) || selectorType.equals(
         STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE);
   }
 
   private InstanceSelector createTestInstanceSelector(String selectorType) {
-    RoutingConfig config = new RoutingConfig(null, null, selectorType);
+    RoutingConfig config = new RoutingConfig(null, null, selectorType, false);
     when(_tableConfig.getRoutingConfig()).thenReturn(config);
     return InstanceSelectorFactory.getInstanceSelector(_tableConfig, _propertyStore, _brokerMetrics, null,
-        _mutableClock);
+        _mutableClock, new PinotConfiguration());
   }
 
   @DataProvider(name = "selectorType")
   public Object[] getSelectorType() {
     return new Object[]{
-        RoutingConfig.REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE,
+        REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE,
         BALANCED_INSTANCE_SELECTOR
     };
   }
 
   @BeforeMethod
   public void setUp() {
-    _mutableClock = TestClock.fixed(Instant.now(), ZoneId.systemDefault());
+    _mutableClock = new TestClock(Instant.now(), ZoneId.systemDefault());
     _mocks = MockitoAnnotations.openMocks(this);
     when(_brokerRequest.getPinotQuery()).thenReturn(_pinotQuery);
     when(_pinotQuery.getQueryOptions()).thenReturn(null);
@@ -190,39 +192,40 @@ public class InstanceSelectorTest {
     TableConfig tableConfig = mock(TableConfig.class);
     ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
     BrokerMetrics brokerMetrics = mock(BrokerMetrics.class);
+    when(tableConfig.getTableName()).thenReturn("testTable_OFFLINE");
 
     // Routing config is missing
-    assertTrue(InstanceSelectorFactory.getInstanceSelector(tableConfig, propertyStore,
-        brokerMetrics) instanceof BalancedInstanceSelector);
+    assertTrue(InstanceSelectorFactory.getInstanceSelector(tableConfig, propertyStore, brokerMetrics,
+        new PinotConfiguration()) instanceof BalancedInstanceSelector);
 
     // Instance selector type is not configured
     RoutingConfig routingConfig = mock(RoutingConfig.class);
     when(tableConfig.getRoutingConfig()).thenReturn(routingConfig);
-    assertTrue(InstanceSelectorFactory.getInstanceSelector(tableConfig, propertyStore,
-        brokerMetrics) instanceof BalancedInstanceSelector);
+    assertTrue(InstanceSelectorFactory.getInstanceSelector(tableConfig, propertyStore, brokerMetrics,
+        new PinotConfiguration()) instanceof BalancedInstanceSelector);
 
     // Replica-group instance selector should be returned
-    when(routingConfig.getInstanceSelectorType()).thenReturn(RoutingConfig.REPLICA_GROUP_INSTANCE_SELECTOR_TYPE);
-    assertTrue(InstanceSelectorFactory.getInstanceSelector(tableConfig, propertyStore,
-        brokerMetrics) instanceof ReplicaGroupInstanceSelector);
+    when(routingConfig.getInstanceSelectorType()).thenReturn(REPLICA_GROUP_INSTANCE_SELECTOR_TYPE);
+    assertTrue(InstanceSelectorFactory.getInstanceSelector(tableConfig, propertyStore, brokerMetrics,
+        new PinotConfiguration()) instanceof ReplicaGroupInstanceSelector);
 
     // Strict replica-group instance selector should be returned
     when(routingConfig.getInstanceSelectorType()).thenReturn(STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE);
-    assertTrue(InstanceSelectorFactory.getInstanceSelector(tableConfig, propertyStore,
-        brokerMetrics) instanceof StrictReplicaGroupInstanceSelector);
+    assertTrue(InstanceSelectorFactory.getInstanceSelector(tableConfig, propertyStore, brokerMetrics,
+        new PinotConfiguration()) instanceof StrictReplicaGroupInstanceSelector);
 
     // Should be backward-compatible with legacy config
     when(routingConfig.getInstanceSelectorType()).thenReturn(null);
     when(tableConfig.getTableType()).thenReturn(TableType.OFFLINE);
     when(routingConfig.getRoutingTableBuilderName()).thenReturn(
         InstanceSelectorFactory.LEGACY_REPLICA_GROUP_OFFLINE_ROUTING);
-    assertTrue(InstanceSelectorFactory.getInstanceSelector(tableConfig, propertyStore,
-        brokerMetrics) instanceof ReplicaGroupInstanceSelector);
+    assertTrue(InstanceSelectorFactory.getInstanceSelector(tableConfig, propertyStore, brokerMetrics,
+        new PinotConfiguration()) instanceof ReplicaGroupInstanceSelector);
     when(tableConfig.getTableType()).thenReturn(TableType.REALTIME);
     when(routingConfig.getRoutingTableBuilderName()).thenReturn(
         InstanceSelectorFactory.LEGACY_REPLICA_GROUP_REALTIME_ROUTING);
-    assertTrue(InstanceSelectorFactory.getInstanceSelector(tableConfig, propertyStore,
-        brokerMetrics) instanceof ReplicaGroupInstanceSelector);
+    assertTrue(InstanceSelectorFactory.getInstanceSelector(tableConfig, propertyStore, brokerMetrics,
+        new PinotConfiguration()) instanceof ReplicaGroupInstanceSelector);
   }
 
   @Test
@@ -231,11 +234,14 @@ public class InstanceSelectorTest {
     ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
     BrokerMetrics brokerMetrics = mock(BrokerMetrics.class);
     BalancedInstanceSelector balancedInstanceSelector =
-        new BalancedInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC());
+        new BalancedInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC(),
+            false, 300);
     ReplicaGroupInstanceSelector replicaGroupInstanceSelector =
-        new ReplicaGroupInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC());
+        new ReplicaGroupInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC(),
+            false, 300);
     StrictReplicaGroupInstanceSelector strictReplicaGroupInstanceSelector =
-        new StrictReplicaGroupInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC());
+        new StrictReplicaGroupInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC(),
+            false, 300);
 
     Set<String> enabledInstances = new HashSet<>();
     IdealState idealState = new IdealState(offlineTableName);
@@ -755,7 +761,8 @@ public class InstanceSelectorTest {
     when(pinotQuery.getQueryOptions()).thenReturn(queryOptions);
 
     ReplicaGroupInstanceSelector replicaGroupInstanceSelector =
-        new ReplicaGroupInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC());
+        new ReplicaGroupInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC(),
+            false, 300);
 
     Set<String> enabledInstances = new HashSet<>();
     IdealState idealState = new IdealState(offlineTableName);
@@ -837,7 +844,8 @@ public class InstanceSelectorTest {
     when(pinotQuery.getQueryOptions()).thenReturn(queryOptions);
 
     ReplicaGroupInstanceSelector replicaGroupInstanceSelector =
-        new ReplicaGroupInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC());
+        new ReplicaGroupInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC(),
+            false, 300);
 
     Set<String> enabledInstances = new HashSet<>();
     IdealState idealState = new IdealState(offlineTableName);
@@ -919,7 +927,8 @@ public class InstanceSelectorTest {
     when(pinotQuery.getQueryOptions()).thenReturn(queryOptions);
 
     ReplicaGroupInstanceSelector replicaGroupInstanceSelector =
-        new ReplicaGroupInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC());
+        new ReplicaGroupInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC(),
+            false, 300);
 
     Set<String> enabledInstances = new HashSet<>();
     IdealState idealState = new IdealState(offlineTableName);
@@ -992,7 +1001,8 @@ public class InstanceSelectorTest {
     when(pinotQuery.getQueryOptions()).thenReturn(queryOptions);
 
     MultiStageReplicaGroupSelector multiStageSelector =
-        new MultiStageReplicaGroupSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC());
+        new MultiStageReplicaGroupSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC(),
+            false, 300);
     multiStageSelector = spy(multiStageSelector);
     doReturn(instancePartitions).when(multiStageSelector).getInstancePartitions();
 
@@ -1087,10 +1097,12 @@ public class InstanceSelectorTest {
     ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
     BrokerMetrics brokerMetrics = mock(BrokerMetrics.class);
     BalancedInstanceSelector balancedInstanceSelector =
-        new BalancedInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC());
+        new BalancedInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC(),
+            false, 300);
     // ReplicaGroupInstanceSelector has the same behavior as BalancedInstanceSelector for the unavailable segments
     StrictReplicaGroupInstanceSelector strictReplicaGroupInstanceSelector =
-        new StrictReplicaGroupInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC());
+        new StrictReplicaGroupInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC(),
+            false, 300);
 
     Set<String> enabledInstances = new HashSet<>();
     IdealState idealState = new IdealState(offlineTableName);
@@ -1377,8 +1389,9 @@ public class InstanceSelectorTest {
   public void testNewSegmentFromZKMetadataSelection(String selectorType) {
     String oldSeg = "segment0";
     String newSeg = "segment1";
-    List<Pair<String, Long>> segmentPushTime = ImmutableList.of(Pair.of(newSeg, _mutableClock.millis() - 100));
-    createSegments(segmentPushTime);
+    List<Pair<String, Long>> segmentCreationTimeMsPairs =
+        ImmutableList.of(Pair.of(newSeg, _mutableClock.millis() - 100));
+    createSegments(segmentCreationTimeMsPairs);
     Set<String> onlineSegments = ImmutableSet.of(oldSeg, newSeg);
 
     // Set up instances
@@ -1412,15 +1425,15 @@ public class InstanceSelectorTest {
       // First selection, we select instance0 for oldSeg and instance1 for newSeg in balance selector
       // For replica group, we select instance0 for oldSeg and newSeg. Because newSeg is not online in instance0, so
       // we exclude it from selection result.
-      Map<String, String> expectedSelectionResult;
-      if (isReplicaGroupType(selectorType)) {
-        expectedSelectionResult = ImmutableMap.of(oldSeg, instance0);
-      } else {
-        expectedSelectionResult = ImmutableMap.of(oldSeg, instance0, newSeg, instance1);
-      }
       InstanceSelector.SelectionResult selectionResult =
           selector.select(_brokerRequest, Lists.newArrayList(onlineSegments), requestId);
-      assertEquals(selectionResult.getSegmentToInstanceMap(), expectedSelectionResult);
+      if (isReplicaGroupType(selectorType)) {
+        assertEquals(selectionResult.getSegmentToInstanceMap(), ImmutableMap.of(oldSeg, instance0));
+        assertEquals(selectionResult.getOptionalSegmentToInstanceMap(), ImmutableMap.of(newSeg, instance0));
+      } else {
+        assertEquals(selectionResult.getSegmentToInstanceMap(), ImmutableMap.of(oldSeg, instance0, newSeg, instance1));
+        assertTrue(selectionResult.getOptionalSegmentToInstanceMap().isEmpty());
+      }
       assertTrue(selectionResult.getUnavailableSegments().isEmpty());
     }
     {
@@ -1428,21 +1441,22 @@ public class InstanceSelectorTest {
       // Second selection, we select instance1 for oldSeg and instance0 for newSeg in balance selector
       // Because newSeg is not online in instance0, so we exclude it from selection result.
       // For replica group, we select instance1 for oldSeg and newSeg.
-      Map<String, String> expectedSelectionResult;
+      InstanceSelector.SelectionResult selectionResult =
+          selector.select(_brokerRequest, Lists.newArrayList(onlineSegments), requestId);
       switch (selectorType) {
         case BALANCED_INSTANCE_SELECTOR:
-          expectedSelectionResult = ImmutableMap.of(oldSeg, instance1);
+          assertEquals(selectionResult.getSegmentToInstanceMap(), ImmutableMap.of(oldSeg, instance1));
+          assertEquals(selectionResult.getOptionalSegmentToInstanceMap(), ImmutableMap.of(newSeg, instance0));
           break;
         case STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE: // fall through
-        case RoutingConfig.REPLICA_GROUP_INSTANCE_SELECTOR_TYPE:
-          expectedSelectionResult = ImmutableMap.of(oldSeg, instance1, newSeg, instance1);
+        case REPLICA_GROUP_INSTANCE_SELECTOR_TYPE:
+          assertEquals(selectionResult.getSegmentToInstanceMap(),
+              ImmutableMap.of(oldSeg, instance1, newSeg, instance1));
+          assertTrue(selectionResult.getOptionalSegmentToInstanceMap().isEmpty());
           break;
         default:
           throw new RuntimeException("unsupported selector type:" + selectorType);
       }
-      InstanceSelector.SelectionResult selectionResult =
-          selector.select(_brokerRequest, Lists.newArrayList(onlineSegments), requestId);
-      assertEquals(selectionResult.getSegmentToInstanceMap(), expectedSelectionResult);
       assertTrue(selectionResult.getUnavailableSegments().isEmpty());
     }
     // Advance the clock to make newSeg to old segment.
@@ -1451,21 +1465,22 @@ public class InstanceSelectorTest {
     selector.init(enabledInstances, idealState, externalView, onlineSegments);
     {
       int requestId = 0;
-      Map<String, String> expectedSelectionResult;
+      InstanceSelector.SelectionResult selectionResult =
+          selector.select(_brokerRequest, Lists.newArrayList(onlineSegments), requestId);
       switch (selectorType) {
         case BALANCED_INSTANCE_SELECTOR: // fall through
-        case RoutingConfig.REPLICA_GROUP_INSTANCE_SELECTOR_TYPE:
-          expectedSelectionResult = ImmutableMap.of(oldSeg, instance0, newSeg, instance1);
+        case REPLICA_GROUP_INSTANCE_SELECTOR_TYPE:
+          assertEquals(selectionResult.getSegmentToInstanceMap(),
+              ImmutableMap.of(oldSeg, instance0, newSeg, instance1));
           break;
         case STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE:
-          expectedSelectionResult = ImmutableMap.of(oldSeg, instance1, newSeg, instance1);
+          assertEquals(selectionResult.getSegmentToInstanceMap(),
+              ImmutableMap.of(oldSeg, instance1, newSeg, instance1));
           break;
         default:
           throw new RuntimeException("unsupported selector type:" + selectorType);
       }
-      InstanceSelector.SelectionResult selectionResult =
-          selector.select(_brokerRequest, Lists.newArrayList(onlineSegments), requestId);
-      assertEquals(selectionResult.getSegmentToInstanceMap(), expectedSelectionResult);
+      assertTrue(selectionResult.getOptionalSegmentToInstanceMap().isEmpty());
       assertTrue(selectionResult.getUnavailableSegments().isEmpty());
     }
     {
@@ -1474,6 +1489,7 @@ public class InstanceSelectorTest {
       InstanceSelector.SelectionResult selectionResult =
           selector.select(_brokerRequest, Lists.newArrayList(onlineSegments), requestId);
       assertEquals(selectionResult.getSegmentToInstanceMap(), expectedSelectionResult);
+      assertTrue(selectionResult.getOptionalSegmentToInstanceMap().isEmpty());
       assertTrue(selectionResult.getUnavailableSegments().isEmpty());
     }
   }
@@ -1484,9 +1500,10 @@ public class InstanceSelectorTest {
     // Set segment0 as new segment
     String newSeg = "segment0";
     String oldSeg = "segment1";
-    List<Pair<String, Long>> segmentPushTime = ImmutableList.of(Pair.of(newSeg, _mutableClock.millis() - 100),
-        Pair.of(oldSeg, _mutableClock.millis() - NEW_SEGMENT_EXPIRATION_MILLIS - 100));
-    createSegments(segmentPushTime);
+    List<Pair<String, Long>> segmentCreationTimeMsPairs =
+        ImmutableList.of(Pair.of(newSeg, _mutableClock.millis() - 100),
+            Pair.of(oldSeg, _mutableClock.millis() - NEW_SEGMENT_EXPIRATION_MILLIS - 100));
+    createSegments(segmentCreationTimeMsPairs);
     Set<String> onlineSegments = ImmutableSet.of(newSeg, oldSeg);
 
     // Set up instances
@@ -1520,19 +1537,21 @@ public class InstanceSelectorTest {
     InstanceSelector.SelectionResult selectionResult =
         selector.select(_brokerRequest, Lists.newArrayList(onlineSegments), requestId);
     assertEquals(selectionResult.getSegmentToInstanceMap(), expectedResult);
+    assertEquals(selectionResult.getOptionalSegmentToInstanceMap(), ImmutableMap.of(newSeg, instance0));
     assertTrue(selectionResult.getUnavailableSegments().isEmpty());
 
     // Advance the clock to make newSeg to old segment and we see newSeg is reported as unavailable segment.
     _mutableClock.fastForward(Duration.ofMillis(NEW_SEGMENT_EXPIRATION_MILLIS + 10));
     selector.init(enabledInstances, idealState, externalView, onlineSegments);
     selectionResult = selector.select(_brokerRequest, Lists.newArrayList(onlineSegments), requestId);
-    if (selectorType == STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE) {
+    if (STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE.equals(selectorType)) {
       expectedResult = ImmutableMap.of();
       assertEquals(selectionResult.getUnavailableSegments(), ImmutableList.of(newSeg, oldSeg));
     } else {
       assertEquals(selectionResult.getUnavailableSegments(), ImmutableList.of(newSeg));
     }
     assertEquals(selectionResult.getSegmentToInstanceMap(), expectedResult);
+    assertTrue(selectionResult.getOptionalSegmentToInstanceMap().isEmpty());
   }
 
   @Test(dataProvider = "selectorType")
@@ -1541,8 +1560,9 @@ public class InstanceSelectorTest {
     String oldSeg = "segment0";
     // Set segment1 as new segment
     String newSeg = "segment1";
-    List<Pair<String, Long>> segmentPushTime = ImmutableList.of(Pair.of(newSeg, _mutableClock.millis() - 100));
-    createSegments(segmentPushTime);
+    List<Pair<String, Long>> segmentCreationTimeMsPairs =
+        ImmutableList.of(Pair.of(newSeg, _mutableClock.millis() - 100));
+    createSegments(segmentCreationTimeMsPairs);
     Set<String> onlineSegments = ImmutableSet.of(oldSeg, newSeg);
 
     // Set up instances
@@ -1621,8 +1641,9 @@ public class InstanceSelectorTest {
     String oldSeg = "segment0";
     // Set segment1 as new segment
     String newSeg = "segment1";
-    List<Pair<String, Long>> segmentPushTime = ImmutableList.of(Pair.of(newSeg, _mutableClock.millis() - 100));
-    createSegments(segmentPushTime);
+    List<Pair<String, Long>> segmentCreationTimeMsPairs =
+        ImmutableList.of(Pair.of(newSeg, _mutableClock.millis() - 100));
+    createSegments(segmentCreationTimeMsPairs);
     Set<String> onlineSegments = ImmutableSet.of(oldSeg, newSeg);
 
     // Set up instances
@@ -1775,8 +1796,9 @@ public class InstanceSelectorTest {
     String oldSeg = "segment0";
     // Set segment1 as new segment
     String newSeg = "segment1";
-    List<Pair<String, Long>> segmentPushTime = ImmutableList.of(Pair.of(newSeg, _mutableClock.millis() - 100));
-    createSegments(segmentPushTime);
+    List<Pair<String, Long>> segmentCreationTimeMsPairs =
+        ImmutableList.of(Pair.of(newSeg, _mutableClock.millis() - 100));
+    createSegments(segmentCreationTimeMsPairs);
     Set<String> onlineSegments = ImmutableSet.of(oldSeg, newSeg);
 
     // Set up instances
@@ -1844,10 +1866,10 @@ public class InstanceSelectorTest {
     String oldSeg = "segment0";
     // Set segment1 as new segment
     String newSeg = "segment1";
-    List<Pair<String, Long>> segmentPushTime =
+    List<Pair<String, Long>> segmentCreationTimeMsPairs =
         ImmutableList.of(Pair.of(oldSeg, _mutableClock.millis() - NEW_SEGMENT_EXPIRATION_MILLIS - 100),
             Pair.of(newSeg, _mutableClock.millis() - 100));
-    createSegments(segmentPushTime);
+    createSegments(segmentCreationTimeMsPairs);
     Set<String> onlineSegments = ImmutableSet.of(oldSeg, newSeg);
 
     // Set up instances
@@ -1893,11 +1915,10 @@ public class InstanceSelectorTest {
     String newSeg = "segment0";
     String oldSeg = "segment1";
 
-    List<Pair<String, Long>> segmentPushTime = ImmutableList.of(
-        Pair.of(newSeg, _mutableClock.millis() - 100),
-        Pair.of(oldSeg, _mutableClock.millis() - NEW_SEGMENT_EXPIRATION_MILLIS - 100));
-
-    createSegments(segmentPushTime);
+    List<Pair<String, Long>> segmentCreationTimeMsPairs =
+        ImmutableList.of(Pair.of(newSeg, _mutableClock.millis() - 100),
+            Pair.of(oldSeg, _mutableClock.millis() - NEW_SEGMENT_EXPIRATION_MILLIS - 100));
+    createSegments(segmentCreationTimeMsPairs);
     Set<String> onlineSegments = ImmutableSet.of(newSeg, oldSeg);
 
     // Set up instances

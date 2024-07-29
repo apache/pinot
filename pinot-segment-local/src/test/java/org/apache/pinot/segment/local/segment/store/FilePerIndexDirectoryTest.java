@@ -27,10 +27,12 @@ import java.util.HashSet;
 import java.util.TreeSet;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
+import org.apache.pinot.segment.local.segment.creator.impl.text.NativeTextIndexCreator;
 import org.apache.pinot.segment.local.segment.index.readers.text.LuceneTextIndexReader;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
+import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.ColumnIndexDirectory;
@@ -170,13 +172,42 @@ public class FilePerIndexDirectoryTest {
   }
 
   @Test
+  public void nativeTextIndexIsRecognized()
+      throws IOException {
+    // See https://github.com/apache/pinot/issues/11529
+    try (FilePerIndexDirectory fpi = new FilePerIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap);
+        NativeTextIndexCreator fooCreator = new NativeTextIndexCreator("foo", TEMP_DIR)) {
+
+      fooCreator.add("{\"clean\":\"this\"}");
+      fooCreator.seal();
+
+      assertTrue(fpi.hasIndexFor("foo", StandardIndexes.text()), "Native text index not found");
+    }
+  }
+
+  @Test
+  public void nativeTextIndexIsDeleted()
+      throws IOException {
+    // See https://github.com/apache/pinot/issues/11529
+    nativeTextIndexIsRecognized();
+    try (FilePerIndexDirectory fpi = new FilePerIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap)) {
+      fpi.removeIndex("foo", StandardIndexes.text());
+    }
+    try (FilePerIndexDirectory fpi = new FilePerIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap)) {
+      assertFalse(fpi.hasIndexFor("foo", StandardIndexes.text()), "Native text index was not deleted");
+    }
+  }
+
+  @Test
   public void testRemoveTextIndices()
       throws IOException {
+    TextIndexConfig config =
+        new TextIndexConfig(false, null, null, false, false, null, null, true, 500, null, false, false, 0);
     try (FilePerIndexDirectory fpi = new FilePerIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap);
-        LuceneTextIndexCreator fooCreator = new LuceneTextIndexCreator("foo", TEMP_DIR, true,
-            null, null, true, 500);
-        LuceneTextIndexCreator barCreator = new LuceneTextIndexCreator("bar", TEMP_DIR, true,
-            null, null, true, 500)) {
+        LuceneTextIndexCreator fooCreator = new LuceneTextIndexCreator("foo", TEMP_DIR, true, false, null, null,
+            config);
+        LuceneTextIndexCreator barCreator = new LuceneTextIndexCreator("bar", TEMP_DIR, true, false, null, null,
+            config)) {
       PinotDataBuffer buf = fpi.newBuffer("col1", StandardIndexes.forward(), 1024);
       buf.putInt(0, 1);
 
@@ -202,11 +233,11 @@ public class FilePerIndexDirectoryTest {
 
       // Both files for TextIndex should be removed.
       fpi.removeIndex("foo", StandardIndexes.text());
-      assertFalse(new File(TEMP_DIR, "foo" + V1Constants.Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION).exists());
+      assertFalse(new File(TEMP_DIR, "foo" + V1Constants.Indexes.LUCENE_V99_TEXT_INDEX_FILE_EXTENSION).exists());
       assertFalse(
           new File(TEMP_DIR, "foo" + V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION).exists());
     }
-    assertTrue(new File(TEMP_DIR, "bar" + V1Constants.Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION).exists());
+    assertTrue(new File(TEMP_DIR, "bar" + V1Constants.Indexes.LUCENE_V99_TEXT_INDEX_FILE_EXTENSION).exists());
     assertTrue(new File(TEMP_DIR, "bar" + V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION).exists());
 
     // Read indices back and check the content.
@@ -234,12 +265,14 @@ public class FilePerIndexDirectoryTest {
   @Test
   public void testGetColumnIndices()
       throws IOException {
+    TextIndexConfig config =
+        new TextIndexConfig(false, null, null, false, false, null, null, true, 500, null, false, false, 0);
     // Write sth to buffers and flush them to index files on disk
     try (FilePerIndexDirectory fpi = new FilePerIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap);
-        LuceneTextIndexCreator fooCreator = new LuceneTextIndexCreator("foo", TEMP_DIR, true,
-            null, null, true, 500);
-        LuceneTextIndexCreator barCreator = new LuceneTextIndexCreator("bar", TEMP_DIR, true,
-            null, null, true, 500)) {
+        LuceneTextIndexCreator fooCreator = new LuceneTextIndexCreator("foo", TEMP_DIR, true, false, null, null,
+            config);
+        LuceneTextIndexCreator barCreator = new LuceneTextIndexCreator("bar", TEMP_DIR, true, false, null, null,
+            config)) {
       PinotDataBuffer buf = fpi.newBuffer("col1", StandardIndexes.forward(), 1024);
       buf.putInt(0, 111);
       buf = fpi.newBuffer("col2", StandardIndexes.dictionary(), 1024);
@@ -260,17 +293,15 @@ public class FilePerIndexDirectoryTest {
     }
 
     // Need segmentMetadata to tell the full set of columns in this segment.
-    when(_segmentMetadata.getAllColumns())
-        .thenReturn(new TreeSet<>(Arrays.asList("col1", "col2", "col3", "col4", "col5", "foo", "bar")));
+    when(_segmentMetadata.getAllColumns()).thenReturn(
+        new TreeSet<>(Arrays.asList("col1", "col2", "col3", "col4", "col5", "foo", "bar")));
     try (FilePerIndexDirectory fpi = new FilePerIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap)) {
-      assertEquals(fpi.getColumnsWithIndex(StandardIndexes.forward()),
-          new HashSet<>(Arrays.asList("col1", "col3")));
+      assertEquals(fpi.getColumnsWithIndex(StandardIndexes.forward()), new HashSet<>(Arrays.asList("col1", "col3")));
       assertEquals(fpi.getColumnsWithIndex(StandardIndexes.dictionary()),
           new HashSet<>(Collections.singletonList("col2")));
       assertEquals(fpi.getColumnsWithIndex(StandardIndexes.inverted()),
           new HashSet<>(Collections.singletonList("col4")));
-      assertEquals(fpi.getColumnsWithIndex(StandardIndexes.h3()),
-          new HashSet<>(Collections.singletonList("col5")));
+      assertEquals(fpi.getColumnsWithIndex(StandardIndexes.h3()), new HashSet<>(Collections.singletonList("col5")));
       assertEquals(fpi.getColumnsWithIndex(StandardIndexes.text()), new HashSet<>(Arrays.asList("foo", "bar")));
 
       fpi.removeIndex("col1", StandardIndexes.forward());
@@ -285,8 +316,7 @@ public class FilePerIndexDirectoryTest {
       assertEquals(fpi.getColumnsWithIndex(StandardIndexes.inverted()),
           new HashSet<>(Collections.singletonList("col4")));
       assertEquals(fpi.getColumnsWithIndex(StandardIndexes.h3()), new HashSet<>(Collections.emptySet()));
-      assertEquals(fpi.getColumnsWithIndex(StandardIndexes.text()),
-          new HashSet<>(Collections.singletonList("bar")));
+      assertEquals(fpi.getColumnsWithIndex(StandardIndexes.text()), new HashSet<>(Collections.singletonList("bar")));
     }
   }
 }

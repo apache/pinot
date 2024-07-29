@@ -18,68 +18,42 @@
  */
 package org.apache.pinot.query.planner.plannode;
 
-import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import org.apache.calcite.rel.core.JoinRelType;
-import org.apache.calcite.rel.hint.RelHint;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
-import org.apache.pinot.query.planner.partitioning.FieldSelectionKeySelector;
-import org.apache.pinot.query.planner.partitioning.KeySelector;
-import org.apache.pinot.query.planner.serde.ProtoProperties;
 
 
-public class JoinNode extends AbstractPlanNode {
-  @ProtoProperties
-  private JoinRelType _joinRelType;
-  @ProtoProperties
-  private JoinKeys _joinKeys;
-  @ProtoProperties
-  private List<RexExpression> _joinClause;
-  @ProtoProperties
-  private NodeHint _joinHints;
-  @ProtoProperties
-  private List<String> _leftColumnNames;
-  @ProtoProperties
-  private List<String> _rightColumnNames;
+public class JoinNode extends BasePlanNode {
+  private final JoinRelType _joinType;
+  private final List<Integer> _leftKeys;
+  private final List<Integer> _rightKeys;
+  private final List<RexExpression> _nonEquiConditions;
 
-  public JoinNode(int planFragmentId) {
-    super(planFragmentId);
+  public JoinNode(int stageId, DataSchema dataSchema, NodeHint nodeHint, List<PlanNode> inputs, JoinRelType joinType,
+      List<Integer> leftKeys, List<Integer> rightKeys, List<RexExpression> nonEquiConditions) {
+    super(stageId, dataSchema, nodeHint, inputs);
+    _joinType = joinType;
+    _leftKeys = leftKeys;
+    _rightKeys = rightKeys;
+    _nonEquiConditions = nonEquiConditions;
   }
 
-  public JoinNode(int planFragmentId, DataSchema dataSchema, DataSchema leftSchema, DataSchema rightSchema,
-      JoinRelType joinRelType, JoinKeys joinKeys, List<RexExpression> joinClause, List<RelHint> joinHints) {
-    super(planFragmentId, dataSchema);
-    _leftColumnNames = Arrays.asList(leftSchema.getColumnNames());
-    _rightColumnNames = Arrays.asList(rightSchema.getColumnNames());
-    _joinRelType = joinRelType;
-    _joinKeys = joinKeys;
-    _joinClause = joinClause;
-    _joinHints = new NodeHint(joinHints);
+  public JoinRelType getJoinType() {
+    return _joinType;
   }
 
-  public JoinRelType getJoinRelType() {
-    return _joinRelType;
+  public List<Integer> getLeftKeys() {
+    return _leftKeys;
   }
 
-  public JoinKeys getJoinKeys() {
-    return _joinKeys;
+  public List<Integer> getRightKeys() {
+    return _rightKeys;
   }
 
-  public List<RexExpression> getJoinClauses() {
-    return _joinClause;
-  }
-
-  public NodeHint getJoinHints() {
-    return _joinHints;
-  }
-
-  public List<String> getLeftColumnNames() {
-    return _leftColumnNames;
-  }
-
-  public List<String> getRightColumnNames() {
-    return _rightColumnNames;
+  public List<RexExpression> getNonEquiConditions() {
+    return _nonEquiConditions;
   }
 
   @Override
@@ -92,26 +66,24 @@ public class JoinNode extends AbstractPlanNode {
     return visitor.visitJoin(this, context);
   }
 
-  public static class JoinKeys {
-    @ProtoProperties
-    private KeySelector<Object[], Object[]> _leftJoinKeySelector;
-    @ProtoProperties
-    private KeySelector<Object[], Object[]> _rightJoinKeySelector;
-
-    public JoinKeys() {
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
     }
-
-    public JoinKeys(FieldSelectionKeySelector leftKeySelector, FieldSelectionKeySelector rightKeySelector) {
-      _leftJoinKeySelector = leftKeySelector;
-      _rightJoinKeySelector = rightKeySelector;
+    if (!(o instanceof JoinNode)) {
+      return false;
     }
-
-    public KeySelector<Object[], Object[]> getLeftJoinKeySelector() {
-      return _leftJoinKeySelector;
+    if (!super.equals(o)) {
+      return false;
     }
+    JoinNode joinNode = (JoinNode) o;
+    return _joinType == joinNode._joinType && Objects.equals(_leftKeys, joinNode._leftKeys) && Objects.equals(
+        _rightKeys, joinNode._rightKeys) && Objects.equals(_nonEquiConditions, joinNode._nonEquiConditions);
+  }
 
-    public KeySelector<Object[], Object[]> getRightJoinKeySelector() {
-      return _rightJoinKeySelector;
-    }
+  @Override
+  public int hashCode() {
+    return Objects.hash(super.hashCode(), _joinType, _leftKeys, _rightKeys, _nonEquiConditions);
   }
 }

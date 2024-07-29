@@ -21,9 +21,9 @@ package org.apache.pinot.spi.plugin;
 import java.util.Objects;
 
 
-public class Plugin {
+public final class Plugin {
 
-  String _name;
+  final String _name;
 
   public Plugin(String name) {
     _name = name;

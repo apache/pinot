@@ -19,12 +19,19 @@
 package org.apache.pinot.query.mailbox;
 
 import com.google.common.base.Preconditions;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.datablock.DataBlock;
+import org.apache.pinot.common.datablock.DataBlockUtils;
+import org.apache.pinot.common.datablock.MetadataBlock;
+import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.slf4j.Logger;
@@ -49,8 +56,12 @@ public class ReceivingMailbox {
   // TODO: Revisit if this is the correct way to apply back pressure
   private final BlockingQueue<TransferableBlock> _blocks = new ArrayBlockingQueue<>(DEFAULT_MAX_PENDING_BLOCKS);
   private final AtomicReference<TransferableBlock> _errorBlock = new AtomicReference<>();
+  private volatile boolean _isEarlyTerminated = false;
+  private long _lastArriveTime = System.currentTimeMillis();
+
   @Nullable
   private volatile Reader _reader;
+  private final StatMap<StatKey> _stats = new StatMap<>(StatKey.class);
 
   public ReceivingMailbox(String id) {
     _id = id;
@@ -71,14 +82,56 @@ public class ReceivingMailbox {
   }
 
   /**
+   * Offers a raw block into the mailbox within the timeout specified, returns whether the block is successfully added.
+   * If the block is not added, an error block is added to the mailbox.
+   * <p>
+   * Contrary to {@link #offer(TransferableBlock, long)}, the block may be an
+   * {@link TransferableBlock#isErrorBlock() error block}.
+   */
+  public ReceivingMailboxStatus offerRaw(ByteBuffer byteBuffer, long timeoutMs)
+      throws IOException {
+    TransferableBlock block;
+    long now = System.currentTimeMillis();
+    _stats.merge(StatKey.WAIT_CPU_TIME_MS, now - _lastArriveTime);
+    _lastArriveTime = now;
+    _stats.merge(StatKey.DESERIALIZED_BYTES, byteBuffer.remaining());
+    _stats.merge(StatKey.DESERIALIZED_MESSAGES, 1);
+
+    now = System.currentTimeMillis();
+    DataBlock dataBlock = DataBlockUtils.getDataBlock(byteBuffer);
+    _stats.merge(StatKey.DESERIALIZATION_TIME_MS, System.currentTimeMillis() - now);
+
+    if (dataBlock instanceof MetadataBlock) {
+      Map<Integer, String> exceptions = dataBlock.getExceptions();
+      if (exceptions.isEmpty()) {
+        block = TransferableBlockUtils.wrap(dataBlock);
+      } else {
+        setErrorBlock(TransferableBlockUtils.getErrorTransferableBlock(exceptions));
+        return ReceivingMailboxStatus.FIRST_ERROR;
+      }
+    } else {
+      block = TransferableBlockUtils.wrap(dataBlock);
+    }
+    return offerPrivate(block, timeoutMs);
+  }
+
+  public ReceivingMailboxStatus offer(TransferableBlock block, long timeoutMs) {
+    long now = System.currentTimeMillis();
+    _stats.merge(StatKey.WAIT_CPU_TIME_MS, now - _lastArriveTime);
+    _lastArriveTime = now;
+    _stats.merge(StatKey.IN_MEMORY_MESSAGES, 1);
+    return offerPrivate(block, timeoutMs);
+  }
+
+  /**
    * Offers a non-error block into the mailbox within the timeout specified, returns whether the block is successfully
    * added. If the block is not added, an error block is added to the mailbox.
    */
-  public ReceivingMailboxStatus offer(TransferableBlock block, long timeoutMs) {
+  private ReceivingMailboxStatus offerPrivate(TransferableBlock block, long timeoutMs) {
     TransferableBlock errorBlock = _errorBlock.get();
     if (errorBlock != null) {
       LOGGER.debug("Mailbox: {} is already cancelled or errored out, ignoring the late block", _id);
-      return errorBlock == CANCELLED_ERROR_BLOCK ? ReceivingMailboxStatus.EARLY_TERMINATED
+      return errorBlock == CANCELLED_ERROR_BLOCK ? ReceivingMailboxStatus.CANCELLED
           : ReceivingMailboxStatus.ERROR;
     }
     if (timeoutMs <= 0) {
@@ -88,18 +141,21 @@ public class ReceivingMailbox {
       return ReceivingMailboxStatus.TIMEOUT;
     }
     try {
-      if (_blocks.offer(block, timeoutMs, TimeUnit.MILLISECONDS)) {
+      long now = System.currentTimeMillis();
+      boolean accepted = _blocks.offer(block, timeoutMs, TimeUnit.MILLISECONDS);
+      _stats.merge(StatKey.OFFER_CPU_TIME_MS, System.currentTimeMillis() - now);
+      if (accepted) {
         errorBlock = _errorBlock.get();
         if (errorBlock == null) {
           if (LOGGER.isDebugEnabled()) {
             LOGGER.debug("==[MAILBOX]== Block " + block + " ready to read from mailbox: " + _id);
           }
           notifyReader();
-          return ReceivingMailboxStatus.SUCCESS;
+          return _isEarlyTerminated ? ReceivingMailboxStatus.EARLY_TERMINATED : ReceivingMailboxStatus.SUCCESS;
         } else {
           LOGGER.debug("Mailbox: {} is already cancelled or errored out, ignoring the late block", _id);
           _blocks.clear();
-          return errorBlock == CANCELLED_ERROR_BLOCK ? ReceivingMailboxStatus.EARLY_TERMINATED
+          return errorBlock == CANCELLED_ERROR_BLOCK ? ReceivingMailboxStatus.CANCELLED
               : ReceivingMailboxStatus.ERROR;
         }
       } else {
@@ -137,6 +193,13 @@ public class ReceivingMailbox {
   }
 
   /**
+   * Early terminate the mailbox, called when upstream doesn't expect any more data block.
+   */
+  public void earlyTerminate() {
+    _isEarlyTerminated = true;
+  }
+
+  /**
    * Cancels the mailbox. No more blocks are accepted after calling this method. Should only be called by the receive
    * operator to clean up the remaining blocks.
    */
@@ -161,11 +224,40 @@ public class ReceivingMailbox {
     }
   }
 
+  public StatMap<StatKey> getStatMap() {
+    return _stats;
+  }
+
   public interface Reader {
     void blockReadyToRead();
   }
 
   public enum ReceivingMailboxStatus {
-    SUCCESS, ERROR, TIMEOUT, EARLY_TERMINATED
+    SUCCESS, FIRST_ERROR, ERROR, TIMEOUT, CANCELLED, EARLY_TERMINATED
+  }
+
+  public enum StatKey implements StatMap.Key {
+    DESERIALIZED_MESSAGES(StatMap.Type.INT),
+    DESERIALIZED_BYTES(StatMap.Type.LONG),
+    DESERIALIZATION_TIME_MS(StatMap.Type.LONG) {
+      @Override
+      public boolean includeDefaultInJson() {
+        return true;
+      }
+    },
+    IN_MEMORY_MESSAGES(StatMap.Type.INT),
+    OFFER_CPU_TIME_MS(StatMap.Type.LONG),
+    WAIT_CPU_TIME_MS(StatMap.Type.LONG);
+
+    private final StatMap.Type _type;
+
+    StatKey(StatMap.Type type) {
+      _type = type;
+    }
+
+    @Override
+    public StatMap.Type getType() {
+      return _type;
+    }
   }
 }

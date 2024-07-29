@@ -26,10 +26,12 @@ import java.time.Duration;
 import java.time.Instant;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import net.openhft.chronicle.core.Jvm;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
+import org.testng.SkipException;
 
 
 /**
@@ -50,7 +52,7 @@ public class TestUtils {
         String extension = resourceUrlStr.substring(resourceUrlStr.lastIndexOf('.'));
         File tempFile = File.createTempFile("pinot-test-temp", extension);
         String tempFilePath = tempFile.getAbsolutePath();
-        LOGGER.info("Extracting from " + resourceUrlStr + " to " + tempFilePath);
+        LOGGER.info("Extracting from {} to {}", resourceUrlStr, tempFilePath);
         FileUtils.copyURLToFile(resourceUrl, tempFile);
         return tempFilePath;
       } catch (IOException e) {
@@ -198,6 +200,12 @@ public class TestUtils {
     }
 
     throw new IllegalStateException("Failed to return result in " + timeoutMs + "ms");
+  }
+
+  public static void ensureArchitectureIsNotARM() {
+    if (Jvm.isArm()) {
+      throw new SkipException("Skipping test as the underlying architecture is ARM");
+    }
   }
 
   @FunctionalInterface

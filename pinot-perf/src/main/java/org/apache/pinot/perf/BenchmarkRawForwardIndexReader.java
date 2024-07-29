@@ -25,11 +25,11 @@ import java.util.SplittableRandom;
 import java.util.UUID;
 import java.util.function.LongSupplier;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkSVForwardIndexWriter;
-import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkSVForwardIndexWriterV4;
+import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriter;
+import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV4;
 import org.apache.pinot.segment.local.segment.index.readers.forward.ChunkReaderContext;
+import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkForwardIndexReaderV4;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
-import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkSVForwardIndexReaderV4;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -137,7 +137,7 @@ public class BenchmarkRawForwardIndexReader {
         throws IOException {
       super.setup();
       _file = new File(TARGET_DIR, UUID.randomUUID().toString());
-      try (VarByteChunkSVForwardIndexWriterV4 writer = new VarByteChunkSVForwardIndexWriterV4(_file,
+      try (VarByteChunkForwardIndexWriterV4 writer = new VarByteChunkForwardIndexWriterV4(_file,
           _chunkCompressionType, _maxChunkSize)) {
         for (int i = 0; i < _records; i++) {
           writer.putBytes(_bytes[i]);
@@ -163,7 +163,7 @@ public class BenchmarkRawForwardIndexReader {
         throws IOException {
       super.setup();
       _file = new File(TARGET_DIR, UUID.randomUUID().toString());
-      try (VarByteChunkSVForwardIndexWriter writer = new VarByteChunkSVForwardIndexWriter(_file, _chunkCompressionType,
+      try (VarByteChunkForwardIndexWriter writer = new VarByteChunkForwardIndexWriter(_file, _chunkCompressionType,
           _records, _maxChunkSize / _maxLength, _maxLength, 3)) {
         for (int i = 0; i < _records; i++) {
           writer.putBytes(_bytes[i]);
@@ -184,9 +184,9 @@ public class BenchmarkRawForwardIndexReader {
   public void readV4(V4State state, Blackhole bh)
       throws IOException {
     try (PinotDataBuffer buffer = PinotDataBuffer.loadBigEndianFile(state._file);
-        VarByteChunkSVForwardIndexReaderV4 reader =
-        new VarByteChunkSVForwardIndexReaderV4(buffer, FieldSpec.DataType.BYTES);
-        VarByteChunkSVForwardIndexReaderV4.ReaderContext context = reader.createContext()) {
+        VarByteChunkForwardIndexReaderV4 reader =
+        new VarByteChunkForwardIndexReaderV4(buffer, FieldSpec.DataType.BYTES, true);
+        VarByteChunkForwardIndexReaderV4.ReaderContext context = reader.createContext()) {
       for (int i = 0; i < state._records; i++) {
         bh.consume(reader.getBytes(i, context));
       }

@@ -23,7 +23,10 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
+import it.unimi.dsi.fastutil.floats.FloatArrayList;
+import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -37,6 +40,7 @@ import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
 import org.apache.pinot.spi.utils.EqualityUtils;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -51,7 +55,9 @@ public class DataSchema {
   private final ColumnDataType[] _columnDataTypes;
   private ColumnDataType[] _storedColumnDataTypes;
 
-  /** Used by both Broker and Server to generate results for EXPLAIN PLAN queries. */
+  /**
+   * Used by both Broker and Server to generate results for EXPLAIN PLAN queries.
+   */
   public static final DataSchema EXPLAIN_RESULT_SCHEMA =
       new DataSchema(new String[]{"Operator", "Operator_Id", "Parent_Id"}, new ColumnDataType[]{
           ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.INT
@@ -191,25 +197,25 @@ public class DataSchema {
   }
 
   public enum ColumnDataType {
-    INT(0),
-    LONG(0L),
-    FLOAT(0f),
-    DOUBLE(0d),
-    BIG_DECIMAL(BigDecimal.ZERO),
-    BOOLEAN(INT, 0),
-    TIMESTAMP(LONG, 0L),
-    STRING(""),
-    JSON(STRING, ""),
-    BYTES(new ByteArray(new byte[0])),
+    INT(NullValuePlaceHolder.INT),
+    LONG(NullValuePlaceHolder.LONG),
+    FLOAT(NullValuePlaceHolder.FLOAT),
+    DOUBLE(NullValuePlaceHolder.DOUBLE),
+    BIG_DECIMAL(NullValuePlaceHolder.BIG_DECIMAL),
+    BOOLEAN(INT, NullValuePlaceHolder.INT),
+    TIMESTAMP(LONG, NullValuePlaceHolder.LONG),
+    STRING(NullValuePlaceHolder.STRING),
+    JSON(STRING, NullValuePlaceHolder.STRING),
+    BYTES(NullValuePlaceHolder.INTERNAL_BYTES),
     OBJECT(null),
-    INT_ARRAY(new int[0]),
-    LONG_ARRAY(new long[0]),
-    FLOAT_ARRAY(new float[0]),
-    DOUBLE_ARRAY(new double[0]),
-    BOOLEAN_ARRAY(INT_ARRAY, new int[0]),
-    TIMESTAMP_ARRAY(LONG_ARRAY, new long[0]),
-    STRING_ARRAY(new String[0]),
-    BYTES_ARRAY(new byte[0][]),
+    INT_ARRAY(NullValuePlaceHolder.INT_ARRAY),
+    LONG_ARRAY(NullValuePlaceHolder.LONG_ARRAY),
+    FLOAT_ARRAY(NullValuePlaceHolder.FLOAT_ARRAY),
+    DOUBLE_ARRAY(NullValuePlaceHolder.DOUBLE_ARRAY),
+    BOOLEAN_ARRAY(INT_ARRAY, NullValuePlaceHolder.INT_ARRAY),
+    TIMESTAMP_ARRAY(LONG_ARRAY, NullValuePlaceHolder.LONG_ARRAY),
+    STRING_ARRAY(NullValuePlaceHolder.STRING_ARRAY),
+    BYTES_ARRAY(NullValuePlaceHolder.BYTES_ARRAY),
     UNKNOWN(null);
 
     private static final EnumSet<ColumnDataType> NUMERIC_TYPES = EnumSet.of(INT, LONG, FLOAT, DOUBLE, BIG_DECIMAL);
@@ -424,19 +430,19 @@ public class DataSchema {
         case BYTES:
           return ((ByteArray) value).getBytes();
         case INT_ARRAY:
-          return (int[]) value;
+          return toIntArray(value);
         case LONG_ARRAY:
           return toLongArray(value);
         case FLOAT_ARRAY:
-          return (float[]) value;
+          return toFloatArray(value);
         case DOUBLE_ARRAY:
           return toDoubleArray(value);
         case STRING_ARRAY:
-          return (String[]) value;
+          return toStringArray(value);
         case BOOLEAN_ARRAY:
-          return toBooleanArray((int[]) value);
+          return toBooleanArray(toIntArray(value));
         case TIMESTAMP_ARRAY:
-          return toTimestampArray((long[]) value);
+          return toTimestampArray(toLongArray(value));
         case BYTES_ARRAY:
           return (byte[][]) value;
         case UNKNOWN: // fall through
@@ -448,10 +454,13 @@ public class DataSchema {
     }
 
     /**
-     * Formats the value to human-readable format based on the type to be used in the query response.
+     * Formats the value based on the type to be used in the JSON query response. For BIG_DECIMAL, even though JSON can
+     * serialize BigDecimal, it is best practice to convert it to String to avoid precision loss during deserialization.
      */
     public Serializable format(Object value) {
       switch (this) {
+        case BIG_DECIMAL:
+          return ((BigDecimal) value).toPlainString();
         case TIMESTAMP:
           assert value instanceof Timestamp;
           return value.toString();
@@ -478,7 +487,7 @@ public class DataSchema {
         case DOUBLE:
           return ((Number) value).doubleValue();
         case BIG_DECIMAL:
-          return (BigDecimal) value;
+          return ((BigDecimal) value).toPlainString();
         case BOOLEAN:
           return ((int) value) == 1;
         case TIMESTAMP:
@@ -509,12 +518,32 @@ public class DataSchema {
       }
     }
 
+    private static int[] toIntArray(Object value) {
+      if (value instanceof int[]) {
+        return (int[]) value;
+      } else if (value instanceof IntArrayList) {
+        // For ArrayAggregationFunction
+        return ArrayListUtils.toIntArray((IntArrayList) value);
+      }
+      throw new IllegalStateException(String.format("Cannot convert: '%s' to int[]", value));
+    }
+
+    private static float[] toFloatArray(Object value) {
+      if (value instanceof float[]) {
+        return (float[]) value;
+      } else if (value instanceof FloatArrayList) {
+        // For ArrayAggregationFunction
+        return ArrayListUtils.toFloatArray((FloatArrayList) value);
+      }
+      throw new IllegalStateException(String.format("Cannot convert: '%s' to float[]", value));
+    }
+
     private static double[] toDoubleArray(Object value) {
       if (value instanceof double[]) {
         return (double[]) value;
       } else if (value instanceof DoubleArrayList) {
-        // For HistogramAggregationFunction
-        return ((DoubleArrayList) value).elements();
+        // For HistogramAggregationFunction and ArrayAggregationFunction
+        return ArrayListUtils.toDoubleArray((DoubleArrayList) value);
       } else if (value instanceof int[]) {
         int[] intValues = (int[]) value;
         int length = intValues.length;
@@ -546,8 +575,8 @@ public class DataSchema {
       if (value instanceof long[]) {
         return (long[]) value;
       } else if (value instanceof LongArrayList) {
-        // For FunnelCountAggregationFunction
-        return ((LongArrayList) value).elements();
+        // For FunnelCountAggregationFunction and ArrayAggregationFunction
+        return ArrayListUtils.toLongArray((LongArrayList) value);
       } else {
         int[] intValues = (int[]) value;
         int length = intValues.length;
@@ -557,6 +586,16 @@ public class DataSchema {
         }
         return longValues;
       }
+    }
+
+    private static String[] toStringArray(Object value) {
+      if (value instanceof String[]) {
+        return (String[]) value;
+      } else if (value instanceof ObjectArrayList) {
+        // For ArrayAggregationFunction
+        return ArrayListUtils.toStringArray((ObjectArrayList<String>) value);
+      }
+      throw new IllegalStateException(String.format("Cannot convert: '%s' to String[]", value));
     }
 
     private static boolean[] toBooleanArray(int[] intArray) {

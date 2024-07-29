@@ -45,6 +45,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.LocalPinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
+import org.apache.pinot.spi.ingestion.batch.spec.Constants;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.util.TestUtils;
 import org.joda.time.DateTime;
@@ -244,11 +245,11 @@ public class SegmentDeletionManagerTest {
     deletionManager.removeAgedDeletedSegments(leadControllerManager);
 
     // Create dummy directories and files
-    File dummyDir1 = new File(deletedDirectoryPath + File.separator + "dummy1");
+    File dummyDir1 = new File(deletedDirectoryPath + File.separator + "dummy1 %");
     dummyDir1.mkdir();
-    File dummyDir2 = new File(deletedDirectoryPath + File.separator + "dummy2");
+    File dummyDir2 = new File(deletedDirectoryPath + File.separator + "dummy2 %");
     dummyDir2.mkdir();
-    File dummyDir3 = new File(deletedDirectoryPath + File.separator + "dummy3");
+    File dummyDir3 = new File(deletedDirectoryPath + File.separator + "dummy3 %");
     dummyDir3.mkdir();
 
     // Test delete when there is no files but some directories exist
@@ -264,13 +265,15 @@ public class SegmentDeletionManagerTest {
 
     // Create dummy files
     for (int i = 0; i < 3; i++) {
-      createTestFileWithAge(dummyDir1.getAbsolutePath() + File.separator + genDeletedSegmentName("file" + i, i, 1), i);
+      createTestFileWithAge(dummyDir1.getAbsolutePath() + File.separator + genDeletedSegmentName("file %" + i, i, 1),
+          i);
     }
     for (int i = 2; i < 5; i++) {
-      createTestFileWithAge(dummyDir2.getAbsolutePath() + File.separator + genDeletedSegmentName("file" + i, i, 1), i);
+      createTestFileWithAge(dummyDir2.getAbsolutePath() + File.separator + genDeletedSegmentName("file %" + i, i, 1),
+          i);
     }
     for (int i = 6; i < 9; i++) {
-      createTestFileWithAge(dummyDir3.getAbsolutePath() + File.separator + "file" + i, i);
+      createTestFileWithAge(dummyDir3.getAbsolutePath() + File.separator + "file %" + i, i);
     }
 
     // Sleep 1 second to ensure the clock moves.
@@ -355,6 +358,9 @@ public class SegmentDeletionManagerTest {
     tableDir.mkdir();
     for (String segmentId : segmentIds) {
       createTestFileWithAge(tableDir.getAbsolutePath() + File.separator + segmentId, 0);
+      // Create segment metadata file
+      createTestFileWithAge(
+          tableDir.getAbsolutePath() + File.separator + segmentId + Constants.METADATA_TAR_GZ_FILE_EXT, 0);
     }
   }
 

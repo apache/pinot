@@ -20,7 +20,6 @@ package org.apache.pinot.core.operator.combine;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 import java.util.PriorityQueue;
 import java.util.concurrent.ExecutorService;
@@ -36,6 +35,7 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.AcquireReleaseColumnsSegmentOperator;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.ExceptionResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.MetadataResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
@@ -63,9 +63,7 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator
 
   // For min/max value based combine, when a thread detects that no more segment needs to be processed, it inserts this
   // special results block, which can be skipped during the merge phase
-  private static final BaseResultsBlock EMPTY_RESULTS_BLOCK =
-      new SelectionResultsBlock(new DataSchema(new String[0], new DataSchema.ColumnDataType[0]),
-          Collections.emptyList());
+  private static final BaseResultsBlock EMPTY_RESULTS_BLOCK = new MetadataResultsBlock();
 
   // Use an AtomicInteger to track the end operator id, beyond which no operator needs to be processed
   private final AtomicInteger _endOperatorId;

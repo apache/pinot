@@ -20,6 +20,8 @@ package org.apache.pinot.spi.stream;
 
 import java.io.Closeable;
 import java.util.concurrent.TimeoutException;
+import javax.annotation.Nullable;
+
 
 /**
  * Consumer interface for consuming from a partition group of a stream
@@ -35,7 +37,7 @@ public interface PartitionGroupConsumer extends Closeable {
    * Poll-based consumers can optionally use this to prefetch metadata from the source.
    *
    * This method should be invoked by the caller before trying to invoke
-   * {@link #fetchMessages(StreamPartitionMsgOffset, StreamPartitionMsgOffset, int)}.
+   * {@link #fetchMessages(StreamPartitionMsgOffset, int)}.
    *
    * @param startOffset Offset (inclusive) at which the consumption should begin
    */
@@ -43,20 +45,28 @@ public interface PartitionGroupConsumer extends Closeable {
   }
 
   /**
-   * Return messages from the stream partition group within the specified timeout
+   * Fetches messages from the stream partition from the given start offset within the specified timeout.
    *
-   * The message may be fetched by actively polling the source or by retrieving from a pre-fetched buffer. This depends
-   * on the implementation.
+   * This method should return within the timeout. If there is no message available before time runs out, an empty
+   * message batch should be returned.
    *
    * @param startOffset The offset of the first message desired, inclusive
-   * @param endOffset The offset of the last message desired, exclusive, or null
    * @param timeoutMs Timeout in milliseconds
-   * @throws java.util.concurrent.TimeoutException If the operation could not be completed within {@code timeoutMillis}
-   * milliseconds
-   * @return An iterable containing messages fetched from the stream partition and their offsets
+   * @throws TimeoutException If the operation could not be completed within timeout
+   * @return A batch of messages from the stream partition group
    */
-  MessageBatch fetchMessages(StreamPartitionMsgOffset startOffset, StreamPartitionMsgOffset endOffset, int timeoutMs)
-      throws TimeoutException;
+  default MessageBatch fetchMessages(StreamPartitionMsgOffset startOffset, int timeoutMs)
+      throws TimeoutException {
+    return fetchMessages(startOffset, null, timeoutMs);
+  }
+
+  // Deprecated because the offset is not always monotonically increasing
+  @Deprecated
+  default MessageBatch fetchMessages(StreamPartitionMsgOffset startOffset, @Nullable StreamPartitionMsgOffset endOffset,
+      int timeoutMs)
+      throws TimeoutException {
+    throw new UnsupportedOperationException();
+  }
 
   /**
    * Checkpoints the consumption state of the stream partition group in the source

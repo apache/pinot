@@ -18,80 +18,92 @@
  */
 package org.apache.pinot.core.operator.streaming;
 
-import com.google.common.base.Preconditions;
-import io.grpc.stub.StreamObserver;
-import java.io.IOException;
-import java.util.Collection;
 import java.util.List;
-import org.apache.commons.lang.StringUtils;
-import org.apache.pinot.common.datatable.DataTable;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.exception.QueryException;
-import org.apache.pinot.common.proto.Server;
-import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.operator.InstanceResponseOperator;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.ExceptionResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.MetadataResultsBlock;
 import org.apache.pinot.core.operator.combine.BaseCombineOperator;
+import org.apache.pinot.core.query.executor.ResultsBlockStreamer;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.FetchContext;
-import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.exception.QueryCancelledException;
 import org.apache.pinot.spi.trace.Tracing;
 
 
+/**
+ * Like {@link InstanceResponseOperator}, but instead of sending all the data to the broker at once, it streams the data
+ * to a given {@link ResultsBlockStreamer}.
+ *
+ * This is used in multi-stage to stream data to the receiving mailboxes.
+ */
 public class StreamingInstanceResponseOperator extends InstanceResponseOperator {
   private static final String EXPLAIN_NAME = "STREAMING_INSTANCE_RESPONSE";
 
-  private final StreamObserver<Server.ServerResponse> _streamObserver;
+  private final BaseStreamingCombineOperator<?> _streamingCombineOperator;
+  private final ResultsBlockStreamer _streamer;
 
-  public StreamingInstanceResponseOperator(BaseCombineOperator<?> combinedOperator, List<IndexSegment> indexSegments,
-      List<FetchContext> fetchContexts, StreamObserver<Server.ServerResponse> streamObserver,
+  public StreamingInstanceResponseOperator(BaseCombineOperator<?> combinedOperator,
+      List<SegmentContext> segmentContexts, List<FetchContext> fetchContexts, ResultsBlockStreamer streamer,
       QueryContext queryContext) {
-    super(combinedOperator, indexSegments, fetchContexts, queryContext);
-    _streamObserver = streamObserver;
+    super(combinedOperator, segmentContexts, fetchContexts, queryContext);
+    _streamingCombineOperator =
+        combinedOperator instanceof BaseStreamingCombineOperator ? (BaseStreamingCombineOperator<?>) combinedOperator
+            : null;
+    _streamer = streamer;
   }
 
-  @SuppressWarnings("rawtypes")
   @Override
   protected InstanceResponseBlock getNextBlock() {
-    BaseStreamingCombineOperator<?> streamingCombineOperator = (BaseStreamingCombineOperator) _combineOperator;
     try {
       prefetchAll();
-      streamingCombineOperator.start();
-      BaseResultsBlock resultsBlock = streamingCombineOperator.nextBlock();
-      while (!(resultsBlock instanceof MetadataResultsBlock)) {
-        if (resultsBlock instanceof ExceptionResultsBlock) {
-          return new InstanceResponseBlock(resultsBlock, _queryContext);
+      if (_streamingCombineOperator != null) {
+        _streamingCombineOperator.start();
+        BaseResultsBlock resultsBlock = getBaseBlock();
+        while (!(resultsBlock instanceof MetadataResultsBlock)) {
+          if (resultsBlock instanceof ExceptionResultsBlock) {
+            return new InstanceResponseBlock(resultsBlock);
+          }
+          if (resultsBlock.getNumRows() > 0) {
+            _streamer.send(resultsBlock);
+          }
+          resultsBlock = getBaseBlock();
         }
-        sendBlock(resultsBlock);
-        resultsBlock = streamingCombineOperator.nextBlock();
+        // Return a metadata-only block in the end
+        return buildInstanceResponseBlock(resultsBlock);
+      } else {
+        // Handle single block combine operator in streaming fashion
+        BaseResultsBlock resultsBlock = getBaseBlock();
+        if (resultsBlock instanceof ExceptionResultsBlock) {
+          return new InstanceResponseBlock(resultsBlock);
+        }
+        if (resultsBlock.getNumRows() > 0) {
+          _streamer.send(resultsBlock);
+        }
+        return buildInstanceResponseBlock(resultsBlock).toMetadataOnlyResponseBlock();
       }
-      // Return a metadata-only block
-      return new InstanceResponseBlock(resultsBlock, _queryContext);
     } catch (EarlyTerminationException e) {
       Exception killedErrorMsg = Tracing.getThreadAccountant().getErrorStatus();
       return new InstanceResponseBlock(new ExceptionResultsBlock(new QueryCancelledException(
           "Cancelled while streaming results" + (killedErrorMsg == null ? StringUtils.EMPTY : " " + killedErrorMsg),
-          e)), _queryContext);
+          e)));
     } catch (Exception e) {
-      return new InstanceResponseBlock(new ExceptionResultsBlock(QueryException.DATA_TABLE_SERIALIZATION_ERROR, e),
-          _queryContext);
+      return new InstanceResponseBlock(new ExceptionResultsBlock(QueryException.INTERNAL_ERROR, e));
     } finally {
-      streamingCombineOperator.stop();
+      if (_streamingCombineOperator != null) {
+        _streamingCombineOperator.stop();
+      }
       releaseAll();
     }
   }
 
-  private void sendBlock(BaseResultsBlock baseResultBlock)
-      throws IOException {
-    DataSchema dataSchema = baseResultBlock.getDataSchema(_queryContext);
-    Collection<Object[]> rows = baseResultBlock.getRows(_queryContext);
-    Preconditions.checkState(dataSchema != null && rows != null, "Malformed data block");
-    DataTable dataTable = baseResultBlock.getDataTable(_queryContext);
-    _streamObserver.onNext(StreamingResponseUtils.getDataResponse(dataTable));
+  protected BaseResultsBlock getCombinedResults() {
+    return _combineOperator.nextBlock();
   }
 
   @Override

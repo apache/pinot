@@ -24,7 +24,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.Function;
@@ -96,6 +96,10 @@ public class QueryContextConverterUtils {
     Expression filterExpression = pinotQuery.getFilterExpression();
     if (filterExpression != null) {
       filter = RequestContextUtils.getFilter(filterExpression);
+      // Remove the filter if it is always true
+      if (filter.isConstantTrue()) {
+        filter = null;
+      }
     }
 
     // GROUP BY
@@ -135,6 +139,10 @@ public class QueryContextConverterUtils {
     Expression havingExpression = pinotQuery.getHavingExpression();
     if (havingExpression != null) {
       havingFilter = RequestContextUtils.getFilter(havingExpression);
+      // Remove the filter if it is always true
+      if (havingFilter.isConstantTrue()) {
+        havingFilter = null;
+      }
     }
 
     // EXPRESSION OVERRIDE HINTS

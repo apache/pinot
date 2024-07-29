@@ -20,7 +20,7 @@ package org.apache.pinot.controller.helix.core.realtime.segment;
 
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import org.apache.pinot.spi.stream.PartitionLevelStreamConfig;
+import org.apache.pinot.spi.stream.StreamConfig;
 
 
 /**
@@ -32,20 +32,39 @@ public class FlushThresholdUpdateManager {
   /**
    * Check table config for flush size.
    *
-   * If flush size > 0, create a new DefaultFlushThresholdUpdater with given flush size.
-   * If flush size <= 0, create new SegmentSizeBasedFlushThresholdUpdater if not already created. Create only 1 per
-   * table because we want to maintain tuning information for the table in the updater.
+   * If flush rows > 0, create a new DefaultFlushThresholdUpdater with the given flush size.
+   * If flush segment rows > 0, create a new FixedFlushThresholdUpdater with the given flush size.
+   * If flush segment size > 0, create a new SegmentSizeBasedFlushThresholdUpdater if not already created. Create only 1
+   * per table because we want to maintain tuning information for the table in the updater.
+   *
+   * LEGACY BEHAVIOR:
+   * If flush rows = 0, use segment size based flush threshold.
+   * If none of the above are set, create a new DefaultFlushThresholdUpdater.
+   *
+   * DefaultFlushThresholdUpdater sets the actual segment flush threshold to be flush rows divided by max number of
+   * partitions consumed by a server; FixedFlushThresholdUpdater sets the actual segment flush threshold as is.
    */
-  public FlushThresholdUpdater getFlushThresholdUpdater(PartitionLevelStreamConfig streamConfig) {
+  public FlushThresholdUpdater getFlushThresholdUpdater(StreamConfig streamConfig) {
     String realtimeTableName = streamConfig.getTableNameWithType();
-    int flushThresholdRows = streamConfig.getFlushThresholdRows();
 
+    int flushThresholdRows = streamConfig.getFlushThresholdRows();
     if (flushThresholdRows > 0) {
       _flushThresholdUpdaterMap.remove(realtimeTableName);
       return new DefaultFlushThresholdUpdater(flushThresholdRows);
+    }
+    int flushThresholdSegmentRows = streamConfig.getFlushThresholdSegmentRows();
+    if (flushThresholdSegmentRows > 0) {
+      _flushThresholdUpdaterMap.remove(realtimeTableName);
+      return new FixedFlushThresholdUpdater(flushThresholdSegmentRows);
+    }
+    // Legacy behavior: when flush threshold rows is explicitly set to 0, use segment size based flush threshold
+    long flushThresholdSegmentSizeBytes = streamConfig.getFlushThresholdSegmentSizeBytes();
+    if (flushThresholdRows == 0 || flushThresholdSegmentSizeBytes > 0) {
+      return _flushThresholdUpdaterMap.computeIfAbsent(realtimeTableName,
+          k -> new SegmentSizeBasedFlushThresholdUpdater());
     } else {
-      return _flushThresholdUpdaterMap
-          .computeIfAbsent(realtimeTableName, k -> new SegmentSizeBasedFlushThresholdUpdater());
+      _flushThresholdUpdaterMap.remove(realtimeTableName);
+      return new DefaultFlushThresholdUpdater(StreamConfig.DEFAULT_FLUSH_THRESHOLD_ROWS);
     }
   }
 

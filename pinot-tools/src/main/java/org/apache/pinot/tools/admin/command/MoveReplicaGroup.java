@@ -41,6 +41,7 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
+import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -274,7 +275,7 @@ public class MoveReplicaGroup extends AbstractBaseAdminCommand implements Comman
   private Map<String, Map<String, String>> copyIdealState(Map<String, Map<String, String>> idealStateMap) {
     Map<String, Map<String, String>> copy = new HashMap<>(idealStateMap);
     for (Map.Entry<String, Map<String, String>> segmentEntry : idealStateMap.entrySet()) {
-      Map<String, String> instanceCopy = new HashMap<>(segmentEntry.getValue().size());
+      Map<String, String> instanceCopy = new HashMap<>(HashUtil.getHashMapCapacity(segmentEntry.getValue().size()));
       for (Map.Entry<String, String> instanceEntry : segmentEntry.getValue().entrySet()) {
         instanceCopy.put(instanceEntry.getKey(), instanceEntry.getValue());
       }
@@ -313,7 +314,7 @@ public class MoveReplicaGroup extends AbstractBaseAdminCommand implements Comman
   private PriorityQueue<ServerInstance> getDestinationServerQueue(Map<String, Map<String, String>> idealStateMap,
       List<String> destServers) {
     // better to keep map rather than removing elements from heap each time
-    Map<String, ServerInstance> serverMap = new HashMap<>(destServers.size());
+    Map<String, ServerInstance> serverMap = new HashMap<>(HashUtil.getHashMapCapacity(destServers.size()));
     for (String ds : destServers) {
       serverMap.put(ds, new ServerInstance(ds, 0));
     }

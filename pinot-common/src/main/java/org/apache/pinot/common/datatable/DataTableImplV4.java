@@ -33,9 +33,10 @@ import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
-import org.apache.pinot.spi.annotations.InterfaceStability;
+import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
@@ -44,9 +45,39 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 /**
- * Datatable V4 Implementation is a wrapper around the Row-based data block.
+ * Datatable V4 implementation.
+ *
+ * The layout of serialized V4 datatable looks like:
+ * +-----------------------------------------------+
+ * | 13 integers of header:                        |
+ * | VERSION                                       |
+ * | NUM_ROWS                                      |
+ * | NUM_COLUMNS                                   |
+ * | EXCEPTIONS SECTION START OFFSET               |
+ * | EXCEPTIONS SECTION LENGTH                     |
+ * | DICTIONARY_MAP SECTION START OFFSET           |
+ * | DICTIONARY_MAP SECTION LENGTH                 |
+ * | DATA_SCHEMA SECTION START OFFSET              |
+ * | DATA_SCHEMA SECTION LENGTH                    |
+ * | FIXED_SIZE_DATA SECTION START OFFSET          |
+ * | FIXED_SIZE_DATA SECTION LENGTH                |
+ * | VARIABLE_SIZE_DATA SECTION START OFFSET       |
+ * | VARIABLE_SIZE_DATA SECTION LENGTH             |
+ * +-----------------------------------------------+
+ * | EXCEPTIONS SECTION                            |
+ * +-----------------------------------------------+
+ * | DICTIONARY_MAP SECTION                        |
+ * +-----------------------------------------------+
+ * | DATA_SCHEMA SECTION                           |
+ * +-----------------------------------------------+
+ * | FIXED_SIZE_DATA SECTION                       |
+ * +-----------------------------------------------+
+ * | VARIABLE_SIZE_DATA SECTION                    |
+ * +-----------------------------------------------+
+ * | METADATA LENGTH                               |
+ * | METADATA SECTION                              |
+ * +-----------------------------------------------+
  */
-@InterfaceStability.Evolving
 public class DataTableImplV4 implements DataTable {
 
   protected static final int HEADER_SIZE = Integer.BYTES * 13;
@@ -82,8 +113,8 @@ public class DataTableImplV4 implements DataTable {
     _errCodeToExceptionMap = new HashMap<>();
   }
 
-  public DataTableImplV4(int numRows, DataSchema dataSchema, String[] stringDictionary,
-      byte[] fixedSizeDataBytes, byte[] variableSizeDataBytes) {
+  public DataTableImplV4(int numRows, DataSchema dataSchema, String[] stringDictionary, byte[] fixedSizeDataBytes,
+      byte[] variableSizeDataBytes) {
     _numRows = numRows;
     _dataSchema = dataSchema;
     _numColumns = dataSchema == null ? 0 : dataSchema.size();
@@ -334,10 +365,13 @@ public class DataTableImplV4 implements DataTable {
     DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
 
     dataOutputStream.writeInt(_stringDictionary.length);
+    int numEntriesAdded = 0;
     for (String entry : _stringDictionary) {
+      Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(numEntriesAdded);
       byte[] valueBytes = entry.getBytes(UTF_8);
       dataOutputStream.writeInt(valueBytes.length);
       dataOutputStream.write(valueBytes);
+      numEntriesAdded++;
     }
 
     return byteArrayOutputStream.toByteArray();
@@ -568,7 +602,7 @@ public class DataTableImplV4 implements DataTable {
   private Map<Integer, String> deserializeExceptions(ByteBuffer buffer)
       throws IOException {
     int numExceptions = buffer.getInt();
-    Map<Integer, String> exceptions = new HashMap<>(numExceptions);
+    Map<Integer, String> exceptions = new HashMap<>(HashUtil.getHashMapCapacity(numExceptions));
     for (int i = 0; i < numExceptions; i++) {
       int errCode = buffer.getInt();
       String errMessage = DataTableUtils.decodeString(buffer);

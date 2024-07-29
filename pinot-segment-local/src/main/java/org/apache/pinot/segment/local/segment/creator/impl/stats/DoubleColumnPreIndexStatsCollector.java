@@ -47,11 +47,21 @@ public class DoubleColumnPreIndexStatsCollector extends AbstractColumnStatistics
 
       _maxNumberOfMultiValues = Math.max(_maxNumberOfMultiValues, values.length);
       updateTotalNumberOfEntries(values);
+    } else if (entry instanceof double[]) {
+      double[] values = (double[]) entry;
+      for (double value : values) {
+        _values.add(value);
+      }
+
+      _maxNumberOfMultiValues = Math.max(_maxNumberOfMultiValues, values.length);
+      updateTotalNumberOfEntries(values.length);
     } else {
       double value = (double) entry;
       addressSorted(value);
       if (_values.add(value)) {
-        updatePartition(value);
+        if (isPartitionEnabled()) {
+          updatePartition(Double.toString(value));
+        }
       }
 
       _totalNumberOfEntries++;

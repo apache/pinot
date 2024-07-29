@@ -20,10 +20,12 @@
 package org.apache.pinot.server.starter.helix;
 
 import com.google.common.collect.ImmutableSet;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
-import org.apache.pinot.core.data.manager.realtime.LLRealtimeSegmentDataManager;
+import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.testng.annotations.Test;
@@ -41,10 +43,13 @@ public class OffsetBasedConsumptionStatusCheckerTest {
     String segA0 = "tableA__0__0__123Z";
     String segA1 = "tableA__1__0__123Z";
     String segB0 = "tableB__0__0__123Z";
-    Set<String> consumingSegments = ImmutableSet.of(segA0, segA1, segB0);
+    Map<String, Set<String>> consumingSegments = new HashMap<>();
+    consumingSegments.put("tableA_REALTIME", ImmutableSet.of(segA0, segA1));
+    consumingSegments.put("tableB_REALTIME", ImmutableSet.of(segB0));
     InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
     OffsetBasedConsumptionStatusChecker statusChecker =
-        new OffsetBasedConsumptionStatusChecker(instanceDataManager, consumingSegments);
+        new OffsetBasedConsumptionStatusChecker(instanceDataManager, consumingSegments,
+            ConsumptionStatusCheckerTestUtils.getConsumingSegments(consumingSegments));
 
     // setup TableDataMangers
     TableDataManager tableDataManagerA = mock(TableDataManager.class);
@@ -53,9 +58,9 @@ public class OffsetBasedConsumptionStatusCheckerTest {
     when(instanceDataManager.getTableDataManager("tableB_REALTIME")).thenReturn(tableDataManagerB);
 
     // setup SegmentDataManagers
-    LLRealtimeSegmentDataManager segMngrA0 = mock(LLRealtimeSegmentDataManager.class);
-    LLRealtimeSegmentDataManager segMngrA1 = mock(LLRealtimeSegmentDataManager.class);
-    LLRealtimeSegmentDataManager segMngrB0 = mock(LLRealtimeSegmentDataManager.class);
+    RealtimeSegmentDataManager segMngrA0 = mock(RealtimeSegmentDataManager.class);
+    RealtimeSegmentDataManager segMngrA1 = mock(RealtimeSegmentDataManager.class);
+    RealtimeSegmentDataManager segMngrB0 = mock(RealtimeSegmentDataManager.class);
     when(tableDataManagerA.acquireSegment(segA0)).thenReturn(segMngrA0);
     when(tableDataManagerA.acquireSegment(segA1)).thenReturn(segMngrA1);
     when(tableDataManagerB.acquireSegment(segB0)).thenReturn(segMngrB0);
@@ -88,11 +93,14 @@ public class OffsetBasedConsumptionStatusCheckerTest {
     String segA0 = "tableA__0__0__123Z";
     String segA1 = "tableA__1__0__123Z";
     String segB0 = "tableB__0__0__123Z";
-    Set<String> consumingSegments = ImmutableSet.of(segA0, segA1, segB0);
+    Map<String, Set<String>> consumingSegments = new HashMap<>();
+    consumingSegments.put("tableA_REALTIME", ImmutableSet.of(segA0, segA1));
+    consumingSegments.put("tableB_REALTIME", ImmutableSet.of(segB0));
     InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
 
     OffsetBasedConsumptionStatusChecker statusChecker =
-        new OffsetBasedConsumptionStatusChecker(instanceDataManager, consumingSegments);
+        new OffsetBasedConsumptionStatusChecker(instanceDataManager, consumingSegments,
+            ConsumptionStatusCheckerTestUtils.getConsumingSegments(consumingSegments));
 
     // TableDataManager is not set up yet
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 3);
@@ -104,8 +112,8 @@ public class OffsetBasedConsumptionStatusCheckerTest {
     when(instanceDataManager.getTableDataManager("tableB_REALTIME")).thenReturn(tableDataManagerB);
 
     // setup some SegmentDataManagers
-    LLRealtimeSegmentDataManager segMngrA0 = mock(LLRealtimeSegmentDataManager.class);
-    LLRealtimeSegmentDataManager segMngrA1 = mock(LLRealtimeSegmentDataManager.class);
+    RealtimeSegmentDataManager segMngrA0 = mock(RealtimeSegmentDataManager.class);
+    RealtimeSegmentDataManager segMngrA1 = mock(RealtimeSegmentDataManager.class);
     when(tableDataManagerA.acquireSegment(segA0)).thenReturn(segMngrA0);
     when(tableDataManagerA.acquireSegment(segA1)).thenReturn(segMngrA1);
 
@@ -120,7 +128,7 @@ public class OffsetBasedConsumptionStatusCheckerTest {
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 3);
 
     // setup the remaining SegmentDataManager
-    LLRealtimeSegmentDataManager segMngrB0 = mock(LLRealtimeSegmentDataManager.class);
+    RealtimeSegmentDataManager segMngrB0 = mock(RealtimeSegmentDataManager.class);
     when(tableDataManagerB.acquireSegment(segB0)).thenReturn(segMngrB0);
 
     //           latest ingested offset     latest stream offset
@@ -149,10 +157,13 @@ public class OffsetBasedConsumptionStatusCheckerTest {
     String segA0 = "tableA__0__0__123Z";
     String segA1 = "tableA__1__0__123Z";
     String segB0 = "tableB__0__0__123Z";
-    Set<String> consumingSegments = ImmutableSet.of(segA0, segA1, segB0);
+    Map<String, Set<String>> consumingSegments = new HashMap<>();
+    consumingSegments.put("tableA_REALTIME", ImmutableSet.of(segA0, segA1));
+    consumingSegments.put("tableB_REALTIME", ImmutableSet.of(segB0));
     InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
     OffsetBasedConsumptionStatusChecker statusChecker =
-        new OffsetBasedConsumptionStatusChecker(instanceDataManager, consumingSegments);
+        new OffsetBasedConsumptionStatusChecker(instanceDataManager, consumingSegments,
+            ConsumptionStatusCheckerTestUtils.getConsumingSegments(consumingSegments));
 
     // setup TableDataMangers
     TableDataManager tableDataManagerA = mock(TableDataManager.class);
@@ -161,9 +172,9 @@ public class OffsetBasedConsumptionStatusCheckerTest {
     when(instanceDataManager.getTableDataManager("tableB_REALTIME")).thenReturn(tableDataManagerB);
 
     // setup SegmentDataManagers
-    LLRealtimeSegmentDataManager segMngrA0 = mock(LLRealtimeSegmentDataManager.class);
-    LLRealtimeSegmentDataManager segMngrA1 = mock(LLRealtimeSegmentDataManager.class);
-    LLRealtimeSegmentDataManager segMngrB0 = mock(LLRealtimeSegmentDataManager.class);
+    RealtimeSegmentDataManager segMngrA0 = mock(RealtimeSegmentDataManager.class);
+    RealtimeSegmentDataManager segMngrA1 = mock(RealtimeSegmentDataManager.class);
+    RealtimeSegmentDataManager segMngrB0 = mock(RealtimeSegmentDataManager.class);
     when(tableDataManagerA.acquireSegment(segA0)).thenReturn(segMngrA0);
     when(tableDataManagerA.acquireSegment(segA1)).thenReturn(segMngrA1);
     when(tableDataManagerB.acquireSegment(segB0)).thenReturn(segMngrB0);
@@ -190,6 +201,8 @@ public class OffsetBasedConsumptionStatusCheckerTest {
     // segB0        committed at 1200               1500
     when(segMngrA0.getCurrentOffset()).thenReturn(new LongMsgOffset(20));
     when(segMngrA1.getCurrentOffset()).thenReturn(new LongMsgOffset(200));
+    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 1);
+    consumingSegments.get("tableB_REALTIME").remove(segB0);
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 0);
   }
 
@@ -199,10 +212,13 @@ public class OffsetBasedConsumptionStatusCheckerTest {
     String segA0 = "tableA__0__0__123Z";
     String segA1 = "tableA__1__0__123Z";
     String segB0 = "tableB__0__0__123Z";
-    Set<String> consumingSegments = ImmutableSet.of(segA0, segA1, segB0);
+    Map<String, Set<String>> consumingSegments = new HashMap<>();
+    consumingSegments.put("tableA_REALTIME", ImmutableSet.of(segA0, segA1));
+    consumingSegments.put("tableB_REALTIME", ImmutableSet.of(segB0));
     InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
     OffsetBasedConsumptionStatusChecker statusChecker =
-        new OffsetBasedConsumptionStatusChecker(instanceDataManager, consumingSegments);
+        new OffsetBasedConsumptionStatusChecker(instanceDataManager, consumingSegments,
+            ConsumptionStatusCheckerTestUtils.getConsumingSegments(consumingSegments));
 
     // setup TableDataMangers
     TableDataManager tableDataManagerA = mock(TableDataManager.class);
@@ -211,9 +227,9 @@ public class OffsetBasedConsumptionStatusCheckerTest {
     when(instanceDataManager.getTableDataManager("tableB_REALTIME")).thenReturn(tableDataManagerB);
 
     // setup SegmentDataManagers
-    LLRealtimeSegmentDataManager segMngrA0 = mock(LLRealtimeSegmentDataManager.class);
-    LLRealtimeSegmentDataManager segMngrA1 = mock(LLRealtimeSegmentDataManager.class);
-    LLRealtimeSegmentDataManager segMngrB0 = mock(LLRealtimeSegmentDataManager.class);
+    RealtimeSegmentDataManager segMngrA0 = mock(RealtimeSegmentDataManager.class);
+    RealtimeSegmentDataManager segMngrA1 = mock(RealtimeSegmentDataManager.class);
+    RealtimeSegmentDataManager segMngrB0 = mock(RealtimeSegmentDataManager.class);
     when(tableDataManagerA.acquireSegment(segA0)).thenReturn(segMngrA0);
     when(tableDataManagerA.acquireSegment(segA1)).thenReturn(segMngrA1);
     when(tableDataManagerB.acquireSegment(segB0)).thenReturn(segMngrB0);

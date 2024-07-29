@@ -18,18 +18,16 @@
  */
 package org.apache.pinot.core.query.aggregation.groupby.utils;
 
-import it.unimi.dsi.fastutil.doubles.Double2IntMap;
 import it.unimi.dsi.fastutil.doubles.Double2IntOpenHashMap;
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
-import it.unimi.dsi.fastutil.doubles.DoubleList;
 
 
 /**
  * Implementation of {@link ValueToIdMap} for double.
  */
-public class DoubleToIdMap extends BaseValueToIdMap {
-  Double2IntMap _valueToIdMap;
-  DoubleList _idToValueMap;
+public class DoubleToIdMap implements ValueToIdMap {
+  private final Double2IntOpenHashMap _valueToIdMap;
+  private final DoubleArrayList _idToValueMap;
 
   public DoubleToIdMap() {
     _valueToIdMap = new Double2IntOpenHashMap();
@@ -39,28 +37,31 @@ public class DoubleToIdMap extends BaseValueToIdMap {
 
   @Override
   public int put(double value) {
-    int id = _valueToIdMap.get(value);
-    if (id == INVALID_KEY) {
-      id = _idToValueMap.size();
-      _valueToIdMap.put(value, id);
+    int numValues = _valueToIdMap.size();
+    int id = _valueToIdMap.computeIfAbsent(value, k -> numValues);
+    if (id == numValues) {
       _idToValueMap.add(value);
     }
     return id;
   }
 
   @Override
-  public double getDouble(int id) {
-    assert id < _idToValueMap.size();
+  public int put(Object value) {
+    return put((double) value);
+  }
+
+  @Override
+  public int getId(double value) {
+    return _valueToIdMap.get(value);
+  }
+
+  @Override
+  public int getId(Object value) {
+    return getId((double) value);
+  }
+
+  @Override
+  public Double get(int id) {
     return _idToValueMap.getDouble(id);
-  }
-
-  @Override
-  public String getString(int id) {
-    return Double.toString(getDouble(id));
-  }
-
-  @Override
-  public Object get(int id) {
-    return getDouble(id);
   }
 }

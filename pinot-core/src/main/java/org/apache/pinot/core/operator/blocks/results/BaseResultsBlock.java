@@ -156,26 +156,32 @@ public abstract class BaseResultsBlock implements Block {
   /**
    * Returns the total size (number of rows) in this result block, without having to materialize the rows.
    *
-   * @see BaseResultsBlock#getRows(QueryContext)
+   * @see BaseResultsBlock#getRows()
    */
   public abstract int getNumRows();
+
+  /**
+   * Returns the query for the results. Return {@code null} when the block only contains metadata.
+   */
+  @Nullable
+  public abstract QueryContext getQueryContext();
 
   /**
    * Returns the data schema for the results. Return {@code null} when the block only contains metadata.
    */
   @Nullable
-  public abstract DataSchema getDataSchema(QueryContext queryContext);
+  public abstract DataSchema getDataSchema();
 
   /**
    * Returns the rows for the results. Return {@code null} when the block only contains metadata.
    */
   @Nullable
-  public abstract List<Object[]> getRows(QueryContext queryContext);
+  public abstract List<Object[]> getRows();
 
   /**
    * Returns a data table without metadata or exception attached.
    */
-  public abstract DataTable getDataTable(QueryContext queryContext)
+  public abstract DataTable getDataTable()
       throws IOException;
 
   /**

@@ -32,9 +32,11 @@ import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
@@ -43,12 +45,19 @@ import org.apache.pinot.core.periodictask.PeriodicTaskScheduler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
 
-@Api(tags = Constants.PERIODIC_TASK_TAG, authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY)})
-@SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = @ApiKeyAuthDefinition(name =
-    HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = SWAGGER_AUTHORIZATION_KEY)))
+@Api(tags = Constants.PERIODIC_TASK_TAG, authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY),
+    @Authorization(value = DATABASE)})
+@SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = {
+    @ApiKeyAuthDefinition(name = HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER,
+        key = SWAGGER_AUTHORIZATION_KEY,
+        description = "The format of the key is  ```\"Basic <token>\" or \"Bearer <token>\"```"),
+    @ApiKeyAuthDefinition(name = DATABASE, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = DATABASE,
+        description = "Database context passed through http header. If no context is provided 'default' database "
+            + "context will be considered.")}))
 @Path("/periodictask")
 public class PinotControllerPeriodicTaskRestletResource {
 
@@ -68,7 +77,7 @@ public class PinotControllerPeriodicTaskRestletResource {
   public Response runPeriodicTask(
       @ApiParam(value = "Periodic task name", required = true) @QueryParam("taskname") String periodicTaskName,
       @ApiParam(value = "Name of the table") @QueryParam("tableName") String tableName,
-      @ApiParam(value = "OFFLINE | REALTIME") @QueryParam("type") String tableType) {
+      @ApiParam(value = "OFFLINE | REALTIME") @QueryParam("type") String tableType, @Context HttpHeaders headers) {
 
     if (!_periodicTaskScheduler.hasTask(periodicTaskName)) {
       throw new WebApplicationException("Periodic task '" + periodicTaskName + "' not found.",
@@ -76,15 +85,14 @@ public class PinotControllerPeriodicTaskRestletResource {
     }
 
     if (tableName != null) {
-      tableName = tableName.trim();
-      List<String> matchingTableNamesWithType = ResourceUtils
-          .getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, Constants.validateTableType(tableType),
-              LOGGER);
+      tableName = DatabaseUtils.translateTableName(tableName, headers);
+      List<String> matchingTableNamesWithType =
+          ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName,
+              Constants.validateTableType(tableType), LOGGER);
 
       if (matchingTableNamesWithType.size() > 1) {
         throw new WebApplicationException(
-            "More than one table matches Table '" + tableName + "'. Matching names: " + matchingTableNamesWithType
-                .toString());
+            "More than one table matches Table '" + tableName + "'. Matching names: " + matchingTableNamesWithType);
       }
 
       tableName = matchingTableNamesWithType.get(0);

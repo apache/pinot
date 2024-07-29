@@ -75,6 +75,8 @@ public class GenericRow implements Serializable {
    */
   public static final String INCOMPLETE_RECORD_KEY = "$INCOMPLETE_RECORD_KEY$";
 
+  public static final String SANITIZED_RECORD_KEY = "$SANITIZED_RECORD_KEY$";
+
   private final Map<String, Object> _fieldToValueMap = new HashMap<>();
   private final Set<String> _nullValueFields = new HashSet<>();
 
@@ -154,6 +156,17 @@ public class GenericRow implements Serializable {
   }
 
   /**
+   * @return a deep copy of the generic row for the given fields
+   */
+  public GenericRow copy(List<String> fieldsToCopy) {
+    GenericRow copy = new GenericRow();
+    for (String field : fieldsToCopy) {
+      copy.putValue(field, copy(getValue(field)));
+    }
+    return copy;
+  }
+
+  /**
    * @return a deep copy of the object.
    */
   private Object copy(Object value) {
@@ -172,6 +185,9 @@ public class GenericRow implements Serializable {
       }
       return list;
     } else if (value.getClass().isArray()) {
+      if (value instanceof byte[]) {
+        return ((byte[]) value).clone();
+      }
       Object[] array = new Object[((Object[]) value).length];
       int idx = 0;
       for (Object object : (Object[]) value) {

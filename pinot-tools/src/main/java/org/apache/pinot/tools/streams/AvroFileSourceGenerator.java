@@ -48,7 +48,7 @@ import org.slf4j.LoggerFactory;
  * time index based on row number.
  */
 public class AvroFileSourceGenerator implements PinotSourceDataGenerator {
-  private static final Logger LOGGER = LoggerFactory.getLogger(PinotRealtimeSource.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(AvroFileSourceGenerator.class);
   private DataFileStream<GenericRecord> _avroDataStream;
   private final Schema _pinotSchema;
   private long _rowsProduced;

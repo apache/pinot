@@ -203,7 +203,7 @@ public class PinotPreparedStatement extends AbstractBasePreparedStatement {
       }
       return _resultSet;
     } catch (PinotClientException e) {
-      throw new SQLException("Failed to execute query : {}", _query, e);
+      throw new SQLException(String.format("Failed to execute query : %s", _query), e);
     }
   }
 

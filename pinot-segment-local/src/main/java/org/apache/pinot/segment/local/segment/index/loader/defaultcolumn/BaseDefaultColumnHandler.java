@@ -29,7 +29,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.pinot.common.function.FunctionUtils;
 import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.segment.local.function.FunctionEvaluator;
@@ -38,7 +38,6 @@ import org.apache.pinot.segment.local.segment.creator.impl.SegmentColumnarIndexC
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentDictionaryCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueUnsortedForwardIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueSortedForwardIndexCreator;
-import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueUnsortedForwardIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.OffHeapBitmapInvertedIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.nullvalue.NullValueVectorCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.BytesColumnPredIndexStatsCollector;
@@ -48,6 +47,8 @@ import org.apache.pinot.segment.local.segment.creator.impl.stats.IntColumnPreInd
 import org.apache.pinot.segment.local.segment.creator.impl.stats.LongColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.StringColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
+import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexCreatorFactory;
+import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexPlugin;
 import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
@@ -56,7 +57,10 @@ import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.ColumnIndexCreationInfo;
+import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
+import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
+import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.creator.DictionaryBasedInvertedIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
@@ -206,7 +210,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     _segmentProperties.setProperty(V1Constants.MetadataKeys.Segment.DATETIME_COLUMNS, dateTimeColumns);
 
     // Save the new metadata
-    SegmentMetadataUtils.savePropertiesConfiguration(_segmentProperties);
+    SegmentMetadataUtils.savePropertiesConfiguration(_segmentProperties, _segmentMetadata.getIndexDir());
   }
 
   /**
@@ -347,6 +351,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
   protected boolean createColumnV1Indices(String column)
       throws Exception {
     TableConfig tableConfig = _indexLoadingConfig.getTableConfig();
+    boolean errorOnFailure = _indexLoadingConfig.isErrorOnColumnBuildFailure();
     if (tableConfig != null && tableConfig.getIngestionConfig() != null
         && tableConfig.getIngestionConfig().getTransformConfigs() != null) {
       List<TransformConfig> transformConfigs = tableConfig.getIngestionConfig().getTransformConfigs();
@@ -362,9 +367,10 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
           for (String argument : arguments) {
             ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(argument);
             if (columnMetadata == null) {
-              LOGGER.warn("Skip creating derived column: {} because argument: {} does not exist in the segment", column,
-                  argument);
-              return false;
+              LOGGER.warn("Assigning default value to derived column: {} because argument: {} does not exist in the "
+                  + "segment", column, argument);
+              createDefaultValueColumnV1Indices(column);
+              return true;
             }
             // TODO: Support creation of derived columns from forward index disabled columns
             if (!_segmentWriter.hasIndexFor(argument, StandardIndexes.forward())) {
@@ -376,15 +382,13 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
             argumentsMetadata.add(columnMetadata);
           }
 
-          // TODO: Support raw derived column
-          if (_indexLoadingConfig.getNoDictionaryColumns().contains(column)) {
-            LOGGER.warn("Skip creating raw derived column: {}", column);
-            return false;
-          }
-
           // TODO: Support forward index disabled derived column
           if (_indexLoadingConfig.getForwardIndexDisabledColumns().contains(column)) {
             LOGGER.warn("Skip creating forward index disabled derived column: {}", column);
+            if (errorOnFailure) {
+              throw new UnsupportedOperationException(
+                  String.format("Failed to create forward index disabled derived column: %s", column));
+            }
             return false;
           }
 
@@ -394,6 +398,9 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
           } catch (Exception e) {
             LOGGER.error("Caught exception while creating derived column: {} with transform function: {}", column,
                 transformFunction, e);
+            if (errorOnFailure) {
+              throw e;
+            }
             return false;
           }
         }
@@ -470,7 +477,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         new ColumnIndexCreationInfo(columnStatistics, true/*createDictionary*/, false, true/*isAutoGenerated*/,
             defaultValue/*defaultNullValue*/);
 
-    // Create dictionary.
+    // We always create a dictionary for default value columns.
     // We will have only one value in the dictionary.
     int dictionaryElementSize;
     try (SegmentDictionaryCreator creator = new SegmentDictionaryCreator(fieldSpec, _indexDir, false)) {
@@ -514,9 +521,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
       }
     }
 
-    if (_indexLoadingConfig.getTableConfig() != null
-        && _indexLoadingConfig.getTableConfig().getIndexingConfig() != null
-        && _indexLoadingConfig.getTableConfig().getIndexingConfig().isNullHandlingEnabled()) {
+    if (isNullable(fieldSpec)) {
       if (!_segmentWriter.hasIndexFor(column, StandardIndexes.nullValueVector())) {
         try (NullValueVectorCreator nullValueVectorCreator =
             new NullValueVectorCreator(_indexDir, fieldSpec.getName())) {
@@ -534,11 +539,20 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         fieldSpec, true/*hasDictionary*/, dictionaryElementSize);
   }
 
+  private boolean isNullable(FieldSpec fieldSpec) {
+    if (_schema.isEnableColumnBasedNullHandling()) {
+      return fieldSpec.isNullable();
+    } else {
+      return _indexLoadingConfig.getTableConfig() != null
+          && _indexLoadingConfig.getTableConfig().getIndexingConfig() != null
+          && _indexLoadingConfig.getTableConfig().getIndexingConfig().isNullHandlingEnabled();
+    }
+  }
+
   /**
    * Helper method to create the V1 indices (dictionary and forward index) for a column with derived values.
    * TODO:
    *   - Support chained derived column
-   *   - Support raw derived column
    *   - Support forward index disabled derived column
    */
   private void createDerivedColumnV1Indices(String column, FunctionEvaluator functionEvaluator,
@@ -565,11 +579,12 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         outputValues[i] = outputValue;
         if (outputValueType == null) {
           Class<?> outputValueClass = outputValue.getClass();
-          outputValueType = FunctionUtils.getParameterType(outputValueClass);
+          outputValueType = FunctionUtils.getArgumentType(outputValueClass);
           Preconditions.checkState(outputValueType != null, "Unsupported output value class: %s", outputValueClass);
         }
       }
 
+      boolean createDictionary = !_indexLoadingConfig.getNoDictionaryColumns().contains(column);
       FieldSpec fieldSpec = _schema.getFieldSpecFor(column);
       StatsCollectorConfig statsCollectorConfig =
           new StatsCollectorConfig(_indexLoadingConfig.getTableConfig(), _schema, null);
@@ -582,11 +597,21 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
             if (isSingleValue) {
               outputValues[i] = outputValueType.toInt(outputValue);
             } else {
-              Integer[] values = outputValueType.toIntegerArray(outputValue);
-              if (values.length == 0) {
-                values = new Integer[]{(Integer) fieldSpec.getDefaultNullValue()};
+              if (createDictionary) {
+                // Use array of primitive wrapper class for dictionary
+                Integer[] values = outputValueType.toIntegerArray(outputValue);
+                if (values.length == 0) {
+                  values = new Integer[]{(Integer) fieldSpec.getDefaultNullValue()};
+                }
+                outputValues[i] = values;
+              } else {
+                // Use primitive array for raw encoded
+                int[] values = outputValueType.toPrimitiveIntArray(outputValue);
+                if (values.length == 0) {
+                  values = new int[]{(int) fieldSpec.getDefaultNullValue()};
+                }
+                outputValues[i] = values;
               }
-              outputValues[i] = values;
             }
           }
           IntColumnPreIndexStatsCollector statsCollector =
@@ -596,7 +621,8 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
           }
           statsCollector.seal();
           indexCreationInfo =
-              new ColumnIndexCreationInfo(statsCollector, true, false, true, fieldSpec.getDefaultNullValue());
+              new ColumnIndexCreationInfo(statsCollector, createDictionary, false, true,
+                  fieldSpec.getDefaultNullValue());
           break;
         }
         case LONG: {
@@ -605,11 +631,21 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
             if (isSingleValue) {
               outputValues[i] = outputValueType.toLong(outputValue);
             } else {
-              Long[] values = outputValueType.toLongArray(outputValue);
-              if (values.length == 0) {
-                values = new Long[]{(Long) fieldSpec.getDefaultNullValue()};
+              if (createDictionary) {
+                // Use array of primitive wrapper class for dictionary
+                Long[] values = outputValueType.toLongArray(outputValue);
+                if (values.length == 0) {
+                  values = new Long[]{(Long) fieldSpec.getDefaultNullValue()};
+                }
+                outputValues[i] = values;
+              } else {
+                // Use primitive array for raw encoded
+                long[] values = outputValueType.toPrimitiveLongArray(outputValue);
+                if (values.length == 0) {
+                  values = new long[]{(long) fieldSpec.getDefaultNullValue()};
+                }
+                outputValues[i] = values;
               }
-              outputValues[i] = values;
             }
           }
           LongColumnPreIndexStatsCollector statsCollector =
@@ -619,7 +655,8 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
           }
           statsCollector.seal();
           indexCreationInfo =
-              new ColumnIndexCreationInfo(statsCollector, true, false, true, fieldSpec.getDefaultNullValue());
+              new ColumnIndexCreationInfo(statsCollector, createDictionary, false, true,
+                  fieldSpec.getDefaultNullValue());
           break;
         }
         case FLOAT: {
@@ -628,11 +665,21 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
             if (isSingleValue) {
               outputValues[i] = outputValueType.toFloat(outputValue);
             } else {
-              Float[] values = outputValueType.toFloatArray(outputValue);
-              if (values.length == 0) {
-                values = new Float[]{(Float) fieldSpec.getDefaultNullValue()};
+              if (createDictionary) {
+                // Use array of primitive wrapper class for dictionary
+                Float[] values = outputValueType.toFloatArray(outputValue);
+                if (values.length == 0) {
+                  values = new Float[]{(Float) fieldSpec.getDefaultNullValue()};
+                }
+                outputValues[i] = values;
+              } else {
+                // Use primitive array for raw encoded
+                float[] values = outputValueType.toPrimitiveFloatArray(outputValue);
+                if (values.length == 0) {
+                  values = new float[]{(float) fieldSpec.getDefaultNullValue()};
+                }
+                outputValues[i] = values;
               }
-              outputValues[i] = values;
             }
           }
           FloatColumnPreIndexStatsCollector statsCollector =
@@ -642,7 +689,8 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
           }
           statsCollector.seal();
           indexCreationInfo =
-              new ColumnIndexCreationInfo(statsCollector, true, false, true, fieldSpec.getDefaultNullValue());
+              new ColumnIndexCreationInfo(statsCollector, createDictionary, false, true,
+                  fieldSpec.getDefaultNullValue());
           break;
         }
         case DOUBLE: {
@@ -651,11 +699,21 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
             if (isSingleValue) {
               outputValues[i] = outputValueType.toDouble(outputValue);
             } else {
-              Double[] values = outputValueType.toDoubleArray(outputValue);
-              if (values.length == 0) {
-                values = new Double[]{(Double) fieldSpec.getDefaultNullValue()};
+              if (createDictionary) {
+                // Use array of primitive wrapper class for dictionary
+                Double[] values = outputValueType.toDoubleArray(outputValue);
+                if (values.length == 0) {
+                  values = new Double[]{(Double) fieldSpec.getDefaultNullValue()};
+                }
+                outputValues[i] = values;
+              } else {
+                // Use primitive array for raw encoded
+                double[] values = outputValueType.toPrimitiveDoubleArray(outputValue);
+                if (values.length == 0) {
+                  values = new double[]{(double) fieldSpec.getDefaultNullValue()};
+                }
+                outputValues[i] = values;
               }
-              outputValues[i] = values;
             }
           }
           DoubleColumnPreIndexStatsCollector statsCollector =
@@ -665,7 +723,8 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
           }
           statsCollector.seal();
           indexCreationInfo =
-              new ColumnIndexCreationInfo(statsCollector, true, false, true, fieldSpec.getDefaultNullValue());
+              new ColumnIndexCreationInfo(statsCollector, createDictionary, false, true,
+                  fieldSpec.getDefaultNullValue());
           break;
         }
         case BIG_DECIMAL: {
@@ -680,7 +739,8 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
           }
           statsCollector.seal();
           indexCreationInfo =
-              new ColumnIndexCreationInfo(statsCollector, true, false, true, fieldSpec.getDefaultNullValue());
+              new ColumnIndexCreationInfo(statsCollector, createDictionary, false, true,
+                  fieldSpec.getDefaultNullValue());
           break;
         }
         case STRING: {
@@ -702,7 +762,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
             statsCollector.collect(value);
           }
           statsCollector.seal();
-          indexCreationInfo = new ColumnIndexCreationInfo(statsCollector, true,
+          indexCreationInfo = new ColumnIndexCreationInfo(statsCollector, createDictionary,
               _indexLoadingConfig.getVarLengthDictionaryColumns().contains(column), true,
               fieldSpec.getDefaultNullValue());
           break;
@@ -732,47 +792,157 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
           } else {
             useVarLengthDictionary = _indexLoadingConfig.getVarLengthDictionaryColumns().contains(column);
           }
-          indexCreationInfo = new ColumnIndexCreationInfo(statsCollector, true, useVarLengthDictionary, true,
-              new ByteArray((byte[]) fieldSpec.getDefaultNullValue()));
+          indexCreationInfo = new ColumnIndexCreationInfo(statsCollector, createDictionary, useVarLengthDictionary,
+              true, new ByteArray((byte[]) fieldSpec.getDefaultNullValue()));
           break;
         }
         default:
           throw new IllegalStateException();
       }
 
-      // Create dictionary
-      try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(fieldSpec, _indexDir,
-          indexCreationInfo.isUseVarLengthDictionary())) {
-        dictionaryCreator.build(indexCreationInfo.getSortedUniqueElementsArray());
-
-        // Create forward index
-        int cardinality = indexCreationInfo.getDistinctValueCount();
-        if (isSingleValue) {
-          try (ForwardIndexCreator forwardIndexCreator = indexCreationInfo.isSorted()
-              ? new SingleValueSortedForwardIndexCreator(_indexDir, column, cardinality)
-              : new SingleValueUnsortedForwardIndexCreator(_indexDir, column, cardinality, numDocs)) {
-            for (int i = 0; i < numDocs; i++) {
-              forwardIndexCreator.putDictId(dictionaryCreator.indexOfSV(outputValues[i]));
-            }
-          }
-        } else {
-          try (ForwardIndexCreator forwardIndexCreator = new MultiValueUnsortedForwardIndexCreator(_indexDir, column,
-              cardinality, numDocs, indexCreationInfo.getTotalNumberOfEntries())) {
-            for (int i = 0; i < numDocs; i++) {
-              forwardIndexCreator.putDictIdMV(dictionaryCreator.indexOfMV(outputValues[i]));
-            }
-          }
-        }
-
-        // Add the column metadata
-        SegmentColumnarIndexCreator.addColumnMetadataInfo(_segmentProperties, column, indexCreationInfo, numDocs,
-            fieldSpec, true, dictionaryCreator.getNumBytesPerEntry());
+      if (createDictionary) {
+        createDerivedColumnForwardIndexWithDictionary(column, fieldSpec, outputValues, indexCreationInfo);
+      } else {
+        createDerivedColumnForwardIndexWithoutDictionary(column, fieldSpec, outputValues, indexCreationInfo);
       }
     } finally {
       for (ValueReader valueReader : valueReaders) {
         valueReader.close();
       }
     }
+  }
+
+  /**
+   * Helper method to create the dictionary and forward indices for a column with derived values.
+   */
+  private void createDerivedColumnForwardIndexWithDictionary(String column, FieldSpec fieldSpec, Object[] outputValues,
+      ColumnIndexCreationInfo indexCreationInfo) throws Exception {
+
+    // Create dictionary
+    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(fieldSpec, _indexDir,
+        indexCreationInfo.isUseVarLengthDictionary())) {
+      dictionaryCreator.build(indexCreationInfo.getSortedUniqueElementsArray());
+
+      int numDocs = outputValues.length;
+
+      // Create forward index
+      boolean isSingleValue = fieldSpec.isSingleValueField();
+
+      try (ForwardIndexCreator forwardIndexCreator
+          = getForwardIndexCreator(fieldSpec, indexCreationInfo, numDocs, column, true)) {
+        if (isSingleValue) {
+          for (Object outputValue : outputValues) {
+            forwardIndexCreator.putDictId(dictionaryCreator.indexOfSV(outputValue));
+          }
+        } else {
+          for (Object outputValue : outputValues) {
+            forwardIndexCreator.putDictIdMV(dictionaryCreator.indexOfMV(outputValue));
+          }
+        }
+        // Add the column metadata
+        SegmentColumnarIndexCreator.addColumnMetadataInfo(_segmentProperties, column, indexCreationInfo, numDocs,
+            fieldSpec, true, dictionaryCreator.getNumBytesPerEntry());
+      }
+    }
+  }
+
+  /**
+   * Helper method to create a forward index for a raw encoded column with derived values.
+   */
+  private void createDerivedColumnForwardIndexWithoutDictionary(String column, FieldSpec fieldSpec,
+      Object[] outputValues, ColumnIndexCreationInfo indexCreationInfo)
+      throws Exception {
+
+    // Create forward index
+    int numDocs = outputValues.length;
+    boolean isSingleValue = fieldSpec.isSingleValueField();
+
+    try (ForwardIndexCreator forwardIndexCreator
+        = getForwardIndexCreator(fieldSpec, indexCreationInfo, numDocs, column, false)) {
+      if (isSingleValue) {
+        for (Object outputValue : outputValues) {
+          switch (fieldSpec.getDataType().getStoredType()) {
+            // Casts are safe here because we've already done the conversion in createDerivedColumnV1Indices
+            case INT:
+              forwardIndexCreator.putInt((int) outputValue);
+              break;
+            case LONG:
+              forwardIndexCreator.putLong((long) outputValue);
+              break;
+            case FLOAT:
+              forwardIndexCreator.putFloat((float) outputValue);
+              break;
+            case DOUBLE:
+              forwardIndexCreator.putDouble((double) outputValue);
+              break;
+            case BIG_DECIMAL:
+              forwardIndexCreator.putBigDecimal((BigDecimal) outputValue);
+              break;
+            case STRING:
+              forwardIndexCreator.putString((String) outputValue);
+              break;
+            case BYTES:
+              forwardIndexCreator.putBytes((byte[]) outputValue);
+              break;
+            default:
+              throw new IllegalStateException();
+          }
+        }
+      } else {
+        for (Object outputValue : outputValues) {
+          switch (fieldSpec.getDataType().getStoredType()) {
+            // Casts are safe here because we've already done the conversion in createDerivedColumnV1Indices
+            case INT:
+              forwardIndexCreator.putIntMV((int[]) outputValue);
+              break;
+            case LONG:
+              forwardIndexCreator.putLongMV((long[]) outputValue);
+              break;
+            case FLOAT:
+              forwardIndexCreator.putFloatMV((float[]) outputValue);
+              break;
+            case DOUBLE:
+              forwardIndexCreator.putDoubleMV((double[]) outputValue);
+              break;
+            case STRING:
+              forwardIndexCreator.putStringMV((String[]) outputValue);
+              break;
+            case BYTES:
+              forwardIndexCreator.putBytesMV((byte[][]) outputValue);
+              break;
+            default:
+              throw new IllegalStateException();
+          }
+        }
+      }
+    }
+
+    // Add the column metadata
+    SegmentColumnarIndexCreator.addColumnMetadataInfo(_segmentProperties, column, indexCreationInfo, numDocs,
+        fieldSpec, false, 0);
+  }
+
+  private ForwardIndexCreator getForwardIndexCreator(FieldSpec fieldSpec, ColumnIndexCreationInfo indexCreationInfo,
+      int numDocs, String column, boolean hasDictionary) throws Exception {
+
+    IndexCreationContext indexCreationContext = IndexCreationContext.builder()
+        .withIndexDir(_indexDir)
+        .withFieldSpec(fieldSpec)
+        .withColumnIndexCreationInfo(indexCreationInfo)
+        .withTotalDocs(numDocs)
+        .withDictionary(hasDictionary)
+        .build();
+
+    ForwardIndexConfig forwardIndexConfig = null;
+    FieldIndexConfigs fieldIndexConfig = _indexLoadingConfig.getFieldIndexConfig(column);
+    if (fieldIndexConfig != null) {
+      forwardIndexConfig = fieldIndexConfig.getConfig(new ForwardIndexPlugin().getIndexType());
+    }
+    if (forwardIndexConfig == null) {
+      forwardIndexConfig = new ForwardIndexConfig(false, null, null, null, null, null);
+    }
+
+    return ForwardIndexCreatorFactory.createIndexCreator(indexCreationContext, forwardIndexConfig);
   }
 
   @SuppressWarnings("rawtypes")

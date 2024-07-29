@@ -25,7 +25,7 @@ import java.net.URI;
 import java.nio.file.Path;
 import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.commons.configuration.ConfigurationException;
+import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;

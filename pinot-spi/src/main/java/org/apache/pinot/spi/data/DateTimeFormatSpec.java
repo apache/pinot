@@ -19,6 +19,7 @@
 package org.apache.pinot.spi.data;
 
 import com.google.common.base.Preconditions;
+import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
@@ -214,7 +215,7 @@ public class DateTimeFormatSpec {
   }
 
   public static DateTimeFormatSpec forEpoch(int size, String timeUnit) {
-    Preconditions.checkArgument(size > 0, "Invalid size: {}, must be positive", size);
+    Preconditions.checkArgument(size > 0, "Invalid size: %s, must be positive", size);
     Preconditions.checkArgument(timeUnit != null, "Must provide time unit");
     return new DateTimeFormatSpec(size, new DateTimeFormatUnitSpec(timeUnit), DateTimeFormatPatternSpec.EPOCH);
   }
@@ -301,11 +302,25 @@ public class DateTimeFormatSpec {
   public long fromFormatToMillis(String dateTimeValue) {
     switch (_patternSpec.getTimeFormat()) {
       case EPOCH:
-        return TimeUnit.MILLISECONDS.convert(Long.parseLong(dateTimeValue) * _size, _unitSpec.getTimeUnit());
+        return TimeUnit.MILLISECONDS.convert((new BigDecimal(dateTimeValue).longValue() * _size),
+            _unitSpec.getTimeUnit());
       case TIMESTAMP:
         return TimestampUtils.toMillisSinceEpoch(dateTimeValue);
       case SIMPLE_DATE_FORMAT:
         return _patternSpec.getDateTimeFormatter().parseMillis(dateTimeValue);
+      default:
+        throw new IllegalStateException("Unsupported time format: " + _patternSpec.getTimeFormat());
+    }
+  }
+
+  public long fromFormatToMillis(long dateTimeValue) {
+    switch (_patternSpec.getTimeFormat()) {
+      case EPOCH:
+        return TimeUnit.MILLISECONDS.convert(dateTimeValue * _size, _unitSpec.getTimeUnit());
+      case TIMESTAMP:
+        return dateTimeValue;
+      case SIMPLE_DATE_FORMAT:
+        return _patternSpec.getDateTimeFormatter().parseMillis(Long.toString(dateTimeValue));
       default:
         throw new IllegalStateException("Unsupported time format: " + _patternSpec.getTimeFormat());
     }

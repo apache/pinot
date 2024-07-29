@@ -39,10 +39,10 @@ import org.roaringbitmap.RoaringBitmap;
 
 
 public class SelectionOnlyOperator extends BaseOperator<SelectionResultsBlock> {
-
   private static final String EXPLAIN_NAME = "SELECT";
 
   private final IndexSegment _indexSegment;
+  private final QueryContext _queryContext;
   private final boolean _nullHandlingEnabled;
   private final BaseProjectOperator<?> _projectOperator;
   private final List<ExpressionContext> _expressions;
@@ -57,6 +57,7 @@ public class SelectionOnlyOperator extends BaseOperator<SelectionResultsBlock> {
   public SelectionOnlyOperator(IndexSegment indexSegment, QueryContext queryContext,
       List<ExpressionContext> expressions, BaseProjectOperator<?> projectOperator) {
     _indexSegment = indexSegment;
+    _queryContext = queryContext;
     _nullHandlingEnabled = queryContext.isNullHandlingEnabled();
     _projectOperator = projectOperator;
     _expressions = expressions;
@@ -127,7 +128,7 @@ public class SelectionOnlyOperator extends BaseOperator<SelectionResultsBlock> {
       }
     }
 
-    return new SelectionResultsBlock(_dataSchema, _rows);
+    return new SelectionResultsBlock(_dataSchema, _rows, _queryContext);
   }
 
   @Override

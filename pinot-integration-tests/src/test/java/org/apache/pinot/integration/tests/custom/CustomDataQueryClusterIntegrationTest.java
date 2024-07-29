@@ -21,7 +21,6 @@ package org.apache.pinot.integration.tests.custom;
 import java.io.File;
 import java.io.IOException;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.integration.tests.BaseClusterIntegrationTest;
 import org.apache.pinot.integration.tests.ClusterIntegrationTestUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -40,12 +39,14 @@ import org.testng.annotations.BeforeSuite;
 
 public abstract class CustomDataQueryClusterIntegrationTest extends BaseClusterIntegrationTest {
   protected static final Logger LOGGER = LoggerFactory.getLogger(CustomDataQueryClusterIntegrationTest.class);
+  protected static CustomDataQueryClusterIntegrationTest _sharedClusterTestSuite = null;
 
   @BeforeSuite
   public void setUpSuite()
       throws Exception {
     LOGGER.warn("Setting up integration test suite");
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
+    _sharedClusterTestSuite = this;
 
     // Start the Pinot cluster
     startZk();
@@ -73,7 +74,8 @@ public abstract class CustomDataQueryClusterIntegrationTest extends BaseClusterI
       throws Exception {
     LOGGER.warn("Setting up integration test class: {}", getClass().getSimpleName());
     if (_controllerRequestURLBuilder == null) {
-      _controllerRequestURLBuilder = ControllerRequestURLBuilder.baseUrl("http://localhost:" + DEFAULT_CONTROLLER_PORT);
+      _controllerRequestURLBuilder =
+          ControllerRequestURLBuilder.baseUrl("http://localhost:" + _sharedClusterTestSuite.getControllerPort());
     }
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
     // create & upload schema AND table config
@@ -102,17 +104,39 @@ public abstract class CustomDataQueryClusterIntegrationTest extends BaseClusterI
 
   @Override
   public String getZkUrl() {
-    return ZkStarter.getDefaultZkStr();
+    if (_sharedClusterTestSuite != this) {
+      return _sharedClusterTestSuite.getZkUrl();
+    }
+    return super.getZkUrl();
+  }
+
+  @Override
+  protected String getBrokerBaseApiUrl() {
+    if (_sharedClusterTestSuite != this) {
+      return _sharedClusterTestSuite.getBrokerBaseApiUrl();
+    }
+    return super.getBrokerBaseApiUrl();
+  }
+
+  @Override
+  public int getControllerPort() {
+    if (_sharedClusterTestSuite != this) {
+      return _sharedClusterTestSuite.getControllerPort();
+    }
+    return super.getControllerPort();
+  }
+
+  @Override
+  public int getRandomBrokerPort() {
+    if (_sharedClusterTestSuite != this) {
+      return _sharedClusterTestSuite.getRandomBrokerPort();
+    }
+    return super.getRandomBrokerPort();
   }
 
   @Override
   public String getHelixClusterName() {
     return "CustomDataQueryClusterIntegrationTest";
-  }
-
-  @Override
-  protected String getBrokerBaseApiUrl() {
-    return "http://localhost:" + DEFAULT_BROKER_PORT;
   }
 
   @Override

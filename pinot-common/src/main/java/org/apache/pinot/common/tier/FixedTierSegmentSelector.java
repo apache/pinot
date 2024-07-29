@@ -20,7 +20,7 @@ package org.apache.pinot.common.tier;
 
 import com.google.common.base.Preconditions;
 import java.util.Set;
-import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
@@ -61,7 +61,7 @@ public class FixedTierSegmentSelector implements TierSegmentSelector {
       SegmentZKMetadata segmentZKMetadata =
           ZKMetadataProvider.getSegmentZKMetadata(_helixManager.getHelixPropertyStore(), tableNameWithType,
               segmentName);
-      Preconditions.checkNotNull(segmentZKMetadata, "Could not find zk metadata for segment: {} of table: {}",
+      Preconditions.checkNotNull(segmentZKMetadata, "Could not find zk metadata for segment: %s of table: %s",
           segmentName, tableNameWithType);
       return segmentZKMetadata.getStatus().isCompleted();
     }

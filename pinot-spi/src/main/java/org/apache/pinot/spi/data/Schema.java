@@ -37,6 +37,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -64,6 +65,7 @@ public final class Schema implements Serializable {
   private static final Logger LOGGER = LoggerFactory.getLogger(Schema.class);
 
   private String _schemaName;
+  private boolean _enableColumnBasedNullHandling;
   private final List<DimensionFieldSpec> _dimensionFieldSpecs = new ArrayList<>();
   private final List<MetricFieldSpec> _metricFieldSpecs = new ArrayList<>();
   private TimeFieldSpec _timeFieldSpec;
@@ -163,6 +165,14 @@ public final class Schema implements Serializable {
 
   public void setSchemaName(String schemaName) {
     _schemaName = schemaName;
+  }
+
+  public boolean isEnableColumnBasedNullHandling() {
+    return _enableColumnBasedNullHandling;
+  }
+
+  public void setEnableColumnBasedNullHandling(boolean enableColumnBasedNullHandling) {
+    _enableColumnBasedNullHandling = enableColumnBasedNullHandling;
   }
 
   public List<String> getPrimaryKeyColumns() {
@@ -427,6 +437,7 @@ public final class Schema implements Serializable {
   public ObjectNode toJsonObject() {
     ObjectNode jsonObject = JsonUtils.newObjectNode();
     jsonObject.put("schemaName", _schemaName);
+    jsonObject.set("enableColumnBasedNullHandling", JsonUtils.objectToJsonNode(_enableColumnBasedNullHandling));
     if (!_dimensionFieldSpecs.isEmpty()) {
       ArrayNode jsonArray = JsonUtils.newArrayNode();
       for (DimensionFieldSpec dimensionFieldSpec : _dimensionFieldSpecs) {
@@ -517,6 +528,58 @@ public final class Schema implements Serializable {
 
     public SchemaBuilder setSchemaName(String schemaName) {
       _schema.setSchemaName(schemaName);
+      return this;
+    }
+
+    public SchemaBuilder setEnableColumnBasedNullHandling(boolean enableColumnBasedNullHandling) {
+      _schema.setEnableColumnBasedNullHandling(enableColumnBasedNullHandling);
+      return this;
+    }
+
+    public SchemaBuilder addField(FieldSpec fieldSpec) {
+      _schema.addField(fieldSpec);
+      return this;
+    }
+
+    public SchemaBuilder addMetricField(String name, DataType dataType) {
+      return addMetricField(name, dataType, ignore -> {
+      });
+    }
+
+    public SchemaBuilder addMetricField(String name, DataType dataType, Consumer<MetricFieldSpec> customizer) {
+      MetricFieldSpec fieldSpec = new MetricFieldSpec();
+      return addField(fieldSpec, name, dataType, customizer);
+    }
+
+    public SchemaBuilder addDimensionField(String name, DataType dataType) {
+      return addDimensionField(name, dataType, ignore -> {
+      });
+    }
+
+    public SchemaBuilder addDimensionField(String name, DataType dataType, Consumer<DimensionFieldSpec> customizer) {
+      DimensionFieldSpec fieldSpec = new DimensionFieldSpec();
+      return addField(fieldSpec, name, dataType, customizer);
+    }
+
+    public SchemaBuilder addDateTimeField(String name, DataType dataType, String format, String granularity) {
+      return addDateTimeField(name, dataType, format, granularity, ignore -> {
+      });
+    }
+
+    public SchemaBuilder addDateTimeField(String name, DataType dataType, String format, String granularity,
+        Consumer<DateTimeFieldSpec> customizer) {
+      DateTimeFieldSpec fieldSpec = new DateTimeFieldSpec();
+      fieldSpec.setFormat(format);
+      fieldSpec.setGranularity(granularity);
+      return addField(fieldSpec, name, dataType, customizer);
+    }
+
+    private <E extends FieldSpec> SchemaBuilder addField(E fieldSpec, String name, DataType dataType,
+        Consumer<E> customizer) {
+      fieldSpec.setName(name);
+      fieldSpec.setDataType(dataType);
+      customizer.accept(fieldSpec);
+      _schema.addField(fieldSpec);
       return this;
     }
 
@@ -674,7 +737,8 @@ public final class Schema implements Serializable {
         && EqualityUtils.isEqual(_timeFieldSpec, that._timeFieldSpec)
         && EqualityUtils.isEqualIgnoreOrder(_dateTimeFieldSpecs, that._dateTimeFieldSpecs)
         && EqualityUtils.isEqualIgnoreOrder(_complexFieldSpecs, that._complexFieldSpecs)
-        && EqualityUtils.isEqual(_primaryKeyColumns, that._primaryKeyColumns);
+        && EqualityUtils.isEqual(_primaryKeyColumns, that._primaryKeyColumns)
+        && EqualityUtils.isEqual(_enableColumnBasedNullHandling, that._enableColumnBasedNullHandling);
     //@formatter:on
   }
 
@@ -733,6 +797,7 @@ public final class Schema implements Serializable {
     result = EqualityUtils.hashCodeOf(result, _dateTimeFieldSpecs);
     result = EqualityUtils.hashCodeOf(result, _complexFieldSpecs);
     result = EqualityUtils.hashCodeOf(result, _primaryKeyColumns);
+    result = EqualityUtils.hashCodeOf(result, _enableColumnBasedNullHandling);
     return result;
   }
 

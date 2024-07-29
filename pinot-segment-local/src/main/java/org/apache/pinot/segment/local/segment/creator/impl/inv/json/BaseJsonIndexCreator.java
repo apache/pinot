@@ -91,7 +91,7 @@ public abstract class BaseJsonIndexCreator implements JsonIndexCreator {
   @Override
   public void add(String jsonString)
       throws IOException {
-    addFlattenedRecords(JsonUtils.flatten(JsonUtils.stringToJsonNode(jsonString), _jsonIndexConfig));
+    addFlattenedRecords(JsonUtils.flatten(jsonString, _jsonIndexConfig));
   }
 
   /**
@@ -168,6 +168,7 @@ public abstract class BaseJsonIndexCreator implements JsonIndexCreator {
         CleanerUtil.BufferCleaner cleaner = CleanerUtil.getCleaner();
         cleaner.freeBuffer(docIdMappingBuffer);
       }
+      indexFileChannel.force(true);
     }
   }
 

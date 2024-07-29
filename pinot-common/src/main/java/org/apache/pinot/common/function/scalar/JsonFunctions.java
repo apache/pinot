@@ -76,7 +76,7 @@ public class JsonFunctions {
   /**
    * Convert object to Json String
    */
-  @ScalarFunction(nullableParameters = true)
+  @ScalarFunction
   public static String jsonFormat(Object object)
       throws JsonProcessingException {
     return JsonUtils.objectToString(object);

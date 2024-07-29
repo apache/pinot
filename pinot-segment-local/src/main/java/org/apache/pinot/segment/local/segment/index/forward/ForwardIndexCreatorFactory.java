@@ -21,6 +21,8 @@ package org.apache.pinot.segment.local.segment.index.forward;
 
 import java.io.File;
 import java.io.IOException;
+import org.apache.pinot.segment.local.segment.creator.impl.fwd.CLPForwardIndexCreatorV1;
+import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueEntryDictForwardIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueFixedByteRawIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueUnsortedForwardIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueVarByteRawIndexCreator;
@@ -29,10 +31,13 @@ import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueSorted
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueUnsortedForwardIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueVarByteRawIndexCreator;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
+import org.apache.pinot.segment.spi.compression.DictIdCompressionType;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 public class ForwardIndexCreatorFactory {
@@ -41,40 +46,50 @@ public class ForwardIndexCreatorFactory {
 
   public static ForwardIndexCreator createIndexCreator(IndexCreationContext context, ForwardIndexConfig indexConfig)
       throws Exception {
-    String colName = context.getFieldSpec().getName();
+    File indexDir = context.getIndexDir();
+    FieldSpec fieldSpec = context.getFieldSpec();
+    String columnName = fieldSpec.getName();
+    int numTotalDocs = context.getTotalDocs();
 
-    if (!context.hasDictionary()) {
-      ChunkCompressionType chunkCompressionType = indexConfig.getChunkCompressionType();
-      if (chunkCompressionType == null) {
-        chunkCompressionType = ForwardIndexType.getDefaultCompressionType(context.getFieldSpec().getFieldType());
-      }
-
-      // Dictionary disabled columns
-      boolean deriveNumDocsPerChunk = indexConfig.isDeriveNumDocsPerChunk();
-      int writerVersion = indexConfig.getRawIndexWriterVersion();
-      if (context.getFieldSpec().isSingleValueField()) {
-        return getRawIndexCreatorForSVColumn(context.getIndexDir(), chunkCompressionType, colName,
-            context.getFieldSpec().getDataType().getStoredType(),
-            context.getTotalDocs(), context.getLengthOfLongestEntry(), deriveNumDocsPerChunk, writerVersion);
-      } else {
-        return getRawIndexCreatorForMVColumn(context.getIndexDir(), chunkCompressionType, colName,
-            context.getFieldSpec().getDataType().getStoredType(),
-            context.getTotalDocs(), context.getMaxNumberOfMultiValueElements(), deriveNumDocsPerChunk, writerVersion,
-            context.getMaxRowLengthInBytes());
-      }
-    } else {
+    if (context.hasDictionary()) {
       // Dictionary enabled columns
-      if (context.getFieldSpec().isSingleValueField()) {
+      int cardinality = context.getCardinality();
+      if (fieldSpec.isSingleValueField()) {
         if (context.isSorted()) {
-          return new SingleValueSortedForwardIndexCreator(context.getIndexDir(), colName,
-              context.getCardinality());
+          return new SingleValueSortedForwardIndexCreator(indexDir, columnName, cardinality);
         } else {
-          return new SingleValueUnsortedForwardIndexCreator(context.getIndexDir(), colName,
-              context.getCardinality(), context.getTotalDocs());
+          return new SingleValueUnsortedForwardIndexCreator(indexDir, columnName, cardinality, numTotalDocs);
         }
       } else {
-        return new MultiValueUnsortedForwardIndexCreator(context.getIndexDir(), colName,
-            context.getCardinality(), context.getTotalDocs(), context.getTotalNumberOfEntries());
+        if (indexConfig.getDictIdCompressionType() == DictIdCompressionType.MV_ENTRY_DICT) {
+          return new MultiValueEntryDictForwardIndexCreator(indexDir, columnName, cardinality, numTotalDocs);
+        } else {
+          return new MultiValueUnsortedForwardIndexCreator(indexDir, columnName, cardinality, numTotalDocs,
+              context.getTotalNumberOfEntries());
+        }
+      }
+    } else {
+      // Dictionary disabled columns
+      DataType storedType = fieldSpec.getDataType().getStoredType();
+      if (indexConfig.getCompressionCodec() == FieldConfig.CompressionCodec.CLP) {
+        return new CLPForwardIndexCreatorV1(indexDir, columnName, numTotalDocs, context.getColumnStatistics());
+      }
+      ChunkCompressionType chunkCompressionType = indexConfig.getChunkCompressionType();
+      if (chunkCompressionType == null) {
+        chunkCompressionType = ForwardIndexType.getDefaultCompressionType(fieldSpec.getFieldType());
+      }
+      boolean deriveNumDocsPerChunk = indexConfig.isDeriveNumDocsPerChunk();
+      int writerVersion = indexConfig.getRawIndexWriterVersion();
+      int targetMaxChunkSize = indexConfig.getTargetMaxChunkSizeBytes();
+      int targetDocsPerChunk = indexConfig.getTargetDocsPerChunk();
+      if (fieldSpec.isSingleValueField()) {
+        return getRawIndexCreatorForSVColumn(indexDir, chunkCompressionType, columnName, storedType, numTotalDocs,
+            context.getLengthOfLongestEntry(), deriveNumDocsPerChunk, writerVersion, targetMaxChunkSize,
+            targetDocsPerChunk);
+      } else {
+        return getRawIndexCreatorForMVColumn(indexDir, chunkCompressionType, columnName, storedType, numTotalDocs,
+            context.getMaxNumberOfMultiValueElements(), deriveNumDocsPerChunk, writerVersion,
+            context.getMaxRowLengthInBytes(), targetMaxChunkSize, targetDocsPerChunk);
       }
     }
   }
@@ -82,66 +97,51 @@ public class ForwardIndexCreatorFactory {
   /**
    * Helper method to build the raw index creator for the column.
    * Assumes that column to be indexed is single valued.
-   *
-   * @param file Output index file
-   * @param column Column name
-   * @param totalDocs Total number of documents to index
-   * @param lengthOfLongestEntry Length of longest entry
-   * @param deriveNumDocsPerChunk true if varbyte writer should auto-derive the number of rows per chunk
-   * @param writerVersion version to use for the raw index writer
-   * @return raw index creator
    */
-  public static ForwardIndexCreator getRawIndexCreatorForSVColumn(File file, ChunkCompressionType compressionType,
-      String column, FieldSpec.DataType dataType, int totalDocs, int lengthOfLongestEntry,
-      boolean deriveNumDocsPerChunk, int writerVersion)
+  public static ForwardIndexCreator getRawIndexCreatorForSVColumn(File indexDir, ChunkCompressionType compressionType,
+      String column, DataType storedType, int numTotalDocs, int lengthOfLongestEntry, boolean deriveNumDocsPerChunk,
+      int writerVersion, int targetMaxChunkSize, int targetDocsPerChunk)
       throws IOException {
-    switch (dataType.getStoredType()) {
+    switch (storedType) {
       case INT:
       case LONG:
       case FLOAT:
       case DOUBLE:
-        return new SingleValueFixedByteRawIndexCreator(file, compressionType, column, totalDocs, dataType,
-            writerVersion);
+        return new SingleValueFixedByteRawIndexCreator(indexDir, compressionType, column, numTotalDocs, storedType,
+            writerVersion, targetDocsPerChunk);
       case BIG_DECIMAL:
       case STRING:
       case BYTES:
-        return new SingleValueVarByteRawIndexCreator(file, compressionType, column, totalDocs, dataType,
-            lengthOfLongestEntry, deriveNumDocsPerChunk, writerVersion);
+        return new SingleValueVarByteRawIndexCreator(indexDir, compressionType, column, numTotalDocs, storedType,
+            lengthOfLongestEntry, deriveNumDocsPerChunk, writerVersion, targetMaxChunkSize, targetDocsPerChunk);
       default:
-        throw new UnsupportedOperationException("Data type not supported for raw indexing: " + dataType);
+        throw new IllegalStateException("Unsupported stored type: " + storedType);
     }
   }
 
   /**
    * Helper method to build the raw index creator for the column.
    * Assumes that column to be indexed is multi-valued.
-   *
-   * @param file Output index file
-   * @param column Column name
-   * @param totalDocs Total number of documents to index
-   * @param deriveNumDocsPerChunk true if varbyte writer should auto-derive the number of rows
-   *     per chunk
-   * @param writerVersion version to use for the raw index writer
-   * @param maxRowLengthInBytes the length of the longest row in bytes
-   * @return raw index creator
    */
-  public static ForwardIndexCreator getRawIndexCreatorForMVColumn(File file, ChunkCompressionType compressionType,
-      String column, FieldSpec.DataType dataType, final int totalDocs, int maxNumberOfMultiValueElements,
-      boolean deriveNumDocsPerChunk, int writerVersion, int maxRowLengthInBytes)
+  public static ForwardIndexCreator getRawIndexCreatorForMVColumn(File indexDir, ChunkCompressionType compressionType,
+      String column, DataType storedType, int numTotalDocs, int maxNumberOfMultiValueElements,
+      boolean deriveNumDocsPerChunk, int writerVersion, int maxRowLengthInBytes, int targetMaxChunkSize,
+      int targetDocsPerChunk)
       throws IOException {
-    switch (dataType.getStoredType()) {
+    switch (storedType) {
       case INT:
       case LONG:
       case FLOAT:
       case DOUBLE:
-        return new MultiValueFixedByteRawIndexCreator(file, compressionType, column, totalDocs, dataType,
-            maxNumberOfMultiValueElements, deriveNumDocsPerChunk, writerVersion);
+        return new MultiValueFixedByteRawIndexCreator(indexDir, compressionType, column, numTotalDocs, storedType,
+            maxNumberOfMultiValueElements, deriveNumDocsPerChunk, writerVersion, targetMaxChunkSize,
+            targetDocsPerChunk);
       case STRING:
       case BYTES:
-        return new MultiValueVarByteRawIndexCreator(file, compressionType, column, totalDocs, dataType, writerVersion,
-            maxRowLengthInBytes, maxNumberOfMultiValueElements);
+        return new MultiValueVarByteRawIndexCreator(indexDir, compressionType, column, numTotalDocs, storedType,
+            writerVersion, maxRowLengthInBytes, maxNumberOfMultiValueElements, targetMaxChunkSize, targetDocsPerChunk);
       default:
-        throw new UnsupportedOperationException("Data type not supported for raw indexing: " + dataType);
+        throw new IllegalStateException("Unsupported stored type: " + storedType);
     }
   }
 }

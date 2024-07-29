@@ -23,17 +23,30 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
  * Minus/Except operator.
  */
 public class MinusOperator extends SetOperator {
+  private static final Logger LOGGER = LoggerFactory.getLogger(MinusOperator.class);
   private static final String EXPLAIN_NAME = "MINUS";
 
-  public MinusOperator(OpChainExecutionContext opChainExecutionContext, List<MultiStageOperator> upstreamOperators,
+  public MinusOperator(OpChainExecutionContext opChainExecutionContext, List<MultiStageOperator> inputOperators,
       DataSchema dataSchema) {
-    super(opChainExecutionContext, upstreamOperators, dataSchema);
+    super(opChainExecutionContext, inputOperators, dataSchema);
+  }
+
+  @Override
+  protected Logger logger() {
+    return LOGGER;
+  }
+
+  @Override
+  public Type getOperatorType() {
+    return Type.MINUS;
   }
 
   @Nullable
@@ -44,6 +57,12 @@ public class MinusOperator extends SetOperator {
 
   @Override
   protected boolean handleRowMatched(Object[] row) {
-    return _rightRowSet.add(new Record(row));
+    Record record = new Record(row);
+    if (_rightRowSet.contains(record)) {
+      return false;
+    } else {
+      _rightRowSet.add(record);
+      return true;
+    }
   }
 }

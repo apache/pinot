@@ -1,0 +1,32 @@
+package org.apache.pinot.plugin.inputformat.protobuf.decoder;
+import org.apache.pinot.spi.data.readers.GenericRow;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+public class ProtobufRecorderMessageExtractor {
+  public static GenericRow execute(byte[] from, GenericRow to) throws Exception {
+    Map<String, Object> msgMap = decodeorg_apache_pinot_plugin_inputformat_protobuf_Sample_SampleRecordMessage(org.apache.pinot.plugin.inputformat.protobuf.Sample.SampleRecord.parseFrom(from));
+    to.putValue("name", msgMap.getOrDefault("name", null));
+    to.putValue("id", msgMap.getOrDefault("id", null));
+    to.putValue("email", msgMap.getOrDefault("email", null));
+    to.putValue("friends", msgMap.getOrDefault("friends", null));
+    to.putValue("optionalField", msgMap.getOrDefault("optionalField", null));
+    return to;
+  }
+
+  public static Map<String, Object> decodeorg_apache_pinot_plugin_inputformat_protobuf_Sample_SampleRecordMessage(org.apache.pinot.plugin.inputformat.protobuf.Sample.SampleRecord msg) {
+    Map<String, Object> msgMap = new HashMap<>();
+    msgMap.put("name", msg.getName());
+    msgMap.put("id", msg.getId());
+    msgMap.put("email", msg.getEmail());
+    if (msg.getFriendsCount() > 0) {
+      msgMap.put("friends", msg.getFriendsList().toArray());
+    }
+    if (msg.hasOptionalField()) {
+      msgMap.put("optionalField", msg.getOptionalField());
+    }
+    return msgMap;
+  }
+}

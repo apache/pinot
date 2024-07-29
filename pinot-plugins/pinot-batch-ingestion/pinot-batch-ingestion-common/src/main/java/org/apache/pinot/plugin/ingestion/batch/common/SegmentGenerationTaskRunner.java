@@ -19,6 +19,7 @@
 package org.apache.pinot.plugin.ingestion.batch.common;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.google.common.base.Preconditions;
 import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
@@ -29,6 +30,7 @@ import org.apache.pinot.segment.spi.creator.name.InputFileSegmentNameGenerator;
 import org.apache.pinot.segment.spi.creator.name.NormalizedDateSegmentNameGenerator;
 import org.apache.pinot.segment.spi.creator.name.SegmentNameGenerator;
 import org.apache.pinot.segment.spi.creator.name.SimpleSegmentNameGenerator;
+import org.apache.pinot.segment.spi.creator.name.UploadedRealtimeSegmentNameGenerator;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
@@ -65,6 +67,7 @@ public class SegmentGenerationTaskRunner implements Serializable {
   public static final String DEPRECATED_USE_LOCAL_DIRECTORY_SEQUENCE_ID = "local.directory.sequence.id";
   public static final String USE_GLOBAL_DIRECTORY_SEQUENCE_ID = "use.global.directory.sequence.id";
   public static final String APPEND_UUID_TO_SEGMENT_NAME = "append.uuid.to.segment.name";
+  public static final String EXCLUDE_TIME_IN_SEGMENT_NAME = BatchConfigProperties.EXCLUDE_TIME_IN_SEGMENT_NAME;
 
   private final SegmentGenerationTaskSpec _taskSpec;
 
@@ -134,13 +137,15 @@ public class SegmentGenerationTaskRunner implements Serializable {
 
     boolean appendUUIDToSegmentName =
         Boolean.parseBoolean(segmentNameGeneratorConfigs.get(APPEND_UUID_TO_SEGMENT_NAME));
+    boolean excludeTimeInSegmentName =
+        Boolean.parseBoolean(segmentNameGeneratorConfigs.get(EXCLUDE_TIME_IN_SEGMENT_NAME));
 
     switch (segmentNameGeneratorType) {
       case BatchConfigProperties.SegmentNameGeneratorType.FIXED:
         return new FixedSegmentNameGenerator(segmentNameGeneratorConfigs.get(SEGMENT_NAME));
       case BatchConfigProperties.SegmentNameGeneratorType.SIMPLE:
         return new SimpleSegmentNameGenerator(tableName, segmentNameGeneratorConfigs.get(SEGMENT_NAME_POSTFIX),
-            appendUUIDToSegmentName);
+            appendUUIDToSegmentName, excludeTimeInSegmentName);
       case BatchConfigProperties.SegmentNameGeneratorType.NORMALIZED_DATE:
         SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
         DateTimeFormatSpec dateTimeFormatSpec = null;
@@ -156,14 +161,25 @@ public class SegmentGenerationTaskRunner implements Serializable {
             Boolean.parseBoolean(segmentNameGeneratorConfigs.get(EXCLUDE_SEQUENCE_ID)),
             IngestionConfigUtils.getBatchSegmentIngestionType(tableConfig),
             IngestionConfigUtils.getBatchSegmentIngestionFrequency(tableConfig), dateTimeFormatSpec,
-            segmentNameGeneratorConfigs.get(SEGMENT_NAME_POSTFIX),
-            appendUUIDToSegmentName);
+            segmentNameGeneratorConfigs.get(SEGMENT_NAME_POSTFIX), appendUUIDToSegmentName);
       case BatchConfigProperties.SegmentNameGeneratorType.INPUT_FILE:
         String inputFileUri = _taskSpec.getCustomProperty(BatchConfigProperties.INPUT_DATA_FILE_URI_KEY);
         return new InputFileSegmentNameGenerator(segmentNameGeneratorConfigs.get(FILE_PATH_PATTERN),
-            segmentNameGeneratorConfigs.get(SEGMENT_NAME_TEMPLATE),
-            inputFileUri,
-            appendUUIDToSegmentName);
+            segmentNameGeneratorConfigs.get(SEGMENT_NAME_TEMPLATE), inputFileUri, appendUUIDToSegmentName);
+      case BatchConfigProperties.SegmentNameGeneratorType.UPLOADED_REALTIME:
+        Preconditions.checkState(segmentGeneratorConfig.getCreationTime() != null,
+            "Creation time must be set for uploaded realtime segment name generator");
+        Preconditions.checkState(segmentGeneratorConfig.getUploadedSegmentPartitionId() != -1,
+            "Valid partition id must be set for uploaded realtime segment name generator");
+        long creationTime;
+        try {
+          creationTime = Long.parseLong(segmentGeneratorConfig.getCreationTime());
+        } catch (NumberFormatException e) {
+          throw new IllegalArgumentException("Creation time must be a valid long value in segmentGeneratorConfig");
+        }
+        return new UploadedRealtimeSegmentNameGenerator(tableName,
+            segmentGeneratorConfig.getUploadedSegmentPartitionId(), creationTime,
+            segmentGeneratorConfig.getSegmentNamePrefix(), segmentGeneratorConfig.getSegmentNamePostfix());
       default:
         throw new UnsupportedOperationException("Unsupported segment name generator type: " + segmentNameGeneratorType);
     }

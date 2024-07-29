@@ -30,6 +30,8 @@ import org.testng.annotations.Test;
 
 public class PinotDriverTest {
   static final String DB_URL = "jdbc:pinot://localhost:8000?controller=localhost:9000";
+  static final String BAD_URL = "jdbc:someOtherDB://localhost:8000?controller=localhost:9000";
+  static final String GOOD_URL_NO_CONNECTION = "jdbc:pinot://localhost:1111?controller=localhost:2222";
 
   @Test(enabled = false)
   public void testDriver()
@@ -58,5 +60,23 @@ public class PinotDriverTest {
     statement.close();
     ;
     conn.close();
+  }
+
+  @Test
+  public void testDriverBadURL() {
+    try {
+      DriverManager.getConnection(BAD_URL);
+    } catch (Exception e) {
+      Assert.assertTrue(e.getMessage().contains("No suitable driver found"));
+    }
+  }
+
+  @Test
+  public void testDriverGoodURLNoConnection() {
+    try {
+      DriverManager.getConnection(GOOD_URL_NO_CONNECTION);
+    } catch (Exception e) {
+      Assert.assertTrue(e.getMessage().contains("Failed to connect to url"));
+    }
   }
 }

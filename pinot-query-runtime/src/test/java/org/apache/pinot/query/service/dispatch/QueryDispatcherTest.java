@@ -25,18 +25,15 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.pinot.common.proto.Worker;
-import org.apache.pinot.common.utils.NamedThreadFactory;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.QueryTestSet;
 import org.apache.pinot.query.mailbox.MailboxService;
-import org.apache.pinot.query.planner.DispatchableSubPlan;
+import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
 import org.apache.pinot.query.runtime.QueryRunner;
-import org.apache.pinot.query.runtime.executor.ExecutorServiceUtils;
 import org.apache.pinot.query.service.server.QueryServer;
 import org.apache.pinot.query.testutils.QueryTestUtils;
 import org.apache.pinot.spi.trace.DefaultRequestContext;
@@ -51,8 +48,6 @@ import org.testng.annotations.Test;
 public class QueryDispatcherTest extends QueryTestSet {
   private static final AtomicLong REQUEST_ID_GEN = new AtomicLong();
   private static final int QUERY_SERVER_COUNT = 2;
-  private static final ExecutorService EXECUTOR =
-      Executors.newCachedThreadPool(new NamedThreadFactory("worker_on_" + QueryDispatcherTest.class.getSimpleName()));
 
   private final Map<Integer, QueryServer> _queryServerMap = new HashMap<>();
 
@@ -65,7 +60,6 @@ public class QueryDispatcherTest extends QueryTestSet {
     for (int i = 0; i < QUERY_SERVER_COUNT; i++) {
       int availablePort = QueryTestUtils.getAvailablePort();
       QueryRunner queryRunner = Mockito.mock(QueryRunner.class);
-      Mockito.when(queryRunner.getOpChainExecutorService()).thenReturn(EXECUTOR);
       QueryServer queryServer = Mockito.spy(new QueryServer(availablePort, queryRunner));
       queryServer.start();
       _queryServerMap.put(availablePort, queryServer);
@@ -85,7 +79,6 @@ public class QueryDispatcherTest extends QueryTestSet {
     for (QueryServer worker : _queryServerMap.values()) {
       worker.shutdown();
     }
-    ExecutorServiceUtils.close(EXECUTOR);
   }
 
   @Test(dataProvider = "testSql")
@@ -125,7 +118,7 @@ public class QueryDispatcherTest extends QueryTestSet {
     context.setRequestId(requestId);
     DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(sql);
     try {
-      _queryDispatcher.submitAndReduce(context, dispatchableSubPlan, 10_000L, Collections.emptyMap(), null);
+      _queryDispatcher.submitAndReduce(context, dispatchableSubPlan, 10_000L, Collections.emptyMap());
       Assert.fail("Method call above should have failed");
     } catch (Exception e) {
       Assert.assertTrue(e.getMessage().contains("Error dispatching query"));
@@ -149,7 +142,7 @@ public class QueryDispatcherTest extends QueryTestSet {
     DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(sql);
     try {
       // will throw b/c mailboxService is mocked
-      _queryDispatcher.submitAndReduce(context, dispatchableSubPlan, 10_000L, Collections.emptyMap(), null);
+      _queryDispatcher.submitAndReduce(context, dispatchableSubPlan, 10_000L, Collections.emptyMap());
       Assert.fail("Method call above should have failed");
     } catch (NullPointerException e) {
       // Expected
@@ -205,15 +198,11 @@ public class QueryDispatcherTest extends QueryTestSet {
     Mockito.reset(failingQueryServer);
   }
 
-  @Test
-  public void testQueryDispatcherThrowsWhenDeadlinePreExpiredAndAsyncResponseNotPolled() {
+  @Test(expectedExceptions = TimeoutException.class)
+  public void testQueryDispatcherThrowsWhenDeadlinePreExpiredAndAsyncResponseNotPolled()
+      throws Exception {
     String sql = "SELECT * FROM a WHERE col1 = 'foo'";
     DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(sql);
-    try {
-      _queryDispatcher.submit(REQUEST_ID_GEN.getAndIncrement(), dispatchableSubPlan, 0L, Collections.emptyMap());
-      Assert.fail("Method call above should have failed");
-    } catch (Exception e) {
-      Assert.assertTrue(e.getMessage().contains("Timed out waiting"));
-    }
+    _queryDispatcher.submit(REQUEST_ID_GEN.getAndIncrement(), dispatchableSubPlan, 0L, Collections.emptyMap());
   }
 }

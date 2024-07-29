@@ -22,13 +22,13 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.core.type.TypeReference;
 import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.JdkSslContext;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Properties;
 import java.util.Random;
 import java.util.Set;
@@ -136,8 +136,7 @@ public class BrokerCache {
 
     Future<Response> responseFuture = getRequest.addHeader("accept", "application/json").execute();
     Response response = responseFuture.get();
-    String responseBody = response.getResponseBody(StandardCharsets.UTF_8);
-    return JsonUtils.stringToObject(responseBody, RESPONSE_TYPE_REF);
+    return JsonUtils.inputStreamToObject(response.getResponseBodyAsStream(), RESPONSE_TYPE_REF);
   }
 
   private BrokerData getBrokerData(Map<String, List<BrokerInstance>> responses) {
@@ -192,7 +191,10 @@ public class BrokerCache {
 
   public String getBroker(String... tableNames) {
     List<String> brokers = null;
-    if (tableNames != null) {
+    // If tableNames is not-null, filter out nulls
+    tableNames =
+        tableNames == null ? tableNames : Arrays.stream(tableNames).filter(Objects::nonNull).toArray(String[]::new);
+    if (!(tableNames == null || tableNames.length == 0)) {
        // returning list of common brokers hosting all the tables.
        brokers = BrokerSelectorUtils.getTablesCommonBrokers(Arrays.asList(tableNames),
            _brokerData.getTableToBrokerMap());

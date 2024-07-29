@@ -45,11 +45,12 @@ class PinotDataSourceReadOptionsTest extends BaseTest {
         None,
         "localhost:9000",
         "localhost:8000",
-        false,
+        usePushDownFilters = false,
         1,
         10000,
-        false,
-        Set("a=1", "b=2")
+        useGrpcServer = false,
+        Set("a=1", "b=2"),
+        failOnInvalidSegments = false
       )
 
     pinotDataSourceReadOptions shouldEqual expected

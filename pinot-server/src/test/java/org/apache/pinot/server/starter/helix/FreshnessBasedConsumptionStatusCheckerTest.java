@@ -20,10 +20,14 @@
 package org.apache.pinot.server.starter.helix;
 
 import com.google.common.collect.ImmutableSet;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
-import org.apache.pinot.core.data.manager.realtime.LLRealtimeSegmentDataManager;
+import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
@@ -42,8 +46,9 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     private final long _now;
 
     public FakeFreshnessBasedConsumptionStatusChecker(InstanceDataManager instanceDataManager,
-        Set<String> consumingSegments, long minFreshnessMs, long idleTimeoutMs, long now) {
-      super(instanceDataManager, consumingSegments, minFreshnessMs, idleTimeoutMs);
+        Map<String, Set<String>> consumingSegments, Function<String, Set<String>> consumingSegmentsSupplier,
+        long minFreshnessMs, long idleTimeoutMs, long now) {
+      super(instanceDataManager, consumingSegments, consumingSegmentsSupplier, minFreshnessMs, idleTimeoutMs);
       _now = now;
     }
 
@@ -58,10 +63,13 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     String segA0 = "tableA__0__0__123Z";
     String segA1 = "tableA__1__0__123Z";
     String segB0 = "tableB__0__0__123Z";
-    Set<String> consumingSegments = ImmutableSet.of(segA0, segA1, segB0);
+    Map<String, Set<String>> consumingSegments = new HashMap<>();
+    consumingSegments.put("tableA_REALTIME", ImmutableSet.of(segA0, segA1));
+    consumingSegments.put("tableB_REALTIME", ImmutableSet.of(segB0));
     InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
     FreshnessBasedConsumptionStatusChecker statusChecker =
-        new FreshnessBasedConsumptionStatusChecker(instanceDataManager, consumingSegments, 10000L, 0L);
+        new FreshnessBasedConsumptionStatusChecker(instanceDataManager, consumingSegments,
+            ConsumptionStatusCheckerTestUtils.getConsumingSegments(consumingSegments), 10000L, 0L);
 
     // TableDataManager is not set up yet
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 3);
@@ -73,9 +81,9 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     when(instanceDataManager.getTableDataManager("tableB_REALTIME")).thenReturn(tableDataManagerB);
 
     // setup SegmentDataManagers
-    LLRealtimeSegmentDataManager segMngrA0 = mock(LLRealtimeSegmentDataManager.class);
-    LLRealtimeSegmentDataManager segMngrA1 = mock(LLRealtimeSegmentDataManager.class);
-    LLRealtimeSegmentDataManager segMngrB0 = mock(LLRealtimeSegmentDataManager.class);
+    RealtimeSegmentDataManager segMngrA0 = mock(RealtimeSegmentDataManager.class);
+    RealtimeSegmentDataManager segMngrA1 = mock(RealtimeSegmentDataManager.class);
+    RealtimeSegmentDataManager segMngrB0 = mock(RealtimeSegmentDataManager.class);
     when(tableDataManagerA.acquireSegment(segA0)).thenReturn(segMngrA0);
     when(tableDataManagerA.acquireSegment(segA1)).thenReturn(segMngrA1);
     when(tableDataManagerB.acquireSegment(segB0)).thenReturn(segMngrB0);
@@ -119,7 +127,56 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 0);
   }
 
-  private void setupLatestIngestionTimestamp(LLRealtimeSegmentDataManager segmentDataManager,
+  @Test
+  public void testWithDroppedTableAndSegment()
+      throws InterruptedException {
+    String segA0 = "tableA__0__0__123Z";
+    String segA1 = "tableA__1__0__123Z";
+    String segB0 = "tableB__0__0__123Z";
+    Map<String, Set<String>> consumingSegments = new HashMap<>();
+    consumingSegments.computeIfAbsent("tableA_REALTIME", k -> new HashSet<>()).add(segA0);
+    consumingSegments.computeIfAbsent("tableA_REALTIME", k -> new HashSet<>()).add(segA1);
+    consumingSegments.computeIfAbsent("tableB_REALTIME", k -> new HashSet<>()).add(segB0);
+    InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
+    FreshnessBasedConsumptionStatusChecker statusChecker =
+        new FreshnessBasedConsumptionStatusChecker(instanceDataManager, consumingSegments,
+            ConsumptionStatusCheckerTestUtils.getConsumingSegments(consumingSegments), 10L, 0L);
+
+    // TableDataManager is not set up yet
+    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 3);
+
+    // setup TableDataMangers
+    TableDataManager tableDataManagerA = mock(TableDataManager.class);
+    when(instanceDataManager.getTableDataManager("tableA_REALTIME")).thenReturn(tableDataManagerA);
+    when(instanceDataManager.getTableDataManager("tableB_REALTIME")).thenReturn(null);
+
+    // setup SegmentDataManagers
+    RealtimeSegmentDataManager segMngrA0 = mock(RealtimeSegmentDataManager.class);
+    when(tableDataManagerA.acquireSegment(segA0)).thenReturn(segMngrA0);
+    when(tableDataManagerA.acquireSegment(segA1)).thenReturn(null);
+
+    when(segMngrA0.fetchLatestStreamOffset(5000)).thenReturn(new LongMsgOffset(20));
+    when(segMngrA0.getCurrentOffset()).thenReturn(new LongMsgOffset(0));
+    // ensure negative values are ignored
+    setupLatestIngestionTimestamp(segMngrA0, Long.MIN_VALUE);
+
+    //              current offset          latest stream offset    current time    last ingestion time
+    // segA0              0                       20                     100               Long.MIN_VALUE
+    // segA1 (segment is absent)
+    // segB0 (table is absent)
+    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 3);
+
+    // updatedConsumingSegments still provide 3 segments to checker but one has caught up.
+    when(segMngrA0.getCurrentOffset()).thenReturn(new LongMsgOffset(20));
+    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 2);
+    // Remove the missing segments and check again.
+    consumingSegments.get("tableA_REALTIME").remove(segA1);
+    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 1);
+    consumingSegments.remove("tableB_REALTIME");
+    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 0);
+  }
+
+  private void setupLatestIngestionTimestamp(RealtimeSegmentDataManager segmentDataManager,
       long latestIngestionTimestamp) {
     MutableSegment mockSegment = mock(MutableSegment.class);
     SegmentMetadata mockSegmentMetdata = mock(SegmentMetadata.class);
@@ -133,10 +190,13 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     String segA0 = "tableA__0__0__123Z";
     String segA1 = "tableA__1__0__123Z";
     String segB0 = "tableB__0__0__123Z";
-    Set<String> consumingSegments = ImmutableSet.of(segA0, segA1, segB0);
+    Map<String, Set<String>> consumingSegments = new HashMap<>();
+    consumingSegments.put("tableA_REALTIME", ImmutableSet.of(segA0, segA1));
+    consumingSegments.put("tableB_REALTIME", ImmutableSet.of(segB0));
     InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
     FreshnessBasedConsumptionStatusChecker statusChecker =
-        new FakeFreshnessBasedConsumptionStatusChecker(instanceDataManager, consumingSegments, 10L, 0L, 100L);
+        new FakeFreshnessBasedConsumptionStatusChecker(instanceDataManager, consumingSegments,
+            ConsumptionStatusCheckerTestUtils.getConsumingSegments(consumingSegments), 10L, 0L, 100L);
 
     // TableDataManager is not set up yet
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 3);
@@ -148,9 +208,9 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     when(instanceDataManager.getTableDataManager("tableB_REALTIME")).thenReturn(tableDataManagerB);
 
     // setup SegmentDataManagers
-    LLRealtimeSegmentDataManager segMngrA0 = mock(LLRealtimeSegmentDataManager.class);
-    LLRealtimeSegmentDataManager segMngrA1 = mock(LLRealtimeSegmentDataManager.class);
-    LLRealtimeSegmentDataManager segMngrB0 = mock(LLRealtimeSegmentDataManager.class);
+    RealtimeSegmentDataManager segMngrA0 = mock(RealtimeSegmentDataManager.class);
+    RealtimeSegmentDataManager segMngrA1 = mock(RealtimeSegmentDataManager.class);
+    RealtimeSegmentDataManager segMngrB0 = mock(RealtimeSegmentDataManager.class);
     when(tableDataManagerA.acquireSegment(segA0)).thenReturn(segMngrA0);
     when(tableDataManagerA.acquireSegment(segA1)).thenReturn(segMngrA1);
     when(tableDataManagerB.acquireSegment(segB0)).thenReturn(segMngrB0);
@@ -195,12 +255,14 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     String segA0 = "tableA__0__0__123Z";
     String segA1 = "tableA__1__0__123Z";
     String segB0 = "tableB__0__0__123Z";
-    Set<String> consumingSegments = ImmutableSet.of(segA0, segA1, segB0);
+    Map<String, Set<String>> consumingSegments = new HashMap<>();
+    consumingSegments.put("tableA_REALTIME", ImmutableSet.of(segA0, segA1));
+    consumingSegments.put("tableB_REALTIME", ImmutableSet.of(segB0));
     InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
     long idleTimeoutMs = 10L;
     FreshnessBasedConsumptionStatusChecker statusChecker =
-        new FakeFreshnessBasedConsumptionStatusChecker(instanceDataManager, consumingSegments, 10L, idleTimeoutMs,
-            100L);
+        new FakeFreshnessBasedConsumptionStatusChecker(instanceDataManager, consumingSegments,
+            ConsumptionStatusCheckerTestUtils.getConsumingSegments(consumingSegments), 10L, idleTimeoutMs, 100L);
 
     // TableDataManager is not set up yet
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 3);
@@ -212,9 +274,9 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     when(instanceDataManager.getTableDataManager("tableB_REALTIME")).thenReturn(tableDataManagerB);
 
     // setup SegmentDataManagers
-    LLRealtimeSegmentDataManager segMngrA0 = mock(LLRealtimeSegmentDataManager.class);
-    LLRealtimeSegmentDataManager segMngrA1 = mock(LLRealtimeSegmentDataManager.class);
-    LLRealtimeSegmentDataManager segMngrB0 = mock(LLRealtimeSegmentDataManager.class);
+    RealtimeSegmentDataManager segMngrA0 = mock(RealtimeSegmentDataManager.class);
+    RealtimeSegmentDataManager segMngrA1 = mock(RealtimeSegmentDataManager.class);
+    RealtimeSegmentDataManager segMngrB0 = mock(RealtimeSegmentDataManager.class);
     when(tableDataManagerA.acquireSegment(segA0)).thenReturn(segMngrA0);
     when(tableDataManagerA.acquireSegment(segA1)).thenReturn(segMngrA1);
     when(tableDataManagerB.acquireSegment(segB0)).thenReturn(segMngrB0);
@@ -270,10 +332,13 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     String segA0 = "tableA__0__0__123Z";
     String segA1 = "tableA__1__0__123Z";
     String segB0 = "tableB__0__0__123Z";
-    Set<String> consumingSegments = ImmutableSet.of(segA0, segA1, segB0);
+    Map<String, Set<String>> consumingSegments = new HashMap<>();
+    consumingSegments.put("tableA_REALTIME", ImmutableSet.of(segA0, segA1));
+    consumingSegments.put("tableB_REALTIME", ImmutableSet.of(segB0));
     InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
     FreshnessBasedConsumptionStatusChecker statusChecker =
-        new FakeFreshnessBasedConsumptionStatusChecker(instanceDataManager, consumingSegments, 10L, 0L, 100L);
+        new FakeFreshnessBasedConsumptionStatusChecker(instanceDataManager, consumingSegments,
+            ConsumptionStatusCheckerTestUtils.getConsumingSegments(consumingSegments), 10L, 0L, 100L);
 
     // TableDataManager is not set up yet
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 3);
@@ -285,9 +350,9 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     when(instanceDataManager.getTableDataManager("tableB_REALTIME")).thenReturn(tableDataManagerB);
 
     // setup SegmentDataManagers
-    LLRealtimeSegmentDataManager segMngrA0 = mock(LLRealtimeSegmentDataManager.class);
-    LLRealtimeSegmentDataManager segMngrA1 = mock(LLRealtimeSegmentDataManager.class);
-    LLRealtimeSegmentDataManager segMngrB0 = mock(LLRealtimeSegmentDataManager.class);
+    RealtimeSegmentDataManager segMngrA0 = mock(RealtimeSegmentDataManager.class);
+    RealtimeSegmentDataManager segMngrA1 = mock(RealtimeSegmentDataManager.class);
+    RealtimeSegmentDataManager segMngrB0 = mock(RealtimeSegmentDataManager.class);
     when(tableDataManagerA.acquireSegment(segA0)).thenReturn(segMngrA0);
     when(tableDataManagerA.acquireSegment(segA1)).thenReturn(segMngrA1);
     when(tableDataManagerB.acquireSegment(segB0)).thenReturn(segMngrB0);
@@ -319,10 +384,13 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     String segA0 = "tableA__0__0__123Z";
     String segA1 = "tableA__1__0__123Z";
     String segB0 = "tableB__0__0__123Z";
-    Set<String> consumingSegments = ImmutableSet.of(segA0, segA1, segB0);
+    Map<String, Set<String>> consumingSegments = new HashMap<>();
+    consumingSegments.put("tableA_REALTIME", ImmutableSet.of(segA0, segA1));
+    consumingSegments.put("tableB_REALTIME", ImmutableSet.of(segB0));
     InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
     FreshnessBasedConsumptionStatusChecker statusChecker =
-        new FakeFreshnessBasedConsumptionStatusChecker(instanceDataManager, consumingSegments, 10L, 0L, 100L);
+        new FakeFreshnessBasedConsumptionStatusChecker(instanceDataManager, consumingSegments,
+            ConsumptionStatusCheckerTestUtils.getConsumingSegments(consumingSegments), 10L, 0L, 100L);
 
     // TableDataManager is not set up yet
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 3);
@@ -334,9 +402,9 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     when(instanceDataManager.getTableDataManager("tableB_REALTIME")).thenReturn(tableDataManagerB);
 
     // setup SegmentDataManagers
-    LLRealtimeSegmentDataManager segMngrA0 = mock(LLRealtimeSegmentDataManager.class);
-    LLRealtimeSegmentDataManager segMngrA1 = mock(LLRealtimeSegmentDataManager.class);
-    LLRealtimeSegmentDataManager segMngrB0 = mock(LLRealtimeSegmentDataManager.class);
+    RealtimeSegmentDataManager segMngrA0 = mock(RealtimeSegmentDataManager.class);
+    RealtimeSegmentDataManager segMngrA1 = mock(RealtimeSegmentDataManager.class);
+    RealtimeSegmentDataManager segMngrB0 = mock(RealtimeSegmentDataManager.class);
     when(tableDataManagerA.acquireSegment(segA0)).thenReturn(segMngrA0);
     when(tableDataManagerA.acquireSegment(segA1)).thenReturn(segMngrA1);
     when(tableDataManagerB.acquireSegment(segB0)).thenReturn(segMngrB0);
@@ -369,6 +437,8 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     setupLatestIngestionTimestamp(segMngrA0, 90L);
     // Unexpected case where latest ingested is somehow after current time
     setupLatestIngestionTimestamp(segMngrA1, 101L);
+    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 1);
+    consumingSegments.get("tableB_REALTIME").remove(segB0);
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 0);
   }
 
@@ -377,10 +447,13 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     String segA0 = "tableA__0__0__123Z";
     String segA1 = "tableA__1__0__123Z";
     String segB0 = "tableB__0__0__123Z";
-    Set<String> consumingSegments = ImmutableSet.of(segA0, segA1, segB0);
+    Map<String, Set<String>> consumingSegments = new HashMap<>();
+    consumingSegments.put("tableA_REALTIME", ImmutableSet.of(segA0, segA1));
+    consumingSegments.put("tableB_REALTIME", ImmutableSet.of(segB0));
     InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
     FreshnessBasedConsumptionStatusChecker statusChecker =
-        new FakeFreshnessBasedConsumptionStatusChecker(instanceDataManager, consumingSegments, 10L, 0L, 100L);
+        new FakeFreshnessBasedConsumptionStatusChecker(instanceDataManager, consumingSegments,
+            ConsumptionStatusCheckerTestUtils.getConsumingSegments(consumingSegments), 10L, 0L, 100L);
 
     // TableDataManager is not set up yet
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 3);
@@ -392,9 +465,9 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     when(instanceDataManager.getTableDataManager("tableB_REALTIME")).thenReturn(tableDataManagerB);
 
     // setup SegmentDataManagers
-    LLRealtimeSegmentDataManager segMngrA0 = mock(LLRealtimeSegmentDataManager.class);
-    LLRealtimeSegmentDataManager segMngrA1 = mock(LLRealtimeSegmentDataManager.class);
-    LLRealtimeSegmentDataManager segMngrB0 = mock(LLRealtimeSegmentDataManager.class);
+    RealtimeSegmentDataManager segMngrA0 = mock(RealtimeSegmentDataManager.class);
+    RealtimeSegmentDataManager segMngrA1 = mock(RealtimeSegmentDataManager.class);
+    RealtimeSegmentDataManager segMngrB0 = mock(RealtimeSegmentDataManager.class);
     when(tableDataManagerA.acquireSegment(segA0)).thenReturn(segMngrA0);
     when(tableDataManagerA.acquireSegment(segA1)).thenReturn(segMngrA1);
     when(tableDataManagerB.acquireSegment(segB0)).thenReturn(segMngrB0);

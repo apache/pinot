@@ -20,6 +20,7 @@ package org.apache.pinot.common.config;
 
 import io.netty.handler.ssl.SslProvider;
 import java.security.KeyStore;
+import java.util.Objects;
 import org.apache.commons.lang3.StringUtils;
 
 
@@ -35,6 +36,8 @@ public class TlsConfig {
   private String _trustStorePath;
   private String _trustStorePassword;
   private String _sslProvider = SslProvider.JDK.toString();
+  // If true, the client will not verify the server's certificate
+  private boolean _insecure = false;
 
   public TlsConfig() {
     // left blank
@@ -117,5 +120,35 @@ public class TlsConfig {
 
   public boolean isCustomized() {
     return StringUtils.isNoneBlank(_keyStorePath) || StringUtils.isNoneBlank(_trustStorePath);
+  }
+
+  public boolean isInsecure() {
+    return _insecure;
+  }
+
+  public void setInsecure(boolean insecure) {
+    _insecure = insecure;
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+    TlsConfig tlsConfig = (TlsConfig) o;
+    return _clientAuthEnabled == tlsConfig._clientAuthEnabled && _insecure == tlsConfig._insecure && Objects.equals(
+        _keyStoreType, tlsConfig._keyStoreType) && Objects.equals(_keyStorePath, tlsConfig._keyStorePath)
+        && Objects.equals(_keyStorePassword, tlsConfig._keyStorePassword) && Objects.equals(_trustStoreType,
+        tlsConfig._trustStoreType) && Objects.equals(_trustStorePath, tlsConfig._trustStorePath) && Objects.equals(
+        _trustStorePassword, tlsConfig._trustStorePassword) && Objects.equals(_sslProvider, tlsConfig._sslProvider);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(_clientAuthEnabled, _keyStoreType, _keyStorePath, _keyStorePassword, _trustStoreType,
+        _trustStorePath, _trustStorePassword, _sslProvider, _insecure);
   }
 }

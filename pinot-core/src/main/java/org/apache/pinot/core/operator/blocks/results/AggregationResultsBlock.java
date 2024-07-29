@@ -19,7 +19,10 @@
 package org.apache.pinot.core.operator.blocks.results;
 
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
+import it.unimi.dsi.fastutil.floats.FloatArrayList;
+import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.Collections;
@@ -27,6 +30,7 @@ import java.util.List;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.request.context.FilterContext;
+import org.apache.pinot.common.utils.ArrayListUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
@@ -45,10 +49,13 @@ import org.roaringbitmap.RoaringBitmap;
 public class AggregationResultsBlock extends BaseResultsBlock {
   private final AggregationFunction[] _aggregationFunctions;
   private final List<Object> _results;
+  private final QueryContext _queryContext;
 
-  public AggregationResultsBlock(AggregationFunction[] aggregationFunctions, List<Object> results) {
+  public AggregationResultsBlock(AggregationFunction[] aggregationFunctions, List<Object> results,
+      QueryContext queryContext) {
     _aggregationFunctions = aggregationFunctions;
     _results = results;
+    _queryContext = queryContext;
   }
 
   public AggregationFunction[] getAggregationFunctions() {
@@ -65,14 +72,19 @@ public class AggregationResultsBlock extends BaseResultsBlock {
   }
 
   @Override
-  public DataSchema getDataSchema(QueryContext queryContext) {
+  public QueryContext getQueryContext() {
+    return _queryContext;
+  }
+
+  @Override
+  public DataSchema getDataSchema() {
     List<Pair<AggregationFunction, FilterContext>> filteredAggregationFunctions =
-        queryContext.getFilteredAggregationFunctions();
+        _queryContext.getFilteredAggregationFunctions();
     assert filteredAggregationFunctions != null;
     int numColumns = filteredAggregationFunctions.size();
     String[] columnNames = new String[numColumns];
     ColumnDataType[] columnDataTypes = new ColumnDataType[numColumns];
-    boolean returnFinalResult = queryContext.isServerReturnFinalResult();
+    boolean returnFinalResult = _queryContext.isServerReturnFinalResult();
     for (int i = 0; i < numColumns; i++) {
       Pair<AggregationFunction, FilterContext> pair = filteredAggregationFunctions.get(i);
       AggregationFunction aggregationFunction = pair.getLeft();
@@ -84,20 +96,20 @@ public class AggregationResultsBlock extends BaseResultsBlock {
   }
 
   @Override
-  public List<Object[]> getRows(QueryContext queryContext) {
+  public List<Object[]> getRows() {
     return Collections.singletonList(_results.toArray());
   }
 
   @Override
-  public DataTable getDataTable(QueryContext queryContext)
+  public DataTable getDataTable()
       throws IOException {
-    DataSchema dataSchema = getDataSchema(queryContext);
+    DataSchema dataSchema = getDataSchema();
     assert dataSchema != null;
     ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
     int numColumns = columnDataTypes.length;
     DataTableBuilder dataTableBuilder = DataTableBuilderFactory.getDataTableBuilder(dataSchema);
-    boolean returnFinalResult = queryContext.isServerReturnFinalResult();
-    if (queryContext.isNullHandlingEnabled()) {
+    boolean returnFinalResult = _queryContext.isServerReturnFinalResult();
+    if (_queryContext.isNullHandlingEnabled()) {
       RoaringBitmap[] nullBitmaps = new RoaringBitmap[numColumns];
       for (int i = 0; i < numColumns; i++) {
         nullBitmaps[i] = new RoaringBitmap();
@@ -183,11 +195,20 @@ public class AggregationResultsBlock extends BaseResultsBlock {
       case BYTES:
         dataTableBuilder.setColumn(index, (ByteArray) result);
         break;
-      case DOUBLE_ARRAY:
-        dataTableBuilder.setColumn(index, ((DoubleArrayList) result).elements());
+      case INT_ARRAY:
+        dataTableBuilder.setColumn(index, ArrayListUtils.toIntArray((IntArrayList) result));
         break;
       case LONG_ARRAY:
-        dataTableBuilder.setColumn(index, ((LongArrayList) result).elements());
+        dataTableBuilder.setColumn(index, ArrayListUtils.toLongArray((LongArrayList) result));
+        break;
+      case FLOAT_ARRAY:
+        dataTableBuilder.setColumn(index, ArrayListUtils.toFloatArray((FloatArrayList) result));
+        break;
+      case DOUBLE_ARRAY:
+        dataTableBuilder.setColumn(index, ArrayListUtils.toDoubleArray((DoubleArrayList) result));
+        break;
+      case STRING_ARRAY:
+        dataTableBuilder.setColumn(index, ArrayListUtils.toStringArray((ObjectArrayList<String>) result));
         break;
       default:
         throw new IllegalStateException("Illegal column data type in final result: " + columnDataType);

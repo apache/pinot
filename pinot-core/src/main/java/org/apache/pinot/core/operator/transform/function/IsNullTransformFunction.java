@@ -40,6 +40,7 @@ public class IsNullTransformFunction extends BaseTransformFunction {
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
+    super.init(arguments, columnContextMap);
     Preconditions.checkArgument(arguments.size() == 1, "Exact 1 argument is required for IS_NULL");
     _transformFunction = arguments.get(0);
   }

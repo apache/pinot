@@ -27,7 +27,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang.WordUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.plugin.inputformat.csv.CSVRecordReader;
 import org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -66,8 +66,8 @@ public class HadoopSegmentGenerationJobRunnerTest {
     FileUtils.touch(new File(outputDir, otherFilename));
 
     // Set up schema file.
-    final String schemaName = "mySchema";
-    File schemaFile = new File(testDir, "schema");
+    final String schemaName = "myTable";
+    File schemaFile = new File(testDir, "myTable.schema");
     Schema schema = new SchemaBuilder()
       .setSchemaName(schemaName)
       .addSingleValueDimension("col1", DataType.STRING)
@@ -76,10 +76,9 @@ public class HadoopSegmentGenerationJobRunnerTest {
     FileUtils.write(schemaFile, schema.toPrettyJsonString(), StandardCharsets.UTF_8);
 
     // Set up table config file.
-    File tableConfigFile = new File(testDir, "tableConfig");
+    File tableConfigFile = new File(testDir, "myTable.table");
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
       .setTableName("myTable")
-      .setSchemaName(schemaName)
       .setNumReplicas(1)
       .build();
     FileUtils.write(tableConfigFile, tableConfig.toJsonString(), StandardCharsets.UTF_8);
@@ -97,7 +96,7 @@ public class HadoopSegmentGenerationJobRunnerTest {
     File pluginsDir = new File(testDir, "plugins");
     File myPluginDir = new File(pluginsDir, "my-plugin");
     myPluginDir.mkdirs();
-    File pluginJar = new File(WordUtils.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+    File pluginJar = new File(StringUtils.class.getProtectionDomain().getCodeSource().getLocation().toURI());
     FileUtils.copyFile(pluginJar, new File(myPluginDir, pluginJar.getName()));
 
     // Set up dependency jars dir.

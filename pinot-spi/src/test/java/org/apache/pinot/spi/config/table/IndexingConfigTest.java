@@ -46,6 +46,9 @@ public class IndexingConfigTest {
     indexingConfig.setOnHeapDictionaryColumns(onHeapDictionaryColumns);
     List<String> bloomFilterColumns = Arrays.asList("a", "b");
     indexingConfig.setBloomFilterColumns(bloomFilterColumns);
+    Map<String, BloomFilterConfig> bloomFilterConfigs = new HashMap<>();
+    bloomFilterConfigs.put("a", new BloomFilterConfig(0.123, 456, true));
+    indexingConfig.setBloomFilterConfigs(bloomFilterConfigs);
     Map<String, String> noDictionaryConfig = new HashMap<>();
     noDictionaryConfig.put("a", "SNAPPY");
     noDictionaryConfig.put("b", "PASS_THROUGH");
@@ -54,7 +57,8 @@ public class IndexingConfigTest {
     indexingConfig.setVarLengthDictionaryColumns(varLengthDictionaryColumns);
     indexingConfig.setSegmentNameGeneratorType("normalizedDate");
 
-    indexingConfig = JsonUtils.stringToObject(JsonUtils.objectToString(indexingConfig), IndexingConfig.class);
+    String indexingConfigStr = JsonUtils.objectToString(indexingConfig);
+    indexingConfig = JsonUtils.stringToObject(indexingConfigStr, IndexingConfig.class);
 
     assertEquals(indexingConfig.getLoadMode(), "MMAP");
     assertTrue(indexingConfig.isAggregateMetrics());
@@ -62,6 +66,7 @@ public class IndexingConfigTest {
     assertEquals(indexingConfig.getSortedColumn(), sortedColumn);
     assertEquals(indexingConfig.getOnHeapDictionaryColumns(), onHeapDictionaryColumns);
     assertEquals(indexingConfig.getBloomFilterColumns(), bloomFilterColumns);
+    assertEquals(indexingConfig.getBloomFilterConfigs(), bloomFilterConfigs);
     assertEquals(indexingConfig.getNoDictionaryConfig(), noDictionaryConfig);
     assertEquals(indexingConfig.getVarLengthDictionaryColumns(), varLengthDictionaryColumns);
     assertEquals(indexingConfig.getSegmentNameGeneratorType(), "normalizedDate");

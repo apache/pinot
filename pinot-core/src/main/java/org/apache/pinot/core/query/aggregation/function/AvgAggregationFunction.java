@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -37,11 +38,11 @@ public class AvgAggregationFunction extends BaseSingleInputAggregationFunction<A
   private static final double DEFAULT_FINAL_RESULT = Double.NEGATIVE_INFINITY;
   private final boolean _nullHandlingEnabled;
 
-  public AvgAggregationFunction(ExpressionContext expression) {
-    this(expression, false);
+  public AvgAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
+    this(verifySingleArgument(arguments, "AVG"), nullHandlingEnabled);
   }
 
-  public AvgAggregationFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
+  protected AvgAggregationFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
     super(expression);
     _nullHandlingEnabled = nullHandlingEnabled;
   }

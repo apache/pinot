@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.tools.admin.command;
 
+import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.spi.utils.RebalanceConfigConstants;
 import org.apache.pinot.tools.Command;
 import org.apache.pinot.tools.PinotTableRebalancer;
 import org.slf4j.Logger;
@@ -73,6 +73,14 @@ public class RebalanceTableCommand extends AbstractBaseAdminCommand implements C
           + "number of replicas allowed to be unavailable if value is negative (1 by default)")
   private int _minAvailableReplicas = 1;
 
+  @CommandLine.Option(names = {"-lowDiskMode"}, description =
+      "For no-downtime rebalance, whether to enable low disk mode during rebalance. When enabled, "
+          + "segments will first be offloaded from servers, then added to servers after offload is done while "
+          + "maintaining the min available replicas. It may increase the total time of the rebalance, but can be "
+          + "useful when servers are low on disk space, and we want to scale up the cluster and rebalance the table "
+          + "to more servers (false by default)")
+  private boolean _lowDiskMode = false;
+
   @CommandLine.Option(names = {"-bestEfforts"},
       description = "Whether to use best-efforts to rebalance (not fail the rebalance when the no-downtime contract"
           + " cannot be achieved, false by default)")
@@ -80,12 +88,12 @@ public class RebalanceTableCommand extends AbstractBaseAdminCommand implements C
 
   @CommandLine.Option(names = {"-externalViewCheckIntervalInMs"},
       description = "How often to check if external view converges with ideal view")
-  private long _externalViewCheckIntervalInMs = RebalanceConfigConstants.DEFAULT_EXTERNAL_VIEW_CHECK_INTERVAL_IN_MS;
+  private long _externalViewCheckIntervalInMs = RebalanceConfig.DEFAULT_EXTERNAL_VIEW_CHECK_INTERVAL_IN_MS;
 
   @CommandLine.Option(names = {"-externalViewStabilizationTimeoutInMs"},
       description = "How long to wait till external view converges with ideal view")
   private long _externalViewStabilizationTimeoutInMs =
-      RebalanceConfigConstants.DEFAULT_EXTERNAL_VIEW_STABILIZATION_TIMEOUT_IN_MS;
+      RebalanceConfig.DEFAULT_EXTERNAL_VIEW_STABILIZATION_TIMEOUT_IN_MS;
 
   @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, help = true, description = "Print this message")
   private boolean _help = false;
@@ -104,7 +112,7 @@ public class RebalanceTableCommand extends AbstractBaseAdminCommand implements C
       throws Exception {
     PinotTableRebalancer tableRebalancer =
         new PinotTableRebalancer(_zkAddress, _clusterName, _dryRun, _reassignInstances, _includeConsuming, _bootstrap,
-            _downtime, _minAvailableReplicas, _bestEfforts, _externalViewCheckIntervalInMs,
+            _downtime, _minAvailableReplicas, _lowDiskMode, _bestEfforts, _externalViewCheckIntervalInMs,
             _externalViewStabilizationTimeoutInMs);
     RebalanceResult rebalanceResult = tableRebalancer.rebalance(_tableNameWithType);
     LOGGER

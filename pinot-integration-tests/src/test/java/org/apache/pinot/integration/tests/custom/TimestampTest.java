@@ -59,6 +59,13 @@ public class TimestampTest extends CustomDataQueryClusterIntegrationTest {
   private static final String LONG_ONE_MONTH_AFTER = "longOneMonthAfter";
   private static final String LONG_ONE_QUARTER_AFTER = "longOneQuarterAfter";
   private static final String LONG_ONE_YEAR_AFTER = "longOneYearAfter";
+  private static final String YYYY_MM_DD_BASE = "yyyyMMddBase";
+  private static final String YYYY_MM_DD_HALF_DAY_AFTER = "yyyyMMddHalfDayAfter";
+  private static final String YYYY_MM_DD_ONE_DAY_AFTER = "yyyyMMddOneDayAfter";
+  private static final String YYYY_MM_DD_ONE_WEEK_AFTER = "yyyyMMddOneWeekAfter";
+  private static final String YYYY_MM_DD_ONE_MONTH_AFTER = "yyyyMMddOneMonthAfter";
+  private static final String YYYY_MM_DD_ONE_QUARTER_AFTER = "yyyyMMddOneQuarterAfter";
+  private static final String YYYY_MM_DD_ONE_YEAR_AFTER = "yyyyMMddOneYearAfter";
 
   private static final TimeZone DEFAULT_TIME_ZONE = TimeZone.getDefault();
 
@@ -141,6 +148,36 @@ public class TimestampTest extends CustomDataQueryClusterIntegrationTest {
   }
 
   @Test(dataProvider = "useBothQueryEngines")
+  public void testSelectWithStringCastAndFilterQueries(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query = String.format("\n"
+        + "SELECT FromDateTime(DATETIMECONVERT(\"yyyyMMddBase\", '1:DAYS:SIMPLE_DATE_FORMAT:yyyy-MM-dd', "
+        + "'1:DAYS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSSZ tz(Europe/Amsterdam)', '1:DAYS'), 'yyyy-MM-dd "
+        + "HH:mm:ss.SSSZ') AS ts, COUNT(*) as cnt\n"
+        + "FROM %s\n"
+        + "GROUP BY \"yyyyMMddBase\"\n"
+        + "HAVING COUNT(*) > 0\n"
+        + "ORDER BY 1\n "
+        + "LIMIT 5", getTableName());
+    JsonNode jsonNode = postQuery(query);
+    assertEquals(jsonNode.get("resultTable").get("rows").size(), 5);
+    if (useMultiStageQueryEngine) {
+      assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asText(), "2018-12-31 23:00:00.0");
+      assertEquals(jsonNode.get("resultTable").get("rows").get(1).get(0).asText(), "2019-01-01 23:00:00.0");
+      assertEquals(jsonNode.get("resultTable").get("rows").get(2).get(0).asText(), "2019-01-02 23:00:00.0");
+      assertEquals(jsonNode.get("resultTable").get("rows").get(3).get(0).asText(), "2019-01-03 23:00:00.0");
+      assertEquals(jsonNode.get("resultTable").get("rows").get(4).get(0).asText(), "2019-01-04 23:00:00.0");
+    } else {
+      assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asText(), "1546297200000");
+      assertEquals(jsonNode.get("resultTable").get("rows").get(1).get(0).asText(), "1546383600000");
+      assertEquals(jsonNode.get("resultTable").get("rows").get(2).get(0).asText(), "1546470000000");
+      assertEquals(jsonNode.get("resultTable").get("rows").get(3).get(0).asText(), "1546556400000");
+      assertEquals(jsonNode.get("resultTable").get("rows").get(4).get(0).asText(), "1546642800000");
+    }
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
   public void testTimeExtractFunction(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
@@ -153,6 +190,7 @@ public class TimestampTest extends CustomDataQueryClusterIntegrationTest {
         + "YEAR_OF_WEEK(tsBase), YEAR_OF_WEEK(tsHalfDayAfter),\n"
         + "MONTH_OF_YEAR(tsBase), MONTH_OF_YEAR(tsHalfDayAfter),\n"
         + "WEEK_OF_YEAR(tsBase), WEEK_OF_YEAR(tsHalfDayAfter),\n"
+        + "WEEK(tsBase), WEEK(tsHalfDayAfter),\n"
         + "DAY_OF_YEAR(tsBase), DAY_OF_YEAR(tsHalfDayAfter),\n"
         + "DAY_OF_MONTH(tsBase), DAY_OF_MONTH(tsHalfDayAfter),\n"
         + "DAY_OF_WEEK(tsBase), DAY_OF_WEEK(tsHalfDayAfter),\n"
@@ -191,6 +229,8 @@ public class TimestampTest extends CustomDataQueryClusterIntegrationTest {
           jsonNode.get("resultTable").get("rows").get(i).get(25).asInt());
       assertEquals(jsonNode.get("resultTable").get("rows").get(i).get(26).asInt(),
           jsonNode.get("resultTable").get("rows").get(i).get(27).asInt());
+      assertEquals(jsonNode.get("resultTable").get("rows").get(i).get(28).asInt(),
+          jsonNode.get("resultTable").get("rows").get(i).get(29).asInt());
     }
   }
 
@@ -370,6 +410,30 @@ public class TimestampTest extends CustomDataQueryClusterIntegrationTest {
     assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(1).textValue(), "2019-01-01 12:00:00");
   }
 
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testLastWithTimeQueries(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query = String.format(
+        "SELECT LASTWITHTIME(longBase, longBase, 'long'), LASTWITHTIME(longBase, tsBase, 'long') FROM %s\n",
+        getTableName());
+    JsonNode jsonNode = postQuery(query);
+    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).longValue(), 1632614400000L);
+    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(1).longValue(), 1632614400000L);
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testFirstWithTimeQueries(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query = String.format(
+        "SELECT FIRSTWITHTIME(longBase, longBase, 'long'), FIRSTWITHTIME(longBase, tsBase, 'long') FROM %s\n",
+        getTableName());
+    JsonNode jsonNode = postQuery(query);
+    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).longValue(), 1546300800000L);
+    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(1).longValue(), 1546300800000L);
+  }
+
   @Override
   public String getTableName() {
     return DEFAULT_TABLE_NAME;
@@ -392,6 +456,7 @@ public class TimestampTest extends CustomDataQueryClusterIntegrationTest {
         .addSingleValueDimension(LONG_ONE_MONTH_AFTER, FieldSpec.DataType.LONG)
         .addSingleValueDimension(LONG_ONE_QUARTER_AFTER, FieldSpec.DataType.LONG)
         .addSingleValueDimension(LONG_ONE_YEAR_AFTER, FieldSpec.DataType.LONG)
+        .addSingleValueDimension(YYYY_MM_DD_BASE, FieldSpec.DataType.STRING)
         .build();
   }
 
@@ -414,7 +479,14 @@ public class TimestampTest extends CustomDataQueryClusterIntegrationTest {
         new Field(LONG_ONE_WEEK_AFTER, create(Type.LONG), null, null),
         new Field(LONG_ONE_MONTH_AFTER, create(Type.LONG), null, null),
         new Field(LONG_ONE_QUARTER_AFTER, create(Type.LONG), null, null),
-        new Field(LONG_ONE_YEAR_AFTER, create(Type.LONG), null, null)
+        new Field(LONG_ONE_YEAR_AFTER, create(Type.LONG), null, null),
+        new Field(YYYY_MM_DD_BASE, create(Type.STRING), null, null),
+        new Field(YYYY_MM_DD_HALF_DAY_AFTER, create(Type.STRING), null, null),
+        new Field(YYYY_MM_DD_ONE_DAY_AFTER, create(Type.STRING), null, null),
+        new Field(YYYY_MM_DD_ONE_WEEK_AFTER, create(Type.STRING), null, null),
+        new Field(YYYY_MM_DD_ONE_MONTH_AFTER, create(Type.STRING), null, null),
+        new Field(YYYY_MM_DD_ONE_QUARTER_AFTER, create(Type.STRING), null, null),
+        new Field(YYYY_MM_DD_ONE_YEAR_AFTER, create(Type.STRING), null, null)
     ));
 
     // create avro file
@@ -448,6 +520,13 @@ public class TimestampTest extends CustomDataQueryClusterIntegrationTest {
         record.put(LONG_ONE_MONTH_AFTER, tsOneMonthAfter);
         record.put(LONG_ONE_QUARTER_AFTER, tsOneQuarterAfter);
         record.put(LONG_ONE_YEAR_AFTER, tsOneYearAfter);
+        record.put(YYYY_MM_DD_BASE, DateTimeFunctions.toDateTime(tsBaseLong, "yyyy-MM-dd"));
+        record.put(YYYY_MM_DD_HALF_DAY_AFTER, DateTimeFunctions.toDateTime(tsHalfDayAfter, "yyyy-MM-dd"));
+        record.put(YYYY_MM_DD_ONE_DAY_AFTER, DateTimeFunctions.toDateTime(tsOneDayAfter, "yyyy-MM-dd"));
+        record.put(YYYY_MM_DD_ONE_WEEK_AFTER, DateTimeFunctions.toDateTime(tsOneWeekAfter, "yyyy-MM-dd"));
+        record.put(YYYY_MM_DD_ONE_MONTH_AFTER, DateTimeFunctions.toDateTime(tsOneMonthAfter, "yyyy-MM-dd"));
+        record.put(YYYY_MM_DD_ONE_QUARTER_AFTER, DateTimeFunctions.toDateTime(tsOneQuarterAfter, "yyyy-MM-dd"));
+        record.put(YYYY_MM_DD_ONE_YEAR_AFTER, DateTimeFunctions.toDateTime(tsOneYearAfter, "yyyy-MM-dd"));
 
         // add avro record to file
         fileWriter.append(record);

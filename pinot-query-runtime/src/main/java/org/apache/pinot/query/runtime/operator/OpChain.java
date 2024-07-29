@@ -34,7 +34,6 @@ public class OpChain implements AutoCloseable {
   private static final Logger LOGGER = LoggerFactory.getLogger(OpChain.class);
 
   private final OpChainId _id;
-  private final OpChainStats _stats;
   private final MultiStageOperator _root;
   private final Consumer<OpChainId> _finishCallback;
 
@@ -45,18 +44,12 @@ public class OpChain implements AutoCloseable {
 
   public OpChain(OpChainExecutionContext context, MultiStageOperator root, Consumer<OpChainId> finishCallback) {
     _id = context.getId();
-    _stats = context.getStats();
     _root = root;
     _finishCallback = finishCallback;
   }
 
   public OpChainId getId() {
     return _id;
-  }
-
-  // TODO: Move OperatorStats here.
-  public OpChainStats getStats() {
-    return _stats;
   }
 
   public Operator<TransferableBlock> getRoot() {

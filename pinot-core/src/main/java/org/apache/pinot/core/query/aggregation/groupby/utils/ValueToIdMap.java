@@ -18,38 +18,47 @@
  */
 package org.apache.pinot.core.query.aggregation.groupby.utils;
 
-import org.apache.pinot.spi.utils.ByteArray;
-
-
 /**
  * Interface for mapping primitive values to contiguous id's.
  */
 public interface ValueToIdMap {
   int INVALID_KEY = -1;
 
-  int put(int value);
+  default int put(int value) {
+    throw new UnsupportedOperationException();
+  }
 
-  int put(long value);
+  default int put(long value) {
+    throw new UnsupportedOperationException();
+  }
 
-  int put(float value);
+  default int put(float value) {
+    throw new UnsupportedOperationException();
+  }
 
-  int put(double value);
+  default int put(double value) {
+    throw new UnsupportedOperationException();
+  }
 
-  int put(String value);
+  int put(Object value);
 
-  int put(ByteArray value);
+  default int getId(int value) {
+    throw new UnsupportedOperationException();
+  }
 
-  int getInt(int id);
+  default int getId(long value) {
+    throw new UnsupportedOperationException();
+  }
 
-  long getLong(int id);
+  default int getId(float value) {
+    throw new UnsupportedOperationException();
+  }
 
-  float getFloat(int id);
+  default int getId(double value) {
+    throw new UnsupportedOperationException();
+  }
 
-  double getDouble(int id);
-
-  String getString(int id);
-
-  ByteArray getBytes(int id);
+  int getId(Object value);
 
   /**
    * Returns the value for the given id.
@@ -59,6 +68,7 @@ public interface ValueToIdMap {
    *   <li>LONG -> Long</li>
    *   <li>FLOAT -> Float</li>
    *   <li>DOUBLE -> Double</li>
+   *   <li>BIG_DECIMAL -> BigDecimal</li>
    *   <li>STRING -> String</li>
    *   <li>BYTES -> ByteArray</li>
    * </ul>

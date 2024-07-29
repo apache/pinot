@@ -19,20 +19,33 @@
 package org.apache.pinot.plugin.minion.tasks;
 
 import com.google.common.base.Preconditions;
+import java.io.File;
+import java.net.URI;
+import java.util.Collections;
+import java.util.List;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
+import org.apache.pinot.common.metrics.MinionMeter;
+import org.apache.pinot.common.metrics.MinionMetrics;
+import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.core.minion.PinotTaskConfig;
+import org.apache.pinot.core.util.PeerServerSegmentFinder;
 import org.apache.pinot.minion.MinionContext;
 import org.apache.pinot.minion.executor.PinotTaskExecutor;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public abstract class BaseTaskExecutor implements PinotTaskExecutor {
+  protected static final Logger LOGGER = LoggerFactory.getLogger(BaseTaskExecutor.class);
   protected static final MinionContext MINION_CONTEXT = MinionContext.getInstance();
 
   protected boolean _cancelled = false;
+  protected final MinionMetrics _minionMetrics = MinionMetrics.get();
 
   @Override
   public void cancel() {
@@ -67,5 +80,61 @@ public abstract class BaseTaskExecutor implements PinotTaskExecutor {
      * and task status would be left unchanged without proper cleanup.
      */
     return segmentZKMetadata == null ? -1 : segmentZKMetadata.getCrc();
+  }
+
+  protected void reportSegmentDownloadMetrics(File indexDir, String tableNameWithType, String taskType) {
+    long downloadSegmentSize = FileUtils.sizeOfDirectory(indexDir);
+    addTaskMeterMetrics(MinionMeter.SEGMENT_BYTES_DOWNLOADED, downloadSegmentSize, tableNameWithType, taskType);
+    addTaskMeterMetrics(MinionMeter.SEGMENT_DOWNLOAD_COUNT, 1L, tableNameWithType, taskType);
+  }
+
+  protected void reportSegmentUploadMetrics(File indexDir, String tableNameWithType, String taskType) {
+    long uploadSegmentSize = FileUtils.sizeOfDirectory(indexDir);
+    addTaskMeterMetrics(MinionMeter.SEGMENT_BYTES_UPLOADED, uploadSegmentSize, tableNameWithType, taskType);
+    addTaskMeterMetrics(MinionMeter.SEGMENT_UPLOAD_COUNT, 1L, tableNameWithType, taskType);
+  }
+
+  protected void reportTaskProcessingMetrics(String tableNameWithType, String taskType, int numRecordsProcessed,
+      int numRecordsPurged) {
+    reportTaskProcessingMetrics(tableNameWithType, taskType, numRecordsProcessed);
+    addTaskMeterMetrics(MinionMeter.RECORDS_PURGED_COUNT, numRecordsPurged, tableNameWithType, taskType);
+  }
+
+  protected void reportTaskProcessingMetrics(String tableNameWithType, String taskType, int numRecordsProcessed) {
+    addTaskMeterMetrics(MinionMeter.RECORDS_PROCESSED_COUNT, numRecordsProcessed, tableNameWithType, taskType);
+  }
+
+  private void addTaskMeterMetrics(MinionMeter meter, long unitCount, String tableName, String taskType) {
+    _minionMetrics.addMeteredGlobalValue(meter, unitCount);
+    _minionMetrics.addMeteredTableValue(tableName, meter, unitCount);
+    _minionMetrics.addMeteredTableValue(tableName, taskType, meter, unitCount);
+  }
+
+  protected void downloadSegmentToLocal(String tableNameWithType, String segmentName, String deepstoreURL,
+      String taskType, File tarredSegmentFile)
+      throws Exception {
+    LOGGER.info("Downloading segment {} from {} to {}", segmentName, deepstoreURL, tarredSegmentFile.getAbsolutePath());
+    TableConfig tableConfig = getTableConfig(tableNameWithType);
+    String crypterName = tableConfig.getValidationConfig().getCrypterClassName();
+    try {
+      // download from deepstore first
+      SegmentFetcherFactory.fetchAndDecryptSegmentToLocal(deepstoreURL, tarredSegmentFile, crypterName);
+    } catch (Exception e) {
+      LOGGER.error("Segment download failed from deepstore for {}, crypter:{}", deepstoreURL, crypterName, e);
+      String peerDownloadScheme = tableConfig.getValidationConfig().getPeerSegmentDownloadScheme();
+      if (MinionTaskUtils.extractMinionAllowDownloadFromServer(tableConfig, taskType,
+          MINION_CONTEXT.isAllowDownloadFromServer()) && peerDownloadScheme != null) {
+        LOGGER.info("Trying to download from servers for segment {} post deepstore download failed", segmentName);
+        SegmentFetcherFactory.fetchAndDecryptSegmentToLocal(segmentName, peerDownloadScheme, () -> {
+          List<URI> uris =
+              PeerServerSegmentFinder.getPeerServerURIs(MINION_CONTEXT.getHelixManager(), tableNameWithType,
+                  segmentName, peerDownloadScheme);
+          Collections.shuffle(uris);
+          return uris;
+          }, tarredSegmentFile, crypterName);
+      } else {
+        throw e;
+      }
+    }
   }
 }

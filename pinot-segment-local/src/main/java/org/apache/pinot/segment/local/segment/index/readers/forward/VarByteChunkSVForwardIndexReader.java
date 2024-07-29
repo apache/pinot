@@ -20,8 +20,9 @@ package org.apache.pinot.segment.local.segment.index.readers.forward;
 
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
+import java.util.List;
 import javax.annotation.Nullable;
-import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkSVForwardIndexWriter;
+import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriter;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
@@ -32,15 +33,15 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 /**
  * Chunk-based single-value raw (non-dictionary-encoded) forward index reader for values of variable length data type
  * (BIG_DECIMAL, STRING, BYTES).
- * <p>For data layout, please refer to the documentation for {@link VarByteChunkSVForwardIndexWriter}
+ * <p>For data layout, please refer to the documentation for {@link VarByteChunkForwardIndexWriter}
  */
 public final class VarByteChunkSVForwardIndexReader extends BaseChunkForwardIndexReader {
-  private static final int ROW_OFFSET_SIZE = VarByteChunkSVForwardIndexWriter.CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE;
+  private static final int ROW_OFFSET_SIZE = VarByteChunkForwardIndexWriter.CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE;
 
   private final int _maxChunkSize;
 
   // Thread local (reusable) byte[] to read bytes from data file.
-  private final ThreadLocal<byte[]> _reusableBytes = ThreadLocal.withInitial(() -> new byte[_lengthOfLongestEntry]);
+  private static ThreadLocal<byte[]> _reusableBytes = ThreadLocal.withInitial(() -> new byte[0]);
 
   public VarByteChunkSVForwardIndexReader(PinotDataBuffer dataBuffer, DataType valueType) {
     super(dataBuffer, valueType, true);
@@ -83,7 +84,7 @@ public final class VarByteChunkSVForwardIndexReader extends BaseChunkForwardInde
     int valueEndOffset = getValueEndOffset(chunkRowId, chunkBuffer);
 
     int length = valueEndOffset - valueStartOffset;
-    byte[] bytes = _reusableBytes.get();
+    byte[] bytes = getOrExpandByteArray();
     chunkBuffer.position(valueStartOffset);
     chunkBuffer.get(bytes, 0, length);
     return new String(bytes, 0, length, UTF_8);
@@ -102,9 +103,18 @@ public final class VarByteChunkSVForwardIndexReader extends BaseChunkForwardInde
     long valueEndOffset = getValueEndOffset(chunkId, chunkRowId, chunkStartOffset);
 
     int length = (int) (valueEndOffset - valueStartOffset);
-    byte[] bytes = _reusableBytes.get();
+    byte[] bytes = getOrExpandByteArray();
     _dataBuffer.copyTo(valueStartOffset, bytes, 0, length);
     return new String(bytes, 0, length, UTF_8);
+  }
+
+  private byte[] getOrExpandByteArray() {
+    byte[] bytes = _reusableBytes.get();
+    if (bytes.length < _lengthOfLongestEntry) {
+      _reusableBytes.set(new byte[_lengthOfLongestEntry]);
+      bytes = _reusableBytes.get();
+    }
+    return bytes;
   }
 
   @Override
@@ -194,5 +204,34 @@ public final class VarByteChunkSVForwardIndexReader extends BaseChunkForwardInde
         return chunkStartOffset + _dataBuffer.getInt(chunkStartOffset + (chunkRowId + 1) * ROW_OFFSET_SIZE);
       }
     }
+  }
+
+  @Override
+  public boolean isBufferByteRangeInfoSupported() {
+    return true;
+  }
+
+  @Override
+  public void recordDocIdByteRanges(int docId, ChunkReaderContext context, List<ByteRange> ranges) {
+    if (_isCompressed) {
+      recordDocIdRanges(docId, context, ranges);
+    } else {
+      recordDocIdRangesUncompressed(docId, ROW_OFFSET_SIZE, ranges);
+    }
+  }
+
+  @Override
+  public boolean isFixedOffsetMappingType() {
+    return false;
+  }
+
+  @Override
+  public long getRawDataStartOffset() {
+    throw new UnsupportedOperationException("Forward index is not of fixed length type");
+  }
+
+  @Override
+  public int getDocLength() {
+    throw new UnsupportedOperationException("Forward index is not of fixed length type");
   }
 }

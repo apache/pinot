@@ -39,8 +39,8 @@ public class ExponentialBackoffRetryPolicy extends BaseRetryPolicy {
 
   @Override
   protected long getDelayMs(int currentAttempt) {
-    double minDelayMs = _initialDelayMs * Math.pow(_delayScaleFactor, currentAttempt);
-    double maxDelayMs = minDelayMs * _delayScaleFactor;
-    return _random.nextLong((long) minDelayMs, (long) maxDelayMs);
+    long minDelayMs = (long) (_initialDelayMs * Math.pow(_delayScaleFactor, currentAttempt));
+    long maxDelayMs = (long) (minDelayMs * _delayScaleFactor);
+    return minDelayMs < maxDelayMs ? _random.nextLong(minDelayMs, maxDelayMs) : minDelayMs;
   }
 }

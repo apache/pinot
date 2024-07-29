@@ -400,19 +400,11 @@
       { "sql": "SELECT 3 BETWEEN small AND big FROM {tbl}" },
       { "sql": "SELECT val NOT BETWEEN small AND big FROM {tbl}" },
       { "sql": "SELECT val NOT BETWEEN big AND small FROM {tbl}" },
-      {
-        "ignored": true,
-        "sql": "SELECT val NOT BETWEEN 2 AND 3 FROM {tbl}",
-        "comment": "Somehow it failed with Range is not implemented yet"
-      },
+      { "sql": "SELECT val NOT BETWEEN 2 AND 3 FROM {tbl}" },
       { "sql": "SELECT val NOT BETWEEN 3 AND 2 FROM {tbl}" },
       { "sql": "SELECT 3 NOT BETWEEN small AND big FROM {tbl}" },
-      {
-        "sql": "SELECT val BETWEEN SYMMETRIC small AND big FROM {tbl}"
-      },
-      {
-        "sql": "SELECT val BETWEEN SYMMETRIC big AND small FROM {tbl}"
-      }
+      { "sql": "SELECT val BETWEEN SYMMETRIC small AND big FROM {tbl}" },
+      { "sql": "SELECT val BETWEEN SYMMETRIC big AND small FROM {tbl}" }
     ]
   },
   "between_bigints": {

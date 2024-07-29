@@ -33,9 +33,11 @@ import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
@@ -47,12 +49,19 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
 
-@Api(tags = Constants.UPSERT_RESOURCE_TAG, authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY)})
-@SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = @ApiKeyAuthDefinition(name =
-    HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = SWAGGER_AUTHORIZATION_KEY)))
+@Api(tags = Constants.UPSERT_RESOURCE_TAG, authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY),
+    @Authorization(value = DATABASE)})
+@SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = {
+    @ApiKeyAuthDefinition(name = HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER,
+        key = SWAGGER_AUTHORIZATION_KEY,
+        description = "The format of the key is  ```\"Basic <token>\" or \"Bearer <token>\"```"),
+    @ApiKeyAuthDefinition(name = DATABASE, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = DATABASE,
+        description = "Database context passed through http header. If no context is provided 'default' database "
+            + "context will be considered.")}))
 @Path("/")
 public class PinotUpsertRestletResource {
 
@@ -90,10 +99,12 @@ public class PinotUpsertRestletResource {
   @ApiOperation(value = "Estimate memory usage for an upsert table", notes =
       "This API returns the estimated heap usage based on primary key column stats."
           + " This allows us to estimate table size before onboarding.")
+  // TODO: Switch to use TableConfigs
   public String estimateHeapUsage(String tableSchemaConfigStr,
       @ApiParam(value = "cardinality", required = true) @QueryParam("cardinality") long cardinality,
       @ApiParam(value = "primaryKeySize", defaultValue = "-1") @QueryParam("primaryKeySize") int primaryKeySize,
-      @ApiParam(value = "numPartitions", defaultValue = "-1") @QueryParam("numPartitions") int numPartitions) {
+      @ApiParam(value = "numPartitions", defaultValue = "-1") @QueryParam("numPartitions") int numPartitions,
+      @Context HttpHeaders headers) {
     ObjectNode resultData = JsonUtils.newObjectNode();
     TableAndSchemaConfig tableSchemaConfig;
 
@@ -106,9 +117,11 @@ public class PinotUpsertRestletResource {
     }
 
     TableConfig tableConfig = tableSchemaConfig.getTableConfig();
-    resultData.put("tableName", tableConfig.getTableName());
-
+    String tableNameWithType = DatabaseUtils.translateTableName(tableConfig.getTableName(), headers);
+    tableConfig.setTableName(tableNameWithType);
     Schema schema = tableSchemaConfig.getSchema();
+
+    resultData.put("tableName", tableNameWithType);
 
     // Estimated key space, it contains primary key columns.
     int bytesPerKey = 0;

@@ -131,6 +131,12 @@ public interface IndexSegment {
   }
 
   /**
+   * Offloads the segment from the metadata management (e.g. upsert metadata), but not releases the resources yet
+   * because there might be queries still accessing the segment.
+   */
+  void offload();
+
+  /**
    * Destroys segment in memory and closes file handlers if in MMAP mode.
    */
   void destroy();

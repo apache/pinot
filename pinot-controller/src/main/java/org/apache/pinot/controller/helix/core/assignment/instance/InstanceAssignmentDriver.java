@@ -60,24 +60,38 @@ public class InstanceAssignmentDriver {
         InstanceAssignmentConfigUtils.getInstanceAssignmentConfig(_tableConfig, instancePartitionsType);
     return getInstancePartitions(
         instancePartitionsType.getInstancePartitionsName(TableNameBuilder.extractRawTableName(tableNameWithType)),
-        assignmentConfig, instanceConfigs, existingInstancePartitions);
+        assignmentConfig, instanceConfigs, existingInstancePartitions, null);
+  }
+
+  public InstancePartitions assignInstances(InstancePartitionsType instancePartitionsType,
+      List<InstanceConfig> instanceConfigs, @Nullable InstancePartitions existingInstancePartitions,
+      @Nullable InstancePartitions preConfiguredInstancePartitions) {
+    String tableNameWithType = _tableConfig.getTableName();
+    InstanceAssignmentConfig assignmentConfig =
+        InstanceAssignmentConfigUtils.getInstanceAssignmentConfig(_tableConfig, instancePartitionsType);
+    return getInstancePartitions(
+        instancePartitionsType.getInstancePartitionsName(TableNameBuilder.extractRawTableName(tableNameWithType)),
+        assignmentConfig, instanceConfigs, existingInstancePartitions, preConfiguredInstancePartitions);
   }
 
   public InstancePartitions assignInstances(String tierName, List<InstanceConfig> instanceConfigs,
       @Nullable InstancePartitions existingInstancePartitions, InstanceAssignmentConfig instanceAssignmentConfig) {
     return getInstancePartitions(
         InstancePartitionsUtils.getInstancePartitionsNameForTier(_tableConfig.getTableName(), tierName),
-        instanceAssignmentConfig, instanceConfigs, existingInstancePartitions);
+        instanceAssignmentConfig, instanceConfigs, existingInstancePartitions, null);
   }
 
   private InstancePartitions getInstancePartitions(String instancePartitionsName,
       InstanceAssignmentConfig instanceAssignmentConfig, List<InstanceConfig> instanceConfigs,
-      @Nullable InstancePartitions existingInstancePartitions) {
+      @Nullable InstancePartitions existingInstancePartitions,
+      @Nullable InstancePartitions preConfiguredInstancePartitions) {
     String tableNameWithType = _tableConfig.getTableName();
     LOGGER.info("Starting {} instance assignment for table {}", instancePartitionsName, tableNameWithType);
 
+    boolean minimizeDataMovement = instanceAssignmentConfig.isMinimizeDataMovement();
     InstanceTagPoolSelector tagPoolSelector =
-        new InstanceTagPoolSelector(instanceAssignmentConfig.getTagPoolConfig(), tableNameWithType);
+        new InstanceTagPoolSelector(instanceAssignmentConfig.getTagPoolConfig(), tableNameWithType,
+            minimizeDataMovement, existingInstancePartitions);
     Map<Integer, List<InstanceConfig>> poolToInstanceConfigsMap = tagPoolSelector.selectInstances(instanceConfigs);
 
     InstanceConstraintConfig constraintConfig = instanceAssignmentConfig.getConstraintConfig();
@@ -93,7 +107,8 @@ public class InstanceAssignmentDriver {
 
     InstancePartitionSelector instancePartitionSelector =
         InstancePartitionSelectorFactory.getInstance(instanceAssignmentConfig.getPartitionSelector(),
-            instanceAssignmentConfig.getReplicaGroupPartitionConfig(), tableNameWithType, existingInstancePartitions);
+            instanceAssignmentConfig.getReplicaGroupPartitionConfig(), tableNameWithType, existingInstancePartitions,
+            preConfiguredInstancePartitions, minimizeDataMovement);
     InstancePartitions instancePartitions = new InstancePartitions(instancePartitionsName);
     instancePartitionSelector.selectInstances(poolToInstanceConfigsMap, instancePartitions);
     return instancePartitions;

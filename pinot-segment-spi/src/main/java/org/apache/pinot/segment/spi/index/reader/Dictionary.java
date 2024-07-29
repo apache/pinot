@@ -208,7 +208,19 @@ public interface Dictionary extends IndexReader {
     }
   }
 
+  default void readIntValues(int[] dictIds, int length, Integer[] outValues) {
+    for (int i = 0; i < length; i++) {
+      outValues[i] = getIntValue(dictIds[i]);
+    }
+  }
+
   default void readLongValues(int[] dictIds, int length, long[] outValues) {
+    for (int i = 0; i < length; i++) {
+      outValues[i] = getLongValue(dictIds[i]);
+    }
+  }
+
+  default void readLongValues(int[] dictIds, int length, Long[] outValues) {
     for (int i = 0; i < length; i++) {
       outValues[i] = getLongValue(dictIds[i]);
     }
@@ -220,7 +232,19 @@ public interface Dictionary extends IndexReader {
     }
   }
 
+  default void readFloatValues(int[] dictIds, int length, Float[] outValues) {
+    for (int i = 0; i < length; i++) {
+      outValues[i] = getFloatValue(dictIds[i]);
+    }
+  }
+
   default void readDoubleValues(int[] dictIds, int length, double[] outValues) {
+    for (int i = 0; i < length; i++) {
+      outValues[i] = getDoubleValue(dictIds[i]);
+    }
+  }
+
+  default void readDoubleValues(int[] dictIds, int length, Double[] outValues) {
     for (int i = 0; i < length; i++) {
       outValues[i] = getDoubleValue(dictIds[i]);
     }
@@ -244,17 +268,26 @@ public interface Dictionary extends IndexReader {
     }
   }
 
-  /**
-   * Returns the dictIds for the given sorted values. This method is for the IN/NOT IN predicate evaluation.
-   * @param sortedValues
-   * @param dictIds
-   */
-  default void getDictIds(List<String> sortedValues, IntSet dictIds) {
-    for (String value : sortedValues) {
+  default void getDictIds(List<String> values, IntSet dictIds) {
+    for (String value : values) {
       int dictId = indexOf(value);
       if (dictId >= 0) {
         dictIds.add(dictId);
       }
     }
+  }
+
+  /**
+   * Returns the dictIds for the given sorted values. This method is for the IN/NOT IN predicate evaluation.
+   */
+  default void getDictIds(List<String> sortedValues, IntSet dictIds, SortedBatchLookupAlgorithm algorithm) {
+    getDictIds(sortedValues, dictIds);
+  }
+
+  enum SortedBatchLookupAlgorithm {
+    DIVIDE_BINARY_SEARCH, SCAN,
+    // Plain binary search should not be used because it does not require sorting the values. We keep it here as a valid
+    // query option value, which should be handled with the unsorted values' algorithm.
+    PLAIN_BINARY_SEARCH
   }
 }

@@ -33,18 +33,21 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
 import java.util.stream.Collectors;
-import org.apache.commons.configuration.ConfigurationException;
+import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
+import org.apache.hc.client5.http.classic.methods.HttpGet;
+import org.apache.hc.client5.http.classic.methods.HttpPost;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
+import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
+import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder;
+import org.apache.hc.client5.http.io.HttpClientConnectionManager;
+import org.apache.hc.client5.http.ssl.SSLConnectionSocketFactory;
+import org.apache.hc.core5.http.Header;
+import org.apache.hc.core5.http.io.entity.StringEntity;
+import org.apache.hc.core5.http.message.BasicHeader;
+import org.apache.hc.core5.ssl.SSLContextBuilder;
 import org.apache.helix.model.InstanceConfig;
-import org.apache.http.Header;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.entity.StringEntity;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClientBuilder;
-import org.apache.http.message.BasicHeader;
-import org.apache.http.ssl.SSLContextBuilder;
 import org.apache.pinot.client.Connection;
 import org.apache.pinot.client.ConnectionFactory;
 import org.apache.pinot.client.JsonAsyncHttpPinotClientTransportFactory;
@@ -52,8 +55,8 @@ import org.apache.pinot.client.PinotDriver;
 import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.common.helix.ExtraInstanceConfig;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
-import org.apache.pinot.common.utils.TlsUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.integration.tests.access.CertBasedTlsChannelAccessControlFactory;
@@ -63,6 +66,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.tools.utils.PinotConfigUtils;
 import org.apache.pinot.util.TestUtils;
@@ -79,30 +83,29 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   private static final String PASSWORD = "changeit";
   private static final char[] PASSWORD_CHAR = PASSWORD.toCharArray();
   private static final Header CLIENT_HEADER = new BasicHeader("Authorization", AUTH_TOKEN);
-
-  private static final int EXTERNAL_CONTROLLER_PORT = DEFAULT_CONTROLLER_PORT + 1;
-  private static final int EXTERNAL_BROKER_PORT = DEFAULT_BROKER_PORT + 1;
   private static final String PKCS_12 = "PKCS12";
   private static final String JKS = "JKS";
+  private static final URL TLS_STORE_EMPTY_PKCS_12 = TlsIntegrationTest.class.getResource("/empty.p12");
+  private static final URL TLS_STORE_EMPTY_JKS = TlsIntegrationTest.class.getResource("/empty.jks");
+  private static final URL TLS_STORE_PKCS_12 = TlsIntegrationTest.class.getResource("/tlstest.p12");
+  private static final URL TLS_STORE_JKS = TlsIntegrationTest.class.getResource("/tlstest.jks");
 
-  private final URL _tlsStoreEmptyPKCS12 = TlsIntegrationTest.class.getResource("/empty.p12");
-  private final URL _tlsStoreEmptyJKS = TlsIntegrationTest.class.getResource("/empty.jks");
-  private final URL _tlsStorePKCS12 = TlsIntegrationTest.class.getResource("/tlstest.p12");
-  private final URL _tlsStoreJKS = TlsIntegrationTest.class.getResource("/tlstest.jks");
+  private int _internalControllerPort;
+  private int _externalControllerPort;
+  private int _internalBrokerPort;
+  private int _externalBrokerPort;
 
   @BeforeClass
   public void setUp()
       throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
 
-    // Start Zookeeper
     startZk();
-    // Start Pinot cluster
-    startKafka();
     startController();
-    startBrokerHttps();
-    startServerHttps();
+    startBroker();
+    startServer();
     startMinion();
+    startKafka();
 
     // Unpack the Avro files
     List<File> avroFiles = unpackAvroData(_tempDir);
@@ -131,107 +134,111 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @Override
-  public Map<String, Object> getDefaultControllerConfiguration() {
-    Map<String, Object> prop = super.getDefaultControllerConfiguration();
+  protected void overrideControllerConf(Map<String, Object> prop) {
+    BasicAuthTestUtils.addControllerConfiguration(prop);
 
     // NOTE: defaults must be suitable for cluster-internal communication
-    prop.put("controller.tls.keystore.path", _tlsStorePKCS12);
+    prop.put("controller.tls.keystore.path", TLS_STORE_PKCS_12);
     prop.put("controller.tls.keystore.password", PASSWORD);
     prop.put("controller.tls.keystore.type", PKCS_12);
-    prop.put("controller.tls.truststore.path", _tlsStorePKCS12);
+    prop.put("controller.tls.truststore.path", TLS_STORE_PKCS_12);
     prop.put("controller.tls.truststore.password", PASSWORD);
     prop.put("controller.tls.truststore.type", PKCS_12);
 
     // CAUTION: order matters. first listener becomes registered as internal address in zookeeper
     prop.put("controller.access.protocols", "internal,external");
     prop.put("controller.access.protocols.internal.protocol", "https");
-    prop.put("controller.access.protocols.internal.port", DEFAULT_CONTROLLER_PORT);
+    _internalControllerPort = _controllerPort;
+    prop.put("controller.access.protocols.internal.port", _internalControllerPort);
     prop.put("controller.access.protocols.internal.tls.client.auth.enabled", "true");
     prop.put("controller.access.protocols.external.protocol", "https");
-    prop.put("controller.access.protocols.external.port", EXTERNAL_CONTROLLER_PORT);
-    prop.put("controller.access.protocols.external.tls.keystore.path", _tlsStoreJKS);
+    _externalControllerPort = NetUtils.findOpenPort(_internalControllerPort + 1);
+    prop.put("controller.access.protocols.external.port", _externalControllerPort);
+    _nextControllerPort = _externalControllerPort + 1;
+    prop.put("controller.access.protocols.external.tls.keystore.path", TLS_STORE_JKS);
     prop.put("controller.access.protocols.external.tls.keystore.type", JKS);
-    prop.put("controller.access.protocols.external.tls.truststore.path", _tlsStoreJKS);
+    prop.put("controller.access.protocols.external.tls.truststore.path", TLS_STORE_JKS);
     prop.put("controller.access.protocols.external.tls.truststore.type", JKS);
 
-    prop.put("controller.broker.protocol", "https");
-
     // announce internal only
-    prop.put("controller.vip.protocol", "https");
-    prop.put("controller.vip.port", DEFAULT_CONTROLLER_PORT);
-
-    prop.remove("controller.port");
-
-    return BasicAuthTestUtils.addControllerConfiguration(prop);
+    prop.remove(ControllerConf.CONTROLLER_PORT);
+    prop.put(ControllerConf.CONTROLLER_VIP_PROTOCOL, "https");
+    prop.put(ControllerConf.CONTROLLER_VIP_PORT, _internalControllerPort);
+    prop.put(ControllerConf.CONTROLLER_BROKER_PROTOCOL, "https");
   }
 
   @Override
-  protected PinotConfiguration getDefaultBrokerConfiguration() {
-    Map<String, Object> prop = super.getDefaultBrokerConfiguration().toMap();
+  protected void overrideBrokerConf(PinotConfiguration brokerConf) {
+    BasicAuthTestUtils.addBrokerConfiguration(brokerConf);
 
     // NOTE: defaults must be suitable for cluster-internal communication
-    prop.put("pinot.broker.tls.keystore.path", _tlsStorePKCS12);
-    prop.put("pinot.broker.tls.keystore.password", PASSWORD);
-    prop.put("pinot.broker.tls.keystore.type", PKCS_12);
-    prop.put("pinot.broker.tls.truststore.path", _tlsStorePKCS12);
-    prop.put("pinot.broker.tls.truststore.password", PASSWORD);
-    prop.put("pinot.broker.tls.truststore.type", PKCS_12);
+    brokerConf.setProperty("pinot.broker.tls.keystore.path", TLS_STORE_PKCS_12);
+    brokerConf.setProperty("pinot.broker.tls.keystore.password", PASSWORD);
+    brokerConf.setProperty("pinot.broker.tls.keystore.type", PKCS_12);
+    brokerConf.setProperty("pinot.broker.tls.truststore.path", TLS_STORE_PKCS_12);
+    brokerConf.setProperty("pinot.broker.tls.truststore.password", PASSWORD);
+    brokerConf.setProperty("pinot.broker.tls.truststore.type", PKCS_12);
 
     // CAUTION: order matters. first listener becomes registered as internal address in zookeeper
-    prop.put("pinot.broker.client.access.protocols", "internal,external");
-    prop.put("pinot.broker.client.access.protocols.internal.protocol", "https");
-    prop.put("pinot.broker.client.access.protocols.internal.port", DEFAULT_BROKER_PORT);
-    prop.put("pinot.broker.client.access.protocols.internal.tls.client.auth.enabled", "true");
-    prop.put("pinot.broker.client.access.protocols.external.protocol", "https");
-    prop.put("pinot.broker.client.access.protocols.external.port", EXTERNAL_BROKER_PORT);
-    prop.put("pinot.broker.client.access.protocols.external.tls.keystore.path", _tlsStoreJKS);
-    prop.put("pinot.broker.client.access.protocols.external.tls.keystore.type", JKS);
-    prop.put("pinot.broker.client.access.protocols.external.tls.truststore.path", _tlsStoreJKS);
-    prop.put("pinot.broker.client.access.protocols.external.tls.truststore.type", JKS);
+    brokerConf.setProperty("pinot.broker.client.access.protocols", "internal,external");
+    brokerConf.setProperty("pinot.broker.client.access.protocols.internal.protocol", "https");
+    _internalBrokerPort = NetUtils.findOpenPort(_nextBrokerPort);
+    brokerConf.setProperty("pinot.broker.client.access.protocols.internal.port", _internalBrokerPort);
+    _brokerPorts.add(_internalBrokerPort);
+    brokerConf.setProperty("pinot.broker.client.access.protocols.internal.tls.client.auth.enabled", "true");
+    brokerConf.setProperty("pinot.broker.client.access.protocols.external.protocol", "https");
+    _externalBrokerPort = NetUtils.findOpenPort(_internalBrokerPort + 1);
+    brokerConf.setProperty("pinot.broker.client.access.protocols.external.port", _externalBrokerPort);
+    _brokerPorts.add(_externalBrokerPort);
+    _brokerBaseApiUrl = "https://localhost:" + _externalBrokerPort;
+    _nextBrokerPort = _externalBrokerPort + 1;
+    brokerConf.setProperty("pinot.broker.client.access.protocols.external.tls.keystore.path", TLS_STORE_JKS);
+    brokerConf.setProperty("pinot.broker.client.access.protocols.external.tls.keystore.type", JKS);
+    brokerConf.setProperty("pinot.broker.client.access.protocols.external.tls.truststore.path", TLS_STORE_JKS);
+    brokerConf.setProperty("pinot.broker.client.access.protocols.external.tls.truststore.type", JKS);
 
-    prop.put("pinot.broker.nettytls.enabled", "true");
-
-    return BasicAuthTestUtils.addBrokerConfiguration(prop);
+    brokerConf.clearProperty(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT);
+    brokerConf.setProperty("pinot.broker.nettytls.enabled", "true");
   }
 
   @Override
-  protected PinotConfiguration getDefaultServerConfiguration() {
-    Map<String, Object> prop = super.getDefaultServerConfiguration().toMap();
+  protected void overrideServerConf(PinotConfiguration serverConf) {
+    BasicAuthTestUtils.addServerConfiguration(serverConf);
 
     // NOTE: defaults must be suitable for cluster-internal communication
-    prop.put("pinot.server.tls.keystore.path", _tlsStorePKCS12);
-    prop.put("pinot.server.tls.keystore.password", PASSWORD);
-    prop.put("pinot.server.tls.keystore.type", PKCS_12);
-    prop.put("pinot.server.tls.truststore.path", _tlsStorePKCS12);
-    prop.put("pinot.server.tls.truststore.password", PASSWORD);
-    prop.put("pinot.server.tls.truststore.type", PKCS_12);
-    prop.put("pinot.server.tls.client.auth.enabled", "true");
+    serverConf.setProperty("pinot.server.tls.keystore.path", TLS_STORE_PKCS_12);
+    serverConf.setProperty("pinot.server.tls.keystore.password", PASSWORD);
+    serverConf.setProperty("pinot.server.tls.keystore.type", PKCS_12);
+    serverConf.setProperty("pinot.server.tls.truststore.path", TLS_STORE_PKCS_12);
+    serverConf.setProperty("pinot.server.tls.truststore.password", PASSWORD);
+    serverConf.setProperty("pinot.server.tls.truststore.type", PKCS_12);
+    serverConf.setProperty("pinot.server.tls.client.auth.enabled", "true");
 
-    prop.put("pinot.server.admin.access.control.factory.class",
+    serverConf.setProperty("pinot.server.admin.access.control.factory.class",
         CertBasedTlsChannelAccessControlFactory.class.getName());
-    prop.put("pinot.server.adminapi.access.protocols", "internal");
-    prop.put("pinot.server.adminapi.access.protocols.internal.protocol", "https");
-    prop.put("pinot.server.adminapi.access.protocols.internal.port", "7443");
-    prop.put("pinot.server.netty.enabled", "false");
-    prop.put("pinot.server.nettytls.enabled", "true");
-    prop.put("pinot.server.nettytls.port", "8089");
-    prop.put("pinot.server.segment.uploader.protocol", "https");
-
-    return BasicAuthTestUtils.addServerConfiguration(prop);
+    serverConf.setProperty("pinot.server.adminapi.access.protocols", "internal");
+    serverConf.setProperty("pinot.server.adminapi.access.protocols.internal.protocol", "https");
+    int internalAdminPort = NetUtils.findOpenPort(_nextServerPort);
+    serverConf.setProperty("pinot.server.adminapi.access.protocols.internal.port", internalAdminPort);
+    serverConf.setProperty("pinot.server.netty.enabled", "false");
+    serverConf.setProperty("pinot.server.nettytls.enabled", "true");
+    int nettyTlsPort = NetUtils.findOpenPort(internalAdminPort + 1);
+    serverConf.setProperty("pinot.server.nettytls.port", nettyTlsPort);
+    _nextServerPort = nettyTlsPort + 1;
+    serverConf.setProperty("pinot.server.segment.uploader.protocol", "https");
   }
 
   @Override
-  protected PinotConfiguration getDefaultMinionConfiguration() {
-    Map<String, Object> prop = super.getDefaultMinionConfiguration().toMap();
-    prop.put("pinot.minion.tls.keystore.path", _tlsStorePKCS12);
-    prop.put("pinot.minion.tls.keystore.password", "changeit");
-    prop.put("pinot.server.tls.keystore.type", "PKCS12");
-    prop.put("pinot.minion.tls.truststore.path", _tlsStorePKCS12);
-    prop.put("pinot.minion.tls.truststore.password", "changeit");
-    prop.put("pinot.minion.tls.truststore.type", "PKCS12");
-    prop.put("pinot.minion.tls.client.auth.enabled", "true");
+  protected void overrideMinionConf(PinotConfiguration minionConf) {
+    BasicAuthTestUtils.addMinionConfiguration(minionConf);
 
-    return BasicAuthTestUtils.addMinionConfiguration(prop);
+    minionConf.setProperty("pinot.minion.tls.keystore.path", TLS_STORE_PKCS_12);
+    minionConf.setProperty("pinot.minion.tls.keystore.password", "changeit");
+    minionConf.setProperty("pinot.server.tls.keystore.type", "PKCS12");
+    minionConf.setProperty("pinot.minion.tls.truststore.path", TLS_STORE_PKCS_12);
+    minionConf.setProperty("pinot.minion.tls.truststore.password", "changeit");
+    minionConf.setProperty("pinot.minion.tls.truststore.type", "PKCS12");
+    minionConf.setProperty("pinot.minion.tls.client.auth.enabled", "true");
   }
 
   @Override
@@ -281,7 +288,6 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
 
   @Test
   public void testUpdatedBrokerTlsPort() {
-
     List<InstanceConfig> instanceConfigs = HelixHelper.getInstanceConfigs(_helixManager);
     List<ExtraInstanceConfig> securedInstances = instanceConfigs.stream().map(ExtraInstanceConfig::new)
         .filter(pinotInstanceConfig -> pinotInstanceConfig.getTlsPort() != null).collect(Collectors.toList());
@@ -291,51 +297,47 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   @Test
   public void testControllerConfigValidation()
       throws Exception {
-    PinotConfigUtils.validateControllerConfig(new ControllerConf(getDefaultControllerConfiguration()));
+    PinotConfigUtils.validateControllerConfig(getControllerConfig());
   }
 
   @Test
   public void testControllerConfigValidationImplicitProtocol()
       throws Exception {
-    Map<String, Object> prop = new HashMap<>(getDefaultControllerConfiguration());
+    Map<String, Object> prop = getControllerConfig().toMap();
     prop.put("controller.access.protocols", "https,http");
-    prop.put("controller.access.protocols.https.port", DEFAULT_CONTROLLER_PORT);
-    prop.put("controller.access.protocols.http.port", EXTERNAL_CONTROLLER_PORT);
-
+    prop.put("controller.access.protocols.https.port", _internalControllerPort);
+    prop.put("controller.access.protocols.http.port", _externalControllerPort);
     PinotConfigUtils.validateControllerConfig(new ControllerConf(prop));
   }
 
   @Test(expectedExceptions = ConfigurationException.class)
   public void testControllerConfigValidationNoProtocol()
       throws Exception {
-    Map<String, Object> prop = new HashMap<>(getDefaultControllerConfiguration());
+    Map<String, Object> prop = getControllerConfig().toMap();
     prop.put("controller.access.protocols", "invalid,http");
-    prop.put("controller.access.protocols.invalid.port", DEFAULT_CONTROLLER_PORT);
-    prop.put("controller.access.protocols.http.port", EXTERNAL_CONTROLLER_PORT);
-
+    prop.put("controller.access.protocols.invalid.port", _internalControllerPort);
+    prop.put("controller.access.protocols.http.port", _externalControllerPort);
     PinotConfigUtils.validateControllerConfig(new ControllerConf(prop));
   }
 
   @Test
   public void testControllerExternalTrustedServer()
       throws Exception {
-    try (CloseableHttpClient client = makeClient(JKS, _tlsStoreJKS, _tlsStoreJKS)) {
-
-      try (CloseableHttpResponse response = client.execute(makeGetTables(EXTERNAL_CONTROLLER_PORT))) {
-        Assert.assertEquals(response.getStatusLine().getStatusCode(), 200);
-        JsonNode tables = JsonUtils.inputStreamToJsonNode(response.getEntity().getContent()).get("tables");
-        Assert.assertEquals(tables.size(), 1);
-        Assert.assertEquals(tables.get(0).textValue(), "mytable");
-      }
+    try (CloseableHttpClient client = makeClient(JKS, TLS_STORE_JKS, TLS_STORE_JKS);
+        CloseableHttpResponse response = client.execute(makeGetTables(_externalControllerPort))) {
+      Assert.assertEquals(response.getCode(), 200);
+      JsonNode tables = JsonUtils.inputStreamToJsonNode(response.getEntity().getContent()).get("tables");
+      Assert.assertEquals(tables.size(), 1);
+      Assert.assertEquals(tables.get(0).textValue(), "mytable");
     }
   }
 
   @Test
   public void testControllerExternalUntrustedServer()
       throws Exception {
-    try (CloseableHttpClient client = makeClient(JKS, _tlsStoreJKS, _tlsStoreEmptyJKS)) {
+    try (CloseableHttpClient client = makeClient(JKS, TLS_STORE_JKS, TLS_STORE_EMPTY_JKS)) {
       try {
-        client.execute(makeGetTables(EXTERNAL_CONTROLLER_PORT));
+        client.execute(makeGetTables(_externalControllerPort));
         Assert.fail("Must not allow connection to untrusted server");
       } catch (IOException ignore) {
         // this should fail
@@ -346,22 +348,21 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   @Test
   public void testControllerInternalTrustedClient()
       throws Exception {
-    try (CloseableHttpClient client = makeClient(PKCS_12, _tlsStorePKCS12, _tlsStorePKCS12)) {
-      try (CloseableHttpResponse response = client.execute(makeGetTables(DEFAULT_CONTROLLER_PORT))) {
-        Assert.assertEquals(response.getStatusLine().getStatusCode(), 200);
-        JsonNode tables = JsonUtils.inputStreamToJsonNode(response.getEntity().getContent()).get("tables");
-        Assert.assertEquals(tables.size(), 1);
-        Assert.assertEquals(tables.get(0).textValue(), "mytable");
-      }
+    try (CloseableHttpClient client = makeClient(PKCS_12, TLS_STORE_PKCS_12, TLS_STORE_PKCS_12);
+        CloseableHttpResponse response = client.execute(makeGetTables(_internalControllerPort))) {
+      Assert.assertEquals(response.getCode(), 200);
+      JsonNode tables = JsonUtils.inputStreamToJsonNode(response.getEntity().getContent()).get("tables");
+      Assert.assertEquals(tables.size(), 1);
+      Assert.assertEquals(tables.get(0).textValue(), "mytable");
     }
   }
 
   @Test
   public void testControllerInternalUntrustedServer()
       throws Exception {
-    try (CloseableHttpClient client = makeClient(PKCS_12, _tlsStorePKCS12, _tlsStoreEmptyPKCS12)) {
+    try (CloseableHttpClient client = makeClient(PKCS_12, TLS_STORE_PKCS_12, TLS_STORE_EMPTY_PKCS_12)) {
       try {
-        client.execute(makeGetTables(DEFAULT_CONTROLLER_PORT));
+        client.execute(makeGetTables(_internalControllerPort));
         Assert.fail("Must not allow connection to untrusted server");
       } catch (IOException ignore) {
         // this should fail
@@ -372,9 +373,9 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   @Test
   public void testControllerInternalUntrustedClient()
       throws Exception {
-    try (CloseableHttpClient client = makeClient(PKCS_12, _tlsStoreEmptyPKCS12, _tlsStorePKCS12)) {
+    try (CloseableHttpClient client = makeClient(PKCS_12, TLS_STORE_EMPTY_PKCS_12, TLS_STORE_PKCS_12)) {
       try {
-        client.execute(makeGetTables(DEFAULT_CONTROLLER_PORT));
+        client.execute(makeGetTables(_internalControllerPort));
         Assert.fail("Must not allow connection from untrusted client");
       } catch (IOException ignore) {
         // this should fail
@@ -385,21 +386,20 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   @Test
   public void testBrokerExternalTrustedServer()
       throws Exception {
-    try (CloseableHttpClient client = makeClient(JKS, _tlsStoreEmptyJKS, _tlsStoreJKS)) {
-      try (CloseableHttpResponse response = client.execute(makeQueryBroker(EXTERNAL_BROKER_PORT))) {
-        Assert.assertEquals(response.getStatusLine().getStatusCode(), 200);
-        JsonNode resultTable = JsonUtils.inputStreamToJsonNode(response.getEntity().getContent()).get("resultTable");
-        Assert.assertTrue(resultTable.get("rows").get(0).get(0).longValue() > 100000);
-      }
+    try (CloseableHttpClient client = makeClient(JKS, TLS_STORE_EMPTY_JKS, TLS_STORE_JKS);
+        CloseableHttpResponse response = client.execute(makeQueryBroker(_externalBrokerPort))) {
+      Assert.assertEquals(response.getCode(), 200);
+      JsonNode resultTable = JsonUtils.inputStreamToJsonNode(response.getEntity().getContent()).get("resultTable");
+      Assert.assertTrue(resultTable.get("rows").get(0).get(0).longValue() > 100000);
     }
   }
 
   @Test
   public void testBrokerExternalUntrustedServer()
       throws Exception {
-    try (CloseableHttpClient client = makeClient(JKS, _tlsStoreJKS, _tlsStoreEmptyJKS)) {
+    try (CloseableHttpClient client = makeClient(JKS, TLS_STORE_JKS, TLS_STORE_EMPTY_JKS)) {
       try {
-        client.execute(makeQueryBroker(EXTERNAL_BROKER_PORT));
+        client.execute(makeQueryBroker(_externalBrokerPort));
         Assert.fail("Must not allow connection to untrusted server");
       } catch (Exception ignore) {
         // this should fail
@@ -410,21 +410,20 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   @Test
   public void testBrokerInternalTrustedServer()
       throws Exception {
-    try (CloseableHttpClient client = makeClient(PKCS_12, _tlsStorePKCS12, _tlsStorePKCS12)) {
-      try (CloseableHttpResponse response = client.execute(makeQueryBroker(DEFAULT_BROKER_PORT))) {
-        Assert.assertEquals(response.getStatusLine().getStatusCode(), 200);
-        JsonNode resultTable = JsonUtils.inputStreamToJsonNode(response.getEntity().getContent()).get("resultTable");
-        Assert.assertTrue(resultTable.get("rows").get(0).get(0).longValue() > 100000);
-      }
+    try (CloseableHttpClient client = makeClient(PKCS_12, TLS_STORE_PKCS_12, TLS_STORE_PKCS_12);
+        CloseableHttpResponse response = client.execute(makeQueryBroker(_internalBrokerPort))) {
+      Assert.assertEquals(response.getCode(), 200);
+      JsonNode resultTable = JsonUtils.inputStreamToJsonNode(response.getEntity().getContent()).get("resultTable");
+      Assert.assertTrue(resultTable.get("rows").get(0).get(0).longValue() > 100000);
     }
   }
 
   @Test
   public void testBrokerInternalUntrustedServer()
       throws Exception {
-    try (CloseableHttpClient client = makeClient(PKCS_12, _tlsStorePKCS12, _tlsStoreEmptyJKS)) {
+    try (CloseableHttpClient client = makeClient(PKCS_12, TLS_STORE_PKCS_12, TLS_STORE_EMPTY_JKS)) {
       try {
-        client.execute(makeQueryBroker(DEFAULT_BROKER_PORT));
+        client.execute(makeQueryBroker(_internalBrokerPort));
         Assert.fail("Must not allow connection to untrusted server");
       } catch (Exception ignore) {
         // this should fail
@@ -435,9 +434,9 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   @Test
   public void testBrokerInternalUntrustedClient()
       throws Exception {
-    try (CloseableHttpClient client = makeClient(PKCS_12, _tlsStoreEmptyPKCS12, _tlsStorePKCS12)) {
+    try (CloseableHttpClient client = makeClient(PKCS_12, TLS_STORE_EMPTY_PKCS_12, TLS_STORE_PKCS_12)) {
       try {
-        client.execute(makeQueryBroker(DEFAULT_BROKER_PORT));
+        client.execute(makeQueryBroker(_internalBrokerPort));
         Assert.fail("Must not allow connection from untrusted client");
       } catch (Exception ignore) {
         // this should fail
@@ -448,16 +447,14 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   @Test
   public void testControllerBrokerQueryForward()
       throws Exception {
-    try (CloseableHttpClient client = makeClient(JKS, _tlsStoreJKS, _tlsStoreJKS)) {
-      HttpPost request = new HttpPost("https://localhost:" + EXTERNAL_CONTROLLER_PORT + "/sql");
-      request.addHeader(CLIENT_HEADER);
-      request.setEntity(new StringEntity("{\"sql\":\"SELECT count(*) FROM mytable\"}"));
-
-      try (CloseableHttpResponse response = client.execute(request)) {
-        Assert.assertEquals(response.getStatusLine().getStatusCode(), 200);
-        JsonNode resultTable = JsonUtils.inputStreamToJsonNode(response.getEntity().getContent()).get("resultTable");
-        Assert.assertTrue(resultTable.get("rows").get(0).get(0).longValue() > 100000);
-      }
+    HttpPost request = new HttpPost("https://localhost:" + _externalControllerPort + "/sql");
+    request.addHeader(CLIENT_HEADER);
+    request.setEntity(new StringEntity("{\"sql\":\"SELECT count(*) FROM mytable\"}"));
+    try (CloseableHttpClient client = makeClient(JKS, TLS_STORE_JKS, TLS_STORE_JKS);
+        CloseableHttpResponse response = client.execute(request)) {
+      Assert.assertEquals(response.getCode(), 200);
+      JsonNode resultTable = JsonUtils.inputStreamToJsonNode(response.getEntity().getContent()).get("resultTable");
+      Assert.assertTrue(resultTable.get("rows").get(0).get(0).longValue() > 100000);
     }
   }
 
@@ -477,7 +474,7 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
     Assert.assertTrue(resultBeforeOffline.getResultSet(0).getLong(0) > 0);
 
     // schedule offline segment generation
-    Assert.assertNotNull(_controllerStarter.getTaskManager().scheduleTasks());
+    Assert.assertNotNull(_controllerStarter.getTaskManager().scheduleAllTasksForAllTables(null));
 
     // wait for offline segments
     JsonNode offlineSegments = TestUtils.waitForResult(() -> {
@@ -507,16 +504,14 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   public void testJDBCClient()
       throws Exception {
     String query = "SELECT count(*) FROM " + getTableName();
-    java.sql.Connection connection = getValidJDBCConnection(DEFAULT_CONTROLLER_PORT);
+    java.sql.Connection connection = getValidJDBCConnection(_internalControllerPort);
     Statement statement = connection.createStatement();
     ResultSet resultSet = statement.executeQuery(query);
     resultSet.first();
     Assert.assertTrue(resultSet.getLong(1) > 0);
 
-    try {
-      java.sql.Connection invalidConnection = getInValidJDBCConnection(DEFAULT_CONTROLLER_PORT);
-      statement = invalidConnection.createStatement();
-      resultSet = statement.executeQuery(query);
+    try (java.sql.Connection invalidConnection = getInValidJDBCConnection(_internalControllerPort)) {
+      invalidConnection.createStatement().executeQuery(query);
       Assert.fail("Should not allow queries with invalid TLS configuration");
     } catch (Exception e) {
       // this should fail
@@ -533,11 +528,12 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
     Assert.assertFalse(httpsComponentUrls.isEmpty());
   }
 
-  private java.sql.Connection getValidJDBCConnection(int controllerPort) throws Exception {
+  private java.sql.Connection getValidJDBCConnection(int controllerPort)
+      throws Exception {
     SSLContextBuilder sslContextBuilder = SSLContextBuilder.create();
     sslContextBuilder.setKeyStoreType(PKCS_12);
-    sslContextBuilder.loadKeyMaterial(_tlsStorePKCS12, PASSWORD_CHAR, PASSWORD_CHAR);
-    sslContextBuilder.loadTrustMaterial(_tlsStorePKCS12, PASSWORD_CHAR);
+    sslContextBuilder.loadKeyMaterial(TLS_STORE_PKCS_12, PASSWORD_CHAR, PASSWORD_CHAR);
+    sslContextBuilder.loadTrustMaterial(TLS_STORE_PKCS_12, PASSWORD_CHAR);
 
     PinotDriver pinotDriver = new PinotDriver(sslContextBuilder.build());
     Properties jdbcProps = new Properties();
@@ -546,11 +542,12 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
     return pinotDriver.connect("jdbc:pinot://localhost:" + controllerPort, jdbcProps);
   }
 
-  private java.sql.Connection getInValidJDBCConnection(int controllerPort) throws Exception {
+  private java.sql.Connection getInValidJDBCConnection(int controllerPort)
+      throws Exception {
     SSLContextBuilder sslContextBuilder = SSLContextBuilder.create();
     sslContextBuilder.setKeyStoreType(PKCS_12);
-    sslContextBuilder.loadKeyMaterial(_tlsStoreEmptyPKCS12, PASSWORD_CHAR, PASSWORD_CHAR);
-    sslContextBuilder.loadTrustMaterial(_tlsStorePKCS12, PASSWORD_CHAR);
+    sslContextBuilder.loadKeyMaterial(TLS_STORE_EMPTY_PKCS_12, PASSWORD_CHAR, PASSWORD_CHAR);
+    sslContextBuilder.loadTrustMaterial(TLS_STORE_PKCS_12, PASSWORD_CHAR);
 
     PinotDriver pinotDriver = new PinotDriver(sslContextBuilder.build());
     Properties jdbcProps = new Properties();
@@ -560,16 +557,19 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
     return pinotDriver.connect("jdbc:pinot://localhost:" + controllerPort, jdbcProps);
   }
 
-  private static CloseableHttpClient makeClient(String keyStoreType, URL keyStoreUrl, URL trustStoreUrl) {
-    try {
-      SSLContextBuilder sslContextBuilder = SSLContextBuilder.create();
-      sslContextBuilder.setKeyStoreType(keyStoreType);
-      sslContextBuilder.loadKeyMaterial(keyStoreUrl, PASSWORD_CHAR, PASSWORD_CHAR);
-      sslContextBuilder.loadTrustMaterial(trustStoreUrl, PASSWORD_CHAR);
-      return HttpClientBuilder.create().setSSLContext(sslContextBuilder.build()).build();
-    } catch (Exception e) {
-      throw new IllegalStateException("Could not create HTTPS client", e);
-    }
+  private static CloseableHttpClient makeClient(String keyStoreType, URL keyStoreUrl, URL trustStoreUrl)
+      throws Exception {
+    SSLContextBuilder sslContextBuilder = SSLContextBuilder.create();
+    sslContextBuilder.setKeyStoreType(keyStoreType);
+    sslContextBuilder.loadKeyMaterial(keyStoreUrl, PASSWORD_CHAR, PASSWORD_CHAR);
+    sslContextBuilder.loadTrustMaterial(trustStoreUrl, PASSWORD_CHAR);
+
+    SSLConnectionSocketFactory sslConnectionSocketFactory = new SSLConnectionSocketFactory(sslContextBuilder.build());
+    HttpClientConnectionManager cm = PoolingHttpClientConnectionManagerBuilder.create()
+        .setSSLSocketFactory(sslConnectionSocketFactory)
+        .build();
+
+    return HttpClientBuilder.create().setConnectionManager(cm).build();
   }
 
   private static HttpGet makeGetTables(int port) {

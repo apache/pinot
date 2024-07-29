@@ -46,6 +46,7 @@ class SumAvgGapfillProcessor extends BaseGapfillProcessor {
   private final static int COLUMN_TYPE_AVG = 2;
   protected Map<Integer, Integer> _filteredMap;
   protected final Map<Key, Integer> _groupByKeys;
+  protected final Map<Key, Integer> _previousIndexByGroupKey;
 
   SumAvgGapfillProcessor(QueryContext queryContext, GapfillUtils.GapfillType gapfillType) {
     super(queryContext, gapfillType);
@@ -53,6 +54,7 @@ class SumAvgGapfillProcessor extends BaseGapfillProcessor {
     _columnTypes = new int[_queryContext.getSelectExpressions().size()];
     _sumArgIndexes = new int[_columnTypes.length];
     _sumes = new double[_columnTypes.length];
+    _previousIndexByGroupKey = new HashMap<>();
   }
 
   protected void initializeAggregationValues(List<Object[]> rows, DataSchema dataSchema) {
@@ -75,13 +77,14 @@ class SumAvgGapfillProcessor extends BaseGapfillProcessor {
     }
 
     for (Map.Entry<Key, Integer> entry : _groupByKeys.entrySet()) {
-      if (_previousByGroupKey.containsKey(entry.getKey())) {
+      if (_previousIndexByGroupKey.containsKey(entry.getKey())) {
         if (_postGapfillFilterHandler == null
-            || _postGapfillFilterHandler.isMatch(_previousByGroupKey.get(entry.getKey()))) {
-          _filteredMap.put(entry.getValue(), entry.getValue());
+            || _postGapfillFilterHandler.isMatch(rows.get(_previousIndexByGroupKey.get(entry.getKey())))) {
+          _filteredMap.put(entry.getValue(), _previousIndexByGroupKey.get(entry.getKey()));
           for (int i = 0; i < _columnTypes.length; i++) {
             if (_columnTypes[i] != 0) {
-              _sumes[i] += ((Number) rows.get(entry.getValue())[_sumArgIndexes[i]]).doubleValue();
+              _sumes[i] +=
+                  ((Number) rows.get(_previousIndexByGroupKey.get(entry.getKey()))[_sumArgIndexes[i]]).doubleValue();
             }
           }
           _count++;
@@ -95,11 +98,13 @@ class SumAvgGapfillProcessor extends BaseGapfillProcessor {
       List<Object[]> rows, DataSchema dataSchema, DataSchema resultTableSchema) {
     int [] timeBucketedRawRows = new int[_numOfTimeBuckets + 1];
     int timeBucketedRawRowsIndex = 0;
+    int lastIndex = rows.size();
     for (int i = 0; i < rows.size(); i++) {
       Object[] row = rows.get(i);
       long time = _dateTimeFormatter.fromFormatToMillis(String.valueOf(row[_timeBucketColumnIndex]));
       int index = findGapfillBucketIndex(time);
       if (index >= _numOfTimeBuckets) {
+        lastIndex = index;
         timeBucketedRawRows[timeBucketedRawRowsIndex++] = i;
         break;
       }
@@ -107,14 +112,15 @@ class SumAvgGapfillProcessor extends BaseGapfillProcessor {
       _groupByKeys.putIfAbsent(key, _groupByKeys.size());
       if (index < 0) {
         // the data can potentially be used for previous value
-        _previousByGroupKey.compute(key, (k, previousRow) -> {
-          if (previousRow == null) {
-            return row;
+        final int currentRowIndex = i;
+        _previousIndexByGroupKey.compute(key, (k, previousRowIndex) -> {
+          if (previousRowIndex == null) {
+            return currentRowIndex;
           } else {
-            if ((Long) row[_timeBucketColumnIndex] > (Long) previousRow[_timeBucketColumnIndex]) {
-              return row;
+            if ((Long) row[_timeBucketColumnIndex] > (Long) rows.get(previousRowIndex)[_timeBucketColumnIndex]) {
+              return currentRowIndex;
             } else {
-              return previousRow;
+              return previousRowIndex;
             }
           }
         });
@@ -125,7 +131,7 @@ class SumAvgGapfillProcessor extends BaseGapfillProcessor {
       }
     }
     while (timeBucketedRawRowsIndex < _numOfTimeBuckets + 1) {
-      timeBucketedRawRows[timeBucketedRawRowsIndex++] = rows.size();
+      timeBucketedRawRows[timeBucketedRawRowsIndex++] = lastIndex;
     }
 
     _filteredMap = new HashMap<>();

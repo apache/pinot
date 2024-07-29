@@ -37,6 +37,7 @@ import LoginPage from './pages/LoginPage';
 import UserPage from "./pages/UserPage";
 
 export default [
+  // TODO: make async
   { path: '/', Component: HomePage },
   { path: '/query', Component: QueryPage },
   { path: '/tenants', Component: TenantsListingPage },

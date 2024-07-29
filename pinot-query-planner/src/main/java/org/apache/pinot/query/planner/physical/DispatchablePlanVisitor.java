@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.query.planner.physical;
 
-import org.apache.calcite.rel.hint.PinotHintOptions;
+import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
@@ -43,16 +43,16 @@ public class DispatchablePlanVisitor implements PlanNodeVisitor<Void, Dispatchab
 
   private static DispatchablePlanMetadata getOrCreateDispatchablePlanMetadata(PlanNode node,
       DispatchablePlanContext context) {
-    return context.getDispatchablePlanMetadataMap().computeIfAbsent(node.getPlanFragmentId(),
-        (id) -> new DispatchablePlanMetadata());
+    return context.getDispatchablePlanMetadataMap()
+        .computeIfAbsent(node.getStageId(), (id) -> new DispatchablePlanMetadata());
   }
 
   @Override
   public Void visitAggregate(AggregateNode node, DispatchablePlanContext context) {
     node.getInputs().get(0).visit(this, context);
     DispatchablePlanMetadata dispatchablePlanMetadata = getOrCreateDispatchablePlanMetadata(node, context);
-    dispatchablePlanMetadata.setRequireSingleton(node.getGroupSet().size() == 0
-        && node.getAggType().equals(AggregateNode.AggType.FINAL));
+    dispatchablePlanMetadata.setRequireSingleton(
+        node.getGroupKeys().isEmpty() && node.getAggType().equals(AggregateNode.AggType.FINAL));
     return null;
   }
 
@@ -64,7 +64,7 @@ public class DispatchablePlanVisitor implements PlanNodeVisitor<Void, Dispatchab
     //       multiple nodes.
     // Empty OVER() and OVER(ORDER BY) need to be processed on a singleton node. OVER() with PARTITION BY can be
     // distributed as no global ordering is required across partitions.
-    dispatchablePlanMetadata.setRequireSingleton(node.getGroupSet().size() == 0);
+    dispatchablePlanMetadata.setRequireSingleton(node.getKeys().isEmpty());
     return null;
   }
 
@@ -104,8 +104,9 @@ public class DispatchablePlanVisitor implements PlanNodeVisitor<Void, Dispatchab
   @Override
   public Void visitMailboxSend(MailboxSendNode node, DispatchablePlanContext context) {
     node.getInputs().get(0).visit(this, context);
-    getOrCreateDispatchablePlanMetadata(node, context);
-    context.getDispatchablePlanStageRootMap().put(node.getPlanFragmentId(), node);
+    DispatchablePlanMetadata dispatchablePlanMetadata = getOrCreateDispatchablePlanMetadata(node, context);
+    dispatchablePlanMetadata.setPrePartitioned(node.isPrePartitioned());
+    context.getDispatchablePlanStageRootMap().put(node.getStageId(), node);
     return null;
   }
 
@@ -120,7 +121,7 @@ public class DispatchablePlanVisitor implements PlanNodeVisitor<Void, Dispatchab
   public Void visitSort(SortNode node, DispatchablePlanContext context) {
     node.getInputs().get(0).visit(this, context);
     DispatchablePlanMetadata dispatchablePlanMetadata = getOrCreateDispatchablePlanMetadata(node, context);
-    dispatchablePlanMetadata.setRequireSingleton(node.getCollationKeys().size() > 0 && node.getOffset() != -1);
+    dispatchablePlanMetadata.setRequireSingleton(!node.getCollations().isEmpty() && node.getOffset() != -1);
     return null;
   }
 
@@ -128,7 +129,8 @@ public class DispatchablePlanVisitor implements PlanNodeVisitor<Void, Dispatchab
   public Void visitTableScan(TableScanNode node, DispatchablePlanContext context) {
     DispatchablePlanMetadata dispatchablePlanMetadata = getOrCreateDispatchablePlanMetadata(node, context);
     dispatchablePlanMetadata.addScannedTable(node.getTableName());
-    dispatchablePlanMetadata.setTableOptions(node.getNodeHint()._hintOptions.get(PinotHintOptions.TABLE_HINT_OPTIONS));
+    dispatchablePlanMetadata.setTableOptions(
+        node.getNodeHint().getHintOptions().get(PinotHintOptions.TABLE_HINT_OPTIONS));
     return null;
   }
 

@@ -45,6 +45,7 @@ public class StarTreeQueryGenerator {
   private static final String IN = " IN ";
   private static final String NOT_IN = " NOT IN ";
   private static final String AND = " AND ";
+  private static final String FILTER = " FILTER (%s)";
 
   private static final int MAX_NUM_AGGREGATIONS = 5;
   private static final int MAX_NUM_PREDICATES = 10;
@@ -82,6 +83,16 @@ public class StarTreeQueryGenerator {
         metricColumn);
   }
 
+  private String generateFilteredAggregation(String metricColumn) {
+    StringBuilder filteredAgg = new StringBuilder(generateAggregation(metricColumn));
+    String predicates = generatePredicates();
+    if (predicates == null) {
+      return filteredAgg.toString();
+    }
+    filteredAgg.append(String.format(FILTER, predicates));
+    return filteredAgg.toString();
+  }
+
   /**
    * Generate the aggregation section of the query, returns at least one aggregation.
    *
@@ -92,7 +103,11 @@ public class StarTreeQueryGenerator {
     int numMetrics = _metricColumns.size();
     String[] aggregations = new String[numAggregations];
     for (int i = 0; i < numAggregations; i++) {
-      aggregations[i] = generateAggregation(_metricColumns.get(_random.nextInt(numMetrics)));
+      if (i % 3 == 0) {
+        aggregations[i] = generateFilteredAggregation(_metricColumns.get(_random.nextInt(numMetrics)));
+      } else {
+        aggregations[i] = generateAggregation(_metricColumns.get(_random.nextInt(numMetrics)));
+      }
     }
     return StringUtils.join(aggregations, ", ");
   }

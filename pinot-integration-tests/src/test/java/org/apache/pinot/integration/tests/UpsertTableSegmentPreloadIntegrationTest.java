@@ -18,26 +18,26 @@
  */
 package org.apache.pinot.integration.tests;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import com.google.common.base.Joiner;
 import java.io.File;
 import java.io.IOException;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.IdealState;
-import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.segment.local.upsert.TableUpsertMetadataManagerFactory;
+import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.server.starter.helix.BaseServerStarter;
+import org.apache.pinot.server.starter.helix.HelixInstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
-import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
@@ -46,7 +46,7 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.assertNotNull;
 
 
 public class UpsertTableSegmentPreloadIntegrationTest extends BaseClusterIntegrationTestSet {
@@ -87,10 +87,9 @@ public class UpsertTableSegmentPreloadIntegrationTest extends BaseClusterIntegra
     // Create and upload schema and table config
     Schema schema = createSchema();
     addSchema(schema);
-    TableConfig tableConfig =
-        createUpsertTableConfig(avroFiles.get(0), PRIMARY_KEY_COL, null, getNumKafkaPartitions());
-    tableConfig.getUpsertConfig().setEnablePreload(true);
-    tableConfig.getUpsertConfig().setEnableSnapshot(true);
+    TableConfig tableConfig = createUpsertTableConfig(avroFiles.get(0), PRIMARY_KEY_COL, null, getNumKafkaPartitions());
+    UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
+    assertNotNull(upsertConfig);
     addTableConfig(tableConfig);
 
     // Create and upload segments
@@ -106,6 +105,12 @@ public class UpsertTableSegmentPreloadIntegrationTest extends BaseClusterIntegra
   protected void overrideServerConf(PinotConfiguration serverConf) {
     serverConf.setProperty(CommonConstants.Server.INSTANCE_DATA_MANAGER_CONFIG_PREFIX + ".max.segment.preload.threads",
         "1");
+    serverConf.setProperty(Joiner.on(".").join(CommonConstants.Server.INSTANCE_DATA_MANAGER_CONFIG_PREFIX,
+        HelixInstanceDataManagerConfig.UPSERT_CONFIG_PREFIX,
+        TableUpsertMetadataManagerFactory.UPSERT_DEFAULT_ENABLE_SNAPSHOT), "true");
+    serverConf.setProperty(Joiner.on(".").join(CommonConstants.Server.INSTANCE_DATA_MANAGER_CONFIG_PREFIX,
+        HelixInstanceDataManagerConfig.UPSERT_CONFIG_PREFIX,
+        TableUpsertMetadataManagerFactory.UPSERT_DEFAULT_ENABLE_PRELOAD), "true");
   }
 
   @AfterClass
@@ -140,11 +145,6 @@ public class UpsertTableSegmentPreloadIntegrationTest extends BaseClusterIntegra
   @Override
   protected String getSchemaFileName() {
     return "upsert_upload_segment_test.schema";
-  }
-
-  @Override
-  protected String getSchemaName() {
-    return "upsertSchema";
   }
 
   @Override
@@ -207,46 +207,27 @@ public class UpsertTableSegmentPreloadIntegrationTest extends BaseClusterIntegra
 
   protected void waitForSnapshotCreation()
       throws Exception {
-    Set<String> consumingSegments = getConsumingSegmentsFromIdealState(getTableName() + "_REALTIME");
-    // trigger force commit for snapshots
-    String jobId = forceCommit(getTableName());
+    // Trigger force commit so that snapshots are created
+    String rawTableName = getTableName();
+    sendPostRequest(_controllerRequestURLBuilder.forTableForceCommit(rawTableName), null);
 
-    Set<String> finalConsumingSegments = consumingSegments;
-
+    // All the uploaded segments should have snapshots generated. There is no guarantee that the just committed segments
+    // have snapshots generated because when the snapshot is taken, the committed segment might not be replaced with the
+    // immutable segment yet.
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
     TestUtils.waitForCondition(aVoid -> {
-      try {
-        if (isForceCommitJobCompleted(jobId)) {
-          assertTrue(_controllerStarter.getHelixResourceManager()
-              .getOnlineSegmentsFromIdealState(getTableName() + "_REALTIME", false)
-              .containsAll(finalConsumingSegments));
-
-          int snapshotFileCount = 0;
-          for (BaseServerStarter serverStarter : _serverStarters) {
-            String segmentDir =
-                serverStarter.getConfig().getProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_DATA_DIR);
-            File[] files = new File(segmentDir, getTableName() + "_REALTIME").listFiles();
-            for (File file : files) {
-              if (!file.getName().startsWith(getTableName())) {
-                continue;
-              }
-              if (file.isDirectory()) {
-                File segmentV3Dir = new File(file, "v3");
-                File[] segmentFiles = segmentV3Dir.listFiles();
-                for (File segmentFile : segmentFiles) {
-                  if (segmentFile.getName().endsWith(".snapshot")) {
-                    snapshotFileCount++;
-                  }
-                }
-              }
-            }
+      for (BaseServerStarter serverStarter : _serverStarters) {
+        String segmentDir = serverStarter.getConfig().getProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_DATA_DIR);
+        File[] files = new File(segmentDir, realtimeTableName).listFiles(
+            (dir, name) -> name.startsWith(rawTableName) && !LLCSegmentName.isLLCSegment(name));
+        for (File file : files) {
+          if (!new File(new File(file, "v3"), V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME).exists()) {
+            return false;
           }
-          return snapshotFileCount == 5;
         }
-        return false;
-      } catch (Exception e) {
-        return false;
       }
-    }, 120000L, "Error verifying force commit operation on table!");
+      return true;
+    }, 600_000L, "Failed to verify snapshots");
   }
 
   protected void verifyIdealState(int numSegmentsExpected) {
@@ -260,8 +241,8 @@ public class UpsertTableSegmentPreloadIntegrationTest extends BaseClusterIntegra
     int maxSequenceNumber = 0;
     for (Map.Entry<String, Map<String, String>> entry : segmentAssignment.entrySet()) {
       String segmentName = entry.getKey();
-      if (LLCSegmentName.isLowLevelConsumerSegmentName(segmentName)) {
-        LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
+      LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentName);
+      if (llcSegmentName != null) {
         maxSequenceNumber = Math.max(maxSequenceNumber, llcSegmentName.getSequenceNumber());
       }
     }
@@ -274,8 +255,8 @@ public class UpsertTableSegmentPreloadIntegrationTest extends BaseClusterIntegra
       assertEquals(instanceStateMap.size(), 1);
       Map.Entry<String, String> instanceIdAndState = instanceStateMap.entrySet().iterator().next();
       String state = instanceIdAndState.getValue();
-      if (LLCSegmentName.isLowLevelConsumerSegmentName(segmentName)) {
-        LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
+      LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentName);
+      if (llcSegmentName != null) {
         if (llcSegmentName.getSequenceNumber() < maxSequenceNumber) {
           assertEquals(state, SegmentStateModel.ONLINE);
         } else {
@@ -303,35 +284,6 @@ public class UpsertTableSegmentPreloadIntegrationTest extends BaseClusterIntegra
         }
       }
     }
-  }
-
-  protected Set<String> getConsumingSegmentsFromIdealState(String tableNameWithType) {
-    IdealState tableIdealState = _controllerStarter.getHelixResourceManager().getTableIdealState(tableNameWithType);
-    Map<String, Map<String, String>> segmentAssignment = tableIdealState.getRecord().getMapFields();
-    Set<String> matchingSegments = new HashSet<>(HashUtil.getHashMapCapacity(segmentAssignment.size()));
-    for (Map.Entry<String, Map<String, String>> entry : segmentAssignment.entrySet()) {
-      Map<String, String> instanceStateMap = entry.getValue();
-      if (instanceStateMap.containsValue(CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING)) {
-        matchingSegments.add(entry.getKey());
-      }
-    }
-    return matchingSegments;
-  }
-
-  protected boolean isForceCommitJobCompleted(String forceCommitJobId)
-      throws Exception {
-    String jobStatusResponse = sendGetRequest(_controllerRequestURLBuilder.forForceCommitJobStatus(forceCommitJobId));
-    JsonNode jobStatus = JsonUtils.stringToJsonNode(jobStatusResponse);
-
-    assertEquals(jobStatus.get("jobId").asText(), forceCommitJobId);
-    assertEquals(jobStatus.get("jobType").asText(), "FORCE_COMMIT");
-    return jobStatus.get("numberOfSegmentsYetToBeCommitted").asInt(-1) == 0;
-  }
-
-  protected String forceCommit(String tableName)
-      throws Exception {
-    String response = sendPostRequest(_controllerRequestURLBuilder.forTableForceCommit(tableName), null);
-    return JsonUtils.stringToJsonNode(response).get("forceCommitJobId").asText();
   }
 
   private static int getSegmentPartitionId(String segmentName) {

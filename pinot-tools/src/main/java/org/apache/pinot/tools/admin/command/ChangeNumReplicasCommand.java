@@ -27,7 +27,7 @@ import picocli.CommandLine;
 
 @CommandLine.Command(name = "ChangeNumReplicas")
 public class ChangeNumReplicasCommand extends AbstractBaseAdminCommand implements Command {
-  private static final Logger LOGGER = LoggerFactory.getLogger(StartBrokerCommand.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(ChangeNumReplicasCommand.class);
 
   @CommandLine.Option(names = {"-zkAddress"}, required = false, description = "HTTP address of Zookeeper.")
   private String _zkAddress = DEFAULT_ZK_ADDRESS;

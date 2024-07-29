@@ -18,24 +18,44 @@
  */
 package org.apache.pinot.segment.local.utils;
 
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import org.apache.commons.lang3.tuple.Pair;
 
 
 public class SegmentLocks {
-  private SegmentLocks() {
+  private final LoadingCache<Pair<String, String>, Lock> _locks =
+      CacheBuilder.newBuilder().weakValues().build(new CacheLoader<>() {
+        @Override
+        public Lock load(Pair<String, String> key) {
+          return new ReentrantLock();
+        }
+      });
+
+  public Lock getLock(String tableNameWithType, String segmentName) {
+    return _locks.getUnchecked(Pair.of(tableNameWithType, segmentName));
   }
 
-  private static final int NUM_LOCKS = 10000;
-  private static final Lock[] LOCKS = new Lock[NUM_LOCKS];
+  // DO NOT use global lock because that can break tests with multiple server instances
 
-  static {
-    for (int i = 0; i < NUM_LOCKS; i++) {
-      LOCKS[i] = new ReentrantLock();
-    }
-  }
+  @Deprecated
+  private static final SegmentLocks DEFAULT_LOCKS = create();
 
+  @Deprecated
   public static Lock getSegmentLock(String tableNameWithType, String segmentName) {
-    return LOCKS[Math.abs((31 * tableNameWithType.hashCode() + segmentName.hashCode()) % NUM_LOCKS)];
+    return DEFAULT_LOCKS.getLock(tableNameWithType, segmentName);
+  }
+
+  @Deprecated
+  public static SegmentLocks create() {
+    return new SegmentLocks();
+  }
+
+  @Deprecated
+  public static SegmentLocks create(int numLocks) {
+    return new SegmentLocks();
   }
 }

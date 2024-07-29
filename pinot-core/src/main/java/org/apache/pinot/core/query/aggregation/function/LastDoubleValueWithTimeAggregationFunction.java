@@ -22,10 +22,10 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
-import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.segment.local.customobject.DoubleLongPair;
 import org.apache.pinot.segment.local.customobject.ValueLongPair;
+import org.roaringbitmap.IntIterator;
 
 
 /**
@@ -41,8 +41,9 @@ import org.apache.pinot.segment.local.customobject.ValueLongPair;
 public class LastDoubleValueWithTimeAggregationFunction extends LastWithTimeAggregationFunction<Double> {
   private final static ValueLongPair<Double> DEFAULT_VALUE_TIME_PAIR = new DoubleLongPair(Double.NaN, Long.MIN_VALUE);
 
-  public LastDoubleValueWithTimeAggregationFunction(ExpressionContext dataCol, ExpressionContext timeCol) {
-    super(dataCol, timeCol, ObjectSerDeUtils.DOUBLE_LONG_PAIR_SER_DE);
+  public LastDoubleValueWithTimeAggregationFunction(ExpressionContext dataCol, ExpressionContext timeCol,
+      boolean nullHandlingEnabled) {
+    super(dataCol, timeCol, ObjectSerDeUtils.DOUBLE_LONG_PAIR_SER_DE, nullHandlingEnabled);
   }
 
   @Override
@@ -56,22 +57,8 @@ public class LastDoubleValueWithTimeAggregationFunction extends LastWithTimeAggr
   }
 
   @Override
-  public void aggregateResultWithRawData(int length, AggregationResultHolder aggregationResultHolder,
-      BlockValSet blockValSet, BlockValSet timeValSet) {
-    ValueLongPair<Double> defaultValueLongPair = getDefaultValueTimePair();
-    Double lastData = defaultValueLongPair.getValue();
-    long lastTime = defaultValueLongPair.getTime();
-    double[] doubleValues = blockValSet.getDoubleValuesSV();
-    long[] timeValues = timeValSet.getLongValuesSV();
-    for (int i = 0; i < length; i++) {
-      double data = doubleValues[i];
-      long time = timeValues[i];
-      if (time >= lastTime) {
-        lastTime = time;
-        lastData = data;
-      }
-    }
-    setAggregationResult(aggregationResultHolder, lastData, lastTime);
+  public Double readCell(BlockValSet block, int docId) {
+    return block.getDoubleValuesSV()[docId];
   }
 
   @Override
@@ -79,11 +66,15 @@ public class LastDoubleValueWithTimeAggregationFunction extends LastWithTimeAggr
       GroupByResultHolder groupByResultHolder, BlockValSet blockValSet, BlockValSet timeValSet) {
     double[] doubleValues = blockValSet.getDoubleValuesSV();
     long[] timeValues = timeValSet.getLongValuesSV();
-    for (int i = 0; i < length; i++) {
-      double data = doubleValues[i];
-      long time = timeValues[i];
-      setGroupByResult(groupKeyArray[i], groupByResultHolder, data, time);
-    }
+
+    IntIterator nullIdxIterator = orNullIterator(blockValSet, timeValSet);
+    forEachNotNull(length, nullIdxIterator, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        double data = doubleValues[i];
+        long time = timeValues[i];
+        setGroupByResult(groupKeyArray[i], groupByResultHolder, data, time);
+      }
+    });
   }
 
   @Override
@@ -91,13 +82,17 @@ public class LastDoubleValueWithTimeAggregationFunction extends LastWithTimeAggr
       GroupByResultHolder groupByResultHolder, BlockValSet blockValSet, BlockValSet timeValSet) {
     double[] doubleValues = blockValSet.getDoubleValuesSV();
     long[] timeValues = timeValSet.getLongValuesSV();
-    for (int i = 0; i < length; i++) {
-      double value = doubleValues[i];
-      long time = timeValues[i];
-      for (int groupKey : groupKeysArray[i]) {
-        setGroupByResult(groupKey, groupByResultHolder, value, time);
+
+    IntIterator nullIdxIterator = orNullIterator(blockValSet, timeValSet);
+    forEachNotNull(length, nullIdxIterator, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        double value = doubleValues[i];
+        long time = timeValues[i];
+        for (int groupKey : groupKeysArray[i]) {
+          setGroupByResult(groupKey, groupByResultHolder, value, time);
+        }
       }
-    }
+    });
   }
 
   @Override

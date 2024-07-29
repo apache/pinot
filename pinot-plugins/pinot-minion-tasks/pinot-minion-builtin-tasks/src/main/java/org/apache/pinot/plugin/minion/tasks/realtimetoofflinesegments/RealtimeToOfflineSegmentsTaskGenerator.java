@@ -42,9 +42,7 @@ import org.apache.pinot.spi.annotations.minion.TaskGenerator;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.CommonConstants.Segment;
-import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -101,20 +99,14 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
         LOGGER.warn("Skip generating task: {} for non-REALTIME table: {}", taskType, realtimeTableName);
         continue;
       }
-      StreamConfig streamConfig =
-          new StreamConfig(realtimeTableName, IngestionConfigUtils.getStreamConfigMap(tableConfig));
-      if (streamConfig.hasHighLevelConsumerType()) {
-        LOGGER.warn("Skip generating task: {} for HLC REALTIME table: {}", taskType, realtimeTableName);
-        continue;
-      }
       LOGGER.info("Start generating task configs for table: {} for task: {}", realtimeTableName, taskType);
 
       // Only schedule 1 task of this type, per table
       Map<String, TaskState> incompleteTasks =
           TaskGeneratorUtils.getIncompleteTasks(taskType, realtimeTableName, _clusterInfoAccessor);
       if (!incompleteTasks.isEmpty()) {
-        LOGGER.warn("Found incomplete tasks: {} for same table: {}. Skipping task generation.",
-            incompleteTasks.keySet(), realtimeTableName);
+        LOGGER.warn("Found incomplete tasks: {} for same table: {} and task type: {}. Skipping task generation.",
+            incompleteTasks.keySet(), realtimeTableName, taskType);
         continue;
       }
 
@@ -140,7 +132,7 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
       TableTaskConfig tableTaskConfig = tableConfig.getTaskConfig();
       Preconditions.checkState(tableTaskConfig != null);
       Map<String, String> taskConfigs = tableTaskConfig.getConfigsForTaskType(taskType);
-      Preconditions.checkState(taskConfigs != null, "Task config shouldn't be null for table: {}", realtimeTableName);
+      Preconditions.checkState(taskConfigs != null, "Task config shouldn't be null for table: %s", realtimeTableName);
 
       // Get the bucket size and buffer
       String bucketTimePeriod =
@@ -207,8 +199,7 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
 
       Map<String, String> configs = MinionTaskUtils.getPushTaskConfig(realtimeTableName, taskConfigs,
           _clusterInfoAccessor);
-      configs.put(MinionConstants.TABLE_NAME_KEY, realtimeTableName);
-      configs.put(MinionConstants.SEGMENT_NAME_KEY, StringUtils.join(segmentNames, ","));
+      configs.putAll(getBaseTaskConfigs(tableConfig, segmentNames));
       configs.put(MinionConstants.DOWNLOAD_URL_KEY, StringUtils.join(downloadURLs, MinionConstants.URL_SEPARATOR));
       configs.put(MinionConstants.UPLOAD_URL_KEY, _clusterInfoAccessor.getVipUrl() + "/segments");
 
@@ -254,7 +245,7 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
    */
   private void getCompletedSegmentsInfo(String realtimeTableName, List<SegmentZKMetadata> completedSegmentsZKMetadata,
       Map<Integer, String> partitionToLatestLLCSegmentName, Set<Integer> allPartitions) {
-    List<SegmentZKMetadata> segmentsZKMetadata = _clusterInfoAccessor.getSegmentsZKMetadata(realtimeTableName);
+    List<SegmentZKMetadata> segmentsZKMetadata = getSegmentsZKMetadataForTable(realtimeTableName);
 
     Map<Integer, LLCSegmentName> latestLLCSegmentNameMap = new HashMap<>();
     for (SegmentZKMetadata segmentZKMetadata : segmentsZKMetadata) {

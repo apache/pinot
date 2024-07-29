@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.metrics;
 
+import com.google.common.base.Preconditions;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
@@ -27,8 +28,10 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.spi.metrics.PinotGauge;
 import org.apache.pinot.spi.metrics.PinotMeter;
@@ -131,6 +134,11 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     }
   }
 
+  public void removePhaseTiming(String tableName, QP phase) {
+    String fullTimerName = _metricPrefix + getTableName(tableName) + "." + phase.getQueryPhaseName();
+    removeTimer(fullTimerName);
+  }
+
   public void addPhaseTiming(String tableName, QP phase, long duration, TimeUnit timeUnit) {
     String fullTimerName = _metricPrefix + getTableName(tableName) + "." + phase.getQueryPhaseName();
     addValueToTimer(fullTimerName, duration, timeUnit);
@@ -204,6 +212,16 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     if (timer != null) {
       timer.update(duration, timeUnit);
     }
+  }
+
+  public void removeTimer(final String fullTimerName) {
+    PinotMetricUtils
+        .removeMetric(_metricsRegistry, PinotMetricUtils.makePinotMetricName(_clazz, fullTimerName));
+  }
+
+  public void removeTableTimer(final String tableName, final T timer) {
+    final String fullTimerName = _metricPrefix + getTableName(tableName) + "." + timer.getTimerName();
+    removeTimer(fullTimerName);
   }
 
   /**
@@ -285,9 +303,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    */
   public PinotMeter addMeteredTableValue(final String tableName, final M meter, final long unitCount,
       PinotMeter reusedMeter) {
-    String meterName = meter.getMeterName();
-    final String fullMeterName = _metricPrefix + getTableName(tableName) + "." + meterName;
-    return addValueToMeter(fullMeterName, meter.getUnit(), unitCount, reusedMeter);
+    return addValueToMeter(getTableFullMeterName(tableName, meter), meter.getUnit(), unitCount, reusedMeter);
   }
 
   /**
@@ -331,12 +347,21 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   }
 
   public PinotMeter getMeteredTableValue(final String tableName, final M meter) {
-    final String fullMeterName;
-    String meterName = meter.getMeterName();
-    fullMeterName = _metricPrefix + getTableName(tableName) + "." + meterName;
-    final PinotMetricName metricName = PinotMetricUtils.makePinotMetricName(_clazz, fullMeterName);
+    final PinotMetricName metricName = PinotMetricUtils.makePinotMetricName(_clazz,
+        getTableFullMeterName(tableName, meter));
 
     return PinotMetricUtils.makePinotMeter(_metricsRegistry, metricName, meter.getUnit(), TimeUnit.SECONDS);
+  }
+
+  public PinotMeter getMeteredValue(final M meter) {
+    final PinotMetricName metricName =
+        PinotMetricUtils.makePinotMetricName(_clazz, _metricPrefix + meter.getMeterName());
+    return PinotMetricUtils.makePinotMeter(_metricsRegistry, metricName, meter.getUnit(), TimeUnit.SECONDS);
+  }
+
+  private String getTableFullMeterName(final String tableName, final M meter) {
+    String meterName = meter.getMeterName();
+    return _metricPrefix + getTableName(tableName) + "." + meterName;
   }
 
   /**
@@ -426,7 +451,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     setValueOfGauge(value, gaugeName);
   }
 
-  private void setValueOfGauge(long value, String gaugeName) {
+  protected void setValueOfGauge(long value, String gaugeName) {
     AtomicLong gaugeValue = _gaugeValues.get(gaugeName);
     if (gaugeValue == null) {
       synchronized (_gaugeValues) {
@@ -468,6 +493,17 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     } else {
       gaugeValue.addAndGet(unitCount);
     }
+  }
+
+  /**
+   * Get the gauge metric value for the provided gauge name
+   * @param gaugeName gauge name
+   * @return gauge value. If gauge is not present return null.
+   */
+  @Nullable
+  public Long getGaugeValue(final String gaugeName) {
+    AtomicLong value = _gaugeValues.get(gaugeName);
+    return value != null ? value.get() : null;
   }
 
   /**
@@ -657,6 +693,34 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   }
 
   /**
+   * Like {@link #setOrUpdateGauge(String, Supplier)}
+   */
+  public void setOrUpdateGauge(final String metricName, final LongSupplier valueSupplier) {
+    PinotGauge<Long> pinotGauge = PinotMetricUtils.makeGauge(_metricsRegistry,
+        PinotMetricUtils.makePinotMetricName(_clazz, _metricPrefix + metricName),
+        PinotMetricUtils.makePinotGauge(avoid -> valueSupplier.getAsLong()));
+    pinotGauge.setValueSupplier((Supplier<Long>) () -> (Long) valueSupplier.getAsLong());
+  }
+
+  /**
+   * Like {@link #setOrUpdateGauge(String, Supplier)} but using a global gauge
+   * @throws IllegalArgumentException if the gauge is not global
+   */
+  public void setOrUpdateGlobalGauge(final G gauge, final Supplier<Long> valueSupplier) {
+    Preconditions.checkArgument(gauge.isGlobal(), "Only global gauges should be sent to this method");
+    setOrUpdateGauge(gauge.getGaugeName(), valueSupplier);
+  }
+
+  /**
+   * Like {@link #setOrUpdateGauge(String, LongSupplier)} but using a global gauge
+   * @throws IllegalArgumentException if the gauge is not global
+   */
+  public void setOrUpdateGlobalGauge(final G gauge, final LongSupplier valueSupplier) {
+    Preconditions.checkArgument(gauge.isGlobal(), "Only global gauges should be sent to this method");
+    setOrUpdateGauge(gauge.getGaugeName(), valueSupplier);
+  }
+
+  /**
    * Removes a global gauge given the key and the gauge
    * @param key the key associated with the gauge
    * @param gauge the gauge to be removed
@@ -714,13 +778,24 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     return gauge.getGaugeName() + "." + getTableName(tableName) + "." + key;
   }
 
+  public String composePluginGaugeName(String pluginName, Gauge gauge) {
+    return gauge.getGaugeName() + "." + pluginName;
+  }
+
   /**
    * Remove gauge from Pinot metrics.
    * @param gaugeName gauge name
    */
   public void removeGauge(final String gaugeName) {
-    _gaugeValues.remove(gaugeName);
-    removeGaugeFromMetricRegistry(gaugeName);
+    synchronized (_gaugeValues) {
+      _gaugeValues.remove(gaugeName);
+      removeGaugeFromMetricRegistry(gaugeName);
+    }
+  }
+
+  public void removeTableMeter(final String tableName, final M meter) {
+    PinotMetricUtils.removeMetric(_metricsRegistry,
+        PinotMetricUtils.makePinotMetricName(_clazz, getTableFullMeterName(tableName, meter)));
   }
 
   /**

@@ -41,8 +41,8 @@ public class MurmurPartitionFunction implements PartitionFunction {
   }
 
   @Override
-  public int getPartition(Object value) {
-    return (murmur2(value.toString().getBytes(UTF_8)) & Integer.MAX_VALUE) % _numPartitions;
+  public int getPartition(String value) {
+    return (murmur2(value.getBytes(UTF_8)) & Integer.MAX_VALUE) % _numPartitions;
   }
 
   @Override
@@ -69,7 +69,7 @@ public class MurmurPartitionFunction implements PartitionFunction {
    * @return 32 bit hash of the given array
    */
   @VisibleForTesting
-  int murmur2(final byte[] data) {
+  static int murmur2(final byte[] data) {
     int length = data.length;
     int seed = 0x9747b28c;
     // 'm' and 'r' are mixing constants generated offline.

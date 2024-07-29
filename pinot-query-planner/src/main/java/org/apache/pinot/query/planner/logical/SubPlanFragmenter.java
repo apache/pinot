@@ -18,12 +18,12 @@
  */
 package org.apache.pinot.query.planner.logical;
 
-import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.calcite.rel.logical.PinotRelExchangeType;
+import org.apache.calcite.runtime.ImmutablePairList;
+import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.query.planner.SubPlanMetadata;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
@@ -42,22 +42,22 @@ import org.apache.pinot.query.planner.plannode.WindowNode;
 
 
 /**
- * SubPlanFragmenter is an implementation of {@link PlanNodeVisitor} to fragment a
- * {@link org.apache.pinot.query.planner.QueryPlan} into multiple {@link org.apache.pinot.query.planner.SubPlan}.
+ * SubPlanFragmenter is an implementation of {@link PlanNodeVisitor} to fragment a query plan into multiple sub-plans.
+ * TODO: Currently it is not hooked up because we don't support multiple sub-plans yet.
  *
  * The fragmenting process is as follows:
  * 1. Traverse the plan tree in a depth-first manner;
  * 2. For each node, if it is a SubPlan splittable ExchangeNode, switch it to a {@link LiteralValueNode};
- * 3. Increment current SubPlan Id by one and keep traverse the tree.
+ * 3. Increment current SubPlan ID by one and keep traverse the tree.
  */
 public class SubPlanFragmenter implements PlanNodeVisitor<PlanNode, SubPlanFragmenter.Context> {
   public static final SubPlanFragmenter INSTANCE = new SubPlanFragmenter();
 
   private PlanNode process(PlanNode node, Context context) {
-    node.setPlanFragmentId(context._currentSubPlanId);
+    node.setStageId(context._currentSubPlanId);
     List<PlanNode> inputs = node.getInputs();
     for (int i = 0; i < inputs.size(); i++) {
-      context._previousSubPlanId = node.getPlanFragmentId();
+      context._previousSubPlanId = node.getStageId();
       inputs.set(i, inputs.get(i).visit(this, context));
     }
     return node;
@@ -133,7 +133,8 @@ public class SubPlanFragmenter implements PlanNodeVisitor<PlanNode, SubPlanFragm
       context._subPlanIdToChildrenMap.put(currentStageId, new ArrayList<>());
     }
     context._subPlanIdToChildrenMap.get(currentStageId).add(nextSubPlanId);
-    context._subPlanIdToMetadataMap.put(nextSubPlanId, new SubPlanMetadata(node.getTableNames(), ImmutableList.of()));
+    context._subPlanIdToMetadataMap.put(nextSubPlanId,
+        new SubPlanMetadata(node.getTableNames(), ImmutablePairList.of()));
     PlanNode literalValueNode = new LiteralValueNode(nextStageRoot.getDataSchema());
     return literalValueNode;
   }

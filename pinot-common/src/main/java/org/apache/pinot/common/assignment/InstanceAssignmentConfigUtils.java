@@ -122,6 +122,17 @@ public class InstanceAssignmentConfigUtils {
           replicaGroupStrategyConfig.getNumInstancesPerPartition(), 0, 0, minimizeDataMovement, null);
     }
 
-    return new InstanceAssignmentConfig(tagPoolConfig, null, replicaGroupPartitionConfig);
+    return new InstanceAssignmentConfig(tagPoolConfig, null, replicaGroupPartitionConfig, null, minimizeDataMovement);
+  }
+
+  public static boolean isMirrorServerSetAssignment(TableConfig tableConfig,
+      InstancePartitionsType instancePartitionsType) {
+    // If the instance assignment config is not null and the partition selector is
+    // MIRROR_SERVER_SET_PARTITION_SELECTOR,
+    return tableConfig.getInstanceAssignmentConfigMap() != null
+        && tableConfig.getInstanceAssignmentConfigMap().get(instancePartitionsType.toString()) != null
+        && InstanceAssignmentConfigUtils.getInstanceAssignmentConfig(tableConfig, instancePartitionsType)
+        .getPartitionSelector()
+        == InstanceAssignmentConfig.PartitionSelector.MIRROR_SERVER_SET_PARTITION_SELECTOR;
   }
 }

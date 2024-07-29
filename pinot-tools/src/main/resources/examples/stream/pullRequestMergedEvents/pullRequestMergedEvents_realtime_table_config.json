@@ -1,32 +1,34 @@
 {
   "tableName": "pullRequestMergedEvents",
   "tableType": "REALTIME",
+  "tenants": {},
   "segmentsConfig": {
     "timeColumnName": "mergedTimeMillis",
     "retentionTimeUnit": "DAYS",
     "retentionTimeValue": "60",
-    "schemaName": "pullRequestMergedEvents",
-    "replication": "1",
-    "replicasPerPartition": "1"
+    "replication": "1"
   },
-  "tenants": {},
   "tableIndexConfig": {
-    "loadMode": "MMAP",
     "invertedIndexColumns": [
       "organization",
       "repo"
-    ],
-    "streamConfigs": {
-      "streamType": "kafka",
-      "stream.kafka.consumer.type": "simple",
-      "stream.kafka.topic.name": "pullRequestMergedEvents",
-      "stream.kafka.decoder.class.name": "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder",
-      "stream.kafka.consumer.factory.class.name": "org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory",
-      "stream.kafka.zk.broker.url": "localhost:2191/kafka",
-      "stream.kafka.broker.list": "localhost:19092",
-      "realtime.segment.flush.threshold.time": "12h",
-      "realtime.segment.flush.threshold.size": "100000",
-      "stream.kafka.consumer.prop.auto.offset.reset": "smallest"
+    ]
+  },
+  "ingestionConfig": {
+    "streamIngestionConfig": {
+      "streamConfigMaps": [
+        {
+          "streamType": "kafka",
+          "stream.kafka.topic.name": "pullRequestMergedEvents",
+          "stream.kafka.decoder.class.name": "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder",
+          "stream.kafka.consumer.factory.class.name": "org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory",
+          "stream.kafka.consumer.prop.auto.offset.reset": "smallest",
+          "stream.kafka.zk.broker.url": "localhost:2191/kafka",
+          "stream.kafka.broker.list": "localhost:19092",
+          "realtime.segment.flush.threshold.time": "12h",
+          "realtime.segment.flush.threshold.size": "100000"
+        }
+      ]
     }
   },
   "metadata": {

@@ -19,18 +19,15 @@
 
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.util.List;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
 public class BooleanAndAggregationFunction extends BaseBooleanAggregationFunction {
 
-  public BooleanAndAggregationFunction(ExpressionContext expression) {
-    this(expression, false);
-  }
-
-  public BooleanAndAggregationFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
-    super(expression, nullHandlingEnabled, BooleanMerge.AND);
+  public BooleanAndAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
+    super(verifySingleArgument(arguments, "BOOL_AND"), nullHandlingEnabled, BooleanMerge.AND);
   }
 
   @Override

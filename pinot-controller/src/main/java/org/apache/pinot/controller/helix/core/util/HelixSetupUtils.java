@@ -125,7 +125,7 @@ public class HelixSetupUtils {
 
       // Add lead controller resource if needed
       createLeadControllerResourceIfNeeded(helixClusterName, helixAdmin, configAccessor, enableBatchMessageMode,
-          controllerConf.getLeadControllerResourceRebalanceStrategy());
+          controllerConf);
     } finally {
       if (zkClient != null) {
         zkClient.close();
@@ -171,48 +171,15 @@ public class HelixSetupUtils {
   }
 
   private static void createLeadControllerResourceIfNeeded(String helixClusterName, HelixAdmin helixAdmin,
-      ConfigAccessor configAccessor, boolean enableBatchMessageMode, String leadControllerResourceRebalanceStrategy) {
-    IdealState idealState = helixAdmin.getResourceIdealState(helixClusterName, LEAD_CONTROLLER_RESOURCE_NAME);
-    if (idealState == null) {
+      ConfigAccessor configAccessor, boolean enableBatchMessageMode, ControllerConf controllerConf) {
+    IdealState currentIdealState = helixAdmin.getResourceIdealState(helixClusterName, LEAD_CONTROLLER_RESOURCE_NAME);
+    if (currentIdealState == null) {
       LOGGER.info("Adding resource: {}", LEAD_CONTROLLER_RESOURCE_NAME);
-
-      // FULL-AUTO Master-Slave state model with a rebalance strategy, auto-rebalance by default
-      FullAutoModeISBuilder idealStateBuilder = new FullAutoModeISBuilder(LEAD_CONTROLLER_RESOURCE_NAME);
-      idealStateBuilder.setStateModel(MasterSlaveSMD.name)
-          .setRebalanceStrategy(leadControllerResourceRebalanceStrategy);
-      // Initialize partitions and replicas
-      idealStateBuilder.setNumPartitions(NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE);
-      for (int i = 0; i < NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE; i++) {
-        idealStateBuilder.add(LeadControllerUtils.generatePartitionName(i));
-      }
-      idealStateBuilder.setNumReplica(LEAD_CONTROLLER_RESOURCE_REPLICA_COUNT);
-      // The below config guarantees if active number of replicas is no less than minimum active replica, there will
-      // not be partition movements happened.
-      // Set min active replicas to 0 and rebalance delay to 5 minutes so that if any master goes offline, Helix
-      // controller waits at most 5 minutes and then re-calculate the participant assignment.
-      // This delay is helpful when periodic tasks are running and we don't want them to be re-run too frequently.
-      // Plus, if virtual id is applied to controller hosts, swapping hosts would be easy as new hosts can use the
-      // same virtual id and it takes least effort to change the configs.
-      idealStateBuilder.setMinActiveReplica(MIN_ACTIVE_REPLICAS);
-      idealStateBuilder.setRebalanceDelay(REBALANCE_DELAY_MS);
-      idealStateBuilder.enableDelayRebalance();
-      // Set instance group tag
-      idealState = idealStateBuilder.build();
-      idealState.setInstanceGroupTag(CONTROLLER_INSTANCE);
-      // Set batch message mode
-      idealState.setBatchMessageMode(enableBatchMessageMode);
-      // Explicitly disable this resource when creating this new resource.
-      // When all the controllers are running the code with the logic to handle this resource, it can be enabled for
-      // backward compatibility.
-      // In the next major release, we can enable this resource by default, so that all the controller logic can be
-      // separated.
-
-      helixAdmin.addResource(helixClusterName, LEAD_CONTROLLER_RESOURCE_NAME, idealState);
-    } else if (!idealState.isEnabled()) {
-      // Enable lead controller resource and let resource config be the only switch for enabling logic of lead
-      // controller resource.
-      idealState.enable(true);
-      helixAdmin.updateIdealState(helixClusterName, LEAD_CONTROLLER_RESOURCE_NAME, idealState);
+      IdealState newIdealState = constructIdealState(enableBatchMessageMode, controllerConf);
+      helixAdmin.addResource(helixClusterName, LEAD_CONTROLLER_RESOURCE_NAME, newIdealState);
+    } else {
+      enableAndUpdateLeadControllerResource(helixClusterName, helixAdmin, currentIdealState, enableBatchMessageMode,
+          controllerConf);
     }
 
     // Create resource config for lead controller resource if it doesn't exist
@@ -225,5 +192,73 @@ public class HelixSetupUtils {
     // TODO: remove the logic of handling this config in both controller and server in the next official release.
     resourceConfig.putSimpleConfig(LEAD_CONTROLLER_RESOURCE_ENABLED_KEY, Boolean.TRUE.toString());
     configAccessor.setResourceConfig(helixClusterName, LEAD_CONTROLLER_RESOURCE_NAME, resourceConfig);
+  }
+
+  private static IdealState constructIdealState(boolean enableBatchMessageMode, ControllerConf controllerConf) {
+    // FULL-AUTO Master-Slave state model with a rebalance strategy, auto-rebalance by default
+    FullAutoModeISBuilder idealStateBuilder = new FullAutoModeISBuilder(LEAD_CONTROLLER_RESOURCE_NAME);
+    idealStateBuilder.setStateModel(MasterSlaveSMD.name)
+        .setRebalanceStrategy(controllerConf.getLeadControllerResourceRebalanceStrategy());
+    // Initialize partitions and replicas
+    idealStateBuilder.setNumPartitions(NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE);
+    for (int i = 0; i < NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE; i++) {
+      idealStateBuilder.add(LeadControllerUtils.generatePartitionName(i));
+    }
+    idealStateBuilder.setNumReplica(LEAD_CONTROLLER_RESOURCE_REPLICA_COUNT);
+    // The below config guarantees if active number of replicas is no less than minimum active replica, there will
+    // not be partition movements happened.
+    // Set min active replicas to 0 and rebalance delay to 5 minutes so that if any master goes offline, Helix
+    // controller waits at most 5 minutes and then re-calculate the participant assignment.
+    // This delay is helpful when periodic tasks are running and we don't want them to be re-run too frequently.
+    // Plus, if virtual id is applied to controller hosts, swapping hosts would be easy as new hosts can use the
+    // same virtual id and it takes least effort to change the configs.
+    idealStateBuilder.setMinActiveReplica(MIN_ACTIVE_REPLICAS);
+    idealStateBuilder.setRebalanceDelay(controllerConf.getLeadControllerResourceRebalanceDelayMs());
+    idealStateBuilder.enableDelayRebalance();
+    // Set instance group tag
+    IdealState idealState = idealStateBuilder.build();
+    idealState.setInstanceGroupTag(CONTROLLER_INSTANCE);
+    // Set batch message mode
+    idealState.setBatchMessageMode(enableBatchMessageMode);
+    return idealState;
+  }
+
+  /**
+   * If user defined properties for the lead controller have changed, update the resource.
+   */
+  private static void enableAndUpdateLeadControllerResource(String helixClusterName, HelixAdmin helixAdmin,
+      IdealState idealState, boolean enableBatchMessageMode, ControllerConf controllerConf) {
+    boolean needsUpdating = false;
+
+    if (!idealState.isEnabled()) {
+      LOGGER.info("Enabling resource: {}", LEAD_CONTROLLER_RESOURCE_NAME);
+      // Enable lead controller resource and let resource config be the only switch for enabling logic of lead
+      // controller resource.
+      idealState.enable(true);
+      needsUpdating = true;
+    }
+    if (idealState.getBatchMessageMode() != enableBatchMessageMode) {
+      LOGGER.info("Updating batch message mode to: {} for resource: {}", enableBatchMessageMode,
+          LEAD_CONTROLLER_RESOURCE_NAME);
+      idealState.setBatchMessageMode(enableBatchMessageMode);
+      needsUpdating = true;
+    }
+    if (!idealState.getRebalanceStrategy().equals(controllerConf.getLeadControllerResourceRebalanceStrategy())) {
+      LOGGER.info("Updating rebalance strategy to: {} for resource: {}",
+          controllerConf.getLeadControllerResourceRebalanceStrategy(), LEAD_CONTROLLER_RESOURCE_NAME);
+      idealState.setRebalanceStrategy(controllerConf.getLeadControllerResourceRebalanceStrategy());
+      needsUpdating = true;
+    }
+    if (idealState.getRebalanceDelay() != controllerConf.getLeadControllerResourceRebalanceDelayMs()) {
+      LOGGER.info("Updating rebalance delay to: {} for resource: {}",
+          controllerConf.getLeadControllerResourceRebalanceDelayMs(), LEAD_CONTROLLER_RESOURCE_NAME);
+      idealState.setRebalanceDelay(controllerConf.getLeadControllerResourceRebalanceDelayMs());
+      needsUpdating = true;
+    }
+
+    if (needsUpdating) {
+      LOGGER.info("Updating ideal state for resource: {}", LEAD_CONTROLLER_RESOURCE_NAME);
+      helixAdmin.updateIdealState(helixClusterName, LEAD_CONTROLLER_RESOURCE_NAME, idealState);
+    }
   }
 }

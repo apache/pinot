@@ -39,6 +39,7 @@ public enum ControllerMeter implements AbstractMetrics.Meter {
   CONTROLLER_TABLE_TENANT_CREATE_ERROR("TableTenantCreateError", true),
   CONTROLLER_TABLE_TENANT_DELETE_ERROR("TableTenantDeleteError", true),
   CONTROLLER_REALTIME_TABLE_SEGMENT_ASSIGNMENT_ERROR("errors", true),
+  CONTROLLER_REALTIME_TABLE_SEGMENT_ASSIGNMENT_MISMATCH("mismatch", true),
   CONTROLLER_LEADERSHIP_CHANGE_WITHOUT_CALLBACK("leadershipChangeWithoutCallback", true),
   LLC_STATE_MACHINE_ABORTS("aborts", false),
   LLC_ZOOKEEPER_FETCH_FAILURES("failures", false),
@@ -46,6 +47,7 @@ public enum ControllerMeter implements AbstractMetrics.Meter {
   LLC_STREAM_DATA_LOSS("dataLoss", false),
   CONTROLLER_PERIODIC_TASK_RUN("periodicTaskRun", false),
   CONTROLLER_PERIODIC_TASK_ERROR("periodicTaskError", false),
+  CONTROLLER_TABLE_SEGMENT_UPLOAD_ERROR("TableSegmentUploadError", false),
   PERIODIC_TASK_ERROR("periodicTaskError", false),
   NUMBER_TIMES_SCHEDULE_TASKS_CALLED("tasks", true),
   NUMBER_TASKS_SUBMITTED("tasks", false),
@@ -59,7 +61,13 @@ public enum ControllerMeter implements AbstractMetrics.Meter {
   LLC_SEGMENTS_DEEP_STORE_UPLOAD_RETRY_SUCCESS("LLCSegmentDeepStoreUploadRetrySuccess", false),
   LLC_SEGMENTS_DEEP_STORE_UPLOAD_RETRY_ERROR("LLCSegmentDeepStoreUploadRetryError", false),
   SEGMENT_MISSING_DEEP_STORE_LINK("RealtimeSegmentMissingDeepStoreLink", false),
-  NUMBER_ADHOC_TASKS_SUBMITTED("adhocTasks", false);
+  DELETED_TMP_SEGMENT_COUNT("DeletedTmpSegmentCount", false),
+  TABLE_REBALANCE_FAILURE_DETECTED("TableRebalanceFailureDetected", false),
+  TABLE_REBALANCE_RETRY("TableRebalanceRetry", false),
+  TABLE_REBALANCE_RETRY_TOO_MANY_TIMES("TableRebalanceRetryTooManyTimes", false),
+  NUMBER_ADHOC_TASKS_SUBMITTED("adhocTasks", false),
+  IDEAL_STATE_UPDATE_FAILURE("IdealStateUpdateFailure", false),
+  IDEAL_STATE_UPDATE_RETRY("IdealStateUpdateRetry", false);
 
 
   private final String _brokerMeterName;

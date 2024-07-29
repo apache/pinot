@@ -19,8 +19,12 @@
 
 package org.apache.pinot.segment.local.segment.index.nullvalue;
 
+import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.segment.creator.impl.nullvalue.NullValueVectorCreator;
@@ -31,20 +35,23 @@ import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.index.AbstractIndexType;
 import org.apache.pinot.segment.spi.index.ColumnConfigDeserializer;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
-import org.apache.pinot.segment.spi.index.IndexConfigDeserializer;
 import org.apache.pinot.segment.spi.index.IndexHandler;
 import org.apache.pinot.segment.spi.index.IndexReaderFactory;
+import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 
 
 public class NullValueIndexType extends AbstractIndexType<IndexConfig, NullValueVectorReader, NullValueVectorCreator> {
   public static final String INDEX_DISPLAY_NAME = "null";
+  private static final List<String> EXTENSIONS =
+      Collections.singletonList(V1Constants.Indexes.NULLVALUE_VECTOR_FILE_EXTENSION);
 
   protected NullValueIndexType() {
     super(StandardIndexes.NULL_VALUE_VECTOR_ID);
@@ -63,7 +70,7 @@ public class NullValueIndexType extends AbstractIndexType<IndexConfig, NullValue
 
   @Override
   public IndexConfig getDefaultConfig() {
-    return IndexConfig.DISABLED;
+    return IndexConfig.ENABLED;
   }
 
   @Override
@@ -73,14 +80,27 @@ public class NullValueIndexType extends AbstractIndexType<IndexConfig, NullValue
 
   @Override
   public ColumnConfigDeserializer<IndexConfig> createDeserializer() {
-    return IndexConfigDeserializer.fromIndexes(getPrettyName(), getIndexConfigClass())
-        .withFallbackAlternative(
-            IndexConfigDeserializer.ifIndexingConfig(
-                IndexConfigDeserializer.alwaysCall((TableConfig tableConfig, Schema schema) ->
-                  tableConfig.getIndexingConfig().isNullHandlingEnabled()
-                      ? IndexConfig.ENABLED
-                      : IndexConfig.DISABLED))
-        );
+    return (TableConfig tableConfig, Schema schema) -> {
+      Collection<FieldSpec> allFieldSpecs = schema.getAllFieldSpecs();
+      Map<String, IndexConfig> configMap = Maps.newHashMapWithExpectedSize(allFieldSpecs.size());
+
+      boolean enableColumnBasedNullHandling = schema.isEnableColumnBasedNullHandling();
+      boolean nullHandlingEnabled = tableConfig.getIndexingConfig() != null
+          && tableConfig.getIndexingConfig().isNullHandlingEnabled();
+
+      for (FieldSpec fieldSpec : allFieldSpecs) {
+        IndexConfig indexConfig;
+        boolean enabled;
+        if (enableColumnBasedNullHandling) {
+          enabled = fieldSpec.isNullable();
+        } else {
+          enabled = nullHandlingEnabled;
+        }
+        indexConfig = enabled ? IndexConfig.ENABLED : IndexConfig.DISABLED;
+        configMap.put(fieldSpec.getName(), indexConfig);
+      }
+      return configMap;
+    };
   }
 
   public NullValueVectorCreator createIndexCreator(File indexDir, String columnName) {
@@ -99,8 +119,8 @@ public class NullValueIndexType extends AbstractIndexType<IndexConfig, NullValue
   }
 
   @Override
-  public String getFileExtension(ColumnMetadata columnMetadata) {
-    return V1Constants.Indexes.NULLVALUE_VECTOR_FILE_EXTENSION;
+  public List<String> getFileExtensions(@Nullable ColumnMetadata columnMetadata) {
+    return EXTENSIONS;
   }
 
   private static class ReaderFactory implements IndexReaderFactory<NullValueVectorReader> {
@@ -115,15 +135,23 @@ public class NullValueIndexType extends AbstractIndexType<IndexConfig, NullValue
     public NullValueVectorReader createIndexReader(SegmentDirectory.Reader segmentReader,
         FieldIndexConfigs fieldIndexConfigs, ColumnMetadata metadata)
           throws IOException {
-      if (!segmentReader.hasIndexFor(metadata.getColumnName(), StandardIndexes.nullValueVector())) {
+      IndexType<IndexConfig, NullValueVectorReader, ?> indexType = StandardIndexes.nullValueVector();
+      if (fieldIndexConfigs.getConfig(indexType).isDisabled()) {
         return null;
       }
-      PinotDataBuffer buffer = segmentReader.getIndexFor(metadata.getColumnName(), StandardIndexes.nullValueVector());
+      if (!segmentReader.hasIndexFor(metadata.getColumnName(), indexType)) {
+        return null;
+      }
+      PinotDataBuffer buffer = segmentReader.getIndexFor(metadata.getColumnName(), indexType);
       return new NullValueVectorReaderImpl(buffer);
     }
   }
 
   @Override
   public void convertToNewFormat(TableConfig tableConfig, Schema schema) {
+  }
+
+  public BuildLifecycle getIndexBuildLifecycle() {
+    return BuildLifecycle.CUSTOM;
   }
 }

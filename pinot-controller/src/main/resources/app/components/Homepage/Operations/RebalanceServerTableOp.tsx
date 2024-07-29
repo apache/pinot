@@ -43,11 +43,12 @@ export default function RebalanceServerTableOp({
   const [downtime, setDowntime] = React.useState(false);
   const [minAvailableReplicas, setMinAvailableReplicas] = React.useState("1");
   const [bestEfforts, setBestEfforts] = React.useState(false);
+  const [lowDiskMode, setLowDiskMode] = React.useState(false);
 
   const getData = () => {
     return {
       type: tableType,
-      dryRun, reassignInstances, includeConsuming, bootstrap, downtime, bestEfforts,
+      dryRun, reassignInstances, includeConsuming, bootstrap, downtime, bestEfforts, lowDiskMode,
       minAvailableReplicas: parseInt(minAvailableReplicas, 10)
     }
   };
@@ -104,6 +105,18 @@ export default function RebalanceServerTableOp({
                   />
                 }
                 label="Downtime"
+              />
+              <br />
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={lowDiskMode}
+                    onChange={() => setLowDiskMode(!lowDiskMode)} 
+                    name="lowDiskMode"
+                    color="primary"
+                  />
+                }
+                label="Low Disk Mode"
               />
             </Grid>
             <Grid item xs={6}>

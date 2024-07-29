@@ -50,9 +50,4 @@ public class LongMsgOffset implements StreamPartitionMsgOffset {
   public String toString() {
     return Long.toString(_offset);
   }
-
-  @Override
-  public StreamPartitionMsgOffset fromString(String longOffset) {
-    return new LongMsgOffset(longOffset);
-  }
 }

@@ -23,8 +23,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import javax.annotation.Nullable;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
@@ -62,6 +62,8 @@ public class RealtimeSegmentConfig {
   private final UpsertConfig.Mode _upsertMode;
   private final List<String> _upsertComparisonColumns;
   private final String _upsertDeleteRecordColumn;
+  private final String _upsertOutOfOrderRecordColumn;
+  private final boolean _upsertDropOutOfOrderRecord;
   private final PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
   private final PartitionDedupMetadataManager _partitionDedupMetadataManager;
   private final String _consumerDir;
@@ -75,7 +77,8 @@ public class RealtimeSegmentConfig {
       PinotDataBufferMemoryManager memoryManager, RealtimeSegmentStatsHistory statsHistory, String partitionColumn,
       PartitionFunction partitionFunction, int partitionId, boolean aggregateMetrics, boolean nullHandlingEnabled,
       String consumerDir, UpsertConfig.Mode upsertMode, List<String> upsertComparisonColumns,
-      String upsertDeleteRecordColumn, PartitionUpsertMetadataManager partitionUpsertMetadataManager,
+      String upsertDeleteRecordColumn, String upsertOutOfOrderRecordColumn, boolean upsertDropOutOfOrderRecord,
+      PartitionUpsertMetadataManager partitionUpsertMetadataManager,
       PartitionDedupMetadataManager partitionDedupMetadataManager, List<FieldConfig> fieldConfigList,
       List<AggregationConfig> ingestionAggregationConfigs) {
     _tableNameWithType = tableNameWithType;
@@ -99,6 +102,8 @@ public class RealtimeSegmentConfig {
     _upsertMode = upsertMode != null ? upsertMode : UpsertConfig.Mode.NONE;
     _upsertComparisonColumns = upsertComparisonColumns;
     _upsertDeleteRecordColumn = upsertDeleteRecordColumn;
+    _upsertOutOfOrderRecordColumn = upsertOutOfOrderRecordColumn;
+    _upsertDropOutOfOrderRecord = upsertDropOutOfOrderRecord;
     _partitionUpsertMetadataManager = partitionUpsertMetadataManager;
     _partitionDedupMetadataManager = partitionDedupMetadataManager;
     _fieldConfigList = fieldConfigList;
@@ -173,7 +178,6 @@ public class RealtimeSegmentConfig {
     return _nullHandlingEnabled;
   }
 
-  @Nullable
   public String getConsumerDir() {
     return _consumerDir;
   }
@@ -192,6 +196,14 @@ public class RealtimeSegmentConfig {
 
   public String getUpsertDeleteRecordColumn() {
     return _upsertDeleteRecordColumn;
+  }
+
+  public String getUpsertOutOfOrderRecordColumn() {
+    return _upsertOutOfOrderRecordColumn;
+  }
+
+  public boolean isUpsertDropOutOfOrderRecord() {
+    return _upsertDropOutOfOrderRecord;
   }
 
   public PartitionUpsertMetadataManager getPartitionUpsertMetadataManager() {
@@ -232,6 +244,8 @@ public class RealtimeSegmentConfig {
     private UpsertConfig.Mode _upsertMode;
     private List<String> _upsertComparisonColumns;
     private String _upsertDeleteRecordColumn;
+    private String _upsertOutOfOrderRecordColumn;
+    private boolean _upsertDropOutOfOrderRecord;
     private PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
     private PartitionDedupMetadataManager _partitionDedupMetadataManager;
     private List<FieldConfig> _fieldConfigList;
@@ -250,7 +264,7 @@ public class RealtimeSegmentConfig {
     }
 
     public Builder(Map<String, FieldIndexConfigs> indexConfigsByColName) {
-      _indexConfigByCol = new HashMap<>(indexConfigsByColName.size());
+      _indexConfigByCol = new HashMap<>(HashUtil.getHashMapCapacity(indexConfigsByColName.size()));
       for (Map.Entry<String, FieldIndexConfigs> entry : indexConfigsByColName.entrySet()) {
         _indexConfigByCol.put(entry.getKey(), new FieldIndexConfigs.Builder(entry.getValue()));
       }
@@ -372,6 +386,16 @@ public class RealtimeSegmentConfig {
       return this;
     }
 
+    public Builder setUpsertOutOfOrderRecordColumn(String upsertOutOfOrderRecordColumn) {
+      _upsertOutOfOrderRecordColumn = upsertOutOfOrderRecordColumn;
+      return this;
+    }
+
+    public Builder setUpsertDropOutOfOrderRecord(boolean upsertDropOutOfOrderRecord) {
+      _upsertDropOutOfOrderRecord = upsertDropOutOfOrderRecord;
+      return this;
+    }
+
     public Builder setPartitionUpsertMetadataManager(PartitionUpsertMetadataManager partitionUpsertMetadataManager) {
       _partitionUpsertMetadataManager = partitionUpsertMetadataManager;
       return this;
@@ -402,6 +426,7 @@ public class RealtimeSegmentConfig {
           _capacity, _avgNumMultiValues, Collections.unmodifiableMap(indexConfigByCol), _segmentZKMetadata, _offHeap,
           _memoryManager, _statsHistory, _partitionColumn, _partitionFunction, _partitionId, _aggregateMetrics,
           _nullHandlingEnabled, _consumerDir, _upsertMode, _upsertComparisonColumns, _upsertDeleteRecordColumn,
+          _upsertOutOfOrderRecordColumn, _upsertDropOutOfOrderRecord,
           _partitionUpsertMetadataManager, _partitionDedupMetadataManager, _fieldConfigList,
           _ingestionAggregationConfigs);
     }

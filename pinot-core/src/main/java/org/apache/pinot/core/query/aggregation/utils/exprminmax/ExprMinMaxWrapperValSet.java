@@ -23,8 +23,8 @@ import org.apache.pinot.core.common.BlockValSet;
 
 
 /**
- * Wrapper class for the value sets of the column to do argmin/max on.
- * This class is used for type-generic implementation of argmin/max.
+ * Wrapper class for the value sets of the column to do exprmin/max on.
+ * This class is used for type-generic implementation of exprmin/max.
  */
 public class ExprMinMaxWrapperValSet {
   protected final DataSchema.ColumnDataType _dataType;

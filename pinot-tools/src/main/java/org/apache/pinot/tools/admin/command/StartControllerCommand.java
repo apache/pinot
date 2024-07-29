@@ -23,7 +23,7 @@ import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.commons.configuration.ConfigurationException;
+import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.spi.services.ServiceRole;
 import org.apache.pinot.spi.utils.NetUtils;
@@ -180,7 +180,7 @@ public class StartControllerCommand extends AbstractBaseAdminCommand implements 
   public boolean execute()
       throws Exception {
     try {
-      LOGGER.info("Executing command: " + toString());
+      LOGGER.info("Executing command: {}", toString());
       Map<String, Object> controllerConf = getControllerConf();
       StartServiceManagerCommand startServiceManagerCommand =
           new StartServiceManagerCommand().setZkAddress(_zkAddress).setClusterName(_clusterName).setPort(-1)

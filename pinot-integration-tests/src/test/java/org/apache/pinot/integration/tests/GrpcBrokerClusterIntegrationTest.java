@@ -53,6 +53,11 @@ public class GrpcBrokerClusterIntegrationTest extends BaseClusterIntegrationTest
   }
 
   @Override
+  protected void overrideControllerConf(Map<String, Object> properties) {
+    properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, false);
+  }
+
+  @Override
   protected void overrideBrokerConf(PinotConfiguration brokerConf) {
     brokerConf.setProperty(Broker.BROKER_REQUEST_HANDLER_TYPE, "grpc");
   }
@@ -94,34 +99,25 @@ public class GrpcBrokerClusterIntegrationTest extends BaseClusterIntegrationTest
 
     // Initialize the query generator
     setUpQueryGenerator(avroFiles);
-
-    // TODO: this doesn't work so we simple wait for 5 second here. will be fixed after:
-    // https://github.com/apache/pinot/pull/7839
-    // waitForAllDocsLoaded(600_000L);
-    Thread.sleep(5000);
   }
 
   protected void startHybridCluster()
       throws Exception {
-    // Start Zk and Kafka
     startZk();
-    startKafka();
-
-    // Start the Pinot cluster
-    Map<String, Object> properties = getDefaultControllerConfiguration();
-    properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, false);
-    startController(properties);
-    startBrokers(1);
+    startController();
+    startBroker();
     startServers(2);
+    startKafka();
 
     // Create tenants
     createBrokerTenant(TENANT_NAME, 1);
     createServerTenant(TENANT_NAME, 1, 1);
   }
 
-  @Test
-  public void testGrpcBrokerRequestHandlerOnSelectionOnlyQuery()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testGrpcBrokerRequestHandlerOnSelectionOnlyQuery(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String query = "SELECT * FROM mytable LIMIT 1000000";
     testQuery(query);
     query = "SELECT * FROM mytable WHERE DaysSinceEpoch > 16312 LIMIT 10000000";
@@ -138,6 +134,7 @@ public class GrpcBrokerClusterIntegrationTest extends BaseClusterIntegrationTest
     stopServer();
     stopBroker();
     stopController();
+    stopKafka();
     stopZk();
 
     FileUtils.deleteDirectory(_tempDir);

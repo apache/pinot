@@ -30,6 +30,7 @@ import io.swagger.annotations.ApiResponses;
 import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
+import java.io.IOException;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -46,10 +47,13 @@ import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.pinot.common.assignment.InstancePartitions;
+import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
@@ -58,7 +62,8 @@ import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
-import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantRebalanceContext;
+import org.apache.pinot.controller.helix.core.rebalance.RebalanceJobConstants;
+import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantRebalanceConfig;
 import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantRebalanceProgressStats;
 import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantRebalanceResult;
 import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantRebalancer;
@@ -67,13 +72,14 @@ import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.tenant.Tenant;
 import org.apache.pinot.spi.config.tenant.TenantRole;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.spi.utils.RebalanceConfigConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
 
@@ -98,9 +104,15 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
  *   }' http://localhost:1234/tenants
  * </ul>
  */
-@Api(tags = Constants.TENANT_TAG, authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY)})
-@SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = @ApiKeyAuthDefinition(name =
-    HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = SWAGGER_AUTHORIZATION_KEY)))
+@Api(tags = Constants.TENANT_TAG, authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY),
+    @Authorization(value = DATABASE)})
+@SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = {
+    @ApiKeyAuthDefinition(name = HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER,
+        key = SWAGGER_AUTHORIZATION_KEY,
+        description = "The format of the key is  ```\"Basic <token>\" or \"Bearer <token>\"```"),
+    @ApiKeyAuthDefinition(name = DATABASE, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = DATABASE,
+        description = "Database context passed through http header. If no context is provided 'default' database "
+            + "context will be considered.")}))
 @Path("/")
 public class PinotTenantRestletResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotTenantRestletResource.class);
@@ -275,22 +287,98 @@ public class PinotTenantRestletResource {
       @ApiParam(value = "Tenant name", required = true) @PathParam("tenantName") String tenantName,
       @ApiParam(value = "Tenant type (server|broker)",
           required = false, allowableValues = "BROKER, SERVER", defaultValue = "SERVER")
-      @QueryParam("type") String tenantType) {
+      @QueryParam("type") String tenantType, @Context HttpHeaders headers) {
     if (tenantType == null || tenantType.isEmpty() || tenantType.equalsIgnoreCase("server")) {
-      return getTablesServedFromServerTenant(tenantName);
+      return getTablesServedFromServerTenant(tenantName, headers.getHeaderString(DATABASE));
     } else if (tenantType.equalsIgnoreCase("broker")) {
-      return getTablesServedFromBrokerTenant(tenantName);
+      return getTablesServedFromBrokerTenant(tenantName, headers.getHeaderString(DATABASE));
     } else {
       throw new ControllerApplicationException(LOGGER, "Invalid tenant type: " + tenantType,
           Response.Status.BAD_REQUEST);
     }
   }
 
-  private String getTablesServedFromServerTenant(String tenantName) {
+  @GET
+  @Path("/tenants/{tenantName}/instancePartitions")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_INSTANCE_PARTITIONS)
+  @Authenticate(AccessType.READ)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Get the instance partitions of a tenant")
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success", response = InstancePartitions.class),
+      @ApiResponse(code = 404, message = "Instance partitions not found")})
+  public InstancePartitions getInstancePartitions(
+      @ApiParam(value = "Tenant name ", required = true) @PathParam("tenantName") String tenantName,
+      @ApiParam(value = "instancePartitionType (OFFLINE|CONSUMING|COMPLETED)", required = true,
+          allowableValues = "OFFLINE, CONSUMING, COMPLETED")
+      @QueryParam("instancePartitionType") String instancePartitionType) {
+    String tenantNameWithType = InstancePartitionsType.valueOf(instancePartitionType)
+        .getInstancePartitionsName(tenantName);
+    InstancePartitions instancePartitions =
+        InstancePartitionsUtils.fetchInstancePartitions(_pinotHelixResourceManager.getPropertyStore(),
+            tenantNameWithType);
+
+    if (instancePartitions == null) {
+      throw new ControllerApplicationException(LOGGER,
+          String.format("Failed to find the instance partitions for %s", tenantNameWithType),
+          Response.Status.NOT_FOUND);
+    } else {
+      return instancePartitions;
+    }
+  }
+
+  @PUT
+  @Path("/tenants/{tenantName}/instancePartitions")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.UPDATE_INSTANCE_PARTITIONS)
+  @Authenticate(AccessType.UPDATE)
+  @Consumes(MediaType.APPLICATION_JSON)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Update an instance partition for a server type in a tenant")
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success", response = InstancePartitions.class),
+      @ApiResponse(code = 400, message = "Failed to deserialize/validate the instance partitions"),
+      @ApiResponse(code = 500, message = "Error updating the tenant")})
+  public InstancePartitions assignInstancesPartitionMap(
+      @ApiParam(value = "Tenant name ", required = true) @PathParam("tenantName") String tenantName,
+      @ApiParam(value = "instancePartitionType (OFFLINE|CONSUMING|COMPLETED)", required = true,
+          allowableValues = "OFFLINE, CONSUMING, COMPLETED")
+      @QueryParam("instancePartitionType") String instancePartitionType,
+      String instancePartitionsStr) {
+    InstancePartitions instancePartitions;
+    try {
+      instancePartitions = JsonUtils.stringToObject(instancePartitionsStr, InstancePartitions.class);
+    } catch (IOException e) {
+      throw new ControllerApplicationException(LOGGER, "Failed to deserialize the instance partitions",
+          Response.Status.BAD_REQUEST);
+    }
+
+    String inputTenantName = InstancePartitionsType.valueOf(instancePartitionType)
+        .getInstancePartitionsName(tenantName);
+
+    if (!instancePartitions.getInstancePartitionsName().equals(inputTenantName)) {
+      throw new ControllerApplicationException(LOGGER, "Instance partitions name mismatch, expected: "
+          + inputTenantName
+          + ", got: " + instancePartitions.getInstancePartitionsName(), Response.Status.BAD_REQUEST);
+    }
+
+    persistInstancePartitionsHelper(instancePartitions);
+    return instancePartitions;
+  }
+
+  private void persistInstancePartitionsHelper(InstancePartitions instancePartitions) {
+    try {
+      LOGGER.info("Persisting instance partitions: {}", instancePartitions);
+      InstancePartitionsUtils.persistInstancePartitions(_pinotHelixResourceManager.getPropertyStore(),
+          instancePartitions);
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER, "Caught Exception while persisting the instance partitions",
+          Response.Status.INTERNAL_SERVER_ERROR, e);
+    }
+  }
+
+  private String getTablesServedFromServerTenant(String tenantName, @Nullable String database) {
     Set<String> tables = new HashSet<>();
     ObjectNode resourceGetRet = JsonUtils.newObjectNode();
 
-    for (String table : _pinotHelixResourceManager.getAllTables()) {
+    for (String table : _pinotHelixResourceManager.getAllTables(database)) {
       TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(table);
       if (tableConfig == null) {
         LOGGER.error("Unable to retrieve table config for table: {}", table);
@@ -306,11 +394,11 @@ public class PinotTenantRestletResource {
     return resourceGetRet.toString();
   }
 
-  private String getTablesServedFromBrokerTenant(String tenantName) {
+  private String getTablesServedFromBrokerTenant(String tenantName, @Nullable String database) {
     Set<String> tables = new HashSet<>();
     ObjectNode resourceGetRet = JsonUtils.newObjectNode();
 
-    for (String table : _pinotHelixResourceManager.getAllTables()) {
+    for (String table : _pinotHelixResourceManager.getAllTables(database)) {
       TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(table);
       if (tableConfig == null) {
         LOGGER.error("Unable to retrieve table config for table: {}", table);
@@ -501,7 +589,7 @@ public class PinotTenantRestletResource {
       }
     }
 
-    boolean enable = StateType.ENABLE.name().equalsIgnoreCase(state) ? true : false;
+    boolean enable = StateType.ENABLE.name().equalsIgnoreCase(state);
     ObjectNode instanceResult = JsonUtils.newObjectNode();
     String instance = null;
     try {
@@ -584,9 +672,10 @@ public class PinotTenantRestletResource {
   @ApiOperation(value = "Rebalances all the tables that are part of the tenant")
   public TenantRebalanceResult rebalance(
       @ApiParam(value = "Name of the tenant whose table are to be rebalanced", required = true)
-      @PathParam("tenantName") String tenantName, @ApiParam(required = true) TenantRebalanceContext context) {
-    context.setTenantName(tenantName);
-    return _tenantRebalancer.rebalance(context);
+      @PathParam("tenantName") String tenantName, @ApiParam(required = true) TenantRebalanceConfig config) {
+    // TODO decide on if the tenant rebalance should be database aware or not
+    config.setTenantName(tenantName);
+    return _tenantRebalancer.rebalance(config);
   }
 
   @GET
@@ -606,9 +695,9 @@ public class PinotTenantRestletResource {
       throw new ControllerApplicationException(LOGGER, "Failed to find controller job id: " + jobId,
           Response.Status.NOT_FOUND);
     }
-    TenantRebalanceProgressStats tenantRebalanceProgressStats =
-        JsonUtils.stringToObject(controllerJobZKMetadata.get(RebalanceConfigConstants.REBALANCE_PROGRESS_STATS),
-            TenantRebalanceProgressStats.class);
+    TenantRebalanceProgressStats tenantRebalanceProgressStats = JsonUtils.stringToObject(
+        controllerJobZKMetadata.get(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS),
+        TenantRebalanceProgressStats.class);
     long timeSinceStartInSecs = tenantRebalanceProgressStats.getTimeToFinishInSeconds();
     if (tenantRebalanceProgressStats.getCompletionStatusMsg() == null) {
       timeSinceStartInSecs =

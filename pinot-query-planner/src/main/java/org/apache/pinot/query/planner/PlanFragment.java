@@ -31,15 +31,12 @@ public class PlanFragment {
 
   private final int _fragmentId;
   private final PlanNode _fragmentRoot;
-  private final PlanFragmentMetadata _fragmentMetadata;
 
   private final List<PlanFragment> _children;
 
-  public PlanFragment(int fragmentId, PlanNode fragmentRoot, PlanFragmentMetadata fragmentMetadata,
-      List<PlanFragment> children) {
+  public PlanFragment(int fragmentId, PlanNode fragmentRoot, List<PlanFragment> children) {
     _fragmentId = fragmentId;
     _fragmentRoot = fragmentRoot;
-    _fragmentMetadata = fragmentMetadata;
     _children = children;
   }
 
@@ -49,10 +46,6 @@ public class PlanFragment {
 
   public PlanNode getFragmentRoot() {
     return _fragmentRoot;
-  }
-
-  public PlanFragmentMetadata getFragmentMetadata() {
-    return _fragmentMetadata;
   }
 
   public List<PlanFragment> getChildren() {

@@ -22,7 +22,7 @@ import org.apache.pinot.common.Utils;
 
 
 public enum MinionTimer implements AbstractMetrics.Timer {
-  TASK_EXECUTION(false), TASK_QUEUEING(false);
+  TASK_EXECUTION(false), TASK_QUEUEING(false), TASK_THREAD_CPU_TIME_NS(false);
 
   private final String _timerName;
   private final boolean _global;

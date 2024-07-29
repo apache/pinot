@@ -62,7 +62,7 @@ import org.roaringbitmap.RoaringBitmap;
  */
 public abstract class LinearSelectionOrderByOperator extends BaseOperator<SelectionResultsBlock> {
   protected final IndexSegment _indexSegment;
-
+  protected final QueryContext _queryContext;
   protected final boolean _nullHandlingEnabled;
   // Deduped order-by expressions followed by output expressions from SelectionOperatorUtils.extractExpressions()
   protected final List<ExpressionContext> _expressions;
@@ -83,6 +83,7 @@ public abstract class LinearSelectionOrderByOperator extends BaseOperator<Select
   public LinearSelectionOrderByOperator(IndexSegment indexSegment, QueryContext queryContext,
       List<ExpressionContext> expressions, BaseProjectOperator<?> projectOperator, int numSortedExpressions) {
     _indexSegment = indexSegment;
+    _queryContext = queryContext;
     _nullHandlingEnabled = queryContext.isNullHandlingEnabled();
     _expressions = expressions;
     _projectOperator = projectOperator;
@@ -213,7 +214,7 @@ public abstract class LinearSelectionOrderByOperator extends BaseOperator<Select
 
   @Override
   protected SelectionResultsBlock getNextBlock() {
-    return new SelectionResultsBlock(createDataSchema(), fetch(_listBuilderSupplier), _comparator);
+    return new SelectionResultsBlock(createDataSchema(), fetch(_listBuilderSupplier), _comparator, _queryContext);
   }
 
   protected DataSchema createDataSchema() {

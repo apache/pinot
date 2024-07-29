@@ -26,8 +26,8 @@ ifconfig
 netstat -i
 
 
-mvn license:check || exit 1
-mvn checkstyle:check || exit 1
-mvn spotless:check || exit 1
-mvn enforcer:enforce || exit 1
+mvn -B -ntp -T1C license:check || exit 1
+mvn -B -ntp -T1C checkstyle:check || exit 1
+mvn -B -ntp -T1C spotless:check || exit 1
+mvn -B -ntp -T1C enforcer:enforce || exit 1
 

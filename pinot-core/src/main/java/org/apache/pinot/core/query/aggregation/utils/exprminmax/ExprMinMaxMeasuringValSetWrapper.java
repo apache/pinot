@@ -23,7 +23,7 @@ import org.apache.pinot.core.common.BlockValSet;
 
 
 /**
- * Wrapper class for measuring columns in argmin/max aggregation function.
+ * Wrapper class for measuring columns in exprmin/max aggregation function.
  * Meanly used to do comparison without boxing primitive types.
  */
 public class ExprMinMaxMeasuringValSetWrapper extends ExprMinMaxWrapperValSet {

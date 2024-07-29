@@ -32,7 +32,7 @@ import javax.annotation.concurrent.NotThreadSafe;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
-import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.flink.metrics.Counter;
@@ -53,6 +53,7 @@ import org.apache.pinot.spi.ingestion.batch.BatchConfig;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.ingestion.batch.spec.Constants;
 import org.apache.pinot.spi.ingestion.segment.writer.SegmentWriter;
+import org.apache.pinot.spi.recordenricher.RecordEnricherPipeline;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -77,6 +78,7 @@ public class FlinkSegmentWriter implements SegmentWriter {
   private String _outputDirURI;
   private Schema _schema;
   private Set<String> _fieldsToRead;
+  private RecordEnricherPipeline _recordEnricherPipeline;
   private RecordTransformer _recordTransformer;
 
   private File _stagingDir;
@@ -137,6 +139,7 @@ public class FlinkSegmentWriter implements SegmentWriter {
 
     _schema = schema;
     _fieldsToRead = _schema.getColumnNames();
+    _recordEnricherPipeline = RecordEnricherPipeline.fromTableConfig(_tableConfig);
     _recordTransformer = CompositeTransformer.getDefaultTransformer(_tableConfig, _schema);
     _avroSchema = SegmentProcessorAvroUtils.convertPinotSchemaToAvroSchema(_schema);
     _reusableRecord = new GenericData.Record(_avroSchema);
@@ -152,7 +155,7 @@ public class FlinkSegmentWriter implements SegmentWriter {
     Preconditions.checkState(bufferDir.mkdirs(), "Failed to create buffer_dir: %s", bufferDir.getAbsolutePath());
     _bufferFile = new File(bufferDir, "buffer_file");
     resetBuffer();
-    LOGGER.info("Initialized {} for Pinot table: {}", this.getClass().getName(), _tableNameWithType);
+    LOGGER.info("Initialized {} for Pinot table: {}", this.getClass().getSimpleName(), _tableNameWithType);
   }
 
   private void registerMetrics(MetricGroup metricGrp) {
@@ -172,6 +175,7 @@ public class FlinkSegmentWriter implements SegmentWriter {
   public void collect(GenericRow row)
       throws IOException {
     long startTime = System.currentTimeMillis();
+    _recordEnricherPipeline.run(row);
     GenericRow transform = _recordTransformer.transform(row);
     SegmentProcessorAvroUtils.convertGenericRowToAvroRecord(transform, _reusableRecord, _fieldsToRead);
     _rowCount++;
@@ -258,7 +262,7 @@ public class FlinkSegmentWriter implements SegmentWriter {
   @Override
   public void close()
       throws IOException {
-    LOGGER.info("Closing {} for Pinot table: {}", this.getClass().getName(), _tableNameWithType);
+    LOGGER.info("Closing {} for Pinot table: {}", this.getClass().getSimpleName(), _tableNameWithType);
     _recordWriter.close();
     resetBuffer();
     _seqId = 0;

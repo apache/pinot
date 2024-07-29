@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.controller.helix.core.rebalance.tenant;
 
-
 public interface TenantRebalancer {
-  TenantRebalanceResult rebalance(TenantRebalanceContext context);
+  TenantRebalanceResult rebalance(TenantRebalanceConfig config);
 }

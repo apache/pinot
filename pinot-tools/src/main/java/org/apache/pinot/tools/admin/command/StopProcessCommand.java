@@ -95,7 +95,7 @@ public class StopProcessCommand extends AbstractBaseAdminCommand implements Comm
   @Override
   public boolean execute()
       throws Exception {
-    LOGGER.info("Executing command: " + toString());
+    LOGGER.info("Executing command: {}", toString());
 
     Map<String, String> processes = new HashMap<String, String>();
     String prefix = System.getProperty("java.io.tmpdir") + File.separator;

@@ -98,6 +98,7 @@ public class DateTruncTransformFunction extends BaseTransformFunction {
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
+    super.init(arguments, columnContextMap);
     Preconditions.checkArgument(arguments.size() >= 2 && arguments.size() <= 5,
         "Between two to five arguments are required, example: %s", EXAMPLE_INVOCATION);
     String unit = ((LiteralTransformFunction) arguments.get(0)).getStringLiteral().toLowerCase();

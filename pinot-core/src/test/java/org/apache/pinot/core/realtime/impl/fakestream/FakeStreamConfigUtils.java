@@ -140,12 +140,8 @@ public class FakeStreamConfigUtils {
    */
   public static StreamConfig getDefaultLowLevelStreamConfigs(int numPartitions) {
     Map<String, String> streamConfigMap = getDefaultStreamConfigs();
-    streamConfigMap
-        .put(StreamConfigProperties.constructStreamProperty(STREAM_TYPE, StreamConfigProperties.STREAM_CONSUMER_TYPES),
-            StreamConfig.ConsumerType.LOWLEVEL.toString());
     streamConfigMap.put(StreamConfigProperties.constructStreamProperty(STREAM_TYPE, NUM_PARTITIONS_KEY),
         String.valueOf(numPartitions));
-
     return new StreamConfig(TABLE_NAME_WITH_TYPE, streamConfigMap);
   }
 

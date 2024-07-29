@@ -26,23 +26,24 @@ import java.util.Arrays;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import org.apache.commons.configuration.ConfigurationException;
-import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.commons.configuration2.PropertiesConfiguration;
+import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
-import org.apache.pinot.segment.local.io.writer.impl.BaseChunkSVForwardIndexWriter;
 import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexCreatorFactory;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
+import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
@@ -248,13 +249,11 @@ public class DictionaryToRawIndexConverter {
    * @param segmentDir Segment directory
    * @param columns Converted columns
    * @param tableName New table name to be written in the meta-data. Skipped if null.
-   * @throws IOException
-   * @throws ConfigurationException
    */
   private void updateMetadata(File segmentDir, String[] columns, String tableName)
-      throws IOException, ConfigurationException {
+      throws ConfigurationException {
     File metadataFile = new File(segmentDir, V1Constants.MetadataKeys.METADATA_FILE_NAME);
-    PropertiesConfiguration properties = new PropertiesConfiguration(metadataFile);
+    PropertiesConfiguration properties = CommonsConfigurationUtils.fromFile(metadataFile);
 
     if (tableName != null) {
       properties
@@ -267,7 +266,7 @@ public class DictionaryToRawIndexConverter {
       properties.setProperty(
           V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.BITS_PER_ELEMENT), -1);
     }
-    properties.save();
+    CommonsConfigurationUtils.saveToFile(properties, metadataFile);
   }
 
   /**
@@ -317,9 +316,10 @@ public class DictionaryToRawIndexConverter {
     int numDocs = segment.getSegmentMetadata().getTotalDocs();
     int lengthOfLongestEntry = (storedType == DataType.STRING) ? getLengthOfLongestEntry(dictionary) : -1;
 
-    try (ForwardIndexCreator rawIndexCreator = ForwardIndexCreatorFactory
-        .getRawIndexCreatorForSVColumn(newSegment, compressionType, column, storedType, numDocs, lengthOfLongestEntry,
-            false, BaseChunkSVForwardIndexWriter.DEFAULT_VERSION);
+    try (ForwardIndexCreator rawIndexCreator = ForwardIndexCreatorFactory.getRawIndexCreatorForSVColumn(newSegment,
+        compressionType, column, storedType, numDocs, lengthOfLongestEntry, false,
+        ForwardIndexConfig.DEFAULT_RAW_WRITER_VERSION, ForwardIndexConfig.DEFAULT_TARGET_MAX_CHUNK_SIZE_BYTES,
+        ForwardIndexConfig.DEFAULT_TARGET_DOCS_PER_CHUNK);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext()) {
       switch (storedType) {
         case INT:

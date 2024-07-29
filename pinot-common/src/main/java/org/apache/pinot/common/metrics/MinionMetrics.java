@@ -18,11 +18,23 @@
  */
 package org.apache.pinot.common.metrics;
 
+import java.util.concurrent.atomic.AtomicReference;
+import org.apache.pinot.spi.metrics.NoopPinotMetricsRegistry;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
 public class MinionMetrics extends AbstractMetrics<MinionQueryPhase, MinionMeter, MinionGauge, MinionTimer> {
+  private static final MinionMetrics NOOP = new MinionMetrics(new NoopPinotMetricsRegistry());
+  private static final AtomicReference<MinionMetrics> MINION_METRICS_INSTANCE = new AtomicReference<>(NOOP);
+
+  public static boolean register(MinionMetrics minionMetrics) {
+    return MINION_METRICS_INSTANCE.compareAndSet(NOOP, minionMetrics);
+  }
+
+  public static MinionMetrics get() {
+    return MINION_METRICS_INSTANCE.get();
+  }
 
   public MinionMetrics(PinotMetricsRegistry metricsRegistry) {
     this(CommonConstants.Minion.CONFIG_OF_METRICS_PREFIX, metricsRegistry);

@@ -36,7 +36,7 @@ public class ResultsBlockUtilsTest {
       throws IOException {
     // Selection
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT * FROM testTable WHERE foo = 'bar'");
-    DataTable dataTable = ResultsBlockUtils.buildEmptyQueryResults(queryContext).getDataTable(queryContext);
+    DataTable dataTable = ResultsBlockUtils.buildEmptyQueryResults(queryContext).getDataTable();
     DataSchema dataSchema = dataTable.getDataSchema();
     assertEquals(dataSchema.getColumnNames(), new String[]{"*"});
     assertEquals(dataSchema.getColumnDataTypes(), new ColumnDataType[]{ColumnDataType.STRING});
@@ -45,7 +45,7 @@ public class ResultsBlockUtilsTest {
     // Aggregation
     queryContext =
         QueryContextConverterUtils.getQueryContext("SELECT COUNT(*), SUM(a), MAX(b) FROM testTable WHERE foo = 'bar'");
-    dataTable = ResultsBlockUtils.buildEmptyQueryResults(queryContext).getDataTable(queryContext);
+    dataTable = ResultsBlockUtils.buildEmptyQueryResults(queryContext).getDataTable();
     dataSchema = dataTable.getDataSchema();
     assertEquals(dataSchema.getColumnNames(), new String[]{"count(*)", "sum(a)", "max(b)"});
     assertEquals(dataSchema.getColumnDataTypes(), new ColumnDataType[]{
@@ -59,7 +59,7 @@ public class ResultsBlockUtilsTest {
     // Group-by
     queryContext = QueryContextConverterUtils.getQueryContext(
         "SELECT c, d, COUNT(*), SUM(a), MAX(b) FROM testTable WHERE foo = 'bar' GROUP BY c, d");
-    dataTable = ResultsBlockUtils.buildEmptyQueryResults(queryContext).getDataTable(queryContext);
+    dataTable = ResultsBlockUtils.buildEmptyQueryResults(queryContext).getDataTable();
     dataSchema = dataTable.getDataSchema();
     assertEquals(dataSchema.getColumnNames(), new String[]{"c", "d", "count(*)", "sum(a)", "max(b)"});
     assertEquals(dataSchema.getColumnDataTypes(), new ColumnDataType[]{
@@ -69,7 +69,7 @@ public class ResultsBlockUtilsTest {
 
     // Distinct
     queryContext = QueryContextConverterUtils.getQueryContext("SELECT DISTINCT a, b FROM testTable WHERE foo = 'bar'");
-    dataTable = ResultsBlockUtils.buildEmptyQueryResults(queryContext).getDataTable(queryContext);
+    dataTable = ResultsBlockUtils.buildEmptyQueryResults(queryContext).getDataTable();
     dataSchema = dataTable.getDataSchema();
     assertEquals(dataSchema.getColumnNames(), new String[]{"a", "b"});
     assertEquals(dataSchema.getColumnDataTypes(), new ColumnDataType[]{

@@ -119,12 +119,17 @@ public abstract class ChildAggregationFunction implements AggregationFunction<Lo
     return 0L;
   }
 
+  @Override
+  public Long mergeFinalResult(Long finalResult1, Long finalResult2) {
+    return 0L;
+  }
+
   /**
    * The name of the column as follows:
    * CHILD_AGGREGATION_NAME_PREFIX + actual function type + operands + CHILD_AGGREGATION_SEPERATOR
    * + actual function type + parent aggregation function id + CHILD_KEY_SEPERATOR + column key in parent function
    * e.g. if the child aggregation function is "exprmax(0,a,b,x)", the name of the column is
-   * "pinotchildaggregationepxrmax(a,b,x)@argmax0_x"
+   * "pinotchildaggregationepxrmax(a,b,x)@exprmax0_x"
    */
   @Override
   public final String getResultColumnName() {

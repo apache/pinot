@@ -34,25 +34,19 @@ import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 public class SelectionResultsBlock extends BaseResultsBlock {
   private final DataSchema _dataSchema;
   private final Comparator<? super Object[]> _comparator;
+  private final QueryContext _queryContext;
   private List<Object[]> _rows;
 
   public SelectionResultsBlock(DataSchema dataSchema, List<Object[]> rows,
-      @Nullable Comparator<? super Object[]> comparator) {
+      @Nullable Comparator<? super Object[]> comparator, QueryContext queryContext) {
     _dataSchema = dataSchema;
     _rows = rows;
     _comparator = comparator;
+    _queryContext = queryContext;
   }
 
-  public SelectionResultsBlock(DataSchema dataSchema, List<Object[]> rows) {
-    this(dataSchema, rows, null);
-  }
-
-  public DataSchema getDataSchema() {
-    return _dataSchema;
-  }
-
-  public List<Object[]> getRows() {
-    return _rows;
+  public SelectionResultsBlock(DataSchema dataSchema, List<Object[]> rows, QueryContext queryContext) {
+    this(dataSchema, rows, null, queryContext);
   }
 
   public void setRows(List<Object[]> rows) {
@@ -70,18 +64,23 @@ public class SelectionResultsBlock extends BaseResultsBlock {
   }
 
   @Override
-  public DataSchema getDataSchema(QueryContext queryContext) {
+  public QueryContext getQueryContext() {
+    return _queryContext;
+  }
+
+  @Override
+  public DataSchema getDataSchema() {
     return _dataSchema;
   }
 
   @Override
-  public List<Object[]> getRows(QueryContext queryContext) {
+  public List<Object[]> getRows() {
     return _rows;
   }
 
   @Override
-  public DataTable getDataTable(QueryContext queryContext)
+  public DataTable getDataTable()
       throws IOException {
-    return SelectionOperatorUtils.getDataTableFromRows(_rows, _dataSchema, queryContext.isNullHandlingEnabled());
+    return SelectionOperatorUtils.getDataTableFromRows(_rows, _dataSchema, _queryContext.isNullHandlingEnabled());
   }
 }

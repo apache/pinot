@@ -18,33 +18,33 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
-import com.google.common.collect.ImmutableList;
 import java.util.List;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.routing.VirtualServerAddress;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.mockito.Mock;
-import org.mockito.Mockito;
-import org.mockito.MockitoAnnotations;
-import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.when;
+import static org.mockito.MockitoAnnotations.openMocks;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
+
 
 public class LiteralValueOperatorTest {
-
   private AutoCloseable _mocks;
-
   @Mock
   private VirtualServerAddress _serverAddress;
 
   @BeforeMethod
   public void setUp() {
-    _mocks = MockitoAnnotations.openMocks(this);
-    Mockito.when(_serverAddress.toString()).thenReturn(new VirtualServerAddress("mock", 80, 0).toString());
+    _mocks = openMocks(this);
+    when(_serverAddress.toString()).thenReturn(new VirtualServerAddress("mock", 80, 0).toString());
   }
 
   @AfterMethod
@@ -58,33 +58,40 @@ public class LiteralValueOperatorTest {
     // Given:
     DataSchema schema = new DataSchema(new String[]{"sLiteral", "iLiteral"},
         new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.INT});
-    List<List<RexExpression>> literals = ImmutableList.of(
-        ImmutableList.of(new RexExpression.Literal(ColumnDataType.STRING, "foo"),
+    List<List<RexExpression.Literal>> literalRows = List.of(
+        List.of(new RexExpression.Literal(ColumnDataType.STRING, "foo"),
             new RexExpression.Literal(ColumnDataType.INT, 1)),
-        ImmutableList.of(new RexExpression.Literal(ColumnDataType.STRING, ""),
+        List.of(new RexExpression.Literal(ColumnDataType.STRING, ""),
             new RexExpression.Literal(ColumnDataType.INT, 2)));
-    LiteralValueOperator operator = new LiteralValueOperator(OperatorTestUtil.getDefaultContext(), schema, literals);
+    LiteralValueOperator operator = getOperator(schema, literalRows);
 
     // When:
-    TransferableBlock transferableBlock = operator.nextBlock();
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
 
     // Then:
-    Assert.assertEquals(transferableBlock.getContainer().get(0), new Object[]{"foo", 1});
-    Assert.assertEquals(transferableBlock.getContainer().get(1), new Object[]{"", 2});
-    Assert.assertTrue(operator.nextBlock().isEndOfStreamBlock(), "Expected EOS after reading two rows");
+    assertEquals(resultRows.size(), 2);
+    assertEquals(resultRows.get(0), new Object[]{"foo", 1});
+    assertEquals(resultRows.get(1), new Object[]{"", 2});
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Expected EOS after reading two rows");
   }
 
   @Test
   public void shouldHandleEmptyLiteralRows() {
     // Given:
-    DataSchema schema = new DataSchema(new String[]{}, new ColumnDataType[]{});
-    List<List<RexExpression>> literals = ImmutableList.of(ImmutableList.of());
-    LiteralValueOperator operator = new LiteralValueOperator(OperatorTestUtil.getDefaultContext(), schema, literals);
+    LiteralValueOperator operator =
+        getOperator(new DataSchema(new String[0], new ColumnDataType[0]), List.of(List.of()));
 
     // When:
-    TransferableBlock transferableBlock = operator.nextBlock();
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
 
     // Then:
-    Assert.assertEquals(transferableBlock.getContainer().get(0), new Object[]{});
+    assertEquals(resultRows.size(), 1);
+    assertEquals(resultRows.get(0), new Object[]{});
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock());
+  }
+
+  private static LiteralValueOperator getOperator(DataSchema schema, List<List<RexExpression.Literal>> literalRows) {
+    return new LiteralValueOperator(OperatorTestUtil.getTracingContext(),
+        new ValueNode(-1, schema, PlanNode.NodeHint.EMPTY, List.of(), literalRows));
   }
 }

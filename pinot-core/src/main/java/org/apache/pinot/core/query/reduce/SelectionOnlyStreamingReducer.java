@@ -21,6 +21,7 @@ package org.apache.pinot.core.query.reduce;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
@@ -58,7 +59,7 @@ public class SelectionOnlyStreamingReducer implements StreamingReducer {
     int numColumns = dataTable.getDataSchema().size();
     int numRows = dataTable.getNumberOfRows();
     if (nullHandlingEnabled) {
-      RoaringBitmap[] nullBitmaps = new RoaringBitmap[numColumns];;
+      RoaringBitmap[] nullBitmaps = new RoaringBitmap[numColumns];
       for (int coldId = 0; coldId < numColumns; coldId++) {
         nullBitmaps[coldId] = dataTable.getNullRowIds(coldId);
       }
@@ -88,16 +89,19 @@ public class SelectionOnlyStreamingReducer implements StreamingReducer {
 
   @Override
   public BrokerResponseNative seal() {
-    BrokerResponseNative brokerResponseNative = new BrokerResponseNative();
-    List<String> selectionColumns = SelectionOperatorUtils.getSelectionColumns(_queryContext, _dataSchema);
-    if (_dataSchema != null && _rows.size() > 0) {
-      brokerResponseNative.setResultTable(
-          SelectionOperatorUtils.renderResultTableWithoutOrdering(_rows, _dataSchema, selectionColumns));
-    } else {
-      // For empty data table map, construct empty result using the cached data schema for selection query
-      DataSchema selectionDataSchema = SelectionOperatorUtils.getResultTableDataSchema(_dataSchema, selectionColumns);
-      brokerResponseNative.setResultTable(new ResultTable(selectionDataSchema, Collections.emptyList()));
+    if (_dataSchema == null) {
+      return BrokerResponseNative.empty();
     }
-    return brokerResponseNative;
+    Pair<DataSchema, int[]> pair =
+        SelectionOperatorUtils.getResultTableDataSchemaAndColumnIndices(_queryContext, _dataSchema);
+    ResultTable resultTable;
+    if (_rows.isEmpty()) {
+      resultTable = new ResultTable(pair.getLeft(), Collections.emptyList());
+    } else {
+      resultTable = SelectionOperatorUtils.renderResultTableWithoutOrdering(_rows, pair.getLeft(), pair.getRight());
+    }
+    BrokerResponseNative brokerResponse = new BrokerResponseNative();
+    brokerResponse.setResultTable(resultTable);
+    return brokerResponse;
   }
 }

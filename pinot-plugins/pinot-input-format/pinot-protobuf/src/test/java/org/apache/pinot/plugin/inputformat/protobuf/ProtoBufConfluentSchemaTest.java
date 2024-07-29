@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.inputformat.protobuf;
 
+import com.google.protobuf.ByteString;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.Message;
 import io.confluent.kafka.serializers.AbstractKafkaSchemaSerDeConfig;
@@ -30,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.function.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
@@ -72,9 +74,16 @@ public class ProtoBufConfluentSchemaTest {
     int numRecords = 10;
     List<Sample.SampleRecord> recordList = new ArrayList<>();
     for (int i = 0; i < numRecords; i++) {
-      Sample.SampleRecord sampleRecord = Sample.SampleRecord.newBuilder().addFriends(UUID.randomUUID().toString())
-          .addFriends(UUID.randomUUID().toString()).setEmail(UUID.randomUUID().toString())
-          .setName(UUID.randomUUID().toString()).setId(i).build();
+      Sample.SampleRecord.Builder builder = Sample.SampleRecord.newBuilder()
+          .addFriends(UUID.randomUUID().toString())
+          .addFriends(UUID.randomUUID().toString())
+          .setEmail(UUID.randomUUID().toString())
+          .setName(UUID.randomUUID().toString())
+          .setId(i);
+      if (i % 2 == 0) {
+        builder.setOptionalField(UUID.randomUUID().toString());
+      }
+      Sample.SampleRecord sampleRecord = builder.build();
 
       _protoProducer.send(new ProducerRecord<>(TOPIC_PROTO, sampleRecord));
       recordList.add(sampleRecord);
@@ -94,8 +103,16 @@ public class ProtoBufConfluentSchemaTest {
     ConsumerRecords<byte[], byte[]> consumerRecords = kafkaConsumer.poll(Duration.ofMillis(1000));
     Iterator<ConsumerRecord<byte[], byte[]>> iter = consumerRecords.iterator();
 
+    Consumer<Message> onMessage = message -> {
+      // we use this to verify we are not creating/consuming modified descriptors
+      // older versions of confluent connectors (7.1.x and lower) used to rewrite proto3 optional as oneof at descriptor
+      // level. Newer versions of confluent consumers support both alternatives.
+      Descriptors.FieldDescriptor optionalField = message.getDescriptorForType().findFieldByName("optionalField");
+      Assert.assertNull(optionalField.getRealContainingOneof(), "Received protobuf have been rewritten");
+    };
+
     KafkaConfluentSchemaRegistryProtoBufMessageDecoder decoder =
-        new KafkaConfluentSchemaRegistryProtoBufMessageDecoder();
+        new KafkaConfluentSchemaRegistryProtoBufMessageDecoder(onMessage);
     Map<String, String> decoderProps = new HashMap<>();
     decoderProps.put("schema.registry.rest.url", _schemaRegistry.getUrl());
     decoder.init(decoderProps, null, TOPIC_PROTO);
@@ -114,12 +131,20 @@ public class ProtoBufConfluentSchemaTest {
       Sample.SampleRecord originalValue = recordList.get(i);
       GenericRow decodedValue = result.get(i);
 
-      for (Map.Entry<Descriptors.FieldDescriptor, Object> fieldWithValue : originalValue.getAllFields().entrySet()) {
-        Assert.assertNotNull(decodedValue.getValue(fieldWithValue.getKey().getName()));
-        if (!fieldWithValue.getKey().isRepeated()) {
-          Assert.assertEquals(fieldWithValue.getValue(), decodedValue.getValue(fieldWithValue.getKey().getName()));
-        }
-      }
+      Assert.assertEquals(decodedValue.getValue("name"), originalValue.getName(), "Unexpected 'name' value");
+      Assert.assertEquals(decodedValue.getValue("id"), originalValue.getId(), "Unexpected 'id' value");
+      Assert.assertEquals(decodedValue.getValue("email"), originalValue.getEmail(), "Unexpected 'email' value");
+
+      Object[] expectedFriends = originalValue.getFriendsList()
+          .asByteStringList()
+          .stream()
+          .map(ByteString::toStringUtf8)
+          .toArray(Object[]::new);
+      Assert.assertEquals(decodedValue.getValue("friends"), expectedFriends, "Unexpected 'friends' value");
+
+      String expectedOptionalField = i % 2 == 0 ? originalValue.getOptionalField() : null;
+      Assert.assertEquals(decodedValue.getValue("optionalField"), expectedOptionalField,
+          "Unexpected 'optionalField' value");
     }
   }
 

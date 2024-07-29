@@ -182,7 +182,7 @@ public class MutableSegmentImplIngestionAggregationTest {
     }
 
     List<ExpressionContext> arguments = Arrays.asList(ExpressionContext.forIdentifier("metric"),
-        ExpressionContext.forLiteralContext(Literal.stringValue("12")));
+        ExpressionContext.forLiteral(Literal.stringValue("12")));
     DistinctCountHLLValueAggregator valueAggregator = new DistinctCountHLLValueAggregator(arguments);
 
     Set<Integer> integers = new HashSet<>();
@@ -480,6 +480,8 @@ public class MutableSegmentImplIngestionAggregationTest {
     Assert.assertThrows(IllegalArgumentException.class, () -> {
       mutableSegmentImpl.index(row, defaultMetadata);
     });
+
+    mutableSegmentImpl.destroy();
   }
 
   private BigDecimal generateRandomBigDecimal(Random random, int maxPrecision, int scale) {

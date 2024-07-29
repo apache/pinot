@@ -394,7 +394,9 @@ public enum PinotDataType {
 
     @Override
     public BigDecimal toBigDecimal(Object value) {
-      return BigDecimal.valueOf((Float) value);
+      // Use string representation of the value to create BigDecimal to avoid getting the exact floating-point value.
+      // new BigDecimal(123.45f) -> 123.4499969482421875
+      return new BigDecimal(value.toString());
     }
 
     @Override
@@ -446,11 +448,9 @@ public enum PinotDataType {
 
     @Override
     public BigDecimal toBigDecimal(Object value) {
-      // Note:
-      // - BigDecimal.valueOf(double): uses the canonical String representation of the double value passed
-      //     in to instantiate the BigDecimal object.
-      // - new BigDecimal(double): attempts to represent the double value as accurately as possible.
-      return BigDecimal.valueOf((Double) value);
+      // Use string representation of the value to create BigDecimal to avoid getting the exact floating-point value.
+      // new BigDecimal(123.45) -> 123.4500000000000028421709430404007434844970703125
+      return new BigDecimal(value.toString());
     }
 
     @Override
@@ -901,12 +901,34 @@ public enum PinotDataType {
     public boolean[] convert(Object value, PinotDataType sourceType) {
       return sourceType.toBooleanArray(value);
     }
+
+    @Override
+    public Integer[] toInternal(Object value) {
+      boolean[] booleanArray = (boolean[]) value;
+      int length = booleanArray.length;
+      Integer[] intArray = new Integer[length];
+      for (int i = 0; i < length; i++) {
+        intArray[i] = booleanArray[i] ? 1 : 0;
+      }
+      return intArray;
+    }
   },
 
   TIMESTAMP_ARRAY {
     @Override
     public Object convert(Object value, PinotDataType sourceType) {
       return sourceType.toTimestampArray(value);
+    }
+
+    @Override
+    public Long[] toInternal(Object value) {
+      Timestamp[] timestampArray = (Timestamp[]) value;
+      int length = timestampArray.length;
+      Long[] longArray = new Long[length];
+      for (int i = 0; i < length; i++) {
+        longArray[i] = timestampArray[i].getTime();
+      }
+      return longArray;
     }
   },
 
@@ -974,7 +996,7 @@ public enum PinotDataType {
         // String does not represent a well-formed JSON. Ignore this exception because we are going to try to convert
         // Java String object to JSON string.
       } catch (Exception e) {
-          throw new RuntimeException("Unable to convert String into JSON. Input value: " + value, e);
+        throw new RuntimeException("Unable to convert String into JSON. Input value: " + value, e);
       }
     }
 
@@ -1232,7 +1254,7 @@ public enum PinotDataType {
       return (boolean[]) value;
     }
     if (isSingleValue()) {
-      return new boolean[] {toBoolean(value)};
+      return new boolean[]{toBoolean(value)};
     } else {
       Object[] valueArray = toObjectArray(value);
       int length = valueArray.length;
@@ -1250,7 +1272,7 @@ public enum PinotDataType {
       return (Timestamp[]) value;
     }
     if (isSingleValue()) {
-      return new Timestamp[] {toTimestamp(value)};
+      return new Timestamp[]{toTimestamp(value)};
     } else {
       Object[] valueArray = toObjectArray(value);
       int length = valueArray.length;
@@ -1272,6 +1294,8 @@ public enum PinotDataType {
    * <ul>
    *   <li>BOOLEAN -> int</li>
    *   <li>TIMESTAMP -> long</li>
+   *   <li>BOOLEAN_ARRAY -> int[]</li>
+   *   <li>TIMESTAMP_ARRAY -> long[]</li>
    * </ul>
    */
   public Object toInternal(Object value) {
@@ -1476,6 +1500,8 @@ public enum PinotDataType {
         return JSON;
       case BYTES:
         return BYTES;
+      case OBJECT:
+        return OBJECT;
       case INT_ARRAY:
         return PRIMITIVE_INT_ARRAY;
       case LONG_ARRAY:

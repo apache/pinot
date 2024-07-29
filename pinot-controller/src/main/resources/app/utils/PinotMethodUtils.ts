@@ -19,7 +19,7 @@
 
 import jwtDecode from "jwt-decode";
 import { get, map, each, isEqual, isArray, keys, union } from 'lodash';
-import { DataTable, SQLResult } from 'Models';
+import { DataTable, SegmentMetadata, SqlException, SQLResult, TableSize } from 'Models';
 import moment from 'moment';
 import {
   getTenants,
@@ -267,19 +267,23 @@ const getQueryResults = (params) => {
   return getQueryResult(params).then(({ data }) => {
     let queryResponse = getAsObject(data);
 
-    let errorStr = '';
+    let exceptions: SqlException[] = [];
     let dataArray = [];
     let columnList = [];
     // if sql api throws error, handle here
     if(typeof queryResponse === 'string'){
-      errorStr = queryResponse;
-    } 
-    if (queryResponse && queryResponse.exceptions && queryResponse.exceptions.length) {
-      try{
-        errorStr = JSON.stringify(queryResponse.exceptions, null, 2);
-      } catch {
-        errorStr = "";
+      exceptions.push({errorCode: null, message: queryResponse});
+    }
+    // if sql api returns a structured error with a `code`, handle here
+    if (queryResponse && queryResponse.code) {
+      if (queryResponse.error) {
+        exceptions.push({errorCode: null, message: "Query failed with error code: " + queryResponse.code + " and error: " + queryResponse.error});
+      } else {
+        exceptions.push({errorCode: null, message: "Query failed with error code: " + queryResponse.code + " but no logs. Please see controller logs for error."});
       }
+    }
+    if (queryResponse && queryResponse.exceptions && queryResponse.exceptions.length) {
+      exceptions = queryResponse.exceptions as SqlException[];
     } 
     if (queryResponse.resultTable?.dataSchema?.columnNames?.length) {
       columnList = queryResponse.resultTable.dataSchema.columnNames;
@@ -311,7 +315,7 @@ const getQueryResults = (params) => {
     ];
 
     return {
-      error: errorStr,
+      exceptions: exceptions,
       result: {
         columns: columnList,
         records: dataArray,
@@ -348,7 +352,6 @@ const getTenantTableData = (tenantName) => {
 const getSchemaObject = async (schemaName) =>{
   let schemaObj:Array<any> = [];
     let {data} = await getSchema(schemaName);
-    console.log(data);
       schemaObj.push(data.schemaName);
       schemaObj.push(data.dimensionFieldSpecs ? data.dimensionFieldSpecs.length : 0);
       schemaObj.push(data.dateTimeFieldSpecs ? data.dateTimeFieldSpecs.length : 0);
@@ -405,6 +408,30 @@ const allTableDetailsColumnHeader = [
   'Status',
 ];
 
+const getTableSizes = (tableName: string) => {
+  return getTableSize(tableName).then(result => {
+    return {
+      reported_size: Utils.formatBytes(result.data.reportedSizeInBytes),
+      estimated_size: Utils.formatBytes(result.data.estimatedSizeInBytes),
+    };
+  })
+}
+
+const getSegmentCountAndStatus = (tableName: string) => {
+  return getIdealState(tableName).then(result => {
+    const idealState = result.data.OFFLINE || result.data.REALTIME || {};
+    return getExternalView(tableName).then(result => {
+      const externalView = result.data.OFFLINE || result.data.REALTIME || {};
+      const externalSegmentCount = Object.keys(externalView).length;
+      const idealSegmentCount = Object.keys(idealState).length;
+      return {
+        segment_count: `${externalSegmentCount} / ${idealSegmentCount}`,
+        segment_status: Utils.getSegmentStatus(idealState, externalView)
+      };
+    });
+  });
+}
+
 const getAllTableDetails = (tablesList) => {
   if (tablesList.length) {
     const promiseArr = [];
@@ -460,10 +487,10 @@ const getAllTableDetails = (tablesList) => {
       };
     });
   }
-  return {
+  return Promise.resolve({
     columns: allTableDetailsColumnHeader,
     records: []
-  };
+  });
 };
 
 // This method is used to display summary of a particular tenant table
@@ -552,7 +579,7 @@ const getSegmentDetails = (tableName, segmentName) => {
 
   return Promise.all(promiseArr).then((results) => {
     const obj = results[0].data.OFFLINE || results[0].data.REALTIME;
-    const segmentMetaData = results[1].data;
+    const segmentMetaData: SegmentMetadata = results[1].data;
     const debugObj = results[2].data;
     let debugInfoObj = {};
 
@@ -565,7 +592,6 @@ const getSegmentDetails = (tableName, segmentName) => {
         });
       }
     }
-    console.log(debugInfoObj);
 
     const result = [];
     for (const prop in obj[segmentName]) {
@@ -715,13 +741,13 @@ const deleteNode = (path) => {
   });
 };
 
-const getBrokerOfTenant = (tenantName) => {
+const getBrokerOfTenant = (tenantName: string) => {
   return getBrokerListOfTenant(tenantName).then((response)=>{
     return !response.data.error ? response.data : [];
   });
 };
 
-const getServerOfTenant = (tenantName) => {
+const getServerOfTenant = (tenantName: string) => {
   return getServerListOfTenant(tenantName).then((response)=>{
     return !response.data.error ? response.data.ServerInstances : [];
   });
@@ -782,7 +808,12 @@ const getAllTaskTypes = async () => {
 const getTaskInfo = async (taskType) => {
   const tasksRes = await getTaskTypeTasks(taskType);
   const stateRes = await getTaskTypeState(taskType);
-  const state = get(stateRes, 'data', '');
+
+  let state = get(stateRes, 'data', '');
+  // response contains error
+  if(typeof state !== "string") {
+    state = "";
+  }
   return [tasksRes?.data?.length || 0, state];
 };
 
@@ -1218,6 +1249,7 @@ export default {
   getSegmentStatus,
   getTableDetails,
   getSegmentDetails,
+  getSegmentCountAndStatus,
   getClusterName,
   getLiveInstance,
   getLiveInstanceConfig,
@@ -1240,6 +1272,7 @@ export default {
   fetchSegmentReloadStatus,
   getTaskTypeDebugData,
   getTableData,
+  getTableSizes,
   getTaskRuntimeConfigData,
   getTaskInfo,
   stopAllTasks,

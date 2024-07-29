@@ -40,6 +40,7 @@ import org.apache.pinot.segment.spi.creator.name.FixedSegmentNameGenerator;
 import org.apache.pinot.segment.spi.creator.name.NormalizedDateSegmentNameGenerator;
 import org.apache.pinot.segment.spi.creator.name.SegmentNameGenerator;
 import org.apache.pinot.segment.spi.creator.name.SimpleSegmentNameGenerator;
+import org.apache.pinot.segment.spi.creator.name.UploadedRealtimeSegmentNameGenerator;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
@@ -66,8 +67,6 @@ import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.TimestampIndexUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -78,9 +77,7 @@ public class SegmentGeneratorConfig implements Serializable {
     EPOCH, SIMPLE_DATE
   }
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentGeneratorConfig.class);
   public static final String GENERATE_INV_BEFORE_PUSH_DEPREC_PROP = "generate.inverted.index.before.push";
-
   private final TableConfig _tableConfig;
   // NOTE: Use TreeMap to guarantee the order. The custom properties will be written into the segment metadata.
   private final TreeMap<String, String> _customProperties = new TreeMap<>();
@@ -111,6 +108,8 @@ public class SegmentGeneratorConfig implements Serializable {
   private String _creatorVersion = null;
   private SegmentNameGenerator _segmentNameGenerator = null;
   private SegmentPartitionConfig _segmentPartitionConfig = null;
+
+  private int _uploadedSegmentPartitionId = -1;
   private int _sequenceId = -1;
   private TimeColumnType _timeColumnType = TimeColumnType.EPOCH;
   private DateTimeFormatSpec _dateTimeFormatSpec = null;
@@ -124,6 +123,9 @@ public class SegmentGeneratorConfig implements Serializable {
   private boolean _optimizeDictionary = false;
   private boolean _optimizeDictionaryForMetrics = false;
   private double _noDictionarySizeRatioThreshold = IndexingConfig.DEFAULT_NO_DICTIONARY_SIZE_RATIO_THRESHOLD;
+  private boolean _realtimeConversion = false;
+  // consumerDir contains data from the consuming segment, and is used during _realtimeConversion optimization
+  private File _consumerDir;
   private final Map<String, FieldIndexConfigs> _indexConfigsByColName;
 
   // constructed from FieldConfig
@@ -278,7 +280,8 @@ public class SegmentGeneratorConfig implements Serializable {
     if (fieldConfigList != null) {
       for (FieldConfig fieldConfig : fieldConfigList) {
         if (fieldConfig.getEncodingType() == FieldConfig.EncodingType.RAW
-            && fieldConfig.getCompressionCodec() != null) {
+            && fieldConfig.getCompressionCodec() != null
+            && fieldConfig.getCompressionCodec().isApplicableToRawIndex()) {
           _rawIndexCreationColumns.add(fieldConfig.getName());
           _rawIndexCompressionType.put(fieldConfig.getName(),
               ChunkCompressionType.valueOf(fieldConfig.getCompressionCodec().name()));
@@ -377,7 +380,7 @@ public class SegmentGeneratorConfig implements Serializable {
   public void setInputFilePath(String inputFilePath) {
     Preconditions.checkNotNull(inputFilePath);
     File inputFile = new File(inputFilePath);
-    Preconditions.checkState(inputFile.exists(), "Input path {} does not exist.", inputFilePath);
+    Preconditions.checkState(inputFile.exists(), "Input path %s does not exist.", inputFilePath);
     _inputFilePath = inputFile.getAbsolutePath();
   }
 
@@ -463,6 +466,9 @@ public class SegmentGeneratorConfig implements Serializable {
     _segmentTimeColumnName = timeColumnName;
   }
 
+  public int getUploadedSegmentPartitionId() {
+    return _uploadedSegmentPartitionId;
+  }
   public int getSequenceId() {
     return _sequenceId;
   }
@@ -473,6 +479,13 @@ public class SegmentGeneratorConfig implements Serializable {
 
   public FSTType getFSTIndexType() {
     return _fstTypeForFSTIndex;
+  }
+
+  /**
+   * Use this method to add partitionId if it is generated externally during segment upload
+   */
+  public void setUploadedSegmentPartitionId(int partitionId) {
+    _uploadedSegmentPartitionId = partitionId;
   }
 
   /**
@@ -581,6 +594,9 @@ public class SegmentGeneratorConfig implements Serializable {
             IngestionConfigUtils.getBatchSegmentIngestionType(_tableConfig),
             IngestionConfigUtils.getBatchSegmentIngestionFrequency(_tableConfig), _dateTimeFormatSpec,
             _segmentNamePostfix);
+      case BatchConfigProperties.SegmentNameGeneratorType.UPLOADED_REALTIME:
+        return new UploadedRealtimeSegmentNameGenerator(_rawTableName, _uploadedSegmentPartitionId,
+            Long.parseLong(_segmentCreationTime), _segmentNamePrefix, _segmentNamePostfix);
       default:
         return new SimpleSegmentNameGenerator(_segmentNamePrefix != null ? _segmentNamePrefix : _rawTableName,
             _segmentNamePostfix);
@@ -598,6 +614,11 @@ public class SegmentGeneratorConfig implements Serializable {
 
     if (_segmentTimeColumnDataType == FieldSpec.DataType.STRING && _timeColumnType == TimeColumnType.SIMPLE_DATE) {
       return BatchConfigProperties.SegmentNameGeneratorType.NORMALIZED_DATE;
+    }
+
+    // if segment is externally partitioned
+    if (_uploadedSegmentPartitionId != -1) {
+      return BatchConfigProperties.SegmentNameGeneratorType.UPLOADED_REALTIME;
     }
 
     return BatchConfigProperties.SegmentNameGeneratorType.SIMPLE;
@@ -724,6 +745,22 @@ public class SegmentGeneratorConfig implements Serializable {
 
   public double getNoDictionarySizeRatioThreshold() {
     return _noDictionarySizeRatioThreshold;
+  }
+
+  public boolean isRealtimeConversion() {
+    return _realtimeConversion;
+  }
+
+  public void setRealtimeConversion(boolean realtimeConversion) {
+    _realtimeConversion = realtimeConversion;
+  }
+
+  public File getConsumerDir() {
+    return _consumerDir;
+  }
+
+  public void setConsumerDir(File consumerDir) {
+    _consumerDir = consumerDir;
   }
 
   public void setNoDictionarySizeRatioThreshold(double noDictionarySizeRatioThreshold) {

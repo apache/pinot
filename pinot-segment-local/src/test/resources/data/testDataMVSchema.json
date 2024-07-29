@@ -48,6 +48,42 @@
       "dataType": "INT"
     },
     {
+      "name": "column14",
+      "dataType": "LONG"
+    },
+    {
+      "name": "column15",
+      "dataType": "FLOAT"
+    },
+    {
+      "name": "column16",
+      "dataType": "DOUBLE"
+    },
+    {
+      "name": "column17",
+      "dataType": "BIG_DECIMAL"
+    },
+    {
+      "name": "column18",
+      "dataType": "BOOLEAN"
+    },
+    {
+      "name": "column19",
+      "dataType": "TIMESTAMP"
+    },
+    {
+      "name": "column20",
+      "dataType": "STRING"
+    },
+    {
+      "name": "column21",
+      "dataType": "JSON"
+    },
+    {
+      "name": "column22",
+      "dataType": "BYTES"
+    },
+    {
       "name": "weeksSinceEpochSunday",
       "dataType": "INT"
     }

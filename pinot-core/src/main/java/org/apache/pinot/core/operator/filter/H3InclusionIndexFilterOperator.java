@@ -36,7 +36,6 @@ import org.apache.pinot.segment.local.utils.H3Utils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.index.reader.H3IndexReader;
 import org.apache.pinot.spi.utils.BooleanUtils;
-import org.apache.pinot.spi.utils.BytesUtils;
 import org.locationtech.jts.geom.Geometry;
 import org.roaringbitmap.buffer.BufferFastAggregation;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
@@ -70,10 +69,10 @@ public class H3InclusionIndexFilterOperator extends BaseFilterOperator {
 
     if (arguments.get(0).getType() == ExpressionContext.Type.IDENTIFIER) {
       _h3IndexReader = segment.getDataSource(arguments.get(0).getIdentifier()).getH3Index();
-      _geometry = GeometrySerializer.deserialize(BytesUtils.toBytes(arguments.get(1).getLiteral().getStringValue()));
+      _geometry = GeometrySerializer.deserialize(arguments.get(1).getLiteral().getBytesValue());
     } else {
       _h3IndexReader = segment.getDataSource(arguments.get(1).getIdentifier()).getH3Index();
-      _geometry = GeometrySerializer.deserialize(BytesUtils.toBytes(arguments.get(0).getLiteral().getStringValue()));
+      _geometry = GeometrySerializer.deserialize(arguments.get(0).getLiteral().getBytesValue());
     }
     // must be some h3 index
     assert _h3IndexReader != null : "the column must have H3 index setup.";
@@ -81,31 +80,29 @@ public class H3InclusionIndexFilterOperator extends BaseFilterOperator {
 
   @Override
   protected BlockDocIdSet getTrues() {
-    // get the set of H3 cells at the specified resolution which completely cover the input shape and potential cover.
-    Pair<LongSet, LongSet> fullCoverAndPotentialCoverCells = _queryContext
-        .getOrComputeSharedValue(Pair.class, LITERAL_H3_CELLS_CACHE_NAME,
+    // NOTE: LHS is the fully covered cells, RHS is the potentially covered cells (excluding fully covered cells).
+    Pair<LongSet, LongSet> fullyAndPotentiallyCoveredCells =
+        _queryContext.getOrComputeSharedValue(Pair.class, LITERAL_H3_CELLS_CACHE_NAME,
             k -> H3Utils.coverGeometryInH3(_geometry, _h3IndexReader.getH3IndexResolution().getLowestResolution()));
 
-    LongSet fullyCoverH3Cells = fullCoverAndPotentialCoverCells.getLeft();
-    LongSet potentialCoverH3Cells = fullCoverAndPotentialCoverCells.getRight();
+    LongSet fullyCoveredCells = fullyAndPotentiallyCoveredCells.getLeft();
+    LongSet potentiallyCoveredCells = fullyAndPotentiallyCoveredCells.getRight();
 
-    int i = 0;
-    ImmutableRoaringBitmap[] fullMatchDocIds = new ImmutableRoaringBitmap[fullyCoverH3Cells.size()];
-    LongIterator fullyCoverH3CellsIterator = fullyCoverH3Cells.iterator();
-    while (fullyCoverH3CellsIterator.hasNext()) {
-      fullMatchDocIds[i++] = _h3IndexReader.getDocIds(fullyCoverH3CellsIterator.nextLong());
+    int numFullyCoveredCells = fullyCoveredCells.size();
+    ImmutableRoaringBitmap[] fullMatchDocIds = new ImmutableRoaringBitmap[numFullyCoveredCells];
+    LongIterator fullyCoveredCellsIterator = fullyCoveredCells.iterator();
+    for (int i = 0; i < numFullyCoveredCells; i++) {
+      fullMatchDocIds[i] = _h3IndexReader.getDocIds(fullyCoveredCellsIterator.nextLong());
     }
     MutableRoaringBitmap fullMatch = BufferFastAggregation.or(fullMatchDocIds);
 
-    // remove full match from potential match to get potential not match cells.
-    i = 0;
-    potentialCoverH3Cells.removeAll(fullyCoverH3Cells);
-    ImmutableRoaringBitmap[] potentialNotMatchDocIds = new ImmutableRoaringBitmap[potentialCoverH3Cells.size()];
-    LongIterator potentialMatchH3CellsIterator = potentialCoverH3Cells.iterator();
-    while (potentialMatchH3CellsIterator.hasNext()) {
-      potentialNotMatchDocIds[i++] = _h3IndexReader.getDocIds(potentialMatchH3CellsIterator.nextLong());
+    int numPotentiallyCoveredCells = potentiallyCoveredCells.size();
+    ImmutableRoaringBitmap[] potentialMatchDocIds = new ImmutableRoaringBitmap[numPotentiallyCoveredCells];
+    LongIterator potentiallyCoveredCellsIterator = potentiallyCoveredCells.iterator();
+    for (int i = 0; i < numPotentiallyCoveredCells; i++) {
+      potentialMatchDocIds[i] = _h3IndexReader.getDocIds(potentiallyCoveredCellsIterator.nextLong());
     }
-    MutableRoaringBitmap potentialMatch = BufferFastAggregation.or(potentialNotMatchDocIds);
+    MutableRoaringBitmap potentialMatch = BufferFastAggregation.or(potentialMatchDocIds);
 
     if (_isPositiveCheck) {
       return getFilterBlock(fullMatch, potentialMatch);

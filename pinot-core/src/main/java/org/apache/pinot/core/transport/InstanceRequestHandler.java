@@ -71,6 +71,7 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
 
   // TODO: make it configurable
   private static final int SLOW_QUERY_LATENCY_THRESHOLD_MS = 100;
+  private static final int LARGE_RESPONSE_SIZE_THRESHOLD_BYTES = 100 * 1024 * 1024; // 100 MB
 
   private final String _instanceName;
   private final ThreadLocal<TDeserializer> _deserializer;
@@ -320,6 +321,11 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
       if (totalQueryTimeMs > SLOW_QUERY_LATENCY_THRESHOLD_MS) {
         LOGGER.info("Slow query: request handler processing time: {}, send response latency: {}, total time to handle "
             + "request: {}", queryProcessingTimeMs, sendResponseLatencyMs, totalQueryTimeMs);
+      }
+      if (serializedDataTable.length > LARGE_RESPONSE_SIZE_THRESHOLD_BYTES) {
+        LOGGER.warn("Large query: response size in bytes: {}, table name {}",
+            serializedDataTable.length, tableNameWithType);
+        ServerMetrics.get().addMeteredTableValue(tableNameWithType, ServerMeter.LARGE_QUERY_RESPONSES_SENT, 1);
       }
     });
   }

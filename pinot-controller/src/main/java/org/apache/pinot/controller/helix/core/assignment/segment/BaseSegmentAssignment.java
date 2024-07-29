@@ -27,6 +27,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.assignment.InstancePartitions;
+import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.tier.Tier;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.controller.helix.core.assignment.segment.strategy.SegmentAssignmentStrategy;
@@ -69,15 +70,16 @@ public abstract class BaseSegmentAssignment implements SegmentAssignment {
   protected int _replication;
   protected String _partitionColumn;
   protected TableConfig _tableConfig;
+  protected ControllerMetrics _controllerMetrics;
 
   @Override
-  public void init(HelixManager helixManager, TableConfig tableConfig) {
+  public void init(HelixManager helixManager, TableConfig tableConfig, @Nullable ControllerMetrics controllerMetrics) {
     _helixManager = helixManager;
     _tableNameWithType = tableConfig.getTableName();
     _tableConfig = tableConfig;
     _replication = tableConfig.getReplication();
     _partitionColumn = TableConfigUtils.getPartitionColumn(_tableConfig);
-
+    _controllerMetrics = controllerMetrics;
     if (_partitionColumn == null) {
       _logger.info("Initialized with replication: {} without partition column for table: {} ", _replication,
           _tableNameWithType);

@@ -19,21 +19,37 @@
 package org.apache.pinot.segment.local.realtime.impl.invertedindex;
 
 import java.io.File;
+import java.io.IOException;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import org.apache.commons.io.FileUtils;
-import org.apache.lucene.search.SearcherManager;
+import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.segment.spi.index.TextIndexConfig;
+import org.apache.pinot.util.TestUtils;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.mock;
 import static org.testng.Assert.assertEquals;
 
 
 public class LuceneMutableTextIndexTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "LuceneMutableIndexTest");
   private static final String TEXT_COLUMN_NAME = "testColumnName";
+  private static final RealtimeLuceneTextIndexSearcherPool SEARCHER_POOL =
+      RealtimeLuceneTextIndexSearcherPool.init(1);
 
   private RealtimeLuceneTextIndex _realtimeLuceneTextIndex;
+
+  public LuceneMutableTextIndexTest() {
+    RealtimeLuceneIndexRefreshManager.init(1, 10);
+    ServerMetrics.register(mock(ServerMetrics.class));
+  }
 
   private String[][] getTextData() {
     return new String[][]{
@@ -41,21 +57,30 @@ public class LuceneMutableTextIndexTest {
     };
   }
 
+  private String[][] getRepeatedData() {
+    return new String[][]{
+        {"distributed storage", "multi-threading"}
+    };
+  }
+
   @BeforeClass
   public void setUp()
       throws Exception {
+    TextIndexConfig config =
+        new TextIndexConfig(false, null, null, false, false, null, null, true, 500, null, false, false, 0);
     _realtimeLuceneTextIndex =
-        new RealtimeLuceneTextIndex(TEXT_COLUMN_NAME, INDEX_DIR, "fooBar", null, null, true, 500);
+        new RealtimeLuceneTextIndex(TEXT_COLUMN_NAME, INDEX_DIR, "table__0__1__20240602T0014Z", config);
     String[][] documents = getTextData();
+    String[][] repeatedDocuments = getRepeatedData();
+
     for (String[] row : documents) {
       _realtimeLuceneTextIndex.add(row);
     }
 
-    SearcherManager searcherManager = _realtimeLuceneTextIndex.getSearcherManager();
-    try {
-      searcherManager.maybeRefresh();
-    } catch (Exception e) {
-      throw new RuntimeException(e);
+    for (int i = 0; i < 1000; i++) {
+      for (String[] row : repeatedDocuments) {
+        _realtimeLuceneTextIndex.add(row);
+      }
     }
   }
 
@@ -66,8 +91,27 @@ public class LuceneMutableTextIndexTest {
 
   @Test
   public void testQueries() {
+    TestUtils.waitForCondition(aVoid -> {
+          try {
+            return _realtimeLuceneTextIndex.getSearcherManager().isSearcherCurrent();
+          } catch (IOException e) {
+            return false;
+          }
+        }, 10000,
+        "Background pool did not refresh the searcher manager in time");
     assertEquals(_realtimeLuceneTextIndex.getDocIds("stream"), ImmutableRoaringBitmap.bitmapOf(0));
     assertEquals(_realtimeLuceneTextIndex.getDocIds("/.*house.*/"), ImmutableRoaringBitmap.bitmapOf(1));
     assertEquals(_realtimeLuceneTextIndex.getDocIds("invalid"), ImmutableRoaringBitmap.bitmapOf());
+  }
+
+  @Test(expectedExceptions = ExecutionException.class,
+      expectedExceptionsMessageRegExp = ".*TEXT_MATCH query interrupted while querying the consuming segment.*")
+  public void testQueryCancellationIsSuccessful()
+      throws InterruptedException, ExecutionException {
+    // Avoid early finalization by not using Executors.newSingleThreadExecutor (java <= 20, JDK-8145304)
+    ExecutorService executor = Executors.newFixedThreadPool(1);
+    Future<MutableRoaringBitmap> res = executor.submit(() -> _realtimeLuceneTextIndex.getDocIds("/.*read.*/"));
+    executor.shutdownNow();
+    res.get();
   }
 }

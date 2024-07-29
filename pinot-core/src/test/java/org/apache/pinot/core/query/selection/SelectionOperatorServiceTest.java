@@ -161,11 +161,11 @@ public class SelectionOperatorServiceTest {
     List<Object[]> mergedRows = new ArrayList<>(2);
     mergedRows.add(_row1);
     mergedRows.add(_row2);
-    SelectionResultsBlock mergedBlock = new SelectionResultsBlock(_dataSchema, mergedRows);
+    SelectionResultsBlock mergedBlock = new SelectionResultsBlock(_dataSchema, mergedRows, _queryContext);
     List<Object[]> rowsToMerge = new ArrayList<>(2);
     rowsToMerge.add(_row3);
     rowsToMerge.add(_row4);
-    SelectionResultsBlock blockToMerge = new SelectionResultsBlock(_dataSchema, rowsToMerge);
+    SelectionResultsBlock blockToMerge = new SelectionResultsBlock(_dataSchema, rowsToMerge, _queryContext);
     SelectionOperatorUtils.mergeWithoutOrdering(mergedBlock, blockToMerge, 3);
     assertEquals(mergedRows.size(), 3);
     assertSame(mergedRows.get(0), _row1);
@@ -179,12 +179,15 @@ public class SelectionOperatorServiceTest {
     Comparator<Object[]> comparator =
         OrderByComparatorFactory.getComparator(_queryContext.getOrderByExpressions(), false);
     int maxNumRows = _queryContext.getOffset() + _queryContext.getLimit();
-    SelectionResultsBlock mergedBlock = new SelectionResultsBlock(_dataSchema, Collections.emptyList(), comparator);
+    SelectionResultsBlock mergedBlock =
+        new SelectionResultsBlock(_dataSchema, Collections.emptyList(), comparator, _queryContext);
     List<Object[]> rowsToMerge1 = Arrays.asList(_row2, _row1);
-    SelectionResultsBlock blockToMerge1 = new SelectionResultsBlock(_dataSchema, rowsToMerge1, comparator);
+    SelectionResultsBlock blockToMerge1 =
+        new SelectionResultsBlock(_dataSchema, rowsToMerge1, comparator, _queryContext);
     SelectionOperatorUtils.mergeWithOrdering(mergedBlock, blockToMerge1, maxNumRows);
     List<Object[]> rowsToMerge2 = Arrays.asList(_row4, _row3);
-    SelectionResultsBlock blockToMerge2 = new SelectionResultsBlock(_dataSchema, rowsToMerge2, comparator);
+    SelectionResultsBlock blockToMerge2 =
+        new SelectionResultsBlock(_dataSchema, rowsToMerge2, comparator, _queryContext);
     SelectionOperatorUtils.mergeWithOrdering(mergedBlock, blockToMerge2, maxNumRows);
     List<Object[]> mergedRows = mergedBlock.getRows();
     assertEquals(mergedRows.size(), 3);

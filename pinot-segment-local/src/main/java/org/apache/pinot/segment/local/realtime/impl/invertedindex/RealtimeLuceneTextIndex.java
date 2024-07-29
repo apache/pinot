@@ -19,17 +19,20 @@
 package org.apache.pinot.segment.local.realtime.impl.invertedindex;
 
 import java.io.File;
-import java.util.List;
-import org.apache.lucene.analysis.standard.StandardAnalyzer;
+import java.util.concurrent.Callable;
+import java.util.concurrent.Future;
+import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.queryparser.classic.QueryParser;
-import org.apache.lucene.search.Collector;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.SearcherManager;
+import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
+import org.apache.pinot.segment.local.utils.LuceneTextIndexUtils;
+import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.apache.pinot.segment.spi.index.mutable.MutableTextIndex;
 import org.roaringbitmap.IntIterator;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
@@ -45,11 +48,17 @@ import org.slf4j.LoggerFactory;
  */
 public class RealtimeLuceneTextIndex implements MutableTextIndex {
   private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(RealtimeLuceneTextIndex.class);
+  private static final RealtimeLuceneTextIndexSearcherPool SEARCHER_POOL =
+      RealtimeLuceneTextIndexSearcherPool.getInstance();
   private final LuceneTextIndexCreator _indexCreator;
   private SearcherManager _searcherManager;
-  private final StandardAnalyzer _analyzer = new StandardAnalyzer();
+  private Analyzer _analyzer;
   private final String _column;
   private final String _segmentName;
+  private final boolean _reuseMutableIndex;
+  private boolean _enablePrefixSuffixMatchingInPhraseQueries = false;
+  private final RealtimeLuceneRefreshListener _refreshListener;
+  private final RealtimeLuceneIndexRefreshManager.SearcherManagerHolder _searcherManagerHolder;
 
   /**
    * Created by {@link MutableSegmentImpl}
@@ -57,11 +66,9 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
    * @param column column name
    * @param segmentIndexDir realtime segment consumer dir
    * @param segmentName realtime segment name
-   * @param stopWordsInclude the words to include in addition to the default stop word list
-   * @param stopWordsExclude stop words to exclude from default stop words
+   * @param config the table index config
    */
-  public RealtimeLuceneTextIndex(String column, File segmentIndexDir, String segmentName,
-      List<String> stopWordsInclude, List<String> stopWordsExclude, boolean useCompoundFile, int maxBufferSizeMB) {
+  public RealtimeLuceneTextIndex(String column, File segmentIndexDir, String segmentName, TextIndexConfig config) {
     _column = column;
     _segmentName = segmentName;
     try {
@@ -75,9 +82,22 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
       // for realtime
       _indexCreator =
           new LuceneTextIndexCreator(column, new File(segmentIndexDir.getAbsolutePath() + "/" + segmentName),
-              false /* commitOnClose */, stopWordsInclude, stopWordsExclude, useCompoundFile, maxBufferSizeMB);
+              false /* commitOnClose */, false, null, null, config);
       IndexWriter indexWriter = _indexCreator.getIndexWriter();
       _searcherManager = new SearcherManager(indexWriter, false, false, null);
+
+      LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
+      _refreshListener = new RealtimeLuceneRefreshListener(llcSegmentName.getTableName(), segmentName, column,
+          llcSegmentName.getPartitionGroupId(), _indexCreator::getNumDocs);
+      _searcherManager.addListener(_refreshListener);
+      _analyzer = _indexCreator.getIndexWriter().getConfig().getAnalyzer();
+      _enablePrefixSuffixMatchingInPhraseQueries = config.isEnablePrefixSuffixMatchingInPhraseQueries();
+      _reuseMutableIndex = config.isReuseMutableIndex();
+
+      // Submit the searcher manager to the global pool for refreshing
+      _searcherManagerHolder =
+          new RealtimeLuceneIndexRefreshManager.SearcherManagerHolder(segmentName, column, _searcherManager);
+      RealtimeLuceneIndexRefreshManager.getInstance().addSearcherManagerHolder(_searcherManagerHolder);
     } catch (Exception e) {
       LOGGER.error("Failed to instantiate realtime Lucene index reader for column {}, exception {}", column,
           e.getMessage());
@@ -109,27 +129,49 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
   @Override
   public MutableRoaringBitmap getDocIds(String searchQuery) {
     MutableRoaringBitmap docIDs = new MutableRoaringBitmap();
-    Collector docIDCollector = new RealtimeLuceneDocIdCollector(docIDs);
-    IndexSearcher indexSearcher = null;
-    try {
-      Query query = new QueryParser(_column, _analyzer).parse(searchQuery);
-      indexSearcher = _searcherManager.acquire();
-      indexSearcher.search(query, docIDCollector);
-      return getPinotDocIds(indexSearcher, docIDs);
-    } catch (Exception e) {
-      LOGGER
-          .error("Failed while searching the realtime text index for column {}, search query {}, exception {}", _column,
-              searchQuery, e.getMessage());
-      throw new RuntimeException(e);
-    } finally {
+    RealtimeLuceneDocIdCollector docIDCollector = new RealtimeLuceneDocIdCollector(docIDs);
+    // A thread interrupt during indexSearcher.search() can break the underlying FSDirectory used by the IndexWriter
+    // which the SearcherManager is created with. To ensure the index is never corrupted the search is executed
+    // in a child thread and the interrupt is handled in the current thread by canceling the search gracefully.
+    // See https://github.com/apache/lucene/issues/3315 and https://github.com/apache/lucene/issues/9309
+    Callable<MutableRoaringBitmap> searchCallable = () -> {
+      IndexSearcher indexSearcher = null;
       try {
-        if (indexSearcher != null) {
-          _searcherManager.release(indexSearcher);
+        QueryParser parser = new QueryParser(_column, _analyzer);
+        if (_enablePrefixSuffixMatchingInPhraseQueries) {
+          parser.setAllowLeadingWildcard(true);
         }
-      } catch (Exception e) {
-        LOGGER.error("Failed while releasing the searcher manager for realtime text index for column {}, exception {}",
-            _column, e.getMessage());
+        Query query = parser.parse(searchQuery);
+        if (_enablePrefixSuffixMatchingInPhraseQueries) {
+          query = LuceneTextIndexUtils.convertToMultiTermSpanQuery(query);
+        }
+        indexSearcher = _searcherManager.acquire();
+        indexSearcher.search(query, docIDCollector);
+        return getPinotDocIds(indexSearcher, docIDs);
+      } finally {
+        try {
+          if (indexSearcher != null) {
+            _searcherManager.release(indexSearcher);
+          }
+        } catch (Exception e) {
+          LOGGER.error(
+              "Failed while releasing the searcher manager for realtime text index for column {}, exception {}",
+              _column, e.getMessage());
+        }
       }
+    };
+    Future<MutableRoaringBitmap> searchFuture = SEARCHER_POOL.getExecutorService().submit(searchCallable);
+    try {
+      return searchFuture.get();
+    } catch (InterruptedException e) {
+      docIDCollector.markShouldCancel();
+      LOGGER.warn("TEXT_MATCH query interrupted while querying the consuming segment {}, column {}, search query {}",
+          _segmentName, _column, searchQuery);
+      throw new RuntimeException("TEXT_MATCH query interrupted while querying the consuming segment");
+    } catch (Exception e) {
+      LOGGER.error("Failed while searching the realtime text index for segment {}, column {}, search query {},"
+          + " exception {}", _segmentName, _column, searchQuery, e.getMessage());
+      throw new RuntimeException(e);
     }
   }
 
@@ -143,7 +185,7 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
       while (luceneDocIDIterator.hasNext()) {
         int luceneDocId = luceneDocIDIterator.next();
         Document document = indexSearcher.doc(luceneDocId);
-        int pinotDocId = Integer.valueOf(document.get(LuceneTextIndexCreator.LUCENE_INDEX_DOC_ID_COLUMN_NAME));
+        int pinotDocId = Integer.parseInt(document.get(LuceneTextIndexCreator.LUCENE_INDEX_DOC_ID_COLUMN_NAME));
         actualDocIDs.add(pinotDocId);
       }
     } catch (Exception e) {
@@ -154,11 +196,47 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
   }
 
   @Override
+  public void commit() {
+    if (!_reuseMutableIndex) {
+      return;
+    }
+    try {
+      _indexCreator.getIndexWriter().commit();
+      // Set the SearcherManagerHolder.indexClosed() flag to stop generating refreshed readers
+      _searcherManagerHolder.getLock().lock();
+      try {
+        _searcherManagerHolder.setIndexClosed();
+        // Block for one final refresh, to ensure queries are fully up to date while segment is being converted
+        _searcherManager.maybeRefreshBlocking();
+      } finally {
+        _searcherManagerHolder.getLock().unlock();
+      }
+      // It is OK to close the index writer as we are done indexing, and no more refreshes will take place
+      // The SearcherManager will still provide an up-to-date reader via .acquire()
+      _indexCreator.getIndexWriter().close();
+    } catch (Exception e) {
+      LOGGER.error("Failed to commit the realtime lucene text index for column {}, exception {}", _column,
+          e.getMessage());
+      throw new RuntimeException(e);
+    }
+  }
+
+  @Override
   public void close() {
     try {
+      // Set the SearcherManagerHolder.indexClosed() flag to stop generating refreshed readers. If completionMode is
+      // set as DOWNLOAD, then commit() will not be called the flag must be set here.
+      _searcherManagerHolder.getLock().lock();
+      try {
+        _searcherManagerHolder.setIndexClosed();
+      } finally {
+        _searcherManagerHolder.getLock().unlock();
+      }
       _searcherManager.close();
       _searcherManager = null;
+      _refreshListener.close(); // clean up metrics prior to closing _indexCreator, as they contain a reference to it
       _indexCreator.close();
+      _analyzer.close();
     } catch (Exception e) {
       LOGGER.error("Failed while closing the realtime text index for column {}, exception {}", _column, e.getMessage());
       throw new RuntimeException(e);

@@ -29,7 +29,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
@@ -42,6 +42,7 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoa
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -151,8 +152,8 @@ public class DictionaryBasedGroupKeyGeneratorTest {
     for (String column : MV_COLUMNS) {
       expressions.add(ExpressionContext.forIdentifier(column));
     }
-    ProjectPlanNode projectPlanNode =
-        new ProjectPlanNode(indexSegment, queryContext, expressions, DocIdSetPlanNode.MAX_DOC_PER_CALL);
+    ProjectPlanNode projectPlanNode = new ProjectPlanNode(new SegmentContext(indexSegment), queryContext, expressions,
+        DocIdSetPlanNode.MAX_DOC_PER_CALL);
     _projectOperator = projectPlanNode.run();
     _valueBlock = _projectOperator.nextBlock();
   }

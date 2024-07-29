@@ -18,83 +18,63 @@
  */
 package org.apache.pinot.segment.local.startree.v2.builder;
 
-import com.google.common.collect.Lists;
 import java.io.File;
-import java.io.IOException;
 import java.net.URL;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
-import java.util.Objects;
-import org.apache.commons.configuration.PropertiesConfiguration;
+import java.util.Set;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
-import org.apache.pinot.spi.env.CommonsConfigurationUtils;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.segment.spi.V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION;
 import static org.apache.pinot.segment.spi.V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION;
 import static org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants.STAR_TREE_INDEX_FILE_NAME;
-import static org.testng.AssertJUnit.assertEquals;
-import static org.testng.AssertJUnit.assertNotNull;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.AssertJUnit.assertTrue;
 
 
 public class StarTreeIndexSeparatorTest {
-
   private static final String SEGMENT_PATH = "data/startree/segment";
-  private static final String TOTAL_DOCS_KEY = "startree.v2.0.total.docs";
-
-  private StarTreeIndexSeparator _separator;
-  private PropertiesConfiguration _metadataProperties;
-  private final StarTreeV2BuilderConfig _builderConfig = StarTreeV2BuilderConfig.fromIndexConfig(
-      new StarTreeIndexConfig(
-          Lists.newArrayList("AirlineID", "Origin", "Dest"),
-          Lists.newArrayList(),
-          Lists.newArrayList("count__*", "max__ArrDelay"),
-          10));
+  private static final StarTreeV2BuilderConfig BUILDER_CONFIG = StarTreeV2BuilderConfig.fromIndexConfig(
+      new StarTreeIndexConfig(List.of("AirlineID", "Origin", "Dest"), List.of(), List.of("count__*", "max__ArrDelay"),
+          null, 10));
+  private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "StarTreeIndexSeparatorTest");
 
   @BeforeClass
-  public void setup()
-      throws IOException {
-    ClassLoader classLoader = getClass().getClassLoader();
-    URL segmentUrl = classLoader.getResource(SEGMENT_PATH);
+  public void setUp() {
+    FileUtils.deleteQuietly(TEMP_DIR);
+  }
+
+  @AfterClass
+  public void tearDown() {
+    FileUtils.deleteQuietly(TEMP_DIR);
+  }
+
+  @Test
+  public void testSeparate()
+      throws Exception {
+    URL segmentUrl = getClass().getClassLoader().getResource(SEGMENT_PATH);
+    assertNotNull(segmentUrl);
     File segmentDir = new File(segmentUrl.getFile());
-    _metadataProperties = CommonsConfigurationUtils.fromFile(
-        new File(segmentDir, V1Constants.MetadataKeys.METADATA_FILE_NAME));
-    _separator = new StarTreeIndexSeparator(
+    try (StarTreeIndexSeparator separator = new StarTreeIndexSeparator(
         new File(segmentDir, StarTreeV2Constants.INDEX_MAP_FILE_NAME),
         new File(segmentDir, StarTreeV2Constants.INDEX_FILE_NAME),
-        _metadataProperties);
-  }
-
-  @Test
-  public void extractTotalDocsListTest() {
-    assertNotNull(_separator);
-    List<Integer> docsList = _separator.extractTotalDocsList(_metadataProperties);
-    assertNotNull(docsList);
-    assertEquals(docsList, Lists.newArrayList(_metadataProperties.getInt(TOTAL_DOCS_KEY)));
-  }
-
-  @Test
-  public void extractBuilderConfigsTest() {
-    List<StarTreeV2BuilderConfig> builderConfigList = _separator.extractBuilderConfigs(_metadataProperties);
-    assertEquals(builderConfigList, Lists.newArrayList(_builderConfig));
-  }
-
-  @Test
-  public void separateTest()
-      throws IOException {
-    File tempDir = new File(FileUtils.getTempDirectory(), "separateTest");
-    _separator.separate(tempDir, _builderConfig);
-    List<String> files = Arrays.asList(Objects.requireNonNull(tempDir.list()));
-    assertTrue(files.contains(STAR_TREE_INDEX_FILE_NAME));
-    _builderConfig.getDimensionsSplitOrder()
-        .forEach(dimension -> assertTrue(files.contains(dimension + UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION)));
-    _builderConfig.getFunctionColumnPairs()
-        .forEach(dimension -> assertTrue(files.contains(dimension + RAW_SV_FORWARD_INDEX_FILE_EXTENSION)));
-    FileUtils.forceDelete(tempDir);
+        new SegmentMetadataImpl(segmentDir).getStarTreeV2MetadataList())) {
+      separator.separate(TEMP_DIR, BUILDER_CONFIG);
+    }
+    String[] fileNames = TEMP_DIR.list();
+    assertNotNull(fileNames);
+    Set<String> fileNameSet = new HashSet<>(Arrays.asList(fileNames));
+    assertTrue(fileNameSet.contains(STAR_TREE_INDEX_FILE_NAME));
+    BUILDER_CONFIG.getDimensionsSplitOrder()
+        .forEach(dimension -> assertTrue(fileNameSet.contains(dimension + UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION)));
+    BUILDER_CONFIG.getFunctionColumnPairs()
+        .forEach(dimension -> assertTrue(fileNameSet.contains(dimension + RAW_SV_FORWARD_INDEX_FILE_EXTENSION)));
   }
 }

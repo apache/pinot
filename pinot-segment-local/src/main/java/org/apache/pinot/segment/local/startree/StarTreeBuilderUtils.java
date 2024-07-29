@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.startree;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteOrder;
@@ -27,7 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import javax.annotation.Nullable;
-import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.startree.v2.builder.StarTreeV2BuilderConfig;
 import org.apache.pinot.segment.spi.SegmentMetadata;
@@ -37,6 +38,7 @@ import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
+import org.apache.pinot.spi.data.Schema;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -76,6 +78,27 @@ public class StarTreeBuilderUtils {
     }
     if (enableDefaultStarTree) {
       StarTreeV2BuilderConfig defaultConfig = StarTreeV2BuilderConfig.generateDefaultConfig(segmentMetadata);
+      if (!builderConfigs.contains(defaultConfig)) {
+        builderConfigs.add(defaultConfig);
+      }
+    }
+    return builderConfigs;
+  }
+
+  public static List<StarTreeV2BuilderConfig> generateBuilderConfigs(@Nullable List<StarTreeIndexConfig> indexConfigs,
+      boolean enableDefaultStarTree, Schema schema, JsonNode segmentMetadata) {
+    List<StarTreeV2BuilderConfig> builderConfigs = new ArrayList<>();
+    if (indexConfigs != null) {
+      for (StarTreeIndexConfig indexConfig : indexConfigs) {
+        StarTreeV2BuilderConfig builderConfig = StarTreeV2BuilderConfig.fromIndexConfig(indexConfig);
+        if (!builderConfigs.contains(builderConfig)) {
+          builderConfigs.add(builderConfig);
+        }
+      }
+    }
+    if (enableDefaultStarTree) {
+      StarTreeV2BuilderConfig defaultConfig =
+          StarTreeV2BuilderConfig.generateDefaultConfig(schema, segmentMetadata.get("columns"));
       if (!builderConfigs.contains(defaultConfig)) {
         builderConfigs.add(defaultConfig);
       }
@@ -244,7 +267,7 @@ public class StarTreeBuilderUtils {
           .equals(metadata.getSkipStarNodeCreationForDimensions())) {
         return true;
       }
-      if (!builderConfig.getFunctionColumnPairs().equals(metadata.getFunctionColumnPairs())) {
+      if (!builderConfig.getAggregationSpecs().equals(metadata.getAggregationSpecs())) {
         return true;
       }
       if (builderConfig.getMaxLeafRecords() != metadata.getMaxLeafRecords()) {
@@ -255,6 +278,25 @@ public class StarTreeBuilderUtils {
   }
 
   /**
+   * Returns {@code true} if the given star-tree builder configs are equal, {@code false} otherwise.
+   */
+  public static boolean areStarTreeBuilderConfigListsEqual(List<StarTreeV2BuilderConfig> builderConfig1,
+      List<StarTreeV2BuilderConfig> builderConfig2) {
+    int numStarTrees = builderConfig1.size();
+    if (builderConfig2.size() != numStarTrees) {
+      return false;
+    }
+    for (int i = 0; i < numStarTrees; i++) {
+      StarTreeV2BuilderConfig builderConfigToCompare1 = builderConfig1.get(i);
+      StarTreeV2BuilderConfig builderConfigToCompare2 = builderConfig2.get(i);
+      if (!builderConfigToCompare1.equals(builderConfigToCompare2)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /**
    * Removes all the star-trees from the given segment.
    */
   public static void removeStarTrees(File indexDir)
@@ -262,7 +304,7 @@ public class StarTreeBuilderUtils {
     // Remove the star-tree metadata
     PropertiesConfiguration metadataProperties = SegmentMetadataUtils.getPropertiesConfiguration(indexDir);
     metadataProperties.subset(StarTreeV2Constants.MetadataKey.STAR_TREE_SUBSET).clear();
-    SegmentMetadataUtils.savePropertiesConfiguration(metadataProperties);
+    SegmentMetadataUtils.savePropertiesConfiguration(metadataProperties, indexDir);
 
     // Remove the index file and index map file
     File segmentDirectory = SegmentDirectoryPaths.findSegmentDirectory(indexDir);

@@ -18,91 +18,61 @@
  */
 package org.apache.pinot.query.planner.plannode;
 
-import com.clearspring.analytics.util.Preconditions;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.Objects;
 import org.apache.calcite.rel.RelFieldCollation;
-import org.apache.calcite.rel.core.Window;
-import org.apache.calcite.rex.RexLiteral;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
-import org.apache.pinot.query.planner.logical.RexExpressionUtils;
-import org.apache.pinot.query.planner.serde.ProtoProperties;
 
 
-public class WindowNode extends AbstractPlanNode {
-  @ProtoProperties
-  private List<RexExpression> _groupSet;
-  @ProtoProperties
-  private List<RexExpression> _orderSet;
-  @ProtoProperties
-  private List<RelFieldCollation.Direction> _orderSetDirection;
-  @ProtoProperties
-  private List<RelFieldCollation.NullDirection> _orderSetNullDirection;
-  @ProtoProperties
-  private List<RexExpression> _aggCalls;
-  @ProtoProperties
-  private int _lowerBound;
-  @ProtoProperties
-  private int _upperBound;
-  @ProtoProperties
-  private List<RexExpression> _constants;
-  @ProtoProperties
-  private WindowFrameType _windowFrameType;
+public class WindowNode extends BasePlanNode {
+  private final List<Integer> _keys;
+  private final List<RelFieldCollation> _collations;
+  private final List<RexExpression.FunctionCall> _aggCalls;
+  private final WindowFrameType _windowFrameType;
+  private final int _lowerBound;
+  private final int _upperBound;
+  private final List<RexExpression.Literal> _constants;
 
-  /**
-   * Enum to denote the type of window frame
-   * ROWS - ROWS type window frame
-   * RANGE - RANGE type window frame
-   */
-  public enum WindowFrameType {
-    ROWS, RANGE
+  public WindowNode(int stageId, DataSchema dataSchema, NodeHint nodeHint, List<PlanNode> inputs, List<Integer> keys,
+      List<RelFieldCollation> collations, List<RexExpression.FunctionCall> aggCalls, WindowFrameType windowFrameType,
+      int lowerBound, int upperBound, List<RexExpression.Literal> constants) {
+    super(stageId, dataSchema, nodeHint, inputs);
+    _keys = keys;
+    _collations = collations;
+    _aggCalls = aggCalls;
+    _windowFrameType = windowFrameType;
+    _lowerBound = lowerBound;
+    _upperBound = upperBound;
+    _constants = constants;
   }
 
-  public WindowNode(int planFragmentId) {
-    super(planFragmentId);
+  public List<Integer> getKeys() {
+    return _keys;
   }
 
-  public WindowNode(int planFragmentId, List<Window.Group> windowGroups, List<RexLiteral> constants,
-      DataSchema dataSchema) {
-    super(planFragmentId, dataSchema);
-    // Only a single Window Group should exist per WindowNode.
-    Preconditions.checkState(windowGroups.size() == 1,
-        String.format("Only a single window group is allowed! Number of window groups: %d", windowGroups.size()));
-    Window.Group windowGroup = windowGroups.get(0);
+  public List<RelFieldCollation> getCollations() {
+    return _collations;
+  }
 
-    _groupSet = windowGroup.keys == null ? Collections.emptyList() : RexExpressionUtils.fromInputRefs(windowGroup.keys);
-    List<RelFieldCollation> relFieldCollations =
-        windowGroup.orderKeys == null ? new ArrayList<>() : windowGroup.orderKeys.getFieldCollations();
-    _orderSet = new ArrayList<>(relFieldCollations.size());
-    _orderSetDirection = new ArrayList<>(relFieldCollations.size());
-    _orderSetNullDirection = new ArrayList<>(relFieldCollations.size());
-    for (RelFieldCollation relFieldCollation : relFieldCollations) {
-      _orderSet.add(new RexExpression.InputRef(relFieldCollation.getFieldIndex()));
-      _orderSetDirection.add(relFieldCollation.direction);
-      _orderSetNullDirection.add(relFieldCollation.nullDirection);
-    }
-    _aggCalls = windowGroup.aggCalls.stream().map(RexExpressionUtils::fromRexCall).collect(Collectors.toList());
+  public List<RexExpression.FunctionCall> getAggCalls() {
+    return _aggCalls;
+  }
 
-    // TODO: For now only the default frame is supported. Add support for custom frames including rows support.
-    //       Frame literals come in the constants from the LogicalWindow and the bound.getOffset() stores the
-    //       InputRef to the constants array offset by the input array length. These need to be extracted here and
-    //       set to the bounds.
+  public WindowFrameType getWindowFrameType() {
+    return _windowFrameType;
+  }
 
-    // Lower bound can only be unbounded preceding for now, set to Integer.MIN_VALUE
-    _lowerBound = Integer.MIN_VALUE;
-    // Upper bound can only be unbounded following or current row for now
-    _upperBound = windowGroup.upperBound.isUnbounded() ? Integer.MAX_VALUE : 0;
-    _windowFrameType = windowGroup.isRows ? WindowFrameType.ROWS : WindowFrameType.RANGE;
+  public int getLowerBound() {
+    return _lowerBound;
+  }
 
-    // TODO: Constants are used to store constants needed such as the frame literals. For now just save this, need to
-    //       extract the constant values into bounds as a part of frame support.
-    _constants = new ArrayList<>();
-    for (RexLiteral constant : constants) {
-      _constants.add(RexExpressionUtils.fromRexLiteral(constant));
-    }
+  public int getUpperBound() {
+    return _upperBound;
+  }
+
+  public List<RexExpression.Literal> getConstants() {
+    return _constants;
   }
 
   @Override
@@ -115,39 +85,35 @@ public class WindowNode extends AbstractPlanNode {
     return visitor.visitWindow(this, context);
   }
 
-  public List<RexExpression> getGroupSet() {
-    return _groupSet;
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (!(o instanceof WindowNode)) {
+      return false;
+    }
+    if (!super.equals(o)) {
+      return false;
+    }
+    WindowNode that = (WindowNode) o;
+    return _lowerBound == that._lowerBound && _upperBound == that._upperBound && Objects.equals(_aggCalls,
+        that._aggCalls) && Objects.equals(_keys, that._keys) && Objects.equals(_collations, that._collations)
+        && _windowFrameType == that._windowFrameType && Objects.equals(_constants, that._constants);
   }
 
-  public List<RexExpression> getOrderSet() {
-    return _orderSet;
+  @Override
+  public int hashCode() {
+    return Objects.hash(super.hashCode(), _aggCalls, _keys, _collations, _windowFrameType, _lowerBound, _upperBound,
+        _constants);
   }
 
-  public List<RelFieldCollation.Direction> getOrderSetDirection() {
-    return _orderSetDirection;
-  }
-
-  public List<RelFieldCollation.NullDirection> getOrderSetNullDirection() {
-    return _orderSetNullDirection;
-  }
-
-  public List<RexExpression> getAggCalls() {
-    return _aggCalls;
-  }
-
-  public int getLowerBound() {
-    return _lowerBound;
-  }
-
-  public int getUpperBound() {
-    return _upperBound;
-  }
-
-  public WindowFrameType getWindowFrameType() {
-    return _windowFrameType;
-  }
-
-  public List<RexExpression> getConstants() {
-    return _constants;
+  /**
+   * Enum to denote the type of window frame
+   * ROWS - ROWS type window frame
+   * RANGE - RANGE type window frame
+   */
+  public enum WindowFrameType {
+    ROWS, RANGE
   }
 }

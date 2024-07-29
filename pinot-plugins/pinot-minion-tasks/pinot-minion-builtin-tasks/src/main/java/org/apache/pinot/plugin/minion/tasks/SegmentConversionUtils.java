@@ -28,12 +28,12 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import javax.net.ssl.SSLContext;
-import org.apache.commons.collections.CollectionUtils;
-import org.apache.http.Header;
-import org.apache.http.HttpHeaders;
-import org.apache.http.HttpStatus;
-import org.apache.http.NameValuePair;
-import org.apache.http.message.BasicHeader;
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.hc.core5.http.Header;
+import org.apache.hc.core5.http.HttpHeaders;
+import org.apache.hc.core5.http.HttpStatus;
+import org.apache.hc.core5.http.NameValuePair;
+import org.apache.hc.core5.http.message.BasicHeader;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.restlet.resources.EndReplaceSegmentsRequest;
 import org.apache.pinot.common.restlet.resources.StartReplaceSegmentsRequest;
@@ -117,7 +117,7 @@ public class SegmentConversionUtils {
       throws Exception {
     // Create a RoundRobinURIProvider to round-robin IP addresses when retry uploading. Otherwise, it may always try to
     // upload to a same broken host as: 1) DNS may not RR the IP addresses 2) OS cache the DNS resolution result.
-    RoundRobinURIProvider uriProvider = new RoundRobinURIProvider(new URI(uploadURL));
+    RoundRobinURIProvider uriProvider = new RoundRobinURIProvider(List.of(new URI(uploadURL)), true);
     // Generate retry policy based on the config
     String maxNumAttemptsConfigStr = configs.get(MinionConstants.MAX_NUM_ATTEMPTS_KEY);
     int maxNumAttemptsFromConfig =

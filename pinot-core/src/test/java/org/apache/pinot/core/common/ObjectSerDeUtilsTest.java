@@ -19,23 +19,40 @@
 package org.apache.pinot.core.common;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
+import com.dynatrace.hash4j.distinctcount.UltraLogLog;
 import com.tdunning.math.stats.TDigest;
 import it.unimi.dsi.fastutil.doubles.Double2LongOpenHashMap;
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import it.unimi.dsi.fastutil.floats.Float2LongOpenHashMap;
+import it.unimi.dsi.fastutil.floats.FloatArrayList;
 import it.unimi.dsi.fastutil.ints.Int2LongOpenHashMap;
+import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
+import it.unimi.dsi.fastutil.longs.LongArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.PriorityQueue;
 import java.util.Random;
-import org.apache.commons.lang.RandomStringUtils;
+import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.datasketches.cpc.CpcSketch;
+import org.apache.datasketches.theta.SetOperationBuilder;
+import org.apache.datasketches.theta.Sketch;
+import org.apache.datasketches.theta.Sketches;
+import org.apache.datasketches.theta.UpdateSketch;
+import org.apache.datasketches.tuple.aninteger.IntegerSketch;
+import org.apache.datasketches.tuple.aninteger.IntegerSummary;
+import org.apache.datasketches.tuple.aninteger.IntegerSummarySetOperations;
 import org.apache.pinot.core.query.aggregation.function.PercentileEstAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.PercentileTDigestAggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.funnel.FunnelStepEvent;
 import org.apache.pinot.segment.local.customobject.AvgPair;
+import org.apache.pinot.segment.local.customobject.CpcSketchAccumulator;
 import org.apache.pinot.segment.local.customobject.DoubleLongPair;
 import org.apache.pinot.segment.local.customobject.FloatLongPair;
 import org.apache.pinot.segment.local.customobject.IntLongPair;
@@ -43,11 +60,15 @@ import org.apache.pinot.segment.local.customobject.LongLongPair;
 import org.apache.pinot.segment.local.customobject.MinMaxRangePair;
 import org.apache.pinot.segment.local.customobject.QuantileDigest;
 import org.apache.pinot.segment.local.customobject.StringLongPair;
+import org.apache.pinot.segment.local.customobject.ThetaSketchAccumulator;
+import org.apache.pinot.segment.local.customobject.TupleIntSketchAccumulator;
 import org.apache.pinot.segment.local.customobject.ValueLongPair;
+import org.apache.pinot.segment.local.utils.UltraLogLogUtils;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertThrows;
+import static org.testng.Assert.assertTrue;
 
 
 public class ObjectSerDeUtilsTest {
@@ -373,5 +394,229 @@ public class ObjectSerDeUtilsTest {
 
       assertEquals(actual, expected, ERROR_MESSAGE);
     }
+  }
+
+  @Test
+  public void testCpcSketch() {
+    for (int i = 0; i < NUM_ITERATIONS; i++) {
+      CpcSketch sketch = new CpcSketch();
+      int size = RANDOM.nextInt(100) + 1;
+      for (int j = 0; j < size; j++) {
+        sketch.update(RANDOM.nextLong());
+      }
+
+      byte[] bytes = ObjectSerDeUtils.serialize(sketch);
+      CpcSketch actual =
+          ObjectSerDeUtils.deserialize(bytes, ObjectSerDeUtils.ObjectType.CompressedProbabilisticCounting);
+
+      assertEquals(actual.getEstimate(), sketch.getEstimate(), ERROR_MESSAGE);
+    }
+  }
+
+  @Test
+  public void testIntArrayList() {
+    for (int i = 0; i < NUM_ITERATIONS; i++) {
+      int size = RANDOM.nextInt(100);
+      IntArrayList expected = new IntArrayList(size);
+      for (int j = 0; j < size; j++) {
+        expected.add(RANDOM.nextInt());
+      }
+      byte[] bytes = ObjectSerDeUtils.serialize(expected);
+      IntArrayList actual = ObjectSerDeUtils.deserialize(bytes, ObjectSerDeUtils.ObjectType.IntArrayList);
+      assertEquals(actual, expected, ERROR_MESSAGE);
+    }
+  }
+
+  @Test
+  public void testLongArrayList() {
+    for (int i = 0; i < NUM_ITERATIONS; i++) {
+      int size = RANDOM.nextInt(100);
+      LongArrayList expected = new LongArrayList(size);
+      for (int j = 0; j < size; j++) {
+        expected.add(RANDOM.nextLong());
+      }
+      byte[] bytes = ObjectSerDeUtils.serialize(expected);
+      LongArrayList actual = ObjectSerDeUtils.deserialize(bytes, ObjectSerDeUtils.ObjectType.LongArrayList);
+      assertEquals(actual, expected, ERROR_MESSAGE);
+    }
+  }
+
+  @Test
+  public void testFloatArrayList() {
+    for (int i = 0; i < NUM_ITERATIONS; i++) {
+      int size = RANDOM.nextInt(100);
+      FloatArrayList expected = new FloatArrayList(size);
+      for (int j = 0; j < size; j++) {
+        expected.add(RANDOM.nextFloat());
+      }
+      byte[] bytes = ObjectSerDeUtils.serialize(expected);
+      FloatArrayList actual = ObjectSerDeUtils.deserialize(bytes, ObjectSerDeUtils.ObjectType.FloatArrayList);
+      assertEquals(actual, expected, ERROR_MESSAGE);
+    }
+  }
+
+  @Test
+  public void testStringArrayList() {
+    for (int i = 0; i < NUM_ITERATIONS; i++) {
+      int size = RANDOM.nextInt(100);
+      ObjectArrayList<String> expected = new ObjectArrayList<>(size);
+      for (int j = 0; j < size; j++) {
+        expected.add(RandomStringUtils.random(RANDOM.nextInt(20)));
+      }
+      byte[] bytes = ObjectSerDeUtils.serialize(expected);
+      ObjectArrayList<String> actual = ObjectSerDeUtils.deserialize(bytes, ObjectSerDeUtils.ObjectType.StringArrayList);
+      assertEquals(actual, expected, ERROR_MESSAGE);
+    }
+  }
+
+  @Test
+  public void testULL() {
+    for (int i = 0; i < NUM_ITERATIONS; i++) {
+      UltraLogLog ull = UltraLogLog.create(12);
+      int size = RANDOM.nextInt(100) + 1;
+      for (int j = 0; j < size; j++) {
+        UltraLogLogUtils.hashObject(RANDOM.nextLong()).ifPresent(ull::add);
+      }
+
+      byte[] bytes = ObjectSerDeUtils.serialize(ull);
+      UltraLogLog actual = ObjectSerDeUtils.deserialize(bytes, ObjectSerDeUtils.ObjectType.UltraLogLog);
+
+      assertEquals(actual.getDistinctCountEstimate(), ull.getDistinctCountEstimate(), ERROR_MESSAGE);
+      assertEquals(actual.getState(), ull.getState(), ERROR_MESSAGE);
+    }
+  }
+
+  @Test
+  public void testThetaSketch() {
+    for (int i = 0; i < NUM_ITERATIONS; i++) {
+      UpdateSketch input = Sketches.updateSketchBuilder().build();
+      int size = RANDOM.nextInt(100) + 10;
+      boolean shouldOrder = RANDOM.nextBoolean();
+
+      for (int j = 0; j < size; j++) {
+        input.update(j);
+      }
+
+      Sketch sketch = input.compact(shouldOrder, null);
+
+      byte[] bytes = ObjectSerDeUtils.serialize(sketch);
+      Sketch actual = ObjectSerDeUtils.deserialize(bytes, ObjectSerDeUtils.ObjectType.DataSketch);
+
+      assertEquals(actual.getEstimate(), sketch.getEstimate(), ERROR_MESSAGE);
+      assertEquals(actual.toByteArray(), sketch.toByteArray(), ERROR_MESSAGE);
+      assertEquals(actual.isOrdered(), shouldOrder, ERROR_MESSAGE);
+    }
+  }
+
+  @Test
+  public void testThetaSketchAccumulator() {
+    for (int i = 0; i < NUM_ITERATIONS; i++) {
+      UpdateSketch input = Sketches.updateSketchBuilder().build();
+      int size = RANDOM.nextInt(100) + 10;
+
+      for (int j = 0; j < size; j++) {
+        input.update(j);
+      }
+
+      SetOperationBuilder setOperationBuilder = new SetOperationBuilder();
+      ThetaSketchAccumulator accumulator = new ThetaSketchAccumulator(setOperationBuilder, 2);
+      Sketch sketch = input.compact(false, null);
+      accumulator.apply(sketch);
+
+      byte[] bytes = ObjectSerDeUtils.serialize(accumulator);
+      ThetaSketchAccumulator actual =
+          ObjectSerDeUtils.deserialize(bytes, ObjectSerDeUtils.ObjectType.ThetaSketchAccumulator);
+
+      assertEquals(actual.getResult().getEstimate(), sketch.getEstimate(), ERROR_MESSAGE);
+      assertEquals(actual.getResult().toByteArray(), sketch.toByteArray(), ERROR_MESSAGE);
+    }
+  }
+
+  @Test
+  public void testTupleIntSketchAccumulator() {
+    for (int i = 0; i < NUM_ITERATIONS; i++) {
+      int lgK = 4;
+      int size = RANDOM.nextInt(100) + 10;
+      IntegerSketch input = new IntegerSketch(lgK, IntegerSummary.Mode.Sum);
+
+      for (int j = 0; j < size; j++) {
+        input.update(j, RANDOM.nextInt(100));
+      }
+
+      IntegerSummarySetOperations setOps =
+          new IntegerSummarySetOperations(IntegerSummary.Mode.Sum, IntegerSummary.Mode.Sum);
+      TupleIntSketchAccumulator accumulator = new TupleIntSketchAccumulator(setOps, (int) Math.pow(2, lgK), 2);
+      org.apache.datasketches.tuple.Sketch<IntegerSummary> sketch = input.compact();
+      accumulator.apply(sketch);
+
+      byte[] bytes = ObjectSerDeUtils.serialize(accumulator);
+      TupleIntSketchAccumulator actual =
+          ObjectSerDeUtils.deserialize(bytes, ObjectSerDeUtils.ObjectType.TupleIntSketchAccumulator);
+
+      assertEquals(actual.getResult().getEstimate(), sketch.getEstimate(), ERROR_MESSAGE);
+      assertEquals(actual.getResult().toByteArray(), sketch.toByteArray(), ERROR_MESSAGE);
+    }
+  }
+
+  @Test
+  public void testCpcSketchAccumulator() {
+    int lgK = 4;
+    for (int i = 0; i < NUM_ITERATIONS; i++) {
+      int size = RANDOM.nextInt(100) + 10;
+      CpcSketch sketch = new CpcSketch(lgK);
+
+      for (int j = 0; j < size; j++) {
+        sketch.update(j);
+      }
+
+      CpcSketchAccumulator accumulator = new CpcSketchAccumulator(lgK, 2);
+      accumulator.apply(sketch);
+
+      byte[] bytes = ObjectSerDeUtils.serialize(accumulator);
+      CpcSketchAccumulator actual =
+          ObjectSerDeUtils.deserialize(bytes, ObjectSerDeUtils.ObjectType.CpcSketchAccumulator);
+
+      assertEquals(actual.getResult().getEstimate(), sketch.getEstimate(), ERROR_MESSAGE);
+      assertEquals(actual.getResult().toByteArray(), sketch.toByteArray(), ERROR_MESSAGE);
+    }
+  }
+
+  @Test
+  public void testOrderedStringSet() {
+    for (int i = 0; i < NUM_ITERATIONS; i++) {
+      int size = RANDOM.nextInt(100);
+      ObjectLinkedOpenHashSet<String> expected = new ObjectLinkedOpenHashSet<>(size);
+      for (int j = 0; j < size; j++) {
+        expected.add(RandomStringUtils.random(RANDOM.nextInt(20)));
+      }
+      byte[] bytes = ObjectSerDeUtils.serialize(expected);
+      ObjectLinkedOpenHashSet<String> actual =
+          ObjectSerDeUtils.deserialize(bytes, ObjectSerDeUtils.ObjectType.OrderedStringSet);
+      for (int j = 0; j < size; j++) {
+        assertEquals(actual.get(j), expected.get(j), ERROR_MESSAGE);
+      }
+    }
+  }
+
+  @Test
+  public void testFunnelStepEventAccumulator() {
+    for (int i = 0; i < NUM_ITERATIONS; i++) {
+      int size = RANDOM.nextInt(1000);
+      PriorityQueue<FunnelStepEvent> expected = new PriorityQueue<>();
+      for (int j = 0; j < size; j++) {
+        expected.add(new FunnelStepEvent(RANDOM.nextLong(), RANDOM.nextInt()));
+      }
+      byte[] bytes = ObjectSerDeUtils.serialize(expected);
+      PriorityQueue<FunnelStepEvent> actual =
+          ObjectSerDeUtils.deserialize(bytes, ObjectSerDeUtils.ObjectType.FunnelStepEventAccumulator);
+      while (!actual.isEmpty()) {
+        assertEquals(actual.poll(), expected.poll(), ERROR_MESSAGE);
+      }
+    }
+    // Test empty queue
+    PriorityQueue<FunnelStepEvent> empty = new PriorityQueue<>();
+    PriorityQueue<FunnelStepEvent> deserialized = ObjectSerDeUtils.deserialize(ObjectSerDeUtils.serialize(empty),
+        ObjectSerDeUtils.ObjectType.FunnelStepEventAccumulator);
+    assertTrue(deserialized.isEmpty());
   }
 }

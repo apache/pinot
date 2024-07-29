@@ -51,7 +51,6 @@ public abstract class KafkaPartitionLevelConnectionHandler {
   protected final String _topic;
   protected final Consumer<String, Bytes> _consumer;
   protected final TopicPartition _topicPartition;
-  protected final KafkaMetadataExtractor _kafkaMetadataExtractor;
 
   public KafkaPartitionLevelConnectionHandler(String clientId, StreamConfig streamConfig, int partition) {
     _config = new KafkaPartitionLevelStreamConfig(streamConfig);
@@ -67,10 +66,10 @@ public abstract class KafkaPartitionLevelConnectionHandler {
       consumerProp.put(ConsumerConfig.ISOLATION_LEVEL_CONFIG, _config.getKafkaIsolationLevel());
     }
     consumerProp.put(ConsumerConfig.CLIENT_ID_CONFIG, _clientId);
+    KafkaSSLUtils.initSSL(consumerProp);
     _consumer = createConsumer(consumerProp);
     _topicPartition = new TopicPartition(_topic, _partition);
     _consumer.assign(Collections.singletonList(_topicPartition));
-    _kafkaMetadataExtractor = KafkaMetadataExtractor.build(_config.isPopulateMetadata());
   }
 
   private Consumer<String, Bytes> createConsumer(Properties consumerProp) {

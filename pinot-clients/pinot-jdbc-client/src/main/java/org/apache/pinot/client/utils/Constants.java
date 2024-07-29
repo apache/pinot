@@ -34,7 +34,7 @@ public class Constants {
   public static final String[] SCHEMA_COLUMNS_DTYPES = {"STRING", "STRING"};
 
   public static final String[] TABLE_COLUMNS = {
-      "TABLE_SCHEM", "TABLE_CATALOG", "TABLE_NAME", "TABLE_TYPE", "REMARKS", "TYPE_CAT", "TYPE_SCHEM", "TYPE_NAME",
+      "TABLE_CAT", "TABLE_SCHEM", "TABLE_NAME", "TABLE_TYPE", "REMARKS", "TYPE_CAT", "TYPE_SCHEM", "TYPE_NAME",
       "SELF_REFERENCING_COL_NAME", "REF_GENERATION"
   };
   public static final String[] TABLE_COLUMNS_DTYPES =

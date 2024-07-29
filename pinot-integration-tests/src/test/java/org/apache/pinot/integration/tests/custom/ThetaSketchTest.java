@@ -442,6 +442,17 @@ public class ThetaSketchTest extends CustomDataQueryClusterIntegrationTest {
       runAndAssert(query, expected);
     }
 
+    // group by sketch with filter
+    {
+      String query = "select dimValue, GET_THETA_SKETCH_ESTIMATE(THETA_SKETCH_INTERSECT( "
+          + "    DISTINCT_COUNT_RAW_THETA_SKETCH(thetaSketchCol, '') FILTER (WHERE dimName = 'gender'),"
+          + "    DISTINCT_COUNT_RAW_THETA_SKETCH(thetaSketchCol, '') FILTER (WHERE dimName != 'gender'))) "
+          + "  FROM " + getTableName() + " GROUP BY dimValue";
+      ImmutableMap<String, Integer> expected =
+          ImmutableMap.of("Female", 0, "Male", 0, "Math", 0, "History", 0, "Biology", 0);
+      runAndAssert(query, expected);
+    }
+
     // group by gender
     {
       String query = "select dimValue, distinctCountThetaSketch(thetaSketchCol) from " + getTableName()
@@ -449,6 +460,73 @@ public class ThetaSketchTest extends CustomDataQueryClusterIntegrationTest {
       ImmutableMap<String, Integer> expected =
           ImmutableMap.of("Female", 50 + 60 + 70 + 110 + 120 + 130, "Male", 80 + 90 + 100 + 140 + 150 + 160);
       runAndAssert(query, expected);
+    }
+
+    // union all by gender
+    {
+      String query = "select dimValue, distinctCountThetaSketch(thetaSketchCol) from "
+          + "( "
+          + "SELECT dimValue, thetaSketchCol FROM " + getTableName()
+          + " where dimName = 'gender' and dimValue = 'Female' "
+          + "UNION ALL "
+          + "SELECT dimValue, thetaSketchCol FROM " + getTableName()
+          + " where dimName = 'gender' and dimValue = 'Male' "
+          + ") "
+          + "GROUP BY dimValue";
+      ImmutableMap<String, Integer> expected =
+          ImmutableMap.of("Female", 50 + 60 + 70 + 110 + 120 + 130, "Male", 80 + 90 + 100 + 140 + 150 + 160);
+      runAndAssert(query, expected);
+    }
+
+    // JOIN all by gender
+    {
+      String query = "select a.dimValue, distinctCountThetaSketch(b.thetaSketchCol) "
+          + "FROM "
+          + "(SELECT dimName, dimValue, thetaSketchCol FROM " + getTableName()
+          + " where dimName = 'gender' and dimValue = 'Female') a "
+          + "JOIN "
+          + "(SELECT dimName, dimValue, thetaSketchCol FROM " + getTableName()
+          + " where dimName = 'gender' and dimValue = 'Male') b "
+          + "ON a.dimName = b.dimName "
+          + "GROUP BY a.dimValue";
+      ImmutableMap<String, Integer> expected =
+          ImmutableMap.of("Female", 80 + 90 + 100 + 140 + 150 + 160);
+      runAndAssert(query, expected);
+    }
+    {
+      String query = "select b.dimValue, distinctCountThetaSketch(a.thetaSketchCol) "
+          + "FROM "
+          + "(SELECT dimName, dimValue, thetaSketchCol FROM " + getTableName()
+          + " where dimName = 'gender' and dimValue = 'Female') a "
+          + "JOIN "
+          + "(SELECT dimName, dimValue, thetaSketchCol FROM " + getTableName()
+          + " where dimName = 'gender' and dimValue = 'Male') b "
+          + "ON a.dimName = b.dimName "
+          + "GROUP BY b.dimValue";
+      ImmutableMap<String, Integer> expected =
+          ImmutableMap.of("Male", 50 + 60 + 70 + 110 + 120 + 130);
+      runAndAssert(query, expected);
+    }
+    {
+      String query = "SELECT "
+          + "GET_THETA_SKETCH_ESTIMATE(THETA_SKETCH_INTERSECT("
+          + "  DISTINCT_COUNT_RAW_THETA_SKETCH(a.thetaSketchCol, ''), "
+          + "  DISTINCT_COUNT_RAW_THETA_SKETCH(b.thetaSketchCol, ''))), "
+          + "GET_THETA_SKETCH_ESTIMATE(THETA_SKETCH_UNION("
+          + "  DISTINCT_COUNT_RAW_THETA_SKETCH(a.thetaSketchCol, ''), "
+          + "  DISTINCT_COUNT_RAW_THETA_SKETCH(b.thetaSketchCol, ''))) "
+          + "FROM "
+          + "(SELECT dimName, dimValue, thetaSketchCol FROM " + getTableName()
+          + " where dimName = 'gender' and dimValue = 'Female') a "
+          + "JOIN "
+          + "(SELECT dimName, dimValue, thetaSketchCol FROM " + getTableName()
+          + " where dimName = 'gender' and dimValue = 'Male') b "
+          + "ON a.dimName = b.dimName";
+      JsonNode jsonNode = postQuery(query);
+      assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).longValue(),
+          0);
+      assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(1).longValue(),
+          50 + 60 + 70 + 110 + 120 + 130 + 80 + 90 + 100 + 140 + 150 + 160);
     }
   }
 

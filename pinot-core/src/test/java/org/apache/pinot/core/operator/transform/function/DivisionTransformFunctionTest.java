@@ -100,7 +100,7 @@ public class DivisionTransformFunctionTest extends BaseTransformFunctionTest {
     testTransformFunction(transformFunction, expectedBigDecimalValues);
 
     expression = RequestContextUtils.getExpression(
-        String.format("div(div(div('3430.34473923874923809',div(%s,0.34)),%s),%s)", STRING_SV_COLUMN,
+        String.format("div(div(div(cast('3430.34473923874923809' as decimal),div(%s,0.34)),%s),%s)", STRING_SV_COLUMN,
             BIG_DECIMAL_SV_COLUMN, INT_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof DivisionTransformFunction);

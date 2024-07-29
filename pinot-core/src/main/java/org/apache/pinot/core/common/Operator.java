@@ -51,6 +51,9 @@ public interface Operator<T extends Block> {
   default void prepareForExplainPlan(ExplainPlanRows explainPlanRows) {
   }
 
+  default void postExplainPlan(ExplainPlanRows explainPlanRows) {
+  }
+
   default void explainPlan(ExplainPlanRows explainPlanRows, int[] globalId, int parentId) {
     prepareForExplainPlan(explainPlanRows);
     String explainPlanString = toExplainString();
@@ -66,13 +69,14 @@ public interface Operator<T extends Block> {
         child.explainPlan(explainPlanRows, globalId, parentId);
       }
     }
+    postExplainPlan(explainPlanRows);
   }
 
   /**
    * Returns the index segment associated with the operator.
    */
   default IndexSegment getIndexSegment() {
-    throw new UnsupportedOperationException();
+    return null;
   }
 
   /**

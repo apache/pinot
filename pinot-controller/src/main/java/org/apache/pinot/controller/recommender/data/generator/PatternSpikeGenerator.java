@@ -19,7 +19,7 @@
 package org.apache.pinot.controller.recommender.data.generator;
 
 import java.util.Map;
-import org.apache.commons.configuration.PropertyConverter;
+import org.apache.commons.configuration2.convert.PropertyConverter;
 import org.apache.commons.math3.distribution.AbstractRealDistribution;
 import org.apache.commons.math3.distribution.ExponentialDistribution;
 import org.apache.commons.math3.distribution.LogNormalDistribution;

@@ -25,7 +25,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.commons.collections.MapUtils;
+import org.apache.commons.collections4.MapUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.core.common.MinionConstants.MergeTask;
 import org.apache.pinot.core.segment.processing.framework.MergeType;
@@ -146,6 +146,10 @@ public class MergeTaskUtils {
     String maxNumRecordsPerSegment = taskConfig.get(MergeTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY);
     if (maxNumRecordsPerSegment != null) {
       segmentConfigBuilder.setMaxNumRecordsPerSegment(Integer.parseInt(maxNumRecordsPerSegment));
+    }
+    String segmentMapperFileSizeThreshold = taskConfig.get(MergeTask.SEGMENT_MAPPER_FILE_SIZE_IN_BYTES);
+    if (segmentMapperFileSizeThreshold != null) {
+      segmentConfigBuilder.setIntermediateFileSizeThreshold(Long.parseLong(segmentMapperFileSizeThreshold));
     }
     segmentConfigBuilder.setSegmentNamePrefix(taskConfig.get(MergeTask.SEGMENT_NAME_PREFIX_KEY));
     segmentConfigBuilder.setSegmentNamePostfix(taskConfig.get(MergeTask.SEGMENT_NAME_POSTFIX_KEY));

@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.queries;
 
-import it.unimi.dsi.fastutil.longs.LongArrayList;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -87,8 +86,12 @@ abstract public class BaseFunnelCountQueriesTest extends BaseQueriesTest {
   private List<IndexSegment> _indexSegments;
 
   protected abstract int getExpectedNumEntriesScannedInFilter();
+  protected abstract int getExpectedInterSegmentMultiplier();
   protected abstract TableConfig getTableConfig();
   protected abstract IndexSegment buildSegment(List<GenericRow> records) throws Exception;
+  protected abstract void assertIntermediateResult(Object intermediateResult, long[] expectedCounts);
+
+  protected abstract String getSettings();
 
   @Override
   protected String getFilter() {
@@ -132,13 +135,16 @@ abstract public class BaseFunnelCountQueriesTest extends BaseQueriesTest {
     return records;
   }
 
+  private String getFunnelCountSql() {
+    return "FUNNEL_COUNT( "
+        + "STEPS(stepColumn = 'A', stepColumn = 'B'), "
+        + "CORRELATE_BY(idColumn), "
+        + getSettings()
+        + ") ";
+  }
   @Test
   public void testAggregationOnly() {
-    String query = String.format("SELECT "
-        + "FUNNEL_COUNT("
-        + " STEPS(stepColumn = 'A', stepColumn = 'B'),"
-        + " CORRELATE_BY(idColumn)"
-        + ") FROM testTable");
+    String query = String.format("SELECT " + getFunnelCountSql() + "FROM testTable");
 
     // Inner segment
     Predicate<Integer> filter = id -> id >= FILTER_LIMIT;
@@ -157,13 +163,11 @@ abstract public class BaseFunnelCountQueriesTest extends BaseQueriesTest {
     List<Object> aggregationResult = resultsBlock.getResults();
     assertNotNull(aggregationResult);
     assertEquals(aggregationResult.size(), 1);
-    for (int i = 0; i < 2; i++) {
-      assertEquals(((LongArrayList) aggregationResult.get(0)).getLong(i), expectedResult[i]);
-    }
+    assertIntermediateResult(aggregationResult.get(0), expectedResult);
 
-    // Inter segments (expect 4 * inner segment result)
+    // Inter segments
     for (int i = 0; i < 2; i++) {
-      expectedResult[i] = 4 * expectedResult[i];
+      expectedResult[i] = expectedResult[i] * getExpectedInterSegmentMultiplier();
     }
     Object[] expectedResults = { expectedResult };
 
@@ -176,10 +180,8 @@ abstract public class BaseFunnelCountQueriesTest extends BaseQueriesTest {
   public void testAggregationGroupBy() {
     String query = String.format("SELECT "
         + "MOD(idColumn, %s), "
-        + "FUNNEL_COUNT("
-        + " STEPS(stepColumn = 'A', stepColumn = 'B'),"
-        + " CORRELATE_BY(idColumn)"
-        + ") FROM testTable "
+        + getFunnelCountSql()
+        + "FROM testTable "
         + "WHERE idColumn >= %s "
         + "GROUP BY 1 ORDER BY 1 LIMIT %s", NUM_GROUPS, FILTER_LIMIT, NUM_GROUPS);
 
@@ -219,19 +221,20 @@ abstract public class BaseFunnelCountQueriesTest extends BaseQueriesTest {
       numGroups++;
       GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
       int key = ((Double) groupKey._keys[0]).intValue();
-      assertEquals(aggregationGroupByResult.getResultForGroupId(0, groupKey._groupId),
-          new LongArrayList(expectedResult[key]));
+      assertIntermediateResult(
+            aggregationGroupByResult.getResultForGroupId(0, groupKey._groupId),
+            expectedResult[key]);
     }
     assertEquals(numGroups, expectedNumGroups);
 
-    // Inter segments (expect 4 * inner segment result)
+    // Inter segments
     List<Object[]> expectedRows = new ArrayList<>();
     for (int i = 0; i < NUM_GROUPS; i++) {
       if (expectedResult[i] == null) {
         continue;
       }
       for (int step = 0; step < 2; step++) {
-          expectedResult[i][step] = 4 * expectedResult[i][step];
+          expectedResult[i][step] = expectedResult[i][step] * getExpectedInterSegmentMultiplier();
       }
       Object[] expectedRow = { Double.valueOf(i), expectedResult[i] };
       expectedRows.add(expectedRow);

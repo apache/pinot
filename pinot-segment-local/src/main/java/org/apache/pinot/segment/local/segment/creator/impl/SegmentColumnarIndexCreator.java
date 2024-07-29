@@ -18,13 +18,12 @@
  */
 package org.apache.pinot.segment.local.segment.creator.impl;
 
-import com.google.common.annotations.VisibleForTesting;
+import com.fasterxml.jackson.core.JsonParseException;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -32,14 +31,16 @@ import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
-import org.apache.commons.configuration.ConfigurationException;
-import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.commons.configuration2.PropertiesConfiguration;
+import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.pinot.common.utils.FileUtils;
 import org.apache.pinot.segment.local.io.util.PinotDataBitSet;
 import org.apache.pinot.segment.local.segment.creator.impl.nullvalue.NullValueVectorCreator;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexPlugin;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
 import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexType;
+import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
+import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.creator.ColumnIndexCreationInfo;
@@ -67,7 +68,6 @@ import org.apache.pinot.spi.data.FieldSpec.FieldType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
-import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Interval;
@@ -77,6 +77,7 @@ import org.slf4j.LoggerFactory;
 
 import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column.*;
 import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Segment.*;
+
 
 /**
  * Segment creator which writes data in a columnar form.
@@ -93,7 +94,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   /**
    * Contains, indexed by column name, the creator associated with each index type.
    *
-   * Indexes that {@link #hasSpecialLifecycle(IndexType) have a special lyfecycle} are not included here.
+   * Indexes whose build lifecycle is not DURING_SEGMENT_CREATION are not included here.
    */
   private Map<String, Map<IndexType<?, ?, ?>, IndexCreator>> _creatorsByColAndIndex = new HashMap<>();
   private final Map<String, NullValueVectorCreator> _nullValueVectorCreatorMap = new HashMap<>();
@@ -102,11 +103,11 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   private File _indexDir;
   private int _totalDocs;
   private int _docIdCounter;
-  private boolean _nullHandlingEnabled;
 
   @Override
   public void init(SegmentGeneratorConfig segmentCreationSpec, SegmentIndexCreationInfo segmentIndexCreationInfo,
-      TreeMap<String, ColumnIndexCreationInfo> indexCreationInfoMap, Schema schema, File outDir)
+      TreeMap<String, ColumnIndexCreationInfo> indexCreationInfoMap, Schema schema, File outDir,
+      @Nullable int[] immutableToMutableIdMap)
       throws Exception {
     _docIdCounter = 0;
     _config = segmentCreationSpec;
@@ -130,12 +131,9 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
     for (String columnName : indexConfigs.keySet()) {
       FieldSpec fieldSpec = schema.getFieldSpecFor(columnName);
-      if (fieldSpec == null) {
-        Preconditions.checkState(schema.hasColumn(columnName),
-            "Cannot create index for column: %s because it is not in schema", columnName);
-      }
+      Preconditions.checkState(fieldSpec != null, "Failed to find column: %s in the schema", columnName);
       if (fieldSpec.isVirtualColumn()) {
-        LOGGER.warn("Ignoring index creation for virtual column " + columnName);
+        LOGGER.warn("Ignoring index creation for virtual column {}", columnName);
         continue;
       }
 
@@ -143,12 +141,15 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       ColumnIndexCreationInfo columnIndexCreationInfo = indexCreationInfoMap.get(columnName);
       Preconditions.checkNotNull(columnIndexCreationInfo, "Missing index creation info for column: %s", columnName);
       boolean dictEnabledColumn = createDictionaryForColumn(columnIndexCreationInfo, segmentCreationSpec, fieldSpec);
-      Preconditions.checkState(dictEnabledColumn || !originalConfig.getConfig(StandardIndexes.inverted()).isEnabled(),
-          "Cannot create inverted index for raw index column: %s", columnName);
+      if (originalConfig.getConfig(StandardIndexes.inverted()).isEnabled()) {
+        Preconditions.checkState(dictEnabledColumn,
+            "Cannot create inverted index for raw index column: %s", columnName);
+      }
 
       IndexType<ForwardIndexConfig, ?, ForwardIndexCreator> forwardIdx = StandardIndexes.forward();
       boolean forwardIndexDisabled = !originalConfig.getConfig(forwardIdx).isEnabled();
 
+      //@formatter:off
       IndexCreationContext.Common context = IndexCreationContext.builder()
           .withIndexDir(_indexDir)
           .withDictionary(dictEnabledColumn)
@@ -160,7 +161,11 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
           .onHeap(segmentCreationSpec.isOnHeap())
           .withForwardIndexDisabled(forwardIndexDisabled)
           .withTextCommitOnClose(true)
+          .withImmutableToMutableIdMap(immutableToMutableIdMap)
+          .withRealtimeConversion(segmentCreationSpec.isRealtimeConversion())
+          .withConsumerDir(segmentCreationSpec.getConsumerDir())
           .build();
+      //@formatter:on
 
       FieldIndexConfigs config = adaptConfig(columnName, originalConfig, columnIndexCreationInfo, segmentCreationSpec);
 
@@ -175,8 +180,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
           LOGGER.info("Creating dictionary index in column {}.{} even when it is disabled in config",
               segmentCreationSpec.getTableName(), columnName);
         }
-        SegmentDictionaryCreator creator = new DictionaryIndexPlugin().getIndexType()
-            .createIndexCreator(context, dictConfig);
+        SegmentDictionaryCreator creator =
+            new DictionaryIndexPlugin().getIndexType().createIndexCreator(context, dictConfig);
 
         try {
           creator.build(context.getSortedUniqueElementsArray());
@@ -192,7 +197,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       Map<IndexType<?, ?, ?>, IndexCreator> creatorsByIndex =
           Maps.newHashMapWithExpectedSize(IndexService.getInstance().getAllIndexes().size());
       for (IndexType<?, ?, ?> index : IndexService.getInstance().getAllIndexes()) {
-        if (hasSpecialLifecycle(index)) {
+        if (index.getIndexBuildLifecycle() != IndexType.BuildLifecycle.DURING_SEGMENT_CREATION) {
           continue;
         }
         tryCreateIndexCreator(creatorsByIndex, index, context, config);
@@ -202,7 +207,6 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       if (oldFwdCreator != null) {
         Object fakeForwardValue = calculateRawValueForTextIndex(dictEnabledColumn, config, fieldSpec);
         if (fakeForwardValue != null) {
-          @SuppressWarnings("unchecked")
           ForwardIndexCreator castedOldFwdCreator = (ForwardIndexCreator) oldFwdCreator;
           SameValueForwardIndexCreator fakeValueFwdCreator =
               new SameValueForwardIndexCreator(fakeForwardValue, castedOldFwdCreator);
@@ -213,14 +217,17 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     }
 
     // Although NullValueVector is implemented as an index, it needs to be treated in a different way than other indexes
-    _nullHandlingEnabled = _config.isNullHandlingEnabled();
-    if (_nullHandlingEnabled) {
-      for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
+    for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
+      if (isNullable(fieldSpec)) {
         // Initialize Null value vector map
         String columnName = fieldSpec.getName();
         _nullValueVectorCreatorMap.put(columnName, new NullValueVectorCreator(_indexDir, columnName));
       }
     }
+  }
+
+  private boolean isNullable(FieldSpec fieldSpec) {
+    return _schema.isEnableColumnBasedNullHandling() ? fieldSpec.isNullable() : _config.isNullHandlingEnabled();
   }
 
   private FieldIndexConfigs adaptConfig(String columnName, FieldIndexConfigs config,
@@ -229,23 +236,15 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     // Sorted columns treat the 'forwardIndexDisabled' flag as a no-op
     ForwardIndexConfig fwdConfig = config.getConfig(StandardIndexes.forward());
     if (!fwdConfig.isEnabled() && columnIndexCreationInfo.isSorted()) {
-      builder.add(StandardIndexes.forward(), new ForwardIndexConfig.Builder(fwdConfig)
-          .withLegacyProperties(segmentCreationSpec.getColumnProperties(), columnName)
-          .build());
+      builder.add(StandardIndexes.forward(),
+          new ForwardIndexConfig.Builder(fwdConfig).withLegacyProperties(segmentCreationSpec.getColumnProperties(),
+              columnName).build());
     }
     // Initialize inverted index creator; skip creating inverted index if sorted
     if (columnIndexCreationInfo.isSorted()) {
       builder.undeclare(StandardIndexes.inverted());
     }
     return builder.build();
-  }
-
-  /**
-   * Returns true if the given index type has their own construction lifecycle and therefore should not be instantiated
-   * in the general index loop and shouldn't be notified of each new column.
-   */
-  private boolean hasSpecialLifecycle(IndexType<?, ?, ?> indexType) {
-    return indexType == StandardIndexes.nullValueVector() || indexType == StandardIndexes.dictionary();
   }
 
   /**
@@ -289,8 +288,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
     FieldIndexConfigs fieldIndexConfigs = config.getIndexConfigsByColName().get(column);
     if (DictionaryIndexType.ignoreDictionaryOverride(config.isOptimizeDictionary(),
-        config.isOptimizeDictionaryForMetrics(), config.getNoDictionarySizeRatioThreshold(), spec,
-        fieldIndexConfigs, info.getDistinctValueCount(), info.getTotalNumberOfEntries())) {
+        config.isOptimizeDictionaryForMetrics(), config.getNoDictionarySizeRatioThreshold(), spec, fieldIndexConfigs,
+        info.getDistinctValueCount(), info.getTotalNumberOfEntries())) {
       // Ignore overrides and pick from config
       createDictionary = info.isCreateDictionary();
     }
@@ -320,25 +319,77 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
       FieldSpec fieldSpec = _schema.getFieldSpecFor(columnName);
       SegmentDictionaryCreator dictionaryCreator = _dictionaryCreatorMap.get(columnName);
-
-      if (fieldSpec.isSingleValueField()) {
-        indexSingleValueRow(dictionaryCreator, columnValueToIndex, creatorsByIndex);
-      } else {
-        indexMultiValueRow(dictionaryCreator, (Object[]) columnValueToIndex, creatorsByIndex);
+      try {
+        if (fieldSpec.isSingleValueField()) {
+          indexSingleValueRow(dictionaryCreator, columnValueToIndex, creatorsByIndex);
+        } else {
+          indexMultiValueRow(dictionaryCreator, (Object[]) columnValueToIndex, creatorsByIndex);
+        }
+      } catch (JsonParseException jpe) {
+        throw new ColumnJsonParserException(columnName, jpe);
       }
     }
 
-    if (_nullHandlingEnabled) {
-      for (Map.Entry<String, NullValueVectorCreator> entry : _nullValueVectorCreatorMap.entrySet()) {
-        String columnName = entry.getKey();
-        // If row has null value for given column name, add to null value vector
-        if (row.isNullValue(columnName)) {
-          _nullValueVectorCreatorMap.get(columnName).setNull(_docIdCounter);
-        }
+    for (Map.Entry<String, NullValueVectorCreator> entry : _nullValueVectorCreatorMap.entrySet()) {
+      // If row has null value for given column name, add to null value vector
+      if (row.isNullValue(entry.getKey())) {
+        entry.getValue().setNull(_docIdCounter);
       }
     }
 
     _docIdCounter++;
+  }
+
+  @Override
+  public void indexColumn(String columnName, @Nullable int[] sortedDocIds, IndexSegment segment)
+      throws IOException {
+    // Iterate over each value in the column
+    int numDocs = segment.getSegmentMetadata().getTotalDocs();
+    if (numDocs == 0) {
+      return;
+    }
+
+    try (PinotSegmentColumnReader colReader = new PinotSegmentColumnReader(segment, columnName)) {
+      Map<IndexType<?, ?, ?>, IndexCreator> creatorsByIndex = _creatorsByColAndIndex.get(columnName);
+      NullValueVectorCreator nullVec = _nullValueVectorCreatorMap.get(columnName);
+      FieldSpec fieldSpec = _schema.getFieldSpecFor(columnName);
+      SegmentDictionaryCreator dictionaryCreator = _dictionaryCreatorMap.get(columnName);
+      if (sortedDocIds != null) {
+        int onDiskDocId = 0;
+        for (int docId : sortedDocIds) {
+          indexColumnValue(colReader, creatorsByIndex, columnName, fieldSpec, dictionaryCreator, docId, onDiskDocId,
+              nullVec);
+          onDiskDocId++;
+        }
+      } else {
+        for (int docId = 0; docId < numDocs; docId++) {
+          indexColumnValue(colReader, creatorsByIndex, columnName, fieldSpec, dictionaryCreator, docId, docId, nullVec);
+        }
+      }
+    }
+  }
+
+  private void indexColumnValue(PinotSegmentColumnReader colReader,
+      Map<IndexType<?, ?, ?>, IndexCreator> creatorsByIndex, String columnName, FieldSpec fieldSpec,
+      SegmentDictionaryCreator dictionaryCreator, int sourceDocId, int onDiskDocPos,
+      @Nullable NullValueVectorCreator nullVec)
+      throws IOException {
+    Object columnValueToIndex = colReader.getValue(sourceDocId);
+    if (columnValueToIndex == null) {
+      throw new RuntimeException("Null value for column:" + columnName);
+    }
+
+    if (fieldSpec.isSingleValueField()) {
+      indexSingleValueRow(dictionaryCreator, columnValueToIndex, creatorsByIndex);
+    } else {
+      indexMultiValueRow(dictionaryCreator, (Object[]) columnValueToIndex, creatorsByIndex);
+    }
+
+    if (nullVec != null) {
+      if (colReader.isNull(sourceDocId)) {
+        nullVec.setNull(onDiskDocPos);
+      }
+    }
   }
 
   private void indexSingleValueRow(SegmentDictionaryCreator dictionaryCreator, Object value,
@@ -414,8 +465,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
   private void writeMetadata()
       throws ConfigurationException {
-    PropertiesConfiguration properties =
-        new PropertiesConfiguration(new File(_indexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME));
+    File metadataFile = new File(_indexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME);
+    PropertiesConfiguration properties = CommonsConfigurationUtils.fromFile(metadataFile);
 
     properties.setProperty(SEGMENT_CREATOR_VERSION, _config.getCreatorVersion());
     properties.setProperty(SEGMENT_PADDING_CHARACTER, String.valueOf(V1Constants.Str.DEFAULT_STRING_PAD_CHAR));
@@ -510,7 +561,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       properties.setProperty(Realtime.END_OFFSET, segmentZKPropsConfig.getEndOffset());
     }
 
-    properties.save();
+    CommonsConfigurationUtils.saveToFile(properties, metadataFile);
   }
 
   public static void addColumnMetadataInfo(PropertiesConfiguration properties, String column,
@@ -534,6 +585,13 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         String.valueOf(columnIndexCreationInfo.getTotalNumberOfEntries()));
     properties.setProperty(getKeyFor(column, IS_AUTO_GENERATED),
         String.valueOf(columnIndexCreationInfo.isAutoGenerated()));
+    if (dataType.equals(DataType.STRING) || dataType.equals(DataType.BYTES) || dataType.equals(DataType.JSON)) {
+      properties.setProperty(getKeyFor(column, SCHEMA_MAX_LENGTH), fieldSpec.getMaxLength());
+      FieldSpec.MaxLengthExceedStrategy maxLengthExceedStrategy = fieldSpec.getMaxLengthExceedStrategy();
+      if (maxLengthExceedStrategy != null) {
+        properties.setProperty(getKeyFor(column, SCHEMA_MAX_LENGTH_EXCEED_STRATEGY), maxLengthExceedStrategy);
+      }
+    }
 
     PartitionFunction partitionFunction = columnIndexCreationInfo.getPartitionFunction();
     if (partitionFunction != null) {
@@ -560,7 +618,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       Object min = columnIndexCreationInfo.getMin();
       Object max = columnIndexCreationInfo.getMax();
       if (min != null && max != null) {
-        addColumnMinMaxValueInfo(properties, column, min.toString(), max.toString(), fieldSpec.getDataType());
+        addColumnMinMaxValueInfo(properties, column, min, max, dataType.getStoredType());
       }
     }
 
@@ -570,73 +628,38 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       //       null value changes
       defaultNullValue = CommonsConfigurationUtils.replaceSpecialCharacterInPropertyValue(defaultNullValue);
     }
-    properties.setProperty(getKeyFor(column, DEFAULT_NULL_VALUE), defaultNullValue);
+    if (defaultNullValue != null) {
+      properties.setProperty(getKeyFor(column, DEFAULT_NULL_VALUE), defaultNullValue);
+    }
   }
 
-  public static void addColumnMinMaxValueInfo(PropertiesConfiguration properties, String column, String minValue,
-      String maxValue, DataType dataType) {
-    properties.setProperty(getKeyFor(column, MIN_VALUE), getValidPropertyValue(minValue, false, dataType));
-    properties.setProperty(getKeyFor(column, MAX_VALUE), getValidPropertyValue(maxValue, true, dataType));
+  public static void addColumnMinMaxValueInfo(PropertiesConfiguration properties, String column,
+      @Nullable Object minValue, @Nullable Object maxValue, DataType storedType) {
+    String validMinValue = minValue != null ? getValidPropertyValue(minValue.toString(), storedType) : null;
+    if (validMinValue != null) {
+      properties.setProperty(getKeyFor(column, MIN_VALUE), validMinValue);
+    }
+    String validMaxValue = maxValue != null ? getValidPropertyValue(maxValue.toString(), storedType) : null;
+    if (validMaxValue != null) {
+      properties.setProperty(getKeyFor(column, MAX_VALUE), validMaxValue);
+    }
+    if (validMinValue == null && validMaxValue == null) {
+      properties.setProperty(getKeyFor(column, MIN_MAX_VALUE_INVALID), true);
+    }
   }
 
   /**
-   * Helper method to get the valid value for setting min/max.
+   * Helper method to get the valid value for setting min/max. Returns {@code null} if the value is too long (longer
+   * than 512 characters), or is not supported in {@link PropertiesConfiguration}, e.g. contains character with
+   * surrogate.
    */
-  private static String getValidPropertyValue(String value, boolean isMax, DataType dataType) {
-    String valueWithinLengthLimit = getValueWithinLengthLimit(value, isMax, dataType);
-    return dataType.getStoredType() == DataType.STRING
-        ? CommonsConfigurationUtils.replaceSpecialCharacterInPropertyValue(valueWithinLengthLimit)
-        : valueWithinLengthLimit;
-  }
-
-  /**
-   * Returns the original string if its length is within the allowed limit. If the string's length exceeds the limit,
-   * returns a truncated version of the string with maintaining min or max value.
-   */
-  @VisibleForTesting
-  static String getValueWithinLengthLimit(String value, boolean isMax, DataType dataType) {
-    int length = value.length();
-    if (length <= METADATA_PROPERTY_LENGTH_LIMIT) {
-      return value;
+  @Nullable
+  private static String getValidPropertyValue(String value, DataType storedType) {
+    if (value.length() > METADATA_PROPERTY_LENGTH_LIMIT) {
+      return null;
     }
-    switch (dataType.getStoredType()) {
-      case STRING:
-        if (isMax) {
-          int trimIndexValue = METADATA_PROPERTY_LENGTH_LIMIT - 1;
-          // determining the index for the character having value less than '\uFFFF'
-          while (trimIndexValue < length && value.charAt(trimIndexValue) == '\uFFFF') {
-            trimIndexValue++;
-          }
-          if (trimIndexValue == length) {
-            return value;
-          } else {
-            // assigning the '\uFFFF' to make the value max.
-            return value.substring(0, trimIndexValue) + '\uFFFF';
-          }
-        } else {
-          return value.substring(0, METADATA_PROPERTY_LENGTH_LIMIT);
-        }
-      case BYTES:
-        if (isMax) {
-          byte[] valueInByteArray = BytesUtils.toBytes(value);
-          int trimIndexValue = METADATA_PROPERTY_LENGTH_LIMIT / 2 - 1;
-          // determining the index for the byte having value less than 0xFF
-          while (trimIndexValue < valueInByteArray.length && valueInByteArray[trimIndexValue] == (byte) 0xFF) {
-            trimIndexValue++;
-          }
-          if (trimIndexValue == valueInByteArray.length) {
-            return value;
-          } else {
-            byte[] shortByteValue = Arrays.copyOf(valueInByteArray, trimIndexValue + 1);
-            shortByteValue[trimIndexValue] = (byte) 0xFF; // assigning the 0xFF to make the value max.
-            return BytesUtils.toHexString(shortByteValue);
-          }
-        } else {
-          return BytesUtils.toHexString(Arrays.copyOf(BytesUtils.toBytes(value), (METADATA_PROPERTY_LENGTH_LIMIT / 2)));
-        }
-      default:
-        throw new IllegalStateException("Unsupported data type for property value length reduction: " + dataType);
-    }
+    return storedType == DataType.STRING ? CommonsConfigurationUtils.replaceSpecialCharacterInPropertyValue(value)
+        : value;
   }
 
   public static void removeColumnMetadataInfo(PropertiesConfiguration properties, String column) {

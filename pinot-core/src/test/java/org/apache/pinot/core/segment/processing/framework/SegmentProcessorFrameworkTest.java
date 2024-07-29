@@ -24,7 +24,10 @@ import java.io.IOException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.IntStream;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.core.segment.processing.timehandler.TimeHandler;
@@ -42,21 +45,27 @@ import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.data.readers.RecordReaderFactory;
 import org.apache.pinot.spi.data.readers.RecordReaderFileConfig;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 
@@ -69,6 +78,8 @@ public class SegmentProcessorFrameworkTest {
   private List<RecordReader> _singleSegment;
   private List<RecordReader> _multipleSegments;
   private List<RecordReader> _multiValueSegments;
+  private List<RecordReader> _recordReaderWithComplexType;
+
 
   private TableConfig _tableConfig;
   private TableConfig _tableConfigNullValueEnabled;
@@ -77,6 +88,7 @@ public class SegmentProcessorFrameworkTest {
 
   private Schema _schema;
   private Schema _schemaMV;
+  private Schema _schemaWithComplexType;
 
   private final List<Object[]> _rawData =
       Arrays.asList(new Object[]{"abc", 1000, 1597719600000L}, new Object[]{null, 2000, 1597773600000L},
@@ -108,21 +120,34 @@ public class SegmentProcessorFrameworkTest {
     _tableConfigWithFixedSegmentName.getIndexingConfig().setSegmentNameGeneratorType("fixed");
 
     _schema =
-        new Schema.SchemaBuilder().setSchemaName("mySchema").addSingleValueDimension("campaign", DataType.STRING, "")
+        new Schema.SchemaBuilder().setSchemaName("mySchema")
+            .addSingleValueDimension("campaign", DataType.STRING, "")
+            .addSingleValueDimension("campaign.inner1", DataType.STRING)
+            .addSingleValueDimension("campaign.inner1.inner2", DataType.STRING)
             // NOTE: Intentionally put 1000 as default value to test skipping null values during rollup
             .addMetric("clicks", DataType.INT, 1000)
             .addDateTime("time", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS").build();
     _schemaMV =
-        new Schema.SchemaBuilder().setSchemaName("mySchema").addMultiValueDimension("campaign", DataType.STRING, "")
+        new Schema.SchemaBuilder().setSchemaName("mySchema")
+            .addMultiValueDimension("campaign", DataType.STRING, "")
             // NOTE: Intentionally put 1000 as default value to test skipping null values during rollup
             .addMetric("clicks", DataType.INT, 1000)
             .addDateTime("time", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS").build();
-
+    _schemaWithComplexType =
+        new Schema.SchemaBuilder().setSchemaName("mySchema")
+            .addSingleValueDimension("campaign", DataType.JSON)
+            .addSingleValueDimension("campaign.inner1", DataType.STRING)
+            .addSingleValueDimension("campaign.inner1.inner2", DataType.STRING)
+            .addSingleValueDimension("targetusers.user", DataType.STRING)
+            // NOTE: Intentionally put 1000 as default value to test skipping null values during rollup
+            .addMetric("clicks", DataType.INT, 1000)
+            .addDateTime("time", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS").build();
     // create segments in many folders
     _singleSegment = createInputSegments(new File(TEMP_DIR, "single_segment"), _rawData, 1, _schema);
     _multipleSegments = createInputSegments(new File(TEMP_DIR, "multiple_segments"), _rawData, 3, _schema);
     _multiValueSegments =
         createInputSegments(new File(TEMP_DIR, "multi_value_segment"), _rawDataMultiValue, 1, _schemaMV);
+    _recordReaderWithComplexType = createRecordReaderWithComplexType();
   }
 
   private List<RecordReader> createInputSegments(File inputDir, List<Object[]> rawData, int numSegments, Schema schema)
@@ -164,6 +189,33 @@ public class SegmentProcessorFrameworkTest {
     return segmentRecordReaders;
   }
 
+  private List<RecordReader> createRecordReaderWithComplexType() {
+    GenericRow genericRow = new GenericRow();
+    genericRow.putValue("a", 1L);
+    Map<String, Object> map1 = new HashMap<>();
+    genericRow.putValue("campaign", map1);
+    map1.put("inner", "innerv");
+    Map<String, Object> innerMap1 = new HashMap<>();
+    innerMap1.put("inner2", "inner2v");
+
+    map1.put("inner1", innerMap1);
+    Map<String, Object> map2 = new HashMap<>();
+    map2.put("c", 3);
+    genericRow.putValue("map2", map2);
+
+
+    //list with two map entries inside
+    List<Map<String, Object>> list = new ArrayList<>();
+    Map<String, Object> map3 = new HashMap<>();
+    map3.put("user", "foobar");
+    list.add(map3);
+    Map<String, Object> map4 = new HashMap<>();
+    map4.put("user", "barfoo");
+    list.add(map4);
+    genericRow.putValue("targetusers", list);
+    return List.of(new GenericRowRecordReader(List.of(genericRow)));
+  }
+
   private GenericRow getGenericRow(Object[] rawRow) {
     GenericRow row = new GenericRow();
     row.putValue("campaign", rawRow[0]);
@@ -191,9 +243,11 @@ public class SegmentProcessorFrameworkTest {
     FileUtils.forceMkdir(workingDir);
     ClassLoader classLoader = getClass().getClassLoader();
     URL resource = classLoader.getResource("data/dimBaseballTeams.csv");
-    RecordReaderFileConfig reader = new RecordReaderFileConfig(FileFormat.CSV,
-        new File(resource.toURI()),
+    RecordReader recordReader = RecordReaderFactory.getRecordReader(FileFormat.CSV, new File(resource.toURI()),
         null, null);
+    RecordReaderFileConfig recordReaderFileConfig = new RecordReaderFileConfig(FileFormat.CSV,
+        new File(resource.toURI()),
+        null, null, recordReader);
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").
         setTimeColumnName("time").build();
 
@@ -205,13 +259,46 @@ public class SegmentProcessorFrameworkTest {
 
     SegmentProcessorConfig config =
         new SegmentProcessorConfig.Builder().setTableConfig(tableConfig).setSchema(schema).build();
-    SegmentProcessorFramework framework = new SegmentProcessorFramework(config, workingDir, ImmutableList.of(reader),
-        null);
+    SegmentProcessorFramework framework = new SegmentProcessorFramework(config, workingDir,
+        ImmutableList.of(recordReaderFileConfig), Collections.emptyList(), null);
     List<File> outputSegments = framework.process();
     assertEquals(outputSegments.size(), 1);
     ImmutableSegment segment = ImmutableSegmentLoader.load(outputSegments.get(0), ReadMode.mmap);
     SegmentMetadata segmentMetadata = segment.getSegmentMetadata();
-    assertEquals(segmentMetadata.getTotalDocs(), 51);
+    assertEquals(segmentMetadata.getTotalDocs(), 52);
+    // Verify reader is closed
+    assertEquals(recordReaderFileConfig.isRecordReaderClosedFromRecordReaderFileConfig(), true);
+  }
+
+  @Test
+  public void testSegmentGenerationWithComplexType() throws Exception {
+    File workingDir = new File(TEMP_DIR, "single_segment_complex_type_output");
+    FileUtils.forceMkdir(workingDir);
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    List<String> fieldsToUnnest = new ArrayList<>();
+    fieldsToUnnest.add("targetusers");
+
+    ingestionConfig.setComplexTypeConfig(
+        new ComplexTypeConfig(fieldsToUnnest, ".", null, null));
+    _tableConfig.setIngestionConfig(ingestionConfig);
+    // Default configs
+    SegmentProcessorConfig config =
+        new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schemaWithComplexType).build();
+    SegmentProcessorFramework framework =
+        new SegmentProcessorFramework(_recordReaderWithComplexType, config, workingDir);
+    List<File> outputSegments = framework.process();
+    ImmutableSegment segment = ImmutableSegmentLoader.load(outputSegments.get(0), ReadMode.mmap);
+    SegmentMetadata segmentMetadata = segment.getSegmentMetadata();
+    // Pick the column created from complex type
+    ColumnMetadata campaignInner2Metadata = segmentMetadata.getColumnMetadataFor("campaign.inner1.inner2");
+    // Verify we see a specific value parsed from the complexType
+    Assert.assertEquals(campaignInner2Metadata.getMinValue().compareTo("inner2v"), 0);
+    ColumnMetadata campaignMetadata = segmentMetadata.getColumnMetadataFor("campaign");
+    Assert.assertEquals(
+        campaignMetadata.getMinValue().compareTo("{\"inner1\":{\"inner2\":\"inner2v\"},\"inner\":\"innerv\"}"), 0);
+
+    ColumnMetadata listMetadata = segmentMetadata.getColumnMetadataFor("targetusers.user");
+    Assert.assertEquals(listMetadata.getMinValue().compareTo("barfoo"), 0);
   }
 
   @Test
@@ -578,6 +665,207 @@ public class SegmentProcessorFrameworkTest {
     assertEquals(segmentMetadata.getName(), "myTable_1597881600000_1597881600000_2");
     FileUtils.cleanDirectory(workingDir);
     rewindRecordReaders(_multipleSegments);
+  }
+
+  @Test
+  public void testConfigurableMapperOutputSize()
+      throws Exception {
+    File workingDir = new File(TEMP_DIR, "configurable_mapper_test_output");
+    FileUtils.forceMkdir(workingDir);
+    int expectedTotalDocsCount = 10;
+
+    // Test 1 :  Default case i.e. no limit to mapper output file size (single record reader).
+
+    SegmentProcessorConfig config =
+        new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schema).build();
+    SegmentProcessorFramework framework = new SegmentProcessorFramework(_singleSegment, config, workingDir);
+    List<File> outputSegments = framework.process();
+    assertEquals(outputSegments.size(), 1);
+    String[] outputDirs = workingDir.list();
+    assertTrue(outputDirs != null && outputDirs.length == 1, Arrays.toString(outputDirs));
+    SegmentMetadata segmentMetadata = new SegmentMetadataImpl(outputSegments.get(0));
+    assertEquals(segmentMetadata.getTotalDocs(), expectedTotalDocsCount);
+    assertEquals(segmentMetadata.getName(), "myTable_1597719600000_1597892400000_0");
+    FileUtils.cleanDirectory(workingDir);
+    rewindRecordReaders(_singleSegment);
+
+    // Test 2 :  Default case i.e. no limit to mapper output file size (multiple record readers).
+    config = new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schema).build();
+    framework = new SegmentProcessorFramework(_multipleSegments, config, workingDir);
+    outputSegments = framework.process();
+    assertEquals(outputSegments.size(), 1);
+    outputDirs = workingDir.list();
+    assertTrue(outputDirs != null && outputDirs.length == 1, Arrays.toString(outputDirs));
+    segmentMetadata = new SegmentMetadataImpl(outputSegments.get(0));
+    assertEquals(segmentMetadata.getTotalDocs(), expectedTotalDocsCount);
+    assertEquals(segmentMetadata.getName(), "myTable_1597719600000_1597892400000_0");
+    FileUtils.cleanDirectory(workingDir);
+    rewindRecordReaders(_multipleSegments);
+
+    // Test 3 :  Test mapper with threshold output size (single record reader).
+
+    // Create a segmentConfig with intermediate mapper output size threshold set to the number of bytes in each row
+    // from the data. In this way, we can test if each row is written to a separate segment.
+    SegmentConfig segmentConfig =
+        new SegmentConfig.Builder().setIntermediateFileSizeThreshold(16).setSegmentNamePrefix("testPrefix")
+            .setSegmentNamePostfix("testPostfix").build();
+    config = new SegmentProcessorConfig.Builder().setSegmentConfig(segmentConfig).setTableConfig(_tableConfig)
+        .setSchema(_schema).build();
+    framework = new SegmentProcessorFramework(_singleSegment, config, workingDir);
+    outputSegments = framework.process();
+    assertEquals(outputSegments.size(), expectedTotalDocsCount);
+    outputDirs = workingDir.list();
+    assertTrue(outputDirs != null && outputDirs.length == 1, Arrays.toString(outputDirs));
+
+    // Verify that each segment has only one row, and the segment name is correct.
+
+    for (int i = 0; i < expectedTotalDocsCount; i++) {
+      segmentMetadata = new SegmentMetadataImpl(outputSegments.get(i));
+      assertEquals(segmentMetadata.getTotalDocs(), 1);
+      assertTrue(segmentMetadata.getName().matches("testPrefix_.*_testPostfix_" + i));
+    }
+    FileUtils.cleanDirectory(workingDir);
+    rewindRecordReaders(_singleSegment);
+
+    // Test 4 :  Test mapper with threshold output size (multiple record readers).
+
+    // Create a segmentConfig with intermediate mapper output size threshold set to the number of bytes in each row
+    // from the data. In this way, we can test if each row is written to a separate segment.
+    segmentConfig = new SegmentConfig.Builder().setIntermediateFileSizeThreshold(16).setSegmentNamePrefix("testPrefix")
+        .setSegmentNamePostfix("testPostfix").build();
+    config = new SegmentProcessorConfig.Builder().setSegmentConfig(segmentConfig).setTableConfig(_tableConfig)
+        .setSchema(_schema).build();
+    framework = new SegmentProcessorFramework(_multipleSegments, config, workingDir);
+    outputSegments = framework.process();
+    assertEquals(outputSegments.size(), expectedTotalDocsCount);
+    outputDirs = workingDir.list();
+    assertTrue(outputDirs != null && outputDirs.length == 1, Arrays.toString(outputDirs));
+
+    // Verify that each segment has only one row, and the segment name is correct.
+
+    for (int i = 0; i < expectedTotalDocsCount; i++) {
+      segmentMetadata = new SegmentMetadataImpl(outputSegments.get(i));
+      assertEquals(segmentMetadata.getTotalDocs(), 1);
+      assertTrue(segmentMetadata.getName().matches("testPrefix_.*_testPostfix_" + i));
+    }
+    FileUtils.cleanDirectory(workingDir);
+    rewindRecordReaders(_multipleSegments);
+
+    // Test 5 :  Test with injected failure in mapper to verify output directory is cleaned up.
+
+    List<RecordReader> testList = new ArrayList<>(_multipleSegments);
+    testList.set(1, null);
+    segmentConfig = new SegmentConfig.Builder().setIntermediateFileSizeThreshold(16).setSegmentNamePrefix("testPrefix")
+        .setSegmentNamePostfix("testPostfix").build();
+    config = new SegmentProcessorConfig.Builder().setSegmentConfig(segmentConfig).setTableConfig(_tableConfig)
+        .setSchema(_schema).build();
+    SegmentProcessorFramework failureTest = new SegmentProcessorFramework(testList, config, workingDir);
+    assertThrows(NullPointerException.class, failureTest::process);
+    assertTrue(FileUtils.isEmptyDirectory(workingDir));
+    rewindRecordReaders(_multipleSegments);
+
+    // Test 6: RecordReader should be closed when recordReader is created inside RecordReaderFileConfig (without mapper
+    // output size threshold configured).
+
+    ClassLoader classLoader = getClass().getClassLoader();
+    URL resource = classLoader.getResource("data/dimBaseballTeams.csv");
+    RecordReaderFileConfig recordReaderFileConfig =
+        new RecordReaderFileConfig(FileFormat.CSV, new File(resource.toURI()), null, null, null);
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").setTimeColumnName("time").build();
+    Schema schema =
+        new Schema.SchemaBuilder().setSchemaName("mySchema").addSingleValueDimension("teamId", DataType.STRING, "")
+            .addSingleValueDimension("teamName", DataType.STRING, "")
+            .addDateTime("time", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS").build();
+
+    config = new SegmentProcessorConfig.Builder().setTableConfig(tableConfig).setSchema(schema).build();
+
+    SegmentProcessorFramework frameworkWithRecordReaderFileConfig =
+        new SegmentProcessorFramework(config, workingDir, ImmutableList.of(recordReaderFileConfig),
+            Collections.emptyList(), null);
+    outputSegments = frameworkWithRecordReaderFileConfig.process();
+
+    // Verify the number of segments created and the total docs.
+    assertEquals(outputSegments.size(), 1);
+    ImmutableSegment segment = ImmutableSegmentLoader.load(outputSegments.get(0), ReadMode.mmap);
+    segmentMetadata = segment.getSegmentMetadata();
+    assertEquals(segmentMetadata.getTotalDocs(), 52);
+
+    // Verify that the record reader is closed from RecordReaderFileConfig.
+    assertTrue(recordReaderFileConfig.isRecordReaderClosedFromRecordReaderFileConfig());
+    FileUtils.cleanDirectory(workingDir);
+
+    // Test 7: RecordReader should not be closed when recordReader is passed to RecordReaderFileConfig. (Without
+    // mapper output size threshold configured)
+
+    RecordReader recordReader = recordReaderFileConfig.getRecordReader();
+    recordReader.rewind();
+
+    // Pass the recordReader to RecordReaderFileConfig.
+    recordReaderFileConfig = new RecordReaderFileConfig(recordReader);
+    SegmentProcessorFramework frameworkWithDelegateRecordReader =
+        new SegmentProcessorFramework(config, workingDir, ImmutableList.of(recordReaderFileConfig),
+            Collections.emptyList(), null);
+    outputSegments = frameworkWithDelegateRecordReader.process();
+
+    // Verify the number of segments created and the total docs.
+    assertEquals(outputSegments.size(), 1);
+    segment = ImmutableSegmentLoader.load(outputSegments.get(0), ReadMode.mmap);
+    segmentMetadata = segment.getSegmentMetadata();
+    assertEquals(segmentMetadata.getTotalDocs(), 52);
+
+    // Verify that the record reader is not closed from RecordReaderFileConfig.
+    assertFalse(recordReaderFileConfig.isRecordReaderClosedFromRecordReaderFileConfig());
+    FileUtils.cleanDirectory(workingDir);
+
+    // Test 8: RecordReader should be closed when recordReader is created inside RecordReaderFileConfig (With mapper
+    // output size threshold configured).
+
+    expectedTotalDocsCount = 52;
+    recordReaderFileConfig = new RecordReaderFileConfig(FileFormat.CSV, new File(resource.toURI()), null, null, null);
+
+    segmentConfig = new SegmentConfig.Builder().setIntermediateFileSizeThreshold(19).setSegmentNamePrefix("testPrefix")
+        .setSegmentNamePostfix("testPostfix").build();
+    config = new SegmentProcessorConfig.Builder().setSegmentConfig(segmentConfig).setTableConfig(tableConfig)
+        .setSchema(schema).build();
+
+    frameworkWithRecordReaderFileConfig =
+        new SegmentProcessorFramework(config, workingDir, ImmutableList.of(recordReaderFileConfig),
+            Collections.emptyList(), null);
+    outputSegments = frameworkWithRecordReaderFileConfig.process();
+
+    // Verify that each segment has only one row.
+    for (int i = 0; i < expectedTotalDocsCount; i++) {
+      segmentMetadata = new SegmentMetadataImpl(outputSegments.get(i));
+      assertEquals(segmentMetadata.getTotalDocs(), 1);
+    }
+
+    // Verify that the record reader is closed from RecordReaderFileConfig.
+    assertTrue(recordReaderFileConfig.isRecordReaderClosedFromRecordReaderFileConfig());
+    FileUtils.cleanDirectory(workingDir);
+
+    // Test 9: RecordReader should not be closed when recordReader is passed to RecordReaderFileConfig (With mapper
+    // output size threshold configured).
+
+    recordReader = recordReaderFileConfig.getRecordReader();
+    recordReader.rewind();
+
+    // Pass the recordReader to RecordReaderFileConfig.
+    recordReaderFileConfig = new RecordReaderFileConfig(recordReader);
+    frameworkWithDelegateRecordReader =
+        new SegmentProcessorFramework(config, workingDir, ImmutableList.of(recordReaderFileConfig),
+            Collections.emptyList(), null);
+    outputSegments = frameworkWithDelegateRecordReader.process();
+
+    // Verify that each segment has only one row.
+    for (int i = 0; i < expectedTotalDocsCount; i++) {
+      segmentMetadata = new SegmentMetadataImpl(outputSegments.get(i));
+      assertEquals(segmentMetadata.getTotalDocs(), 1);
+    }
+
+    // Verify that the record reader is not closed from RecordReaderFileConfig.
+    assertFalse(recordReaderFileConfig.isRecordReaderClosedFromRecordReaderFileConfig());
+    FileUtils.cleanDirectory(workingDir);
   }
 
   @Test

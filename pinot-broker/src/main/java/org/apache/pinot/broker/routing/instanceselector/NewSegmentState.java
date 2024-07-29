@@ -27,22 +27,22 @@ import javax.annotation.concurrent.Immutable;
  */
 @Immutable
 public class NewSegmentState {
-  // Segment push time. This could be
+  // Segment creation time. This could be
   // 1) From ZK if we first see this segment via init call.
-  // 2) Use wall time, if first see this segment from onAssignmentChange call.
-  private final long _pushTimeMillis;
+  // 2) Use wall time if we first see this segment from onAssignmentChange call.
+  private final long _creationTimeMs;
 
   // List of SegmentInstanceCandidate: which contains instance name and online flags.
   // The candidates have to be in instance sorted order.
   private final List<SegmentInstanceCandidate> _candidates;
 
-  public NewSegmentState(long pushTimeMillis, List<SegmentInstanceCandidate> candidates) {
-    _pushTimeMillis = pushTimeMillis;
+  public NewSegmentState(long creationTimeMs, List<SegmentInstanceCandidate> candidates) {
+    _creationTimeMs = creationTimeMs;
     _candidates = candidates;
   }
 
-  public long getPushTimeMillis() {
-    return _pushTimeMillis;
+  public long getCreationTimeMs() {
+    return _creationTimeMs;
   }
 
   public List<SegmentInstanceCandidate> getCandidates() {

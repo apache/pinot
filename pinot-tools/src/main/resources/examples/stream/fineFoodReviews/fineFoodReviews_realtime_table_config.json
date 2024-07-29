@@ -1,0 +1,73 @@
+{
+  "tableName": "fineFoodReviews",
+  "tableType": "REALTIME",
+  "segmentsConfig": {
+    "segmentPushType": "APPEND",
+    "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
+    "timeColumnName": "ts",
+    "retentionTimeUnit": "DAYS",
+    "retentionTimeValue": "5",
+    "replication": "1"
+  },
+  "tenants": {
+  },
+  "tableIndexConfig": {
+    "loadMode": "MMAP",
+    "noDictionaryColumns": ["Text"]
+  },
+  "routing": {
+    "segmentPrunerTypes": [
+      "time"
+    ]
+  },
+  "ingestionConfig": {
+    "streamIngestionConfig": {
+      "streamConfigMaps": [
+        {
+          "streamType": "kafka",
+          "stream.kafka.topic.name": "fineFoodReviews",
+          "stream.kafka.decoder.class.name": "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder",
+          "stream.kafka.consumer.factory.class.name": "org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory",
+          "stream.kafka.consumer.prop.auto.offset.reset": "smallest",
+          "stream.kafka.zk.broker.url": "localhost:2191/kafka",
+          "stream.kafka.broker.list": "localhost:19092",
+          "realtime.segment.flush.threshold.time": "3600000",
+          "realtime.segment.flush.threshold.size": "50000"
+        }
+      ]
+    },
+    "transformConfigs": [
+      {
+        "columnName": "ts",
+        "transformFunction": "now()"
+      }
+    ]
+  },
+  "metadata": {
+    "customConfigs": {
+    }
+  },
+  "fieldConfigList": [
+    {
+      "encodingType": "RAW",
+      "indexType": "VECTOR",
+      "name": "embedding",
+      "properties": {
+        "vectorIndexType": "HNSW",
+        "vectorDimension": 1536,
+        "vectorDistanceFunction": "COSINE",
+        "version": 1,
+        "commitDocs": "1"
+      }
+    },
+    {
+      "encodingType": "RAW",
+      "indexType": "TEXT",
+      "name": "Text",
+      "properties": {
+        "deriveNumDocsPerChunkForRawIndex": "true",
+        "rawIndexWriterVersion": "3"
+      }
+    }
+  ]
+}

@@ -50,6 +50,10 @@ public class ControllerInstanceToggleTest extends ControllerTest {
   @Test
   public void testInstanceToggle()
       throws Exception {
+    // Create schema
+    sendPostRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forSchemaCreate(),
+        createDummySchema(RAW_TABLE_NAME).toPrettyJsonString());
+
     // Create an offline table
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setNumReplicas(DEFAULT_MIN_NUM_REPLICAS)

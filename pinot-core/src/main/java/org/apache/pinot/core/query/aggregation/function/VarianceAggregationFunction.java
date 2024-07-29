@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
@@ -45,12 +46,16 @@ public class VarianceAggregationFunction extends BaseSingleInputAggregationFunct
   protected final boolean _isStdDev;
   protected final boolean _nullHandlingEnabled;
 
-  public VarianceAggregationFunction(ExpressionContext expression, boolean isSample, boolean isStdDev,
+  public VarianceAggregationFunction(List<ExpressionContext> arguments, boolean isSample, boolean isStdDev,
       boolean nullHandlingEnabled) {
-    super(expression);
+    super(verifySingleArgument(arguments, getFunctionName(isSample, isStdDev)));
     _isSample = isSample;
     _isStdDev = isStdDev;
     _nullHandlingEnabled = nullHandlingEnabled;
+  }
+
+  private static String getFunctionName(boolean isSample, boolean isStdDev) {
+    return isSample ? (isStdDev ? "STD_DEV_SAMP" : "VAR_SAMP") : (isStdDev ? "STD_DEV_POP" : "VAR_POP");
   }
 
   @Override

@@ -18,12 +18,16 @@
  */
 package org.apache.pinot.query.runtime.plan;
 
+import java.util.Collections;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.query.mailbox.MailboxService;
+import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.VirtualServerAddress;
+import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.operator.OpChainId;
-import org.apache.pinot.query.runtime.operator.OpChainStats;
 import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerResult;
+import org.apache.pinot.query.runtime.plan.server.ServerPlanRequestContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
@@ -35,33 +39,32 @@ import org.apache.pinot.spi.utils.CommonConstants;
 public class OpChainExecutionContext {
   private final MailboxService _mailboxService;
   private final long _requestId;
-  private final int _stageId;
-  private final VirtualServerAddress _server;
   private final long _deadlineMs;
-  private final Map<String, String> _requestMetadata;
+  private final Map<String, String> _opChainMetadata;
   private final StageMetadata _stageMetadata;
+  private final WorkerMetadata _workerMetadata;
+  private final VirtualServerAddress _server;
   private final OpChainId _id;
-  private final OpChainStats _stats;
+  @Nullable
   private final PipelineBreakerResult _pipelineBreakerResult;
   private final boolean _traceEnabled;
 
-  public OpChainExecutionContext(MailboxService mailboxService, long requestId, int stageId,
-      VirtualServerAddress server, long deadlineMs, Map<String, String> requestMetadata, StageMetadata stageMetadata,
-      PipelineBreakerResult pipelineBreakerResult) {
+  private ServerPlanRequestContext _leafStageContext;
+
+  public OpChainExecutionContext(MailboxService mailboxService, long requestId, long deadlineMs,
+      Map<String, String> opChainMetadata, StageMetadata stageMetadata, WorkerMetadata workerMetadata,
+      @Nullable PipelineBreakerResult pipelineBreakerResult) {
     _mailboxService = mailboxService;
     _requestId = requestId;
-    _stageId = stageId;
-    _server = server;
     _deadlineMs = deadlineMs;
-    _requestMetadata = requestMetadata;
+    _opChainMetadata = Collections.unmodifiableMap(opChainMetadata);
     _stageMetadata = stageMetadata;
-    _id = new OpChainId(requestId, server.workerId(), stageId);
-    _stats = new OpChainStats(_id.toString());
+    _workerMetadata = workerMetadata;
+    _server =
+        new VirtualServerAddress(mailboxService.getHostname(), mailboxService.getPort(), workerMetadata.getWorkerId());
+    _id = new OpChainId(requestId, workerMetadata.getWorkerId(), stageMetadata.getStageId());
     _pipelineBreakerResult = pipelineBreakerResult;
-    if (pipelineBreakerResult != null && pipelineBreakerResult.getOpChainStats() != null) {
-      _stats.getOperatorStatsMap().putAll(pipelineBreakerResult.getOpChainStats().getOperatorStatsMap());
-    }
-    _traceEnabled = Boolean.parseBoolean(requestMetadata.get(CommonConstants.Broker.Request.TRACE));
+    _traceEnabled = Boolean.parseBoolean(opChainMetadata.get(CommonConstants.Broker.Request.TRACE));
   }
 
   public MailboxService getMailboxService() {
@@ -73,7 +76,11 @@ public class OpChainExecutionContext {
   }
 
   public int getStageId() {
-    return _stageId;
+    return _stageMetadata.getStageId();
+  }
+
+  public int getWorkerId() {
+    return _workerMetadata.getWorkerId();
   }
 
   public VirtualServerAddress getServer() {
@@ -84,27 +91,36 @@ public class OpChainExecutionContext {
     return _deadlineMs;
   }
 
-  public Map<String, String> getRequestMetadata() {
-    return _requestMetadata;
+  public Map<String, String> getOpChainMetadata() {
+    return _opChainMetadata;
   }
 
   public StageMetadata getStageMetadata() {
     return _stageMetadata;
   }
 
+  public WorkerMetadata getWorkerMetadata() {
+    return _workerMetadata;
+  }
+
   public OpChainId getId() {
     return _id;
   }
 
-  public OpChainStats getStats() {
-    return _stats;
-  }
-
+  @Nullable
   public PipelineBreakerResult getPipelineBreakerResult() {
     return _pipelineBreakerResult;
   }
 
   public boolean isTraceEnabled() {
     return _traceEnabled;
+  }
+
+  public ServerPlanRequestContext getLeafStageContext() {
+    return _leafStageContext;
+  }
+
+  public void setLeafStageContext(ServerPlanRequestContext leafStageContext) {
+    _leafStageContext = leafStageContext;
   }
 }

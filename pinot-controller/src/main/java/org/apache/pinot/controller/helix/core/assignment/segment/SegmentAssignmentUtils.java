@@ -292,16 +292,16 @@ public class SegmentAssignmentUtils {
     return numSegmentsToBeMovedPerInstance;
   }
 
-  public static Set<String> getSegmentsToMove(Map<String, Map<String, String>> oldAssignment,
+  public static List<String> getSegmentsToMove(Map<String, Map<String, String>> oldAssignment,
       Map<String, Map<String, String>> newAssignment) {
-    Set<String> result = new HashSet<>();
+    List<String> segmentsToMove = new ArrayList<>();
     for (Map.Entry<String, Map<String, String>> entry : newAssignment.entrySet()) {
       String segmentName = entry.getKey();
       if (!entry.getValue().equals(oldAssignment.get(segmentName))) {
-        result.add(segmentName);
+        segmentsToMove.add(segmentName);
       }
     }
-    return result;
+    return segmentsToMove;
   }
 
   /**

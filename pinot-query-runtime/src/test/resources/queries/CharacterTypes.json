@@ -32,8 +32,6 @@
         "sql": "SELECT 'value with spaces' FROM {varchar}"
       },
       {
-        "ignored": true,
-        "comment": "calcite doesn't support parsing non ISO-8859-1 characters as constants",
         "psql": "8.3",
         "description": "test inline UTF8 constants",
         "sql": "SELECT 'Οὐχὶ (greek)' FROM {varchar}"

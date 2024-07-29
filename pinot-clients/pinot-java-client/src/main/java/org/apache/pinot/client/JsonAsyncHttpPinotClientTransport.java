@@ -18,14 +18,12 @@
  */
 package org.apache.pinot.client;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectReader;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.JdkSslContext;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -60,7 +58,7 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport<C
   private final int _brokerReadTimeout;
   private final AsyncHttpClient _httpClient;
   private final String _extraOptionStr;
-  private final boolean _useMultiStageEngine;
+  private final boolean _useMultistageEngine;
 
   public JsonAsyncHttpPinotClientTransport() {
     _brokerReadTimeout = 60000;
@@ -68,17 +66,17 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport<C
     _scheme = CommonConstants.HTTP_PROTOCOL;
     _extraOptionStr = DEFAULT_EXTRA_QUERY_OPTION_STRING;
     _httpClient = Dsl.asyncHttpClient(Dsl.config().setRequestTimeout(_brokerReadTimeout));
-    _useMultiStageEngine = false;
+    _useMultistageEngine = false;
   }
 
   public JsonAsyncHttpPinotClientTransport(Map<String, String> headers, String scheme, String extraOptionString,
-      boolean useMultiStageEngine, @Nullable SSLContext sslContext, ConnectionTimeouts connectionTimeouts,
+      boolean useMultistageEngine, @Nullable SSLContext sslContext, ConnectionTimeouts connectionTimeouts,
       TlsProtocols tlsProtocols, @Nullable String appId) {
     _brokerReadTimeout = connectionTimeouts.getReadTimeoutMs();
     _headers = headers;
     _scheme = scheme;
     _extraOptionStr = StringUtils.isEmpty(extraOptionString) ? DEFAULT_EXTRA_QUERY_OPTION_STRING : extraOptionString;
-    _useMultiStageEngine = useMultiStageEngine;
+    _useMultistageEngine = useMultistageEngine;
 
     Builder builder = Dsl.config();
     if (sslContext != null) {
@@ -111,7 +109,9 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport<C
       json.put("sql", query);
       json.put("queryOptions", _extraOptionStr);
 
-      String url = String.format("%s://%s%s", _scheme, brokerAddress, _useMultiStageEngine ? "/query" : "/query/sql");
+      LOGGER.debug("Query will use Multistage Engine = {}", _useMultistageEngine);
+
+      String url = String.format("%s://%s%s", _scheme, brokerAddress, _useMultistageEngine ? "/query" : "/query/sql");
       BoundRequestBuilder requestBuilder = _httpClient.preparePost(url);
 
       if (_headers != null) {
@@ -127,32 +127,15 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport<C
                   "Pinot returned HTTP status " + httpResponse.getStatusCode() + ", expected 200");
             }
 
-            String responseBody = httpResponse.getResponseBody(StandardCharsets.UTF_8);
             try {
-              return BrokerResponse.fromJson(OBJECT_READER.readTree(responseBody));
-            } catch (JsonProcessingException e) {
+              return BrokerResponse.fromJson(OBJECT_READER.readTree(httpResponse.getResponseBodyAsStream()));
+            } catch (IOException e) {
               throw new CompletionException(e);
             }
           });
     } catch (Exception e) {
       throw new PinotClientException(e);
     }
-  }
-
-  @Override
-  public BrokerResponse executeQuery(String brokerAddress, Request request)
-      throws PinotClientException {
-    try {
-      return executeQueryAsync(brokerAddress, request).get(_brokerReadTimeout, TimeUnit.MILLISECONDS);
-    } catch (Exception e) {
-      throw new PinotClientException(e);
-    }
-  }
-
-  @Override
-  public CompletableFuture<BrokerResponse> executeQueryAsync(String brokerAddress, Request request)
-      throws PinotClientException {
-    return executeQueryAsync(brokerAddress, request.getQuery());
   }
 
   @Override

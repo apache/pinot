@@ -18,33 +18,48 @@
  */
 package org.apache.pinot.common.utils;
 
+import com.google.common.cache.Cache;
 import org.mindrot.jbcrypt.BCrypt;
+
 
 public class BcryptUtils {
 
-    private static final int DEFALUT_LOG_ROUNDS = 10;
-    private static String _bcryptPassword = null;
+  private static final int DEFAULT_LOG_ROUNDS = 10;
+  private static String _bcryptPassword = null;
 
-    private BcryptUtils() {
-    }
+  private BcryptUtils() {
+  }
 
-    public static String encrypt(String password) {
-        return encrypt(password, DEFALUT_LOG_ROUNDS);
-    }
+  public static String encrypt(String password) {
+    return encrypt(password, DEFAULT_LOG_ROUNDS);
+  }
 
-    public static String encrypt(String password, int saltLogRrounds) {
-        _bcryptPassword = BCrypt.hashpw(password, BCrypt.gensalt(saltLogRrounds));
-        return _bcryptPassword;
-    }
+  public static String encrypt(String password, int saltLogRounds) {
+    _bcryptPassword = BCrypt.hashpw(password, BCrypt.gensalt(saltLogRounds));
+    return _bcryptPassword;
+  }
 
-    public static boolean checkpw(String pasword, String encrypedPassword) {
-        boolean isMatch = false;
-        try {
-            isMatch = BCrypt.checkpw(pasword, encrypedPassword);
-        } catch (Exception e) {
-            System.out.println(e.getMessage());
-        } finally {
-            return isMatch;
-        }
+  public static boolean checkpw(String password, String encryptedPassword) {
+    boolean isMatch = false;
+    try {
+      isMatch = BCrypt.checkpw(password, encryptedPassword);
+    } catch (Exception e) {
+      System.out.println(e.getMessage());
+    } finally {
+      return isMatch;
     }
+  }
+
+  public static boolean checkpwWithCache(String password, String encryptedPassword,
+      Cache<String, String> userPasswordAuthCache) {
+    boolean isMatch = true;
+    String cachedPassword = userPasswordAuthCache.getIfPresent(encryptedPassword);
+    if (cachedPassword == null || !cachedPassword.equals(password)) {
+      isMatch = checkpw(password, encryptedPassword);
+      if (isMatch) {
+        userPasswordAuthCache.put(encryptedPassword, password);
+      }
+    }
+    return isMatch;
+  }
 }

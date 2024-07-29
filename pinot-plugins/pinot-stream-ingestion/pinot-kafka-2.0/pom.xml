@@ -26,7 +26,7 @@
   <parent>
     <artifactId>pinot-stream-ingestion</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>0.13.0-SNAPSHOT</version>
+    <version>1.2.0-SNAPSHOT</version>
     <relativePath>..</relativePath>
   </parent>
 
@@ -36,7 +36,7 @@
   <properties>
     <pinot.root>${basedir}/../../..</pinot.root>
     <kafka.lib.version>2.8.1</kafka.lib.version>
-    <phase.prop>package</phase.prop>
+    <shade.phase.prop>package</shade.phase.prop>
   </properties>
 
   <dependencies>
@@ -59,10 +59,6 @@
           <groupId>net.sf.jopt-simple</groupId>
           <artifactId>jopt-simple</artifactId>
         </exclusion>
-        <exclusion>
-          <groupId>org.scala-lang</groupId>
-          <artifactId>scala-library</artifactId>
-        </exclusion>
       </exclusions>
     </dependency>
     <dependency>
@@ -72,7 +68,6 @@
     <dependency>
       <groupId>org.scala-lang</groupId>
       <artifactId>scala-library</artifactId>
-      <version>${scala.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.kafka</groupId>
@@ -112,29 +107,15 @@
       <artifactId>metrics-core</artifactId>
       <scope>test</scope>
     </dependency>
+    <dependency>
+      <groupId>org.bouncycastle</groupId>
+      <artifactId>bcprov-jdk18on</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.bouncycastle</groupId>
+      <artifactId>bcpkix-jdk18on</artifactId>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
-
-
-  <profiles>
-    <profile>
-      <id>scala-2.12</id>
-      <activation>
-        <activeByDefault>true</activeByDefault>
-      </activation>
-      <properties>
-        <scala.version>2.12.11</scala.version>
-        <scala.compat.version>2.12</scala.compat.version>
-      </properties>
-    </profile>
-    <profile>
-      <id>scala-2.13</id>
-      <activation>
-        <activeByDefault>false</activeByDefault>
-      </activation>
-      <properties>
-        <scala.version>2.13.3</scala.version>
-        <scala.compat.version>2.13</scala.compat.version>
-      </properties>
-    </profile>
-  </profiles>
 </project>

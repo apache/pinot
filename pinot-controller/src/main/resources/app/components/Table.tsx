@@ -537,7 +537,7 @@ export default function CustomizedTables({
                           const matches = baseURL.match(regex);
                           url = baseURL.replace(matches[0], row[matches[0].replace(/:/g, '')]);
                         }
-                        return addLinks && !idx ? (
+                        return addLinks && typeof cell === 'string' && !idx ? (
                           <StyledTableCell key={idx}>
                             <Link to={`${encodeURI(`${url}${encodeURIComponent(cell)}`)}`}>{cell}</Link>
                           </StyledTableCell>

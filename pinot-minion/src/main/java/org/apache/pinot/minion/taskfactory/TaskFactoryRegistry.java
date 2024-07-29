@@ -87,7 +87,7 @@ public class TaskFactoryRegistry {
             private final TaskConfig _taskConfig = context.getTaskConfig();
             private final PinotTaskExecutor _taskExecutor = taskExecutorFactory.create();
             private final MinionEventObserver _eventObserver = eventObserverFactory.create();
-            private final MinionMetrics _minionMetrics = MinionContext.getInstance().getMinionMetrics();
+            private final MinionMetrics _minionMetrics = MinionMetrics.get();
 
             @Override
             public TaskResult run() {

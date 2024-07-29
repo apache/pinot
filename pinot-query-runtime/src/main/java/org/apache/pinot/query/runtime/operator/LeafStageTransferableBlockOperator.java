@@ -18,31 +18,48 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
-import com.google.common.collect.ImmutableList;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.LinkedList;
 import java.util.List;
-import java.util.function.Function;
+import java.util.Map;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datablock.DataBlock;
-import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.datatable.DataTable;
+import org.apache.pinot.common.datatable.StatMap;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
-import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
-import org.apache.pinot.core.operator.blocks.results.DistinctResultsBlock;
-import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.MetadataResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
+import org.apache.pinot.core.query.executor.QueryExecutor;
+import org.apache.pinot.core.query.executor.ResultsBlockStreamer;
+import org.apache.pinot.core.query.logger.ServerQueryLogger;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
-import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
+import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionValue;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -59,167 +76,365 @@ import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
  * </ul>
  */
 public class LeafStageTransferableBlockOperator extends MultiStageOperator {
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(LeafStageTransferableBlockOperator.class);
   private static final String EXPLAIN_NAME = "LEAF_STAGE_TRANSFER_OPERATOR";
 
-  private final LinkedList<ServerQueryRequest> _serverQueryRequestQueue;
-  private final DataSchema _desiredDataSchema;
-  private final Function<ServerQueryRequest, InstanceResponseBlock> _processCall;
+  // Use a special results block to indicate that this is the last results block
+  private static final MetadataResultsBlock LAST_RESULTS_BLOCK = new MetadataResultsBlock();
 
-  private InstanceResponseBlock _errorBlock;
+  private final List<ServerQueryRequest> _requests;
+  private final DataSchema _dataSchema;
+  private final QueryExecutor _queryExecutor;
+  private final ExecutorService _executorService;
 
-  public LeafStageTransferableBlockOperator(OpChainExecutionContext context,
-      Function<ServerQueryRequest, InstanceResponseBlock> processCall, List<ServerQueryRequest> serverQueryRequestList,
-      DataSchema dataSchema) {
+  // Use a limit-sized BlockingQueue to store the results blocks and apply back pressure to the single-stage threads
+  private final BlockingQueue<BaseResultsBlock> _blockingQueue;
+
+  private Future<Void> _executionFuture;
+  private volatile Map<Integer, String> _exceptions;
+  private final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
+
+  public LeafStageTransferableBlockOperator(OpChainExecutionContext context, List<ServerQueryRequest> requests,
+      DataSchema dataSchema, QueryExecutor queryExecutor, ExecutorService executorService) {
     super(context);
-    _processCall = processCall;
-    _serverQueryRequestQueue = new LinkedList<>(serverQueryRequestList);
-    _desiredDataSchema = dataSchema;
+    int numRequests = requests.size();
+    Preconditions.checkArgument(numRequests == 1 || numRequests == 2, "Expected 1 or 2 requests, got: %s", numRequests);
+    _requests = requests;
+    _dataSchema = dataSchema;
+    _queryExecutor = queryExecutor;
+    _executorService = executorService;
+    Integer maxStreamingPendingBlocks = QueryOptionsUtils.getMaxStreamingPendingBlocks(context.getOpChainMetadata());
+    _blockingQueue = new ArrayBlockingQueue<>(maxStreamingPendingBlocks != null ? maxStreamingPendingBlocks
+        : QueryOptionValue.DEFAULT_MAX_STREAMING_PENDING_BLOCKS);
+    String tableName = context.getLeafStageContext().getStagePlan().getStageMetadata().getTableName();
+    _statMap.merge(StatKey.TABLE, tableName);
+  }
+
+  @Override
+  public void registerExecution(long time, int numRows) {
+    _statMap.merge(StatKey.EXECUTION_TIME_MS, time);
+    _statMap.merge(StatKey.EMITTED_ROWS, numRows);
+  }
+
+  @Override
+  public Type getOperatorType() {
+    return Type.LEAF;
+  }
+
+  @Override
+  protected Logger logger() {
+    return LOGGER;
   }
 
   @Override
   public List<MultiStageOperator> getChildOperators() {
-    return ImmutableList.of();
+    return Collections.emptyList();
   }
 
-  @Nullable
   @Override
   public String toExplainString() {
     return EXPLAIN_NAME;
   }
 
   @Override
-  protected TransferableBlock getNextBlock() {
-    if (_errorBlock != null) {
-      throw new RuntimeException("Leaf transfer terminated. next block should no longer be called.");
+  protected TransferableBlock getNextBlock()
+      throws InterruptedException, TimeoutException {
+    if (_executionFuture == null) {
+      _executionFuture = startExecution();
     }
-    // runLeafStage
-    InstanceResponseBlock responseBlock = getNextBlockFromLeafStage();
-    if (responseBlock == null) {
-      // finished getting next block from leaf stage. returning EOS
-      return new TransferableBlock(DataBlockUtils.getEndOfStreamDataBlock());
-    } else if (!responseBlock.getExceptions().isEmpty()) {
-      // get error from leaf stage, return ERROR
-      _errorBlock = responseBlock;
-      return new TransferableBlock(DataBlockUtils.getErrorDataBlock(_errorBlock.getExceptions()));
+    BaseResultsBlock resultsBlock =
+        _blockingQueue.poll(_context.getDeadlineMs() - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+    if (resultsBlock == null) {
+      throw new TimeoutException("Timed out waiting for results block");
+    }
+    // Terminate when receiving exception block
+    Map<Integer, String> exceptions = _exceptions;
+    if (exceptions != null) {
+      return TransferableBlockUtils.getErrorTransferableBlock(exceptions);
+    }
+    if (_isEarlyTerminated || resultsBlock == LAST_RESULTS_BLOCK) {
+      return constructMetadataBlock();
     } else {
-      // return normal block.
-      OperatorStats operatorStats = _opChainStats.getOperatorStats(_context, getOperatorId());
-      operatorStats.recordExecutionStats(responseBlock.getResponseMetadata());
-      if (responseBlock.getResultsBlock() != null && responseBlock.getResultsBlock().getNumRows() > 0) {
-        return composeTransferableBlock(responseBlock, _desiredDataSchema);
-      } else {
-        return new TransferableBlock(Collections.emptyList(), _desiredDataSchema, DataBlock.Type.ROW);
+      // Regular data block
+      return composeTransferableBlock(resultsBlock, _dataSchema);
+    }
+  }
+
+  private void mergeExecutionStats(@Nullable Map<String, String> executionStats) {
+    if (executionStats != null) {
+      for (Map.Entry<String, String> entry : executionStats.entrySet()) {
+        DataTable.MetadataKey key = DataTable.MetadataKey.getByName(entry.getKey());
+        if (key == null) {
+          LOGGER.debug("Skipping unknown execution stat: {}", entry.getKey());
+          continue;
+        }
+        switch (key) {
+          case UNKNOWN:
+            LOGGER.debug("Skipping unknown execution stat: {}", entry.getKey());
+            break;
+          case TABLE:
+            _statMap.merge(StatKey.TABLE, entry.getValue());
+            break;
+          case NUM_DOCS_SCANNED:
+            _statMap.merge(StatKey.NUM_DOCS_SCANNED, Long.parseLong(entry.getValue()));
+            break;
+          case NUM_ENTRIES_SCANNED_IN_FILTER:
+            _statMap.merge(StatKey.NUM_ENTRIES_SCANNED_IN_FILTER, Long.parseLong(entry.getValue()));
+            break;
+          case NUM_ENTRIES_SCANNED_POST_FILTER:
+            _statMap.merge(StatKey.NUM_ENTRIES_SCANNED_POST_FILTER, Long.parseLong(entry.getValue()));
+            break;
+          case NUM_SEGMENTS_QUERIED:
+            _statMap.merge(StatKey.NUM_SEGMENTS_QUERIED, Integer.parseInt(entry.getValue()));
+            break;
+          case NUM_SEGMENTS_PROCESSED:
+            _statMap.merge(StatKey.NUM_SEGMENTS_PROCESSED, Integer.parseInt(entry.getValue()));
+            break;
+          case NUM_SEGMENTS_MATCHED:
+            _statMap.merge(StatKey.NUM_SEGMENTS_MATCHED, Integer.parseInt(entry.getValue()));
+            break;
+          case NUM_CONSUMING_SEGMENTS_QUERIED:
+            _statMap.merge(StatKey.NUM_CONSUMING_SEGMENTS_QUERIED, Integer.parseInt(entry.getValue()));
+            break;
+          case MIN_CONSUMING_FRESHNESS_TIME_MS:
+            _statMap.merge(StatKey.MIN_CONSUMING_FRESHNESS_TIME_MS, Long.parseLong(entry.getValue()));
+            break;
+          case TOTAL_DOCS:
+            _statMap.merge(StatKey.TOTAL_DOCS, Long.parseLong(entry.getValue()));
+            break;
+          case NUM_GROUPS_LIMIT_REACHED:
+            _statMap.merge(StatKey.NUM_GROUPS_LIMIT_REACHED, Boolean.parseBoolean(entry.getValue()));
+            break;
+          case TIME_USED_MS:
+            _statMap.merge(StatKey.EXECUTION_TIME_MS, Long.parseLong(entry.getValue()));
+            break;
+          case TRACE_INFO:
+            LOGGER.debug("Skipping trace info: {}", entry.getValue());
+            break;
+          case REQUEST_ID:
+            LOGGER.debug("Skipping request ID: {}", entry.getValue());
+            break;
+          case NUM_RESIZES:
+            _statMap.merge(StatKey.NUM_RESIZES, Integer.parseInt(entry.getValue()));
+            break;
+          case RESIZE_TIME_MS:
+            _statMap.merge(StatKey.RESIZE_TIME_MS, Long.parseLong(entry.getValue()));
+            break;
+          case THREAD_CPU_TIME_NS:
+            _statMap.merge(StatKey.THREAD_CPU_TIME_NS, Long.parseLong(entry.getValue()));
+            break;
+          case SYSTEM_ACTIVITIES_CPU_TIME_NS:
+            _statMap.merge(StatKey.SYSTEM_ACTIVITIES_CPU_TIME_NS, Long.parseLong(entry.getValue()));
+            break;
+          case RESPONSE_SER_CPU_TIME_NS:
+            _statMap.merge(StatKey.RESPONSE_SER_CPU_TIME_NS, Long.parseLong(entry.getValue()));
+            break;
+          case NUM_SEGMENTS_PRUNED_BY_SERVER:
+            _statMap.merge(StatKey.NUM_SEGMENTS_PRUNED_BY_SERVER, Integer.parseInt(entry.getValue()));
+            break;
+          case NUM_SEGMENTS_PRUNED_INVALID:
+            _statMap.merge(StatKey.NUM_SEGMENTS_PRUNED_INVALID, Integer.parseInt(entry.getValue()));
+            break;
+          case NUM_SEGMENTS_PRUNED_BY_LIMIT:
+            _statMap.merge(StatKey.NUM_SEGMENTS_PRUNED_BY_LIMIT, Integer.parseInt(entry.getValue()));
+            break;
+          case NUM_SEGMENTS_PRUNED_BY_VALUE:
+            _statMap.merge(StatKey.NUM_SEGMENTS_PRUNED_BY_VALUE, Integer.parseInt(entry.getValue()));
+            break;
+          case EXPLAIN_PLAN_NUM_EMPTY_FILTER_SEGMENTS:
+            LOGGER.debug("Skipping empty filter segments: {}", entry.getValue());
+            break;
+          case EXPLAIN_PLAN_NUM_MATCH_ALL_FILTER_SEGMENTS:
+            LOGGER.debug("Skipping match all filter segments: {}", entry.getValue());
+            break;
+          case NUM_CONSUMING_SEGMENTS_PROCESSED:
+            _statMap.merge(StatKey.NUM_CONSUMING_SEGMENTS_PROCESSED, Integer.parseInt(entry.getValue()));
+            break;
+          case NUM_CONSUMING_SEGMENTS_MATCHED:
+            _statMap.merge(StatKey.NUM_CONSUMING_SEGMENTS_MATCHED, Integer.parseInt(entry.getValue()));
+            break;
+          default: {
+            throw new IllegalArgumentException("Unhandled V1 execution stat: " + entry.getKey());
+          }
+        }
       }
     }
   }
 
-  @Nullable
-  private InstanceResponseBlock getNextBlockFromLeafStage() {
-    if (!_serverQueryRequestQueue.isEmpty()) {
-      ServerQueryRequest request = _serverQueryRequestQueue.pop();
-      return _processCall.apply(request);
-    } else {
-      return null;
+  private TransferableBlock constructMetadataBlock() {
+    MultiStageQueryStats multiStageQueryStats = MultiStageQueryStats.createLeaf(_context.getStageId(), _statMap);
+    return TransferableBlockUtils.getEndOfStreamTransferableBlock(multiStageQueryStats);
+  }
+
+  private Future<Void> startExecution() {
+    ResultsBlockConsumer resultsBlockConsumer = new ResultsBlockConsumer();
+    ServerQueryLogger queryLogger = ServerQueryLogger.getInstance();
+    return _executorService.submit(() -> {
+      try {
+        if (_requests.size() == 1) {
+          ServerQueryRequest request = _requests.get(0);
+          InstanceResponseBlock instanceResponseBlock =
+              _queryExecutor.execute(request, _executorService, resultsBlockConsumer);
+          if (queryLogger != null) {
+            queryLogger.logQuery(request, instanceResponseBlock, "MultistageEngine");
+          }
+          // TODO: Revisit if we should treat all exceptions as query failure. Currently MERGE_RESPONSE_ERROR and
+          //       SERVER_SEGMENT_MISSING_ERROR are counted as query failure.
+          Map<Integer, String> exceptions = instanceResponseBlock.getExceptions();
+          if (!exceptions.isEmpty()) {
+            _exceptions = exceptions;
+          } else {
+            // NOTE: Instance response block might contain data (not metadata only) when all the segments are pruned.
+            //       Add the results block if it contains data.
+            BaseResultsBlock resultsBlock = instanceResponseBlock.getResultsBlock();
+            if (resultsBlock != null && resultsBlock.getNumRows() > 0) {
+              addResultsBlock(resultsBlock);
+            }
+            // Collect the execution stats
+            mergeExecutionStats(instanceResponseBlock.getResponseMetadata());
+          }
+        } else {
+          assert _requests.size() == 2;
+          Future<Map<String, String>>[] futures = new Future[2];
+          // TODO: this latch mechanism is not the most elegant. We should change it to use a CompletionService.
+          //  In order to interrupt the execution in case of error, we could different mechanisms like throwing in the
+          //  future, or using a shared volatile variable.
+          CountDownLatch latch = new CountDownLatch(2);
+          for (int i = 0; i < 2; i++) {
+            ServerQueryRequest request = _requests.get(i);
+            futures[i] = _executorService.submit(() -> {
+              try {
+                InstanceResponseBlock instanceResponseBlock =
+                    _queryExecutor.execute(request, _executorService, resultsBlockConsumer);
+                if (queryLogger != null) {
+                  queryLogger.logQuery(request, instanceResponseBlock, "MultistageEngine");
+                }
+                Map<Integer, String> exceptions = instanceResponseBlock.getExceptions();
+                if (!exceptions.isEmpty()) {
+                  // Drain the latch when receiving exception block and not wait for the other thread to finish
+                  _exceptions = exceptions;
+                  latch.countDown();
+                  return Collections.emptyMap();
+                } else {
+                  // NOTE: Instance response block might contain data (not metadata only) when all the segments are
+                  //       pruned. Add the results block if it contains data.
+                  BaseResultsBlock resultsBlock = instanceResponseBlock.getResultsBlock();
+                  if (resultsBlock != null && resultsBlock.getNumRows() > 0) {
+                    addResultsBlock(resultsBlock);
+                  }
+                  // Collect the execution stats
+                  return instanceResponseBlock.getResponseMetadata();
+                }
+              } finally {
+                latch.countDown();
+              }
+            });
+          }
+          try {
+            if (!latch.await(_context.getDeadlineMs() - System.currentTimeMillis(), TimeUnit.MILLISECONDS)) {
+              throw new TimeoutException("Timed out waiting for leaf stage to finish");
+            }
+            // Propagate the exception thrown by the leaf stage
+            for (Future<Map<String, String>> future : futures) {
+              Map<String, String> stats =
+                  future.get(_context.getDeadlineMs() - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+              mergeExecutionStats(stats);
+            }
+          } catch (TimeoutException e) {
+            // Cancel all the futures and throw the exception
+            for (Future<?> future : futures) {
+              future.cancel(true);
+            }
+            throw new TimeoutException("Timed out waiting for leaf stage to finish");
+          } finally {
+            for (Future<?> future : futures) {
+              future.cancel(true);
+            }
+          }
+        }
+        return null;
+      } finally {
+        // Always add the last results block to mark the end of the execution
+        addResultsBlock(LAST_RESULTS_BLOCK);
+      }
+    });
+  }
+
+  @VisibleForTesting
+  void addResultsBlock(BaseResultsBlock resultsBlock)
+      throws InterruptedException, TimeoutException {
+    if (!_blockingQueue.offer(resultsBlock, _context.getDeadlineMs() - System.currentTimeMillis(),
+        TimeUnit.MILLISECONDS)) {
+      throw new TimeoutException("Timed out waiting to add results block");
     }
   }
 
-  /**
-   * Leaf stage operators should always collect stats for the tables used in queries
-   * Otherwise the Broker response will just contain zeros for every stat value
-   */
+  // TODO: Revisit the stats aggregation logic
+  private void aggregateExecutionStats(Map<String, String> stats1, Map<String, String> stats2) {
+    for (Map.Entry<String, String> entry : stats2.entrySet()) {
+      String k2 = entry.getKey();
+      String v2 = entry.getValue();
+      stats1.merge(k2, v2, (val1, val2) -> {
+        try {
+          return Long.toString(Long.parseLong(val1) + Long.parseLong(val2));
+        } catch (Exception e) {
+          return val1 + "\n" + val2;
+        }
+      });
+    }
+  }
+
   @Override
-  protected boolean shouldCollectStats() {
-    return true;
+  public void close() {
+    if (_executionFuture != null) {
+      _executionFuture.cancel(true);
+    }
   }
 
   /**
-   * this is data transfer block compose method is here to ensure that V1 results match what the expected projection
-   * schema in the calcite logical operator.
-   * <p> it applies different clean up mechanism based on different type of {@link BaseResultsBlock} and the
-   *     {@link org.apache.pinot.core.query.request.context.QueryContext}.</p>
-   * <p> this also applies to the canonicalization of the data types during post post-process step.</p>
-   *
-   * @param responseBlock result block from leaf stage
-   * @param desiredDataSchema the desired schema for send operator
-   * @return the converted {@link TransferableBlock} that conform with the desiredDataSchema
+   * Composes the {@link TransferableBlock} from the {@link BaseResultsBlock} returned from single-stage engine. It
+   * converts the data types of the results to conform with the desired data schema asked by the multi-stage engine.
    */
-  private static TransferableBlock composeTransferableBlock(InstanceResponseBlock responseBlock,
+  private static TransferableBlock composeTransferableBlock(BaseResultsBlock resultsBlock,
       DataSchema desiredDataSchema) {
-    BaseResultsBlock resultsBlock = responseBlock.getResultsBlock();
     if (resultsBlock instanceof SelectionResultsBlock) {
-      return composeSelectTransferableBlock(responseBlock, desiredDataSchema);
-    } else if (resultsBlock instanceof AggregationResultsBlock) {
-      return composeAggregationTransferableBlock(responseBlock, desiredDataSchema);
-    } else if (resultsBlock instanceof GroupByResultsBlock) {
-      return composeGroupByTransferableBlock(responseBlock, desiredDataSchema);
-    } else if (resultsBlock instanceof DistinctResultsBlock) {
-      return composeDistinctTransferableBlock(responseBlock, desiredDataSchema);
+      return composeSelectTransferableBlock((SelectionResultsBlock) resultsBlock, desiredDataSchema);
     } else {
-      throw new IllegalArgumentException("Unsupported result block type: " + resultsBlock);
+      return composeDirectTransferableBlock(resultsBlock, desiredDataSchema);
     }
   }
 
   /**
-   * we only need to rearrange columns when distinct is not conforming with selection columns, specifically:
-   * <ul>
-   *   <li> when distinct is not returning final result:
-   *       it should never happen as non-final result contains Object opaque columns v2 engine can't process.</li>
-   *   <li> when distinct columns are not all being selected:
-   *       it should never happen as leaf stage MUST return the entire list.</li>
-   * </ul>
-   *
-   * @see LeafStageTransferableBlockOperator#composeTransferableBlock(InstanceResponseBlock, DataSchema).
+   * For selection, we need to check if the columns are in order. If not, we need to re-arrange the columns.
    */
-  @SuppressWarnings("ConstantConditions")
-  private static TransferableBlock composeDistinctTransferableBlock(InstanceResponseBlock responseBlock,
+  private static TransferableBlock composeSelectTransferableBlock(SelectionResultsBlock resultsBlock,
       DataSchema desiredDataSchema) {
-    return composeDirectTransferableBlock(responseBlock, desiredDataSchema);
-  }
-
-  /**
-   * Calcite generated {@link DataSchema} should conform with Pinot's group by result schema thus we only need to check
-   * for correctness similar to distinct case.
-   *
-   * @see LeafStageTransferableBlockOperator#composeDirectTransferableBlock(InstanceResponseBlock, DataSchema).
-   * @see LeafStageTransferableBlockOperator#composeTransferableBlock(InstanceResponseBlock, DataSchema).
-   */
-  @SuppressWarnings("ConstantConditions")
-  private static TransferableBlock composeGroupByTransferableBlock(InstanceResponseBlock responseBlock,
-      DataSchema desiredDataSchema) {
-    return composeDirectTransferableBlock(responseBlock, desiredDataSchema);
-  }
-
-  /**
-   * Calcite generated {@link DataSchema} should conform with Pinot's agg result schema thus we only need to check
-   * for correctness similar to distinct case.
-   *
-   * @see LeafStageTransferableBlockOperator#composeDirectTransferableBlock(InstanceResponseBlock, DataSchema).
-   * @see LeafStageTransferableBlockOperator#composeTransferableBlock(InstanceResponseBlock, DataSchema).
-   */
-  @SuppressWarnings("ConstantConditions")
-  private static TransferableBlock composeAggregationTransferableBlock(InstanceResponseBlock responseBlock,
-      DataSchema desiredDataSchema) {
-    return composeDirectTransferableBlock(responseBlock, desiredDataSchema);
-  }
-
-  /**
-   * Only re-arrange columns to match the projection in the case of select / order-by, when the desiredDataSchema
-   * doesn't conform with the result block schema exactly.
-   *
-   * @see LeafStageTransferableBlockOperator#composeTransferableBlock(InstanceResponseBlock, DataSchema).
-   */
-  @SuppressWarnings("ConstantConditions")
-  private static TransferableBlock composeSelectTransferableBlock(InstanceResponseBlock responseBlock,
-      DataSchema desiredDataSchema) {
-    DataSchema resultSchema = responseBlock.getDataSchema();
-    List<String> selectionColumns =
-        SelectionOperatorUtils.getSelectionColumns(responseBlock.getQueryContext(), resultSchema);
-    int[] columnIndices = SelectionOperatorUtils.getColumnIndices(selectionColumns, resultSchema);
+    int[] columnIndices = getColumnIndices(resultsBlock);
     if (!inOrder(columnIndices)) {
-      return composeColumnIndexedTransferableBlock(responseBlock, desiredDataSchema, columnIndices);
+      return composeColumnIndexedTransferableBlock(resultsBlock, desiredDataSchema, columnIndices);
     } else {
-      return composeDirectTransferableBlock(responseBlock, desiredDataSchema);
+      return composeDirectTransferableBlock(resultsBlock, desiredDataSchema);
     }
+  }
+
+  private static int[] getColumnIndices(SelectionResultsBlock resultsBlock) {
+    DataSchema dataSchema = resultsBlock.getDataSchema();
+    assert dataSchema != null;
+    String[] columnNames = dataSchema.getColumnNames();
+    Object2IntOpenHashMap<String> columnIndexMap = new Object2IntOpenHashMap<>(columnNames.length);
+    for (int i = 0; i < columnNames.length; i++) {
+      columnIndexMap.put(columnNames[i], i);
+    }
+    QueryContext queryContext = resultsBlock.getQueryContext();
+    assert queryContext != null;
+    List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
+    int numSelectExpressions = selectExpressions.size();
+    int[] columnIndices = new int[numSelectExpressions];
+    for (int i = 0; i < numSelectExpressions; i++) {
+      columnIndices[i] = columnIndexMap.getInt(selectExpressions.get(i).toString());
+    }
+    return columnIndices;
   }
 
   private static boolean inOrder(int[] columnIndices) {
@@ -231,15 +446,10 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
     return true;
   }
 
-  /**
-   * Created {@link TransferableBlock} using column indices.
-   *
-   * @see LeafStageTransferableBlockOperator#composeTransferableBlock(InstanceResponseBlock, DataSchema).
-   */
-  private static TransferableBlock composeColumnIndexedTransferableBlock(InstanceResponseBlock responseBlock,
+  private static TransferableBlock composeColumnIndexedTransferableBlock(BaseResultsBlock block,
       DataSchema outputDataSchema, int[] columnIndices) {
-    List<Object[]> resultRows = responseBlock.getRows();
-    DataSchema inputDataSchema = responseBlock.getDataSchema();
+    List<Object[]> resultRows = block.getRows();
+    DataSchema inputDataSchema = block.getDataSchema();
     assert resultRows != null && inputDataSchema != null;
     ColumnDataType[] inputStoredTypes = inputDataSchema.getStoredColumnDataTypes();
     ColumnDataType[] outputStoredTypes = outputDataSchema.getStoredColumnDataTypes();
@@ -291,16 +501,9 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
     return resultRow;
   }
 
-  /**
-   * Fallback mechanism for {@link TransferableBlock}, used when no special handling is necessary. This method only
-   * performs {@link ColumnDataType} canonicalization.
-   *
-   * @see LeafStageTransferableBlockOperator#composeTransferableBlock(InstanceResponseBlock, DataSchema).
-   */
-  private static TransferableBlock composeDirectTransferableBlock(InstanceResponseBlock responseBlock,
-      DataSchema outputDataSchema) {
-    List<Object[]> resultRows = responseBlock.getRows();
-    DataSchema inputDataSchema = responseBlock.getDataSchema();
+  private static TransferableBlock composeDirectTransferableBlock(BaseResultsBlock block, DataSchema outputDataSchema) {
+    List<Object[]> resultRows = block.getRows();
+    DataSchema inputDataSchema = block.getDataSchema();
     assert resultRows != null && inputDataSchema != null;
     ColumnDataType[] inputStoredTypes = inputDataSchema.getStoredColumnDataTypes();
     ColumnDataType[] outputStoredTypes = outputDataSchema.getStoredColumnDataTypes();
@@ -318,6 +521,106 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
       Object value = row[colId];
       if (value != null && inputStoredTypes[colId] != outputStoredTypes[colId]) {
         row[colId] = TypeUtils.convert(value, outputStoredTypes[colId]);
+      }
+    }
+  }
+
+  private class ResultsBlockConsumer implements ResultsBlockStreamer {
+
+    @Override
+    public void send(BaseResultsBlock block)
+        throws InterruptedException, TimeoutException {
+      addResultsBlock(block);
+    }
+  }
+
+  public enum StatKey implements StatMap.Key {
+    TABLE(StatMap.Type.STRING, null),
+    EXECUTION_TIME_MS(StatMap.Type.LONG, null) {
+      @Override
+      public boolean includeDefaultInJson() {
+        return true;
+      }
+    },
+    EMITTED_ROWS(StatMap.Type.LONG, null) {
+      @Override
+      public boolean includeDefaultInJson() {
+        return true;
+      }
+    },
+    NUM_DOCS_SCANNED(StatMap.Type.LONG),
+    TOTAL_DOCS(StatMap.Type.LONG),
+    NUM_ENTRIES_SCANNED_IN_FILTER(StatMap.Type.LONG),
+    NUM_ENTRIES_SCANNED_POST_FILTER(StatMap.Type.LONG),
+    NUM_SEGMENTS_QUERIED(StatMap.Type.INT),
+    NUM_SEGMENTS_PROCESSED(StatMap.Type.INT),
+    NUM_SEGMENTS_MATCHED(StatMap.Type.INT),
+    NUM_CONSUMING_SEGMENTS_QUERIED(StatMap.Type.INT),
+    NUM_CONSUMING_SEGMENTS_PROCESSED(StatMap.Type.INT),
+    NUM_CONSUMING_SEGMENTS_MATCHED(StatMap.Type.INT),
+    MIN_CONSUMING_FRESHNESS_TIME_MS(StatMap.Type.LONG) {
+      @Override
+      public long merge(long value1, long value2) {
+        return StatMap.Key.minPositive(value1, value2);
+      }
+    },
+    NUM_SEGMENTS_PRUNED_BY_SERVER(StatMap.Type.INT),
+    NUM_SEGMENTS_PRUNED_INVALID(StatMap.Type.INT),
+    NUM_SEGMENTS_PRUNED_BY_LIMIT(StatMap.Type.INT),
+    NUM_SEGMENTS_PRUNED_BY_VALUE(StatMap.Type.INT),
+    NUM_GROUPS_LIMIT_REACHED(StatMap.Type.BOOLEAN),
+    NUM_RESIZES(StatMap.Type.INT, null),
+    RESIZE_TIME_MS(StatMap.Type.LONG, null),
+    THREAD_CPU_TIME_NS(StatMap.Type.LONG, null),
+    SYSTEM_ACTIVITIES_CPU_TIME_NS(StatMap.Type.LONG, null),
+    RESPONSE_SER_CPU_TIME_NS(StatMap.Type.LONG, null) {
+      @Override
+      public String getStatName() {
+        return "responseSerializationCpuTimeNs";
+      }
+    };
+
+    private final StatMap.Type _type;
+    @Nullable
+    private final BrokerResponseNativeV2.StatKey _brokerKey;
+
+    StatKey(StatMap.Type type) {
+      _type = type;
+      _brokerKey = BrokerResponseNativeV2.StatKey.valueOf(name());
+    }
+
+    StatKey(StatMap.Type type, @Nullable BrokerResponseNativeV2.StatKey brokerKey) {
+      _type = type;
+      _brokerKey = brokerKey;
+    }
+
+    @Override
+    public StatMap.Type getType() {
+      return _type;
+    }
+
+    public void updateBrokerMetadata(StatMap<BrokerResponseNativeV2.StatKey> oldMetadata, StatMap<StatKey> stats) {
+      if (_brokerKey != null) {
+        switch (_type) {
+          case LONG:
+            if (_brokerKey.getType() == StatMap.Type.INT) {
+              oldMetadata.merge(_brokerKey, (int) stats.getLong(this));
+            } else {
+              oldMetadata.merge(_brokerKey, stats.getLong(this));
+            }
+            break;
+          case INT:
+            oldMetadata.merge(_brokerKey, stats.getInt(this));
+            break;
+          case BOOLEAN:
+            oldMetadata.merge(_brokerKey, stats.getBoolean(this));
+            break;
+          case STRING:
+            oldMetadata.merge(_brokerKey, stats.getString(this));
+            break;
+          default:
+            throw new IllegalStateException("Unsupported type: " + _type);
+        }
       }
     }
   }

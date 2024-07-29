@@ -103,6 +103,7 @@ public class TimeValidationTransformer implements RecordTransformer {
       if (_continueOnError) {
         LOGGER.debug(errorMessage);
         record.putValue(_timeColumnName, null);
+        record.putValue(GenericRow.INCOMPLETE_RECORD_KEY, true);
         return record;
       } else {
         throw new IllegalStateException(errorMessage);

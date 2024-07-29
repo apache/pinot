@@ -88,6 +88,23 @@ public class CastTransformFunction extends BaseTransformFunction {
         case "VARCHAR":
           _resultMetadata = sourceSV ? STRING_SV_NO_DICTIONARY_METADATA : STRING_MV_NO_DICTIONARY_METADATA;
           break;
+        case "INT_ARRAY":
+        case "INTEGER_ARRAY":
+          _resultMetadata = INT_MV_NO_DICTIONARY_METADATA;
+          break;
+        case "LONG_ARRAY":
+          _resultMetadata = LONG_MV_NO_DICTIONARY_METADATA;
+          break;
+        case "FLOAT_ARRAY":
+          _resultMetadata = FLOAT_MV_NO_DICTIONARY_METADATA;
+          break;
+        case "DOUBLE_ARRAY":
+          _resultMetadata = DOUBLE_MV_NO_DICTIONARY_METADATA;
+          break;
+        case "STRING_ARRAY":
+        case "VARCHAR_ARRAY":
+          _resultMetadata = STRING_MV_NO_DICTIONARY_METADATA;
+          break;
         case "JSON":
           _resultMetadata = sourceSV ? JSON_SV_NO_DICTIONARY_METADATA : JSON_MV_NO_DICTIONARY_METADATA;
           break;

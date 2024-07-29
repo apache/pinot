@@ -31,6 +31,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.controller.recommender.data.DataGenerationHelpers;
 import org.apache.pinot.controller.recommender.data.generator.DataGenerator;
 import org.apache.pinot.controller.recommender.data.generator.DataGeneratorSpec;
 import org.apache.pinot.controller.recommender.io.metadata.DateTimeFieldSpecMetadata;
@@ -162,7 +163,8 @@ public class MemoryEstimator {
             .setSegmentName(_segmentMetadata.getName()).setStreamName(_tableNameWithType)
             .setSchema(_segmentMetadata.getSchema()).setCapacity(_segmentMetadata.getTotalDocs())
             .setAvgNumMultiValues(_avgMultiValues).setSegmentZKMetadata(segmentZKMetadata).setOffHeap(true)
-            .setMemoryManager(memoryManager).setStatsHistory(sampleStatsHistory);
+            .setMemoryManager(memoryManager).setStatsHistory(sampleStatsHistory)
+            .setConsumerDir(_workingDir.getAbsolutePath());
 
     // create mutable segment impl
     MutableSegmentImpl mutableSegmentImpl = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), null);
@@ -325,7 +327,8 @@ public class MemoryEstimator {
             .setSegmentName(_segmentMetadata.getName()).setStreamName(_tableNameWithType)
             .setSchema(_segmentMetadata.getSchema()).setCapacity(totalDocs).setAvgNumMultiValues(_avgMultiValues)
             .setSegmentZKMetadata(segmentZKMetadata).setOffHeap(true)
-            .setMemoryManager(memoryManager).setStatsHistory(statsHistory);
+            .setMemoryManager(memoryManager).setStatsHistory(statsHistory)
+            .setConsumerDir(_workingDir.getAbsolutePath());
 
     // create mutable segment impl
     MutableSegmentImpl mutableSegmentImpl = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), null);
@@ -525,13 +528,19 @@ public class MemoryEstimator {
 
       // generate data
       String outputDir = new File(_workingDir, "csv").getAbsolutePath();
-      DataGeneratorSpec spec =
-          new DataGeneratorSpec(colNames, cardinalities, new HashMap<>(), new HashMap<>(), mvCounts, lengths, dataTypes,
-              fieldTypes, timeUnits, FileFormat.CSV, outputDir, true);
+      DataGeneratorSpec spec = new DataGeneratorSpec.Builder()
+          .setColumns(colNames)
+          .setCardinalityMap(cardinalities)
+          .setMvCountMap(mvCounts)
+          .setLengthMap(lengths)
+          .setDataTypeMap(dataTypes)
+          .setFieldTypeMap(fieldTypes)
+          .setTimeUnitMap(timeUnits)
+          .build();
       DataGenerator dataGenerator = new DataGenerator();
       try {
         dataGenerator.init(spec);
-        dataGenerator.generateCsv(_numberOfRows, 1);
+        DataGenerationHelpers.generateCsv(dataGenerator, _numberOfRows, 1, outputDir, true);
         File outputFile = Paths.get(outputDir, "output_0.csv").toFile();
         LOGGER.info("Successfully generated data file: {}", outputFile);
         return outputFile;

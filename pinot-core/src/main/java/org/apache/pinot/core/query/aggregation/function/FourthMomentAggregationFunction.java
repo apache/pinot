@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
@@ -39,8 +40,8 @@ public class FourthMomentAggregationFunction extends BaseSingleInputAggregationF
     KURTOSIS, SKEWNESS, MOMENT
   }
 
-  public FourthMomentAggregationFunction(ExpressionContext expression, Type type) {
-    super(expression);
+  public FourthMomentAggregationFunction(List<ExpressionContext> arguments, Type type) {
+    super(verifySingleArgument(arguments, type.name()));
     _type = type;
   }
 

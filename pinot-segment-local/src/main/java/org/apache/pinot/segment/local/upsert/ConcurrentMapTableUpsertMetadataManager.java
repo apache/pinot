@@ -19,9 +19,15 @@
 package org.apache.pinot.segment.local.upsert;
 
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.concurrent.ThreadSafe;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
+import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.SegmentContext;
+import org.apache.pinot.spi.config.table.UpsertConfig;
 
 
 /**
@@ -35,15 +41,41 @@ public class ConcurrentMapTableUpsertMetadataManager extends BaseTableUpsertMeta
   @Override
   public ConcurrentMapPartitionUpsertMetadataManager getOrCreatePartitionManager(int partitionId) {
     return _partitionMetadataManagerMap.computeIfAbsent(partitionId,
-        k -> new ConcurrentMapPartitionUpsertMetadataManager(_tableNameWithType, k, _primaryKeyColumns,
-            _comparisonColumns, _deleteRecordColumn, _hashFunction, _partialUpsertHandler,
-            _enableSnapshot, _metadataTTL, _tableIndexDir, _serverMetrics));
+        k -> new ConcurrentMapPartitionUpsertMetadataManager(_tableNameWithType, k, _context));
   }
 
   @Override
   public void stop() {
     for (ConcurrentMapPartitionUpsertMetadataManager metadataManager : _partitionMetadataManagerMap.values()) {
       metadataManager.stop();
+    }
+  }
+
+  @Override
+  public Map<Integer, Long> getPartitionToPrimaryKeyCount() {
+    Map<Integer, Long> partitionToPrimaryKeyCount = new HashMap<>();
+    _partitionMetadataManagerMap.forEach(
+        (partitionID, upsertMetadataManager) -> partitionToPrimaryKeyCount.put(partitionID,
+            upsertMetadataManager.getNumPrimaryKeys()));
+    return partitionToPrimaryKeyCount;
+  }
+
+  @Override
+  public void setSegmentContexts(List<SegmentContext> segmentContexts, Map<String, String> queryOptions) {
+    if (_consistencyMode != UpsertConfig.ConsistencyMode.NONE && !QueryOptionsUtils.isSkipUpsertView(queryOptions)) {
+      // Get queryableDocIds bitmaps from partitionMetadataManagers if any consistency mode is used.
+      _partitionMetadataManagerMap.forEach(
+          (partitionID, upsertMetadataManager) -> upsertMetadataManager.setSegmentContexts(segmentContexts,
+              queryOptions));
+    }
+    // If no consistency mode is used, we get queryableDocIds bitmaps as kept by the segment objects directly.
+    // Even if consistency mode is used, we should still check if any segment doesn't get its validDocIds bitmap,
+    // because partitionMetadataManagers may not track all segments of the table, like those out of the metadata TTL.
+    for (SegmentContext segmentContext : segmentContexts) {
+      if (segmentContext.getQueryableDocIdsSnapshot() == null) {
+        IndexSegment segment = segmentContext.getIndexSegment();
+        segmentContext.setQueryableDocIdsSnapshot(UpsertUtils.getQueryableDocIdsSnapshotFromSegment(segment));
+      }
     }
   }
 

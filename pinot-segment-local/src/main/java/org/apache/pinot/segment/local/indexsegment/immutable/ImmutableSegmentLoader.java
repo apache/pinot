@@ -20,7 +20,6 @@ package org.apache.pinot.segment.local.indexsegment.immutable;
 
 import com.google.common.base.Preconditions;
 import java.io.File;
-import java.net.URI;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -45,6 +44,7 @@ import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -68,23 +68,45 @@ public class ImmutableSegmentLoader {
       throws Exception {
     IndexLoadingConfig defaultIndexLoadingConfig = new IndexLoadingConfig();
     defaultIndexLoadingConfig.setReadMode(readMode);
-    return load(indexDir, defaultIndexLoadingConfig, null, false);
+    return load(indexDir, defaultIndexLoadingConfig, false);
   }
 
   /**
-   * Loads the segment with empty schema but a specified IndexLoadingConfig.
+   * Loads the segment with specified table config and schema.
+   * This method is used to access the segment without modifying it, i.e. in read-only mode.
+   */
+  @Deprecated
+  public static ImmutableSegment load(File indexDir, ReadMode readMode, TableConfig tableConfig,
+      @Nullable Schema schema)
+      throws Exception {
+    IndexLoadingConfig defaultIndexLoadingConfig = new IndexLoadingConfig(tableConfig, schema);
+    defaultIndexLoadingConfig.setReadMode(readMode);
+    return load(indexDir, defaultIndexLoadingConfig, false);
+  }
+
+  /**
+   * Loads the segment with specified IndexLoadingConfig.
    * This method modifies the segment like to convert segment format, add or remove indices.
    * Mostly used by UT cases to add some specific index for testing purpose.
    */
   public static ImmutableSegment load(File indexDir, IndexLoadingConfig indexLoadingConfig)
       throws Exception {
-    return load(indexDir, indexLoadingConfig, null, true);
+    return load(indexDir, indexLoadingConfig, true);
+  }
+
+  /**
+   * Loads the segment with specified IndexLoadingConfig.
+   * This method modifies the segment like to convert segment format, add or remove indices.
+   */
+  public static ImmutableSegment load(File indexDir, IndexLoadingConfig indexLoadingConfig, boolean needPreprocess)
+      throws Exception {
+    return load(indexDir, indexLoadingConfig, indexLoadingConfig.getSchema(), needPreprocess);
   }
 
   /**
    * Loads the segment with specified schema and IndexLoadingConfig, usually from Zookeeper.
    * This method modifies the segment like to convert segment format, add or remove indices.
-   * Mainly used during segment reloading.
+   * Mostly used by UT cases to add some specific index for testing purpose.
    */
   public static ImmutableSegment load(File indexDir, IndexLoadingConfig indexLoadingConfig, @Nullable Schema schema)
       throws Exception {
@@ -169,13 +191,6 @@ public class ImmutableSegmentLoader {
       indexLoadingConfig.addKnownColumns(columnMetadataMap.keySet());
     }
 
-    URI indexDirURI = segmentDirectory.getIndexDir();
-    String scheme = indexDirURI.getScheme();
-    File localIndexDir = null;
-    if (scheme != null && scheme.equalsIgnoreCase("file")) {
-      localIndexDir = new File(indexDirURI);
-    }
-
     SegmentDirectory.Reader segmentReader = segmentDirectory.createReader();
     Map<String, ColumnIndexContainer> indexContainerMap = new HashMap<>();
     for (Map.Entry<String, ColumnMetadata> entry : columnMetadataMap.entrySet()) {
@@ -247,7 +262,7 @@ public class ImmutableSegmentLoader {
         segmentVersionToLoad);
     SegmentFormatConverter converter =
         SegmentFormatConverterFactory.getConverter(segmentVersionOnDisk, segmentVersionToLoad);
-    LOGGER.info("Using converter: {} to up-convert segment: {}", converter.getClass().getName(), segmentName);
+    LOGGER.info("Using converter: {} to up-convert segment: {}", converter.getClass().getSimpleName(), segmentName);
     converter.convert(indexDir);
     LOGGER.info("Successfully up-converted segment: {} from version: {} to {}", segmentName, segmentVersionOnDisk,
         segmentVersionToLoad);

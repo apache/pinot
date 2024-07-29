@@ -146,9 +146,9 @@ public class IngestionConfigUtilsTest {
     tableConfig.setValidationConfig(segmentsValidationAndRetentionConfig);
     Assert.assertEquals(IngestionConfigUtils.getBatchSegmentIngestionType(tableConfig), "REFRESH");
 
-    // present nowhere
+    // present nowhere, then should return APPEND which is the default
     segmentsValidationAndRetentionConfig.setSegmentPushType(null);
-    Assert.assertNull(IngestionConfigUtils.getBatchSegmentIngestionType(tableConfig));
+    Assert.assertEquals(IngestionConfigUtils.getBatchSegmentIngestionType(tableConfig), "APPEND");
   }
 
   @Test

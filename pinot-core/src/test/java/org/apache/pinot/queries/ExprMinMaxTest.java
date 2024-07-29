@@ -41,14 +41,18 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.spi.utils.CommonConstants.RewriterConstants.*;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
@@ -56,9 +60,10 @@ import static org.testng.Assert.fail;
 
 
 /**
- * Queries test for argMin/argMax functions.
+ * Queries test for exprmin/exprmax functions.
  */
 public class ExprMinMaxTest extends BaseQueriesTest {
+  private static final Logger LOGGER = LoggerFactory.getLogger(ExprMinMaxTest.class);
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "ExprMinMaxTest");
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String SEGMENT_NAME = "testSegment";
@@ -194,14 +199,14 @@ public class ExprMinMaxTest extends BaseQueriesTest {
 
     query = "SELECT expr_max(mvDoubleColumn, mvDoubleColumn) FROM testTable";
     BrokerResponse brokerResponse = getBrokerResponse(query);
-    Assert.assertTrue(brokerResponse.getProcessingExceptions().get(0).getMessage().contains(
+    Assert.assertTrue(brokerResponse.getExceptions().get(0).getMessage().contains(
         "java.lang.IllegalStateException: ExprMinMax only supports single-valued measuring columns"
     ));
 
     query = "SELECT expr_max(mvDoubleColumn, jsonColumn) FROM testTable";
     brokerResponse = getBrokerResponse(query);
-    Assert.assertTrue(brokerResponse.getProcessingExceptions().get(0).getMessage().contains(
-        "Cannot compute ArgMinMax measuring on non-comparable type: JSON"
+    Assert.assertTrue(brokerResponse.getExceptions().get(0).getMessage().contains(
+        "Cannot compute exprminMax measuring on non-comparable type: JSON"
     ));
   }
 
@@ -256,8 +261,8 @@ public class ExprMinMaxTest extends BaseQueriesTest {
     assertEquals(rows.get(1)[4], new String[]{"a0", "a01", "a02"});
     assertEquals(rows.get(0)[5], 0);
     assertEquals(rows.get(1)[5], 0);
-    assertEquals(rows.get(0)[6], new BigDecimal(360000));
-    assertEquals(rows.get(1)[6], new BigDecimal(360000));
+    assertEquals(rows.get(0)[6], "360000");
+    assertEquals(rows.get(1)[6], "360000");
     assertEquals(rows.get(0)[7], 600D);
     assertEquals(rows.get(1)[7], 600D);
     assertEquals(rows.get(0)[8], 1683138373879L - 1999L);
@@ -532,7 +537,7 @@ public class ExprMinMaxTest extends BaseQueriesTest {
     assertEquals(rows.get(4)[2], new Object[]{27});
 
     //  TODO: The following query works because whenever we find an empty array in the result, we use null
-    //        (see ArgMinMaxProjectionValSetWrapper). Ideally, we should be able to serialize empty array.
+    //        (see exprminMaxProjectionValSetWrapper). Ideally, we should be able to serialize empty array.
     //        requires fix for empty int arrays ser/de in DataBlock
     query =
         "SELECT stringColumn, expr_min(VALUE_IN(mvIntColumn,16,17,18,19,20,21,22,23,24,25,26,27), intColumn), "
@@ -554,15 +559,15 @@ public class ExprMinMaxTest extends BaseQueriesTest {
         + "expr_min(mvStringColumn, intColumn, doubleColumn) FROM testTable GROUP BY groupByMVIntColumn";
     BrokerResponseNative brokerResponse = getBrokerResponse(query);
     Object groupByExplainPlan = brokerResponse.getResultTable().getRows().get(3)[0];
-    Assert.assertTrue(groupByExplainPlan
-        .toString().contains("child_exprMin('0', mvIntColumn, mvIntColumn, intColumn)"));
-    Assert.assertTrue(groupByExplainPlan
-        .toString()
-        .contains("child_exprMin('1', mvStringColumn, mvStringColumn, intColumn, doubleColumn)"));
-    Assert.assertTrue(groupByExplainPlan
-        .toString().contains("parent_exprMin('0', '1', intColumn, mvIntColumn)"));
-    Assert.assertTrue(groupByExplainPlan
-        .toString().contains("parent_exprMin('1', '2', intColumn, doubleColumn, mvStringColumn)"));
+    String explainPlan = groupByExplainPlan.toString();
+    Assert.assertTrue(
+        explainPlan.contains(CHILD_AGGREGATION_NAME_PREFIX + "_exprMin('0', mvIntColumn, mvIntColumn, intColumn)"));
+    Assert.assertTrue(explainPlan.contains(
+        CHILD_AGGREGATION_NAME_PREFIX + "_exprMin('1', mvStringColumn, mvStringColumn, intColumn, doubleColumn)"));
+    Assert.assertTrue(
+        explainPlan.contains(PARENT_AGGREGATION_NAME_PREFIX + "_exprMin('0', '1', intColumn, mvIntColumn)"));
+    Assert.assertTrue(explainPlan.contains(
+        PARENT_AGGREGATION_NAME_PREFIX + "_exprMin('1', '2', intColumn, doubleColumn, mvStringColumn)"));
   }
 
   @Test
@@ -610,9 +615,9 @@ public class ExprMinMaxTest extends BaseQueriesTest {
       ResultTable resultTable = brokerResponse.getResultTable();
       List<Object[]> rows = resultTable.getRows();
       fail();
-    } catch (Exception e) {
-      assertTrue(e.getMessage().contains("Aggregation function: exprmax(longColumn,intColumn) "
-          + "is only supported in selection without alias."));
+    } catch (BadQueryRequestException e) {
+      assertTrue(
+          e.getMessage().contains("Aggregation function: EXPRMAX is only supported in selection without alias."));
     }
   }
 
@@ -627,8 +632,8 @@ public class ExprMinMaxTest extends BaseQueriesTest {
       List<Object[]> rows = resultTable.getRows();
       fail();
     } catch (Exception e) {
-      assertTrue(e.getMessage().contains("Aggregation function: exprmax(longColumn,intColumn) "
-          + "is only supported in selection without alias."));
+      assertTrue(
+          e.getMessage().contains("Aggregation function: EXPRMAX is only supported in selection without alias."));
     }
   }
 

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.data.table;
 
+import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
@@ -30,6 +31,8 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -37,7 +40,10 @@ import org.apache.pinot.core.query.request.context.QueryContext;
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
 public abstract class IndexedTable extends BaseTable {
+  private static final Logger LOGGER = LoggerFactory.getLogger(IndexedTable.class);
+
   protected final Map<Key, Record> _lookupMap;
+  protected final boolean _hasFinalInput;
   protected final int _resultSize;
   protected final int _numKeyColumns;
   protected final AggregationFunction[] _aggregationFunctions;
@@ -54,16 +60,23 @@ public abstract class IndexedTable extends BaseTable {
    * Constructor for the IndexedTable.
    *
    * @param dataSchema    Data schema of the table
+   * @param hasFinalInput Whether the input is the final aggregate result
    * @param queryContext  Query context
    * @param resultSize    Number of records to keep in the final result after calling {@link #finish(boolean, boolean)}
    * @param trimSize      Number of records to keep when trimming the table
    * @param trimThreshold Trim the table when the number of records exceeds the threshold
    * @param lookupMap     Map from keys to records
    */
-  protected IndexedTable(DataSchema dataSchema, QueryContext queryContext, int resultSize, int trimSize,
-      int trimThreshold, Map<Key, Record> lookupMap) {
+  protected IndexedTable(DataSchema dataSchema, boolean hasFinalInput, QueryContext queryContext, int resultSize,
+      int trimSize, int trimThreshold, Map<Key, Record> lookupMap) {
     super(dataSchema);
+
+    Preconditions.checkArgument(resultSize >= 0, "Result size can't be negative");
+    Preconditions.checkArgument(trimSize >= 0, "Trim size can't be negative");
+    Preconditions.checkArgument(trimThreshold >= 0, "Trim threshold can't be negative");
+
     _lookupMap = lookupMap;
+    _hasFinalInput = hasFinalInput;
     _resultSize = resultSize;
 
     List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
@@ -74,11 +87,18 @@ public abstract class IndexedTable extends BaseTable {
     if (orderByExpressions != null) {
       // GROUP BY with ORDER BY
       _hasOrderBy = true;
-      _tableResizer = new TableResizer(dataSchema, queryContext);
-      // NOTE: trimSize is bounded by trimThreshold/2 to protect the server from using too much memory.
-      // TODO: Re-evaluate it as it can lead to in-accurate results
-      _trimSize = Math.min(trimSize, trimThreshold / 2);
-      _trimThreshold = trimThreshold;
+      _tableResizer = new TableResizer(dataSchema, hasFinalInput, queryContext);
+      _trimSize = trimSize;
+      // trimThreshold is lower bounded by (2 * trimSize) in order to avoid excessive trimming. We don't modify trimSize
+      // in order to maintain the desired accuracy
+      if (trimSize > trimThreshold / 2) {
+        // Handle potential overflow
+        _trimThreshold = (2 * trimSize) > 0 ? 2 * trimSize : Integer.MAX_VALUE;
+        LOGGER.debug("Overriding group trim threshold to {}, since the configured value {} is less than twice the "
+            + "trim size ({})", _trimThreshold, trimThreshold, trimSize);
+      } else {
+        _trimThreshold = trimThreshold;
+      }
     } else {
       // GROUP BY without ORDER BY
       // NOTE: The indexed table stops accepting records once the map size reaches resultSize, and there is no
@@ -102,34 +122,32 @@ public abstract class IndexedTable extends BaseTable {
    * Adds a record with new key or updates a record with existing key.
    */
   protected void addOrUpdateRecord(Key key, Record newRecord) {
-    _lookupMap.compute(key, (k, v) -> {
-      if (v == null) {
-        return newRecord;
-      } else {
-        Object[] existingValues = v.getValues();
-        Object[] newValues = newRecord.getValues();
-        int aggNum = 0;
-        for (int i = _numKeyColumns; i < _numColumns; i++) {
-          existingValues[i] = _aggregationFunctions[aggNum++].merge(existingValues[i], newValues[i]);
-        }
-        return v;
-      }
-    });
+    _lookupMap.compute(key, (k, v) -> v == null ? newRecord : updateRecord(v, newRecord));
   }
 
   /**
    * Updates a record with existing key. Record with new key will be ignored.
    */
   protected void updateExistingRecord(Key key, Record newRecord) {
-    _lookupMap.computeIfPresent(key, (k, v) -> {
-      Object[] existingValues = v.getValues();
-      Object[] newValues = newRecord.getValues();
-      int aggNum = 0;
-      for (int i = _numKeyColumns; i < _numColumns; i++) {
-        existingValues[i] = _aggregationFunctions[aggNum++].merge(existingValues[i], newValues[i]);
+    _lookupMap.computeIfPresent(key, (k, v) -> updateRecord(v, newRecord));
+  }
+
+  private Record updateRecord(Record existingRecord, Record newRecord) {
+    Object[] existingValues = existingRecord.getValues();
+    Object[] newValues = newRecord.getValues();
+    int numAggregations = _aggregationFunctions.length;
+    int index = _numKeyColumns;
+    if (!_hasFinalInput) {
+      for (int i = 0; i < numAggregations; i++, index++) {
+        existingValues[index] = _aggregationFunctions[i].merge(existingValues[index], newValues[index]);
       }
-      return v;
-    });
+    } else {
+      for (int i = 0; i < numAggregations; i++, index++) {
+        existingValues[index] = _aggregationFunctions[i].mergeFinalResult((Comparable) existingValues[index],
+            (Comparable) newValues[index]);
+      }
+    }
+    return existingRecord;
   }
 
   /**
@@ -156,7 +174,8 @@ public abstract class IndexedTable extends BaseTable {
       _topRecords = _lookupMap.values();
     }
     // TODO: Directly return final result in _tableResizer.getTopRecords to avoid extracting final result multiple times
-    if (storeFinalResult) {
+    assert !(_hasFinalInput && !storeFinalResult);
+    if (storeFinalResult && !_hasFinalInput) {
       ColumnDataType[] columnDataTypes = _dataSchema.getColumnDataTypes();
       int numAggregationFunctions = _aggregationFunctions.length;
       for (int i = 0; i < numAggregationFunctions; i++) {

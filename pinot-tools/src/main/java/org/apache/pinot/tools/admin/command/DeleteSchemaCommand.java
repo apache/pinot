@@ -19,6 +19,7 @@
 package org.apache.pinot.tools.admin.command;
 
 import java.util.Collections;
+import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -33,13 +34,13 @@ import picocli.CommandLine;
 public class DeleteSchemaCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(DeleteSchemaCommand.class);
 
-  @CommandLine.Option(names = {"-controllerHost"}, required = false, description = "host name for controller.")
+  @CommandLine.Option(names = {"-controllerHost"}, required = false, description = "Host name for controller.")
   private String _controllerHost;
 
-  @CommandLine.Option(names = {"-controllerPort"}, required = false, description = "port name for controller.")
+  @CommandLine.Option(names = {"-controllerPort"}, required = false, description = "Port number for controller.")
   private String _controllerPort = DEFAULT_CONTROLLER_PORT;
 
-  @CommandLine.Option(names = {"-controllerProtocol"}, required = false, description = "protocol for controller.")
+  @CommandLine.Option(names = {"-controllerProtocol"}, required = false, description = "Protocol for controller.")
   private String _controllerProtocol = CommonConstants.HTTP_PROTOCOL;
 
   @CommandLine.Option(names = {"-schemaName"}, required = true, description = "Schema name.")
@@ -140,19 +141,19 @@ public class DeleteSchemaCommand extends AbstractBaseAdminCommand implements Com
     }
 
     if (!_exec) {
-      LOGGER.warn("Dry Running Command: " + toString());
+      LOGGER.warn("Dry Running Command: {}", toString());
       LOGGER.warn("Use the -exec option to actually execute the command.");
       return true;
     }
 
-    LOGGER.info("Executing command: " + toString());
+    LOGGER.info("Executing command: {}", toString());
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
       fileUploadDownloadClient.getHttpClient().sendDeleteRequest(
           FileUploadDownloadClient.getDeleteSchemaURI(_controllerProtocol, _controllerHost,
               Integer.parseInt(_controllerPort), _schemaName), Collections.emptyMap(),
-          makeAuthProvider(_authProvider, _authTokenUrl, _authToken, _user, _password));
+          AuthProviderUtils.makeAuthProvider(_authProvider, _authTokenUrl, _authToken, _user, _password));
     } catch (Exception e) {
-      LOGGER.error("Got Exception while deleting Pinot Schema: " + _schemaName, e);
+      LOGGER.error("Got Exception while deleting Pinot Schema: {}", _schemaName, e);
       return false;
     }
     return true;

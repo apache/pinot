@@ -40,6 +40,8 @@ import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionFactory;
 import org.apache.pinot.core.util.MemoizedClassAssociation;
+import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.spi.config.table.FieldConfig;
 
 
 /**
@@ -123,6 +125,10 @@ public class QueryContext {
   private boolean _nullHandlingEnabled;
   // Whether server returns the final result
   private boolean _serverReturnFinalResult;
+  // Whether server returns the final result with unpartitioned group key
+  private boolean _serverReturnFinalResultKeyUnpartitioned;
+  // Collection of index types to skip per column
+  private Map<String, Set<FieldConfig.IndexType>> _skipIndexes;
 
   private QueryContext(@Nullable String tableName, @Nullable QueryContext subquery,
       List<ExpressionContext> selectExpressions, boolean distinct, List<String> aliasList,
@@ -402,6 +408,14 @@ public class QueryContext {
     _serverReturnFinalResult = serverReturnFinalResult;
   }
 
+  public boolean isServerReturnFinalResultKeyUnpartitioned() {
+    return _serverReturnFinalResultKeyUnpartitioned;
+  }
+
+  public void setServerReturnFinalResultKeyUnpartitioned(boolean serverReturnFinalResultKeyUnpartitioned) {
+    _serverReturnFinalResultKeyUnpartitioned = serverReturnFinalResultKeyUnpartitioned;
+  }
+
   /**
    * Gets or computes a value of type {@code V} associated with a key of type {@code K} so that it can be shared
    * within the scope of a query.
@@ -428,6 +442,21 @@ public class QueryContext {
         + ", _expressionOverrideHints=" + _expressionOverrideHints + ", _explain=" + _explain + '}';
   }
 
+  public void setSkipIndexes(Map<String, Set<FieldConfig.IndexType>> skipIndexes) {
+    _skipIndexes = skipIndexes;
+  }
+
+  public boolean isIndexUseAllowed(String columnName, FieldConfig.IndexType indexType) {
+    if (_skipIndexes == null) {
+      return true;
+    }
+    return !_skipIndexes.getOrDefault(columnName, Collections.EMPTY_SET).contains(indexType);
+  }
+
+  public boolean isIndexUseAllowed(DataSource dataSource, FieldConfig.IndexType indexType) {
+    return isIndexUseAllowed(dataSource.getColumnName(), indexType);
+  }
+
   public static class Builder {
     private String _tableName;
     private QueryContext _subquery;
@@ -441,7 +470,6 @@ public class QueryContext {
     private int _limit;
     private int _offset;
     private Map<String, String> _queryOptions;
-    private Map<String, String> _debugOptions;
     private Map<ExpressionContext, ExpressionContext> _expressionOverrideHints;
     private boolean _explain;
 
@@ -527,6 +555,8 @@ public class QueryContext {
               _expressionOverrideHints, _explain);
       queryContext.setNullHandlingEnabled(QueryOptionsUtils.isNullHandlingEnabled(_queryOptions));
       queryContext.setServerReturnFinalResult(QueryOptionsUtils.isServerReturnFinalResult(_queryOptions));
+      queryContext.setServerReturnFinalResultKeyUnpartitioned(
+          QueryOptionsUtils.isServerReturnFinalResultKeyUnpartitioned(_queryOptions));
 
       // Pre-calculate the aggregation functions and columns for the query
       generateAggregationFunctions(queryContext);

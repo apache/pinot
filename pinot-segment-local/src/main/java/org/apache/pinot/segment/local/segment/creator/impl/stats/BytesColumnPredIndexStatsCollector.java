@@ -62,7 +62,9 @@ public class BytesColumnPredIndexStatsCollector extends AbstractColumnStatistics
       ByteArray value = new ByteArray((byte[]) entry);
       addressSorted(value);
       if (_values.add(value)) {
-        updatePartition(value);
+        if (isPartitionEnabled()) {
+          updatePartition(value.toString());
+        }
         int length = value.length();
         _minLength = Math.min(_minLength, length);
         _maxLength = Math.max(_maxLength, length);

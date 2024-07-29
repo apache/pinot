@@ -25,7 +25,6 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
-import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.DataTableFactory;
@@ -34,6 +33,7 @@ import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
@@ -58,7 +58,7 @@ public class StreamingReduceService extends BaseReduceService {
 
   public BrokerResponseNative reduceOnStreamResponse(BrokerRequest brokerRequest,
       Map<ServerRoutingInstance, Iterator<Server.ServerResponse>> serverResponseMap, long reduceTimeOutMs,
-      @Nullable BrokerMetrics brokerMetrics)
+      BrokerMetrics brokerMetrics)
       throws IOException {
     if (serverResponseMap.isEmpty()) {
       // Empty response.
@@ -78,10 +78,20 @@ public class StreamingReduceService extends BaseReduceService {
     // initialize empty response.
     ExecutionStatsAggregator aggregator = new ExecutionStatsAggregator(enableTrace);
 
+    Integer minGroupTrimSizeQueryOption = null;
+    Integer groupTrimThresholdQueryOption = null;
+    if (queryOptions != null) {
+      minGroupTrimSizeQueryOption = QueryOptionsUtils.getMinBrokerGroupTrimSize(queryOptions);
+      groupTrimThresholdQueryOption = QueryOptionsUtils.getGroupTrimThreshold(queryOptions);
+    }
+    int minGroupTrimSize = minGroupTrimSizeQueryOption != null ? minGroupTrimSizeQueryOption : _minGroupTrimSize;
+    int groupTrimThreshold =
+        groupTrimThresholdQueryOption != null ? groupTrimThresholdQueryOption : _groupByTrimThreshold;
+
     // Process server response.
     DataTableReducerContext dataTableReducerContext =
         new DataTableReducerContext(_reduceExecutorService, _maxReduceThreadsPerQuery, reduceTimeOutMs,
-            _groupByTrimThreshold);
+            groupTrimThreshold, minGroupTrimSize);
     StreamingReducer streamingReducer = ResultReducerFactory.getStreamingReducer(queryContext);
 
     streamingReducer.init(dataTableReducerContext);

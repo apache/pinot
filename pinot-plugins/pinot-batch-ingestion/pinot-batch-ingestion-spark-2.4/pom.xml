@@ -26,7 +26,7 @@
   <parent>
     <artifactId>pinot-batch-ingestion</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>0.13.0-SNAPSHOT</version>
+    <version>1.2.0-SNAPSHOT</version>
     <relativePath>..</relativePath>
   </parent>
 
@@ -35,10 +35,10 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/../../..</pinot.root>
-    <phase.prop>package</phase.prop>
+    <shade.phase.prop>package</shade.phase.prop>
     <scala.major.version>2.11</scala.major.version>
     <spark.version>2.4.6</spark.version>
-    <scala.minor.version>2.11.11</scala.minor.version>
+    <scala.minor.version>2.11.12</scala.minor.version>
   </properties>
 
   <dependencies>
@@ -54,8 +54,8 @@
       <scope>provided</scope>
       <exclusions>
         <exclusion>
-          <groupId>org.scala-lang</groupId>
-          <artifactId>scala-library</artifactId>
+          <groupId>com.zaxxer</groupId>
+          <artifactId>HikariCP-java7</artifactId>
         </exclusion>
         <exclusion>
           <groupId>com.twitter</groupId>
@@ -77,22 +77,6 @@
           <groupId>org.slf4j</groupId>
           <artifactId>slf4j-log4j12</artifactId>
         </exclusion>
-        <exclusion>
-          <groupId>com.google.protobuf</groupId>
-          <artifactId>protobuf-java</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>com.zaxxer</groupId>
-          <artifactId>HikariCP-java7</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.glassfish.hk2.external</groupId>
-          <artifactId>jakarta.inject</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>jakarta.ws.rs</groupId>
-          <artifactId>jakarta.ws.rs-api</artifactId>
-        </exclusion>
       </exclusions>
     </dependency>
     <dependency>
@@ -102,12 +86,8 @@
       <scope>provided</scope>
     </dependency>
     <dependency>
-      <groupId>commons-logging</groupId>
-      <artifactId>commons-logging</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>commons-lang</groupId>
-      <artifactId>commons-lang</artifactId>
+      <groupId>org.slf4j</groupId>
+      <artifactId>jcl-over-slf4j</artifactId>
     </dependency>
     <dependency>
       <groupId>com.google.guava</groupId>
@@ -142,7 +122,7 @@
     <dependency>
       <groupId>com.twitter</groupId>
       <artifactId>chill_2.11</artifactId>
-      <version>0.9.3</version>
+      <version>0.10.0</version>
       <scope>test</scope>
       <exclusions>
         <exclusion>
@@ -160,24 +140,16 @@
       <artifactId>pinot-common</artifactId>
       <version>${project.version}</version>
       <scope>provided</scope>
-      <exclusions>
-        <exclusion>
-          <groupId>org.apache.commons</groupId>
-          <artifactId>commons-lang3</artifactId>
-        </exclusion>
-      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>org.codehaus.woodstox</groupId>
+      <artifactId>stax2-api</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-spi</artifactId>
       <version>${project.version}</version>
       <scope>provided</scope>
-      <exclusions>
-        <exclusion>
-          <groupId>org.apache.commons</groupId>
-          <artifactId>commons-lang3</artifactId>
-        </exclusion>
-      </exclusions>
     </dependency>
   </dependencies>
 </project>

@@ -26,7 +26,7 @@
   <parent>
     <groupId>org.apache.pinot</groupId>
     <artifactId>pinot-connectors</artifactId>
-    <version>0.13.0-SNAPSHOT</version>
+    <version>1.2.0-SNAPSHOT</version>
     <relativePath>..</relativePath>
   </parent>
   <artifactId>pinot-flink-connector</artifactId>
@@ -34,8 +34,6 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/../..</pinot.root>
-    <scala.version>2.12</scala.version>
-    <flink.version>1.12.0</flink.version>
   </properties>
 
   <dependencies>
@@ -44,17 +42,12 @@
       <artifactId>guava</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.glassfish.jersey.inject</groupId>
-      <artifactId>jersey-hk2</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.glassfish.jersey.media</groupId>
-      <artifactId>jersey-media-json-jackson</artifactId>
+      <groupId>org.apache.flink</groupId>
+      <artifactId>flink-streaming-java</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.flink</groupId>
-      <artifactId>flink-streaming-java_${scala.version}</artifactId>
-      <version>${flink.version}</version>
+      <artifactId>flink-java</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
@@ -85,8 +78,7 @@
     </dependency>
     <dependency>
       <groupId>org.apache.flink</groupId>
-      <artifactId>flink-clients_${scala.version}</artifactId>
-      <version>${flink.version}</version>
+      <artifactId>flink-clients</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
@@ -95,16 +87,6 @@
       <version>${project.parent.version}</version>
       <type>test-jar</type>
       <scope>test</scope>
-      <exclusions>
-        <exclusion>
-          <groupId>org.scala-lang</groupId>
-          <artifactId>scala-library</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.scala-lang.modules</groupId>
-          <artifactId>scala-java8-compat_2.12</artifactId>
-        </exclusion>
-      </exclusions>
     </dependency>
   </dependencies>
   <build>
@@ -115,18 +97,6 @@
         <configuration>
           <source>${jdk.version}</source>
           <target>${jdk.version}</target>
-        </configuration>
-      </plugin>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-enforcer-plugin</artifactId>
-        <version>3.2.1</version>
-        <executions>
-        </executions>
-        <configuration>
-          <rules>
-            <dependencyConvergence/>
-          </rules>
         </configuration>
       </plugin>
       <plugin>

@@ -32,7 +32,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
-import org.apache.http.conn.HttpClientConnectionManager;
+import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.restlet.resources.SegmentConsumerInfo;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -75,8 +75,9 @@ public class ConsumingSegmentInfoReader {
         _pinotHelixResourceManager.getDataInstanceAdminEndpoints(serverToSegments.keySet());
 
     // Gets info for segments with LLRealtimeSegmentDataManager found in the table data manager
-    Map<String, List<SegmentConsumerInfo>> serverToSegmentConsumerInfoMap =
+    ConsumingSegmentsInfoFromServersResponse response =
         getConsumingSegmentsInfoFromServers(tableNameWithType, serverToEndpoints, timeoutMs);
+    Map<String, List<SegmentConsumerInfo>> serverToSegmentConsumerInfoMap = response._serverToSegmentConsumerInfoMap;
     TreeMap<String, List<ConsumingSegmentInfo>> consumingSegmentInfoMap = new TreeMap<>();
     for (Map.Entry<String, List<SegmentConsumerInfo>> entry : serverToSegmentConsumerInfoMap.entrySet()) {
       String serverName = entry.getKey();
@@ -93,14 +94,14 @@ public class ConsumingSegmentInfoReader {
     // Segments which are in CONSUMING state but found no consumer on the server
     Set<String> consumingSegments = _pinotHelixResourceManager.getConsumingSegments(tableNameWithType);
     consumingSegments.forEach(c -> consumingSegmentInfoMap.putIfAbsent(c, Collections.emptyList()));
-    return new ConsumingSegmentsInfoMap(consumingSegmentInfoMap);
+    return new ConsumingSegmentsInfoMap(consumingSegmentInfoMap, response._failedResponseCount, response._failedParses);
   }
 
   /**
    * This method makes a MultiGet call to all servers to get the consuming segments info.
    * @return servers queried and a list of consumer status information for consuming segments on that server
    */
-  private Map<String, List<SegmentConsumerInfo>> getConsumingSegmentsInfoFromServers(String tableNameWithType,
+  private ConsumingSegmentsInfoFromServersResponse getConsumingSegmentsInfoFromServers(String tableNameWithType,
       BiMap<String, String> serverToEndpoints, int timeoutMs) {
     LOGGER.info("Reading consuming segment info from servers: {} for table: {}", serverToEndpoints.keySet(),
         tableNameWithType);
@@ -132,7 +133,8 @@ public class ConsumingSegmentInfoReader {
     if (failedParses != 0) {
       LOGGER.warn("Failed to parse {} / {} segment size info responses from servers.", failedParses, serverUrls.size());
     }
-    return serverToConsumingSegmentInfoList;
+    return new ConsumingSegmentsInfoFromServersResponse(
+        serverToConsumingSegmentInfoList, serviceResponse._failedResponseCount, failedParses);
   }
 
   private String generateServerURL(String tableNameWithType, String endpoint) {
@@ -157,13 +159,13 @@ public class ConsumingSegmentInfoReader {
         }
 
         // Check if any responses are missing
-        Set<String> serversForSegment = _pinotHelixResourceManager.getServersForSegment(tableNameWithType, segmentName);
-        if (serversForSegment.size() != consumingSegmentInfoList.size()) {
+        Set<String> servers = _pinotHelixResourceManager.getServers(tableNameWithType, segmentName);
+        if (servers.size() != consumingSegmentInfoList.size()) {
           Set<String> serversResponded =
               consumingSegmentInfoList.stream().map(c -> c._serverName).collect(Collectors.toSet());
-          serversForSegment.removeAll(serversResponded);
+          servers.removeAll(serversResponded);
           String errorMessage =
-              "Not all servers responded for segment: " + segmentName + " Missing servers : " + serversForSegment;
+              "Not all servers responded for segment: " + segmentName + " Missing servers : " + servers;
           return TableStatus.IngestionStatus.newIngestionStatus(TableStatus.IngestionState.UNHEALTHY, errorMessage);
         }
 
@@ -189,10 +191,18 @@ public class ConsumingSegmentInfoReader {
   @JsonIgnoreProperties(ignoreUnknown = true)
   static public class ConsumingSegmentsInfoMap {
     public TreeMap<String, List<ConsumingSegmentInfo>> _segmentToConsumingInfoMap;
+    @JsonProperty("serversFailingToRespond")
+    public int _serversFailingToRespond;
+    @JsonProperty("serversUnparsableRespond")
+    public int _serversUnparsableRespond;
 
     public ConsumingSegmentsInfoMap(@JsonProperty("segmentToConsumingInfoMap")
-        TreeMap<String, List<ConsumingSegmentInfo>> segmentToConsumingInfoMap) {
+        TreeMap<String, List<ConsumingSegmentInfo>> segmentToConsumingInfoMap,
+        @JsonProperty("serversFailingToRespond") int serversFailingToRespond,
+        @JsonProperty("serversUnparsableRespond") int serversUnparsableRespond) {
       _segmentToConsumingInfoMap = segmentToConsumingInfoMap;
+      _serversFailingToRespond = serversFailingToRespond;
+      _serversUnparsableRespond = serversUnparsableRespond;
     }
   }
 
@@ -252,6 +262,20 @@ public class ConsumingSegmentInfoReader {
       _latestUpstreamOffsetMap = latestUpstreamOffsetMap;
       _recordsLagMap = recordsLagMap;
       _availabilityLagMap = availabilityLagMsMap;
+    }
+  }
+
+  public static class ConsumingSegmentsInfoFromServersResponse {
+    private final Map<String, List<SegmentConsumerInfo>> _serverToSegmentConsumerInfoMap;
+    private final int _failedResponseCount;
+    private final int _failedParses;
+
+    public ConsumingSegmentsInfoFromServersResponse(
+        Map<String, List<SegmentConsumerInfo>> serverToSegmentConsumerInfoMap, int failedResponseCount,
+        int failedParses) {
+      _serverToSegmentConsumerInfoMap = serverToSegmentConsumerInfoMap;
+      _failedResponseCount = failedResponseCount;
+      _failedParses = failedParses;
     }
   }
 }

@@ -632,4 +632,13 @@ public class JsonUtilsTest {
         .addDateTime("hoursSinceEpoch", FieldSpec.DataType.INT, "1:HOURS:EPOCH", "1:HOURS").build();
     Assert.assertEquals(inferredPinotSchema, expectedSchema);
   }
+
+  @Test
+  public void testEmptyString()
+      throws IOException {
+    JsonIndexConfig jsonIndexConfig = new JsonIndexConfig();
+    JsonNode jsonNode = JsonUtils.stringToJsonNode("");
+    List<Map<String, String>> flattenedRecords = JsonUtils.flatten(jsonNode, jsonIndexConfig);
+    assertTrue(flattenedRecords.isEmpty());
+  }
 }

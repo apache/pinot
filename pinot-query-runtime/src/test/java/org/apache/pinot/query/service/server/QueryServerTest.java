@@ -18,44 +18,45 @@
  */
 package org.apache.pinot.query.service.server;
 
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
+import com.google.protobuf.ByteString;
 import io.grpc.Deadline;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Random;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
+import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.proto.Worker;
-import org.apache.pinot.common.utils.NamedThreadFactory;
-import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.QueryTestSet;
-import org.apache.pinot.query.planner.DispatchablePlanFragment;
-import org.apache.pinot.query.planner.DispatchableSubPlan;
+import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
+import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
 import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.query.planner.serde.PlanNodeSerializer;
+import org.apache.pinot.query.routing.QueryPlanSerDeUtils;
 import org.apache.pinot.query.routing.QueryServerInstance;
+import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.QueryRunner;
-import org.apache.pinot.query.runtime.plan.StageMetadata;
-import org.apache.pinot.query.runtime.plan.serde.QueryPlanSerDeUtils;
 import org.apache.pinot.query.testutils.QueryTestUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.EqualityUtils;
 import org.apache.pinot.util.TestUtils;
-import org.mockito.Mockito;
-import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.*;
+import static org.testng.Assert.assertTrue;
 
 
 public class QueryServerTest extends QueryTestSet {
@@ -63,11 +64,6 @@ public class QueryServerTest extends QueryTestSet {
   private static final int QUERY_SERVER_COUNT = 2;
   private static final String KEY_OF_SERVER_INSTANCE_HOST = "pinot.query.runner.server.hostname";
   private static final String KEY_OF_SERVER_INSTANCE_PORT = "pinot.query.runner.server.port";
-  private static final ExecutorService LEAF_WORKER_EXECUTOR_SERVICE =
-      Executors.newFixedThreadPool(ResourceManager.DEFAULT_QUERY_WORKER_THREADS,
-          new NamedThreadFactory("QueryDispatcherTest_LeafWorker"));
-  private static final ExecutorService INTERM_WORKER_EXECUTOR_SERVICE =
-      Executors.newCachedThreadPool(new NamedThreadFactory("QueryDispatcherTest_IntermWorker"));
 
   private final Map<Integer, QueryServer> _queryServerMap = new HashMap<>();
   private final Map<Integer, QueryRunner> _queryRunnerMap = new HashMap<>();
@@ -77,12 +73,9 @@ public class QueryServerTest extends QueryTestSet {
   @BeforeClass
   public void setUp()
       throws Exception {
-
     for (int i = 0; i < QUERY_SERVER_COUNT; i++) {
       int availablePort = QueryTestUtils.getAvailablePort();
-      QueryRunner queryRunner = Mockito.mock(QueryRunner.class);
-      Mockito.when(queryRunner.getOpChainExecutorService()).thenReturn(LEAF_WORKER_EXECUTOR_SERVICE);
-      Mockito.when(queryRunner.getOpChainExecutorService()).thenReturn(INTERM_WORKER_EXECUTOR_SERVICE);
+      QueryRunner queryRunner = mock(QueryRunner.class);
       QueryServer queryServer = new QueryServer(availablePort, queryRunner);
       queryServer.start();
       _queryServerMap.put(availablePort, queryServer);
@@ -105,86 +98,82 @@ public class QueryServerTest extends QueryTestSet {
   }
 
   @Test
-  public void testException() {
-    DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery("SELECT * FROM a");
+  public void testException()
+      throws Exception {
+    DispatchableSubPlan queryPlan = _queryEnvironment.planQuery("SELECT * FROM a");
     // only get one worker request out.
-    Worker.QueryRequest queryRequest = getQueryRequest(dispatchableSubPlan, 1);
-    QueryRunner mockRunner =
-        _queryRunnerMap.get(Integer.parseInt(queryRequest.getMetadataOrThrow(KEY_OF_SERVER_INSTANCE_PORT)));
-    Mockito.doThrow(new RuntimeException("foo")).when(mockRunner).processQuery(Mockito.any(), Mockito.anyMap());
+    Worker.QueryRequest queryRequest = getQueryRequest(queryPlan, 1);
+    Map<String, String> requestMetadata = QueryPlanSerDeUtils.fromProtoProperties(queryRequest.getMetadata());
+    QueryRunner mockRunner = _queryRunnerMap.get(Integer.parseInt(requestMetadata.get(KEY_OF_SERVER_INSTANCE_PORT)));
+    doThrow(new RuntimeException("foo")).when(mockRunner).processQuery(any(), any(), any());
     // submit the request for testing.
-    Worker.QueryResponse resp = submitRequest(queryRequest);
+    Worker.QueryResponse resp = submitRequest(queryRequest, requestMetadata);
     // reset the mock runner before assert.
-    Mockito.reset(mockRunner);
+    reset(mockRunner);
     // should contain error message pattern
     String errorMessage = resp.getMetadataMap().get(CommonConstants.Query.Response.ServerResponseStatus.STATUS_ERROR);
-    Assert.assertTrue(errorMessage.contains("foo"));
+    assertTrue(errorMessage.contains("foo"));
   }
 
   @Test(dataProvider = "testSql")
   public void testWorkerAcceptsWorkerRequestCorrect(String sql)
       throws Exception {
-    DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(sql);
+    DispatchableSubPlan queryPlan = _queryEnvironment.planQuery(sql);
+    List<DispatchablePlanFragment> stagePlans = queryPlan.getQueryStageList();
+    int numStages = stagePlans.size();
+    // Ignore reduce stage (stage 0)
+    for (int stageId = 1; stageId < numStages; stageId++) {
+      // only get one worker request out.
+      Worker.QueryRequest queryRequest = getQueryRequest(queryPlan, stageId);
+      Map<String, String> requestMetadata = QueryPlanSerDeUtils.fromProtoProperties(queryRequest.getMetadata());
 
-    for (int stageId = 0; stageId < dispatchableSubPlan.getQueryStageList().size(); stageId++) {
-      if (stageId > 0) { // we do not test reduce stage.
-        // only get one worker request out.
-        Worker.QueryRequest queryRequest = getQueryRequest(dispatchableSubPlan, stageId);
+      // submit the request for testing.
+      Worker.QueryResponse resp = submitRequest(queryRequest, requestMetadata);
+      assertTrue(resp.getMetadataMap().containsKey(CommonConstants.Query.Response.ServerResponseStatus.STATUS_OK));
 
-        // submit the request for testing.
-        Worker.QueryResponse resp = submitRequest(queryRequest);
-        Assert.assertNotNull(resp.getMetadataMap().get(CommonConstants.Query.Response.ServerResponseStatus.STATUS_OK));
+      DispatchablePlanFragment dispatchableStagePlan = stagePlans.get(stageId);
+      List<WorkerMetadata> workerMetadataList = dispatchableStagePlan.getWorkerMetadataList();
+      StageMetadata stageMetadata =
+          new StageMetadata(stageId, workerMetadataList, dispatchableStagePlan.getCustomProperties());
 
-        DispatchablePlanFragment dispatchablePlanFragment = dispatchableSubPlan.getQueryStageList().get(stageId);
+      // ensure mock query runner received correctly deserialized payload.
+      QueryRunner mockRunner = _queryRunnerMap.get(Integer.parseInt(requestMetadata.get(KEY_OF_SERVER_INSTANCE_PORT)));
+      String requestId = requestMetadata.get(CommonConstants.Query.Request.MetadataKeys.REQUEST_ID);
 
-        StageMetadata stageMetadata = new StageMetadata.Builder()
-            .setWorkerMetadataList(dispatchablePlanFragment.getWorkerMetadataList())
-            .addCustomProperties(dispatchablePlanFragment.getCustomProperties()).build();
+      // since submitRequest is async, we need to wait for the mockRunner to receive the query payload.
+      TestUtils.waitForCondition(aVoid -> {
+        try {
+          verify(mockRunner, times(workerMetadataList.size())).processQuery(any(), argThat(stagePlan -> {
+            PlanNode planNode = dispatchableStagePlan.getPlanFragment().getFragmentRoot();
+            return planNode.equals(stagePlan.getRootNode()) && isStageMetadataEqual(stageMetadata,
+                stagePlan.getStageMetadata());
+          }), argThat(requestMetadataMap -> requestId.equals(
+              requestMetadataMap.get(CommonConstants.Query.Request.MetadataKeys.REQUEST_ID))));
+          return true;
+        } catch (Throwable t) {
+          return false;
+        }
+      }, 10000L, "Error verifying mock QueryRunner intercepted query payload!");
 
-        // ensure mock query runner received correctly deserialized payload.
-        QueryRunner mockRunner =
-            _queryRunnerMap.get(Integer.parseInt(queryRequest.getMetadataOrThrow(KEY_OF_SERVER_INSTANCE_PORT)));
-        String requestIdStr = queryRequest.getMetadataOrThrow(CommonConstants.Query.Request.MetadataKeys.REQUEST_ID);
-
-        // since submitRequest is async, we need to wait for the mockRunner to receive the query payload.
-        int finalStageId = stageId;
-        TestUtils.waitForCondition(aVoid -> {
-          try {
-            Mockito.verify(mockRunner).processQuery(Mockito.argThat(distributedStagePlan -> {
-              PlanNode planNode =
-                  dispatchableSubPlan.getQueryStageList().get(finalStageId).getPlanFragment().getFragmentRoot();
-              return isStageNodesEqual(planNode, distributedStagePlan.getStageRoot()) && isStageMetadataEqual(
-                  stageMetadata, distributedStagePlan.getStageMetadata());
-            }), Mockito.argThat(requestMetadataMap -> requestIdStr.equals(
-                requestMetadataMap.get(CommonConstants.Query.Request.MetadataKeys.REQUEST_ID))));
-            return true;
-          } catch (Throwable t) {
-            return false;
-          }
-        }, 10000L, "Error verifying mock QueryRunner intercepted query payload!");
-
-        // reset the mock runner.
-        Mockito.reset(mockRunner);
-      }
+      // reset the mock runner.
+      reset(mockRunner);
     }
   }
 
   private boolean isStageMetadataEqual(StageMetadata expected, StageMetadata actual) {
-    if (!EqualityUtils.isEqual(StageMetadata.getTableName(expected),
-        StageMetadata.getTableName(actual))) {
+    if (!Objects.equals(expected.getTableName(), actual.getTableName())) {
       return false;
     }
-    TimeBoundaryInfo expectedTimeBoundaryInfo = StageMetadata.getTimeBoundary(expected);
-    TimeBoundaryInfo actualTimeBoundaryInfo = StageMetadata.getTimeBoundary(actual);
-    if (expectedTimeBoundaryInfo == null && actualTimeBoundaryInfo != null
-        || expectedTimeBoundaryInfo != null && actualTimeBoundaryInfo == null) {
-      return false;
-    }
-    if (expectedTimeBoundaryInfo != null && actualTimeBoundaryInfo != null && (
-        !EqualityUtils.isEqual(expectedTimeBoundaryInfo.getTimeColumn(), actualTimeBoundaryInfo.getTimeColumn())
-            || !EqualityUtils.isEqual(expectedTimeBoundaryInfo.getTimeValue(),
-            actualTimeBoundaryInfo.getTimeValue()))) {
-      return false;
+    TimeBoundaryInfo expectedTimeBoundaryInfo = expected.getTimeBoundary();
+    TimeBoundaryInfo actualTimeBoundaryInfo = actual.getTimeBoundary();
+    if (expectedTimeBoundaryInfo != null || actualTimeBoundaryInfo != null) {
+      if (expectedTimeBoundaryInfo == null || actualTimeBoundaryInfo == null) {
+        return false;
+      }
+      if (!expectedTimeBoundaryInfo.getTimeColumn().equals(actualTimeBoundaryInfo.getTimeColumn())
+          || !expectedTimeBoundaryInfo.getTimeValue().equals(actualTimeBoundaryInfo.getTimeValue())) {
+        return false;
+      }
     }
     List<WorkerMetadata> expectedWorkerMetadataList = expected.getWorkerMetadataList();
     List<WorkerMetadata> actualWorkerMetadataList = actual.getWorkerMetadataList();
@@ -200,62 +189,49 @@ public class QueryServerTest extends QueryTestSet {
   }
 
   private static boolean isWorkerMetadataEqual(WorkerMetadata expected, WorkerMetadata actual) {
-    if (!expected.getVirtualServerAddress().hostname().equals(actual.getVirtualServerAddress().hostname())
-        || expected.getVirtualServerAddress().port() != actual.getVirtualServerAddress().port()
-        || expected.getVirtualServerAddress().workerId() != actual.getVirtualServerAddress().workerId()) {
-      return false;
-    }
-    return EqualityUtils.isEqual(WorkerMetadata.getTableSegmentsMap(expected),
-        WorkerMetadata.getTableSegmentsMap(actual));
+    return expected.getWorkerId() == actual.getWorkerId() && EqualityUtils.isEqual(expected.getTableSegmentsMap(),
+        actual.getTableSegmentsMap());
   }
 
-  private static boolean isStageNodesEqual(PlanNode left, PlanNode right) {
-    // This only checks the stage tree structure is correct. because the input/stageId fields are not
-    // part of the generic proto ser/de; which is tested in query planner.
-    if (left.getPlanFragmentId() != right.getPlanFragmentId() || left.getClass() != right.getClass()
-        || left.getInputs().size() != right.getInputs().size()) {
-      return false;
-    }
-    left.getInputs().sort(Comparator.comparingInt(PlanNode::getPlanFragmentId));
-    right.getInputs().sort(Comparator.comparingInt(PlanNode::getPlanFragmentId));
-    for (int i = 0; i < left.getInputs().size(); i++) {
-      if (!isStageNodesEqual(left.getInputs().get(i), right.getInputs().get(i))) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  private Worker.QueryResponse submitRequest(Worker.QueryRequest queryRequest) {
-    String host = queryRequest.getMetadataMap().get(KEY_OF_SERVER_INSTANCE_HOST);
-    int port = Integer.parseInt(queryRequest.getMetadataMap().get(KEY_OF_SERVER_INSTANCE_PORT));
-    long timeoutMs =
-        Long.parseLong(queryRequest.getMetadataMap().get(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS));
+  private Worker.QueryResponse submitRequest(Worker.QueryRequest queryRequest, Map<String, String> requestMetadata) {
+    String host = requestMetadata.get(KEY_OF_SERVER_INSTANCE_HOST);
+    int port = Integer.parseInt(requestMetadata.get(KEY_OF_SERVER_INSTANCE_PORT));
+    long timeoutMs = Long.parseLong(requestMetadata.get(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS));
     ManagedChannel channel = ManagedChannelBuilder.forAddress(host, port).usePlaintext().build();
     PinotQueryWorkerGrpc.PinotQueryWorkerBlockingStub stub = PinotQueryWorkerGrpc.newBlockingStub(channel);
-    Worker.QueryResponse resp = stub.withDeadline(Deadline.after(timeoutMs, TimeUnit.MILLISECONDS))
-        .submit(queryRequest);
+    Worker.QueryResponse resp =
+        stub.withDeadline(Deadline.after(timeoutMs, TimeUnit.MILLISECONDS)).submit(queryRequest);
     channel.shutdown();
     return resp;
   }
 
-  private Worker.QueryRequest getQueryRequest(DispatchableSubPlan dispatchableSubPlan, int stageId) {
-    Map<QueryServerInstance, List<Integer>> serverInstanceToWorkerIdMap =
-        dispatchableSubPlan.getQueryStageList().get(stageId).getServerInstanceToWorkerIdMap();
+  private Worker.QueryRequest getQueryRequest(DispatchableSubPlan queryPlan, int stageId) {
+    DispatchablePlanFragment stagePlan = queryPlan.getQueryStageList().get(stageId);
+    Plan.PlanNode rootNode = PlanNodeSerializer.process(stagePlan.getPlanFragment().getFragmentRoot());
+    List<Worker.WorkerMetadata> workerMetadataList =
+        QueryPlanSerDeUtils.toProtoWorkerMetadataList(stagePlan.getWorkerMetadataList());
+    ByteString customProperty = QueryPlanSerDeUtils.toProtoProperties(stagePlan.getCustomProperties());
+
     // this particular test set requires the request to have a single QueryServerInstance to dispatch to
     // as it is not testing the multi-tenancy dispatch (which is in the QueryDispatcherTest)
-    QueryServerInstance serverInstance = serverInstanceToWorkerIdMap.keySet().iterator().next();
-    int workerId = serverInstanceToWorkerIdMap.get(serverInstance).get(0);
+    QueryServerInstance serverInstance = stagePlan.getServerInstanceToWorkerIdMap().keySet().iterator().next();
+    Worker.StageMetadata stageMetadata =
+        Worker.StageMetadata.newBuilder().setStageId(stageId).addAllWorkerMetadata(workerMetadataList)
+            .setCustomProperty(customProperty).build();
+    Worker.StagePlan protoStagePlan =
+        Worker.StagePlan.newBuilder().setRootNode(rootNode.toByteString()).setStageMetadata(stageMetadata).build();
 
-    return Worker.QueryRequest.newBuilder().addStagePlan(
-            QueryPlanSerDeUtils.serialize(dispatchableSubPlan, stageId, serverInstance, ImmutableList.of(workerId)))
-        // the default configurations that must exist.
-        .putMetadata(CommonConstants.Query.Request.MetadataKeys.REQUEST_ID,
-            String.valueOf(RANDOM_REQUEST_ID_GEN.nextLong()))
-        .putMetadata(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS,
-            String.valueOf(CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS))
-        // extra configurations we want to test also parsed out correctly.
-        .putMetadata(KEY_OF_SERVER_INSTANCE_HOST, serverInstance.getHostname())
-        .putMetadata(KEY_OF_SERVER_INSTANCE_PORT, String.valueOf(serverInstance.getQueryServicePort())).build();
+    Map<String, String> requestMetadata = new HashMap<>();
+    // the default configurations that must exist.
+    requestMetadata.put(CommonConstants.Query.Request.MetadataKeys.REQUEST_ID,
+        String.valueOf(RANDOM_REQUEST_ID_GEN.nextLong()));
+    requestMetadata.put(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS,
+        String.valueOf(CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS));
+    // extra configurations we want to test also parsed out correctly.
+    requestMetadata.put(KEY_OF_SERVER_INSTANCE_HOST, serverInstance.getHostname());
+    requestMetadata.put(KEY_OF_SERVER_INSTANCE_PORT, Integer.toString(serverInstance.getQueryServicePort()));
+
+    return Worker.QueryRequest.newBuilder().addStagePlan(protoStagePlan)
+        .setMetadata(QueryPlanSerDeUtils.toProtoProperties(requestMetadata)).build();
   }
 }

@@ -20,13 +20,14 @@ package org.apache.pinot.query.runtime.operator.exchange;
 
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.query.mailbox.SendingMailbox;
-import org.apache.pinot.query.planner.partitioning.KeySelector;
+import org.apache.pinot.query.planner.partitioning.KeySelectorFactory;
 import org.apache.pinot.query.runtime.blocks.BlockSplitter;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.spi.exception.EarlyTerminationException;
+import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 
 
 /**
@@ -40,13 +41,13 @@ public abstract class BlockExchange {
   private final List<SendingMailbox> _sendingMailboxes;
   private final BlockSplitter _splitter;
 
-  public static BlockExchange getExchange(List<SendingMailbox> sendingMailboxes, RelDistribution.Type exchangeType,
-      KeySelector<Object[], Object[]> selector, BlockSplitter splitter) {
-    switch (exchangeType) {
+  public static BlockExchange getExchange(List<SendingMailbox> sendingMailboxes, RelDistribution.Type distributionType,
+      List<Integer> keys, BlockSplitter splitter) {
+    switch (distributionType) {
       case SINGLETON:
         return new SingletonExchange(sendingMailboxes, splitter);
       case HASH_DISTRIBUTED:
-        return new HashExchange(sendingMailboxes, selector, splitter);
+        return new HashExchange(sendingMailboxes, KeySelectorFactory.getKeySelector(keys), splitter);
       case RANDOM_DISTRIBUTED:
         return new RandomExchange(sendingMailboxes, splitter);
       case BROADCAST_DISTRIBUTED:
@@ -55,7 +56,7 @@ public abstract class BlockExchange {
       case RANGE_DISTRIBUTED:
       case ANY:
       default:
-        throw new UnsupportedOperationException("Unsupported mailbox exchange type: " + exchangeType);
+        throw new UnsupportedOperationException("Unsupported distribution type: " + distributionType);
     }
   }
 
@@ -64,25 +65,48 @@ public abstract class BlockExchange {
     _splitter = splitter;
   }
 
-  public void send(TransferableBlock block)
+  /**
+   * API to send a block to the destination mailboxes.
+   * @param block the block to be transferred
+   * @return true if all the mailboxes has been early terminated.
+   * @throws Exception when sending stream unexpectedly closed.
+   */
+  public boolean send(TransferableBlock block)
       throws Exception {
+    if (block.isErrorBlock()) {
+      // Send error block to all mailboxes to propagate the error
+      for (SendingMailbox sendingMailbox : _sendingMailboxes) {
+        sendBlock(sendingMailbox, block);
+      }
+      return false;
+    }
+
+    if (block.isSuccessfulEndOfStreamBlock()) {
+      // Send metadata to only one randomly picked mailbox, and empty EOS block to other mailboxes
+      int numMailboxes = _sendingMailboxes.size();
+      int mailboxIdToSendMetadata = ThreadLocalRandom.current().nextInt(numMailboxes);
+      assert block.getQueryStats() != null;
+      for (int i = 0; i < numMailboxes; i++) {
+        SendingMailbox sendingMailbox = _sendingMailboxes.get(i);
+        TransferableBlock blockToSend =
+            i == mailboxIdToSendMetadata ? block : TransferableBlockUtils.getEndOfStreamTransferableBlock();
+        sendBlock(sendingMailbox, blockToSend);
+      }
+      return false;
+    }
+
+    assert block.isDataBlock();
     boolean isEarlyTerminated = true;
     for (SendingMailbox sendingMailbox : _sendingMailboxes) {
-      if (!sendingMailbox.isTerminated()) {
+      if (!sendingMailbox.isEarlyTerminated()) {
         isEarlyTerminated = false;
         break;
       }
     }
-    if (isEarlyTerminated) {
-      throw new EarlyTerminationException();
-    }
-    if (block.isEndOfStreamBlock()) {
-      for (SendingMailbox sendingMailbox : _sendingMailboxes) {
-        sendBlock(sendingMailbox, block);
-      }
-    } else {
+    if (!isEarlyTerminated) {
       route(_sendingMailboxes, block);
     }
+    return isEarlyTerminated;
   }
 
   protected void sendBlock(SendingMailbox sendingMailbox, TransferableBlock block)

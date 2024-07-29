@@ -140,6 +140,10 @@ public class PinotBrokerRestletResourceStatelessTest extends ControllerTest {
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_BROKER").size(),
         10);
 
+    // Create schema
+    addDummySchema(TABLE_NAME_1);
+    addDummySchema(TABLE_NAME_2);
+
     // Adding table
     _helixResourceManager
         .addTable(new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME_1).setNumReplicas(1).build());

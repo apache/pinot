@@ -89,7 +89,7 @@ public class ZKOperatorTest {
     TableConfig offlineTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
     TableConfig realtimeTableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setTimeColumnName(TIME_COLUMN)
-            .setStreamConfigs(getStreamConfigs()).setLLC(true).setNumReplicas(1).build();
+            .setStreamConfigs(getStreamConfigs()).setNumReplicas(1).build();
 
     _resourceManager.addSchema(schema, false, false);
     _resourceManager.addTable(offlineTableConfig);
@@ -292,8 +292,9 @@ public class ZKOperatorTest {
     assertEquals(segmentZKMetadata.getCreationTime(), 456L);
     long refreshTime = segmentZKMetadata.getRefreshTime();
     assertTrue(refreshTime > 0);
-    // DownloadURL and crypter should not unchanged
-    assertEquals(segmentZKMetadata.getDownloadUrl(), "downloadUrl");
+    // Download URL should change. Refer: https://github.com/apache/pinot/issues/11535
+    assertEquals(segmentZKMetadata.getDownloadUrl(), "otherDownloadUrl");
+    // crypter should not be changed
     assertEquals(segmentZKMetadata.getCrypterName(), "crypter");
     assertEquals(segmentZKMetadata.getSegmentUploadStartTime(), -1);
     assertEquals(segmentZKMetadata.getSizeInBytes(), 10);

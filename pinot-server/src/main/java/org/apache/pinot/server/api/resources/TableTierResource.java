@@ -39,11 +39,13 @@ import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.pinot.common.restlet.resources.ResourceUtils;
 import org.apache.pinot.common.restlet.resources.TableTierInfo;
+import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
@@ -52,15 +54,22 @@ import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.server.starter.ServerInstance;
 
+import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
 
 /**
  * A server-side API to get the storage tiers of immutable segments of the given table from the server being requested.
  */
-@Api(tags = "Table", authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY)})
-@SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = @ApiKeyAuthDefinition(name =
-    HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = SWAGGER_AUTHORIZATION_KEY)))
+@Api(tags = "Table", authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY),
+    @Authorization(value = DATABASE)})
+@SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = {
+    @ApiKeyAuthDefinition(name = HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER,
+        key = SWAGGER_AUTHORIZATION_KEY,
+        description = "The format of the key is  ```\"Basic <token>\" or \"Bearer <token>\"```"),
+    @ApiKeyAuthDefinition(name = DATABASE, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = DATABASE,
+        description = "Database context passed through http header. If no context is provided 'default' database "
+            + "context will be considered.")}))
 @Path("/")
 public class TableTierResource {
 
@@ -77,8 +86,9 @@ public class TableTierResource {
       @ApiResponse(code = 404, message = "Table not found")
   })
   public String getTableTiers(@ApiParam(value = "Table name with type", required = true) @PathParam("tableNameWithType")
-      String tableNameWithType)
+      String tableNameWithType, @Context HttpHeaders headers)
       throws WebApplicationException {
+    tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
     InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
     if (instanceDataManager == null) {
       throw new WebApplicationException("Invalid server initialization", Response.Status.INTERNAL_SERVER_ERROR);
@@ -120,8 +130,10 @@ public class TableTierResource {
   public String getTableSegmentTiers(
       @ApiParam(value = "Table name with type", required = true) @PathParam("tableNameWithType")
           String tableNameWithType,
-      @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName)
+      @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
+      @Context HttpHeaders headers)
       throws WebApplicationException {
+    tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
     segmentName = URIUtils.decode(segmentName);
     InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
     if (instanceDataManager == null) {

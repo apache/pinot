@@ -140,7 +140,8 @@ public class CombinePlanNodeTest {
     _queryContext.setEndTimeMs(System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
     CombinePlanNode combinePlanNode = new CombinePlanNode(planNodes, _queryContext, _executorService, null);
     AtomicReference<Exception> exp = new AtomicReference<>();
-    ExecutorService combineExecutor = Executors.newSingleThreadExecutor();
+    // Avoid early finalization by not using Executors.newSingleThreadExecutor (java <= 20, JDK-8145304)
+    ExecutorService combineExecutor = Executors.newFixedThreadPool(1);
     try {
       Future<?> future = combineExecutor.submit(() -> {
         try {

@@ -32,6 +32,7 @@ import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils.AggregationInfo;
 import org.apache.pinot.core.query.aggregation.groupby.DefaultGroupByExecutor;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByExecutor;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -47,35 +48,35 @@ import org.apache.pinot.spi.trace.Tracing;
 public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
   private static final String EXPLAIN_NAME = "GROUP_BY";
 
+  private final QueryContext _queryContext;
   private final AggregationFunction[] _aggregationFunctions;
   private final ExpressionContext[] _groupByExpressions;
   private final BaseProjectOperator<?> _projectOperator;
-  private final long _numTotalDocs;
   private final boolean _useStarTree;
+  private final long _numTotalDocs;
   private final DataSchema _dataSchema;
-  private final QueryContext _queryContext;
 
   private int _numDocsScanned = 0;
 
-  public GroupByOperator(AggregationFunction[] aggregationFunctions, ExpressionContext[] groupByExpressions,
-      BaseProjectOperator<?> projectOperator, long numTotalDocs, QueryContext queryContext, boolean useStarTree) {
-    _aggregationFunctions = aggregationFunctions;
-    _groupByExpressions = groupByExpressions;
-    _projectOperator = projectOperator;
-    _numTotalDocs = numTotalDocs;
-    _useStarTree = useStarTree;
+  public GroupByOperator(QueryContext queryContext, AggregationInfo aggregationInfo, long numTotalDocs) {
+    assert queryContext.getAggregationFunctions() != null && queryContext.getGroupByExpressions() != null;
     _queryContext = queryContext;
+    _aggregationFunctions = queryContext.getAggregationFunctions();
+    _groupByExpressions = queryContext.getGroupByExpressions().toArray(new ExpressionContext[0]);
+    _projectOperator = aggregationInfo.getProjectOperator();
+    _useStarTree = aggregationInfo.isUseStarTree();
+    _numTotalDocs = numTotalDocs;
 
-    // NOTE: The indexedTable expects that the the data schema will have group by columns before aggregation columns
-    int numGroupByExpressions = groupByExpressions.length;
-    int numAggregationFunctions = aggregationFunctions.length;
+    // NOTE: The indexedTable expects that the data schema will have group by columns before aggregation columns
+    int numGroupByExpressions = _groupByExpressions.length;
+    int numAggregationFunctions = _aggregationFunctions.length;
     int numColumns = numGroupByExpressions + numAggregationFunctions;
     String[] columnNames = new String[numColumns];
     DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numColumns];
 
     // Extract column names and data types for group-by columns
     for (int i = 0; i < numGroupByExpressions; i++) {
-      ExpressionContext groupByExpression = groupByExpressions[i];
+      ExpressionContext groupByExpression = _groupByExpressions[i];
       columnNames[i] = groupByExpression.toString();
       columnDataTypes[i] = DataSchema.ColumnDataType.fromDataTypeSV(
           _projectOperator.getResultColumnContext(groupByExpression).getDataType());
@@ -83,7 +84,7 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
 
     // Extract column names and data types for aggregation functions
     for (int i = 0; i < numAggregationFunctions; i++) {
-      AggregationFunction aggregationFunction = aggregationFunctions[i];
+      AggregationFunction aggregationFunction = _aggregationFunctions[i];
       int index = numGroupByExpressions + i;
       columnNames[index] = aggregationFunction.getResultColumnName();
       columnDataTypes[index] = aggregationFunction.getIntermediateResultColumnType();
@@ -123,13 +124,13 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
       if (groupByExecutor.getNumGroups() > trimSize) {
         TableResizer tableResizer = new TableResizer(_dataSchema, _queryContext);
         Collection<IntermediateRecord> intermediateRecords = groupByExecutor.trimGroupByResult(trimSize, tableResizer);
-        GroupByResultsBlock resultsBlock = new GroupByResultsBlock(_dataSchema, intermediateRecords);
+        GroupByResultsBlock resultsBlock = new GroupByResultsBlock(_dataSchema, intermediateRecords, _queryContext);
         resultsBlock.setNumGroupsLimitReached(numGroupsLimitReached);
         return resultsBlock;
       }
     }
 
-    GroupByResultsBlock resultsBlock = new GroupByResultsBlock(_dataSchema, groupByExecutor.getResult());
+    GroupByResultsBlock resultsBlock = new GroupByResultsBlock(_dataSchema, groupByExecutor.getResult(), _queryContext);
     resultsBlock.setNumGroupsLimitReached(numGroupsLimitReached);
     return resultsBlock;
   }

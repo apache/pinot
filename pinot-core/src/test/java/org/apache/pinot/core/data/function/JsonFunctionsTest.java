@@ -137,4 +137,19 @@ public class JsonFunctionsTest {
     });
     return inputs.toArray(new Object[0][]);
   }
+
+  @Test(description = "jsonFormat(Java null) should return Java null")
+  public void jsonFormatWithJavaNullReturnsJavaNull() {
+    GenericRow row = new GenericRow();
+    row.putValue("jsonMap", null);
+    testFunction("json_format(jsonMap)", Lists.newArrayList("jsonMap"), row, null);
+  }
+
+  @Test(description = "jsonFormat(JSON null) should return \"null\"")
+  public void jsonFormatWithJsonNullReturnsStringNull()
+      throws IOException {
+    GenericRow row = new GenericRow();
+    row.putValue("jsonMap", JsonUtils.stringToJsonNode("null"));
+    testFunction("json_format(jsonMap)", Lists.newArrayList("jsonMap"), row, "null");
+  }
 }

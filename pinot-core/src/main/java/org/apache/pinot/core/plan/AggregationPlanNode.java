@@ -20,12 +20,8 @@ package org.apache.pinot.core.plan;
 
 import java.util.EnumSet;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
@@ -34,15 +30,12 @@ import org.apache.pinot.core.operator.query.FilteredAggregationOperator;
 import org.apache.pinot.core.operator.query.NonScanBasedAggregationOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils.AggregationInfo;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.core.startree.CompositePredicateEvaluator;
-import org.apache.pinot.core.startree.StarTreeUtils;
-import org.apache.pinot.core.startree.plan.StarTreeProjectPlanNode;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
-import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
-import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 
 import static org.apache.pinot.segment.spi.AggregationFunctionType.*;
 
@@ -56,17 +49,20 @@ public class AggregationPlanNode implements PlanNode {
   private static final EnumSet<AggregationFunctionType> DICTIONARY_BASED_FUNCTIONS =
       EnumSet.of(MIN, MINMV, MAX, MAXMV, MINMAXRANGE, MINMAXRANGEMV, DISTINCTCOUNT, DISTINCTCOUNTMV, DISTINCTCOUNTHLL,
           DISTINCTCOUNTHLLMV, DISTINCTCOUNTRAWHLL, DISTINCTCOUNTRAWHLLMV, SEGMENTPARTITIONEDDISTINCTCOUNT,
-          DISTINCTCOUNTSMARTHLL, DISTINCTSUM, DISTINCTAVG, DISTINCTSUMMV, DISTINCTAVGMV);
+          DISTINCTCOUNTSMARTHLL, DISTINCTSUM, DISTINCTAVG, DISTINCTSUMMV, DISTINCTAVGMV, DISTINCTCOUNTHLLPLUS,
+          DISTINCTCOUNTHLLPLUSMV, DISTINCTCOUNTRAWHLLPLUS, DISTINCTCOUNTRAWHLLPLUSMV);
 
   // DISTINCTCOUNT excluded because consuming segment metadata contains unknown cardinality when there is no dictionary
   private static final EnumSet<AggregationFunctionType> METADATA_BASED_FUNCTIONS =
       EnumSet.of(COUNT, MIN, MINMV, MAX, MAXMV, MINMAXRANGE, MINMAXRANGEMV);
 
   private final IndexSegment _indexSegment;
+  private final SegmentContext _segmentContext;
   private final QueryContext _queryContext;
 
-  public AggregationPlanNode(IndexSegment indexSegment, QueryContext queryContext) {
-    _indexSegment = indexSegment;
+  public AggregationPlanNode(SegmentContext segmentContext, QueryContext queryContext) {
+    _indexSegment = segmentContext.getIndexSegment();
+    _segmentContext = segmentContext;
     _queryContext = queryContext;
   }
 
@@ -80,9 +76,8 @@ public class AggregationPlanNode implements PlanNode {
    * Build the operator to be used for filtered aggregations
    */
   private FilteredAggregationOperator buildFilteredAggOperator() {
-    List<Pair<AggregationFunction[], BaseProjectOperator<?>>> projectOperators =
-        AggregationFunctionUtils.buildFilteredAggregateProjectOperators(_indexSegment, _queryContext);
-    return new FilteredAggregationOperator(_queryContext.getAggregationFunctions(), projectOperators,
+    return new FilteredAggregationOperator(_queryContext,
+        AggregationFunctionUtils.buildFilteredAggregationInfos(_segmentContext, _queryContext),
         _indexSegment.getSegmentMetadata().getTotalDocs());
   }
 
@@ -92,20 +87,19 @@ public class AggregationPlanNode implements PlanNode {
    * aggregates code will be invoked
    */
   public Operator<AggregationResultsBlock> buildNonFilteredAggOperator() {
-    assert _queryContext.getAggregationFunctions() != null;
+    AggregationFunction[] aggregationFunctions = _queryContext.getAggregationFunctions();
+    assert aggregationFunctions != null;
 
     int numTotalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
-    AggregationFunction[] aggregationFunctions = _queryContext.getAggregationFunctions();
-
-    FilterPlanNode filterPlanNode = new FilterPlanNode(_indexSegment, _queryContext);
+    FilterPlanNode filterPlanNode = new FilterPlanNode(_segmentContext, _queryContext);
     BaseFilterOperator filterOperator = filterPlanNode.run();
 
-    if (canOptimizeFilteredCount(filterOperator, aggregationFunctions) && !_queryContext.isNullHandlingEnabled()) {
-      return new FastFilteredCountOperator(aggregationFunctions, filterOperator, _indexSegment.getSegmentMetadata());
-    }
+    if (!_queryContext.isNullHandlingEnabled()) {
+      if (canOptimizeFilteredCount(filterOperator, aggregationFunctions)) {
+        return new FastFilteredCountOperator(_queryContext, filterOperator, _indexSegment.getSegmentMetadata());
+      }
 
-    if (filterOperator.isResultMatchingAll() && !_queryContext.isNullHandlingEnabled()) {
-      if (isFitForNonScanBasedPlan(aggregationFunctions, _indexSegment)) {
+      if (filterOperator.isResultMatchingAll() && isFitForNonScanBasedPlan(aggregationFunctions, _indexSegment)) {
         DataSource[] dataSources = new DataSource[aggregationFunctions.length];
         for (int i = 0; i < aggregationFunctions.length; i++) {
           List<?> inputExpressions = aggregationFunctions[i].getInputExpressions();
@@ -114,39 +108,14 @@ public class AggregationPlanNode implements PlanNode {
             dataSources[i] = _indexSegment.getDataSource(column);
           }
         }
-        return new NonScanBasedAggregationOperator(aggregationFunctions, dataSources, numTotalDocs);
+        return new NonScanBasedAggregationOperator(_queryContext, dataSources, numTotalDocs);
       }
     }
 
-    // Use star-tree to solve the query if possible
-    List<StarTreeV2> starTrees = _indexSegment.getStarTrees();
-    if (starTrees != null && !_queryContext.isSkipStarTree() && !_queryContext.isNullHandlingEnabled()) {
-      AggregationFunctionColumnPair[] aggregationFunctionColumnPairs =
-          StarTreeUtils.extractAggregationFunctionPairs(aggregationFunctions);
-      if (aggregationFunctionColumnPairs != null) {
-        Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap =
-            StarTreeUtils.extractPredicateEvaluatorsMap(_indexSegment, _queryContext.getFilter(),
-                filterPlanNode.getPredicateEvaluators());
-        if (predicateEvaluatorsMap != null) {
-          for (StarTreeV2 starTreeV2 : starTrees) {
-            if (StarTreeUtils.isFitForStarTree(starTreeV2.getMetadata(), aggregationFunctionColumnPairs, null,
-                predicateEvaluatorsMap.keySet())) {
-              BaseProjectOperator<?> projectOperator =
-                  new StarTreeProjectPlanNode(_queryContext, starTreeV2, aggregationFunctionColumnPairs, null,
-                      predicateEvaluatorsMap).run();
-              return new AggregationOperator(aggregationFunctions, projectOperator, numTotalDocs, true);
-            }
-          }
-        }
-      }
-    }
-
-    Set<ExpressionContext> expressionsToTransform =
-        AggregationFunctionUtils.collectExpressionsToTransform(aggregationFunctions, null);
-    BaseProjectOperator<?> projectOperator =
-        new ProjectPlanNode(_indexSegment, _queryContext, expressionsToTransform, DocIdSetPlanNode.MAX_DOC_PER_CALL,
-            filterOperator).run();
-    return new AggregationOperator(aggregationFunctions, projectOperator, numTotalDocs, false);
+    AggregationInfo aggregationInfo =
+        AggregationFunctionUtils.buildAggregationInfo(_segmentContext, _queryContext, aggregationFunctions,
+            _queryContext.getFilter(), filterOperator, filterPlanNode.getPredicateEvaluators());
+    return new AggregationOperator(_queryContext, aggregationInfo, numTotalDocs);
   }
 
   /**

@@ -21,9 +21,13 @@ package org.apache.pinot.perf;
 import com.github.luben.zstd.Zstd;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import net.jpountz.lz4.LZ4Factory;
-import org.apache.commons.lang3.RandomUtils;
+import org.apache.pinot.segment.local.io.compression.ChunkCompressorFactory;
+import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
+import org.apache.pinot.segment.spi.compression.ChunkCompressor;
+import org.apache.pinot.segment.spi.compression.ChunkDecompressor;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -68,7 +72,13 @@ public class BenchmarkNoDictionaryIntegerCompression {
     private static ByteBuffer _lz4CompressedIntegerInput;
     private static ByteBuffer _lz4IntegerDecompressed;
 
+    private static ByteBuffer _gzipCompressedIntegerOutput;
+    private static ByteBuffer _gzipCompressedIntegerInput;
+    private static ByteBuffer _gzipIntegerDecompressed;
+
     private static LZ4Factory _factory;
+    private static ChunkCompressor _gzipCompressor;
+    private static ChunkDecompressor _gzipDecompressor;
 
     @Setup(Level.Invocation)
     public void setUp()
@@ -84,26 +94,31 @@ public class BenchmarkNoDictionaryIntegerCompression {
       // position for lz4 is required
       _uncompressedInt.flip();
       _factory.fastCompressor().compress(_uncompressedInt, _lz4CompressedIntegerInput);
+      _gzipCompressor.compress(_uncompressedInt, _gzipCompressedIntegerInput);
 
       _zstdIntegerDecompressed.rewind();
       _zstandardCompressedIntegerInput.flip();
       _uncompressedInt.flip();
       _snappyIntegerDecompressed.rewind();
       _lz4CompressedIntegerInput.flip();
+      _gzipCompressedIntegerInput.flip();
     }
 
     private void generateRandomIntegerBuffer() {
       //Generate Random Int
       _uncompressedInt = ByteBuffer.allocateDirect(_rowLength * Integer.BYTES);
+      Random random = new Random();
       for (int i = 0; i < _rowLength; i++) {
-        _uncompressedInt.putInt(RandomUtils.nextInt());
+        _uncompressedInt.putInt(random.nextInt());
       }
       _uncompressedInt.flip();
     }
 
     private void initializeCompressors() {
-      //Initialize compressors and decompressors for lz4
+      //Initialize compressors and decompressors for lz4 and gzip
       _factory = LZ4Factory.fastestInstance();
+      _gzipCompressor = ChunkCompressorFactory.getCompressor(ChunkCompressionType.GZIP);
+      _gzipDecompressor = ChunkCompressorFactory.getDecompressor(ChunkCompressionType.GZIP);
     }
 
     private void allocateBufferMemory() {
@@ -117,6 +132,9 @@ public class BenchmarkNoDictionaryIntegerCompression {
       _lz4CompressedIntegerOutput = ByteBuffer.allocateDirect(_uncompressedInt.capacity() * 2);
       _snappyCompressedIntegerOutput = ByteBuffer.allocateDirect(_uncompressedInt.capacity() * 2);
       _zstdCompressedIntegerOutput = ByteBuffer.allocateDirect(_uncompressedInt.capacity() * 2);
+      _gzipIntegerDecompressed = ByteBuffer.allocateDirect(_uncompressedInt.capacity() * 2);
+      _gzipCompressedIntegerOutput = ByteBuffer.allocateDirect(_uncompressedInt.capacity() * 2);
+      _gzipCompressedIntegerInput = ByteBuffer.allocateDirect(_uncompressedInt.capacity() * 2);
     }
 
     @TearDown(Level.Invocation)
@@ -128,10 +146,13 @@ public class BenchmarkNoDictionaryIntegerCompression {
       _zstdIntegerDecompressed.clear();
       _lz4CompressedIntegerOutput.clear();
       _lz4IntegerDecompressed.clear();
+      _gzipCompressedIntegerOutput.clear();
+      _gzipIntegerDecompressed.clear();
 
       _uncompressedInt.rewind();
       _zstandardCompressedIntegerInput.rewind();
       _lz4CompressedIntegerInput.rewind();
+      _gzipCompressedIntegerInput.rewind();
     }
   }
 
@@ -207,9 +228,27 @@ public class BenchmarkNoDictionaryIntegerCompression {
     return state._lz4IntegerDecompressed.position();
   }
 
+  @Benchmark
+  @BenchmarkMode(Mode.AverageTime)
+  @OutputTimeUnit(TimeUnit.MILLISECONDS)
+  public int benchmarkGZIPIntegerCompression(BenchmarkNoDictionaryIntegerCompressionState state)
+      throws IOException {
+    state._gzipCompressor.compress(state._uncompressedInt, state._gzipCompressedIntegerOutput);
+    return state._gzipCompressedIntegerOutput.position();
+  }
+
+  @Benchmark
+  @BenchmarkMode(Mode.AverageTime)
+  @OutputTimeUnit(TimeUnit.MILLISECONDS)
+  public int benchmarkGZIPIntegerDecompression(BenchmarkNoDictionaryIntegerCompressionState state)
+      throws IOException {
+    state._gzipDecompressor.decompress(state._gzipCompressedIntegerInput, state._gzipIntegerDecompressed);
+    return state._gzipIntegerDecompressed.position();
+  }
+
   public static void main(String[] args)
       throws Exception {
-    new Runner(new OptionsBuilder().include(BenchmarkNoDictionaryIntegerCompression.class.getSimpleName()).build())
-        .run();
+    new Runner(
+        new OptionsBuilder().include(BenchmarkNoDictionaryIntegerCompression.class.getSimpleName()).build()).run();
   }
 }

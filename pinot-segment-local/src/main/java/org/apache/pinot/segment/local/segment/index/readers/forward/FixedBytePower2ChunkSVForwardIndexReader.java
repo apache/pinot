@@ -19,8 +19,9 @@
 package org.apache.pinot.segment.local.segment.index.readers.forward;
 
 import java.nio.ByteBuffer;
+import java.util.List;
 import javax.annotation.Nullable;
-import org.apache.pinot.segment.local.io.writer.impl.FixedByteChunkSVForwardIndexWriter;
+import org.apache.pinot.segment.local.io.writer.impl.FixedByteChunkForwardIndexWriter;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
@@ -28,7 +29,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 /**
  * Chunk-based single-value raw (non-dictionary-encoded) forward index reader for values of fixed length data type (INT,
  * LONG, FLOAT, DOUBLE).
- * <p>For data layout, please refer to the documentation for {@link FixedByteChunkSVForwardIndexWriter}
+ * <p>For data layout, please refer to the documentation for {@link FixedByteChunkForwardIndexWriter}
  */
 public final class FixedBytePower2ChunkSVForwardIndexReader extends BaseChunkForwardIndexReader {
   public static final int VERSION = 4;
@@ -94,21 +95,45 @@ public final class FixedBytePower2ChunkSVForwardIndexReader extends BaseChunkFor
     }
   }
 
-  /**
-   * Helper method to return the chunk buffer that contains the value at the given document id.
-   * <ul>
-   *   <li> If the chunk already exists in the reader context, returns the same. </li>
-   *   <li> Otherwise, loads the chunk for the row, and sets it in the reader context. </li>
-   * </ul>
-   * @param docId Document id
-   * @param context Reader context
-   * @return Chunk for the row
-   */
-  protected ByteBuffer getChunkBuffer(int docId, ChunkReaderContext context) {
-    int chunkId = docId >>> _shift;
-    if (context.getChunkId() == chunkId) {
-      return context.getChunkBuffer();
+  protected int getChunkId(int docId) {
+    return docId >>> _shift;
+  }
+
+  @Override
+  public boolean isBufferByteRangeInfoSupported() {
+    return true;
+  }
+
+  @Override
+  public void recordDocIdByteRanges(int docId, ChunkReaderContext context, List<ByteRange> ranges) {
+    if (_isCompressed) {
+      recordDocIdRanges(docId, context, ranges);
+    } else {
+      // If uncompressed, should use fixed offset
+      throw new UnsupportedOperationException("Forward index is of fixed length type");
     }
-    return decompressChunk(chunkId, context);
+  }
+
+  @Override
+  public boolean isFixedOffsetMappingType() {
+    return !_isCompressed;
+  }
+
+  @Override
+  public long getRawDataStartOffset() {
+    if (isFixedOffsetMappingType()) {
+      return _rawDataStart;
+    } else {
+      throw new UnsupportedOperationException("Forward index is not fixed length type");
+    }
+  }
+
+  @Override
+  public int getDocLength() {
+    if (isFixedOffsetMappingType()) {
+      return _storedType.size();
+    } else {
+      throw new UnsupportedOperationException("Forward index is not fixed length type");
+    }
   }
 }

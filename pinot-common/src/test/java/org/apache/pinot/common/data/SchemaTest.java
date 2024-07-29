@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.common.data;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.net.URL;
 import java.sql.Timestamp;
@@ -33,6 +35,7 @@ import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.data.TimeGranularitySpec.TimeFormat;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
@@ -218,8 +221,7 @@ public class SchemaTest {
         .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.DAYS, "time"), null)
         .addDateTime("dateTime0", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS")
         .addDateTime("dateTime1", FieldSpec.DataType.TIMESTAMP, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
-        .addDateTime("dateTime2", FieldSpec.DataType.INT, "1:DAYS:EPOCH", "1:DAYS")
-        .build();
+        .addDateTime("dateTime2", FieldSpec.DataType.INT, "1:DAYS:EPOCH", "1:DAYS").build();
 
     // Test method which fetches the DateTimeFieldSpec given the timeColumnName
     // Test is on TIME
@@ -251,7 +253,7 @@ public class SchemaTest {
     Assert.assertEquals(dateTimeFieldSpec.getDataType(), FieldSpec.DataType.TIMESTAMP);
     Assert.assertTrue(dateTimeFieldSpec.isSingleValueField());
     Assert.assertEquals(dateTimeFieldSpec.getDefaultNullValue(), 0L);
-    Assert.assertEquals(dateTimeFieldSpec.getFormat(), "1:MILLISECONDS:EPOCH");
+    Assert.assertEquals(dateTimeFieldSpec.getFormat(), "TIMESTAMP");
     Assert.assertEquals(dateTimeFieldSpec.getGranularity(), "1:MILLISECONDS");
 
     dateTimeFieldSpec = schema.getSpecForTimeColumn("dateTime2");
@@ -321,6 +323,24 @@ public class SchemaTest {
   }
 
   @Test
+  public void testSerializeDeserializeOptions()
+      throws IOException {
+    String json =
+        "{\n" + "  \"primaryKeyColumns\" : null,\n" + "  \"timeFieldSpec\" : null,\n" + "  \"schemaName\" : null,\n"
+            + "  \"enableColumnBasedNullHandling\" : true,\n" + "  \"dimensionFieldSpecs\" : [ ],\n"
+            + "  \"metricFieldSpecs\" : [ ],\n" + "  \"dateTimeFieldSpecs\" : [ ]\n" + "}";
+    JsonNode expectedNode = JsonUtils.stringToJsonNode(json);
+
+    Schema schema = JsonUtils.jsonNodeToObject(expectedNode, Schema.class);
+    Assert.assertTrue(schema.isEnableColumnBasedNullHandling(), "Column null handling should be enabled");
+
+    String serialized = JsonUtils.objectToString(schema);
+    Schema deserialized = JsonUtils.stringToObject(serialized, Schema.class);
+
+    Assert.assertEquals(deserialized, schema, "Changes detected while checking serialize/deserialize idempotency");
+  }
+
+  @Test
   public void testSimpleDateFormat()
       throws Exception {
     TimeGranularitySpec incomingTimeGranularitySpec =
@@ -335,6 +355,17 @@ public class SchemaTest {
     Schema schemaFromJson = Schema.fromString(jsonSchema);
     Assert.assertEquals(schemaFromJson, schema);
     Assert.assertEquals(schemaFromJson.hashCode(), schema.hashCode());
+  }
+
+  @Test
+  public void testTimestampFormatOverride()
+      throws Exception {
+    URL resourceUrl = getClass().getClassLoader().getResource("schemaTest.schema");
+    Assert.assertNotNull(resourceUrl);
+    Schema schema = Schema.fromFile(new File(resourceUrl.getFile()));
+    DateTimeFieldSpec fieldSpec = schema.getDateTimeSpec("dateTime3");
+    Assert.assertNotNull(fieldSpec);
+    Assert.assertEquals(fieldSpec.getFormat(), "TIMESTAMP");
   }
 
   @Test

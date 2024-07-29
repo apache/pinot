@@ -30,7 +30,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
-import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
@@ -87,6 +87,7 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
   private final AtomicInteger _loadToken = new AtomicInteger();
 
   private boolean _disablePreload = false;
+  private boolean _errorOnDuplicatePrimaryKey = false;
 
   @Override
   protected void doInit() {
@@ -103,6 +104,7 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
       DimensionTableConfig dimensionTableConfig = tableConfig.getDimensionTableConfig();
       if (dimensionTableConfig != null) {
         _disablePreload = dimensionTableConfig.isDisablePreload();
+        _errorOnDuplicatePrimaryKey = dimensionTableConfig.isErrorOnDuplicatePrimaryKey();
       }
     }
 
@@ -117,41 +119,30 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
 
   @Override
   public void addSegment(ImmutableSegment immutableSegment) {
-    String segmentName = immutableSegment.getSegmentName();
-    Preconditions.checkState(!_shutDown, "Table data manager is already shut down, cannot add segment: %s to table: %s",
-        segmentName, _tableNameWithType);
     super.addSegment(immutableSegment);
-    try {
-      if (loadLookupTable()) {
-        _logger.info("Successfully loaded lookup table after adding segment: {}", segmentName);
-      } else {
-        _logger.info("Skip loading lookup table after adding segment: {}, another loading in progress", segmentName);
-      }
-    } catch (Exception e) {
-      throw new RuntimeException(
-          String.format("Caught exception while loading lookup table: %s after adding segment: %s", _tableNameWithType,
-              segmentName), e);
+    String segmentName = immutableSegment.getSegmentName();
+    if (loadLookupTable()) {
+      _logger.info("Successfully loaded lookup table after adding segment: {}", segmentName);
+    } else {
+      _logger.info("Skip loading lookup table after adding segment: {}, another loading in progress", segmentName);
     }
   }
 
   @Override
-  public void removeSegment(String segmentName) {
-    // Allow removing segment after shutdown so that we can remove the segment when the table is deleted
-    if (_shutDown) {
-      _logger.info("Table data manager is already shut down, skip removing segment: {}", segmentName);
-      return;
-    }
-    super.removeSegment(segmentName);
-    try {
+  protected void doOffloadSegment(String segmentName) {
+    SegmentDataManager segmentDataManager = unregisterSegment(segmentName);
+    if (segmentDataManager != null) {
+      segmentDataManager.offload();
+      releaseSegment(segmentDataManager);
+      _logger.info("Offloaded segment: {}", segmentName);
       if (loadLookupTable()) {
-        _logger.info("Successfully loaded lookup table after removing segment: {}", segmentName);
+        _logger.info("Successfully loaded lookup table after offloading segment: {}", segmentName);
       } else {
-        _logger.info("Skip loading lookup table after removing segment: {}, another loading in progress", segmentName);
+        _logger.info("Skip loading lookup table after offloading segment: {}, another loading in progress",
+            segmentName);
       }
-    } catch (Exception e) {
-      throw new RuntimeException(
-          String.format("Caught exception while loading lookup table: %s after removing segment: %s",
-              _tableNameWithType, segmentName), e);
+    } else {
+      _logger.warn("Failed to find segment: {}, skipping offloading it", segmentName);
     }
   }
 
@@ -211,7 +202,12 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
               }
               GenericRow row = new GenericRow();
               recordReader.getRecord(i, row);
-              lookupTable.put(row.getPrimaryKey(primaryKeyColumns), row);
+              GenericRow previousRow = lookupTable.put(row.getPrimaryKey(primaryKeyColumns), row);
+              if (_errorOnDuplicatePrimaryKey && previousRow != null) {
+                throw new IllegalStateException(
+                    "Caught exception while reading records from segment: " + indexSegment.getSegmentName()
+                        + "primary key already exist for: " + row.getPrimaryKey(primaryKeyColumns));
+              }
             }
           } catch (Exception e) {
             throw new RuntimeException(

@@ -29,6 +29,7 @@ import org.apache.pinot.segment.spi.index.IndexCreator;
  */
 public interface JsonIndexCreator extends IndexCreator {
   char KEY_VALUE_SEPARATOR = '\0';
+  char KEY_VALUE_SEPARATOR_NEXT_CHAR = KEY_VALUE_SEPARATOR + 1;
 
   @Override
   default void add(@Nonnull Object value, int dictId)

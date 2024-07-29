@@ -31,6 +31,7 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.utils.DoubleVectorOpUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.spi.utils.ArrayCopyUtils;
 
 
 /**
@@ -59,17 +60,25 @@ public class HistogramAggregationFunction extends BaseSingleInputAggregationFunc
     if (numArguments == 2) {
       ExpressionContext arrayExpression = arguments.get(1);
       Preconditions.checkArgument(
-          (arrayExpression.getType() == ExpressionContext.Type.FUNCTION) && (arrayExpression.getFunction()
-              .getFunctionName().equals(ARRAY_CONSTRUCTOR)),
+          // ARRAY function
+          (arrayExpression.getType() == ExpressionContext.Type.FUNCTION && arrayExpression.getFunction()
+              .getFunctionName().equals(ARRAY_CONSTRUCTOR)) || (
+              arrayExpression.getType() == ExpressionContext.Type.LITERAL && !arrayExpression.getLiteral()
+                  .isSingleValue()),
           "Please use the format of `Histogram(columnName, ARRAY[1,10,100])` to specify the bin edges");
-      _bucketEdges = parseVector(arrayExpression.getFunction().getArguments());
+      if (arrayExpression.getType() == ExpressionContext.Type.FUNCTION) {
+        _bucketEdges = parseVector(arrayExpression.getFunction().getArguments());
+      } else {
+        _bucketEdges = parseVectorLiteral(arrayExpression.getLiteral().getValue());
+      }
       _lower = _bucketEdges[0];
       _upper = _bucketEdges[_bucketEdges.length - 1];
     } else {
       _isEqualLength = true;
       _lower = arguments.get(1).getLiteral().getDoubleValue();
       _upper = arguments.get(2).getLiteral().getDoubleValue();
-      int numBins = arguments.get(3).getLiteral().getIntValue();;
+      int numBins = arguments.get(3).getLiteral().getIntValue();
+      ;
       Preconditions.checkArgument(_upper > _lower,
           "The right most edge must be greater than left most edge, given %s and %s", _lower, _upper);
       Preconditions.checkArgument(numBins > 0, "The number of bins must be greater than zero, given %s", numBins);
@@ -103,14 +112,42 @@ public class HistogramAggregationFunction extends BaseSingleInputAggregationFunc
         ret[i] = arrayStr.get(i).getLiteral().getDoubleValue();
       }
       if (i > 0) {
-        Preconditions.checkState(ret[i] > ret[i - 1], "The bin edges must be strictly increasing");
+        Preconditions.checkArgument(ret[i] > ret[i - 1], "The bin edges must be strictly increasing");
       }
+    }
+    return ret;
+  }
+
+  private double[] parseVectorLiteral(Object array) {
+    Preconditions.checkArgument(array != null, "The bin edges must not be null");
+    double[] ret;
+    if (array instanceof int[]) {
+      int[] intArray = (int[]) array;
+      ret = new double[intArray.length];
+      ArrayCopyUtils.copy(intArray, ret, intArray.length);
+    } else if (array instanceof long[]) {
+      long[] longArray = (long[]) array;
+      ret = new double[longArray.length];
+      ArrayCopyUtils.copy(longArray, ret, longArray.length);
+    } else if (array instanceof float[]) {
+      float[] floatArray = (float[]) array;
+      ret = new double[floatArray.length];
+      ArrayCopyUtils.copy(floatArray, ret, floatArray.length);
+    } else if (array instanceof double[]) {
+      ret = (double[]) array;
+    } else {
+      throw new IllegalArgumentException("Unsupported array type: " + array.getClass());
+    }
+    Preconditions.checkArgument(ret.length > 1, "The number of bin edges must be greater than 1");
+    for (int i = 1; i < ret.length; i++) {
+      Preconditions.checkArgument(ret[i] > ret[i - 1], "The bin edges must be strictly increasing");
     }
     return ret;
   }
 
   /**
    * Find the bin id for the input value. Use division for equal-length bins, and binary search otherwise.
+   *
    * @param val input value
    * @return bin id
    */
@@ -135,7 +172,7 @@ public class HistogramAggregationFunction extends BaseSingleInputAggregationFunc
           i = mid;
         }
       }
-     id = i;
+      id = i;
     }
     return id;
   }
@@ -188,12 +225,7 @@ public class HistogramAggregationFunction extends BaseSingleInputAggregationFunc
 
   @Override
   public DoubleArrayList extractFinalResult(DoubleArrayList doubleArrayList) {
-    int count = doubleArrayList.size();
-    if (count < 1L) {
-      throw new IllegalStateException("histogram result shouldn't be empty!");
-    } else {
-      return new DoubleArrayList(doubleArrayList.elements());
-    }
+    return doubleArrayList;
   }
 
   @Override

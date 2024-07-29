@@ -134,12 +134,14 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends BaseC
 
     Map<String, String> taskConfigsWithMetadata = new HashMap<>();
     taskConfigsWithMetadata.put(BatchConfigProperties.OVERWRITE_OUTPUT, "true");
-    taskConfigsWithMetadata.put(
-        BatchConfigProperties.PUSH_MODE, BatchConfigProperties.SegmentPushType.METADATA.toString());
+    taskConfigsWithMetadata.put(BatchConfigProperties.PUSH_MODE,
+        BatchConfigProperties.SegmentPushType.METADATA.toString());
     String tableWithMetadataPush = "myTable2";
+    schema.setSchemaName(tableWithMetadataPush);
+    addSchema(schema);
     TableConfig realtimeMetadataTableConfig = createRealtimeTableConfig(avroFiles.get(0), tableWithMetadataPush,
-        new TableTaskConfig(Collections.singletonMap(
-            MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, taskConfigsWithMetadata)));
+        new TableTaskConfig(Collections.singletonMap(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE,
+            taskConfigsWithMetadata)));
     realtimeMetadataTableConfig.setIngestionConfig(ingestionConfig);
     realtimeMetadataTableConfig.setFieldConfigList(Collections.singletonList(tsFieldConfig));
     addTableConfig(realtimeMetadataTableConfig);
@@ -148,7 +150,6 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends BaseC
         createOfflineTableConfig(tableWithMetadataPush, null, getSegmentPartitionConfig());
     offlineMetadataTableConfig.setFieldConfigList(Collections.singletonList(tsFieldConfig));
     addTableConfig(offlineMetadataTableConfig);
-
 
     // Push data into Kafka
     pushAvroIntoKafka(avroFiles);
@@ -160,7 +161,6 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends BaseC
     waitForAllDocsLoaded(600_000L);
 
     waitForDocsLoaded(600_000L, true, tableWithMetadataPush);
-
 
     _taskResourceManager = _controllerStarter.getHelixTaskResourceManager();
     _taskManager = _controllerStarter.getTaskManager();
@@ -179,8 +179,8 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends BaseC
     }
     _dataSmallestTimeMs = minSegmentTimeMs;
 
-   segmentsZKMetadata = _helixResourceManager.getSegmentsZKMetadata(_realtimeMetadataTableName);
-   minSegmentTimeMs = Long.MAX_VALUE;
+    segmentsZKMetadata = _helixResourceManager.getSegmentsZKMetadata(_realtimeMetadataTableName);
+    minSegmentTimeMs = Long.MAX_VALUE;
     for (SegmentZKMetadata segmentZKMetadata : segmentsZKMetadata) {
       if (segmentZKMetadata.getStatus() == CommonConstants.Segment.Realtime.Status.DONE) {
         minSegmentTimeMs = Math.min(minSegmentTimeMs, segmentZKMetadata.getStartTimeMs());
@@ -191,28 +191,27 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends BaseC
 
   private TableConfig createOfflineTableConfig(String tableName, @Nullable TableTaskConfig taskConfig,
       @Nullable SegmentPartitionConfig partitionConfig) {
-    return new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).setSchemaName(getSchemaName())
-        .setTimeColumnName(getTimeColumnName()).setSortedColumn(getSortedColumn())
-        .setInvertedIndexColumns(getInvertedIndexColumns()).setNoDictionaryColumns(getNoDictionaryColumns())
-        .setRangeIndexColumns(getRangeIndexColumns()).setBloomFilterColumns(getBloomFilterColumns())
-        .setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas()).setSegmentVersion(getSegmentVersion())
-        .setLoadMode(getLoadMode()).setTaskConfig(taskConfig).setBrokerTenant(getBrokerTenant())
-        .setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig())
-        .setNullHandlingEnabled(getNullHandlingEnabled()).setSegmentPartitionConfig(partitionConfig).build();
+    return new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).setTimeColumnName(getTimeColumnName())
+        .setSortedColumn(getSortedColumn()).setInvertedIndexColumns(getInvertedIndexColumns())
+        .setNoDictionaryColumns(getNoDictionaryColumns()).setRangeIndexColumns(getRangeIndexColumns())
+        .setBloomFilterColumns(getBloomFilterColumns()).setFieldConfigList(getFieldConfigs())
+        .setNumReplicas(getNumReplicas()).setSegmentVersion(getSegmentVersion()).setLoadMode(getLoadMode())
+        .setTaskConfig(taskConfig).setBrokerTenant(getBrokerTenant()).setServerTenant(getServerTenant())
+        .setIngestionConfig(getIngestionConfig()).setNullHandlingEnabled(getNullHandlingEnabled())
+        .setSegmentPartitionConfig(partitionConfig).build();
   }
 
   protected TableConfig createRealtimeTableConfig(File sampleAvroFile, String tableName, TableTaskConfig taskConfig) {
     AvroFileSchemaKafkaAvroMessageDecoder._avroFile = sampleAvroFile;
-    return new TableConfigBuilder(TableType.REALTIME).setTableName(tableName).setSchemaName(getSchemaName())
-        .setTimeColumnName(getTimeColumnName()).setSortedColumn(getSortedColumn())
-        .setInvertedIndexColumns(getInvertedIndexColumns()).setNoDictionaryColumns(getNoDictionaryColumns())
-        .setRangeIndexColumns(getRangeIndexColumns()).setBloomFilterColumns(getBloomFilterColumns())
-        .setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas()).setSegmentVersion(getSegmentVersion())
-        .setLoadMode(getLoadMode()).setTaskConfig(taskConfig).setBrokerTenant(getBrokerTenant())
-        .setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig()).setQueryConfig(getQueryConfig())
-        .setLLC(useLlc()).setStreamConfigs(getStreamConfigs()).setNullHandlingEnabled(getNullHandlingEnabled()).build();
+    return new TableConfigBuilder(TableType.REALTIME).setTableName(tableName).setTimeColumnName(getTimeColumnName())
+        .setSortedColumn(getSortedColumn()).setInvertedIndexColumns(getInvertedIndexColumns())
+        .setNoDictionaryColumns(getNoDictionaryColumns()).setRangeIndexColumns(getRangeIndexColumns())
+        .setBloomFilterColumns(getBloomFilterColumns()).setFieldConfigList(getFieldConfigs())
+        .setNumReplicas(getNumReplicas()).setSegmentVersion(getSegmentVersion()).setLoadMode(getLoadMode())
+        .setTaskConfig(taskConfig).setBrokerTenant(getBrokerTenant()).setServerTenant(getServerTenant())
+        .setIngestionConfig(getIngestionConfig()).setQueryConfig(getQueryConfig()).setStreamConfigs(getStreamConfigs())
+        .setNullHandlingEnabled(getNullHandlingEnabled()).build();
   }
-
 
   @Test
   public void testRealtimeToOfflineSegmentsTask()
@@ -232,12 +231,12 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends BaseC
     long expectedWatermark = _dataSmallestTimeMs + 86400000;
     for (int i = 0; i < 3; i++) {
       // Schedule task
-      assertNotNull(_taskManager.scheduleTasks(_realtimeTableName)
+      assertNotNull(_taskManager.scheduleAllTasksForTable(_realtimeTableName, null)
           .get(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE));
       assertTrue(_taskResourceManager.getTaskQueues().contains(
           PinotHelixTaskResourceManager.getHelixJobQueueName(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE)));
       // Should not generate more tasks
-      assertNull(_taskManager.scheduleTasks(_realtimeTableName)
+      assertNull(_taskManager.scheduleAllTasksForTable(_realtimeTableName, null)
           .get(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE));
 
       // Wait at most 600 seconds for all tasks COMPLETED
@@ -284,12 +283,12 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends BaseC
     _taskManager.cleanUpTask();
     for (int i = 0; i < 3; i++) {
       // Schedule task
-      assertNotNull(_taskManager.scheduleTasks(_realtimeMetadataTableName)
+      assertNotNull(_taskManager.scheduleAllTasksForTable(_realtimeMetadataTableName, null)
           .get(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE));
       assertTrue(_taskResourceManager.getTaskQueues().contains(
           PinotHelixTaskResourceManager.getHelixJobQueueName(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE)));
       // Should not generate more tasks
-      assertNull(_taskManager.scheduleTasks(_realtimeMetadataTableName)
+      assertNull(_taskManager.scheduleAllTasksForTable(_realtimeMetadataTableName, null)
           .get(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE));
 
       // Wait at most 600 seconds for all tasks COMPLETED

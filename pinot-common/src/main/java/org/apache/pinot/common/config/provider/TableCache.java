@@ -29,8 +29,8 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
-import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.collections.MapUtils;
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.collections4.MapUtils;
 import org.apache.helix.AccessOption;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
@@ -153,6 +153,20 @@ public class TableCache implements PinotConfigProvider {
    */
   public Map<String, String> getTableNameMap() {
     return _tableNameMap;
+  }
+
+  /**
+   * Get all dimension table names.
+   * @return List of dimension table names
+   */
+  public List<String> getAllDimensionTables() {
+    List<String> dimensionTables = new ArrayList<>();
+    for (TableConfigInfo tableConfigInfo : _tableConfigInfoMap.values()) {
+      if (tableConfigInfo._tableConfig.isDimTable()) {
+        dimensionTables.add(tableConfigInfo._tableConfig.getTableName());
+      }
+    }
+    return dimensionTables;
   }
 
   /**

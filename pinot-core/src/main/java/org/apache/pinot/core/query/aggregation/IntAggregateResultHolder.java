@@ -29,7 +29,7 @@ public class IntAggregateResultHolder implements AggregationResultHolder {
 
   @Override
   public void setValue(double value) {
-    throw new RuntimeException("Method 'setValue' (with double value) not supported for class " + getClass().getName());
+    throw new RuntimeException("Method 'setValue' (with double value) not supported in IntAggregateResultHolder");
   }
 
   @Override
@@ -39,12 +39,12 @@ public class IntAggregateResultHolder implements AggregationResultHolder {
 
   @Override
   public void setValue(Object value) {
-    throw new RuntimeException("Method 'setValue' (with object value) not supported for class " + getClass().getName());
+    throw new RuntimeException("Method 'setValue' (with object value) not supported in IntAggregateResultHolder");
   }
 
   @Override
   public double getDoubleResult() {
-    throw new RuntimeException("Method 'getDoubleResult' not supported for class " + getClass().getName());
+    throw new RuntimeException("Method 'getDoubleResult' not supported in IntAggregateResultHolder");
   }
 
   @Override
@@ -54,6 +54,6 @@ public class IntAggregateResultHolder implements AggregationResultHolder {
 
   @Override
   public <T> T getResult() {
-    throw new RuntimeException("Method 'getResult' not supported for class " + getClass().getName());
+    throw new RuntimeException("Method 'getResult' not supported in IntAggregateResultHolder");
   }
 }

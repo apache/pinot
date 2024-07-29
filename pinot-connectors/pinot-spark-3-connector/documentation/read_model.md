@@ -128,14 +128,15 @@ val df = spark.read
 **Note: Limit is added to every query. Because, generated queries will be converted to the Pinot `BrokerRequest` class. In this operation, pinot sets limit to `10` automatically. Therefore, `LIMIT` was set to `Int.MaxValue` to prevent this issue.**
 
 ### Connector Read Parameters
-| Configuration  | Description | Required | Default Value |
-| ------------- | ------------- | ------------- | ------------- |
-| table | Pinot table name without table type | Yes | - |
-| tableType | Pinot table type(`realtime`, `offline` or `hybrid`) | Yes | - |
-| controller | Pinot controller url and port. Input should be `url:port` format without schema. Connector does not support `https` schema for now. | No | localhost:9000 |
-| broker | Pinot broker url and port. Input should be `url:port` format without schema. If not specified, connector will find broker instances of table automatically. Connector does not support `https` schema for now | No | Fetch broker instances of table from Pinot Controller | 
-| usePushDownFilters | Push filters to pinot servers or not. If true, data exchange between pinot server and spark will be minimized. | No | true |
-| segmentsPerSplit | Represents the maximum segment count that will be scanned by pinot server in one connection | No | 3 | 
-| pinotServerTimeoutMs | The maximum timeout(ms) to get data from pinot server | No | 10 mins |
-| useGrpcServer | Boolean value to enable reads via gRPC. This option is more memory efficient both on Pinot server and Spark executor side because it utilizes streaming. Requires gRPC to be enabled on Pinot server. | No | false |
-| queryOptions | Comma separated list of Pinot query options (e.g. "enableNullHandling=true,skipUpsert=true") | No | "" |
+| Configuration         | Description                                                                                                                                                                                                   | Required | Default Value                                         |
+|-----------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------| ------------- |-------------------------------------------------------|
+| table                 | Pinot table name without table type                                                                                                                                                                           | Yes | -                                                     |
+| tableType             | Pinot table type(`realtime`, `offline` or `hybrid`)                                                                                                                                                           | Yes | -                                                     |
+| controller            | Pinot controller url and port. Input should be `url:port` format without schema. Connector does not support `https` schema for now.                                                                           | No | localhost:9000                                        |
+| broker                | Pinot broker url and port. Input should be `url:port` format without schema. If not specified, connector will find broker instances of table automatically. Connector does not support `https` schema for now | No | Fetch broker instances of table from Pinot Controller | 
+| usePushDownFilters    | Push filters to pinot servers or not. If true, data exchange between pinot server and spark will be minimized.                                                                                                | No | true                                                  |
+| segmentsPerSplit      | Represents the maximum segment count that will be scanned by pinot server in one connection                                                                                                                   | No | 3                                                     | 
+| pinotServerTimeoutMs  | The maximum timeout(ms) to get data from pinot server                                                                                                                                                         | No | 10 mins                                               |
+| useGrpcServer         | Boolean value to enable reads via gRPC. This option is more memory efficient both on Pinot server and Spark executor side because it utilizes streaming. Requires gRPC to be enabled on Pinot server.         | No | false                                                 |
+| queryOptions          | Comma separated list of Pinot query options (e.g. "enableNullHandling=true,skipUpsert=true")                                                                                                                  | No | ""                                                    |
+| failOnInvalidSegments | Fail the read operation if response metadata indicates invalid segments                                                                                                                                       | No | false                                                 |

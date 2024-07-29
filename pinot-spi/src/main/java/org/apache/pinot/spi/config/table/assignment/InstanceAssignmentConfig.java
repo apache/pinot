@@ -41,13 +41,17 @@ public class InstanceAssignmentConfig extends BaseJsonConfig {
       "Configuration for the instance replica-group and partition of the instance assignment (mandatory)")
   private final InstanceReplicaGroupPartitionConfig _replicaGroupPartitionConfig;
 
+  @JsonPropertyDescription("Configuration to minimize data movement for pool and instance assignment")
+  private final boolean _minimizeDataMovement;
+
   @JsonCreator
   public InstanceAssignmentConfig(
       @JsonProperty(value = "tagPoolConfig", required = true) InstanceTagPoolConfig tagPoolConfig,
       @JsonProperty("constraintConfig") @Nullable InstanceConstraintConfig constraintConfig,
       @JsonProperty(value = "replicaGroupPartitionConfig", required = true)
           InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig,
-      @JsonProperty("partitionSelector") @Nullable String partitionSelector) {
+      @JsonProperty("partitionSelector") @Nullable String partitionSelector,
+      @JsonProperty("minimizeDataMovement") boolean minimizeDataMovement) {
     Preconditions.checkArgument(tagPoolConfig != null, "'tagPoolConfig' must be configured");
     Preconditions
         .checkArgument(replicaGroupPartitionConfig != null, "'replicaGroupPartitionConfig' must be configured");
@@ -57,11 +61,7 @@ public class InstanceAssignmentConfig extends BaseJsonConfig {
     _partitionSelector =
         partitionSelector == null ? PartitionSelector.INSTANCE_REPLICA_GROUP_PARTITION_SELECTOR
             : PartitionSelector.valueOf(partitionSelector);
-  }
-
-  public InstanceAssignmentConfig(InstanceTagPoolConfig tagPoolConfig, InstanceConstraintConfig constraintConfig,
-      InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig) {
-    this(tagPoolConfig, constraintConfig, replicaGroupPartitionConfig, null);
+    _minimizeDataMovement = minimizeDataMovement;
   }
 
   public PartitionSelector getPartitionSelector() {
@@ -81,7 +81,12 @@ public class InstanceAssignmentConfig extends BaseJsonConfig {
     return _replicaGroupPartitionConfig;
   }
 
+  public boolean isMinimizeDataMovement() {
+    return _minimizeDataMovement;
+  }
+
   public enum PartitionSelector {
-    FD_AWARE_INSTANCE_PARTITION_SELECTOR, INSTANCE_REPLICA_GROUP_PARTITION_SELECTOR
+    FD_AWARE_INSTANCE_PARTITION_SELECTOR, INSTANCE_REPLICA_GROUP_PARTITION_SELECTOR,
+    MIRROR_SERVER_SET_PARTITION_SELECTOR
   }
 }

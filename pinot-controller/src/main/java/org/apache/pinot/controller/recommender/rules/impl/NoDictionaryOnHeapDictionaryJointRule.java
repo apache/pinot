@@ -197,8 +197,9 @@ public class NoDictionaryOnHeapDictionaryJointRule extends AbstractRule {
       });
     }
 
-    if (queryContext.getFilter() != null) {
-      fixedLenBitsetFilterGroupBy.union(parsePredicateList(queryContext.getFilter()));
+    FilterContext filter = queryContext.getFilter();
+    if (filter != null && !filter.isConstant()) {
+      fixedLenBitsetFilterGroupBy.union(parsePredicateList(filter));
     }
 
     for (Integer colId : fixedLenBitsetFilterGroupBy.getOffsets()) {

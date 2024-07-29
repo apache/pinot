@@ -44,14 +44,23 @@ public class V1Constants {
     public static final String UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION = ".mv.fwd";
     public static final String BITMAP_INVERTED_INDEX_FILE_EXTENSION = ".bitmap.inv";
     public static final String BITMAP_RANGE_INDEX_FILE_EXTENSION = ".bitmap.range";
-    public static final String FST_INDEX_FILE_EXTENSION = ".lucene.fst";
     public static final String JSON_INDEX_FILE_EXTENSION = ".json.idx";
     public static final String NATIVE_TEXT_INDEX_FILE_EXTENSION = ".nativetext.idx";
     public static final String H3_INDEX_FILE_EXTENSION = ".h3.idx";
     public static final String BLOOM_FILTER_FILE_EXTENSION = ".bloom";
     public static final String NULLVALUE_VECTOR_FILE_EXTENSION = ".bitmap.nullvalue";
+    public static final String LUCENE_FST_INDEX_FILE_EXTENSION = ".lucene.fst";
     public static final String LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION = ".lucene.mapping";
     public static final String LUCENE_TEXT_INDEX_FILE_EXTENSION = ".lucene.index";
+    public static final String LUCENE_V9_FST_INDEX_FILE_EXTENSION = ".lucene.v9.fst";
+    public static final String LUCENE_V9_TEXT_INDEX_FILE_EXTENSION = ".lucene.v9.index";
+    public static final String LUCENE_V99_FST_INDEX_FILE_EXTENSION = ".lucene.v99.fst";
+    public static final String LUCENE_V99_TEXT_INDEX_FILE_EXTENSION = ".lucene.v99.index";
+    public static final String VECTOR_INDEX_FILE_EXTENSION = ".vector.index";
+    public static final String VECTOR_HNSW_INDEX_FILE_EXTENSION = ".vector.hnsw.index";
+    public static final String VECTOR_V99_INDEX_FILE_EXTENSION = ".vector.v99.index";
+    public static final String VECTOR_V99_HNSW_INDEX_FILE_EXTENSION = ".vector.v99.hnsw.index";
+    public static final String VECTOR_HNSW_INDEX_DOCID_MAPPING_FILE_EXTENSION = ".vector.hnsw.mapping";
   }
 
   public static class MetadataKeys {
@@ -110,6 +119,8 @@ public class V1Constants {
       public static final String DATETIME_GRANULARITY = "datetimeGranularity";
 
       public static final String COLUMN_PROPS_KEY_PREFIX = "column.";
+      public static final String SCHEMA_MAX_LENGTH = "schemaMaxLength";
+      public static final String SCHEMA_MAX_LENGTH_EXCEED_STRATEGY = "schemaMaxLengthExceedStrategy";
 
       public static String getKeyFor(String column, String key) {
         return COLUMN_PROPS_KEY_PREFIX + column + "." + key;

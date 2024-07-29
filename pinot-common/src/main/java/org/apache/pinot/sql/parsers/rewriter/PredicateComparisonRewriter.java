@@ -18,8 +18,7 @@
  */
 package org.apache.pinot.sql.parsers.rewriter;
 
-import java.util.ArrayList;
-import java.util.Arrays;
+import com.google.common.base.Preconditions;
 import java.util.List;
 import org.apache.commons.lang3.EnumUtils;
 import org.apache.pinot.common.request.Expression;
@@ -95,10 +94,7 @@ public class PredicateComparisonRewriter implements QueryRewriter {
         case AND:
         case OR:
         case NOT:
-          for (int i = 0; i < operands.size(); i++) {
-            Expression operand = operands.get(i);
-            operands.set(i, updatePredicate(operand));
-          }
+          operands.replaceAll(PredicateComparisonRewriter::updatePredicate);
           break;
         case EQUALS:
         case NOT_EQUALS:
@@ -121,13 +117,37 @@ public class PredicateComparisonRewriter implements QueryRewriter {
 
           // Handle predicate like 'a > b' -> 'a - b > 0'
           if (!secondOperand.isSetLiteral()) {
-            Expression minusExpression = RequestUtils.getFunctionExpression("minus");
-            minusExpression.getFunctionCall().setOperands(Arrays.asList(firstOperand, secondOperand));
+            Expression minusExpression = RequestUtils.getFunctionExpression("minus", firstOperand, secondOperand);
             operands.set(0, minusExpression);
             operands.set(1, RequestUtils.getLiteralExpression(0));
             break;
           }
           break;
+        case VECTOR_SIMILARITY: {
+          Preconditions.checkArgument(operands.size() >= 2 && operands.size() <= 3,
+              "For %s predicate, the number of operands must be at either 2 or 3, got: %s", filterKind, expression);
+          /*
+           * Array Literal could be either:
+           * 1. a function of type 'ARRAYVALUECONSTRUCTOR' with operands of float/double
+           * 2. a float/double array literals
+           * Also check in {@link org.apache.pinot.sql.parsers.CalciteSqlParser#validateFilter(Expression)}}
+           */
+          if ((operands.get(1).getFunctionCall() != null && !operands.get(1).getFunctionCall().getOperator()
+              .equalsIgnoreCase("arrayvalueconstructor"))
+              || (operands.get(1).getLiteral() != null && !operands.get(1).getLiteral().isSetFloatArrayValue()
+                  && !operands.get(1).getLiteral().isSetDoubleArrayValue())) {
+            throw new SqlCompilationException(
+                String.format("For %s predicate, the second operand must be a float/double array literal, got: %s",
+                    filterKind,
+                    expression));
+          }
+          if (operands.size() == 3 && operands.get(2).getLiteral() == null) {
+            throw new SqlCompilationException(
+                String.format("For %s predicate, the third operand must be a literal, got: %s", filterKind,
+                    expression));
+          }
+          break;
+        }
         default:
           int numOperands = operands.size();
           for (int i = 1; i < numOperands; i++) {
@@ -147,21 +167,16 @@ public class PredicateComparisonRewriter implements QueryRewriter {
   /**
    * Rewrite predicates to boolean expressions with EQUALS operator
    *     Example1: "select * from table where col1" converts to
-   *                "select * from table where col1 = true"
+   *               "select * from table where col1 = true"
    *     Example2: "select * from table where startsWith(col1, 'str')" converts to
    *               "select * from table where startsWith(col1, 'str') = true"
+   *
    * @param expression Expression
    * @return Rewritten expression
    */
   private static Expression convertPredicateToEqualsBooleanExpression(Expression expression) {
-      Expression newExpression;
-      newExpression = RequestUtils.getFunctionExpression(FilterKind.EQUALS.name());
-      List<Expression> operands = new ArrayList<>();
-      operands.add(expression);
-      operands.add(RequestUtils.getLiteralExpression(true));
-      newExpression.getFunctionCall().setOperands(operands);
-
-      return newExpression;
+    return RequestUtils.getFunctionExpression(FilterKind.EQUALS.name(), expression,
+        RequestUtils.getLiteralExpression(true));
   }
 
   /**

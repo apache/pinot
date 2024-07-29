@@ -23,14 +23,15 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.lang.StringEscapeUtils;
+import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
-import org.apache.helix.model.Message;
 import org.apache.pinot.client.ResultSet;
 import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.common.exception.QueryException;
@@ -48,6 +49,7 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testng.annotations.BeforeMethod;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
@@ -66,6 +68,11 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
   private static final String DEFAULT_QUERY_FILE_NAME =
       "On_Time_On_Time_Performance_2014_100k_subset.test_queries_200.sql";
   private static final int DEFAULT_NUM_QUERIES_TO_GENERATE = 100;
+
+  @BeforeMethod
+  public void resetMultiStage() {
+    setUseMultiStageQueryEngine(false);
+  }
 
   /**
    * Can be overridden to change default setting
@@ -118,6 +125,10 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
       throws Exception {
     String query;
     String h2Query;
+    // Literal early evaluation
+    query = "SELECT DATETIMECONVERT(1697762729000, '1:MILLISECONDS:EPOCH', '1:DAYS:EPOCH', '1:DAYS') from mytable";
+    h2Query = "SELECT 19650";
+    testQuery(query, h2Query);
 
     // SUM INTEGER result will be BIGINT
     query = "SELECT SUM(ActualElapsedTime) FROM mytable";
@@ -130,8 +141,10 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     testQuery(query);
     query = "SELECT COUNT(*) FROM mytable WHERE CarrierDelay=15 AND ArrDelay > CarrierDelay LIMIT 1";
     testQuery(query);
-    query = "SELECT ArrDelay, CarrierDelay, (ArrDelay - CarrierDelay) AS diff FROM mytable WHERE CarrierDelay=15 AND "
-        + "ArrDelay > CarrierDelay ORDER BY diff, ArrDelay, CarrierDelay LIMIT 100000";
+    query =
+        "SELECT ArrDelay, CarrierDelay, (ArrDelay - CarrierDelay) AS diff, substring(DestStateName, 4, 8) as "
+            + "stateSubStr FROM mytable WHERE CarrierDelay=15 AND "
+            + "ArrDelay > CarrierDelay ORDER BY diff, ArrDelay, CarrierDelay LIMIT 100000";
     testQuery(query);
     query = "SELECT COUNT(*) FROM mytable WHERE ArrDelay > CarrierDelay LIMIT 1";
     testQuery(query);
@@ -255,13 +268,20 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     testQuery(query, h2Query);
 
     // test arithmetic operations on date time columns
-    query = "SELECT sub(DaysSinceEpoch,25), COUNT(*) FROM mytable "
-        + "GROUP BY sub(DaysSinceEpoch,25) "
+    query = "SELECT sub(DaysSinceEpoch,25), COUNT(*) FROM mytable " + "GROUP BY sub(DaysSinceEpoch,25) "
         + "ORDER BY COUNT(*),sub(DaysSinceEpoch,25) DESC";
-    h2Query = "SELECT DaysSinceEpoch - 25, COUNT(*) FROM mytable "
-        + "GROUP BY DaysSinceEpoch "
+    h2Query = "SELECT DaysSinceEpoch - 25, COUNT(*) FROM mytable " + "GROUP BY DaysSinceEpoch "
         + "ORDER BY COUNT(*), DaysSinceEpoch DESC";
     testQuery(query, h2Query);
+
+    // Test aggregation functions in a CaseWhen statement
+    query = "SELECT AirlineID, "
+        + "CASE WHEN Sum(ArrDelay) < 0 THEN 0 WHEN SUM(ArrDelay) > 0 THEN SUM(ArrDelay) END AS SumArrDelay "
+        + "FROM mytable GROUP BY AirlineID";
+    testQuery(query);
+    query = "SELECT CASE WHEN Sum(ArrDelay) < 0 THEN 0 WHEN SUM(ArrDelay) > 0 THEN SUM(ArrDelay) END AS SumArrDelay "
+        + "FROM mytable";
+    testQuery(query);
   }
 
   private void testHardcodedQueriesV2()
@@ -386,7 +406,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     for (String query : queries) {
       JsonNode response = postQuery(query);
       for (String statName : statNames) {
-        assertTrue(response.has(statName));
+        assertTrue(response.has(statName), "Response does not contain stat: " + statName);
       }
     }
   }
@@ -487,8 +507,16 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
   public void testQueryExceptions()
       throws Exception {
     testQueryException("POTATO", QueryException.SQL_PARSING_ERROR_CODE);
-    testQueryException("SELECT COUNT(*) FROM potato", QueryException.TABLE_DOES_NOT_EXIST_ERROR_CODE);
-    testQueryException("SELECT POTATO(ArrTime) FROM mytable", QueryException.QUERY_EXECUTION_ERROR_CODE);
+
+    // Ideally, we should attempt to unify the error codes returned by the two query engines if possible
+    testQueryException("SELECT COUNT(*) FROM potato",
+        useMultiStageQueryEngine()
+            ? QueryException.QUERY_PLANNING_ERROR_CODE : QueryException.TABLE_DOES_NOT_EXIST_ERROR_CODE);
+
+    testQueryException("SELECT POTATO(ArrTime) FROM mytable",
+        useMultiStageQueryEngine()
+            ? QueryException.QUERY_PLANNING_ERROR_CODE : QueryException.QUERY_EXECUTION_ERROR_CODE);
+
     testQueryException("SELECT COUNT(*) FROM mytable where ArrTime = 'potato'",
         QueryException.QUERY_EXECUTION_ERROR_CODE);
   }
@@ -599,40 +627,47 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     }, 60_000L, errorMessage);
   }
 
-  public void testReset(TableType tableType)
-      throws Exception {
+  public void testReset(TableType tableType) {
     String rawTableName = getTableName();
+    String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(rawTableName);
 
-    // reset the table.
-    resetTable(rawTableName, tableType, null);
+    // Reset the table.
+    // NOTE: Reset table might fail if there are pending messages, so we need to retry until it succeeds.
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        resetTable(rawTableName, tableType, null);
+        return true;
+      } catch (IOException e) {
+        assertTrue(e.toString().contains("pending message"), "Got unexpected exception: " + e);
+        return false;
+      }
+    }, 30_000L, "Failed to reset table: " + tableNameWithType);
 
-    // wait for all live messages clear the queue.
-    List<String> instances = _helixResourceManager.getServerInstancesForTable(rawTableName, tableType);
+    // Wait for all the reset messages being processed.
+    IdealState idealState = _helixResourceManager.getTableIdealState(tableNameWithType);
+    assertNotNull(idealState, "Failed to find ideal state for table: " + tableNameWithType);
+    Set<String> instances = new HashSet<>();
+    for (Map<String, String> instanceStateMap : idealState.getRecord().getMapFields().values()) {
+      instances.addAll(instanceStateMap.keySet());
+    }
     PropertyKey.Builder keyBuilder = _helixDataAccessor.keyBuilder();
     TestUtils.waitForCondition(aVoid -> {
-      int liveMessageCount = 0;
       for (String instanceName : instances) {
-        List<Message> messages = _helixDataAccessor.getChildValues(keyBuilder.messages(instanceName), true);
-        liveMessageCount += messages.size();
-      }
-      return liveMessageCount == 0;
-    }, 30_000L, "Failed to wait for all segment reset messages clear helix state transition!");
-
-    // Check that all segment states come back to ONLINE.
-    TestUtils.waitForCondition(aVoid -> {
-      // check external view and wait for everything to come back online
-      ExternalView externalView = _helixAdmin.getResourceExternalView(getHelixClusterName(),
-          TableNameBuilder.forType(tableType).tableNameWithType(rawTableName));
-      for (Map<String, String> externalViewStateMap : externalView.getRecord().getMapFields().values()) {
-        for (String state : externalViewStateMap.values()) {
-          if (!CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE.equals(state)
-              && !CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING.equals(state)) {
-            return false;
-          }
+        if (!_helixDataAccessor.getChildNames(keyBuilder.messages(instanceName)).isEmpty()) {
+          return false;
         }
       }
       return true;
-    }, 30_000L, "Failed to wait for all segments come back online");
+    }, 30_000L, "Failed to process all the reset messages");
+
+    // Wait for external view converging with ideal state.
+    TestUtils.waitForCondition(aVoid -> {
+      IdealState is = _helixResourceManager.getTableIdealState(tableNameWithType);
+      assertNotNull(is, "Failed to find ideal state for table: " + tableNameWithType);
+      ExternalView ev = _helixResourceManager.getTableExternalView(tableNameWithType);
+      assertNotNull(ev, "Failed to find external view for table: " + tableNameWithType);
+      return ev.getRecord().getMapFields().equals(is.getRecord().getMapFields());
+    }, 30_000L, "Failed to match the ideal state");
   }
 
   public String reloadTableAndValidateResponse(String tableName, TableType tableType, boolean forceDownload)
@@ -640,12 +675,12 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     String response =
         sendPostRequest(_controllerRequestURLBuilder.forTableReload(tableName, tableType, forceDownload), null);
     String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(tableName);
-    JsonNode tableLevelDetails =
-        JsonUtils.stringToJsonNode(StringEscapeUtils.unescapeJava(response.split(": ")[1])).get(tableNameWithType);
+    JsonNode responseJson = JsonUtils.stringToJsonNode(response);
+    JsonNode tableLevelDetails = JsonUtils.stringToJsonNode(responseJson.get("status").asText()).get(tableNameWithType);
     String isZKWriteSuccess = tableLevelDetails.get("reloadJobMetaZKStorageStatus").asText();
     assertEquals(isZKWriteSuccess, "SUCCESS");
     String jobId = tableLevelDetails.get("reloadJobId").asText();
-    String jobStatusResponse = sendGetRequest(_controllerRequestURLBuilder.forControllerJobStatus(jobId));
+    String jobStatusResponse = sendGetRequest(_controllerRequestURLBuilder.forSegmentReloadStatus(jobId));
     JsonNode jobStatus = JsonUtils.stringToJsonNode(jobStatusResponse);
 
     // Validate all fields are present
@@ -657,7 +692,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
 
   public boolean isReloadJobCompleted(String reloadJobId)
       throws Exception {
-    String jobStatusResponse = sendGetRequest(_controllerRequestURLBuilder.forControllerJobStatus(reloadJobId));
+    String jobStatusResponse = sendGetRequest(_controllerRequestURLBuilder.forSegmentReloadStatus(reloadJobId));
     JsonNode jobStatus = JsonUtils.stringToJsonNode(jobStatusResponse);
 
     assertEquals(jobStatus.get("metadata").get("jobId").asText(), reloadJobId);
@@ -667,12 +702,12 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
 
   /**
    * TODO: Support removing new added columns for MutableSegment and remove the new added columns before running the
-   *       next test. Use this to replace {@link OfflineClusterIntegrationTest#testDefaultColumns()}.
+   *       next test. Use this to replace {@link OfflineClusterIntegrationTest#testDefaultColumns(boolean)}.
    */
   public void testReload(boolean includeOfflineTable)
       throws Exception {
     String rawTableName = getTableName();
-    Schema schema = getSchema();
+    Schema schema = getSchema(getTableName());
 
     String selectStarQuery = "SELECT * FROM " + rawTableName;
     JsonNode queryResponse = postQuery(selectStarQuery);

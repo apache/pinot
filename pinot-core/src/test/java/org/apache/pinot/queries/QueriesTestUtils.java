@@ -90,6 +90,11 @@ public class QueriesTestUtils {
     validateRows(brokerResponse.getResultTable().getRows(), expectedRows);
   }
 
+  public static void testExplainSegmentsResult(BrokerResponseNative brokerResponse, ResultTable expectedResultTable) {
+    assertEquals(brokerResponse.getResultTable().getDataSchema(), expectedResultTable.getDataSchema());
+    validateExplainedRows(brokerResponse.getResultTable().getRows(), expectedResultTable.getRows());
+  }
+
   public static void testInterSegmentsResult(BrokerResponseNative brokerResponse, ResultTable expectedResultTable) {
     validateResultTable(brokerResponse.getResultTable(), expectedResultTable);
   }
@@ -130,11 +135,39 @@ public class QueriesTestUtils {
     validateRows(actual.getRows(), expected.getRows());
   }
 
+  private static void validateExplainedRows(List<Object[]> actual, List<Object[]> expected) {
+    assertEquals(actual.size(), expected.size());
+    // Sorting here to eliminate the nondeternism of nested sql calls
+    for (int j = 0; j < actual.size(); j++) {
+      Object[] act = actual.get(j);
+      Object[] exp = expected.get(j);
+      String attributeToSort = "PROJECT";
+      assertEquals(act.length, exp.length);
+      if (act[0].toString().startsWith(attributeToSort)) {
+        char[] act0 = act[0].toString().toCharArray();
+        char[] exp0 = exp[0].toString().toCharArray();
+        Arrays.sort(act0);
+        Arrays.sort(exp0);
+        act[0] = new String(act0);
+        exp[0] = new String(exp0);
+      }
+      assertEquals(act, exp);
+    }
+  }
+
   private static void validateRows(List<Object[]> actual, List<Object[]> expected) {
     assertEquals(actual.size(), expected.size());
     for (int i = 0; i < actual.size(); i++) {
-      // Generic assertEquals delegates to assertArrayEquals, which can test for equality of array values in rows.
-      assertEquals((Object) actual.get(i), (Object) expected.get(i));
+      // NOTE: Do not use 'assertEquals(actual.get(i), expected.get(i))' because for array within the row, it only
+      //       compares the reference of the array, instead of the content of the array.
+      validateRow(actual.get(i), expected.get(i));
+    }
+  }
+
+  private static void validateRow(Object[] actual, Object[] expected) {
+    assertEquals(actual.length, expected.length);
+    for (int i = 0; i < actual.length; i++) {
+      assertEquals(actual[i], expected[i]);
     }
   }
 

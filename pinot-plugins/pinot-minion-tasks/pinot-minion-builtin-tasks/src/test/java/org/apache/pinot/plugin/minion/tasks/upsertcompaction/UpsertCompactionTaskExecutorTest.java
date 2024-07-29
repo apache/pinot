@@ -19,11 +19,13 @@
 package org.apache.pinot.plugin.minion.tasks.upsertcompaction;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.model.ExternalView;
 import org.apache.pinot.minion.MinionContext;
+import org.apache.pinot.plugin.minion.tasks.MinionTaskUtils;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.mockito.Mockito;
 import org.testng.Assert;
@@ -36,7 +38,7 @@ public class UpsertCompactionTaskExecutorTest {
   private static final String CLUSTER_NAME = "testCluster";
 
   @Test
-  public void testGetServer() {
+  public void testGetServers() {
     ExternalView externalView = new ExternalView(REALTIME_TABLE_NAME);
     Map<String, Map<String, String>> externalViewSegmentAssignment = externalView.getRecord().getMapFields();
     Map<String, String> map = new HashMap<>();
@@ -51,13 +53,15 @@ public class UpsertCompactionTaskExecutorTest {
     Mockito.when(helixManager.getClusterManagmentTool()).thenReturn(clusterManagementTool);
     minionContext.setHelixManager(helixManager);
 
-    String server = UpsertCompactionTaskExecutor.getServer(SEGMENT_NAME, REALTIME_TABLE_NAME);
+    List<String> servers = MinionTaskUtils.getServers(SEGMENT_NAME, REALTIME_TABLE_NAME,
+        helixManager.getClusterManagmentTool(), helixManager.getClusterName());
 
-    Assert.assertEquals(server, "server1");
+    Assert.assertEquals(servers.get(0), "server1");
 
     // verify exception thrown with OFFLINE server
     map.put("server1", SegmentStateModel.OFFLINE);
     Assert.assertThrows(IllegalStateException.class,
-        () -> UpsertCompactionTaskExecutor.getServer(SEGMENT_NAME, REALTIME_TABLE_NAME));
+        () -> MinionTaskUtils.getServers(SEGMENT_NAME, REALTIME_TABLE_NAME,
+            helixManager.getClusterManagmentTool(), helixManager.getClusterName()));
   }
 }

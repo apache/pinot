@@ -20,7 +20,6 @@ package org.apache.pinot.plugin.stream.pulsar;
 
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;
 import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
-import org.apache.pinot.spi.stream.PartitionLevelConsumer;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffsetFactory;
@@ -30,10 +29,6 @@ import org.apache.pinot.spi.stream.StreamPartitionMsgOffsetFactory;
  * A {@link StreamConsumerFactory} implementation for the Pulsar stream
  */
 public class PulsarConsumerFactory extends StreamConsumerFactory {
-  @Override
-  public PartitionLevelConsumer createPartitionLevelConsumer(String clientId, int partition) {
-    throw new UnsupportedOperationException("Partition Level consumer is deprecated!");
-  }
 
   @Override
   public StreamMetadataProvider createPartitionMetadataProvider(String clientId, int partition) {
@@ -53,6 +48,7 @@ public class PulsarConsumerFactory extends StreamConsumerFactory {
   @Override
   public PartitionGroupConsumer createPartitionGroupConsumer(String clientId,
       PartitionGroupConsumptionStatus partitionGroupConsumptionStatus) {
-    return new PulsarPartitionLevelConsumer(clientId, _streamConfig, partitionGroupConsumptionStatus);
+    return new PulsarPartitionLevelConsumer(clientId, _streamConfig,
+        partitionGroupConsumptionStatus.getPartitionGroupId());
   }
 }

@@ -114,6 +114,40 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     _rows.add(row);
   }
 
+  @DataProvider(name = "BooleanAssertionFunctions")
+  public static Object[][] getBooleanAssertionFunctionsParameters() {
+    return new Object[][]{
+        {"istrue", true, true},
+        {"istrue", false, false},
+        {"istrue", null, false},
+        {"isnottrue", true, false},
+        {"isnottrue", false, true},
+        {"isnottrue", null, true},
+        {"isfalse", true, false},
+        {"isfalse", false, true},
+        {"isfalse", null, false},
+        {"isnotfalse", true, true},
+        {"isnotfalse", false, false},
+        {"isnotfalse", null, true}
+    };
+  }
+
+  @Test(dataProvider = "BooleanAssertionFunctions")
+  public void testBooleanAssertionFunctions(String function, Boolean data, Boolean queryResult)
+      throws Exception {
+    initializeRows();
+    insertRow(data);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.BOOLEAN).build();
+    setUpSegments(tableConfig, schema);
+    String query = String.format("SELECT %s(%s) FROM testTable LIMIT 1", function, COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    assertEquals(resultTable.getRows().get(0)[0], queryResult);
+  }
+
   @Test
   public void testGroupByOrderByNullsLastUsingOrdinal()
       throws Exception {
@@ -1521,5 +1555,101 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     List<Object[]> rows = resultTable.getRows();
     assertEquals(rows.size(), 1);
     assertEquals(rows.get(0)[0], Double.NEGATIVE_INFINITY);
+  }
+
+  @Test
+  public void testTrueAndNullReturnsNull()
+      throws Exception {
+    initializeRows();
+    insertRowWithTwoColumns(true, null);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.BOOLEAN)
+        .addSingleValueDimension(COLUMN2, FieldSpec.DataType.BOOLEAN).build();
+    setUpSegments(tableConfig, schema);
+    String query = String.format("SELECT AND(%s, %s) FROM testTable LIMIT 1", COLUMN1, COLUMN2);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    assertEquals(brokerResponse.getResultTable().getRows().get(0)[0], null);
+  }
+
+  @Test
+  public void testFalseAndNullReturnsFalse()
+      throws Exception {
+    initializeRows();
+    insertRowWithTwoColumns(false, null);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.BOOLEAN)
+        .addSingleValueDimension(COLUMN2, FieldSpec.DataType.BOOLEAN).build();
+    setUpSegments(tableConfig, schema);
+    String query = String.format("SELECT AND(%s, %s) FROM testTable LIMIT 1", COLUMN1, COLUMN2);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    assertEquals(brokerResponse.getResultTable().getRows().get(0)[0], false);
+  }
+
+  @Test
+  public void testNullAndNullReturnsNull()
+      throws Exception {
+    initializeRows();
+    insertRowWithTwoColumns(null, null);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.BOOLEAN)
+        .addSingleValueDimension(COLUMN2, FieldSpec.DataType.BOOLEAN).build();
+    setUpSegments(tableConfig, schema);
+    String query = String.format("SELECT AND(%s, %s) FROM testTable LIMIT 1", COLUMN1, COLUMN2);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    assertEquals(brokerResponse.getResultTable().getRows().get(0)[0], null);
+  }
+
+  @Test
+  public void testTrueOrNullReturnsTrue()
+      throws Exception {
+    initializeRows();
+    insertRowWithTwoColumns(true, null);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.BOOLEAN)
+        .addSingleValueDimension(COLUMN2, FieldSpec.DataType.BOOLEAN).build();
+    setUpSegments(tableConfig, schema);
+    String query = String.format("SELECT OR(%s, %s) FROM testTable LIMIT 1", COLUMN1, COLUMN2);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    assertEquals(brokerResponse.getResultTable().getRows().get(0)[0], true);
+  }
+
+  @Test
+  public void testFalseOrNullReturnsNull()
+      throws Exception {
+    initializeRows();
+    insertRowWithTwoColumns(false, null);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.BOOLEAN)
+        .addSingleValueDimension(COLUMN2, FieldSpec.DataType.BOOLEAN).build();
+    setUpSegments(tableConfig, schema);
+    String query = String.format("SELECT OR(%s, %s) FROM testTable LIMIT 1", COLUMN1, COLUMN2);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    assertEquals(brokerResponse.getResultTable().getRows().get(0)[0], null);
+  }
+
+  @Test
+  public void testNullOrNullReturnsNull()
+      throws Exception {
+    initializeRows();
+    insertRowWithTwoColumns(null, null);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.BOOLEAN)
+        .addSingleValueDimension(COLUMN2, FieldSpec.DataType.BOOLEAN).build();
+    setUpSegments(tableConfig, schema);
+    String query = String.format("SELECT OR(%s, %s) FROM testTable LIMIT 1", COLUMN1, COLUMN2);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    assertEquals(brokerResponse.getResultTable().getRows().get(0)[0], null);
   }
 }

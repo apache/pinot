@@ -18,10 +18,13 @@
  */
 package org.apache.pinot.segment.local.indexsegment.mutable;
 
+import java.io.File;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
@@ -49,6 +52,7 @@ public class MutableSegmentImplTestUtils {
   private static final String TABLE_NAME_WITH_TYPE = "testTable_REALTIME";
   private static final String SEGMENT_NAME = "testSegment__0__0__155555";
   private static final String STREAM_NAME = "testStream";
+  private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "MutableSegmentImplTestUtils");
 
   public static MutableSegmentImpl createMutableSegmentImpl(Schema schema, Set<String> noDictionaryColumns,
       Set<String> varLengthDictionaryColumns, Set<String> invertedIndexColumns,
@@ -100,6 +104,8 @@ public class MutableSegmentImplTestUtils {
 
     UpsertConfig.Mode upsertMode = upsertConfig == null ? UpsertConfig.Mode.NONE : upsertConfig.getMode();
     List<String> comparisonColumns = upsertConfig == null ? null : upsertConfig.getComparisonColumns();
+    boolean isUpsertDropOutOfOrderRecord = upsertConfig == null ? false : upsertConfig.isDropOutOfOrderRecord();
+    String upsertOutOfOrderRecordColumn = upsertConfig == null ? null : upsertConfig.getOutOfOrderRecordColumn();
     DictionaryIndexConfig varLengthDictConf = new DictionaryIndexConfig(false, true);
     RealtimeSegmentConfig.Builder segmentConfBuilder = new RealtimeSegmentConfig.Builder()
         .setTableNameWithType(TABLE_NAME_WITH_TYPE).setSegmentName(SEGMENT_NAME)
@@ -114,7 +120,10 @@ public class MutableSegmentImplTestUtils {
         .setUpsertComparisonColumns(comparisonColumns)
         .setPartitionUpsertMetadataManager(partitionUpsertMetadataManager)
         .setPartitionDedupMetadataManager(partitionDedupMetadataManager)
-        .setIngestionAggregationConfigs(aggregationConfigs);
+        .setIngestionAggregationConfigs(aggregationConfigs)
+        .setUpsertDropOutOfOrderRecord(isUpsertDropOutOfOrderRecord)
+        .setUpsertOutOfOrderRecordColumn(upsertOutOfOrderRecordColumn)
+        .setConsumerDir(TEMP_DIR.getAbsolutePath() + "/" + UUID.randomUUID() + "/consumerDir");
     for (Map.Entry<String, JsonIndexConfig> entry : jsonIndexConfigs.entrySet()) {
       segmentConfBuilder.setIndex(entry.getKey(), StandardIndexes.json(), entry.getValue());
     }

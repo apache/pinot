@@ -28,10 +28,10 @@ public class TablePartitionInfo {
   private final String _partitionFunctionName;
   private final int _numPartitions;
   private final PartitionInfo[] _partitionInfoMap;
-  private final Set<String> _segmentsWithInvalidPartition;
+  private final List<String> _segmentsWithInvalidPartition;
 
   public TablePartitionInfo(String tableNameWithType, String partitionColumn, String partitionFunctionName,
-      int numPartitions, PartitionInfo[] partitionInfoMap, Set<String> segmentsWithInvalidPartition) {
+      int numPartitions, PartitionInfo[] partitionInfoMap, List<String> segmentsWithInvalidPartition) {
     _tableNameWithType = tableNameWithType;
     _partitionColumn = partitionColumn;
     _partitionFunctionName = partitionFunctionName;
@@ -60,7 +60,7 @@ public class TablePartitionInfo {
     return _partitionInfoMap;
   }
 
-  public Set<String> getSegmentsWithInvalidPartition() {
+  public List<String> getSegmentsWithInvalidPartition() {
     return _segmentsWithInvalidPartition;
   }
 

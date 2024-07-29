@@ -49,7 +49,6 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
-import org.apache.calcite.jdbc.CalciteSchemaBuilder;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -57,6 +56,8 @@ import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.ProcessingException;
+import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.controller.ControllerConf;
@@ -64,13 +65,13 @@ import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.ManualAuthorization;
 import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
 import org.apache.pinot.query.QueryEnvironment;
-import org.apache.pinot.query.catalog.PinotCatalog;
-import org.apache.pinot.query.type.TypeFactory;
-import org.apache.pinot.query.type.TypeSystem;
+import org.apache.pinot.query.parser.utils.ParserUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.exception.DatabaseConflictException;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -107,6 +108,10 @@ public class PinotQueryResource {
   public String handlePostSql(String requestJsonStr, @Context HttpHeaders httpHeaders) {
     try {
       JsonNode requestJson = JsonUtils.stringToJsonNode(requestJsonStr);
+      if (!requestJson.has("sql")) {
+        return constructQueryExceptionResponse(QueryException.getException(QueryException.JSON_PARSING_ERROR,
+            "JSON Payload is missing the query string field 'sql'"));
+      }
       String sqlQuery = requestJson.get("sql").asText();
       String traceEnabled = "false";
       if (requestJson.has("trace")) {
@@ -120,13 +125,13 @@ public class PinotQueryResource {
       return executeSqlQuery(httpHeaders, sqlQuery, traceEnabled, queryOptions, "/sql");
     } catch (ProcessingException pe) {
       LOGGER.error("Caught exception while processing post request {}", pe.getMessage());
-      return pe.getMessage();
+      return constructQueryExceptionResponse(pe);
     } catch (WebApplicationException wae) {
       LOGGER.error("Caught exception while processing post request", wae);
       throw wae;
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing post request", e);
-      return QueryException.getException(QueryException.INTERNAL_ERROR, e).toString();
+      return constructQueryExceptionResponse(QueryException.getException(QueryException.INTERNAL_ERROR, e));
     }
   }
 
@@ -140,13 +145,13 @@ public class PinotQueryResource {
       return executeSqlQuery(httpHeaders, sqlQuery, traceEnabled, queryOptions, "/sql");
     } catch (ProcessingException pe) {
       LOGGER.error("Caught exception while processing get request {}", pe.getMessage());
-      return pe.getMessage();
+      return constructQueryExceptionResponse(pe);
     } catch (WebApplicationException wae) {
       LOGGER.error("Caught exception while processing get request", wae);
       throw wae;
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing get request", e);
-      return QueryException.getException(QueryException.INTERNAL_ERROR, e).toString();
+      return constructQueryExceptionResponse(QueryException.getException(QueryException.INTERNAL_ERROR, e));
     }
   }
 
@@ -171,8 +176,7 @@ public class PinotQueryResource {
           CommonConstants.Helix.DEFAULT_MULTI_STAGE_ENGINE_ENABLED)) {
         return getMultiStageQueryResponse(sqlQuery, queryOptions, httpHeaders, endpointUrl, traceEnabled);
       } else {
-        throw new UnsupportedOperationException("V2 Multi-Stage query engine not enabled. "
-            + "Please see https://docs.pinot.apache.org/ for instruction to enable V2 engine.");
+        throw QueryException.getException(QueryException.INTERNAL_ERROR, "V2 Multi-Stage query engine not enabled.");
       }
     } else {
       PinotSqlType sqlType = sqlNodeAndOptions.getSqlType();
@@ -186,13 +190,14 @@ public class PinotQueryResource {
                   .collect(Collectors.toMap(Pair::getKey, Pair::getValue));
           return _sqlQueryExecutor.executeDMLStatement(sqlNodeAndOptions, headers).toJsonString();
         default:
-          throw new UnsupportedOperationException("Unsupported SQL type - " + sqlType);
+          throw QueryException.getException(QueryException.INTERNAL_ERROR, "Unsupported SQL type - " + sqlType);
       }
     }
   }
 
   private String getMultiStageQueryResponse(String query, String queryOptions, HttpHeaders httpHeaders,
-      String endpointUrl, String traceEnabled) {
+      String endpointUrl, String traceEnabled)
+      throws ProcessingException {
 
     // Validate data access
     // we don't have a cross table access control rule so only ADMIN can make request to multi-stage engine.
@@ -201,9 +206,20 @@ public class PinotQueryResource {
       throw new WebApplicationException("Permission denied", Response.Status.FORBIDDEN);
     }
 
-    QueryEnvironment queryEnvironment = new QueryEnvironment(new TypeFactory(new TypeSystem()),
-        CalciteSchemaBuilder.asRootSchema(new PinotCatalog(_pinotHelixResourceManager.getTableCache())), null, null);
-    List<String> tableNames = queryEnvironment.getTableNamesForQuery(query);
+    Map<String, String> queryOptionsMap = RequestUtils.parseQuery(query).getOptions();
+    if (queryOptions != null) {
+      queryOptionsMap.putAll(RequestUtils.getOptionsFromString(queryOptions));
+    }
+    String database = DatabaseUtils.extractDatabaseFromQueryRequest(queryOptionsMap, httpHeaders);
+    QueryEnvironment queryEnvironment =
+        new QueryEnvironment(database, _pinotHelixResourceManager.getTableCache(), null);
+    List<String> tableNames;
+    try {
+      tableNames = queryEnvironment.getTableNamesForQuery(query);
+    } catch (Exception e) {
+      return QueryException.getException(QueryException.SQL_PARSING_ERROR,
+          new Exception("Unable to find table for this query", e)).toString();
+    }
     List<String> instanceIds;
     if (tableNames.size() != 0) {
       List<TableConfig> tableConfigList = getListTableConfigs(tableNames);
@@ -215,10 +231,19 @@ public class PinotQueryResource {
       // find the unions of all the broker tenant tags of the queried tables.
       Set<String> brokerTenantsUnion = getBrokerTenantsUnion(tableConfigList);
       if (brokerTenantsUnion.isEmpty()) {
-        return QueryException.getException(QueryException.BROKER_REQUEST_SEND_ERROR, new Exception(
-            String.format("Unable to dispatch multistage query for tables: [%s]", tableNames))).toString();
+        return QueryException.getException(QueryException.BROKER_REQUEST_SEND_ERROR,
+                new Exception(String.format("Unable to dispatch multistage query for tables: [%s]", tableNames)))
+            .toString();
       }
       instanceIds = findCommonBrokerInstances(brokerTenantsUnion);
+      if (instanceIds.isEmpty()) {
+        // No common broker found for table tenants
+        LOGGER.error("Unable to find a common broker instance for table tenants. Tables: {}, Tenants: {}", tableNames,
+            brokerTenantsUnion);
+        throw QueryException.getException(QueryException.BROKER_RESOURCE_MISSING_ERROR, new Exception(
+            "Unable to find a common broker instance for table tenants. Tables: " + tableNames + ", Tenants: "
+                + brokerTenantsUnion));
+      }
     } else {
       // TODO fail these queries going forward. Added this logic to take care of tautologies like BETWEEN 0 and -1.
       instanceIds = _pinotHelixResourceManager.getAllBrokerInstances();
@@ -229,23 +254,43 @@ public class PinotQueryResource {
   }
 
   private String getQueryResponse(String query, @Nullable SqlNode sqlNode, String traceEnabled, String queryOptions,
-      HttpHeaders httpHeaders) {
+      HttpHeaders httpHeaders)
+      throws ProcessingException {
     // Get resource table name.
     String tableName;
+    Map<String, String> queryOptionsMap = RequestUtils.parseQuery(query).getOptions();
+    if (queryOptions != null) {
+      queryOptionsMap.putAll(RequestUtils.getOptionsFromString(queryOptions));
+    }
+    String database;
+    try {
+      database = DatabaseUtils.extractDatabaseFromQueryRequest(queryOptionsMap, httpHeaders);
+    } catch (DatabaseConflictException e) {
+      return QueryException.getException(QueryException.QUERY_VALIDATION_ERROR, e).toString();
+    }
     try {
       String inputTableName =
           sqlNode != null ? RequestUtils.getTableNames(CalciteSqlParser.compileSqlNodeToPinotQuery(sqlNode)).iterator()
               .next() : CalciteSqlCompiler.compileToBrokerRequest(query).getQuerySource().getTableName();
-      tableName = _pinotHelixResourceManager.getActualTableName(inputTableName);
+      tableName = _pinotHelixResourceManager.getActualTableName(inputTableName, database);
     } catch (Exception e) {
       LOGGER.error("Caught exception while compiling query: {}", query, e);
-      return QueryException.getException(QueryException.SQL_PARSING_ERROR, e).toString();
+
+      // Check if the query is a v2 supported query
+      if (ParserUtils.canCompileWithMultiStageEngine(query, database, _pinotHelixResourceManager.getTableCache())) {
+        return QueryException.getException(QueryException.SQL_PARSING_ERROR, new Exception(
+            "It seems that the query is only supported by the multi-stage query engine, please retry the query using "
+                + "the multi-stage query engine "
+                + "(https://docs.pinot.apache.org/developers/advanced/v2-multi-stage-query-engine)")).toString();
+      } else {
+        return QueryException.getException(QueryException.SQL_PARSING_ERROR, e).toString();
+      }
     }
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
 
     // Validate data access
     AccessControl accessControl = _accessControlFactory.create();
-    if (!accessControl.hasDataAccess(httpHeaders, rawTableName)) {
+    if (!accessControl.hasAccess(rawTableName, AccessType.READ, httpHeaders, Actions.Table.QUERY)) {
       return QueryException.ACCESS_DENIED_ERROR.toString();
     }
 
@@ -274,14 +319,16 @@ public class PinotQueryResource {
     return allTableConfigList;
   }
 
-  private String selectRandomInstanceId(List<String> instanceIds) {
+  private String selectRandomInstanceId(List<String> instanceIds)
+      throws ProcessingException {
     if (instanceIds.isEmpty()) {
-      return QueryException.BROKER_RESOURCE_MISSING_ERROR.toString();
+      throw QueryException.getException(QueryException.BROKER_RESOURCE_MISSING_ERROR, "No broker found for query");
     }
 
     instanceIds.retainAll(_pinotHelixResourceManager.getOnlineInstanceList());
     if (instanceIds.isEmpty()) {
-      return QueryException.BROKER_INSTANCE_MISSING_ERROR.toString();
+      throw QueryException.getException(QueryException.BROKER_INSTANCE_MISSING_ERROR,
+          "No online broker found for query");
     }
 
     // Send query to a random broker.
@@ -362,7 +409,7 @@ public class PinotQueryResource {
         LOGGER.debug("The request is - " + requestStr);
       }*/
 
-      LOGGER.info("url string passed is : " + urlStr);
+      LOGGER.info("url string passed is : {}", urlStr);
       final URL url = new URL(urlStr);
       conn = (HttpURLConnection) url.openConnection();
       conn.setDoOutput(true);
@@ -441,12 +488,21 @@ public class PinotQueryResource {
       final String pinotResultString = sendPostRaw(url, requestJson.toString(), headers);
 
       final long queryTime = System.currentTimeMillis() - startTime;
-      LOGGER.info("Query: " + query + " Time: " + queryTime);
+      LOGGER.info("Query: {} Time: {}", query, queryTime);
 
       return pinotResultString;
     } catch (final Exception ex) {
       LOGGER.error("Caught exception in sendQueryRaw", ex);
       Utils.rethrowException(ex);
+      throw new AssertionError("Should not reach this");
+    }
+  }
+
+  private static String constructQueryExceptionResponse(ProcessingException pe) {
+    try {
+      return new BrokerResponseNative(pe).toJsonString();
+    } catch (IOException ioe) {
+      Utils.rethrowException(ioe);
       throw new AssertionError("Should not reach this");
     }
   }

@@ -63,7 +63,7 @@ public class SplitSegmentCommitter implements SegmentCommitter {
 
   @Override
   public SegmentCompletionProtocol.Response commit(
-      LLRealtimeSegmentDataManager.SegmentBuildDescriptor segmentBuildDescriptor) {
+      RealtimeSegmentDataManager.SegmentBuildDescriptor segmentBuildDescriptor) {
     File segmentTarFile = segmentBuildDescriptor.getSegmentTarFile();
 
     SegmentCompletionProtocol.Response segmentCommitStartResponse = _protocolHandler.segmentCommitStart(_params);

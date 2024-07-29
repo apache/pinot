@@ -149,7 +149,7 @@ public class PeriodicTaskScheduler {
     // level) whether the periodic task exists.
     PeriodicTask periodicTask = getPeriodicTask(periodicTaskName);
     if (periodicTask == null) {
-      LOGGER.error("Unknown Periodic Task " + periodicTaskName);
+      LOGGER.error("Unknown Periodic Task {}", periodicTaskName);
       return;
     }
 

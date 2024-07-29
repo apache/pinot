@@ -20,7 +20,7 @@ package org.apache.pinot.tools.admin.command;
 
 import java.util.ArrayList;
 import java.util.List;
-import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.PropertyPathBuilder;
 import org.apache.helix.manager.zk.ZKHelixAdmin;
@@ -88,7 +88,7 @@ public class OfflineSegmentIntervalCheckerCommand extends AbstractBaseAdminComma
   @Override
   public boolean execute()
       throws Exception {
-    LOGGER.info("Executing command: " + toString());
+    LOGGER.info("Executing command: {}", toString());
 
     ZKHelixAdmin helixAdmin = new ZKHelixAdmin.Builder().setZkAddress(_zkAddress).build();
     _propertyStore = new ZkHelixPropertyStore<>(_zkAddress, new ZNRecordSerializer(),

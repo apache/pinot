@@ -23,8 +23,8 @@ import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.commons.collections.MapUtils;
-import org.apache.commons.configuration.ConfigurationException;
+import org.apache.commons.collections4.MapUtils;
+import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.pinot.spi.services.ServiceRole;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.tools.Command;
@@ -119,7 +119,7 @@ public class StartMinionCommand extends AbstractBaseAdminCommand implements Comm
   public boolean execute()
       throws Exception {
     try {
-      LOGGER.info("Executing command: " + toString());
+      LOGGER.info("Executing command: {}", toString());
       Map<String, Object> minionConf = getMinionConf();
       StartServiceManagerCommand startServiceManagerCommand =
           new StartServiceManagerCommand().setZkAddress(_zkAddress).setClusterName(_clusterName).setPort(-1)

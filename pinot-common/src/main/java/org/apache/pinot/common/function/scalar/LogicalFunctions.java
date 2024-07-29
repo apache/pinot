@@ -20,9 +20,9 @@ package org.apache.pinot.common.function.scalar;
 
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
-
-// Logical transformation on boolean values.
-// Currently, only not is supported.
+/**
+ * Logical transformation on boolean values. Currently, only not is supported.
+ */
 public class LogicalFunctions {
   private LogicalFunctions() {
   }

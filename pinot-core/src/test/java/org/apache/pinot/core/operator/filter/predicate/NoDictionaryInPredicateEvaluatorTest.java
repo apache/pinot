@@ -33,7 +33,7 @@ import java.util.List;
 import java.util.Random;
 import java.util.Set;
 import java.util.TreeSet;
-import org.apache.commons.lang.RandomStringUtils;
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.predicate.InPredicate;
 import org.apache.pinot.common.request.context.predicate.NotInPredicate;
@@ -278,6 +278,50 @@ public class NoDictionaryInPredicateEvaluatorTest {
     String[] multiValues = new String[NUM_MULTI_VALUES];
     PredicateEvaluatorTestUtils.fillRandom(multiValues, MAX_STRING_LENGTH);
     multiValues[_random.nextInt(NUM_MULTI_VALUES)] = stringValues.get(_random.nextInt(NUM_PREDICATE_VALUES));
+
+    Assert.assertTrue(inPredicateEvaluator.applyMV(multiValues, NUM_MULTI_VALUES));
+    Assert.assertFalse(notInPredicateEvaluator.applyMV(multiValues, NUM_MULTI_VALUES));
+  }
+
+  @Test
+  public void testJsonPredicateEvaluators() {
+    String jsonStringTemplate = "{\"id\": %s, \"name\": %s}";
+
+    List<String> jsonValues = new ArrayList<>(NUM_PREDICATE_VALUES);
+    Set<String> jsonValueSet = new HashSet<>();
+
+    for (int i = 0; i < 100; i++) {
+      String jsonString = String.format(jsonStringTemplate,
+          RandomStringUtils.randomAlphanumeric(MAX_STRING_LENGTH),
+          RandomStringUtils.randomAlphanumeric(MAX_STRING_LENGTH));
+      jsonValues.add(jsonString);
+      jsonValueSet.add(jsonString);
+    }
+
+    InPredicate inPredicate = new InPredicate(COLUMN_EXPRESSION, jsonValues);
+    PredicateEvaluator inPredicateEvaluator =
+        InPredicateEvaluatorFactory.newRawValueBasedEvaluator(inPredicate, FieldSpec.DataType.JSON);
+
+    NotInPredicate notInPredicate = new NotInPredicate(COLUMN_EXPRESSION, jsonValues);
+    PredicateEvaluator notInPredicateEvaluator =
+        NotInPredicateEvaluatorFactory.newRawValueBasedEvaluator(notInPredicate, FieldSpec.DataType.JSON);
+
+    for (String value : jsonValueSet) {
+      Assert.assertTrue(inPredicateEvaluator.applySV(value));
+      Assert.assertFalse(notInPredicateEvaluator.applySV(value));
+    }
+
+    for (int i = 0; i < 100; i++) {
+      String randomJsonValue = String.format(jsonStringTemplate,
+          RandomStringUtils.randomAlphanumeric(MAX_STRING_LENGTH),
+          RandomStringUtils.randomAlphanumeric(MAX_STRING_LENGTH));
+      Assert.assertEquals(inPredicateEvaluator.applySV(randomJsonValue), jsonValueSet.contains(randomJsonValue));
+      Assert.assertEquals(notInPredicateEvaluator.applySV(randomJsonValue), !jsonValueSet.contains(randomJsonValue));
+    }
+
+    String[] multiValues = new String[NUM_MULTI_VALUES];
+    PredicateEvaluatorTestUtils.fillRandomJson(multiValues, jsonStringTemplate, 2, MAX_STRING_LENGTH);
+    multiValues[_random.nextInt(NUM_MULTI_VALUES)] = jsonValues.get(_random.nextInt(NUM_PREDICATE_VALUES));
 
     Assert.assertTrue(inPredicateEvaluator.applyMV(multiValues, NUM_MULTI_VALUES));
     Assert.assertFalse(notInPredicateEvaluator.applyMV(multiValues, NUM_MULTI_VALUES));

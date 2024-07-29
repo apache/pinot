@@ -19,7 +19,11 @@
 package org.apache.pinot.query.runtime.operator.utils;
 
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
+import it.unimi.dsi.fastutil.floats.FloatArrayList;
+import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import org.apache.pinot.common.utils.ArrayListUtils;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 
 
@@ -45,17 +49,46 @@ public class TypeUtils {
       // For AggregationFunctions that return serialized custom object, e.g. DistinctCountRawHLLAggregationFunction
       case STRING:
         return value.toString();
+      case INT_ARRAY:
+        if (value instanceof IntArrayList) {
+          // For ArrayAggregationFunction
+          return ArrayListUtils.toIntArray((IntArrayList) value);
+        } else {
+          return value;
+        }
       case LONG_ARRAY:
         if (value instanceof LongArrayList) {
-          // For FunnelCountAggregationFunction
-          return ((LongArrayList) value).elements();
+          // For FunnelCountAggregationFunction and ArrayAggregationFunction
+          return ArrayListUtils.toLongArray((LongArrayList) value);
+        } else {
+          return value;
+        }
+      case FLOAT_ARRAY:
+        if (value instanceof FloatArrayList) {
+          // For ArrayAggregationFunction
+          return ArrayListUtils.toFloatArray((FloatArrayList) value);
+        } else if (value instanceof double[]) {
+          // This is due to for parsing array literal value like [0.1, 0.2, 0.3].
+          // The parsed value is stored as double[] in java, however the calcite type is FLOAT_ARRAY.
+          float[] floatArray = new float[((double[]) value).length];
+          for (int i = 0; i < floatArray.length; i++) {
+            floatArray[i] = (float) ((double[]) value)[i];
+          }
+          return floatArray;
         } else {
           return value;
         }
       case DOUBLE_ARRAY:
         if (value instanceof DoubleArrayList) {
-          // For HistogramAggregationFunction
-          return ((DoubleArrayList) value).elements();
+          // For HistogramAggregationFunction and ArrayAggregationFunction
+          return ArrayListUtils.toDoubleArray((DoubleArrayList) value);
+        } else {
+          return value;
+        }
+      case STRING_ARRAY:
+        if (value instanceof ObjectArrayList) {
+          // For ArrayAggregationFunction
+          return ArrayListUtils.toStringArray((ObjectArrayList<String>) value);
         } else {
           return value;
         }

@@ -35,7 +35,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.segment.local.segment.index.column.PhysicalColumnIndexContainer;
 import org.apache.pinot.segment.local.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGeneratorMode;
-import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.ColumnConfigDeserializer;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
@@ -44,11 +43,13 @@ import org.apache.pinot.segment.spi.index.IndexConfigDeserializer;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.RangeIndexConfig;
 import org.apache.pinot.segment.spi.index.creator.H3IndexConfig;
+import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.BloomFilterConfig;
 import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.JsonIndexConfig;
@@ -84,6 +85,7 @@ public class IndexLoadingConfig {
   private FSTType _fstIndexType = FSTType.LUCENE;
   private Map<String, JsonIndexConfig> _jsonIndexConfigs = new HashMap<>();
   private Map<String, H3IndexConfig> _h3IndexConfigs = new HashMap<>();
+  private Map<String, VectorIndexConfig> _vectorIndexConfigs = new HashMap<>();
   private Set<String> _noDictionaryColumns = new HashSet<>(); // TODO: replace this by _noDictionaryConfig.
   private final Map<String, String> _noDictionaryConfig = new HashMap<>();
   private final Set<String> _varLengthDictionaryColumns = new HashSet<>();
@@ -93,17 +95,16 @@ public class IndexLoadingConfig {
   private boolean _enableDynamicStarTreeCreation;
   private List<StarTreeIndexConfig> _starTreeIndexConfigs;
   private boolean _enableDefaultStarTree;
-  private Map<String, ChunkCompressionType> _compressionConfigs = new HashMap<>();
+  private Map<String, CompressionCodec> _compressionConfigs = new HashMap<>();
   private Map<String, FieldIndexConfigs> _indexConfigsByColName = new HashMap<>();
 
   private SegmentVersion _segmentVersion;
   private ColumnMinMaxValueGeneratorMode _columnMinMaxValueGeneratorMode = ColumnMinMaxValueGeneratorMode.DEFAULT_MODE;
   private int _realtimeAvgMultiValueCount = DEFAULT_REALTIME_AVG_MULTI_VALUE_COUNT;
-  private boolean _enableSplitCommit;
   private boolean _isRealtimeOffHeapAllocation;
   private boolean _isDirectRealtimeOffHeapAllocation;
-  private boolean _enableSplitCommitEndWithMetadata;
   private String _segmentStoreURI;
+  private boolean _errorOnColumnBuildFailure;
 
   // constructed from FieldConfig
   private Map<String, Map<String, String>> _columnProperties = new HashMap<>();
@@ -132,6 +133,10 @@ public class IndexLoadingConfig {
   @VisibleForTesting
   public IndexLoadingConfig(InstanceDataManagerConfig instanceDataManagerConfig, TableConfig tableConfig) {
     this(instanceDataManagerConfig, tableConfig, null);
+  }
+
+  public IndexLoadingConfig(TableConfig tableConfig, @Nullable Schema schema) {
+    extractFromTableConfigAndSchema(tableConfig, schema);
   }
 
   public IndexLoadingConfig() {
@@ -214,6 +219,7 @@ public class IndexLoadingConfig {
     extractTextIndexColumnsFromTableConfig(tableConfig);
     extractFSTIndexColumnsFromTableConfig(tableConfig);
     extractH3IndexConfigsFromTableConfig(tableConfig);
+    extractVectorIndexConfigsFromTableConfig(tableConfig);
     extractForwardIndexDisabledColumnsFromTableConfig(tableConfig);
 
     Map<String, String> noDictionaryConfig = indexingConfig.getNoDictionaryConfig();
@@ -296,8 +302,8 @@ public class IndexLoadingConfig {
             + "indexLoadingConfig for indexType: {}", _schema == null, _tableConfig == null, indexType);
         deserializer = IndexConfigDeserializer.fromMap(table -> fromIndexLoadingConfig);
       } else if (_segmentTier == null) {
-        deserializer = IndexConfigDeserializer.fromMap(table -> fromIndexLoadingConfig)
-            .withFallbackAlternative(stdDeserializer);
+        deserializer =
+            IndexConfigDeserializer.fromMap(table -> fromIndexLoadingConfig).withFallbackAlternative(stdDeserializer);
       } else {
         // No need to fall back to fromIndexLoadingConfig which contains index configs for default tier, when looking
         // for tier specific index configs.
@@ -349,8 +355,7 @@ public class IndexLoadingConfig {
     for (FieldConfig fieldConfig : fieldConfigList) {
       String column = fieldConfig.getName();
       if (fieldConfig.getCompressionCodec() != null) {
-        ChunkCompressionType compressionType = ChunkCompressionType.valueOf(fieldConfig.getCompressionCodec().name());
-        _compressionConfigs.put(column, compressionType);
+        _compressionConfigs.put(column, fieldConfig.getCompressionCodec());
       }
     }
   }
@@ -399,6 +404,18 @@ public class IndexLoadingConfig {
     }
   }
 
+  private void extractVectorIndexConfigsFromTableConfig(TableConfig tableConfig) {
+    List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
+    if (fieldConfigList != null) {
+      for (FieldConfig fieldConfig : fieldConfigList) {
+        if (fieldConfig.getIndexType() == FieldConfig.IndexType.VECTOR) {
+          //noinspection ConstantConditions
+          _vectorIndexConfigs.put(fieldConfig.getName(), new VectorIndexConfig(fieldConfig.getProperties()));
+        }
+      }
+    }
+  }
+
   private void extractFromInstanceConfig(InstanceDataManagerConfig instanceDataManagerConfig) {
     if (instanceDataManagerConfig == null) {
       return;
@@ -417,8 +434,6 @@ public class IndexLoadingConfig {
       _segmentVersion = SegmentVersion.valueOf(instanceSegmentVersion.toLowerCase());
     }
 
-    _enableSplitCommit = instanceDataManagerConfig.isEnableSplitCommit();
-
     _isRealtimeOffHeapAllocation = instanceDataManagerConfig.isRealtimeOffHeapAllocation();
     _isDirectRealtimeOffHeapAllocation = instanceDataManagerConfig.isDirectRealtimeOffHeapAllocation();
 
@@ -426,7 +441,6 @@ public class IndexLoadingConfig {
     if (avgMultiValueCount != null) {
       _realtimeAvgMultiValueCount = Integer.valueOf(avgMultiValueCount);
     }
-    _enableSplitCommitEndWithMetadata = instanceDataManagerConfig.isEnableSplitCommitEndWithMetadata();
     _segmentStoreURI =
         instanceDataManagerConfig.getConfig().getProperty(CommonConstants.Server.CONFIG_OF_SEGMENT_STORE_URI);
     _segmentDirectoryLoader = instanceDataManagerConfig.getSegmentDirectoryLoader();
@@ -511,7 +525,7 @@ public class IndexLoadingConfig {
   /**
    * Used in two places:
    * (1) In {@link PhysicalColumnIndexContainer} to create the index loading info for immutable segments
-   * (2) In LLRealtimeSegmentDataManager to create the RealtimeSegmentConfig.
+   * (2) In RealtimeSegmentDataManager to create the RealtimeSegmentConfig.
    * RealtimeSegmentConfig is used to specify the text index column info for newly
    * to-be-created Mutable Segments
    * @return a set containing names of text index columns
@@ -530,6 +544,10 @@ public class IndexLoadingConfig {
 
   public Map<String, H3IndexConfig> getH3IndexConfigs() {
     return unmodifiable(_h3IndexConfigs);
+  }
+
+  public Map<String, VectorIndexConfig> getVectorIndexConfigs() {
+    return unmodifiable(_vectorIndexConfigs);
   }
 
   public Map<String, Map<String, String>> getColumnProperties() {
@@ -613,7 +631,7 @@ public class IndexLoadingConfig {
    * Used by segmentPreProcessorTest to set compression configs.
    */
   @VisibleForTesting
-  public void setCompressionConfigs(Map<String, ChunkCompressionType> compressionConfigs) {
+  public void setCompressionConfigs(Map<String, CompressionCodec> compressionConfigs) {
     _compressionConfigs = new HashMap<>(compressionConfigs);
     _dirty = true;
   }
@@ -705,6 +723,12 @@ public class IndexLoadingConfig {
   }
 
   @VisibleForTesting
+  public void setVectorIndexConfigs(Map<String, VectorIndexConfig> vectorIndexConfigs) {
+    _vectorIndexConfigs = new HashMap<>(vectorIndexConfigs);
+    _dirty = true;
+  }
+
+  @VisibleForTesting
   public void setBloomFilterConfigs(Map<String, BloomFilterConfig> bloomFilterConfigs) {
     _bloomFilterConfigs = new HashMap<>(bloomFilterConfigs);
     _dirty = true;
@@ -750,7 +774,7 @@ public class IndexLoadingConfig {
    *
    * @return a map containing column name as key and compressionType as value.
    */
-  public Map<String, ChunkCompressionType> getCompressionConfigs() {
+  public Map<String, CompressionCodec> getCompressionConfigs() {
     return unmodifiable(_compressionConfigs);
   }
 
@@ -807,14 +831,6 @@ public class IndexLoadingConfig {
   public void setSegmentVersion(SegmentVersion segmentVersion) {
     _segmentVersion = segmentVersion;
     _dirty = true;
-  }
-
-  public boolean isEnableSplitCommit() {
-    return _enableSplitCommit;
-  }
-
-  public boolean isEnableSplitCommitEndWithMetadata() {
-    return _enableSplitCommitEndWithMetadata;
   }
 
   public boolean isRealtimeOffHeapAllocation() {
@@ -878,6 +894,14 @@ public class IndexLoadingConfig {
   public void setTableDataDir(String tableDataDir) {
     _tableDataDir = tableDataDir;
     _dirty = true;
+  }
+
+  public boolean isErrorOnColumnBuildFailure() {
+    return _errorOnColumnBuildFailure;
+  }
+
+  public void setErrorOnColumnBuildFailure(boolean errorOnColumnBuildFailure) {
+    _errorOnColumnBuildFailure = errorOnColumnBuildFailure;
   }
 
   public String getTableDataDir() {

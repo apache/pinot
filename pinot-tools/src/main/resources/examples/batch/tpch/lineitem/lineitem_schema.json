@@ -44,15 +44,15 @@
       "name": "l_linestatus"
     },
     {
-      "dataType": "LONG",
+      "dataType": "STRING",
       "name": "l_shipdate"
     },
     {
-      "dataType": "LONG",
+      "dataType": "STRING",
       "name": "l_commitdate"
     },
     {
-      "dataType": "LONG",
+      "dataType": "STRING",
       "name": "l_receiptdate"
     },
     {

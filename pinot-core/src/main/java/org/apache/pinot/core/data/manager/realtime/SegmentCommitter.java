@@ -30,5 +30,5 @@ public interface SegmentCommitter {
    * @param segmentBuildDescriptor object that describes segment to be committed
    * @return
    */
-  SegmentCompletionProtocol.Response commit(LLRealtimeSegmentDataManager.SegmentBuildDescriptor segmentBuildDescriptor);
+  SegmentCompletionProtocol.Response commit(RealtimeSegmentDataManager.SegmentBuildDescriptor segmentBuildDescriptor);
 }

@@ -39,7 +39,7 @@ public class VectorFunctions {
    * @param vector2 vector2
    * @return cosine distance
    */
-  @ScalarFunction(names = {"cosinedistance", "cosine_distance"})
+  @ScalarFunction
   public static double cosineDistance(float[] vector1, float[] vector2) {
     return cosineDistance(vector1, vector2, Double.NaN);
   }
@@ -51,7 +51,7 @@ public class VectorFunctions {
    * @param defaultValue default value when either vector has a norm of 0
    * @return cosine distance
    */
-  @ScalarFunction(names = {"cosinedistance", "cosine_distance"})
+  @ScalarFunction
   public static double cosineDistance(float[] vector1, float[] vector2, double defaultValue) {
     validateVectors(vector1, vector2);
     double dotProduct = 0.0;
@@ -74,7 +74,7 @@ public class VectorFunctions {
    * @param vector2 vector2
    * @return inner product
    */
-  @ScalarFunction(names = {"innerproduct", "inner_product"})
+  @ScalarFunction
   public static double innerProduct(float[] vector1, float[] vector2) {
     validateVectors(vector1, vector2);
     double dotProduct = 0.0;
@@ -90,7 +90,7 @@ public class VectorFunctions {
    * @param vector2 vector2
    * @return L2 distance
    */
-  @ScalarFunction(names = {"l2distance", "l2_distance"})
+  @ScalarFunction
   public static double l2Distance(float[] vector1, float[] vector2) {
     validateVectors(vector1, vector2);
     double distance = 0.0;
@@ -106,7 +106,7 @@ public class VectorFunctions {
    * @param vector2 vector2
    * @return L1 distance
    */
-  @ScalarFunction(names = {"l1distance", "l1_distance"})
+  @ScalarFunction
   public static double l1Distance(float[] vector1, float[] vector2) {
     validateVectors(vector1, vector2);
     double distance = 0.0;
@@ -117,11 +117,43 @@ public class VectorFunctions {
   }
 
   /**
+   * Returns the Euclidean distance between two vectors
+   * @param vector1 vector1
+   * @param vector2 vector2
+   * @return Euclidean distance
+   */
+  @ScalarFunction
+  public static double euclideanDistance(float[] vector1, float[] vector2) {
+    validateVectors(vector1, vector2);
+    double distance = 0;
+    for (int i = 0; i < vector1.length; i++) {
+      distance += Math.pow(vector1[i] - vector2[i], 2);
+    }
+    return distance;
+  }
+
+  /**
+   * Returns the dot product between two vectors
+   * @param vector1 vector1
+   * @param vector2 vector2
+   * @return dot product
+   */
+  @ScalarFunction
+  public static double dotProduct(float[] vector1, float[] vector2) {
+    validateVectors(vector1, vector2);
+    double dotProduct = 0.0;
+    for (int i = 0; i < vector1.length; i++) {
+      dotProduct += vector1[i] * vector2[i];
+    }
+    return dotProduct;
+  }
+
+  /**
    * Returns the number of dimensions in a vector
    * @param vector input vector
    * @return number of dimensions
    */
-  @ScalarFunction(names = {"vectordims", "vector_dims"})
+  @ScalarFunction
   public static int vectorDims(float[] vector) {
     validateVector(vector);
     return vector.length;
@@ -132,7 +164,7 @@ public class VectorFunctions {
    * @param vector input vector
    * @return norm
    */
-  @ScalarFunction(names = {"vectornorm", "vector_norm"})
+  @ScalarFunction
   public static double vectorNorm(float[] vector) {
     validateVector(vector);
     double norm = 0.0;

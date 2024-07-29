@@ -32,7 +32,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -188,7 +188,7 @@ public class PluginManager {
 
     for (String pluginsDirectory : directories) {
       if (!new File(pluginsDirectory).exists()) {
-        throw new IllegalArgumentException(String.format("Plugins dir [{}] doesn't exist.", pluginsDirectory));
+        throw new IllegalArgumentException(String.format("Plugins dir [%s] doesn't exist.", pluginsDirectory));
       }
 
       Collection<File> jarFiles = FileUtils.listFiles(

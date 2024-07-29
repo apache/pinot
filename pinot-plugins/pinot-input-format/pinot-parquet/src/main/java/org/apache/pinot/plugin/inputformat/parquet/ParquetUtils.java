@@ -26,13 +26,12 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.parquet.avro.AvroParquetReader;
-import org.apache.parquet.avro.AvroParquetWriter;
+import org.apache.parquet.avro.AvroReadSupport;
 import org.apache.parquet.avro.AvroSchemaConverter;
-import org.apache.parquet.format.converter.ParquetMetadataConverter;
 import org.apache.parquet.hadoop.ParquetFileReader;
 import org.apache.parquet.hadoop.ParquetReader;
-import org.apache.parquet.hadoop.ParquetWriter;
-import org.apache.parquet.hadoop.metadata.ParquetMetadata;
+import org.apache.parquet.hadoop.util.HadoopInputFile;
+import org.apache.parquet.io.InputFile;
 import org.apache.parquet.schema.MessageType;
 
 
@@ -49,17 +48,8 @@ public class ParquetUtils {
    */
   public static ParquetReader<GenericRecord> getParquetAvroReader(Path path)
       throws IOException {
-    //noinspection unchecked
-    return AvroParquetReader.<GenericRecord>builder(path).disableCompatibility().withDataModel(GenericData.get())
-        .withConf(getParquetHadoopConfiguration()).build();
-  }
-
-  /**
-   * Returns a ParquetWriter with the given path and schema.
-   */
-  public static ParquetWriter<GenericRecord> getParquetAvroWriter(Path path, Schema schema)
-      throws IOException {
-    return AvroParquetWriter.<GenericRecord>builder(path).withSchema(schema).withConf(getParquetHadoopConfiguration())
+    InputFile inputFile = HadoopInputFile.fromPath(path, getParquetHadoopConfiguration());
+    return AvroParquetReader.<GenericRecord>builder(inputFile).disableCompatibility().withDataModel(GenericData.get())
         .build();
   }
 
@@ -68,30 +58,30 @@ public class ParquetUtils {
    */
   public static Schema getParquetAvroSchema(Path path)
       throws IOException {
-    ParquetMetadata footer =
-        ParquetFileReader.readFooter(getParquetHadoopConfiguration(), path, ParquetMetadataConverter.NO_FILTER);
-    Map<String, String> metaData = footer.getFileMetaData().getKeyValueMetaData();
-
-    if (hasAvroSchemaInFileMetadata(path)) {
-      String schemaString = metaData.get(AVRO_SCHEMA_METADATA_KEY);
-      if (schemaString == null) {
-        // Try the older property
-        schemaString = metaData.get(OLD_AVRO_SCHEMA_METADATA_KEY);
+    InputFile inputFile = HadoopInputFile.fromPath(path, getParquetHadoopConfiguration());
+    try (ParquetFileReader reader = ParquetFileReader.open(inputFile)) {
+      Map<String, String> metaData = reader.getFileMetaData().getKeyValueMetaData();
+      if (hasAvroSchemaInFileMetadata(path)) {
+        String schemaString = metaData.get(AVRO_SCHEMA_METADATA_KEY);
+        if (schemaString == null) {
+          // Try the older property
+          schemaString = metaData.get(OLD_AVRO_SCHEMA_METADATA_KEY);
+        }
+        return new Schema.Parser().parse(schemaString);
+      } else {
+        MessageType parquetSchema = reader.getFileMetaData().getSchema();
+        return new AvroSchemaConverter().convert(parquetSchema);
       }
-      return new Schema.Parser().parse(schemaString);
-    } else {
-      MessageType parquetSchema = footer.getFileMetaData().getSchema();
-      return new AvroSchemaConverter().convert(parquetSchema);
     }
   }
 
   public static boolean hasAvroSchemaInFileMetadata(Path path)
       throws IOException {
-    ParquetMetadata footer =
-        ParquetFileReader.readFooter(getParquetHadoopConfiguration(), path, ParquetMetadataConverter.NO_FILTER);
-    Map<String, String> metaData = footer.getFileMetaData().getKeyValueMetaData();
-
-    return metaData.containsKey(AVRO_SCHEMA_METADATA_KEY) || metaData.containsKey(OLD_AVRO_SCHEMA_METADATA_KEY);
+    InputFile inputFile = HadoopInputFile.fromPath(path, getParquetHadoopConfiguration());
+    try (ParquetFileReader reader = ParquetFileReader.open(inputFile)) {
+      Map<String, String> metaData = reader.getFileMetaData().getKeyValueMetaData();
+      return metaData.containsKey(AVRO_SCHEMA_METADATA_KEY) || metaData.containsKey(OLD_AVRO_SCHEMA_METADATA_KEY);
+    }
   }
 
   public static Configuration getParquetHadoopConfiguration() {
@@ -100,6 +90,8 @@ public class ParquetUtils {
     // in case that user's hadoop conf overwrite this item
     Configuration conf = new Configuration();
     conf.set("fs.defaultFS", DEFAULT_FS);
+    // To read Int96 as bytes.
+    conf.set(AvroReadSupport.READ_INT96_AS_FIXED, "true");
     conf.set("fs.file.impl", org.apache.hadoop.fs.LocalFileSystem.class.getName());
     return conf;
   }

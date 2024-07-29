@@ -27,14 +27,12 @@ import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager.*;
-import static org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager.ConsumptionRateLimiter;
-import static org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager.MetricEmitter;
-import static org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager.NOOP_RATE_LIMITER;
-import static org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager.RateLimiterImpl;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -51,6 +49,10 @@ public class RealtimeConsumptionRateManagerTest {
   private static final StreamConfig STREAM_CONFIG_A = mock(StreamConfig.class);
   private static final StreamConfig STREAM_CONFIG_B = mock(StreamConfig.class);
   private static final StreamConfig STREAM_CONFIG_C = mock(StreamConfig.class);
+  private static final PinotConfiguration SERVER_CONFIG_1 = mock(PinotConfiguration.class);
+  private static final PinotConfiguration SERVER_CONFIG_2 = mock(PinotConfiguration.class);
+  private static final PinotConfiguration SERVER_CONFIG_3 = mock(PinotConfiguration.class);
+  private static final PinotConfiguration SERVER_CONFIG_4 = mock(PinotConfiguration.class);
   private static RealtimeConsumptionRateManager _consumptionRateManager;
 
   static {
@@ -65,6 +67,15 @@ public class RealtimeConsumptionRateManagerTest {
     when(STREAM_CONFIG_B.getTopicConsumptionRateLimit()).thenReturn(Optional.of(RATE_LIMIT_FOR_ENTIRE_TOPIC));
     when(STREAM_CONFIG_C.getTopicConsumptionRateLimit()).thenReturn(Optional.empty());
     _consumptionRateManager = new RealtimeConsumptionRateManager(cache);
+
+    when(SERVER_CONFIG_1.getProperty(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT,
+        CommonConstants.Server.DEFAULT_SERVER_CONSUMPTION_RATE_LIMIT)).thenReturn(5.0);
+    when(SERVER_CONFIG_2.getProperty(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT,
+        CommonConstants.Server.DEFAULT_SERVER_CONSUMPTION_RATE_LIMIT)).thenReturn(2.5);
+    when(SERVER_CONFIG_3.getProperty(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT,
+        CommonConstants.Server.DEFAULT_SERVER_CONSUMPTION_RATE_LIMIT)).thenReturn(0.0);
+    when(SERVER_CONFIG_4.getProperty(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT,
+        CommonConstants.Server.DEFAULT_SERVER_CONSUMPTION_RATE_LIMIT)).thenReturn(-1.0);
   }
 
   @Test
@@ -83,7 +94,27 @@ public class RealtimeConsumptionRateManagerTest {
   }
 
   @Test
-  public void testBuildCache() throws Exception {
+  public void testCreateServerRateLimiter() {
+    // Server config 1
+    ConsumptionRateLimiter rateLimiter = _consumptionRateManager.createServerRateLimiter(SERVER_CONFIG_1, null);
+    assertEquals(5.0, ((RateLimiterImpl) rateLimiter).getRate(), DELTA);
+
+    // Server config 2
+    rateLimiter = _consumptionRateManager.createServerRateLimiter(SERVER_CONFIG_2, null);
+    assertEquals(2.5, ((RateLimiterImpl) rateLimiter).getRate(), DELTA);
+
+    // Server config 3
+    rateLimiter = _consumptionRateManager.createServerRateLimiter(SERVER_CONFIG_3, null);
+    assertEquals(rateLimiter, NOOP_RATE_LIMITER);
+
+    // Server config 4
+    rateLimiter = _consumptionRateManager.createServerRateLimiter(SERVER_CONFIG_4, null);
+    assertEquals(rateLimiter, NOOP_RATE_LIMITER);
+  }
+
+  @Test
+  public void testBuildCache()
+      throws Exception {
     PartitionCountFetcher partitionCountFetcher = mock(PartitionCountFetcher.class);
     LoadingCache<StreamConfig, Integer> cache = buildCache(partitionCountFetcher, 500, TimeUnit.MILLISECONDS);
     when(partitionCountFetcher.fetch(STREAM_CONFIG_A)).thenReturn(10);
@@ -150,21 +181,21 @@ public class RealtimeConsumptionRateManagerTest {
     now = Clock.fixed(Instant.parse("2022-08-10T12:01:05Z"), ZoneOffset.UTC).instant();
     int sumOfMsgsInPrevMinute = sum(numMsgs);
     int expectedRatio = calcExpectedRatio(rateLimitInMinutes, sumOfMsgsInPrevMinute);
-    numMsgs = new int[] {35};
+    numMsgs = new int[]{35};
     assertEquals(metricEmitter.emitMetric(numMsgs[0], rateLimit, now), expectedRatio);
 
     // 3rd minute
     now = Clock.fixed(Instant.parse("2022-08-10T12:02:25Z"), ZoneOffset.UTC).instant();
     sumOfMsgsInPrevMinute = sum(numMsgs);
     expectedRatio = calcExpectedRatio(rateLimitInMinutes, sumOfMsgsInPrevMinute);
-    numMsgs = new int[] {0};
+    numMsgs = new int[]{0};
     assertEquals(metricEmitter.emitMetric(numMsgs[0], rateLimit, now), expectedRatio);
 
     // 4th minute
     now = Clock.fixed(Instant.parse("2022-08-10T12:03:15Z"), ZoneOffset.UTC).instant();
     sumOfMsgsInPrevMinute = sum(numMsgs);
     expectedRatio = calcExpectedRatio(rateLimitInMinutes, sumOfMsgsInPrevMinute);
-    numMsgs = new int[] {10, 20};
+    numMsgs = new int[]{10, 20};
     assertEquals(metricEmitter.emitMetric(numMsgs[0], rateLimit, now), expectedRatio);
     now = Clock.fixed(Instant.parse("2022-08-10T12:03:20Z"), ZoneOffset.UTC).instant();
     assertEquals(metricEmitter.emitMetric(numMsgs[1], rateLimit, now), expectedRatio);
@@ -173,7 +204,7 @@ public class RealtimeConsumptionRateManagerTest {
     now = Clock.fixed(Instant.parse("2022-08-10T12:04:30Z"), ZoneOffset.UTC).instant();
     sumOfMsgsInPrevMinute = sum(numMsgs);
     expectedRatio = calcExpectedRatio(rateLimitInMinutes, sumOfMsgsInPrevMinute);
-    numMsgs = new int[] {5};
+    numMsgs = new int[]{5};
     assertEquals(metricEmitter.emitMetric(numMsgs[0], rateLimit, now), expectedRatio);
   }
 

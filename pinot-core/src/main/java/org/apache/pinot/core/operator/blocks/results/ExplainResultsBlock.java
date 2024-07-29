@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
@@ -34,15 +35,15 @@ import org.apache.pinot.core.query.request.context.QueryContext;
  * Results block for EXPLAIN queries.
  */
 public class ExplainResultsBlock extends BaseResultsBlock {
+  private final QueryContext _queryContext;
   private final List<ExplainEntry> _entries = new ArrayList<>();
+
+  public ExplainResultsBlock(QueryContext queryContext) {
+    _queryContext = queryContext;
+  }
 
   public void addOperator(String operatorName, int operatorId, int parentId) {
     _entries.add(new ExplainEntry(operatorName, operatorId, parentId));
-  }
-
-  @Override
-  public DataSchema getDataSchema(QueryContext queryContext) {
-    return DataSchema.EXPLAIN_RESULT_SCHEMA;
   }
 
   @Override
@@ -51,7 +52,18 @@ public class ExplainResultsBlock extends BaseResultsBlock {
   }
 
   @Override
-  public List<Object[]> getRows(QueryContext queryContext) {
+  public QueryContext getQueryContext() {
+    return _queryContext;
+  }
+
+  @Nullable
+  @Override
+  public DataSchema getDataSchema() {
+    return DataSchema.EXPLAIN_RESULT_SCHEMA;
+  }
+
+  @Override
+  public List<Object[]> getRows() {
     List<Object[]> rows = new ArrayList<>(_entries.size());
     for (ExplainEntry entry : _entries) {
       rows.add(entry.toRow());
@@ -60,7 +72,7 @@ public class ExplainResultsBlock extends BaseResultsBlock {
   }
 
   @Override
-  public DataTable getDataTable(QueryContext queryContext)
+  public DataTable getDataTable()
       throws IOException {
     DataTableBuilder dataTableBuilder = DataTableBuilderFactory.getDataTableBuilder(DataSchema.EXPLAIN_RESULT_SCHEMA);
     for (ExplainEntry entry : _entries) {

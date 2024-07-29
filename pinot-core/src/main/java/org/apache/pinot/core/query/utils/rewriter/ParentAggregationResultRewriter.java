@@ -190,11 +190,11 @@ public class ParentAggregationResultRewriter implements ResultRewriter {
    * For example, for a list of aggregation functions result:
    *            0                      1                    2                   3
    *            |                      |                    |                   |
-   * "child_argmin(a, b, x) ,child_argmin(a, b, y), child_argmin(a, b, z), parent_argmin(a, b, x, y, z)"
+   * "child_exprmin(a, b, x) ,child_exprmin(a, b, y), child_exprmin(a, b, z), parent_exprmin(a, b, x, y, z)"
    *                                                                                           |  |  |
    *                                                                                           0  1  2
-   * offset of the parent of child_argmin(a, b, y) is 3
-   * nested offset is child_argmin(a, b, y) is 1
+   * offset of the parent of child_exprmin(a, b, y) is 3
+   * nested offset is child_exprmin(a, b, y) is 1
    */
   private static class ChildFunctionMapping {
     private final ParentAggregationFunctionResultObject _parent;

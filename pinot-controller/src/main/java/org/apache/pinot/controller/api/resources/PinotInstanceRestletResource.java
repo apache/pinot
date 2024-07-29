@@ -53,6 +53,7 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.config.InstanceUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.controller.api.access.AccessType;
@@ -74,7 +75,8 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
 
 @Api(tags = Constants.INSTANCE_TAG, authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY)})
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = @ApiKeyAuthDefinition(name =
-    HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = SWAGGER_AUTHORIZATION_KEY)))
+    HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = SWAGGER_AUTHORIZATION_KEY,
+    description = "The format of the key is  ```\"Basic <token>\" or \"Bearer <token>\"```")))
 @Path("/")
 public class PinotInstanceRestletResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotInstanceRestletResource.class);
@@ -103,8 +105,25 @@ public class PinotInstanceRestletResource {
       @ApiResponse(code = 200, message = "Success"),
       @ApiResponse(code = 500, message = "Internal error")
   })
-  public Instances getAllInstances() {
+  public Instances getAllInstances(
+      @ApiParam("Filter by tag") @QueryParam("tag") String tag) {
+    if (tag != null) {
+      return new Instances(_pinotHelixResourceManager.getAllInstancesWithTag(tag));
+    }
     return new Instances(_pinotHelixResourceManager.getAllInstances());
+  }
+
+  @GET
+  @Path("/liveinstances")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_INSTANCE)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "List all live instances")
+  @ApiResponses(value = {
+          @ApiResponse(code = 200, message = "Success"),
+          @ApiResponse(code = 500, message = "Internal error")
+  })
+  public Instances getAllLiveInstances() {
+    return new Instances(_pinotHelixResourceManager.getAllLiveInstances());
   }
 
   @GET
@@ -502,7 +521,8 @@ public class PinotInstanceRestletResource {
     Map<String, Integer> tagToInstanceCountMap = getUpdatedTagToInstanceCountMap(requests);
     Map<String, Integer> tagDeficiency = computeTagDeficiency(tagToInstanceCountMap, tagMinServerMap);
 
-    Map<String, List<OperationValidationResponse.ErrorWrapper>> responseMap = new HashMap<>(requests.size());
+    Map<String, List<OperationValidationResponse.ErrorWrapper>> responseMap
+        = new HashMap<>(HashUtil.getHashMapCapacity(requests.size()));
     List<OperationValidationResponse.ErrorWrapper> tenantIssues = new ArrayList<>();
     requests.forEach(request -> responseMap.put(request.getInstanceName(), new ArrayList<>()));
     for (InstanceTagUpdateRequest request : requests) {

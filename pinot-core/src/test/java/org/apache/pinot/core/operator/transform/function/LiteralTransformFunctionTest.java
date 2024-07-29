@@ -18,83 +18,130 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import java.math.BigDecimal;
 import org.apache.pinot.common.request.context.LiteralContext;
-import org.apache.pinot.core.operator.blocks.ProjectionBlock;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
+import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
+import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
 import org.roaringbitmap.RoaringBitmap;
-import org.testng.Assert;
-import org.testng.annotations.AfterMethod;
-import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.testng.Assert.*;
 
 
 public class LiteralTransformFunctionTest {
   private static final int NUM_DOCS = 100;
-  private AutoCloseable _mocks;
-
-  @Mock
-  private ProjectionBlock _projectionBlock;
-
-  @BeforeMethod
-  public void setUp() {
-    _mocks = MockitoAnnotations.openMocks(this);
-    when(_projectionBlock.getNumDocs()).thenReturn(NUM_DOCS);
-  }
-
-  @AfterMethod
-  public void tearDown()
-      throws Exception {
-    _mocks.close();
-  }
 
   @Test
   public void testLiteralTransformFunction() {
-    LiteralTransformFunction trueBoolean = new LiteralTransformFunction(new LiteralContext(DataType.BOOLEAN, true));
-    Assert.assertEquals(trueBoolean.getResultMetadata().getDataType(), DataType.BOOLEAN);
-    Assert.assertEquals(trueBoolean.getBooleanLiteral(), true);
-    LiteralTransformFunction falseBoolean = new LiteralTransformFunction(new LiteralContext(DataType.BOOLEAN, false));
-    Assert.assertEquals(falseBoolean.getResultMetadata().getDataType(), DataType.BOOLEAN);
-    Assert.assertEquals(falseBoolean.getBooleanLiteral(), false);
-    LiteralTransformFunction nullLiteral = new LiteralTransformFunction(new LiteralContext(DataType.UNKNOWN, true));
-    Assert.assertEquals(nullLiteral.getStringLiteral(), "null");
-  }
+    LiteralTransformFunction function = new LiteralTransformFunction(new LiteralContext(DataType.STRING, "1234"));
+    assertFalse(function.getBooleanLiteral());
+    assertEquals(function.getIntLiteral(), 1234);
+    assertEquals(function.getLongLiteral(), 1234L);
+    assertEquals(function.getFloatLiteral(), 1234.0f);
+    assertEquals(function.getDoubleLiteral(), 1234.0);
+    assertEquals(function.getBigDecimalLiteral(), new BigDecimal("1234"));
+    assertEquals(function.getStringLiteral(), "1234");
+    assertEquals(function.getBytesLiteral(), BytesUtils.toBytes("1234"));
+    assertFalse(function.isNull());
+    TransformResultMetadata resultMetadata = function.getResultMetadata();
+    assertEquals(resultMetadata.getDataType(), DataType.STRING);
+    assertTrue(resultMetadata.isSingleValue());
+    assertFalse(resultMetadata.hasDictionary());
 
-  @Test
-  public void testNullTransform() {
-    LiteralTransformFunction nullLiteral = new LiteralTransformFunction(new LiteralContext(DataType.UNKNOWN, true));
-    Assert.assertEquals(nullLiteral.getStringLiteral(), "null");
-    RoaringBitmap bitmap = nullLiteral.getNullBitmap(_projectionBlock);
-    RoaringBitmap expectedBitmap = new RoaringBitmap();
-    expectedBitmap.add(0L, NUM_DOCS);
-    Assert.assertEquals(bitmap, expectedBitmap);
-    int[] intValues = nullLiteral.transformToIntValuesSV(_projectionBlock);
-    Assert.assertEquals(intValues.length, NUM_DOCS);
+    ValueBlock valueBlock = mock(ValueBlock.class);
+    when(valueBlock.getNumDocs()).thenReturn(NUM_DOCS);
+    int[] intValues = function.transformToIntValuesSV(valueBlock);
+    assertEquals(intValues.length, NUM_DOCS);
     for (int i = 0; i < NUM_DOCS; i++) {
-      Assert.assertEquals(intValues[i], 0);
+      assertEquals(intValues[i], 1234);
     }
-    Assert.assertEquals(nullLiteral.getNullBitmap(_projectionBlock), expectedBitmap);
+    long[] longValues = function.transformToLongValuesSV(valueBlock);
+    assertEquals(longValues.length, NUM_DOCS);
+    for (int i = 0; i < NUM_DOCS; i++) {
+      assertEquals(longValues[i], 1234L);
+    }
+    float[] floatValues = function.transformToFloatValuesSV(valueBlock);
+    assertEquals(floatValues.length, NUM_DOCS);
+    for (int i = 0; i < NUM_DOCS; i++) {
+      assertEquals(floatValues[i], 1234.0f);
+    }
+    double[] doubleValues = function.transformToDoubleValuesSV(valueBlock);
+    assertEquals(doubleValues.length, NUM_DOCS);
+    for (int i = 0; i < NUM_DOCS; i++) {
+      assertEquals(doubleValues[i], 1234.0);
+    }
+    String[] stringValues = function.transformToStringValuesSV(valueBlock);
+    assertEquals(stringValues.length, NUM_DOCS);
+    for (int i = 0; i < NUM_DOCS; i++) {
+      assertEquals(stringValues[i], "1234");
+    }
+    byte[][] bytesValues = function.transformToBytesValuesSV(valueBlock);
+    assertEquals(bytesValues.length, NUM_DOCS);
+    for (int i = 0; i < NUM_DOCS; i++) {
+      assertEquals(bytesValues[i], BytesUtils.toBytes("1234"));
+    }
+    assertNull(function.getNullBitmap(valueBlock));
   }
 
   @Test
-  public void testIsNullLiteralTransform() {
-    LiteralTransformFunction nullLiteral =
-        new LiteralTransformFunction(new LiteralContext(DataType.UNKNOWN, null));
-    Assert.assertTrue(nullLiteral.isNull());
+  public void testNullLiteral() {
+    LiteralTransformFunction function = new LiteralTransformFunction(new LiteralContext(DataType.UNKNOWN, null));
+    assertFalse(function.getBooleanLiteral());
+    assertEquals(function.getIntLiteral(), NullValuePlaceHolder.INT);
+    assertEquals(function.getLongLiteral(), NullValuePlaceHolder.LONG);
+    assertEquals(function.getFloatLiteral(), NullValuePlaceHolder.FLOAT);
+    assertEquals(function.getDoubleLiteral(), NullValuePlaceHolder.DOUBLE);
+    assertEquals(function.getBigDecimalLiteral(), NullValuePlaceHolder.BIG_DECIMAL);
+    assertEquals(function.getStringLiteral(), NullValuePlaceHolder.STRING);
+    assertEquals(function.getBytesLiteral(), NullValuePlaceHolder.BYTES);
+    assertTrue(function.isNull());
+    TransformResultMetadata resultMetadata = function.getResultMetadata();
+    assertEquals(resultMetadata.getDataType(), DataType.UNKNOWN);
+    assertTrue(resultMetadata.isSingleValue());
+    assertFalse(resultMetadata.hasDictionary());
 
-    LiteralTransformFunction nullLiteralWITHBooleanValue =
-        new LiteralTransformFunction(new LiteralContext(DataType.UNKNOWN, true));
-    Assert.assertTrue(nullLiteralWITHBooleanValue.isNull());
-
-    LiteralTransformFunction trueLiteral =
-        new LiteralTransformFunction(new LiteralContext(DataType.BOOLEAN, true));
-    Assert.assertFalse(trueLiteral.isNull());
-
-    LiteralTransformFunction stringNullLiteral =
-        new LiteralTransformFunction(new LiteralContext(DataType.STRING, null));
-    Assert.assertFalse(stringNullLiteral.isNull());
+    ValueBlock valueBlock = mock(ValueBlock.class);
+    when(valueBlock.getNumDocs()).thenReturn(NUM_DOCS);
+    int[] intValues = function.transformToIntValuesSV(valueBlock);
+    assertEquals(intValues.length, NUM_DOCS);
+    for (int i = 0; i < NUM_DOCS; i++) {
+      assertEquals(intValues[i], NullValuePlaceHolder.INT);
+    }
+    long[] longValues = function.transformToLongValuesSV(valueBlock);
+    assertEquals(longValues.length, NUM_DOCS);
+    for (int i = 0; i < NUM_DOCS; i++) {
+      assertEquals(longValues[i], NullValuePlaceHolder.LONG);
+    }
+    float[] floatValues = function.transformToFloatValuesSV(valueBlock);
+    assertEquals(floatValues.length, NUM_DOCS);
+    for (int i = 0; i < NUM_DOCS; i++) {
+      assertEquals(floatValues[i], NullValuePlaceHolder.FLOAT);
+    }
+    double[] doubleValues = function.transformToDoubleValuesSV(valueBlock);
+    assertEquals(doubleValues.length, NUM_DOCS);
+    for (int i = 0; i < NUM_DOCS; i++) {
+      assertEquals(doubleValues[i], NullValuePlaceHolder.DOUBLE);
+    }
+    String[] stringValues = function.transformToStringValuesSV(valueBlock);
+    assertEquals(stringValues.length, NUM_DOCS);
+    for (int i = 0; i < NUM_DOCS; i++) {
+      assertEquals(stringValues[i], NullValuePlaceHolder.STRING);
+    }
+    byte[][] bytesValues = function.transformToBytesValuesSV(valueBlock);
+    assertEquals(bytesValues.length, NUM_DOCS);
+    for (int i = 0; i < NUM_DOCS; i++) {
+      assertEquals(bytesValues[i], NullValuePlaceHolder.BYTES);
+    }
+    RoaringBitmap nullBitmap = function.getNullBitmap(valueBlock);
+    assertNotNull(nullBitmap);
+    assertEquals(nullBitmap.getCardinality(), NUM_DOCS);
+    for (int i = 0; i < NUM_DOCS; i++) {
+      assertTrue(nullBitmap.contains(i));
+    }
   }
 }

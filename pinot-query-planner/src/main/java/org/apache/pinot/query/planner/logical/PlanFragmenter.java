@@ -18,16 +18,15 @@
  */
 package org.apache.pinot.query.planner.logical;
 
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.ints.IntArrayList;
+import it.unimi.dsi.fastutil.ints.IntList;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import org.apache.calcite.rel.RelDistribution;
-import org.apache.calcite.rel.logical.PinotRelExchangeType;
+import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.query.planner.PlanFragment;
-import org.apache.pinot.query.planner.PlanFragmentMetadata;
-import org.apache.pinot.query.planner.partitioning.FieldSelectionKeySelector;
-import org.apache.pinot.query.planner.partitioning.KeySelector;
+import org.apache.pinot.query.planner.SubPlan;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
@@ -45,26 +44,39 @@ import org.apache.pinot.query.planner.plannode.WindowNode;
 
 
 /**
- * PlanFragmenter is an implementation of {@link PlanNodeVisitor} to fragment a
- * {@link org.apache.pinot.query.planner.SubPlan} into multiple {@link PlanFragment}.
+ * PlanFragmenter is an implementation of {@link PlanNodeVisitor} to fragment a {@link SubPlan} into multiple
+ * {@link PlanFragment}s.
  *
  * The fragmenting process is as follows:
  * 1. Traverse the plan tree in a depth-first manner;
  * 2. For each node, if it is a PlanFragment splittable ExchangeNode, split it into {@link MailboxReceiveNode} and
  * {@link MailboxSendNode} pair;
- * 3. Assign current PlanFragment Id to {@link MailboxReceiveNode};
- * 4. Increment current PlanFragment Id by one and assign it to the {@link MailboxSendNode}.
+ * 3. Assign current PlanFragment ID to {@link MailboxReceiveNode};
+ * 4. Increment current PlanFragment ID by one and assign it to the {@link MailboxSendNode}.
  */
 public class PlanFragmenter implements PlanNodeVisitor<PlanNode, PlanFragmenter.Context> {
-  public static final PlanFragmenter INSTANCE = new PlanFragmenter();
+  private final Int2ObjectOpenHashMap<PlanFragment> _planFragmentMap = new Int2ObjectOpenHashMap<>();
+  private final Int2ObjectOpenHashMap<IntList> _childPlanFragmentIdsMap = new Int2ObjectOpenHashMap<>();
+
+  // ROOT PlanFragment ID is 0, current PlanFragment ID starts with 1, next PlanFragment ID starts with 2.
+  private int _nextPlanFragmentId = 2;
+
+  public Context createContext() {
+    // ROOT PlanFragment ID is 0, current PlanFragment ID starts with 1.
+    return new Context(1);
+  }
+
+  public Int2ObjectOpenHashMap<PlanFragment> getPlanFragmentMap() {
+    return _planFragmentMap;
+  }
+
+  public Int2ObjectOpenHashMap<IntList> getChildPlanFragmentIdsMap() {
+    return _childPlanFragmentIdsMap;
+  }
 
   private PlanNode process(PlanNode node, Context context) {
-    node.setPlanFragmentId(context._currentPlanFragmentId);
-    List<PlanNode> inputs = node.getInputs();
-    for (int i = 0; i < inputs.size(); i++) {
-      context._previousPlanFragmentId = node.getPlanFragmentId();
-      inputs.set(i, inputs.get(i).visit(this, context));
-    }
+    node.setStageId(context._currentPlanFragmentId);
+    node.getInputs().replaceAll(planNode -> planNode.visit(this, context));
     return node;
   }
 
@@ -128,37 +140,29 @@ public class PlanFragmenter implements PlanNodeVisitor<PlanNode, PlanFragmenter.
     if (!isPlanFragmentSplitter(node)) {
       return process(node, context);
     }
-    int currentPlanFragmentId = context._previousPlanFragmentId;
-    int nextPlanFragmentId = ++context._currentPlanFragmentId;
-    PlanNode nextPlanFragmentRoot = node.getInputs().get(0).visit(this, context);
 
-    List<Integer> distributionKeys = node.getDistributionKeys();
-    RelDistribution.Type distributionType = node.getDistributionType();
+    // Split the ExchangeNode to a MailboxReceiveNode and a MailboxSendNode, where MailboxReceiveNode is the leave node
+    // of the current PlanFragment, and MailboxSendNode is the root node of the next PlanFragment.
+    int receiverPlanFragmentId = context._currentPlanFragmentId;
+    int senderPlanFragmentId = _nextPlanFragmentId++;
+    _childPlanFragmentIdsMap.computeIfAbsent(receiverPlanFragmentId, k -> new IntArrayList()).add(senderPlanFragmentId);
+
+    // Create a new context for the next PlanFragment with MailboxSendNode as the root node.
+    PlanNode nextPlanFragmentRoot = node.getInputs().get(0).visit(this, new Context(senderPlanFragmentId));
     PinotRelExchangeType exchangeType = node.getExchangeType();
-
-    // make an exchange sender and receiver node pair
-    // only HASH_DISTRIBUTED requires a partition key selector; so all other types (SINGLETON and BROADCAST)
-    // of exchange will not carry a partition key selector.
-    KeySelector<Object[], Object[]> keySelector = distributionType == RelDistribution.Type.HASH_DISTRIBUTED
-        ? new FieldSelectionKeySelector(distributionKeys) : null;
-
-    PlanNode mailboxSender =
-        new MailboxSendNode(nextPlanFragmentId, nextPlanFragmentRoot.getDataSchema(),
-            currentPlanFragmentId, distributionType, exchangeType, keySelector, node.getCollations(),
+    RelDistribution.Type distributionType = node.getDistributionType();
+    List<Integer> keys = node.getKeys();
+    MailboxSendNode mailboxSendNode =
+        new MailboxSendNode(senderPlanFragmentId, nextPlanFragmentRoot.getDataSchema(), List.of(nextPlanFragmentRoot),
+            receiverPlanFragmentId, exchangeType, distributionType, keys, node.isPrePartitioned(), node.getCollations(),
             node.isSortOnSender());
-    PlanNode mailboxReceiver = new MailboxReceiveNode(currentPlanFragmentId, nextPlanFragmentRoot.getDataSchema(),
-        nextPlanFragmentId, distributionType, exchangeType, keySelector,
-        node.getCollations(), node.isSortOnSender(), node.isSortOnReceiver(), mailboxSender);
-    mailboxSender.addInput(nextPlanFragmentRoot);
+    _planFragmentMap.put(senderPlanFragmentId,
+        new PlanFragment(senderPlanFragmentId, mailboxSendNode, new ArrayList<>()));
 
-    context._planFragmentIdToRootNodeMap.put(nextPlanFragmentId,
-        new PlanFragment(nextPlanFragmentId, mailboxSender, new PlanFragmentMetadata(), new ArrayList<>()));
-    if (!context._planFragmentIdToChildrenMap.containsKey(currentPlanFragmentId)) {
-      context._planFragmentIdToChildrenMap.put(currentPlanFragmentId, new ArrayList<>());
-    }
-    context._planFragmentIdToChildrenMap.get(currentPlanFragmentId).add(nextPlanFragmentId);
-
-    return mailboxReceiver;
+    // Return the MailboxReceiveNode as the leave node of the current PlanFragment.
+    return new MailboxReceiveNode(receiverPlanFragmentId, nextPlanFragmentRoot.getDataSchema(), List.of(),
+        senderPlanFragmentId, exchangeType, distributionType, keys, node.getCollations(), node.isSortOnReceiver(),
+        node.isSortOnSender(), mailboxSendNode);
   }
 
   private boolean isPlanFragmentSplitter(PlanNode node) {
@@ -166,12 +170,10 @@ public class PlanFragmenter implements PlanNodeVisitor<PlanNode, PlanFragmenter.
   }
 
   public static class Context {
+    private final int _currentPlanFragmentId;
 
-    // PlanFragment ID starts with 1, 0 will be reserved for ROOT PlanFragment.
-    Integer _currentPlanFragmentId = 1;
-    Integer _previousPlanFragmentId = 1;
-    Map<Integer, PlanFragment> _planFragmentIdToRootNodeMap = new HashMap<>();
-
-    Map<Integer, List<Integer>> _planFragmentIdToChildrenMap = new HashMap<>();
+    private Context(int currentPlanFragmentId) {
+      _currentPlanFragmentId = currentPlanFragmentId;
+    }
   }
 }

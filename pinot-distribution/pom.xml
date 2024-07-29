@@ -25,7 +25,7 @@
   <parent>
     <artifactId>pinot</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>0.13.0-SNAPSHOT</version>
+    <version>1.2.0-SNAPSHOT</version>
     <relativePath>..</relativePath>
   </parent>
   <artifactId>pinot-distribution</artifactId>
@@ -34,6 +34,7 @@
   <properties>
     <pinot.root>${basedir}/..</pinot.root>
     <maven.build.timestamp.format>yyyy-MM-dd'T'HHmmss'Z'</maven.build.timestamp.format>
+    <shade.phase.prop>package</shade.phase.prop>
   </properties>
   <dependencies>
     <dependency>
@@ -90,7 +91,7 @@
         </exclusion>
         <exclusion>
           <groupId>org.apache.pinot</groupId>
-          <artifactId>pinot-kafka-${kafka.version}</artifactId>
+          <artifactId>pinot-kafka-2.0</artifactId>
         </exclusion>
         <exclusion>
           <groupId>org.apache.pinot</groupId>
@@ -108,15 +109,11 @@
           <groupId>org.apache.hadoop</groupId>
           <artifactId>hadoop-common</artifactId>
         </exclusion>
+        <exclusion>
+          <groupId>org.apache.hadoop</groupId>
+          <artifactId>hadoop-mapreduce-client-core</artifactId>
+        </exclusion>
       </exclusions>
-    </dependency>
-    <dependency>
-      <groupId>javax.servlet</groupId>
-      <artifactId>javax.servlet-api</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>javax.activation</groupId>
-      <artifactId>activation</artifactId>
     </dependency>
   </dependencies>
   <build>
@@ -124,7 +121,7 @@
       <plugin>
         <groupId>net.nicoulaj.maven.plugins</groupId>
         <artifactId>checksum-maven-plugin</artifactId>
-        <version>1.8</version>
+        <version>1.11</version>
         <executions>
           <execution>
             <goals>
@@ -147,58 +144,6 @@
             <algorithm>SHA-512</algorithm>
           </algorithms>
         </configuration>
-      </plugin>
-      <plugin>
-        <artifactId>maven-shade-plugin</artifactId>
-        <executions>
-          <execution>
-            <goals>
-              <goal>shade</goal>
-            </goals>
-            <configuration>
-              <transformers>
-                <transformer implementation="org.apache.maven.plugins.shade.resource.ApacheLicenseResourceTransformer"/>
-              </transformers>
-              <!--
-              Usually in hadoop environment, there are multiple jars with different versions.
-              Most of the NoSuchMethodExceptions are caused by class loading conflicts.
-              Class relocation ensures the reference of certain packages/classes in Pinot code to
-              shaded libs, e.g. jackson or guava.
-              Ref: https://maven.apache.org/plugins/maven-shade-plugin/examples/class-relocation.html
-              -->
-              <relocations>
-                <relocation>
-                  <pattern>com.google.common</pattern>
-                  <shadedPattern>${shade.prefix}.com.google.common</shadedPattern>
-                </relocation>
-                <relocation>
-                  <pattern>com.fasterxml.jackson</pattern>
-                  <shadedPattern>${shade.prefix}.com.fasterxml.jackson</shadedPattern>
-                </relocation>
-                <relocation>
-                  <pattern>org.apache.http</pattern>
-                  <shadedPattern>${shade.prefix}.org.apache.http</shadedPattern>
-                </relocation>
-                <relocation>
-                  <pattern>software.amazon</pattern>
-                  <shadedPattern>${shade.prefix}.software.amazon</shadedPattern>
-                </relocation>
-                <relocation>
-                  <pattern>org.reflections</pattern>
-                  <shadedPattern>${shade.prefix}.org.reflections</shadedPattern>
-                </relocation>
-                <relocation>
-                  <pattern>io.netty</pattern>
-                  <shadedPattern>${shade.prefix}.io.netty</shadedPattern>
-                </relocation>
-                <relocation>
-                  <pattern>org.apache.parquet</pattern>
-                  <shadedPattern>${shade.prefix}.org.apache.parquet</shadedPattern>
-                </relocation>
-              </relocations>
-            </configuration>
-          </execution>
-        </executions>
       </plugin>
     </plugins>
   </build>
@@ -254,15 +199,11 @@
               </execution>
             </executions>
           </plugin>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-enforcer-plugin</artifactId>
-          </plugin>
           <!-- Create symlink "build" to the root directory (Unix only) -->
           <plugin>
             <groupId>org.codehaus.mojo</groupId>
             <artifactId>exec-maven-plugin</artifactId>
-            <version>1.5.0</version>
+            <version>3.3.0</version>
             <executions>
               <execution>
                 <id>remove-build-directory</id>

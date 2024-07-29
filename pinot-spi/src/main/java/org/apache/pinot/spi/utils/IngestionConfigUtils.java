@@ -41,6 +41,7 @@ public final class IngestionConfigUtils {
   public static final String DOT_SEPARATOR = ".";
   private static final String DEFAULT_SEGMENT_NAME_GENERATOR_TYPE =
       BatchConfigProperties.SegmentNameGeneratorType.SIMPLE;
+  private static final String DEFAULT_SEGMENT_INGESTION_TYPE = "APPEND";
   private static final String DEFAULT_PUSH_MODE = "tar";
   private static final int DEFAULT_PUSH_ATTEMPTS = 5;
   private static final int DEFAULT_PUSH_PARALLELISM = 1;
@@ -116,7 +117,7 @@ public final class IngestionConfigUtils {
     if (segmentIngestionType == null) {
       segmentIngestionType = tableConfig.getValidationConfig().getSegmentPushType();
     }
-    return segmentIngestionType;
+    return (segmentIngestionType == null) ? DEFAULT_SEGMENT_INGESTION_TYPE : segmentIngestionType;
   }
 
   /**

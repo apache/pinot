@@ -23,11 +23,15 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.Callable;
+import javax.net.ssl.SSLContext;
+import org.apache.pinot.common.auth.AuthProviderUtils;
+import org.apache.pinot.common.utils.ClientSSLContextGenerator;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.TableConfigs;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.NetUtils;
@@ -65,22 +69,25 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
       + " table schema file.")
   private String _schemaFile = null;
 
-  @CommandLine.Option(names = {"-controllerHost"}, required = false, description = "host name for controller.")
+  @CommandLine.Option(names = {"-controllerHost"}, required = false, description = "Host name for controller.")
   private String _controllerHost;
 
-  @CommandLine.Option(names = {"-controllerPort"}, required = false, description = "Port number to start the "
-      + "controller at.")
+  @CommandLine.Option(names = {"-controllerPort"}, required = false, description = "Port number for controller.")
   private String _controllerPort = DEFAULT_CONTROLLER_PORT;
 
-  @CommandLine.Option(names = {"-controllerProtocol"}, required = false, description = "protocol for controller.")
+  @CommandLine.Option(names = {"-controllerProtocol"}, required = false, description = "Protocol for controller.")
   private String _controllerProtocol = CommonConstants.HTTP_PROTOCOL;
 
-  @CommandLine.Option(names = {"-update"}, required = false,
-      description = "Update the existing table instead of creating new one")
+  @CommandLine.Option(names = {"-update"}, required = false, description = "Update the existing table instead of "
+      + "creating new one")
   private boolean _update = false;
 
   @CommandLine.Option(names = {"-exec"}, required = false, description = "Execute the command.")
   private boolean _exec;
+
+  @CommandLine.Option(names = {"-skipControllerCertValidation"}, required = false, description = "Whether to skip"
+      + " controller certification validation.")
+  private boolean _skipControllerCertValidation = false;
 
   @CommandLine.Option(names = {"-user"}, required = false, description = "Username for basic auth.")
   private String _user;
@@ -188,7 +195,9 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
       throws IOException {
     String res = AbstractBaseAdminCommand.sendRequest("POST",
         ControllerRequestURLBuilder.baseUrl(_controllerAddress).forTableConfigsCreate(), node.toString(),
-        makeAuthHeaders(makeAuthProvider(_authProvider, _authTokenUrl, _authToken, _user, _password)));
+        AuthProviderUtils.makeAuthHeaders(
+            AuthProviderUtils.makeAuthProvider(_authProvider, _authTokenUrl, _authToken, _user, _password)),
+        makeTrustAllSSLContext());
     LOGGER.info(res);
     return res.contains("successfully added");
   }
@@ -197,16 +206,27 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
       throws IOException {
     String res = AbstractBaseAdminCommand.sendRequest("PUT",
         ControllerRequestURLBuilder.baseUrl(_controllerAddress).forTableConfigsUpdate(tableName), node.toString(),
-        makeAuthHeaders(makeAuthProvider(_authProvider, _authTokenUrl, _authToken, _user, _password)));
+        AuthProviderUtils.makeAuthHeaders(
+            AuthProviderUtils.makeAuthProvider(_authProvider, _authTokenUrl, _authToken, _user, _password)),
+        makeTrustAllSSLContext());
     LOGGER.info(res);
     return res.contains("TableConfigs updated");
+  }
+
+  private SSLContext makeTrustAllSSLContext() {
+    if (_skipControllerCertValidation) {
+      PinotConfiguration trustAllSslConfig = new PinotConfiguration();
+      return new ClientSSLContextGenerator(trustAllSslConfig).generate();
+    } else {
+      return null;
+    }
   }
 
   @Override
   public boolean execute()
       throws Exception {
     if (!_exec) {
-      LOGGER.warn("Dry Running Command: " + toString());
+      LOGGER.warn("Dry Running Command: {}", toString());
       LOGGER.warn("Use the -exec option to actually execute the command.");
       return true;
     }
@@ -216,7 +236,7 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
     }
     _controllerAddress = _controllerProtocol + "://" + _controllerHost + ":" + _controllerPort;
 
-    LOGGER.info("Executing command: " + toString());
+    LOGGER.info("Executing command: {}", toString());
 
     String rawTableName = null;
     TableConfig offlineTableConfig = null;

@@ -42,7 +42,7 @@ public class TableRebalanceProgressStats {
   }
 
   // Done/In_progress/Failed
-  private String _status;
+  private RebalanceResult.Status _status;
   // When did Rebalance start
   private long _startTimeMs;
   // How long did rebalance take
@@ -62,7 +62,7 @@ public class TableRebalanceProgressStats {
     _initialToTargetStateConvergence = new RebalanceStateStats();
   }
 
-  public void setStatus(String status) {
+  public void setStatus(RebalanceResult.Status status) {
     _status = status;
   }
 
@@ -90,7 +90,7 @@ public class TableRebalanceProgressStats {
     _completionStatusMsg = completionStatusMsg;
   }
 
-  public String getStatus() {
+  public RebalanceResult.Status getStatus() {
     return _status;
   }
 

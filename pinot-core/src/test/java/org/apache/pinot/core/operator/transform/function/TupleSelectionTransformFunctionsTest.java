@@ -124,7 +124,7 @@ public class TupleSelectionTransformFunctionsTest extends BaseTransformFunctionT
     assertEquals(transformFunction.getResultMetadata().getDataType(), FieldSpec.DataType.DOUBLE);
     double[] doubleValues = transformFunction.transformToDoubleValuesSV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
-      assertEquals(doubleValues[i], Math.min(Math.min(_intSVValues[i], -1), _doubleSVValues[i]));
+      assertEquals(doubleValues[i], Math.min(Math.min(_intSVValues[i], -1), Double.valueOf(_floatSVValues[i])));
     }
   }
 
@@ -323,7 +323,7 @@ public class TupleSelectionTransformFunctionsTest extends BaseTransformFunctionT
     assertEquals(transformFunction.getResultMetadata().getDataType(), FieldSpec.DataType.DOUBLE);
     double[] doubleValues = transformFunction.transformToDoubleValuesSV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
-      assertEquals(doubleValues[i], Math.max(Math.max(_intSVValues[i], -1), _doubleSVValues[i]));
+      assertEquals(doubleValues[i], Math.max(Math.max(_intSVValues[i], -1), Double.valueOf(_floatSVValues[i])));
     }
   }
 

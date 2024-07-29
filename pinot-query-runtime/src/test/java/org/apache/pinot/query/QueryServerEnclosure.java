@@ -20,17 +20,16 @@ package org.apache.pinot.query;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.CompletableFuture;
 import org.apache.helix.HelixManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.common.utils.NamedThreadFactory;
 import org.apache.pinot.common.utils.SchemaUtils;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
+import org.apache.pinot.query.routing.StagePlan;
+import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.QueryRunner;
-import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 import org.apache.pinot.query.testutils.MockInstanceDataManagerFactory;
 import org.apache.pinot.query.testutils.QueryTestUtils;
 import org.apache.pinot.spi.data.Schema;
@@ -63,26 +62,17 @@ public class QueryServerEnclosure {
   private static final String SCHEMAS_PREFIX = "/SCHEMAS/";
 
   private final int _queryRunnerPort;
-  private final Map<String, Object> _runnerConfig = new HashMap<>();
-  private final InstanceDataManager _instanceDataManager;
-  private final HelixManager _helixManager;
-
   private final QueryRunner _queryRunner;
-  private final ExecutorService _executor =
-      Executors.newCachedThreadPool(new NamedThreadFactory("QueryServerTest_Server"));
 
   public QueryServerEnclosure(MockInstanceDataManagerFactory factory) {
-    try {
-      _instanceDataManager = factory.buildInstanceDataManager();
-      _helixManager = mockHelixManager(factory.buildSchemaMap());
-      _queryRunnerPort = QueryTestUtils.getAvailablePort();
-      _runnerConfig.put(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT, _queryRunnerPort);
-      _runnerConfig.put(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME,
-          String.format("Server_%s", CommonConstants.MultiStageQueryRunner.DEFAULT_QUERY_RUNNER_HOSTNAME));
-      _queryRunner = new QueryRunner();
-    } catch (Exception e) {
-      throw new RuntimeException("Test Failed!", e);
-    }
+    _queryRunnerPort = QueryTestUtils.getAvailablePort();
+    Map<String, Object> runnerConfig = new HashMap<>();
+    runnerConfig.put(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME, "Server_localhost");
+    runnerConfig.put(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT, _queryRunnerPort);
+    InstanceDataManager instanceDataManager = factory.buildInstanceDataManager();
+    HelixManager helixManager = mockHelixManager(factory.buildSchemaMap());
+    _queryRunner = new QueryRunner();
+    _queryRunner.init(new PinotConfiguration(runnerConfig), instanceDataManager, helixManager, mockServiceMetrics());
   }
 
   private HelixManager mockHelixManager(Map<String, Schema> schemaMap) {
@@ -112,31 +102,17 @@ public class QueryServerEnclosure {
     return _queryRunnerPort;
   }
 
-  public void start()
-      throws Exception {
-    PinotConfiguration configuration = new PinotConfiguration(_runnerConfig);
-    _queryRunner.init(configuration, _instanceDataManager, _helixManager, mockServiceMetrics());
+  public void start() {
     _queryRunner.start();
   }
 
   public void shutDown() {
-    try {
-      _queryRunner.shutDown();
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
+    _queryRunner.shutDown();
   }
 
-  public void processQuery(DistributedStagePlan distributedStagePlan, Map<String, String> requestMetadataMap) {
-    _executor.submit(() -> {
-      try {
-        _queryRunner.processQuery(distributedStagePlan, requestMetadataMap);
-      } catch (Exception e) {
-        // TODO: Find a way to propagate the exception and fail the test
-        System.err.println("Caught exception while executing query");
-        e.printStackTrace(System.err);
-        throw new RuntimeException("Error executing query!", e);
-      }
-    });
+  public CompletableFuture<Void> processQuery(WorkerMetadata workerMetadata, StagePlan stagePlan,
+      Map<String, String> requestMetadataMap) {
+    return CompletableFuture.runAsync(() -> _queryRunner.processQuery(workerMetadata, stagePlan, requestMetadataMap),
+        _queryRunner.getExecutorService());
   }
 }

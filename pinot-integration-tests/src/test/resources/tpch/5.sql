@@ -18,8 +18,8 @@ where
   and s_nationkey = n_nationkey
   and n_regionkey = r_regionkey
   and r_name = 'ASIA'
-  and o_orderdate >= 757382400
-  and o_orderdate < 788918400
+  and o_orderdate >= '1994-01-01'
+  and o_orderdate < '1995-01-01'
 group by
   n_name
 order by

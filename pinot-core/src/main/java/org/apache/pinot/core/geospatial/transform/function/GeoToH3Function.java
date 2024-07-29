@@ -52,6 +52,7 @@ public class GeoToH3Function extends BaseTransformFunction {
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
+    super.init(arguments, columnContextMap);
     Preconditions.checkArgument(arguments.size() == 3 || arguments.size() == 2,
         "Transform function %s requires 2 or 3 arguments", getName());
     if (arguments.size() == 3) {

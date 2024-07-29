@@ -40,7 +40,13 @@ public interface TableRebalanceObserver {
   void onTrigger(Trigger trigger, Map<String, Map<String, String>> currentState,
       Map<String, Map<String, String>> targetState);
 
+  void onNoop(String msg);
+
   void onSuccess(String msg);
 
   void onError(String errorMsg);
+
+  boolean isStopped();
+
+  RebalanceResult.Status getStopStatus();
 }

@@ -87,12 +87,13 @@ public class QueryInvertedSortedIndexRecommender {
    * meaning that at most one candidate (PredicateParseResult) in the list can contribute to the global recommendation.
    */
   public List<List<PredicateParseResult>> parseQuery(QueryContext queryContext, double queryWeight) {
-    if (queryContext.getFilter() == null) {
+    FilterContext filter = queryContext.getFilter();
+    if (filter == null || filter.isConstant()) {
       return EMPTY_PARSE_RESULT;
     }
 
-    LOGGER.trace("Parsing Where Clause: {}", queryContext.getFilter().toString());
-    return parseTopLevel(queryContext.getFilter(), queryWeight);
+    LOGGER.trace("Parsing Where Clause: {}", filter);
+    return parseTopLevel(filter, queryWeight);
   }
 
   /**

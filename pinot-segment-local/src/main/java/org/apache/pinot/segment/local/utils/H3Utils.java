@@ -20,10 +20,9 @@ package org.apache.pinot.segment.local.utils;
 
 import com.uber.h3core.H3CoreV3;
 import com.uber.h3core.util.LatLng;
-import it.unimi.dsi.fastutil.longs.LongArrayList;
-import it.unimi.dsi.fastutil.longs.LongList;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
+import it.unimi.dsi.fastutil.longs.LongSets;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
@@ -39,7 +38,6 @@ import org.locationtech.jts.geom.Polygon;
 
 
 public class H3Utils {
-
   private H3Utils() {
   }
 
@@ -53,45 +51,57 @@ public class H3Utils {
     }
   }
 
+  /**
+   * Returns the H3 cells that is crossed by the line.
+   */
   private static LongSet coverLineInH3(LineString lineString, int resolution) {
-    LongSet coveringH3Cells = new LongOpenHashSet();
-    LongList endpointH3Cells = new LongArrayList();
-    for (Coordinate endpoint : lineString.getCoordinates()) {
-      endpointH3Cells.add(H3_CORE.geoToH3(endpoint.y, endpoint.x, resolution));
+    Coordinate[] endPoints = lineString.getCoordinates();
+    int numEndPoints = endPoints.length;
+    if (numEndPoints == 0) {
+      return LongSets.EMPTY_SET;
     }
-    for (int i = 0; i < endpointH3Cells.size() - 1; i++) {
-      try {
-        coveringH3Cells.addAll(H3_CORE.h3Line(endpointH3Cells.getLong(i), endpointH3Cells.getLong(i + 1)));
-      } catch (Exception e) {
-        throw new RuntimeException(e);
-      }
+    long previousCell = H3_CORE.geoToH3(endPoints[0].y, endPoints[0].x, resolution);
+    if (numEndPoints == 1) {
+      return LongSets.singleton(previousCell);
     }
-    return coveringH3Cells;
+    LongSet coveringCells = new LongOpenHashSet();
+    for (int i = 1; i < numEndPoints; i++) {
+      long currentCell = H3_CORE.geoToH3(endPoints[i].y, endPoints[i].x, resolution);
+      coveringCells.addAll(H3_CORE.h3Line(previousCell, currentCell));
+      previousCell = currentCell;
+    }
+    return coveringCells;
   }
 
+  /**
+   * Returns the H3 cells that is fully covered and potentially covered (excluding fully covered) by the polygon.
+   */
   private static Pair<LongSet, LongSet> coverPolygonInH3(Polygon polygon, int resolution) {
+    // TODO: this can be further optimized to use native H3 implementation. They have plan to support natively.
+    // https://github.com/apache/pinot/issues/8547
     List<Long> polyfillCells = H3_CORE.polyfill(Arrays.stream(polygon.getExteriorRing().getCoordinates())
             .map(coordinate -> new LatLng(coordinate.y, coordinate.x)).collect(Collectors.toList()),
         Collections.emptyList(), resolution);
-    // TODO: this can be further optimized to use native H3 implementation. They have plan to support natively.
-    // https://github.com/apache/pinot/issues/8547
-    LongSet potentialH3Cells = new LongOpenHashSet();
     if (polyfillCells.isEmpty()) {
       // If the polyfill cells are empty, meaning the polygon might be smaller than a single cell in the H3 system.
       // So just get whatever one. here choose the first one. the follow up kRing(firstCell, 1) will cover the whole
       // polygon if there is potential not covered by the first point's belonging cell.
       // ref: https://github.com/uber/h3/issues/456#issuecomment-827760163
       Coordinate represent = polygon.getCoordinate();
-      potentialH3Cells.add(H3_CORE.geoToH3(represent.getY(), represent.getX(), resolution));
-    } else {
-      potentialH3Cells.addAll(polyfillCells);
+      return Pair.of(LongSets.EMPTY_SET,
+          new LongOpenHashSet(H3_CORE.kRing(H3_CORE.geoToH3(represent.y, represent.x, resolution), 1)));
     }
-    LongSet fullyContainedCell = new LongOpenHashSet(
-        potentialH3Cells.stream().filter(h3Cell -> polygon.contains(createPolygonFromH3Cell(h3Cell)))
-            .collect(Collectors.toSet()));
-    potentialH3Cells
-        .addAll(potentialH3Cells.stream().flatMap(cell -> H3_CORE.kRing(cell, 1).stream()).collect(Collectors.toSet()));
-    return Pair.of(fullyContainedCell, potentialH3Cells);
+
+    LongSet fullyCoveredCells = new LongOpenHashSet();
+    LongSet potentiallyCoveredCells = new LongOpenHashSet(polyfillCells);
+    for (long cell : polyfillCells) {
+      if (polygon.contains(createPolygonFromH3Cell(cell))) {
+        fullyCoveredCells.add(cell);
+      }
+      potentiallyCoveredCells.addAll(H3_CORE.kRing(cell, 1));
+    }
+    potentiallyCoveredCells.removeAll(fullyCoveredCells);
+    return Pair.of(fullyCoveredCells, potentiallyCoveredCells);
   }
 
   private static Polygon createPolygonFromH3Cell(long h3Cell) {
@@ -101,27 +111,28 @@ public class H3Utils {
         boundary.stream().map(geoCoord -> new Coordinate(geoCoord.lng, geoCoord.lat)).toArray(Coordinate[]::new));
   }
 
-  // Return a pair of cell ids: The first fully contain, the second is potential contain.
-  // potential contains contain the fully contain.
+  /**
+   * Returns the H3 cells that is fully covered and potentially covered (excluding fully covered) by the geometry.
+   */
   public static Pair<LongSet, LongSet> coverGeometryInH3(Geometry geometry, int resolution) {
     if (geometry instanceof Point) {
-      LongSet potentialCover = new LongOpenHashSet();
-      potentialCover.add(H3_CORE.geoToH3(geometry.getCoordinate().y, geometry.getCoordinate().x, resolution));
-      return Pair.of(new LongOpenHashSet(), potentialCover);
+      return Pair.of(LongSets.EMPTY_SET,
+          LongSets.singleton(H3_CORE.geoToH3(geometry.getCoordinate().y, geometry.getCoordinate().x, resolution)));
     } else if (geometry instanceof LineString) {
-      LongSet potentialCover = new LongOpenHashSet();
-      potentialCover.addAll(coverLineInH3(((LineString) geometry), resolution));
-      return Pair.of(new LongOpenHashSet(), potentialCover);
+      return Pair.of(LongSets.EMPTY_SET, coverLineInH3(((LineString) geometry), resolution));
     } else if (geometry instanceof Polygon) {
       return coverPolygonInH3(((Polygon) geometry), resolution);
     } else if (geometry instanceof GeometryCollection) {
-      LongOpenHashSet fullCover = new LongOpenHashSet();
-      LongOpenHashSet potentialCover = new LongOpenHashSet();
-      for (int i = 0; i < geometry.getNumGeometries(); i++) {
-        fullCover.addAll(coverGeometryInH3(geometry.getGeometryN(i), resolution).getLeft());
-        potentialCover.addAll(coverGeometryInH3(geometry.getGeometryN(i), resolution).getRight());
+      LongOpenHashSet fullyCoveredCells = new LongOpenHashSet();
+      LongOpenHashSet potentiallyCoveredCells = new LongOpenHashSet();
+      int numGeometries = geometry.getNumGeometries();
+      for (int i = 0; i < numGeometries; i++) {
+        Pair<LongSet, LongSet> pair = coverGeometryInH3(geometry.getGeometryN(i), resolution);
+        fullyCoveredCells.addAll(pair.getLeft());
+        potentiallyCoveredCells.addAll(pair.getRight());
       }
-      return Pair.of(fullCover, potentialCover);
+      potentiallyCoveredCells.removeAll(fullyCoveredCells);
+      return Pair.of(fullyCoveredCells, potentiallyCoveredCells);
     } else {
       throw new UnsupportedOperationException("Unexpected type: " + geometry.getGeometryType());
     }

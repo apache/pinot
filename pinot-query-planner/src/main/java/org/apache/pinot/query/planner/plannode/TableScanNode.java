@@ -19,41 +19,27 @@
 package org.apache.pinot.query.planner.plannode;
 
 import java.util.List;
-import org.apache.calcite.rel.hint.RelHint;
+import java.util.Objects;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.query.planner.serde.ProtoProperties;
 
 
-public class TableScanNode extends AbstractPlanNode {
-  @ProtoProperties
-  private NodeHint _nodeHint;
-  @ProtoProperties
-  private String _tableName;
-  @ProtoProperties
-  private List<String> _tableScanColumns;
+public class TableScanNode extends BasePlanNode {
+  private final String _tableName;
+  private final List<String> _columns;
 
-  public TableScanNode(int planFragmentId) {
-    super(planFragmentId);
-  }
-
-  public TableScanNode(int planFragmentId, DataSchema dataSchema, List<RelHint> relHints, String tableName,
-      List<String> tableScanColumns) {
-    super(planFragmentId, dataSchema);
+  public TableScanNode(int stageId, DataSchema dataSchema, NodeHint nodeHint, List<PlanNode> inputs, String tableName,
+      List<String> columns) {
+    super(stageId, dataSchema, nodeHint, inputs);
     _tableName = tableName;
-    _nodeHint = new NodeHint(relHints);
-    _tableScanColumns = tableScanColumns;
+    _columns = columns;
   }
 
   public String getTableName() {
     return _tableName;
   }
 
-  public List<String> getTableScanColumns() {
-    return _tableScanColumns;
-  }
-
-  public NodeHint getNodeHint() {
-    return _nodeHint;
+  public List<String> getColumns() {
+    return _columns;
   }
 
   @Override
@@ -64,5 +50,25 @@ public class TableScanNode extends AbstractPlanNode {
   @Override
   public <T, C> T visit(PlanNodeVisitor<T, C> visitor, C context) {
     return visitor.visitTableScan(this, context);
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (!(o instanceof TableScanNode)) {
+      return false;
+    }
+    if (!super.equals(o)) {
+      return false;
+    }
+    TableScanNode that = (TableScanNode) o;
+    return Objects.equals(_tableName, that._tableName) && Objects.equals(_columns, that._columns);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(super.hashCode(), _tableName, _columns);
   }
 }

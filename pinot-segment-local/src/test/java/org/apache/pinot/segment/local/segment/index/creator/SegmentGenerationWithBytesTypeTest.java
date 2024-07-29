@@ -27,7 +27,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Random;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
@@ -37,7 +36,6 @@ import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
 import org.apache.pinot.segment.local.aggregator.PercentileTDigestValueAggregator;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.readers.BaseImmutableDictionary;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
@@ -45,25 +43,24 @@ import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
-import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
-import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.data.DimensionFieldSpec;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
-import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
-import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 
 /**
@@ -89,92 +86,70 @@ public class SegmentGenerationWithBytesTypeTest {
   private static final String VARIABLE_BYTES_COLUMN = "variableBytes";
 
   private Random _random;
-  private RecordReader _recordReader;
-  private Schema _schema;
+  private List<GenericRow> _rows;
   private TableConfig _tableConfig;
+  private Schema _schema;
   private ImmutableSegment _segment;
 
   /**
    * Setup to build a segment with raw indexes (no-dictionary) of various data types.
-   *
-   * @throws Exception
    */
   @BeforeClass
-  public void setup()
+  public void setUp()
       throws Exception {
-
-    _schema = new Schema();
-    _schema.addField(new DimensionFieldSpec(FIXED_BYTE_SORTED_COLUMN, FieldSpec.DataType.BYTES, true));
-    _schema.addField(new DimensionFieldSpec(FIXED_BYTES_UNSORTED_COLUMN, FieldSpec.DataType.BYTES, true));
-    _schema.addField(new DimensionFieldSpec(FIXED_BYTES_NO_DICT_COLUMN, FieldSpec.DataType.BYTES, true));
-    _schema.addField(new DimensionFieldSpec(VARIABLE_BYTES_COLUMN, FieldSpec.DataType.BYTES, true));
-
-    _tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("test").build();
-
     _random = new Random(System.nanoTime());
-    _recordReader = buildIndex(_schema);
+    _rows = generateRows();
+    _tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("test").build();
+    _schema = new Schema.SchemaBuilder().setSchemaName("test")
+        .addSingleValueDimension(FIXED_BYTE_SORTED_COLUMN, DataType.BYTES)
+        .addSingleValueDimension(FIXED_BYTES_UNSORTED_COLUMN, DataType.BYTES)
+        .addSingleValueDimension(FIXED_BYTES_NO_DICT_COLUMN, DataType.BYTES)
+        .addSingleValueDimension(VARIABLE_BYTES_COLUMN, DataType.BYTES).build();
+    buildSegment();
     _segment = ImmutableSegmentLoader.load(new File(SEGMENT_DIR_NAME, SEGMENT_NAME), ReadMode.heap);
   }
 
-  /**
-   * Clean up after test
-   */
   @AfterClass
-  public void cleanup()
+  public void tearDown()
       throws IOException {
-    _recordReader.close();
     _segment.destroy();
     FileUtils.deleteQuietly(new File(SEGMENT_DIR_NAME));
     FileUtils.deleteQuietly(new File(AVRO_DIR_NAME));
   }
 
   @Test
-  public void test()
+  public void testRecords()
       throws Exception {
-    PinotSegmentRecordReader pinotReader = new PinotSegmentRecordReader(new File(SEGMENT_DIR_NAME, SEGMENT_NAME));
-
-    _recordReader.rewind();
-    while (pinotReader.hasNext()) {
-      GenericRow expectedRow = _recordReader.next();
-      GenericRow actualRow = pinotReader.next();
-
-      for (String column : _schema.getColumnNames()) {
-        byte[] actual = (byte[]) actualRow.getValue(column);
-        byte[] expected = (byte[]) expectedRow.getValue(column);
-
-        if (ByteArray.compare(actual, expected) != 0) {
-          Assert.assertEquals(actualRow.getValue(column), expectedRow.getValue(column));
-        }
+    try (PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader()) {
+      recordReader.init(_segment);
+      for (int i = 0; i < NUM_ROWS; i++) {
+        assertEquals(recordReader.next(), _rows.get(i));
       }
+      assertFalse(recordReader.hasNext());
     }
-
-    // Ensure both record readers are exhausted, ie same number of rows.
-    Assert.assertFalse(_recordReader.hasNext());
-    pinotReader.close();
   }
 
   @Test
   public void testMetadata() {
-    Assert.assertTrue(_segment.getDataSource(FIXED_BYTE_SORTED_COLUMN).getDataSourceMetadata().isSorted());
-    Assert.assertFalse(_segment.getSegmentMetadata().getColumnMetadataFor(FIXED_BYTES_NO_DICT_COLUMN).hasDictionary());
+    assertTrue(_segment.getDataSource(FIXED_BYTE_SORTED_COLUMN).getDataSourceMetadata().isSorted());
+    assertFalse(_segment.getSegmentMetadata().getColumnMetadataFor(FIXED_BYTES_NO_DICT_COLUMN).hasDictionary());
   }
 
   @Test
   public void testDictionary() {
     BaseImmutableDictionary dictionary = (BaseImmutableDictionary) _segment.getDictionary(FIXED_BYTE_SORTED_COLUMN);
-    Assert.assertEquals(dictionary.length(), NUM_SORTED_VALUES);
+    assertEquals(dictionary.length(), NUM_SORTED_VALUES);
 
     // Test dictionary indexing.
     for (int i = 0; i < NUM_ROWS; i++) {
       int value = (i * NUM_SORTED_VALUES) / NUM_ROWS;
       // For sorted columns, values are written as 0, 0, 0.., 1, 1, 1...n, n, n
-      Assert.assertEquals(dictionary.indexOf(BytesUtils.toHexString(Ints.toByteArray(value))),
-          value % NUM_SORTED_VALUES);
+      assertEquals(dictionary.indexOf(BytesUtils.toHexString(Ints.toByteArray(value))), value % NUM_SORTED_VALUES);
     }
 
     // Test value not in dictionary.
-    Assert.assertEquals(dictionary.indexOf(BytesUtils.toHexString(Ints.toByteArray(NUM_SORTED_VALUES + 1))), -1);
-    Assert.assertEquals(dictionary.insertionIndexOf(BytesUtils.toHexString(Ints.toByteArray(NUM_SORTED_VALUES + 1))),
+    assertEquals(dictionary.indexOf(BytesUtils.toHexString(Ints.toByteArray(NUM_SORTED_VALUES + 1))), -1);
+    assertEquals(dictionary.insertionIndexOf(BytesUtils.toHexString(Ints.toByteArray(NUM_SORTED_VALUES + 1))),
         -(NUM_SORTED_VALUES + 1));
 
     int[] dictIds = new int[NUM_SORTED_VALUES];
@@ -186,7 +161,7 @@ public class SegmentGenerationWithBytesTypeTest {
     dictionary.readBytesValues(dictIds, NUM_SORTED_VALUES, values);
     for (int expected = 0; expected < NUM_SORTED_VALUES; expected++) {
       int actual = ByteBuffer.wrap(values[expected]).asIntBuffer().get();
-      Assert.assertEquals(actual, expected);
+      assertEquals(actual, expected);
     }
   }
 
@@ -197,8 +172,8 @@ public class SegmentGenerationWithBytesTypeTest {
   public void testTDigestAvro()
       throws Exception {
     Schema schema = new Schema();
-    schema.addField(new MetricFieldSpec(FIXED_BYTES_UNSORTED_COLUMN, FieldSpec.DataType.BYTES));
-    schema.addField(new MetricFieldSpec(VARIABLE_BYTES_COLUMN, FieldSpec.DataType.BYTES));
+    schema.addField(new MetricFieldSpec(FIXED_BYTES_UNSORTED_COLUMN, DataType.BYTES));
+    schema.addField(new MetricFieldSpec(VARIABLE_BYTES_COLUMN, DataType.BYTES));
 
     List<byte[]> fixedExpected = new ArrayList<>(NUM_ROWS);
     List<byte[]> varExpected = new ArrayList<>(NUM_ROWS);
@@ -207,38 +182,24 @@ public class SegmentGenerationWithBytesTypeTest {
 
     IndexSegment segment = buildSegmentFromAvro(schema, AVRO_DIR_NAME, AVRO_NAME, SEGMENT_NAME);
     SegmentMetadata metadata = segment.getSegmentMetadata();
+    assertTrue(metadata.getColumnMetadataFor(FIXED_BYTES_UNSORTED_COLUMN).hasDictionary());
+    assertTrue(metadata.getColumnMetadataFor(VARIABLE_BYTES_COLUMN).hasDictionary());
 
-    Assert.assertTrue(metadata.getColumnMetadataFor(FIXED_BYTES_UNSORTED_COLUMN).hasDictionary());
-    Assert.assertTrue(metadata.getColumnMetadataFor(VARIABLE_BYTES_COLUMN).hasDictionary());
-
-    PinotSegmentRecordReader reader = new PinotSegmentRecordReader(new File(AVRO_DIR_NAME, SEGMENT_NAME));
-    GenericRow row = new GenericRow();
-
-    int i = 0;
-    while (reader.hasNext()) {
-      row = reader.next(row);
-      Assert.assertEquals(ByteArray.compare((byte[]) row.getValue(FIXED_BYTES_UNSORTED_COLUMN), fixedExpected.get(i)),
-          0);
-      Assert.assertEquals(ByteArray.compare((byte[]) row.getValue(VARIABLE_BYTES_COLUMN), varExpected.get(i++)), 0);
+    try (PinotSegmentRecordReader reader = new PinotSegmentRecordReader()) {
+      reader.init(segment);
+      GenericRow row = new GenericRow();
+      int i = 0;
+      while (reader.hasNext()) {
+        row = reader.next(row);
+        assertEquals(ByteArray.compare((byte[]) row.getValue(FIXED_BYTES_UNSORTED_COLUMN), fixedExpected.get(i)), 0);
+        assertEquals(ByteArray.compare((byte[]) row.getValue(VARIABLE_BYTES_COLUMN), varExpected.get(i++)), 0);
+      }
     }
+
     segment.destroy();
   }
 
-  /**
-   * Helper method to build a segment containing a single valued string column with RAW (no-dictionary) index.
-   *
-   * @return Array of string values for the rows in the generated index.
-   * @throws Exception
-   */
-
-  private RecordReader buildIndex(Schema schema)
-      throws Exception {
-    SegmentGeneratorConfig config = new SegmentGeneratorConfig(_tableConfig, schema);
-
-    config.setOutDir(SEGMENT_DIR_NAME);
-    config.setSegmentName(SEGMENT_NAME);
-    config.setRawIndexCreationColumns(Collections.singletonList(FIXED_BYTES_NO_DICT_COLUMN));
-
+  private List<GenericRow> generateRows() {
     List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
     for (int i = 0; i < NUM_ROWS; i++) {
       HashMap<String, Object> map = new HashMap<>();
@@ -264,19 +225,21 @@ public class SegmentGenerationWithBytesTypeTest {
       genericRow.init(map);
       rows.add(genericRow);
     }
+    return rows;
+  }
 
-    RecordReader recordReader = new GenericRowRecordReader(rows);
-    SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    driver.init(config, recordReader);
-    driver.build();
+  private void buildSegment()
+      throws Exception {
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(_tableConfig, _schema);
+    config.setOutDir(SEGMENT_DIR_NAME);
+    config.setSegmentName(SEGMENT_NAME);
+    config.setRawIndexCreationColumns(Collections.singletonList(FIXED_BYTES_NO_DICT_COLUMN));
 
-    Map<String, Object> props = new HashMap<>();
-    props.put(IndexLoadingConfig.READ_MODE_KEY, ReadMode.mmap.toString());
-    SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader().load(driver.getOutputDirectory().toURI(),
-        new SegmentDirectoryLoaderContext.Builder().setTableConfig(_tableConfig)
-            .setSegmentDirectoryConfigs(new PinotConfiguration(props)).build());
-    recordReader.rewind();
-    return recordReader;
+    try (RecordReader recordReader = new GenericRowRecordReader(_rows)) {
+      SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+      driver.init(config, recordReader);
+      driver.build();
+    }
   }
 
   /**

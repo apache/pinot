@@ -29,7 +29,26 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
   UNCAUGHT_POST_EXCEPTIONS("exceptions", true),
   HEALTHCHECK_BAD_CALLS("healthcheck", true),
   HEALTHCHECK_OK_CALLS("healthcheck", true),
+  /**
+   * Number of queries executed.
+   * <p>
+   * At this moment this counter does not include queries executed in multi-stage mode.
+   */
   QUERIES("queries", false),
+  /**
+   * Number of multi-stage queries that have been started.
+   * <p>
+   * Unlike {@link #MULTI_STAGE_QUERIES}, this metric is global and not attached to a particular table.
+   * That means it can be used to know how many multi-stage queries have been started in total.
+   */
+  MULTI_STAGE_QUERIES_GLOBAL("queries", true),
+  /**
+   * Number of multi-stage queries that have been started touched a given table.
+   * <p>
+   * In case the query touch multiple tables (ie using joins)1, this metric will be incremented for each table, so the
+   * sum of this metric across all tables should be greater or equal than {@link #MULTI_STAGE_QUERIES_GLOBAL}.
+   */
+  MULTI_STAGE_QUERIES("queries", false),
 
   // These metrics track the exceptions caught during query execution in broker side.
   // Query rejected by Jersey thread pool executor
@@ -67,6 +86,9 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
   // This metric track the number of broker responses with not all servers responded.
   // (numServersQueried > numServersResponded)
   BROKER_RESPONSES_WITH_PARTIAL_SERVERS_RESPONDED("badResponses", false),
+
+  BROKER_RESPONSES_WITH_TIMEOUTS("badResponses", false),
+
   // This metric track the number of broker responses with number of groups limit reached (potential bad responses).
   BROKER_RESPONSES_WITH_NUM_GROUPS_LIMIT_REACHED("badResponses", false),
 
@@ -98,7 +120,34 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
   NETTY_CONNECTION_BYTES_SENT("nettyConnection", true),
   NETTY_CONNECTION_BYTES_RECEIVED("nettyConnection", true),
 
-  PROACTIVE_CLUSTER_CHANGE_CHECK("proactiveClusterChangeCheck", true);
+  PROACTIVE_CLUSTER_CHANGE_CHECK("proactiveClusterChangeCheck", true),
+  DIRECT_MEMORY_OOM("directMemoryOOMCount", true),
+
+  /**
+   * How many queries with joins have been executed.
+   * <p>
+   * For each query with at least one join, this meter is increased exactly once.
+   */
+  QUERIES_WITH_JOINS("queries", true),
+  /**
+   * How many joins have been executed.
+   * <p>
+   * For each query with at least one join, this meter is increased as many times as joins in the query.
+   */
+  JOIN_COUNT("queries", true),
+  /**
+   * How many queries with window functions have been executed.
+   * <p>
+   * For each query with at least one window function, this meter is increased exactly once.
+   */
+  QUERIES_WITH_WINDOW("queries", true),
+  /**
+   * How many window functions have been executed.
+   * <p>
+   * For each query with at least one window function, this meter is increased as many times as window functions in the
+   * query.
+   */
+  WINDOW_COUNT("queries", true),;
 
   private final String _brokerMeterName;
   private final String _unit;

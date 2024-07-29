@@ -25,7 +25,7 @@
   <parent>
     <artifactId>pinot</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>0.13.0-SNAPSHOT</version>
+    <version>1.2.0-SNAPSHOT</version>
     <relativePath>..</relativePath>
   </parent>
   <artifactId>pinot-integration-tests</artifactId>
@@ -34,50 +34,12 @@
 
   <properties>
     <pinot.root>${basedir}/..</pinot.root>
-    <localstack-utils.version>0.2.19</localstack-utils.version>
-    <testcontainers.version>1.17.3</testcontainers.version>
+    <testcontainers.version>1.20.0</testcontainers.version>
   </properties>
-
-  <build>
-    <plugins>
-      <plugin>
-        <artifactId>maven-jar-plugin</artifactId>
-        <executions>
-          <execution>
-            <goals>
-              <goal>test-jar</goal>
-            </goals>
-          </execution>
-        </executions>
-      </plugin>
-      <plugin>
-        <groupId>org.codehaus.mojo</groupId>
-        <artifactId>appassembler-maven-plugin</artifactId>
-        <configuration>
-          <programs>
-            <program>
-              <mainClass>org.apache.pinot.compat.tests.CompatibilityOpsRunner</mainClass>
-              <name>pinot-compat-test-runner</name>
-              <jvmSettings>
-                <initialMemorySize>2G</initialMemorySize>
-                <maxMemorySize>2G</maxMemorySize>
-              </jvmSettings>
-            </program>
-          </programs>
-          <repositoryLayout>flat</repositoryLayout>
-          <repositoryName>lib</repositoryName>
-        </configuration>
-      </plugin>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-enforcer-plugin</artifactId>
-      </plugin>
-    </plugins>
-  </build>
 
   <profiles>
     <profile>
-      <id>integration-tests-only</id>
+      <id>no-integration-tests</id>
       <activation>
         <activeByDefault>false</activeByDefault>
       </activation>
@@ -87,15 +49,7 @@
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-surefire-plugin</artifactId>
             <configuration>
-              <skipTests>false</skipTests>
-              <excludes>
-                <!-- Covered by FlakyConsumerRealtimeClusterIntegrationTest -->
-                <exclude>**/RealtimeClusterIntegrationTest.java</exclude>
-                <!-- Covered by ConvertToRawIndexMinionClusterIntegrationTest -->
-                <exclude>**/HybridClusterIntegrationTest.java</exclude>
-                <!-- Covered by TlsIntegrationTest -->
-                <exclude>**/BasicAuthRealtimeIntegrationTest.java</exclude>
-              </excludes>
+              <skipTests>true</skipTests>
             </configuration>
           </plugin>
         </plugins>
@@ -153,12 +107,14 @@
                 <include>**/org/apache/pinot/integration/tests/R*Test.java</include>
                 <include>**/org/apache/pinot/integration/tests/S*Test.java</include>
                 <include>**/org/apache/pinot/integration/tests/T*Test.java</include>
+                <include>**/org/apache/pinot/integration/tests/tpch/*Test.java</include>
                 <include>**/org/apache/pinot/integration/tests/U*Test.java</include>
                 <include>**/org/apache/pinot/integration/tests/V*Test.java</include>
                 <include>**/org/apache/pinot/integration/tests/W*Test.java</include>
                 <include>**/org/apache/pinot/integration/tests/X*Test.java</include>
                 <include>**/org/apache/pinot/integration/tests/Y*Test.java</include>
                 <include>**/org/apache/pinot/integration/tests/Z*Test.java</include>
+                <include>**/org/apache/pinot/server/realtime/**</include>
               </includes>
             </configuration>
           </plugin>
@@ -180,23 +136,6 @@
               <suiteXmlFiles>
                 <suiteXmlFile>src/test/resources/custom-cluster-integration-test-suite.xml</suiteXmlFile>
               </suiteXmlFiles>
-            </configuration>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
-    <profile>
-      <id>no-integration-tests</id>
-      <activation>
-        <activeByDefault>false</activeByDefault>
-      </activation>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-surefire-plugin</artifactId>
-            <configuration>
-              <skipTests>true</skipTests>
             </configuration>
           </plugin>
         </plugins>
@@ -238,14 +177,6 @@
     <dependency>
       <groupId>com.101tec</groupId>
       <artifactId>zkclient</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.glassfish.hk2</groupId>
-      <artifactId>hk2-locator</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.glassfish.hk2</groupId>
-      <artifactId>hk2-metadata-generator</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
@@ -314,7 +245,7 @@
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-kafka-${kafka.version}</artifactId>
+      <artifactId>pinot-kafka-2.0</artifactId>
       <version>${project.version}</version>
       <scope>runtime</scope>
     </dependency>
@@ -358,22 +289,8 @@
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>cloud.localstack</groupId>
-      <artifactId>localstack-utils</artifactId>
-      <version>${localstack-utils.version}</version>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
       <groupId>org.testng</groupId>
       <artifactId>testng</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.commons</groupId>
-      <artifactId>commons-lang3</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>javax.servlet</groupId>
-      <artifactId>javax.servlet-api</artifactId>
     </dependency>
     <dependency>
       <groupId>com.h2database</groupId>
@@ -394,16 +311,8 @@
       <artifactId>zookeeper</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.apache.commons</groupId>
-      <artifactId>commons-math3</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>commons-lang</groupId>
-      <artifactId>commons-lang</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>commons-logging</groupId>
-      <artifactId>commons-logging</artifactId>
+      <groupId>org.slf4j</groupId>
+      <artifactId>jcl-over-slf4j</artifactId>
     </dependency>
     <dependency>
       <groupId>org.mockito</groupId>

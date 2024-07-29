@@ -47,7 +47,43 @@ public enum ServerTimer implements AbstractMetrics.Timer {
   SEGMENT_UPLOAD_TIME_MS("milliseconds", false),
 
   TOTAL_CPU_TIME_NS("nanoseconds", false, "Total query cost (thread cpu time + system "
-      + "activities cpu time + response serialization cpu time) for query processing on server.");
+      + "activities cpu time + response serialization cpu time) for query processing on server."),
+
+  UPSERT_PRELOAD_TIME_MS("milliseconds", false,
+      "Total time taken to preload a table partition of an upsert table with upsert snapshot"),
+  UPSERT_REMOVE_EXPIRED_PRIMARY_KEYS_TIME_MS("milliseconds", false,
+      "Total time taken to delete expired primary keys based on metadataTTL or deletedKeysTTL"),
+  GRPC_QUERY_EXECUTION_MS("milliseconds", false, "Total execution time of a successful query over gRPC"),
+  UPSERT_SNAPSHOT_TIME_MS("milliseconds", false, "Total time taken to take upsert table snapshot"),
+
+  // Multi-stage
+  /**
+   * Time spent building the hash table for the join.
+   * This is the sum of all time spent by all workers in the stage.
+   */
+  HASH_JOIN_BUILD_TABLE_CPU_TIME_MS("millis", true),
+  /**
+   * Time spent serializing blocks into bytes to be sent to the next stage.
+   * This is the sum of all time spent by all workers in the stage.
+   */
+  MULTI_STAGE_SERIALIZATION_CPU_TIME_MS("millis", true),
+  /**
+   * Time spent deserializing bytes into blocks to be processed by the stage.
+   * This is the sum of all time spent by all workers in the stage.
+   */
+  MULTI_STAGE_DESERIALIZATION_CPU_TIME_MS("millis", true),
+  /**
+   * Time waiting on the receive mailbox for its parent operator to consume the data.
+   * Remember that each stage may have several workers and each one will have a receive mailbox for each worker it is
+   * reading from. This is the sum of all time waiting.
+   */
+  RECEIVE_DOWNSTREAM_WAIT_CPU_TIME_MS("millis", true),
+  /**
+   * Time waiting on the receive mailbox waiting for the child operator to produce the data.
+   * Remember that each stage may have several workers and each one will have a receive mailbox for each worker it is
+   * reading from. This is the sum of all time waiting.
+   */
+  RECEIVE_UPSTREAM_WAIT_CPU_TIME_MS("millis", true);
 
   private final String _timerName;
   private final boolean _global;

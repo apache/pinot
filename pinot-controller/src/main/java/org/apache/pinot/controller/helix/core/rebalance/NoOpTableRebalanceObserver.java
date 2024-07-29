@@ -30,10 +30,24 @@ public class NoOpTableRebalanceObserver implements TableRebalanceObserver {
   }
 
   @Override
+  public void onNoop(String msg) {
+  }
+
+  @Override
   public void onSuccess(String msg) {
   }
 
   @Override
   public void onError(String errorMsg) {
+  }
+
+  @Override
+  public boolean isStopped() {
+    return false;
+  }
+
+  @Override
+  public RebalanceResult.Status getStopStatus() {
+    throw new UnsupportedOperationException();
   }
 }

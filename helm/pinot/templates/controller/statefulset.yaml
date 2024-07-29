@@ -1,0 +1,156 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "pinot.controller.fullname" . }}
+  namespace: {{ include "pinot.namespace" . }}
+  labels:
+    {{- include "pinot.controllerLabels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "pinot.controllerMatchLabels" . | nindent 6 }}
+  serviceName: {{ template "pinot.controller.headless" . }}
+  replicas: {{ .Values.controller.replicaCount }}
+  updateStrategy:
+    type: {{ .Values.controller.updateStrategy.type }}
+  podManagementPolicy: {{ .Values.controller.podManagementPolicy }}
+  template:
+    metadata:
+      labels:
+        {{- include "pinot.controllerLabels" . | nindent 8 }}
+      annotations:
+        {{- if .Values.controller.automaticReload.enabled }}
+        checksum/config: {{ include (print $.Template.BasePath "/controller/configmap.yaml") . | sha256sum }}
+        {{- end }}
+        {{- with .Values.controller.podAnnotations }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      serviceAccountName: {{ include "pinot.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.controller.podSecurityContext | nindent 8 }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      nodeSelector:
+{{ toYaml .Values.controller.nodeSelector | indent 8 }}
+      affinity:
+{{ toYaml .Values.controller.affinity | indent 8 }}
+      tolerations:
+{{ toYaml .Values.controller.tolerations | indent 8 }}
+      containers:
+      - name: controller
+        securityContext:
+          {{- toYaml .Values.controller.securityContext | nindent 10 }}
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        args: [ "{{ .Values.controller.startCommand }}", "-configFileName", "/var/pinot/controller/config/pinot-controller.conf" ]
+        env:
+          - name: JAVA_OPTS
+            value: "{{ .Values.controller.jvmOpts }} -Dlog4j2.configurationFile={{ .Values.controller.log4j2ConfFile }} -Dplugins.dir={{ .Values.controller.pluginsDir }}"
+{{- if .Values.controller.extraEnv }}
+{{ toYaml .Values.controller.extraEnv | indent 10 }}
+{{- end }}
+        envFrom:
+{{ toYaml .Values.controller.envFrom | indent 10 }}
+        ports:
+          - containerPort: {{ .Values.controller.service.port }}
+            protocol: {{ .Values.controller.service.protocol }}
+            name: {{ .Values.controller.service.name }}
+{{- if .Values.controller.service.extraPorts }}
+{{ toYaml .Values.controller.service.extraPorts | indent 10 }}
+{{- end }}           
+        {{- if .Values.controller.probes.livenessEnabled }}
+        livenessProbe:
+          initialDelaySeconds: {{ .Values.controller.probes.liveness.initialDelaySeconds | default .Values.probes.initialDelaySeconds }}
+          periodSeconds: {{ .Values.controller.probes.liveness.periodSeconds | default .Values.probes.periodSeconds }}
+          failureThreshold: {{ .Values.controller.probes.liveness.failureThreshold | default .Values.probes.failureThreshold }}
+          successThreshold: {{ .Values.controller.probes.liveness.successThreshold | default .Values.probes.successThreshold }}
+          timeoutSeconds: {{ .Values.controller.probes.liveness.timeoutSeconds | default .Values.probes.timeoutSeconds }}
+          httpGet:
+            path: {{ .Values.controller.probes.endpoint }}
+            port: {{ .Values.controller.service.port }}
+        {{- end }}
+        {{- if .Values.controller.probes.readinessEnabled }}
+        readinessProbe:
+          initialDelaySeconds: {{ .Values.controller.probes.readiness.initialDelaySeconds | default .Values.probes.initialDelaySeconds }}
+          periodSeconds: {{ .Values.controller.probes.readiness.periodSeconds | default .Values.probes.periodSeconds }}
+          failureThreshold: {{ .Values.controller.probes.readiness.failureThreshold | default .Values.probes.failureThreshold }}
+          successThreshold: {{ .Values.controller.probes.readiness.successThreshold | default .Values.probes.successThreshold }}
+          timeoutSeconds: {{ .Values.controller.probes.readiness.timeoutSeconds | default .Values.probes.timeoutSeconds }}
+          httpGet:
+            path: {{ .Values.controller.probes.endpoint }}
+            port: {{ .Values.controller.service.port }}
+        {{- end }}
+        {{- if .Values.controller.probes.startupEnabled }}
+        startupProbe:
+          initialDelaySeconds: {{ .Values.controller.probes.startup.initialDelaySeconds | default .Values.probes.initialDelaySeconds }}
+          periodSeconds: {{ .Values.controller.probes.startup.periodSeconds | default .Values.probes.periodSeconds }}
+          failureThreshold: {{ .Values.controller.probes.startup.failureThreshold | default .Values.probes.failureThreshold }}
+          successThreshold: {{ .Values.controller.probes.startup.successThreshold | default .Values.probes.successThreshold }}
+          timeoutSeconds: {{ .Values.controller.probes.startup.timeoutSeconds | default .Values.probes.timeoutSeconds }}
+          httpGet:
+            path: {{ .Values.controller.probes.endpoint }}
+            port: {{ .Values.controller.service.port }}
+        {{- end }}
+        volumeMounts:
+          - name: config
+            mountPath: /var/pinot/controller/config
+          - name: data
+            mountPath: "{{ .Values.controller.persistence.mountPath }}"
+          {{- if ne (len .Values.controller.persistence.extraVolumeMounts) 0 }}
+{{ toYaml .Values.controller.persistence.extraVolumeMounts | indent 10 }}
+          {{- end }}
+        resources:
+{{ toYaml .Values.controller.resources | indent 12 }}
+      restartPolicy: Always
+      volumes:
+      - name: config
+        configMap:
+          name: {{ include "pinot.controller.config" . }}
+{{- if not .Values.controller.persistence.enabled }}
+      - name: data
+        emptyDir: {}
+{{- end }}
+      {{- if ne (len .Values.controller.persistence.extraVolumes) 0 }}
+{{ toYaml .Values.controller.persistence.extraVolumes | indent 6 }}
+      {{- end }}
+{{- if .Values.controller.persistence.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes:
+          - {{ .Values.controller.persistence.accessMode | quote }}
+        {{- if .Values.controller.persistence.storageClass }}
+        {{- if (eq "-" .Values.controller.persistence.storageClass) }}
+        storageClassName: ""
+        {{- else }}
+        storageClassName: {{ .Values.controller.persistence.storageClass }}
+        {{- end }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.controller.persistence.size | quote}}
+{{ end }}

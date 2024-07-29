@@ -20,7 +20,7 @@ package org.apache.pinot.controller.recommender.data.generator;
 
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.configuration.PropertyConverter;
+import org.apache.commons.configuration2.convert.PropertyConverter;
 
 
 /**

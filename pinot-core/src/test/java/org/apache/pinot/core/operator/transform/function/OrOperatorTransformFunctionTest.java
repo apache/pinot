@@ -45,11 +45,14 @@ public class OrOperatorTransformFunctionTest extends LogicalOperatorTransformFun
     Assert.assertTrue(transformFunction instanceof OrOperatorTransformFunction);
     Assert.assertEquals(transformFunction.getName(), TransformFunctionType.OR.getName());
     int[] expectedValues = new int[NUM_ROWS];
-    for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = 1;
-    }
     RoaringBitmap roaringBitmap = new RoaringBitmap();
-    roaringBitmap.add(0L, NUM_ROWS);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      if (_intSVValues[i] != 0) {
+        expectedValues[i] = 1;
+      } else {
+        roaringBitmap.add(i);
+      }
+    }
     testTransformFunctionWithNull(transformFunction, expectedValues, roaringBitmap);
   }
 
@@ -63,12 +66,12 @@ public class OrOperatorTransformFunctionTest extends LogicalOperatorTransformFun
     int[] expectedValues = new int[NUM_ROWS];
     RoaringBitmap roaringBitmap = new RoaringBitmap();
     for (int i = 0; i < NUM_ROWS; i++) {
-      if (isNullRow(i)) {
-        // null int is set to int min in field spec.
+      if (_intSVValues[i] != 0) {
         expectedValues[i] = 1;
+      } else if (isNullRow(i)) {
         roaringBitmap.add(i);
       } else {
-        expectedValues[i] = (_intSVValues[i] == 0) ? 0 : 1;
+        expectedValues[i] = 0;
       }
     }
     testTransformFunctionWithNull(transformFunction, expectedValues, roaringBitmap);

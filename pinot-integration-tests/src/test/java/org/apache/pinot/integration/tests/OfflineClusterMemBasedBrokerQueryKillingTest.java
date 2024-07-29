@@ -33,7 +33,7 @@ import java.util.stream.IntStream;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.log4j.Level;
 import org.apache.log4j.LogManager;
 import org.apache.pinot.common.exception.QueryException;
@@ -198,7 +198,7 @@ public class OfflineClusterMemBasedBrokerQueryKillingTest extends BaseClusterInt
   }
 
   protected TableConfig createOfflineTableConfig() {
-    return new TableConfigBuilder(TableType.OFFLINE).setTableName(getTableName()).setSchemaName(getSchemaName())
+    return new TableConfigBuilder(TableType.OFFLINE).setTableName(getTableName())
         .setTimeColumnName(getTimeColumnName()).setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas())
         .setSegmentVersion(getSegmentVersion()).setLoadMode(getLoadMode()).setTaskConfig(getTaskConfig())
         .setBrokerTenant(getBrokerTenant()).setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig())

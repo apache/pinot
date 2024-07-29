@@ -93,6 +93,11 @@ public class AcquireReleaseColumnsSegmentOperator extends BaseOperator<BaseResul
   }
 
   @Override
+  public void postExplainPlan(ExplainPlanRows explainPlanRows) {
+    release();
+  }
+
+  @Override
   public String toExplainString() {
     return EXPLAIN_NAME;
   }

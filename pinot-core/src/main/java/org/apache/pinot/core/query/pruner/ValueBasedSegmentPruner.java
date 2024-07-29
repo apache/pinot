@@ -200,15 +200,19 @@ abstract public class ValueBasedSegmentPruner implements SegmentPruner {
     }
 
     public static class CachedValue {
-      private final Object _value;
+      private final String _value;
       private boolean _hashed = false;
       private long _hash1;
       private long _hash2;
       private DataType _dt;
       private Comparable _comparableValue;
 
-      private CachedValue(Object value) {
+      private CachedValue(String value) {
         _value = value;
+      }
+
+      public String getValue() {
+        return _value;
       }
 
       public Comparable getComparableValue() {
@@ -218,9 +222,8 @@ abstract public class ValueBasedSegmentPruner implements SegmentPruner {
 
       public void ensureDataType(DataType dt) {
         if (dt != _dt) {
-          String strValue = _value.toString();
           _dt = dt;
-          _comparableValue = convertValue(strValue, dt);
+          _comparableValue = convertValue(_value, dt);
           _hashed = false;
         }
       }

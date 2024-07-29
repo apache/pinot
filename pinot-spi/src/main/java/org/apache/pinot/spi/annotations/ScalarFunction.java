@@ -41,17 +41,26 @@ import java.lang.annotation.Target;
  *     - byte[]
  */
 @Retention(RetentionPolicy.RUNTIME)
-@Target(ElementType.METHOD)
+@Target({ElementType.METHOD, ElementType.TYPE})
 public @interface ScalarFunction {
 
   boolean enabled() default true;
 
-  // If empty, FunctionsRegistry registers the method name as function name;
-  // If not empty, FunctionsRegistry only registers the function names specified here, the method name is ignored.
+  /**
+   * If empty, FunctionsRegistry registers the method name as function name;
+   * If not empty, FunctionsRegistry only registers the function names specified here, the method name is ignored.
+   */
   String[] names() default {};
 
-  // Whether the scalar function expects and can handle null arguments.
+  /**
+   * Whether the scalar function expects and can handle null arguments.
+   */
   boolean nullableParameters() default false;
 
-  boolean isPlaceholder() default false;
+  /**
+   * Whether the scalar function takes various number of arguments.
+   */
+  boolean isVarArg() default false;
+
+  @Deprecated boolean isPlaceholder() default false;
 }

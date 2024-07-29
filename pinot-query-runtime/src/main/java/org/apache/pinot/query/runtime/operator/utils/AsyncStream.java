@@ -67,6 +67,11 @@ public interface AsyncStream<E> {
    */
   void cancel();
 
+  /**
+   * Set this stream to early terminate state, asking for metadata block.
+   */
+  void earlyTerminate();
+
   interface OnNewData {
     void newDataAvailable();
   }

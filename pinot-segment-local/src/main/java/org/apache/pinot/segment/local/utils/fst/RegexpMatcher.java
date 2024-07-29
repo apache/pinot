@@ -29,8 +29,6 @@ import org.apache.lucene.util.automaton.RegExp;
 import org.apache.lucene.util.automaton.Transition;
 import org.apache.lucene.util.fst.FST;
 import org.apache.lucene.util.fst.Util;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -42,7 +40,6 @@ import org.slf4j.LoggerFactory;
  *   match(input) Function builds the automaton and matches given input.
  */
 public class RegexpMatcher {
-  public static final Logger LOGGER = LoggerFactory.getLogger(FSTBuilder.class);
 
   private final String _regexQuery;
   private final FST<Long> _fst;
@@ -122,16 +119,16 @@ public class RegexpMatcher {
             newInput.copyInts(currentInput.get());
             newInput.append(t.min);
             queue.add(new Path<Long>(t.dest, new FST.Arc<Long>().copyFrom(nextArc),
-                _fst.outputs.add(path._output, nextArc.output), newInput));
+                _fst.outputs.add(path._output, nextArc.output()), newInput));
           }
         } else {
           FST.Arc<Long> nextArc = Util.readCeilArc(min, _fst, path._fstNode, scratchArc, fstReader);
-          while (nextArc != null && nextArc.label <= max) {
+          while (nextArc != null && nextArc.label() <= max) {
             final IntsRefBuilder newInput = new IntsRefBuilder();
             newInput.copyInts(currentInput.get());
-            newInput.append(nextArc.label);
+            newInput.append(nextArc.label());
             queue.add(new Path<>(t.dest, new FST.Arc<Long>().copyFrom(nextArc),
-                _fst.outputs.add(path._output, nextArc.output), newInput));
+                _fst.outputs.add(path._output, nextArc.output()), newInput));
             nextArc = nextArc.isLast() ? null : _fst.readNextRealArc(nextArc, fstReader);
           }
         }

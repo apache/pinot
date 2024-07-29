@@ -65,13 +65,16 @@ public class PinotInstanceAssignmentRestletResourceStatelessTest extends Control
 
   private static final String TIER_NAME = "tier1";
 
+  @Override
+  protected void overrideControllerConf(Map<String, Object> properties) {
+    properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, false);
+  }
+
   @BeforeClass
   public void setUp()
       throws Exception {
     startZk();
-    Map<String, Object> properties = getDefaultControllerConfiguration();
-    properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, false);
-    startController(properties);
+    startController();
 
     addFakeBrokerInstancesToAutoJoinHelixCluster(1, false);
     addFakeServerInstancesToAutoJoinHelixCluster(2, false);
@@ -95,7 +98,7 @@ public class PinotInstanceAssignmentRestletResourceStatelessTest extends Control
     _helixResourceManager.addTable(offlineTableConfig);
     TableConfig realtimeTableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setBrokerTenant(BROKER_TENANT_NAME)
-            .setServerTenant(SERVER_TENANT_NAME).setLLC(true)
+            .setServerTenant(SERVER_TENANT_NAME)
             .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap()).build();
     _helixResourceManager.addTable(realtimeTableConfig);
 
@@ -118,7 +121,7 @@ public class PinotInstanceAssignmentRestletResourceStatelessTest extends Control
     // Add OFFLINE instance assignment config to the offline table config
     InstanceAssignmentConfig offlineInstanceAssignmentConfig = new InstanceAssignmentConfig(
         new InstanceTagPoolConfig(TagNameUtils.getOfflineTagForTenant(SERVER_TENANT_NAME), false, 0, null), null,
-        new InstanceReplicaGroupPartitionConfig(false, 0, 0, 0, 0, 0, false, null));
+        new InstanceReplicaGroupPartitionConfig(false, 0, 0, 0, 0, 0, false, null), null, false);
     offlineTableConfig.setInstanceAssignmentConfigMap(
         Collections.singletonMap(InstancePartitionsType.OFFLINE.toString(), offlineInstanceAssignmentConfig));
     _helixResourceManager.setExistingTableConfig(offlineTableConfig);
@@ -136,7 +139,7 @@ public class PinotInstanceAssignmentRestletResourceStatelessTest extends Control
     // Add CONSUMING instance assignment config to the real-time table config
     InstanceAssignmentConfig consumingInstanceAssignmentConfig = new InstanceAssignmentConfig(
         new InstanceTagPoolConfig(TagNameUtils.getRealtimeTagForTenant(SERVER_TENANT_NAME), false, 0, null), null,
-        new InstanceReplicaGroupPartitionConfig(false, 0, 0, 0, 0, 0, false, null));
+        new InstanceReplicaGroupPartitionConfig(false, 0, 0, 0, 0, 0, false, null), null, false);
     realtimeTableConfig.setInstanceAssignmentConfigMap(
         Collections.singletonMap(InstancePartitionsType.CONSUMING.toString(), consumingInstanceAssignmentConfig));
     _helixResourceManager.setExistingTableConfig(realtimeTableConfig);
@@ -164,7 +167,7 @@ public class PinotInstanceAssignmentRestletResourceStatelessTest extends Control
             null)));
     InstanceAssignmentConfig tierInstanceAssignmentConfig = new InstanceAssignmentConfig(
         new InstanceTagPoolConfig(TagNameUtils.getOfflineTagForTenant(SERVER_TENANT_NAME), false, 0, null), null,
-        new InstanceReplicaGroupPartitionConfig(false, 0, 0, 0, 0, 0, false, null));
+        new InstanceReplicaGroupPartitionConfig(false, 0, 0, 0, 0, 0, false, null), null, false);
     Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = new HashMap<>();
     instanceAssignmentConfigMap.put(InstancePartitionsType.OFFLINE.toString(), offlineInstanceAssignmentConfig);
     instanceAssignmentConfigMap.put(TIER_NAME, tierInstanceAssignmentConfig);
@@ -372,7 +375,7 @@ public class PinotInstanceAssignmentRestletResourceStatelessTest extends Control
 
   private Map<String, InstancePartitions> deserializeInstancePartitionsMap(String instancePartitionsMapString)
       throws Exception {
-    return JsonUtils.stringToObject(instancePartitionsMapString, new TypeReference<Map<String, InstancePartitions>>() {
+    return JsonUtils.stringToObject(instancePartitionsMapString, new TypeReference<>() {
     });
   }
 

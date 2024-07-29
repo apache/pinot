@@ -28,6 +28,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
 /**
@@ -35,7 +36,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
  * This helps look at and operate on the pinot table configs as a whole unit.
  */
 public class TableConfigs extends BaseJsonConfig {
-  private final String _tableName;
+  private String _tableName;
   private final Schema _schema;
   private final TableConfig _offline;
   private final TableConfig _realtime;
@@ -55,6 +56,17 @@ public class TableConfigs extends BaseJsonConfig {
 
   public String getTableName() {
     return _tableName;
+  }
+
+  public void setTableName(String rawTableName) {
+    _tableName = rawTableName;
+    _schema.setSchemaName(rawTableName);
+    if (_offline != null) {
+      _offline.setTableName(TableNameBuilder.OFFLINE.tableNameWithType(rawTableName));
+    }
+    if (_realtime != null) {
+      _realtime.setTableName(TableNameBuilder.REALTIME.tableNameWithType(rawTableName));
+    }
   }
 
   public Schema getSchema() {

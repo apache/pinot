@@ -20,6 +20,7 @@ package org.apache.pinot.plugin.stream.kafka20;
 
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.pinot.plugin.stream.kafka.KafkaStreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
@@ -50,17 +51,20 @@ public class KafkaPartitionLevelStreamConfigTest {
   private KafkaPartitionLevelStreamConfig getStreamConfig(String topic, String bootstrapHosts, String buffer,
       String socketTimeout, String fetcherSize, String fetcherMinBytes, String isolationLevel,
       String populateRowMetadata) {
+    return new KafkaPartitionLevelStreamConfig(
+        getStreamConfig(topic, bootstrapHosts, buffer, socketTimeout, fetcherSize, fetcherMinBytes, isolationLevel,
+            populateRowMetadata, "tableName_REALTIME"));
+  }
+
+  private StreamConfig getStreamConfig(String topic, String bootstrapHosts, String buffer,
+      String socketTimeout, String fetcherSize, String fetcherMinBytes, String isolationLevel,
+      String populateRowMetadata, String tableNameWithType) {
     Map<String, String> streamConfigMap = new HashMap<>();
     String streamType = "kafka";
-    String consumerType = StreamConfig.ConsumerType.LOWLEVEL.toString();
     String consumerFactoryClassName = KafkaConsumerFactory.class.getName();
-    String tableNameWithType = "tableName_REALTIME";
     streamConfigMap.put(StreamConfigProperties.STREAM_TYPE, streamType);
     streamConfigMap.put(
         StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_TOPIC_NAME), topic);
-    streamConfigMap.put(
-        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
-        consumerType);
     streamConfigMap.put(StreamConfigProperties.constructStreamProperty(streamType,
         StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS), consumerFactoryClassName);
     streamConfigMap.put(
@@ -85,7 +89,7 @@ public class KafkaPartitionLevelStreamConfigTest {
     if (populateRowMetadata != null) {
       streamConfigMap.put("stream.kafka.metadata.populate", populateRowMetadata);
     }
-    return new KafkaPartitionLevelStreamConfig(new StreamConfig(tableNameWithType, streamConfigMap));
+    return new StreamConfig(tableNameWithType, streamConfigMap);
   }
 
   @Test
@@ -195,5 +199,20 @@ public class KafkaPartitionLevelStreamConfigTest {
 
     config = getStreamConfig("topic", "host1", null, null, null, null, null, "TrUe");
     Assert.assertTrue(config.isPopulateMetadata());
+  }
+
+  @Test
+  public void testBackwardCompatibility() {
+    StreamConfig streamConfig = getStreamConfig("topic", "host1", "100", "200", "300", "400", "read_committed", "true",
+        "myTable_REALTIME");
+    streamConfig.getStreamConfigsMap().put("sasl.jaas.config",
+        "org.apache.kafka.common.security.plain.PlainLoginModule required \n username=\"user\" \n password=\"pwd\";");
+    streamConfig.getStreamConfigsMap().put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG,
+        "org.apache.kafka.common.serialization.WrongStringDeserializer");
+    KafkaConfigBackwardCompatibleUtils.handleStreamConfig(streamConfig);
+    Assert.assertEquals(streamConfig.getStreamConfigsMap().get("sasl.jaas.config"),
+        "org.apache.kafka.common.security.plain.PlainLoginModule required \n username=\"user\" \n password=\"pwd\";");
+    Assert.assertEquals(streamConfig.getStreamConfigsMap().get(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG),
+        "org.apache.kafka.common.serialization.WrongStringDeserializer");
   }
 }

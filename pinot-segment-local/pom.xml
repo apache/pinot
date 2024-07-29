@@ -26,7 +26,7 @@
   <parent>
     <artifactId>pinot</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>0.13.0-SNAPSHOT</version>
+    <version>1.2.0-SNAPSHOT</version>
     <relativePath>..</relativePath>
   </parent>
   <artifactId>pinot-segment-local</artifactId>
@@ -36,24 +36,6 @@
     <pinot.root>${basedir}/..</pinot.root>
   </properties>
 
-  <build>
-    <plugins>
-      <plugin>
-        <artifactId>maven-jar-plugin</artifactId>
-        <executions>
-          <execution>
-            <goals>
-              <goal>test-jar</goal>
-            </goals>
-          </execution>
-        </executions>
-      </plugin>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-enforcer-plugin</artifactId>
-      </plugin>
-    </plugins>
-  </build>
   <dependencies>
     <dependency>
       <groupId>org.apache.pinot</groupId>
@@ -75,24 +57,33 @@
       <groupId>com.uber</groupId>
       <artifactId>h3</artifactId>
     </dependency>
+
+    <!-- Lucene dependencies -->
+    <dependency>
+      <groupId>org.apache.lucene</groupId>
+      <artifactId>lucene-backward-codecs</artifactId>
+    </dependency>
     <dependency>
       <groupId>org.apache.lucene</groupId>
       <artifactId>lucene-core</artifactId>
-      <version>${lucene.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.lucene</groupId>
       <artifactId>lucene-queryparser</artifactId>
-      <version>${lucene.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.lucene</groupId>
-      <artifactId>lucene-analyzers-common</artifactId>
-      <version>${lucene.version}</version>
+      <artifactId>lucene-analysis-common</artifactId>
     </dependency>
+    <!-- Lucene dependencies end -->
+
     <dependency>
       <groupId>org.apache.datasketches</groupId>
       <artifactId>datasketches-java</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.dynatrace.hash4j</groupId>
+      <artifactId>hash4j</artifactId>
     </dependency>
     <dependency>
       <groupId>com.tdunning</groupId>
@@ -108,7 +99,7 @@
     </dependency>
     <dependency>
       <groupId>com.google.auto.service</groupId>
-      <artifactId>auto-service-annotations</artifactId>
+      <artifactId>auto-service</artifactId>
     </dependency>
 
     <!-- Test dependencies -->
@@ -117,10 +108,9 @@
       <artifactId>testng</artifactId>
       <scope>test</scope>
     </dependency>
-    <!-- required for static mock in IndexCreatorOverrideTest -->
     <dependency>
       <groupId>org.mockito</groupId>
-      <artifactId>mockito-inline</artifactId>
+      <artifactId>mockito-core</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
@@ -160,6 +150,10 @@
       <version>${project.version}</version>
       <type>test-jar</type>
       <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.yscope.clp</groupId>
+      <artifactId>clp-ffi</artifactId>
     </dependency>
   </dependencies>
 </project>

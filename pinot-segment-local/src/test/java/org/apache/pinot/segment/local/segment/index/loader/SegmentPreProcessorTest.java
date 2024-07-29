@@ -18,9 +18,11 @@
  */
 package org.apache.pinot.segment.local.segment.index.loader;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Sets;
 import java.io.File;
+import java.math.BigDecimal;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.attribute.FileTime;
@@ -34,7 +36,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
-import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.commons.configuration2.PropertiesConfiguration;
+import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentCreationDriverFactory;
@@ -62,8 +65,10 @@ import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
 import org.apache.pinot.spi.config.table.BloomFilterConfig;
+import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
+import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
@@ -137,6 +142,7 @@ public class SegmentPreProcessorTest {
   private static final String NEW_BOOLEAN_SV_DIMENSION_COLUMN_NAME = "newBooleanSVDimension";
   private static final String NEW_INT_SV_DIMENSION_COLUMN_NAME = "newIntSVDimension";
   private static final String NEW_STRING_MV_DIMENSION_COLUMN_NAME = "newStringMVDimension";
+  private static final String NEW_RAW_STRING_SV_DIMENSION_COLUMN_NAME = "newRawStringSVDimension";
   private static final String NEW_HLL_BYTE_METRIC_COLUMN_NAME = "newHLLByteMetric";
   private static final String NEW_TDIGEST_BYTE_METRIC_COLUMN_NAME = "newTDigestByteMetric";
 
@@ -655,9 +661,8 @@ public class SegmentPreProcessorTest {
   @Test
   public void testForwardIndexHandlerChangeCompression()
       throws Exception {
-    Map<String, ChunkCompressionType> compressionConfigs = new HashMap<>();
-    ChunkCompressionType newCompressionType = ChunkCompressionType.ZSTANDARD;
-    compressionConfigs.put(EXISTING_STRING_COL_RAW, newCompressionType);
+    Map<String, CompressionCodec> compressionConfigs = new HashMap<>();
+    compressionConfigs.put(EXISTING_STRING_COL_RAW, CompressionCodec.ZSTANDARD);
     _indexLoadingConfig.setCompressionConfigs(compressionConfigs);
     _indexLoadingConfig.addNoDictionaryColumns(EXISTING_STRING_COL_RAW);
 
@@ -671,12 +676,11 @@ public class SegmentPreProcessorTest {
     new SegmentV1V2ToV3FormatConverter().convert(_indexDir);
 
     // Test2: Now forward index will be rewritten with ZSTANDARD compressionType.
-    checkForwardIndexCreation(EXISTING_STRING_COL_RAW, 5, 3, _schema, false, false, false, 0, newCompressionType, true,
-        0, DataType.STRING, 100000);
+    checkForwardIndexCreation(EXISTING_STRING_COL_RAW, 5, 3, _schema, false, false, false, 0,
+        ChunkCompressionType.ZSTANDARD, true, 0, DataType.STRING, 100000);
 
     // Test3: Change compression on existing raw index column. Also add text index on same column. Check correctness.
-    newCompressionType = ChunkCompressionType.SNAPPY;
-    compressionConfigs.put(EXISTING_STRING_COL_RAW, newCompressionType);
+    compressionConfigs.put(EXISTING_STRING_COL_RAW, CompressionCodec.SNAPPY);
     _indexLoadingConfig.setCompressionConfigs(compressionConfigs);
     Set<String> textIndexColumns = new HashSet<>();
     textIndexColumns.add(EXISTING_STRING_COL_RAW);
@@ -687,12 +691,11 @@ public class SegmentPreProcessorTest {
     ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(EXISTING_STRING_COL_RAW);
     assertNotNull(columnMetadata);
     checkTextIndexCreation(EXISTING_STRING_COL_RAW, 5, 3, _schema, false, false, false, 0);
-    validateIndex(StandardIndexes.forward(), EXISTING_STRING_COL_RAW, 5, 3, _schema, false, false, false, 0, true,
-        0, newCompressionType, false, DataType.STRING, 100000);
+    validateIndex(StandardIndexes.forward(), EXISTING_STRING_COL_RAW, 5, 3, _schema, false, false, false, 0, true, 0,
+        ChunkCompressionType.SNAPPY, false, DataType.STRING, 100000);
 
     // Test4: Change compression on RAW index column. Change another index on another column. Check correctness.
-    newCompressionType = ChunkCompressionType.ZSTANDARD;
-    compressionConfigs.put(EXISTING_STRING_COL_RAW, newCompressionType);
+    compressionConfigs.put(EXISTING_STRING_COL_RAW, CompressionCodec.ZSTANDARD);
     _indexLoadingConfig.setCompressionConfigs(compressionConfigs);
     Set<String> fstColumns = new HashSet<>();
     fstColumns.add(EXISTING_STRING_COL_DICT);
@@ -705,12 +708,11 @@ public class SegmentPreProcessorTest {
     // Check FST index
     checkFSTIndexCreation(EXISTING_STRING_COL_DICT, 9, 4, _newColumnsSchemaWithFST, false, false, 26);
     // Check forward index.
-    validateIndex(StandardIndexes.forward(), EXISTING_STRING_COL_RAW, 5, 3, _schema, false, false, false, 0, true,
-        0, newCompressionType, false, DataType.STRING, 100000);
+    validateIndex(StandardIndexes.forward(), EXISTING_STRING_COL_RAW, 5, 3, _schema, false, false, false, 0, true, 0,
+        ChunkCompressionType.ZSTANDARD, false, DataType.STRING, 100000);
 
     // Test5: Change compressionType for an MV column
-    newCompressionType = ChunkCompressionType.ZSTANDARD;
-    compressionConfigs.put(EXISTING_INT_COL_RAW_MV, newCompressionType);
+    compressionConfigs.put(EXISTING_INT_COL_RAW_MV, CompressionCodec.ZSTANDARD);
     _indexLoadingConfig.setCompressionConfigs(compressionConfigs);
     _indexLoadingConfig.addNoDictionaryColumns(EXISTING_INT_COL_RAW_MV);
 
@@ -1101,9 +1103,13 @@ public class SegmentPreProcessorTest {
         Collections.emptyList());
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setTransformConfigs(
-        Collections.singletonList(new TransformConfig(NEW_INT_SV_DIMENSION_COLUMN_NAME, "plus(column1, 1)")));
+        ImmutableList.of(
+            new TransformConfig(NEW_INT_SV_DIMENSION_COLUMN_NAME, "plus(column1, 1)"),
+            new TransformConfig(NEW_RAW_STRING_SV_DIMENSION_COLUMN_NAME, "reverse(column3)")
+        ));
     _tableConfig.setIngestionConfig(ingestionConfig);
     _indexLoadingConfig.addInvertedIndexColumns(NEW_COLUMN_INVERTED_INDEX);
+    _indexLoadingConfig.addNoDictionaryColumns(NEW_RAW_STRING_SV_DIMENSION_COLUMN_NAME);
     checkUpdateDefaultColumns();
 
     // Try to use the third schema and update default value again.
@@ -1148,9 +1154,13 @@ public class SegmentPreProcessorTest {
 
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setTransformConfigs(
-        Collections.singletonList(new TransformConfig(NEW_INT_SV_DIMENSION_COLUMN_NAME, "plus(column1, 1)")));
+        ImmutableList.of(
+            new TransformConfig(NEW_INT_SV_DIMENSION_COLUMN_NAME, "plus(column1, 1)"),
+            new TransformConfig(NEW_RAW_STRING_SV_DIMENSION_COLUMN_NAME, "reverse(column3)")
+        ));
     _tableConfig.setIngestionConfig(ingestionConfig);
     _indexLoadingConfig.addInvertedIndexColumns(NEW_COLUMN_INVERTED_INDEX);
+    _indexLoadingConfig.addNoDictionaryColumns(NEW_RAW_STRING_SV_DIMENSION_COLUMN_NAME);
     checkUpdateDefaultColumns();
 
     // Try to use the third schema and update default value again.
@@ -1257,6 +1267,15 @@ public class SegmentPreProcessorTest {
     assertEquals(columnMetadata.getMinValue(), (int) originalColumnMetadata.getMinValue() + 1);
     assertEquals(columnMetadata.getMaxValue(), (int) originalColumnMetadata.getMaxValue() + 1);
 
+    columnMetadata = segmentMetadata.getColumnMetadataFor(NEW_RAW_STRING_SV_DIMENSION_COLUMN_NAME);
+    assertEquals(columnMetadata.getFieldSpec(),
+        _newColumnsSchema1.getFieldSpecFor(NEW_RAW_STRING_SV_DIMENSION_COLUMN_NAME));
+    assertTrue(columnMetadata.isAutoGenerated());
+    originalColumnMetadata = segmentMetadata.getColumnMetadataFor("column3");
+    assertEquals(columnMetadata.getCardinality(), originalColumnMetadata.getCardinality());
+    assertEquals(columnMetadata.getBitsPerElement(), originalColumnMetadata.getBitsPerElement());
+    assertEquals(columnMetadata.getTotalNumberOfEntries(), originalColumnMetadata.getTotalNumberOfEntries());
+
     // Check dictionary and forward index exist.
     try (SegmentDirectory segmentDirectory = SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader()
         .load(_indexDir.toURI(),
@@ -1276,6 +1295,9 @@ public class SegmentPreProcessorTest {
       assertTrue(reader.hasIndexFor(NEW_INT_SV_DIMENSION_COLUMN_NAME, StandardIndexes.forward()));
       assertTrue(reader.hasIndexFor(NEW_STRING_MV_DIMENSION_COLUMN_NAME, StandardIndexes.dictionary()));
       assertTrue(reader.hasIndexFor(NEW_STRING_MV_DIMENSION_COLUMN_NAME, StandardIndexes.forward()));
+      // Dictionary shouldn't be created for raw derived column
+      assertFalse(reader.hasIndexFor(NEW_RAW_STRING_SV_DIMENSION_COLUMN_NAME, StandardIndexes.dictionary()));
+      assertTrue(reader.hasIndexFor(NEW_RAW_STRING_SV_DIMENSION_COLUMN_NAME, StandardIndexes.forward()));
 
       assertTrue(reader.hasIndexFor(NEW_INT_METRIC_COLUMN_NAME, StandardIndexes.nullValueVector()));
       assertTrue(reader.hasIndexFor(NEW_LONG_METRIC_COLUMN_NAME, StandardIndexes.nullValueVector()));
@@ -1388,6 +1410,33 @@ public class SegmentPreProcessorTest {
     assertEquals(timeColumnMetadata.getMaxValue(), 1756015683);
     assertEquals(dimensionColumnMetadata.getMinValue(), "AKXcXcIqsqOJFsdwxZ");
     assertEquals(dimensionColumnMetadata.getMaxValue(), "yQkJTLOQoOqqhkAClgC");
+    dimensionColumnMetadata = segmentMetadata.getColumnMetadataFor("column14");
+    assertEquals(dimensionColumnMetadata.getMaxValue(), -9223372036854775808L);
+    assertEquals(dimensionColumnMetadata.getMinValue(), -9223372036854775808L);
+    dimensionColumnMetadata = segmentMetadata.getColumnMetadataFor("column15");
+    assertEquals(dimensionColumnMetadata.getMaxValue(), Float.NEGATIVE_INFINITY);
+    assertEquals(dimensionColumnMetadata.getMinValue(), Float.NEGATIVE_INFINITY);
+    dimensionColumnMetadata = segmentMetadata.getColumnMetadataFor("column16");
+    assertEquals(dimensionColumnMetadata.getMaxValue(), Double.NEGATIVE_INFINITY);
+    assertEquals(dimensionColumnMetadata.getMinValue(), Double.NEGATIVE_INFINITY);
+    dimensionColumnMetadata = segmentMetadata.getColumnMetadataFor("column17");
+    assertEquals(dimensionColumnMetadata.getMaxValue(), new BigDecimal("0"));
+    assertEquals(dimensionColumnMetadata.getMinValue(), new BigDecimal("0"));
+    dimensionColumnMetadata = segmentMetadata.getColumnMetadataFor("column18");
+    assertEquals(dimensionColumnMetadata.getMaxValue(), 0);
+    assertEquals(dimensionColumnMetadata.getMinValue(), 0);
+    dimensionColumnMetadata = segmentMetadata.getColumnMetadataFor("column19");
+    assertEquals(dimensionColumnMetadata.getMaxValue().toString(), "0");
+    assertEquals(dimensionColumnMetadata.getMinValue().toString(), "0");
+    dimensionColumnMetadata = segmentMetadata.getColumnMetadataFor("column20");
+    assertEquals(dimensionColumnMetadata.getMaxValue(), "null");
+    assertEquals(dimensionColumnMetadata.getMinValue(), "null");
+    dimensionColumnMetadata = segmentMetadata.getColumnMetadataFor("column21");
+    assertEquals(dimensionColumnMetadata.getMaxValue(), "null");
+    assertEquals(dimensionColumnMetadata.getMinValue(), "null");
+    dimensionColumnMetadata = segmentMetadata.getColumnMetadataFor("column22");
+    assertEquals(dimensionColumnMetadata.getMaxValue().toString(), "");
+    assertEquals(dimensionColumnMetadata.getMinValue().toString(), "");
     assertEquals(metricColumnMetadata.getMinValue(), 890662862);
     assertEquals(metricColumnMetadata.getMaxValue(), 890662862);
   }
@@ -1414,8 +1463,8 @@ public class SegmentPreProcessorTest {
     // V1 use separate file for each column index.
     File iiFile = new File(_indexDir, strColumn + V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION);
     File rgFile = new File(_indexDir, strColumn + V1Constants.Indexes.BITMAP_RANGE_INDEX_FILE_EXTENSION);
-    File txtFile = new File(_indexDir, strColumn + V1Constants.Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION);
-    File fstFile = new File(_indexDir, strColumn + V1Constants.Indexes.FST_INDEX_FILE_EXTENSION);
+    File txtFile = new File(_indexDir, strColumn + V1Constants.Indexes.LUCENE_V99_TEXT_INDEX_FILE_EXTENSION);
+    File fstFile = new File(_indexDir, strColumn + V1Constants.Indexes.LUCENE_V99_FST_INDEX_FILE_EXTENSION);
     File bfFile = new File(_indexDir, strColumn + V1Constants.Indexes.BLOOM_FILTER_FILE_EXTENSION);
 
     assertFalse(iiFile.exists());
@@ -1774,7 +1823,7 @@ public class SegmentPreProcessorTest {
     FileUtils.deleteQuietly(INDEX_DIR);
 
     // build good segment, no needPreprocess
-    File segment = buildTestSegmentForMinMax(tableConfig, schema, "validSegment", stringValuesValid, longValues);
+    File segment = buildTestSegment(tableConfig, schema, "validSegment", stringValuesValid, longValues);
     SegmentDirectory segmentDirectory = SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader()
         .load(segment.toURI(),
             new SegmentDirectoryLoaderContext.Builder().setSegmentDirectoryConfigs(_configuration).build());
@@ -1785,7 +1834,7 @@ public class SegmentPreProcessorTest {
 
     // build bad segment, still no needPreprocess, since minMaxInvalid flag should be set
     FileUtils.deleteQuietly(INDEX_DIR);
-    segment = buildTestSegmentForMinMax(tableConfig, schema, "invalidSegment", stringValuesInvalid, longValues);
+    segment = buildTestSegment(tableConfig, schema, "invalidSegment", stringValuesInvalid, longValues);
     segmentDirectory = SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader().load(segment.toURI(),
         new SegmentDirectoryLoaderContext.Builder().setSegmentDirectoryConfigs(_configuration).build());
     indexLoadingConfig = getDefaultIndexLoadingConfig();
@@ -1807,7 +1856,75 @@ public class SegmentPreProcessorTest {
     FileUtils.deleteQuietly(INDEX_DIR);
   }
 
-  private File buildTestSegmentForMinMax(final TableConfig tableConfig, final Schema schema, String segmentName,
+  @Test
+  public void testStarTreeCreationWithDictionaryChanges()
+      throws Exception {
+    // Build the sample segment
+    String[] stringValues = {"A", "C", "B", "C", "D", "E", "E", "E"};
+    long[] longValues = {2, 1, 2, 3, 4, 5, 3, 2};
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("stringCol", FieldSpec.DataType.STRING)
+        .addMetric("longCol", DataType.LONG).build();
+    FileUtils.deleteQuietly(INDEX_DIR);
+
+    // Build good segment, no need for preprocess
+    File segment = buildTestSegment(tableConfig, schema, "validSegment", stringValues, longValues);
+    SegmentDirectory segmentDirectory = SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader()
+        .load(segment.toURI(),
+            new SegmentDirectoryLoaderContext.Builder().setSegmentDirectoryConfigs(_configuration).build());
+
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(null, tableConfig);
+    try (SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, indexLoadingConfig, schema)) {
+      assertFalse(processor.needProcess());
+    }
+
+    // Update table config to convert dict to noDict for longCol
+    indexLoadingConfig.setNoDictionaryColumns(Set.of("longCol"));
+    try (SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, indexLoadingConfig, schema)) {
+      assertTrue(processor.needProcess());
+      processor.process();
+    }
+
+    // Update table config to convert noDict to dict for longCol
+    indexLoadingConfig.setNoDictionaryColumns(Set.of());
+    try (SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, indexLoadingConfig, schema)) {
+      assertTrue(processor.needProcess());
+      processor.process();
+    }
+
+    // Update table config to convert dict to noDict for longCol and add the Startree index config
+    StarTreeIndexConfig starTreeIndexConfig =
+        new StarTreeIndexConfig(List.of("stringCol"), null, List.of("SUM__longCol"), null, 1000);
+    tableConfig.getIndexingConfig().setStarTreeIndexConfigs(List.of(starTreeIndexConfig));
+    tableConfig.getIndexingConfig().setEnableDynamicStarTreeCreation(true);
+    tableConfig.getIndexingConfig().setNoDictionaryColumns(List.of("longCol"));
+    indexLoadingConfig = new IndexLoadingConfig(null, tableConfig);
+    try (SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, indexLoadingConfig, schema)) {
+      assertTrue(processor.needProcess());
+      processor.process();
+    }
+
+    // Remove Startree index but keep the no dictionary for longCol
+    tableConfig.getIndexingConfig().setStarTreeIndexConfigs(List.of());
+    tableConfig.getIndexingConfig().setEnableDynamicStarTreeCreation(true);
+    indexLoadingConfig = new IndexLoadingConfig(null, tableConfig);
+    try (SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, indexLoadingConfig, schema)) {
+      assertTrue(processor.needProcess());
+      processor.process();
+    }
+
+    // Update table config to convert noDict to dict for longCol and also add the Startree index
+    tableConfig.getIndexingConfig().setStarTreeIndexConfigs(List.of(starTreeIndexConfig));
+    tableConfig.getIndexingConfig().setEnableDynamicStarTreeCreation(true);
+    tableConfig.getIndexingConfig().setNoDictionaryColumns(List.of());
+    indexLoadingConfig = new IndexLoadingConfig(null, tableConfig);
+    try (SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, indexLoadingConfig, schema)) {
+      assertTrue(processor.needProcess());
+      processor.process();
+    }
+  }
+
+  private File buildTestSegment(final TableConfig tableConfig, final Schema schema, String segmentName,
       String[] stringValues, long[] longValues)
       throws Exception {
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
@@ -1829,18 +1946,23 @@ public class SegmentPreProcessorTest {
     return driver.getOutputDirectory();
   }
 
-  private static void removeMinMaxValuesFromMetadataFile(File indexDir) {
+  private static void removeMinMaxValuesFromMetadataFile(File indexDir)
+      throws ConfigurationException {
     PropertiesConfiguration configuration = SegmentMetadataUtils.getPropertiesConfiguration(indexDir);
     Iterator<String> keys = configuration.getKeys();
+    List<String> keysToClear = new ArrayList<>();
     while (keys.hasNext()) {
       String key = keys.next();
       if (key.endsWith(V1Constants.MetadataKeys.Column.MIN_VALUE) || key.endsWith(
           V1Constants.MetadataKeys.Column.MAX_VALUE) || key.endsWith(
           V1Constants.MetadataKeys.Column.MIN_MAX_VALUE_INVALID)) {
-        configuration.clearProperty(key);
+        keysToClear.add(key);
       }
     }
-    SegmentMetadataUtils.savePropertiesConfiguration(configuration);
+    for (String key: keysToClear) {
+      configuration.clearProperty(key);
+    }
+    SegmentMetadataUtils.savePropertiesConfiguration(configuration, indexDir);
   }
 
   private static Map<String, Consumer<IndexLoadingConfig>> createConfigPrepFunctions() {

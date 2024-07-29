@@ -23,7 +23,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
@@ -39,6 +39,10 @@ public class UpsertConfig extends BaseJsonConfig {
     APPEND, IGNORE, INCREMENT, MAX, MIN, OVERWRITE, UNION
   }
 
+  public enum ConsistencyMode {
+    NONE, SYNC, SNAPSHOT
+  }
+
   @JsonPropertyDescription("Upsert mode.")
   private Mode _mode;
 
@@ -51,11 +55,17 @@ public class UpsertConfig extends BaseJsonConfig {
   @JsonPropertyDescription("default upsert strategy for partial mode")
   private Strategy _defaultPartialUpsertStrategy = Strategy.OVERWRITE;
 
+  @JsonPropertyDescription("Class name for custom row merger implementation")
+  private String _partialUpsertMergerClass;
+
   @JsonPropertyDescription("Columns for upsert comparison, default to time column")
   private List<String> _comparisonColumns;
 
   @JsonPropertyDescription("Boolean column to indicate whether a records should be deleted")
   private String _deleteRecordColumn;
+
+  @JsonPropertyDescription("Boolean column to indicate whether a records is out-of-order")
+  private String _outOfOrderRecordColumn;
 
   @JsonPropertyDescription("Whether to use snapshot for fast upsert metadata recovery")
   private boolean _enableSnapshot;
@@ -63,14 +73,29 @@ public class UpsertConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Whether to use TTL for upsert metadata cleanup, it uses the same unit as comparison col")
   private double _metadataTTL;
 
+  @JsonPropertyDescription("TTL for upsert metadata cleanup for deleted keys, it uses the same unit as comparison col")
+  private double _deletedKeysTTL;
+
   @JsonPropertyDescription("Whether to preload segments for fast upsert metadata recovery")
   private boolean _enablePreload;
+
+  @JsonPropertyDescription("Configure the way to provide consistent view for upsert table")
+  private ConsistencyMode _consistencyMode = ConsistencyMode.NONE;
+
+  @JsonPropertyDescription("Refresh interval when using the snapshot consistency mode")
+  private long _upsertViewRefreshIntervalMs = 3000;
 
   @JsonPropertyDescription("Custom class for upsert metadata manager")
   private String _metadataManagerClass;
 
   @JsonPropertyDescription("Custom configs for upsert metadata manager")
   private Map<String, String> _metadataManagerConfigs;
+
+  @JsonPropertyDescription("Whether to drop out-of-order record")
+  private boolean _dropOutOfOrderRecord;
+
+  @JsonPropertyDescription("Whether to pause partial upsert table's partition consumption during commit")
+  private boolean _allowPartialUpsertConsumptionDuringCommit;
 
   public UpsertConfig(Mode mode) {
     _mode = mode;
@@ -101,6 +126,10 @@ public class UpsertConfig extends BaseJsonConfig {
     return _defaultPartialUpsertStrategy;
   }
 
+  public String getPartialUpsertMergerClass() {
+    return _partialUpsertMergerClass;
+  }
+
   public List<String> getComparisonColumns() {
     return _comparisonColumns;
   }
@@ -108,6 +137,11 @@ public class UpsertConfig extends BaseJsonConfig {
   @Nullable
   public String getDeleteRecordColumn() {
     return _deleteRecordColumn;
+  }
+
+  @Nullable
+  public String getOutOfOrderRecordColumn() {
+    return _outOfOrderRecordColumn;
   }
 
   public boolean isEnableSnapshot() {
@@ -118,8 +152,24 @@ public class UpsertConfig extends BaseJsonConfig {
     return _metadataTTL;
   }
 
+  public double getDeletedKeysTTL() {
+    return _deletedKeysTTL;
+  }
+
   public boolean isEnablePreload() {
     return _enablePreload;
+  }
+
+  public ConsistencyMode getConsistencyMode() {
+    return _consistencyMode;
+  }
+
+  public long getUpsertViewRefreshIntervalMs() {
+    return _upsertViewRefreshIntervalMs;
+  }
+
+  public boolean isDropOutOfOrderRecord() {
+    return _dropOutOfOrderRecord;
   }
 
   @Nullable
@@ -154,6 +204,14 @@ public class UpsertConfig extends BaseJsonConfig {
   }
 
   /**
+   * Specify to plug a custom implementation for merging rows in partial upsert realtime table.
+   * @param partialUpsertMergerClass
+   */
+  public void setPartialUpsertMergerClass(String partialUpsertMergerClass) {
+    _partialUpsertMergerClass = partialUpsertMergerClass;
+  }
+
+  /**
    * By default, Pinot uses the value in the time column to determine the latest record. For two records with the
    * same primary key, the record with the larger value of the time column is picked as the
    * latest update.
@@ -177,9 +235,11 @@ public class UpsertConfig extends BaseJsonConfig {
   }
 
   public void setDeleteRecordColumn(String deleteRecordColumn) {
-    if (deleteRecordColumn != null) {
-      _deleteRecordColumn = deleteRecordColumn;
-    }
+    _deleteRecordColumn = deleteRecordColumn;
+  }
+
+  public void setOutOfOrderRecordColumn(String outOfOrderRecordColumn) {
+    _outOfOrderRecordColumn = outOfOrderRecordColumn;
   }
 
   public void setEnableSnapshot(boolean enableSnapshot) {
@@ -190,8 +250,24 @@ public class UpsertConfig extends BaseJsonConfig {
     _metadataTTL = metadataTTL;
   }
 
+  public void setDeletedKeysTTL(double deletedKeysTTL) {
+    _deletedKeysTTL = deletedKeysTTL;
+  }
+
   public void setEnablePreload(boolean enablePreload) {
     _enablePreload = enablePreload;
+  }
+
+  public void setConsistencyMode(ConsistencyMode consistencyMode) {
+    _consistencyMode = consistencyMode;
+  }
+
+  public void setUpsertViewRefreshIntervalMs(long upsertViewRefreshIntervalMs) {
+    _upsertViewRefreshIntervalMs = upsertViewRefreshIntervalMs;
+  }
+
+  public void setDropOutOfOrderRecord(boolean dropOutOfOrderRecord) {
+    _dropOutOfOrderRecord = dropOutOfOrderRecord;
   }
 
   public void setMetadataManagerClass(String metadataManagerClass) {
@@ -200,5 +276,14 @@ public class UpsertConfig extends BaseJsonConfig {
 
   public void setMetadataManagerConfigs(Map<String, String> metadataManagerConfigs) {
     _metadataManagerConfigs = metadataManagerConfigs;
+  }
+
+  public void setAllowPartialUpsertConsumptionDuringCommit(
+      boolean allowPartialUpsertConsumptionDuringCommit) {
+    _allowPartialUpsertConsumptionDuringCommit = allowPartialUpsertConsumptionDuringCommit;
+  }
+
+  public boolean isAllowPartialUpsertConsumptionDuringCommit() {
+    return _allowPartialUpsertConsumptionDuringCommit;
   }
 }

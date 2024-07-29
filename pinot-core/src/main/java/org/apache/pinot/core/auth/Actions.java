@@ -34,12 +34,14 @@ public class Actions {
     public static final String CREATE_TENANT = "CreateTenant";
     public static final String CREATE_USER = "CreateUser";
     public static final String DEBUG_TASK = "DebugTask";
+    public static final String DEBUG_RESOURCE_USAGE = "DebugResourceUsage";
     public static final String DELETE_CLUSTER_CONFIG = "DeleteClusterConfig";
     public static final String DELETE_INSTANCE = "DeleteInstance";
     public static final String DELETE_TASK = "DeleteTask";
     public static final String DELETE_TENANT = "DeleteTenant";
     public static final String DELETE_USER = "DeleteUser";
     public static final String DELETE_ZNODE = "DeleteZnode";
+    public static final String DELETE_DATABASE = "DeleteDatabase";
     public static final String ESTIMATE_UPSERT_MEMORY = "EstimateUpsertMemory";
     public static final String EXECUTE_TASK = "ExecuteTask";
     public static final String GET_ADMIN_INFO = "GetAdminInfo";
@@ -59,6 +61,7 @@ public class Actions {
     public static final String GET_SEGMENT = "GetSegment";
     public static final String GET_SEGMENT_RELOAD_STATUS = "GetSegmentReloadStatus";
     public static final String GET_SERVER_ROUTING_STATS = "GetServerRoutingStats";
+    public static final String GET_DATABASE = "GetDatabase";
     public static final String GET_TABLE = "GetTable";
     public static final String GET_TABLE_CONFIG = "GetTableConfig";
     public static final String GET_TABLE_LEADER = "GetTableLeader";
@@ -85,11 +88,14 @@ public class Actions {
     public static final String UPDATE_USER = "UpdateUser";
     public static final String UPDATE_ZNODE = "UpdateZnode";
     public static final String UPLOAD_SEGMENT = "UploadSegment";
+    public static final String GET_INSTANCE_PARTITIONS = "GetInstancePartitions";
+    public static final String UPDATE_INSTANCE_PARTITIONS = "UpdateInstancePartitions";
   }
 
   // Action names for table
   public static class Table {
     public static final String BUILD_ROUTING = "BuildRouting";
+    public static final String CANCEL_REBALANCE = "CancelRebalance";
     public static final String CREATE_INSTANCE_PARTITIONS = "CreateInstancePartitions";
     public static final String CREATE_SCHEMA = "CreateSchema";
     public static final String CREATE_TABLE = "CreateTable";
@@ -126,6 +132,7 @@ public class Actions {
     public static final String GET_TABLE_CONFIGS = "GetTableConfigs";
     public static final String GET_TABLE_LEADER = "GetTableLeader";
     public static final String GET_TIME_BOUNDARY = "GetTimeBoundary";
+    public static final String GET_SCHEDULER_JOB_DETAILS = "GetSchedulerJobDetails";
     public static final String PAUSE_CONSUMPTION = "PauseConsumption";
     public static final String QUERY = "Query";
     public static final String REBALANCE_TABLE = "RebalanceTable";

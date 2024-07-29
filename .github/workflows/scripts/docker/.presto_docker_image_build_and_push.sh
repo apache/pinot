@@ -31,40 +31,31 @@ if [ -z "${BUILD_PLATFORM}" ]; then
   BUILD_PLATFORM="linux/amd64"
 fi
 
-# Get presto commit id
-ROOT_DIR=`pwd`
-rm -rf /tmp/presto
-git clone -b ${PRESTO_BRANCH} --single-branch ${PRESTO_GIT_URL} /tmp/presto
-cd /tmp/presto
-COMMIT_ID=`git rev-parse --short HEAD`
-VERSION=`mvn help:evaluate -Dexpression=project.version -q -DforceStdout`
-rm -rf /tmp/presto
-DATE=`date +%Y%m%d`
-cd ${ROOT_DIR}
-
 tags=()
-if [ -z "${TAGS}" ]; then
-  tags=("${VERSION}-${COMMIT_ID}-${DATE}")
-  tags+=("latest")
-else
-  declare -a tags=($(echo ${TAGS} | tr "," " "))
-fi
+declare -a tags=($(echo ${TAGS} | tr "," " "))
 
 DOCKER_BUILD_TAGS=""
 for tag in "${tags[@]}"
 do
-  echo "Plan to build and push docker images for: ${DOCKER_IMAGE_NAME}:${tag}"
+  echo "Plan to build docker images for: ${DOCKER_IMAGE_NAME}:${tag}"
   DOCKER_BUILD_TAGS+=" --tag ${DOCKER_IMAGE_NAME}:${tag} "
 done
 
 
 cd ${DOCKER_FILE_BASE_DIR}
 
-docker buildx build \
+docker image prune --all --filter "until=1h" -f
+
+docker build \
     --no-cache \
     --platform=${BUILD_PLATFORM} \
     --file Dockerfile \
     --build-arg PRESTO_GIT_URL=${PRESTO_GIT_URL} --build-arg PRESTO_BRANCH=${PRESTO_BRANCH} \
     ${DOCKER_BUILD_TAGS} \
-    --push \
     .
+
+for tag in "${tags[@]}"
+do
+  echo "Push docker image: ${DOCKER_IMAGE_NAME}:${tag}"
+  docker push ${DOCKER_IMAGE_NAME}:${tag}
+done

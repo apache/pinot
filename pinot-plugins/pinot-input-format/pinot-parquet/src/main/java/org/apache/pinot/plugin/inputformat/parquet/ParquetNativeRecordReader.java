@@ -53,7 +53,7 @@ public class ParquetNativeRecordReader implements RecordReader {
   private Group _nextRecord;
   private PageReadStore _pageReadStore;
   private MessageColumnIO _columnIO;
-  private org.apache.parquet.io.RecordReader _parquetRecordReader;
+  private org.apache.parquet.io.RecordReader<Group> _parquetRecordReader;
   private int _currentPageIdx;
   private Configuration _hadoopConf;
   private ParquetReadOptions _parquetReadOptions;
@@ -72,10 +72,20 @@ public class ParquetNativeRecordReader implements RecordReader {
     _parquetFileReader =
         ParquetFileReader.open(HadoopInputFile.fromPath(_dataFilePath, _hadoopConf), _parquetReadOptions);
     _schema = _parquetFileReader.getFooter().getFileMetaData().getSchema();
-    _pageReadStore = _parquetFileReader.readNextRowGroup();
     _columnIO = new ColumnIOFactory().getColumnIO(_schema);
-    _parquetRecordReader = _columnIO.getRecordReader(_pageReadStore, new GroupRecordConverter(_schema));
-    _currentPageIdx = 0;
+    init();
+  }
+
+  private void init()
+      throws IOException {
+    _pageReadStore = _parquetFileReader.readNextRowGroup();
+    // If the parquet file is initially empty, then we cannot set up the _pageRecordReader.
+    // It's expected a user would always call init() -> hasNext() -> next().
+    // Without this, an empty parquet file will fail to init.
+    if (_pageReadStore != null) {
+      _parquetRecordReader = _columnIO.getRecordReader(_pageReadStore, new GroupRecordConverter(_schema));
+      _currentPageIdx = 0;
+    }
   }
 
   @Override
@@ -110,7 +120,7 @@ public class ParquetNativeRecordReader implements RecordReader {
   @Override
   public GenericRow next(GenericRow reuse)
       throws IOException {
-    _nextRecord = (Group) _parquetRecordReader.read();
+    _nextRecord = _parquetRecordReader.read();
     _recordExtractor.extract(_nextRecord, reuse);
     _currentPageIdx++;
     return reuse;
@@ -122,9 +132,7 @@ public class ParquetNativeRecordReader implements RecordReader {
     _parquetFileReader.close();
     _parquetFileReader =
         ParquetFileReader.open(HadoopInputFile.fromPath(_dataFilePath, _hadoopConf), _parquetReadOptions);
-    _pageReadStore = _parquetFileReader.readNextRowGroup();
-    _parquetRecordReader = _columnIO.getRecordReader(_pageReadStore, new GroupRecordConverter(_schema));
-    _currentPageIdx = 0;
+    init();
   }
 
   @Override

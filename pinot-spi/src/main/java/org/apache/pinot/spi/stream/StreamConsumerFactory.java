@@ -31,31 +31,8 @@ public abstract class StreamConsumerFactory {
    * Initializes the stream consumer factory with the stream metadata for the table
    * @param streamConfig the stream config object from the table config
    */
-  void init(StreamConfig streamConfig) {
+  protected void init(StreamConfig streamConfig) {
     _streamConfig = streamConfig;
-  }
-
-  /**
-   * Creates a partition level consumer which can fetch messages from a partitioned stream
-   * @param clientId a client id to identify the creator of this consumer
-   * @param partition the partition id of the partition for which this consumer is being created
-   * @return
-   */
-  public abstract PartitionLevelConsumer createPartitionLevelConsumer(String clientId, int partition);
-
-  /**
-   * Creates a stream level consumer (high level) which can fetch messages from the stream
-   * @param clientId a client id to identify the creator of this consumer
-   * @param tableName the table name for the topic of this consumer
-   * @param fieldsToRead the fields to read from the source stream
-   * @param groupId consumer group Id
-   * @return the stream level consumer
-   */
-  @Deprecated
-  public StreamLevelConsumer createStreamLevelConsumer(String clientId, String tableName,
-      Set<String> fieldsToRead, String groupId) {
-    throw new UnsupportedOperationException("Apache pinot no longer supports stream level consumer model. Please "
-        + "create partition level consumer only");
   }
 
   /**
@@ -83,5 +60,16 @@ public abstract class StreamConsumerFactory {
   public PartitionGroupConsumer createPartitionGroupConsumer(String clientId,
       PartitionGroupConsumptionStatus partitionGroupConsumptionStatus) {
     return createPartitionLevelConsumer(clientId, partitionGroupConsumptionStatus.getPartitionGroupId());
+  }
+
+  @Deprecated
+  public PartitionLevelConsumer createPartitionLevelConsumer(String clientId, int partition) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Deprecated
+  public StreamLevelConsumer createStreamLevelConsumer(String clientId, String tableName, Set<String> fieldsToRead,
+      String groupId) {
+    throw new UnsupportedOperationException();
   }
 }

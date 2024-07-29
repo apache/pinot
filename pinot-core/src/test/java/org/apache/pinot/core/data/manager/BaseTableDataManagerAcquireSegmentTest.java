@@ -22,35 +22,31 @@ import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
-import org.apache.commons.configuration.MapConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.data.manager.offline.OfflineTableDataManager;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
-import org.apache.pinot.segment.local.data.manager.TableDataManagerConfig;
-import org.apache.pinot.segment.local.data.manager.TableDataManagerParams;
+import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
-import org.apache.pinot.spi.metrics.PinotMetricUtils;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
-import org.testng.annotations.AfterSuite;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeMethod;
-import org.testng.annotations.BeforeSuite;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.*;
@@ -58,7 +54,6 @@ import static org.mockito.Mockito.*;
 
 public class BaseTableDataManagerAcquireSegmentTest {
   private static final String RAW_TABLE_NAME = "testTable";
-  private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(RAW_TABLE_NAME);
   private static final String SEGMENT_PREFIX = "segment";
   private static final int DELETED_SEGMENTS_CACHE_SIZE = 100;
   private static final int DELETED_SEGMENTS_TTL_MINUTES = 2;
@@ -70,12 +65,9 @@ public class BaseTableDataManagerAcquireSegmentTest {
   // Set once for every test
   private volatile int _nDestroys;
   private volatile boolean _closing;
-  private Set<ImmutableSegment> _allSegments = new HashSet<>();
-  private Set<SegmentDataManager> _accessedSegManagers =
-      Collections.newSetFromMap(new ConcurrentHashMap<SegmentDataManager, Boolean>());
-  private Set<SegmentDataManager> _allSegManagers =
-      Collections.newSetFromMap(new ConcurrentHashMap<SegmentDataManager, Boolean>());
-  private AtomicInteger _numQueries = new AtomicInteger(0);
+  private final Set<ImmutableSegment> _allSegments = new HashSet<>();
+  private final Set<SegmentDataManager> _accessedSegManagers = ConcurrentHashMap.newKeySet();
+  private final Set<SegmentDataManager> _allSegManagers = ConcurrentHashMap.newKeySet();
   private Map<String, ImmutableSegmentDataManager> _internalSegMap;
   private Throwable _exception;
   private Thread _masterThread;
@@ -86,9 +78,11 @@ public class BaseTableDataManagerAcquireSegmentTest {
   private volatile int _lo;
   private volatile int _hi;
 
-  @BeforeSuite
+  @BeforeClass
   public void setUp()
       throws Exception {
+    ServerMetrics.register(mock(ServerMetrics.class));
+
     _tmpDir = new File(FileUtils.getTempDirectory(), "OfflineTableDataManagerTest");
     TestUtils.ensureDirectoriesExistAndEmpty(_tmpDir);
     _tmpDir.deleteOnExit();
@@ -98,7 +92,7 @@ public class BaseTableDataManagerAcquireSegmentTest {
     System.out.printf("Record random seed: %d to reproduce test results upon failure\n", seed);
   }
 
-  @AfterSuite
+  @AfterClass
   public void tearDown() {
     if (_tmpDir != null) {
       org.apache.commons.io.FileUtils.deleteQuietly(_tmpDir);
@@ -112,26 +106,20 @@ public class BaseTableDataManagerAcquireSegmentTest {
     _allSegments.clear();
     _accessedSegManagers.clear();
     _allSegManagers.clear();
-    _numQueries.set(0);
     _exception = null;
     _masterThread = null;
   }
 
   private TableDataManager makeTestableManager()
       throws Exception {
+    InstanceDataManagerConfig instanceDataManagerConfig = mock(InstanceDataManagerConfig.class);
+    when(instanceDataManagerConfig.getInstanceDataDir()).thenReturn(_tmpDir.getAbsolutePath());
+    when(instanceDataManagerConfig.getDeletedSegmentsCacheSize()).thenReturn(DELETED_SEGMENTS_CACHE_SIZE);
+    when(instanceDataManagerConfig.getDeletedSegmentsCacheTtlMinutes()).thenReturn(DELETED_SEGMENTS_TTL_MINUTES);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
     TableDataManager tableDataManager = new OfflineTableDataManager();
-    TableDataManagerConfig config;
-    {
-      config = mock(TableDataManagerConfig.class);
-      when(config.getTableName()).thenReturn(OFFLINE_TABLE_NAME);
-      when(config.getDataDir()).thenReturn(_tmpDir.getAbsolutePath());
-      when(config.getAuthConfig()).thenReturn(new MapConfiguration(new HashMap<>()));
-      when(config.getTableDeletedSegmentsCacheSize()).thenReturn(DELETED_SEGMENTS_CACHE_SIZE);
-      when(config.getTableDeletedSegmentsCacheTtlMinutes()).thenReturn(DELETED_SEGMENTS_TTL_MINUTES);
-    }
-    tableDataManager.init(config, "dummyInstance", mock(ZkHelixPropertyStore.class),
-        new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()), mock(HelixManager.class), null, null,
-        new TableDataManagerParams(0, false, -1));
+    tableDataManager.init(instanceDataManagerConfig, mock(HelixManager.class), new SegmentLocks(), tableConfig, null,
+        null);
     tableDataManager.start();
     Field segsMapField = BaseTableDataManager.class.getDeclaredField("_segmentDataManagerMap");
     segsMapField.setAccessible(true);
@@ -167,7 +155,7 @@ public class BaseTableDataManagerAcquireSegmentTest {
     Assert.assertEquals(tableDataManager.getNumSegments(), 1);
     SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segmentName);
     Assert.assertEquals(segmentDataManager.getReferenceCount(), 2);
-    tableDataManager.removeSegment(segmentName);
+    tableDataManager.offloadSegment(segmentName);
     Assert.assertEquals(tableDataManager.getNumSegments(), 0);
     Assert.assertEquals(segmentDataManager.getReferenceCount(), 1);
     Assert.assertEquals(_nDestroys, 0);
@@ -192,10 +180,10 @@ public class BaseTableDataManagerAcquireSegmentTest {
     // return false.
     tableDataManager.addSegment(immutableSegment);
     Assert.assertFalse(tableDataManager.isSegmentDeletedRecently(segmentName));
-    tableDataManager.removeSegment(segmentName);
+    tableDataManager.offloadSegment(segmentName);
 
     // Removing the segment again is fine.
-    tableDataManager.removeSegment(segmentName);
+    tableDataManager.offloadSegment(segmentName);
     Assert.assertEquals(tableDataManager.getNumSegments(), 0);
 
     // Add a new segment and remove it in order this time.
@@ -227,7 +215,7 @@ public class BaseTableDataManagerAcquireSegmentTest {
     // Delete ix2 without accessing it.
     SegmentDataManager sdm2 = _internalSegMap.get(anotherSeg);
     Assert.assertEquals(sdm2.getReferenceCount(), 1);
-    tableDataManager.removeSegment(anotherSeg);
+    tableDataManager.offloadSegment(anotherSeg);
     Assert.assertEquals(tableDataManager.getNumSegments(), 0);
     Assert.assertEquals(sdm2.getReferenceCount(), 0);
     verify(ix2, times(1)).destroy();
@@ -461,10 +449,11 @@ public class BaseTableDataManagerAcquireSegmentTest {
     }
 
     // Remove the segment _lo and then bump _lo
-    private void removeSegment() {
+    private void removeSegment()
+        throws Exception {
       // Keep at least one segment in place.
       if (_hi > _lo) {
-        _tableDataManager.removeSegment(SEGMENT_PREFIX + _lo);
+        _tableDataManager.offloadSegment(SEGMENT_PREFIX + _lo);
         _lo++;
       } else {
         addSegment();

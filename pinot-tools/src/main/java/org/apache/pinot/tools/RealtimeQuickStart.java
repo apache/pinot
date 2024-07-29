@@ -22,8 +22,11 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.tools.Quickstart.Color;
 import org.apache.pinot.tools.admin.PinotAdministrator;
 import org.apache.pinot.tools.admin.command.QuickstartRunner;
@@ -41,6 +44,13 @@ public class RealtimeQuickStart extends QuickStartBase {
     arguments.addAll(Arrays.asList("QuickStart", "-type", "REALTIME"));
     arguments.addAll(Arrays.asList(args));
     PinotAdministrator.main(arguments.toArray(new String[arguments.size()]));
+  }
+
+  @Override
+  protected Map<String, Object> getConfigOverrides() {
+    Map<String, Object> configOverrides = new HashMap<>();
+    configOverrides.put(CommonConstants.Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT, true);
+    return configOverrides;
   }
 
   @Override
@@ -77,11 +87,14 @@ public class RealtimeQuickStart extends QuickStartBase {
     printStatus(Color.CYAN, "Query : " + q5);
     printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q5)));
     printStatus(Color.GREEN, "***************************************************");
+
+    runVectorQueryExamples(runner);
   }
 
   public void execute()
       throws Exception {
-    File quickstartTmpDir = new File(_dataDir, String.valueOf(System.currentTimeMillis()));
+    File quickstartTmpDir =
+        _setCustomDataDir ? _dataDir : new File(_dataDir, String.valueOf(System.currentTimeMillis()));
     File quickstartRunnerDir = new File(quickstartTmpDir, "quickstart");
     Preconditions.checkState(quickstartRunnerDir.mkdirs());
     List<QuickstartTableRequest> quickstartTableRequests = bootstrapStreamTableDirectories(quickstartTmpDir);

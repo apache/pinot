@@ -18,41 +18,22 @@
  */
 package org.apache.pinot.query.planner.plannode;
 
-import com.google.common.collect.ImmutableList;
-import java.util.ArrayList;
 import java.util.List;
-import org.apache.calcite.rex.RexLiteral;
+import java.util.Objects;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
-import org.apache.pinot.query.planner.logical.RexExpressionUtils;
-import org.apache.pinot.query.planner.serde.ProtoProperties;
 
 
-public class ValueNode extends AbstractPlanNode {
-  @ProtoProperties
-  private List<List<RexExpression>> _literalRows;
+public class ValueNode extends BasePlanNode {
+  private final List<List<RexExpression.Literal>> _literalRows;
 
-  public ValueNode(int planFragmentId) {
-    super(planFragmentId);
+  public ValueNode(int stageId, DataSchema dataSchema, NodeHint nodeHint, List<PlanNode> inputs,
+      List<List<RexExpression.Literal>> literalRows) {
+    super(stageId, dataSchema, nodeHint, inputs);
+    _literalRows = literalRows;
   }
 
-  public ValueNode(int currentStageId, DataSchema dataSchema, ImmutableList<ImmutableList<RexLiteral>> literalTuples) {
-    super(currentStageId, dataSchema);
-    _literalRows = new ArrayList<>();
-    for (List<RexLiteral> literalTuple : literalTuples) {
-      List<RexExpression> literalRow = new ArrayList<>();
-      for (RexLiteral literal : literalTuple) {
-        if (literal == null) {
-          literalRow.add(null);
-          continue;
-        }
-        literalRow.add(RexExpressionUtils.fromRexLiteral(literal));
-      }
-      _literalRows.add(literalRow);
-    }
-  }
-
-  public List<List<RexExpression>> getLiteralRows() {
+  public List<List<RexExpression.Literal>> getLiteralRows() {
     return _literalRows;
   }
 
@@ -64,5 +45,25 @@ public class ValueNode extends AbstractPlanNode {
   @Override
   public <T, C> T visit(PlanNodeVisitor<T, C> visitor, C context) {
     return visitor.visitValue(this, context);
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (!(o instanceof ValueNode)) {
+      return false;
+    }
+    if (!super.equals(o)) {
+      return false;
+    }
+    ValueNode valueNode = (ValueNode) o;
+    return Objects.equals(_literalRows, valueNode._literalRows);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(super.hashCode(), _literalRows);
   }
 }

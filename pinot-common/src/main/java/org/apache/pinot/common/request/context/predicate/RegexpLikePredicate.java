@@ -19,9 +19,9 @@
 package org.apache.pinot.common.request.context.predicate;
 
 import java.util.Objects;
-import java.util.regex.Pattern;
 import org.apache.pinot.common.request.context.ExpressionContext;
-
+import org.apache.pinot.common.utils.regex.Pattern;
+import org.apache.pinot.common.utils.regex.PatternFactory;
 
 /**
  * Predicate for REGEXP_LIKE.
@@ -46,7 +46,7 @@ public class RegexpLikePredicate extends BasePredicate {
 
   public Pattern getPattern() {
     if (_pattern == null) {
-      _pattern = Pattern.compile(_value, Pattern.UNICODE_CASE | Pattern.CASE_INSENSITIVE);
+      _pattern = PatternFactory.compile(_value);
     }
     return _pattern;
   }

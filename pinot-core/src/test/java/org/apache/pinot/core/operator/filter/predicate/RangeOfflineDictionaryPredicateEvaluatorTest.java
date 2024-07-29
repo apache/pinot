@@ -270,6 +270,6 @@ public class RangeOfflineDictionaryPredicateEvaluatorTest {
     if (upper == DICT_LEN - 1 && inclUpper) {
       upperStr = "*";
     }
-    return new RangePredicate(COLUMN_EXPRESSION, inclLower, lowerStr, inclUpper, upperStr);
+    return new RangePredicate(COLUMN_EXPRESSION, inclLower, lowerStr, inclUpper, upperStr, DataType.STRING);
   }
 }

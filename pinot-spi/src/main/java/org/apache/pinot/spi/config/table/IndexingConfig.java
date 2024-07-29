@@ -42,6 +42,7 @@ public class IndexingConfig extends BaseJsonConfig {
   private List<String> _jsonIndexColumns;
   private Map<String, JsonIndexConfig> _jsonIndexConfigs;
   private List<String> _h3IndexColumns;
+  private List<String> _vectorIndexColumns;
   private List<String> _sortedColumn;
   private List<String> _bloomFilterColumns;
   private Map<String, BloomFilterConfig> _bloomFilterConfigs;
@@ -61,6 +62,7 @@ public class IndexingConfig extends BaseJsonConfig {
   private SegmentPartitionConfig _segmentPartitionConfig;
   private boolean _aggregateMetrics;
   private boolean _nullHandlingEnabled;
+  private boolean _columnMajorSegmentBuilderEnabled = true;
 
   /**
    * If `optimizeDictionary` enabled, dictionary is not created for the high-cardinality
@@ -153,6 +155,33 @@ public class IndexingConfig extends BaseJsonConfig {
 
   public void setCreateInvertedIndexDuringSegmentGeneration(boolean createInvertedIndexDuringSegmentGeneration) {
     _createInvertedIndexDuringSegmentGeneration = createInvertedIndexDuringSegmentGeneration;
+  }
+
+  public List<String> getH3IndexColumns() {
+    return _h3IndexColumns;
+  }
+
+  public IndexingConfig setH3IndexColumns(List<String> h3IndexColumns) {
+    _h3IndexColumns = h3IndexColumns;
+    return this;
+  }
+
+  public List<String> getVectorIndexColumns() {
+    return _vectorIndexColumns;
+  }
+
+  public IndexingConfig setVectorIndexColumns(List<String> vectorIndexColumns) {
+    _vectorIndexColumns = vectorIndexColumns;
+    return this;
+  }
+
+  public FSTType getFstTypeForFSTIndex() {
+    return _fstTypeForFSTIndex;
+  }
+
+  public IndexingConfig setFstTypeForFSTIndex(FSTType fstTypeForFSTIndex) {
+    _fstTypeForFSTIndex = fstTypeForFSTIndex;
+    return this;
   }
 
   @Nullable
@@ -314,6 +343,14 @@ public class IndexingConfig extends BaseJsonConfig {
 
   public void setNullHandlingEnabled(boolean nullHandlingEnabled) {
     _nullHandlingEnabled = nullHandlingEnabled;
+  }
+
+  public boolean isColumnMajorSegmentBuilderEnabled() {
+    return _columnMajorSegmentBuilderEnabled;
+  }
+
+  public void setColumnMajorSegmentBuilderEnabled(boolean columnMajorSegmentBuilderEnabled) {
+    _columnMajorSegmentBuilderEnabled = columnMajorSegmentBuilderEnabled;
   }
 
   public boolean isOptimizeDictionary() {

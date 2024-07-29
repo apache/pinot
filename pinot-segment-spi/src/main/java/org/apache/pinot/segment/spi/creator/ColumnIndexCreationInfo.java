@@ -43,6 +43,10 @@ public class ColumnIndexCreationInfo implements Serializable {
     _defaultNullValue = defaultNullValue;
   }
 
+  public ColumnStatistics getColumnStatistics() {
+    return _columnStatistics;
+  }
+
   public boolean isCreateDictionary() {
     return _createDictionary;
   }

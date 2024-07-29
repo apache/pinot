@@ -38,7 +38,6 @@ import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.segment.local.utils.H3Utils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.index.reader.H3IndexReader;
-import org.apache.pinot.spi.utils.BytesUtils;
 import org.locationtech.jts.geom.Coordinate;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
@@ -69,12 +68,10 @@ public class H3IndexFilterOperator extends BaseFilterOperator {
     Coordinate coordinate;
     if (arguments.get(0).getType() == ExpressionContext.Type.IDENTIFIER) {
       _h3IndexReader = segment.getDataSource(arguments.get(0).getIdentifier()).getH3Index();
-      coordinate = GeometrySerializer.deserialize(BytesUtils.toBytes(arguments.get(1).getLiteral().getStringValue()))
-          .getCoordinate();
+      coordinate = GeometrySerializer.deserialize(arguments.get(1).getLiteral().getBytesValue()).getCoordinate();
     } else {
       _h3IndexReader = segment.getDataSource(arguments.get(1).getIdentifier()).getH3Index();
-      coordinate = GeometrySerializer.deserialize(BytesUtils.toBytes(arguments.get(0).getLiteral().getStringValue()))
-          .getCoordinate();
+      coordinate = GeometrySerializer.deserialize(arguments.get(0).getLiteral().getBytesValue()).getCoordinate();
     }
     assert _h3IndexReader != null;
     int resolution = _h3IndexReader.getH3IndexResolution().getLowestResolution();
@@ -244,7 +241,6 @@ public class H3IndexFilterOperator extends BaseFilterOperator {
       }
     };
   }
-
 
   @Override
   public List<Operator> getChildOperators() {

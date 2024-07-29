@@ -18,9 +18,13 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.List;
+import java.util.function.Supplier;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
+import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 
 
 /**
@@ -59,5 +63,29 @@ public abstract class BaseSingleInputAggregationFunction<I, F extends Comparable
       }
     }
     return stringBuilder.append(')').toString();
+  }
+
+  protected static ExpressionContext verifySingleArgument(List<ExpressionContext> arguments, String functionName) {
+    Preconditions.checkArgument(arguments.size() == 1, "%s expects 1 argument, got: %s", functionName,
+        arguments.size());
+    return arguments.get(0);
+  }
+
+  protected static <E> E getValue(AggregationResultHolder aggregationResultHolder, Supplier<E> orCreate) {
+    E result = aggregationResultHolder.getResult();
+    if (result == null) {
+      result = orCreate.get();
+      aggregationResultHolder.setValue(result);
+    }
+    return result;
+  }
+
+  protected static <E> E getValue(GroupByResultHolder groupByResultHolder, int groupKey, Supplier<E> orCreate) {
+    E result = groupByResultHolder.getResult(groupKey);
+    if (result == null) {
+      result = orCreate.get();
+      groupByResultHolder.setValueForKey(groupKey, result);
+    }
+    return result;
   }
 }

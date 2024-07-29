@@ -35,9 +35,9 @@ public class DistinctCountThetaSketchAggregator implements ValueAggregator {
 
   @Override
   public Object aggregate(Object value1, Object value2) {
-    Sketch first = ObjectSerDeUtils.DATA_SKETCH_SER_DE.deserialize((byte[]) value1);
-    Sketch second = ObjectSerDeUtils.DATA_SKETCH_SER_DE.deserialize((byte[]) value2);
+    Sketch first = ObjectSerDeUtils.DATA_SKETCH_THETA_SER_DE.deserialize((byte[]) value1);
+    Sketch second = ObjectSerDeUtils.DATA_SKETCH_THETA_SER_DE.deserialize((byte[]) value2);
     Sketch result = _union.union(first, second);
-    return ObjectSerDeUtils.DATA_SKETCH_SER_DE.serialize(result);
+    return ObjectSerDeUtils.DATA_SKETCH_THETA_SER_DE.serialize(result);
   }
 }

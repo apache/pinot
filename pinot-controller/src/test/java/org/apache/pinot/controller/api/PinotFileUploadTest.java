@@ -18,11 +18,12 @@
  */
 package org.apache.pinot.controller.api;
 
-import org.apache.http.HttpEntity;
-import org.apache.http.HttpResponse;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.entity.StringEntity;
-import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.hc.client5.http.classic.methods.HttpPost;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
+import org.apache.hc.client5.http.impl.classic.HttpClients;
+import org.apache.hc.core5.http.HttpEntity;
+import org.apache.hc.core5.http.io.entity.StringEntity;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -46,6 +47,8 @@ public class PinotFileUploadTest {
       throws Exception {
     TEST_INSTANCE.setupSharedStateAndValidate();
 
+    // Create schema
+    TEST_INSTANCE.addDummySchema(TABLE_NAME);
     // Adding table
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setSegmentAssignmentStrategy("RandomAssignmentStrategy").setNumReplicas(2).build();
@@ -55,14 +58,16 @@ public class PinotFileUploadTest {
   @Test
   public void testUploadBogusData()
       throws Exception {
-    org.apache.http.client.HttpClient httpClient = new DefaultHttpClient();
-    HttpPost httpPost = new HttpPost(TEST_INSTANCE.getControllerRequestURLBuilder().forDataFileUpload());
-    HttpEntity entity = new StringEntity("blah");
-    httpPost.setEntity(entity);
-    HttpResponse response = httpClient.execute(httpPost);
-    int statusCode = response.getStatusLine().getStatusCode();
+    try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
+      HttpPost httpPost = new HttpPost(TEST_INSTANCE.getControllerRequestURLBuilder().forDataFileUpload());
+      HttpEntity entity = new StringEntity("blah");
+      httpPost.setEntity(entity);
+      try (CloseableHttpResponse response = httpClient.execute(httpPost)) {
+        int statusCode = response.getCode();
 
-    assertTrue(statusCode >= 400 && statusCode < 500, "Status code = " + statusCode);
+        assertTrue(statusCode >= 400 && statusCode < 500, "Status code = " + statusCode);
+      }
+    }
   }
 
   @AfterClass

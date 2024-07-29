@@ -18,10 +18,34 @@
  */
 
 import { AxiosResponse } from 'axios';
-import { TableData, Instances, Instance, Tenants, ClusterConfig, TableName, TableSize,
-  IdealState, QueryTables, TableSchema, SQLResult, ClusterName, ZKGetList, ZKConfig, OperationResponse,
-  BrokerList, ServerList, UserList, TableList, UserObject, TaskProgressResponse, TableSegmentJobs, TaskRuntimeConfig,
-  SegmentDebugDetails, QuerySchemas, TableType, InstanceState
+import {
+  TableData,
+  Instances,
+  Instance,
+  Tenants,
+  ClusterConfig,
+  TableName,
+  TableSize,
+  IdealState,
+  QueryTables,
+  TableSchema,
+  SQLResult,
+  ClusterName,
+  ZKGetList,
+  ZKConfig,
+  OperationResponse,
+  BrokerList,
+  ServerList,
+  UserList,
+  TableList,
+  UserObject,
+  TaskProgressResponse,
+  TableSegmentJobs,
+  TaskRuntimeConfig,
+  SegmentDebugDetails,
+  QuerySchemas,
+  TableType,
+  InstanceState, SegmentMetadata,
 } from 'Models';
 
 const headers = {
@@ -62,7 +86,7 @@ export const putSchema = (name: string, params: string, reload?: boolean): Promi
   return baseApi.put(`/schemas/${name}`, params, { headers, params: queryParams });
 }
 
-export const getSegmentMetadata = (tableName: string, segmentName: string): Promise<AxiosResponse<IdealState>> =>
+export const getSegmentMetadata = (tableName: string, segmentName: string): Promise<AxiosResponse<SegmentMetadata>> =>
   baseApi.get(`/segments/${tableName}/${segmentName}/metadata?columns=*`);
 
 export const getTableSize = (name: string): Promise<AxiosResponse<TableSize>> =>
@@ -198,7 +222,7 @@ export const reloadAllSegments = (tableName: string, tableType: string): Promise
   baseApi.post(`/segments/${tableName}/reload?type=${tableType}`, null, {headers});
 
 export const reloadStatus = (tableName: string, tableType: string): Promise<AxiosResponse<OperationResponse>> =>
-  baseApi.get(`/segments/${tableName}/metadata?type=${tableType}&columns=*`);
+  baseApi.get(`/tables/${tableName}/indexes?type=${tableType}`);
 
 export const deleteSegment = (tableName: string, instanceName: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.delete(`/segments/${tableName}/${instanceName}`, {headers});
@@ -229,13 +253,13 @@ export const rebalanceBrokersForTable = (tableName: string): Promise<AxiosRespon
   baseApi.post(`/tables/${tableName}/rebuildBrokerResourceFromHelixTags`, null, {headers});
 
 export const validateSchema = (schemaObject: string): Promise<AxiosResponse<OperationResponse>> =>
-  baseApi.post(`/schemas/validate`, JSON.stringify(schemaObject), {headers});
+  baseApi.post(`/schemas/validate`, schemaObject, {headers});
 
 export const validateTable = (tableObject: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.post(`/tables/validate`, JSON.stringify(tableObject), {headers});
 
 export const saveSchema = (schemaObject: string): Promise<AxiosResponse<OperationResponse>> =>
-  baseApi.post(`/schemas`, JSON.stringify(schemaObject), {headers});
+  baseApi.post(`/schemas`, schemaObject, {headers});
 
 export const saveTable = (tableObject: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.post(`/tables`, JSON.stringify(tableObject), {headers});

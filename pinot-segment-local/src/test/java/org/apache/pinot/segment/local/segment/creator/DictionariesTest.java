@@ -20,12 +20,16 @@ package org.apache.pinot.segment.local.segment.creator;
 
 import java.io.File;
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import net.openhft.chronicle.core.Jvm;
 import org.apache.avro.Schema.Field;
 import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericRecord;
@@ -54,6 +58,7 @@ import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -64,6 +69,7 @@ import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
+import org.testng.SkipException;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -149,29 +155,29 @@ public class DictionariesTest {
           Assert.assertTrue(heapDictionary instanceof IntDictionary);
           Assert.assertTrue(mmapDictionary instanceof IntDictionary);
           int firstInt = heapDictionary.getIntValue(0);
-          Assert.assertEquals(heapDictionary.indexOf(firstInt), heapDictionary.indexOf("" + firstInt));
-          Assert.assertEquals(mmapDictionary.indexOf(firstInt), mmapDictionary.indexOf("" + firstInt));
+          Assert.assertEquals(heapDictionary.indexOf(firstInt), heapDictionary.indexOf(String.valueOf(firstInt)));
+          Assert.assertEquals(mmapDictionary.indexOf(firstInt), mmapDictionary.indexOf(String.valueOf(firstInt)));
           break;
         case LONG:
           Assert.assertTrue(heapDictionary instanceof LongDictionary);
           Assert.assertTrue(mmapDictionary instanceof LongDictionary);
           long firstLong = heapDictionary.getLongValue(0);
-          Assert.assertEquals(heapDictionary.indexOf(firstLong), heapDictionary.indexOf("" + firstLong));
-          Assert.assertEquals(mmapDictionary.indexOf(firstLong), mmapDictionary.indexOf("" + firstLong));
+          Assert.assertEquals(heapDictionary.indexOf(firstLong), heapDictionary.indexOf(String.valueOf(firstLong)));
+          Assert.assertEquals(mmapDictionary.indexOf(firstLong), mmapDictionary.indexOf(String.valueOf(firstLong)));
           break;
         case FLOAT:
           Assert.assertTrue(heapDictionary instanceof FloatDictionary);
           Assert.assertTrue(mmapDictionary instanceof FloatDictionary);
           float firstFloat = heapDictionary.getFloatValue(0);
-          Assert.assertEquals(heapDictionary.indexOf(firstFloat), heapDictionary.indexOf("" + firstFloat));
-          Assert.assertEquals(mmapDictionary.indexOf(firstFloat), mmapDictionary.indexOf("" + firstFloat));
+          Assert.assertEquals(heapDictionary.indexOf(firstFloat), heapDictionary.indexOf(String.valueOf(firstFloat)));
+          Assert.assertEquals(mmapDictionary.indexOf(firstFloat), mmapDictionary.indexOf(String.valueOf(firstFloat)));
           break;
         case DOUBLE:
           Assert.assertTrue(heapDictionary instanceof DoubleDictionary);
           Assert.assertTrue(mmapDictionary instanceof DoubleDictionary);
           double firstDouble = heapDictionary.getDoubleValue(0);
-          Assert.assertEquals(heapDictionary.indexOf(firstDouble), heapDictionary.indexOf("" + firstDouble));
-          Assert.assertEquals(mmapDictionary.indexOf(firstDouble), mmapDictionary.indexOf("" + firstDouble));
+          Assert.assertEquals(heapDictionary.indexOf(firstDouble), heapDictionary.indexOf(String.valueOf(firstDouble)));
+          Assert.assertEquals(mmapDictionary.indexOf(firstDouble), mmapDictionary.indexOf(String.valueOf(firstDouble)));
           break;
         case BIG_DECIMAL:
           Assert.assertTrue(heapDictionary instanceof BigDecimalDictionary);
@@ -529,5 +535,42 @@ public class DictionariesTest {
       default:
         throw new IllegalArgumentException("Illegal data type for stats builder: " + dataType);
     }
+  }
+
+  @Test
+  public void clpStatsCollectorTest() {
+    //skip this test if the underlying architecture is aarch64. See: https://github.com/y-scope/clp-ffi-java/issues/46.
+    // Note that an x86 JVM might be running in emulated mode on macs. In that case, this will return a false. This is
+    // okay as in that case the x86 version of CLP would be used.
+    if (Jvm.isArm()) {
+      throw new SkipException("CLP is not supported yet on arm/aarch. Skipping this test");
+    }
+    Schema schema = new Schema();
+    schema.addField(new DimensionFieldSpec("column1", DataType.STRING, true));
+    List<FieldConfig> fieldConfigList = new ArrayList<>();
+    fieldConfigList.add(new FieldConfig("column1", FieldConfig.EncodingType.RAW, Collections.EMPTY_LIST,
+        FieldConfig.CompressionCodec.CLP, Collections.EMPTY_MAP));
+    _tableConfig.setFieldConfigList(fieldConfigList);
+    StatsCollectorConfig statsCollectorConfig = new StatsCollectorConfig(_tableConfig, schema, null);
+    StringColumnPreIndexStatsCollector statsCollector =
+        new StringColumnPreIndexStatsCollector("column1", statsCollectorConfig);
+
+    List<String> logLines = new ArrayList<>();
+    logLines.add(
+        "2023/10/26 00:03:10.168 INFO [PropertyCache] [HelixController-pipeline-default-pinot-(4a02a32c_DEFAULT)] "
+            + "Event pinot::DEFAULT::4a02a32c_DEFAULT : Refreshed 35 property LiveInstance took 5 ms. Selective: true");
+    logLines.add(
+        "2023/10/26 00:03:10.169 INFO [PropertyCache] [HelixController-pipeline-default-pinot-(4a02a32d_DEFAULT)] "
+            + "Event pinot::DEFAULT::4a02a32d_DEFAULT : Refreshed 81 property LiveInstance took 4 ms. Selective: true");
+
+    for (String logLine : logLines) {
+      statsCollector.collect(logLine);
+    }
+    statsCollector.seal();
+
+    Assert.assertNotNull(statsCollector.getCLPStats());
+
+    // Same log line format
+    Assert.assertEquals(statsCollector.getCLPStats().getSortedLogTypeValues().length, 1);
   }
 }

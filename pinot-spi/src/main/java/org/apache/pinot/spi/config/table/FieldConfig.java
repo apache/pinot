@@ -51,6 +51,9 @@ public class FieldConfig extends BaseJsonConfig {
   public static final String TEXT_INDEX_STOP_WORD_EXCLUDE_KEY = "stopWordExclude";
   public static final String TEXT_INDEX_LUCENE_USE_COMPOUND_FILE = "luceneUseCompoundFile";
   public static final String TEXT_INDEX_LUCENE_MAX_BUFFER_SIZE_MB = "luceneMaxBufferSizeMB";
+  public static final String TEXT_INDEX_LUCENE_ANALYZER_CLASS = "luceneAnalyzerClass";
+  public static final String TEXT_INDEX_DEFAULT_LUCENE_ANALYZER_CLASS =
+      "org.apache.lucene.analysis.standard.StandardAnalyzer";
   public static final String TEXT_INDEX_STOP_WORD_SEPERATOR = ",";
   // "native" for native, default is Lucene
   public static final String TEXT_FST_TYPE = "fstType";
@@ -58,6 +61,8 @@ public class FieldConfig extends BaseJsonConfig {
   // Config to disable forward index
   public static final String FORWARD_INDEX_DISABLED = "forwardIndexDisabled";
   public static final String DEFAULT_FORWARD_INDEX_DISABLED = Boolean.FALSE.toString();
+  public static final String TEXT_INDEX_ENABLE_PREFIX_SUFFIX_PHRASE_QUERIES =
+      "enablePrefixSuffixMatchingInPhraseQueries";
 
   private final String _name;
   private final EncodingType _encodingType;
@@ -98,9 +103,9 @@ public class FieldConfig extends BaseJsonConfig {
       @JsonProperty(value = "tierOverwrites") @Nullable JsonNode tierOverwrites) {
     Preconditions.checkArgument(name != null, "'name' must be configured");
     _name = name;
-    _encodingType = encodingType;
-    _indexTypes = indexTypes != null ? indexTypes : (
-        indexType == null ? Lists.newArrayList() : Lists.newArrayList(indexType));
+    _encodingType = encodingType == null ? EncodingType.DICTIONARY : encodingType;
+    _indexTypes =
+        indexTypes != null ? indexTypes : (indexType == null ? Lists.newArrayList() : Lists.newArrayList(indexType));
     _compressionCodec = compressionCodec;
     _timestampConfig = timestampConfig;
     _properties = properties;
@@ -115,11 +120,40 @@ public class FieldConfig extends BaseJsonConfig {
 
   // If null, there won't be any index
   public enum IndexType {
-    INVERTED, SORTED, TEXT, FST, H3, JSON, TIMESTAMP, RANGE
+    INVERTED, SORTED, TEXT, FST, H3, JSON, TIMESTAMP, VECTOR, RANGE
   }
 
   public enum CompressionCodec {
-    PASS_THROUGH, SNAPPY, ZSTANDARD, LZ4
+    //@formatter:off
+    PASS_THROUGH(true, false),
+    SNAPPY(true, false),
+    ZSTANDARD(true, false),
+    LZ4(true, false),
+    GZIP(true, false),
+
+    // For MV dictionary encoded forward index, add a second level dictionary encoding for the multi-value entries
+    MV_ENTRY_DICT(false, true),
+
+    // CLP is a special type of compression codec that isn't generally applicable to all RAW columns and has a special
+    // handling for log lines (see {@link CLPForwardIndexCreatorV1})
+    CLP(false, false);
+    //@formatter:on
+
+    private final boolean _applicableToRawIndex;
+    private final boolean _applicableToDictEncodedIndex;
+
+    CompressionCodec(boolean applicableToRawIndex, boolean applicableToDictEncodedIndex) {
+      _applicableToRawIndex = applicableToRawIndex;
+      _applicableToDictEncodedIndex = applicableToDictEncodedIndex;
+    }
+
+    public boolean isApplicableToRawIndex() {
+      return _applicableToRawIndex;
+    }
+
+    public boolean isApplicableToDictEncodedIndex() {
+      return _applicableToDictEncodedIndex;
+    }
   }
 
   public String getName() {
@@ -230,8 +264,8 @@ public class FieldConfig extends BaseJsonConfig {
     }
 
     public FieldConfig build() {
-      return new FieldConfig(_name, _encodingType, null, _indexTypes, _compressionCodec, _timestampConfig,
-          _indexes, _properties, _tierOverwrites);
+      return new FieldConfig(_name, _encodingType, null, _indexTypes, _compressionCodec, _timestampConfig, _indexes,
+          _properties, _tierOverwrites);
     }
   }
 }

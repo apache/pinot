@@ -26,14 +26,14 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
-import org.apache.commons.configuration.Configuration;
+import org.apache.commons.configuration2.Configuration;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.controller.rebalancer.strategy.AutoRebalanceStrategy;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
+import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.LocalPinotFS;
 import org.apache.pinot.spi.utils.CommonConstants;
-import org.apache.pinot.spi.utils.RebalanceConfigConstants;
 import org.apache.pinot.spi.utils.TimeUtils;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Controller.CONFIG_OF_CONTROLLER_METRICS_PREFIX;
@@ -68,6 +68,7 @@ public class ControllerConf extends PinotConfiguration {
   public static final String CONSOLE_SWAGGER_USE_HTTPS = "controller.swagger.use.https";
   public static final String CONTROLLER_MODE = "controller.mode";
   public static final String LEAD_CONTROLLER_RESOURCE_REBALANCE_STRATEGY = "controller.resource.rebalance.strategy";
+  public static final String LEAD_CONTROLLER_RESOURCE_REBALANCE_DELAY_MS = "controller.resource.rebalance.delay_ms";
 
   // Comma separated list of packages that contain TableConfigTuners to be added to the registry
   public static final String TABLE_CONFIG_TUNER_PACKAGES = "controller.table.config.tuner.packages";
@@ -177,9 +178,9 @@ public class ControllerConf extends PinotConfiguration {
     public static final String DEPRECATED_SEGMENT_RELOCATOR_FREQUENCY_IN_SECONDS =
         "controller.segment.relocator.frequencyInSeconds";
     public static final String SEGMENT_RELOCATOR_FREQUENCY_PERIOD = "controller.segment.relocator.frequencyPeriod";
+    public static final String REBALANCE_CHECKER_FREQUENCY_PERIOD = "controller.rebalance.checker.frequencyPeriod";
     // Because segment level validation is expensive and requires heavy ZK access, we run segment level validation
-    // with a
-    // separate interval
+    // with a separate interval
     // Deprecated as of 0.8.0
     @Deprecated
     public static final String DEPRECATED_SEGMENT_LEVEL_VALIDATION_INTERVAL_IN_SECONDS =
@@ -198,6 +199,8 @@ public class ControllerConf extends PinotConfiguration {
     // RealtimeSegmentRelocator has been rebranded as SegmentRelocator
     public static final String DEPRECATED_REALTIME_SEGMENT_RELOCATION_INITIAL_DELAY_IN_SECONDS =
         "controller.realtimeSegmentRelocation.initialDelayInSeconds";
+    public static final String REBALANCE_CHECKER_INITIAL_DELAY_IN_SECONDS =
+        "controller.rebalanceChecker.initialDelayInSeconds";
     public static final String SEGMENT_RELOCATOR_INITIAL_DELAY_IN_SECONDS =
         "controller.segmentRelocator.initialDelayInSeconds";
     public static final String SEGMENT_RELOCATOR_ENABLE_LOCAL_TIER_MIGRATION =
@@ -215,9 +218,17 @@ public class ControllerConf extends PinotConfiguration {
         "controller.realtime.segment.deepStoreUploadRetryEnabled";
     public static final String DEEP_STORE_RETRY_UPLOAD_TIMEOUT_MS =
         "controller.realtime.segment.deepStoreUploadRetry.timeoutMs";
+    public static final String DEEP_STORE_RETRY_UPLOAD_PARALLELISM =
+        "controller.realtime.segment.deepStoreUploadRetry.parallelism";
+    public static final String ENABLE_TMP_SEGMENT_ASYNC_DELETION =
+        "controller.realtime.segment.tmpFileAsyncDeletionEnabled";
+    // temporary segments within expiration won't be deleted so that ongoing split commit won't be impacted.
+    public static final String TMP_SEGMENT_RETENTION_IN_SECONDS =
+        "controller.realtime.segment.tmpFileRetentionInSeconds";
 
     public static final int MIN_INITIAL_DELAY_IN_SECONDS = 120;
     public static final int MAX_INITIAL_DELAY_IN_SECONDS = 300;
+    public static final int DEFAULT_SPLIT_COMMIT_TMP_SEGMENT_LIFETIME_SECOND = 60 * 60; // 1 Hour.
 
     private static final Random RANDOM = new Random();
 
@@ -230,7 +241,8 @@ public class ControllerConf extends PinotConfiguration {
     private static final int DEFAULT_OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_IN_SECONDS = 24 * 60 * 60; // 24 Hours.
     private static final int DEFAULT_REALTIME_SEGMENT_VALIDATION_FREQUENCY_IN_SECONDS = 60 * 60; // 1 Hour.
     private static final int DEFAULT_BROKER_RESOURCE_VALIDATION_FREQUENCY_IN_SECONDS = 60 * 60; // 1 Hour.
-    private static final int DEFAULT_STATUS_CONTROLLER_FREQUENCY_IN_SECONDS = 5 * 60; // 5 minutes
+    private static final int DEFAULT_STATUS_CHECKER_FREQUENCY_IN_SECONDS = 5 * 60; // 5 minutes
+    private static final int DEFAULT_REBALANCE_CHECKER_FREQUENCY_IN_SECONDS = 5 * 60; // 5 minutes
     private static final int DEFAULT_TASK_METRICS_EMITTER_FREQUENCY_IN_SECONDS = 5 * 60; // 5 minutes
     private static final int DEFAULT_STATUS_CONTROLLER_WAIT_FOR_PUSH_TIME_IN_SECONDS = 10 * 60; // 10 minutes
     private static final int DEFAULT_TASK_MANAGER_FREQUENCY_IN_SECONDS = -1; // Disabled
@@ -257,7 +269,6 @@ public class ControllerConf extends PinotConfiguration {
   private static final String SEGMENT_COMMIT_TIMEOUT_SECONDS = "controller.realtime.segment.commit.timeoutSeconds";
   private static final String DELETED_SEGMENTS_RETENTION_IN_DAYS = "controller.deleted.segments.retentionInDays";
   public static final String TABLE_MIN_REPLICAS = "table.minReplicas";
-  public static final String ENABLE_SPLIT_COMMIT = "controller.enable.split.commit";
   private static final String JERSEY_ADMIN_API_PORT = "jersey.admin.api.port";
   private static final String JERSEY_ADMIN_IS_PRIMARY = "jersey.admin.isprimary";
   public static final String ACCESS_CONTROL_FACTORY_CLASS = "controller.admin.access.control.factory.class";
@@ -271,11 +282,6 @@ public class ControllerConf extends PinotConfiguration {
       "controller.realtime.segment.metadata.commit.numLocks";
   private static final String ENABLE_STORAGE_QUOTA_CHECK = "controller.enable.storage.quota.check";
   private static final String ENABLE_BATCH_MESSAGE_MODE = "controller.enable.batch.message.mode";
-  // It is used to disable the HLC realtime segment completion and disallow HLC table in the cluster. True by default.
-  // If it's set to false, existing HLC realtime tables will stop consumption, and creation of new HLC tables will be
-  // disallowed.
-  // Please make sure there is no HLC table running in the cluster before disallowing it.
-  public static final String ALLOW_HLC_TABLES = "controller.allow.hlc.tables";
   public static final String DIM_TABLE_MAX_SIZE = "controller.dimTable.maxSize";
 
   // Defines the kind of storage and the underlying PinotFS implementation
@@ -285,7 +291,6 @@ public class ControllerConf extends PinotConfiguration {
   private static final int DEFAULT_MINION_ADMIN_REQUEST_TIMEOUT_SECONDS = 30;
   private static final int DEFAULT_DELETED_SEGMENTS_RETENTION_IN_DAYS = 7;
   private static final int DEFAULT_TABLE_MIN_REPLICAS = 1;
-  private static final boolean DEFAULT_ENABLE_SPLIT_COMMIT = true;
   private static final int DEFAULT_JERSEY_ADMIN_PORT = 21000;
   private static final String DEFAULT_ACCESS_CONTROL_FACTORY_CLASS =
       "org.apache.pinot.controller.api.access.AllowAllAccessFactory";
@@ -303,12 +308,16 @@ public class ControllerConf extends PinotConfiguration {
   private static final String DEFAULT_CONTROLLER_MODE = ControllerMode.DUAL.name();
   private static final String DEFAULT_LEAD_CONTROLLER_RESOURCE_REBALANCE_STRATEGY =
       AutoRebalanceStrategy.class.getName();
+  private static final int DEFAULT_LEAD_CONTROLLER_RESOURCE_REBALANCE_DELAY_MS = 300_000; // 5 minutes
   private static final String DEFAULT_DIM_TABLE_MAX_SIZE = "200M";
 
   private static final String DEFAULT_PINOT_FS_FACTORY_CLASS_LOCAL = LocalPinotFS.class.getName();
 
   public static final String DISABLE_GROOVY = "controller.disable.ingestion.groovy";
   public static final boolean DEFAULT_DISABLE_GROOVY = true;
+
+  public static final String ENFORCE_POOL_BASED_ASSIGNMENT_KEY = "enforce.pool.based.assignment";
+  public static final boolean DEFAULT_ENFORCE_POOL_BASED_ASSIGNMENT = false;
 
   public ControllerConf() {
     super(new HashMap<>());
@@ -336,10 +345,6 @@ public class ControllerConf extends PinotConfiguration {
     if (pinotFSFactoryClasses != null) {
       pinotFSFactoryClasses.getKeys().forEachRemaining(key -> setProperty(key, pinotFSFactoryClasses.getProperty(key)));
     }
-  }
-
-  public void setSplitCommit(boolean isSplitCommit) {
-    setProperty(ENABLE_SPLIT_COMMIT, isSplitCommit);
   }
 
   public void setQueryConsolePath(String path) {
@@ -482,10 +487,6 @@ public class ControllerConf extends PinotConfiguration {
     return super.toString();
   }
 
-  public boolean getAcceptSplitCommit() {
-    return getProperty(ENABLE_SPLIT_COMMIT, DEFAULT_ENABLE_SPLIT_COMMIT);
-  }
-
   public String getControllerVipHost() {
     return Optional.ofNullable(getProperty(CONTROLLER_VIP_HOST))
 
@@ -611,12 +612,23 @@ public class ControllerConf extends PinotConfiguration {
     return Optional.ofNullable(getProperty(ControllerPeriodicTasksConf.STATUS_CHECKER_FREQUENCY_PERIOD))
         .map(period -> (int) convertPeriodToSeconds(period)).orElseGet(
             () -> getProperty(ControllerPeriodicTasksConf.DEPRECATED_STATUS_CHECKER_FREQUENCY_IN_SECONDS,
-                ControllerPeriodicTasksConf.DEFAULT_STATUS_CONTROLLER_FREQUENCY_IN_SECONDS));
+                ControllerPeriodicTasksConf.DEFAULT_STATUS_CHECKER_FREQUENCY_IN_SECONDS));
   }
 
   public void setStatusCheckerFrequencyInSeconds(int statusCheckerFrequencyInSeconds) {
     setProperty(ControllerPeriodicTasksConf.DEPRECATED_STATUS_CHECKER_FREQUENCY_IN_SECONDS,
         Integer.toString(statusCheckerFrequencyInSeconds));
+  }
+
+  public int getRebalanceCheckerFrequencyInSeconds() {
+    return Optional.ofNullable(getProperty(ControllerPeriodicTasksConf.REBALANCE_CHECKER_FREQUENCY_PERIOD))
+        .map(period -> (int) convertPeriodToSeconds(period)).orElse(
+            ControllerPeriodicTasksConf.DEFAULT_REBALANCE_CHECKER_FREQUENCY_IN_SECONDS);
+  }
+
+  public long getRebalanceCheckerInitialDelayInSeconds() {
+    return getProperty(ControllerPeriodicTasksConf.REBALANCE_CHECKER_INITIAL_DELAY_IN_SECONDS,
+        ControllerPeriodicTasksConf.getRandomInitialDelayInSeconds());
   }
 
   public int getRealtimeConsumerMonitorRunFrequency() {
@@ -922,8 +934,21 @@ public class ControllerConf extends PinotConfiguration {
     return getProperty(ControllerPeriodicTasksConf.ENABLE_DEEP_STORE_RETRY_UPLOAD_LLC_SEGMENT, false);
   }
 
+  public boolean isTmpSegmentAsyncDeletionEnabled() {
+    return getProperty(ControllerPeriodicTasksConf.ENABLE_TMP_SEGMENT_ASYNC_DELETION, false);
+  }
+
   public int getDeepStoreRetryUploadTimeoutMs() {
     return getProperty(ControllerPeriodicTasksConf.DEEP_STORE_RETRY_UPLOAD_TIMEOUT_MS, -1);
+  }
+
+  public int getDeepStoreRetryUploadParallelism() {
+    return getProperty(ControllerPeriodicTasksConf.DEEP_STORE_RETRY_UPLOAD_PARALLELISM, 1);
+  }
+
+  public int getTmpSegmentRetentionInSeconds() {
+    return getProperty(ControllerPeriodicTasksConf.TMP_SEGMENT_RETENTION_IN_SECONDS,
+        ControllerPeriodicTasksConf.DEFAULT_SPLIT_COMMIT_TMP_SEGMENT_LIFETIME_SECOND);
   }
 
   public long getPinotTaskManagerInitialDelaySeconds() {
@@ -960,12 +985,12 @@ public class ControllerConf extends PinotConfiguration {
 
   public long getSegmentRelocatorExternalViewCheckIntervalInMs() {
     return getProperty(ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_EXTERNAL_VIEW_CHECK_INTERVAL_IN_MS,
-        RebalanceConfigConstants.DEFAULT_EXTERNAL_VIEW_CHECK_INTERVAL_IN_MS);
+        RebalanceConfig.DEFAULT_EXTERNAL_VIEW_CHECK_INTERVAL_IN_MS);
   }
 
   public long getSegmentRelocatorExternalViewStabilizationTimeoutInMs() {
     return getProperty(ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_EXTERNAL_VIEW_STABILIZATION_TIMEOUT_IN_MS,
-        RebalanceConfigConstants.DEFAULT_EXTERNAL_VIEW_STABILIZATION_TIMEOUT_IN_MS);
+        RebalanceConfig.DEFAULT_EXTERNAL_VIEW_STABILIZATION_TIMEOUT_IN_MS);
   }
 
   public boolean isSegmentRelocatorRebalanceTablesSequentially() {
@@ -991,6 +1016,15 @@ public class ControllerConf extends PinotConfiguration {
   public String getLeadControllerResourceRebalanceStrategy() {
     return getProperty(LEAD_CONTROLLER_RESOURCE_REBALANCE_STRATEGY,
         DEFAULT_LEAD_CONTROLLER_RESOURCE_REBALANCE_STRATEGY);
+  }
+
+  public void setLeadControllerResourceRebalanceDelayMs(long rebalanceDelayMs) {
+    setProperty(LEAD_CONTROLLER_RESOURCE_REBALANCE_DELAY_MS, rebalanceDelayMs);
+  }
+
+  public int getLeadControllerResourceRebalanceDelayMs() {
+    return getProperty(
+        LEAD_CONTROLLER_RESOURCE_REBALANCE_DELAY_MS, DEFAULT_LEAD_CONTROLLER_RESOURCE_REBALANCE_DELAY_MS);
   }
 
   public boolean getHLCTablesAllowed() {
@@ -1033,5 +1067,9 @@ public class ControllerConf extends PinotConfiguration {
     String value = getProperty(property, CommonConstants.HTTP_PROTOCOL);
     Preconditions.checkArgument(SUPPORTED_PROTOCOLS.contains(value), "Unsupported %s protocol '%s'", property, value);
     return value;
+  }
+
+  public boolean isEnforcePoolBasedAssignmentEnabled() {
+    return getProperty(ENFORCE_POOL_BASED_ASSIGNMENT_KEY, DEFAULT_ENFORCE_POOL_BASED_ASSIGNMENT);
   }
 }

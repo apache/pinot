@@ -21,14 +21,16 @@ package org.apache.pinot.tools.streams.githubevents;
 import java.io.IOException;
 import java.net.SocketTimeoutException;
 import java.nio.charset.StandardCharsets;
-import org.apache.http.StatusLine;
-import org.apache.http.client.config.RequestConfig;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpUriRequest;
-import org.apache.http.client.methods.RequestBuilder;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
-import org.apache.http.util.EntityUtils;
+import java.util.concurrent.TimeUnit;
+import org.apache.hc.client5.http.config.RequestConfig;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
+import org.apache.hc.client5.http.impl.classic.HttpClients;
+import org.apache.hc.core5.http.ClassicHttpRequest;
+import org.apache.hc.core5.http.ParseException;
+import org.apache.hc.core5.http.io.entity.EntityUtils;
+import org.apache.hc.core5.http.io.support.ClassicRequestBuilder;
+import org.apache.hc.core5.util.Timeout;
 import org.apache.pinot.tools.Quickstart;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,6 +52,10 @@ public class GitHubAPICaller {
   private static final String ETAG_HEADER = "ETag";
   private static final String TOKEN_PREFIX = "token ";
   private static final String TIMEOUT_MESSAGE = "Timeout";
+  private static final RequestConfig REQUEST_CONFIG = RequestConfig.custom()
+      .setConnectTimeout(Timeout.of(10_000, TimeUnit.MILLISECONDS))
+      .setResponseTimeout(Timeout.of(10_000, TimeUnit.MILLISECONDS))
+      .build();
 
   private final CloseableHttpClient _closeableHttpClient;
   private String _personalAccessToken;
@@ -57,7 +63,7 @@ public class GitHubAPICaller {
   GitHubAPICaller(String personalAccessToken) {
     printStatus(Quickstart.Color.CYAN, "***** Initializing GitHubAPICaller *****");
     _personalAccessToken = personalAccessToken;
-    _closeableHttpClient = HttpClients.createDefault();
+    _closeableHttpClient = HttpClients.custom().setDefaultRequestConfig(REQUEST_CONFIG).build();
   }
 
   /**
@@ -65,7 +71,7 @@ public class GitHubAPICaller {
    */
   public GitHubAPIResponse callEventsAPI(String etag)
       throws IOException {
-    HttpUriRequest request = buildRequest(EVENTS_API_URL, etag);
+    ClassicHttpRequest request = buildRequest(EVENTS_API_URL, etag);
     return executeEventsRequest(request);
   }
 
@@ -74,36 +80,29 @@ public class GitHubAPICaller {
    */
   public GitHubAPIResponse callAPI(String url)
       throws IOException {
-    HttpUriRequest request = buildRequest(url, null);
+    ClassicHttpRequest request = buildRequest(url, null);
     return executeGet(request);
   }
 
-  private void setTimeout(RequestBuilder requestBuilder) {
-    RequestConfig requestConfig = RequestConfig.custom().setConnectTimeout(10_000).setSocketTimeout(10_000).build();
-    requestBuilder.setConfig(requestConfig);
-  }
-
-  private HttpUriRequest buildRequest(String url, String etag) {
-    RequestBuilder requestBuilder =
-        RequestBuilder.get(url).setHeader(AUTHORIZATION_HEADER, TOKEN_PREFIX + _personalAccessToken);
+  private ClassicHttpRequest buildRequest(String url, String etag) {
+    ClassicRequestBuilder requestBuilder =
+        ClassicRequestBuilder.get(url).setHeader(AUTHORIZATION_HEADER, TOKEN_PREFIX + _personalAccessToken);
     if (etag != null) {
       requestBuilder.setHeader(IF_NONE_MATCH_HEADER, etag);
     }
-    setTimeout(requestBuilder);
     return requestBuilder.build();
   }
 
   /**
    * Make an Http GET call to the /events API
    */
-  private GitHubAPIResponse executeEventsRequest(HttpUriRequest request)
+  private GitHubAPIResponse executeEventsRequest(ClassicHttpRequest request)
       throws IOException {
     GitHubAPIResponse githubAPIResponse = new GitHubAPIResponse();
 
     try (CloseableHttpResponse httpResponse = _closeableHttpClient.execute(request)) {
-      StatusLine statusLine = httpResponse.getStatusLine();
-      githubAPIResponse.setStatusCode(statusLine.getStatusCode());
-      githubAPIResponse.setStatusMessage(statusLine.getReasonPhrase());
+      githubAPIResponse.setStatusCode(httpResponse.getCode());
+      githubAPIResponse.setStatusMessage(httpResponse.getReasonPhrase());
       String remainingLimit = httpResponse.getFirstHeader(RATE_LIMIT_REMAINING_HEADER).getValue();
       String resetTimeSeconds = httpResponse.getFirstHeader(RATE_LIMIT_RESET_HEADER).getValue();
       try {
@@ -114,9 +113,9 @@ public class GitHubAPICaller {
           githubAPIResponse.setResetTimeMs(Long.parseLong(resetTimeSeconds) * 1000);
         }
       } catch (NumberFormatException e) {
-        LOGGER.warn("Could not parse remainingLimit: " + remainingLimit);
+        LOGGER.warn("Could not parse remainingLimit: {}", remainingLimit);
       }
-      if (statusLine.getStatusCode() == 200) {
+      if (httpResponse.getCode() == 200) {
         githubAPIResponse.setEtag(httpResponse.getFirstHeader(ETAG_HEADER).getValue());
         githubAPIResponse.setResponseString(EntityUtils.toString(httpResponse.getEntity(), StandardCharsets.UTF_8));
       }
@@ -127,6 +126,9 @@ public class GitHubAPICaller {
     } catch (IOException e) {
       LOGGER.error("Exception in call to GitHub events API.", e);
       throw e;
+    } catch (ParseException e) {
+      LOGGER.error("Parse exception in GitHub events API response", e);
+      throw new IOException(e);
     }
     return githubAPIResponse;
   }
@@ -134,29 +136,31 @@ public class GitHubAPICaller {
   /**
    * Makes an Http GET call to the provided URL
    */
-  private GitHubAPIResponse executeGet(HttpUriRequest request)
+  private GitHubAPIResponse executeGet(ClassicHttpRequest request)
       throws IOException {
     GitHubAPIResponse githubAPIResponse = new GitHubAPIResponse();
 
     try (CloseableHttpResponse httpResponse = _closeableHttpClient.execute(request)) {
-      StatusLine statusLine = httpResponse.getStatusLine();
-      githubAPIResponse.setStatusCode(statusLine.getStatusCode());
-      githubAPIResponse.setStatusMessage(statusLine.getReasonPhrase());
+      githubAPIResponse.setStatusCode(httpResponse.getCode());
+      githubAPIResponse.setStatusMessage(httpResponse.getReasonPhrase());
 
-      if (statusLine.getStatusCode() == 200) {
+      if (httpResponse.getCode() == 200) {
         githubAPIResponse.setResponseString(EntityUtils.toString(httpResponse.getEntity(), StandardCharsets.UTF_8));
       } else {
         printStatus(Quickstart.Color.YELLOW,
             "Status code " + githubAPIResponse._statusCode + " status message " + githubAPIResponse._statusMessage
-                + " uri " + request.getURI());
+                + " uri " + request.getRequestUri());
       }
     } catch (SocketTimeoutException e) {
       githubAPIResponse.setStatusCode(408);
       githubAPIResponse.setStatusMessage(TIMEOUT_MESSAGE);
-      LOGGER.error("Timeout in call to GitHub API {}", request.getURI(), e);
+      LOGGER.error("Timeout in call to GitHub API {}", request.getRequestUri(), e);
     } catch (IOException e) {
-      LOGGER.error("Exception in call to GitHub API {}", request.getURI(), e);
+      LOGGER.error("Exception in call to GitHub API {}", request.getRequestUri(), e);
       throw e;
+    } catch (ParseException e) {
+      LOGGER.error("Parse exception in GitHub API response {}", request.getRequestUri(), e);
+      throw new IOException(e);
     }
     return githubAPIResponse;
   }

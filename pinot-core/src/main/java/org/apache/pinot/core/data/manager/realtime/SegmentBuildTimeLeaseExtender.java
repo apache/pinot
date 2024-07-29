@@ -102,7 +102,7 @@ public class SegmentBuildTimeLeaseExtender {
       Future future = entry.getValue();
       boolean cancelled = future.cancel(true);
       if (!cancelled) {
-        LOGGER.warn("Task could not be cancelled for {}" + entry.getKey());
+        LOGGER.warn("Task could not be cancelled for {}", entry.getKey());
       }
     }
     _segmentToFutureMap.clear();
@@ -133,7 +133,7 @@ public class SegmentBuildTimeLeaseExtender {
     if (future != null) {
       boolean cancelled = future.cancel(true);
       if (!cancelled) {
-        LOGGER.warn("Task could not be cancelled for {}" + segmentId);
+        LOGGER.warn("Task could not be cancelled for {}", segmentId);
       }
     }
     _segmentToFutureMap.remove(segmentId);

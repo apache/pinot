@@ -25,14 +25,10 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
-import org.apache.pinot.spi.stream.StreamConsumerFactory;
-import org.easymock.Capture;
-import org.testng.Assert;
-import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 import software.amazon.awssdk.core.SdkBytes;
 import software.amazon.awssdk.services.kinesis.KinesisClient;
-import software.amazon.awssdk.services.kinesis.model.ChildShard;
 import software.amazon.awssdk.services.kinesis.model.GetRecordsRequest;
 import software.amazon.awssdk.services.kinesis.model.GetRecordsResponse;
 import software.amazon.awssdk.services.kinesis.model.GetShardIteratorRequest;
@@ -40,10 +36,14 @@ import software.amazon.awssdk.services.kinesis.model.GetShardIteratorResponse;
 import software.amazon.awssdk.services.kinesis.model.Record;
 import software.amazon.awssdk.services.kinesis.model.ShardIteratorType;
 
-import static org.easymock.EasyMock.capture;
-import static org.easymock.EasyMock.createMock;
-import static org.easymock.EasyMock.expect;
-import static org.easymock.EasyMock.replay;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 
 public class KinesisConsumerTest {
@@ -58,21 +58,16 @@ public class KinesisConsumerTest {
   private static final String PLACEHOLDER = "DUMMY";
   private static final int MAX_RECORDS_TO_FETCH = 20;
 
-  private KinesisConnectionHandler _kinesisConnectionHandler;
-  private StreamConsumerFactory _streamConsumerFactory;
-  private KinesisClient _kinesisClient;
-  private List<Record> _recordList;
+  private KinesisConfig _kinesisConfig;
+  private List<Record> _records;
 
   private KinesisConfig getKinesisConfig() {
     Map<String, String> props = new HashMap<>();
     props.put(StreamConfigProperties.STREAM_TYPE, STREAM_TYPE);
     props.put(StreamConfigProperties.constructStreamProperty(STREAM_TYPE, StreamConfigProperties.STREAM_TOPIC_NAME),
         STREAM_NAME);
-    props.put(StreamConfigProperties.constructStreamProperty(STREAM_TYPE, StreamConfigProperties.STREAM_CONSUMER_TYPES),
-        StreamConfig.ConsumerType.LOWLEVEL.toString());
-    props.put(StreamConfigProperties
-            .constructStreamProperty(STREAM_TYPE, StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS),
-        KinesisConsumerFactory.class.getName());
+    props.put(StreamConfigProperties.constructStreamProperty(STREAM_TYPE,
+        StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS), KinesisConsumerFactory.class.getName());
     props.put(StreamConfigProperties.constructStreamProperty(STREAM_TYPE, StreamConfigProperties.STREAM_DECODER_CLASS),
         "org.apache.pinot.plugin.inputformat.json.JSONMessageDecoder");
     props.put(KinesisConfig.REGION, AWS_REGION);
@@ -81,120 +76,77 @@ public class KinesisConsumerTest {
     return new KinesisConfig(new StreamConfig(TABLE_NAME_WITH_TYPE, props));
   }
 
-  @BeforeMethod
-  public void setupTest() {
-    _kinesisConnectionHandler = createMock(KinesisConnectionHandler.class);
-    _kinesisClient = createMock(KinesisClient.class);
-    _streamConsumerFactory = createMock(StreamConsumerFactory.class);
-
-    _recordList = new ArrayList<>();
-
+  @BeforeClass
+  public void setUp() {
+    _kinesisConfig = getKinesisConfig();
+    _records = new ArrayList<>(NUM_RECORDS);
     for (int i = 0; i < NUM_RECORDS; i++) {
       Record record =
           Record.builder().data(SdkBytes.fromUtf8String(DUMMY_RECORD_PREFIX + i)).partitionKey(PARTITION_KEY_PREFIX + i)
-              .approximateArrivalTimestamp(Instant.now())
-              .sequenceNumber(String.valueOf(i + 1)).build();
-      _recordList.add(record);
+              .approximateArrivalTimestamp(Instant.now()).sequenceNumber(String.valueOf(i + 1)).build();
+      _records.add(record);
     }
   }
 
   @Test
   public void testBasicConsumer() {
-    Capture<GetRecordsRequest> getRecordsRequestCapture = Capture.newInstance();
-    Capture<GetShardIteratorRequest> getShardIteratorRequestCapture = Capture.newInstance();
+    KinesisClient kinesisClient = mock(KinesisClient.class);
+    when(kinesisClient.getShardIterator(any(GetShardIteratorRequest.class))).thenReturn(
+        GetShardIteratorResponse.builder().shardIterator(PLACEHOLDER).build());
+    when(kinesisClient.getRecords(any(GetRecordsRequest.class))).thenReturn(
+        GetRecordsResponse.builder().nextShardIterator(PLACEHOLDER).records(_records).build());
 
-    GetRecordsResponse getRecordsResponse =
-        GetRecordsResponse.builder().nextShardIterator(null).records(_recordList).build();
-    GetShardIteratorResponse getShardIteratorResponse =
-        GetShardIteratorResponse.builder().shardIterator(PLACEHOLDER).build();
+    KinesisConsumer kinesisConsumer = new KinesisConsumer(_kinesisConfig, kinesisClient);
 
-    expect(_kinesisClient.getRecords(capture(getRecordsRequestCapture))).andReturn(getRecordsResponse).anyTimes();
-    expect(_kinesisClient.getShardIterator(capture(getShardIteratorRequestCapture))).andReturn(getShardIteratorResponse)
-        .anyTimes();
-
-    replay(_kinesisClient);
-
-    KinesisConsumer kinesisConsumer = new KinesisConsumer(getKinesisConfig(), _kinesisClient);
-
-    Map<String, String> shardToSequenceMap = new HashMap<>();
-    shardToSequenceMap.put("0", "1");
-    KinesisPartitionGroupOffset kinesisPartitionGroupOffset = new KinesisPartitionGroupOffset(shardToSequenceMap);
-    KinesisRecordsBatch kinesisRecordsBatch = kinesisConsumer.fetchMessages(kinesisPartitionGroupOffset, null, TIMEOUT);
-
-    Assert.assertEquals(kinesisRecordsBatch.getMessageCount(), NUM_RECORDS);
-
+    // Fetch first batch
+    KinesisPartitionGroupOffset startOffset = new KinesisPartitionGroupOffset("0", "1");
+    KinesisMessageBatch kinesisMessageBatch = kinesisConsumer.fetchMessages(startOffset, TIMEOUT);
+    assertEquals(kinesisMessageBatch.getMessageCount(), NUM_RECORDS);
     for (int i = 0; i < NUM_RECORDS; i++) {
-      Assert.assertEquals(baToString(kinesisRecordsBatch.getMessageAtIndex(i).getValue()), DUMMY_RECORD_PREFIX + i);
+      assertEquals(baToString(kinesisMessageBatch.getStreamMessage(i).getValue()), DUMMY_RECORD_PREFIX + i);
     }
+    assertFalse(kinesisMessageBatch.isEndOfPartitionGroup());
 
-    Assert.assertFalse(kinesisRecordsBatch.isEndOfPartitionGroup());
+    // Fetch second batch
+    kinesisMessageBatch = kinesisConsumer.fetchMessages(kinesisMessageBatch.getOffsetOfNextBatch(), TIMEOUT);
+    assertEquals(kinesisMessageBatch.getMessageCount(), NUM_RECORDS);
+    for (int i = 0; i < NUM_RECORDS; i++) {
+      assertEquals(baToString(kinesisMessageBatch.getStreamMessage(i).getValue()), DUMMY_RECORD_PREFIX + i);
+    }
+    assertFalse(kinesisMessageBatch.isEndOfPartitionGroup());
+
+    // Expect only 1 call to get shard iterator and 2 calls to get records
+    verify(kinesisClient, times(1)).getShardIterator(any(GetShardIteratorRequest.class));
+    verify(kinesisClient, times(2)).getRecords(any(GetRecordsRequest.class));
   }
 
   @Test
-  public void testBasicConsumerWithMaxRecordsLimit() {
-    Capture<GetRecordsRequest> getRecordsRequestCapture = Capture.newInstance();
-    Capture<GetShardIteratorRequest> getShardIteratorRequestCapture = Capture.newInstance();
+  public void testEndOfShard() {
+    KinesisClient kinesisClient = mock(KinesisClient.class);
+    when(kinesisClient.getShardIterator(any(GetShardIteratorRequest.class))).thenReturn(
+        GetShardIteratorResponse.builder().shardIterator(PLACEHOLDER).build());
+    when(kinesisClient.getRecords(any(GetRecordsRequest.class))).thenReturn(
+        GetRecordsResponse.builder().nextShardIterator(null).records(_records).build());
 
-    GetRecordsResponse getRecordsResponse =
-        GetRecordsResponse.builder().nextShardIterator(PLACEHOLDER).records(_recordList).build();
-    GetShardIteratorResponse getShardIteratorResponse =
-        GetShardIteratorResponse.builder().shardIterator(PLACEHOLDER).build();
+    KinesisConsumer kinesisConsumer = new KinesisConsumer(_kinesisConfig, kinesisClient);
 
-    expect(_kinesisClient.getRecords(capture(getRecordsRequestCapture))).andReturn(getRecordsResponse).anyTimes();
-    expect(_kinesisClient.getShardIterator(capture(getShardIteratorRequestCapture))).andReturn(getShardIteratorResponse)
-        .anyTimes();
-
-    replay(_kinesisClient);
-
-    KinesisConfig kinesisConfig = getKinesisConfig();
-    KinesisConsumer kinesisConsumer = new KinesisConsumer(kinesisConfig, _kinesisClient);
-
-    Map<String, String> shardToSequenceMap = new HashMap<>();
-    shardToSequenceMap.put("0", "1");
-    KinesisPartitionGroupOffset kinesisPartitionGroupOffset = new KinesisPartitionGroupOffset(shardToSequenceMap);
-    KinesisRecordsBatch kinesisRecordsBatch = kinesisConsumer.fetchMessages(kinesisPartitionGroupOffset, null, TIMEOUT);
-
-    Assert.assertEquals(kinesisRecordsBatch.getMessageCount(), MAX_RECORDS_TO_FETCH);
-
+    // Fetch first batch
+    KinesisPartitionGroupOffset startOffset = new KinesisPartitionGroupOffset("0", "1");
+    KinesisMessageBatch kinesisMessageBatch = kinesisConsumer.fetchMessages(startOffset, TIMEOUT);
+    assertEquals(kinesisMessageBatch.getMessageCount(), NUM_RECORDS);
     for (int i = 0; i < NUM_RECORDS; i++) {
-      Assert.assertEquals(baToString(kinesisRecordsBatch.getMessageAtIndex(i).getValue()), DUMMY_RECORD_PREFIX + i);
+      assertEquals(baToString(kinesisMessageBatch.getStreamMessage(i).getValue()), DUMMY_RECORD_PREFIX + i);
     }
-  }
+    assertTrue(kinesisMessageBatch.isEndOfPartitionGroup());
 
-  @Test
-  public void testBasicConsumerWithChildShard() {
+    // Fetch second batch
+    kinesisMessageBatch = kinesisConsumer.fetchMessages(kinesisMessageBatch.getOffsetOfNextBatch(), TIMEOUT);
+    assertEquals(kinesisMessageBatch.getMessageCount(), 0);
+    assertTrue(kinesisMessageBatch.isEndOfPartitionGroup());
 
-    List<ChildShard> shardList = new ArrayList<>();
-    shardList.add(ChildShard.builder().shardId(PLACEHOLDER).parentShards("0").build());
-
-    Capture<GetRecordsRequest> getRecordsRequestCapture = Capture.newInstance();
-    Capture<GetShardIteratorRequest> getShardIteratorRequestCapture = Capture.newInstance();
-
-    GetRecordsResponse getRecordsResponse =
-        GetRecordsResponse.builder().nextShardIterator(null).records(_recordList).childShards(shardList).build();
-    GetShardIteratorResponse getShardIteratorResponse =
-        GetShardIteratorResponse.builder().shardIterator(PLACEHOLDER).build();
-
-    expect(_kinesisClient.getRecords(capture(getRecordsRequestCapture))).andReturn(getRecordsResponse).anyTimes();
-    expect(_kinesisClient.getShardIterator(capture(getShardIteratorRequestCapture))).andReturn(getShardIteratorResponse)
-        .anyTimes();
-
-    replay(_kinesisClient);
-
-    KinesisConfig kinesisConfig = getKinesisConfig();
-    KinesisConsumer kinesisConsumer = new KinesisConsumer(kinesisConfig, _kinesisClient);
-
-    Map<String, String> shardToSequenceMap = new HashMap<>();
-    shardToSequenceMap.put("0", "1");
-    KinesisPartitionGroupOffset kinesisPartitionGroupOffset = new KinesisPartitionGroupOffset(shardToSequenceMap);
-    KinesisRecordsBatch kinesisRecordsBatch = kinesisConsumer.fetchMessages(kinesisPartitionGroupOffset, null, TIMEOUT);
-
-    Assert.assertTrue(kinesisRecordsBatch.isEndOfPartitionGroup());
-    Assert.assertEquals(kinesisRecordsBatch.getMessageCount(), NUM_RECORDS);
-
-    for (int i = 0; i < NUM_RECORDS; i++) {
-      Assert.assertEquals(baToString(kinesisRecordsBatch.getMessageAtIndex(i).getValue()), DUMMY_RECORD_PREFIX + i);
-    }
+    // Expect only 1 call to get shard iterator and 1 call to get records
+    verify(kinesisClient, times(1)).getShardIterator(any(GetShardIteratorRequest.class));
+    verify(kinesisClient, times(1)).getRecords(any(GetRecordsRequest.class));
   }
 
   public String baToString(byte[] bytes) {

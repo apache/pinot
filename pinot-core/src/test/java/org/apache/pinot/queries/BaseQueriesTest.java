@@ -19,7 +19,7 @@
 package org.apache.pinot.queries;
 
 import java.io.File;
-import java.util.Collections;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -29,6 +29,7 @@ import java.util.concurrent.TimeoutException;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.DataTableFactory;
+import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
@@ -49,6 +50,7 @@ import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.SegmentPreProcessor;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
@@ -56,11 +58,13 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
+
+import static org.mockito.Mockito.mock;
 
 
 /**
@@ -69,8 +73,8 @@ import org.apache.pinot.sql.parsers.CalciteSqlParser;
 public abstract class BaseQueriesTest {
   protected static final PlanMaker PLAN_MAKER = new InstancePlanMakerImplV2();
   protected static final QueryOptimizer OPTIMIZER = new QueryOptimizer();
-
   protected static final ExecutorService EXECUTOR_SERVICE = Executors.newFixedThreadPool(2);
+  protected static final BrokerMetrics BROKER_METRICS = mock(BrokerMetrics.class);
 
   protected abstract String getFilter();
 
@@ -79,7 +83,7 @@ public abstract class BaseQueriesTest {
   protected abstract List<IndexSegment> getIndexSegments();
 
   protected List<List<IndexSegment>> getDistinctInstances() {
-    return Collections.singletonList(getIndexSegments());
+    return List.of(getIndexSegments());
   }
 
   /**
@@ -91,7 +95,7 @@ public abstract class BaseQueriesTest {
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     PinotQuery serverPinotQuery = GapfillUtils.stripGapfill(pinotQuery);
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(serverPinotQuery);
-    return (T) PLAN_MAKER.makeSegmentPlanNode(getIndexSegment(), queryContext).run();
+    return (T) PLAN_MAKER.makeSegmentPlanNode(new SegmentContext(getIndexSegment()), queryContext).run();
   }
 
   /**
@@ -206,7 +210,8 @@ public abstract class BaseQueriesTest {
 
     // Server side
     serverQueryContext.setEndTimeMs(System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
-    Plan plan = planMaker.makeInstancePlan(getIndexSegments(), serverQueryContext, EXECUTOR_SERVICE, null);
+    Plan plan =
+        planMaker.makeInstancePlan(getSegmentContexts(getIndexSegments()), serverQueryContext, EXECUTOR_SERVICE, null);
     InstanceResponseBlock instanceResponse;
     try {
       instanceResponse =
@@ -216,9 +221,6 @@ public abstract class BaseQueriesTest {
     }
 
     // Broker side
-    // Use 2 Threads for 2 data-tables
-    BrokerReduceService brokerReduceService = new BrokerReduceService(new PinotConfiguration(
-        Collections.singletonMap(CommonConstants.Broker.CONFIG_OF_MAX_REDUCE_THREADS_PER_QUERY, 2)));
     Map<ServerRoutingInstance, DataTable> dataTableMap = new HashMap<>();
     try {
       // For multi-threaded BrokerReduceService, we cannot reuse the same data-table
@@ -233,11 +235,23 @@ public abstract class BaseQueriesTest {
     BrokerRequest brokerRequest = CalciteSqlCompiler.convertToBrokerRequest(pinotQuery);
     BrokerRequest serverBrokerRequest =
         serverPinotQuery == pinotQuery ? brokerRequest : CalciteSqlCompiler.convertToBrokerRequest(serverPinotQuery);
+    return reduceOnDataTable(brokerRequest, serverBrokerRequest, dataTableMap);
+  }
+
+  private static List<SegmentContext> getSegmentContexts(List<IndexSegment> indexSegments) {
+    List<SegmentContext> segmentContexts = new ArrayList<>(indexSegments.size());
+    indexSegments.forEach(s -> segmentContexts.add(new SegmentContext(s)));
+    return segmentContexts;
+  }
+
+  protected BrokerResponseNative reduceOnDataTable(BrokerRequest brokerRequest, BrokerRequest serverBrokerRequest,
+      Map<ServerRoutingInstance, DataTable> dataTableMap) {
+    BrokerReduceService brokerReduceService =
+        new BrokerReduceService(new PinotConfiguration(Map.of(Broker.CONFIG_OF_MAX_REDUCE_THREADS_PER_QUERY, 2)));
     BrokerResponseNative brokerResponse =
         brokerReduceService.reduceOnDataTable(brokerRequest, serverBrokerRequest, dataTableMap,
-            CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS, null);
+            Broker.DEFAULT_BROKER_TIMEOUT_MS, BROKER_METRICS);
     brokerReduceService.shutDown();
-
     return brokerResponse;
   }
 
@@ -297,8 +311,10 @@ public abstract class BaseQueriesTest {
     List<List<IndexSegment>> instances = getDistinctInstances();
     // Server side
     serverQueryContext.setEndTimeMs(System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
-    Plan plan1 = planMaker.makeInstancePlan(instances.get(0), serverQueryContext, EXECUTOR_SERVICE, null);
-    Plan plan2 = planMaker.makeInstancePlan(instances.get(1), serverQueryContext, EXECUTOR_SERVICE, null);
+    Plan plan1 =
+        planMaker.makeInstancePlan(getSegmentContexts(instances.get(0)), serverQueryContext, EXECUTOR_SERVICE, null);
+    Plan plan2 =
+        planMaker.makeInstancePlan(getSegmentContexts(instances.get(1)), serverQueryContext, EXECUTOR_SERVICE, null);
 
     InstanceResponseBlock instanceResponse1;
     try {
@@ -316,9 +332,6 @@ public abstract class BaseQueriesTest {
     }
 
     // Broker side
-    // Use 2 Threads for 2 data-tables
-    BrokerReduceService brokerReduceService = new BrokerReduceService(new PinotConfiguration(
-        Collections.singletonMap(CommonConstants.Broker.CONFIG_OF_MAX_REDUCE_THREADS_PER_QUERY, 2)));
     Map<ServerRoutingInstance, DataTable> dataTableMap = new HashMap<>();
     try {
       // For multi-threaded BrokerReduceService, we cannot reuse the same data-table
@@ -334,10 +347,6 @@ public abstract class BaseQueriesTest {
     BrokerRequest brokerRequest = CalciteSqlCompiler.convertToBrokerRequest(pinotQuery);
     BrokerRequest serverBrokerRequest =
         serverPinotQuery == pinotQuery ? brokerRequest : CalciteSqlCompiler.convertToBrokerRequest(serverPinotQuery);
-    BrokerResponseNative brokerResponse =
-        brokerReduceService.reduceOnDataTable(brokerRequest, serverBrokerRequest, dataTableMap,
-            CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS, null);
-    brokerReduceService.shutDown();
-    return brokerResponse;
+    return reduceOnDataTable(brokerRequest, serverBrokerRequest, dataTableMap);
   }
 }

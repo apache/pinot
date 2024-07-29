@@ -24,6 +24,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.LiteralContext;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
@@ -53,6 +54,60 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
   private float[][] _floatArrayResult;
   private double[][] _doubleArrayResult;
   private String[][] _stringArrayResult;
+
+  public ArrayLiteralTransformFunction(LiteralContext literalContext) {
+    _dataType = literalContext.getType();
+    Object value = literalContext.getValue();
+    if (value == null) {
+      _intArrayLiteral = new int[0];
+      _longArrayLiteral = new long[0];
+      _floatArrayLiteral = new float[0];
+      _doubleArrayLiteral = new double[0];
+      _stringArrayLiteral = new String[0];
+      return;
+    }
+    switch (_dataType) {
+      case INT:
+        _intArrayLiteral = (int[]) value;
+        _longArrayLiteral = null;
+        _floatArrayLiteral = null;
+        _doubleArrayLiteral = null;
+        _stringArrayLiteral = null;
+        break;
+      case LONG:
+        _longArrayLiteral = (long[]) value;
+        _intArrayLiteral = null;
+        _floatArrayLiteral = null;
+        _doubleArrayLiteral = null;
+        _stringArrayLiteral = null;
+        break;
+      case FLOAT:
+        _floatArrayLiteral = (float[]) value;
+        _intArrayLiteral = null;
+        _longArrayLiteral = null;
+        _doubleArrayLiteral = null;
+        _stringArrayLiteral = null;
+        break;
+      case DOUBLE:
+        _doubleArrayLiteral = (double[]) value;
+        _intArrayLiteral = null;
+        _longArrayLiteral = null;
+        _floatArrayLiteral = null;
+        _stringArrayLiteral = null;
+        break;
+      case STRING:
+        _stringArrayLiteral = (String[]) value;
+        _intArrayLiteral = null;
+        _longArrayLiteral = null;
+        _floatArrayLiteral = null;
+        _doubleArrayLiteral = null;
+        break;
+      default:
+        throw new IllegalStateException(
+            "Illegal data type for ArrayLiteralTransformFunction: " + _dataType + ", literal context: "
+                + literalContext);
+    }
+  }
 
   public ArrayLiteralTransformFunction(List<ExpressionContext> literalContexts) {
     Preconditions.checkNotNull(literalContexts);
@@ -84,7 +139,7 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
       case LONG:
         _longArrayLiteral = new long[literalContexts.size()];
         for (int i = 0; i < _longArrayLiteral.length; i++) {
-          _longArrayLiteral[i] = Long.parseLong(literalContexts.get(i).getLiteral().getStringValue());
+          _longArrayLiteral[i] = literalContexts.get(i).getLiteral().getLongValue();
         }
         _intArrayLiteral = null;
         _floatArrayLiteral = null;
@@ -94,7 +149,7 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
       case FLOAT:
         _floatArrayLiteral = new float[literalContexts.size()];
         for (int i = 0; i < _floatArrayLiteral.length; i++) {
-          _floatArrayLiteral[i] = Float.parseFloat(literalContexts.get(i).getLiteral().getStringValue());
+          _floatArrayLiteral[i] = literalContexts.get(i).getLiteral().getFloatValue();
         }
         _intArrayLiteral = null;
         _longArrayLiteral = null;
@@ -104,7 +159,7 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
       case DOUBLE:
         _doubleArrayLiteral = new double[literalContexts.size()];
         for (int i = 0; i < _doubleArrayLiteral.length; i++) {
-          _doubleArrayLiteral[i] = Double.parseDouble(literalContexts.get(i).getLiteral().getStringValue());
+          _doubleArrayLiteral[i] = literalContexts.get(i).getLiteral().getDoubleValue();
         }
         _intArrayLiteral = null;
         _longArrayLiteral = null;

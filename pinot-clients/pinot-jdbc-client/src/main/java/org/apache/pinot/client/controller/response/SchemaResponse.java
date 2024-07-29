@@ -20,6 +20,7 @@ package org.apache.pinot.client.controller.response;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -75,15 +76,13 @@ public class SchemaResponse {
     @Override
     public SchemaResponse get(long timeout, TimeUnit unit)
         throws ExecutionException {
-      String response = getStringResponse(timeout, unit);
       try {
-        JsonNode jsonResponse = JsonUtils.stringToJsonNode(response);
+        InputStream response = getStreamResponse(timeout, unit);
+        JsonNode jsonResponse = JsonUtils.inputStreamToJsonNode(response);
         return SchemaResponse.fromJson(jsonResponse);
       } catch (IOException e) {
-        new ExecutionException(e);
+        throw new ExecutionException(e);
       }
-
-      return null;
     }
   }
 }

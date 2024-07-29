@@ -41,6 +41,7 @@ import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.task.JobConfig;
 import org.apache.helix.task.JobContext;
@@ -52,9 +53,9 @@ import org.apache.helix.task.TaskState;
 import org.apache.helix.task.WorkflowConfig;
 import org.apache.helix.task.WorkflowContext;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
-import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.pinot.common.minion.MinionTaskMetadataUtils;
 import org.apache.pinot.common.utils.DateTimeUtils;
+import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.CompletionServiceHelper;
 import org.apache.pinot.core.common.MinionConstants;
@@ -551,7 +552,7 @@ public class PinotHelixTaskResourceManager {
       return Collections.emptyMap();
     }
     Map<String, TaskConfig> helixTaskConfigs = jobConfig.getTaskConfigMap();
-    Map<String, PinotTaskConfig> taskConfigs = new HashMap<>(helixTaskConfigs.size());
+    Map<String, PinotTaskConfig> taskConfigs = new HashMap<>(HashUtil.getHashMapCapacity(helixTaskConfigs.size()));
     if (StringUtils.isEmpty(subtaskNames)) {
       helixTaskConfigs.forEach((sub, cfg) -> taskConfigs.put(sub, PinotTaskConfig.fromHelixTaskConfig(cfg)));
       return taskConfigs;

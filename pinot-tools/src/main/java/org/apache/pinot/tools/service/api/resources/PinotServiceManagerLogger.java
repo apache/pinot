@@ -47,7 +47,8 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
  */
 @Api(tags = "Logger", authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY)})
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = @ApiKeyAuthDefinition(name =
-    HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = SWAGGER_AUTHORIZATION_KEY)))
+    HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = SWAGGER_AUTHORIZATION_KEY,
+    description = "The format of the key is  ```\"Basic <token>\" or \"Bearer <token>\"```")))
 @Path("/")
 public class PinotServiceManagerLogger {
 
@@ -56,7 +57,7 @@ public class PinotServiceManagerLogger {
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get all the loggers", notes = "Return all the logger names")
   public List<String> getLoggers() {
-    return LoggerUtils.getAllLoggers();
+    return LoggerUtils.getAllConfiguredLoggers();
   }
 
   @GET

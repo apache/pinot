@@ -12,6 +12,10 @@
     {
       "name": "offset",
       "dataType": "LONG"
+    },
+    {
+      "name": "outOfOrderRecordColumn",
+      "dataType": "BOOLEAN"
     }
   ],
   "timeFieldSpec": {

@@ -17,81 +17,179 @@
 // under the License.
 //
 
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *   http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
- * specific language governing permissions and limitations
- * under the License.
- */
 syntax = "proto3";
+import "expressions.proto";
 
 package org.apache.pinot.common.proto;
 
-message StageNode {
+message PlanNode {
   int32 stageId = 1;
-  string nodeName = 2;
-  repeated StageNode inputs = 3;
-  repeated string columnNames = 4;
-  repeated string columnDataTypes = 5;
-  ObjectField objectField = 6;
-}
-
-// MemberVariableField defines the serialized format of the member variables of a class object.
-// MemberVariableField can be one of
-//   1. literal
-//   2. list
-//   3. map
-//   4. complex class object
-message MemberVariableField {
-  oneof member_variable_field {
-    LiteralField literalField = 1;
-    ListField listField = 2;
-    MapField mapField = 3;
-    ObjectField objectField = 4;
+  DataSchema dataSchema = 2;
+  NodeHint nodeHint = 3;
+  repeated PlanNode inputs = 4;
+  oneof node {
+    AggregateNode aggregateNode = 5;
+    FilterNode filterNode = 6;
+    JoinNode joinNode = 7;
+    MailboxReceiveNode mailboxReceiveNode = 8;
+    MailboxSendNode mailboxSendNode = 9;
+    ProjectNode projectNode = 10;
+    SetOpNode setOpNode = 11;
+    SortNode sortNode = 12;
+    TableScanNode tableScanNode = 13;
+    ValueNode valueNode = 14;
+    WindowNode windowNode = 15;
   }
 }
 
-// ObjectField defines the serialized format of a complex class object.
-// it contains:
-//   1. its fully-qualified clazz name;
-//   2. its MemberVariableField map.
-message ObjectField {
-  string objectClassName = 1;
-  map<string, MemberVariableField> memberVariables = 2;
+message DataSchema {
+  repeated string columnNames = 1;
+  repeated ColumnDataType columnDataTypes = 2;
 }
 
-// LiteralField defines the serialized format of a literal field.
-message LiteralField {
-  oneof literal_field {
-    bool boolField = 1;
-    int32 intField = 2;
-    int64 longField = 3;
-    float floatField = 4;
-    double doubleField = 5;
-    string stringField = 6;
-  }
+message StrStrMap {
+  map<string, string> options = 1;
 }
 
-// ListField defines the serialized format of a list field.
-// The content of the list is a MemberVariableField.
-message ListField {
-  repeated MemberVariableField content = 1;
+message NodeHint {
+  map<string, StrStrMap> hintOptions = 1;
 }
 
-// ListField defines the serialized format of a map field.
-// The key of the map is a string and the value of the map is a MemberVariableField.
-message MapField {
-  map<string, MemberVariableField> content = 1;
+enum AggType {
+  DIRECT = 0;
+  LEAF = 1;
+  INTERMEDIATE = 2;
+  FINAL = 3;
+}
+
+message AggregateNode {
+  repeated FunctionCall aggCalls = 1;
+  repeated int32 filterArgs = 2;
+  repeated int32 groupKeys = 3;
+  AggType aggType = 4;
+}
+
+message FilterNode {
+  Expression condition = 1;
+}
+
+enum JoinType {
+  INNER = 0;
+  LEFT = 1;
+  RIGHT = 2;
+  FULL = 3;
+  SEMI = 4;
+  ANTI = 5;
+}
+
+message JoinNode {
+  JoinType joinType = 1;
+  repeated int32 leftKeys = 2;
+  repeated int32 rightKeys = 3;
+  repeated Expression nonEquiConditions = 4;
+}
+
+enum ExchangeType {
+  STREAMING = 0;
+  SUB_PLAN = 1;
+  PIPELINE_BREAKER = 2;
+}
+
+enum DistributionType {
+  SINGLETON = 0;
+  HASH_DISTRIBUTED = 1;
+  RANGE_DISTRIBUTED = 2;
+  RANDOM_DISTRIBUTED = 3;
+  ROUND_ROBIN_DISTRIBUTED = 4;
+  BROADCAST_DISTRIBUTED = 5;
+  ANY = 6;
+}
+
+enum Direction {
+  ASCENDING = 0;
+  STRICTLY_ASCENDING = 1;
+  DESCENDING = 2;
+  STRICTLY_DESCENDING = 3;
+  CLUSTERED = 4;
+}
+
+enum NullDirection {
+  FIRST = 0;
+  LAST = 1;
+  UNSPECIFIED = 2;
+}
+
+message Collation {
+  int32 index = 1;
+  Direction direction = 2;
+  NullDirection nullDirection = 3;
+}
+
+message MailboxReceiveNode {
+  int32 senderStageId = 1;
+  ExchangeType exchangeType = 2;
+  DistributionType distributionType = 3;
+  repeated int32 keys = 4;
+  repeated Collation collations = 5;
+  bool sort = 6;
+  bool sortedOnSender = 7;
+}
+
+message MailboxSendNode {
+  int32 receiverStageId = 1;
+  ExchangeType exchangeType = 2;
+  DistributionType distributionType = 3;
+  repeated int32 keys = 4;
+  bool prePartitioned = 5;
+  repeated Collation collations = 6;
+  bool sort = 7;
+}
+
+message ProjectNode {
+  repeated Expression projects = 1;
+}
+
+enum SetOpType {
+  UNION = 0;
+  INTERSECT = 1;
+  MINUS = 2;
+}
+
+message SetOpNode {
+  SetOpType setOpType = 1;
+  bool all = 2;
+}
+
+message SortNode {
+  repeated Collation collations = 1;
+  int32 fetch = 2;
+  int32 offset = 3;
+}
+
+message TableScanNode {
+  string tableName = 1;
+  repeated string columns = 2;
+}
+
+message LiteralRow {
+  repeated Literal values = 1;
+}
+
+message ValueNode {
+  repeated LiteralRow literalRows = 1;
+}
+
+enum WindowFrameType {
+  ROWS = 0;
+  RANGE = 1;
+}
+
+message WindowNode {
+  repeated int32 keys = 1;
+  repeated Collation collations = 2;
+  repeated FunctionCall aggCalls = 3;
+  WindowFrameType windowFrameType = 4;
+  int32 lowerBound = 5;
+  int32 upperBound = 6;
+  repeated Literal constants = 7;
 }

@@ -60,7 +60,7 @@
       }
     ],
     "extraProps": {
-      "noEmptySegment": "true"
+      "noEmptySegment": true
     }
   }
 }

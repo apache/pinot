@@ -9,10 +9,10 @@
           "\nLogicalUnion(all=[true])",
           "\n  PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n    LogicalProject(col1=[$0], col2=[$1])",
-          "\n      LogicalTableScan(table=[[a]])",
+          "\n      LogicalTableScan(table=[[default, a]])",
           "\n  PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n    LogicalProject(col1=[$0], col2=[$1])",
-          "\n      LogicalTableScan(table=[[b]])",
+          "\n      LogicalTableScan(table=[[default, b]])",
           "\n"
         ]
       },
@@ -26,13 +26,13 @@
           "\n    LogicalUnion(all=[true])",
           "\n      PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n        LogicalProject(col1=[$0], col2=[$1])",
-          "\n          LogicalTableScan(table=[[a]])",
+          "\n          LogicalTableScan(table=[[default, a]])",
           "\n      PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n        LogicalProject(col1=[$0], col2=[$1])",
-          "\n          LogicalTableScan(table=[[b]])",
+          "\n          LogicalTableScan(table=[[default, b]])",
           "\n  PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n    LogicalProject(col1=[$0], col2=[$1])",
-          "\n      LogicalTableScan(table=[[c]])",
+          "\n      LogicalTableScan(table=[[default, c]])",
           "\n"
         ]
       },
@@ -41,21 +41,21 @@
         "sql": "EXPLAIN PLAN FOR SELECT col1, col2 FROM a UNION SELECT col1, col2 FROM b UNION SELECT col1, col2 FROM c",
         "output": [
           "Execution Plan",
-          "\nLogicalAggregate(group=[{0, 1}])",
+          "\nPinotLogicalAggregate(group=[{0, 1}])",
           "\n  PinotLogicalExchange(distribution=[hash[0, 1]])",
-          "\n    LogicalAggregate(group=[{0, 1}])",
+          "\n    PinotLogicalAggregate(group=[{0, 1}])",
           "\n      LogicalUnion(all=[true])",
           "\n        PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n          LogicalUnion(all=[true])",
           "\n            PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n              LogicalProject(col1=[$0], col2=[$1])",
-          "\n                LogicalTableScan(table=[[a]])",
+          "\n                LogicalTableScan(table=[[default, a]])",
           "\n            PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n              LogicalProject(col1=[$0], col2=[$1])",
-          "\n                LogicalTableScan(table=[[b]])",
+          "\n                LogicalTableScan(table=[[default, b]])",
           "\n        PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n          LogicalProject(col1=[$0], col2=[$1])",
-          "\n            LogicalTableScan(table=[[c]])",
+          "\n            LogicalTableScan(table=[[default, c]])",
           "\n"
         ]
       },
@@ -69,13 +69,13 @@
           "\n    LogicalIntersect(all=[false])",
           "\n      PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n        LogicalProject(col1=[$0], col2=[$1])",
-          "\n          LogicalTableScan(table=[[a]])",
+          "\n          LogicalTableScan(table=[[default, a]])",
           "\n      PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n        LogicalProject(col1=[$0], col2=[$1])",
-          "\n          LogicalTableScan(table=[[b]])",
+          "\n          LogicalTableScan(table=[[default, b]])",
           "\n  PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n    LogicalProject(col1=[$0], col2=[$1])",
-          "\n      LogicalTableScan(table=[[c]])",
+          "\n      LogicalTableScan(table=[[default, c]])",
           "\n"
         ]
       },
@@ -89,13 +89,13 @@
           "\n    LogicalMinus(all=[false])",
           "\n      PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n        LogicalProject(col1=[$0], col2=[$1])",
-          "\n          LogicalTableScan(table=[[a]])",
+          "\n          LogicalTableScan(table=[[default, a]])",
           "\n      PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n        LogicalProject(col1=[$0], col2=[$1])",
-          "\n          LogicalTableScan(table=[[b]])",
+          "\n          LogicalTableScan(table=[[default, b]])",
           "\n  PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n    LogicalProject(col1=[$0], col2=[$1])",
-          "\n      LogicalTableScan(table=[[c]])",
+          "\n      LogicalTableScan(table=[[default, c]])",
           "\n"
         ]
       }
@@ -106,7 +106,7 @@
       {
         "description": "Incorrect selection list ",
         "sql": "EXPLAIN PLAN FOR SELECT col1, col3 FROM a UNION ALL SELECT col1 FROM b",
-        "expectedException": "Error explain query plan for.*"
+        "expectedException": ".*Column count mismatch in UNION.*"
       }
     ]
   }

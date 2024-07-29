@@ -18,8 +18,14 @@
  */
 package org.apache.pinot.core.function.scalar;
 
+import com.dynatrace.hash4j.distinctcount.UltraLogLog;
 import java.math.BigDecimal;
+import org.apache.datasketches.cpc.CpcSketch;
+import org.apache.datasketches.memory.Memory;
+import org.apache.datasketches.theta.Sketch;
+import org.apache.datasketches.theta.Sketches;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
+import org.apache.pinot.segment.local.utils.UltraLogLogUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -27,7 +33,7 @@ import org.testng.annotations.Test;
 public class SketchFunctionsTest {
 
   private double thetaEstimate(byte[] bytes) {
-    return ObjectSerDeUtils.DATA_SKETCH_SER_DE.deserialize(bytes).getEstimate();
+    return ObjectSerDeUtils.DATA_SKETCH_THETA_SER_DE.deserialize(bytes).getEstimate();
   }
 
   byte[] _bytes = {1, 2, 3};
@@ -46,6 +52,15 @@ public class SketchFunctionsTest {
     Assert.assertEquals(thetaEstimate(SketchFunctions.toThetaSketch(null, 1024)), 0.0);
     Assert.assertThrows(IllegalArgumentException.class, () -> SketchFunctions.toThetaSketch(new Object()));
     Assert.assertThrows(IllegalArgumentException.class, () -> SketchFunctions.toThetaSketch(new Object(), 1024));
+  }
+
+  @Test
+  public void thetaThetaSketchSummary() {
+    for (Object i : _inputs) {
+      Sketch sketch = Sketches.wrapSketch(Memory.wrap(SketchFunctions.toThetaSketch(i)));
+      Assert.assertEquals(SketchFunctions.thetaSketchToString(sketch), sketch.toString());
+    }
+    Assert.assertThrows(RuntimeException.class, () -> SketchFunctions.thetaSketchToString(new Object()));
   }
 
   private long hllEstimate(byte[] bytes) {
@@ -77,5 +92,58 @@ public class SketchFunctionsTest {
     Assert.assertThrows(IllegalArgumentException.class, () -> SketchFunctions.toIntegerSumTupleSketch(new Object(), 1));
     Assert.assertThrows(IllegalArgumentException.class,
         () -> SketchFunctions.toIntegerSumTupleSketch(new Object(), 1, 1024));
+  }
+
+  private double cpcEstimate(byte[] bytes) {
+    return ObjectSerDeUtils.DATA_SKETCH_CPC_SER_DE.deserialize(bytes).getEstimate();
+  }
+
+  @Test
+  public void testCpcCreation() {
+    for (Object i : _inputs) {
+      Assert.assertEquals(cpcEstimate(SketchFunctions.toCpcSketch(i)), 1.0);
+      Assert.assertEquals(cpcEstimate(SketchFunctions.toCpcSketch(i, 11)), 1.0);
+    }
+    Assert.assertEquals(cpcEstimate(SketchFunctions.toCpcSketch(null)), 0.0);
+    Assert.assertEquals(cpcEstimate(SketchFunctions.toCpcSketch(null, 11)), 0.0);
+    Assert.assertThrows(IllegalArgumentException.class, () -> SketchFunctions.toCpcSketch(new Object()));
+    Assert.assertThrows(IllegalArgumentException.class, () -> SketchFunctions.toCpcSketch(new Object(), 11));
+  }
+
+  @Test
+  public void thetaCpcSketchToString() {
+    for (Object i : _inputs) {
+      CpcSketch sketch = CpcSketch.heapify(Memory.wrap(SketchFunctions.toCpcSketch(i)));
+      Assert.assertEquals(SketchFunctions.cpcSketchToString(sketch), sketch.toString());
+    }
+    Assert.assertThrows(RuntimeException.class, () -> SketchFunctions.cpcSketchToString(new Object()));
+  }
+
+  private long ullEstimate(byte[] bytes) {
+    // round it to a long to make it easier to assert on
+    return Math.round(ObjectSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.deserialize(bytes).getDistinctCountEstimate());
+  }
+
+  @Test
+  public void testULLCreation() {
+    for (Object i : _inputs) {
+      Assert.assertEquals(ullEstimate(SketchFunctions.toULL(i)), 1);
+      Assert.assertEquals(ullEstimate(SketchFunctions.toULL(i, 11)), 1);
+    }
+    Assert.assertEquals(ullEstimate(SketchFunctions.toULL(null)), 0);
+    Assert.assertEquals(ullEstimate(SketchFunctions.toULL(null, 11)), 0);
+    Assert.assertThrows(IllegalArgumentException.class, () -> SketchFunctions.toULL(new Object()));
+    Assert.assertThrows(IllegalArgumentException.class, () -> SketchFunctions.toULL(new Object(), 11));
+  }
+
+  @Test
+  public void testULLLoading() {
+    for (Object i : _inputs) {
+      UltraLogLog ull = UltraLogLog.create(12);
+      UltraLogLogUtils.hashObject(i).ifPresent(ull::add);
+      byte[] loaded = SketchFunctions.fromULL(ull.getState());
+      UltraLogLog deserialized = ObjectSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.deserialize(loaded);
+      Assert.assertEquals(deserialized.getState(), ull.getState());
+    }
   }
 }

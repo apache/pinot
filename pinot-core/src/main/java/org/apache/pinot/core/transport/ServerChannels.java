@@ -19,6 +19,8 @@
 package org.apache.pinot.core.transport;
 
 import io.netty.bootstrap.Bootstrap;
+import io.netty.buffer.PooledByteBufAllocator;
+import io.netty.buffer.PooledByteBufAllocatorMetric;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelInitializer;
@@ -142,7 +144,7 @@ public class ServerChannels {
   }
 
   @ThreadSafe
-  private class ServerChannel {
+  class ServerChannel {
     final ServerRoutingInstance _serverRoutingInstance;
     final Bootstrap _bootstrap;
     // lock to protect channel as requests must be written into channel sequentially
@@ -151,7 +153,19 @@ public class ServerChannels {
 
     ServerChannel(ServerRoutingInstance serverRoutingInstance) {
       _serverRoutingInstance = serverRoutingInstance;
+      PooledByteBufAllocator bufAllocator = PooledByteBufAllocator.DEFAULT;
+      PooledByteBufAllocatorMetric metric = bufAllocator.metric();
+      _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.NETTY_POOLED_USED_DIRECT_MEMORY, metric::usedDirectMemory);
+      _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.NETTY_POOLED_USED_HEAP_MEMORY, metric::usedHeapMemory);
+      _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.NETTY_POOLED_ARENAS_DIRECT, metric::numDirectArenas);
+      _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.NETTY_POOLED_ARENAS_HEAP, metric::numHeapArenas);
+      _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.NETTY_POOLED_CACHE_SIZE_SMALL, metric::smallCacheSize);
+      _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.NETTY_POOLED_CACHE_SIZE_NORMAL, metric::normalCacheSize);
+      _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.NETTY_POOLED_THREADLOCALCACHE, metric::numThreadLocalCaches);
+      _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.NETTY_POOLED_CHUNK_SIZE, metric::chunkSize);
+
       _bootstrap = new Bootstrap().remoteAddress(serverRoutingInstance.getHostname(), serverRoutingInstance.getPort())
+          .option(ChannelOption.ALLOCATOR, bufAllocator)
           .group(_eventLoopGroup).channel(_channelClass).option(ChannelOption.SO_KEEPALIVE, true)
           .handler(new ChannelInitializer<SocketChannel>() {
             @Override
@@ -164,12 +178,30 @@ public class ServerChannels {
 
               ch.pipeline().addLast(ChannelHandlerFactory.getLengthFieldBasedFrameDecoder());
               ch.pipeline().addLast(ChannelHandlerFactory.getLengthFieldPrepender());
+              ch.pipeline().addLast(
+                  ChannelHandlerFactory.getDirectOOMHandler(_queryRouter, _serverRoutingInstance, _serverToChannelMap)
+              );
               // NOTE: data table de-serialization happens inside this handler
               // Revisit if this becomes a bottleneck
-              ch.pipeline().addLast(
-                  ChannelHandlerFactory.getDataTableHandler(_queryRouter, _serverRoutingInstance, _brokerMetrics));
+              ch.pipeline().addLast(ChannelHandlerFactory
+                      .getDataTableHandler(_queryRouter, _serverRoutingInstance, _brokerMetrics));
             }
           });
+    }
+
+    void closeChannel() {
+      if (_channel != null) {
+        _channel.close();
+      }
+    }
+
+    void setSilentShutdown() {
+      if (_channel != null) {
+        DirectOOMHandler directOOMHandler = _channel.pipeline().get(DirectOOMHandler.class);
+        if (directOOMHandler != null) {
+          directOOMHandler.setSilentShutDown();
+        }
+      }
     }
 
     void sendRequest(String rawTableName, AsyncQueryResponse asyncQueryResponse,

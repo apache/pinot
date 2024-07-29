@@ -22,10 +22,7 @@ package org.apache.pinot.compat;
 public class ClusterDescriptor {
 
   private static final String DEFAULT_HOST = "localhost";
-  private static final String ZOOKEEPER_PORT = "2181";
   private static final String KAFKA_PORT = "19092";
-  private static final String ZOOKEEPER_URL = String.format("http://%s:%s", DEFAULT_HOST, ZOOKEEPER_PORT);
-  private static final String KAFKA_URL = String.format("http://%s:%s", DEFAULT_HOST, KAFKA_PORT);
   private static final ClusterDescriptor INSTANCE = new ClusterDescriptor();
 
   private String _controllerPort = "9000";
@@ -62,15 +59,7 @@ public class ClusterDescriptor {
     return String.format("http://%s:%s", DEFAULT_HOST, _brokerQueryPort);
   }
 
-  public String getDefaultHost() {
-    return DEFAULT_HOST;
-  }
-
-  public String getKafkaPort() {
-    return KAFKA_PORT;
-  }
-
-  public String getServerAdminUrl() {
-    return String.format("http://%s:%s", DEFAULT_HOST, _serverAdminPort);
+  public String getKafkaServerUrl() {
+    return String.format("%s:%s", DEFAULT_HOST, KAFKA_PORT);
   }
 }

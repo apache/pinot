@@ -33,7 +33,7 @@ import java.util.stream.IntStream;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.log4j.Level;
 import org.apache.log4j.LogManager;
 import org.apache.pinot.core.accounting.PerQueryCPUMemAccountantFactory;
@@ -55,6 +55,8 @@ import org.testng.annotations.Test;
 
 /**
  * Integration test for heap size based server query killing, this works only for xmx4G
+ * <p>
+ * Query killing isn't currently supported in the v2 multi-stage query engine so these tests only run on the v1 engine.
  */
 public class OfflineClusterServerCPUTimeQueryKillingTest extends BaseClusterIntegrationTestSet {
   public static final String STRING_DIM_SV1 = "stringDimSV1";
@@ -205,7 +207,7 @@ public class OfflineClusterServerCPUTimeQueryKillingTest extends BaseClusterInte
   }
 
   protected TableConfig createOfflineTableConfig() {
-    return new TableConfigBuilder(TableType.OFFLINE).setTableName(getTableName()).setSchemaName(getSchemaName())
+    return new TableConfigBuilder(TableType.OFFLINE).setTableName(getTableName())
         .setTimeColumnName(getTimeColumnName()).setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas())
         .setSegmentVersion(getSegmentVersion()).setLoadMode(getLoadMode()).setTaskConfig(getTaskConfig())
         .setBrokerTenant(getBrokerTenant()).setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig())
@@ -214,9 +216,11 @@ public class OfflineClusterServerCPUTimeQueryKillingTest extends BaseClusterInte
         .build();
   }
 
-  @Test
-  public void testDigestTimeoutMultipleQueries()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testDigestTimeoutMultipleQueries(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    notSupportedInV2();
     AtomicReference<JsonNode> queryResponse1 = new AtomicReference<>();
     AtomicReference<JsonNode> queryResponse2 = new AtomicReference<>();
     AtomicReference<JsonNode> queryResponse3 = new AtomicReference<>();

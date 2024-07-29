@@ -150,30 +150,34 @@ public class PinotConnectionMetaData extends AbstractBaseConnectionMetaData {
   public ResultSet getColumns(String catalog, String schemaPattern, String tableNamePattern, String columnNamePattern)
       throws SQLException {
 
+    if (tableNamePattern != null && tableNamePattern.equals("%")) {
+      LOGGER.warn("driver does not support pattern [{}] for table name", tableNamePattern);
+      return PinotResultSet.empty();
+    }
+
     SchemaResponse schemaResponse = _controllerTransport.getTableSchema(tableNamePattern, _controllerURL);
     PinotMeta pinotMeta = new PinotMeta();
     pinotMeta.setColumnNames(TABLE_SCHEMA_COLUMNS);
     pinotMeta.setColumnDataTypes(TABLE_SCHEMA_COLUMNS_DTYPES);
 
-    String tableName = schemaResponse.getSchemaName();
     int ordinalPosition = 1;
     if (schemaResponse.getDimensions() != null) {
       for (JsonNode columns : schemaResponse.getDimensions()) {
-        appendColumnMeta(pinotMeta, tableName, ordinalPosition, columns);
+        appendColumnMeta(pinotMeta, tableNamePattern, ordinalPosition, columns);
         ordinalPosition++;
       }
     }
 
     if (schemaResponse.getMetrics() != null) {
       for (JsonNode columns : schemaResponse.getMetrics()) {
-        appendColumnMeta(pinotMeta, tableName, ordinalPosition, columns);
+        appendColumnMeta(pinotMeta, tableNamePattern, ordinalPosition, columns);
         ordinalPosition++;
       }
     }
 
     if (schemaResponse.getDateTimeFieldSpecs() != null) {
       for (JsonNode columns : schemaResponse.getDateTimeFieldSpecs()) {
-        appendColumnMeta(pinotMeta, tableName, ordinalPosition, columns);
+        appendColumnMeta(pinotMeta, tableNamePattern, ordinalPosition, columns);
         ordinalPosition++;
       }
     }

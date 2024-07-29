@@ -19,11 +19,13 @@
 package org.apache.pinot.core.data.function;
 
 import com.google.common.collect.Lists;
+import java.sql.Timestamp;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import org.apache.pinot.common.function.scalar.DateTimeFunctions;
 import org.apache.pinot.segment.local.function.InbuiltFunctionEvaluator;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.joda.time.DateTime;
@@ -57,6 +59,7 @@ public class DateTimeFunctionsTest {
       Object expectedResult) {
     testFunction(functionExpression, expectedArguments, row, expectedResult);
   }
+
 
   @DataProvider(name = "dateTimeFunctionsDataProvider")
   public Object[][] dateTimeFunctionsDataProvider() {
@@ -241,6 +244,14 @@ public class DateTimeFunctionsTest {
         "fromDateTime(dateTime, 'yyyy-MM-dd''T''HH:mm:ss.SSS''Z''')", Lists.newArrayList("dateTime"), row113, null
     });
 
+    // fromDateTime with malformed dateTime and default Value should return -1
+    GenericRow row114 = new GenericRow();
+    row114.putValue("dateTime", "malformed_string");
+    inputs.add(new Object[]{
+        "fromDateTime(dateTime, 'yyyy-MM-dd''T''HH:mm:ss.SSS''Z''', 'UTC', -1)", Lists.newArrayList("dateTime"),
+        row114, -1L
+    });
+
     // timezone_hour and timezone_minute
     List<String> expectedArguments = Collections.singletonList("tz");
     GenericRow row120 = new GenericRow();
@@ -346,7 +357,11 @@ public class DateTimeFunctionsTest {
     row.putValue("epochMillis", 1612296732123L);
     List<String> arguments = Lists.newArrayList("epochMillis");
 
-    // name variations
+    // Standard SQL
+    testFunction("date_trunc(second, epochMillis)", arguments, row, 1612296732000L);
+    testFunction("DATE_TRUNC(MINUTE, epochMillis)", arguments, row, 1612296720000L);
+
+    // Name variations
     testFunction("datetrunc('millisecond', epochMillis, 'MILLISECONDS')", arguments, row, 1612296732123L);
     testFunction("date_trunc('MILLISECOND', epochMillis, 'MILLISECONDS')", arguments, row, 1612296732123L);
     testFunction("dateTrunc('millisecond', epochMillis, 'milliseconds')", arguments, row, 1612296732123L);
@@ -418,6 +433,48 @@ public class DateTimeFunctionsTest {
   private static long iso8601ToUtcEpochMillis(String iso8601) {
     DateTimeFormatter formatter = ISODateTimeFormat.dateTimeParser().withOffsetParsed();
     return formatter.parseDateTime(iso8601).getMillis();
+  }
+
+  @Test
+  public void testDateBin() {
+    assertEquals(DateTimeFunctions.dateBin("2s", Timestamp.valueOf("2024-02-10 23:29:55.0"),
+        Timestamp.valueOf("2024-01-01 00:00:00.0")), Timestamp.valueOf("2024-02-10 23:29:54.0"));
+
+    assertEquals(DateTimeFunctions.dateBin("10s", Timestamp.valueOf("2024-02-10 23:29:55.0"),
+        Timestamp.valueOf("2024-01-01 00:00:00.0")), Timestamp.valueOf("2024-02-10 23:29:50.0"));
+
+    assertEquals(DateTimeFunctions.dateBin("10m", Timestamp.valueOf("2024-02-10 23:29:55.0"),
+        Timestamp.valueOf("2024-01-01 00:00:00.0")), Timestamp.valueOf("2024-02-10 23:20:00.0"));
+
+    assertEquals(DateTimeFunctions.dateBin("15m", Timestamp.valueOf("2024-02-10 23:29:55.0"),
+        Timestamp.valueOf("2024-01-01 00:00:00.0")), Timestamp.valueOf("2024-02-10 23:15:00.0"));
+
+    assertEquals(DateTimeFunctions.dateBin("20m", Timestamp.valueOf("2024-02-10 23:29:55.0"),
+        Timestamp.valueOf("2024-01-01 00:00:00.0")), Timestamp.valueOf("2024-02-10 23:20:00.0"));
+
+    assertEquals(DateTimeFunctions.dateBin("30m", Timestamp.valueOf("2024-02-10 23:00:55.0"),
+        Timestamp.valueOf("2024-01-01 00:00:00.0")), Timestamp.valueOf("2024-02-10 23:00:00.0"));
+
+    assertEquals(DateTimeFunctions.dateBin("1h", Timestamp.valueOf("2024-02-10 23:00:55.0"),
+        Timestamp.valueOf("2024-01-01 00:00:00.0")), Timestamp.valueOf("2024-02-10 23:00:00.0"));
+
+    assertEquals(DateTimeFunctions.dateBin("1h15m", Timestamp.valueOf("2024-02-10 23:00:55.0"),
+        Timestamp.valueOf("2024-01-01 00:00:00.0")), Timestamp.valueOf("2024-02-10 22:30:00.0"));
+
+    assertEquals(DateTimeFunctions.dateBin("2h", Timestamp.valueOf("2024-02-10 23:00:55.0"),
+        Timestamp.valueOf("2024-01-01 00:00:00.0")), Timestamp.valueOf("2024-02-10 22:00:00.0"));
+
+    assertEquals(DateTimeFunctions.dateBin("24h", Timestamp.valueOf("2024-02-10 23:00:55.0"),
+        Timestamp.valueOf("2024-01-01 00:00:00.0")), Timestamp.valueOf("2024-02-10 00:00:00.0"));
+
+    assertEquals(DateTimeFunctions.dateBin("1d", Timestamp.valueOf("2024-02-10 23:00:55.0"),
+        Timestamp.valueOf("2024-01-01 00:00:00.0")), Timestamp.valueOf("2024-02-10 00:00:00.0"));
+
+    assertEquals(DateTimeFunctions.dateBin("2d", Timestamp.valueOf("2024-02-09 23:00:55.0"),
+        Timestamp.valueOf("2024-01-01 00:00:00.0")), Timestamp.valueOf("2024-02-08 00:00:00.0"));
+
+    assertEquals(DateTimeFunctions.dateBin("10d10m", Timestamp.valueOf("2024-02-09 23:00:55.0"),
+        Timestamp.valueOf("2024-01-01 00:00:00.0")), Timestamp.valueOf("2024-01-31 00:30:00.0"));
   }
 
   @Test
@@ -531,6 +588,9 @@ public class DateTimeFunctionsTest {
     testDateTimeConvert("20180418T01:00:00", "1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd''T''HH:mm:ss",
         "1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS tz(America/Los_Angeles)", "1:DAYS",
         "2018-04-17 00:00:00.000");
+    // Test time value with scientific number
+    testDateTimeConvert(1.50598536E12/* 20170921T02:16:00 */, "1:MILLISECONDS:EPOCH",
+        "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", "1:DAYS", "20170921");
   }
 
   @Test
@@ -581,7 +641,7 @@ public class DateTimeFunctionsTest {
     row.putValue("timeCol", timeValue);
     List<String> arguments = Collections.singletonList("timeCol");
     testFunction(String.format("dateTimeConvert(timeCol, '%s', '%s', '%s')", inputFormatStr, outputFormatStr,
-        outputGranularityStr), arguments, row, expectedResult == null ? null : expectedResult.toString());
+        outputGranularityStr), arguments, row, expectedResult == null ? null : expectedResult);
   }
 
   private void testMultipleInvocations(String functionExpression, List<GenericRow> rows, List<Object> expectedResults) {
@@ -589,7 +649,7 @@ public class DateTimeFunctionsTest {
     int numInvocations = rows.size();
     assertEquals(expectedResults.size(), numInvocations);
     for (int i = 0; i < numInvocations; i++) {
-      assertEquals(evaluator.evaluate(rows.get(i)), expectedResults.get(i).toString());
+      assertEquals(evaluator.evaluate(rows.get(i)), expectedResults.get(i));
     }
   }
 

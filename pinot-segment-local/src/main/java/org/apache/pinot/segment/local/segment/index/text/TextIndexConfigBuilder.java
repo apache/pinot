@@ -50,6 +50,8 @@ public class TextIndexConfigBuilder extends TextIndexConfig.AbstractBuilder {
           textIndexProperties.get(FieldConfig.TEXT_INDEX_USE_AND_FOR_MULTI_TERM_QUERIES));
       _stopWordsInclude = TextIndexUtils.extractStopWordsInclude(textIndexProperties);
       _stopWordsExclude = TextIndexUtils.extractStopWordsExclude(textIndexProperties);
+      _enablePrefixSuffixMatchingInPhraseQueries =
+          Boolean.parseBoolean(textIndexProperties.get(FieldConfig.TEXT_INDEX_ENABLE_PREFIX_SUFFIX_PHRASE_QUERIES));
 
       if (textIndexProperties.get(FieldConfig.TEXT_INDEX_LUCENE_USE_COMPOUND_FILE) != null) {
         _luceneUseCompoundFile =
@@ -61,6 +63,9 @@ public class TextIndexConfigBuilder extends TextIndexConfig.AbstractBuilder {
             Integer.parseInt(textIndexProperties.get(FieldConfig.TEXT_INDEX_LUCENE_MAX_BUFFER_SIZE_MB));
       }
 
+      if (textIndexProperties.get(FieldConfig.TEXT_INDEX_LUCENE_ANALYZER_CLASS) != null) {
+        _luceneAnalyzerClass = textIndexProperties.get(FieldConfig.TEXT_INDEX_LUCENE_ANALYZER_CLASS);
+      }
 
       for (Map.Entry<String, String> entry : textIndexProperties.entrySet()) {
         if (entry.getKey().equalsIgnoreCase(FieldConfig.TEXT_FST_TYPE)) {

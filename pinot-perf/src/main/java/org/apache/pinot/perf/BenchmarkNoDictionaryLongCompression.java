@@ -21,9 +21,13 @@ package org.apache.pinot.perf;
 import com.github.luben.zstd.Zstd;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import net.jpountz.lz4.LZ4Factory;
-import org.apache.commons.lang3.RandomUtils;
+import org.apache.pinot.segment.local.io.compression.ChunkCompressorFactory;
+import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
+import org.apache.pinot.segment.spi.compression.ChunkCompressor;
+import org.apache.pinot.segment.spi.compression.ChunkDecompressor;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -67,8 +71,13 @@ public class BenchmarkNoDictionaryLongCompression {
     private static ByteBuffer _lz4CompressedLongOutput;
     private static ByteBuffer _lz4CompressedLongInput;
     private static ByteBuffer _lz4LongDecompressed;
+    private static ByteBuffer _gzipCompressedLongOutput;
+    private static ByteBuffer _gzipCompressedLongInput;
+    private static ByteBuffer _gzipLongDecompressed;
 
     private static LZ4Factory _factory;
+    private static ChunkCompressor _gzipCompressor;
+    private static ChunkDecompressor _gzipDecompressor;
 
     @Setup(Level.Invocation)
     public void setUp()
@@ -84,26 +93,31 @@ public class BenchmarkNoDictionaryLongCompression {
       // position for lz4 is required
       _uncompressedLong.flip();
       _factory.fastCompressor().compress(_uncompressedLong, _lz4CompressedLongInput);
+      _gzipCompressor.compress(_uncompressedLong, _gzipCompressedLongInput);
 
       _zstandardLongDecompressedOutput.rewind();
       _zstandardCompressedLongInput.flip();
       _uncompressedLong.flip();
       _snappyLongDecompressedOutput.flip();
       _lz4CompressedLongInput.flip();
+      _gzipCompressedLongInput.flip();
     }
 
     private void generateRandomLongBuffer() {
       //Generate Random Long
+      Random random = new Random();
       _uncompressedLong = ByteBuffer.allocateDirect(_rowLength * Long.BYTES);
       for (int i = 0; i < _rowLength; i++) {
-        _uncompressedLong.putLong(RandomUtils.nextLong());
+        _uncompressedLong.putLong(random.nextLong());
       }
       _uncompressedLong.flip();
     }
 
     private void initializeCompressors() {
-      //Initialize compressors and decompressors for lz4
+      //Initialize compressors and decompressors for lz4 and gzip
       _factory = LZ4Factory.fastestInstance();
+      _gzipCompressor = ChunkCompressorFactory.getCompressor(ChunkCompressionType.GZIP);
+      _gzipDecompressor = ChunkCompressorFactory.getDecompressor(ChunkCompressionType.GZIP);
     }
 
     private void allocateBufferMemory() {
@@ -116,6 +130,9 @@ public class BenchmarkNoDictionaryLongCompression {
       _lz4LongDecompressed = ByteBuffer.allocateDirect(_uncompressedLong.capacity() * 2);
       _lz4CompressedLongOutput = ByteBuffer.allocateDirect(_uncompressedLong.capacity() * 2);
       _lz4CompressedLongInput = ByteBuffer.allocateDirect(_uncompressedLong.capacity() * 2);
+      _gzipLongDecompressed = ByteBuffer.allocateDirect(_uncompressedLong.capacity() * 2);
+      _gzipCompressedLongOutput = ByteBuffer.allocateDirect(_uncompressedLong.capacity() * 2);
+      _gzipCompressedLongInput = ByteBuffer.allocateDirect(_uncompressedLong.capacity() * 2);
     }
 
     @TearDown(Level.Invocation)
@@ -127,10 +144,13 @@ public class BenchmarkNoDictionaryLongCompression {
       _zstandardLongDecompressedOutput.clear();
       _lz4CompressedLongOutput.clear();
       _lz4LongDecompressed.clear();
+      _gzipCompressedLongOutput.clear();
+      _gzipLongDecompressed.clear();
 
       _uncompressedLong.rewind();
       _zstandardCompressedLongInput.rewind();
       _lz4CompressedLongInput.rewind();
+      _gzipCompressedLongInput.rewind();
     }
   }
 
@@ -208,6 +228,26 @@ public class BenchmarkNoDictionaryLongCompression {
       throws IOException {
     state._factory.safeDecompressor().decompress(state._lz4CompressedLongInput, state._lz4LongDecompressed);
     return state._lz4LongDecompressed.position();
+  }
+
+  @Benchmark
+  @BenchmarkMode(Mode.AverageTime)
+  @OutputTimeUnit(TimeUnit.MILLISECONDS)
+  public int benchmarkGZIPLongCompression(
+      BenchmarkNoDictionaryLongCompression.BenchmarkNoDictionaryLongCompressionState state)
+      throws IOException {
+    state._gzipCompressor.compress(state._uncompressedLong, state._gzipCompressedLongOutput);
+    return state._gzipCompressedLongOutput.position();
+  }
+
+  @Benchmark
+  @BenchmarkMode(Mode.AverageTime)
+  @OutputTimeUnit(TimeUnit.MILLISECONDS)
+  public int benchmarkGZIPLongDecompression(
+      BenchmarkNoDictionaryLongCompression.BenchmarkNoDictionaryLongCompressionState state)
+      throws IOException {
+    state._gzipDecompressor.decompress(state._gzipCompressedLongInput, state._gzipLongDecompressed);
+    return state._gzipLongDecompressed.position();
   }
 
   public static void main(String[] args)

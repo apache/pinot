@@ -1,17 +1,33 @@
 {
   "tableName": "githubEvents",
   "tableType": "REALTIME",
+  "tenants": {},
   "segmentsConfig": {
     "timeColumnName": "created_at_timestamp",
-    "segmentPushType": "APPEND",
-    "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
-    "schemaName": "githubEvents",
-    "replication": "1",
-    "replicasPerPartition": "1"
+    "replication": "1"
   },
-  "tenants": {
+  "tableIndexConfig": {
+    "invertedIndexColumns": [
+      "id"
+    ],
+    "segmentNameGeneratorType": "normalizedDate"
   },
   "ingestionConfig": {
+    "streamIngestionConfig": {
+      "streamConfigMaps": [
+        {
+          "streamType": "kafka",
+          "stream.kafka.topic.name": "githubEvents",
+          "stream.kafka.decoder.class.name": "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder",
+          "stream.kafka.consumer.factory.class.name": "org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory",
+          "stream.kafka.consumer.prop.auto.offset.reset": "smallest",
+          "stream.kafka.zk.broker.url": "localhost:2191/kafka",
+          "stream.kafka.broker.list": "localhost:19092",
+          "realtime.segment.flush.threshold.time": "1h",
+          "realtime.segment.flush.threshold.size": "100"
+        }
+      ]
+    },
     "transformConfigs": [
       {
         "columnName": "created_at_timestamp",
@@ -19,27 +35,7 @@
       }
     ]
   },
-  "tableIndexConfig": {
-    "loadMode": "MMAP",
-    "invertedIndexColumns": [
-      "id"
-    ],
-    "segmentNameGeneratorType": "normalizedDate",
-    "streamConfigs": {
-      "streamType": "kafka",
-      "stream.kafka.consumer.type": "simple",
-      "stream.kafka.topic.name": "githubEvents",
-      "stream.kafka.decoder.class.name": "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder",
-      "stream.kafka.consumer.factory.class.name": "org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory",
-      "stream.kafka.zk.broker.url": "localhost:2191/kafka",
-      "stream.kafka.broker.list": "localhost:19092",
-      "realtime.segment.flush.threshold.time": "1h",
-      "realtime.segment.flush.threshold.size": "100",
-      "stream.kafka.consumer.prop.auto.offset.reset": "smallest"
-    }
-  },
   "metadata": {
-    "customConfigs": {
-    }
+    "customConfigs": {}
   }
 }

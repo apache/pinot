@@ -28,6 +28,7 @@ import org.apache.pinot.segment.spi.IndexSegment;
  */
 public abstract class SegmentDataManager {
   private final long _loadTimeMs = System.currentTimeMillis();
+  private final AtomicBoolean _offloaded = new AtomicBoolean();
   private final AtomicBoolean _destroyed = new AtomicBoolean();
   private int _referenceCount = 1;
 
@@ -74,10 +75,26 @@ public abstract class SegmentDataManager {
   public abstract IndexSegment getSegment();
 
   /**
+   * Offloads the segment from the metadata management (e.g. upsert metadata), but not releases the resources yet
+   * because there might be queries still accessing the segment.
+   */
+  public void offload() {
+    if (_offloaded.compareAndSet(false, true)) {
+      doOffload();
+    }
+  }
+
+  public abstract void doOffload();
+
+  /**
    * Destroys the data manager and releases all the resources allocated.
    * The data manager can only be destroyed once.
    */
   public void destroy() {
+    // NOTE: We want the test to catch the case when destroy is called without offloading, but not fail the production.
+    assert _offloaded.get() : "Cannot destroy segment data manager without offloading it first";
+    offload();
+
     if (_destroyed.compareAndSet(false, true)) {
       doDestroy();
     }

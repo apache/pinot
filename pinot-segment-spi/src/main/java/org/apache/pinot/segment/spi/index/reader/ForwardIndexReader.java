@@ -19,8 +19,11 @@
 package org.apache.pinot.segment.spi.index.reader;
 
 import java.math.BigDecimal;
+import java.util.List;
+import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
+import org.apache.pinot.segment.spi.compression.DictIdCompressionType;
 import org.apache.pinot.segment.spi.index.IndexReader;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
@@ -53,9 +56,17 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
   /**
    * Returns the compression type (if valid). Only valid for RAW forward index columns implemented in
    * BaseChunkForwardIndexReader.
-   * @return
    */
+  @Nullable
   default ChunkCompressionType getCompressionType() {
+    return null;
+  }
+
+  /**
+   * Returns the compression type for dictionary encoded forward index.
+   */
+  @Nullable
+  default DictIdCompressionType getDictIdCompressionType() {
     return null;
   }
 
@@ -915,5 +926,105 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
    */
   default int getNumValuesMV(int docId, T context) {
     throw new UnsupportedOperationException();
+  }
+
+  // Functions for recording absolute buffer byte ranges accessed while reading a given docId
+
+  /**
+   * Returns whether the forward index supports recording the byte ranges accessed while reading a given docId.
+   * For readers that do support this info, caller should check if the buffer is a {@link isFixedOffsetMappingType()}.
+   * If yes, the byte range mapping for a docId can be calculated using the {@link getRawDataStartOffset()} and the
+   * {@link getDocLength()} functions.
+   * if not, caller should use the {@link recordDocIdByteRanges()} function to get the list of byte ranges accessed
+   * for a docId.
+   */
+  default boolean isBufferByteRangeInfoSupported() {
+    return false;
+  }
+
+  /**
+   * Returns a list of {@link ByteRange} that represents all the distinct
+   * buffer byte ranges (absolute offset, sizeInBytes) that are accessed when reading the given (@param docId}
+   * @param docId to find the range for
+   * @param context Reader context
+   * @param ranges List of {@link ByteRange} to which the applicable value ranges will be added
+   */
+  default void recordDocIdByteRanges(int docId, T context, List<ByteRange> ranges) {
+    throw new UnsupportedOperationException();
+  }
+
+  /**
+   * Returns whether the forward index is of fixed length type, and therefore the docId -> byte range mapping is fixed
+   * @return true if forward index has a fixed mapping of docId -> buffer offsets
+   * (eg: FixedBitSVForwardIndexReader, FixedByteChunkSVForwardIndexReader (if buffer is uncompressed) etc), false
+   * otherwise
+   */
+  default boolean isFixedOffsetMappingType() {
+    throw new UnsupportedOperationException();
+  }
+
+  /**
+   * Returns the base offset of raw data start within the fwd index buffer, if it's of fixed offset mapping type
+   * @return raw data start offset if the reader is of fixed offset mapping type
+   */
+  default long getRawDataStartOffset() {
+    throw new UnsupportedOperationException();
+  }
+
+  /**
+   * Returns the length of each entry in the forward index, if it's of fixed offset mapping type
+   */
+  default int getDocLength() {
+    throw new UnsupportedOperationException();
+  }
+
+  /**
+   * Returns whether the length of each entry in the forward index is in bits, if it's of fixed offset mapping type
+   */
+  default boolean isDocLengthInBits() {
+    return false;
+  }
+
+  /**
+   * This class represents the buffer byte ranges accessed while reading a given docId.
+   */
+  class ByteRange {
+    private final long _offset;
+    private final int _sizeInBytes;
+
+    public ByteRange(long offset, int sizeInBytes) {
+      _offset = offset;
+      _sizeInBytes = sizeInBytes;
+    }
+
+    public long getOffset() {
+      return _offset;
+    }
+
+    public int getSizeInBytes() {
+      return _sizeInBytes;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (o == null || getClass() != o.getClass()) {
+        return false;
+      }
+      ByteRange byteRange = (ByteRange) o;
+      return _offset == byteRange._offset && _sizeInBytes == byteRange._sizeInBytes;
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(_offset, _sizeInBytes);
+    }
+
+    @Override
+    public String toString() {
+      return "Range{" + "_offset=" + _offset + ", _size=" + _sizeInBytes + '}';
+    }
   }
 }

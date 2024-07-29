@@ -26,6 +26,7 @@ import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.sql.FilterKind;
 
@@ -84,7 +85,7 @@ public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
         Expression lhs = operands.get(0);
         Expression rhs = operands.get(1);
         if (isNumericLiteral(rhs)) {
-          FieldSpec.DataType dataType = getDataType(lhs, schema);
+          DataType dataType = getDataType(lhs, schema);
           if (dataType != null && dataType.isNumeric()) {
             switch (kind) {
               case EQUALS:
@@ -94,7 +95,7 @@ public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
               case GREATER_THAN_OR_EQUAL:
               case LESS_THAN:
               case LESS_THAN_OR_EQUAL:
-                return rewriteRangeExpression(filterExpression, kind, lhs, rhs, schema);
+                return rewriteRangeExpression(filterExpression, kind, dataType, rhs);
               default:
                 break;
             }
@@ -109,16 +110,14 @@ public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
    * Rewrite expressions of form "column = literal" or "column != literal" to ensure that RHS literal is the same
    * datatype as LHS column.
    */
-  private static Expression rewriteEqualsExpression(Expression equals, FilterKind kind, FieldSpec.DataType dataType,
+  private static Expression rewriteEqualsExpression(Expression equals, FilterKind kind, DataType dataType,
       Expression rhs) {
     // Get expression operator
     boolean result = kind == FilterKind.NOT_EQUALS;
 
     switch (rhs.getLiteral().getSetField()) {
-      case SHORT_VALUE:
       case INT_VALUE:
-        // No rewrites needed since SHORT and INT conversion to numeric column types (INT, LONG, FLOAT, and DOUBLE) is
-        // lossless and will be implicitly handled on the server side.
+        // No rewrites needed since INT conversion to numeric column types can be handled on the server side.
         break;
       case LONG_VALUE: {
         long actual = rhs.getLiteral().getLongValue();
@@ -161,6 +160,11 @@ public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
         }
         break;
       }
+      case FLOAT_VALUE: {
+        float actual = Float.intBitsToFloat(rhs.getLiteral().getFloatValue());
+        System.out.println(actual);
+        break;
+      }
       case DOUBLE_VALUE: {
         double actual = rhs.getLiteral().getDoubleValue();
         switch (dataType) {
@@ -186,22 +190,11 @@ public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
             }
             break;
           }
-          case FLOAT: {
-            float converted = (float) actual;
-            if (converted != actual) {
-              // Double to float conversion is lossy.
-              return getExpressionFromBoolean(result);
-            } else {
-              // Replace double value with converted float value.
-              rhs.getLiteral().setDoubleValue(converted);
-            }
-            break;
-          }
           default:
             break;
         }
+        break;
       }
-      break;
       default:
         break;
     }
@@ -212,16 +205,11 @@ public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
    * Rewrite expressions of form "column > literal", "column >= literal", "column < literal", and "column <= literal"
    * to ensure that RHS literal is the same datatype as LHS column.
    */
-  private static Expression rewriteRangeExpression(Expression range, FilterKind kind, Expression lhs, Expression rhs,
-      Schema schema) {
-    // Get column data type.
-    FieldSpec.DataType dataType = schema.getFieldSpecFor(lhs.getIdentifier().getName()).getDataType();
-
+  private static Expression rewriteRangeExpression(Expression range, FilterKind kind, DataType dataType,
+      Expression rhs) {
     switch (rhs.getLiteral().getSetField()) {
-      case SHORT_VALUE:
       case INT_VALUE:
-        // No rewrites needed since SHORT and INT conversion to numeric column types (INT, LONG, FLOAT, and DOUBLE) is
-        // lossless and will be implicitly handled on the server side.
+        // No rewrites needed since INT conversion to numeric column types can be handled on the server side.
         break;
       case LONG_VALUE: {
         long actual = rhs.getLiteral().getLongValue();
@@ -283,6 +271,11 @@ public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
         }
         break;
       }
+      case FLOAT_VALUE: {
+        float actual = Float.intBitsToFloat(rhs.getLiteral().getFloatValue());
+        System.out.println(actual);
+        break;
+      }
       case DOUBLE_VALUE: {
         double actual = rhs.getLiteral().getDoubleValue();
         switch (dataType) {
@@ -334,21 +327,19 @@ public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
               // Literal value is less than the bounds of LONG.
               return getExpressionFromBoolean(
                   kind == FilterKind.GREATER_THAN || kind == FilterKind.GREATER_THAN_OR_EQUAL);
-            } else {
-              int comparison = Double.compare(actual, converted);
-              // Rewrite range operator
-              rewriteRangeOperator(range, kind, comparison);
-
-              // Rewrite range literal
-              rhs.getLiteral().setDoubleValue(converted);
             }
+            // Do not rewrite range operator since double has higher precision than float
+            // If we do, we may introduce problems.
+            // For example, in the previous logic, "> 0.05" will be converted into ">= 0.05000000074505806". When the
+            // query reaches a server, the server will convert it to ">= 0.05" in
+            // ColumnValueSegmentPruner#pruneRangePredicate, which is incorrect.
             break;
           }
           default:
             break;
         }
+        break;
       }
-      break;
       default:
         break;
     }
@@ -391,7 +382,7 @@ public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
 
   /** @return field data type extracted from the expression. null if we can't determine the type. */
   @Nullable
-  private static FieldSpec.DataType getDataType(Expression expression, Schema schema) {
+  private static DataType getDataType(Expression expression, Schema schema) {
     if (expression.getType() == ExpressionType.IDENTIFIER) {
       String column = expression.getIdentifier().getName();
       FieldSpec fieldSpec = schema.getFieldSpecFor(column);
@@ -403,13 +394,20 @@ public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
       // expression is not identifier but we can also determine the data type.
       String targetTypeLiteral =
           expression.getFunctionCall().getOperands().get(1).getLiteral().getStringValue().toUpperCase();
-      FieldSpec.DataType dataType;
+      DataType dataType;
+
+      // Strip out _ARRAY suffix that can be used to represent an MV field type since the semantics here will be the
+      // same as that for the equivalent SV field of the same type
+      if (targetTypeLiteral.endsWith("_ARRAY")) {
+        targetTypeLiteral = targetTypeLiteral.substring(0, targetTypeLiteral.length() - 6);
+      }
+
       if ("INTEGER".equals(targetTypeLiteral)) {
-        dataType = FieldSpec.DataType.INT;
+        dataType = DataType.INT;
       } else if ("VARCHAR".equals(targetTypeLiteral)) {
-        dataType = FieldSpec.DataType.STRING;
+        dataType = DataType.STRING;
       } else {
-        dataType = FieldSpec.DataType.valueOf(targetTypeLiteral);
+        dataType = DataType.valueOf(targetTypeLiteral);
       }
       return dataType;
     }
@@ -421,9 +419,9 @@ public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
     if (expression.getType() == ExpressionType.LITERAL) {
       Literal._Fields type = expression.getLiteral().getSetField();
       switch (type) {
-        case SHORT_VALUE:
         case INT_VALUE:
         case LONG_VALUE:
+        case FLOAT_VALUE:
         case DOUBLE_VALUE:
           return true;
         default:

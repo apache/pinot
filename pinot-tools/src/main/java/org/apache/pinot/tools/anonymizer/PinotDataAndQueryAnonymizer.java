@@ -38,7 +38,7 @@ import org.apache.avro.SchemaBuilder;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
-import org.apache.commons.lang.RandomStringUtils;
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
@@ -233,7 +233,7 @@ public class PinotDataAndQueryAnonymizer {
     File segmentParentDirectory = new File(_segmentDir);
     _segmentDirectories = segmentParentDirectory.list();
     _numFilesToGenerate = _segmentDirectories.length;
-    LOGGER.info("Total number of segments: " + _numFilesToGenerate);
+    LOGGER.info("Total number of segments: {}", _numFilesToGenerate);
 
     if (_globalDictionaryColumns.isEmpty()) {
       LOGGER.info("Set of global dictionary columns is empty. Not building global dictionaries");
@@ -266,7 +266,7 @@ public class PinotDataAndQueryAnonymizer {
 
   private void getSchemaFromFirstSegment(String segmentDirectory)
       throws Exception {
-    LOGGER.info("Reading metadata from segment: " + segmentDirectory);
+    LOGGER.info("Reading metadata from segment: {}", segmentDirectory);
     File segmentIndexDir = new File(segmentDirectory);
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(segmentIndexDir);
     pinotToAvroSchema(segmentMetadata);
@@ -278,8 +278,8 @@ public class PinotDataAndQueryAnonymizer {
       _pinotSchema = segmentMetadata.getSchema();
       anonymizeColumnNames(_pinotSchema);
       _avroSchema = getAvroSchemaFromPinotSchema(_pinotSchema);
-      LOGGER.info("Pinot schema: " + _pinotSchema.toPrettyJsonString());
-      LOGGER.info("Avro schema: " + _avroSchema.toString(true));
+      LOGGER.info("Pinot schema: {}", _pinotSchema.toPrettyJsonString());
+      LOGGER.info("Avro schema: {}", _avroSchema.toString(true));
     }
   }
 

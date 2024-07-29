@@ -28,6 +28,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.datatable.DataTable;
+import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 
 
@@ -54,14 +55,18 @@ public class AsyncQueryResponse implements QueryResponse {
     _queryRouter = queryRouter;
     _requestId = requestId;
     int numServersQueried = serversQueried.size();
-    _responseMap = new ConcurrentHashMap<>(numServersQueried);
+    _responseMap = new ConcurrentHashMap<>(HashUtil.getHashMapCapacity(numServersQueried));
+    _serverRoutingStatsManager = serverRoutingStatsManager;
     for (ServerRoutingInstance serverRoutingInstance : serversQueried) {
+      // Record stats related to query submission just before sending the request. Otherwise, if the response is
+      // received immediately, there's a possibility of updating query response stats before updating query
+      // submission stats.
+      _serverRoutingStatsManager.recordStatsForQuerySubmission(requestId, serverRoutingInstance.getInstanceId());
       _responseMap.put(serverRoutingInstance, new ServerResponse(startTimeMs));
     }
     _countDownLatch = new CountDownLatch(numServersQueried);
     _timeoutMs = timeoutMs;
     _maxEndTimeMs = startTimeMs + timeoutMs;
-    _serverRoutingStatsManager = serverRoutingStatsManager;
   }
 
   @Override
@@ -87,15 +92,16 @@ public class AsyncQueryResponse implements QueryResponse {
       _status.compareAndSet(Status.IN_PROGRESS, finish ? Status.COMPLETED : Status.TIMED_OUT);
       return _responseMap;
     } finally {
-      // Update ServerRoutingStats.
+      // Update ServerRoutingStats for query completion. This is done here to ensure that the stats are updated for
+      // servers even if the query times out or if servers have not responded.
       for (Map.Entry<ServerRoutingInstance, ServerResponse> entry : _responseMap.entrySet()) {
         ServerResponse response = entry.getValue();
-        if (response == null || response.getDataTable() == null) {
-          // These are servers from which a response was not received. So update query response stats for such
-          // servers with maximum latency i.e timeout value.
-          _serverRoutingStatsManager.recordStatsUponResponseArrival(_requestId, entry.getKey().getInstanceId(),
-              _timeoutMs);
-        }
+
+        // ServerResponse returns -1 if responseDelayMs is not set. This indicates that a response was not received
+        // from the server. Hence we set the latency to the timeout value.
+        long latency =
+            (response != null && response.getResponseDelayMs() >= 0) ? response.getResponseDelayMs() : _timeoutMs;
+        _serverRoutingStatsManager.recordStatsUponResponseArrival(_requestId, entry.getKey().getInstanceId(), latency);
       }
 
       _queryRouter.markQueryDone(_requestId);
@@ -151,12 +157,6 @@ public class AsyncQueryResponse implements QueryResponse {
     ServerResponse response = _responseMap.get(serverRoutingInstance);
     response.receiveDataTable(dataTable, responseSize, deserializationTimeMs);
 
-    // Record query completion stats immediately after receiving the response from the server instead of waiting
-    // for all servers to respond. This helps to keep the stats up-to-date.
-    long latencyMs = response.getResponseDelayMs();
-    _serverRoutingStatsManager.recordStatsUponResponseArrival(_requestId, serverRoutingInstance.getInstanceId(),
-        latencyMs);
-
     _numServersResponded.getAndIncrement();
     _countDownLatch.countDown();
   }
@@ -180,5 +180,13 @@ public class AsyncQueryResponse implements QueryResponse {
     if (serverResponse != null && serverResponse.getDataTable() == null) {
       markQueryFailed(serverRoutingInstance, exception);
     }
+  }
+
+  /**
+   * Wait for one less server response. This is used when the server is skipped, as
+   * query submission will have failed we do not want to wait for the response.
+   */
+  void skipServerResponse() {
+    _countDownLatch.countDown();
   }
 }

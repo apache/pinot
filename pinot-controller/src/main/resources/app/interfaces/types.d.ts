@@ -18,12 +18,30 @@
  */
 
 declare module 'Models' {
+  export type SegmentStatus = {
+    value: DISPLAY_SEGMENT_STATUS,
+    tooltip: string,
+    component?: JSX.Element
+  }
+
+  export type LoadingRecord = {
+    customRenderer: JSX.Element
+  }
+
   export type TableData = {
-    records: Array<Array<string | number | boolean>>;
+    records: Array<Array<string | number | boolean | SegmentStatus | LoadingRecord>>;
     columns: Array<string>;
     error?: string;
     isLoading? : boolean
   };
+
+  export type PinotTableDetails = {
+    name: string,
+    reported_size: string,
+    estimated_size: string,
+    number_of_segments: string,
+    segment_status: SegmentStatus,
+  }
 
   type SchemaDetails = {
     schemaName: string,
@@ -79,6 +97,12 @@ declare module 'Models' {
     segments: Object;
   };
 
+  type SegmentMetadata = {
+    indexes?: any;
+    columns: Array<any>;
+    code?: number;
+  };
+
   export type IdealState = {
     OFFLINE: Object | null;
     REALTIME: Object | null;
@@ -97,6 +121,7 @@ declare module 'Models' {
     metricFieldSpecs?: Array<schema>;
     dateTimeFieldSpecs?: Array<schema>;
     error?: string;
+    code?: number;
   };
 
   type schema = {
@@ -145,7 +170,8 @@ declare module 'Models' {
 
   export type ZKConfig = {
     ctime: any,
-    mtime: any
+    mtime: any,
+    code?: number
   };
   export type OperationResponse = any;
 
@@ -253,8 +279,20 @@ declare module 'Models' {
     DISABLE = "disable"
   }
 
+  export const enum InstanceType {
+    BROKER = "BROKER",
+    CONTROLLER = "CONTROLLER",
+    MINION = "MINION",
+    SERVER = "SERVER"
+  }
+
   export const enum TableType {
     REALTIME = "realtime",
     OFFLINE = "offline"
+  }
+
+  export interface SqlException {
+    errorCode: number,
+    message: string
   }
 }

@@ -18,19 +18,19 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeoutException;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.mailbox.MailboxService;
-import org.apache.pinot.query.routing.VirtualServerAddress;
+import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
+import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
-import org.apache.pinot.query.runtime.plan.StageMetadata;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.testng.annotations.AfterMethod;
@@ -39,12 +39,9 @@ import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 import static org.mockito.MockitoAnnotations.openMocks;
-import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
 
@@ -53,27 +50,22 @@ public class MailboxSendOperatorTest {
   private static final int SENDER_STAGE_ID = 1;
 
   private AutoCloseable _mocks;
-
-  @Mock
-  private VirtualServerAddress _server;
-  @Mock
-  private MultiStageOperator _sourceOperator;
   @Mock
   private MailboxService _mailboxService;
+  @Mock
+  private MultiStageOperator _input;
   @Mock
   private BlockExchange _exchange;
 
   @BeforeMethod
-  public void setUp()
-      throws Exception {
+  public void setUpMethod() {
     _mocks = openMocks(this);
-    when(_server.hostname()).thenReturn("mock");
-    when(_server.port()).thenReturn(0);
-    when(_server.workerId()).thenReturn(0);
+    when(_mailboxService.getHostname()).thenReturn("localhost");
+    when(_mailboxService.getPort()).thenReturn(1234);
   }
 
   @AfterMethod
-  public void tearDown()
+  public void tearDownMethod()
       throws Exception {
     _mocks.close();
   }
@@ -83,10 +75,10 @@ public class MailboxSendOperatorTest {
       throws Exception {
     // Given:
     TransferableBlock errorBlock = TransferableBlockUtils.getErrorTransferableBlock(new Exception("TEST ERROR"));
-    when(_sourceOperator.nextBlock()).thenReturn(errorBlock);
+    when(_input.nextBlock()).thenReturn(errorBlock);
 
     // When:
-    TransferableBlock block = getMailboxSendOperator().nextBlock();
+    TransferableBlock block = getOperator().nextBlock();
 
     // Then:
     assertSame(block, errorBlock, "expected error block to propagate");
@@ -97,10 +89,10 @@ public class MailboxSendOperatorTest {
   public void shouldSendErrorBlockWhenInputThrows()
       throws Exception {
     // Given:
-    when(_sourceOperator.nextBlock()).thenThrow(new RuntimeException("TEST ERROR"));
+    when(_input.nextBlock()).thenThrow(new RuntimeException("TEST ERROR"));
 
     // When:
-    TransferableBlock block = getMailboxSendOperator().nextBlock();
+    TransferableBlock block = getOperator().nextBlock();
 
     // Then:
     assertTrue(block.isErrorBlock(), "expected error block to propagate");
@@ -113,13 +105,12 @@ public class MailboxSendOperatorTest {
   public void shouldNotSendErrorBlockWhenTimedOut()
       throws Exception {
     // Given:
-    TransferableBlock dataBlock =
-        OperatorTestUtil.block(new DataSchema(new String[]{}, new DataSchema.ColumnDataType[]{}));
-    when(_sourceOperator.nextBlock()).thenReturn(dataBlock);
+    TransferableBlock dataBlock = getDummyDataBlock();
+    when(_input.nextBlock()).thenReturn(dataBlock);
     doThrow(new TimeoutException()).when(_exchange).send(any());
 
     // When:
-    TransferableBlock block = getMailboxSendOperator().nextBlock();
+    TransferableBlock block = getOperator().nextBlock();
 
     // Then:
     assertTrue(block.isErrorBlock(), "expected error block to propagate");
@@ -132,11 +123,12 @@ public class MailboxSendOperatorTest {
   public void shouldSendEosBlock()
       throws Exception {
     // Given:
-    TransferableBlock eosBlock = TransferableBlockUtils.getEndOfStreamTransferableBlock();
-    when(_sourceOperator.nextBlock()).thenReturn(eosBlock);
+    TransferableBlock eosBlock =
+        TransferableBlockUtils.getEndOfStreamTransferableBlock(MultiStageQueryStats.emptyStats(SENDER_STAGE_ID));
+    when(_input.nextBlock()).thenReturn(eosBlock);
 
     // When:
-    TransferableBlock block = getMailboxSendOperator().nextBlock();
+    TransferableBlock block = getOperator().nextBlock();
 
     // Then:
     assertSame(block, eosBlock, "expected EOS block to propagate");
@@ -149,15 +141,14 @@ public class MailboxSendOperatorTest {
   public void shouldSendDataBlock()
       throws Exception {
     // Given:
-    TransferableBlock dataBlock1 =
-        OperatorTestUtil.block(new DataSchema(new String[]{}, new DataSchema.ColumnDataType[]{}));
-    TransferableBlock dataBlock2 =
-        OperatorTestUtil.block(new DataSchema(new String[]{}, new DataSchema.ColumnDataType[]{}));
-    TransferableBlock eosBlock = TransferableBlockUtils.getEndOfStreamTransferableBlock();
-    when(_sourceOperator.nextBlock()).thenReturn(dataBlock1, dataBlock2, eosBlock);
+    TransferableBlock dataBlock1 = getDummyDataBlock();
+    TransferableBlock dataBlock2 = getDummyDataBlock();
+    TransferableBlock eosBlock =
+        TransferableBlockUtils.getEndOfStreamTransferableBlock(MultiStageQueryStats.emptyStats(SENDER_STAGE_ID));
+    when(_input.nextBlock()).thenReturn(dataBlock1, dataBlock2, eosBlock);
 
     // When:
-    MailboxSendOperator mailboxSendOperator = getMailboxSendOperator();
+    MailboxSendOperator mailboxSendOperator = getOperator();
     TransferableBlock block = mailboxSendOperator.nextBlock();
     // Then:
     assertSame(block, dataBlock1, "expected first data block to propagate");
@@ -180,17 +171,38 @@ public class MailboxSendOperatorTest {
     assertTrue(blocks.get(2).isSuccessfulEndOfStreamBlock(), "expected to send EOS block to exchange on third call");
 
     // EOS block should contain statistics
-    Map<String, OperatorStats> resultMetadata = blocks.get(2).getResultMetadata();
-    assertEquals(resultMetadata.size(), 1);
-    assertTrue(resultMetadata.containsKey(mailboxSendOperator.getOperatorId()));
+    MultiStageQueryStats resultMetadata = blocks.get(2).getQueryStats();
+    MultiStageQueryStats.StageStats stageStats = resultMetadata.getCurrentStats();
+    assertNotNull(stageStats, "expected to have stats for sender stage");
+    assertNotNull(stageStats.getOperatorStats(0));
   }
 
-  private MailboxSendOperator getMailboxSendOperator() {
-    StageMetadata stageMetadata = new StageMetadata.Builder().setWorkerMetadataList(
-        Collections.singletonList(new WorkerMetadata.Builder().setVirtualServerAddress(_server).build())).build();
+  @Test
+  public void shouldEarlyTerminateWhenUpstreamWhenIndicated()
+      throws Exception {
+    // Given:
+    TransferableBlock dataBlock = getDummyDataBlock();
+    when(_input.nextBlock()).thenReturn(dataBlock);
+    doReturn(true).when(_exchange).send(any());
+
+    // When:
+    getOperator().nextBlock();
+
+    // Then:
+    verify(_input).earlyTerminate();
+  }
+
+  private MailboxSendOperator getOperator() {
+    WorkerMetadata workerMetadata = new WorkerMetadata(0, Map.of(), Map.of());
+    StageMetadata stageMetadata = new StageMetadata(SENDER_STAGE_ID, List.of(workerMetadata), Map.of());
     OpChainExecutionContext context =
-        new OpChainExecutionContext(_mailboxService, 0, SENDER_STAGE_ID, _server, Long.MAX_VALUE,
-            Collections.emptyMap(), stageMetadata, null);
-    return new MailboxSendOperator(context, _sourceOperator, _exchange, null, null, false);
+        new OpChainExecutionContext(_mailboxService, 123L, Long.MAX_VALUE, Map.of(), stageMetadata, workerMetadata,
+            null);
+    return new MailboxSendOperator(context, _input, statMap -> _exchange);
+  }
+
+  private static TransferableBlock getDummyDataBlock() {
+    return OperatorTestUtil.block(new DataSchema(new String[]{"intCol"}, new ColumnDataType[]{ColumnDataType.INT}),
+        new Object[]{1});
   }
 }

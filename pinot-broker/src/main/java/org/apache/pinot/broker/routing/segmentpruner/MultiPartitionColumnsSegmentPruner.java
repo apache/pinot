@@ -34,6 +34,7 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.Identifier;
+import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.sql.FilterKind;
 
 
@@ -140,7 +141,7 @@ public class MultiPartitionColumnsSegmentPruner implements SegmentPruner {
         if (identifier != null) {
           SegmentPartitionInfo partitionInfo = columnPartitionInfoMap.get(identifier.getName());
           return partitionInfo == null || partitionInfo.getPartitions().contains(
-              partitionInfo.getPartitionFunction().getPartition(operands.get(1).getLiteral().getFieldValue()));
+              partitionInfo.getPartitionFunction().getPartition(RequestContextUtils.getStringValue(operands.get(1))));
         } else {
           return true;
         }
@@ -155,7 +156,7 @@ public class MultiPartitionColumnsSegmentPruner implements SegmentPruner {
           int numOperands = operands.size();
           for (int i = 1; i < numOperands; i++) {
             if (partitionInfo.getPartitions().contains(partitionInfo.getPartitionFunction()
-                .getPartition(operands.get(i).getLiteral().getFieldValue().toString()))) {
+                .getPartition(RequestContextUtils.getStringValue(operands.get(i))))) {
               return true;
             }
           }

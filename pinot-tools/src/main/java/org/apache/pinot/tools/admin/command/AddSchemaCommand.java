@@ -20,7 +20,9 @@ package org.apache.pinot.tools.admin.command;
 
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.net.URI;
 import java.util.Collections;
+import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.data.Schema;
@@ -36,17 +38,25 @@ import picocli.CommandLine;
 public class AddSchemaCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(AddSchemaCommand.class);
 
-  @CommandLine.Option(names = {"-controllerHost"}, required = false, description = "host name for controller.")
+  @CommandLine.Option(names = {"-controllerHost"}, required = false, description = "Host name for controller.")
   private String _controllerHost;
 
-  @CommandLine.Option(names = {"-controllerPort"}, required = false, description = "port name for controller.")
+  @CommandLine.Option(names = {"-controllerPort"}, required = false, description = "Port number for controller.")
   private String _controllerPort = DEFAULT_CONTROLLER_PORT;
 
-  @CommandLine.Option(names = {"-controllerProtocol"}, required = false, description = "protocol for controller.")
+  @CommandLine.Option(names = {"-controllerProtocol"}, required = false, description = "Protocol for controller.")
   private String _controllerProtocol = CommonConstants.HTTP_PROTOCOL;
 
   @CommandLine.Option(names = {"-schemaFile"}, required = true, description = "Path to schema file.")
   private String _schemaFile = null;
+
+  @CommandLine.Option(names = {"-override"}, required = false, description = "Whether to override the schema if the "
+      + "schema exists.")
+  private boolean _override = false;
+
+  @CommandLine.Option(names = {"-force"}, required = false, description = "Whether to force overriding the schema if "
+      + "the schema exists.")
+  private boolean _force = false;
 
   @CommandLine.Option(names = {"-exec"}, required = false, description = "Execute the command.")
   private boolean _exec;
@@ -87,8 +97,8 @@ public class AddSchemaCommand extends AbstractBaseAdminCommand implements Comman
   @Override
   public String toString() {
     String retString = ("AddSchema -controllerProtocol " + _controllerProtocol + " -controllerHost " + _controllerHost
-        + " -controllerPort " + _controllerPort + " -schemaFile " + _schemaFile + " -user " + _user + " -password "
-        + "[hidden]");
+        + " -controllerPort " + _controllerPort + " -schemaFile " + _schemaFile + " -override " + _override + " _force "
+        + _force + " -user " + _user + " -password " + "[hidden]");
 
     return ((_exec) ? (retString + " -exec") : retString);
   }
@@ -117,6 +127,16 @@ public class AddSchemaCommand extends AbstractBaseAdminCommand implements Comman
     return this;
   }
 
+  public AddSchemaCommand setOverride(boolean override) {
+    _override = override;
+    return this;
+  }
+
+  public AddSchemaCommand setForce(boolean force) {
+    _force = force;
+    return this;
+  }
+
   public void setUser(String user) {
     _user = user;
   }
@@ -142,25 +162,28 @@ public class AddSchemaCommand extends AbstractBaseAdminCommand implements Comman
     }
 
     if (!_exec) {
-      LOGGER.warn("Dry Running Command: " + toString());
+      LOGGER.warn("Dry Running Command: {}", toString());
       LOGGER.warn("Use the -exec option to actually execute the command.");
       return true;
     }
 
     File schemaFile = new File(_schemaFile);
-    LOGGER.info("Executing command: " + toString());
+    LOGGER.info("Executing command: {}", toString());
     if (!schemaFile.exists()) {
       throw new FileNotFoundException("file does not exist, + " + _schemaFile);
     }
 
     Schema schema = Schema.fromFile(schemaFile);
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
-      fileUploadDownloadClient.addSchema(FileUploadDownloadClient
-              .getUploadSchemaURI(_controllerProtocol, _controllerHost, Integer.parseInt(_controllerPort)),
-          schema.getSchemaName(), schemaFile, makeAuthHeaders(makeAuthProvider(_authProvider, _authTokenUrl, _authToken,
+      URI schemaURI = FileUploadDownloadClient
+          .getUploadSchemaURI(_controllerProtocol, _controllerHost, Integer.parseInt(_controllerPort));
+      schemaURI = new URI(schemaURI + "?override=" + _override + "&force=" + _force);
+      fileUploadDownloadClient.addSchema(schemaURI,
+          schema.getSchemaName(), schemaFile, AuthProviderUtils.makeAuthHeaders(
+              AuthProviderUtils.makeAuthProvider(_authProvider, _authTokenUrl, _authToken,
               _user, _password)), Collections.emptyList());
     } catch (Exception e) {
-      LOGGER.error("Got Exception to upload Pinot Schema: " + schema.getSchemaName(), e);
+      LOGGER.error("Got Exception to upload Pinot Schema: {}", schema.getSchemaName(), e);
       return false;
     }
     return true;

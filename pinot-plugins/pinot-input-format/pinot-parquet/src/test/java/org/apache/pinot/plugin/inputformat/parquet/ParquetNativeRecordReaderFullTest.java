@@ -20,8 +20,11 @@ package org.apache.pinot.plugin.inputformat.parquet;
 
 import java.io.File;
 import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import org.apache.commons.io.FileUtils;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
 
 
 public class ParquetNativeRecordReaderFullTest {
@@ -30,6 +33,8 @@ public class ParquetNativeRecordReaderFullTest {
   @Test
   protected void testReadDataSet1()
       throws Exception {
+    testParquetFile("airlineStats.zstd.parquet");
+    testParquetFile("baseballStats.zstd.parquet");
     testParquetFile("test-data/gzip-nation.impala.parquet");
     //testParquetFile("test-data/nation.dict.parquet");
     testParquetFile("test-data/nation.impala.parquet");
@@ -39,7 +44,7 @@ public class ParquetNativeRecordReaderFullTest {
     testParquetFile("test-data/test-null.parquet");
     testParquetFile("test-data/test-null-dictionary.parquet");
     testParquetFile("test-data/airlines_parquet/4345e5eef217aa1b-c8f16177f35fd983_1150363067_data.1.parq");
-    //testParquetFile("test-data/dir_metadata/empty.parquet");
+    testParquetFile("test-data/dir_metadata/empty.parquet");
     testParquetFile("test-data/multi_rgs_pyarrow/b=hi/a97cc141d16f4014a59e5b234dddf07c.parquet");
     testParquetFile("test-data/multi_rgs_pyarrow/b=lo/01bc139247874a0aa9e0e541f2eec497.parquet");
     for (int i = 1; i < 4; i++) {
@@ -54,7 +59,7 @@ public class ParquetNativeRecordReaderFullTest {
     testParquetFile("test-data/customer.impala.parquet");
     testParquetFile("test-data/datapage_v2.snappy.parquet");
     testParquetFile("test-data/decimals.parquet");
-    //testParquetFile("test-data/empty.parquet");
+    testParquetFile("test-data/empty.parquet");
     testParquetFile("test-data/foo.parquet");
     testParquetFile("test-data/gzip-nation.impala.parquet");
     testParquetFile("test-data/map-test.snappy.parquet");
@@ -123,12 +128,23 @@ public class ParquetNativeRecordReaderFullTest {
 
   protected void testParquetFile(String filePath)
       throws Exception {
-    File dataFile = new File(URLDecoder.decode(getClass().getClassLoader().getResource(filePath).getFile(), "UTF-8"));
-    ParquetNativeRecordReader recordReader = new ParquetNativeRecordReader();
-    recordReader.init(dataFile, null, null);
-    while (recordReader.hasNext()) {
-      recordReader.next();
+    File dataFile = new File(
+        URLDecoder.decode(getClass().getClassLoader().getResource(filePath).getFile(), StandardCharsets.UTF_8));
+    try (ParquetNativeRecordReader recordReader = new ParquetNativeRecordReader()) {
+      recordReader.init(dataFile, null, null);
+      int numDocsForFirstPass = 0;
+      while (recordReader.hasNext()) {
+        recordReader.next();
+        numDocsForFirstPass++;
+      }
+      recordReader.rewind();
+      int numDocsForSecondPass = 0;
+      while (recordReader.hasNext()) {
+        recordReader.next();
+        numDocsForSecondPass++;
+      }
+      recordReader.close();
+      assertEquals(numDocsForFirstPass, numDocsForSecondPass);
     }
-    recordReader.close();
   }
 }

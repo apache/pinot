@@ -21,11 +21,13 @@ package org.apache.pinot.core.operator.transform.function;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.glassfish.jersey.internal.guava.Preconditions;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -33,12 +35,10 @@ import org.glassfish.jersey.internal.guava.Preconditions;
  * The results are BOOLEAN type.
  */
 public abstract class LogicalOperatorTransformFunction extends BaseTransformFunction {
-  protected List<TransformFunction> _arguments;
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
     super.init(arguments, columnContextMap);
-    _arguments = arguments;
     int numArguments = arguments.size();
     if (numArguments <= 1) {
       throw new IllegalArgumentException(
@@ -75,5 +75,35 @@ public abstract class LogicalOperatorTransformFunction extends BaseTransformFunc
     return _intValuesSV;
   }
 
+  @Nullable
+  @Override
+  public RoaringBitmap getNullBitmap(ValueBlock valueBlock) {
+    int numDocs = valueBlock.getNumDocs();
+    int numArguments = _arguments.size();
+    RoaringBitmap nullBitmap = new RoaringBitmap();
+    boolean[] supersedesNull = new boolean[numDocs];
+    for (int i = 0; i < numArguments; i++) {
+      int[] intValues = _arguments.get(i).transformToIntValuesSV(valueBlock);
+      RoaringBitmap argumentNullBitmap = _arguments.get(i).getNullBitmap(valueBlock);
+      for (int docId = 0; docId < numDocs; docId++) {
+        if ((argumentNullBitmap == null || !argumentNullBitmap.contains(docId)) && valueSupersedesNull(
+            intValues[docId])) {
+          supersedesNull[docId] = true;
+          nullBitmap.remove(docId);
+        }
+      }
+      if (argumentNullBitmap != null) {
+        for (int docId : argumentNullBitmap) {
+          if (!supersedesNull[docId]) {
+            nullBitmap.add(docId);
+          }
+        }
+      }
+    }
+    return nullBitmap.isEmpty() ? null : nullBitmap;
+  }
+
   abstract int getLogicalFuncResult(int left, int right);
+
+  abstract boolean valueSupersedesNull(int i);
 }

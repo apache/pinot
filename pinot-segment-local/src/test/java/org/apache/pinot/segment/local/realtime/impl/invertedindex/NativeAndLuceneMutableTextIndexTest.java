@@ -23,10 +23,13 @@ import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.lucene.search.SearcherManager;
+import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.mock;
 import static org.testng.Assert.assertEquals;
 
 
@@ -34,6 +37,8 @@ public class NativeAndLuceneMutableTextIndexTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "RealTimeNativeVsLuceneTest");
   private static final String TEXT_COLUMN_NAME = "testColumnName";
   private static final String MV_TEXT_COLUMN_NAME = "testMVColumnName";
+  private static final RealtimeLuceneTextIndexSearcherPool SEARCHER_POOL =
+      RealtimeLuceneTextIndexSearcherPool.init(1);
 
   private RealtimeLuceneTextIndex _realtimeLuceneTextIndex;
   private NativeMutableTextIndex _nativeMutableTextIndex;
@@ -68,12 +73,16 @@ public class NativeAndLuceneMutableTextIndexTest {
   @BeforeClass
   public void setUp()
       throws Exception {
+    RealtimeLuceneIndexRefreshManager.init(1, 10);
+    ServerMetrics.register(mock(ServerMetrics.class));
+    TextIndexConfig config =
+        new TextIndexConfig(false, null, null, false, false, null, null, true, 500, null, false, false, 0);
     _realtimeLuceneTextIndex =
-        new RealtimeLuceneTextIndex(TEXT_COLUMN_NAME, INDEX_DIR, "fooBar", null, null, true, 500);
+        new RealtimeLuceneTextIndex(TEXT_COLUMN_NAME, INDEX_DIR, "table__0__1__20240602T0014Z", config);
     _nativeMutableTextIndex = new NativeMutableTextIndex(TEXT_COLUMN_NAME);
 
     _realtimeLuceneMVTextIndex =
-        new RealtimeLuceneTextIndex(MV_TEXT_COLUMN_NAME, INDEX_DIR, "fooBar", null, null, true, 500);
+        new RealtimeLuceneTextIndex(MV_TEXT_COLUMN_NAME, INDEX_DIR, "table__0__1__20240602T0014Z", config);
     _nativeMutableMVTextIndex = new NativeMutableTextIndex(MV_TEXT_COLUMN_NAME);
 
     String[] documents = getTextData();
@@ -93,7 +102,7 @@ public class NativeAndLuceneMutableTextIndexTest {
     searcherManagers.add(_realtimeLuceneMVTextIndex.getSearcherManager());
     try {
       for (SearcherManager searcherManager : searcherManagers) {
-        searcherManager.maybeRefresh();
+        searcherManager.maybeRefreshBlocking();
       }
     } catch (Exception e) {
       throw new RuntimeException(e);

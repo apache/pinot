@@ -27,6 +27,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
@@ -57,7 +58,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-
 
 /**
  * PRODUCE
@@ -167,9 +167,8 @@ public class StreamOp extends BaseOp {
       int partitions = Integer.parseInt(streamConfigMap.getProperty(NUM_PARTITIONS));
 
       final Map<String, Object> config = new HashMap<>();
-      config.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG,
-          ClusterDescriptor.getInstance().getDefaultHost() + ":" + ClusterDescriptor.getInstance().getKafkaPort());
-      config.put(AdminClientConfig.CLIENT_ID_CONFIG, "Kafka2AdminClient-" + UUID.randomUUID().toString());
+      config.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, ClusterDescriptor.getInstance().getKafkaServerUrl());
+      config.put(AdminClientConfig.CLIENT_ID_CONFIG, "Kafka2AdminClient-" + UUID.randomUUID());
       config.put(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, 15000);
       AdminClient adminClient = KafkaAdminClient.create(config);
       NewTopic topic = new NewTopic(topicName, partitions, KAFKA_REPLICATION_FACTOR);
@@ -226,7 +225,8 @@ public class StreamOp extends BaseOp {
           .sendGetRequest(ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.getInstance().getControllerUrl())
               .forSchemaGet(schemaName));
       Schema schema = JsonUtils.stringToObject(schemaString, Schema.class);
-      DateTimeFormatSpec dateTimeFormatSpec = schema.getSpecForTimeColumn(timeColumn).getFormatSpec();
+      DateTimeFormatSpec dateTimeFormatSpec = Objects.requireNonNull(
+          schema.getSpecForTimeColumn(timeColumn)).getFormatSpec();
 
       try (RecordReader csvRecordReader = RecordReaderFactory
           .getRecordReader(FileFormat.CSV, localReplacedCSVFile, columnNames, recordReaderConfig)) {
@@ -282,7 +282,7 @@ public class StreamOp extends BaseOp {
       JsonNode errorCode = exceptions.get(ERROR_CODE);
       if (String.valueOf(QueryException.BROKER_INSTANCE_MISSING_ERROR).equals(String.valueOf(errorCode))
           && errorCode != null) {
-        LOGGER.warn(errorMsg + ".Trying again");
+        LOGGER.warn("{}.Trying again", errorMsg);
         return 0;
       }
       LOGGER.error(errorMsg);

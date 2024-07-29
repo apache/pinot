@@ -18,12 +18,10 @@
  */
 package org.apache.pinot.core.plan;
 
-import io.grpc.stub.StreamObserver;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.core.common.Operator;
@@ -34,11 +32,8 @@ import org.apache.pinot.core.operator.combine.GroupByCombineOperator;
 import org.apache.pinot.core.operator.combine.MinMaxValueBasedSelectionOrderByCombineOperator;
 import org.apache.pinot.core.operator.combine.SelectionOnlyCombineOperator;
 import org.apache.pinot.core.operator.combine.SelectionOrderByCombineOperator;
-import org.apache.pinot.core.operator.streaming.StreamingAggregationCombineOperator;
-import org.apache.pinot.core.operator.streaming.StreamingDistinctCombineOperator;
-import org.apache.pinot.core.operator.streaming.StreamingGroupByCombineOperator;
 import org.apache.pinot.core.operator.streaming.StreamingSelectionOnlyCombineOperator;
-import org.apache.pinot.core.operator.streaming.StreamingSelectionOrderByCombineOperator;
+import org.apache.pinot.core.query.executor.ResultsBlockStreamer;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
 import org.apache.pinot.core.util.QueryMultiThreadingUtils;
@@ -60,7 +55,7 @@ public class CombinePlanNode implements PlanNode {
   private final List<PlanNode> _planNodes;
   private final QueryContext _queryContext;
   private final ExecutorService _executorService;
-  private final StreamObserver<Server.ServerResponse> _streamObserver;
+  private final ResultsBlockStreamer _streamer;
 
   /**
    * Constructor for the class.
@@ -68,14 +63,14 @@ public class CombinePlanNode implements PlanNode {
    * @param planNodes List of underlying plan nodes
    * @param queryContext Query context
    * @param executorService Executor service
-   * @param streamObserver Optional stream observer for streaming query
+   * @param streamer Optional results block streamer for streaming query
    */
   public CombinePlanNode(List<PlanNode> planNodes, QueryContext queryContext, ExecutorService executorService,
-      @Nullable StreamObserver<Server.ServerResponse> streamObserver) {
+      @Nullable ResultsBlockStreamer streamer) {
     _planNodes = planNodes;
     _queryContext = queryContext;
     _executorService = executorService;
-    _streamObserver = streamObserver;
+    _streamer = streamer;
   }
 
   @Override
@@ -127,27 +122,9 @@ public class CombinePlanNode implements PlanNode {
       }, _executorService, _queryContext.getEndTimeMs());
     }
 
-    if (_streamObserver != null) {
-      if (QueryContextUtils.isAggregationQuery(_queryContext)) {
-        if (_queryContext.getGroupByExpressions() == null) {
-          // Aggregation only
-          return new StreamingAggregationCombineOperator(operators, _queryContext, _executorService);
-        } else {
-          // Aggregation group-by
-          return new StreamingGroupByCombineOperator(operators, _queryContext, _executorService);
-        }
-      } else if (QueryContextUtils.isSelectionQuery(_queryContext)) {
-        if (_queryContext.getLimit() == 0 || _queryContext.getOrderByExpressions() == null) {
-          // Streaming query (special handling to support selection only)
-          return new StreamingSelectionOnlyCombineOperator(operators, _queryContext, _executorService);
-        } else {
-          // Selection order-by
-          return new StreamingSelectionOrderByCombineOperator(operators, _queryContext, _executorService);
-        }
-      } else {
-        assert QueryContextUtils.isDistinctQuery(_queryContext);
-        return new StreamingDistinctCombineOperator(operators, _queryContext, _executorService);
-      }
+    if (_streamer != null && QueryContextUtils.isSelectionOnlyQuery(_queryContext) && _queryContext.getLimit() != 0) {
+      // Use streaming operator only for non-empty selection-only query
+      return new StreamingSelectionOnlyCombineOperator(operators, _queryContext, _executorService);
     } else {
       if (QueryContextUtils.isAggregationQuery(_queryContext)) {
         if (_queryContext.getGroupByExpressions() == null) {

@@ -33,7 +33,7 @@ import java.util.stream.IntStream;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.log4j.Level;
 import org.apache.log4j.LogManager;
 import org.apache.pinot.common.exception.QueryException;
@@ -55,7 +55,9 @@ import org.testng.annotations.Test;
 
 
 /**
- * Integration test for heap size based server query killing, this works only for xmx4G
+ * Integration test for heap size based server query killing, this works only for xmx4G.
+ * <p>
+ * Query killing isn't currently supported in the v2 multi-stage query engine so these tests only run on the v1 engine.
  */
 public class OfflineClusterMemBasedServerQueryKillingTest extends BaseClusterIntegrationTestSet {
   public static final String STRING_DIM_SV1 = "stringDimSV1";
@@ -80,6 +82,7 @@ public class OfflineClusterMemBasedServerQueryKillingTest extends BaseClusterInt
       "SELECT PERCENTILETDigest(doubleDimSV1, 50) AS digest FROM mytable";
   private static final String COUNT_STAR_QUERY =
       "SELECT * FROM mytable LIMIT 5";
+  private static final String OOM_QUERY_SELECTION_ONLY = "SELECT * FROM mytable LIMIT 9000000";
 
   private static final ExecutorService EXECUTOR_SERVICE = Executors.newFixedThreadPool(20, r -> {
     Thread thread = new Thread(r);
@@ -202,7 +205,7 @@ public class OfflineClusterMemBasedServerQueryKillingTest extends BaseClusterInt
   }
 
   protected TableConfig createOfflineTableConfig() {
-    return new TableConfigBuilder(TableType.OFFLINE).setTableName(getTableName()).setSchemaName(getSchemaName())
+    return new TableConfigBuilder(TableType.OFFLINE).setTableName(getTableName())
         .setTimeColumnName(getTimeColumnName()).setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas())
         .setSegmentVersion(getSegmentVersion()).setLoadMode(getLoadMode()).setTaskConfig(getTaskConfig())
         .setBrokerTenant(getBrokerTenant()).setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig())
@@ -211,9 +214,11 @@ public class OfflineClusterMemBasedServerQueryKillingTest extends BaseClusterInt
         .build();
   }
 
-  @Test
-  public void testDigestOOM()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testDigestOOM(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    notSupportedInV2();
     JsonNode queryResponse = postQuery(OOM_QUERY);
     Assert.assertTrue(queryResponse.get("exceptions").toString().contains("\"errorCode\":"
         + QueryException.QUERY_CANCELLATION_ERROR_CODE));
@@ -221,17 +226,34 @@ public class OfflineClusterMemBasedServerQueryKillingTest extends BaseClusterInt
     Assert.assertTrue(queryResponse.get("exceptions").toString().contains("got killed because"));
   }
 
-  @Test
-  public void testDigestOOM2()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testSelectionOnlyOOM(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    notSupportedInV2();
+    JsonNode queryResponse = postQuery(OOM_QUERY_SELECTION_ONLY);
+
+    Assert.assertTrue(queryResponse.get("exceptions").toString().contains("\"errorCode\":"
+        + QueryException.QUERY_CANCELLATION_ERROR_CODE));
+    Assert.assertTrue(queryResponse.get("exceptions").toString().contains("QueryCancelledException"));
+    Assert.assertTrue(queryResponse.get("exceptions").toString().contains("got killed because"));
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testDigestOOM2(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    notSupportedInV2();
     JsonNode queryResponse = postQuery(OOM_QUERY_2);
     Assert.assertTrue(queryResponse.get("exceptions").toString().contains("QueryCancelledException"));
     Assert.assertTrue(queryResponse.get("exceptions").toString().contains("got killed because"));
   }
 
-  @Test
-  public void testDigestOOMMultipleQueries()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testDigestOOMMultipleQueries(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    notSupportedInV2();
     AtomicReference<JsonNode> queryResponse1 = new AtomicReference<>();
     AtomicReference<JsonNode> queryResponse2 = new AtomicReference<>();
     AtomicReference<JsonNode> queryResponse3 = new AtomicReference<>();

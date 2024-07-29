@@ -18,16 +18,17 @@
  */
 package org.apache.pinot.segment.local.segment.store;
 
-import com.google.common.base.Preconditions;
 import java.io.Closeable;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteOrder;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.pinot.segment.local.startree.v2.store.StarTreeIndexMapUtils;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
@@ -49,13 +50,13 @@ public class StarTreeIndexReader implements Closeable {
   private static final Logger LOGGER = LoggerFactory.getLogger(StarTreeIndexReader.class);
 
   private final File _segmentDirectory;
-  private final SegmentMetadataImpl _segmentMetadata;
+  private final List<StarTreeV2Metadata> _starTreeMetadataList;
+  private final int _numStarTrees;
   private final ReadMode _readMode;
   private final File _indexFile;
-  private final int _numStarTrees;
 
   // StarTree index can contain multiple index instances, identified by ids like 0, 1, etc.
-  private final Map<Integer, Map<IndexKey, StarTreeIndexEntry>> _indexColumnEntries;
+  private final List<Map<IndexKey, StarTreeIndexEntry>> _indexColumnEntries;
   private PinotDataBuffer _dataBuffer;
 
   /**
@@ -64,29 +65,23 @@ public class StarTreeIndexReader implements Closeable {
    * @param readMode         mmap vs heap mode
    */
   public StarTreeIndexReader(File segmentDirectory, SegmentMetadataImpl segmentMetadata, ReadMode readMode)
-      throws IOException {
-    Preconditions.checkNotNull(segmentDirectory);
-    Preconditions.checkArgument(segmentDirectory.exists(), "SegmentDirectory: " + segmentDirectory + " does not exist");
-    Preconditions.checkArgument(segmentDirectory.isDirectory(),
-        "SegmentDirectory: " + segmentDirectory + " is not a directory");
-    Preconditions.checkNotNull(segmentMetadata);
-    Preconditions.checkNotNull(readMode);
-
+      throws IOException, ConfigurationException {
     _segmentDirectory = segmentDirectory;
-    _segmentMetadata = segmentMetadata;
+    _starTreeMetadataList = segmentMetadata.getStarTreeV2MetadataList();
+    assert _starTreeMetadataList != null;
+    _numStarTrees = _starTreeMetadataList.size();
     _readMode = readMode;
-    _numStarTrees = _segmentMetadata.getStarTreeV2MetadataList().size();
     _indexFile = new File(_segmentDirectory, StarTreeV2Constants.INDEX_FILE_NAME);
-    _indexColumnEntries = new HashMap<>(_numStarTrees);
+    _indexColumnEntries = new ArrayList<>(_numStarTrees);
     load();
   }
 
   private void load()
-      throws IOException {
+      throws IOException, ConfigurationException {
     List<Map<StarTreeIndexMapUtils.IndexKey, StarTreeIndexMapUtils.IndexValue>> indexMapList;
     try (InputStream inputStream = new FileInputStream(
         new File(_segmentDirectory, StarTreeV2Constants.INDEX_MAP_FILE_NAME))) {
-      indexMapList = StarTreeIndexMapUtils.loadFromInputStream(inputStream, _numStarTrees);
+      indexMapList = StarTreeIndexMapUtils.loadFromInputStream(inputStream, _starTreeMetadataList);
     }
     if (_readMode == ReadMode.heap) {
       _dataBuffer = PinotDataBuffer.loadFile(_indexFile, 0, _indexFile.length(), ByteOrder.LITTLE_ENDIAN,
@@ -103,27 +98,24 @@ public class StarTreeIndexReader implements Closeable {
 
   private void mapBufferEntries(int starTreeId,
       Map<StarTreeIndexMapUtils.IndexKey, StarTreeIndexMapUtils.IndexValue> indexMap) {
-    Map<IndexKey, StarTreeIndexEntry> columnEntries =
-        _indexColumnEntries.computeIfAbsent(starTreeId, k -> new HashMap<>());
+    Map<IndexKey, StarTreeIndexEntry> columnEntries = new HashMap<>();
+    _indexColumnEntries.add(columnEntries);
     // Load star-tree index. The index tree doesn't have corresponding column name or column index type to create an
     // IndexKey. As it's a kind of inverted index, we uniquely identify it with index id and inverted index type.
-    columnEntries.computeIfAbsent(new IndexKey(String.valueOf(starTreeId), StandardIndexes.inverted()),
-        k -> new StarTreeIndexEntry(indexMap.get(StarTreeIndexMapUtils.STAR_TREE_INDEX_KEY), _dataBuffer,
+    columnEntries.put(new IndexKey(String.valueOf(starTreeId), StandardIndexes.inverted()),
+        new StarTreeIndexEntry(indexMap.get(StarTreeIndexMapUtils.STAR_TREE_INDEX_KEY), _dataBuffer,
             ByteOrder.LITTLE_ENDIAN));
-    List<StarTreeV2Metadata> starTreeMetadataList = _segmentMetadata.getStarTreeV2MetadataList();
-    StarTreeV2Metadata starTreeMetadata = starTreeMetadataList.get(starTreeId);
+    StarTreeV2Metadata starTreeMetadata = _starTreeMetadataList.get(starTreeId);
     // Load dimension forward indexes
     for (String dimension : starTreeMetadata.getDimensionsSplitOrder()) {
-      IndexKey indexKey = new IndexKey(dimension, StandardIndexes.forward());
-      columnEntries.computeIfAbsent(indexKey, k -> new StarTreeIndexEntry(
+      columnEntries.put(new IndexKey(dimension, StandardIndexes.forward()), new StarTreeIndexEntry(
           indexMap.get(new StarTreeIndexMapUtils.IndexKey(StarTreeIndexMapUtils.IndexType.FORWARD_INDEX, dimension)),
           _dataBuffer, ByteOrder.BIG_ENDIAN));
     }
     // Load metric (function-column pair) forward indexes
     for (AggregationFunctionColumnPair functionColumnPair : starTreeMetadata.getFunctionColumnPairs()) {
       String metric = functionColumnPair.toColumnName();
-      IndexKey indexKey = new IndexKey(metric, StandardIndexes.forward());
-      columnEntries.computeIfAbsent(indexKey, k -> new StarTreeIndexEntry(
+      columnEntries.put(new IndexKey(metric, StandardIndexes.forward()), new StarTreeIndexEntry(
           indexMap.get(new StarTreeIndexMapUtils.IndexKey(StarTreeIndexMapUtils.IndexType.FORWARD_INDEX, metric)),
           _dataBuffer, ByteOrder.BIG_ENDIAN));
     }
@@ -131,12 +123,11 @@ public class StarTreeIndexReader implements Closeable {
 
   public PinotDataBuffer getBuffer(int starTreeId, String column, IndexType<?, ?, ?> type)
       throws IOException {
-    Map<IndexKey, StarTreeIndexEntry> columnEntries = _indexColumnEntries.get(starTreeId);
-    if (columnEntries == null) {
+    if (_indexColumnEntries.size() <= starTreeId) {
       throw new RuntimeException(
           String.format("Could not find StarTree index: %s in segment: %s", starTreeId, _segmentDirectory.toString()));
     }
-    StarTreeIndexEntry entry = columnEntries.get(new IndexKey(column, type));
+    StarTreeIndexEntry entry = _indexColumnEntries.get(starTreeId).get(new IndexKey(column, type));
     if (entry != null && entry._buffer != null) {
       return entry._buffer;
     }
@@ -146,11 +137,10 @@ public class StarTreeIndexReader implements Closeable {
   }
 
   public boolean hasIndexFor(int starTreeId, String column, IndexType<?, ?, ?> type) {
-    Map<IndexKey, StarTreeIndexEntry> columnEntries = _indexColumnEntries.get(starTreeId);
-    if (columnEntries == null) {
+    if (_indexColumnEntries.size() <= starTreeId) {
       return false;
     }
-    return columnEntries.containsKey(new IndexKey(column, type));
+    return _indexColumnEntries.get(starTreeId).containsKey(new IndexKey(column, type));
   }
 
   @Override

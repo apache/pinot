@@ -31,6 +31,7 @@ import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
+import org.apache.pinot.common.request.context.LiteralContext;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.geospatial.transform.function.GeoToH3Function;
 import org.apache.pinot.core.geospatial.transform.function.StAreaFunction;
@@ -119,11 +120,14 @@ public class TransformFunctionFactory {
     typeToImplementation.put(TransformFunctionType.TRUNCATE, TruncateDecimalTransformFunction.class);
 
     typeToImplementation.put(TransformFunctionType.CAST, CastTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.JSONEXTRACTSCALAR, JsonExtractScalarTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.JSONEXTRACTKEY, JsonExtractKeyTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.TIMECONVERT, TimeConversionTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.DATETIMECONVERT, DateTimeConversionTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.DATETRUNC, DateTruncTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.JSON_EXTRACT_SCALAR, JsonExtractScalarTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.JSON_EXTRACT_KEY, JsonExtractKeyTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.TIME_CONVERT, TimeConversionTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.DATE_TIME_CONVERT, DateTimeConversionTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.DATE_TIME_CONVERT_WINDOW_HOP,
+        DateTimeConversionHopTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.DATE_TRUNC, DateTruncTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.JSON_EXTRACT_INDEX, JsonExtractIndexTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.YEAR, DateTimeTransformFunction.Year.class);
     typeToImplementation.put(TransformFunctionType.YEAR_OF_WEEK, DateTimeTransformFunction.YearOfWeek.class);
     typeToImplementation.put(TransformFunctionType.QUARTER, DateTimeTransformFunction.Quarter.class);
@@ -136,12 +140,13 @@ public class TransformFunctionFactory {
     typeToImplementation.put(TransformFunctionType.MINUTE, DateTimeTransformFunction.Minute.class);
     typeToImplementation.put(TransformFunctionType.SECOND, DateTimeTransformFunction.Second.class);
     typeToImplementation.put(TransformFunctionType.MILLISECOND, DateTimeTransformFunction.Millisecond.class);
-    typeToImplementation.put(TransformFunctionType.ARRAYLENGTH, ArrayLengthTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.VALUEIN, ValueInTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.MAPVALUE, MapValueTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.INIDSET, InIdSetTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.ARRAY_LENGTH, ArrayLengthTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.VALUE_IN, ValueInTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.MAP_VALUE, MapValueTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.IN_ID_SET, InIdSetTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.LOOKUP, LookupTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.CLPDECODE, CLPDecodeTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.CLP_DECODE, CLPDecodeTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.CLP_ENCODED_VARS_MATCH, ClpEncodedVarsMatchTransformFunction.class);
 
     typeToImplementation.put(TransformFunctionType.EXTRACT, ExtractTransformFunction.class);
 
@@ -149,11 +154,10 @@ public class TransformFunctionFactory {
     typeToImplementation.put(TransformFunctionType.REGEXP_EXTRACT, RegexpExtractTransformFunction.class);
 
     // Array functions
-    typeToImplementation.put(TransformFunctionType.ARRAYAVERAGE, ArrayAverageTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.ARRAYMAX, ArrayMaxTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.ARRAYMIN, ArrayMinTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.ARRAYSUM, ArraySumTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.ARRAY_VALUE_CONSTRUCTOR, ArrayLiteralTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.ARRAY_AVERAGE, ArrayAverageTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.ARRAY_MAX, ArrayMaxTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.ARRAY_MIN, ArrayMinTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.ARRAY_SUM, ArraySumTransformFunction.class);
 
     typeToImplementation.put(TransformFunctionType.GROOVY, GroovyTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.CASE, CaseTransformFunction.class);
@@ -196,13 +200,17 @@ public class TransformFunctionFactory {
     typeToImplementation.put(TransformFunctionType.ST_WITHIN, StWithinFunction.class);
 
     // geo indexing
-    typeToImplementation.put(TransformFunctionType.GEOTOH3, GeoToH3Function.class);
+    typeToImplementation.put(TransformFunctionType.GEO_TO_H3, GeoToH3Function.class);
 
     // tuple selection
     typeToImplementation.put(TransformFunctionType.LEAST, LeastTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.GREATEST, GreatestTransformFunction.class);
 
     // null handling
+    typeToImplementation.put(TransformFunctionType.IS_TRUE, IsTrueTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.IS_NOT_TRUE, IsNotTrueTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.IS_FALSE, IsFalseTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.IS_NOT_FALSE, IsNotFalseTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.IS_NULL, IsNullTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.IS_NOT_NULL, IsNotNullTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.COALESCE, CoalesceTransformFunction.class);
@@ -232,10 +240,11 @@ public class TransformFunctionFactory {
     typeToImplementation.put(TransformFunctionType.VECTOR_DIMS, VectorDimsTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.VECTOR_NORM, VectorNormTransformFunction.class);
 
-    Map<String, Class<? extends TransformFunction>> registry = new HashMap<>(typeToImplementation.size());
+    Map<String, Class<? extends TransformFunction>> registry =
+        new HashMap<>(HashUtil.getHashMapCapacity(typeToImplementation.size()));
     for (Map.Entry<TransformFunctionType, Class<? extends TransformFunction>> entry : typeToImplementation.entrySet()) {
-      for (String alias : entry.getKey().getAlternativeNames()) {
-        registry.put(canonicalize(alias), entry.getValue());
+      for (String name : entry.getKey().getNames()) {
+        registry.put(canonicalize(name), entry.getValue());
       }
     }
     return registry;
@@ -282,11 +291,17 @@ public class TransformFunctionFactory {
         List<ExpressionContext> arguments = function.getArguments();
         int numArguments = arguments.size();
 
-        // Check if the function is ArrayLiteraltransform function
+        // Check if the function is ArrayValueConstructor transform function
         if (functionName.equalsIgnoreCase(ArrayLiteralTransformFunction.FUNCTION_NAME)) {
           return queryContext.getOrComputeSharedValue(ArrayLiteralTransformFunction.class,
+              expression.getFunction().getArguments(), ArrayLiteralTransformFunction::new);
+        }
+
+        // Check if the function is GenerateArray transform function
+        if (functionName.equalsIgnoreCase(GenerateArrayTransformFunction.FUNCTION_NAME)) {
+          return queryContext.getOrComputeSharedValue(GenerateArrayTransformFunction.class,
               expression.getFunction().getArguments(),
-              ArrayLiteralTransformFunction::new);
+              GenerateArrayTransformFunction::new);
         }
 
         TransformFunction transformFunction;
@@ -300,13 +315,14 @@ public class TransformFunctionFactory {
           }
         } else {
           // Scalar function
-          FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(functionName, numArguments);
+          String canonicalName = FunctionRegistry.canonicalize(functionName);
+          FunctionInfo functionInfo = FunctionRegistry.lookupFunctionInfo(canonicalName, numArguments);
           if (functionInfo == null) {
-            if (FunctionRegistry.containsFunction(functionName)) {
+            if (FunctionRegistry.contains(canonicalName)) {
               throw new BadQueryRequestException(
-                  String.format("Unsupported function: %s with %d parameters", functionName, numArguments));
+                  String.format("Unsupported function: %s with %d arguments", functionName, numArguments));
             } else {
-              throw new BadQueryRequestException(String.format("Unsupported function: %s not found", functionName));
+              throw new BadQueryRequestException(String.format("Unsupported function: %s", functionName));
             }
           }
           transformFunction = new ScalarTransformFunctionWrapper(functionInfo);
@@ -327,22 +343,30 @@ public class TransformFunctionFactory {
         String columnName = expression.getIdentifier();
         return new IdentifierTransformFunction(columnName, columnContextMap.get(columnName));
       case LITERAL:
-        return queryContext.getOrComputeSharedValue(LiteralTransformFunction.class, expression.getLiteral(),
-            LiteralTransformFunction::new);
+        LiteralContext literal = expression.getLiteral();
+        if (literal.isSingleValue()) {
+          return queryContext.getOrComputeSharedValue(LiteralTransformFunction.class, literal,
+              LiteralTransformFunction::new);
+        } else {
+          return queryContext.getOrComputeSharedValue(ArrayLiteralTransformFunction.class, literal,
+              ArrayLiteralTransformFunction::new);
+        }
       default:
         throw new IllegalStateException();
     }
   }
 
+  // TODO: Move to a test util class
   @VisibleForTesting
   public static TransformFunction get(ExpressionContext expression, Map<String, DataSource> dataSourceMap) {
     Map<String, ColumnContext> columnContextMap = new HashMap<>(HashUtil.getHashMapCapacity(dataSourceMap.size()));
     dataSourceMap.forEach((k, v) -> columnContextMap.put(k, ColumnContext.fromDataSource(v)));
-    QueryContext dummy = QueryContextConverterUtils.getQueryContext(
-        CalciteSqlParser.compileToPinotQuery("SELECT * from testTable;"));
+    QueryContext dummy =
+        QueryContextConverterUtils.getQueryContext(CalciteSqlParser.compileToPinotQuery("SELECT * from testTable;"));
     return get(expression, columnContextMap, dummy);
   }
 
+  // TODO: Move to a test util class
   @VisibleForTesting
   public static TransformFunction getNullHandlingEnabled(ExpressionContext expression,
       Map<String, DataSource> dataSourceMap) {

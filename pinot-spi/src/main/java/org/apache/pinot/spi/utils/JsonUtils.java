@@ -38,6 +38,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.AbstractMap;
 import java.util.ArrayList;
@@ -74,7 +75,10 @@ public class JsonUtils {
   public static final String KEY_SEPARATOR = ".";
   public static final String ARRAY_PATH = "[*]";
   public static final String ARRAY_INDEX_KEY = ".$index";
+  public static final String SKIPPED_VALUE_REPLACEMENT = "$SKIPPED$";
   public static final int MAX_COMBINATIONS = 100_000;
+  private static final List<Map<String, String>> SKIPPED_FLATTENED_RECORD =
+      Collections.singletonList(Collections.singletonMap(VALUE_KEY, SKIPPED_VALUE_REPLACEMENT));
 
   // For querying
   public static final String WILDCARD = "*";
@@ -196,6 +200,11 @@ public class JsonUtils {
     return DEFAULT_READER.forType(valueType).readValue(jsonInputStream);
   }
 
+  public static <T> T inputStreamToObject(InputStream jsonInputStream, TypeReference<T> valueTypeRef)
+      throws IOException {
+    return DEFAULT_READER.forType(valueTypeRef).readValue(jsonInputStream);
+  }
+
   public static JsonNode inputStreamToJsonNode(InputStream jsonInputStream)
       throws IOException {
     return DEFAULT_READER.readTree(jsonInputStream);
@@ -229,6 +238,11 @@ public class JsonUtils {
   public static String objectToString(Object object)
       throws JsonProcessingException {
     return DEFAULT_WRITER.writeValueAsString(object);
+  }
+
+  public static void objectToOutputStream(Object object, OutputStream outputStream)
+      throws IOException {
+    DEFAULT_WRITER.writeValue(outputStream, object);
   }
 
   public static String objectToPrettyString(Object object)
@@ -350,7 +364,7 @@ public class JsonUtils {
    * ]
    * </pre>
    */
-  public static List<Map<String, String>> flatten(JsonNode node, JsonIndexConfig jsonIndexConfig) {
+  protected static List<Map<String, String>> flatten(JsonNode node, JsonIndexConfig jsonIndexConfig) {
     try {
       return flatten(node, jsonIndexConfig, 0, "$", false);
     } catch (OutOfMemoryError oom) {
@@ -370,9 +384,18 @@ public class JsonUtils {
       return Collections.emptyList();
     }
 
+    if (node.isMissingNode()) {
+      return Collections.emptyList();
+    }
+
     // Value
     if (node.isValueNode()) {
-      return Collections.singletonList(Collections.singletonMap(VALUE_KEY, node.asText()));
+      String valueAsText = node.asText();
+      int maxValueLength = jsonIndexConfig.getMaxValueLength();
+      if (0 < maxValueLength && maxValueLength < valueAsText.length()) {
+        valueAsText = SKIPPED_VALUE_REPLACEMENT;
+      }
+      return Collections.singletonList(Collections.singletonMap(VALUE_KEY, valueAsText));
     }
 
     Preconditions.checkArgument(node.isArray() || node.isObject(), "Unexpected node type: %s", node.getNodeType());
@@ -636,7 +659,7 @@ public class JsonUtils {
             fieldTypeMap, timeUnit, fieldsToUnnest, delimiter, collectionNotUnnestedToJson);
       }
     } else {
-      throw new IllegalArgumentException(String.format("Unsupported json node type", jsonNode.getClass()));
+      throw new IllegalArgumentException(String.format("Unsupported json node type for class %s", jsonNode.getClass()));
     }
   }
 
@@ -707,5 +730,20 @@ public class JsonUtils {
           throw new UnsupportedOperationException("Unsupported field type: " + fieldType + " for field: " + name);
       }
     }
+  }
+
+  public static List<Map<String, String>> flatten(String jsonString, JsonIndexConfig jsonIndexConfig)
+      throws IOException {
+    JsonNode jsonNode;
+    try {
+      jsonNode = JsonUtils.stringToJsonNode(jsonString);
+    } catch (JsonProcessingException e) {
+      if (jsonIndexConfig.getSkipInvalidJson()) {
+        return SKIPPED_FLATTENED_RECORD;
+      } else {
+        throw e;
+      }
+    }
+    return JsonUtils.flatten(jsonNode, jsonIndexConfig);
   }
 }

@@ -20,6 +20,7 @@ package org.apache.pinot.spi.annotations.metrics;
 
 import java.util.function.Function;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.metrics.NoopPinotMetricsRegistry;
 import org.apache.pinot.spi.metrics.PinotGauge;
 import org.apache.pinot.spi.metrics.PinotJmxReporter;
 import org.apache.pinot.spi.metrics.PinotMetricName;
@@ -60,4 +61,37 @@ public interface PinotMetricsFactory {
    * Returns the name of metrics factory.
    */
   String getMetricsFactoryName();
+
+  class Noop implements PinotMetricsFactory {
+    private final NoopPinotMetricsRegistry _registry = new NoopPinotMetricsRegistry();
+    @Override
+    public void init(PinotConfiguration metricsConfiguration) {
+    }
+
+    @Override
+    public PinotMetricsRegistry getPinotMetricsRegistry() {
+      return _registry;
+    }
+
+    @Override
+    public PinotMetricName makePinotMetricName(Class<?> klass, String name) {
+      return () -> "noopMetricName";
+    }
+
+    @Override
+    public <T> PinotGauge<T> makePinotGauge(Function<Void, T> condition) {
+      return _registry.newGauge();
+    }
+
+    @Override
+    public PinotJmxReporter makePinotJmxReporter(PinotMetricsRegistry metricsRegistry) {
+      return () -> {
+      };
+    }
+
+    @Override
+    public String getMetricsFactoryName() {
+      return "noop";
+    }
+  }
 }

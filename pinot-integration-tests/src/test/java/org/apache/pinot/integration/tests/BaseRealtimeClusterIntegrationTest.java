@@ -74,8 +74,14 @@ public abstract class BaseRealtimeClusterIntegrationTest extends BaseClusterInte
     // Initialize the query generator
     setUpQueryGenerator(avroFiles);
 
+    runValidationJob(600_000);
+
     // Wait for all documents loaded
     waitForAllDocsLoaded(600_000L);
+  }
+
+  protected void runValidationJob(long timeoutMs)
+      throws Exception {
   }
 
   protected void createSegmentsAndUpload(List<File> avroFile, Schema schema, TableConfig tableConfig)
@@ -106,9 +112,10 @@ public abstract class BaseRealtimeClusterIntegrationTest extends BaseClusterInte
    * to ensure the right result is computed, wherein dictionary is not read if it is mutable
    * @throws Exception
    */
-  @Test
-  public void testDictionaryBasedQueries()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testDictionaryBasedQueries(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
 
     // Dictionary columns
     // int
@@ -142,30 +149,34 @@ public abstract class BaseRealtimeClusterIntegrationTest extends BaseClusterInte
         String.format("SELECT MAX(%s)-MIN(%s) FROM %s", column, column, getTableName()));
   }
 
-  @Test
-  public void testHardcodedQueries()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testHardcodedQueries(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     super.testHardcodedQueries();
   }
 
-  @Test
-  @Override
-  public void testQueriesFromQueryFile()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testQueriesFromQueryFile(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    // Some of the hardcoded queries in the query file need to be adapted for v2 (for instance, using the arrayToMV
+    // with multi-value columns in filters / aggregations)
+    notSupportedInV2();
     super.testQueriesFromQueryFile();
   }
 
-  @Test
-  @Override
-  public void testGeneratedQueries()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testGeneratedQueries(boolean useMultiStageQueryEngine)
       throws Exception {
-    testGeneratedQueries(true, false);
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    testGeneratedQueries(true, useMultiStageQueryEngine);
   }
 
-  @Test
-  @Override
-  public void testQueryExceptions()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testQueryExceptions(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     super.testQueryExceptions();
   }
 

@@ -1,0 +1,164 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "pinot.server.fullname" . }}
+  namespace: {{ include "pinot.namespace" . }}
+  labels:
+    {{- include "pinot.serverLabels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "pinot.serverMatchLabels" . | nindent 6 }}
+  serviceName: {{ template "pinot.server.headless" . }}
+  replicas: {{ .Values.server.replicaCount }}
+  updateStrategy:
+    type: {{ .Values.server.updateStrategy.type }}
+  podManagementPolicy: {{ .Values.server.podManagementPolicy }}
+  template:
+    metadata:
+      labels:
+        {{- include "pinot.serverLabels" . | nindent 8 }}
+      annotations:
+        {{- if .Values.server.automaticReload.enabled }}
+        checksum/config: {{ include (print $.Template.BasePath "/server/configmap.yaml") . | sha256sum }}
+        {{- end }}
+        {{- with .Values.server.podAnnotations }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      serviceAccountName: {{ include "pinot.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.server.podSecurityContext | nindent 8 }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      nodeSelector:
+{{ toYaml .Values.server.nodeSelector | indent 8 }}
+      affinity:
+{{ toYaml .Values.server.affinity | indent 8 }}
+      tolerations:
+{{ toYaml .Values.server.tolerations | indent 8 }}
+      containers:
+      - name: server
+        securityContext:
+          {{- toYaml .Values.server.securityContext | nindent 10 }}
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        args: [
+          "{{ .Values.server.startCommand }}",
+          "-clusterName", "{{ .Values.cluster.name }}",
+          "-zkAddress", {{ include "zookeeper.url" . | quote }},
+          "-configFileName", "/var/pinot/server/config/pinot-server.conf"
+        ]
+        env:
+          - name: JAVA_OPTS
+            value: "{{ .Values.server.jvmOpts }} -Dlog4j2.configurationFile={{ .Values.server.log4j2ConfFile }} -Dplugins.dir={{ .Values.server.pluginsDir }}"
+{{- if .Values.server.extraEnv }}
+{{ toYaml .Values.server.extraEnv | indent 10 }}
+{{- end}}
+        envFrom:
+{{ toYaml .Values.server.envFrom | indent 10 }}
+        ports:
+          - containerPort: {{ .Values.server.service.nettyPort }}
+            protocol: {{ .Values.server.service.protocol }}
+            name: {{ .Values.server.service.nettyPortName }}
+          - containerPort: {{ .Values.server.service.adminPort }}
+            protocol: {{ .Values.server.service.protocol }}
+            name: {{ .Values.server.service.adminPortName }}
+{{- if .Values.server.service.extraPorts }}
+{{ toYaml .Values.server.service.extraPorts | indent 10 }}
+{{- end }}   
+        {{- if .Values.server.probes.livenessEnabled }}
+        livenessProbe:
+          initialDelaySeconds: {{ .Values.server.probes.liveness.initialDelaySeconds | default .Values.probes.initialDelaySeconds }}
+          periodSeconds: {{ .Values.server.probes.liveness.periodSeconds | default .Values.probes.periodSeconds }}
+          failureThreshold: {{ .Values.server.probes.liveness.failureThreshold | default .Values.probes.failureThreshold }}
+          successThreshold: {{ .Values.server.probes.liveness.successThreshold | default .Values.probes.successThreshold }}
+          timeoutSeconds: {{ .Values.server.probes.liveness.timeoutSeconds | default .Values.probes.timeoutSeconds }}
+          httpGet:
+            path: {{ .Values.server.probes.liveness.endpoint | default .Values.server.probes.endpoint }}
+            port: {{ .Values.server.service.adminPort }}
+        {{- end }}
+        {{- if .Values.server.probes.readinessEnabled }}
+        readinessProbe:
+          initialDelaySeconds: {{ .Values.server.probes.readiness.initialDelaySeconds | default .Values.probes.initialDelaySeconds }}
+          periodSeconds: {{ .Values.server.probes.readiness.periodSeconds | default .Values.probes.periodSeconds }}
+          failureThreshold: {{ .Values.server.probes.readiness.failureThreshold | default .Values.probes.failureThreshold }}
+          successThreshold: {{ .Values.server.probes.readiness.successThreshold | default .Values.probes.successThreshold }}
+          timeoutSeconds: {{ .Values.server.probes.readiness.timeoutSeconds | default .Values.probes.timeoutSeconds }}
+          httpGet:
+            path: {{ .Values.server.probes.readiness.endpoint | default .Values.server.probes.endpoint }}
+            port: {{ .Values.server.service.adminPort }}
+        {{- end }}
+        {{- if .Values.server.probes.startupEnabled }}
+        startupProbe:
+          initialDelaySeconds: {{ .Values.server.probes.startup.initialDelaySeconds | default .Values.probes.initialDelaySeconds }}
+          periodSeconds: {{ .Values.server.probes.startup.periodSeconds | default .Values.probes.periodSeconds }}
+          failureThreshold: {{ .Values.server.probes.startup.failureThreshold | default .Values.probes.failureThreshold }}
+          successThreshold: {{ .Values.server.probes.startup.successThreshold | default .Values.probes.successThreshold }}
+          timeoutSeconds: {{ .Values.server.probes.startup.timeoutSeconds | default .Values.probes.timeoutSeconds }}
+          httpGet:
+            path: {{ .Values.server.probes.liveness.endpoint | default .Values.server.probes.endpoint }}
+            port: {{ .Values.server.service.adminPort }}
+        {{- end }}
+        volumeMounts:
+          - name: config
+            mountPath: /var/pinot/server/config
+          - name: data
+            mountPath: "{{ .Values.server.persistence.mountPath }}"
+          {{- if ne (len .Values.server.persistence.extraVolumeMounts) 0 }}
+{{ toYaml .Values.server.persistence.extraVolumeMounts | indent 10 }}
+          {{- end }}
+        resources:
+{{ toYaml .Values.server.resources | indent 12 }}
+      restartPolicy: Always
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "pinot.server.config" . }}
+      {{- if not .Values.server.persistence.enabled }}
+        - name: data
+          emptyDir: {}
+      {{- end }}
+      {{- if ne (len .Values.server.persistence.extraVolumes) 0 }}
+{{ toYaml .Values.server.persistence.extraVolumes | indent 8 }}
+      {{- end }}
+  {{- if .Values.server.persistence.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes:
+          - {{ .Values.server.persistence.accessMode | quote }}
+        {{- if .Values.server.persistence.storageClass }}
+        {{- if (eq "-" .Values.server.persistence.storageClass) }}
+        storageClassName: ""
+        {{- else }}
+        storageClassName: {{ .Values.server.persistence.storageClass }}
+        {{- end }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.server.persistence.size }}
+  {{ end }}

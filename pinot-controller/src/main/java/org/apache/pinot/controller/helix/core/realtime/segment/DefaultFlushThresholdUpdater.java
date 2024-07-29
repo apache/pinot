@@ -19,11 +19,9 @@
 package org.apache.pinot.controller.helix.core.realtime.segment;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
-import org.apache.pinot.spi.stream.PartitionGroupMetadata;
-import org.apache.pinot.spi.stream.PartitionLevelStreamConfig;
+import org.apache.pinot.spi.stream.StreamConfig;
 
 
 /**
@@ -38,10 +36,9 @@ public class DefaultFlushThresholdUpdater implements FlushThresholdUpdater {
   }
 
   @Override
-  public void updateFlushThreshold(PartitionLevelStreamConfig streamConfig,
-      SegmentZKMetadata newSegmentZKMetadata, CommittingSegmentDescriptor committingSegmentDescriptor,
-      @Nullable SegmentZKMetadata committingSegmentZKMetadata, int maxNumPartitionsPerInstance,
-      List<PartitionGroupMetadata> partitionGroupMetadataList) {
+  public void updateFlushThreshold(StreamConfig streamConfig, SegmentZKMetadata newSegmentZKMetadata,
+      CommittingSegmentDescriptor committingSegmentDescriptor, @Nullable SegmentZKMetadata committingSegmentZKMetadata,
+      int maxNumPartitionsPerInstance) {
     // Configure the segment size flush limit based on the maximum number of partitions allocated to an instance
     newSegmentZKMetadata.setSizeThresholdToFlushSegment(_tableFlushSize / maxNumPartitionsPerInstance);
   }

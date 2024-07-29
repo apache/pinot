@@ -21,7 +21,10 @@ package org.apache.pinot.tools;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.tools.admin.PinotAdministrator;
 
 
@@ -34,6 +37,13 @@ public class ColocatedJoinEngineQuickStart extends MultistageEngineQuickStart {
   @Override
   public List<String> types() {
     return Collections.singletonList(QUICKSTART_IDENTIFIER);
+  }
+
+  @Override
+  public Map<String, Object> getConfigOverrides() {
+    Map<String, Object> overrides = new HashMap<>(super.getConfigOverrides());
+    overrides.put(CommonConstants.Broker.CONFIG_OF_ENABLE_PARTITION_METADATA_MANAGER, "true");
+    return overrides;
   }
 
   @Override

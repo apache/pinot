@@ -24,8 +24,11 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.tuple.Pair;
@@ -44,15 +47,25 @@ import static org.testng.Assert.assertTrue;
 
 public class ValueReaderComparisonTest {
 
+  // Number of rounds to run the test for, change this number to test locally for catching the corner cases.
+  private static final int NUM_ROUNDS = 1;
+
   @DataProvider
   public static Object[] text() {
-    return Stream.of(Pair.of(ByteOrder.BIG_ENDIAN, true), Pair.of(ByteOrder.LITTLE_ENDIAN, true),
-        // there is no little endian support for var length at the time of writing
-        Pair.of(ByteOrder.BIG_ENDIAN, false)).flatMap(
-        pair -> Stream.of(new AsciiTestCase(pair.getLeft(), pair.getRight()),
-            new Utf8TestCase(pair.getLeft(), pair.getRight()),
-            new RandomBytesTextTestCase(pair.getLeft(), pair.getRight()),
-            new OrderedInvalidUtf8TestCase(pair.getLeft(), pair.getRight()))).toArray(Object[]::new);
+    return Collections.nCopies(NUM_ROUNDS,
+            Stream.of(
+                    Pair.of(ByteOrder.BIG_ENDIAN, true),
+                    Pair.of(ByteOrder.LITTLE_ENDIAN, true),
+                    Pair.of(ByteOrder.BIG_ENDIAN, false))
+                .flatMap(
+                    pair -> Stream.of(
+                        new AsciiTestCase(pair.getLeft(), pair.getRight()),
+                        new Utf8TestCase(pair.getLeft(), pair.getRight()),
+                        new RandomBytesTextTestCase(pair.getLeft(), pair.getRight()),
+                        new OrderedInvalidUtf8TestCase(pair.getLeft(), pair.getRight())))
+                .collect(Collectors.toList()))
+        .stream()
+        .flatMap(List::stream).toArray(Object[]::new);
   }
 
   static abstract class TestCase {
@@ -142,7 +155,8 @@ public class ValueReaderComparisonTest {
         char[] chars = strings[i].toCharArray();
         for (int j = 0; j < strings[i].length(); j++) {
           // this test's ordering assumption is not valid for surrogates
-          if (!Character.isLowSurrogate(chars[j])) {
+          char nextChar = (char) (chars[j] + 1);
+          if (!Character.isSurrogate(chars[j]) && !Character.isSurrogate(nextChar)) {
             chars[j]++;
             String string = new String(chars);
             int signum = strings[i].compareTo(string);

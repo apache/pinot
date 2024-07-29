@@ -59,6 +59,7 @@ public class InTransformFunction extends BaseTransformFunction {
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
+    super.init(arguments, columnContextMap);
     int numArguments = arguments.size();
     Preconditions.checkArgument(numArguments >= 2, "At least 2 arguments are required for [%s] "
         + "transform function: (expression, values)", getName());

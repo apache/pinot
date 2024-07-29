@@ -110,6 +110,38 @@ public abstract class FilterOperand implements TransformOperand {
     }
   }
 
+  public static class In extends FilterOperand {
+    List<TransformOperand> _childOperands;
+    boolean _isNotIn;
+
+    public In(List<RexExpression> children, DataSchema dataSchema, boolean isNotIn) {
+      _childOperands = new ArrayList<>(children.size());
+      for (RexExpression child : children) {
+        _childOperands.add(TransformOperandFactory.getTransformOperand(child, dataSchema));
+      }
+      _isNotIn = isNotIn;
+    }
+
+    @Nullable
+    @Override
+    public Integer apply(Object[] row) {
+      Object firstResult = _childOperands.get(0).apply(row);
+      if (firstResult == null) {
+        return null;
+      }
+      for (int i = 1; i < _childOperands.size(); i++) {
+        Object result = _childOperands.get(i).apply(row);
+        if (result == null) {
+          return null;
+        }
+        if (firstResult.equals(result)) {
+          return _isNotIn ? 0 : 1;
+        }
+      }
+      return _isNotIn ? 1 : 0;
+    }
+  }
+
   public static class IsTrue extends FilterOperand {
     TransformOperand _childOperand;
 

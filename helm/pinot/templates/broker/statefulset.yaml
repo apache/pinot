@@ -1,0 +1,137 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "pinot.broker.fullname" . }}
+  namespace: {{ include "pinot.namespace" . }}
+  labels:
+    {{- include "pinot.brokerLabels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "pinot.brokerMatchLabels" . | nindent 6 }}
+  serviceName: {{ template "pinot.broker.headless" . }}
+  replicas: {{ .Values.broker.replicaCount }}
+  updateStrategy:
+    type: {{ .Values.broker.updateStrategy.type }}
+  podManagementPolicy: {{ .Values.broker.podManagementPolicy }}
+  template:
+    metadata:
+      labels:
+        {{- include "pinot.brokerLabels" . | nindent 8 }}
+      annotations:
+        {{- if .Values.broker.automaticReload.enabled }}
+        checksum/config: {{ include (print $.Template.BasePath "/broker/configmap.yaml") . | sha256sum }}
+        {{- end }}
+        {{- with .Values.broker.podAnnotations }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      serviceAccountName: {{ include "pinot.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.broker.podSecurityContext | nindent 8 }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      nodeSelector:
+{{ toYaml .Values.broker.nodeSelector | indent 8 }}
+      affinity:
+{{ toYaml .Values.broker.affinity | indent 8 }}
+      tolerations:
+{{ toYaml .Values.broker.tolerations | indent 8 }}
+      containers:
+      - name: broker
+        securityContext:
+          {{- toYaml .Values.broker.securityContext | nindent 10 }}
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        args: [
+          "{{ .Values.broker.startCommand }}",
+          "-clusterName", "{{ .Values.cluster.name }}",
+          "-zkAddress", {{ include "zookeeper.url" . | quote }},
+          "-configFileName", "/var/pinot/broker/config/pinot-broker.conf"
+        ]
+        env:
+          - name: JAVA_OPTS
+            value: "{{ .Values.broker.jvmOpts }} -Dlog4j2.configurationFile={{ .Values.broker.log4j2ConfFile }} -Dplugins.dir={{ .Values.broker.pluginsDir }}"
+{{- if .Values.broker.extraEnv }}
+{{ toYaml .Values.broker.extraEnv | indent 10 }}
+{{- end }}
+        envFrom:
+{{ toYaml .Values.broker.envFrom | indent 10 }}
+        ports:
+          - containerPort: {{ .Values.broker.service.port }}
+            protocol: {{ .Values.broker.service.protocol }}
+            name: {{ .Values.broker.service.name }}
+{{- if .Values.broker.service.extraPorts }}
+{{ toYaml .Values.broker.service.extraPorts | indent 10 }}
+{{- end }}                  
+        volumeMounts:
+          - name: config
+            mountPath: /var/pinot/broker/config
+          {{- if ne (len .Values.broker.persistence.extraVolumeMounts) 0 }}
+{{ toYaml .Values.broker.persistence.extraVolumeMounts | indent 10 }}
+          {{- end }}
+        {{- if .Values.broker.probes.livenessEnabled }}
+        livenessProbe:
+          initialDelaySeconds: {{ .Values.broker.probes.liveness.initialDelaySeconds | default .Values.probes.initialDelaySeconds }}
+          periodSeconds: {{ .Values.broker.probes.liveness.periodSeconds | default .Values.probes.periodSeconds }}
+          failureThreshold: {{ .Values.broker.probes.liveness.failureThreshold | default .Values.probes.failureThreshold }}
+          successThreshold: {{ .Values.broker.probes.liveness.successThreshold | default .Values.probes.successThreshold }}
+          timeoutSeconds: {{ .Values.broker.probes.liveness.timeoutSeconds | default .Values.probes.timeoutSeconds }}
+          httpGet:
+            path: {{ .Values.broker.probes.endpoint }}
+            port: {{ .Values.broker.service.port }}
+        {{- end }}
+        {{- if .Values.broker.probes.readinessEnabled }}
+        readinessProbe:
+          initialDelaySeconds: {{ .Values.broker.probes.readiness.initialDelaySeconds | default .Values.probes.initialDelaySeconds }}
+          periodSeconds: {{ .Values.broker.probes.readiness.periodSeconds | default .Values.probes.periodSeconds }}
+          failureThreshold: {{ .Values.broker.probes.readiness.failureThreshold | default .Values.probes.failureThreshold }}
+          successThreshold: {{ .Values.broker.probes.readiness.successThreshold | default .Values.probes.successThreshold }}
+          timeoutSeconds: {{ .Values.broker.probes.readiness.timeoutSeconds | default .Values.probes.timeoutSeconds }}
+          httpGet:
+            path: {{ .Values.broker.probes.endpoint }}
+            port: {{ .Values.broker.service.port }}
+        {{- end }}
+        {{- if .Values.broker.probes.startupEnabled }}
+        startupProbe:
+          initialDelaySeconds: {{ .Values.broker.probes.startup.initialDelaySeconds | default .Values.probes.initialDelaySeconds }}
+          periodSeconds: {{ .Values.broker.probes.startup.periodSeconds | default .Values.probes.periodSeconds }}
+          failureThreshold: {{ .Values.broker.probes.startup.failureThreshold | default .Values.probes.failureThreshold }}
+          successThreshold: {{ .Values.broker.probes.startup.successThreshold | default .Values.probes.successThreshold }}
+          timeoutSeconds: {{ .Values.broker.probes.startup.timeoutSeconds | default .Values.probes.timeoutSeconds }}
+          httpGet:
+            path: {{ .Values.broker.probes.endpoint }}
+            port: {{ .Values.broker.service.port }}
+        {{- end }}
+        resources:
+{{ toYaml .Values.broker.resources | indent 12 }}
+      restartPolicy: Always
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "pinot.broker.config" . }}
+      {{- if ne (len .Values.broker.persistence.extraVolumes) 0 }}
+{{ toYaml .Values.broker.persistence.extraVolumes | indent 8 }}
+      {{- end }}

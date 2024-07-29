@@ -107,9 +107,8 @@ public class ColumnValueSegmentPruner extends ValueBasedSegmentPruner {
     assert dataSource != null;
     DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
     ValueCache.CachedValue cachedValue = valueCache.get(eqPredicate, dataSourceMetadata.getDataType());
-    Comparable value = cachedValue.getComparableValue();
     // Check min/max value
-    if (!checkMinMaxRange(dataSourceMetadata, value)) {
+    if (!checkMinMaxRange(dataSourceMetadata, cachedValue.getComparableValue())) {
       return true;
     }
     // Check column partition
@@ -117,7 +116,7 @@ public class ColumnValueSegmentPruner extends ValueBasedSegmentPruner {
     if (partitionFunction != null) {
       Set<Integer> partitions = dataSourceMetadata.getPartitions();
       assert partitions != null;
-      if (!partitions.contains(partitionFunction.getPartition(value))) {
+      if (!partitions.contains(partitionFunction.getPartition(cachedValue.getValue()))) {
         return true;
       }
     }

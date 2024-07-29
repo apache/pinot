@@ -22,8 +22,8 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.SortedMap;
 import org.apache.lucene.util.IntsRefBuilder;
-import org.apache.lucene.util.fst.Builder;
 import org.apache.lucene.util.fst.FST;
+import org.apache.lucene.util.fst.FSTCompiler;
 import org.apache.lucene.util.fst.PositiveIntOutputs;
 import org.apache.lucene.util.fst.Util;
 import org.slf4j.Logger;
@@ -36,29 +36,31 @@ import org.slf4j.LoggerFactory;
  */
 public class FSTBuilder {
   public static final Logger LOGGER = LoggerFactory.getLogger(FSTBuilder.class);
-  private Builder<Long> _builder = new Builder<>(FST.INPUT_TYPE.BYTE4, PositiveIntOutputs.getSingleton());
-  private IntsRefBuilder _scratch = new IntsRefBuilder();
+  private final FSTCompiler<Long> _fstCompiler =
+      (new FSTCompiler.Builder<>(FST.INPUT_TYPE.BYTE4, PositiveIntOutputs.getSingleton())).build();
+  private final IntsRefBuilder _scratch = new IntsRefBuilder();
 
-  public static FST buildFST(SortedMap<String, Integer> input)
+  public static FST<Long> buildFST(SortedMap<String, Integer> input)
       throws IOException {
     PositiveIntOutputs fstOutput = PositiveIntOutputs.getSingleton();
-    Builder<Long> builder = new Builder<Long>(FST.INPUT_TYPE.BYTE4, fstOutput);
+    FSTCompiler.Builder<Long> fstCompilerBuilder = new FSTCompiler.Builder<>(FST.INPUT_TYPE.BYTE4, fstOutput);
+    FSTCompiler<Long> fstCompiler = fstCompilerBuilder.build();
 
     IntsRefBuilder scratch = new IntsRefBuilder();
     for (Map.Entry<String, Integer> entry : input.entrySet()) {
-      builder.add(Util.toUTF16(entry.getKey(), scratch), entry.getValue().longValue());
+      fstCompiler.add(Util.toUTF16(entry.getKey(), scratch), entry.getValue().longValue());
     }
-    FST<Long> result = builder.finish();
-    return result;
+
+    return FST.fromFSTReader(fstCompiler.compile(), fstCompiler.getFSTReader());
   }
 
   public void addEntry(String key, Integer value)
       throws IOException {
-    _builder.add(Util.toUTF16(key, _scratch), value.longValue());
+    _fstCompiler.add(Util.toUTF16(key, _scratch), value.longValue());
   }
 
-  public FST done()
+  public FST<Long> done()
       throws IOException {
-    return _builder.finish();
+    return FST.fromFSTReader(_fstCompiler.compile(), _fstCompiler.getFSTReader());
   }
 }

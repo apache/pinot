@@ -128,18 +128,6 @@ public class ServerSegmentCompletionProtocolHandler {
     return request.getUrl(hostPort, protocol);
   }
 
-  // Replaced by segmentCommitEndWithMetadata().
-  @Deprecated
-  public SegmentCompletionProtocol.Response segmentCommitEnd(SegmentCompletionProtocol.Request.Params params) {
-    SegmentCompletionProtocol.SegmentCommitEndRequest request =
-        new SegmentCompletionProtocol.SegmentCommitEndRequest(params);
-    String url = createSegmentCompletionUrl(request);
-    if (url == null) {
-      return SegmentCompletionProtocol.RESP_NOT_SENT;
-    }
-    return sendRequest(url);
-  }
-
   public SegmentCompletionProtocol.Response segmentCommitEndWithMetadata(
       SegmentCompletionProtocol.Request.Params params, final Map<String, File> metadataFiles) {
     SegmentCompletionProtocol.SegmentCommitEndWithMetadataRequest request =

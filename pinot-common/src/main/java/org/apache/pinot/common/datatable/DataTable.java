@@ -35,8 +35,6 @@ import org.roaringbitmap.RoaringBitmap;
  * Data table is used to transfer data from server to broker.
  */
 public interface DataTable {
-  // TODO: remove this when we stop supporting DataTable V2.
-  String EXCEPTION_METADATA_KEY = "Exception";
 
   void addException(ProcessingException processingException);
 
@@ -110,6 +108,8 @@ public interface DataTable {
     NUM_SEGMENTS_PROCESSED(6, "numSegmentsProcessed", MetadataValueType.INT),
     NUM_SEGMENTS_MATCHED(7, "numSegmentsMatched", MetadataValueType.INT),
     NUM_CONSUMING_SEGMENTS_QUERIED(8, "numConsumingSegmentsQueried", MetadataValueType.INT),
+    // the timestamp indicating the freshness of the data queried in consuming segments.
+    // This can be ingestion timestamp if provided by the stream, or the last index time
     MIN_CONSUMING_FRESHNESS_TIME_MS(9, "minConsumingFreshnessTimeMs", MetadataValueType.LONG),
     TOTAL_DOCS(10, "totalDocs", MetadataValueType.LONG),
     NUM_GROUPS_LIMIT_REACHED(11, "numGroupsLimitReached", MetadataValueType.STRING),
@@ -129,16 +129,18 @@ public interface DataTable {
     EXPLAIN_PLAN_NUM_MATCH_ALL_FILTER_SEGMENTS(25, "explainPlanNumMatchAllFilterSegments", MetadataValueType.INT),
     NUM_CONSUMING_SEGMENTS_PROCESSED(26, "numConsumingSegmentsProcessed", MetadataValueType.INT),
     NUM_CONSUMING_SEGMENTS_MATCHED(27, "numConsumingSegmentsMatched", MetadataValueType.INT),
+    // The following keys (28 - 34) are deprecated keys for multi-stage query engine.
     NUM_BLOCKS(28, "numBlocks", MetadataValueType.INT),
     NUM_ROWS(29, "numRows", MetadataValueType.INT),
     OPERATOR_EXECUTION_TIME_MS(30, "operatorExecutionTimeMs", MetadataValueType.LONG),
     OPERATOR_ID(31, "operatorId", MetadataValueType.STRING),
     OPERATOR_EXEC_START_TIME_MS(32, "operatorExecStartTimeMs", MetadataValueType.LONG),
-    OPERATOR_EXEC_END_TIME_MS(33, "operatorExecEndTimeMs", MetadataValueType.LONG);
+    OPERATOR_EXEC_END_TIME_MS(33, "operatorExecEndTimeMs", MetadataValueType.LONG),
+    MAX_ROWS_IN_JOIN_REACHED(34, "maxRowsInJoinReached", MetadataValueType.STRING);
 
     // We keep this constant to track the max id added so far for backward compatibility.
     // Increase it when adding new keys, but NEVER DECREASE IT!!!
-    private static final int MAX_ID = 33;
+    private static final int MAX_ID = 34;
 
     private static final MetadataKey[] ID_TO_ENUM_KEY_MAP = new MetadataKey[MAX_ID + 1];
     private static final Map<String, MetadataKey> NAME_TO_ENUM_KEY_MAP = new HashMap<>();

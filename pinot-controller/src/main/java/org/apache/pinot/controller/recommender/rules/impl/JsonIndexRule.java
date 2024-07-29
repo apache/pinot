@@ -30,7 +30,7 @@ import org.slf4j.LoggerFactory;
 
 /** JSON columns must be NoDictionary columns with JsonIndex. */
 public class JsonIndexRule extends AbstractRule {
-  private static final Logger LOGGER = LoggerFactory.getLogger(RangeIndexRule.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(JsonIndexRule.class);
 
   public JsonIndexRule(InputManager input, ConfigManager output) {
     super(input, output);

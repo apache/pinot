@@ -19,7 +19,14 @@
 
 import React, { useState, useEffect } from 'react';
 import { makeStyles } from '@material-ui/core/styles';
-import { Checkbox, DialogContent, FormControlLabel, Grid, IconButton, Tooltip } from '@material-ui/core';
+import {
+  Checkbox,
+  DialogContent,
+  FormControlLabel,
+  Grid,
+  IconButton,
+  Tooltip,
+} from '@material-ui/core';
 import { RouteComponentProps, useHistory } from 'react-router-dom';
 import { UnControlled as CodeMirror } from 'react-codemirror2';
 import { TableData } from 'Models';
@@ -38,6 +45,7 @@ import Confirm from '../components/Confirm';
 import CustomCodemirror from '../components/CustomCodemirror';
 import CustomDialog from '../components/CustomDialog';
 import { HelpOutlineOutlined } from '@material-ui/icons';
+import NotFound from '../components/NotFound';
 
 const useStyles = makeStyles(() => ({
   root: {
@@ -69,8 +77,8 @@ const useStyles = makeStyles(() => ({
   operationDiv: {
     border: '1px #BDCCD9 solid',
     borderRadius: 4,
-    marginBottom: 20
-  }
+    marginBottom: 20,
+  },
 }));
 
 const jsonoptions = {
@@ -79,7 +87,7 @@ const jsonoptions = {
   styleActiveLine: true,
   gutters: ['CodeMirror-lint-markers'],
   theme: 'default',
-  readOnly: true
+  readOnly: true,
 };
 
 type Props = {
@@ -89,7 +97,7 @@ type Props = {
 };
 
 type Summary = {
-    schemaName: string;
+  schemaName: string;
   reportedSize: string | number;
   estimatedSize: string | number;
 };
@@ -99,6 +107,7 @@ const SchemaPageDetails = ({ match }: RouteComponentProps<Props>) => {
   const classes = useStyles();
   const history = useHistory();
   const [fetching, setFetching] = useState(true);
+  const [schemaNotFound, setSchemaNotFound] = useState(false);
   const [] = useState<Summary>({
     schemaName: match.params.schemaName,
     reportedSize: '',
@@ -111,7 +120,7 @@ const SchemaPageDetails = ({ match }: RouteComponentProps<Props>) => {
 
   const [confirmDialog, setConfirmDialog] = React.useState(false);
   const [dialogDetails, setDialogDetails] = React.useState(null);
-  const {dispatch} = React.useContext(NotificationContext);
+  const { dispatch } = React.useContext(NotificationContext);
 
   const [showEditConfig, setShowEditConfig] = useState(false);
   const [config, setConfig] = useState('{}');
@@ -122,24 +131,28 @@ const SchemaPageDetails = ({ match }: RouteComponentProps<Props>) => {
   });
   const [tableConfig, setTableConfig] = useState('');
   const [schemaJSON, setSchemaJSON] = useState(null);
-  const [actionType,setActionType] = useState(null);
+  const [actionType, setActionType] = useState(null);
   const [schemaJSONFormat, setSchemaJSONFormat] = useState(false);
   const [reloadSegmentsOnUpdate, setReloadSegmentsOnUpdate] = useState(false);
 
   const fetchTableSchema = async () => {
     const result = await PinotMethodUtils.getTableSchemaData(schemaName);
-    if(result.error){
+    if (result?.code === 404) {
+      setSchemaNotFound(true);
+      setFetching(false);
+    } else if (result.error) {
       setSchemaJSON(null);
       setTableSchema({
         columns: ['Column', 'Type', 'Field Type', 'Multi Value'],
-        records: []
+        records: [],
       });
+      setFetching(false);
     } else {
       setSchemaJSON(JSON.parse(JSON.stringify(result)));
       const tableSchema = Utils.syncTableSchemaData(result, true);
       setTableSchema(tableSchema);
+      fetchTableJSON();
     }
-    fetchTableJSON();
   };
 
   const fetchTableJSON = async () => {
@@ -148,9 +161,9 @@ const SchemaPageDetails = ({ match }: RouteComponentProps<Props>) => {
     setFetching(false);
   };
 
-  useEffect(()=>{
+  useEffect(() => {
     fetchTableSchema();
-  },[])
+  }, []);
 
   const handleConfigChange = (value: string) => {
     setConfig(value);
@@ -158,34 +171,39 @@ const SchemaPageDetails = ({ match }: RouteComponentProps<Props>) => {
 
   const saveConfigAction = async () => {
     let configObj = JSON.parse(config);
-    if(actionType === 'editTable'){
-      if(configObj.OFFLINE || configObj.REALTIME){
+    if (actionType === 'editTable') {
+      if (configObj.OFFLINE || configObj.REALTIME) {
         configObj = configObj.OFFLINE || configObj.REALTIME;
       }
       const result = await PinotMethodUtils.updateTable(schemaName, configObj);
       syncResponse(result);
-    } else if(actionType === 'editSchema'){
-      const result = await PinotMethodUtils.updateSchema(schemaJSON.schemaName, configObj, reloadSegmentsOnUpdate);
+    } else if (actionType === 'editSchema') {
+      const result = await PinotMethodUtils.updateSchema(
+        schemaJSON.schemaName,
+        configObj,
+        reloadSegmentsOnUpdate
+      );
       syncResponse(result);
     }
   };
 
   const syncResponse = (result) => {
-    if(result.status){
-      dispatch({type: 'success', message: result.status, show: true});
+    if (result.status) {
+      dispatch({ type: 'success', message: result.status, show: true });
       setShowEditConfig(false);
       fetchTableJSON();
       setReloadSegmentsOnUpdate(false);
     } else {
-      dispatch({type: 'error', message: result.error, show: true});
+      dispatch({ type: 'error', message: result.error, show: true });
     }
   };
 
   const handleDeleteSchemaAction = () => {
     setDialogDetails({
       title: 'Delete Schema',
-      content: 'Are you sure want to delete this schema? Any tables using this schema might not function correctly.',
-      successCb: () => deleteSchema()
+      content:
+        'Are you sure want to delete this schema? Any tables using this schema might not function correctly.',
+      successCb: () => deleteSchema(),
     });
     setConfirmDialog(true);
   };
@@ -204,143 +222,146 @@ const SchemaPageDetails = ({ match }: RouteComponentProps<Props>) => {
   const handleSegmentDialogHide = () => {
     setShowEditConfig(false);
     setReloadSegmentsOnUpdate(false);
-  }
+  };
 
-  return fetching ? (
-    <AppLoader />
-  ) : (
-    <Grid
-      item
-      xs
-      style={{
-        padding: 20,
-        backgroundColor: 'white',
-        maxHeight: 'calc(100vh - 70px)',
-        overflowY: 'auto',
-      }}
-    >
-      <div className={classes.operationDiv}>
-        <SimpleAccordion
-          headerTitle="Operations"
-          showSearchBox={false}
-        >
-          <div>
-      <CustomButton
-              onClick={()=>{
-                setActionType('editSchema');
-                setConfig(JSON.stringify(schemaJSON, null, 2));
-                setShowEditConfig(true);
-              }}
-              tooltipTitle="Edit Schema"
-              enableTooltip={true}
-            >
-              Edit Schema
-            </CustomButton>
-            <CustomButton
-              isDisabled={!schemaJSON} onClick={handleDeleteSchemaAction}
-              tooltipTitle="Delete Schema"
-              enableTooltip={true}
-            >
-              Delete Schema
-            </CustomButton>
-            </div>
-        </SimpleAccordion>
-      </div>
-      <Grid container spacing={2}>
-        <Grid item xs={6}>
-          <div className={classes.sqlDiv}>
-            <SimpleAccordion
-              headerTitle="Schema Json"
-              showSearchBox={false}
-            >
-              <CodeMirror
-                options={jsonoptions}
-                value={tableConfig}
-                className={classes.queryOutput}
-                autoCursor={false}
-              />
-            </SimpleAccordion>
-          </div>
-        </Grid>
-        <Grid item xs={6}>
-          {!schemaJSONFormat ?
-            <CustomizedTables
-              title="Table Schema"
-              data={tableSchema}
-              showSearchBox={true}
-            />
-          :
-          <div className={classes.sqlDiv}>
-            <SimpleAccordion
-              headerTitle="Table Schema"
-              showSearchBox={false}
-              accordionToggleObject={{
-                toggleName: "JSON Format",
-                toggleValue: schemaJSONFormat,
-                toggleChangeHandler: ()=>{setSchemaJSONFormat(!schemaJSONFormat);}
-              }}
-            >
-              <CodeMirror
-                options={jsonoptions}
-                value={JSON.stringify(schemaJSON, null, 2)}
-                className={classes.queryOutput}
-                autoCursor={false}
-              />
-            </SimpleAccordion>
-          </div>
-          }
-        </Grid>
-      </Grid>
-      {/* Segment config edit dialog */}
-      <CustomDialog
-        open={showEditConfig}
-        handleClose={handleSegmentDialogHide}
-        title="Edit Schema"
-        handleSave={saveConfigAction}
+  if (fetching) {
+    return <AppLoader />;
+  } else if (schemaNotFound) {
+    return <NotFound message={`Schema ${schemaName} not found`} />;
+  } else {
+    return (
+      <Grid
+        item
+        xs
+        style={{
+          padding: 20,
+          backgroundColor: 'white',
+          maxHeight: 'calc(100vh - 70px)',
+          overflowY: 'auto',
+        }}
       >
-        <DialogContent>
-          <FormControlLabel
-            control={
-              <Checkbox
-                size="small"
-                color="primary"
-                checked={reloadSegmentsOnUpdate}
-                onChange={(e) => setReloadSegmentsOnUpdate(e.target.checked)}
-                name="reload"
+        <div className={classes.operationDiv}>
+          <SimpleAccordion headerTitle="Operations" showSearchBox={false}>
+            <div>
+              <CustomButton
+                onClick={() => {
+                  setActionType('editSchema');
+                  setConfig(JSON.stringify(schemaJSON, null, 2));
+                  setShowEditConfig(true);
+                }}
+                tooltipTitle="Edit Schema"
+                enableTooltip={true}
+              >
+                Edit Schema
+              </CustomButton>
+              <CustomButton
+                isDisabled={!schemaJSON}
+                onClick={handleDeleteSchemaAction}
+                tooltipTitle="Delete Schema"
+                enableTooltip={true}
+              >
+                Delete Schema
+              </CustomButton>
+            </div>
+          </SimpleAccordion>
+        </div>
+        <Grid container spacing={2}>
+          <Grid item xs={6}>
+            <div className={classes.sqlDiv}>
+              <SimpleAccordion headerTitle="Schema Json" showSearchBox={false}>
+                <CodeMirror
+                  options={jsonoptions}
+                  value={tableConfig}
+                  className={classes.queryOutput}
+                  autoCursor={false}
+                />
+              </SimpleAccordion>
+            </div>
+          </Grid>
+          <Grid item xs={6}>
+            {!schemaJSONFormat ? (
+              <CustomizedTables
+                title="Table Schema"
+                data={tableSchema}
+                showSearchBox={true}
               />
-            }
-            label="Reload all segments"
-          />
-          <IconButton size="small">
-            <Tooltip
-              title="Reload all segments to make updated schema effective for already ingested data."
-              arrow
-              placement="top"
-            >
-              <HelpOutlineOutlined fontSize="small" />
-            </Tooltip>
-          </IconButton>
-          <CustomCodemirror
-            data={config}
-            isEditable={true}
-            returnCodemirrorValue={(newValue) => {
-              handleConfigChange(newValue);
-            }}
-          />
-        </DialogContent>
-      </CustomDialog>
+            ) : (
+              <div className={classes.sqlDiv}>
+                <SimpleAccordion
+                  headerTitle="Table Schema"
+                  showSearchBox={false}
+                  accordionToggleObject={{
+                    toggleName: 'JSON Format',
+                    toggleValue: schemaJSONFormat,
+                    toggleChangeHandler: () => {
+                      setSchemaJSONFormat(!schemaJSONFormat);
+                    },
+                  }}
+                >
+                  <CodeMirror
+                    options={jsonoptions}
+                    value={JSON.stringify(schemaJSON, null, 2)}
+                    className={classes.queryOutput}
+                    autoCursor={false}
+                  />
+                </SimpleAccordion>
+              </div>
+            )}
+          </Grid>
+        </Grid>
+        {/* Segment config edit dialog */}
+        <CustomDialog
+          open={showEditConfig}
+          handleClose={handleSegmentDialogHide}
+          title="Edit Schema"
+          handleSave={saveConfigAction}
+        >
+          <DialogContent>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  size="small"
+                  color="primary"
+                  checked={reloadSegmentsOnUpdate}
+                  onChange={(e) => setReloadSegmentsOnUpdate(e.target.checked)}
+                  name="reload"
+                />
+              }
+              label="Reload all segments"
+            />
+            <IconButton size="small">
+              <Tooltip
+                title="Reload all segments to make updated schema effective for already ingested data."
+                arrow
+                placement="top"
+              >
+                <HelpOutlineOutlined fontSize="small" />
+              </Tooltip>
+            </IconButton>
+            <CustomCodemirror
+              data={config}
+              isEditable={true}
+              returnCodemirrorValue={(newValue) => {
+                handleConfigChange(newValue);
+              }}
+            />
+          </DialogContent>
+        </CustomDialog>
 
-      {confirmDialog && dialogDetails && <Confirm
-        openDialog={confirmDialog}
-        dialogTitle={dialogDetails.title}
-        dialogContent={dialogDetails.content}
-        successCallback={dialogDetails.successCb}
-        closeDialog={closeDialog}
-        dialogYesLabel='Yes'
-        dialogNoLabel='No'
-      />}
-    </Grid>
-  );
+        {confirmDialog && dialogDetails && (
+          <Confirm
+            openDialog={confirmDialog}
+            dialogTitle={dialogDetails.title}
+            dialogContent={dialogDetails.content}
+            successCallback={dialogDetails.successCb}
+            closeDialog={closeDialog}
+            dialogYesLabel="Yes"
+            dialogNoLabel="No"
+          />
+        )}
+      </Grid>
+    );
+  }
 };
 
 export default SchemaPageDetails;

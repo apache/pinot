@@ -23,7 +23,7 @@ import org.apache.pinot.core.common.BlockValSet;
 
 
 /**
- * Wrapper class for projection block value set for argmin/max aggregation function.
+ * Wrapper class for projection block value set for exprmin/max aggregation function.
  * Used to get the value from val set of different data types.
  */
 public class ExprMinMaxProjectionValSetWrapper extends ExprMinMaxWrapperValSet {

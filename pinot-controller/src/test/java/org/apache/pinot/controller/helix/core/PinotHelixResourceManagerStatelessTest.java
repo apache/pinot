@@ -101,19 +101,23 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
   private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(RAW_TABLE_NAME);
   private static final String REALTIME_TABLE_NAME = TableNameBuilder.REALTIME.tableNameWithType(RAW_TABLE_NAME);
 
+  @Override
+  protected void overrideControllerConf(Map<String, Object> properties) {
+    properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, false);
+  }
+
   @BeforeClass
   public void setUp()
       throws Exception {
     startZk();
-    Map<String, Object> properties = getDefaultControllerConfiguration();
-    properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, false);
-    startController(properties);
+    startController();
 
     addFakeBrokerInstancesToAutoJoinHelixCluster(NUM_BROKER_INSTANCES, false);
     addFakeServerInstancesToAutoJoinHelixCluster(NUM_SERVER_INSTANCES, false);
 
     resetBrokerTags();
     resetServerTags();
+    addDummySchema(RAW_TABLE_NAME);
   }
 
   private void untagBrokers() {
@@ -147,6 +151,17 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
   }
 
   @Test
+  public void testGetInstancesByTag() {
+    List<String> controllersByTag = _helixResourceManager.getAllInstancesWithTag("controller");
+    List<InstanceConfig> controllerConfigs = _helixResourceManager.getAllControllerInstanceConfigs();
+
+    assertEquals(controllersByTag.size(), controllerConfigs.size());
+    for (InstanceConfig c : controllerConfigs) {
+      assertTrue(controllersByTag.contains(c.getInstanceName()));
+    }
+  }
+
+  @Test
   public void testGetDataInstanceAdminEndpoints()
       throws Exception {
     Set<String> servers = _helixResourceManager.getAllInstancesForServerTenant(SERVER_TENANT_NAME);
@@ -156,7 +171,8 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     for (Map.Entry<String, String> entry : adminEndpoints.entrySet()) {
       String key = entry.getKey();
       int port = Server.DEFAULT_ADMIN_API_PORT + Integer.parseInt(key.substring("Server_localhost_".length()));
-      assertEquals(entry.getValue(), "http://localhost:" + port);
+      // ports are random generated
+      assertTrue(port > 0);
     }
 
     // Add a new server
@@ -185,7 +201,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     }, 60_000L, "Failed to update the admin port");
 
     // Remove the new added server
-    _helixResourceManager.dropInstance(serverName);
+    assertTrue(_helixResourceManager.dropInstance(serverName).isSuccessful());
     TestUtils.waitForCondition(aVoid -> {
       try {
         _helixResourceManager.getDataInstanceAdminEndpoints(Collections.singleton(serverName));
@@ -210,6 +226,8 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     String instanceName = "Server_localhost_" + NUM_SERVER_INSTANCES;
     List<String> allInstances = _helixResourceManager.getAllInstances();
     assertFalse(allInstances.contains(instanceName));
+    List<String> allLiveInstances = _helixResourceManager.getAllLiveInstances();
+    assertFalse(allLiveInstances.contains(instanceName));
 
     Instance instance = new Instance("localhost", NUM_SERVER_INSTANCES, InstanceType.SERVER,
         Collections.singletonList(Helix.UNTAGGED_SERVER_INSTANCE), null, 0, 0, 0, 0, false);
@@ -218,9 +236,11 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     assertTrue(allInstances.contains(instanceName));
 
     // Remove the added instance
-    _helixResourceManager.dropInstance(instanceName);
+    assertTrue(_helixResourceManager.dropInstance(instanceName).isSuccessful());
     allInstances = _helixResourceManager.getAllInstances();
     assertFalse(allInstances.contains(instanceName));
+    allLiveInstances = _helixResourceManager.getAllLiveInstances();
+    assertFalse(allLiveInstances.contains(instanceName));
   }
 
   @Test
@@ -239,6 +259,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     assertEquals(untaggedBrokers.size(), 1);
 
     // Add a table
+    addDummySchema(RAW_TABLE_NAME);
     TableConfig offlineTableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setBrokerTenant(BROKER_TENANT_NAME)
             .setServerTenant(SERVER_TENANT_NAME).build();
@@ -297,6 +318,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
   public void testRebuildBrokerResourceFromHelixTags()
       throws Exception {
     // Create the table
+    addDummySchema(RAW_TABLE_NAME);
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setBrokerTenant(BROKER_TENANT_NAME)
             .setServerTenant(SERVER_TENANT_NAME).build();
@@ -390,6 +412,30 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     assertThrows(TableNotFoundException.class, () -> _helixResourceManager.getLiveBrokersForTable("fake"));
     assertThrows(TableNotFoundException.class, () -> _helixResourceManager.getLiveBrokersForTable("fake_OFFLINE"));
     assertThrows(TableNotFoundException.class, () -> _helixResourceManager.getLiveBrokersForTable("fake_REALTIME"));
+
+    // Test retrieving table name to live broker mapping for table without type suffix
+    Map<String, List<InstanceInfo>> rawTableToLiveBrokersMapping =
+        _helixResourceManager.getTableToLiveBrokersMapping(null, List.of(RAW_TABLE_NAME));
+    assertEquals(rawTableToLiveBrokersMapping.size(), 2);
+    assertEquals(rawTableToLiveBrokersMapping.get(OFFLINE_TABLE_NAME).size(), NUM_BROKER_INSTANCES);
+    assertEquals(rawTableToLiveBrokersMapping.get(REALTIME_TABLE_NAME).size(), NUM_BROKER_INSTANCES);
+
+    // Test retrieving table names list to live broker mapping for each table without type suffix
+    Map<String, List<InstanceInfo>> tablesListToLiveBrokersMapping =
+        _helixResourceManager.getTableToLiveBrokersMapping(List.of(OFFLINE_TABLE_NAME, REALTIME_TABLE_NAME));
+    assertEquals(tablesListToLiveBrokersMapping.size(), 2);
+    assertEquals(tablesListToLiveBrokersMapping.get(OFFLINE_TABLE_NAME).size(), NUM_BROKER_INSTANCES);
+    assertEquals(tablesListToLiveBrokersMapping.get(REALTIME_TABLE_NAME).size(), NUM_BROKER_INSTANCES);
+
+    // Test retrieving table name to live broker mapping for table with type suffix
+    Map<String, List<InstanceInfo>> offlineTableToLiveBrokersMapping =
+        _helixResourceManager.getTableToLiveBrokersMapping(List.of(OFFLINE_TABLE_NAME));
+    assertEquals(offlineTableToLiveBrokersMapping.size(), 1);
+    assertEquals(offlineTableToLiveBrokersMapping.get(OFFLINE_TABLE_NAME).size(), NUM_BROKER_INSTANCES);
+
+    // Test that default value behaves the same as empty for optional argument
+    tableToLiveBrokersMapping = _helixResourceManager.getTableToLiveBrokersMapping();
+    assertEquals(tableToLiveBrokersMapping.size(), 2);
 
     // Delete the tables
     _helixResourceManager.deleteRealtimeTable(RAW_TABLE_NAME);
@@ -761,6 +807,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setBrokerTenant(BROKER_TENANT_NAME)
             .setTierConfigList(Collections.singletonList(tierConfig)).setServerTenant(SERVER_TENANT_NAME).build();
     waitForEVToDisappear(tableConfig.getTableName());
+    addDummySchema(RAW_TABLE_NAME);
     _helixResourceManager.addTable(tableConfig);
 
     String segmentName = "testSegment";
@@ -794,8 +841,10 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
    * @throws Exception
    */
   @Test
-  public void testSegmentReplacementWithCustomToSegments() throws Exception {
+  public void testSegmentReplacementWithCustomToSegments()
+      throws Exception {
     // Create the table
+    addDummySchema(RAW_TABLE_NAME);
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setBrokerTenant(BROKER_TENANT_NAME)
             .setServerTenant(SERVER_TENANT_NAME).build();
@@ -830,6 +879,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
   public void testSegmentReplacementRegular()
       throws Exception {
     // Create the table
+    addDummySchema(RAW_TABLE_NAME);
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setBrokerTenant(BROKER_TENANT_NAME)
             .setServerTenant(SERVER_TENANT_NAME).build();
@@ -875,8 +925,8 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     assertThrows(RuntimeException.class,
         () -> _helixResourceManager.endReplaceSegments(REALTIME_TABLE_NAME, lineageEntryId1, null));
     // Invalid lineage entry id
-    assertThrows(RuntimeException.class, () -> _helixResourceManager.
-        endReplaceSegments(OFFLINE_TABLE_NAME, "invalid", null));
+    assertThrows(RuntimeException.class,
+        () -> _helixResourceManager.endReplaceSegments(OFFLINE_TABLE_NAME, "invalid", null));
 
     // New segments not available in the table
     assertThrows(RuntimeException.class,
@@ -1101,6 +1151,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
   public void testSegmentReplacementForRefresh()
       throws Exception {
     // Create the table
+    addDummySchema(RAW_TABLE_NAME);
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setBatchIngestionConfig(new BatchIngestionConfig(null, "REFRESH", "DAILY"));
     TableConfig tableConfig =

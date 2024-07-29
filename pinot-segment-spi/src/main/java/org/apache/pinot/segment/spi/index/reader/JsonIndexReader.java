@@ -18,7 +18,10 @@
  */
 package org.apache.pinot.segment.spi.index.reader;
 
+import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.IndexReader;
+import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
@@ -31,4 +34,37 @@ public interface JsonIndexReader extends IndexReader {
    * Returns the matching document ids for the given filter.
    */
   MutableRoaringBitmap getMatchingDocIds(String filterString);
+
+  /**
+   * For an array of docIds and context specific to a JSON key, returns the corresponding sv value for each docId.
+   * @param docIds array of docIds
+   * @param length length of the array
+   * @param matchingValueToDocs Map from each unique value for the jsonPathKey value to the flattened docId
+   *                                     posting list
+   * @param isFlattenedDocIds whether the docIds are flattened or unflattened
+   * @return String[] where String[i] is the sv value for docIds[i]
+   */
+  String[] getValuesSV(int[] docIds, int length, Map<String, RoaringBitmap> matchingValueToDocs,
+      boolean isFlattenedDocIds);
+
+  /**
+   * For an array of docIds and context specific to a JSON key, returns the corresponding mv array for each docId.
+   * @param docIds array of docIds
+   * @param length length of the array
+   * @param matchingValueToFlattenedDocs Map from each unique value for the jsonPathKey value to the flattened docId
+   *                                     posting list
+   * @return String[][] where String[i] is the mv array for docIds[i]
+   */
+  String[][] getValuesMV(int[] docIds, int length, Map<String, RoaringBitmap> matchingValueToFlattenedDocs);
+
+  /**
+   * For a JSON key, returns a Map from each value to the flattened docId posting list. This map should be used to
+   * avoid reading and converting the posting list of flattened docIds to real docIds
+   */
+  Map<String, RoaringBitmap> getMatchingFlattenedDocsMap(String key, @Nullable String filterJsonString);
+
+  /**
+   * Converts the flattened docIds to real docIds using the map returned by getMatchingFlattenedDocsMap
+   */
+  void convertFlattenedDocIdsToDocIds(Map<String, RoaringBitmap> flattenedDocIdsMap);
 }

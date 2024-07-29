@@ -20,7 +20,7 @@ package org.apache.pinot.core.query.optimizer.filter;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
@@ -28,6 +28,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.Function;
+import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.operator.transform.function.DateTimeConversionTransformFunction;
 import org.apache.pinot.core.operator.transform.function.TimeConversionTransformFunction;
@@ -128,7 +129,7 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
           // -> millis >= 1000
           //
           // Note that 'millisToSeconds(millis) > 0' is not equivalent to 'millis > 0'
-          long lowerValue = Long.parseLong(filterOperands.get(1).getLiteral().getFieldValue().toString());
+          long lowerValue = getLongValue(filterOperands.get(1));
           lowerMillis = outputTimeUnit.toMillis(lowerValue + 1);
           Preconditions.checkState(TimeUtils.timeValueInValidRange(lowerMillis), "Invalid lower bound in millis: %s",
               lowerMillis);
@@ -137,7 +138,7 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
         case GREATER_THAN_OR_EQUAL: {
           // millisToFormat(millis) >= n
           // -> millis >= formatToMillis(n)
-          long lowerValue = Long.parseLong(filterOperands.get(1).getLiteral().getFieldValue().toString());
+          long lowerValue = getLongValue(filterOperands.get(1));
           lowerMillis = outputTimeUnit.toMillis(lowerValue);
           Preconditions.checkState(TimeUtils.timeValueInValidRange(lowerMillis), "Invalid lower bound in millis: %s",
               lowerMillis);
@@ -146,7 +147,7 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
         case LESS_THAN: {
           // millisToFormat(millis) < n
           // -> millis < formatToMillis(n)
-          long upperValue = Long.parseLong(filterOperands.get(1).getLiteral().getFieldValue().toString());
+          long upperValue = getLongValue(filterOperands.get(1));
           upperMillis = outputTimeUnit.toMillis(upperValue);
           Preconditions.checkState(TimeUtils.timeValueInValidRange(upperMillis), "Invalid upper bound in millis: %s",
               upperMillis);
@@ -163,7 +164,7 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
           // -> millis < 1000
           //
           // Note that 'millisToSeconds(millis) <= 0' is not equivalent to 'millis <= 0'
-          long upperValue = Long.parseLong(filterOperands.get(1).getLiteral().getFieldValue().toString());
+          long upperValue = getLongValue(filterOperands.get(1));
           upperMillis = outputTimeUnit.toMillis(upperValue + 1);
           Preconditions.checkState(TimeUtils.timeValueInValidRange(upperMillis), "Invalid upper bound in millis: %s",
               upperMillis);
@@ -171,11 +172,11 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
         }
         case BETWEEN: {
           // Combine GREATER_THAN_OR_EQUAL and LESS_THAN_OR_EQUAL
-          long lowerValue = Long.parseLong(filterOperands.get(1).getLiteral().getFieldValue().toString());
+          long lowerValue = getLongValue(filterOperands.get(1));
           lowerMillis = outputTimeUnit.toMillis(lowerValue);
           Preconditions.checkState(TimeUtils.timeValueInValidRange(lowerMillis), "Invalid lower bound in millis: %s",
               lowerMillis);
-          long upperValue = Long.parseLong(filterOperands.get(2).getLiteral().getFieldValue().toString());
+          long upperValue = getLongValue(filterOperands.get(2));
           upperMillis = outputTimeUnit.toMillis(upperValue + 1);
           Preconditions.checkState(TimeUtils.timeValueInValidRange(upperMillis), "Invalid upper bound in millis: %s",
               upperMillis);
@@ -183,7 +184,7 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
         }
         case EQUALS: {
           // Combine GREATER_THAN_OR_EQUAL and LESS_THAN_OR_EQUAL
-          long value = Long.parseLong(filterOperands.get(1).getLiteral().getFieldValue().toString());
+          long value = getLongValue(filterOperands.get(1));
           lowerMillis = outputTimeUnit.toMillis(value);
           Preconditions.checkState(TimeUtils.timeValueInValidRange(lowerMillis), "Invalid lower bound in millis: %s",
               lowerMillis);
@@ -234,9 +235,7 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
 
       // Step 3: Rewrite the filter function
       String rangeString = new Range(lowerValue, lowerInclusive, upperValue, upperInclusive).getRangeString();
-      filterFunction.setOperator(FilterKind.RANGE.name());
-      filterFunction.setOperands(
-          Arrays.asList(timeConvertOperands.get(0), RequestUtils.getLiteralExpression(rangeString)));
+      rewriteToRange(filterFunction, timeConvertOperands.get(0), rangeString);
     } catch (Exception e) {
       LOGGER.warn("Caught exception while optimizing TIME_CONVERT predicate: {}, skipping the optimization",
           filterFunction, e);
@@ -289,8 +288,8 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
           // -> millis >= 60000
           //
           // Note that 'millisToSeconds(floor(millis, 1 minute)) > 0' is not equivalent to 'millis > 0'
-          long lowerValue = Long.parseLong(filterOperands.get(1).getLiteral().getFieldValue().toString());
-          lowerMillis = ceil(outputFormat.fromFormatToMillis(Long.toString(lowerValue + 1)), granularityMillis);
+          long lowerValue = getLongValue(filterOperands.get(1));
+          lowerMillis = ceil(outputFormat.fromFormatToMillis(lowerValue + 1), granularityMillis);
           Preconditions.checkState(TimeUtils.timeValueInValidRange(lowerMillis), "Invalid lower bound in millis: %s",
               lowerMillis);
           break;
@@ -299,7 +298,7 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
           // millisToFormat(floor(millis, granularity)) >= n
           // -> floor(millis, granularity) >= formatToMillis(n)
           // -> millis >= ceil(formatToMillis(n), granularity)
-          String lowerValue = filterOperands.get(1).getLiteral().getFieldValue().toString();
+          long lowerValue = getLongValue(filterOperands.get(1));
           lowerMillis = ceil(outputFormat.fromFormatToMillis(lowerValue), granularityMillis);
           Preconditions.checkState(TimeUtils.timeValueInValidRange(lowerMillis), "Invalid lower bound in millis: %s",
               lowerMillis);
@@ -309,7 +308,7 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
           // millisToFormat(floor(millis, granularity)) < n
           // -> floor(millis, granularity) < formatToMillis(n)
           // -> millis < ceil(formatToMillis(n), granularity)
-          String upperValue = filterOperands.get(1).getLiteral().getFieldValue().toString();
+          long upperValue = getLongValue(filterOperands.get(1));
           upperMillis = ceil(outputFormat.fromFormatToMillis(upperValue), granularityMillis);
           Preconditions.checkState(TimeUtils.timeValueInValidRange(upperMillis), "Invalid upper bound in millis: %s",
               upperMillis);
@@ -328,32 +327,31 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
           // -> millis < 60000
           //
           // Note that 'millisToSeconds(floor(millis, 1 minute)) <= 0' is not equivalent to 'millis <= 0'
-          long upperValue = Long.parseLong(filterOperands.get(1).getLiteral().getFieldValue().toString());
-          upperMillis = ceil(outputFormat.fromFormatToMillis(Long.toString(upperValue + 1)), granularityMillis);
+          long upperValue = getLongValue(filterOperands.get(1));
+          upperMillis = ceil(outputFormat.fromFormatToMillis(upperValue + 1), granularityMillis);
           Preconditions.checkState(TimeUtils.timeValueInValidRange(upperMillis), "Invalid upper bound in millis: %s",
               upperMillis);
           break;
         }
         case BETWEEN: {
           // Combine GREATER_THAN_OR_EQUAL and LESS_THAN_OR_EQUAL
-          String lowerValue = filterOperands.get(1).getLiteral().getFieldValue().toString();
+          long lowerValue = getLongValue(filterOperands.get(1));
           lowerMillis = ceil(outputFormat.fromFormatToMillis(lowerValue), granularityMillis);
           Preconditions.checkState(TimeUtils.timeValueInValidRange(lowerMillis), "Invalid lower bound in millis: %s",
               lowerMillis);
-          long upperValue = Long.parseLong(filterOperands.get(2).getLiteral().getFieldValue().toString());
-          upperMillis = ceil(outputFormat.fromFormatToMillis(Long.toString(upperValue + 1)), granularityMillis);
+          long upperValue = getLongValue(filterOperands.get(2));
+          upperMillis = ceil(outputFormat.fromFormatToMillis(upperValue + 1), granularityMillis);
           Preconditions.checkState(TimeUtils.timeValueInValidRange(upperMillis), "Invalid upper bound in millis: %s",
               upperMillis);
           break;
         }
         case EQUALS: {
           // Combine GREATER_THAN_OR_EQUAL and LESS_THAN_OR_EQUAL
-          String value = filterOperands.get(1).getLiteral().getFieldValue().toString();
+          long value = getLongValue(filterOperands.get(1));
           lowerMillis = ceil(outputFormat.fromFormatToMillis(value), granularityMillis);
           Preconditions.checkState(TimeUtils.timeValueInValidRange(lowerMillis), "Invalid lower bound in millis: %s",
               lowerMillis);
-          upperMillis =
-              ceil(outputFormat.fromFormatToMillis(Long.toString(Long.parseLong(value) + 1)), granularityMillis);
+          upperMillis = ceil(outputFormat.fromFormatToMillis(value + 1), granularityMillis);
           Preconditions.checkState(TimeUtils.timeValueInValidRange(upperMillis), "Invalid upper bound in millis: %s",
               upperMillis);
           break;
@@ -400,9 +398,7 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
 
       // Step 3: Rewrite the filter function
       String rangeString = new Range(lowerValue, lowerInclusive, upperValue, upperInclusive).getRangeString();
-      filterFunction.setOperator(FilterKind.RANGE.name());
-      filterFunction.setOperands(
-          Arrays.asList(dateTimeConvertOperands.get(0), RequestUtils.getLiteralExpression(rangeString)));
+      rewriteToRange(filterFunction, dateTimeConvertOperands.get(0), rangeString);
     } catch (Exception e) {
       LOGGER.warn("Caught exception while optimizing DATE_TIME_CONVERT predicate: {}, skipping the optimization",
           filterFunction, e);
@@ -410,7 +406,23 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
   }
 
   private boolean isStringLiteral(Expression expression) {
-    return expression.getType() == ExpressionType.LITERAL && expression.getLiteral().isSetStringValue();
+    Literal literal = expression.getLiteral();
+    return literal != null && literal.isSetStringValue();
+  }
+
+  private long getLongValue(Expression expression) {
+    Literal literal = expression.getLiteral();
+    Preconditions.checkArgument(literal != null, "Got non-literal expression: %s", expression);
+    switch (literal.getSetField()) {
+      case INT_VALUE:
+        return literal.getIntValue();
+      case LONG_VALUE:
+        return literal.getLongValue();
+      case STRING_VALUE:
+        return Long.parseLong(literal.getStringValue());
+      default:
+        throw new IllegalStateException("Unsupported literal type: " + literal.getSetField() + " as long value");
+    }
   }
 
   /**
@@ -418,5 +430,14 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
    */
   private long ceil(long millisValue, long granularityMillis) {
     return (millisValue + granularityMillis - 1) / granularityMillis * granularityMillis;
+  }
+
+  private static void rewriteToRange(Function filterFunction, Expression expression, String rangeString) {
+    filterFunction.setOperator(FilterKind.RANGE.name());
+    // NOTE: Create an ArrayList because we might need to modify the list later
+    List<Expression> newOperands = new ArrayList<>(2);
+    newOperands.add(expression);
+    newOperands.add(RequestUtils.getLiteralExpression(rangeString));
+    filterFunction.setOperands(newOperands);
   }
 }

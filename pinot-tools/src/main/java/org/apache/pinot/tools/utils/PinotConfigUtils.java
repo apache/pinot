@@ -27,11 +27,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import org.apache.commons.configuration.ConfigurationException;
-import org.apache.commons.configuration.PropertiesConfiguration;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.configuration2.builder.fluent.Configurations;
+import org.apache.commons.configuration2.ex.ConfigurationException;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.ControllerConf.ControllerPeriodicTasksConf;
+import org.apache.pinot.core.accounting.PerQueryCPUMemAccountantFactory;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.NetUtils;
@@ -98,7 +99,8 @@ public class PinotConfigUtils {
       return null;
     }
 
-    Map<String, Object> properties = CommonsConfigurationUtils.toMap(new PropertiesConfiguration(configFile));
+    Configurations configs = new Configurations();
+    Map<String, Object> properties = CommonsConfigurationUtils.toMap(configs.properties(configFile));
     ControllerConf conf = new ControllerConf(properties);
 
     conf.setPinotFSFactoryClasses(null);
@@ -142,7 +144,8 @@ public class PinotConfigUtils {
     }
     File configFile = new File(configFileName);
     if (configFile.exists()) {
-      return CommonsConfigurationUtils.toMap(new PropertiesConfiguration(configFile));
+      Configurations configs = new Configurations();
+      return CommonsConfigurationUtils.toMap(configs.properties(configFile));
     }
 
     return null;
@@ -211,6 +214,27 @@ public class PinotConfigUtils {
     properties.put(CommonConstants.Helix.KEY_OF_MINION_PORT, minionPort != 0 ? minionPort : getAvailablePort());
 
     return properties;
+  }
+
+  public static Map<String, Object> getResourceTrackingConf() {
+    Map<String, Object> configOverrides = new HashMap<>();
+    configOverrides.put(CommonConstants.Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT, true);
+    configOverrides.put(CommonConstants.Server.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT, true);
+    configOverrides.put(CommonConstants.Broker.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT, true);
+    configOverrides.put(CommonConstants.Broker.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT, true);
+    configOverrides.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING, true);
+    configOverrides.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING, true);
+
+    configOverrides.put(
+        CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "." + CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME,
+        PerQueryCPUMemAccountantFactory.class.getCanonicalName());
+    configOverrides.put(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
+        + CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING, true);
+    configOverrides.put(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
+        + CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING, false);
+    configOverrides.put(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
+        + CommonConstants.Accounting.CONFIG_OF_OOM_PROTECTION_KILLING_QUERY, true);
+    return configOverrides;
   }
 
   public static int getAvailablePort() {

@@ -19,6 +19,9 @@
 package org.apache.pinot.core.realtime.impl.fakestream;
 
 import java.io.IOException;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
@@ -38,6 +41,11 @@ public class FakeStreamMetadataProvider implements StreamMetadataProvider {
   @Override
   public int fetchPartitionCount(long timeoutMillis) {
     return _numPartitions;
+  }
+
+  @Override
+  public Set<Integer> fetchPartitionIds(long timeoutMillis) {
+    return IntStream.range(0, _numPartitions).boxed().collect(Collectors.toSet());
   }
 
   @Override

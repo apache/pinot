@@ -157,7 +157,7 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
       LOGGER.info("Start generating task configs for table: {} for task: {}", tableNameWithType, taskType);
 
       // Get all segment metadata
-      List<SegmentZKMetadata> allSegments = _clusterInfoAccessor.getSegmentsZKMetadata(tableNameWithType);
+      List<SegmentZKMetadata> allSegments = getSegmentsZKMetadataForTable(tableNameWithType);
       // Filter segments based on status
       List<SegmentZKMetadata> preSelectedSegmentsBasedOnStatus
           = filterSegmentsBasedOnStatus(tableConfig.getTableType(), allSegments);
@@ -692,9 +692,7 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
         String downloadURL = StringUtils.join(downloadURLsList.get(i), MinionConstants.URL_SEPARATOR);
         Map<String, String> configs = MinionTaskUtils.getPushTaskConfig(tableNameWithType, taskConfigs,
             _clusterInfoAccessor);
-        configs.put(MinionConstants.TABLE_NAME_KEY, tableNameWithType);
-        configs.put(MinionConstants.SEGMENT_NAME_KEY,
-            StringUtils.join(segmentNamesList.get(i), MinionConstants.SEGMENT_NAME_SEPARATOR));
+        configs.putAll(getBaseTaskConfigs(tableConfig, segmentNamesList.get(i)));
         configs.put(MinionConstants.DOWNLOAD_URL_KEY, downloadURL);
         configs.put(MinionConstants.UPLOAD_URL_KEY, _clusterInfoAccessor.getVipUrl() + "/segments");
         configs.put(MinionConstants.ENABLE_REPLACE_SEGMENTS_KEY, "true");
@@ -859,8 +857,8 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
       if (v == null) {
         LOGGER.info(
             "Creating the gauge metric for tracking the merge/roll-up number buckets to process for table: {} "
-                + "and mergeLevel: {}.(bufferTimeMs={}, bucketTimeMs={}, numTimeBucketsToProcess={})"
-                + tableNameWithType, mergeLevel, bufferTimeMs, bucketTimeMs, finalCount);
+                + "and mergeLevel: {}.(bufferTimeMs={}, bucketTimeMs={}, numTimeBucketsToProcess={})",
+                tableNameWithType, mergeLevel, bufferTimeMs, bucketTimeMs, finalCount);
         controllerMetrics.setOrUpdateGauge(getMetricNameForNumBucketsToProcess(tableNameWithType, mergeLevel),
             () -> _tableNumberBucketsToProcess.get(tableNameWithType).getOrDefault(mergeLevel, finalCount));
       }

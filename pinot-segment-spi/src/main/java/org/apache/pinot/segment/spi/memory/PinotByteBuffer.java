@@ -31,6 +31,8 @@ import javax.annotation.concurrent.ThreadSafe;
 
 @ThreadSafe
 public class PinotByteBuffer extends PinotDataBuffer {
+  public static final PinotDataBuffer EMPTY = PinotByteBuffer.wrap(ByteBuffer.allocate(0));
+
   private final ByteBuffer _buffer;
   private final boolean _flushable;
 
@@ -58,6 +60,14 @@ public class PinotByteBuffer extends PinotDataBuffer {
         return new PinotByteBuffer(buffer, true, true);
       }
     }
+  }
+
+  public static PinotByteBuffer wrap(byte[] buffer) {
+    return new PinotByteBuffer(ByteBuffer.wrap(buffer), false, false);
+  }
+
+  public static PinotByteBuffer wrap(ByteBuffer buffer) {
+    return new PinotByteBuffer(buffer, false, false);
   }
 
   private PinotByteBuffer(ByteBuffer buffer, boolean closeable, boolean flushable) {
@@ -237,7 +247,7 @@ public class PinotByteBuffer extends PinotDataBuffer {
   }
 
   @Override
-  public void copyTo(long offset, PinotDataBuffer buffer, long destOffset, long size) {
+  public void copyTo(long offset, DataBuffer buffer, long destOffset, long size) {
     assert offset <= Integer.MAX_VALUE;
     assert size <= Integer.MAX_VALUE;
     int start = (int) offset;
@@ -276,12 +286,14 @@ public class PinotByteBuffer extends PinotDataBuffer {
       throws IOException {
     assert offset <= Integer.MAX_VALUE;
     assert size <= Integer.MAX_VALUE;
-    try (RandomAccessFile randomAccessFile = new RandomAccessFile(file, "r")) {
+    try (RandomAccessFile randomAccessFile = new RandomAccessFile(file, "r");
+        FileChannel channel = randomAccessFile.getChannel()) {
+
       ByteBuffer duplicate = _buffer.duplicate();
       int start = (int) offset;
       int end = start + (int) size;
-      ((Buffer) duplicate).position(start).limit(end);
-      randomAccessFile.getChannel().read(duplicate, srcOffset);
+      duplicate.position(start).limit(end);
+      channel.read(duplicate, srcOffset);
     }
   }
 

@@ -20,7 +20,6 @@ package org.apache.pinot.core.data.manager.realtime;
 
 import java.io.File;
 import java.net.URI;
-import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -74,7 +73,7 @@ public class PinotFSSegmentUploader implements SegmentUploader {
     final String rawTableName = TableNameBuilder.extractRawTableName(segmentName.getTableName());
     Callable<URI> uploadTask = () -> {
       URI destUri = new URI(StringUtil.join(File.separator, _segmentStoreUriStr, segmentName.getTableName(),
-          segmentName.getSegmentName() + UUID.randomUUID().toString()));
+          SegmentCompletionUtils.generateTmpSegmentFileName(segmentName.getSegmentName())));
       long startTime = System.currentTimeMillis();
       try {
         PinotFS pinotFS = PinotFSFactory.create(new URI(_segmentStoreUriStr).getScheme());
@@ -108,8 +107,8 @@ public class PinotFSSegmentUploader implements SegmentUploader {
       _serverMetrics.addMeteredTableValue(rawTableName, ServerMeter.SEGMENT_UPLOAD_TIMEOUT, 1);
       LOGGER.warn("Timed out waiting to upload segment: {} for table: {}", segmentName.getSegmentName(), rawTableName);
     } catch (Exception e) {
-      LOGGER
-          .warn("Failed to upload file {} of segment {} for table {} ", segmentFile.getAbsolutePath(), segmentName, e);
+      LOGGER.warn("Failed to upload file {} of segment {} for table {}",
+              segmentFile.getAbsolutePath(), segmentName, rawTableName, e);
     }
     _serverMetrics.addMeteredTableValue(rawTableName, ServerMeter.SEGMENT_UPLOAD_FAILURE, 1);
 

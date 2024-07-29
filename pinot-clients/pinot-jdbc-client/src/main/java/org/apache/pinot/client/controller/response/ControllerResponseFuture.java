@@ -18,10 +18,11 @@
  */
 package org.apache.pinot.client.controller.response;
 
-import java.nio.charset.StandardCharsets;
+import java.io.InputStream;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.apache.pinot.client.PinotClientException;
 import org.asynchttpclient.Response;
 import org.slf4j.Logger;
@@ -62,7 +63,7 @@ abstract class ControllerResponseFuture<T> implements Future<T> {
   abstract public T get(long timeout, TimeUnit unit)
       throws ExecutionException;
 
-  public String getStringResponse(long timeout, TimeUnit unit)
+  public InputStream getStreamResponse(long timeout, TimeUnit unit)
       throws ExecutionException {
     try {
       LOGGER.debug("Sending request to {}", _url);
@@ -75,10 +76,8 @@ abstract class ControllerResponseFuture<T> implements Future<T> {
         throw new PinotClientException("Pinot returned HTTP status " + httpResponse.getStatusCode() + ", expected 200");
       }
 
-      String responseBody = httpResponse.getResponseBody(StandardCharsets.UTF_8);
-
-      return responseBody;
-    } catch (Exception e) {
+      return httpResponse.getResponseBodyAsStream();
+    } catch (TimeoutException | InterruptedException e) {
       throw new ExecutionException(e);
     }
   }

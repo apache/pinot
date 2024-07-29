@@ -23,10 +23,11 @@ import it.unimi.dsi.fastutil.ints.IntLinkedOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
+import java.math.BigDecimal;
 import java.util.Arrays;
 import org.apache.commons.lang3.ArrayUtils;
-import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.spi.annotations.ScalarFunction;
+import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
 
 
 /**
@@ -72,6 +73,55 @@ public class ArrayFunctions {
   @ScalarFunction
   public static int arrayIndexOfString(String[] values, String valueToFind) {
     return ArrayUtils.indexOf(values, valueToFind);
+  }
+
+  @ScalarFunction
+  public static int[] arrayIndexesOfInt(int[] value, int valueToFind) {
+    return ArrayUtils.indexesOf(value, valueToFind).stream().toArray();
+  }
+
+  @ScalarFunction
+  public static int[] arrayIndexesOfLong(long[] value, long valueToFind) {
+    return ArrayUtils.indexesOf(value, valueToFind).stream().toArray();
+  }
+
+  @ScalarFunction
+  public static int[] arrayIndexesOfFloat(float[] value, float valueToFind) {
+    return ArrayUtils.indexesOf(value, valueToFind).stream().toArray();
+  }
+
+  @ScalarFunction
+  public static int[] arrayIndexesOfDouble(double[] value, double valueToFind) {
+    return ArrayUtils.indexesOf(value, valueToFind).stream().toArray();
+  }
+
+  @ScalarFunction
+  public static int[] arrayIndexesOfString(String[] value, String valueToFind) {
+    return ArrayUtils.indexesOf(value, valueToFind).stream().toArray();
+  }
+
+  /**
+   * Assume values1, and values2 are monotonous increasing indices of MV cols.
+   * Here is the common usage:
+   * col1: ["a", "b", "a", "b"]
+   * col2: ["c", "d", "d", "c"]
+   * The user want to get the first index called idx, s.t. col1[idx] == "b" && col2[idx] == "d"
+   * arrayElementAtInt(0, intersectIndices(arrayIndexOfAllString(col1, "b"), arrayIndexOfAllString(col2, "d")))
+   */
+  @ScalarFunction
+  public static int[] intersectIndices(int[] values1, int[] values2) {
+    // TODO: if values1.length << values2.length. Use binary search can speed up the query
+    int i = 0;
+    int j = 0;
+    IntArrayList indices = new IntArrayList();
+    while (i < values1.length && j < values2.length) {
+      if (values1[i] == values2[j]) {
+        indices.add(values1[i]);
+        j++;
+      }
+      i++;
+    }
+    return indices.toIntArray();
   }
 
   @ScalarFunction
@@ -155,26 +205,146 @@ public class ArrayFunctions {
 
   @ScalarFunction
   public static int arrayElementAtInt(int[] arr, int idx) {
-    return idx > 0 && idx <= arr.length ? arr[idx - 1] : (int) DataSchema.ColumnDataType.INT.getNullPlaceholder();
+    return idx > 0 && idx <= arr.length ? arr[idx - 1] : NullValuePlaceHolder.INT;
   }
 
   @ScalarFunction
   public static long arrayElementAtLong(long[] arr, int idx) {
-    return idx > 0 && idx <= arr.length ? arr[idx - 1] : (long) DataSchema.ColumnDataType.LONG.getNullPlaceholder();
+    return idx > 0 && idx <= arr.length ? arr[idx - 1] : NullValuePlaceHolder.LONG;
   }
 
   @ScalarFunction
   public static float arrayElementAtFloat(float[] arr, int idx) {
-    return idx > 0 && idx <= arr.length ? arr[idx - 1] : (float) DataSchema.ColumnDataType.FLOAT.getNullPlaceholder();
+    return idx > 0 && idx <= arr.length ? arr[idx - 1] : NullValuePlaceHolder.FLOAT;
   }
 
   @ScalarFunction
   public static double arrayElementAtDouble(double[] arr, int idx) {
-    return idx > 0 && idx <= arr.length ? arr[idx - 1] : (double) DataSchema.ColumnDataType.DOUBLE.getNullPlaceholder();
+    return idx > 0 && idx <= arr.length ? arr[idx - 1] : NullValuePlaceHolder.DOUBLE;
   }
 
   @ScalarFunction
   public static String arrayElementAtString(String[] arr, int idx) {
-    return idx > 0 && idx <= arr.length ? arr[idx - 1] : (String) DataSchema.ColumnDataType.STRING.getNullPlaceholder();
+    return idx > 0 && idx <= arr.length ? arr[idx - 1] : NullValuePlaceHolder.STRING;
+  }
+
+  @ScalarFunction
+  public static int arraySumInt(int[] arr) {
+    int sum = 0;
+    for (int value : arr) {
+      sum += value;
+    }
+    return sum;
+  }
+
+  @ScalarFunction
+  public static long arraySumLong(long[] arr) {
+    long sum = 0;
+    for (long value : arr) {
+      sum += value;
+    }
+    return sum;
+  }
+
+  @ScalarFunction(names = {"array", "arrayValueConstructor"}, isVarArg = true)
+  public static Object arrayValueConstructor(Object... arr) {
+    if (arr == null || arr.length == 0) {
+      return arr;
+    }
+    Class<?> clazz = arr[0].getClass();
+    if (clazz == Integer.class) {
+      int[] intArr = new int[arr.length];
+      for (int i = 0; i < arr.length; i++) {
+        intArr[i] = (Integer) arr[i];
+      }
+      return intArr;
+    }
+    if (clazz == Long.class) {
+      long[] longArr = new long[arr.length];
+      for (int i = 0; i < arr.length; i++) {
+        longArr[i] = (Long) arr[i];
+      }
+      return longArr;
+    }
+    if (clazz == Float.class) {
+      float[] floatArr = new float[arr.length];
+      for (int i = 0; i < arr.length; i++) {
+        floatArr[i] = (Float) arr[i];
+      }
+      return floatArr;
+    }
+    if (clazz == Double.class) {
+      double[] doubleArr = new double[arr.length];
+      for (int i = 0; i < arr.length; i++) {
+        doubleArr[i] = (Double) arr[i];
+      }
+      return doubleArr;
+    }
+    if (clazz == Boolean.class) {
+      boolean[] boolArr = new boolean[arr.length];
+      for (int i = 0; i < arr.length; i++) {
+        boolArr[i] = (Boolean) arr[i];
+      }
+      return boolArr;
+    }
+    if (clazz == BigDecimal.class) {
+      BigDecimal[] bigDecimalArr = new BigDecimal[arr.length];
+      for (int i = 0; i < arr.length; i++) {
+        bigDecimalArr[i] = (BigDecimal) arr[i];
+      }
+      return bigDecimalArr;
+    }
+    if (clazz == String.class) {
+      String[] strArr = new String[arr.length];
+      for (int i = 0; i < arr.length; i++) {
+        strArr[i] = (String) arr[i];
+      }
+      return strArr;
+    }
+    return arr;
+  }
+
+  @ScalarFunction
+  public static int[] generateIntArray(int start, int end, int inc) {
+    int size = (end - start) / inc + 1;
+    int[] arr = new int[size];
+
+    for (int i = 0, value = start; i < size; i++, value += inc) {
+      arr[i] = value;
+    }
+    return arr;
+  }
+
+  @ScalarFunction
+  public static long[] generateLongArray(long start, long end, long inc) {
+    int size = (int) ((end - start) / inc + 1);
+    long[] arr = new long[size];
+
+    for (int i = 0; i < size; i++, start += inc) {
+      arr[i] = start;
+    }
+    return arr;
+  }
+
+  @ScalarFunction
+  public static float[] generateFloatArray(float start, float end, float inc) {
+    int size = (int) ((end - start) / inc + 1);
+    float[] arr = new float[size];
+
+    for (int i = 0; i < size; i++, start += inc) {
+      arr[i] = start;
+    }
+    return arr;
+  }
+
+  @ScalarFunction
+  public static double[] generateDoubleArray(double start, double end, double inc) {
+    int size = (int) ((end - start) / inc + 1);
+    double[] arr = new double[size];
+
+    for (int i = 0; i < size; i++, start += inc) {
+      arr[i] = start;
+    }
+    return arr;
   }
 }

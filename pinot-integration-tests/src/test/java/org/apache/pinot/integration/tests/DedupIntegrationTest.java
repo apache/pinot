@@ -49,7 +49,7 @@ public class DedupIntegrationTest extends BaseClusterIntegrationTestSet {
     // Start a customized controller with more frequent realtime segment validation
     startController();
     startBroker();
-    startServers(1);
+    startServer();
 
     _avroFiles = unpackAvroData(_tempDir);
     startKafka();
@@ -84,11 +84,6 @@ public class DedupIntegrationTest extends BaseClusterIntegrationTestSet {
   @Override
   protected String getSchemaFileName() {
     return "dedupIngestionTestSchema.schema";
-  }
-
-  @Override
-  protected String getSchemaName() {
-    return "dedupSchema";
   }
 
   @Override

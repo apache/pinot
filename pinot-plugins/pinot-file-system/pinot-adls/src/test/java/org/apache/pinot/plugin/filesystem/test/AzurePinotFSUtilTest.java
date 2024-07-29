@@ -23,6 +23,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import org.apache.pinot.plugin.filesystem.AzurePinotFSUtil;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -67,11 +68,12 @@ public class AzurePinotFSUtilTest {
       throws Exception {
     // "/encode(dir)/encode(segment)"
     String expectedPath = String.join(File.separator, tableName, segmentName);
-    URI uri = createUri(URLEncoder.encode(tableName, "UTF-8"), URLEncoder.encode(segmentName, "UTF-8"));
+    URI uri = createUri(URLEncoder.encode(tableName, StandardCharsets.UTF_8), URLEncoder.encode(segmentName,
+        StandardCharsets.UTF_8));
     checkUri(uri, expectedPath, urlEncoded);
 
     // "/encode(dir/segment)"
-    uri = createUri(URLEncoder.encode(String.join(File.separator, tableName, segmentName), "UTF-8"));
+    uri = createUri(URLEncoder.encode(String.join(File.separator, tableName, segmentName), StandardCharsets.UTF_8));
     checkUri(uri, expectedPath, urlEncoded);
 
     // "/encode(dir/segment)"

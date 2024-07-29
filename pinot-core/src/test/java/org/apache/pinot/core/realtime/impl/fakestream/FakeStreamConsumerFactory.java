@@ -18,21 +18,10 @@
  */
 package org.apache.pinot.core.realtime.impl.fakestream;
 
-import org.apache.pinot.segment.local.utils.IngestionUtils;
-import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.stream.LongMsgOffset;
-import org.apache.pinot.spi.stream.MessageBatch;
-import org.apache.pinot.spi.stream.OffsetCriteria;
-import org.apache.pinot.spi.stream.PartitionLevelConsumer;
-import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.stream.PartitionGroupConsumer;
+import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
-import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
-import org.apache.pinot.spi.stream.StreamDecoderProvider;
-import org.apache.pinot.spi.stream.StreamMessageDecoder;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
-import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 
 
 /**
@@ -44,11 +33,6 @@ import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 public class FakeStreamConsumerFactory extends StreamConsumerFactory {
 
   @Override
-  public PartitionLevelConsumer createPartitionLevelConsumer(String clientId, int partition) {
-    return new FakePartitionLevelConsumer(partition, _streamConfig, FakeStreamConfigUtils.MESSAGE_BATCH_SIZE);
-  }
-
-  @Override
   public StreamMetadataProvider createPartitionMetadataProvider(String clientId, int partition) {
     return new FakeStreamMetadataProvider(_streamConfig);
   }
@@ -58,43 +42,10 @@ public class FakeStreamConsumerFactory extends StreamConsumerFactory {
     return new FakeStreamMetadataProvider(_streamConfig);
   }
 
-  public static void main(String[] args)
-      throws Exception {
-    String clientId = "client_id_localhost_tester";
-
-    // stream config
-    int numPartitions = 5;
-    StreamConfig streamConfig = FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs(numPartitions);
-
-    // stream consumer factory
-    StreamConsumerFactory streamConsumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
-
-    // stream metadata provider
-    StreamMetadataProvider streamMetadataProvider = streamConsumerFactory.createStreamMetadataProvider(clientId);
-    int partitionCount = streamMetadataProvider.fetchPartitionCount(10_000);
-    System.out.println(partitionCount);
-
-    // Partition metadata provider
-    int partition = 3;
-    StreamMetadataProvider partitionMetadataProvider =
-        streamConsumerFactory.createPartitionMetadataProvider(clientId, partition);
-    StreamPartitionMsgOffset partitionOffset =
-        partitionMetadataProvider.fetchStreamPartitionOffset(OffsetCriteria.SMALLEST_OFFSET_CRITERIA, 10_000);
-    System.out.println(partitionOffset);
-
-    // Partition level consumer
-    PartitionLevelConsumer partitionLevelConsumer =
-        streamConsumerFactory.createPartitionLevelConsumer(clientId, partition);
-    MessageBatch messageBatch =
-        partitionLevelConsumer.fetchMessages(new LongMsgOffset(10), new LongMsgOffset(40), 10_000);
-
-    // Message decoder
-    Schema pinotSchema = FakeStreamConfigUtils.getPinotSchema();
-    TableConfig tableConfig = FakeStreamConfigUtils.getTableConfig();
-    StreamMessageDecoder streamMessageDecoder = StreamDecoderProvider.create(streamConfig,
-        IngestionUtils.getFieldsForRecordExtractor(tableConfig.getIngestionConfig(), pinotSchema));
-    GenericRow decodedRow = new GenericRow();
-    streamMessageDecoder.decode(messageBatch.getMessageAtIndex(0), decodedRow);
-    System.out.println(decodedRow);
+  @Override
+  public PartitionGroupConsumer createPartitionGroupConsumer(String clientId,
+      PartitionGroupConsumptionStatus partitionGroupConsumptionStatus) {
+    return new FakePartitionLevelConsumer(partitionGroupConsumptionStatus.getPartitionGroupId(), _streamConfig,
+        FakeStreamConfigUtils.MESSAGE_BATCH_SIZE);
   }
 }

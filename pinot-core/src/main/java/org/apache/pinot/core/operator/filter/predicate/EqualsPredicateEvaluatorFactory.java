@@ -62,8 +62,7 @@ public class EqualsPredicateEvaluatorFactory {
    * @param dataType Data type for the column
    * @return Raw value based EQ predicate evaluator
    */
-  public static EqRawPredicateEvaluator newRawValueBasedEvaluator(EqPredicate eqPredicate,
-      DataType dataType) {
+  public static EqRawPredicateEvaluator newRawValueBasedEvaluator(EqPredicate eqPredicate, DataType dataType) {
     String value = eqPredicate.getValue();
     switch (dataType) {
       case INT:
@@ -81,6 +80,7 @@ public class EqualsPredicateEvaluatorFactory {
       case TIMESTAMP:
         return new LongRawValueBasedEqPredicateEvaluator(eqPredicate, TimestampUtils.toMillisSinceEpoch(value));
       case STRING:
+      case JSON:
         return new StringRawValueBasedEqPredicateEvaluator(eqPredicate, value);
       case BYTES:
         return new BytesRawValueBasedEqPredicateEvaluator(eqPredicate, BytesUtils.toBytes(value));
@@ -92,10 +92,9 @@ public class EqualsPredicateEvaluatorFactory {
   private static final class DictionaryBasedEqPredicateEvaluator extends BaseDictionaryBasedPredicateEvaluator
       implements IntValue {
     final int _matchingDictId;
-    final int[] _matchingDictIds;
 
     DictionaryBasedEqPredicateEvaluator(EqPredicate eqPredicate, Dictionary dictionary, DataType dataType) {
-      super(eqPredicate);
+      super(eqPredicate, dictionary);
       String predicateValue = PredicateUtils.getStoredValue(eqPredicate.getValue(), dataType);
       _matchingDictId = dictionary.indexOf(predicateValue);
       if (_matchingDictId >= 0) {
@@ -107,6 +106,11 @@ public class EqualsPredicateEvaluatorFactory {
         _matchingDictIds = new int[0];
         _alwaysFalse = true;
       }
+    }
+
+    @Override
+    protected int[] calculateNonMatchingDictIds() {
+      return PredicateUtils.getDictIds(_dictionary.length(), _matchingDictId);
     }
 
     @Override
@@ -130,11 +134,6 @@ public class EqualsPredicateEvaluatorFactory {
         }
       }
       return matches;
-    }
-
-    @Override
-    public int[] getMatchingDictIds() {
-      return _matchingDictIds;
     }
 
     @Override

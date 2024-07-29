@@ -25,15 +25,28 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.common.function.scalar.StringFunctions.*;
@@ -44,6 +57,10 @@ import static org.testng.Assert.assertTrue;
 
 public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestSet {
   private static final String SCHEMA_FILE_NAME = "On_Time_On_Time_Performance_2014_100k_subset_nonulls.schema";
+  private static final String DEFAULT_DATABASE_NAME = CommonConstants.DEFAULT_DATABASE;
+  private static final String DATABASE_NAME = "db1";
+  private static final String TABLE_NAME_WITH_DATABASE = DATABASE_NAME + "." + DEFAULT_TABLE_NAME;
+  private String _tableName = DEFAULT_TABLE_NAME;
 
   @Override
   protected String getSchemaFileName() {
@@ -57,7 +74,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
 
     // Start the Pinot cluster
     startZk();
-    startController(getDefaultControllerConfiguration());
+    startController();
     startBroker();
     startServer();
     setupTenants();
@@ -83,15 +100,51 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
 
     // Wait for all documents loaded
     waitForAllDocsLoaded(600_000L);
+
+    setupTableWithNonDefaultDatabase(avroFiles);
+  }
+
+  private void setupTableWithNonDefaultDatabase(List<File> avroFiles)
+      throws Exception {
+    _tableName = TABLE_NAME_WITH_DATABASE;
+    String defaultCol = "ActualElapsedTime";
+    String customCol = "ActualElapsedTime_2";
+    Schema schema = createSchema();
+    schema.addField(new MetricFieldSpec(customCol, FieldSpec.DataType.INT));
+    addSchema(schema);
+    TableConfig tableConfig = createOfflineTableConfig();
+    assert tableConfig.getIndexingConfig().getNoDictionaryColumns() != null;
+    List<String> noDicCols = new ArrayList<>(DEFAULT_NO_DICTIONARY_COLUMNS);
+    noDicCols.add(customCol);
+    tableConfig.getIndexingConfig().setNoDictionaryColumns(noDicCols);
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setTransformConfigs(List.of(new TransformConfig(customCol, defaultCol)));
+    tableConfig.setIngestionConfig(ingestionConfig);
+    addTableConfig(tableConfig);
+
+    // Create and upload segments to 'db1.mytable'
+    TestUtils.ensureDirectoriesExistAndEmpty(_segmentDir, _tarDir);
+    ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, tableConfig, schema, 0, _segmentDir, _tarDir);
+    uploadSegments(getTableName(), _tarDir);
+
+    // Wait for all documents loaded
+    waitForAllDocsLoaded(600_000L);
+    _tableName = DEFAULT_TABLE_NAME;
   }
 
   protected void setupTenants()
       throws IOException {
   }
 
+//  @Override
+//  protected boolean useMultiStageQueryEngine() {
+//    return true;
+//  }
+
+  @BeforeMethod
   @Override
-  protected boolean useMultiStageQueryEngine() {
-    return true;
+  public void resetMultiStage() {
+    setUseMultiStageQueryEngine(true);
   }
 
   @Test
@@ -155,12 +208,21 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     double[] expectedNumericResults = new double[]{
         364, 364, 355, 364, 364, 364, 5915969, 16252.662087912087
     };
+    double[] expectedNumericResultsV1 = new double[]{
+        364, 364, 357, 364, 364, 364, 5915969, 16252.662087912087
+    };
     Assert.assertEquals(numericResultFunctions.length, expectedNumericResults.length);
 
     for (int i = 0; i < numericResultFunctions.length; i++) {
       String pinotQuery = String.format("SELECT %s(DaysSinceEpoch) FROM mytable", numericResultFunctions[i]);
       JsonNode jsonNode = postQuery(pinotQuery);
-      Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asDouble(), expectedNumericResults[i]);
+      if (useMultiStageQueryEngine) {
+        Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asDouble(),
+            expectedNumericResults[i]);
+      } else {
+        Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asDouble(),
+            expectedNumericResultsV1[i]);
+      }
     }
 
     String[] binaryResultFunctions = new String[]{
@@ -170,14 +232,21 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
         360,
         3904
     };
+    int[] expectedBinarySizeResultsV1 = new int[]{
+        5480,
+        3904
+    };
     for (int i = 0; i < binaryResultFunctions.length; i++) {
       String pinotQuery = String.format("SELECT %s(DaysSinceEpoch) FROM mytable", binaryResultFunctions[i]);
       JsonNode jsonNode = postQuery(pinotQuery);
-      Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asText().length(),
-          expectedBinarySizeResults[i]);
+      if (useMultiStageQueryEngine) {
+        Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asText().length(),
+            expectedBinarySizeResults[i]);
+      } else {
+        Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asText().length(),
+            expectedBinarySizeResultsV1[i]);
+      }
     }
-
-    setUseMultiStageQueryEngine(true);
   }
 
   @Test(dataProvider = "useBothQueryEngines")
@@ -193,13 +262,21 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
         -5.421344202E9, 577725, -9999.0, 16271.0, -9383.95292223809, 26270.0, 312, 312, 328, 3954484.0,
         12674.628205128205
     };
+    double[] expectedResultsV1 = new double[]{
+        -5.421344202E9, 577725, -9999.0, 16271.0, -9383.95292223809, 26270.0, 312, 312, 312, 3954484.0,
+        12674.628205128205
+    };
 
     Assert.assertEquals(multiValueFunctions.length, expectedResults.length);
 
     for (int i = 0; i < multiValueFunctions.length; i++) {
       String pinotQuery = String.format("SELECT %s(DivAirportIDs) FROM mytable", multiValueFunctions[i]);
       JsonNode jsonNode = postQuery(pinotQuery);
-      Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asDouble(), expectedResults[i]);
+      if (useMultiStageQueryEngine) {
+        Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asDouble(), expectedResults[i]);
+      } else {
+        Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asDouble(), expectedResultsV1[i]);
+      }
     }
 
     String pinotQuery = "SELECT percentileMV(DivAirportIDs, 99) FROM mytable";
@@ -225,8 +302,6 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     jsonNode = postQuery(pinotQuery);
     Assert.assertTrue(jsonNode.get("resultTable").get("rows").get(0).get(0).asDouble() > 10000);
     Assert.assertTrue(jsonNode.get("resultTable").get("rows").get(0).get(0).asDouble() < 17000);
-
-    setUseMultiStageQueryEngine(true);
   }
 
   @Test
@@ -450,12 +525,14 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     // invalid argument
     sqlQuery = "SELECT toBase64('hello!') FROM mytable";
     response = postQuery(sqlQuery);
-    assertTrue(response.get("exceptions").get(0).get("message").toString().contains("SQLParsingError"));
+    int expectedStatusCode = useMultiStageQueryEngine() ? QueryException.QUERY_PLANNING_ERROR_CODE
+        : QueryException.SQL_PARSING_ERROR_CODE;
+    Assert.assertEquals(response.get("exceptions").get(0).get("errorCode").asInt(), expectedStatusCode);
 
     // invalid argument
     sqlQuery = "SELECT fromBase64('hello!') FROM mytable";
     response = postQuery(sqlQuery);
-    assertTrue(response.get("exceptions").get(0).get("message").toString().contains("IllegalArgumentException"));
+    assertTrue(response.get("exceptions").get(0).get("message").toString().contains("Illegal base64 character"));
 
     // string literal used in a filter
     sqlQuery = "SELECT * FROM mytable WHERE fromUtf8(fromBase64('aGVsbG8h')) != Carrier AND "
@@ -529,6 +606,28 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
       assertEquals(encoded, toBase64(toUtf8(original)));
       assertEquals(decoded, fromUtf8(fromBase64(toBase64(toUtf8(original)))));
     }
+
+    // Test select with group by order by limit
+    sqlQuery = "SELECT toBase64(toUtf8(AirlineID)) "
+        + "FROM mytable "
+        + "GROUP BY toBase64(toUtf8(AirlineID)) "
+        + "ORDER BY toBase64(toUtf8(AirlineID)) DESC "
+        + "LIMIT 10";
+    response = postQuery(sqlQuery);
+    resultTable = response.get("resultTable");
+    dataSchema = resultTable.get("dataSchema");
+    assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"STRING\"]");
+    rows = response.get("resultTable").get("rows");
+    assertEquals(rows.get(0).get(0).asText(), "MjExNzE=");
+    assertEquals(rows.get(1).get(0).asText(), "MjAzOTg=");
+    assertEquals(rows.get(2).get(0).asText(), "MjAzNjY=");
+    assertEquals(rows.get(3).get(0).asText(), "MjAzNTU=");
+    assertEquals(rows.get(4).get(0).asText(), "MjAzMDQ=");
+    assertEquals(rows.get(5).get(0).asText(), "MjA0Mzc=");
+    assertEquals(rows.get(6).get(0).asText(), "MjA0MzY=");
+    assertEquals(rows.get(7).get(0).asText(), "MjA0MDk=");
+    assertEquals(rows.get(8).get(0).asText(), "MTkzOTM=");
+    assertEquals(rows.get(9).get(0).asText(), "MTk5Nzc=");
   }
 
   @Test
@@ -595,19 +694,315 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   }
 
   @Test
+  public void testVariadicFunction() throws Exception {
+    String sqlQuery = "SELECT ARRAY_TO_MV(VALUE_IN(RandomAirports, 'MFR', 'SUN', 'GTR')) as airport, count(*) "
+        + "FROM mytable WHERE ARRAY_TO_MV(RandomAirports) IN ('MFR', 'SUN', 'GTR') GROUP BY airport";
+    JsonNode jsonNode = postQuery(sqlQuery);
+    assertNoError(jsonNode);
+    assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "STRING");
+    assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").get(1).asText(), "LONG");
+    assertEquals(jsonNode.get("numRowsResultSet").asInt(), 3);
+  }
+
+  @Test
+  public void skipArrayToMvOptimization()
+      throws Exception {
+    String sqlQuery = "SELECT 1 "
+        + "FROM mytable "
+        + "WHERE ARRAY_TO_MV(RandomAirports) = 'MFR' and ARRAY_TO_MV(RandomAirports) = 'GTR'";
+
+    JsonNode jsonNode = postQuery("Explain plan for " + sqlQuery);
+    JsonNode plan = jsonNode.get("resultTable").get("rows").get(0).get(1);
+
+    Pattern pattern = Pattern.compile("LogicalValues\\(tuples=\\[\\[]]\\)");
+    String planAsText = plan.asText();
+    boolean matches = pattern.matcher(planAsText).find();
+    Assert.assertFalse(matches, "Plan should not contain contain LogicalValues node but plan is \n"
+        + planAsText);
+
+    jsonNode = postQuery(sqlQuery);
+    Assert.assertNotEquals(jsonNode.get("resultTable").get("rows").size(), 0);
+  }
+
+  @Test
   public void testMultiValueColumnGroupByOrderBy()
       throws Exception {
-    String pinotQuery = "SELECT count(*), arrayToMV(RandomAirports) FROM mytable "
-        + "GROUP BY arrayToMV(RandomAirports) "
-        + "ORDER BY arrayToMV(RandomAirports) DESC";
+    String pinotQuery =
+        "SELECT count(*), arrayToMV(RandomAirports) FROM mytable " + "GROUP BY arrayToMV(RandomAirports) "
+            + "ORDER BY arrayToMV(RandomAirports) DESC";
     JsonNode jsonNode = postQuery(pinotQuery);
     Assert.assertEquals(jsonNode.get("resultTable").get("rows").size(), 154);
+  }
+
+  @Test
+  public void testMultiValueColumnTransforms()
+      throws Exception {
+    String pinotQuery = "SELECT arrayLength(RandomAirports) FROM mytable limit 10";
+    JsonNode jsonNode = postQuery(pinotQuery);
+    Assert.assertEquals(jsonNode.get("resultTable").get("rows").size(), 10);
+    Assert.assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "INT");
+
+    pinotQuery = "SELECT cardinality(DivAirportIDs) FROM mytable limit 10";
+    jsonNode = postQuery(pinotQuery);
+    Assert.assertEquals(jsonNode.get("resultTable").get("rows").size(), 10);
+    Assert.assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "INT");
+
+    // arrayMin dataType should be same as the column dataType
+    pinotQuery = "SELECT arrayMin(DivAirports) FROM mytable limit 10";
+    jsonNode = postQuery(pinotQuery);
+    Assert.assertEquals(jsonNode.get("resultTable").get("rows").size(), 10);
+    Assert.assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "STRING");
+
+    pinotQuery = "SELECT arrayMin(DivAirportIDs) FROM mytable limit 10";
+    jsonNode = postQuery(pinotQuery);
+    Assert.assertEquals(jsonNode.get("resultTable").get("rows").size(), 10);
+    Assert.assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "INT");
+
+    // arrayMax dataType should be same as the column dataType
+    pinotQuery = "SELECT arrayMax(DivAirports) FROM mytable limit 10";
+    jsonNode = postQuery(pinotQuery);
+    Assert.assertEquals(jsonNode.get("resultTable").get("rows").size(), 10);
+    Assert.assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "STRING");
+
+    pinotQuery = "SELECT arrayMax(DivAirportIDs) FROM mytable limit 10";
+    jsonNode = postQuery(pinotQuery);
+    Assert.assertEquals(jsonNode.get("resultTable").get("rows").size(), 10);
+    Assert.assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "INT");
+
+    // arraySum
+    pinotQuery = "SELECT arraySum(DivAirportIDs) FROM mytable limit 1";
+    jsonNode = postQuery(pinotQuery);
+    Assert.assertEquals(jsonNode.get("resultTable").get("rows").size(), 1);
+    Assert.assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "DOUBLE");
+
+    // arraySum
+    pinotQuery = "SELECT arrayAverage(DivAirportIDs) FROM mytable limit 1";
+    jsonNode = postQuery(pinotQuery);
+    Assert.assertEquals(jsonNode.get("resultTable").get("rows").size(), 1);
+    Assert.assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "DOUBLE");
+  }
+
+  @Test
+  public void selectStarDoesNotProjectSystemColumns()
+      throws Exception {
+    JsonNode jsonNode = postQuery("select * from mytable limit 0");
+    List<String> columns = getColumns(jsonNode);
+    for (int i = 0; i < columns.size(); i++) {
+      String colName = columns.get(i);
+      Assert.assertFalse(colName.startsWith("$"), "Column " + colName + " (found at index " + i + " is a system column "
+          + "and shouldn't be included in select *");
+    }
+  }
+
+  @Test(dataProvider = "systemColumns")
+  public void systemColumnsCanBeSelected(String systemColumn)
+      throws Exception {
+    JsonNode jsonNode = postQuery("select " + systemColumn + " from mytable limit 0");
+    assertNoError(jsonNode);
+  }
+
+  @Test(dataProvider = "systemColumns")
+  public void systemColumnsCanBeUsedInWhere(String systemColumn)
+      throws Exception {
+    JsonNode jsonNode = postQuery("select 1 from mytable where " + systemColumn + " is not null limit 0");
+    assertNoError(jsonNode);
+  }
+
+  @Test
+  public void testSearch()
+      throws Exception {
+    String sqlQuery = "SELECT CASE WHEN ArrDelay > 50 OR ArrDelay < 10 THEN 10 ELSE 0 END "
+        + "FROM mytable LIMIT 1000";
+    JsonNode jsonNode = postQuery("Explain plan for " + sqlQuery);
+    JsonNode plan = jsonNode.get("resultTable").get("rows").get(0).get(1);
+
+    Pattern pattern = Pattern.compile("SEARCH\\(\\$7, Sarg\\[\\(-∞\\.\\.10\\), \\(50\\.\\.\\+∞\\)]\\)");
+    boolean matches = pattern.matcher(plan.asText()).find();
+    Assert.assertTrue(matches, "Plan doesn't contain the expected SEARCH");
+
+    jsonNode = postQuery(sqlQuery);
+    assertNoError(jsonNode);
+  }
+
+  @Test
+  public void testMVNumericCastInFilter() throws Exception {
+    String sqlQuery = "SELECT COUNT(*) FROM mytable WHERE arrayToMV(CAST(DivAirportIDs AS BIGINT ARRAY)) > 0";
+    JsonNode jsonNode = postQuery(sqlQuery);
+    assertNoError(jsonNode);
+    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asInt(), 15482);
+  }
+
+  @Override
+  protected String getTableName() {
+    return _tableName;
+  }
+
+  @Test
+  public void testWithoutDatabaseContext()
+      throws Exception {
+    // default database check. No database context passed
+    checkQueryResultForDBTest("ActualElapsedTime", DEFAULT_TABLE_NAME);
+  }
+
+  @Test
+  public void testWithDefaultDatabaseContextAsTableNamePrefix()
+      throws Exception {
+    // default database check. Default database context passed as table prefix
+    checkQueryResultForDBTest("ActualElapsedTime", DEFAULT_DATABASE_NAME + "." + DEFAULT_TABLE_NAME);
+  }
+
+  @Test
+  public void testWithDefaultDatabaseContextAsQueryOption()
+      throws Exception {
+    // default database check. Default database context passed as SET database='dbName'
+    checkQueryResultForDBTest("ActualElapsedTime", DEFAULT_TABLE_NAME, DEFAULT_DATABASE_NAME);
+  }
+
+  @Test
+  public void testWithDefaultDatabaseContextAsHttpHeader()
+      throws Exception {
+    // default database check. Default database context passed as "database" http header
+    checkQueryResultForDBTest("ActualElapsedTime", DEFAULT_TABLE_NAME,
+        Collections.singletonMap(CommonConstants.DATABASE, DEFAULT_DATABASE_NAME));
+  }
+
+  @Test
+  public void testWithDefaultDatabaseContextAsTableNamePrefixAndQueryOption()
+      throws Exception {
+    // default database check. Default database context passed as table prefix as well as query option
+    checkQueryResultForDBTest("ActualElapsedTime", DEFAULT_DATABASE_NAME + "." + DEFAULT_TABLE_NAME,
+        DEFAULT_DATABASE_NAME);
+  }
+
+  @Test
+  public void testWithDefaultDatabaseContextAsTableNamePrefixAndHttpHeader()
+      throws Exception {
+    // default database check. Default database context passed as table prefix as well as http header
+    checkQueryResultForDBTest("ActualElapsedTime", DEFAULT_DATABASE_NAME + "." + DEFAULT_TABLE_NAME,
+        Collections.singletonMap(CommonConstants.DATABASE, DEFAULT_DATABASE_NAME));
+  }
+
+  @Test
+  public void testWithDatabaseContextAsTableNamePrefix()
+      throws Exception {
+    // Using renamed column "ActualElapsedTime_2" to ensure that the same table is not being queried.
+    // custom database check. Database context passed only as table prefix. Will
+    JsonNode result = getQueryResultForDBTest("ActualElapsedTime_2", TABLE_NAME_WITH_DATABASE, null, null);
+    checkQueryPlanningErrorForDBTest(result, QueryException.QUERY_PLANNING_ERROR_CODE);
+  }
+
+  @Test
+  public void testWithDatabaseContextAsQueryOption()
+      throws Exception {
+    // Using renamed column "ActualElapsedTime_2" to ensure that the same table is not being queried.
+    // custom database check. Database context passed as SET database='dbName'
+    checkQueryResultForDBTest("ActualElapsedTime_2", DEFAULT_TABLE_NAME, DATABASE_NAME);
+  }
+
+  @Test
+  public void testWithDatabaseContextAsHttpHeader()
+      throws Exception {
+    // Using renamed column "ActualElapsedTime_2" to ensure that the same table is not being queried.
+    // custom database check. Database context passed as "database" http header
+    checkQueryResultForDBTest("ActualElapsedTime_2", DEFAULT_TABLE_NAME,
+        Collections.singletonMap(CommonConstants.DATABASE, DATABASE_NAME));
+  }
+
+  @Test
+  public void testWithDatabaseContextAsTableNamePrefixAndQueryOption()
+      throws Exception {
+    // Using renamed column "ActualElapsedTime_2" to ensure that the same table is not being queried.
+    // custom database check. Database context passed as table prefix as well as query option
+    checkQueryResultForDBTest("ActualElapsedTime_2", TABLE_NAME_WITH_DATABASE, DATABASE_NAME);
+  }
+
+  @Test
+  public void testWithDatabaseContextAsTableNamePrefixAndHttpHeader()
+      throws Exception {
+    // Using renamed column "ActualElapsedTime_2" to ensure that the same table is not being queried.
+    // custom database check. Database context passed as table prefix as well as http header
+    checkQueryResultForDBTest("ActualElapsedTime_2", TABLE_NAME_WITH_DATABASE,
+        Collections.singletonMap(CommonConstants.DATABASE, DATABASE_NAME));
+  }
+
+  @Test
+  public void testWithConflictingDatabaseContextFromTableNamePrefixAndQueryOption()
+      throws Exception {
+    JsonNode result = getQueryResultForDBTest("ActualElapsedTime", TABLE_NAME_WITH_DATABASE, DEFAULT_DATABASE_NAME,
+        null);
+    checkQueryPlanningErrorForDBTest(result, QueryException.QUERY_PLANNING_ERROR_CODE);
+  }
+
+  @Test
+  public void testWithConflictingDatabaseContextFromTableNamePrefixAndHttpHeader()
+      throws Exception {
+    JsonNode result = getQueryResultForDBTest("ActualElapsedTime", TABLE_NAME_WITH_DATABASE, null,
+        Collections.singletonMap(CommonConstants.DATABASE, DEFAULT_DATABASE_NAME));
+    checkQueryPlanningErrorForDBTest(result, QueryException.QUERY_PLANNING_ERROR_CODE);
+  }
+
+  @Test
+  public void testWithConflictingDatabaseContextFromHttpHeaderAndQueryOption()
+      throws Exception {
+    JsonNode result = getQueryResultForDBTest("ActualElapsedTime", TABLE_NAME_WITH_DATABASE, DATABASE_NAME,
+        Collections.singletonMap(CommonConstants.DATABASE, DEFAULT_DATABASE_NAME));
+    checkQueryPlanningErrorForDBTest(result, QueryException.QUERY_VALIDATION_ERROR_CODE);
+  }
+
+  @Test
+  public void testCrossDatabaseQuery()
+      throws Exception {
+    String query = "SELECT tb1.Carrier, maxTime, distance FROM (SELECT max(AirTime) AS maxTime, Carrier FROM "
+        + DEFAULT_TABLE_NAME + " GROUP BY Carrier ORDER BY maxTime DESC) AS tb1 JOIN (SELECT sum(Distance) AS distance,"
+        + " Carrier FROM " + TABLE_NAME_WITH_DATABASE + " GROUP BY Carrier) AS tb2 "
+        + "ON tb1.Carrier = tb2.Carrier; ";
+    JsonNode result = postQuery(query);
+    checkQueryPlanningErrorForDBTest(result, QueryException.QUERY_PLANNING_ERROR_CODE);
+  }
+
+  private void checkQueryResultForDBTest(String column, String tableName)
+      throws Exception {
+    checkQueryResultForDBTest(column, tableName, null, null);
+  }
+
+  private void checkQueryResultForDBTest(String column, String tableName, Map<String, String> headers)
+      throws Exception {
+    checkQueryResultForDBTest(column, tableName, null, headers);
+  }
+
+  private void checkQueryResultForDBTest(String column, String tableName, String database)
+      throws Exception {
+    checkQueryResultForDBTest(column, tableName, database, null);
+  }
+
+  private void checkQueryResultForDBTest(String column, String tableName, @Nullable String database,
+      Map<String, String> headers)
+      throws Exception {
+    // max value of 'ActualElapsedTime'
+    long expectedValue = 678;
+    JsonNode jsonNode = getQueryResultForDBTest(column, tableName, database, headers);
+    long result = jsonNode.get("resultTable").get("rows").get(0).get(0).asLong();
+    assertEquals(result, expectedValue);
+  }
+
+  private void checkQueryPlanningErrorForDBTest(JsonNode queryResult, int errorCode) {
+    long result = queryResult.get("exceptions").get(0).get("errorCode").asInt();
+    assertEquals(result, errorCode);
+  }
+
+  private JsonNode getQueryResultForDBTest(String column, String tableName, @Nullable String database,
+      Map<String, String> headers)
+      throws Exception {
+    String query = (StringUtils.isNotBlank(database) ? "SET database='" + database + "'; " : "")
+        + "select max(" + column + ") from " + tableName + ";";
+    return postQuery(query, headers);
   }
 
   @AfterClass
   public void tearDown()
       throws Exception {
     dropOfflineTable(DEFAULT_TABLE_NAME);
+    dropOfflineTable(TABLE_NAME_WITH_DATABASE);
 
     stopServer();
     stopBroker();

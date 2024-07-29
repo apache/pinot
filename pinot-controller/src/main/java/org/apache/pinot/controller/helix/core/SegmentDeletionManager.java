@@ -20,6 +20,7 @@ package org.apache.pinot.controller.helix.core;
 
 import java.io.IOException;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -42,11 +43,11 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
-import org.apache.pinot.common.utils.SegmentName;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.core.segment.processing.lifecycle.PinotSegmentLifecycleEventListenerManager;
 import org.apache.pinot.core.segment.processing.lifecycle.impl.SegmentDeletionEventDetails;
+import org.apache.pinot.segment.local.utils.SegmentPushUtils;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.filesystem.PinotFS;
@@ -109,8 +110,7 @@ public class SegmentDeletionManager {
     deleteSegments(tableName, segmentIds, (Long) null);
   }
 
-  public void deleteSegments(String tableName, Collection<String> segmentIds,
-      @Nullable TableConfig tableConfig) {
+  public void deleteSegments(String tableName, Collection<String> segmentIds, @Nullable TableConfig tableConfig) {
     deleteSegments(tableName, segmentIds, getRetentionMsFromTableConfig(tableConfig));
   }
 
@@ -124,8 +124,7 @@ public class SegmentDeletionManager {
     _executorService.schedule(new Runnable() {
       @Override
       public void run() {
-        deleteSegmentFromPropertyStoreAndLocal(tableName, segmentIds, deletedSegmentsRetentionMs,
-            deletionDelaySeconds);
+        deleteSegmentFromPropertyStoreAndLocal(tableName, segmentIds, deletedSegmentsRetentionMs, deletionDelaySeconds);
       }
     }, deletionDelaySeconds, TimeUnit.SECONDS);
   }
@@ -155,7 +154,7 @@ public class SegmentDeletionManager {
         }
       }
     } catch (Exception e) {
-      LOGGER.warn("Caught exception while checking helix states for table {} " + tableName, e);
+      LOGGER.warn("Caught exception while checking helix states for table: {}", tableName, e);
       segmentsToDelete.clear();
       segmentsToDelete.addAll(segmentIds);
       segmentsToRetryLater.clear();
@@ -214,18 +213,33 @@ public class SegmentDeletionManager {
     }
   }
 
+  private void deleteSegmentMetadataFromStore(PinotFS pinotFS, URI segmentFileUri, String segmentId) {
+    // Check if segment metadata exists in remote store and delete it.
+    // URI is generated from segment's location and segment name
+    try {
+      URI segmentMetadataUri = SegmentPushUtils.generateSegmentMetadataURI(segmentFileUri.toString(), segmentId);
+      if (pinotFS.exists(segmentMetadataUri)) {
+        LOGGER.info("Deleting segment metadata {} from {}", segmentId, segmentMetadataUri);
+        pinotFS.delete(segmentMetadataUri, true);
+      }
+    } catch (IOException e) {
+      LOGGER.warn("Could not delete segment metadata {} from {}", segmentId, segmentFileUri, e);
+    } catch (URISyntaxException e) {
+      LOGGER.warn("Could not parse segment uri {}", segmentFileUri, e);
+    }
+  }
+
   protected void removeSegmentFromStore(String tableNameWithType, String segmentId,
       @Nullable Long deletedSegmentsRetentionMs) {
-    // Ignore HLC segments as they are not stored in Pinot FS
-    if (SegmentName.isHighLevelConsumerSegmentName(segmentId)) {
-      return;
-    }
     if (_dataDir != null) {
       long retentionMs = deletedSegmentsRetentionMs == null
           ? _defaultDeletedSegmentsRetentionMs : deletedSegmentsRetentionMs;
       String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
       URI fileToDeleteURI = URIUtils.getUri(_dataDir, rawTableName, URIUtils.encode(segmentId));
       PinotFS pinotFS = PinotFSFactory.create(fileToDeleteURI.getScheme());
+      // Segment metadata in remote store is an optimization, to avoid downloading segment to parse metadata.
+      // This is catch all clean up to ensure that metadata is removed from deep store.
+      deleteSegmentMetadataFromStore(pinotFS, fileToDeleteURI, segmentId);
       if (retentionMs <= 0) {
         // delete the segment file instantly if retention is set to zero
         try {
@@ -296,13 +310,14 @@ public class SegmentDeletionManager {
         for (String tableNameDir : tableNameDirs) {
           String tableName = URIUtils.getLastPart(tableNameDir);
           if (leadControllerManager.isLeaderForTable(tableName)) {
-            URI tableNameURI = URIUtils.getUri(tableNameDir);
+            URI tableNameURI = URIUtils.getUri(deletedDirURI.toString(), URIUtils.encode(tableName));
             // Get files that are aged
             final String[] targetFiles = pinotFS.listFiles(tableNameURI, false);
             int numFilesDeleted = 0;
             for (String targetFile : targetFiles) {
-              URI targetURI = URIUtils.getUri(targetFile);
-              long deletionTimeMs = getDeletionTimeMsFromFile(targetFile, pinotFS.lastModified(targetURI));
+              URI targetURI =
+                  URIUtils.getUri(tableNameURI.toString(), URIUtils.encode(URIUtils.getLastPart(targetFile)));
+              long deletionTimeMs = getDeletionTimeMsFromFile(targetURI.toString(), pinotFS.lastModified(targetURI));
               if (System.currentTimeMillis() >= deletionTimeMs) {
                 if (!pinotFS.delete(targetURI, true)) {
                   LOGGER.warn("Cannot remove file {} from deleted directory.", targetURI);

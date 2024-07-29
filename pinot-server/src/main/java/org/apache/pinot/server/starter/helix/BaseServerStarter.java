@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -58,17 +59,21 @@ import org.apache.pinot.common.utils.PinotAppConfigs;
 import org.apache.pinot.common.utils.ServiceStartableUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.ServiceStatus.Status;
-import org.apache.pinot.common.utils.TlsUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.common.utils.regex.PatternFactory;
+import org.apache.pinot.common.utils.tls.PinotInsecureMode;
+import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.common.version.PinotVersion;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager;
+import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
-import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneIndexRefreshState;
+import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneIndexRefreshManager;
+import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndexSearcherPool;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.server.access.AccessControlFactory;
 import org.apache.pinot.server.api.AdminApiApplication;
@@ -134,9 +139,11 @@ public abstract class BaseServerStarter implements ServiceStartable {
   protected HelixManager _helixManager;
   protected HelixAdmin _helixAdmin;
   protected ServerInstance _serverInstance;
+  protected AccessControlFactory _accessControlFactory;
   protected AdminApiApplication _adminApiApplication;
   protected ServerQueriesDisabledTracker _serverQueriesDisabledTracker;
-  protected RealtimeLuceneIndexRefreshState _realtimeLuceneIndexRefreshState;
+  protected RealtimeLuceneTextIndexSearcherPool _realtimeLuceneTextIndexSearcherPool;
+  protected RealtimeLuceneIndexRefreshManager _realtimeLuceneTextIndexRefreshManager;
   protected PinotEnvironmentProvider _pinotEnvironmentProvider;
   protected volatile boolean _isServerReadyToServeQueries = false;
 
@@ -149,11 +156,19 @@ public abstract class BaseServerStarter implements ServiceStartable {
     _helixClusterName = _serverConf.getProperty(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME);
     ServiceStartableUtils.applyClusterConfig(_serverConf, _zkAddress, _helixClusterName, ServiceRole.SERVER);
 
+    PinotInsecureMode.setPinotInInsecureMode(Boolean.parseBoolean(
+        _serverConf.getProperty(CommonConstants.CONFIG_OF_PINOT_INSECURE_MODE,
+            CommonConstants.DEFAULT_PINOT_INSECURE_MODE)));
+
     setupHelixSystemProperties();
     _listenerConfigs = ListenerConfigUtil.buildServerAdminConfigs(_serverConf);
     _hostname = _serverConf.getProperty(Helix.KEY_OF_SERVER_NETTY_HOST,
         _serverConf.getProperty(Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false) ? NetUtils.getHostnameOrAddress()
             : NetUtils.getHostAddress());
+    // Override multi-stage query runner hostname if not set explicitly
+    if (!_serverConf.containsKey(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME)) {
+      _serverConf.setProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME, _hostname);
+    }
     _port = _serverConf.getProperty(Helix.KEY_OF_SERVER_NETTY_PORT, Helix.DEFAULT_SERVER_NETTY_PORT);
 
     _instanceId = _serverConf.getProperty(Server.CONFIG_OF_INSTANCE_ID);
@@ -198,7 +213,6 @@ public abstract class BaseServerStarter implements ServiceStartable {
     ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(
         _serverConf.getProperty(Server.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT,
             Server.DEFAULT_THREAD_ALLOCATED_BYTES_MEASUREMENT));
-
     // Set data table version send to broker.
     int dataTableVersion =
         _serverConf.getProperty(Server.CONFIG_OF_CURRENT_DATA_TABLE_VERSION, DataTableBuilderFactory.DEFAULT_VERSION);
@@ -264,8 +278,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
     // collect all resources which have this instance in the ideal state
     List<String> resourcesToMonitor = new ArrayList<>();
-
-    Set<String> consumingSegments = new HashSet<>();
+    Map<String, Set<String>> consumingSegments = new HashMap<>();
     boolean checkRealtime = realtimeConsumptionCatchupWaitMs > 0;
     if (isFreshnessStatusCheckerEnabled && realtimeMinFreshnessMs <= 0) {
       LOGGER.warn("Realtime min freshness {} must be > 0. Setting relatime min freshness to default {}.",
@@ -278,23 +291,22 @@ public abstract class BaseServerStarter implements ServiceStartable {
       if (!TableNameBuilder.isTableResource(resourceName)) {
         continue;
       }
-
       // Only monitor enabled resources
       IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, resourceName);
-      if (idealState.isEnabled()) {
-
-        for (String partitionName : idealState.getPartitionSet()) {
-          if (idealState.getInstanceSet(partitionName).contains(_instanceId)) {
-            resourcesToMonitor.add(resourceName);
-            break;
-          }
+      if (idealState == null || !idealState.isEnabled()) {
+        continue;
+      }
+      for (String partitionName : idealState.getPartitionSet()) {
+        if (idealState.getInstanceSet(partitionName).contains(_instanceId)) {
+          resourcesToMonitor.add(resourceName);
+          break;
         }
-        if (checkRealtime && TableNameBuilder.isRealtimeTableResource(resourceName)) {
-          for (String partitionName : idealState.getPartitionSet()) {
-            if (StateModel.SegmentStateModel.CONSUMING.equals(
-                idealState.getInstanceStateMap(partitionName).get(_instanceId))) {
-              consumingSegments.add(partitionName);
-            }
+      }
+      if (checkRealtime && TableNameBuilder.isRealtimeTableResource(resourceName)) {
+        for (String partitionName : idealState.getPartitionSet()) {
+          if (StateModel.SegmentStateModel.CONSUMING.equals(
+              idealState.getInstanceStateMap(partitionName).get(_instanceId))) {
+            consumingSegments.computeIfAbsent(resourceName, k -> new HashSet<>()).add(partitionName);
           }
         }
       }
@@ -321,7 +333,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
             realtimeMinFreshnessMs, idleTimeoutMs);
         FreshnessBasedConsumptionStatusChecker freshnessStatusChecker =
             new FreshnessBasedConsumptionStatusChecker(_serverInstance.getInstanceDataManager(), consumingSegments,
-                realtimeMinFreshnessMs, idleTimeoutMs);
+                this::getConsumingSegments, realtimeMinFreshnessMs, idleTimeoutMs);
         Supplier<Integer> getNumConsumingSegmentsNotReachedMinFreshness =
             freshnessStatusChecker::getNumConsumingSegmentsNotReachedIngestionCriteria;
         serviceStatusCallbackListBuilder.add(
@@ -330,7 +342,8 @@ public abstract class BaseServerStarter implements ServiceStartable {
       } else if (isOffsetBasedConsumptionStatusCheckerEnabled) {
         LOGGER.info("Setting up offset based status checker");
         OffsetBasedConsumptionStatusChecker consumptionStatusChecker =
-            new OffsetBasedConsumptionStatusChecker(_serverInstance.getInstanceDataManager(), consumingSegments);
+            new OffsetBasedConsumptionStatusChecker(_serverInstance.getInstanceDataManager(), consumingSegments,
+                this::getConsumingSegments);
         Supplier<Integer> getNumConsumingSegmentsNotReachedTheirLatestOffset =
             consumptionStatusChecker::getNumConsumingSegmentsNotReachedIngestionCriteria;
         serviceStatusCallbackListBuilder.add(
@@ -346,6 +359,22 @@ public abstract class BaseServerStarter implements ServiceStartable {
     LOGGER.info("Registering service status handler");
     ServiceStatus.setServiceStatusCallback(_instanceId,
         new ServiceStatus.MultipleCallbackServiceStatusCallback(serviceStatusCallbackListBuilder.build()));
+  }
+
+  @Nullable
+  private Set<String> getConsumingSegments(String realtimeTableName) {
+    IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, realtimeTableName);
+    if (idealState == null || !idealState.isEnabled()) {
+      return null;
+    }
+    Set<String> consumingSegments = new HashSet<>();
+    for (String partitionName : idealState.getPartitionSet()) {
+      if (StateModel.SegmentStateModel.CONSUMING.equals(
+          idealState.getInstanceStateMap(partitionName).get(_instanceId))) {
+        consumingSegments.add(partitionName);
+      }
+    }
+    return consumingSegments;
   }
 
   private void updateInstanceConfigIfNeeded(ServerConf serverConf) {
@@ -411,7 +440,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
       }
     }
 
-    // Update system resource info (CPU, memory, etc)
+    // Update system resource info (CPU, memory, etc.)
     Map<String, String> newSystemResourceInfoMap = new SystemResourceInfo().toMap();
     Map<String, String> existingSystemResourceInfoMap =
         znRecord.getMapField(CommonConstants.Helix.Instance.SYSTEM_RESOURCE_INFO_KEY);
@@ -420,7 +449,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
       if (existingSystemResourceInfoMap == null) {
         existingSystemResourceInfoMap = newSystemResourceInfoMap;
       } else {
-        // existingSystemResourceInfoMap may contains more KV pairs than newSystemResourceInfoMap,
+        // existingSystemResourceInfoMap may contain more KV pairs than newSystemResourceInfoMap,
         // we need to preserve those KV pairs and only update the different values.
         for (Map.Entry<String, String> entry : newSystemResourceInfoMap.entrySet()) {
           existingSystemResourceInfoMap.put(entry.getKey(), entry.getValue());
@@ -507,12 +536,13 @@ public abstract class BaseServerStarter implements ServiceStartable {
       }
     }
 
-    boolean exitServerOnIncompleteStartup = _serverConf.getProperty(
-        Server.CONFIG_OF_EXIT_ON_SERVICE_STATUS_CHECK_FAILURE,
-        Server.DEFAULT_EXIT_ON_SERVICE_STATUS_CHECK_FAILURE);
+    boolean exitServerOnIncompleteStartup =
+        _serverConf.getProperty(Server.CONFIG_OF_EXIT_ON_SERVICE_STATUS_CHECK_FAILURE,
+            Server.DEFAULT_EXIT_ON_SERVICE_STATUS_CHECK_FAILURE);
     if (exitServerOnIncompleteStartup) {
-      String errorMessage = String.format("Service status %s has not turned GOOD within %dms: %s. Exiting server.",
-          serviceStatus, System.currentTimeMillis() - startTimeMs, ServiceStatus.getStatusDescription());
+      String errorMessage =
+          String.format("Service status %s has not turned GOOD within %dms: %s. Exiting server.", serviceStatus,
+              System.currentTimeMillis() - startTimeMs, ServiceStatus.getStatusDescription());
       throw new IllegalStateException(errorMessage);
     }
     LOGGER.warn("Service status has not turned GOOD within {}ms: {}", System.currentTimeMillis() - startTimeMs,
@@ -543,14 +573,28 @@ public abstract class BaseServerStarter implements ServiceStartable {
     String accessControlFactoryClass =
         _serverConf.getProperty(Server.ACCESS_CONTROL_FACTORY_CLASS, Server.DEFAULT_ACCESS_CONTROL_FACTORY_CLASS);
     LOGGER.info("Using class: {} as the AccessControlFactory", accessControlFactoryClass);
-    AccessControlFactory accessControlFactory;
     try {
-      accessControlFactory = PluginManager.get().createInstance(accessControlFactoryClass);
+      _accessControlFactory = PluginManager.get().createInstance(accessControlFactoryClass);
     } catch (Exception e) {
       throw new RuntimeException(
           "Caught exception while creating new AccessControlFactory instance using class '" + accessControlFactoryClass
               + "'", e);
     }
+
+    // Create a thread pool used for mutable lucene index searches, with size based on query_worker_threads config
+    LOGGER.info("Initializing lucene searcher thread pool");
+    int queryWorkerThreads =
+        _serverConf.getProperty(ResourceManager.QUERY_WORKER_CONFIG_KEY, ResourceManager.DEFAULT_QUERY_WORKER_THREADS);
+    _realtimeLuceneTextIndexSearcherPool = RealtimeLuceneTextIndexSearcherPool.init(queryWorkerThreads);
+
+    // Initialize RealtimeLuceneIndexRefreshManager with max refresh threads and min refresh interval configs
+    LOGGER.info("Initializing lucene refresh manager");
+    int luceneMaxRefreshThreads =
+        _serverConf.getProperty(Server.LUCENE_MAX_REFRESH_THREADS, Server.DEFAULT_LUCENE_MAX_REFRESH_THREADS);
+    int luceneMinRefreshIntervalDuration =
+        _serverConf.getProperty(Server.LUCENE_MIN_REFRESH_INTERVAL_MS, Server.DEFAULT_LUCENE_MIN_REFRESH_INTERVAL_MS);
+    _realtimeLuceneTextIndexRefreshManager =
+        RealtimeLuceneIndexRefreshManager.init(luceneMaxRefreshThreads, luceneMinRefreshIntervalDuration);
 
     LOGGER.info("Initializing server instance and registering state model factory");
     Utils.logVersions();
@@ -558,13 +602,14 @@ public abstract class BaseServerStarter implements ServiceStartable {
     ServerSegmentCompletionProtocolHandler.init(
         _serverConf.subset(SegmentCompletionProtocol.PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER));
     ServerConf serverConf = new ServerConf(_serverConf);
-    _serverInstance = new ServerInstance(serverConf, _helixManager, accessControlFactory);
+    _serverInstance = new ServerInstance(serverConf, _helixManager, _accessControlFactory);
     ServerMetrics serverMetrics = _serverInstance.getServerMetrics();
+
     InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
     instanceDataManager.setSupplierOfIsServerReadyToServeQueries(() -> _isServerReadyToServeQueries);
     // initialize the thread accountant for query killing
-    Tracing.ThreadAccountantOps
-        .initializeThreadAccountant(_serverConf.subset(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX), _instanceId);
+    Tracing.ThreadAccountantOps.initializeThreadAccountant(
+        _serverConf.subset(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX), _instanceId);
     initSegmentFetcher(_serverConf);
     StateModelFactory<?> stateModelFactory =
         new SegmentOnlineOfflineStateModelFactory(_instanceId, instanceDataManager);
@@ -581,7 +626,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
     // Start restlet server for admin API endpoint
     LOGGER.info("Starting server admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));
-    _adminApiApplication = new AdminApiApplication(_serverInstance, accessControlFactory, _serverConf);
+    _adminApiApplication = createServerAdminApp();
     _adminApiApplication.start(_listenerConfigs);
 
     // Init QueryRewriterFactory
@@ -616,7 +661,14 @@ public abstract class BaseServerStarter implements ServiceStartable {
       }
     }
 
+    // Initialize regex pattern factory
+    PatternFactory.init(
+        _serverConf.getProperty(Server.CONFIG_OF_SERVER_QUERY_REGEX_CLASS, Server.DEFAULT_SERVER_QUERY_REGEX_CLASS));
+
     preServeQueries();
+
+    // Enable Server level realtime ingestion rate limier
+    RealtimeConsumptionRateManager.getInstance().createServerRateLimiter(_serverConf, serverMetrics);
 
     // Start the query server after finishing the service status check. If the query server is started before all the
     // segments are loaded, broker might not have finished processing the callback of routing table update, and start
@@ -641,9 +693,6 @@ public abstract class BaseServerStarter implements ServiceStartable {
     _serverQueriesDisabledTracker =
         new ServerQueriesDisabledTracker(_helixClusterName, _instanceId, _helixManager, serverMetrics);
     _serverQueriesDisabledTracker.start();
-
-    _realtimeLuceneIndexRefreshState = RealtimeLuceneIndexRefreshState.getInstance();
-    _realtimeLuceneIndexRefreshState.start();
   }
 
   /**
@@ -675,9 +724,6 @@ public abstract class BaseServerStarter implements ServiceStartable {
     }
     if (_serverQueriesDisabledTracker != null) {
       _serverQueriesDisabledTracker.stop();
-    }
-    if (_realtimeLuceneIndexRefreshState != null) {
-      _realtimeLuceneIndexRefreshState.stop();
     }
     try {
       // Close PinotFS after all data managers are shutdown. Otherwise, segments which are being committed will not
@@ -752,7 +798,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
   /**
    * When shutting down the server, waits for all the resources turn OFFLINE (all partitions served by the server are
-   * neither ONLINE or CONSUMING).
+   * neither ONLINE nor CONSUMING).
    *
    * @param endTimeMs Timeout for the check
    */
@@ -887,5 +933,9 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
     PinotConfiguration pinotCrypterConfig = config.subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_PINOT_CRYPTER);
     PinotCrypterFactory.init(pinotCrypterConfig);
+  }
+
+  protected AdminApiApplication createServerAdminApp() {
+    return new AdminApiApplication(_serverInstance, _accessControlFactory, _serverConf);
   }
 }

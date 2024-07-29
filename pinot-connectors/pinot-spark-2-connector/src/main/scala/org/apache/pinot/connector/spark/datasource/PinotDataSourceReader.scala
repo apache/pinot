@@ -55,7 +55,7 @@ class PinotDataSourceReader(options: DataSourceOptions, userSchema: Option[Struc
       currentSchema = userSchema.getOrElse {
         val pinotTableSchema =
           PinotClusterClient.getTableSchema(readParameters.controller, readParameters.tableName)
-        TypeConverter.pinotSchemaToSparkSchema(pinotTableSchema)
+        DataExtractor.pinotSchemaToSparkSchema(pinotTableSchema)
       }
     }
     currentSchema

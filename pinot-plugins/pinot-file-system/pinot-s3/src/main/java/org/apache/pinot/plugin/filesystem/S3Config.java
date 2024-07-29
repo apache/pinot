@@ -23,12 +23,14 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import java.time.Duration;
 import java.util.UUID;
+import javax.annotation.Nullable;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.DataSizeUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.http.apache.ApacheHttpClient;
+import software.amazon.awssdk.services.s3.model.StorageClass;
 
 
 /**
@@ -48,6 +50,8 @@ public class S3Config {
   public static final String REGION = "region";
   public static final String ENDPOINT = "endpoint";
   public static final String DISABLE_ACL_CONFIG_KEY = "disableAcl";
+
+  public static final String STORAGE_CLASS = "storageClass";
 
   // Encryption related configurations
   public static final String SERVER_SIDE_ENCRYPTION_CONFIG_KEY = "serverSideEncryption";
@@ -76,6 +80,7 @@ public class S3Config {
   private final String _accessKey;
   private final String _secretKey;
   private final String _region;
+  private final String _storageClass;
   private final boolean _disableAcl;
   private final String _endpoint;
 
@@ -99,6 +104,14 @@ public class S3Config {
     _secretKey = pinotConfig.getProperty(SECRET_KEY);
     _region = pinotConfig.getProperty(REGION);
     _endpoint = pinotConfig.getProperty(ENDPOINT);
+
+    _storageClass = pinotConfig.getProperty(STORAGE_CLASS);
+    if (_storageClass != null) {
+      if (StorageClass.fromValue(_storageClass) == StorageClass.UNKNOWN_TO_SDK_VERSION) {
+        throw new IllegalStateException(
+            "unknown s3 storage class: " + _storageClass + " - Valid storage classes: " + StorageClass.knownValues());
+      }
+    }
 
     _serverSideEncryption = pinotConfig.getProperty(SERVER_SIDE_ENCRYPTION_CONFIG_KEY);
     _ssekmsKeyId = pinotConfig.getProperty(SSE_KMS_KEY_ID_CONFIG_KEY);
@@ -246,5 +259,10 @@ public class S3Config {
 
   public ApacheHttpClient.Builder getHttpClientBuilder() {
     return _httpClientBuilder;
+  }
+
+  @Nullable
+  public String getStorageClass() {
+    return _storageClass;
   }
 }

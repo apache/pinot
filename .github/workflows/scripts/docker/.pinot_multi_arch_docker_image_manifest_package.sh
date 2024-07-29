@@ -18,6 +18,8 @@
 # under the License.
 #
 
+set -x
+
 if [ -z "${DOCKER_IMAGE_NAME}" ]; then
   DOCKER_IMAGE_NAME="apachepinot/pinot"
 fi

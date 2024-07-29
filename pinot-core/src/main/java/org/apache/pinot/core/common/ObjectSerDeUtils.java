@@ -19,7 +19,9 @@
 package org.apache.pinot.core.common;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
+import com.clearspring.analytics.stream.cardinality.HyperLogLogPlus;
 import com.clearspring.analytics.stream.cardinality.RegisterSet;
+import com.dynatrace.hash4j.distinctcount.UltraLogLog;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.primitives.Longs;
@@ -33,19 +35,24 @@ import it.unimi.dsi.fastutil.doubles.DoubleOpenHashSet;
 import it.unimi.dsi.fastutil.doubles.DoubleSet;
 import it.unimi.dsi.fastutil.floats.Float2LongMap;
 import it.unimi.dsi.fastutil.floats.Float2LongOpenHashMap;
+import it.unimi.dsi.fastutil.floats.FloatArrayList;
 import it.unimi.dsi.fastutil.floats.FloatIterator;
 import it.unimi.dsi.fastutil.floats.FloatOpenHashSet;
 import it.unimi.dsi.fastutil.floats.FloatSet;
 import it.unimi.dsi.fastutil.ints.Int2LongMap;
 import it.unimi.dsi.fastutil.ints.Int2LongOpenHashMap;
+import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntIterator;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.longs.Long2LongMap;
 import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
+import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.longs.LongIterator;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
 import java.io.IOException;
@@ -56,19 +63,27 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.PriorityQueue;
 import java.util.Set;
+import org.apache.datasketches.common.ArrayOfStringsSerDe;
+import org.apache.datasketches.cpc.CpcSketch;
+import org.apache.datasketches.frequencies.ItemsSketch;
+import org.apache.datasketches.frequencies.LongsSketch;
 import org.apache.datasketches.kll.KllDoublesSketch;
 import org.apache.datasketches.memory.Memory;
 import org.apache.datasketches.theta.Sketch;
 import org.apache.datasketches.tuple.aninteger.IntegerSummary;
 import org.apache.datasketches.tuple.aninteger.IntegerSummaryDeserializer;
 import org.apache.pinot.common.CustomObject;
+import org.apache.pinot.common.utils.HashUtil;
+import org.apache.pinot.core.query.aggregation.function.funnel.FunnelStepEvent;
 import org.apache.pinot.core.query.aggregation.utils.exprminmax.ExprMinMaxObject;
 import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.apache.pinot.core.query.utils.idset.IdSet;
 import org.apache.pinot.core.query.utils.idset.IdSets;
 import org.apache.pinot.segment.local.customobject.AvgPair;
 import org.apache.pinot.segment.local.customobject.CovarianceTuple;
+import org.apache.pinot.segment.local.customobject.CpcSketchAccumulator;
 import org.apache.pinot.segment.local.customobject.DoubleLongPair;
 import org.apache.pinot.segment.local.customobject.FloatLongPair;
 import org.apache.pinot.segment.local.customobject.IntLongPair;
@@ -77,6 +92,8 @@ import org.apache.pinot.segment.local.customobject.MinMaxRangePair;
 import org.apache.pinot.segment.local.customobject.PinotFourthMoment;
 import org.apache.pinot.segment.local.customobject.QuantileDigest;
 import org.apache.pinot.segment.local.customobject.StringLongPair;
+import org.apache.pinot.segment.local.customobject.ThetaSketchAccumulator;
+import org.apache.pinot.segment.local.customobject.TupleIntSketchAccumulator;
 import org.apache.pinot.segment.local.customobject.VarianceTuple;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
@@ -132,9 +149,23 @@ public class ObjectSerDeUtils {
     CovarianceTuple(32),
     VarianceTuple(33),
     PinotFourthMoment(34),
-    ArgMinMaxObject(35),
+    ExprMinMaxObject(35),
     KllDataSketch(36),
-    IntegerTupleSketch(37);
+    IntegerTupleSketch(37),
+    FrequentStringsSketch(38),
+    FrequentLongsSketch(39),
+    HyperLogLogPlus(40),
+    CompressedProbabilisticCounting(41),
+    IntArrayList(42),
+    LongArrayList(43),
+    FloatArrayList(44),
+    StringArrayList(45),
+    UltraLogLog(46),
+    ThetaSketchAccumulator(47),
+    TupleIntSketchAccumulator(48),
+    CpcSketchAccumulator(49),
+    OrderedStringSet(50),
+    FunnelStepEventAccumulator(51);
 
     private final int _value;
 
@@ -155,8 +186,25 @@ public class ObjectSerDeUtils {
         return ObjectType.Double;
       } else if (value instanceof BigDecimal) {
         return ObjectType.BigDecimal;
+      } else if (value instanceof IntArrayList) {
+        return ObjectType.IntArrayList;
+      } else if (value instanceof LongArrayList) {
+        return ObjectType.LongArrayList;
+      } else if (value instanceof FloatArrayList) {
+        return ObjectType.FloatArrayList;
       } else if (value instanceof DoubleArrayList) {
         return ObjectType.DoubleArrayList;
+      } else if (value instanceof ObjectArrayList) {
+        ObjectArrayList objectArrayList = (ObjectArrayList) value;
+        if (!objectArrayList.isEmpty()) {
+          Object next = objectArrayList.get(0);
+          if (next instanceof String) {
+            return ObjectType.StringArrayList;
+          }
+          throw new IllegalArgumentException(
+              "Unsupported type of value: " + next.getClass().getSimpleName());
+        }
+        return ObjectType.StringArrayList;
       } else if (value instanceof AvgPair) {
         return ObjectType.AvgPair;
       } else if (value instanceof MinMaxRangePair) {
@@ -195,6 +243,13 @@ public class ObjectSerDeUtils {
         return ObjectType.FloatSet;
       } else if (value instanceof DoubleSet) {
         return ObjectType.DoubleSet;
+      } else if (value instanceof ObjectLinkedOpenHashSet) {
+        ObjectLinkedOpenHashSet objectSet = (ObjectLinkedOpenHashSet) value;
+        if (objectSet.isEmpty() || objectSet.first() instanceof String) {
+          return ObjectType.OrderedStringSet;
+        }
+        throw new IllegalArgumentException(
+            "Unsupported type of value: " + objectSet.first().getClass().getSimpleName());
       } else if (value instanceof ObjectSet) {
         ObjectSet objectSet = (ObjectSet) value;
         if (objectSet.isEmpty() || objectSet.iterator().next() instanceof String) {
@@ -225,7 +280,30 @@ public class ObjectSerDeUtils {
       } else if (value instanceof org.apache.datasketches.tuple.Sketch) {
         return ObjectType.IntegerTupleSketch;
       } else if (value instanceof ExprMinMaxObject) {
-        return ObjectType.ArgMinMaxObject;
+        return ObjectType.ExprMinMaxObject;
+      } else if (value instanceof ItemsSketch) {
+        return ObjectType.FrequentStringsSketch;
+      } else if (value instanceof LongsSketch) {
+        return ObjectType.FrequentLongsSketch;
+      } else if (value instanceof HyperLogLogPlus) {
+        return ObjectType.HyperLogLogPlus;
+      } else if (value instanceof CpcSketch) {
+        return ObjectType.CompressedProbabilisticCounting;
+      } else if (value instanceof UltraLogLog) {
+        return ObjectType.UltraLogLog;
+      } else if (value instanceof ThetaSketchAccumulator) {
+        return ObjectType.ThetaSketchAccumulator;
+      } else if (value instanceof TupleIntSketchAccumulator) {
+        return ObjectType.TupleIntSketchAccumulator;
+      } else if (value instanceof CpcSketchAccumulator) {
+        return ObjectType.CpcSketchAccumulator;
+      } else if (value instanceof PriorityQueue) {
+        PriorityQueue priorityQueue = (PriorityQueue) value;
+        if (priorityQueue.isEmpty() || priorityQueue.peek() instanceof FunnelStepEvent) {
+          return ObjectType.FunnelStepEventAccumulator;
+        }
+        throw new IllegalArgumentException(
+            "Unsupported type of value: " + priorityQueue.peek().getClass().getSimpleName());
       } else {
         throw new IllegalArgumentException("Unsupported type of value: " + value.getClass().getSimpleName());
       }
@@ -311,6 +389,99 @@ public class ObjectSerDeUtils {
     }
   };
 
+  public static final ObjectSerDe<IntArrayList> INT_ARRAY_LIST_SER_DE = new ObjectSerDe<IntArrayList>() {
+
+    @Override
+    public byte[] serialize(IntArrayList intArrayList) {
+      int size = intArrayList.size();
+      byte[] bytes = new byte[Integer.BYTES + size * Integer.BYTES];
+      ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
+      byteBuffer.putInt(size);
+      int[] values = intArrayList.elements();
+      for (int i = 0; i < size; i++) {
+        byteBuffer.putInt(values[i]);
+      }
+      return bytes;
+    }
+
+    @Override
+    public IntArrayList deserialize(byte[] bytes) {
+      return deserialize(ByteBuffer.wrap(bytes));
+    }
+
+    @Override
+    public IntArrayList deserialize(ByteBuffer byteBuffer) {
+      int numValues = byteBuffer.getInt();
+      IntArrayList intArrayList = new IntArrayList(numValues);
+      for (int i = 0; i < numValues; i++) {
+        intArrayList.add(byteBuffer.getInt());
+      }
+      return intArrayList;
+    }
+  };
+
+  public static final ObjectSerDe<LongArrayList> LONG_ARRAY_LIST_SER_DE = new ObjectSerDe<LongArrayList>() {
+
+    @Override
+    public byte[] serialize(LongArrayList longArrayList) {
+      int size = longArrayList.size();
+      byte[] bytes = new byte[Integer.BYTES + size * Long.BYTES];
+      ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
+      byteBuffer.putInt(size);
+      long[] values = longArrayList.elements();
+      for (int i = 0; i < size; i++) {
+        byteBuffer.putLong(values[i]);
+      }
+      return bytes;
+    }
+
+    @Override
+    public LongArrayList deserialize(byte[] bytes) {
+      return deserialize(ByteBuffer.wrap(bytes));
+    }
+
+    @Override
+    public LongArrayList deserialize(ByteBuffer byteBuffer) {
+      int numValues = byteBuffer.getInt();
+      LongArrayList longArrayList = new LongArrayList(numValues);
+      for (int i = 0; i < numValues; i++) {
+        longArrayList.add(byteBuffer.getLong());
+      }
+      return longArrayList;
+    }
+  };
+
+  public static final ObjectSerDe<FloatArrayList> FLOAT_ARRAY_LIST_SER_DE = new ObjectSerDe<FloatArrayList>() {
+
+    @Override
+    public byte[] serialize(FloatArrayList floatArrayList) {
+      int size = floatArrayList.size();
+      byte[] bytes = new byte[Integer.BYTES + size * Float.BYTES];
+      ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
+      byteBuffer.putInt(size);
+      float[] values = floatArrayList.elements();
+      for (int i = 0; i < size; i++) {
+        byteBuffer.putFloat(values[i]);
+      }
+      return bytes;
+    }
+
+    @Override
+    public FloatArrayList deserialize(byte[] bytes) {
+      return deserialize(ByteBuffer.wrap(bytes));
+    }
+
+    @Override
+    public FloatArrayList deserialize(ByteBuffer byteBuffer) {
+      int numValues = byteBuffer.getInt();
+      FloatArrayList floatArrayList = new FloatArrayList(numValues);
+      for (int i = 0; i < numValues; i++) {
+        floatArrayList.add(byteBuffer.getFloat());
+      }
+      return floatArrayList;
+    }
+  };
+
   public static final ObjectSerDe<DoubleArrayList> DOUBLE_ARRAY_LIST_SER_DE = new ObjectSerDe<DoubleArrayList>() {
 
     @Override
@@ -341,6 +512,50 @@ public class ObjectSerDeUtils {
       return doubleArrayList;
     }
   };
+
+  public static final ObjectSerDe<ObjectArrayList> STRING_ARRAY_LIST_SER_DE =
+      new ObjectSerDe<ObjectArrayList>() {
+        @Override
+        public byte[] serialize(ObjectArrayList stringArrayList) {
+          int size = stringArrayList.size();
+          // Besides the value bytes, we store: size, length for each value
+          long bufferSize = (1 + (long) size) * Integer.BYTES;
+          byte[][] valueBytesArray = new byte[size][];
+          for (int index = 0; index < size; index++) {
+            Object value = stringArrayList.get(index);
+            byte[] valueBytes = value.toString().getBytes(UTF_8);
+            bufferSize += valueBytes.length;
+            valueBytesArray[index] = valueBytes;
+          }
+          Preconditions.checkState(bufferSize <= Integer.MAX_VALUE, "Buffer size exceeds 2GB");
+          byte[] bytes = new byte[(int) bufferSize];
+          ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
+          byteBuffer.putInt(size);
+          for (byte[] valueBytes : valueBytesArray) {
+            byteBuffer.putInt(valueBytes.length);
+            byteBuffer.put(valueBytes);
+          }
+          return bytes;
+        }
+
+        @Override
+        public ObjectArrayList deserialize(byte[] bytes) {
+          return deserialize(ByteBuffer.wrap(bytes));
+        }
+
+        @Override
+        public ObjectArrayList deserialize(ByteBuffer byteBuffer) {
+          int size = byteBuffer.getInt();
+          ObjectArrayList stringArrayList = new ObjectArrayList(size);
+          for (int i = 0; i < size; i++) {
+            int length = byteBuffer.getInt();
+            byte[] valueBytes = new byte[length];
+            byteBuffer.get(valueBytes);
+            stringArrayList.add(new String(valueBytes, UTF_8));
+          }
+          return stringArrayList;
+        }
+      };
 
   public static final ObjectSerDe<AvgPair> AVG_PAIR_SER_DE = new ObjectSerDe<AvgPair>() {
 
@@ -554,6 +769,34 @@ public class ObjectSerDeUtils {
     }
   };
 
+  public static final ObjectSerDe<HyperLogLogPlus> HYPER_LOG_LOG_PLUS_SER_DE = new ObjectSerDe<HyperLogLogPlus>() {
+
+    @Override
+    public byte[] serialize(HyperLogLogPlus hyperLogLogPlus) {
+      try {
+        return hyperLogLogPlus.getBytes();
+      } catch (IOException e) {
+        throw new RuntimeException("Caught exception while serializing HyperLogLogPlus", e);
+      }
+    }
+
+    @Override
+    public HyperLogLogPlus deserialize(byte[] bytes) {
+      try {
+        return HyperLogLogPlus.Builder.build(bytes);
+      } catch (IOException e) {
+        throw new RuntimeException("Caught exception while serializing HyperLogLogPlus", e);
+      }
+    }
+
+    @Override
+    public HyperLogLogPlus deserialize(ByteBuffer byteBuffer) {
+      byte[] bytes = new byte[byteBuffer.remaining()];
+      byteBuffer.get(bytes);
+      return deserialize(bytes);
+    }
+  };
+
   public static final ObjectSerDe<DistinctTable> DISTINCT_TABLE_SER_DE = new ObjectSerDe<DistinctTable>() {
 
     @Override
@@ -656,7 +899,7 @@ public class ObjectSerDeUtils {
     @Override
     public HashMap<Object, Object> deserialize(ByteBuffer byteBuffer) {
       int size = byteBuffer.getInt();
-      HashMap<Object, Object> map = new HashMap<>(size);
+      HashMap<Object, Object> map = new HashMap<>(HashUtil.getHashMapCapacity(size));
       if (size == 0) {
         return map;
       }
@@ -909,13 +1152,16 @@ public class ObjectSerDeUtils {
     }
   };
 
-  public static final ObjectSerDe<Sketch> DATA_SKETCH_SER_DE = new ObjectSerDe<Sketch>() {
+  public static final ObjectSerDe<Sketch> DATA_SKETCH_THETA_SER_DE = new ObjectSerDe<Sketch>() {
 
     @Override
     public byte[] serialize(Sketch value) {
-      // NOTE: Compact the sketch in unsorted, on-heap fashion for performance concern.
-      //       See https://datasketches.apache.org/docs/Theta/ThetaSize.html for more details.
-      return value.compact(false, null).toByteArray();
+      // The serializer should respect existing ordering to enable "early stop"
+      // optimisations on unions.
+      if (!value.isCompact()) {
+        return value.compact(value.isOrdered(), null).toByteArray();
+      }
+      return value.toByteArray();
     }
 
     @Override
@@ -970,6 +1216,25 @@ public class ObjectSerDeUtils {
       byte[] bytes = new byte[byteBuffer.remaining()];
       byteBuffer.get(bytes);
       return KllDoublesSketch.wrap(Memory.wrap(bytes));
+    }
+  };
+
+  public static final ObjectSerDe<CpcSketch> DATA_SKETCH_CPC_SER_DE = new ObjectSerDe<CpcSketch>() {
+    @Override
+    public byte[] serialize(CpcSketch value) {
+      return value.toByteArray();
+    }
+
+    @Override
+    public CpcSketch deserialize(byte[] bytes) {
+      return CpcSketch.heapify(Memory.wrap(bytes));
+    }
+
+    @Override
+    public CpcSketch deserialize(ByteBuffer byteBuffer) {
+      byte[] bytes = new byte[byteBuffer.remaining()];
+      byteBuffer.get(bytes);
+      return CpcSketch.heapify(Memory.wrap(bytes));
     }
   };
 
@@ -1285,6 +1550,236 @@ public class ObjectSerDeUtils {
         }
       };
 
+  public static final ObjectSerDe<ItemsSketch<String>> FREQUENT_STRINGS_SKETCH_SER_DE =
+      new ObjectSerDe<>() {
+        @Override
+        public byte[] serialize(ItemsSketch<String> sketch) {
+          return sketch.toByteArray(new ArrayOfStringsSerDe());
+        }
+
+        @Override
+        public ItemsSketch<String> deserialize(byte[] bytes) {
+          return ItemsSketch.getInstance(Memory.wrap(bytes), new ArrayOfStringsSerDe());
+        }
+
+        @Override
+        public ItemsSketch<String> deserialize(ByteBuffer byteBuffer) {
+          byte[] arr = new byte[byteBuffer.remaining()];
+          byteBuffer.get(arr);
+          return ItemsSketch.getInstance(Memory.wrap(arr), new ArrayOfStringsSerDe());
+        }
+      };
+
+  public static final ObjectSerDe<LongsSketch> FREQUENT_LONGS_SKETCH_SER_DE =
+      new ObjectSerDe<>() {
+        @Override
+        public byte[] serialize(LongsSketch sketch) {
+          return sketch.toByteArray();
+        }
+
+        @Override
+        public LongsSketch deserialize(byte[] bytes) {
+          return LongsSketch.getInstance(Memory.wrap(bytes));
+        }
+
+        @Override
+        public LongsSketch deserialize(ByteBuffer byteBuffer) {
+          byte[] arr = new byte[byteBuffer.remaining()];
+          byteBuffer.get(arr);
+          return LongsSketch.getInstance(Memory.wrap(arr));
+        }
+      };
+
+  public static final ObjectSerDe<UltraLogLog> ULTRA_LOG_LOG_OBJECT_SER_DE = new ObjectSerDe<UltraLogLog>() {
+
+    @Override
+    public byte[] serialize(UltraLogLog value) {
+      ByteBuffer buff = ByteBuffer.wrap(new byte[(1 << value.getP()) + 1]);
+      buff.put((byte) value.getP());
+      buff.put(value.getState());
+      return buff.array();
+    }
+
+    @Override
+    public UltraLogLog deserialize(byte[] bytes) {
+      return deserialize(ByteBuffer.wrap(bytes));
+    }
+
+    @Override
+    public UltraLogLog deserialize(ByteBuffer byteBuffer) {
+      byte p = byteBuffer.get();
+      byte[] state = new byte[1 << p];
+      byteBuffer.get(state);
+      return UltraLogLog.wrap(state);
+    }
+  };
+
+  public static final ObjectSerDe<ThetaSketchAccumulator> DATA_SKETCH_THETA_ACCUMULATOR_SER_DE =
+      new ObjectSerDe<ThetaSketchAccumulator>() {
+
+        @Override
+        public byte[] serialize(ThetaSketchAccumulator thetaSketchBuffer) {
+          Sketch sketch = thetaSketchBuffer.getResult();
+          return sketch.toByteArray();
+        }
+
+        @Override
+        public ThetaSketchAccumulator deserialize(byte[] bytes) {
+          return deserialize(ByteBuffer.wrap(bytes));
+        }
+
+        // Note: The accumulator is designed to serialize as a sketch and should
+        // not be deserialized in practice.
+        @Override
+        public ThetaSketchAccumulator deserialize(ByteBuffer byteBuffer) {
+          ThetaSketchAccumulator thetaSketchAccumulator = new ThetaSketchAccumulator();
+          byte[] bytes = new byte[byteBuffer.remaining()];
+          byteBuffer.get(bytes);
+          Sketch sketch = Sketch.wrap(Memory.wrap(bytes));
+          thetaSketchAccumulator.apply(sketch);
+          return thetaSketchAccumulator;
+        }
+      };
+
+  public static final ObjectSerDe<TupleIntSketchAccumulator> DATA_SKETCH_INT_TUPLE_ACCUMULATOR_SER_DE =
+      new ObjectSerDe<TupleIntSketchAccumulator>() {
+
+        @Override
+        public byte[] serialize(TupleIntSketchAccumulator tupleIntSketchBuffer) {
+          org.apache.datasketches.tuple.Sketch<IntegerSummary> sketch = tupleIntSketchBuffer.getResult();
+          return sketch.toByteArray();
+        }
+
+        @Override
+        public TupleIntSketchAccumulator deserialize(byte[] bytes) {
+          return deserialize(ByteBuffer.wrap(bytes));
+        }
+
+        // Note: The accumulator is designed to serialize as a sketch and should
+        // not be deserialized in practice.
+        @Override
+        public TupleIntSketchAccumulator deserialize(ByteBuffer byteBuffer) {
+          TupleIntSketchAccumulator tupleIntSketchAccumulator = new TupleIntSketchAccumulator();
+          byte[] bytes = new byte[byteBuffer.remaining()];
+          byteBuffer.get(bytes);
+          org.apache.datasketches.tuple.Sketch<IntegerSummary> sketch =
+              org.apache.datasketches.tuple.Sketches.heapifySketch(Memory.wrap(bytes),
+                  new IntegerSummaryDeserializer());
+          tupleIntSketchAccumulator.apply(sketch);
+          return tupleIntSketchAccumulator;
+        }
+      };
+
+  public static final ObjectSerDe<CpcSketchAccumulator> DATA_SKETCH_CPC_ACCUMULATOR_SER_DE =
+      new ObjectSerDe<CpcSketchAccumulator>() {
+
+        @Override
+        public byte[] serialize(CpcSketchAccumulator cpcSketchBuffer) {
+          CpcSketch sketch = cpcSketchBuffer.getResult();
+          return sketch.toByteArray();
+        }
+
+        @Override
+        public CpcSketchAccumulator deserialize(byte[] bytes) {
+          return deserialize(ByteBuffer.wrap(bytes));
+        }
+
+        // Note: The accumulator is designed to serialize as a sketch and should
+        // not be deserialized in practice.
+        @Override
+        public CpcSketchAccumulator deserialize(ByteBuffer byteBuffer) {
+          CpcSketchAccumulator cpcSketchAccumulator = new CpcSketchAccumulator();
+          byte[] bytes = new byte[byteBuffer.remaining()];
+          byteBuffer.get(bytes);
+          CpcSketch sketch = CpcSketch.heapify(Memory.wrap(bytes));
+          cpcSketchAccumulator.apply(sketch);
+          return cpcSketchAccumulator;
+        }
+      };
+
+  public static final ObjectSerDe<ObjectLinkedOpenHashSet<String>> ORDERED_STRING_SET_SER_DE =
+      new ObjectSerDe<ObjectLinkedOpenHashSet<String>>() {
+
+        @Override
+        public byte[] serialize(ObjectLinkedOpenHashSet<String> stringSet) {
+          int size = stringSet.size();
+          // Besides the value bytes, we store: size, length for each value
+          long bufferSize = (1 + (long) size) * Integer.BYTES;
+          byte[][] valueBytesArray = new byte[size][];
+          int index = 0;
+          for (String value : stringSet) {
+            byte[] valueBytes = value.getBytes(UTF_8);
+            bufferSize += valueBytes.length;
+            valueBytesArray[index++] = valueBytes;
+          }
+          Preconditions.checkState(bufferSize <= Integer.MAX_VALUE, "Buffer size exceeds 2GB");
+          byte[] bytes = new byte[(int) bufferSize];
+          ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
+          byteBuffer.putInt(size);
+          for (byte[] valueBytes : valueBytesArray) {
+            byteBuffer.putInt(valueBytes.length);
+            byteBuffer.put(valueBytes);
+          }
+          return bytes;
+        }
+
+        @Override
+        public ObjectLinkedOpenHashSet<String> deserialize(byte[] bytes) {
+          return deserialize(ByteBuffer.wrap(bytes));
+        }
+
+        @Override
+        public ObjectLinkedOpenHashSet<String> deserialize(ByteBuffer byteBuffer) {
+          int size = byteBuffer.getInt();
+          ObjectLinkedOpenHashSet<String> stringSet = new ObjectLinkedOpenHashSet<>(size);
+          for (int i = 0; i < size; i++) {
+            int length = byteBuffer.getInt();
+            byte[] bytes = new byte[length];
+            byteBuffer.get(bytes);
+            stringSet.add(new String(bytes, UTF_8));
+          }
+          return stringSet;
+        }
+      };
+
+  public static final ObjectSerDe<PriorityQueue<FunnelStepEvent>> FUNNEL_STEP_EVENT_ACCUMULATOR_SER_DE =
+      new ObjectSerDe<PriorityQueue<FunnelStepEvent>>() {
+
+        @Override
+        public byte[] serialize(PriorityQueue<FunnelStepEvent> funnelStepEvents) {
+          int numEvents = funnelStepEvents.size();
+          long bufferSize = Integer.BYTES + (long) numEvents * FunnelStepEvent.SIZE_IN_BYTES;
+          Preconditions.checkState(bufferSize <= Integer.MAX_VALUE, "Buffer size exceeds 2GB");
+          byte[] bytes = new byte[(int) bufferSize];
+          ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
+          byteBuffer.putInt(numEvents);
+          for (FunnelStepEvent funnelStepEvent : funnelStepEvents) {
+            byteBuffer.put(funnelStepEvent.getBytes());
+          }
+          return bytes;
+        }
+
+        @Override
+        public PriorityQueue<FunnelStepEvent> deserialize(byte[] bytes) {
+          return deserialize(ByteBuffer.wrap(bytes));
+        }
+
+        @Override
+        public PriorityQueue<FunnelStepEvent> deserialize(ByteBuffer byteBuffer) {
+          int size = byteBuffer.getInt();
+          if (size == 0) {
+            return new PriorityQueue<>();
+          }
+          PriorityQueue<FunnelStepEvent> funnelStepEvents = new PriorityQueue<>(size);
+          byte[] bytes = new byte[FunnelStepEvent.SIZE_IN_BYTES];
+          for (int i = 0; i < size; i++) {
+            byteBuffer.get(bytes);
+            funnelStepEvents.add(new FunnelStepEvent(bytes));
+          }
+          return funnelStepEvents;
+        }
+      };
+
   // NOTE: DO NOT change the order, it has to be the same order as the ObjectType
   //@formatter:off
   private static final ObjectSerDe[] SER_DES = {
@@ -1300,7 +1795,7 @@ public class ObjectSerDeUtils {
       INT_SET_SER_DE,
       TDIGEST_SER_DE,
       DISTINCT_TABLE_SER_DE,
-      DATA_SKETCH_SER_DE,
+      DATA_SKETCH_THETA_SER_DE,
       GEOMETRY_SER_DE,
       ROARING_BITMAP_SER_DE,
       LONG_SET_SER_DE,
@@ -1326,6 +1821,20 @@ public class ObjectSerDeUtils {
       ARG_MIN_MAX_OBJECT_SER_DE,
       KLL_SKETCH_SER_DE,
       DATA_SKETCH_INT_TUPLE_SER_DE,
+      FREQUENT_STRINGS_SKETCH_SER_DE,
+      FREQUENT_LONGS_SKETCH_SER_DE,
+      HYPER_LOG_LOG_PLUS_SER_DE,
+      DATA_SKETCH_CPC_SER_DE,
+      INT_ARRAY_LIST_SER_DE,
+      LONG_ARRAY_LIST_SER_DE,
+      FLOAT_ARRAY_LIST_SER_DE,
+      STRING_ARRAY_LIST_SER_DE,
+      ULTRA_LOG_LOG_OBJECT_SER_DE,
+      DATA_SKETCH_THETA_ACCUMULATOR_SER_DE,
+      DATA_SKETCH_INT_TUPLE_ACCUMULATOR_SER_DE,
+      DATA_SKETCH_CPC_ACCUMULATOR_SER_DE,
+      ORDERED_STRING_SET_SER_DE,
+      FUNNEL_STEP_EVENT_ACCUMULATOR_SER_DE,
   };
   //@formatter:on
 

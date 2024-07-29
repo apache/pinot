@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.controller.helix.core.minion.generator;
 
-import com.clearspring.analytics.util.Preconditions;
+import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;

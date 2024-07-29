@@ -20,10 +20,15 @@ package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
-import java.net.URLEncoder;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
+import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.IdealState;
+import org.apache.pinot.broker.broker.helix.BaseBrokerStarter;
+import org.apache.pinot.common.utils.URIUtils;
+import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -37,6 +42,10 @@ import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.fail;
 
 
 /**
@@ -56,6 +65,16 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
   @Override
   protected String getServerTenant() {
     return TENANT_NAME;
+  }
+
+  @Override
+  protected void overrideControllerConf(Map<String, Object> properties) {
+    properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, false);
+  }
+
+  protected void overrideBrokerConf(PinotConfiguration configuration) {
+    configuration.setProperty(CommonConstants.Broker.CONFIG_OF_BROKER_INSTANCE_TAGS,
+        TagNameUtils.getBrokerTagForTenant(TENANT_NAME));
   }
 
   @Override
@@ -102,22 +121,78 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
 
   protected void startHybridCluster()
       throws Exception {
-    // Start Zk and Kafka
     startZk();
-    startKafka();
-
-    // Start the Pinot cluster
-    Map<String, Object> properties = getDefaultControllerConfiguration();
-    properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, false);
-
-    startController(properties);
-
+    startController();
     startBroker();
     startServers(2);
+    startKafka();
 
     // Create tenants
-    createBrokerTenant(TENANT_NAME, 1);
     createServerTenant(TENANT_NAME, 1, 1);
+  }
+
+  @Test
+  public void testUpdateBrokerResource()
+      throws Exception {
+    // Add a new broker to the cluster
+    BaseBrokerStarter brokerStarter = startOneBroker(1);
+
+    // Check if broker is added to all the tables in broker resource
+    String clusterName = getHelixClusterName();
+    String brokerId = brokerStarter.getInstanceId();
+    IdealState brokerResourceIdealState =
+        _helixAdmin.getResourceIdealState(clusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
+    for (Map<String, String> brokerAssignment : brokerResourceIdealState.getRecord().getMapFields().values()) {
+      assertEquals(brokerAssignment.get(brokerId), CommonConstants.Helix.StateModel.BrokerResourceStateModel.ONLINE);
+    }
+    TestUtils.waitForCondition(aVoid -> {
+      ExternalView brokerResourceExternalView =
+          _helixAdmin.getResourceExternalView(clusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
+      for (Map<String, String> brokerAssignment : brokerResourceExternalView.getRecord().getMapFields().values()) {
+        if (!brokerAssignment.containsKey(brokerId)) {
+          return false;
+        }
+      }
+      return true;
+    }, 60_000L, "Failed to find broker in broker resource ExternalView");
+
+    // Stop the broker
+    brokerStarter.stop();
+    _brokerPorts.remove(_brokerPorts.size() - 1);
+
+    // Dropping the broker should fail because it is still in the broker resource
+    try {
+      sendDeleteRequest(_controllerRequestURLBuilder.forInstance(brokerId));
+      fail("Dropping instance should fail because it is still in the broker resource");
+    } catch (Exception e) {
+      // Expected
+    }
+
+    // Untag the broker and update the broker resource so that it is removed from the broker resource
+    sendPutRequest(_controllerRequestURLBuilder.forInstanceUpdateTags(brokerId, Collections.emptyList(), true));
+
+    // Check if broker is removed from all the tables in broker resource
+    brokerResourceIdealState =
+        _helixAdmin.getResourceIdealState(clusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
+    for (Map<String, String> brokerAssignment : brokerResourceIdealState.getRecord().getMapFields().values()) {
+      assertFalse(brokerAssignment.containsKey(brokerId));
+    }
+    TestUtils.waitForCondition(aVoid -> {
+      ExternalView brokerResourceExternalView =
+          _helixAdmin.getResourceExternalView(clusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
+      for (Map<String, String> brokerAssignment : brokerResourceExternalView.getRecord().getMapFields().values()) {
+        if (brokerAssignment.containsKey(brokerId)) {
+          return false;
+        }
+      }
+      return true;
+    }, 60_000L, "Failed to remove broker from broker resource ExternalView");
+
+    // Dropping the broker should success now
+    sendDeleteRequest(_controllerRequestURLBuilder.forInstance(brokerId));
+
+    // Check if broker is dropped from the cluster
+    assertFalse(_helixAdmin.getInstancesInCluster(clusterName).contains(brokerId));
   }
 
   @Test
@@ -185,22 +260,26 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     Assert.assertNotNull(getDebugInfo("debug/routingTable/" + TableNameBuilder.REALTIME.tableNameWithType(tableName)));
   }
 
-  @Test
-  public void testBrokerDebugRoutingTableSQL()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testBrokerDebugRoutingTableSQL(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String tableName = getTableName();
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
     String encodedSQL;
-    encodedSQL = URLEncoder.encode("select * from " + realtimeTableName, "UTF-8");
+    encodedSQL = URIUtils.encode("select * from " + realtimeTableName);
     Assert.assertNotNull(getDebugInfo("debug/routingTable/sql?query=" + encodedSQL));
-    encodedSQL = URLEncoder.encode("select * from " + offlineTableName, "UTF-8");
+    encodedSQL = URIUtils.encode("select * from " + offlineTableName);
     Assert.assertNotNull(getDebugInfo("debug/routingTable/sql?query=" + encodedSQL));
   }
 
-  @Test
-  public void testQueryTracing()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testQueryTracing(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    // Tracing is a v1 only concept and the v2 query engine has separate multi-stage stats that are enabled by default
+    notSupportedInV2();
     JsonNode jsonNode = postQuery("SET trace = true; SELECT COUNT(*) FROM " + getTableName());
     Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asLong(), getCountStarResult());
     Assert.assertTrue(jsonNode.get("exceptions").isEmpty());
@@ -210,9 +289,12 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     Assert.assertTrue(traceInfo.has("localhost_R"));
   }
 
-  @Test
-  public void testQueryTracingWithLiteral()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testQueryTracingWithLiteral(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    // Tracing is a v1 only concept and the v2 query engine has separate multi-stage stats that are enabled by default
+    notSupportedInV2();
     JsonNode jsonNode =
         postQuery("SET trace = true; SELECT 1, \'test\', ArrDelay FROM " + getTableName() + " LIMIT 10");
     long countStarResult = 10;
@@ -228,14 +310,16 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     Assert.assertTrue(traceInfo.has("localhost_R"));
   }
 
-  @Test
-  public void testDropResults()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testDropResults(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     final String query = String.format("SELECT * FROM %s limit 10", getTableName());
     final String resultTag = "resultTable";
 
     // dropResults=true - resultTable must not be in the response
-    Assert.assertFalse(postQueryWithOptions(query, "dropResults=true").has(resultTag));
+    JsonNode jsonNode = postQueryWithOptions(query, "dropResults=true");
+    Assert.assertFalse(jsonNode.has(resultTag));
 
     // dropResults=TrUE (case insensitive match) - resultTable must not be in the response
     Assert.assertFalse(postQueryWithOptions(query, "dropResults=TrUE").has(resultTag));
@@ -244,31 +328,34 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     Assert.assertTrue(postQueryWithOptions(query, "dropResults=truee").has(resultTag));
   }
 
-  @Test
-  @Override
-  public void testHardcodedQueries()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testHardcodedQueries(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     super.testHardcodedQueries();
   }
 
-  @Test
-  @Override
-  public void testQueriesFromQueryFile()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testQueriesFromQueryFile(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    // Some of the hardcoded queries in the query file need to be adapted for v2 (for instance, using the arrayToMV
+    // with multi-value columns in filters / aggregations)
+    notSupportedInV2();
     super.testQueriesFromQueryFile();
   }
 
-  @Test
-  @Override
-  public void testGeneratedQueries()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testGeneratedQueries(boolean useMultiStageQueryEngine)
       throws Exception {
-    super.testGeneratedQueries();
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    super.testGeneratedQueries(true, useMultiStageQueryEngine);
   }
 
-  @Test
-  @Override
-  public void testQueryExceptions()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testQueryExceptions(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     super.testQueryExceptions();
   }
 
@@ -286,9 +373,9 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     super.testBrokerResponseMetadata();
   }
 
-  @Test
-  @Override
-  public void testVirtualColumnQueries() {
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testVirtualColumnQueries(boolean useMultiStageQueryEngine)
+      throws Exception {
     super.testVirtualColumnQueries();
   }
 

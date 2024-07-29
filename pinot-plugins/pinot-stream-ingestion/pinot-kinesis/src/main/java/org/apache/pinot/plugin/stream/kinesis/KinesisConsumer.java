@@ -19,31 +19,23 @@
 package org.apache.pinot.plugin.stream.kinesis;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
+import org.apache.pinot.spi.stream.BytesStreamMessage;
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;
+import org.apache.pinot.spi.stream.StreamMessageMetadata;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import software.amazon.awssdk.core.exception.AbortedException;
 import software.amazon.awssdk.services.kinesis.KinesisClient;
-import software.amazon.awssdk.services.kinesis.model.ExpiredIteratorException;
 import software.amazon.awssdk.services.kinesis.model.GetRecordsRequest;
 import software.amazon.awssdk.services.kinesis.model.GetRecordsResponse;
 import software.amazon.awssdk.services.kinesis.model.GetShardIteratorRequest;
-import software.amazon.awssdk.services.kinesis.model.InvalidArgumentException;
-import software.amazon.awssdk.services.kinesis.model.KinesisException;
 import software.amazon.awssdk.services.kinesis.model.ProvisionedThroughputExceededException;
-import software.amazon.awssdk.services.kinesis.model.ResourceNotFoundException;
+import software.amazon.awssdk.services.kinesis.model.Record;
 import software.amazon.awssdk.services.kinesis.model.ShardIteratorType;
 
 
@@ -52,220 +44,114 @@ import software.amazon.awssdk.services.kinesis.model.ShardIteratorType;
  */
 public class KinesisConsumer extends KinesisConnectionHandler implements PartitionGroupConsumer {
   private static final Logger LOGGER = LoggerFactory.getLogger(KinesisConsumer.class);
-  public static final long SLEEP_TIME_BETWEEN_REQUESTS = 1000L;
-  private final String _streamTopicName;
-  private final int _numMaxRecordsToFetch;
-  private final ExecutorService _executorService;
-  private final ShardIteratorType _shardIteratorType;
-  private final int _rpsLimit;
 
-  public KinesisConsumer(KinesisConfig kinesisConfig) {
-    super(kinesisConfig);
-    _streamTopicName = kinesisConfig.getStreamTopicName();
-    _numMaxRecordsToFetch = kinesisConfig.getNumMaxRecordsToFetch();
-    _shardIteratorType = kinesisConfig.getShardIteratorType();
-    _rpsLimit = kinesisConfig.getRpsLimit();
-    _executorService = Executors.newSingleThreadExecutor();
+  private String _nextStartSequenceNumber = null;
+  private String _nextShardIterator = null;
+  private int _currentSecond = 0;
+  private int _numRequestsInCurrentSecond = 0;
+
+  public KinesisConsumer(KinesisConfig config) {
+    super(config);
+    LOGGER.info("Created Kinesis consumer with topic: {}, RPS limit: {}, max records per fetch: {}",
+        config.getStreamTopicName(), config.getRpsLimit(), config.getNumMaxRecordsToFetch());
   }
 
   @VisibleForTesting
-  public KinesisConsumer(KinesisConfig kinesisConfig, KinesisClient kinesisClient) {
-    super(kinesisConfig, kinesisClient);
-    _kinesisClient = kinesisClient;
-    _streamTopicName = kinesisConfig.getStreamTopicName();
-    _numMaxRecordsToFetch = kinesisConfig.getNumMaxRecordsToFetch();
-    _shardIteratorType = kinesisConfig.getShardIteratorType();
-    _rpsLimit = kinesisConfig.getRpsLimit();
-    _executorService = Executors.newSingleThreadExecutor();
+  public KinesisConsumer(KinesisConfig config, KinesisClient kinesisClient) {
+    super(config, kinesisClient);
+  }
+
+  @Override
+  public synchronized KinesisMessageBatch fetchMessages(StreamPartitionMsgOffset startMsgOffset, int timeoutMs) {
+    KinesisPartitionGroupOffset startOffset = (KinesisPartitionGroupOffset) startMsgOffset;
+    String shardId = startOffset.getShardId();
+    String startSequenceNumber = startOffset.getSequenceNumber();
+    // Get the shard iterator
+    String shardIterator;
+    if (startSequenceNumber.equals(_nextStartSequenceNumber)) {
+      shardIterator = _nextShardIterator;
+    } else {
+      // TODO: Revisit the offset handling logic. Reading after the start sequence number can lose the first message
+      //       when consuming from a new partition because the initial start sequence number is inclusive.
+      GetShardIteratorRequest getShardIteratorRequest =
+          GetShardIteratorRequest.builder().streamName(_config.getStreamTopicName()).shardId(shardId)
+              .startingSequenceNumber(startSequenceNumber).shardIteratorType(ShardIteratorType.AFTER_SEQUENCE_NUMBER)
+              .build();
+      shardIterator = _kinesisClient.getShardIterator(getShardIteratorRequest).shardIterator();
+    }
+    if (shardIterator == null) {
+      return new KinesisMessageBatch(List.of(), startOffset, true);
+    }
+
+    // Read records
+    rateLimitRequests();
+    GetRecordsRequest getRecordRequest =
+        GetRecordsRequest.builder().shardIterator(shardIterator).limit(_config.getNumMaxRecordsToFetch()).build();
+    GetRecordsResponse getRecordsResponse = _kinesisClient.getRecords(getRecordRequest);
+    List<Record> records = getRecordsResponse.records();
+    List<BytesStreamMessage> messages;
+    KinesisPartitionGroupOffset offsetOfNextBatch;
+    if (!records.isEmpty()) {
+      messages = records.stream().map(record -> extractStreamMessage(record, shardId)).collect(Collectors.toList());
+      StreamMessageMetadata lastMessageMetadata = messages.get(messages.size() - 1).getMetadata();
+      assert lastMessageMetadata != null;
+      offsetOfNextBatch = (KinesisPartitionGroupOffset) lastMessageMetadata.getNextOffset();
+    } else {
+      // TODO: Revisit whether Kinesis can return empty batch when there are available records. The consumer cna handle
+      //       empty message batch, but it will treat it as fully caught up.
+      messages = List.of();
+      offsetOfNextBatch = startOffset;
+    }
+    assert offsetOfNextBatch != null;
+    _nextStartSequenceNumber = offsetOfNextBatch.getSequenceNumber();
+    _nextShardIterator = getRecordsResponse.nextShardIterator();
+    return new KinesisMessageBatch(messages, offsetOfNextBatch, _nextShardIterator == null);
   }
 
   /**
-   * Fetch records from the Kinesis stream between the start and end KinesisCheckpoint
+   * Kinesis enforces a limit of 5 getRecords request per second on each shard from AWS end, beyond which we start
+   * getting {@link ProvisionedThroughputExceededException}. Rate limit the requests to avoid this.
    */
-  @Override
-  public KinesisRecordsBatch fetchMessages(StreamPartitionMsgOffset startCheckpoint,
-      StreamPartitionMsgOffset endCheckpoint, int timeoutMs) {
-    List<KinesisStreamMessage> recordList = new ArrayList<>();
-    Future<KinesisRecordsBatch> kinesisFetchResultFuture =
-        _executorService.submit(() -> getResult(startCheckpoint, endCheckpoint, recordList));
-
-    try {
-      return kinesisFetchResultFuture.get(timeoutMs, TimeUnit.MILLISECONDS);
-    } catch (TimeoutException e) {
-      kinesisFetchResultFuture.cancel(true);
-      return handleException((KinesisPartitionGroupOffset) startCheckpoint, recordList);
-    } catch (Exception e) {
-      return handleException((KinesisPartitionGroupOffset) startCheckpoint, recordList);
-    }
-  }
-
-  private KinesisRecordsBatch getResult(StreamPartitionMsgOffset startOffset, StreamPartitionMsgOffset endOffset,
-      List<KinesisStreamMessage> recordList) {
-    KinesisPartitionGroupOffset kinesisStartCheckpoint = (KinesisPartitionGroupOffset) startOffset;
-
-    try {
-      if (_kinesisClient == null) {
-        createConnection();
+  private void rateLimitRequests() {
+    long currentTimeMs = System.currentTimeMillis();
+    int currentTimeSeconds = (int) TimeUnit.MILLISECONDS.toSeconds(currentTimeMs);
+    if (currentTimeSeconds == _currentSecond) {
+      if (_numRequestsInCurrentSecond == _config.getRpsLimit()) {
+        try {
+          Thread.sleep(1000 - (currentTimeMs % 1000));
+        } catch (InterruptedException e) {
+          throw new RuntimeException(e);
+        }
+        _currentSecond++;
+        _numRequestsInCurrentSecond = 1;
+      } else {
+        _numRequestsInCurrentSecond++;
       }
-
-      // TODO: iterate upon all the shardIds in the map
-      //  Okay for now, since we have assumed that every partition group contains a single shard
-      Map<String, String> startShardToSequenceMap = kinesisStartCheckpoint.getShardToStartSequenceMap();
-      Preconditions.checkState(startShardToSequenceMap.size() == 1,
-          "Only 1 shard per consumer supported. Found: %s, in startShardToSequenceMap",
-          startShardToSequenceMap.keySet());
-      Map.Entry<String, String> startShardToSequenceNum = startShardToSequenceMap.entrySet().iterator().next();
-      String shardIterator = getShardIterator(startShardToSequenceNum.getKey(), startShardToSequenceNum.getValue());
-
-      String kinesisEndSequenceNumber = null;
-
-      if (endOffset != null) {
-        KinesisPartitionGroupOffset kinesisEndCheckpoint = (KinesisPartitionGroupOffset) endOffset;
-        Map<String, String> endShardToSequenceMap = kinesisEndCheckpoint.getShardToStartSequenceMap();
-        Preconditions.checkState(endShardToSequenceMap.size() == 1,
-            "Only 1 shard per consumer supported. Found: %s, in endShardToSequenceMap", endShardToSequenceMap.keySet());
-        kinesisEndSequenceNumber = endShardToSequenceMap.values().iterator().next();
-      }
-
-      String nextStartSequenceNumber;
-      boolean isEndOfShard = false;
-      long currentWindow = System.currentTimeMillis() / SLEEP_TIME_BETWEEN_REQUESTS;
-      int currentWindowRequests = 0;
-      while (shardIterator != null) {
-        GetRecordsRequest getRecordsRequest = GetRecordsRequest.builder().shardIterator(shardIterator).build();
-
-        long requestSentTime = System.currentTimeMillis() / 1000;
-        GetRecordsResponse getRecordsResponse = _kinesisClient.getRecords(getRecordsRequest);
-
-        if (!getRecordsResponse.records().isEmpty()) {
-          getRecordsResponse.records().forEach(record -> {
-            recordList.add(
-            new KinesisStreamMessage(record.partitionKey().getBytes(StandardCharsets.UTF_8),
-                record.data().asByteArray(), record.sequenceNumber(),
-                (KinesisStreamMessageMetadata) _kinesisMetadataExtractor.extract(record),
-                record.data().asByteArray().length));
-          });
-          nextStartSequenceNumber = recordList.get(recordList.size() - 1).sequenceNumber();
-
-          if (kinesisEndSequenceNumber != null && kinesisEndSequenceNumber.compareTo(nextStartSequenceNumber) <= 0) {
-            break;
-          }
-
-          if (recordList.size() >= _numMaxRecordsToFetch) {
-            break;
-          }
-        }
-
-        if (getRecordsResponse.hasChildShards() && !getRecordsResponse.childShards().isEmpty()) {
-          //This statement returns true only when end of current shard has reached.
-          // hasChildShards only checks if the childShard is null and is a valid instance.
-          isEndOfShard = true;
-          break;
-        }
-
-        shardIterator = getRecordsResponse.nextShardIterator();
-
-        if (Thread.interrupted()) {
-          break;
-        }
-
-        // Kinesis enforces a limit of 5 .getRecords request per second on each shard from AWS end
-        // Beyond this limit we start getting ProvisionedThroughputExceededException which affect the ingestion
-        if (requestSentTime == currentWindow) {
-          currentWindowRequests++;
-        } else if (requestSentTime > currentWindow) {
-          currentWindow = requestSentTime;
-          currentWindowRequests = 0;
-        }
-
-        if (currentWindowRequests >= _rpsLimit) {
-          try {
-            Thread.sleep(SLEEP_TIME_BETWEEN_REQUESTS);
-          } catch (InterruptedException e) {
-            LOGGER.debug("Sleep interrupted while rate limiting Kinesis requests", e);
-            break;
-          }
-        }
-      }
-
-      return new KinesisRecordsBatch(recordList, startShardToSequenceNum.getKey(), isEndOfShard);
-    } catch (IllegalStateException e) {
-      debugOrLogWarning("Illegal state exception, connection is broken", e);
-      return handleException(kinesisStartCheckpoint, recordList);
-    } catch (ProvisionedThroughputExceededException e) {
-      debugOrLogWarning("The request rate for the stream is too high", e);
-      return handleException(kinesisStartCheckpoint, recordList);
-    } catch (ExpiredIteratorException e) {
-      debugOrLogWarning("ShardIterator expired while trying to fetch records", e);
-      return handleException(kinesisStartCheckpoint, recordList);
-    } catch (ResourceNotFoundException | InvalidArgumentException e) {
-      // aws errors
-      LOGGER.error("Encountered AWS error while attempting to fetch records", e);
-      return handleException(kinesisStartCheckpoint, recordList);
-    } catch (KinesisException e) {
-      debugOrLogWarning("Encountered unknown unrecoverable AWS exception", e);
-      throw new RuntimeException(e);
-    } catch (AbortedException e) {
-      if (!(e.getCause() instanceof InterruptedException)) {
-        debugOrLogWarning("Task aborted due to exception", e);
-      }
-      return handleException(kinesisStartCheckpoint, recordList);
-    } catch (Throwable e) {
-      // non transient errors
-      LOGGER.error("Unknown fetchRecords exception", e);
-      throw new RuntimeException(e);
-    }
-  }
-
-  private void debugOrLogWarning(String message, Throwable throwable) {
-    if (LOGGER.isDebugEnabled()) {
-      LOGGER.debug(message, throwable);
     } else {
-      LOGGER.warn(message + ": " + throwable.getMessage());
+      _currentSecond = currentTimeSeconds;
+      _numRequestsInCurrentSecond = 1;
     }
   }
 
-  private KinesisRecordsBatch handleException(KinesisPartitionGroupOffset start,
-      List<KinesisStreamMessage> recordList) {
-    String shardId = start.getShardToStartSequenceMap().entrySet().iterator().next().getKey();
-
-    if (!recordList.isEmpty()) {
-      String nextStartSequenceNumber = recordList.get(recordList.size() - 1).sequenceNumber();
-      Map<String, String> newCheckpoint = new HashMap<>(start.getShardToStartSequenceMap());
-      newCheckpoint.put(newCheckpoint.keySet().iterator().next(), nextStartSequenceNumber);
+  private BytesStreamMessage extractStreamMessage(Record record, String shardId) {
+    byte[] key = record.partitionKey().getBytes(StandardCharsets.UTF_8);
+    byte[] value = record.data().asByteArray();
+    long timestamp = record.approximateArrivalTimestamp().toEpochMilli();
+    String sequenceNumber = record.sequenceNumber();
+    KinesisPartitionGroupOffset offset = new KinesisPartitionGroupOffset(shardId, sequenceNumber);
+    // NOTE: Use the same offset as next offset because the consumer starts consuming AFTER the start sequence number.
+    StreamMessageMetadata.Builder builder =
+        new StreamMessageMetadata.Builder().setRecordIngestionTimeMs(timestamp).setOffset(offset, offset);
+    if (_config.isPopulateMetadata()) {
+      builder.setMetadata(Map.of(KinesisStreamMessageMetadata.APPRX_ARRIVAL_TIMESTAMP_KEY, String.valueOf(timestamp),
+          KinesisStreamMessageMetadata.SEQUENCE_NUMBER_KEY, sequenceNumber));
     }
-    return new KinesisRecordsBatch(recordList, shardId, false);
-  }
-
-  private String getShardIterator(String shardId, String sequenceNumber) {
-    GetShardIteratorRequest.Builder requestBuilder =
-        GetShardIteratorRequest.builder().streamName(_streamTopicName).shardId(shardId);
-
-    if (sequenceNumber != null) {
-      requestBuilder = requestBuilder.startingSequenceNumber(sequenceNumber)
-          .shardIteratorType(ShardIteratorType.AFTER_SEQUENCE_NUMBER);
-    } else {
-      requestBuilder = requestBuilder.shardIteratorType(_shardIteratorType);
-    }
-
-    return _kinesisClient.getShardIterator(requestBuilder.build()).shardIterator();
+    StreamMessageMetadata metadata = builder.build();
+    return new BytesStreamMessage(key, value, metadata);
   }
 
   @Override
   public void close() {
     super.close();
-    shutdownAndAwaitTermination();
-  }
-
-  void shutdownAndAwaitTermination() {
-    _executorService.shutdown();
-    try {
-      if (!_executorService.awaitTermination(60, TimeUnit.SECONDS)) {
-        _executorService.shutdownNow();
-      }
-    } catch (InterruptedException ie) {
-      _executorService.shutdownNow();
-      Thread.currentThread().interrupt();
-    }
   }
 }

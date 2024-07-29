@@ -20,6 +20,7 @@ package org.apache.pinot.tools.admin.command;
 
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request;
@@ -138,7 +139,7 @@ public class PostQueryCommand extends AbstractBaseAdminCommand implements Comman
     if (_brokerHost == null) {
       _brokerHost = NetUtils.getHostAddress();
     }
-    LOGGER.info("Executing command: " + this);
+    LOGGER.info("Executing command: {}", this);
     String url = _brokerProtocol + "://" + _brokerHost + ":" + _brokerPort + "/query/sql";
     Map<String, String> payload = new HashMap<>();
     payload.put(Request.SQL, _query);
@@ -146,15 +147,15 @@ public class PostQueryCommand extends AbstractBaseAdminCommand implements Comman
       payload.putAll(_additionalOptions);
     }
     String request = JsonUtils.objectToString(payload);
-    return sendRequest("POST", url, request, makeAuthHeaders(makeAuthProvider(_authProvider,
-            _authTokenUrl, _authToken, _user, _password)));
+    return sendRequest("POST", url, request, AuthProviderUtils.makeAuthHeaders(
+        AuthProviderUtils.makeAuthProvider(_authProvider, _authTokenUrl, _authToken, _user, _password)));
   }
 
   @Override
   public boolean execute()
       throws Exception {
     String result = run();
-    LOGGER.info("Result: " + result);
+    LOGGER.info("Result: {}", result);
     return true;
   }
 }

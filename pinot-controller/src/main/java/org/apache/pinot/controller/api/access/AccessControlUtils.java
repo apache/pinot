@@ -20,6 +20,7 @@
 package org.apache.pinot.controller.api.access;
 
 import javax.annotation.Nullable;
+import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
@@ -42,7 +43,7 @@ public final class AccessControlUtils {
   /**
    * Validate permission for the given access type against the given table
    *
-   * @param tableName name of the table to be accessed
+   * @param tableName name of the table to be accessed (post database name translation)
    * @param accessType type of the access
    * @param httpHeaders HTTP headers containing requester identity required by access control object
    * @param endpointUrl the request url for which this access control is called
@@ -63,9 +64,14 @@ public final class AccessControlUtils {
           return;
         }
       }
-    } catch (Exception e) {
-      throw new ControllerApplicationException(LOGGER, "Caught exception while validating permission for "
-          + userMessage, Response.Status.INTERNAL_SERVER_ERROR, e);
+    } catch (WebApplicationException exception) {
+      // throwing the exception if it's WebApplicationException
+      throw exception;
+    } catch (Throwable t) {
+      // catch and log Throwable for NoSuchMethodError which can happen when there are classpath conflicts
+      // otherwise, grizzly will return a 500 without any logs or indication of what failed
+      throw new ControllerApplicationException(LOGGER,
+          "Caught exception while validating permission for " + userMessage, Response.Status.INTERNAL_SERVER_ERROR, t);
     }
 
     throw new ControllerApplicationException(LOGGER, "Permission is denied for " + userMessage,

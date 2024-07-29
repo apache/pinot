@@ -25,7 +25,7 @@
   <parent>
     <artifactId>pinot</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>0.13.0-SNAPSHOT</version>
+    <version>1.2.0-SNAPSHOT</version>
     <relativePath>..</relativePath>
   </parent>
   <artifactId>pinot-compatibility-verifier</artifactId>
@@ -41,16 +41,6 @@
   <build>
     <plugins>
       <plugin>
-        <artifactId>maven-jar-plugin</artifactId>
-        <executions>
-          <execution>
-            <goals>
-              <goal>test-jar</goal>
-            </goals>
-          </execution>
-        </executions>
-      </plugin>
-      <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>appassembler-maven-plugin</artifactId>
         <configuration>
@@ -61,16 +51,15 @@
               <jvmSettings>
                 <initialMemorySize>2G</initialMemorySize>
                 <maxMemorySize>2G</maxMemorySize>
+                <extraArguments>
+                  <extraArgument>-Dlog4j2.configurationFile=pinot-compatibility-verifier-log4j2.xml</extraArgument>
+                </extraArguments>
               </jvmSettings>
             </program>
           </programs>
           <repositoryLayout>flat</repositoryLayout>
           <repositoryName>lib</repositoryName>
         </configuration>
-      </plugin>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-enforcer-plugin</artifactId>
       </plugin>
     </plugins>
   </build>
@@ -80,10 +69,6 @@
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-tools</artifactId>
       <exclusions>
-        <exclusion>
-          <groupId>net.minidev</groupId>
-          <artifactId>json-smart</artifactId>
-        </exclusion>
         <exclusion>
           <groupId>com.typesafe.netty</groupId>
           <artifactId>netty-reactive-streams</artifactId>
@@ -112,12 +97,6 @@
       <artifactId>pinot-controller</artifactId>
       <version>${project.version}</version>
       <type>test-jar</type>
-      <exclusions>
-        <exclusion>
-          <groupId>jakarta.activation</groupId>
-          <artifactId>jakarta.activation-api</artifactId>
-        </exclusion>
-      </exclusions>
     </dependency>
     <!-- Kafka  -->
     <dependency>

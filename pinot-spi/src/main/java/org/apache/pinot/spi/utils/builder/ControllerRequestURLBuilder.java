@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.spi.utils.builder;
 
-import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -28,7 +27,6 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
-import org.apache.pinot.spi.utils.RebalanceConfigConstants;
 import org.apache.pinot.spi.utils.StringUtil;
 
 
@@ -108,6 +106,10 @@ public class ControllerRequestURLBuilder {
       params.append("?component=" + componentTypeStr);
     }
     return StringUtil.join("/", _baseUrl, "users", username, params.toString());
+  }
+
+  public String forPeriodTaskRun(String taskName) {
+    return StringUtil.join("/", _baseUrl, "periodictask", "run?taskname=" + taskName);
   }
 
   public String forUpdateUserConfig(String username, String componentTypeStr, boolean passwordChanged) {
@@ -199,29 +201,26 @@ public class ControllerRequestURLBuilder {
   }
 
   public String forTableRebalance(String tableName, String tableType) {
-    return forTableRebalance(tableName, tableType, RebalanceConfigConstants.DEFAULT_DRY_RUN,
-        RebalanceConfigConstants.DEFAULT_REASSIGN_INSTANCES, RebalanceConfigConstants.DEFAULT_INCLUDE_CONSUMING,
-        RebalanceConfigConstants.DEFAULT_DOWNTIME,
-        RebalanceConfigConstants.DEFAULT_MIN_REPLICAS_TO_KEEP_UP_FOR_NO_DOWNTIME);
+    return forTableRebalance(tableName, tableType, false, false, false, false, 1);
   }
 
   public String forTableRebalance(String tableName, String tableType, boolean dryRun, boolean reassignInstances,
       boolean includeConsuming, boolean downtime, int minAvailableReplicas) {
     StringBuilder stringBuilder =
         new StringBuilder(StringUtil.join("/", _baseUrl, "tables", tableName, "rebalance?type=" + tableType));
-    if (dryRun != RebalanceConfigConstants.DEFAULT_DRY_RUN) {
+    if (dryRun) {
       stringBuilder.append("&dryRun=").append(dryRun);
     }
-    if (reassignInstances != RebalanceConfigConstants.DEFAULT_REASSIGN_INSTANCES) {
+    if (reassignInstances) {
       stringBuilder.append("&reassignInstances=").append(reassignInstances);
     }
-    if (includeConsuming != RebalanceConfigConstants.DEFAULT_INCLUDE_CONSUMING) {
+    if (includeConsuming) {
       stringBuilder.append("&includeConsuming=").append(includeConsuming);
     }
-    if (downtime != RebalanceConfigConstants.DEFAULT_DOWNTIME) {
+    if (downtime) {
       stringBuilder.append("&downtime=").append(downtime);
     }
-    if (minAvailableReplicas != RebalanceConfigConstants.DEFAULT_MIN_REPLICAS_TO_KEEP_UP_FOR_NO_DOWNTIME) {
+    if (minAvailableReplicas != 1) {
       stringBuilder.append("&minAvailableReplicas=").append(minAvailableReplicas);
     }
     return stringBuilder.toString();
@@ -240,12 +239,16 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "segments", tableName, query);
   }
 
+  public String forTableRebalanceStatus(String jobId) {
+    return StringUtil.join("/", _baseUrl, "rebalanceStatus", jobId);
+  }
+
   public String forTableReset(String tableNameWithType, @Nullable String targetInstance) {
     String query = targetInstance == null ? "reset" : String.format("reset?targetInstance=%s", targetInstance);
     return StringUtil.join("/", _baseUrl, "segments", tableNameWithType, query);
   }
 
-  public String forControllerJobStatus(String jobId) {
+  public String forSegmentReloadStatus(String jobId) {
     return StringUtil.join("/", _baseUrl, "segments", "segmentReloadStatus", jobId);
   }
 
@@ -380,7 +383,7 @@ public class ControllerRequestURLBuilder {
   }
 
   public String forListAllCrcInformationForTable(String tableName) {
-    return StringUtil.join("/", _baseUrl, "tables", tableName, "segments", "crc");
+    return StringUtil.join("/", _baseUrl, "segments", tableName, "crc");
   }
 
   public String forDeleteTableWithType(String tableName, String tableType) {
@@ -431,6 +434,16 @@ public class ControllerRequestURLBuilder {
     return url.toString();
   }
 
+  public String forDeleteMultipleSegments(String tableName, String tableType, List<String> segments) {
+    StringBuilder fullUrl = new StringBuilder(
+        StringUtil.join("?", StringUtil.join("/", _baseUrl, "segments", tableName),
+             "type=" + tableType));
+    for (String segment : segments) {
+      fullUrl.append("&segments=").append(segment);
+    }
+    return fullUrl.toString();
+  }
+
   private void appendUrlParameter(StringBuilder url, String urlParameterKey, String urlParameterValue) {
     if (url.length() == 0) {
       url.append("?").append(urlParameterKey).append("=").append(urlParameterValue);
@@ -474,31 +487,27 @@ public class ControllerRequestURLBuilder {
     return url;
   }
 
-  public String forIngestFromFile(String tableNameWithType, String batchConfigMapStr)
-      throws UnsupportedEncodingException {
+  public String forIngestFromFile(String tableNameWithType, String batchConfigMapStr) {
     return String.format("%s?tableNameWithType=%s&batchConfigMapStr=%s",
         StringUtil.join("/", _baseUrl, "ingestFromFile"), tableNameWithType,
-        URLEncoder.encode(batchConfigMapStr, StandardCharsets.UTF_8.toString()));
+        URLEncoder.encode(batchConfigMapStr, StandardCharsets.UTF_8));
   }
 
-  public String forIngestFromFile(String tableNameWithType, Map<String, String> batchConfigMap)
-      throws UnsupportedEncodingException {
+  public String forIngestFromFile(String tableNameWithType, Map<String, String> batchConfigMap) {
     String batchConfigMapStr =
         batchConfigMap.entrySet().stream().map(e -> String.format("\"%s\":\"%s\"", e.getKey(), e.getValue()))
             .collect(Collectors.joining(",", "{", "}"));
     return forIngestFromFile(tableNameWithType, batchConfigMapStr);
   }
 
-  public String forIngestFromURI(String tableNameWithType, String batchConfigMapStr, String sourceURIStr)
-      throws UnsupportedEncodingException {
+  public String forIngestFromURI(String tableNameWithType, String batchConfigMapStr, String sourceURIStr) {
     return String.format("%s?tableNameWithType=%s&batchConfigMapStr=%s&sourceURIStr=%s",
         StringUtil.join("/", _baseUrl, "ingestFromURI"), tableNameWithType,
-        URLEncoder.encode(batchConfigMapStr, StandardCharsets.UTF_8.toString()),
-        URLEncoder.encode(sourceURIStr, StandardCharsets.UTF_8.toString()));
+        URLEncoder.encode(batchConfigMapStr, StandardCharsets.UTF_8),
+        URLEncoder.encode(sourceURIStr, StandardCharsets.UTF_8));
   }
 
-  public String forIngestFromURI(String tableNameWithType, Map<String, String> batchConfigMap, String sourceURIStr)
-      throws UnsupportedEncodingException {
+  public String forIngestFromURI(String tableNameWithType, Map<String, String> batchConfigMap, String sourceURIStr) {
     String batchConfigMapStr =
         batchConfigMap.entrySet().stream().map(e -> String.format("\"%s\":\"%s\"", e.getKey(), e.getValue()))
             .collect(Collectors.joining(",", "{", "}"));
@@ -519,6 +528,14 @@ public class ControllerRequestURLBuilder {
 
   public String forZkPutChildren(String path) {
     return StringUtil.join("/", _baseUrl, "zk/putChildren", "?path=" + path);
+  }
+
+  public String forZKCreate() {
+    return StringUtil.join("/", _baseUrl, "zk/create");
+  }
+
+  public String forZkDelete() {
+    return StringUtil.join("/", _baseUrl, "zk/delete");
   }
 
   public String forZkGet(String path) {
@@ -551,12 +568,7 @@ public class ControllerRequestURLBuilder {
   }
 
   private static String encode(String s) {
-    try {
-      return URLEncoder.encode(s, "UTF-8");
-    } catch (Exception e) {
-      // Should never happen
-      throw new RuntimeException(e);
-    }
+    return URLEncoder.encode(s, StandardCharsets.UTF_8);
   }
 
   public String forSegmentUpload() {

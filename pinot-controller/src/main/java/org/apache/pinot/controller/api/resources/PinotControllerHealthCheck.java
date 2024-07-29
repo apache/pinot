@@ -26,6 +26,9 @@ import io.swagger.annotations.ApiResponses;
 import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.format.DateTimeFormatter;
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.ws.rs.GET;
@@ -35,12 +38,13 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.controller.BaseControllerStarter;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.api.ControllerAdminApiApplication;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
@@ -50,7 +54,8 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
 
 @Api(tags = Constants.HEALTH_TAG, authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY)})
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = @ApiKeyAuthDefinition(name =
-    HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = SWAGGER_AUTHORIZATION_KEY)))
+    HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = SWAGGER_AUTHORIZATION_KEY,
+    description = "The format of the key is  ```\"Basic <token>\" or \"Bearer <token>\"```")))
 @Path("/")
 public class PinotControllerHealthCheck {
 
@@ -63,6 +68,10 @@ public class PinotControllerHealthCheck {
 
   @Inject
   private ControllerMetrics _controllerMetrics;
+
+  @Inject
+  @Named(ControllerAdminApiApplication.START_TIME)
+  private Instant _startTime;
 
   @GET
   @Path("pinot-controller/admin")
@@ -94,5 +103,29 @@ public class PinotControllerHealthCheck {
     Response response =
         Response.status(Response.Status.SERVICE_UNAVAILABLE).entity(errMessage).build();
     throw new WebApplicationException(errMessage, response);
+  }
+
+  @GET
+  @Produces(MediaType.TEXT_PLAIN)
+  @Path("uptime")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_HEALTH)
+  @ApiOperation(value = "Get controller uptime")
+  public long getUptime() {
+    if (_startTime == null) {
+      return 0;
+    }
+    Instant now = Instant.now();
+    Duration uptime = Duration.between(_startTime, now);
+    return uptime.getSeconds();
+  }
+
+  @GET
+  @Path("start-time")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_HEALTH)
+  @ApiOperation(value = "Get controller start time")
+  @Produces(MediaType.TEXT_PLAIN)
+  public String getStartTime() {
+    DateTimeFormatter formatter = DateTimeFormatter.ISO_INSTANT;
+    return _startTime != null ? formatter.format(_startTime) : "";
   }
 }

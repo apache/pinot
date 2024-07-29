@@ -71,8 +71,7 @@ public class InPredicateEvaluatorFactory {
    * @param dataType Data type for the column
    * @return Raw value based IN predicate evaluator
    */
-  public static InRawPredicateEvaluator newRawValueBasedEvaluator(InPredicate inPredicate,
-      DataType dataType) {
+  public static InRawPredicateEvaluator newRawValueBasedEvaluator(InPredicate inPredicate, DataType dataType) {
     switch (dataType) {
       case INT: {
         int[] intValues = inPredicate.getIntValues();
@@ -129,7 +128,8 @@ public class InPredicateEvaluatorFactory {
         }
         return new LongRawValueBasedInPredicateEvaluator(inPredicate, matchingValues);
       }
-      case STRING: {
+      case STRING:
+      case JSON: {
         List<String> stringValues = inPredicate.getValues();
         Set<String> matchingValues = new ObjectOpenHashSet<>(HashUtil.getMinHashSetSize(stringValues.size()));
         // NOTE: Add value-by-value to avoid overhead
@@ -157,42 +157,34 @@ public class InPredicateEvaluatorFactory {
 
   private static final class DictionaryBasedInPredicateEvaluator extends BaseDictionaryBasedPredicateEvaluator {
     final IntSet _matchingDictIdSet;
-    final int _numMatchingDictIds;
-    int[] _matchingDictIds;
 
     DictionaryBasedInPredicateEvaluator(InPredicate inPredicate, Dictionary dictionary, DataType dataType,
         @Nullable QueryContext queryContext) {
-      super(inPredicate);
+      super(inPredicate, dictionary);
       _matchingDictIdSet = PredicateUtils.getDictIdSet(inPredicate, dictionary, dataType, queryContext);
-      _numMatchingDictIds = _matchingDictIdSet.size();
-      if (_numMatchingDictIds == 0) {
+      int numMatchingDictIds = _matchingDictIdSet.size();
+      if (numMatchingDictIds == 0) {
         _alwaysFalse = true;
-      } else if (dictionary.length() == _numMatchingDictIds) {
+      } else if (dictionary.length() == numMatchingDictIds) {
         _alwaysTrue = true;
       }
     }
 
     @Override
-    public boolean applySV(int dictId) {
-      return _matchingDictIdSet.contains(dictId);
-    }
-
-    @Override
-    public int getNumMatchingDictIds() {
-      return _numMatchingDictIds;
+    protected int[] calculateMatchingDictIds() {
+      int[] matchingDictIds = _matchingDictIdSet.toIntArray();
+      Arrays.sort(matchingDictIds);
+      return matchingDictIds;
     }
 
     @Override
     public int getNumMatchingItems() {
-      return getNumMatchingDictIds();
+      return _matchingDictIdSet.size();
     }
 
     @Override
-    public int[] getMatchingDictIds() {
-      if (_matchingDictIds == null) {
-        _matchingDictIds = _matchingDictIdSet.toIntArray();
-      }
-      return _matchingDictIds;
+    public boolean applySV(int dictId) {
+      return _matchingDictIdSet.contains(dictId);
     }
 
     @Override
@@ -477,9 +469,7 @@ public class InPredicateEvaluatorFactory {
 
     @Override
     public <R> R accept(MultiValueVisitor<R> visitor) {
-      byte[][] bytes = _matchingValues.stream()
-          .map(ByteArray::getBytes)
-          .toArray(byte[][]::new);
+      byte[][] bytes = _matchingValues.stream().map(ByteArray::getBytes).toArray(byte[][]::new);
       return visitor.visitBytes(bytes);
     }
   }

@@ -18,9 +18,10 @@
  */
 package org.apache.pinot.server.starter.helix;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
-import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.NotificationContext;
 import org.apache.helix.messaging.handling.HelixTaskResult;
@@ -32,8 +33,11 @@ import org.apache.pinot.common.messages.ForceCommitMessage;
 import org.apache.pinot.common.messages.SegmentRefreshMessage;
 import org.apache.pinot.common.messages.SegmentReloadMessage;
 import org.apache.pinot.common.messages.TableDeletionMessage;
+import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.metrics.ServerQueryPhase;
+import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.util.SegmentRefreshSemaphore;
 import org.slf4j.Logger;
@@ -97,10 +101,10 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
         throws InterruptedException {
       HelixTaskResult result = new HelixTaskResult();
       _logger.info("Handling message: {}", _message);
+      _segmentRefreshSemaphore.acquireSema(_segmentName, _logger);
       try {
-        _segmentRefreshSemaphore.acquireSema(_segmentName, _logger);
         // The number of retry times depends on the retry count in Constants.
-        _instanceDataManager.addOrReplaceSegment(_tableNameWithType, _segmentName);
+        _instanceDataManager.replaceSegment(_tableNameWithType, _segmentName);
         result.setSuccess(true);
       } catch (Exception e) {
         _metrics.addMeteredTableValue(_tableNameWithType, ServerMeter.REFRESH_FAILURES, 1);
@@ -176,6 +180,22 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
       } catch (Exception e) {
         _metrics.addMeteredTableValue(_tableNameWithType, ServerMeter.DELETE_TABLE_FAILURES, 1);
         Utils.rethrowException(e);
+      }
+      try {
+        Arrays.stream(ServerMeter.values())
+            .filter(m -> !m.isGlobal())
+            .forEach(m -> _metrics.removeTableMeter(_tableNameWithType, m));
+        Arrays.stream(ServerGauge.values())
+            .filter(g -> !g.isGlobal())
+            .forEach(g -> _metrics.removeTableGauge(_tableNameWithType, g));
+        Arrays.stream(ServerTimer.values())
+            .filter(t -> !t.isGlobal())
+            .forEach(t -> _metrics.removeTableTimer(_tableNameWithType, t));
+        Arrays.stream(ServerQueryPhase.values())
+            .forEach(p -> _metrics.removePhaseTiming(_tableNameWithType, p));
+      } catch (Exception e) {
+        LOGGER.warn("Error while removing metrics of removed table {}. "
+            + "Some metrics may survive until the next restart.", _tableNameWithType);
       }
       return helixTaskResult;
     }

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.tools.admin.command;
 
+import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -66,13 +67,13 @@ import picocli.CommandLine;
 public class BootstrapTableCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(BootstrapTableCommand.class.getName());
 
-  @CommandLine.Option(names = {"-controllerHost"}, required = false, description = "host name for controller.")
+  @CommandLine.Option(names = {"-controllerHost"}, required = false, description = "Host name for controller.")
   private String _controllerHost;
 
-  @CommandLine.Option(names = {"-controllerPort"}, required = false, description = "http port for broker.")
+  @CommandLine.Option(names = {"-controllerPort"}, required = false, description = "Port number for controller.")
   private String _controllerPort = DEFAULT_CONTROLLER_PORT;
 
-  @CommandLine.Option(names = {"-controllerProtocol"}, required = false, description = "protocol for controller.")
+  @CommandLine.Option(names = {"-controllerProtocol"}, required = false, description = "Protocol for controller.")
   private String _controllerProtocol = CommonConstants.HTTP_PROTOCOL;
 
   @CommandLine.Option(names = {"-dir", "-d", "-directory"}, required = false,
@@ -139,6 +140,6 @@ public class BootstrapTableCommand extends AbstractBaseAdminCommand implements C
       _controllerHost = NetUtils.getHostAddress();
     }
     return new BootstrapTableTool(_controllerProtocol, _controllerHost, Integer.parseInt(_controllerPort), _dir,
-        makeAuthProvider(_authProvider, _authTokenUrl, _authToken, _user, _password)).execute();
+        AuthProviderUtils.makeAuthProvider(_authProvider, _authTokenUrl, _authToken, _user, _password)).execute();
   }
 }

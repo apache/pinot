@@ -26,7 +26,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
-import org.testng.annotations.AfterTest;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -45,6 +45,9 @@ public class ControllerSentinelTest extends ControllerTest {
   @Test
   public void testOfflineTableLifeCycle()
       throws IOException {
+    // Create schema
+    sendPostRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forSchemaCreate(),
+        createDummySchema(TABLE_NAME).toPrettyJsonString());
     // Create offline table creation request
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setNumReplicas(DEFAULT_MIN_NUM_REPLICAS)
@@ -83,7 +86,7 @@ public class ControllerSentinelTest extends ControllerTest {
         TagNameUtils.getRealtimeTagForTenant(TagNameUtils.DEFAULT_TENANT_NAME)).size(), DEFAULT_NUM_SERVER_INSTANCES);
   }
 
-  @AfterTest
+  @AfterClass
   public void tearDown() {
     DEFAULT_INSTANCE.cleanup();
   }

@@ -47,6 +47,7 @@ public class StreamingSelectionOnlyOperator extends BaseOperator<SelectionResult
   private static final String EXPLAIN_NAME = "SELECT_STREAMING";
 
   private final IndexSegment _indexSegment;
+  private final QueryContext _queryContext;
   private final List<ExpressionContext> _expressions;
   private final BaseProjectOperator<?> _projectOperator;
   private final BlockValSet[] _blockValSets;
@@ -60,6 +61,7 @@ public class StreamingSelectionOnlyOperator extends BaseOperator<SelectionResult
   public StreamingSelectionOnlyOperator(IndexSegment indexSegment, QueryContext queryContext,
       List<ExpressionContext> expressions, BaseProjectOperator<?> projectOperator) {
     _indexSegment = indexSegment;
+    _queryContext = queryContext;
     _expressions = expressions;
     _projectOperator = projectOperator;
     _nullHandlingEnabled = queryContext.isNullHandlingEnabled();
@@ -118,7 +120,7 @@ public class StreamingSelectionOnlyOperator extends BaseOperator<SelectionResult
       }
     }
     _numDocsScanned += numDocs;
-    return new SelectionResultsBlock(_dataSchema, rows);
+    return new SelectionResultsBlock(_dataSchema, rows, _queryContext);
   }
 
   @Override

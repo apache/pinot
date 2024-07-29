@@ -38,6 +38,7 @@ public class StreamConfigProperties {
    */
   public static final String STREAM_TYPE = "streamType";
   public static final String STREAM_TOPIC_NAME = "topic.name";
+  @Deprecated
   public static final String STREAM_CONSUMER_TYPES = "consumer.type";
   public static final String STREAM_CONSUMER_FACTORY_CLASS = "consumer.factory.class.name";
   public static final String STREAM_CONSUMER_OFFSET_CRITERIA = "consumer.prop.auto.offset.reset";
@@ -80,6 +81,12 @@ public class StreamConfigProperties {
    */
   public static final String DEPRECATED_SEGMENT_FLUSH_THRESHOLD_ROWS = "realtime.segment.flush.threshold.size";
   public static final String SEGMENT_FLUSH_THRESHOLD_ROWS = "realtime.segment.flush.threshold.rows";
+
+  /**
+   * Config is similar to {@link StreamConfigProperties#SEGMENT_FLUSH_THRESHOLD_ROWS} but independent of
+   * partition count. This is useful when we want to flush segment exactly based on number of rows in a segment
+   */
+  public static final String SEGMENT_FLUSH_THRESHOLD_SEGMENT_ROWS = "realtime.segment.flush.threshold.segment.rows";
 
   /**
    * @deprecated because the property key is confusing (desired size is not indicative of segment size).

@@ -32,16 +32,21 @@ import org.apache.pinot.plugin.stream.kafka20.utils.MiniKafkaCluster;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.OffsetCriteria;
-import org.apache.pinot.spi.stream.PartitionLevelConsumer;
-import org.apache.pinot.spi.stream.RowMetadata;
+import org.apache.pinot.spi.stream.PartitionGroupConsumer;
+import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
 import org.apache.pinot.spi.stream.StreamMessage;
-import org.testng.Assert;
+import org.apache.pinot.spi.stream.StreamMessageMetadata;
+import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertTrue;
 
 
 /**
@@ -104,8 +109,7 @@ public class KafkaPartitionLevelConsumerTest {
   }
 
   @Test
-  public void testBuildConsumer()
-      throws Exception {
+  public void testBuildConsumer() {
     String streamType = "kafka";
     String streamKafkaTopicName = "theTopic";
     String streamKafkaBrokerList = _kafkaBrokerAddress;
@@ -126,27 +130,25 @@ public class KafkaPartitionLevelConsumerTest {
 
     // test default value
     KafkaPartitionLevelConsumer kafkaSimpleStreamConsumer = new KafkaPartitionLevelConsumer(clientId, streamConfig, 0);
-    kafkaSimpleStreamConsumer.fetchMessages(new LongMsgOffset(12345L), new LongMsgOffset(23456L), 10000);
+    kafkaSimpleStreamConsumer.fetchMessages(new LongMsgOffset(12345L), 10000);
 
-    Assert.assertEquals(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_BUFFER_SIZE_DEFAULT,
+    assertEquals(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_BUFFER_SIZE_DEFAULT,
         kafkaSimpleStreamConsumer.getKafkaPartitionLevelStreamConfig().getKafkaBufferSize());
-    Assert.assertEquals(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_SOCKET_TIMEOUT_DEFAULT,
+    assertEquals(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_SOCKET_TIMEOUT_DEFAULT,
         kafkaSimpleStreamConsumer.getKafkaPartitionLevelStreamConfig().getKafkaSocketTimeout());
 
     // test parsing values
-    Assert.assertEquals(10000,
-        kafkaSimpleStreamConsumer.getKafkaPartitionLevelStreamConfig().getKafkaFetcherSizeBytes());
-    Assert.assertEquals(20000,
-        kafkaSimpleStreamConsumer.getKafkaPartitionLevelStreamConfig().getKafkaFetcherMinBytes());
+    assertEquals(10000, kafkaSimpleStreamConsumer.getKafkaPartitionLevelStreamConfig().getKafkaFetcherSizeBytes());
+    assertEquals(20000, kafkaSimpleStreamConsumer.getKafkaPartitionLevelStreamConfig().getKafkaFetcherMinBytes());
 
     // test user defined values
     streamConfigMap.put("stream.kafka.buffer.size", "100");
     streamConfigMap.put("stream.kafka.socket.timeout", "1000");
     streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
     kafkaSimpleStreamConsumer = new KafkaPartitionLevelConsumer(clientId, streamConfig, 0);
-    kafkaSimpleStreamConsumer.fetchMessages(new LongMsgOffset(12345L), new LongMsgOffset(23456L), 10000);
-    Assert.assertEquals(100, kafkaSimpleStreamConsumer.getKafkaPartitionLevelStreamConfig().getKafkaBufferSize());
-    Assert.assertEquals(1000, kafkaSimpleStreamConsumer.getKafkaPartitionLevelStreamConfig().getKafkaSocketTimeout());
+    kafkaSimpleStreamConsumer.fetchMessages(new LongMsgOffset(12345L), 10000);
+    assertEquals(100, kafkaSimpleStreamConsumer.getKafkaPartitionLevelStreamConfig().getKafkaBufferSize());
+    assertEquals(1000, kafkaSimpleStreamConsumer.getKafkaPartitionLevelStreamConfig().getKafkaSocketTimeout());
   }
 
   @Test
@@ -167,7 +169,7 @@ public class KafkaPartitionLevelConsumerTest {
     StreamConfig streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
 
     KafkaStreamMetadataProvider streamMetadataProvider = new KafkaStreamMetadataProvider(clientId, streamConfig);
-    Assert.assertEquals(streamMetadataProvider.fetchPartitionCount(10000L), 1);
+    assertEquals(streamMetadataProvider.fetchPartitionCount(10000L), 1);
 
     streamConfigMap = new HashMap<>();
     streamConfigMap.put("streamType", streamType);
@@ -179,12 +181,11 @@ public class KafkaPartitionLevelConsumerTest {
     streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
 
     streamMetadataProvider = new KafkaStreamMetadataProvider(clientId, streamConfig);
-    Assert.assertEquals(streamMetadataProvider.fetchPartitionCount(10000L), 2);
+    assertEquals(streamMetadataProvider.fetchPartitionCount(10000L), 2);
   }
 
   @Test
-  public void testFetchMessages()
-      throws Exception {
+  public void testFetchMessages() {
     String streamType = "kafka";
     String streamKafkaTopicName = "theTopic";
     String streamKafkaBrokerList = _kafkaBrokerAddress;
@@ -204,18 +205,16 @@ public class KafkaPartitionLevelConsumerTest {
     int partition = 0;
     KafkaPartitionLevelConsumer kafkaSimpleStreamConsumer =
         new KafkaPartitionLevelConsumer(clientId, streamConfig, partition);
-    kafkaSimpleStreamConsumer.fetchMessages(new LongMsgOffset(12345L), new LongMsgOffset(23456L), 10000);
+    kafkaSimpleStreamConsumer.fetchMessages(new LongMsgOffset(12345L), 10000);
   }
 
   @Test
-  public void testFetchOffsets()
-      throws Exception {
+  public void testFetchOffsets() {
     testFetchOffsets(TEST_TOPIC_1);
     testFetchOffsets(TEST_TOPIC_2);
   }
 
-  private void testFetchOffsets(String topic)
-      throws Exception {
+  private void testFetchOffsets(String topic) {
     String streamType = "kafka";
     String streamKafkaBrokerList = _kafkaBrokerAddress;
     String streamKafkaConsumerType = "simple";
@@ -235,14 +234,14 @@ public class KafkaPartitionLevelConsumerTest {
     for (int partition = 0; partition < numPartitions; partition++) {
       KafkaStreamMetadataProvider kafkaStreamMetadataProvider =
           new KafkaStreamMetadataProvider(clientId, streamConfig, partition);
-      Assert.assertEquals(new LongMsgOffset(0).compareTo(kafkaStreamMetadataProvider.fetchStreamPartitionOffset(
+      assertEquals(new LongMsgOffset(0).compareTo(kafkaStreamMetadataProvider.fetchStreamPartitionOffset(
           new OffsetCriteria.OffsetCriteriaBuilder().withOffsetSmallest(), 10000)), 0);
-      Assert.assertEquals(new LongMsgOffset(0).compareTo(kafkaStreamMetadataProvider.fetchStreamPartitionOffset(
+      assertEquals(new LongMsgOffset(0).compareTo(kafkaStreamMetadataProvider.fetchStreamPartitionOffset(
           new OffsetCriteria.OffsetCriteriaBuilder().withOffsetAsPeriod("2d"), 10000)), 0);
-      Assert.assertEquals(new LongMsgOffset(NUM_MSG_PRODUCED_PER_PARTITION)
-          .compareTo(kafkaStreamMetadataProvider.fetchStreamPartitionOffset(new OffsetCriteria.OffsetCriteriaBuilder()
-              .withOffsetAsTimestamp(Instant.now().toString()), 10000)), 0);
-      Assert.assertEquals(new LongMsgOffset(NUM_MSG_PRODUCED_PER_PARTITION).compareTo(
+      assertEquals(new LongMsgOffset(NUM_MSG_PRODUCED_PER_PARTITION).compareTo(
+          kafkaStreamMetadataProvider.fetchStreamPartitionOffset(
+              new OffsetCriteria.OffsetCriteriaBuilder().withOffsetAsTimestamp(Instant.now().toString()), 10000)), 0);
+      assertEquals(new LongMsgOffset(NUM_MSG_PRODUCED_PER_PARTITION).compareTo(
           kafkaStreamMetadataProvider.fetchStreamPartitionOffset(
               new OffsetCriteria.OffsetCriteriaBuilder().withOffsetLargest(), 10000)), 0);
     }
@@ -272,102 +271,100 @@ public class KafkaPartitionLevelConsumerTest {
     streamConfigMap.put("stream.kafka.decoder.class.name", "decoderClass");
     StreamConfig streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
 
-    final StreamConsumerFactory streamConsumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
+    StreamConsumerFactory streamConsumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
     int numPartitions = new KafkaStreamMetadataProvider(clientId, streamConfig).fetchPartitionCount(10000);
     for (int partition = 0; partition < numPartitions; partition++) {
-      final PartitionLevelConsumer consumer = streamConsumerFactory.createPartitionLevelConsumer(clientId, partition);
+      PartitionGroupConsumer consumer = streamConsumerFactory.createPartitionGroupConsumer(clientId,
+          new PartitionGroupConsumptionStatus(partition, 0, new LongMsgOffset(0),
+              new LongMsgOffset(NUM_MSG_PRODUCED_PER_PARTITION), "CONSUMING"));
 
       // Test consume a large batch, only 500 records will be returned.
-      final MessageBatch batch1 =
-          consumer.fetchMessages(new LongMsgOffset(0), new LongMsgOffset(NUM_MSG_PRODUCED_PER_PARTITION), 10000);
-      Assert.assertEquals(batch1.getMessageCount(), 500);
-      for (int i = 0; i < batch1.getMessageCount(); i++) {
-        StreamMessage streamMessage = batch1.getStreamMessage(i);
-        Assert.assertNotNull(streamMessage.getMetadata());
-        final byte[] msg = (byte[]) streamMessage.getValue();
-        Assert.assertEquals(new String(msg), "sample_msg_" + i);
-        Assert.assertNotNull(batch1.getMetadataAtIndex(i));
+      MessageBatch messageBatch = consumer.fetchMessages(new LongMsgOffset(0), 10000);
+      assertEquals(messageBatch.getMessageCount(), 500);
+      assertEquals(messageBatch.getUnfilteredMessageCount(), 500);
+      for (int i = 0; i < 500; i++) {
+        StreamMessage streamMessage = messageBatch.getStreamMessage(i);
+        assertEquals(new String((byte[]) streamMessage.getValue()), "sample_msg_" + i);
+        StreamMessageMetadata metadata = streamMessage.getMetadata();
+        assertNotNull(metadata);
+        assertEquals(metadata.getRecordIngestionTimeMs(), TIMESTAMP + i);
+        StreamPartitionMsgOffset offset = metadata.getOffset();
+        assertTrue(offset instanceof LongMsgOffset);
+        assertEquals(((LongMsgOffset) offset).getOffset(), i);
+        StreamPartitionMsgOffset nextOffset = metadata.getNextOffset();
+        assertTrue(nextOffset instanceof LongMsgOffset);
+        assertEquals(((LongMsgOffset) nextOffset).getOffset(), i + 1);
       }
+      assertEquals(messageBatch.getOffsetOfNextBatch().toString(), "500");
+      assertEquals(messageBatch.getFirstMessageOffset().toString(), "0");
+      assertEquals(messageBatch.getLastMessageMetadata().getOffset().toString(), "499");
+      assertEquals(messageBatch.getLastMessageMetadata().getNextOffset().toString(), "500");
+
       // Test second half batch
-      final MessageBatch batch2 =
-          consumer.fetchMessages(new LongMsgOffset(500), new LongMsgOffset(NUM_MSG_PRODUCED_PER_PARTITION), 10000);
-      Assert.assertEquals(batch2.getMessageCount(), 500);
-      for (int i = 0; i < batch2.getMessageCount(); i++) {
-        StreamMessage streamMessage = batch2.getStreamMessage(i);
-        Assert.assertNotNull(streamMessage.getMetadata());
-        final byte[] msg = (byte[]) streamMessage.getValue();
-        Assert.assertEquals(new String(msg), "sample_msg_" + (500 + i));
-        Assert.assertNotNull(batch1.getMetadataAtIndex(i));
+      messageBatch = consumer.fetchMessages(new LongMsgOffset(500), 10000);
+      assertEquals(messageBatch.getMessageCount(), 500);
+      assertEquals(messageBatch.getUnfilteredMessageCount(), 500);
+      for (int i = 0; i < 500; i++) {
+        StreamMessage streamMessage = messageBatch.getStreamMessage(i);
+        assertEquals(new String((byte[]) streamMessage.getValue()), "sample_msg_" + (500 + i));
+        StreamMessageMetadata metadata = streamMessage.getMetadata();
+        assertNotNull(metadata);
+        assertEquals(metadata.getRecordIngestionTimeMs(), TIMESTAMP + 500 + i);
+        StreamPartitionMsgOffset offset = metadata.getOffset();
+        assertTrue(offset instanceof LongMsgOffset);
+        assertEquals(((LongMsgOffset) offset).getOffset(), 500 + i);
+        StreamPartitionMsgOffset nextOffset = metadata.getNextOffset();
+        assertTrue(nextOffset instanceof LongMsgOffset);
+        assertEquals(((LongMsgOffset) nextOffset).getOffset(), 501 + i);
       }
+      assertEquals(messageBatch.getOffsetOfNextBatch().toString(), "1000");
+      assertEquals(messageBatch.getFirstMessageOffset().toString(), "500");
+      assertEquals(messageBatch.getLastMessageMetadata().getOffset().toString(), "999");
+      assertEquals(messageBatch.getLastMessageMetadata().getNextOffset().toString(), "1000");
+
       // Some random range
-      final MessageBatch batch3 = consumer.fetchMessages(new LongMsgOffset(10), new LongMsgOffset(35), 10000);
-      Assert.assertEquals(batch3.getMessageCount(), 25);
-      for (int i = 0; i < batch3.getMessageCount(); i++) {
-        StreamMessage streamMessage = batch3.getStreamMessage(i);
-        Assert.assertNotNull(streamMessage.getMetadata());
-        final byte[] msg = (byte[]) streamMessage.getValue();
-        Assert.assertEquals(new String(msg), "sample_msg_" + (10 + i));
-        Assert.assertNotNull(batch1.getMetadataAtIndex(i));
+      messageBatch = consumer.fetchMessages(new LongMsgOffset(10), 10000);
+      assertEquals(messageBatch.getMessageCount(), 500);
+      assertEquals(messageBatch.getUnfilteredMessageCount(), 500);
+      for (int i = 0; i < 500; i++) {
+        StreamMessage streamMessage = messageBatch.getStreamMessage(i);
+        assertEquals(new String((byte[]) streamMessage.getValue()), "sample_msg_" + (10 + i));
+        StreamMessageMetadata metadata = streamMessage.getMetadata();
+        assertNotNull(metadata);
+        assertEquals(metadata.getRecordIngestionTimeMs(), TIMESTAMP + 10 + i);
+        StreamPartitionMsgOffset offset = metadata.getOffset();
+        assertTrue(offset instanceof LongMsgOffset);
+        assertEquals(((LongMsgOffset) offset).getOffset(), 10 + i);
+        StreamPartitionMsgOffset nextOffset = metadata.getNextOffset();
+        assertTrue(nextOffset instanceof LongMsgOffset);
+        assertEquals(((LongMsgOffset) nextOffset).getOffset(), 11 + i);
       }
-    }
-  }
+      assertEquals(messageBatch.getOffsetOfNextBatch().toString(), "510");
+      assertEquals(messageBatch.getFirstMessageOffset().toString(), "10");
+      assertEquals(messageBatch.getLastMessageMetadata().getOffset().toString(), "509");
+      assertEquals(messageBatch.getLastMessageMetadata().getNextOffset().toString(), "510");
 
-  @Test
-  public void testMessageMetadata()
-      throws Exception {
-    testMessageMetadata(TEST_TOPIC_1);
-    testMessageMetadata(TEST_TOPIC_2);
-  }
-
-  private void testMessageMetadata(String topic)
-      throws TimeoutException {
-    String streamType = "kafka";
-    String streamKafkaBrokerList = _kafkaBrokerAddress;
-    String streamKafkaConsumerType = "simple";
-    String clientId = "clientId";
-    String tableNameWithType = "tableName_REALTIME";
-
-    Map<String, String> streamConfigMap = new HashMap<>();
-    streamConfigMap.put("streamType", streamType);
-    streamConfigMap.put("stream.kafka.topic.name", topic);
-    streamConfigMap.put("stream.kafka.broker.list", streamKafkaBrokerList);
-    streamConfigMap.put("stream.kafka.consumer.type", streamKafkaConsumerType);
-    streamConfigMap.put("stream.kafka.consumer.factory.class.name", getKafkaConsumerFactoryName());
-    streamConfigMap.put("stream.kafka.decoder.class.name", "decoderClass");
-    streamConfigMap.put("stream.kafka.metadata.populate", "true");
-    StreamConfig streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
-
-    final StreamConsumerFactory streamConsumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
-    int numPartitions = new KafkaStreamMetadataProvider(clientId, streamConfig).fetchPartitionCount(10000);
-    for (int partition = 0; partition < numPartitions; partition++) {
-      final PartitionLevelConsumer consumer = streamConsumerFactory.createPartitionLevelConsumer(clientId, partition);
-
-      // Test consume a large batch, only 500 records will be returned.
-      final MessageBatch batch1 =
-          consumer.fetchMessages(new LongMsgOffset(0), new LongMsgOffset(NUM_MSG_PRODUCED_PER_PARTITION), 10000);
-      Assert.assertEquals(batch1.getMessageCount(), 500);
-      for (int i = 0; i < batch1.getMessageCount(); i++) {
-        final RowMetadata metadata = batch1.getMetadataAtIndex(i);
-        Assert.assertNotNull(metadata);
-        Assert.assertEquals(metadata.getRecordIngestionTimeMs(), TIMESTAMP + i);
-      }
-      // Test second half batch
-      final MessageBatch batch2 =
-          consumer.fetchMessages(new LongMsgOffset(500), new LongMsgOffset(NUM_MSG_PRODUCED_PER_PARTITION), 10000);
-      Assert.assertEquals(batch2.getMessageCount(), 500);
-      for (int i = 0; i < batch2.getMessageCount(); i++) {
-        final RowMetadata metadata = batch2.getMetadataAtIndex(i);
-        Assert.assertNotNull(metadata);
-        Assert.assertEquals(metadata.getRecordIngestionTimeMs(), TIMESTAMP + (500 + i));
-      }
       // Some random range
-      final MessageBatch batch3 = consumer.fetchMessages(new LongMsgOffset(10), new LongMsgOffset(35), 10000);
-      Assert.assertEquals(batch3.getMessageCount(), 25);
-      for (int i = 0; i < batch3.getMessageCount(); i++) {
-        final RowMetadata metadata = batch3.getMetadataAtIndex(i);
-        Assert.assertNotNull(metadata);
-        Assert.assertEquals(metadata.getRecordIngestionTimeMs(), TIMESTAMP + (10 + i));
+      messageBatch = consumer.fetchMessages(new LongMsgOffset(610), 10000);
+      assertEquals(messageBatch.getMessageCount(), 390);
+      assertEquals(messageBatch.getUnfilteredMessageCount(), 390);
+      for (int i = 0; i < 390; i++) {
+        StreamMessage streamMessage = messageBatch.getStreamMessage(i);
+        assertEquals(new String((byte[]) streamMessage.getValue()), "sample_msg_" + (610 + i));
+        StreamMessageMetadata metadata = streamMessage.getMetadata();
+        assertNotNull(metadata);
+        assertEquals(metadata.getRecordIngestionTimeMs(), TIMESTAMP + 610 + i);
+        StreamPartitionMsgOffset offset = metadata.getOffset();
+        assertTrue(offset instanceof LongMsgOffset);
+        assertEquals(((LongMsgOffset) offset).getOffset(), 610 + i);
+        StreamPartitionMsgOffset nextOffset = metadata.getNextOffset();
+        assertTrue(nextOffset instanceof LongMsgOffset);
+        assertEquals(((LongMsgOffset) nextOffset).getOffset(), 611 + i);
       }
+      assertEquals(messageBatch.getOffsetOfNextBatch().toString(), "1000");
+      assertEquals(messageBatch.getFirstMessageOffset().toString(), "610");
+      assertEquals(messageBatch.getLastMessageMetadata().getOffset().toString(), "999");
+      assertEquals(messageBatch.getLastMessageMetadata().getNextOffset().toString(), "1000");
     }
   }
 
@@ -389,35 +386,17 @@ public class KafkaPartitionLevelConsumerTest {
     StreamConfig streamConfig = new StreamConfig("tableName_REALTIME", streamConfigMap);
 
     StreamConsumerFactory streamConsumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
-    PartitionLevelConsumer consumer = streamConsumerFactory.createPartitionLevelConsumer("clientId", 0);
+    PartitionGroupConsumer consumer = streamConsumerFactory.createPartitionGroupConsumer("clientId",
+        new PartitionGroupConsumptionStatus(0, 0, new LongMsgOffset(0),
+            new LongMsgOffset(NUM_MSG_PRODUCED_PER_PARTITION), "CONSUMING"));
 
     // Start offset has expired. Automatically reset to earliest available and fetch whatever available
-    MessageBatch batch1 = consumer.fetchMessages(new LongMsgOffset(0), new LongMsgOffset(400), 10000);
-    Assert.assertEquals(batch1.getMessageCount(), 200);
-    for (int i = 0; i < batch1.getMessageCount(); i++) {
-      byte[] msg = (byte[]) batch1.getStreamMessage(i).getValue();
-      Assert.assertEquals(new String(msg), "sample_msg_" + (i + 200));
+    MessageBatch messageBatch = consumer.fetchMessages(new LongMsgOffset(0), 10000);
+    assertEquals(messageBatch.getMessageCount(), 500);
+    assertEquals(messageBatch.getUnfilteredMessageCount(), 500);
+    for (int i = 0; i < 500; i++) {
+      assertEquals(new String((byte[]) messageBatch.getStreamMessage(i).getValue()), "sample_msg_" + (200 + i));
     }
-    Assert.assertEquals(batch1.getOffsetOfNextBatch().toString(), "400");
-
-    // Start and end offset has expired
-    MessageBatch batch2 = consumer.fetchMessages(new LongMsgOffset(0), new LongMsgOffset(100), 10000);
-    Assert.assertEquals(batch2.getMessageCount(), 0);
-
-    MessageBatch batch3 = consumer.fetchMessages(new LongMsgOffset(201), new LongMsgOffset(401), 10000);
-    Assert.assertEquals(batch3.getMessageCount(), 200);
-    for (int i = 0; i < batch3.getMessageCount(); i++) {
-      byte[] msg = (byte[]) batch3.getStreamMessage(i).getValue();
-      Assert.assertEquals(new String(msg), "sample_msg_" + (i + 201));
-    }
-    Assert.assertEquals(batch3.getOffsetOfNextBatch().toString(), "401");
-
-    MessageBatch batch4 = consumer.fetchMessages(new LongMsgOffset(0), null, 10000);
-    Assert.assertEquals(batch4.getMessageCount(), 500);
-    for (int i = 0; i < batch4.getMessageCount(); i++) {
-      byte[] msg = (byte[]) batch4.getStreamMessage(i).getValue();
-      Assert.assertEquals(new String(msg), "sample_msg_" + (i + 200));
-    }
-    Assert.assertEquals(batch4.getOffsetOfNextBatch().toString(), "700");
+    assertEquals(messageBatch.getOffsetOfNextBatch().toString(), "700");
   }
 }

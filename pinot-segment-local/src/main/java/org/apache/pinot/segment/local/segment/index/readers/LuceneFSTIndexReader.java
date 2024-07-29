@@ -51,7 +51,9 @@ public class LuceneFSTIndexReader implements TextIndexReader {
     _dataBuffer = pinotDataBuffer;
     _dataBufferIndexInput = new PinotBufferIndexInput(_dataBuffer, 0L, _dataBuffer.size());
 
-    _readFST = new FST(_dataBufferIndexInput, PositiveIntOutputs.getSingleton(), new OffHeapFSTStore());
+    _readFST =
+        new FST<>(FST.readMetadata(_dataBufferIndexInput, PositiveIntOutputs.getSingleton()),
+            _dataBufferIndexInput, new OffHeapFSTStore());
   }
 
   @Override

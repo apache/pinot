@@ -27,9 +27,10 @@ import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 
 
-public class LLCSegmentName extends SegmentName implements Comparable {
-  private final static String DATE_FORMAT = "yyyyMMdd'T'HHmm'Z'";
-  private final static DateTimeFormatter DATE_FORMATTER = DateTimeFormat.forPattern(DATE_FORMAT).withZoneUTC();
+public class LLCSegmentName implements Comparable<LLCSegmentName> {
+  private static final String SEPARATOR = "__";
+  private static final String DATE_FORMAT = "yyyyMMdd'T'HHmm'Z'";
+  private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormat.forPattern(DATE_FORMAT).withZoneUTC();
 
   private final String _tableName;
   private final int _partitionGroupId;
@@ -48,9 +49,7 @@ public class LLCSegmentName extends SegmentName implements Comparable {
   }
 
   public LLCSegmentName(String tableName, int partitionGroupId, int sequenceNumber, long msSinceEpoch) {
-    if (!isValidComponentName(tableName)) {
-      throw new RuntimeException("Invalid table name " + tableName);
-    }
+    Preconditions.checkArgument(!tableName.contains(SEPARATOR), "Illegal table name: %s", tableName);
     _tableName = tableName;
     _partitionGroupId = partitionGroupId;
     _sequenceNumber = sequenceNumber;
@@ -82,33 +81,38 @@ public class LLCSegmentName extends SegmentName implements Comparable {
   }
 
   /**
+   * Returns whether the given segment name represents an LLC segment.
+   */
+  public static boolean isLLCSegment(String segmentName) {
+    int numSeparators = 0;
+    int index = 0;
+    while ((index = segmentName.indexOf(SEPARATOR, index)) != -1) {
+      numSeparators++;
+      index += 2; // SEPARATOR.length()
+    }
+    return numSeparators == 3;
+  }
+
+  @Deprecated
+  public static boolean isLowLevelConsumerSegmentName(String segmentName) {
+    return isLLCSegment(segmentName);
+  }
+
+  /**
    * Returns the sequence number of the given segment name.
    */
   public static int getSequenceNumber(String segmentName) {
     return Integer.parseInt(StringUtils.splitByWholeSeparator(segmentName, SEPARATOR)[2]);
   }
 
-  @Override
-  public RealtimeSegmentType getSegmentType() {
-    return RealtimeSegmentType.LLC;
-  }
-
-  @Override
   public String getTableName() {
     return _tableName;
   }
 
-  @Override
   public int getPartitionGroupId() {
     return _partitionGroupId;
   }
 
-  @Override
-  public String getPartitionRange() {
-    return Integer.toString(getPartitionGroupId());
-  }
-
-  @Override
   public int getSequenceNumber() {
     return _sequenceNumber;
   }
@@ -122,41 +126,18 @@ public class LLCSegmentName extends SegmentName implements Comparable {
     return dateTime.getMillis();
   }
 
-  @Override
   public String getSegmentName() {
     return _segmentName;
   }
 
   @Override
-  public String getSequenceNumberStr() {
-    return Integer.toString(_sequenceNumber);
-  }
-
-  @Override
-  public int compareTo(Object o) {
-    LLCSegmentName other = (LLCSegmentName) o;
-    if (!this.getTableName().equals(other.getTableName())) {
-      throw new RuntimeException(
-          "Cannot compare segment names " + this.getSegmentName() + " and " + other.getSegmentName());
+  public int compareTo(LLCSegmentName other) {
+    Preconditions.checkArgument(_tableName.equals(other._tableName),
+        "Cannot compare segment names from different table: %s, %s", _segmentName, other.getSegmentName());
+    if (_partitionGroupId != other._partitionGroupId) {
+      return Integer.compare(_partitionGroupId, other._partitionGroupId);
     }
-    if (this.getPartitionGroupId() > other.getPartitionGroupId()) {
-      return 1;
-    } else if (this.getPartitionGroupId() < other.getPartitionGroupId()) {
-      return -1;
-    } else {
-      if (this.getSequenceNumber() > other.getSequenceNumber()) {
-        return 1;
-      } else if (this.getSequenceNumber() < other.getSequenceNumber()) {
-        return -1;
-      } else {
-        if (!this.getCreationTime().equals(other.getCreationTime())) {
-          // If sequence number is the same, time cannot be different.
-          throw new RuntimeException(
-              "Cannot compare segment names " + this.getSegmentName() + " and " + other.getSegmentName());
-        }
-        return 0;
-      }
-    }
+    return Integer.compare(_sequenceNumber, other._sequenceNumber);
   }
 
   @Override
@@ -164,7 +145,7 @@ public class LLCSegmentName extends SegmentName implements Comparable {
     if (this == o) {
       return true;
     }
-    if (o == null || getClass() != o.getClass()) {
+    if (!(o instanceof LLCSegmentName)) {
       return false;
     }
     LLCSegmentName that = (LLCSegmentName) o;
@@ -178,6 +159,6 @@ public class LLCSegmentName extends SegmentName implements Comparable {
 
   @Override
   public String toString() {
-    return getSegmentName();
+    return _segmentName;
   }
 }
