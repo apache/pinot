@@ -110,7 +110,7 @@
     <jdk.version>11</jdk.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
-    <!-- Setting maven.compiler flags to the jdk version. These can be used by maven plugins like maven-javadoc-plugin -->
+    <!-- Setting maven.compiler flags to the jdk version. These are used by maven plugins like maven-javadoc-plugin -->
     <maven.compiler.release>${jdk.version}</maven.compiler.release>
     <maven.compiler.source>${jdk.version}</maven.compiler.source>
     <maven.compiler.target>${jdk.version}</maven.compiler.target>
