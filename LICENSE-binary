@@ -487,8 +487,8 @@ org.apache.yetus:audience-annotations:0.15.0
 org.apache.zookeeper:zookeeper-jute:3.9.2
 org.apache.zookeeper:zookeeper:3.9.2
 org.apiguardian:apiguardian-api:1.1.2
-org.asynchttpclient:async-http-client-netty-utils:2.12.3
-org.asynchttpclient:async-http-client:2.12.3
+org.asynchttpclient:async-http-client-netty-utils:3.0.0
+org.asynchttpclient:async-http-client:3.0.0
 org.codehaus.groovy:groovy-all:2.4.21
 org.conscrypt:conscrypt-openjdk-uber:2.5.2
 org.eclipse.jetty.websocket:websocket-api:9.4.54.v20240208
