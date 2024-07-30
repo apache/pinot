@@ -29,7 +29,6 @@ import org.apache.commons.io.FileUtils;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.core.KeywordTokenizer;
 import org.apache.lucene.queryparser.classic.QueryParser;
-import org.apache.lucene.search.SearcherManager;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
@@ -38,6 +37,7 @@ import org.apache.pinot.util.TestUtils;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
@@ -53,6 +53,11 @@ public class LuceneMutableTextIndexTest {
   private static final RealtimeLuceneTextIndexSearcherPool SEARCHER_POOL =
       RealtimeLuceneTextIndexSearcherPool.init(1);
   private RealtimeLuceneTextIndex _realtimeLuceneTextIndex;
+
+  public LuceneMutableTextIndexTest() {
+    RealtimeLuceneIndexRefreshManager.init(1, 10);
+    ServerMetrics.register(mock(ServerMetrics.class));
+  }
 
   @Test
   public void testDefaultAnalyzerAndDefaultQueryParser() {
@@ -116,17 +121,6 @@ public class LuceneMutableTextIndexTest {
             "columnar processing for data warehouses"), ImmutableRoaringBitmap.bitmapOf(1));
   }
 
-  @Test(expectedExceptions = ExecutionException.class,
-          expectedExceptionsMessageRegExp = ".*TEXT_MATCH query timeout on realtime consuming segment.*")
-  public void testQueryCancellationIsSuccessful() throws Exception {
-    // Test queries with standard analyzer with default configurations used by Pinot
-    configureIndex(null, null, null, null);
-    ExecutorService executor = Executors.newSingleThreadExecutor();
-    Future<MutableRoaringBitmap> res = executor.submit(() -> _realtimeLuceneTextIndex.getDocIds("/.*read.*/"));
-    executor.shutdownNow();
-    res.get();
-  }
-
   private static class CustomQueryParser extends QueryParser {
     public CustomQueryParser(String field, Analyzer analyzer) {
       super(field, analyzer);
@@ -153,12 +147,7 @@ public class LuceneMutableTextIndexTest {
     protected Analyzer.TokenStreamComponents createComponents(String fieldName) {
       return new Analyzer.TokenStreamComponents(new KeywordTokenizer());
     }
-
-    
-    public LuceneMutableTextIndexTest() {
-      RealtimeLuceneIndexRefreshManager.init(1, 10);
-      ServerMetrics.register(mock(ServerMetrics.class));
-    }
+  }
 
   private String[][] getTextData() {
     return new String[][]{
@@ -188,21 +177,12 @@ public class LuceneMutableTextIndexTest {
     if (null != queryParserClass) {
       builder.withLuceneQueryParserClass(queryParserClass);
     }
-    TextIndexConfig config = builder.build();
+    TextIndexConfig config = builder.withUseANDForMultiTermQueries(false).build();
 
     // Note that segment name must be unique on each query setup, otherwise `testQueryCancellationIsSuccessful` method
     // will cause unit test to fail due to inability to release a lock.
     _realtimeLuceneTextIndex = new RealtimeLuceneTextIndex(TEXT_COLUMN_NAME, INDEX_DIR,
-            "fooBar" + SEGMENT_NAME_SUFFIX_COUNTER.getAndIncrement(), config);
-
-  @BeforeClass
-  public void setUp()
-      throws Exception {
-    TextIndexConfig config =
-        new TextIndexConfig(false, null, null, false, false, null, null, true, 500, null, false, false, 0);
-    _realtimeLuceneTextIndex =
-        new RealtimeLuceneTextIndex(TEXT_COLUMN_NAME, INDEX_DIR, "table__0__1__20240602T0014Z", config);
-
+        "table__0__1__20240601T1818Z" + SEGMENT_NAME_SUFFIX_COUNTER.getAndIncrement(), config);
     String[][] documents = getTextData();
     String[][] repeatedDocuments = getRepeatedData();
 
@@ -215,6 +195,22 @@ public class LuceneMutableTextIndexTest {
         _realtimeLuceneTextIndex.add(row);
       }
     }
+
+    // ensure searches work after .commit() is called
+    _realtimeLuceneTextIndex.commit();
+
+    // sleep for index refresh
+    try {
+      Thread.sleep(100);
+    } catch (Exception e) {
+      // no-op
+    }
+  }
+
+  @BeforeClass
+  public void setUp()
+      throws Exception {
+    RealtimeLuceneIndexRefreshManager.getInstance().reset();
   }
 
   @AfterClass

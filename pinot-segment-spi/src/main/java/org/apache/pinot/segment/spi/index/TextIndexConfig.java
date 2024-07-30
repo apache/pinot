@@ -39,10 +39,10 @@ public class TextIndexConfig extends IndexConfig {
   private static final boolean LUCENE_INDEX_ENABLE_PREFIX_SUFFIX_MATCH_IN_PHRASE_SEARCH = false;
   private static final boolean LUCENE_INDEX_REUSE_MUTABLE_INDEX = false;
   private static final int LUCENE_INDEX_NRT_CACHING_DIRECTORY_MAX_BUFFER_SIZE_MB = 0;
+
   public static final TextIndexConfig DISABLED =
       new TextIndexConfig(true, null, null, false, false, Collections.emptyList(), Collections.emptyList(), false,
          LUCENE_INDEX_DEFAULT_MAX_BUFFER_SIZE_MB, null, null, null, null, false, false, 0);
-    private static final boolean LUCENE_INDEX_ENABLE_PREFIX_SUFFIX_MATCH_IN_PHRASE_SEARCH = false;
 
   private final FSTType _fstType;
   @Nullable

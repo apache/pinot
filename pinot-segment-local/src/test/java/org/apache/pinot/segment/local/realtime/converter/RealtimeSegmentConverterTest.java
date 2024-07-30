@@ -481,9 +481,11 @@ public class RealtimeSegmentConverterTest {
     String tableNameWithType = tableConfig.getTableName();
     String segmentName = "testTable__0__0__123456";
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
-    TextIndexConfig textIndexConfig =
-        new TextIndexConfig(false, null, null, false, false, Collections.emptyList(), Collections.emptyList(), false,
-            500, null, null, null, null false, reuseMutableIndex, luceneNRTCachingDirectoryMaxBufferSizeMB);
+    TextIndexConfig textIndexConfig = new TextIndexConfigBuilder()
+            .withUseANDForMultiTermQueries(false)
+            .withReuseMutableIndex(reuseMutableIndex)
+            .withLuceneNRTCachingDirectoryMaxBufferSizeMB(luceneNRTCachingDirectoryMaxBufferSizeMB)
+            .build();
 
     RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder =
         new RealtimeSegmentConfig.Builder().setTableNameWithType(tableNameWithType).setSegmentName(segmentName)
