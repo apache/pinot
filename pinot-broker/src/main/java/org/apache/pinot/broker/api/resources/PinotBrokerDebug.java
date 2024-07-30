@@ -84,7 +84,7 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
 public class PinotBrokerDebug {
 
   // Request ID is passed to the RoutingManager to rotate the selected replica-group.
-  private final AtomicLong _requestIdGenerator = new AtomicLong();
+  private final static AtomicLong REQUEST_ID_GENERATOR = new AtomicLong();
 
   @Inject
   private BrokerRoutingManager _routingManager;
@@ -272,7 +272,7 @@ public class PinotBrokerDebug {
   }
 
   private long getRequestId() {
-    return _requestIdGenerator.getAndIncrement();
+    return REQUEST_ID_GENERATOR.getAndIncrement();
   }
 
   @GET
