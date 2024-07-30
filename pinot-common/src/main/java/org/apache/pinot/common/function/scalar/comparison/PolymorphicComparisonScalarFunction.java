@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.function.scalar;
+package org.apache.pinot.common.function.scalar.comparison;
 
 import javax.annotation.Nullable;
 import org.apache.calcite.sql.type.ReturnTypes;
@@ -47,8 +47,8 @@ public abstract class PolymorphicComparisonScalarFunction implements PinotScalar
       return null;
     }
 
-    // Only support comparing arguments of the same type. Explicit type casts should be added to compare arguments of
-    // different types.
+    // Only support comparing arguments of the same type. Type casts (explicitly by the user / implicitly by Calcite)
+    // should be added to compare arguments of different types.
     if (argumentTypes[0] != argumentTypes[1]) {
       return null;
     }

@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.function.scalar;
+package org.apache.pinot.common.function.scalar.comparison;
 
 import java.math.BigDecimal;
 import java.util.Arrays;
@@ -28,7 +28,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
 /**
- * Polymorphic notEquals scalar function implementation
+ * Polymorphic notEquals (!=) scalar function implementation
  */
 @ScalarFunction
 public class NotEqualsScalarFunction extends PolymorphicComparisonScalarFunction {
