@@ -1974,6 +1974,7 @@
         <artifactId>maven-javadoc-plugin</artifactId>
         <configuration>
           <!-- Default configuration for all reports -->
+          <excludePackageNames>protobuf.grpc-java.org.apache.pinot.common.proto</excludePackageNames>
         </configuration>
         <executions>
           <execution>
@@ -2379,6 +2380,10 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-javadoc-plugin</artifactId>
+        <configuration>
+          <!-- Default configuration for all reports -->
+          <excludePackageNames>protobuf.grpc-java.org.apache.pinot.common.proto</excludePackageNames>
+        </configuration>
         <reportSets>
           <reportSet>
             <id>non-aggregate</id>
