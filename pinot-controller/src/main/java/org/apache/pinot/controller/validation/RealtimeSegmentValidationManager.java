@@ -120,7 +120,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
     // segment deletion.
     // In which case we need to pass "recreateDeletedConsumingSegment" as true to "ensureAllPartitionsConsuming" below.
     boolean idealStateUpdated = _llcRealtimeSegmentManager.updateStorageQuotaExceededInIdealState(tableNameWithType,
-        _storageQuotaChecker.isTableStorageQuotaExceeded(tableConfig));
+        null, _storageQuotaChecker.isTableStorageQuotaExceeded(tableConfig));
 
     _llcRealtimeSegmentManager.ensureAllPartitionsConsuming(tableConfig, streamConfig,
         context._recreateDeletedConsumingSegment || idealStateUpdated, context._offsetCriteria);
