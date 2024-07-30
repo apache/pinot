@@ -45,6 +45,8 @@ import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.segment.local.function.FunctionEvaluator;
 import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
+import org.apache.pinot.segment.local.recordtransformer.RecordTransformerRegistry;
+import org.apache.pinot.segment.local.recordtransformer.RecordTransformerValidationConfig;
 import org.apache.pinot.segment.local.recordtransformer.SchemaConformingTransformer;
 import org.apache.pinot.segment.local.recordtransformer.SchemaConformingTransformerV2;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.BitSlicedRangeIndexCreator;
@@ -74,7 +76,6 @@ import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
-import org.apache.pinot.spi.config.table.ingestion.EnrichmentConfig;
 import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.SchemaConformingTransformerConfig;
@@ -85,8 +86,6 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.ingestion.batch.BatchConfig;
-import org.apache.pinot.spi.recordenricher.RecordEnricherRegistry;
-import org.apache.pinot.spi.recordenricher.RecordEnricherValidationConfig;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -98,7 +97,25 @@ import org.quartz.CronScheduleBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.segment.spi.AggregationFunctionType.*;
+import static org.apache.pinot.segment.spi.AggregationFunctionType.AVGVALUEINTEGERSUMTUPLESKETCH;
+import static org.apache.pinot.segment.spi.AggregationFunctionType.COUNT;
+import static org.apache.pinot.segment.spi.AggregationFunctionType.DISTINCTCOUNTCPCSKETCH;
+import static org.apache.pinot.segment.spi.AggregationFunctionType.DISTINCTCOUNTHLL;
+import static org.apache.pinot.segment.spi.AggregationFunctionType.DISTINCTCOUNTHLLPLUS;
+import static org.apache.pinot.segment.spi.AggregationFunctionType.DISTINCTCOUNTRAWCPCSKETCH;
+import static org.apache.pinot.segment.spi.AggregationFunctionType.DISTINCTCOUNTRAWHLL;
+import static org.apache.pinot.segment.spi.AggregationFunctionType.DISTINCTCOUNTRAWHLLPLUS;
+import static org.apache.pinot.segment.spi.AggregationFunctionType.DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH;
+import static org.apache.pinot.segment.spi.AggregationFunctionType.DISTINCTCOUNTRAWTHETASKETCH;
+import static org.apache.pinot.segment.spi.AggregationFunctionType.DISTINCTCOUNTRAWULL;
+import static org.apache.pinot.segment.spi.AggregationFunctionType.DISTINCTCOUNTTHETASKETCH;
+import static org.apache.pinot.segment.spi.AggregationFunctionType.DISTINCTCOUNTTUPLESKETCH;
+import static org.apache.pinot.segment.spi.AggregationFunctionType.DISTINCTCOUNTULL;
+import static org.apache.pinot.segment.spi.AggregationFunctionType.MAX;
+import static org.apache.pinot.segment.spi.AggregationFunctionType.MIN;
+import static org.apache.pinot.segment.spi.AggregationFunctionType.SUM;
+import static org.apache.pinot.segment.spi.AggregationFunctionType.SUMPRECISION;
+import static org.apache.pinot.segment.spi.AggregationFunctionType.SUMVALUESINTEGERSUMTUPLESKETCH;
 
 
 /**
@@ -543,20 +560,16 @@ public final class TableConfigUtils {
         });
       }
 
-      // Enrichment configs
-      List<EnrichmentConfig> enrichmentConfigs = ingestionConfig.getEnrichmentConfigs();
-      if (enrichmentConfigs != null) {
-        for (EnrichmentConfig enrichmentConfig : enrichmentConfigs) {
-          RecordEnricherRegistry.validateEnrichmentConfig(enrichmentConfig,
-              new RecordEnricherValidationConfig(_disableGroovy));
-        }
-      }
-
       // Transform configs
       List<TransformConfig> transformConfigs = ingestionConfig.getTransformConfigs();
       if (transformConfigs != null) {
         Set<String> transformColumns = new HashSet<>();
         for (TransformConfig transformConfig : transformConfigs) {
+          if (transformConfig.getEnricherType() != null) {
+            RecordTransformerRegistry.validateTransformConfig(transformConfig,
+                new RecordTransformerValidationConfig(_disableGroovy));
+            continue;
+          }
           String columnName = transformConfig.getColumnName();
           String transformFunction = transformConfig.getTransformFunction();
           if (columnName == null || transformFunction == null) {

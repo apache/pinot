@@ -1585,15 +1585,15 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     TableConfig tableConfig = getOfflineTableConfig();
     List<TransformConfig> transformConfigs =
-        Arrays.asList(new TransformConfig("NewAddedDerivedHoursSinceEpoch", "DaysSinceEpoch * 24"),
-            new TransformConfig("NewAddedDerivedTimestamp", "DaysSinceEpoch * 24 * 3600 * 1000"),
-            new TransformConfig("NewAddedDerivedSVBooleanDimension", "ActualElapsedTime > 0"),
-            new TransformConfig("NewAddedDerivedMVStringDimension", "split(DestCityName, ', ')"),
-            new TransformConfig("NewAddedDerivedDivAirportSeqIDs", "DivAirportSeqIDs"),
-            new TransformConfig("NewAddedDerivedDivAirportSeqIDsString", "DivAirportSeqIDs"),
-            new TransformConfig("NewAddedRawDerivedStringDimension", "reverse(DestCityName)"),
-            new TransformConfig("NewAddedRawDerivedMVIntDimension", "array(ActualElapsedTime)"),
-            new TransformConfig("NewAddedDerivedMVDoubleDimension", "array(ArrDelayMinutes)"));
+        Arrays.asList(new TransformConfig("NewAddedDerivedHoursSinceEpoch", "DaysSinceEpoch * 24", null, null),
+            new TransformConfig("NewAddedDerivedTimestamp", "DaysSinceEpoch * 24 * 3600 * 1000", null, null),
+            new TransformConfig("NewAddedDerivedSVBooleanDimension", "ActualElapsedTime > 0", null, null),
+            new TransformConfig("NewAddedDerivedMVStringDimension", "split(DestCityName, ', ')", null, null),
+            new TransformConfig("NewAddedDerivedDivAirportSeqIDs", "DivAirportSeqIDs", null, null),
+            new TransformConfig("NewAddedDerivedDivAirportSeqIDsString", "DivAirportSeqIDs", null, null),
+            new TransformConfig("NewAddedRawDerivedStringDimension", "reverse(DestCityName)", null, null),
+            new TransformConfig("NewAddedRawDerivedMVIntDimension", "array(ActualElapsedTime)", null, null),
+            new TransformConfig("NewAddedDerivedMVDoubleDimension", "array(ArrDelayMinutes)", null, null));
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setTransformConfigs(transformConfigs);
     tableConfig.setIngestionConfig(ingestionConfig);

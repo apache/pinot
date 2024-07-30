@@ -74,8 +74,9 @@ public class FileBasedSegmentWriterTest {
     _ingestionConfig.setBatchIngestionConfig(new BatchIngestionConfig(Collections.singletonList(
         Collections.singletonMap(BatchConfigProperties.OUTPUT_DIR_URI, _outputDir.getAbsolutePath())), "APPEND",
         "HOURLY"));
-    _ingestionConfig.setTransformConfigs(Arrays.asList(new TransformConfig("aSimpleMap_str", "jsonFormat(aSimpleMap)"),
-        new TransformConfig("anAdvancedMap_str", "jsonFormat(anAdvancedMap)")));
+    _ingestionConfig.setTransformConfigs(Arrays.asList(new TransformConfig("aSimpleMap_str",
+            "jsonFormat(aSimpleMap)", null, null),
+        new TransformConfig("anAdvancedMap_str", "jsonFormat(anAdvancedMap)", null, null)));
     _tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIngestionConfig(_ingestionConfig)
             .setTimeColumnName(TIME_COLUMN_NAME).build();

@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.pinot.plugin.record.enricher.function;
+package org.apache.pinot.segment.local.recordtransformer.function;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
@@ -27,20 +27,21 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.segment.local.function.FunctionEvaluator;
 import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
+import org.apache.pinot.segment.local.recordtransformer.RecordTransformer;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.recordenricher.RecordEnricher;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
 /**
- * Enriches the record with custom functions.
+ * Transforms the record with custom functions.
  */
-public class CustomFunctionEnricher implements RecordEnricher {
+public class CustomFunctionTransformer implements RecordTransformer {
   private final Map<String, FunctionEvaluator> _fieldToFunctionEvaluator;
   private final List<String> _fieldsToExtract;
 
-  public CustomFunctionEnricher(JsonNode enricherProps) throws IOException {
-    CustomFunctionEnricherConfig config = JsonUtils.jsonNodeToObject(enricherProps, CustomFunctionEnricherConfig.class);
+  public CustomFunctionTransformer(JsonNode transformProps) throws IOException {
+    CustomFunctionTransformerConfig config = JsonUtils.jsonNodeToObject(transformProps,
+        CustomFunctionTransformerConfig.class);
     _fieldToFunctionEvaluator = new LinkedHashMap<>();
     _fieldsToExtract = new ArrayList<>();
     for (Map.Entry<String, String> entry : config.getFieldToFunctionMap().entrySet()) {
@@ -58,9 +59,10 @@ public class CustomFunctionEnricher implements RecordEnricher {
   }
 
   @Override
-  public void enrich(GenericRow record) {
+  public GenericRow transform(GenericRow record) {
     _fieldToFunctionEvaluator.forEach((field, evaluator) -> {
       record.putValue(field, evaluator.evaluate(record));
     });
+    return record;
   }
 }

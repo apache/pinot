@@ -16,8 +16,8 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.recordenricher;
+package org.apache.pinot.segment.local.recordtransformer;
 
-public interface RecordEnricherConfig {
-  void parse();
-}
+//public interface RecordTransformerConfig {
+//  void parse();
+//}

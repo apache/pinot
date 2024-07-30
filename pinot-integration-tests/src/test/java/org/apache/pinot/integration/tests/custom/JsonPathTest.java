@@ -85,10 +85,12 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
   @Override
   public TableConfig createOfflineTableConfig() {
     List<TransformConfig> transformConfigs = Arrays.asList(
-        new TransformConfig(MY_MAP_STR_K1_FIELD_NAME, "jsonPathString(" + MY_MAP_STR_FIELD_NAME + ", '$.k1')"),
-        new TransformConfig(MY_MAP_STR_K2_FIELD_NAME, "jsonPathString(" + MY_MAP_STR_FIELD_NAME + ", '$.k2')"),
+        new TransformConfig(MY_MAP_STR_K1_FIELD_NAME, "jsonPathString(" + MY_MAP_STR_FIELD_NAME + ", '$.k1')",
+            null, null),
+        new TransformConfig(MY_MAP_STR_K2_FIELD_NAME, "jsonPathString(" + MY_MAP_STR_FIELD_NAME + ", '$.k2')",
+            null, null),
         new TransformConfig(COMPLEX_MAP_STR_K3_FIELD_NAME,
-            "jsonPathArray(" + COMPLEX_MAP_STR_FIELD_NAME + ", '$.k3')"));
+            "jsonPathArray(" + COMPLEX_MAP_STR_FIELD_NAME + ", '$.k3')", null, null));
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setTransformConfigs(transformConfigs);
     return new TableConfigBuilder(TableType.OFFLINE).setTableName(getTableName()).setIngestionConfig(ingestionConfig)

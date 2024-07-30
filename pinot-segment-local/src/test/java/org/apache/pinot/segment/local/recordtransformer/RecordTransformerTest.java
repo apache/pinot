@@ -523,7 +523,7 @@ public class RecordTransformerTest {
         new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setIngestionConfig(ingestionConfig)
             .setTimeColumnName("timeCol").build();
     ingestionConfig.setFilterConfig(new FilterConfig("svInt = 123 AND svDouble <= 200"));
-    ingestionConfig.setTransformConfigs(List.of(new TransformConfig("expressionTestColumn", "plus(x,10)")));
+    ingestionConfig.setTransformConfigs(List.of(new TransformConfig("expressionTestColumn", "plus(x,10)", null, null)));
     ingestionConfig.setSchemaConformingTransformerConfig(
         new SchemaConformingTransformerConfig("indexableExtras", null, null, null));
     ingestionConfig.setRowTimeValueCheck(true);

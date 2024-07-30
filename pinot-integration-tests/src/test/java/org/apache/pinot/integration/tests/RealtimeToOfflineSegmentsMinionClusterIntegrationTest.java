@@ -114,7 +114,7 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends BaseC
     TableConfig realtimeTableConfig = createRealtimeTableConfig(avroFiles.get(0));
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setTransformConfigs(
-        Collections.singletonList(new TransformConfig("ts", "fromEpochDays(DaysSinceEpoch)")));
+        Collections.singletonList(new TransformConfig("ts", "fromEpochDays(DaysSinceEpoch)", null, null)));
     realtimeTableConfig.setIngestionConfig(ingestionConfig);
     FieldConfig tsFieldConfig =
         new FieldConfig("ts", FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.TIMESTAMP, null, null,

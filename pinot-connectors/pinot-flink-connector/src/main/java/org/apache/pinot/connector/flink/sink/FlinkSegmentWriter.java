@@ -42,6 +42,7 @@ import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.core.util.SegmentProcessorAvroUtils;
 import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
 import org.apache.pinot.segment.local.recordtransformer.RecordTransformer;
+import org.apache.pinot.segment.local.recordtransformer.RecordTransformerPipeline;
 import org.apache.pinot.segment.local.utils.IngestionUtils;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -53,7 +54,6 @@ import org.apache.pinot.spi.ingestion.batch.BatchConfig;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.ingestion.batch.spec.Constants;
 import org.apache.pinot.spi.ingestion.segment.writer.SegmentWriter;
-import org.apache.pinot.spi.recordenricher.RecordEnricherPipeline;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -78,7 +78,7 @@ public class FlinkSegmentWriter implements SegmentWriter {
   private String _outputDirURI;
   private Schema _schema;
   private Set<String> _fieldsToRead;
-  private RecordEnricherPipeline _recordEnricherPipeline;
+  private RecordTransformerPipeline _recordTransformerPipeline;
   private RecordTransformer _recordTransformer;
 
   private File _stagingDir;
@@ -139,7 +139,7 @@ public class FlinkSegmentWriter implements SegmentWriter {
 
     _schema = schema;
     _fieldsToRead = _schema.getColumnNames();
-    _recordEnricherPipeline = RecordEnricherPipeline.fromTableConfig(_tableConfig);
+    _recordTransformerPipeline = RecordTransformerPipeline.fromTableConfig(_tableConfig);
     _recordTransformer = CompositeTransformer.getDefaultTransformer(_tableConfig, _schema);
     _avroSchema = SegmentProcessorAvroUtils.convertPinotSchemaToAvroSchema(_schema);
     _reusableRecord = new GenericData.Record(_avroSchema);
@@ -175,7 +175,7 @@ public class FlinkSegmentWriter implements SegmentWriter {
   public void collect(GenericRow row)
       throws IOException {
     long startTime = System.currentTimeMillis();
-    _recordEnricherPipeline.run(row);
+    _recordTransformerPipeline.run(row);
     GenericRow transform = _recordTransformer.transform(row);
     SegmentProcessorAvroUtils.convertGenericRowToAvroRecord(transform, _reusableRecord, _fieldsToRead);
     _rowCount++;

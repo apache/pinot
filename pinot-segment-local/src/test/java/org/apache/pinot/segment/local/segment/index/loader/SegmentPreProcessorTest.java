@@ -1104,8 +1104,8 @@ public class SegmentPreProcessorTest {
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setTransformConfigs(
         ImmutableList.of(
-            new TransformConfig(NEW_INT_SV_DIMENSION_COLUMN_NAME, "plus(column1, 1)"),
-            new TransformConfig(NEW_RAW_STRING_SV_DIMENSION_COLUMN_NAME, "reverse(column3)")
+            new TransformConfig(NEW_INT_SV_DIMENSION_COLUMN_NAME, "plus(column1, 1)", null, null),
+            new TransformConfig(NEW_RAW_STRING_SV_DIMENSION_COLUMN_NAME, "reverse(column3)", null, null)
         ));
     _tableConfig.setIngestionConfig(ingestionConfig);
     _indexLoadingConfig.addInvertedIndexColumns(NEW_COLUMN_INVERTED_INDEX);
@@ -1155,8 +1155,8 @@ public class SegmentPreProcessorTest {
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setTransformConfigs(
         ImmutableList.of(
-            new TransformConfig(NEW_INT_SV_DIMENSION_COLUMN_NAME, "plus(column1, 1)"),
-            new TransformConfig(NEW_RAW_STRING_SV_DIMENSION_COLUMN_NAME, "reverse(column3)")
+            new TransformConfig(NEW_INT_SV_DIMENSION_COLUMN_NAME, "plus(column1, 1)", null, null),
+            new TransformConfig(NEW_RAW_STRING_SV_DIMENSION_COLUMN_NAME, "reverse(column3)", null, null)
         ));
     _tableConfig.setIngestionConfig(ingestionConfig);
     _indexLoadingConfig.addInvertedIndexColumns(NEW_COLUMN_INVERTED_INDEX);

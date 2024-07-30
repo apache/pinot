@@ -284,7 +284,8 @@ public class TableConfigSerDeTest {
           new StreamIngestionConfig(Collections.singletonList(Collections.singletonMap("streamType", "kafka"))));
       ingestionConfig.setFilterConfig(new FilterConfig("filterFunc(foo)"));
       ingestionConfig.setTransformConfigs(
-          Arrays.asList(new TransformConfig("bar", "func(moo)"), new TransformConfig("zoo", "myfunc()")));
+          Arrays.asList(new TransformConfig("bar", "func(moo)", null, null),
+              new TransformConfig("zoo", "myfunc()", null, null)));
       ingestionConfig.setComplexTypeConfig(new ComplexTypeConfig(Arrays.asList("c1", "c2"), ".",
           ComplexTypeConfig.CollectionNotUnnestedToJson.NON_PRIMITIVE, Collections.emptyMap()));
       ingestionConfig.setAggregationConfigs(
