@@ -29,6 +29,10 @@ import org.apache.pinot.spi.config.table.FieldConfig;
 
 
 public class TextIndexConfigBuilder extends TextIndexConfig.AbstractBuilder {
+  public TextIndexConfigBuilder() {
+    super((FSTType) null);
+  }
+
   public TextIndexConfigBuilder(@Nullable FSTType fstType) {
     super(fstType);
   }

@@ -74,8 +74,8 @@ public class TextIndexConfig extends IndexConfig {
     _rawValueForTextIndex = rawValueForTextIndex;
     _enableQueryCache = enableQueryCache;
     _useANDForMultiTermQueries = useANDForMultiTermQueries;
-    _stopWordsInclude = stopWordsInclude;
-    _stopWordsExclude = stopWordsExclude;
+    _stopWordsInclude = null == stopWordsInclude ? Collections.emptyList() : stopWordsInclude;
+    _stopWordsExclude = null == stopWordsExclude ? Collections.emptyList() : stopWordsExclude;
     _luceneUseCompoundFile =
         luceneUseCompoundFile == null ? LUCENE_INDEX_DEFAULT_USE_COMPOUND_FILE : luceneUseCompoundFile;
     _luceneMaxBufferSizeMB =
@@ -219,7 +219,7 @@ public class TextIndexConfig extends IndexConfig {
       return new TextIndexConfig(false, _fstType, _rawValueForTextIndex, _enableQueryCache, _useANDForMultiTermQueries,
           _stopWordsInclude, _stopWordsExclude, _luceneUseCompoundFile, _luceneMaxBufferSizeMB, _luceneAnalyzerClass,
           CsvParser.serialize(_luceneAnalyzerClassArgs, true, false),
-          CsvParser.serialize(_luceneAnalyzerClassArgTypes, false, false),
+          CsvParser.serialize(_luceneAnalyzerClassArgTypes, true, false),
           _luceneQueryParserClass, _enablePrefixSuffixMatchingInPhraseQueries);
     }
 
@@ -227,6 +227,11 @@ public class TextIndexConfig extends IndexConfig {
 
     public AbstractBuilder withRawValueForTextIndex(@Nullable Object rawValueForTextIndex) {
       _rawValueForTextIndex = rawValueForTextIndex;
+      return this;
+    }
+
+    public AbstractBuilder withUseANDForMultiTermQueries(boolean useANDForMultiTermQueries) {
+      _useANDForMultiTermQueries = useANDForMultiTermQueries;
       return this;
     }
 

@@ -31,6 +31,7 @@ import org.apache.lucene.search.Query;
 import org.apache.lucene.search.SearcherManager;
 import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
+import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
 import org.apache.pinot.segment.local.utils.LuceneTextIndexUtils;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.apache.pinot.segment.spi.index.mutable.MutableTextIndex;
@@ -85,7 +86,7 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
       _searcherManager = new SearcherManager(indexWriter, false, false, null);
       _analyzer = _indexCreator.getIndexWriter().getConfig().getAnalyzer();
       _queryParserClassConstructor =
-              getQueryParserWithStringAndAnalyzerTypeConstructor(config.getLuceneQueryParserClass());
+          TextIndexUtils.getQueryParserWithStringAndAnalyzerTypeConstructor(config.getLuceneQueryParserClass());
       _enablePrefixSuffixMatchingInPhraseQueries = config.isEnablePrefixSuffixMatchingInPhraseQueries();
     } catch (Exception e) {
       LOGGER.error("Failed to instantiate realtime Lucene index reader for column {}, exception {}", column,
@@ -131,16 +132,20 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
         // and can be created upfront.
         QueryParserBase parser = _queryParserClassConstructor.newInstance(_column, _analyzer);
         if (_enablePrefixSuffixMatchingInPhraseQueries) {
-          // TODO: this code path is semi-broken as the default QueryParser does not always utilizes the analyzer
-          // passed into the constructor for wildcards in phrases in favor of using a custom Lucene query parser
-          // https://github.com/elastic/elasticsearch/issues/22540
+          // Note: Lucene's built-in QueryParser has limited wildcard functionality in phrase queries. It does not use
+          // the provided analyzer when wildcards are present, defaulting to the default analyzer for tokenization.
+          // Additionally, it does not support wildcards that span across terms.
+          // For more details, see: https://github.com/elastic/elasticsearch/issues/22540
+          // Workaround: Use a custom query parser that correctly implements wildcard searches.
           parser.setAllowLeadingWildcard(true);
         }
         Query query = parser.parse(searchQuery);
         if (_enablePrefixSuffixMatchingInPhraseQueries) {
-          // TODO: this code path is semi-broken as the default QueryParser does not always utilizes the analyzer
-          // passed into the constructor for wildcards in phrases in favor of using a custom Lucene query parser
-          // https://github.com/elastic/elasticsearch/issues/22540
+          // Note: Lucene's built-in QueryParser has limited wildcard functionality in phrase queries. It does not use
+          // the provided analyzer when wildcards are present, defaulting to the default analyzer for tokenization.
+          // Additionally, it does not support wildcards that span across terms.
+          // For more details, see: https://github.com/elastic/elasticsearch/issues/22540
+          // Workaround: Use a custom query parser that correctly implements wildcard searches.
           query = LuceneTextIndexUtils.convertToMultiTermSpanQuery(query);
         }
         indexSearcher = _searcherManager.acquire();
@@ -209,7 +214,7 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
       throw new NoSuchMethodException("The specified lucene query parser class " + queryParserClassName
               + " is not assignable from does not have the required constructor method with parameter type "
               + "[String.class, Analyzer.class]"
-        );
+      );
     }
 
     return (Constructor<QueryParserBase>) queryParserClass.getConstructor(String.class, Analyzer.class);

@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.segment.store;
 
 import java.io.File;
+import java.lang.reflect.Constructor;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -31,6 +32,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.CharArraySet;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
+import org.apache.lucene.queryparser.classic.QueryParserBase;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
 import org.apache.pinot.segment.spi.V1Constants.Indexes;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
@@ -259,5 +261,26 @@ public class TextIndexUtils {
       stopWordsExclude.forEach(stopWordSet::remove);
     }
     return new StandardAnalyzer(new CharArraySet(stopWordSet, true));
+  }
+
+  public static Constructor<QueryParserBase> getQueryParserWithStringAndAnalyzerTypeConstructor(
+          String queryParserClassName) throws ReflectiveOperationException {
+    // Fail-fast if the query parser is specified class is not QueryParseBase class
+    final Class<?> queryParserClass = Class.forName(queryParserClassName);
+    if (!QueryParserBase.class.isAssignableFrom(queryParserClass)) {
+      throw new ReflectiveOperationException("The specified lucene query parser class " + queryParserClassName
+              + " is not assignable from " + QueryParserBase.class.getName());
+    }
+    // Fail-fast if the query parser does not have the required constructor used by this class
+    try {
+      queryParserClass.getConstructor(String.class, Analyzer.class);
+    } catch (NoSuchMethodException ex) {
+      throw new NoSuchMethodException("The specified lucene query parser class " + queryParserClassName
+              + " is not assignable from does not have the required constructor method with parameter type "
+              + "[String.class, Analyzer.class]"
+      );
+    }
+
+    return (Constructor<QueryParserBase>) queryParserClass.getConstructor(String.class, Analyzer.class);
   }
 }
