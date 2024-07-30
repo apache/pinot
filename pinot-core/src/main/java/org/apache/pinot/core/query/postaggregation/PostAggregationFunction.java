@@ -19,6 +19,7 @@
 package org.apache.pinot.core.query.postaggregation;
 
 import com.google.common.base.Preconditions;
+import java.util.Arrays;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionInvoker;
 import org.apache.pinot.common.function.FunctionRegistry;
@@ -37,20 +38,20 @@ public class PostAggregationFunction {
 
   public PostAggregationFunction(String functionName, ColumnDataType[] argumentTypes) {
     String canonicalName = FunctionRegistry.canonicalize(functionName);
-    int numArguments = argumentTypes.length;
-    FunctionInfo functionInfo = FunctionRegistry.lookupFunctionInfo(canonicalName, numArguments);
+    FunctionInfo functionInfo = FunctionRegistry.lookupFunctionInfo(canonicalName, argumentTypes);
     if (functionInfo == null) {
       if (FunctionRegistry.contains(canonicalName)) {
         throw new IllegalArgumentException(
-            String.format("Unsupported function: %s with %d parameters", functionName, numArguments));
+            String.format("Unsupported function: %s with argument types: %s", functionName,
+                Arrays.toString(argumentTypes)));
       } else {
-        throw new IllegalArgumentException(
-            String.format("Unsupported function: %s not found", functionName));
+        throw new IllegalArgumentException(String.format("Unsupported function: %s", functionName));
       }
     }
     _functionInvoker = new FunctionInvoker(functionInfo);
     Class<?>[] parameterClasses = _functionInvoker.getParameterClasses();
     PinotDataType[] parameterTypes = _functionInvoker.getParameterTypes();
+    int numArguments = argumentTypes.length;
     int numParameters = parameterClasses.length;
     Preconditions.checkArgument(numArguments == numParameters,
         "Wrong number of arguments for method: %s, expected: %s, actual: %s", functionInfo.getMethod(), numParameters,

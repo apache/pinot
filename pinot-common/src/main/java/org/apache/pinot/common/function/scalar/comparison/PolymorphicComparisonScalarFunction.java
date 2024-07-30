@@ -47,10 +47,10 @@ public abstract class PolymorphicComparisonScalarFunction implements PinotScalar
       return null;
     }
 
-    // Only support comparing arguments of the same type. Type casts (explicitly by the user / implicitly by Calcite)
-    // should be added to compare arguments of different types.
+    // In case of heterogeneous argument types, fall back to double based comparison and allow FunctionInvoker to
+    // convert argument types for v1 engine support.
     if (argumentTypes[0] != argumentTypes[1]) {
-      return null;
+      return functionInfoForType(DataSchema.ColumnDataType.DOUBLE);
     }
 
     return functionInfoForType(argumentTypes[0].getStoredType());
