@@ -26,26 +26,6 @@ public class ComparisonFunctions {
   }
 
   @ScalarFunction
-  public static boolean greaterThan(double a, double b) {
-    return a > b;
-  }
-
-  @ScalarFunction
-  public static boolean greaterThanOrEqual(double a, double b) {
-    return a >= b;
-  }
-
-  @ScalarFunction
-  public static boolean lessThan(double a, double b) {
-    return a < b;
-  }
-
-  @ScalarFunction
-  public static boolean lessThanOrEqual(double a, double b) {
-    return a <= b;
-  }
-
-  @ScalarFunction
   public static boolean between(double val, double a, double b) {
     return val >= a && val <= b;
   }

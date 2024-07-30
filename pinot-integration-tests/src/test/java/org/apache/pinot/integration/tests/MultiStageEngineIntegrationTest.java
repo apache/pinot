@@ -753,6 +753,46 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "INT");
     assertEquals(jsonNode.get("numRowsResultSet").asLong(), DEFAULT_COUNT_STAR_RESULT);
     assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asInt(), 1);
+
+    sqlQuery = "WITH data as (SELECT 1 as \"foo\" FROM mytable) "
+        + "SELECT * FROM data WHERE \"foo\" > 0";
+    jsonNode = postQuery(sqlQuery);
+    assertNoError(jsonNode);
+
+    assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").size(), 1);
+    assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "INT");
+    assertEquals(jsonNode.get("numRowsResultSet").asLong(), DEFAULT_COUNT_STAR_RESULT);
+    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asInt(), 1);
+
+    sqlQuery = "WITH data as (SELECT 'test' as \"foo\" FROM mytable) "
+        + "SELECT * FROM data WHERE \"foo\" >= 'abc';";
+    jsonNode = postQuery(sqlQuery);
+    assertNoError(jsonNode);
+
+    assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").size(), 1);
+    assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "STRING");
+    assertEquals(jsonNode.get("numRowsResultSet").asLong(), DEFAULT_COUNT_STAR_RESULT);
+    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asText(), "test");
+
+    sqlQuery = "WITH data as (SELECT 1 as \"foo\" FROM mytable) "
+        + "SELECT * FROM data WHERE \"foo\" <= 2";
+    jsonNode = postQuery(sqlQuery);
+    assertNoError(jsonNode);
+
+    assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").size(), 1);
+    assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "INT");
+    assertEquals(jsonNode.get("numRowsResultSet").asLong(), DEFAULT_COUNT_STAR_RESULT);
+    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asInt(), 1);
+
+    sqlQuery = "WITH data as (SELECT 'test' as \"foo\" FROM mytable) "
+        + "SELECT * FROM data WHERE \"foo\" < 'xyz';";
+    jsonNode = postQuery(sqlQuery);
+    assertNoError(jsonNode);
+
+    assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").size(), 1);
+    assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "STRING");
+    assertEquals(jsonNode.get("numRowsResultSet").asLong(), DEFAULT_COUNT_STAR_RESULT);
+    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asText(), "test");
   }
 
   @Test
