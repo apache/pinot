@@ -154,9 +154,7 @@ public class LuceneTextIndexReader implements TextIndexReader {
     MutableRoaringBitmap docIds = new MutableRoaringBitmap();
     Collector docIDCollector = new LuceneDocIdCollector(docIds, _docIdTranslator);
     try {
-      // Lucene Query Parser is JavaCC based. It is stateful and should
-      // be instantiated per query. Analyzer on the other hand is stateless
-      // and can be created upfront.
+      // Lucene query parsers are generally stateful and a new instance must be created per query.
       QueryParserBase parser = _queryParserClassConstructor.newInstance(_column, _analyzer);
       // Phrase search with prefix/suffix matching may have leading *. E.g., `*pache pinot` which can be stripped by
       // the query parser. To support the feature, we need to explicitly set the config to be true.

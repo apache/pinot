@@ -127,9 +127,7 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
     Callable<MutableRoaringBitmap> searchCallable = () -> {
       IndexSearcher indexSearcher = null;
       try {
-        // Lucene Query Parser is JavaCC based. It is stateful and should
-        // be instantiated per query. Analyzer on the other hand is stateless
-        // and can be created upfront.
+        // Lucene query parsers are generally stateful and a new instance must be created per query.
         QueryParserBase parser = _queryParserClassConstructor.newInstance(_column, _analyzer);
         if (_enablePrefixSuffixMatchingInPhraseQueries) {
           // Note: Lucene's built-in QueryParser has limited wildcard functionality in phrase queries. It does not use
@@ -212,8 +210,8 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
       queryParserClass.getConstructor(String.class, Analyzer.class);
     } catch (NoSuchMethodException ex) {
       throw new NoSuchMethodException("The specified lucene query parser class " + queryParserClassName
-              + " is not assignable from does not have the required constructor method with parameter type "
-              + "[String.class, Analyzer.class]"
+              + " is not assignable because the class does not have the required constructor method with parameter "
+              + "type [String.class, Analyzer.class]"
       );
     }
 
