@@ -113,8 +113,8 @@ public class PulsarStreamMetadataProvider extends PulsarPartitionLevelConnection
       }
       return new MessageIdStreamOffset(offset);
     } catch (PulsarClientException e) {
-      LOGGER.error("Cannot fetch offsets for partition " + _partition + " and topic " + _topic + " and offsetCriteria "
-          + offsetCriteria, e);
+      LOGGER.error("Cannot fetch offsets for partition {} and topic {} and offsetCriteria {}", _partition, _topic,
+          offsetCriteria, e);
       return null;
     }
   }
@@ -161,14 +161,13 @@ public class PulsarStreamMetadataProvider extends PulsarPartitionLevelConnection
                   new PartitionGroupMetadata(p, new MessageIdStreamOffset(lastMessageId)));
             }
           } catch (PulsarClientException pce) {
-            LOGGER.warn(
-                "Error encountered while calculating partition group metadata for topic " + _config.getPulsarTopicName()
-                    + " partition " + partitionedTopicNameList.get(p), pce);
+            LOGGER.warn("Error encountered while calculating partition group metadata for topic {} partition {}",
+                _config.getPulsarTopicName(), partitionedTopicNameList.get(p), pce);
           }
         }
       }
     } catch (Exception e) {
-      LOGGER.warn("Error encountered when trying to fetch partition list for pulsar topic " + _topic, e);
+      LOGGER.warn("Error encountered when trying to fetch partition list for pulsar topic {}", _topic, e);
     }
     return newPartitionGroupMetadataList;
   }

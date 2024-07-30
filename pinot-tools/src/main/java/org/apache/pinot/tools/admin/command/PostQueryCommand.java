@@ -139,7 +139,7 @@ public class PostQueryCommand extends AbstractBaseAdminCommand implements Comman
     if (_brokerHost == null) {
       _brokerHost = NetUtils.getHostAddress();
     }
-    LOGGER.info("Executing command: " + this);
+    LOGGER.info("Executing command: {}", this);
     String url = _brokerProtocol + "://" + _brokerHost + ":" + _brokerPort + "/query/sql";
     Map<String, String> payload = new HashMap<>();
     payload.put(Request.SQL, _query);
@@ -155,7 +155,7 @@ public class PostQueryCommand extends AbstractBaseAdminCommand implements Comman
   public boolean execute()
       throws Exception {
     String result = run();
-    LOGGER.info("Result: " + result);
+    LOGGER.info("Result: {}", result);
     return true;
   }
 }

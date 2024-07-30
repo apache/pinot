@@ -20,8 +20,11 @@ package org.apache.pinot.plugin.inputformat.parquet;
 
 import java.io.File;
 import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import org.apache.commons.io.FileUtils;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
 
 
 public class ParquetNativeRecordReaderFullTest {
@@ -125,17 +128,23 @@ public class ParquetNativeRecordReaderFullTest {
 
   protected void testParquetFile(String filePath)
       throws Exception {
-    File dataFile = new File(URLDecoder.decode(getClass().getClassLoader().getResource(filePath).getFile(), "UTF-8"));
-    ParquetNativeRecordReader recordReader = new ParquetNativeRecordReader();
-    recordReader.init(dataFile, null, null);
-    while (recordReader.hasNext()) {
-      recordReader.next();
+    File dataFile = new File(
+        URLDecoder.decode(getClass().getClassLoader().getResource(filePath).getFile(), StandardCharsets.UTF_8));
+    try (ParquetNativeRecordReader recordReader = new ParquetNativeRecordReader()) {
+      recordReader.init(dataFile, null, null);
+      int numDocsForFirstPass = 0;
+      while (recordReader.hasNext()) {
+        recordReader.next();
+        numDocsForFirstPass++;
+      }
+      recordReader.rewind();
+      int numDocsForSecondPass = 0;
+      while (recordReader.hasNext()) {
+        recordReader.next();
+        numDocsForSecondPass++;
+      }
+      recordReader.close();
+      assertEquals(numDocsForFirstPass, numDocsForSecondPass);
     }
-    recordReader.rewind();
-    while (recordReader.hasNext()) {
-      recordReader.next();
-    }
-
-    recordReader.close();
   }
 }

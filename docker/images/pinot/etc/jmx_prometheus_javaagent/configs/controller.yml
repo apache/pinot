@@ -64,6 +64,9 @@ rules:
     database: "$2"
     table: "$1$3"
     tableType: "$4"
+- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.dataDir\\.(\\w+)\"><>(\\w+)"
+  name: "pinot_controller_dataDir_$1_$2"
+  cache: true
 - pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.numberSegmentUploadTimeoutExceeded\"><>(\\w+)"
   name: "pinot_controller_numberSegmentUploadTimeoutExceeded_$1"
   cache: true
@@ -84,6 +87,9 @@ rules:
   cache: true
 - pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.offlineTableCount\"><>(\\w+)"
   name: "pinot_controller_offlineTableCount_$1"
+  cache: true
+- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.tierBackendTableCount\\.(\\w+)\"><>(\\w+)"
+  name: "pinot_controller_tierBackendTableCount_$1_$2"
   cache: true
 - pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ValidationMetrics\", name=\"pinot\\.controller\\.(([^.]+)\\.)?([^.]*)\\.(\\w+)\"><>(\\w+)"
   name: "pinot_controller_validateion_$4_$5"
@@ -225,6 +231,10 @@ rules:
     database: "$2"
     table: "$1$3"
     tableType: "$4"
+# Controller periodic task metrics
+- pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"?pinot\\.controller\\.(\\w+)\\.controllerPeriodicTaskRun\"?><>(\\w+)"
+  name: "pinot_controller_periodicTaskRun_$1_$2"
+  cache: true
 - pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.version\\.(\\w+)\"?><>(\\w+)"
   name: "pinot_$1_version"
   cache: true
@@ -251,7 +261,7 @@ rules:
     table: "$2$4"
     tableType: "$5"
   #This is a catch-all pattern for pinot table metrics with offline/realtime suffix that also contain kafka topic
-- pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.(\\w+)\\.((\\w+)\\.)?(\\w+)_(OFFLINE|REALTIME)\\-(\\.+)\\-(\\w+)\"?><>(\\w+)"
+- pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.(\\w+)\\.((\\w+)\\.)?(\\w+)_(OFFLINE|REALTIME)\\-(.+)\\-(\\w+)\"?><>(\\w+)"
   name: "pinot_$1_$2_$9"
   cache: true
   labels:

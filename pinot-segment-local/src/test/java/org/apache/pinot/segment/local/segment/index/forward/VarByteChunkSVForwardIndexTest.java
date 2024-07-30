@@ -25,8 +25,8 @@ import java.nio.ByteOrder;
 import java.nio.file.Files;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang.RandomStringUtils;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriter;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueVarByteRawIndexCreator;
 import org.apache.pinot.segment.local.segment.index.readers.forward.ChunkReaderContext;
@@ -237,7 +237,7 @@ public class VarByteChunkSVForwardIndexTest {
       maxStringLengthInBytes = Math.max(maxStringLengthInBytes, value.getBytes(UTF_8).length);
     }
 
-    int numDocsPerChunk = SingleValueVarByteRawIndexCreator.getNumDocsPerChunk(maxStringLengthInBytes);
+    int numDocsPerChunk = SingleValueVarByteRawIndexCreator.getNumDocsPerChunk(maxStringLengthInBytes, 1024 * 1024);
     try (VarByteChunkForwardIndexWriter writer = new VarByteChunkForwardIndexWriter(outFile, compressionType, numDocs,
         numDocsPerChunk, maxStringLengthInBytes, 3)) {
       // NOTE: No need to test BYTES explicitly because STRING is handled as UTF-8 encoded bytes

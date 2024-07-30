@@ -38,9 +38,8 @@ import org.yaml.snakeyaml.representer.Representer;
 public class CompatibilityOpsRunner {
   private static final Logger LOGGER = LoggerFactory.getLogger(CompatibilityOpsRunner.class);
 
-  private String _parentDir;
   private final String _configFileName;
-  private int _generationNumber;
+  private final int _generationNumber;
 
   private CompatibilityOpsRunner(String configFileName, int generationNumber) {
     _configFileName = configFileName;
@@ -50,7 +49,7 @@ public class CompatibilityOpsRunner {
   private boolean runOps()
       throws Exception {
     Path path = Paths.get(_configFileName);
-    _parentDir = path.getParent().toString();
+    String parentDir = path.getParent().toString();
     InputStream inputStream = Files.newInputStream(path);
 
     Representer representer = new Representer(new DumperOptions());
@@ -58,14 +57,14 @@ public class CompatibilityOpsRunner {
     Yaml yaml = new Yaml(new CustomConstructor(new LoaderOptions()), representer);
 
     CompatTestOperation operation = yaml.loadAs(inputStream, CompatTestOperation.class);
-    LOGGER.info("Running compat verifications from file:{} ({})", path.toString(), operation.getDescription());
+    LOGGER.info("Running compat verifications from file:{} ({})", path, operation.getDescription());
 
     boolean passed = true;
     for (BaseOp op : operation.getOperations()) {
-      op.setParentDir(_parentDir);
+      op.setParentDir(parentDir);
       if (!op.run(_generationNumber)) {
         passed = false;
-        System.out.println("Failure");
+        LOGGER.error("Failure");
         break;
       }
     }
@@ -82,7 +81,7 @@ public class CompatibilityOpsRunner {
     clusterDescriptor.setBrokerQueryPort(System.getProperty("BrokerQueryPort"));
     clusterDescriptor.setServerAdminPort(System.getProperty("ServerAdminPort"));
 
-    CompatibilityOpsRunner runner = new CompatibilityOpsRunner(args[0], Integer.valueOf(args[1]));
+    CompatibilityOpsRunner runner = new CompatibilityOpsRunner(args[0], Integer.parseInt(args[1]));
     int exitStatus = 1;
     if (runner.runOps()) {
       exitStatus = 0;

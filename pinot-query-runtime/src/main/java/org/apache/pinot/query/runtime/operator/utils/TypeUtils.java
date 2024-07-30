@@ -23,6 +23,7 @@ import it.unimi.dsi.fastutil.floats.FloatArrayList;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import org.apache.pinot.common.utils.ArrayListUtils;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 
 
@@ -51,21 +52,21 @@ public class TypeUtils {
       case INT_ARRAY:
         if (value instanceof IntArrayList) {
           // For ArrayAggregationFunction
-          return ((IntArrayList) value).elements();
+          return ArrayListUtils.toIntArray((IntArrayList) value);
         } else {
           return value;
         }
       case LONG_ARRAY:
         if (value instanceof LongArrayList) {
           // For FunnelCountAggregationFunction and ArrayAggregationFunction
-          return ((LongArrayList) value).elements();
+          return ArrayListUtils.toLongArray((LongArrayList) value);
         } else {
           return value;
         }
       case FLOAT_ARRAY:
         if (value instanceof FloatArrayList) {
           // For ArrayAggregationFunction
-          return ((FloatArrayList) value).elements();
+          return ArrayListUtils.toFloatArray((FloatArrayList) value);
         } else if (value instanceof double[]) {
           // This is due to for parsing array literal value like [0.1, 0.2, 0.3].
           // The parsed value is stored as double[] in java, however the calcite type is FLOAT_ARRAY.
@@ -80,14 +81,14 @@ public class TypeUtils {
       case DOUBLE_ARRAY:
         if (value instanceof DoubleArrayList) {
           // For HistogramAggregationFunction and ArrayAggregationFunction
-          return ((DoubleArrayList) value).elements();
+          return ArrayListUtils.toDoubleArray((DoubleArrayList) value);
         } else {
           return value;
         }
       case STRING_ARRAY:
         if (value instanceof ObjectArrayList) {
           // For ArrayAggregationFunction
-          return ((ObjectArrayList<String>) value).toArray(new String[0]);
+          return ArrayListUtils.toStringArray((ObjectArrayList<String>) value);
         } else {
           return value;
         }

@@ -164,6 +164,10 @@ public abstract class AbstractColumnStatisticsCollector implements ColumnStatist
     _totalNumberOfEntries += entries.length;
   }
 
+  protected void updateTotalNumberOfEntries(int newEntries) {
+    _totalNumberOfEntries += newEntries;
+  }
+
   public int getTotalNumberOfEntries() {
     return _totalNumberOfEntries;
   }

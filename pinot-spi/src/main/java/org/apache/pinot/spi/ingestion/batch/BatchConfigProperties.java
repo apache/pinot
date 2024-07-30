@@ -74,6 +74,7 @@ public class BatchConfigProperties {
     public static final String SIMPLE = "simple";
     public static final String NORMALIZED_DATE = "normalizedDate";
     public static final String FIXED = "fixed";
+    public static final String UPLOADED_REALTIME = "uploadedRealtime";
     public static final String INPUT_FILE = "inputFile";
   }
 

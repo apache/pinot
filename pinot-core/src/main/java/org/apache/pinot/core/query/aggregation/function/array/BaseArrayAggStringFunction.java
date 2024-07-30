@@ -94,6 +94,9 @@ public abstract class BaseArrayAggStringFunction<I extends AbstractObjectCollect
 
   @Override
   public ObjectArrayList<String> extractFinalResult(I stringArrayList) {
+    if (stringArrayList == null) {
+      return new ObjectArrayList<>();
+    }
     // NOTE: Wrap a String[] to work around the bug of ObjectArrayList constructor creating Object[] internally.
     String[] stringArray = new String[stringArrayList.size()];
     ObjectIterators.unwrap(stringArrayList.iterator(), stringArray);

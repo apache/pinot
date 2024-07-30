@@ -71,8 +71,7 @@ public class NotInPredicateEvaluatorFactory {
    * @param dataType Data type for the column
    * @return Raw value based NOT_IN predicate evaluator
    */
-  public static NotInRawPredicateEvaluator newRawValueBasedEvaluator(NotInPredicate notInPredicate,
-      DataType dataType) {
+  public static NotInRawPredicateEvaluator newRawValueBasedEvaluator(NotInPredicate notInPredicate, DataType dataType) {
     switch (dataType) {
       case INT: {
         int[] intValues = notInPredicate.getIntValues();
@@ -129,7 +128,8 @@ public class NotInPredicateEvaluatorFactory {
         }
         return new LongRawValueBasedNotInPredicateEvaluator(notInPredicate, nonMatchingValues);
       }
-      case STRING: {
+      case STRING:
+      case JSON: {
         List<String> stringValues = notInPredicate.getValues();
         Set<String> nonMatchingValues = new ObjectOpenHashSet<>(HashUtil.getMinHashSetSize(stringValues.size()));
         // NOTE: Add value-by-value to avoid overhead
@@ -157,27 +157,34 @@ public class NotInPredicateEvaluatorFactory {
 
   public static final class DictionaryBasedNotInPredicateEvaluator extends BaseDictionaryBasedPredicateEvaluator {
     final IntSet _nonMatchingDictIdSet;
-    final int _numNonMatchingDictIds;
-    final Dictionary _dictionary;
-    int[] _matchingDictIds;
-    int[] _nonMatchingDictIds;
 
     DictionaryBasedNotInPredicateEvaluator(NotInPredicate notInPredicate, Dictionary dictionary, DataType dataType,
         @Nullable QueryContext queryContext) {
-      super(notInPredicate);
+      super(notInPredicate, dictionary);
       _nonMatchingDictIdSet = PredicateUtils.getDictIdSet(notInPredicate, dictionary, dataType, queryContext);
-      _numNonMatchingDictIds = _nonMatchingDictIdSet.size();
-      if (_numNonMatchingDictIds == 0) {
+      int numNonMatchingDictIds = _nonMatchingDictIdSet.size();
+      if (numNonMatchingDictIds == 0) {
         _alwaysTrue = true;
-      } else if (dictionary.length() == _numNonMatchingDictIds) {
+      } else if (dictionary.length() == numNonMatchingDictIds) {
         _alwaysFalse = true;
       }
-      _dictionary = dictionary;
+    }
+
+    @Override
+    protected int[] calculateMatchingDictIds() {
+      return PredicateUtils.flipDictIds(getNonMatchingDictIds(), _dictionary.length());
+    }
+
+    @Override
+    protected int[] calculateNonMatchingDictIds() {
+      int[] nonMatchingDictIds = _nonMatchingDictIdSet.toIntArray();
+      Arrays.sort(nonMatchingDictIds);
+      return nonMatchingDictIds;
     }
 
     @Override
     public int getNumMatchingItems() {
-      return -_numNonMatchingDictIds;
+      return -_nonMatchingDictIdSet.size();
     }
 
     @Override
@@ -196,34 +203,6 @@ public class NotInPredicateEvaluatorFactory {
         }
       }
       return matches;
-    }
-
-    @Override
-    public int[] getMatchingDictIds() {
-      if (_matchingDictIds == null) {
-        int dictionarySize = _dictionary.length();
-        _matchingDictIds = new int[dictionarySize - _numNonMatchingDictIds];
-        int index = 0;
-        for (int dictId = 0; dictId < dictionarySize; dictId++) {
-          if (!_nonMatchingDictIdSet.contains(dictId)) {
-            _matchingDictIds[index++] = dictId;
-          }
-        }
-      }
-      return _matchingDictIds;
-    }
-
-    @Override
-    public int getNumNonMatchingDictIds() {
-      return _numNonMatchingDictIds;
-    }
-
-    @Override
-    public int[] getNonMatchingDictIds() {
-      if (_nonMatchingDictIds == null) {
-        _nonMatchingDictIds = _nonMatchingDictIdSet.toIntArray();
-      }
-      return _nonMatchingDictIds;
     }
   }
 
@@ -491,9 +470,7 @@ public class NotInPredicateEvaluatorFactory {
 
     @Override
     public <R> R accept(MultiValueVisitor<R> visitor) {
-      byte[][] bytes = _nonMatchingValues.stream()
-          .map(ByteArray::getBytes)
-          .toArray(byte[][]::new);
+      byte[][] bytes = _nonMatchingValues.stream().map(ByteArray::getBytes).toArray(byte[][]::new);
       return visitor.visitBytes(bytes);
     }
   }

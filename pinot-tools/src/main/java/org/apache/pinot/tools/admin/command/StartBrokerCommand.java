@@ -23,7 +23,7 @@ import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.commons.collections.MapUtils;
+import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.pinot.spi.services.ServiceRole;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -159,7 +159,7 @@ public class StartBrokerCommand extends AbstractBaseAdminCommand implements Comm
   public boolean execute()
       throws Exception {
     try {
-      LOGGER.info("Executing command: " + toString());
+      LOGGER.info("Executing command: {}", toString());
       Map<String, Object> brokerConf = getBrokerConf();
       StartServiceManagerCommand startServiceManagerCommand =
           new StartServiceManagerCommand().setZkAddress(_zkAddress).setClusterName(_clusterName).setPort(-1)

@@ -98,7 +98,7 @@ public class BrokerManagedAsyncExecutorProvider extends ThreadPoolExecutorProvid
     @Override
     public void rejectedExecution(Runnable r, ThreadPoolExecutor executor) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.QUERY_REJECTED_EXCEPTIONS, 1L);
-      LOGGER.error("Task " + r + " rejected from " + executor);
+      LOGGER.error("Task {} rejected from {}", r, executor);
 
       throw new ServiceUnavailableException(Response.status(Response.Status.SERVICE_UNAVAILABLE).entity(
           "Pinot Broker thread pool can not accommodate more requests now. " + "Request is rejected from " + executor)

@@ -18,69 +18,54 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
-import com.google.common.base.Joiner;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.calcite.rel.core.JoinRelType;
-import org.apache.calcite.rel.hint.RelHint;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
-import org.apache.pinot.common.datatable.DataTable;
+import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.JoinNode;
+import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.blocks.TransferableBlockTestUtils;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
-import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.mockito.Mock;
 import org.mockito.Mockito;
-import org.mockito.MockitoAnnotations;
-import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.when;
+import static org.mockito.MockitoAnnotations.openMocks;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
+
+// TODO: Add more inequi join tests.
 public class HashJoinOperatorTest {
   private AutoCloseable _mocks;
-
   @Mock
-  private MultiStageOperator _leftOperator;
-
+  private MultiStageOperator _leftInput;
   @Mock
-  private MultiStageOperator _rightOperator;
-
+  private MultiStageOperator _rightInput;
   @Mock
   private VirtualServerAddress _serverAddress;
 
   @BeforeMethod
   public void setUp() {
-    _mocks = MockitoAnnotations.openMocks(this);
-    Mockito.when(_serverAddress.toString()).thenReturn(new VirtualServerAddress("mock", 80, 0).toString());
+    _mocks = openMocks(this);
+    when(_serverAddress.toString()).thenReturn(new VirtualServerAddress("mock", 80, 0).toString());
   }
 
   @AfterMethod
   public void tearDown()
       throws Exception {
     _mocks.close();
-  }
-
-  private static JoinNode.JoinKeys getJoinKeys(List<Integer> leftKeys, List<Integer> rightKeys) {
-    return new JoinNode.JoinKeys(leftKeys, rightKeys);
-  }
-
-  private static List<RelHint> getJoinHints(Map<String, String> hintsMap) {
-    RelHint.Builder relHintBuilder = RelHint.builder(PinotHintOptions.JOIN_HINT_OPTIONS);
-    hintsMap.forEach(relHintBuilder::hintOption);
-    return ImmutableList.of(relHintBuilder.build());
   }
 
   @Test
@@ -91,30 +76,23 @@ public class HashJoinOperatorTest {
     DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
         ColumnDataType.INT, ColumnDataType.STRING
     });
-    List<RexExpression> joinClauses = new ArrayList<>();
-    Mockito.when(_leftOperator.nextBlock())
-        .thenReturn(OperatorTestUtil.block(leftSchema, new Object[]{1, "Aa"}, new Object[]{2, "BB"}))
-        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
-    Mockito.when(_rightOperator.nextBlock()).thenReturn(
+    when(_leftInput.nextBlock()).thenReturn(
+            OperatorTestUtil.block(leftSchema, new Object[]{1, "Aa"}, new Object[]{2, "BB"}))
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    when(_rightInput.nextBlock()).thenReturn(
             OperatorTestUtil.block(rightSchema, new Object[]{2, "Aa"}, new Object[]{2, "BB"}, new Object[]{3, "BB"}))
-        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
     DataSchema resultSchema =
         new DataSchema(new String[]{"int_col1", "string_col1", "int_col2", "string_col2"}, new ColumnDataType[]{
             ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING
         });
-    JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.INNER,
-        getJoinKeys(Arrays.asList(1), Arrays.asList(1)), joinClauses, Collections.emptyList());
-    HashJoinOperator joinOnString =
-        new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
-
-    TransferableBlock result = joinOnString.nextBlock();
-    List<Object[]> resultRows = result.getContainer();
-    List<Object[]> expectedRows =
-        Arrays.asList(new Object[]{1, "Aa", 2, "Aa"}, new Object[]{2, "BB", 2, "BB"}, new Object[]{2, "BB", 3, "BB"});
-    Assert.assertEquals(resultRows.size(), expectedRows.size());
-    Assert.assertEquals(resultRows.get(0), expectedRows.get(0));
-    Assert.assertEquals(resultRows.get(1), expectedRows.get(1));
-    Assert.assertEquals(resultRows.get(2), expectedRows.get(2));
+    HashJoinOperator operator =
+        getOperator(leftSchema, resultSchema, JoinRelType.INNER, List.of(1), List.of(1), List.of());
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    assertEquals(resultRows.size(), 3);
+    assertEquals(resultRows.get(0), new Object[]{1, "Aa", 2, "Aa"});
+    assertEquals(resultRows.get(1), new Object[]{2, "BB", 2, "BB"});
+    assertEquals(resultRows.get(2), new Object[]{2, "BB", 3, "BB"});
   }
 
   @Test
@@ -125,27 +103,22 @@ public class HashJoinOperatorTest {
     DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
         ColumnDataType.INT, ColumnDataType.STRING
     });
-    Mockito.when(_leftOperator.nextBlock())
-        .thenReturn(OperatorTestUtil.block(leftSchema, new Object[]{1, "Aa"}, new Object[]{2, "BB"}))
-        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
-    Mockito.when(_rightOperator.nextBlock()).thenReturn(
+    when(_leftInput.nextBlock()).thenReturn(
+            OperatorTestUtil.block(leftSchema, new Object[]{1, "Aa"}, new Object[]{2, "BB"}))
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    when(_rightInput.nextBlock()).thenReturn(
             OperatorTestUtil.block(rightSchema, new Object[]{2, "Aa"}, new Object[]{2, "BB"}, new Object[]{3, "BB"}))
-        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
-    List<RexExpression> joinClauses = new ArrayList<>();
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
     DataSchema resultSchema =
         new DataSchema(new String[]{"int_col1", "string_col1", "int_col2", "string_co2"}, new ColumnDataType[]{
             ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING
         });
-    JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.INNER,
-        getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses, Collections.emptyList());
-    HashJoinOperator joinOnInt =
-        new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
-    TransferableBlock result = joinOnInt.nextBlock();
-    List<Object[]> resultRows = result.getContainer();
-    List<Object[]> expectedRows = Arrays.asList(new Object[]{2, "BB", 2, "Aa"}, new Object[]{2, "BB", 2, "BB"});
-    Assert.assertEquals(resultRows.size(), expectedRows.size());
-    Assert.assertEquals(resultRows.get(0), expectedRows.get(0));
-    Assert.assertEquals(resultRows.get(1), expectedRows.get(1));
+    HashJoinOperator operator =
+        getOperator(leftSchema, resultSchema, JoinRelType.INNER, List.of(0), List.of(0), List.of());
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    assertEquals(resultRows.size(), 2);
+    assertEquals(resultRows.get(0), new Object[]{2, "BB", 2, "Aa"});
+    assertEquals(resultRows.get(1), new Object[]{2, "BB", 2, "BB"});
   }
 
   @Test
@@ -156,33 +129,26 @@ public class HashJoinOperatorTest {
     DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
         ColumnDataType.INT, ColumnDataType.STRING
     });
-    Mockito.when(_leftOperator.nextBlock())
-        .thenReturn(OperatorTestUtil.block(leftSchema, new Object[]{1, "Aa"}, new Object[]{2, "BB"}))
-        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
-    Mockito.when(_rightOperator.nextBlock()).thenReturn(
+    when(_leftInput.nextBlock()).thenReturn(
+            OperatorTestUtil.block(leftSchema, new Object[]{1, "Aa"}, new Object[]{2, "BB"}))
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    when(_rightInput.nextBlock()).thenReturn(
             OperatorTestUtil.block(rightSchema, new Object[]{2, "Aa"}, new Object[]{2, "BB"}, new Object[]{3, "BB"}))
-        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
-    List<RexExpression> joinClauses = new ArrayList<>();
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
     DataSchema resultSchema =
         new DataSchema(new String[]{"int_col1", "string_col1", "int_col2", "string_co2"}, new ColumnDataType[]{
             ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING
         });
-    JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.INNER,
-        getJoinKeys(new ArrayList<>(), new ArrayList<>()), joinClauses, Collections.emptyList());
-    HashJoinOperator joinOnInt =
-        new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
-    TransferableBlock result = joinOnInt.nextBlock();
-    List<Object[]> resultRows = result.getContainer();
-    List<Object[]> expectedRows =
-        Arrays.asList(new Object[]{1, "Aa", 2, "Aa"}, new Object[]{1, "Aa", 2, "BB"}, new Object[]{1, "Aa", 3, "BB"},
-            new Object[]{2, "BB", 2, "Aa"}, new Object[]{2, "BB", 2, "BB"}, new Object[]{2, "BB", 3, "BB"});
-    Assert.assertEquals(resultRows.size(), expectedRows.size());
-    Assert.assertEquals(resultRows.get(0), expectedRows.get(0));
-    Assert.assertEquals(resultRows.get(1), expectedRows.get(1));
-    Assert.assertEquals(resultRows.get(2), expectedRows.get(2));
-    Assert.assertEquals(resultRows.get(3), expectedRows.get(3));
-    Assert.assertEquals(resultRows.get(4), expectedRows.get(4));
-    Assert.assertEquals(resultRows.get(5), expectedRows.get(5));
+    HashJoinOperator operator =
+        getOperator(leftSchema, resultSchema, JoinRelType.INNER, List.of(), List.of(), List.of());
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    assertEquals(resultRows.size(), 6);
+    assertEquals(resultRows.get(0), new Object[]{1, "Aa", 2, "Aa"});
+    assertEquals(resultRows.get(1), new Object[]{1, "Aa", 2, "BB"});
+    assertEquals(resultRows.get(2), new Object[]{1, "Aa", 3, "BB"});
+    assertEquals(resultRows.get(3), new Object[]{2, "BB", 2, "Aa"});
+    assertEquals(resultRows.get(4), new Object[]{2, "BB", 2, "BB"});
+    assertEquals(resultRows.get(5), new Object[]{2, "BB", 3, "BB"});
   }
 
   @Test
@@ -193,29 +159,22 @@ public class HashJoinOperatorTest {
     DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
         ColumnDataType.INT, ColumnDataType.STRING
     });
-    Mockito.when(_leftOperator.nextBlock())
-        .thenReturn(OperatorTestUtil.block(leftSchema, new Object[]{1, "Aa"}, new Object[]{2, "CC"}))
-        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
-    Mockito.when(_rightOperator.nextBlock()).thenReturn(
+    when(_leftInput.nextBlock()).thenReturn(
+            OperatorTestUtil.block(leftSchema, new Object[]{1, "Aa"}, new Object[]{2, "CC"}))
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    when(_rightInput.nextBlock()).thenReturn(
             OperatorTestUtil.block(rightSchema, new Object[]{2, "Aa"}, new Object[]{2, "BB"}, new Object[]{3, "BB"}))
-        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
-
-    List<RexExpression> joinClauses = new ArrayList<>();
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
     DataSchema resultSchema =
         new DataSchema(new String[]{"int_col1", "string_col1", "int_co2", "string_col2"}, new ColumnDataType[]{
             ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING
         });
-    JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.LEFT,
-        getJoinKeys(Arrays.asList(1), Arrays.asList(1)), joinClauses, Collections.emptyList());
-    HashJoinOperator join =
-        new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
-
-    TransferableBlock result = join.nextBlock();
-    List<Object[]> resultRows = result.getContainer();
-    List<Object[]> expectedRows = Arrays.asList(new Object[]{1, "Aa", 2, "Aa"}, new Object[]{2, "CC", null, null});
-    Assert.assertEquals(resultRows.size(), expectedRows.size());
-    Assert.assertEquals(resultRows.get(0), expectedRows.get(0));
-    Assert.assertEquals(resultRows.get(1), expectedRows.get(1));
+    HashJoinOperator operator =
+        getOperator(leftSchema, resultSchema, JoinRelType.LEFT, List.of(1), List.of(1), List.of());
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    assertEquals(resultRows.size(), 2);
+    assertEquals(resultRows.get(0), new Object[]{1, "Aa", 2, "Aa"});
+    assertEquals(resultRows.get(1), new Object[]{2, "CC", null, null});
   }
 
   @Test
@@ -226,23 +185,18 @@ public class HashJoinOperatorTest {
     DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
         ColumnDataType.INT, ColumnDataType.STRING
     });
-    Mockito.when(_leftOperator.nextBlock()).thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
-    Mockito.when(_rightOperator.nextBlock()).thenReturn(
+    when(_leftInput.nextBlock()).thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    when(_rightInput.nextBlock()).thenReturn(
             OperatorTestUtil.block(rightSchema, new Object[]{1, "BB"}, new Object[]{1, "CC"}, new Object[]{3, "BB"}))
-        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
-
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
     DataSchema resultSchema =
         new DataSchema(new String[]{"int_col1", "string_col1", "int_co2", "string_col2"}, new ColumnDataType[]{
             ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING
         });
-    List<RexExpression> joinClauses = new ArrayList<>();
-    JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.INNER,
-        getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses, Collections.emptyList());
-    HashJoinOperator join =
-        new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
-
-    TransferableBlock result = join.nextBlock();
-    Assert.assertTrue(result.isEndOfStreamBlock());
+    HashJoinOperator operator =
+        getOperator(leftSchema, resultSchema, JoinRelType.INNER, List.of(0), List.of(0), List.of());
+    TransferableBlock block = operator.nextBlock();
+    assertTrue(block.isEndOfStreamBlock());
   }
 
   @Test
@@ -253,28 +207,21 @@ public class HashJoinOperatorTest {
     DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
         ColumnDataType.INT, ColumnDataType.STRING
     });
-    Mockito.when(_leftOperator.nextBlock()).thenReturn(OperatorTestUtil.block(leftSchema, new Object[]{1, "Aa"}))
-        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
-    Mockito.when(_rightOperator.nextBlock()).thenReturn(
+    when(_leftInput.nextBlock()).thenReturn(OperatorTestUtil.block(leftSchema, new Object[]{1, "Aa"}))
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    when(_rightInput.nextBlock()).thenReturn(
             OperatorTestUtil.block(rightSchema, new Object[]{1, "BB"}, new Object[]{1, "CC"}, new Object[]{3, "BB"}))
-        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
-
-    List<RexExpression> joinClauses = new ArrayList<>();
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
     DataSchema resultSchema =
         new DataSchema(new String[]{"int_col1", "string_col1", "int_co2", "string_col2"}, new ColumnDataType[]{
             ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING
         });
-    JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.LEFT,
-        getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses, Collections.emptyList());
-    HashJoinOperator join =
-        new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
-
-    TransferableBlock result = join.nextBlock();
-    List<Object[]> resultRows = result.getContainer();
-    List<Object[]> expectedRows = Arrays.asList(new Object[]{1, "Aa", 1, "BB"}, new Object[]{1, "Aa", 1, "CC"});
-    Assert.assertEquals(resultRows.size(), expectedRows.size());
-    Assert.assertEquals(resultRows.get(0), expectedRows.get(0));
-    Assert.assertEquals(resultRows.get(1), expectedRows.get(1));
+    HashJoinOperator operator =
+        getOperator(leftSchema, resultSchema, JoinRelType.LEFT, List.of(0), List.of(0), List.of());
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    assertEquals(resultRows.size(), 2);
+    assertEquals(resultRows.get(0), new Object[]{1, "Aa", 1, "BB"});
+    assertEquals(resultRows.get(1), new Object[]{1, "Aa", 1, "CC"});
   }
 
   @Test
@@ -285,25 +232,17 @@ public class HashJoinOperatorTest {
     DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
         ColumnDataType.INT, ColumnDataType.STRING
     });
-    Mockito.when(_leftOperator.nextBlock()).thenReturn(
+    when(_leftInput.nextBlock()).thenReturn(
             OperatorTestUtil.block(rightSchema, new Object[]{1, "BB"}, new Object[]{1, "CC"}, new Object[]{3, "BB"}))
-        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
-    Mockito.when(_rightOperator.nextBlock()).thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
-
-    List<RexExpression> joinClauses = new ArrayList<>();
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    when(_rightInput.nextBlock()).thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
     DataSchema resultSchema =
         new DataSchema(new String[]{"int_col1", "string_col1", "int_co2", "string_col2"}, new ColumnDataType[]{
             ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING
         });
-
-    JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.INNER,
-        getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses, Collections.emptyList());
-    HashJoinOperator join =
-        new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
-
-    TransferableBlock result = join.nextBlock();
-    List<Object[]> resultRows = result.getContainer();
-    Assert.assertTrue(resultRows.isEmpty());
+    HashJoinOperator operator =
+        getOperator(leftSchema, resultSchema, JoinRelType.INNER, List.of(0), List.of(0), List.of());
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock());
   }
 
   @Test
@@ -314,34 +253,26 @@ public class HashJoinOperatorTest {
     DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
         ColumnDataType.INT, ColumnDataType.STRING
     });
-    Mockito.when(_leftOperator.nextBlock())
-        .thenReturn(OperatorTestUtil.block(leftSchema, new Object[]{1, "Aa"}, new Object[]{2, "BB"}))
-        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
-    Mockito.when(_rightOperator.nextBlock()).thenReturn(
+    when(_leftInput.nextBlock()).thenReturn(
+            OperatorTestUtil.block(leftSchema, new Object[]{1, "Aa"}, new Object[]{2, "BB"}))
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    when(_rightInput.nextBlock()).thenReturn(
             OperatorTestUtil.block(rightSchema, new Object[]{2, "Aa"}, new Object[]{2, "BB"}, new Object[]{3, "BB"}))
-        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
-
-    List<RexExpression> joinClauses = new ArrayList<>();
-    List<RexExpression> functionOperands = new ArrayList<>();
-    functionOperands.add(new RexExpression.InputRef(1));
-    functionOperands.add(new RexExpression.InputRef(3));
-    joinClauses.add(new RexExpression.FunctionCall(SqlKind.NOT_EQUALS, ColumnDataType.BOOLEAN, "<>", functionOperands));
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    List<RexExpression> functionOperands = List.of(new RexExpression.InputRef(1), new RexExpression.InputRef(3));
+    List<RexExpression> nonEquiConditions =
+        List.of(new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.NOT_EQUALS.name(), functionOperands));
     DataSchema resultSchema =
         new DataSchema(new String[]{"int_col1", "string_col1", "int_col2", "string_col2"}, new ColumnDataType[]{
             ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING
         });
-    JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.INNER,
-        getJoinKeys(new ArrayList<>(), new ArrayList<>()), joinClauses, Collections.emptyList());
-    HashJoinOperator join =
-        new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
-    TransferableBlock result = join.nextBlock();
-    List<Object[]> resultRows = result.getContainer();
-    List<Object[]> expectedRows =
-        Arrays.asList(new Object[]{1, "Aa", 2, "BB"}, new Object[]{1, "Aa", 3, "BB"}, new Object[]{2, "BB", 2, "Aa"});
-    Assert.assertEquals(resultRows.size(), expectedRows.size());
-    for (int i = 0; i < expectedRows.size(); i++) {
-      Assert.assertEquals(resultRows.get(i), expectedRows.get(i));
-    }
+    HashJoinOperator operator =
+        getOperator(leftSchema, resultSchema, JoinRelType.INNER, List.of(), List.of(), nonEquiConditions);
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    assertEquals(resultRows.size(), 3);
+    assertEquals(resultRows.get(0), new Object[]{1, "Aa", 2, "BB"});
+    assertEquals(resultRows.get(1), new Object[]{1, "Aa", 3, "BB"});
+    assertEquals(resultRows.get(2), new Object[]{2, "BB", 2, "Aa"});
   }
 
   @Test
@@ -352,33 +283,25 @@ public class HashJoinOperatorTest {
     DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
         ColumnDataType.INT, ColumnDataType.STRING
     });
-    Mockito.when(_leftOperator.nextBlock())
-        .thenReturn(OperatorTestUtil.block(leftSchema, new Object[]{1, "Aa"}, new Object[]{2, "BB"}))
-        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
-    Mockito.when(_rightOperator.nextBlock())
-        .thenReturn(OperatorTestUtil.block(rightSchema, new Object[]{2, "Aa"}, new Object[]{1, "BB"}))
-        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
-
-    List<RexExpression> joinClauses = new ArrayList<>();
-    List<RexExpression> functionOperands = new ArrayList<>();
-    functionOperands.add(new RexExpression.InputRef(0));
-    functionOperands.add(new RexExpression.InputRef(2));
-    joinClauses.add(new RexExpression.FunctionCall(SqlKind.NOT_EQUALS, ColumnDataType.BOOLEAN, "<>", functionOperands));
+    when(_leftInput.nextBlock()).thenReturn(
+            OperatorTestUtil.block(leftSchema, new Object[]{1, "Aa"}, new Object[]{2, "BB"}))
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    when(_rightInput.nextBlock()).thenReturn(
+            OperatorTestUtil.block(rightSchema, new Object[]{2, "Aa"}, new Object[]{1, "BB"}))
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    List<RexExpression> functionOperands = List.of(new RexExpression.InputRef(0), new RexExpression.InputRef(2));
+    List<RexExpression> nonEquiConditions =
+        List.of(new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.NOT_EQUALS.name(), functionOperands));
     DataSchema resultSchema =
         new DataSchema(new String[]{"int_col1", "string_col1", "int_co2", "string_col2"}, new ColumnDataType[]{
             ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING
         });
-    JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.INNER,
-        getJoinKeys(new ArrayList<>(), new ArrayList<>()), joinClauses, Collections.emptyList());
-    HashJoinOperator join =
-        new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
-    TransferableBlock result = join.nextBlock();
-    List<Object[]> resultRows = result.getContainer();
-    List<Object[]> expectedRows = Arrays.asList(new Object[]{1, "Aa", 2, "Aa"}, new Object[]{2, "BB", 1, "BB"});
-    Assert.assertEquals(resultRows.size(), expectedRows.size());
-    for (int i = 0; i < expectedRows.size(); i++) {
-      Assert.assertEquals(resultRows.get(i), expectedRows.get(i));
-    }
+    HashJoinOperator operator =
+        getOperator(leftSchema, resultSchema, JoinRelType.INNER, List.of(), List.of(), nonEquiConditions);
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    assertEquals(resultRows.size(), 2);
+    assertEquals(resultRows.get(0), new Object[]{1, "Aa", 2, "Aa"});
+    assertEquals(resultRows.get(1), new Object[]{2, "BB", 1, "BB"});
   }
 
   @Test
@@ -389,36 +312,27 @@ public class HashJoinOperatorTest {
     DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
         ColumnDataType.INT, ColumnDataType.STRING
     });
-    Mockito.when(_leftOperator.nextBlock())
-        .thenReturn(OperatorTestUtil.block(leftSchema, new Object[]{1, "Aa"}, new Object[]{2, "BB"}))
-        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
-    Mockito.when(_rightOperator.nextBlock()).thenReturn(
+    when(_leftInput.nextBlock()).thenReturn(
+            OperatorTestUtil.block(leftSchema, new Object[]{1, "Aa"}, new Object[]{2, "BB"}))
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    when(_rightInput.nextBlock()).thenReturn(
             OperatorTestUtil.block(rightSchema, new Object[]{2, "Aa"}, new Object[]{2, "BB"}, new Object[]{3, "BB"}))
-        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
-
-    List<RexExpression> joinClauses = new ArrayList<>();
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
     DataSchema resultSchema = new DataSchema(new String[]{"foo", "bar", "foo", "bar"}, new ColumnDataType[]{
         ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING
     });
-    JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.RIGHT,
-        getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses, Collections.emptyList());
-    HashJoinOperator joinOnNum =
-        new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
-    TransferableBlock result = joinOnNum.nextBlock();
-    List<Object[]> resultRows = result.getContainer();
-    List<Object[]> expectedRows = Arrays.asList(new Object[]{2, "BB", 2, "Aa"}, new Object[]{2, "BB", 2, "BB"});
-    Assert.assertEquals(resultRows.size(), expectedRows.size());
-    Assert.assertEquals(resultRows.get(0), expectedRows.get(0));
-    Assert.assertEquals(resultRows.get(1), expectedRows.get(1));
+    HashJoinOperator operator =
+        getOperator(leftSchema, resultSchema, JoinRelType.RIGHT, List.of(0), List.of(0), List.of());
+    List<Object[]> resultRows1 = operator.nextBlock().getContainer();
+    assertEquals(resultRows1.size(), 2);
+    assertEquals(resultRows1.get(0), new Object[]{2, "BB", 2, "Aa"});
+    assertEquals(resultRows1.get(1), new Object[]{2, "BB", 2, "BB"});
     // Second block should be non-matched broadcast rows
-    result = joinOnNum.nextBlock();
-    resultRows = result.getContainer();
-    expectedRows = ImmutableList.of(new Object[]{null, null, 3, "BB"});
-    Assert.assertEquals(resultRows.size(), expectedRows.size());
-    Assert.assertEquals(resultRows.get(0), expectedRows.get(0));
+    List<Object[]> resultRows2 = operator.nextBlock().getContainer();
+    assertEquals(resultRows2.size(), 1);
+    assertEquals(resultRows2.get(0), new Object[]{null, null, 3, "BB"});
     // Third block is EOS block.
-    result = joinOnNum.nextBlock();
-    Assert.assertTrue(result.isSuccessfulEndOfStreamBlock());
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock());
   }
 
   @Test
@@ -429,30 +343,22 @@ public class HashJoinOperatorTest {
     DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
         ColumnDataType.INT, ColumnDataType.STRING
     });
-    Mockito.when(_leftOperator.nextBlock()).thenReturn(
+    when(_leftInput.nextBlock()).thenReturn(
             OperatorTestUtil.block(leftSchema, new Object[]{1, "Aa"}, new Object[]{2, "BB"}, new Object[]{4, "CC"}))
-        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
-    Mockito.when(_rightOperator.nextBlock()).thenReturn(
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    when(_rightInput.nextBlock()).thenReturn(
             OperatorTestUtil.block(rightSchema, new Object[]{2, "Aa"}, new Object[]{2, "BB"}, new Object[]{3, "BB"}))
-        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
-
-    List<RexExpression> joinClauses = new ArrayList<>();
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
     DataSchema resultSchema = new DataSchema(new String[]{"foo", "bar", "foo", "bar"}, new ColumnDataType[]{
         ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING
     });
-    JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.SEMI,
-        getJoinKeys(Arrays.asList(1), Arrays.asList(1)), joinClauses, Collections.emptyList());
-    HashJoinOperator join =
-        new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
-    TransferableBlock result = join.nextBlock();
-    List<Object[]> resultRows = result.getContainer();
-    List<Object[]> expectedRows =
-        ImmutableList.of(new Object[]{1, "Aa", null, null}, new Object[]{2, "BB", null, null});
-    Assert.assertEquals(resultRows.size(), expectedRows.size());
-    Assert.assertEquals(resultRows.get(0), expectedRows.get(0));
-    Assert.assertEquals(resultRows.get(1), expectedRows.get(1));
-    result = join.nextBlock();
-    Assert.assertTrue(result.isSuccessfulEndOfStreamBlock());
+    HashJoinOperator operator =
+        getOperator(leftSchema, resultSchema, JoinRelType.SEMI, List.of(1), List.of(1), List.of());
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    assertEquals(resultRows.size(), 2);
+    assertEquals(resultRows.get(0), new Object[]{1, "Aa", null, null});
+    assertEquals(resultRows.get(1), new Object[]{2, "BB", null, null});
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock());
   }
 
   @Test
@@ -463,38 +369,29 @@ public class HashJoinOperatorTest {
     DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
         ColumnDataType.INT, ColumnDataType.STRING
     });
-    Mockito.when(_leftOperator.nextBlock()).thenReturn(
+    when(_leftInput.nextBlock()).thenReturn(
             OperatorTestUtil.block(leftSchema, new Object[]{1, "Aa"}, new Object[]{2, "BB"}, new Object[]{4, "CC"}))
-        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
-    Mockito.when(_rightOperator.nextBlock()).thenReturn(
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    when(_rightInput.nextBlock()).thenReturn(
             OperatorTestUtil.block(rightSchema, new Object[]{2, "Aa"}, new Object[]{2, "BB"}, new Object[]{3, "BB"}))
-        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
-    List<RexExpression> joinClauses = new ArrayList<>();
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
     DataSchema resultSchema = new DataSchema(new String[]{"foo", "bar", "foo", "bar"}, new ColumnDataType[]{
         ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING
     });
-    JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.FULL,
-        getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses, Collections.emptyList());
-    HashJoinOperator join =
-        new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
-    TransferableBlock result = join.nextBlock();
-    List<Object[]> resultRows = result.getContainer();
-    List<Object[]> expectedRows = ImmutableList.of(new Object[]{1, "Aa", null, null}, new Object[]{2, "BB", 2, "Aa"},
-        new Object[]{2, "BB", 2, "BB"}, new Object[]{4, "CC", null, null});
-    Assert.assertEquals(resultRows.size(), expectedRows.size());
-    Assert.assertEquals(resultRows.get(0), expectedRows.get(0));
-    Assert.assertEquals(resultRows.get(1), expectedRows.get(1));
-    Assert.assertEquals(resultRows.get(2), expectedRows.get(2));
-    Assert.assertEquals(resultRows.get(3), expectedRows.get(3));
+    HashJoinOperator operator =
+        getOperator(leftSchema, resultSchema, JoinRelType.FULL, List.of(0), List.of(0), List.of());
+    List<Object[]> resultRows1 = operator.nextBlock().getContainer();
+    assertEquals(resultRows1.size(), 4);
+    assertEquals(resultRows1.get(0), new Object[]{1, "Aa", null, null});
+    assertEquals(resultRows1.get(1), new Object[]{2, "BB", 2, "Aa"});
+    assertEquals(resultRows1.get(2), new Object[]{2, "BB", 2, "BB"});
+    assertEquals(resultRows1.get(3), new Object[]{4, "CC", null, null});
     // Second block should be non-matched broadcast rows
-    result = join.nextBlock();
-    resultRows = result.getContainer();
-    expectedRows = ImmutableList.of(new Object[]{null, null, 3, "BB"});
-    Assert.assertEquals(resultRows.size(), expectedRows.size());
-    Assert.assertEquals(resultRows.get(0), expectedRows.get(0));
+    List<Object[]> resultRows2 = operator.nextBlock().getContainer();
+    assertEquals(resultRows2.size(), 1);
+    assertEquals(resultRows2.get(0), new Object[]{null, null, 3, "BB"});
     // Third block is EOS block.
-    result = join.nextBlock();
-    Assert.assertTrue(result.isSuccessfulEndOfStreamBlock());
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock());
   }
 
   @Test
@@ -505,28 +402,21 @@ public class HashJoinOperatorTest {
     DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
         ColumnDataType.INT, ColumnDataType.STRING
     });
-    Mockito.when(_leftOperator.nextBlock()).thenReturn(
+    when(_leftInput.nextBlock()).thenReturn(
             OperatorTestUtil.block(leftSchema, new Object[]{1, "Aa"}, new Object[]{2, "BB"}, new Object[]{4, "CC"}))
-        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
-    Mockito.when(_rightOperator.nextBlock()).thenReturn(
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    when(_rightInput.nextBlock()).thenReturn(
             OperatorTestUtil.block(rightSchema, new Object[]{2, "Aa"}, new Object[]{2, "BB"}, new Object[]{3, "BB"}))
-        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
-
-    List<RexExpression> joinClauses = new ArrayList<>();
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
     DataSchema resultSchema = new DataSchema(new String[]{"foo", "bar", "foo", "bar"}, new ColumnDataType[]{
         ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING
     });
-    JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.ANTI,
-        getJoinKeys(Arrays.asList(1), Arrays.asList(1)), joinClauses, Collections.emptyList());
-    HashJoinOperator join =
-        new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
-    TransferableBlock result = join.nextBlock();
-    List<Object[]> resultRows = result.getContainer();
-    List<Object[]> expectedRows = ImmutableList.of(new Object[]{4, "CC", null, null});
-    Assert.assertEquals(resultRows.size(), expectedRows.size());
-    Assert.assertEquals(resultRows.get(0), expectedRows.get(0));
-    result = join.nextBlock();
-    Assert.assertTrue(result.isSuccessfulEndOfStreamBlock());
+    HashJoinOperator operator =
+        getOperator(leftSchema, resultSchema, JoinRelType.ANTI, List.of(1), List.of(1), List.of());
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    assertEquals(resultRows.size(), 1);
+    assertEquals(resultRows.get(0), new Object[]{4, "CC", null, null});
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock());
   }
 
   @Test
@@ -537,26 +427,20 @@ public class HashJoinOperatorTest {
     DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
         ColumnDataType.INT, ColumnDataType.STRING
     });
-    Mockito.when(_leftOperator.nextBlock()).thenReturn(
+    when(_leftInput.nextBlock()).thenReturn(
             OperatorTestUtil.block(rightSchema, new Object[]{1, "BB"}, new Object[]{1, "CC"}, new Object[]{3, "BB"}))
-        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
-    Mockito.when(_rightOperator.nextBlock())
-        .thenReturn(TransferableBlockUtils.getErrorTransferableBlock(new Exception("testInnerJoinRightError")));
-
-    List<RexExpression> joinClauses = new ArrayList<>();
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    when(_rightInput.nextBlock()).thenReturn(
+        TransferableBlockUtils.getErrorTransferableBlock(new Exception("testInnerJoinRightError")));
     DataSchema resultSchema =
         new DataSchema(new String[]{"int_col1", "string_col1", "int_co2", "string_col2"}, new ColumnDataType[]{
             ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING
         });
-    JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.INNER,
-        getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses, Collections.emptyList());
-    HashJoinOperator join =
-        new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
-
-    TransferableBlock result = join.nextBlock();
-    Assert.assertTrue(result.isErrorBlock());
-    Assert.assertTrue(
-        result.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains("testInnerJoinRightError"));
+    HashJoinOperator operator =
+        getOperator(leftSchema, resultSchema, JoinRelType.INNER, List.of(0), List.of(0), List.of());
+    TransferableBlock block = operator.nextBlock();
+    assertTrue(block.isErrorBlock());
+    assertTrue(block.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains("testInnerJoinRightError"));
   }
 
   @Test
@@ -567,25 +451,20 @@ public class HashJoinOperatorTest {
     DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
         ColumnDataType.INT, ColumnDataType.STRING
     });
-    Mockito.when(_rightOperator.nextBlock()).thenReturn(
+    when(_rightInput.nextBlock()).thenReturn(
             OperatorTestUtil.block(rightSchema, new Object[]{1, "BB"}, new Object[]{1, "CC"}, new Object[]{3, "BB"}))
-        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
-    Mockito.when(_leftOperator.nextBlock())
-        .thenReturn(TransferableBlockUtils.getErrorTransferableBlock(new Exception("testInnerJoinLeftError")));
-
-    List<RexExpression> joinClauses = new ArrayList<>();
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    when(_leftInput.nextBlock()).thenReturn(
+        TransferableBlockUtils.getErrorTransferableBlock(new Exception("testInnerJoinLeftError")));
     DataSchema resultSchema =
         new DataSchema(new String[]{"int_col1", "string_col1", "int_co2", "string_col2"}, new ColumnDataType[]{
             ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING
         });
-    JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.INNER,
-        getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses, Collections.emptyList());
-    HashJoinOperator join =
-        new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
-
-    TransferableBlock result = join.nextBlock();
-    Assert.assertTrue(result.isErrorBlock());
-    Assert.assertTrue(result.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains("testInnerJoinLeftError"));
+    HashJoinOperator operator =
+        getOperator(leftSchema, resultSchema, JoinRelType.INNER, List.of(0), List.of(0), List.of());
+    TransferableBlock block = operator.nextBlock();
+    assertTrue(block.isErrorBlock());
+    assertTrue(block.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains("testInnerJoinLeftError"));
   }
 
   @Test
@@ -596,28 +475,24 @@ public class HashJoinOperatorTest {
     DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
         ColumnDataType.INT, ColumnDataType.STRING
     });
-    Mockito.when(_leftOperator.nextBlock())
-        .thenReturn(OperatorTestUtil.block(leftSchema, new Object[]{1, "Aa"}, new Object[]{2, "BB"}))
-        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
-    Mockito.when(_rightOperator.nextBlock()).thenReturn(
+    when(_leftInput.nextBlock()).thenReturn(
+            OperatorTestUtil.block(leftSchema, new Object[]{1, "Aa"}, new Object[]{2, "BB"}))
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    when(_rightInput.nextBlock()).thenReturn(
             OperatorTestUtil.block(rightSchema, new Object[]{2, "Aa"}, new Object[]{2, "BB"}, new Object[]{3, "BB"}))
-        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
-
-    List<RexExpression> joinClauses = new ArrayList<>();
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
     DataSchema resultSchema =
         new DataSchema(new String[]{"int_col1", "string_col1", "int_co2", "string_col2"}, new ColumnDataType[]{
             ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING
         });
-    Map<String, String> hintsMap = ImmutableMap.of(PinotHintOptions.JoinHintOptions.JOIN_OVERFLOW_MODE, "THROW",
-        PinotHintOptions.JoinHintOptions.MAX_ROWS_IN_JOIN, "1");
-    JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.INNER,
-        getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses, getJoinHints(hintsMap));
-    HashJoinOperator join =
-        new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
-
-    TransferableBlock result = join.nextBlock();
-    Assert.assertTrue(result.isErrorBlock());
-    Assert.assertTrue(result.getExceptions().get(QueryException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE)
+    PlanNode.NodeHint nodeHint = new PlanNode.NodeHint(Map.of(PinotHintOptions.JOIN_HINT_OPTIONS,
+        Map.of(PinotHintOptions.JoinHintOptions.JOIN_OVERFLOW_MODE, "THROW",
+            PinotHintOptions.JoinHintOptions.MAX_ROWS_IN_JOIN, "1")));
+    HashJoinOperator operator =
+        getOperator(leftSchema, resultSchema, JoinRelType.INNER, List.of(0), List.of(0), List.of(), nodeHint);
+    TransferableBlock block = operator.nextBlock();
+    assertTrue(block.isErrorBlock());
+    assertTrue(block.getExceptions().get(QueryException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE)
         .contains("reach number of rows limit"));
   }
 
@@ -629,36 +504,41 @@ public class HashJoinOperatorTest {
     DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
         ColumnDataType.INT, ColumnDataType.STRING
     });
-    Mockito.when(_leftOperator.nextBlock())
-        .thenReturn(OperatorTestUtil.block(leftSchema, new Object[]{1, "Aa"}, new Object[]{2, "BB"}))
-        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
-    Mockito.when(_rightOperator.nextBlock()).thenReturn(
+    when(_leftInput.nextBlock()).thenReturn(
+            OperatorTestUtil.block(leftSchema, new Object[]{1, "Aa"}, new Object[]{2, "BB"}))
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    when(_rightInput.nextBlock()).thenReturn(
             OperatorTestUtil.block(rightSchema, new Object[]{2, "Aa"}, new Object[]{2, "BB"}, new Object[]{3, "BB"}))
-        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
-
-    List<RexExpression> joinClauses = new ArrayList<>();
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
     DataSchema resultSchema =
         new DataSchema(new String[]{"int_col1", "string_col1", "int_co2", "string_col2"}, new ColumnDataType[]{
             ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING
         });
-    Map<String, String> hintsMap = ImmutableMap.of(PinotHintOptions.JoinHintOptions.JOIN_OVERFLOW_MODE, "BREAK",
-        PinotHintOptions.JoinHintOptions.MAX_ROWS_IN_JOIN, "1");
-    JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.INNER,
-        getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses, getJoinHints(hintsMap));
+    PlanNode.NodeHint nodeHint = new PlanNode.NodeHint(Map.of(PinotHintOptions.JOIN_HINT_OPTIONS,
+        Map.of(PinotHintOptions.JoinHintOptions.JOIN_OVERFLOW_MODE, "BREAK",
+            PinotHintOptions.JoinHintOptions.MAX_ROWS_IN_JOIN, "1")));
+    HashJoinOperator operator =
+        getOperator(leftSchema, resultSchema, JoinRelType.INNER, List.of(0), List.of(0), List.of(), nodeHint);
+    List<Object[]> resultRows1 = operator.nextBlock().getContainer();
+    Mockito.verify(_rightInput).earlyTerminate();
+    assertEquals(resultRows1.size(), 1);
+    TransferableBlock block2 = operator.nextBlock();
+    assertTrue(block2.isSuccessfulEndOfStreamBlock());
+    StatMap<HashJoinOperator.StatKey> statMap = OperatorTestUtil.getStatMap(HashJoinOperator.StatKey.class, block2);
+    assertTrue(statMap.getBoolean(HashJoinOperator.StatKey.MAX_ROWS_IN_JOIN_REACHED),
+        "Max rows in join should be reached");
+  }
 
-    OpChainExecutionContext context = OperatorTestUtil.getDefaultContext();
-    HashJoinOperator join = new HashJoinOperator(context, _leftOperator, _rightOperator, leftSchema, node);
+  private HashJoinOperator getOperator(DataSchema leftSchema, DataSchema resultSchema, JoinRelType joinType,
+      List<Integer> leftKeys, List<Integer> rightKeys, List<RexExpression> nonEquiConditions,
+      PlanNode.NodeHint nodeHint) {
+    return new HashJoinOperator(OperatorTestUtil.getTracingContext(), _leftInput, leftSchema, _rightInput,
+        new JoinNode(-1, resultSchema, nodeHint, List.of(), joinType, leftKeys, rightKeys, nonEquiConditions));
+  }
 
-    TransferableBlock result = join.nextBlock();
-    Mockito.verify(_rightOperator).earlyTerminate();
-    Assert.assertFalse(result.isErrorBlock());
-    Assert.assertEquals(result.getNumRows(), 1);
-
-    String operatorId =
-        Joiner.on("_").join(HashJoinOperator.class.getSimpleName(), context.getStageId(), context.getServer());
-    OperatorStats operatorStats = context.getStats().getOperatorStats(context, operatorId);
-    Assert.assertEquals(
-        operatorStats.getExecutionStats().get(DataTable.MetadataKey.MAX_ROWS_IN_JOIN_REACHED.getName()), "true");
+  private HashJoinOperator getOperator(DataSchema leftSchema, DataSchema resultSchema, JoinRelType joinType,
+      List<Integer> leftKeys, List<Integer> rightKeys, List<RexExpression> nonEquiConditions) {
+    return getOperator(leftSchema, resultSchema, joinType, leftKeys, rightKeys, nonEquiConditions,
+        PlanNode.NodeHint.EMPTY);
   }
 }
-// TODO: Add more inequi join tests.

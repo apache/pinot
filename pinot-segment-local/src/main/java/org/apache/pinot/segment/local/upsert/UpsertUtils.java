@@ -26,6 +26,7 @@ import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -36,6 +37,16 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 @SuppressWarnings("rawtypes")
 public class UpsertUtils {
   private UpsertUtils() {
+  }
+
+  @Nullable
+  public static MutableRoaringBitmap getQueryableDocIdsSnapshotFromSegment(IndexSegment segment) {
+    ThreadSafeMutableRoaringBitmap queryableDocIds = segment.getQueryableDocIds();
+    if (queryableDocIds != null) {
+      return queryableDocIds.getMutableRoaringBitmap();
+    }
+    ThreadSafeMutableRoaringBitmap validDocIds = segment.getValidDocIds();
+    return validDocIds != null ? validDocIds.getMutableRoaringBitmap() : null;
   }
 
   /**
@@ -73,6 +84,26 @@ public class UpsertUtils {
       @Override
       public RecordInfo next() {
         return recordInfoReader.getRecordInfo(_docIdIterator.next());
+      }
+    };
+  }
+
+  /**
+   * Returns an iterator of {@link PrimaryKey} for the valid documents from the segment.
+   */
+  public static Iterator<PrimaryKey> getPrimaryKeyIterator(PrimaryKeyReader primaryKeyReader,
+      MutableRoaringBitmap validDocIds) {
+    return new Iterator<>() {
+      private final PeekableIntIterator _docIdIterator = validDocIds.getIntIterator();
+
+      @Override
+      public boolean hasNext() {
+        return _docIdIterator.hasNext();
+      }
+
+      @Override
+      public PrimaryKey next() {
+        return primaryKeyReader.getPrimaryKey(_docIdIterator.next());
       }
     };
   }

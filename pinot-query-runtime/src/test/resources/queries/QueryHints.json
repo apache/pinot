@@ -275,7 +275,7 @@
       },
       {
         "description": "semi-join with dynamic_broadcast join strategy then group-by on same key",
-        "sql": "SELECT /*+ aggOptionsInternal(agg_type='DIRECT') */ {tbl1}.num, SUM({tbl1}.val) FROM {tbl1} WHERE {tbl1}.name IN (SELECT id FROM {tbl2} WHERE {tbl2}.data > 0) GROUP BY {tbl1}.num"
+        "sql": "SELECT /*+ aggOptions(is_partitioned_by_group_by_keys='true') */ {tbl1}.num, SUM({tbl1}.val) FROM {tbl1} WHERE {tbl1}.name IN (SELECT id FROM {tbl2} WHERE {tbl2}.data > 0) GROUP BY {tbl1}.num"
       },
       {
         "description": "semi-join with dynamic_broadcast join strategy then group-by on different key",
@@ -290,11 +290,7 @@
         "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ {tbl1}.num, COUNT(*), SUM({tbl1}.val), SUM({tbl1}.num) FROM {tbl1} WHERE {tbl1}.val >= 0 AND {tbl1}.name != 'a' GROUP BY {tbl1}.num HAVING COUNT(*) > 10 AND MAX({tbl1}.val) >= 0 AND MIN({tbl1}.val) < 20 AND SUM({tbl1}.val) <= 10 AND AVG({tbl1}.val) = 5"
       },
       {
-        "description": "aggregate with skip intermediate stage hint (via hinting the leaf stage group by as final stage_",
-        "sql": "SELECT /*+ aggOptionsInternal(agg_type='DIRECT') */ {tbl1}.num, COUNT(*), SUM({tbl1}.val), SUM({tbl1}.num) FROM {tbl1} WHERE {tbl1}.val >= 0 AND {tbl1}.name != 'a' GROUP BY {tbl1}.num HAVING COUNT(*) > 10"
-      },
-      {
-        "description": "aggregate with skip leaf stage hint (via hint option is_partitioned_by_group_by_keys",
+        "description": "aggregate with skip intermediate stage hint (via hint option is_partitioned_by_group_by_keys)",
         "sql": "SELECT /*+ aggOptions(is_partitioned_by_group_by_keys='true') */ {tbl1}.num, COUNT(*), SUM({tbl1}.val), SUM({tbl1}.num) FROM {tbl1} WHERE {tbl1}.val >= 0 AND {tbl1}.name != 'a' GROUP BY {tbl1}.num"
       },
       {

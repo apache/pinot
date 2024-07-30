@@ -310,4 +310,9 @@ public class MaxAggregationFunction extends BaseSingleInputAggregationFunction<D
   public Double extractFinalResult(Double intermediateResult) {
     return intermediateResult;
   }
+
+  @Override
+  public Double mergeFinalResult(Double finalResult1, Double finalResult2) {
+    return merge(finalResult1, finalResult2);
+  }
 }

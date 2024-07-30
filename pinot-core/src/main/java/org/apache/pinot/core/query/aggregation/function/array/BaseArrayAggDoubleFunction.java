@@ -93,6 +93,9 @@ public abstract class BaseArrayAggDoubleFunction<I extends AbstractDoubleCollect
 
   @Override
   public DoubleArrayList extractFinalResult(I doubleArrayList) {
+    if (doubleArrayList == null) {
+      return new DoubleArrayList();
+    }
     return new DoubleArrayList(doubleArrayList);
   }
 }

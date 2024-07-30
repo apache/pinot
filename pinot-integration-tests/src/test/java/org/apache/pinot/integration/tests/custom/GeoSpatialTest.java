@@ -404,6 +404,39 @@ public class GeoSpatialTest extends CustomDataQueryClusterIntegrationTest {
     }
   }
 
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testStContainsQuery(boolean useMultiStageQueryEngine) throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    // contains is the converse of within
+    String query =
+        String.format("Select ST_Contains(ST_GeomFromText(%s), ST_GeomFromText(%s)), %s from %s",
+            WKT_2_NAME, WKT_1_NAME, ST_WITHIN_RESULT_NAME, getTableName());
+    JsonNode pinotResponse = postQuery(query);
+    JsonNode rows = pinotResponse.get("resultTable").get("rows");
+    for (int i = 0; i < rows.size(); i++) {
+      JsonNode row = rows.get(i);
+      boolean actualResult = row.get(0).intValue() == 1;
+      boolean expectedResult = row.get(1).booleanValue();
+      Assert.assertEquals(actualResult, expectedResult);
+    }
+  }
+
+  @Test(dataProvider = "useV2QueryEngine")
+  public void testStContainsQueryWithV2(boolean useMultiStageQueryEngine) throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+
+    String query = String.format("Select ST_Contains(ST_GeomFromText('MULTIPOINT (20 20, 25 25)'), "
+        + "ST_GeomFromText('POINT (25 25)')) from %s a CROSS JOIN %s b LIMIT 5", getTableName(), getTableName());
+
+    JsonNode pinotResponse = postQuery(query);
+    JsonNode rows = pinotResponse.get("resultTable").get("rows");
+    for (int i = 0; i < rows.size(); i++) {
+      JsonNode row = rows.get(i);
+      boolean actualResult = row.get(0).intValue() == 1;
+      Assert.assertTrue(actualResult);
+    }
+  }
+
   @Test(dataProvider = "useV2QueryEngine")
   public void testStWithinLiteral(boolean useMultiStageQueryEngine)
       throws Exception {

@@ -35,7 +35,6 @@ import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalSortExchange;
 import org.apache.pinot.query.type.TypeFactory;
-import org.apache.pinot.query.type.TypeSystem;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.Mockito;
@@ -47,8 +46,7 @@ import org.testng.annotations.Test;
 
 
 public class PinotSortExchangeCopyRuleTest {
-
-  public static final TypeFactory TYPE_FACTORY = new TypeFactory(new TypeSystem());
+  private static final TypeFactory TYPE_FACTORY = new TypeFactory();
   private static final RexBuilder REX_BUILDER = new RexBuilder(TYPE_FACTORY);
 
   private AutoCloseable _mocks;

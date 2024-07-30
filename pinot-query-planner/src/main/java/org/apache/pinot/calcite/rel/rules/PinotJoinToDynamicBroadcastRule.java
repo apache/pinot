@@ -24,6 +24,7 @@ import java.util.List;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.hep.HepRelVertex;
+import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Exchange;
@@ -31,11 +32,11 @@ import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.core.JoinInfo;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.logical.LogicalJoin;
-import org.apache.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.calcite.tools.RelBuilderFactory;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.calcite.rel.hint.PinotHintStrategyTable;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalExchange;
+import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.zookeeper.common.StringUtils;
 
 
@@ -164,11 +165,15 @@ public class PinotJoinToDynamicBroadcastRule extends RelOptRule {
     //    2. when hash key are the same but hash functions are different, it can be done via normal hash shuffle.
     boolean isColocatedJoin = PinotHintStrategyTable.isHintOptionTrue(join.getHints(),
         PinotHintOptions.JOIN_HINT_OPTIONS, PinotHintOptions.JoinHintOptions.IS_COLOCATED_BY_JOIN_KEYS);
-    PinotLogicalExchange dynamicBroadcastExchange = isColocatedJoin
-        ? PinotLogicalExchange.create(right.getInput(), RelDistributions.hash(join.analyzeCondition().rightKeys),
-        PinotRelExchangeType.PIPELINE_BREAKER)
-        : PinotLogicalExchange.create(right.getInput(), RelDistributions.BROADCAST_DISTRIBUTED,
-            PinotRelExchangeType.PIPELINE_BREAKER);
+    PinotLogicalExchange dynamicBroadcastExchange;
+    RelNode rightInput = right.getInput();
+    if (isColocatedJoin) {
+      RelDistribution dist = RelDistributions.hash(join.analyzeCondition().rightKeys);
+      dynamicBroadcastExchange = PinotLogicalExchange.create(rightInput, dist, PinotRelExchangeType.PIPELINE_BREAKER);
+    } else {
+      RelDistribution dist = RelDistributions.BROADCAST_DISTRIBUTED;
+      dynamicBroadcastExchange = PinotLogicalExchange.create(rightInput, dist, PinotRelExchangeType.PIPELINE_BREAKER);
+    }
     Join dynamicFilterJoin =
         new LogicalJoin(join.getCluster(), join.getTraitSet(), left.getInput(), dynamicBroadcastExchange,
             join.getCondition(), join.getVariablesSet(), join.getJoinType(), join.isSemiJoinDone(),

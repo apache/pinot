@@ -253,7 +253,7 @@ public class TimeSegmentPruner implements SegmentPruner {
         return null;
       case RANGE:
         if (isTimeColumn(operands.get(0))) {
-          return parseInterval(operands.get(1).getLiteral().getFieldValue().toString());
+          return parseInterval(operands.get(1).getLiteral().getStringValue());
         }
         return null;
       default:
@@ -375,7 +375,22 @@ public class TimeSegmentPruner implements SegmentPruner {
   private long toMillisSinceEpoch(Expression expression) {
     Literal literal = expression.getLiteral();
     Preconditions.checkArgument(literal != null, "Literal is required for time column filter, got: %s", expression);
-    return _timeFormatSpec.fromFormatToMillis(literal.getFieldValue().toString());
+    String value;
+    Literal._Fields type = literal.getSetField();
+    switch (type) {
+      case INT_VALUE:
+        value = Integer.toString(literal.getIntValue());
+        break;
+      case LONG_VALUE:
+        value = Long.toString(literal.getLongValue());
+        break;
+      case STRING_VALUE:
+        value = literal.getStringValue();
+        break;
+      default:
+        throw new IllegalStateException("Unsupported literal type: " + type + " as time column filter");
+    }
+    return _timeFormatSpec.fromFormatToMillis(value);
   }
 
   /**

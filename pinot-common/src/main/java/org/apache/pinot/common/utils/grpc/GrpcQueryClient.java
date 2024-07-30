@@ -25,6 +25,7 @@ import io.grpc.netty.shaded.io.grpc.netty.NettyChannelBuilder;
 import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext;
 import io.grpc.netty.shaded.io.netty.handler.ssl.SslContextBuilder;
 import io.grpc.netty.shaded.io.netty.handler.ssl.SslProvider;
+import java.io.Closeable;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.Map;
@@ -42,9 +43,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class GrpcQueryClient {
+public class GrpcQueryClient implements Closeable {
   private static final Logger LOGGER = LoggerFactory.getLogger(GrpcQueryClient.class);
-  private static final int DEFAULT_CHANNEL_SHUTDOWN_TIMEOUT_SECOND = 10;
+
   // the key is the hashCode of the TlsConfig, the value is the SslContext
   // We don't use TlsConfig as the map key because the TlsConfig is mutable, which means the hashCode can change. If the
   // hashCode changes and the map is resized, the SslContext of the old hashCode will be lost.
@@ -52,31 +53,43 @@ public class GrpcQueryClient {
 
   private final ManagedChannel _managedChannel;
   private final PinotQueryServerGrpc.PinotQueryServerBlockingStub _blockingStub;
+  private final int _channelShutdownTimeoutSeconds;
 
   public GrpcQueryClient(String host, int port) {
     this(host, port, new GrpcConfig(Collections.emptyMap()));
   }
 
   public GrpcQueryClient(String host, int port, GrpcConfig config) {
+    ManagedChannelBuilder<?> channelBuilder;
     if (config.isUsePlainText()) {
-      _managedChannel =
+      channelBuilder =
           ManagedChannelBuilder.forAddress(host, port).maxInboundMessageSize(config.getMaxInboundMessageSizeBytes())
-              .usePlaintext().build();
+              .usePlaintext();
     } else {
-      _managedChannel =
+      channelBuilder =
           NettyChannelBuilder.forAddress(host, port).maxInboundMessageSize(config.getMaxInboundMessageSizeBytes())
-              .sslContext(buildSslContext(config.getTlsConfig())).build();
+              .sslContext(buildSslContext(config.getTlsConfig()));
     }
+
+    // Set keep alive configs, if enabled
+    int channelKeepAliveTimeSeconds = config.getChannelKeepAliveTimeSeconds();
+    if (channelKeepAliveTimeSeconds > 0) {
+      channelBuilder.keepAliveTime(channelKeepAliveTimeSeconds, TimeUnit.SECONDS)
+          .keepAliveTimeout(config.getChannelKeepAliveTimeoutSeconds(), TimeUnit.SECONDS)
+          .keepAliveWithoutCalls(config.isChannelKeepAliveWithoutCalls());
+    }
+
+    _managedChannel = channelBuilder.build();
     _blockingStub = PinotQueryServerGrpc.newBlockingStub(_managedChannel);
+    _channelShutdownTimeoutSeconds = config.getChannelShutdownTimeoutSecond();
   }
 
   private SslContext buildSslContext(TlsConfig tlsConfig) {
     LOGGER.info("Building gRPC SSL context");
     SslContext sslContext = CLIENT_SSL_CONTEXTS_CACHE.computeIfAbsent(tlsConfig.hashCode(), tlsConfigHashCode -> {
       try {
-        SSLFactory sslFactory =
-            RenewableTlsUtils.createSSLFactoryAndEnableAutoRenewalWhenUsingFileStores(
-                tlsConfig, PinotInsecureMode::isPinotInInsecureMode);
+        SSLFactory sslFactory = RenewableTlsUtils.createSSLFactoryAndEnableAutoRenewalWhenUsingFileStores(tlsConfig,
+            PinotInsecureMode::isPinotInInsecureMode);
         SslContextBuilder sslContextBuilder = SslContextBuilder.forClient();
         sslFactory.getKeyManagerFactory().ifPresent(sslContextBuilder::keyManager);
         sslFactory.getTrustManagerFactory().ifPresent(sslContextBuilder::trustManager);
@@ -98,11 +111,12 @@ public class GrpcQueryClient {
     return _blockingStub.submit(request);
   }
 
+  @Override
   public void close() {
     if (!_managedChannel.isShutdown()) {
       try {
         _managedChannel.shutdownNow();
-        if (!_managedChannel.awaitTermination(DEFAULT_CHANNEL_SHUTDOWN_TIMEOUT_SECOND, TimeUnit.SECONDS)) {
+        if (!_managedChannel.awaitTermination(_channelShutdownTimeoutSeconds, TimeUnit.SECONDS)) {
           LOGGER.warn("Timed out forcefully shutting down connection: {}. ", _managedChannel);
         }
       } catch (Exception e) {

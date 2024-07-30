@@ -36,7 +36,11 @@ public interface InstanceSelector {
   long NEW_SEGMENT_EXPIRATION_MILLIS = TimeUnit.MINUTES.toMillis(5);
 
   static boolean isNewSegment(long creationTimeMs, long currentTimeMs) {
-    return creationTimeMs > 0 && currentTimeMs - creationTimeMs <= NEW_SEGMENT_EXPIRATION_MILLIS;
+    return isNewSegment(creationTimeMs, currentTimeMs, NEW_SEGMENT_EXPIRATION_MILLIS);
+  }
+
+  static boolean isNewSegment(long creationTimeMs, long currentTimeMs, long newSegmentExpirationMillis) {
+    return creationTimeMs > 0 && currentTimeMs - creationTimeMs <= newSegmentExpirationMillis;
   }
 
   /**

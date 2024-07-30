@@ -20,7 +20,6 @@ package org.apache.pinot.common.function.scalar;
 
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
-
 public class TrigonometricFunctions {
   private TrigonometricFunctions() {
   }

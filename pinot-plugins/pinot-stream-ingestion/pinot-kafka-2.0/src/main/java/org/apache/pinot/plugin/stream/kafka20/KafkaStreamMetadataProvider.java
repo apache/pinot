@@ -28,7 +28,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.kafka.clients.consumer.OffsetAndTimestamp;
 import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.errors.TimeoutException;
@@ -108,9 +108,9 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
         if (offsetAndTimestamp == null) {
           offset = _consumer.endOffsets(Collections.singletonList(_topicPartition), Duration.ofMillis(timeoutMillis))
               .get(_topicPartition);
-          LOGGER.warn("initial offset type is period and its value evaluates "
-              + "to null hence proceeding with offset " + offset + "for topic " + _topicPartition.topic()
-              + " partition " + _topicPartition.partition());
+          LOGGER.warn(
+              "initial offset type is period and its value evaluates to null hence proceeding with offset {} for "
+                  + "topic {} partition {}", offset, _topicPartition.topic(), _topicPartition.partition());
         } else {
           offset = offsetAndTimestamp.offset();
         }
@@ -120,9 +120,9 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
         if (offsetAndTimestamp == null) {
           offset = _consumer.endOffsets(Collections.singletonList(_topicPartition), Duration.ofMillis(timeoutMillis))
               .get(_topicPartition);
-          LOGGER.warn("initial offset type is timestamp and its value evaluates "
-              + "to null hence proceeding with offset " + offset + "for topic " + _topicPartition.topic()
-              + " partition " + _topicPartition.partition());
+          LOGGER.warn(
+              "initial offset type is timestamp and its value evaluates to null hence proceeding with offset {} for "
+                  + "topic {} partition {}", offset, _topicPartition.topic(), _topicPartition.partition());
         } else {
           offset = offsetAndTimestamp.offset();
         }

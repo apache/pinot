@@ -25,6 +25,8 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
+import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,6 +57,12 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
   protected abstract boolean isError(E element);
 
   protected abstract boolean isEos(E element);
+
+  /**
+   * This method is called whenever one of the consumer sends a EOS. It is guaranteed that the received element is
+   * an EOS as defined by {@link #isEos(Object)}
+   */
+  protected abstract void onConsumerFinish(E element);
 
   protected abstract E onTimeout();
 
@@ -175,6 +183,7 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
         LOGGER.debug("==[RECEIVE]== EOS received : " + _id + " in mailbox: " + removed.getId()
             + " (" + _mailboxes.size() + " mailboxes alive)");
       }
+      onConsumerFinish(block);
 
       block = readBlockOrNull();
     }
@@ -225,9 +234,13 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
   }
 
   public static class OfTransferableBlock extends BlockingMultiStreamConsumer<TransferableBlock> {
-    public OfTransferableBlock(Object id, long deadlineMs,
+
+    private final MultiStageQueryStats _stats;
+
+    public OfTransferableBlock(OpChainExecutionContext context,
         List<? extends AsyncStream<TransferableBlock>> asyncProducers) {
-      super(id, deadlineMs, asyncProducers);
+      super(context.getId(), context.getDeadlineMs(), asyncProducers);
+      _stats = MultiStageQueryStats.emptyStats(context.getStageId());
     }
 
     @Override
@@ -238,6 +251,15 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
     @Override
     protected boolean isEos(TransferableBlock element) {
       return element.isSuccessfulEndOfStreamBlock();
+    }
+
+    @Override
+    protected void onConsumerFinish(TransferableBlock element) {
+      if (element.getQueryStats() != null) {
+        _stats.mergeUpstream(element.getQueryStats());
+      } else {
+        _stats.mergeUpstream(element.getSerializedStatsByStage());
+      }
     }
 
     @Override
@@ -252,7 +274,7 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
 
     @Override
     protected TransferableBlock onEos() {
-      return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+      return TransferableBlockUtils.getEndOfStreamTransferableBlock(_stats);
     }
   }
 }

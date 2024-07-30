@@ -135,9 +135,9 @@ public class ServerRoutingStatsManager {
   }
 
   /**
-   * Called when a query is submitted to a server. Updates stats corresponding to query submission.
+   * Called just before submitting a query to a server. Updates stats corresponding to query submission.
    */
-  public void recordStatsAfterQuerySubmission(long requestId, String serverInstanceId) {
+  public void recordStatsForQuerySubmission(long requestId, String serverInstanceId) {
     if (!_isEnabled) {
       return;
     }

@@ -27,6 +27,7 @@ import io.swagger.annotations.ApiResponses;
 import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -57,7 +58,11 @@ import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
+import org.apache.pinot.spi.accounting.QueryResourceTracker;
+import org.apache.pinot.spi.accounting.ThreadResourceTracker;
+import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 
@@ -69,7 +74,8 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
     @Authorization(value = DATABASE)})
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = {
     @ApiKeyAuthDefinition(name = HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER,
-        key = SWAGGER_AUTHORIZATION_KEY),
+        key = SWAGGER_AUTHORIZATION_KEY,
+        description = "The format of the key is  ```\"Basic <token>\" or \"Bearer <token>\"```"),
     @ApiKeyAuthDefinition(name = DATABASE, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = DATABASE,
         description = "Database context passed through http header. If no context is provided 'default' database "
             + "context will be considered.")}))
@@ -267,5 +273,26 @@ public class PinotBrokerDebug {
 
   private long getRequestId() {
     return _requestIdGenerator.getAndIncrement();
+  }
+
+  @GET
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/debug/threads/resourceUsage")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.DEBUG_RESOURCE_USAGE)
+  @ApiOperation(value = "Get resource usage of threads")
+  public Collection<? extends ThreadResourceTracker> getThreadResourceUsage() {
+    ThreadResourceUsageAccountant threadAccountant = Tracing.getThreadAccountant();
+    return threadAccountant.getThreadResources();
+  }
+
+  @GET
+  @Path("debug/queries/resourceUsage")
+  @Produces(MediaType.APPLICATION_JSON)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.DEBUG_RESOURCE_USAGE)
+  @ApiOperation(value = "Get current resource usage of queries in this service", notes = "This is a debug endpoint, "
+      + "and won't maintain backward compatibility")
+  public Collection<? extends QueryResourceTracker> getQueryUsage() {
+    ThreadResourceUsageAccountant threadAccountant = Tracing.getThreadAccountant();
+    return threadAccountant.getQueryResources().values();
   }
 }

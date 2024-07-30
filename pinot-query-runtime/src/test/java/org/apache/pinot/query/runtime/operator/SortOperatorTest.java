@@ -18,45 +18,43 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
-import com.google.common.collect.ImmutableList;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
+import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelFieldCollation.Direction;
 import org.apache.calcite.rel.RelFieldCollation.NullDirection;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.blocks.TransferableBlockTestUtils;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.mockito.Mock;
-import org.mockito.Mockito;
-import org.mockito.MockitoAnnotations;
-import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.INT;
 import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.STRING;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+import static org.mockito.MockitoAnnotations.openMocks;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 public class SortOperatorTest {
-
   private AutoCloseable _mocks;
-
   @Mock
   private MultiStageOperator _input;
-
   @Mock
   private VirtualServerAddress _serverAddress;
 
   @BeforeMethod
   public void setUp() {
-    _mocks = MockitoAnnotations.openMocks(this);
-    Mockito.when(_serverAddress.toString()).thenReturn(new VirtualServerAddress("mock", 80, 0).toString());
+    _mocks = openMocks(this);
+    when(_serverAddress.toString()).thenReturn(new VirtualServerAddress("mock", 80, 0).toString());
   }
 
   @AfterMethod
@@ -68,588 +66,422 @@ public class SortOperatorTest {
   @Test
   public void shouldHandleUpstreamErrorBlock() {
     // Given:
-    List<RexExpression> collation = collation(0);
-    List<Direction> directions = ImmutableList.of(Direction.ASCENDING);
-    List<NullDirection> nullDirections = ImmutableList.of(NullDirection.LAST);
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
-    SortOperator op =
-        new SortOperator(OperatorTestUtil.getDefaultContext(), _input, collation, directions, nullDirections, 10, 0,
-            schema, false);
-
-    Mockito.when(_input.nextBlock())
-        .thenReturn(TransferableBlockUtils.getErrorTransferableBlock(new Exception("foo!")));
+    when(_input.nextBlock()).thenReturn(TransferableBlockUtils.getErrorTransferableBlock(new Exception("foo!")));
+    List<RelFieldCollation> collations = List.of(new RelFieldCollation(0, Direction.ASCENDING, NullDirection.LAST));
+    SortOperator operator = getOperator(schema, collations);
 
     // When:
-    TransferableBlock block = op.nextBlock();
+    TransferableBlock block = operator.nextBlock();
 
     // Then:
-    Assert.assertTrue(block.isErrorBlock(), "expected error block to propagate");
+    assertTrue(block.isErrorBlock(), "expected error block to propagate");
   }
 
   @Test
   public void shouldCreateEmptyBlockOnUpstreamEOS() {
     // Given:
-    List<RexExpression> collation = collation(0);
-    List<Direction> directions = ImmutableList.of(Direction.ASCENDING);
-    List<NullDirection> nullDirections = ImmutableList.of(NullDirection.LAST);
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
-    SortOperator op =
-        new SortOperator(OperatorTestUtil.getDefaultContext(), _input, collation, directions, nullDirections, 10, 0,
-            schema, false);
-
-    Mockito.when(_input.nextBlock()).thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
+    when(_input.nextBlock()).thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    List<RelFieldCollation> collations = List.of(new RelFieldCollation(0, Direction.ASCENDING, NullDirection.LAST));
+    SortOperator operator = getOperator(schema, collations);
 
     // When:
-    TransferableBlock block = op.nextBlock();
+    TransferableBlock block = operator.nextBlock();
 
     // Then:
-    Assert.assertTrue(block.isEndOfStreamBlock(), "expected EOS block to propagate");
+    assertTrue(block.isSuccessfulEndOfStreamBlock(), "expected EOS block to propagate");
   }
 
   @Test
   public void shouldConsumeAndSortInputOneBlockWithTwoRows() {
     // Given:
-    List<RexExpression> collation = collation(0);
-    List<Direction> directions = ImmutableList.of(Direction.ASCENDING);
-    List<NullDirection> nullDirections = ImmutableList.of(NullDirection.LAST);
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
-    SortOperator op =
-        new SortOperator(OperatorTestUtil.getDefaultContext(), _input, collation, directions, nullDirections, 10, 0,
-            schema, false);
-
-    Mockito.when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}, new Object[]{1}))
-        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
+    when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}, new Object[]{1}))
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    List<RelFieldCollation> collations = List.of(new RelFieldCollation(0, Direction.ASCENDING, NullDirection.LAST));
+    SortOperator operator = getOperator(schema, collations);
 
     // When:
-    TransferableBlock block = op.nextBlock(); // construct
-    TransferableBlock block2 = op.nextBlock(); // eos
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
 
     // Then:
-    Assert.assertEquals(block.getNumRows(), 2);
-    Assert.assertEquals(block.getContainer().get(0), new Object[]{1});
-    Assert.assertEquals(block.getContainer().get(1), new Object[]{2});
-    Assert.assertTrue(block2.isEndOfStreamBlock(), "expected EOS block to propagate");
+    assertEquals(resultRows.size(), 2);
+    assertEquals(resultRows.get(0), new Object[]{1});
+    assertEquals(resultRows.get(1), new Object[]{2});
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "expected EOS block to propagate");
   }
 
   @Test
   public void shouldConsumeAndSkipSortInputOneBlockWithTwoRowsInputSorted() {
     // Given:
-    List<RexExpression> collation = collation(0);
-    List<Direction> directions = ImmutableList.of(Direction.ASCENDING);
-    List<NullDirection> nullDirections = ImmutableList.of(NullDirection.LAST);
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
-    SortOperator op =
-        new SortOperator(OperatorTestUtil.getDefaultContext(), _input, collation, directions, nullDirections, 10, 0,
-            schema, true);
-
+    _input = mock(SortedMailboxReceiveOperator.class);
     // Purposefully setting input as unsorted order for validation but 'isInputSorted' should only be true if actually
     // sorted
-    Mockito.when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}, new Object[]{1}))
-        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
+    when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}, new Object[]{1}))
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    List<RelFieldCollation> collations = List.of(new RelFieldCollation(0, Direction.ASCENDING, NullDirection.LAST));
+    SortOperator operator = getOperator(schema, collations);
 
     // When:
-    TransferableBlock block = op.nextBlock(); // construct
-    TransferableBlock block2 = op.nextBlock(); // eos
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
 
     // Then:
-    Assert.assertEquals(block.getNumRows(), 2);
-    Assert.assertEquals(block.getContainer().get(0), new Object[]{2});
-    Assert.assertEquals(block.getContainer().get(1), new Object[]{1});
-    Assert.assertTrue(block2.isEndOfStreamBlock(), "expected EOS block to propagate");
+    assertEquals(resultRows.size(), 2);
+    assertEquals(resultRows.get(0), new Object[]{2});
+    assertEquals(resultRows.get(1), new Object[]{1});
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "expected EOS block to propagate");
   }
 
   @Test
   public void shouldConsumeAndSortOnNonZeroIdxCollation() {
     // Given:
-    List<RexExpression> collation = collation(1);
-    List<Direction> directions = ImmutableList.of(Direction.ASCENDING);
-    List<NullDirection> nullDirections = ImmutableList.of(NullDirection.LAST);
     DataSchema schema = new DataSchema(new String[]{"ignored", "sort"}, new DataSchema.ColumnDataType[]{INT, INT});
-    SortOperator op =
-        new SortOperator(OperatorTestUtil.getDefaultContext(), _input, collation, directions, nullDirections, 10, 0,
-            schema, false);
-
-    Mockito.when(_input.nextBlock()).thenReturn(block(schema, new Object[]{1, 2}, new Object[]{2, 1}))
-        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
+    when(_input.nextBlock()).thenReturn(block(schema, new Object[]{1, 2}, new Object[]{2, 1}))
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    List<RelFieldCollation> collations = List.of(new RelFieldCollation(1, Direction.ASCENDING, NullDirection.LAST));
+    SortOperator operator = getOperator(schema, collations);
 
     // When:
-    TransferableBlock block = op.nextBlock(); // construct
-    TransferableBlock block2 = op.nextBlock(); // eos
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
 
     // Then:
-    Assert.assertEquals(block.getNumRows(), 2);
-    Assert.assertEquals(block.getContainer().get(0), new Object[]{2, 1});
-    Assert.assertEquals(block.getContainer().get(1), new Object[]{1, 2});
-    Assert.assertTrue(block2.isEndOfStreamBlock(), "expected EOS block to propagate");
+    assertEquals(resultRows.size(), 2);
+    assertEquals(resultRows.get(0), new Object[]{2, 1});
+    assertEquals(resultRows.get(1), new Object[]{1, 2});
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "expected EOS block to propagate");
   }
 
   @Test
   public void shouldConsumeAndSortInputOneBlockWithTwoRowsNonNumeric() {
     // Given:
-    List<RexExpression> collation = collation(0);
-    List<Direction> directions = ImmutableList.of(Direction.ASCENDING);
-    List<NullDirection> nullDirections = ImmutableList.of(NullDirection.LAST);
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{STRING});
-    SortOperator op =
-        new SortOperator(OperatorTestUtil.getDefaultContext(), _input, collation, directions, nullDirections, 10, 0,
-            schema, false);
-
-    Mockito.when(_input.nextBlock()).thenReturn(block(schema, new Object[]{"b"}, new Object[]{"a"}))
-        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
+    when(_input.nextBlock()).thenReturn(block(schema, new Object[]{"b"}, new Object[]{"a"}))
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    List<RelFieldCollation> collations = List.of(new RelFieldCollation(0, Direction.ASCENDING, NullDirection.LAST));
+    SortOperator operator = getOperator(schema, collations);
 
     // When:
-    TransferableBlock block = op.nextBlock(); // construct
-    TransferableBlock block2 = op.nextBlock(); // eos
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
 
     // Then:
-    Assert.assertEquals(block.getNumRows(), 2);
-    Assert.assertEquals(block.getContainer().get(0), new Object[]{"a"});
-    Assert.assertEquals(block.getContainer().get(1), new Object[]{"b"});
-    Assert.assertTrue(block2.isEndOfStreamBlock(), "expected EOS block to propagate");
+    assertEquals(resultRows.size(), 2);
+    assertEquals(resultRows.get(0), new Object[]{"a"});
+    assertEquals(resultRows.get(1), new Object[]{"b"});
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "expected EOS block to propagate");
   }
 
   @Test
   public void shouldConsumeAndSortDescending() {
     // Given:
-    List<RexExpression> collation = collation(0);
-    List<Direction> directions = ImmutableList.of(Direction.DESCENDING);
-    List<NullDirection> nullDirections = ImmutableList.of(NullDirection.LAST);
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
-    SortOperator op =
-        new SortOperator(OperatorTestUtil.getDefaultContext(), _input, collation, directions, nullDirections, 10, 0,
-            schema, false);
-
-    Mockito.when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}, new Object[]{1}))
-        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
+    when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}, new Object[]{1}))
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    List<RelFieldCollation> collations = List.of(new RelFieldCollation(0, Direction.DESCENDING, NullDirection.LAST));
+    SortOperator operator = getOperator(schema, collations);
 
     // When:
-    TransferableBlock block = op.nextBlock(); // construct
-    TransferableBlock block2 = op.nextBlock(); // eos
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
 
     // Then:
-    Assert.assertEquals(block.getNumRows(), 2);
-    Assert.assertEquals(block.getContainer().get(0), new Object[]{2});
-    Assert.assertEquals(block.getContainer().get(1), new Object[]{1});
-    Assert.assertTrue(block2.isEndOfStreamBlock(), "expected EOS block to propagate");
+    assertEquals(resultRows.size(), 2);
+    assertEquals(resultRows.get(0), new Object[]{2});
+    assertEquals(resultRows.get(1), new Object[]{1});
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "expected EOS block to propagate");
   }
 
   @Test
   public void shouldOffsetSortInputOneBlockWithThreeRows() {
     // Given:
-    List<RexExpression> collation = collation(0);
-    List<Direction> directions = ImmutableList.of(Direction.ASCENDING);
-    List<NullDirection> nullDirections = ImmutableList.of(NullDirection.LAST);
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
-    SortOperator op =
-        new SortOperator(OperatorTestUtil.getDefaultContext(), _input, collation, directions, nullDirections, 10, 1,
-            schema, false);
-
-    Mockito.when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}, new Object[]{1}, new Object[]{3}))
-        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
+    when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}, new Object[]{1}, new Object[]{3}))
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    List<RelFieldCollation> collations = List.of(new RelFieldCollation(0, Direction.ASCENDING, NullDirection.LAST));
+    SortOperator operator = getOperator(schema, collations, 10, 1);
 
     // When:
-    TransferableBlock block = op.nextBlock(); // construct
-    TransferableBlock block2 = op.nextBlock(); // eos
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
 
     // Then:
-    Assert.assertEquals(block.getNumRows(), 2);
-    Assert.assertEquals(block.getContainer().get(0), new Object[]{2});
-    Assert.assertEquals(block.getContainer().get(1), new Object[]{3});
-    Assert.assertTrue(block2.isEndOfStreamBlock(), "expected EOS block to propagate");
+    assertEquals(resultRows.size(), 2);
+    assertEquals(resultRows.get(0), new Object[]{2});
+    assertEquals(resultRows.get(1), new Object[]{3});
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "expected EOS block to propagate");
   }
 
   @Test
   public void shouldOffsetSortInputOneBlockWithThreeRowsInputSorted() {
     // Given:
-    List<RexExpression> collation = collation(0);
-    List<Direction> directions = ImmutableList.of(Direction.ASCENDING);
-    List<NullDirection> nullDirections = ImmutableList.of(NullDirection.LAST);
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
-    SortOperator op =
-        new SortOperator(OperatorTestUtil.getDefaultContext(), _input, collation, directions, nullDirections, 10, 1,
-            schema, true);
-
+    _input = mock(SortedMailboxReceiveOperator.class);
     // Set input rows as sorted since input is expected to be sorted
-    Mockito.when(_input.nextBlock()).thenReturn(block(schema, new Object[]{1}, new Object[]{2}, new Object[]{3}))
-        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
+    when(_input.nextBlock()).thenReturn(block(schema, new Object[]{1}, new Object[]{2}, new Object[]{3}))
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    List<RelFieldCollation> collations = List.of(new RelFieldCollation(0, Direction.ASCENDING, NullDirection.LAST));
+    SortOperator operator = getOperator(schema, collations, 10, 1);
 
     // When:
-    TransferableBlock block = op.nextBlock(); // construct
-    TransferableBlock block2 = op.nextBlock(); // eos
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
 
     // Then:
-    Assert.assertEquals(block.getNumRows(), 2);
-    Assert.assertEquals(block.getContainer().get(0), new Object[]{2});
-    Assert.assertEquals(block.getContainer().get(1), new Object[]{3});
-    Assert.assertTrue(block2.isEndOfStreamBlock(), "expected EOS block to propagate");
+    assertEquals(resultRows.size(), 2);
+    assertEquals(resultRows.get(0), new Object[]{2});
+    assertEquals(resultRows.get(1), new Object[]{3});
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "expected EOS block to propagate");
   }
 
   @Test
   public void shouldOffsetLimitSortInputOneBlockWithThreeRows() {
     // Given:
-    List<RexExpression> collation = collation(0);
-    List<Direction> directions = ImmutableList.of(Direction.ASCENDING);
-    List<NullDirection> nullDirections = ImmutableList.of(NullDirection.LAST);
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
-    SortOperator op =
-        new SortOperator(OperatorTestUtil.getDefaultContext(), _input, collation, directions, nullDirections, 1, 1,
-            schema, false);
-
-    Mockito.when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}, new Object[]{1}, new Object[]{3}))
-        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
+    when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}, new Object[]{1}, new Object[]{3}))
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    List<RelFieldCollation> collations = List.of(new RelFieldCollation(0, Direction.ASCENDING, NullDirection.LAST));
+    SortOperator operator = getOperator(schema, collations, 1, 1);
 
     // When:
-    TransferableBlock block = op.nextBlock(); // construct
-    TransferableBlock block2 = op.nextBlock(); // eos
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
 
     // Then:
-    Assert.assertEquals(block.getNumRows(), 1);
-    Assert.assertEquals(block.getContainer().get(0), new Object[]{2});
-    Assert.assertTrue(block2.isEndOfStreamBlock(), "expected EOS block to propagate");
+    assertEquals(resultRows.size(), 1);
+    assertEquals(resultRows.get(0), new Object[]{2});
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "expected EOS block to propagate");
   }
 
   @Test
   public void shouldOffsetLimitSortInputOneBlockWithThreeRowsInputSorted() {
     // Given:
-    List<RexExpression> collation = collation(0);
-    List<Direction> directions = ImmutableList.of(Direction.ASCENDING);
-    List<NullDirection> nullDirections = ImmutableList.of(NullDirection.LAST);
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
-    SortOperator op =
-        new SortOperator(OperatorTestUtil.getDefaultContext(), _input, collation, directions, nullDirections, 1, 1,
-            schema, true);
-
+    _input = mock(SortedMailboxReceiveOperator.class);
     // Set input rows as sorted since input is expected to be sorted
-    Mockito.when(_input.nextBlock()).thenReturn(block(schema, new Object[]{1}, new Object[]{2}, new Object[]{3}))
-        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
+    when(_input.nextBlock()).thenReturn(block(schema, new Object[]{1}, new Object[]{2}, new Object[]{3}))
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    List<RelFieldCollation> collations = List.of(new RelFieldCollation(0, Direction.ASCENDING, NullDirection.LAST));
+    SortOperator operator = getOperator(schema, collations, 1, 1);
 
     // When:
-    TransferableBlock block = op.nextBlock(); // construct
-    TransferableBlock block2 = op.nextBlock(); // eos
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
 
     // Then:
-    Assert.assertEquals(block.getNumRows(), 1);
-    Assert.assertEquals(block.getContainer().get(0), new Object[]{2});
-    Assert.assertTrue(block2.isEndOfStreamBlock(), "expected EOS block to propagate");
+    assertEquals(resultRows.size(), 1);
+    assertEquals(resultRows.get(0), new Object[]{2});
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "expected EOS block to propagate");
   }
 
   @Test
   public void shouldRespectDefaultLimit() {
     // Given:
-    List<RexExpression> collation = collation(0);
-    List<Direction> directions = ImmutableList.of(Direction.ASCENDING);
-    List<NullDirection> nullDirections = ImmutableList.of(NullDirection.LAST);
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
-    SortOperator op =
-        new SortOperator(OperatorTestUtil.getDefaultContext(), _input, collation, directions, nullDirections, 0, 0,
-            schema, false, 10, 1);
-
-    Mockito.when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}, new Object[]{1}, new Object[]{3}))
-        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
+    when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}, new Object[]{1}, new Object[]{3}))
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    List<RelFieldCollation> collations = List.of(new RelFieldCollation(0, Direction.ASCENDING, NullDirection.LAST));
+    SortOperator operator = new SortOperator(OperatorTestUtil.getTracingContext(), _input,
+        new SortNode(-1, schema, PlanNode.NodeHint.EMPTY, List.of(), collations, -1, 0), 10, 1);
 
     // When:
-    TransferableBlock block = op.nextBlock(); // construct
-    TransferableBlock block2 = op.nextBlock(); // eos
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
 
     // Then:
-    Assert.assertEquals(block.getNumRows(), 1, "expected 1 element even though fetch is 2 because of max limit");
-    Assert.assertEquals(block.getContainer().get(0), new Object[]{1});
-    Assert.assertTrue(block2.isEndOfStreamBlock(), "expected EOS block to propagate");
+    assertEquals(resultRows.size(), 1, "expected 1 element even though fetch is 2 because of max limit");
+    assertEquals(resultRows.get(0), new Object[]{1});
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "expected EOS block to propagate");
   }
 
   @Test
   public void shouldFetchAllWithNegativeFetch() {
     // Given:
-    List<RexExpression> collation = collation(0);
-    List<Direction> directions = ImmutableList.of(Direction.ASCENDING);
-    List<NullDirection> nullDirections = ImmutableList.of(NullDirection.LAST);
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
-    SortOperator op =
-        new SortOperator(OperatorTestUtil.getDefaultContext(), _input, collation, directions, nullDirections, -1, 0,
-            schema, false);
-
-    Mockito.when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}, new Object[]{1}, new Object[]{3}))
-        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
+    when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}, new Object[]{1}, new Object[]{3}))
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    List<RelFieldCollation> collations = List.of(new RelFieldCollation(0, Direction.ASCENDING, NullDirection.LAST));
+    SortOperator operator = getOperator(schema, collations, -1, 0);
 
     // When:
-    TransferableBlock block = op.nextBlock(); // construct
-    TransferableBlock block2 = op.nextBlock(); // eos
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
 
     // Then:
-    Assert.assertEquals(block.getNumRows(), 3);
-    Assert.assertTrue(block2.isEndOfStreamBlock(), "expected EOS block to propagate");
+    assertEquals(resultRows.size(), 3);
+    assertEquals(resultRows.get(0), new Object[]{1});
+    assertEquals(resultRows.get(1), new Object[]{2});
+    assertEquals(resultRows.get(2), new Object[]{3});
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "expected EOS block to propagate");
   }
 
   @Test
   public void shouldConsumeAndSortTwoInputBlocksWithOneRowEach() {
     // Given:
-    List<RexExpression> collation = collation(0);
-    List<Direction> directions = ImmutableList.of(Direction.ASCENDING);
-    List<NullDirection> nullDirections = ImmutableList.of(NullDirection.LAST);
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
-    SortOperator op =
-        new SortOperator(OperatorTestUtil.getDefaultContext(), _input, collation, directions, nullDirections, 10, 0,
-            schema, false);
-
-    Mockito.when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}))
-        .thenReturn(block(schema, new Object[]{1}))
-        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
+    when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2})).thenReturn(block(schema, new Object[]{1}))
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    List<RelFieldCollation> collations = List.of(new RelFieldCollation(0, Direction.ASCENDING, NullDirection.LAST));
+    SortOperator operator = getOperator(schema, collations);
 
     // When:
-    TransferableBlock block = op.nextBlock(); // construct
-    TransferableBlock block2 = op.nextBlock(); // eos
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
 
     // Then:
-    Assert.assertEquals(block.getNumRows(), 2);
-    Assert.assertEquals(block.getContainer().get(0), new Object[]{1});
-    Assert.assertEquals(block.getContainer().get(1), new Object[]{2});
-    Assert.assertTrue(block2.isEndOfStreamBlock(), "expected EOS block to propagate");
+    assertEquals(resultRows.size(), 2);
+    assertEquals(resultRows.get(0), new Object[]{1});
+    assertEquals(resultRows.get(1), new Object[]{2});
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "expected EOS block to propagate");
   }
 
   @Test
   public void shouldConsumeAndSortTwoInputBlocksWithOneRowEachInputSorted() {
     // Given:
-    List<RexExpression> collation = collation(0);
-    List<Direction> directions = ImmutableList.of(Direction.ASCENDING);
-    List<NullDirection> nullDirections = ImmutableList.of(NullDirection.LAST);
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
-    SortOperator op =
-        new SortOperator(OperatorTestUtil.getDefaultContext(), _input, collation, directions, nullDirections, 10, 0,
-            schema, true);
-
+    _input = mock(SortedMailboxReceiveOperator.class);
     // Set input rows as sorted since input is expected to be sorted
-    Mockito.when(_input.nextBlock()).thenReturn(block(schema, new Object[]{1}))
-        .thenReturn(block(schema, new Object[]{2}))
-        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
+    when(_input.nextBlock()).thenReturn(block(schema, new Object[]{1})).thenReturn(block(schema, new Object[]{2}))
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    List<RelFieldCollation> collations = List.of(new RelFieldCollation(0, Direction.ASCENDING, NullDirection.LAST));
+    SortOperator operator = getOperator(schema, collations);
 
     // When:
-    TransferableBlock block = op.nextBlock(); // construct
-    TransferableBlock block2 = op.nextBlock(); // eos
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
 
     // Then:
-    Assert.assertEquals(block.getNumRows(), 2);
-    Assert.assertEquals(block.getContainer().get(0), new Object[]{1});
-    Assert.assertEquals(block.getContainer().get(1), new Object[]{2});
-    Assert.assertTrue(block2.isEndOfStreamBlock(), "expected EOS block to propagate");
+    assertEquals(resultRows.size(), 2);
+    assertEquals(resultRows.get(0), new Object[]{1});
+    assertEquals(resultRows.get(1), new Object[]{2});
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "expected EOS block to propagate");
   }
 
   @Test
   public void shouldBreakTiesUsingSecondCollationKey() {
     // Given:
-    List<RexExpression> collation = collation(0, 1);
-    List<Direction> directions = ImmutableList.of(Direction.ASCENDING, Direction.ASCENDING);
-    List<NullDirection> nullDirections = ImmutableList.of(NullDirection.LAST, NullDirection.LAST);
     DataSchema schema = new DataSchema(new String[]{"first", "second"}, new DataSchema.ColumnDataType[]{INT, INT});
-    SortOperator op =
-        new SortOperator(OperatorTestUtil.getDefaultContext(), _input, collation, directions, nullDirections, 10, 0,
-            schema, false);
-
-    Mockito.when(_input.nextBlock())
-        .thenReturn(block(schema, new Object[]{1, 2}, new Object[]{1, 1}, new Object[]{1, 3}))
-        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
+    when(_input.nextBlock()).thenReturn(block(schema, new Object[]{1, 2}, new Object[]{1, 1}, new Object[]{1, 3}))
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    List<RelFieldCollation> collations = List.of(new RelFieldCollation(0, Direction.ASCENDING, NullDirection.LAST),
+        new RelFieldCollation(1, Direction.ASCENDING, NullDirection.LAST));
+    SortOperator operator = getOperator(schema, collations);
 
     // When:
-    TransferableBlock block = op.nextBlock(); // construct
-    TransferableBlock block2 = op.nextBlock(); // eos
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
 
     // Then:
-    Assert.assertEquals(block.getNumRows(), 3);
-    Assert.assertEquals(block.getContainer().get(0), new Object[]{1, 1});
-    Assert.assertEquals(block.getContainer().get(1), new Object[]{1, 2});
-    Assert.assertEquals(block.getContainer().get(2), new Object[]{1, 3});
-    Assert.assertTrue(block2.isEndOfStreamBlock(), "expected EOS block to propagate");
+    assertEquals(resultRows.size(), 3);
+    assertEquals(resultRows.get(0), new Object[]{1, 1});
+    assertEquals(resultRows.get(1), new Object[]{1, 2});
+    assertEquals(resultRows.get(2), new Object[]{1, 3});
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "expected EOS block to propagate");
   }
 
   @Test
   public void shouldBreakTiesUsingSecondCollationKeyWithDifferentDirection() {
     // Given:
-    List<RexExpression> collation = collation(0, 1);
-    List<Direction> directions = ImmutableList.of(Direction.ASCENDING, Direction.DESCENDING);
-    List<NullDirection> nullDirections = ImmutableList.of(NullDirection.LAST, NullDirection.FIRST);
     DataSchema schema = new DataSchema(new String[]{"first", "second"}, new DataSchema.ColumnDataType[]{INT, INT});
-    SortOperator op =
-        new SortOperator(OperatorTestUtil.getDefaultContext(), _input, collation, directions, nullDirections, 10, 0,
-            schema, false);
-
-    Mockito.when(_input.nextBlock())
-        .thenReturn(block(schema, new Object[]{1, 2}, new Object[]{1, 1}, new Object[]{1, 3}))
-        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
+    when(_input.nextBlock()).thenReturn(block(schema, new Object[]{1, 2}, new Object[]{1, 1}, new Object[]{1, 3}))
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    List<RelFieldCollation> collations = List.of(new RelFieldCollation(0, Direction.ASCENDING, NullDirection.LAST),
+        new RelFieldCollation(1, Direction.DESCENDING, NullDirection.FIRST));
+    SortOperator operator = getOperator(schema, collations);
 
     // When:
-    TransferableBlock block = op.nextBlock(); // construct
-    TransferableBlock block2 = op.nextBlock(); // eos
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
 
     // Then:
-    Assert.assertEquals(block.getNumRows(), 3);
-    Assert.assertEquals(block.getContainer().get(0), new Object[]{1, 3});
-    Assert.assertEquals(block.getContainer().get(1), new Object[]{1, 2});
-    Assert.assertEquals(block.getContainer().get(2), new Object[]{1, 1});
-    Assert.assertTrue(block2.isEndOfStreamBlock(), "expected EOS block to propagate");
-  }
-
-  @Test
-  public void shouldHandleNoOpUpstreamBlockWhileConstructing() {
-    // Given:
-    List<RexExpression> collation = collation(0);
-    List<Direction> directions = ImmutableList.of(Direction.ASCENDING);
-    List<NullDirection> nullDirections = ImmutableList.of(NullDirection.LAST);
-    DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
-    SortOperator op =
-        new SortOperator(OperatorTestUtil.getDefaultContext(), _input, collation, directions, nullDirections, 10, 0,
-            schema, false);
-
-    Mockito.when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}))
-        .thenReturn(block(schema, new Object[]{1}))
-        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
-
-    // When:
-    TransferableBlock block = op.nextBlock(); // construct
-    TransferableBlock block2 = op.nextBlock(); // eos
-
-    // Then:
-    Assert.assertEquals(block.getNumRows(), 2);
-    Assert.assertEquals(block.getContainer().get(0), new Object[]{1});
-    Assert.assertEquals(block.getContainer().get(1), new Object[]{2});
-    Assert.assertTrue(block2.isEndOfStreamBlock(), "expected EOS block to propagate");
-  }
-
-  @Test
-  public void shouldHandleNoOpUpstreamBlockWhileConstructingInputSorted() {
-    // Given:
-    List<RexExpression> collation = collation(0);
-    List<Direction> directions = ImmutableList.of(Direction.ASCENDING);
-    List<NullDirection> nullDirections = ImmutableList.of(NullDirection.LAST);
-    DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
-    SortOperator op =
-        new SortOperator(OperatorTestUtil.getDefaultContext(), _input, collation, directions, nullDirections, 10, 0,
-            schema, true);
-
-    // Set input rows as sorted since input is expected to be sorted
-    Mockito.when(_input.nextBlock()).thenReturn(block(schema, new Object[]{1}))
-        .thenReturn(block(schema, new Object[]{2}))
-        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
-
-    // When:
-    TransferableBlock block = op.nextBlock(); // construct
-    TransferableBlock block2 = op.nextBlock(); // eos
-
-    // Then:
-    Assert.assertEquals(block.getNumRows(), 2);
-    Assert.assertEquals(block.getContainer().get(0), new Object[]{1});
-    Assert.assertEquals(block.getContainer().get(1), new Object[]{2});
-    Assert.assertTrue(block2.isEndOfStreamBlock(), "expected EOS block to propagate");
+    assertEquals(resultRows.size(), 3);
+    assertEquals(resultRows.get(0), new Object[]{1, 3});
+    assertEquals(resultRows.get(1), new Object[]{1, 2});
+    assertEquals(resultRows.get(2), new Object[]{1, 1});
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "expected EOS block to propagate");
   }
 
   @Test
   public void shouldHaveNullAtLast() {
     // Given:
-    List<RexExpression> collation = collation(0);
-    List<Direction> directions = ImmutableList.of(Direction.ASCENDING);
-    List<NullDirection> nullDirections = ImmutableList.of(NullDirection.LAST);
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
-    SortOperator op =
-        new SortOperator(OperatorTestUtil.getDefaultContext(), _input, collation, directions, nullDirections, 10, 0,
-            schema, false);
-
-    Mockito.when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}, new Object[]{1}, new Object[]{null}))
-        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
+    when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}, new Object[]{1}, new Object[]{null}))
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    List<RelFieldCollation> collations = List.of(new RelFieldCollation(0, Direction.ASCENDING, NullDirection.LAST));
+    SortOperator operator = getOperator(schema, collations);
 
     // When:
-    TransferableBlock block = op.nextBlock(); // construct
-    TransferableBlock block2 = op.nextBlock(); // eos
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
 
     // Then:
-    Assert.assertEquals(block.getNumRows(), 3);
-    Assert.assertEquals(block.getContainer().get(0), new Object[]{1});
-    Assert.assertEquals(block.getContainer().get(1), new Object[]{2});
-    Assert.assertEquals(block.getContainer().get(2), new Object[]{null});
-    Assert.assertTrue(block2.isEndOfStreamBlock(), "expected EOS block to propagate");
+    assertEquals(resultRows.size(), 3);
+    assertEquals(resultRows.get(0), new Object[]{1});
+    assertEquals(resultRows.get(1), new Object[]{2});
+    assertEquals(resultRows.get(2), new Object[]{null});
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "expected EOS block to propagate");
   }
 
   @Test
   public void shouldHaveNullAtFirst() {
     // Given:
-    List<RexExpression> collation = collation(0);
-    List<Direction> directions = ImmutableList.of(Direction.ASCENDING);
-    List<NullDirection> nullDirections = ImmutableList.of(NullDirection.FIRST);
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
-    SortOperator op =
-        new SortOperator(OperatorTestUtil.getDefaultContext(), _input, collation, directions, nullDirections, 10, 0,
-            schema, false);
-
-    Mockito.when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}, new Object[]{1}, new Object[]{null}))
-        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
+    when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}, new Object[]{1}, new Object[]{null}))
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    List<RelFieldCollation> collations = List.of(new RelFieldCollation(0, Direction.ASCENDING, NullDirection.FIRST));
+    SortOperator operator = getOperator(schema, collations);
 
     // When:
-    TransferableBlock block = op.nextBlock(); // construct
-    TransferableBlock block2 = op.nextBlock(); // eos
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
 
     // Then:
-    Assert.assertEquals(block.getNumRows(), 3);
-    Assert.assertEquals(block.getContainer().get(0), new Object[]{null});
-    Assert.assertEquals(block.getContainer().get(1), new Object[]{1});
-    Assert.assertEquals(block.getContainer().get(2), new Object[]{2});
-    Assert.assertTrue(block2.isEndOfStreamBlock(), "expected EOS block to propagate");
+    assertEquals(resultRows.size(), 3);
+    assertEquals(resultRows.get(0), new Object[]{null});
+    assertEquals(resultRows.get(1), new Object[]{1});
+    assertEquals(resultRows.get(2), new Object[]{2});
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "expected EOS block to propagate");
+  }
+
+  @Test
+  public void shouldHaveNullAtLastWhenUnspecified() {
+    // Given:
+    DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
+    when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}, new Object[]{1}, new Object[]{null}))
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    List<RelFieldCollation> collations =
+        List.of(new RelFieldCollation(0, Direction.ASCENDING, NullDirection.UNSPECIFIED));
+    SortOperator operator = getOperator(schema, collations);
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    assertEquals(resultRows.size(), 3);
+    assertEquals(resultRows.get(0), new Object[]{1});
+    assertEquals(resultRows.get(1), new Object[]{2});
+    assertEquals(resultRows.get(2), new Object[]{null});
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "expected EOS block to propagate");
   }
 
   @Test
   public void shouldHandleMultipleCollationKeysWithNulls() {
     // Given:
-    List<RexExpression> collation = collation(0, 1);
-    List<Direction> directions = ImmutableList.of(Direction.ASCENDING, Direction.DESCENDING);
-    List<NullDirection> nullDirections = ImmutableList.of(NullDirection.FIRST, NullDirection.LAST);
     DataSchema schema = new DataSchema(new String[]{"first", "second"}, new DataSchema.ColumnDataType[]{INT, INT});
-    SortOperator op =
-        new SortOperator(OperatorTestUtil.getDefaultContext(), _input, collation, directions, nullDirections, 10, 0,
-            schema, false);
-
-    Mockito.when(_input.nextBlock())
-        .thenReturn(block(schema, new Object[]{1, 1}, new Object[]{1, null}, new Object[]{null, 1}))
-        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
+    when(_input.nextBlock()).thenReturn(block(schema, new Object[]{1, 1}, new Object[]{1, null}, new Object[]{null, 1}))
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    List<RelFieldCollation> collations = List.of(new RelFieldCollation(0, Direction.ASCENDING, NullDirection.FIRST),
+        new RelFieldCollation(1, Direction.DESCENDING, NullDirection.LAST));
+    SortOperator operator = getOperator(schema, collations);
 
     // When:
-    TransferableBlock block = op.nextBlock(); // construct
-    TransferableBlock block2 = op.nextBlock(); // eos
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
 
     // Then:
-    Assert.assertEquals(block.getNumRows(), 3);
-    Assert.assertEquals(block.getContainer().get(0), new Object[]{null, 1});
-    Assert.assertEquals(block.getContainer().get(1), new Object[]{1, 1});
-    Assert.assertEquals(block.getContainer().get(2), new Object[]{1, null});
-    Assert.assertTrue(block2.isEndOfStreamBlock(), "expected EOS block to propagate");
+    assertEquals(resultRows.size(), 3);
+    assertEquals(resultRows.get(0), new Object[]{null, 1});
+    assertEquals(resultRows.get(1), new Object[]{1, 1});
+    assertEquals(resultRows.get(2), new Object[]{1, null});
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "expected EOS block to propagate");
   }
 
-  @Test
-  public void shouldEarlyTerminateCorrectlyWithSignalingPropagateUpstream() {
-    // Given:
-    List<RexExpression> collation = Collections.emptyList();
-    List<Direction> directions = ImmutableList.of(Direction.ASCENDING);
-    List<NullDirection> nullDirections = ImmutableList.of(NullDirection.LAST);
-    DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
-    SortOperator op =
-        new SortOperator(OperatorTestUtil.getDefaultContext(), _input, collation, directions, nullDirections, 10, 0,
-            schema, false);
-
-    Mockito.when(_input.nextBlock()).thenReturn(block(schema, new Object[]{1}, new Object[]{2}, new Object[]{3},
-        new Object[]{4}, new Object[]{5}, new Object[]{6}, new Object[]{7}, new Object[]{8}, new Object[]{9},
-        new Object[]{10}, new Object[]{11}, new Object[]{12}))
-        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
-
-    // When:
-    TransferableBlock block = op.nextBlock(); // construct
-    TransferableBlock block2 = op.nextBlock(); // eos
-
-    // Then:
-    Mockito.verify(_input).earlyTerminate();
-    Assert.assertEquals(block.getNumRows(), 10);
-    Assert.assertTrue(block2.isEndOfStreamBlock(), "expected EOS block to propagate");
+  private SortOperator getOperator(DataSchema schema, List<RelFieldCollation> collations, int fetch, int offset) {
+    return new SortOperator(OperatorTestUtil.getTracingContext(), _input,
+        new SortNode(-1, schema, PlanNode.NodeHint.EMPTY, List.of(), collations, fetch, offset));
   }
 
-  private static List<RexExpression> collation(int... indexes) {
-    return Arrays.stream(indexes).mapToObj(RexExpression.InputRef::new).collect(Collectors.toList());
+  private SortOperator getOperator(DataSchema schema, List<RelFieldCollation> collations) {
+    return getOperator(schema, collations, 10, 0);
   }
 
   private static TransferableBlock block(DataSchema schema, Object[]... rows) {
-    return new TransferableBlock(Arrays.asList(rows), schema, DataBlock.Type.ROW);
+    return new TransferableBlock(List.of(rows), schema, DataBlock.Type.ROW);
   }
 }

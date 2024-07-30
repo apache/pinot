@@ -23,7 +23,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import javax.annotation.Nullable;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
@@ -179,7 +178,6 @@ public class RealtimeSegmentConfig {
     return _nullHandlingEnabled;
   }
 
-  @Nullable
   public String getConsumerDir() {
     return _consumerDir;
   }

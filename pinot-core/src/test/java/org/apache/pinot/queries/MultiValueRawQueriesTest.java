@@ -49,11 +49,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertNull;
-import static org.testng.Assert.assertThrows;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 
 public class MultiValueRawQueriesTest extends BaseQueriesTest {
@@ -439,8 +435,8 @@ public class MultiValueRawQueriesTest extends BaseQueriesTest {
       String query = "SELECT ARRAYLENGTH(mvRawLongCol), ARRAYLENGTH(mvLongCol) from testTable ORDER BY "
           + "ARRAYLENGTH(mvRawLongCol), ARRAYLENGTH(mvLongCol) LIMIT 10";
       BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
-      assertTrue(brokerResponseNative.getProcessingExceptions() == null
-          || brokerResponseNative.getProcessingExceptions().size() == 0);
+      assertTrue(brokerResponseNative.getExceptions() == null
+          || brokerResponseNative.getExceptions().size() == 0);
       ResultTable resultTable = brokerResponseNative.getResultTable();
       assertEquals(resultTable.getRows().size(), 10);
       List<Object[]> recordRows = resultTable.getRows();

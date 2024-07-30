@@ -20,7 +20,6 @@ package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
-import java.net.URLEncoder;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -28,6 +27,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.broker.broker.helix.BaseBrokerStarter;
+import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -65,6 +65,11 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
   @Override
   protected String getServerTenant() {
     return TENANT_NAME;
+  }
+
+  @Override
+  protected void overrideControllerConf(Map<String, Object> properties) {
+    properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, false);
   }
 
   protected void overrideBrokerConf(PinotConfiguration configuration) {
@@ -116,18 +121,11 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
 
   protected void startHybridCluster()
       throws Exception {
-    // Start Zk and Kafka
     startZk();
-    startKafka();
-
-    // Start the Pinot cluster
-    Map<String, Object> properties = getDefaultControllerConfiguration();
-    properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, false);
-
-    startController(properties);
-
+    startController();
     startBroker();
     startServers(2);
+    startKafka();
 
     // Create tenants
     createServerTenant(TENANT_NAME, 1, 1);
@@ -160,6 +158,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
 
     // Stop the broker
     brokerStarter.stop();
+    _brokerPorts.remove(_brokerPorts.size() - 1);
 
     // Dropping the broker should fail because it is still in the broker resource
     try {
@@ -269,9 +268,9 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
     String encodedSQL;
-    encodedSQL = URLEncoder.encode("select * from " + realtimeTableName, "UTF-8");
+    encodedSQL = URIUtils.encode("select * from " + realtimeTableName);
     Assert.assertNotNull(getDebugInfo("debug/routingTable/sql?query=" + encodedSQL));
-    encodedSQL = URLEncoder.encode("select * from " + offlineTableName, "UTF-8");
+    encodedSQL = URIUtils.encode("select * from " + offlineTableName);
     Assert.assertNotNull(getDebugInfo("debug/routingTable/sql?query=" + encodedSQL));
   }
 
@@ -279,6 +278,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
   public void testQueryTracing(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    // Tracing is a v1 only concept and the v2 query engine has separate multi-stage stats that are enabled by default
     notSupportedInV2();
     JsonNode jsonNode = postQuery("SET trace = true; SELECT COUNT(*) FROM " + getTableName());
     Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asLong(), getCountStarResult());
@@ -293,6 +293,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
   public void testQueryTracingWithLiteral(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    // Tracing is a v1 only concept and the v2 query engine has separate multi-stage stats that are enabled by default
     notSupportedInV2();
     JsonNode jsonNode =
         postQuery("SET trace = true; SELECT 1, \'test\', ArrDelay FROM " + getTableName() + " LIMIT 10");
@@ -317,7 +318,8 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     final String resultTag = "resultTable";
 
     // dropResults=true - resultTable must not be in the response
-    Assert.assertFalse(postQueryWithOptions(query, "dropResults=true").has(resultTag));
+    JsonNode jsonNode = postQueryWithOptions(query, "dropResults=true");
+    Assert.assertFalse(jsonNode.has(resultTag));
 
     // dropResults=TrUE (case insensitive match) - resultTable must not be in the response
     Assert.assertFalse(postQueryWithOptions(query, "dropResults=TrUE").has(resultTag));
@@ -330,7 +332,6 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
   public void testHardcodedQueries(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    notSupportedInV2();
     super.testHardcodedQueries();
   }
 
@@ -338,6 +339,8 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
   public void testQueriesFromQueryFile(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    // Some of the hardcoded queries in the query file need to be adapted for v2 (for instance, using the arrayToMV
+    // with multi-value columns in filters / aggregations)
     notSupportedInV2();
     super.testQueriesFromQueryFile();
   }
@@ -346,15 +349,13 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
   public void testGeneratedQueries(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    notSupportedInV2();
-    super.testGeneratedQueries();
+    super.testGeneratedQueries(true, useMultiStageQueryEngine);
   }
 
   @Test(dataProvider = "useBothQueryEngines")
   public void testQueryExceptions(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    notSupportedInV2();
     super.testQueryExceptions();
   }
 

@@ -51,4 +51,9 @@ public class DistinctCountIntegerTupleSketchAggregationFunction extends IntegerT
     accumulator.setThreshold(_accumulatorThreshold);
     return Double.valueOf(accumulator.getResult().getEstimate()).longValue();
   }
+
+  @Override
+  public Comparable mergeFinalResult(Comparable finalResult1, Comparable finalResult2) {
+    return (Long) finalResult1 + (Long) finalResult2;
+  }
 }

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.request.context;
 
+import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -42,8 +43,6 @@ import org.apache.pinot.common.utils.RegexpPatternConverterUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
-import org.apache.pinot.spi.utils.BigDecimalUtils;
-import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 
@@ -70,7 +69,7 @@ public class RequestContextUtils {
   public static ExpressionContext getExpression(Expression thriftExpression) {
     switch (thriftExpression.getType()) {
       case LITERAL:
-        return ExpressionContext.forLiteralContext(thriftExpression.getLiteral());
+        return ExpressionContext.forLiteral(thriftExpression.getLiteral());
       case IDENTIFIER:
         return ExpressionContext.forIdentifier(thriftExpression.getIdentifier().getName());
       case FUNCTION:
@@ -249,7 +248,7 @@ public class RequestContextUtils {
         float[] vectorValue = getVectorValue(operands.get(1));
         int topK = VectorSimilarityPredicate.DEFAULT_TOP_K;
         if (operands.size() == 3) {
-          topK = (int) operands.get(2).getLiteral().getLongValue();
+          topK = operands.get(2).getLiteral().getIntValue();
         }
         return FilterContext.forPredicate(new VectorSimilarityPredicate(lhs, vectorValue, topK));
       case IS_NULL:
@@ -267,32 +266,7 @@ public class RequestContextUtils {
       throw new BadQueryRequestException(
           "Pinot does not support column or function on the right-hand side of the predicate");
     }
-    switch (literal.getSetField()) {
-      case BOOL_VALUE:
-        return Boolean.toString(literal.getBoolValue());
-      case BYTE_VALUE:
-        return Byte.toString(literal.getByteValue());
-      case SHORT_VALUE:
-        return Short.toString(literal.getShortValue());
-      case INT_VALUE:
-        return Integer.toString(literal.getIntValue());
-      case LONG_VALUE:
-        return Long.toString(literal.getLongValue());
-      case FLOAT_VALUE:
-        return Float.toString(literal.getFloatValue());
-      case DOUBLE_VALUE:
-        return Double.toString(literal.getDoubleValue());
-      case BIG_DECIMAL_VALUE:
-        return BigDecimalUtils.deserialize(literal.getBigDecimalValue()).toPlainString();
-      case STRING_VALUE:
-        return literal.getStringValue();
-      case BINARY_VALUE:
-        return BytesUtils.toHexString(literal.getBinaryValue());
-      case NULL_VALUE:
-        return "null";
-      default:
-        throw new IllegalStateException("Unsupported literal type: " + literal.getSetField());
-    }
+    return RequestUtils.getLiteralString(literal);
   }
 
   /**
@@ -472,46 +446,77 @@ public class RequestContextUtils {
   }
 
   private static float[] getVectorValue(Expression thriftExpression) {
-    if (thriftExpression.getType() == ExpressionType.LITERAL) {
-      Literal literalExpression = thriftExpression.getLiteral();
-      if (literalExpression.isSetIntArrayValue()) {
-        float[] vector = new float[literalExpression.getIntArrayValue().size()];
-        for (int i = 0; i < literalExpression.getIntArrayValue().size(); i++) {
-          vector[i] = literalExpression.getIntArrayValue().get(i).floatValue();
+    Literal literal = thriftExpression.getLiteral();
+    if (literal != null) {
+      Literal._Fields type = literal.getSetField();
+      switch (type) {
+        case INT_ARRAY_VALUE: {
+          List<Integer> values = literal.getIntArrayValue();
+          int numValues = values.size();
+          float[] vector = new float[numValues];
+          for (int i = 0; i < numValues; i++) {
+            vector[i] = values.get(i);
+          }
+          return vector;
         }
-        return vector;
-      }
-      if (literalExpression.isSetLongArrayValue()) {
-        float[] vector = new float[literalExpression.getLongArrayValue().size()];
-        for (int i = 0; i < literalExpression.getLongArrayValue().size(); i++) {
-          vector[i] = literalExpression.getLongArrayValue().get(i).floatValue();
+        case LONG_ARRAY_VALUE: {
+          List<Long> values = literal.getLongArrayValue();
+          int numValues = values.size();
+          float[] vector = new float[numValues];
+          for (int i = 0; i < numValues; i++) {
+            vector[i] = values.get(i);
+          }
+          return vector;
         }
-        return vector;
-      }
-      if (literalExpression.isSetFloatArrayValue()) {
-        float[] vector = new float[literalExpression.getFloatArrayValue().size()];
-        for (int i = 0; i < literalExpression.getFloatArrayValue().size(); i++) {
-          vector[i] = literalExpression.getFloatArrayValue().get(i);
+        case FLOAT_ARRAY_VALUE: {
+          List<Integer> values = literal.getFloatArrayValue();
+          int numValues = values.size();
+          float[] vector = new float[numValues];
+          for (int i = 0; i < numValues; i++) {
+            vector[i] = Float.intBitsToFloat(values.get(i));
+          }
+          return vector;
         }
-        return vector;
-      }
-      if (literalExpression.isSetDoubleArrayValue()) {
-        float[] vector = new float[literalExpression.getDoubleArrayValue().size()];
-        for (int i = 0; i < literalExpression.getDoubleArrayValue().size(); i++) {
-          vector[i] = literalExpression.getDoubleArrayValue().get(i).floatValue();
+        case DOUBLE_ARRAY_VALUE: {
+          List<Double> values = literal.getDoubleArrayValue();
+          int numValues = values.size();
+          float[] vector = new float[numValues];
+          for (int i = 0; i < numValues; i++) {
+            vector[i] = values.get(i).floatValue();
+          }
+          return vector;
         }
-        return vector;
+        default:
+          throw new IllegalStateException("Unsupported literal type: " + type);
       }
     }
-    if (thriftExpression.getType() != ExpressionType.FUNCTION) {
-      throw new BadQueryRequestException(
-          "Pinot does not support column or function on the right-hand side of the predicate");
-    }
-    float[] vector = new float[thriftExpression.getFunctionCall().getOperandsSize()];
-    for (int i = 0; i < thriftExpression.getFunctionCall().getOperandsSize(); i++) {
-      vector[i] = Float.parseFloat(
-          Double.toString(thriftExpression.getFunctionCall().getOperands().get(i).getLiteral().getDoubleValue()));
+    Function function = thriftExpression.getFunctionCall();
+    Preconditions.checkState(function != null,
+        "Unsupported right-hand side expression for vector similarity predicate: %s", thriftExpression);
+    List<Expression> operands = function.getOperands();
+    int numOperands = operands.size();
+    float[] vector = new float[numOperands];
+    for (int i = 0; i < numOperands; i++) {
+      vector[i] = getFloatValue(operands.get(i));
     }
     return vector;
+  }
+
+  private static float getFloatValue(Expression thriftExpression) {
+    Literal literal = thriftExpression.getLiteral();
+    Preconditions.checkState(literal != null, "Expecting literal expression, got: %s", thriftExpression);
+    Literal._Fields type = literal.getSetField();
+    switch (type) {
+      case INT_VALUE:
+        return literal.getIntValue();
+      case LONG_VALUE:
+        return (float) literal.getLongValue();
+      case FLOAT_VALUE:
+        return Float.intBitsToFloat(literal.getFloatValue());
+      case DOUBLE_VALUE:
+        return (float) literal.getDoubleValue();
+      default:
+        throw new IllegalStateException("Unsupported literal type: " + type);
+    }
   }
 }

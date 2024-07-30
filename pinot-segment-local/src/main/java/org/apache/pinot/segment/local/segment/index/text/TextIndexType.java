@@ -75,7 +75,8 @@ public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexR
   private static final List<String> EXTENSIONS = Lists.newArrayList(
       V1Constants.Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION,
       V1Constants.Indexes.NATIVE_TEXT_INDEX_FILE_EXTENSION,
-      V1Constants.Indexes.LUCENE_V9_TEXT_INDEX_FILE_EXTENSION
+      V1Constants.Indexes.LUCENE_V9_TEXT_INDEX_FILE_EXTENSION,
+      V1Constants.Indexes.LUCENE_V99_TEXT_INDEX_FILE_EXTENSION
   );
 
   protected TextIndexType() {
@@ -192,9 +193,6 @@ public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexR
     }
     if (config.getFstType() == FSTType.NATIVE) {
       return new NativeMutableTextIndex(context.getFieldSpec().getName());
-    }
-    if (context.getConsumerDir() == null) {
-      throw new IllegalArgumentException("A consumer directory is required");
     }
     return new RealtimeLuceneTextIndex(context.getFieldSpec().getName(), context.getConsumerDir(),
         context.getSegmentName(), config);

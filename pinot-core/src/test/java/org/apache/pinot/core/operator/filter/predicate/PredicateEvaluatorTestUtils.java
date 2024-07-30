@@ -20,7 +20,7 @@ package org.apache.pinot.core.operator.filter.predicate;
 
 import java.math.BigDecimal;
 import java.util.Random;
-import org.apache.commons.lang.RandomStringUtils;
+import org.apache.commons.lang3.RandomStringUtils;
 
 
 public class PredicateEvaluatorTestUtils {
@@ -68,6 +68,17 @@ public class PredicateEvaluatorTestUtils {
   public static void fillRandom(byte[][] randomValues, int maxStringLength) {
     for (int i = 0; i < randomValues.length; i++) {
       randomValues[i] = RandomStringUtils.random(maxStringLength).getBytes();
+    }
+  }
+
+  public static void fillRandomJson(String[] randomValues, String jsonStringTemplate, int numPlaceholders,
+      int maxStringLength) {
+    for (int i = 0; i < randomValues.length; i++) {
+      Object[] randomPlaceholderValues = new String[numPlaceholders];
+      for (int j = 0; j < numPlaceholders; j++) {
+        randomPlaceholderValues[j] = RandomStringUtils.randomAlphanumeric(maxStringLength);
+      }
+      randomValues[i] = String.format(jsonStringTemplate, randomPlaceholderValues);
     }
   }
 }

@@ -9,6 +9,14 @@
       "dataType": "STRING"
     },
     {
+      "name": "payload",
+      "dataType": "JSON"
+    },
+    {
+      "name": "payload_str",
+      "dataType": "STRING"
+    },
+    {
       "name": "payload.push_id",
       "dataType": "LONG"
     },

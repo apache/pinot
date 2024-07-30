@@ -29,9 +29,7 @@ import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.io.File;
-import java.io.UnsupportedEncodingException;
 import java.net.URI;
-import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
@@ -115,7 +113,8 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
     @Authorization(value = DATABASE)})
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = {
     @ApiKeyAuthDefinition(name = HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER,
-        key = SWAGGER_AUTHORIZATION_KEY),
+        key = SWAGGER_AUTHORIZATION_KEY,
+        description = "The format of the key is  ```\"Basic <token>\" or \"Bearer <token>\"```"),
     @ApiKeyAuthDefinition(name = DATABASE, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = DATABASE,
         description = "Database context passed through http header. If no context is provided 'default' database "
             + "context will be considered.")}))
@@ -207,11 +206,7 @@ public class TablesResource {
 
     List<String> decodedColumns = new ArrayList<>(columns.size());
     for (String column : columns) {
-      try {
-        decodedColumns.add(URLDecoder.decode(column, StandardCharsets.UTF_8.name()));
-      } catch (UnsupportedEncodingException e) {
-        throw new RuntimeException(e.getCause());
-      }
+      decodedColumns.add(URIUtils.decode(column));
     }
 
     boolean allColumns = false;
@@ -380,19 +375,11 @@ public class TablesResource {
       List<String> columns, @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     for (int i = 0; i < columns.size(); i++) {
-      try {
-        columns.set(i, URLDecoder.decode(columns.get(i), StandardCharsets.UTF_8.name()));
-      } catch (UnsupportedEncodingException e) {
-        throw new RuntimeException(e.getCause());
-      }
+      columns.set(i, URIUtils.decode(columns.get(i)));
     }
 
     TableDataManager tableDataManager = ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableName);
-    try {
-      segmentName = URLDecoder.decode(segmentName, StandardCharsets.UTF_8.name());
-    } catch (UnsupportedEncodingException e) {
-      throw new RuntimeException(e.getCause());
-    }
+    segmentName = URIUtils.decode(segmentName);
     SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segmentName);
     if (segmentDataManager == null) {
       throw new WebApplicationException(String.format("Table %s segments %s does not exist", tableName, segmentName),
@@ -661,20 +648,24 @@ public class TablesResource {
     TableDataManager tableDataManager =
         ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableNameWithType);
     List<String> missingSegments = new ArrayList<>();
+    int nonImmutableSegmentCount = 0;
+    int missingValidDocIdSnapshotSegmentCount = 0;
     List<SegmentDataManager> segmentDataManagers;
     if (segments == null) {
       segmentDataManagers = tableDataManager.acquireAllSegments();
     } else {
       segmentDataManagers = tableDataManager.acquireSegments(segments, missingSegments);
-      if (!missingSegments.isEmpty()) {
-        throw new WebApplicationException(
-            String.format("Table %s has missing segments: %s)", tableNameWithType, segments),
-            Response.Status.NOT_FOUND);
-      }
     }
-    List<Map<String, Object>> allValidDocIdsMetadata = new ArrayList<>();
-    for (SegmentDataManager segmentDataManager : segmentDataManagers) {
-      try {
+    try {
+      if (!missingSegments.isEmpty()) {
+        // we need not abort here or throw exception as we can still process the segments that are available
+        // During UpsertCompactionTaskGenerator, controller sends a lot of segments to server to fetch validDocIds
+        // and it may happen that a segment is deleted concurrently. In such cases, we should log a warning and
+        // process the remaining available segments.
+        LOGGER.warn("Table {} has missing segments {}", tableNameWithType, missingSegments);
+      }
+      List<Map<String, Object>> allValidDocIdsMetadata = new ArrayList<>(segmentDataManagers.size());
+      for (SegmentDataManager segmentDataManager : segmentDataManagers) {
         IndexSegment indexSegment = segmentDataManager.getSegment();
         if (indexSegment == null) {
           LOGGER.warn("Table {} segment {} does not exist", tableNameWithType, segmentDataManager.getSegmentName());
@@ -682,9 +673,12 @@ public class TablesResource {
         }
         // Skip the consuming segments
         if (!(indexSegment instanceof ImmutableSegmentImpl)) {
-          String msg = String.format("Table %s segment %s is not a immutable segment", tableNameWithType,
-              segmentDataManager.getSegmentName());
-          LOGGER.warn(msg);
+          if (LOGGER.isDebugEnabled()) {
+            String msg = String.format("Table %s segment %s is not a immutable segment", tableNameWithType,
+                segmentDataManager.getSegmentName());
+            LOGGER.debug(msg);
+          }
+          nonImmutableSegmentCount++;
           continue;
         }
 
@@ -693,11 +687,14 @@ public class TablesResource {
         String finalValidDocIdsType = validDocIdSnapshotPair.getLeft().toString();
         MutableRoaringBitmap validDocIdsSnapshot = validDocIdSnapshotPair.getRight();
         if (validDocIdsSnapshot == null) {
-          String msg = String.format(
-              "Found that validDocIds is missing while processing validDocIdsMetadata for table %s segment %s while "
-                  + "reading the validDocIds with validDocIdType %s",
-              tableNameWithType, segmentDataManager.getSegmentName(), validDocIdsType);
-          LOGGER.warn(msg);
+          if (LOGGER.isDebugEnabled()) {
+            String msg = String.format(
+                "Found that validDocIds is missing while processing validDocIdsMetadata for table %s segment %s while "
+                    + "reading the validDocIds with validDocIdType %s", tableNameWithType,
+                segmentDataManager.getSegmentName(), validDocIdsType);
+            LOGGER.debug(msg);
+          }
+          missingValidDocIdSnapshotSegmentCount++;
           continue;
         }
 
@@ -712,11 +709,22 @@ public class TablesResource {
         validDocIdsMetadata.put("segmentCrc", indexSegment.getSegmentMetadata().getCrc());
         validDocIdsMetadata.put("validDocIdsType", finalValidDocIdsType);
         allValidDocIdsMetadata.add(validDocIdsMetadata);
-      } finally {
+      }
+      if (nonImmutableSegmentCount > 0) {
+        LOGGER.warn("Table {} has {} non-immutable segments found while processing validDocIdsMetadata",
+            tableNameWithType, nonImmutableSegmentCount);
+      }
+      if (missingValidDocIdSnapshotSegmentCount > 0) {
+        LOGGER.warn("Found that validDocIds is missing for {} segments while processing validDocIdsMetadata "
+                + "for table {} while reading the validDocIds with validDocIdType {}. ",
+            missingValidDocIdSnapshotSegmentCount, tableNameWithType, validDocIdsType);
+      }
+      return allValidDocIdsMetadata;
+    } finally {
+      for (SegmentDataManager segmentDataManager : segmentDataManagers) {
         tableDataManager.releaseSegment(segmentDataManager);
       }
     }
-    return allValidDocIdsMetadata;
   }
 
   private Pair<ValidDocIdsType, MutableRoaringBitmap> getValidDocIds(IndexSegment indexSegment,

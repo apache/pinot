@@ -414,6 +414,11 @@ public class DistinctCountCPCSketchAggregationFunction
     return Math.round(intermediateResult.getResult().getEstimate());
   }
 
+  @Override
+  public Comparable mergeFinalResult(Comparable finalResult1, Comparable finalResult2) {
+    return (Long) finalResult1 + (Long) finalResult2;
+  }
+
   /**
    * Returns the CpcSketch from the result holder or creates a new one if it does not exist.
    */

@@ -98,7 +98,7 @@ public class SegmentGenerationMinionClusterIntegrationTest extends BaseClusterIn
         }
         return getTotalDocs(tableName) == rowCnt;
       } catch (Exception e) {
-        LOGGER.error("Failed to get expected totalDocs: " + rowCnt, e);
+        LOGGER.error("Failed to get expected totalDocs: {}", rowCnt, e);
         return false;
       }
     }, 5000L, 600_000L, "Failed to load " + rowCnt + " documents", true);
@@ -143,7 +143,7 @@ public class SegmentGenerationMinionClusterIntegrationTest extends BaseClusterIn
         }
         return getTotalDocs(tableName) == rowCnt;
       } catch (Exception e) {
-        LOGGER.error("Failed to get expected totalDocs: " + rowCnt, e);
+        LOGGER.error("Failed to get expected totalDocs: {}", rowCnt, e);
         return false;
       }
     }, 5000L, 600_000L, "Failed to load " + rowCnt + " documents", true);

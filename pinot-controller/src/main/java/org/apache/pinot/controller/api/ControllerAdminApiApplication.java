@@ -18,15 +18,15 @@
  */
 package org.apache.pinot.controller.api;
 
-import io.swagger.jaxrs.config.BeanConfig;
+import io.swagger.jaxrs.listing.SwaggerSerializers;
 import java.io.IOException;
-import java.net.URL;
-import java.net.URLClassLoader;
 import java.util.List;
 import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerResponseContext;
 import javax.ws.rs.container.ContainerResponseFilter;
+import org.apache.pinot.common.swagger.SwaggerApiListingResource;
+import org.apache.pinot.common.swagger.SwaggerSetupUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AuthenticationFilter;
 import org.apache.pinot.core.api.ServiceAutoDiscoveryFeature;
@@ -65,8 +65,8 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     }
     register(JacksonFeature.class);
     register(MultiPartFeature.class);
-    registerClasses(io.swagger.jaxrs.listing.ApiListingResource.class);
-    registerClasses(io.swagger.jaxrs.listing.SwaggerSerializers.class);
+    register(SwaggerApiListingResource.class);
+    register(SwaggerSerializers.class);
     register(new CorsFilter());
     register(AuthenticationFilter.class);
     // property("jersey.config.server.tracing.type", "ALL");
@@ -85,9 +85,9 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     } catch (IOException e) {
       throw new RuntimeException("Failed to start http server", e);
     }
-    PinotReflectionUtils.runWithLock(this::setupSwagger);
-
     ClassLoader classLoader = ControllerAdminApiApplication.class.getClassLoader();
+    PinotReflectionUtils.runWithLock(() ->
+        SwaggerSetupUtils.setupSwagger("Controller", _controllerResourcePackages, _useHttps, "/", _httpServer));
 
     // This is ugly from typical patterns to setup static resources but all our APIs are
     // at path "/". So, configuring static handler for path "/" does not work well.
@@ -100,33 +100,6 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     _httpServer.getServerConfiguration()
         .addHttpHandler(new CLStaticHttpHandler(classLoader, "/webapp/images/"), "/images/");
     _httpServer.getServerConfiguration().addHttpHandler(new CLStaticHttpHandler(classLoader, "/webapp/js/"), "/js/");
-  }
-
-  private void setupSwagger() {
-    BeanConfig beanConfig = new BeanConfig();
-    beanConfig.setTitle("Pinot Controller API");
-    beanConfig.setDescription("APIs for accessing Pinot Controller information");
-    beanConfig.setContact("https://github.com/apache/pinot");
-    beanConfig.setVersion("1.0");
-    beanConfig.setExpandSuperTypes(false);
-    if (_useHttps) {
-      beanConfig.setSchemes(new String[]{CommonConstants.HTTPS_PROTOCOL});
-    } else {
-      beanConfig.setSchemes(new String[]{CommonConstants.HTTP_PROTOCOL, CommonConstants.HTTPS_PROTOCOL});
-    }
-    beanConfig.setBasePath("/");
-    beanConfig.setResourcePackage(_controllerResourcePackages);
-    beanConfig.setScan(true);
-
-    ClassLoader loader = this.getClass().getClassLoader();
-    CLStaticHttpHandler apiStaticHttpHandler = new CLStaticHttpHandler(loader, "/api/");
-    // map both /api and /help to swagger docs. /api because it looks nice. /help for backward compatibility
-    _httpServer.getServerConfiguration().addHttpHandler(apiStaticHttpHandler, "/api/");
-    _httpServer.getServerConfiguration().addHttpHandler(apiStaticHttpHandler, "/help/");
-
-    URL swaggerDistLocation = loader.getResource(CommonConstants.CONFIG_OF_SWAGGER_RESOURCES_PATH);
-    CLStaticHttpHandler swaggerDist = new CLStaticHttpHandler(new URLClassLoader(new URL[]{swaggerDistLocation}));
-    _httpServer.getServerConfiguration().addHttpHandler(swaggerDist, "/swaggerui-dist/");
   }
 
   public void stop() {
@@ -148,5 +121,9 @@ public class ControllerAdminApiApplication extends ResourceConfig {
         containerResponseContext.setStatus(HttpServletResponse.SC_OK);
       }
     }
+  }
+
+  public HttpServer getHttpServer() {
+    return _httpServer;
   }
 }

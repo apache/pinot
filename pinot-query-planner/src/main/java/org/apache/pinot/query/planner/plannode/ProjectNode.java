@@ -19,25 +19,18 @@
 package org.apache.pinot.query.planner.plannode;
 
 import java.util.List;
-import java.util.stream.Collectors;
-import org.apache.calcite.rex.RexNode;
+import java.util.Objects;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
-import org.apache.pinot.query.planner.logical.RexExpressionUtils;
-import org.apache.pinot.query.planner.serde.ProtoProperties;
 
 
-public class ProjectNode extends AbstractPlanNode {
-  @ProtoProperties
-  private List<RexExpression> _projects;
+public class ProjectNode extends BasePlanNode {
+  private final List<RexExpression> _projects;
 
-  public ProjectNode(int planFragmentId) {
-    super(planFragmentId);
-  }
-
-  public ProjectNode(int currentStageId, DataSchema dataSchema, List<RexNode> projects) {
-    super(currentStageId, dataSchema);
-    _projects = projects.stream().map(RexExpressionUtils::fromRexNode).collect(Collectors.toList());
+  public ProjectNode(int stageId, DataSchema dataSchema, NodeHint nodeHint, List<PlanNode> inputs,
+      List<RexExpression> projects) {
+    super(stageId, dataSchema, nodeHint, inputs);
+    _projects = projects;
   }
 
   public List<RexExpression> getProjects() {
@@ -52,5 +45,25 @@ public class ProjectNode extends AbstractPlanNode {
   @Override
   public <T, C> T visit(PlanNodeVisitor<T, C> visitor, C context) {
     return visitor.visitProject(this, context);
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (!(o instanceof ProjectNode)) {
+      return false;
+    }
+    if (!super.equals(o)) {
+      return false;
+    }
+    ProjectNode that = (ProjectNode) o;
+    return Objects.equals(_projects, that._projects);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(super.hashCode(), _projects);
   }
 }

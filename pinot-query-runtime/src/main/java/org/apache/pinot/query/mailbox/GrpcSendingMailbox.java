@@ -24,12 +24,14 @@ import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.datablock.DataBlock;
+import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.proto.Mailbox.MailboxContent;
 import org.apache.pinot.common.proto.PinotMailboxGrpc;
 import org.apache.pinot.query.mailbox.channel.ChannelManager;
 import org.apache.pinot.query.mailbox.channel.MailboxStatusObserver;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,16 +47,19 @@ public class GrpcSendingMailbox implements SendingMailbox {
   private final String _hostname;
   private final int _port;
   private final long _deadlineMs;
+  private final StatMap<MailboxSendOperator.StatKey> _statMap;
   private final MailboxStatusObserver _statusObserver = new MailboxStatusObserver();
 
   private StreamObserver<MailboxContent> _contentObserver;
 
-  public GrpcSendingMailbox(String id, ChannelManager channelManager, String hostname, int port, long deadlineMs) {
+  public GrpcSendingMailbox(String id, ChannelManager channelManager, String hostname, int port, long deadlineMs,
+      StatMap<MailboxSendOperator.StatKey> statMap) {
     _id = id;
     _channelManager = channelManager;
     _hostname = hostname;
     _port = port;
     _deadlineMs = deadlineMs;
+    _statMap = statMap;
   }
 
   @Override
@@ -64,25 +69,31 @@ public class GrpcSendingMailbox implements SendingMailbox {
       return;
     }
     if (LOGGER.isDebugEnabled()) {
-      LOGGER.debug("==[GRPC SEND]== sending data to: " + _id);
+      LOGGER.debug("==[GRPC SEND]== sending message " + block + " to: " + _id);
     }
     if (_contentObserver == null) {
       _contentObserver = getContentObserver();
     }
     _contentObserver.onNext(toMailboxContent(block));
+    if (LOGGER.isDebugEnabled()) {
+      LOGGER.debug("==[GRPC SEND]== message " + block + " sent to: " + _id);
+    }
   }
 
   @Override
   public void complete() {
     if (isTerminated()) {
+      LOGGER.debug("Already terminated mailbox: {}", _id);
       return;
     }
+    LOGGER.debug("Completing mailbox: {}", _id);
     _contentObserver.onCompleted();
   }
 
   @Override
   public void cancel(Throwable t) {
     if (isTerminated()) {
+      LOGGER.debug("Already terminated mailbox: {}", _id);
       return;
     }
     LOGGER.debug("Cancelling mailbox: {}", _id);
@@ -118,9 +129,22 @@ public class GrpcSendingMailbox implements SendingMailbox {
 
   private MailboxContent toMailboxContent(TransferableBlock block)
       throws IOException {
-    DataBlock dataBlock = block.getDataBlock();
-    byte[] bytes = dataBlock.toBytes();
-    ByteString byteString = UnsafeByteOperations.unsafeWrap(bytes);
-    return MailboxContent.newBuilder().setMailboxId(_id).setPayload(byteString).build();
+    _statMap.merge(MailboxSendOperator.StatKey.RAW_MESSAGES, 1);
+    long start = System.currentTimeMillis();
+    try {
+      DataBlock dataBlock = block.getDataBlock();
+      byte[] bytes = dataBlock.toBytes();
+      ByteString byteString = UnsafeByteOperations.unsafeWrap(bytes);
+      if (LOGGER.isDebugEnabled()) {
+        LOGGER.debug("Serialized block: {} to {} bytes", block, bytes.length);
+      }
+      _statMap.merge(MailboxSendOperator.StatKey.SERIALIZED_BYTES, bytes.length);
+      return MailboxContent.newBuilder().setMailboxId(_id).setPayload(byteString).build();
+    } catch (Throwable t) {
+      LOGGER.warn("Caught exception while serializing block: {}", block, t);
+      throw t;
+    } finally {
+      _statMap.merge(MailboxSendOperator.StatKey.SERIALIZATION_TIME_MS, System.currentTimeMillis() - start);
+    }
   }
 }

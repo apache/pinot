@@ -21,7 +21,7 @@ package org.apache.pinot.server.starter.helix;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
-import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.NotificationContext;
 import org.apache.helix.messaging.handling.HelixTaskResult;
@@ -101,10 +101,10 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
         throws InterruptedException {
       HelixTaskResult result = new HelixTaskResult();
       _logger.info("Handling message: {}", _message);
+      _segmentRefreshSemaphore.acquireSema(_segmentName, _logger);
       try {
-        _segmentRefreshSemaphore.acquireSema(_segmentName, _logger);
         // The number of retry times depends on the retry count in Constants.
-        _instanceDataManager.addOrReplaceSegment(_tableNameWithType, _segmentName);
+        _instanceDataManager.replaceSegment(_tableNameWithType, _segmentName);
         result.setSuccess(true);
       } catch (Exception e) {
         _metrics.addMeteredTableValue(_tableNameWithType, ServerMeter.REFRESH_FAILURES, 1);

@@ -77,6 +77,10 @@ public class EmptyIndexSegment implements ImmutableSegment {
   }
 
   @Override
+  public void offload() {
+  }
+
+  @Override
   public void destroy() {
   }
 

@@ -65,8 +65,7 @@ public class KinesisConfig {
   public static final String SESSION_DURATION_SECONDS = "sessionDurationSeconds";
   public static final String ASYNC_SESSION_UPDATED_ENABLED = "asyncSessionUpdateEnabled";
 
-  // TODO: this is a starting point, until a better default is figured out
-  public static final String DEFAULT_MAX_RECORDS = "20";
+  public static final String DEFAULT_MAX_RECORDS = "10000";
   public static final String DEFAULT_SHARD_ITERATOR_TYPE = ShardIteratorType.LATEST.toString();
   public static final String DEFAULT_IAM_ROLE_BASED_ACCESS_ENABLED = "false";
   public static final String DEFAULT_SESSION_DURATION_SECONDS = "900";

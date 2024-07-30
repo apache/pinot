@@ -78,7 +78,7 @@ public class PullRequestMergedEventsStream {
         pinotSchema = new File(schemaFilePath);
       }
     } catch (Exception e) {
-      LOGGER.error("Got exception while reading Pinot schema from file: [" + schemaFilePath + "]");
+      LOGGER.error("Got exception while reading Pinot schema from file: [{}]", schemaFilePath);
       throw e;
     }
     return pinotSchema;

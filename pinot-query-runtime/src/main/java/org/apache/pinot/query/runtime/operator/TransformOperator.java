@@ -18,18 +18,19 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
-import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.List;
-import javax.annotation.Nullable;
 import org.apache.pinot.common.datablock.DataBlock;
+import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperandFactory;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -43,35 +44,50 @@ import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
  * and canonicalized function name matching (lower case).
  */
 public class TransformOperator extends MultiStageOperator {
+  private static final Logger LOGGER = LoggerFactory.getLogger(TransformOperator.class);
   private static final String EXPLAIN_NAME = "TRANSFORM";
 
-  private final MultiStageOperator _upstreamOperator;
+  private final MultiStageOperator _input;
   private final List<TransformOperand> _transformOperandsList;
   private final int _resultColumnSize;
   // TODO: Check type matching between resultSchema and the actual result.
   private final DataSchema _resultSchema;
+  private final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
 
-  public TransformOperator(OpChainExecutionContext context, MultiStageOperator upstreamOperator,
-      DataSchema resultSchema, List<RexExpression> transforms, DataSchema upstreamDataSchema) {
+  public TransformOperator(OpChainExecutionContext context, MultiStageOperator input, DataSchema inputSchema,
+      ProjectNode node) {
     super(context);
-    Preconditions.checkState(!transforms.isEmpty(), "transform operand should not be empty.");
-    Preconditions.checkState(resultSchema.size() == transforms.size(),
-        "result schema size:" + resultSchema.size() + " doesn't match transform operand size:" + transforms.size());
-    _upstreamOperator = upstreamOperator;
-    _resultColumnSize = transforms.size();
+    _input = input;
+    List<RexExpression> projects = node.getProjects();
+    _resultColumnSize = projects.size();
     _transformOperandsList = new ArrayList<>(_resultColumnSize);
-    for (RexExpression rexExpression : transforms) {
-      _transformOperandsList.add(TransformOperandFactory.getTransformOperand(rexExpression, upstreamDataSchema));
+    for (RexExpression rexExpression : projects) {
+      _transformOperandsList.add(TransformOperandFactory.getTransformOperand(rexExpression, inputSchema));
     }
-    _resultSchema = resultSchema;
+    _resultSchema = node.getDataSchema();
+  }
+
+  @Override
+  public void registerExecution(long time, int numRows) {
+    _statMap.merge(StatKey.EXECUTION_TIME_MS, time);
+    _statMap.merge(StatKey.EMITTED_ROWS, numRows);
+  }
+
+  @Override
+  protected Logger logger() {
+    return LOGGER;
   }
 
   @Override
   public List<MultiStageOperator> getChildOperators() {
-    return ImmutableList.of(_upstreamOperator);
+    return List.of(_input);
   }
 
-  @Nullable
+  @Override
+  public Type getOperatorType() {
+    return Type.TRANSFORM;
+  }
+
   @Override
   public String toExplainString() {
     return EXPLAIN_NAME;
@@ -79,9 +95,13 @@ public class TransformOperator extends MultiStageOperator {
 
   @Override
   protected TransferableBlock getNextBlock() {
-    TransferableBlock block = _upstreamOperator.nextBlock();
+    TransferableBlock block = _input.nextBlock();
     if (block.isEndOfStreamBlock()) {
-      return block;
+      if (block.isSuccessfulEndOfStreamBlock()) {
+        return updateEosBlock(block, _statMap);
+      } else {
+        return block;
+      }
     }
     List<Object[]> container = block.getContainer();
     List<Object[]> resultRows = new ArrayList<>(container.size());
@@ -93,5 +113,28 @@ public class TransformOperator extends MultiStageOperator {
       resultRows.add(resultRow);
     }
     return new TransferableBlock(resultRows, _resultSchema, DataBlock.Type.ROW);
+  }
+
+  public enum StatKey implements StatMap.Key {
+    //@formatter:off
+    EXECUTION_TIME_MS(StatMap.Type.LONG) {
+      @Override
+      public boolean includeDefaultInJson() {
+        return true;
+      }
+    },
+    EMITTED_ROWS(StatMap.Type.LONG);
+    //@formatter:on
+
+    private final StatMap.Type _type;
+
+    StatKey(StatMap.Type type) {
+      _type = type;
+    }
+
+    @Override
+    public StatMap.Type getType() {
+      return _type;
+    }
   }
 }

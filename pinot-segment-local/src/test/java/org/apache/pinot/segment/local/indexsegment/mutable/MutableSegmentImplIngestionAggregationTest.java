@@ -182,7 +182,7 @@ public class MutableSegmentImplIngestionAggregationTest {
     }
 
     List<ExpressionContext> arguments = Arrays.asList(ExpressionContext.forIdentifier("metric"),
-        ExpressionContext.forLiteralContext(Literal.stringValue("12")));
+        ExpressionContext.forLiteral(Literal.stringValue("12")));
     DistinctCountHLLValueAggregator valueAggregator = new DistinctCountHLLValueAggregator(arguments);
 
     Set<Integer> integers = new HashSet<>();

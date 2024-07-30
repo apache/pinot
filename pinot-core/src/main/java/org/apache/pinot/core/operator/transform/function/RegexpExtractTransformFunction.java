@@ -21,8 +21,9 @@ package org.apache.pinot.core.operator.transform.function;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import org.apache.pinot.common.utils.regex.Matcher;
+import org.apache.pinot.common.utils.regex.Pattern;
+import org.apache.pinot.common.utils.regex.PatternFactory;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
@@ -67,7 +68,7 @@ public class RegexpExtractTransformFunction extends BaseTransformFunction {
     TransformFunction regexpFunction = arguments.get(1);
     Preconditions.checkState(regexpFunction instanceof LiteralTransformFunction,
         "`regexp` must be a literal regex expression.");
-    _regexp = Pattern.compile(((LiteralTransformFunction) regexpFunction).getStringLiteral());
+    _regexp = PatternFactory.compile(((LiteralTransformFunction) regexpFunction).getStringLiteral());
 
     if (arguments.size() >= 3) {
       TransformFunction groupFunction = arguments.get(2);

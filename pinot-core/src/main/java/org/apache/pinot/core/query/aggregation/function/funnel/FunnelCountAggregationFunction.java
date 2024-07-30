@@ -156,6 +156,16 @@ public class FunnelCountAggregationFunction<A, I> implements AggregationFunction
   }
 
   @Override
+  public ColumnDataType getIntermediateResultColumnType() {
+    return ColumnDataType.OBJECT;
+  }
+
+  @Override
+  public ColumnDataType getFinalResultColumnType() {
+    return ColumnDataType.LONG_ARRAY;
+  }
+
+  @Override
   public LongArrayList extractFinalResult(I intermediateResult) {
     if (intermediateResult == null) {
       return new LongArrayList(_numSteps);
@@ -164,13 +174,13 @@ public class FunnelCountAggregationFunction<A, I> implements AggregationFunction
   }
 
   @Override
-  public ColumnDataType getIntermediateResultColumnType() {
-    return ColumnDataType.OBJECT;
-  }
-
-  @Override
-  public ColumnDataType getFinalResultColumnType() {
-    return ColumnDataType.LONG_ARRAY;
+  public LongArrayList mergeFinalResult(LongArrayList finalResult1, LongArrayList finalResult2) {
+    long[] elements1 = finalResult1.elements();
+    long[] elements2 = finalResult2.elements();
+    for (int i = 0; i < _numSteps; i++) {
+      elements1[i] += elements2[i];
+    }
+    return finalResult1;
   }
 
   @Override

@@ -1000,7 +1000,7 @@ public class SegmentCompletionManager {
       // If the winner is coming back again, then we have some more conditions to look at.
       response = abortIfTooLateAndReturnHold(now, instanceId, offset);
       if (response != null) {
-        return null;
+        return response;
       }
       if (instanceId.equals(_winner)) {
         // The winner is coming back to report its offset. Take a decision based on the offset reported, and whether we

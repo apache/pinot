@@ -1030,6 +1030,11 @@ public class DistinctCountThetaSketchAggregationFunction
     return Math.round(evaluatePostAggregationExpression(_postAggregationExpression, mergedSketches).getEstimate());
   }
 
+  @Override
+  public Comparable mergeFinalResult(Comparable finalResult1, Comparable finalResult2) {
+    return (Long) finalResult1 + (Long) finalResult2;
+  }
+
   // This ensures backward compatibility with servers that still return sketches directly.
   // The AggregationDataTableReducer casts intermediate results to Objects and although the code compiles,
   // types might still be incompatible at runtime due to type erasure.

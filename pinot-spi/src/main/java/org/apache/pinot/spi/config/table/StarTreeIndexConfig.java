@@ -23,7 +23,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import javax.annotation.Nullable;
-import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
@@ -34,7 +34,7 @@ public class StarTreeIndexConfig extends BaseJsonConfig {
   private final List<String> _skipStarNodeCreationForDimensions;
   // Function column pairs with delimiter "__", e.g. SUM__col1, MAX__col2, COUNT__*
   private final List<String> _functionColumnPairs;
-  // Function column pairs config, currently only handling compression.
+  // Function column pairs config
   private final List<StarTreeAggregationConfig> _aggregationConfigs;
   // The upper bound of records to be scanned at the leaf node
   private final int _maxLeafRecords;

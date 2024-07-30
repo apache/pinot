@@ -33,11 +33,12 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import javax.annotation.Nullable;
-import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
 import org.apache.helix.AccessOption;
 import org.apache.helix.task.TaskState;
 import org.apache.helix.zookeeper.zkclient.IZkChildListener;
-import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
@@ -430,7 +431,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
         _controllerMetrics.addValueToTableGauge(getCronJobName(tableWithType, taskType),
             ControllerGauge.CRON_SCHEDULER_JOB_SCHEDULED, 1L);
       } catch (Exception e) {
-        LOGGER.error("Failed to parse Cron expression - " + cronExprStr, e);
+        LOGGER.error("Failed to parse Cron expression - {}", cronExprStr, e);
         throw e;
       }
       Date nextRuntime = trigger.getNextFireTime();
@@ -658,6 +659,11 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
       int numTasks = pinotTaskConfigs.size();
       try {
         if (numTasks > 0) {
+          if (_pinotHelixResourceManager.getInstancesWithTag(minionInstanceTag).isEmpty()) {
+            LOGGER.error("Skipping {} tasks for task type: {} with task configs: {} to invalid minionInstanceTag: {}",
+                numTasks, taskType, pinotTaskConfigs, minionInstanceTag);
+            throw new IllegalArgumentException("No valid minion instance found for tag: " + minionInstanceTag);
+          }
           // This might lead to lot of logs, maybe sum it up and move outside the loop
           LOGGER.info("Submitting {} tasks for task type: {} to minionInstance: {} with task configs: {}", numTasks,
               taskType, minionInstanceTag, pinotTaskConfigs);
@@ -694,6 +700,18 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
     LOGGER.info("Cleaning up all task generators");
     for (String taskType : _taskGeneratorRegistry.getAllTaskTypes()) {
       _taskGeneratorRegistry.getTaskGenerator(taskType).nonLeaderCleanUp();
+    }
+  }
+
+  @Override
+  protected void nonLeaderCleanup(List<String> tableNamesWithType) {
+    LOGGER.info(
+        "Cleaning up all task generators for tables that the controller is not the leader for. Number of tables to be"
+            + " cleaned up: {}. Printing at most first 10 table names to be cleaned up: [{}].",
+        tableNamesWithType.size(),
+        StringUtils.join(tableNamesWithType.stream().limit(10).map(t -> "\"" + t + "\"").toArray(), ", "));
+    for (String taskType : _taskGeneratorRegistry.getAllTaskTypes()) {
+      _taskGeneratorRegistry.getTaskGenerator(taskType).nonLeaderCleanUp(tableNamesWithType);
     }
   }
 

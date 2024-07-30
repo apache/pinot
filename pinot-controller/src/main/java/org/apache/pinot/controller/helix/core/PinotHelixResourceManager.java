@@ -58,7 +58,7 @@ import javax.ws.rs.BadRequestException;
 import javax.ws.rs.ClientErrorException;
 import javax.ws.rs.NotFoundException;
 import javax.ws.rs.core.Response;
-import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.AccessOption;
@@ -352,6 +352,15 @@ public class PinotHelixResourceManager {
    */
   public String getHelixClusterName() {
     return _helixClusterName;
+  }
+
+  /**
+   * Get the data directory path.
+   *
+   * @return Data directory path
+   */
+  public String getDataDir() {
+    return _dataDir;
   }
 
   /**
@@ -999,13 +1008,16 @@ public class PinotHelixResourceManager {
       LOGGER.info("Trying to delete segments: {} from table: {} ", segmentNames, tableNameWithType);
       Preconditions.checkArgument(TableNameBuilder.isTableResource(tableNameWithType),
           "Table name: %s is not a valid table name with type suffix", tableNameWithType);
-      HelixHelper.removeSegmentsFromIdealState(_helixZkManager, tableNameWithType, segmentNames);
-      if (retentionPeriod != null) {
-        _segmentDeletionManager.deleteSegments(tableNameWithType, segmentNames,
-            TimeUtils.convertPeriodToMillis(retentionPeriod));
-      } else {
-        TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
-        _segmentDeletionManager.deleteSegments(tableNameWithType, segmentNames, tableConfig);
+
+      synchronized (getTableUpdaterLock(tableNameWithType)) {
+        HelixHelper.removeSegmentsFromIdealState(_helixZkManager, tableNameWithType, segmentNames);
+        if (retentionPeriod != null) {
+          _segmentDeletionManager.deleteSegments(tableNameWithType, segmentNames,
+              TimeUtils.convertPeriodToMillis(retentionPeriod));
+        } else {
+          TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
+          _segmentDeletionManager.deleteSegments(tableNameWithType, segmentNames, tableConfig);
+        }
       }
       return PinotResourceManagerResponse.success("Segment " + segmentNames + " deleted");
     } catch (final Exception e) {
@@ -1069,7 +1081,7 @@ public class PinotHelixResourceManager {
           "Failed to fetch broker tag for table " + tableNameWithType + " due to exception: " + e.getMessage());
     }
     if (tableConfig == null) {
-      LOGGER.warn("Table " + tableNameWithType + " does not exist");
+      LOGGER.warn("Table {} does not exist", tableNameWithType);
       throw new InvalidConfigException(
           "Invalid table configuration for table " + tableNameWithType + ". Table does not exist");
     }
@@ -1350,7 +1362,7 @@ public class PinotHelixResourceManager {
     int numberOfInstances = brokerTenant.getNumberOfInstances();
     if (unTaggedInstanceList.size() < numberOfInstances) {
       String message = "Failed to allocate broker instances to Tag : " + brokerTenant.getTenantName()
-          + ", Current number of untagged server instances : " + unTaggedInstanceList.size()
+          + ", Current number of untagged broker instances : " + unTaggedInstanceList.size()
           + ", Request asked number is : " + brokerTenant.getNumberOfInstances();
       LOGGER.error(message);
       return PinotResourceManagerResponse.failure(message);

@@ -46,6 +46,8 @@ import org.apache.pinot.spi.utils.TimestampUtils;
  * <p>- <code>DefaultNullValue</code>: when no value found for this field, use this value. Stored in string format.
  * <p>- <code>VirtualColumnProvider</code>: the virtual column provider to use for this field.
  * <p>- <code>NotNull</code>: whether the column accepts nulls or not. Defaults to false.
+ * <p>- <code>MaxLength</code>: the maximum length of the string column. Defaults to 512.
+ * <p>- <code>MaxLengthExceedStrategy</code>: the strategy to handle the case when the string column exceeds the max
  */
 @SuppressWarnings("unused")
 public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
@@ -98,6 +100,10 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     }
   }
 
+  public enum MaxLengthExceedStrategy {
+    TRIM_LENGTH, ERROR, SUBSTITUTE_DEFAULT_VALUE, NO_ACTION
+  }
+
   protected String _name;
   protected DataType _dataType;
   protected boolean _isSingleValueField = true;
@@ -105,6 +111,9 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
 
   // NOTE: This only applies to STRING column, which is the max number of characters
   private int _maxLength = DEFAULT_MAX_LENGTH;
+
+  // NOTE: This only applies to STRING column during {@link SanitizationTransformer}
+  protected MaxLengthExceedStrategy _maxLengthExceedStrategy;
 
   protected Object _defaultNullValue;
   private transient String _stringDefaultNullValue;
@@ -129,11 +138,17 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
 
   public FieldSpec(String name, DataType dataType, boolean isSingleValueField, int maxLength,
       @Nullable Object defaultNullValue) {
+    this(name, dataType, isSingleValueField, maxLength, defaultNullValue, null);
+  }
+
+  public FieldSpec(String name, DataType dataType, boolean isSingleValueField, int maxLength,
+      @Nullable Object defaultNullValue, @Nullable MaxLengthExceedStrategy maxLengthExceedStrategy) {
     _name = name;
     _dataType = dataType;
     _isSingleValueField = isSingleValueField;
     _maxLength = maxLength;
     setDefaultNullValue(defaultNullValue);
+    _maxLengthExceedStrategy = maxLengthExceedStrategy;
   }
 
   public abstract FieldType getFieldType();
@@ -173,6 +188,16 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   // Required by JSON de-serializer. DO NOT REMOVE.
   public void setMaxLength(int maxLength) {
     _maxLength = maxLength;
+  }
+
+  @Nullable
+  public MaxLengthExceedStrategy getMaxLengthExceedStrategy() {
+    return _maxLengthExceedStrategy;
+  }
+
+  // Required by JSON de-serializer. DO NOT REMOVE.
+  public void setMaxLengthExceedStrategy(@Nullable MaxLengthExceedStrategy maxLengthExceedStrategy) {
+    _maxLengthExceedStrategy = maxLengthExceedStrategy;
   }
 
   public String getVirtualColumnProvider() {
@@ -411,6 +436,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
         .isEqual(_isSingleValueField, that._isSingleValueField) && EqualityUtils
         .isEqual(getStringValue(_defaultNullValue), getStringValue(that._defaultNullValue)) && EqualityUtils
         .isEqual(_maxLength, that._maxLength) && EqualityUtils.isEqual(_transformFunction, that._transformFunction)
+        && EqualityUtils.isEqual(_maxLengthExceedStrategy, that._maxLengthExceedStrategy)
         && EqualityUtils.isEqual(_virtualColumnProvider, that._virtualColumnProvider)
         && EqualityUtils.isEqual(_notNull, that._notNull);
   }
@@ -422,6 +448,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     result = EqualityUtils.hashCodeOf(result, _isSingleValueField);
     result = EqualityUtils.hashCodeOf(result, getStringValue(_defaultNullValue));
     result = EqualityUtils.hashCodeOf(result, _maxLength);
+    result = EqualityUtils.hashCodeOf(result, _maxLengthExceedStrategy);
     result = EqualityUtils.hashCodeOf(result, _transformFunction);
     result = EqualityUtils.hashCodeOf(result, _virtualColumnProvider);
     result = EqualityUtils.hashCodeOf(result, _notNull);

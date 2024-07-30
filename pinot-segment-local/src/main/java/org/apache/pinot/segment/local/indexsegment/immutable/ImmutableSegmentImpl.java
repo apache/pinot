@@ -252,18 +252,19 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   }
 
   @Override
-  public void destroy() {
-    String segmentName = getSegmentName();
-    LOGGER.info("Trying to destroy segment : {}", segmentName);
-
-    // Remove the upsert and dedup metadata before closing the readers
+  public void offload() {
     if (_partitionUpsertMetadataManager != null) {
       _partitionUpsertMetadataManager.removeSegment(this);
     }
-
     if (_partitionDedupMetadataManager != null) {
       _partitionDedupMetadataManager.removeSegment(this);
     }
+  }
+
+  @Override
+  public void destroy() {
+    String segmentName = getSegmentName();
+    LOGGER.info("Trying to destroy segment : {}", segmentName);
     // StarTreeIndexContainer refers to other column index containers, so close it firstly.
     if (_starTreeIndexContainer != null) {
       try {

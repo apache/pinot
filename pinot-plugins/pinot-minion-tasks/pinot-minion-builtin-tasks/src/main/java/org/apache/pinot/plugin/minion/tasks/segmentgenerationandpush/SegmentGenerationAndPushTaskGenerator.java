@@ -329,7 +329,7 @@ public class SegmentGenerationAndPushTaskGenerator extends BaseTaskGenerator {
       try {
         files = inputDirFS.listFiles(inputDirURI, true);
       } catch (IOException e) {
-        LOGGER.error("Unable to list files under URI: " + inputDirURI, e);
+        LOGGER.error("Unable to list files under URI: {}", inputDirURI, e);
         return Collections.emptyList();
       }
       PathMatcher includeFilePathMatcher = null;

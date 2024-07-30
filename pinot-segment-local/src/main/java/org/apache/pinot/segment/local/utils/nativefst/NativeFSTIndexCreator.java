@@ -47,7 +47,7 @@ public class NativeFSTIndexCreator implements FSTIndexCreator {
    * @param sortedEntries Sorted entries of the unique values of the column.
    */
   public NativeFSTIndexCreator(File indexDir, String columnName, String[] sortedEntries) {
-    _fstIndexFile = new File(indexDir, columnName + V1Constants.Indexes.LUCENE_V9_FST_INDEX_FILE_EXTENSION);
+    _fstIndexFile = new File(indexDir, columnName + V1Constants.Indexes.LUCENE_V99_FST_INDEX_FILE_EXTENSION);
 
     _fstBuilder = new FSTBuilder();
     _dictId = 0;
@@ -77,7 +77,7 @@ public class NativeFSTIndexCreator implements FSTIndexCreator {
   @Override
   public void seal()
       throws IOException {
-    LOGGER.info("Sealing FST index: " + _fstIndexFile.getAbsolutePath());
+    LOGGER.info("Sealing FST index: {}", _fstIndexFile.getAbsolutePath());
     try (FileOutputStream fileOutputStream = new FileOutputStream(_fstIndexFile)) {
       FST fst = _fstBuilder.complete();
       fst.save(fileOutputStream);

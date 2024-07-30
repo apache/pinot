@@ -163,7 +163,8 @@ public class MemoryEstimator {
             .setSegmentName(_segmentMetadata.getName()).setStreamName(_tableNameWithType)
             .setSchema(_segmentMetadata.getSchema()).setCapacity(_segmentMetadata.getTotalDocs())
             .setAvgNumMultiValues(_avgMultiValues).setSegmentZKMetadata(segmentZKMetadata).setOffHeap(true)
-            .setMemoryManager(memoryManager).setStatsHistory(sampleStatsHistory);
+            .setMemoryManager(memoryManager).setStatsHistory(sampleStatsHistory)
+            .setConsumerDir(_workingDir.getAbsolutePath());
 
     // create mutable segment impl
     MutableSegmentImpl mutableSegmentImpl = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), null);
@@ -326,7 +327,8 @@ public class MemoryEstimator {
             .setSegmentName(_segmentMetadata.getName()).setStreamName(_tableNameWithType)
             .setSchema(_segmentMetadata.getSchema()).setCapacity(totalDocs).setAvgNumMultiValues(_avgMultiValues)
             .setSegmentZKMetadata(segmentZKMetadata).setOffHeap(true)
-            .setMemoryManager(memoryManager).setStatsHistory(statsHistory);
+            .setMemoryManager(memoryManager).setStatsHistory(statsHistory)
+            .setConsumerDir(_workingDir.getAbsolutePath());
 
     // create mutable segment impl
     MutableSegmentImpl mutableSegmentImpl = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), null);

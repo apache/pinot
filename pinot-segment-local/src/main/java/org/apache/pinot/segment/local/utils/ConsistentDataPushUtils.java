@@ -62,10 +62,10 @@ public class ConsistentDataPushUtils {
   public static Map<URI, String> preUpload(SegmentGenerationJobSpec spec, List<String> segmentsTo)
       throws Exception {
     String rawTableName = spec.getTableSpec().getTableName();
-    LOGGER.info("Start consistent push for table: " + rawTableName);
+    LOGGER.info("Start consistent push for table: {}", rawTableName);
     Map<URI, List<String>> uriToExistingOfflineSegments = getSegmentsToReplace(spec, rawTableName);
-    LOGGER.info("Existing segments for table {}: " + uriToExistingOfflineSegments, rawTableName);
-    LOGGER.info("New segments for table: {}: " + segmentsTo, rawTableName);
+    LOGGER.info("Existing segments for table {}: {}", rawTableName, uriToExistingOfflineSegments);
+    LOGGER.info("New segments for table: {}: {}", rawTableName, segmentsTo);
     return startReplaceSegments(spec, uriToExistingOfflineSegments, segmentsTo);
   }
 
@@ -77,7 +77,7 @@ public class ConsistentDataPushUtils {
       throws Exception {
     String rawTableName = spec.getTableSpec().getTableName();
     if (uriToLineageEntryIdMap != null && !uriToLineageEntryIdMap.isEmpty()) {
-      LOGGER.info("End consistent push for table: " + rawTableName);
+      LOGGER.info("End consistent push for table: {}", rawTableName);
       endReplaceSegments(spec, uriToLineageEntryIdMap);
     }
   }
@@ -112,7 +112,7 @@ public class ConsistentDataPushUtils {
     String rawTableName = spec.getTableSpec().getTableName();
     Map<URI, URI> segmentsUris = getStartReplaceSegmentUris(spec, rawTableName);
     AuthProvider authProvider = AuthProviderUtils.makeAuthProvider(spec.getAuthToken());
-    LOGGER.info("Start replace segment URIs: " + segmentsUris);
+    LOGGER.info("Start replace segment URIs: {}", segmentsUris);
 
     for (Map.Entry<URI, URI> entry : segmentsUris.entrySet()) {
       URI controllerUri = entry.getKey();

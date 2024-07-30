@@ -25,17 +25,19 @@ import org.apache.datasketches.tuple.aninteger.IntegerSummarySetOperations;
 import org.apache.pinot.segment.local.utils.CustomSerDeUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.CommonConstants;
 
 
-public class IntegerTupleSketchValueAggregator implements ValueAggregator<byte[], Sketch<IntegerSummary>> {
+@SuppressWarnings("unchecked")
+public class IntegerTupleSketchValueAggregator implements ValueAggregator<byte[], Object> {
   public static final DataType AGGREGATED_VALUE_TYPE = DataType.BYTES;
 
-  // This changes a lot similar to the Bitmap aggregator
-  private int _maxByteSize;
+  private final int _nominalEntries;
 
   private final IntegerSummary.Mode _mode;
 
   public IntegerTupleSketchValueAggregator(IntegerSummary.Mode mode) {
+    _nominalEntries = 1 << CommonConstants.Helix.DEFAULT_TUPLE_SKETCH_LGK;
     _mode = mode;
   }
 
@@ -49,47 +51,85 @@ public class IntegerTupleSketchValueAggregator implements ValueAggregator<byte[]
     return AGGREGATED_VALUE_TYPE;
   }
 
-  // Utility method to merge two sketches
-  private Sketch<IntegerSummary> union(Sketch<IntegerSummary> a, Sketch<IntegerSummary> b) {
-    return new Union<>(new IntegerSummarySetOperations(_mode, _mode)).union(a, b);
-  }
-
   @Override
-  public Sketch<IntegerSummary> getInitialAggregatedValue(byte[] rawValue) {
+  public Object getInitialAggregatedValue(byte[] rawValue) {
     Sketch<IntegerSummary> initialValue = deserializeAggregatedValue(rawValue);
-    _maxByteSize = Math.max(_maxByteSize, rawValue.length);
-    return initialValue;
+    Union tupleUnion = new Union<>(_nominalEntries, new IntegerSummarySetOperations(_mode, _mode));
+    tupleUnion.union(initialValue);
+    return tupleUnion;
+  }
+
+  private Union extractUnion(Object value) {
+    if (value == null) {
+      return new Union<>(_nominalEntries, new IntegerSummarySetOperations(_mode, _mode));
+    } else if (value instanceof Union) {
+      return (Union) value;
+    } else if (value instanceof Sketch) {
+      Sketch sketch = (Sketch) value;
+      Union tupleUnion = new Union<>(_nominalEntries, new IntegerSummarySetOperations(_mode, _mode));
+      tupleUnion.union(sketch);
+      return tupleUnion;
+    } else {
+      throw new IllegalStateException(
+          "Unsupported data type for Integer Tuple Sketch aggregation: " + value.getClass().getSimpleName());
+    }
+  }
+
+  private Sketch extractSketch(Object value) {
+    if (value instanceof Union) {
+      return ((Union) value).getResult();
+    } else if (value instanceof Sketch) {
+      return ((Sketch) value);
+    } else {
+      throw new IllegalStateException(
+          "Unsupported data type for Integer Tuple Sketch aggregation: " + value.getClass().getSimpleName());
+    }
   }
 
   @Override
-  public Sketch<IntegerSummary> applyRawValue(Sketch<IntegerSummary> value, byte[] rawValue) {
-    Sketch<IntegerSummary> right = deserializeAggregatedValue(rawValue);
-    Sketch<IntegerSummary> result = union(value, right).compact();
-    _maxByteSize = Math.max(_maxByteSize, result.toByteArray().length);
-    return result;
+  public Object applyRawValue(Object aggregatedValue, byte[] rawValue) {
+    Union tupleUnion = extractUnion(aggregatedValue);
+    tupleUnion.union(deserializeAggregatedValue(rawValue));
+    return tupleUnion;
   }
 
   @Override
-  public Sketch<IntegerSummary> applyAggregatedValue(Sketch<IntegerSummary> value,
-      Sketch<IntegerSummary> aggregatedValue) {
-    Sketch<IntegerSummary> result = union(value, aggregatedValue);
-    _maxByteSize = Math.max(_maxByteSize, result.toByteArray().length);
-    return result;
+  public Object applyAggregatedValue(Object value, Object aggregatedValue) {
+    Union tupleUnion = extractUnion(aggregatedValue);
+    Sketch sketch = extractSketch(value);
+    tupleUnion.union(sketch);
+    return tupleUnion;
   }
 
   @Override
-  public Sketch<IntegerSummary> cloneAggregatedValue(Sketch<IntegerSummary> value) {
+  public Object cloneAggregatedValue(Object value) {
     return deserializeAggregatedValue(serializeAggregatedValue(value));
   }
 
+  /**
+   * Returns the maximum number of storage bytes required for a Compact Integer Tuple Sketch with the given
+   * number of actual entries. Note that this assumes the worst case of the sketch in
+   * estimation mode, which requires storing theta and count.
+   * @return the maximum number of storage bytes required for a Compact Integer Tuple Sketch with the given number
+   * of entries.
+   */
   @Override
   public int getMaxAggregatedValueByteSize() {
-    return _maxByteSize;
+    if (_nominalEntries == 0) {
+      return 8;
+    }
+    if (_nominalEntries == 1) {
+      return 16;
+    }
+    int longSizeInBytes = Long.BYTES;
+    int intSizeInBytes = Integer.BYTES;
+    return (_nominalEntries * (longSizeInBytes + intSizeInBytes)) + 24;
   }
 
   @Override
-  public byte[] serializeAggregatedValue(Sketch<IntegerSummary> value) {
-    return CustomSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.serialize(value);
+  public byte[] serializeAggregatedValue(Object value) {
+    Sketch sketch = extractSketch(value);
+    return sketch.compact().toByteArray();
   }
 
   @Override

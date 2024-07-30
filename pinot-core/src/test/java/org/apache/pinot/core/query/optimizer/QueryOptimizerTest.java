@@ -73,16 +73,14 @@ public class QueryOptimizerTest {
     assertEquals(secondChildFunction.getOperator(), FilterKind.AND.name());
     List<Expression> secondChildChildren = secondChildFunction.getOperands();
     assertEquals(secondChildChildren.size(), 3);
-    assertEquals(secondChildChildren.get(0), getEqFilterExpression("long", 5L));
-    assertEquals(secondChildChildren.get(1), getEqFilterExpression("float", 9f));
+    assertEquals(secondChildChildren.get(0), getEqFilterExpression("long", 5));
+    assertEquals(secondChildChildren.get(1), getEqFilterExpression("float", 9));
     assertEquals(secondChildChildren.get(2), getEqFilterExpression("double", 7.5));
   }
 
   private static Expression getEqFilterExpression(String column, Object value) {
-    Expression eqFilterExpression = RequestUtils.getFunctionExpression(FilterKind.EQUALS.name());
-    eqFilterExpression.getFunctionCall().setOperands(
-        Arrays.asList(RequestUtils.getIdentifierExpression(column), RequestUtils.getLiteralExpression(value)));
-    return eqFilterExpression;
+    return RequestUtils.getFunctionExpression(FilterKind.EQUALS.name(), RequestUtils.getIdentifierExpression(column),
+        RequestUtils.getLiteralExpression(value));
   }
 
   @Test
@@ -97,7 +95,7 @@ public class QueryOptimizerTest {
     List<Expression> children = filterFunction.getOperands();
     assertEquals(children.size(), 3);
     assertEquals(children.get(0), getEqFilterExpression("int", 1));
-    checkInFilterFunction(children.get(1).getFunctionCall(), "long", Arrays.asList(2L, 3L, 4L));
+    checkInFilterFunction(children.get(1).getFunctionCall(), "long", Arrays.asList(2, 3, 4));
 
     Function thirdChildFunction = children.get(2).getFunctionCall();
     assertEquals(thirdChildFunction.getOperator(), FilterKind.OR.name());
@@ -154,7 +152,7 @@ public class QueryOptimizerTest {
     assertEquals(secondChildFunction.getOperator(), FilterKind.AND.name());
     List<Expression> secondChildChildren = secondChildFunction.getOperands();
     assertEquals(secondChildChildren.size(), 2);
-    assertEquals(secondChildChildren.get(0), getEqFilterExpression("float", 6f));
+    assertEquals(secondChildChildren.get(0), getEqFilterExpression("float", 6));
     assertEquals(secondChildChildren.get(1), getRangeFilterExpression("float", "[6.0\0006.5)"));
 
     // Range filter on multi-value column should not be merged ([-5, 10] can match this filter)
@@ -178,14 +176,12 @@ public class QueryOptimizerTest {
     List<Expression> operands = filterFunction.getOperands();
     assertEquals(operands.size(), 2);
     assertEquals(operands.get(0), RequestUtils.getIdentifierExpression("string"));
-    assertEquals(operands.get(1), RequestUtils.getLiteralExpression("foo AND bar OR baz"));
+    assertEquals(operands.get(1), RequestUtils.getLiteralExpression("((foo AND bar) OR baz)"));
   }
 
   private static Expression getRangeFilterExpression(String column, String rangeString) {
-    Expression rangeFilterExpression = RequestUtils.getFunctionExpression(FilterKind.RANGE.name());
-    rangeFilterExpression.getFunctionCall().setOperands(
-        Arrays.asList(RequestUtils.getIdentifierExpression(column), RequestUtils.getLiteralExpression(rangeString)));
-    return rangeFilterExpression;
+    return RequestUtils.getFunctionExpression(FilterKind.RANGE.name(), RequestUtils.getIdentifierExpression(column),
+        RequestUtils.getLiteralExpression(rangeString));
   }
 
   @Test
@@ -268,32 +264,40 @@ public class QueryOptimizerTest {
 
     // TextMatchFilterOptimizer
     testQuery("SELECT * FROM testTable WHERE TEXT_MATCH(string, 'foo') AND TEXT_MATCH(string, 'bar')",
-        "SELECT * FROM testTable WHERE TEXT_MATCH(string, 'foo AND bar')");
+        "SELECT * FROM testTable WHERE TEXT_MATCH(string, '(foo AND bar)')");
     testQuery("SELECT * FROM testTable WHERE TEXT_MATCH(string, '\"foo bar\"') AND TEXT_MATCH(string, 'baz')",
-        "SELECT * FROM testTable WHERE TEXT_MATCH(string, '\"foo bar\" AND baz')");
+        "SELECT * FROM testTable WHERE TEXT_MATCH(string, '(\"foo bar\" AND baz)')");
     testQuery("SELECT * FROM testTable WHERE TEXT_MATCH(string, '\"foo bar\"') AND TEXT_MATCH(string, '/.*ooba.*/')",
-        "SELECT * FROM testTable WHERE TEXT_MATCH(string, '\"foo bar\" AND /.*ooba.*/')");
+        "SELECT * FROM testTable WHERE TEXT_MATCH(string, '(\"foo bar\" AND /.*ooba.*/)')");
     testQuery("SELECT * FROM testTable WHERE int = 1 AND TEXT_MATCH(string, 'foo') AND TEXT_MATCH(string, 'bar')",
-        "SELECT * FROM testTable WHERE int = 1 AND TEXT_MATCH(string, 'foo AND bar')");
+        "SELECT * FROM testTable WHERE int = 1 AND TEXT_MATCH(string, '(foo AND bar)')");
     testQuery("SELECT * FROM testTable WHERE int = 1 OR TEXT_MATCH(string, 'foo') AND TEXT_MATCH(string, 'bar')",
-        "SELECT * FROM testTable WHERE int = 1 OR TEXT_MATCH(string, 'foo AND bar')");
+        "SELECT * FROM testTable WHERE int = 1 OR TEXT_MATCH(string, '(foo AND bar)')");
     testQuery("SELECT * FROM testTable WHERE TEXT_MATCH(string, 'foo') AND NOT TEXT_MATCH(string, 'bar')",
-        "SELECT * FROM testTable WHERE TEXT_MATCH(string, 'foo AND NOT bar')");
+        "SELECT * FROM testTable WHERE TEXT_MATCH(string, '(foo AND NOT bar)')");
     testQuery("SELECT * FROM testTable WHERE NOT TEXT_MATCH(string, 'foo') AND TEXT_MATCH(string, 'bar')",
-        "SELECT * FROM testTable WHERE TEXT_MATCH(string, 'NOT foo AND bar')");
+        "SELECT * FROM testTable WHERE TEXT_MATCH(string, '(NOT foo AND bar)')");
     testQuery("SELECT * FROM testTable WHERE NOT TEXT_MATCH(string, 'foo') AND NOT TEXT_MATCH(string, 'bar')",
-        "SELECT * FROM testTable WHERE NOT TEXT_MATCH(string, 'foo OR bar')");
+        "SELECT * FROM testTable WHERE NOT TEXT_MATCH(string, '(foo OR bar)')");
     testQuery("SELECT * FROM testTable WHERE NOT TEXT_MATCH(string, 'foo') OR NOT TEXT_MATCH(string, 'bar')",
-        "SELECT * FROM testTable WHERE NOT TEXT_MATCH(string, 'foo AND bar')");
+        "SELECT * FROM testTable WHERE NOT TEXT_MATCH(string, '(foo AND bar)')");
     testQuery("SELECT * FROM testTable WHERE TEXT_MATCH(string, 'foo') AND TEXT_MATCH(string, 'bar') OR "
-        + "TEXT_MATCH(string, 'baz')", "SELECT * FROM testTable WHERE TEXT_MATCH(string, 'foo AND bar OR baz')");
+        + "TEXT_MATCH(string, 'baz')", "SELECT * FROM testTable WHERE TEXT_MATCH(string, '((foo AND bar) OR baz)')");
+    testQuery("SELECT * FROM testTable WHERE TEXT_MATCH(string, 'foo') AND (TEXT_MATCH(string, 'bar') OR "
+        + "TEXT_MATCH(string, 'baz'))", "SELECT * FROM testTable WHERE TEXT_MATCH(string, '(foo AND (bar OR baz))')");
     testQuery("SELECT * FROM testTable WHERE TEXT_MATCH(string1, 'foo1') AND TEXT_MATCH(string1, 'bar1') OR "
             + "TEXT_MATCH(string1, 'baz1') AND TEXT_MATCH(string2, 'foo')",
-        "SELECT * FROM testTable WHERE TEXT_MATCH(string1, 'foo1 AND bar1') OR TEXT_MATCH(string1, 'baz1') AND "
+        "SELECT * FROM testTable WHERE TEXT_MATCH(string1, '(foo1 AND bar1)') OR TEXT_MATCH(string1, 'baz1') AND "
             + "TEXT_MATCH(string2, 'foo')");
     testQuery("SELECT * FROM testTable WHERE TEXT_MATCH(string1, 'foo1') AND TEXT_MATCH(string1, 'bar1')"
             + "AND TEXT_MATCH(string2, 'foo2') AND TEXT_MATCH(string2, 'bar2')",
-        "SELECT * FROM testTable WHERE TEXT_MATCH(string1, 'foo1 AND bar1') AND TEXT_MATCH(string2, 'foo2 AND bar2')");
+        "SELECT * FROM testTable WHERE TEXT_MATCH(string1, '(foo1 AND bar1)') AND TEXT_MATCH(string2, '(foo2 AND "
+            + "bar2)')");
+    testQuery("SELECT * FROM testTable WHERE TEXT_MATCH(string, 'foo') OR NOT TEXT_MATCH(string, 'bar')",
+        "SELECT * FROM testTable WHERE NOT TEXT_MATCH(string, 'bar') OR TEXT_MATCH(string, 'foo')");
+    testQuery(
+        "select * from testTable where intCol > 1 AND (text_match(string, 'foo') OR NOT text_match(string, 'bar'))",
+        "select * from testTable where intCol > 1 AND (NOT text_match(string, 'bar') OR text_match(string, 'foo'))");
     testCannotOptimizeQuery("SELECT * FROM testTable WHERE TEXT_MATCH(string1, 'foo') OR TEXT_MATCH(string2, 'bar')");
     testCannotOptimizeQuery(
         "SELECT * FROM testTable WHERE int = 1 AND TEXT_MATCH(string, 'foo') OR TEXT_MATCH(string, 'bar')");
@@ -388,16 +392,16 @@ public class QueryOptimizerTest {
   private static String getRangeString(FilterKind filterKind, List<Expression> operands) {
     switch (filterKind) {
       case GREATER_THAN:
-        return Range.LOWER_EXCLUSIVE + operands.get(1).getLiteral().getFieldValue().toString() + Range.UPPER_UNBOUNDED;
+        return Range.LOWER_EXCLUSIVE + RequestUtils.getLiteralString(operands.get(1)) + Range.UPPER_UNBOUNDED;
       case GREATER_THAN_OR_EQUAL:
-        return Range.LOWER_INCLUSIVE + operands.get(1).getLiteral().getFieldValue().toString() + Range.UPPER_UNBOUNDED;
+        return Range.LOWER_INCLUSIVE + RequestUtils.getLiteralString(operands.get(1)) + Range.UPPER_UNBOUNDED;
       case LESS_THAN:
-        return Range.LOWER_UNBOUNDED + operands.get(1).getLiteral().getFieldValue().toString() + Range.UPPER_EXCLUSIVE;
+        return Range.LOWER_UNBOUNDED + RequestUtils.getLiteralString(operands.get(1)) + Range.UPPER_EXCLUSIVE;
       case LESS_THAN_OR_EQUAL:
-        return Range.LOWER_UNBOUNDED + operands.get(1).getLiteral().getFieldValue().toString() + Range.UPPER_INCLUSIVE;
+        return Range.LOWER_UNBOUNDED + RequestUtils.getLiteralString(operands.get(1)) + Range.UPPER_INCLUSIVE;
       case BETWEEN:
-        return Range.LOWER_INCLUSIVE + operands.get(1).getLiteral().getFieldValue().toString() + Range.DELIMITER
-            + operands.get(2).getLiteral().getFieldValue().toString() + Range.UPPER_INCLUSIVE;
+        return Range.LOWER_INCLUSIVE + RequestUtils.getLiteralString(operands.get(1)) + Range.DELIMITER
+            + RequestUtils.getLiteralString(operands.get(2)) + Range.UPPER_INCLUSIVE;
       case RANGE:
         return operands.get(1).getLiteral().getStringValue();
       default:

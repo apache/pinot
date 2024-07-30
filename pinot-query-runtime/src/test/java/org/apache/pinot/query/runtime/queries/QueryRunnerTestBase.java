@@ -50,7 +50,6 @@ import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
-import org.apache.pinot.core.query.reduce.ExecutionStatsAggregator;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.QueryServerEnclosure;
 import org.apache.pinot.query.QueryTestSet;
@@ -99,11 +98,17 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
   // QUERY UTILS
   // --------------------------------------------------------------------------
 
+  protected QueryEnvironment.QueryPlannerResult planQuery(String sql) {
+    long requestId = REQUEST_ID_GEN.getAndIncrement();
+    SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sql);
+    return _queryEnvironment.planQuery(sql, sqlNodeAndOptions, requestId);
+  }
+
   /**
    * Dispatch query to each pinot-server. The logic should mimic QueryDispatcher.submit() but does not actually make
    * ser/de dispatches.
    */
-  protected ResultTable queryRunner(String sql, Map<Integer, ExecutionStatsAggregator> executionStatsAggregatorMap) {
+  protected QueryDispatcher.QueryResult queryRunner(String sql, boolean trace) {
     long requestId = REQUEST_ID_GEN.getAndIncrement();
     SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sql);
     QueryEnvironment.QueryPlannerResult queryPlannerResult =
@@ -119,7 +124,7 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
     requestMetadataMap.putAll(sqlNodeAndOptions.getOptions());
 
     // Putting trace testing here as extra options as it doesn't go along with the rest of the items.
-    if (executionStatsAggregatorMap != null) {
+    if (trace) {
       requestMetadataMap.put(CommonConstants.Broker.Request.TRACE, "true");
     }
 
@@ -129,9 +134,6 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
     for (int stageId = 0; stageId < stagePlans.size(); stageId++) {
       if (stageId != 0) {
         submissionStubs.addAll(processDistributedStagePlans(dispatchableSubPlan, stageId, requestMetadataMap));
-      }
-      if (executionStatsAggregatorMap != null) {
-        executionStatsAggregatorMap.put(stageId, new ExecutionStatsAggregator(true));
       }
     }
     try {
@@ -149,7 +151,7 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
     }
     // exception will be propagated through for assert purpose on runtime error
     return QueryDispatcher.runReducer(requestId, dispatchableSubPlan, timeoutMs, Collections.emptyMap(),
-        executionStatsAggregatorMap, _mailboxService);
+        _mailboxService);
   }
 
   protected List<CompletableFuture<?>> processDistributedStagePlans(DispatchableSubPlan dispatchableSubPlan,

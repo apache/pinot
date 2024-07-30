@@ -19,7 +19,9 @@
 package org.apache.pinot.query.runtime.queries;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStream;
@@ -35,18 +37,21 @@ import java.util.Set;
 import java.util.TimeZone;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
-import org.apache.pinot.common.response.broker.BrokerResponseStats;
-import org.apache.pinot.common.response.broker.ResultTable;
-import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
-import org.apache.pinot.core.query.reduce.ExecutionStatsAggregator;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.QueryServerEnclosure;
 import org.apache.pinot.query.mailbox.MailboxService;
+import org.apache.pinot.query.planner.PlanFragment;
+import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
+import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.routing.QueryServerInstance;
+import org.apache.pinot.query.runtime.MultiStageStatsTreeBuilder;
+import org.apache.pinot.query.runtime.operator.LeafStageTransferableBlockOperator;
+import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
+import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.query.testutils.MockInstanceDataManagerFactory;
 import org.apache.pinot.query.testutils.QueryTestUtils;
 import org.apache.pinot.spi.config.table.TableType;
@@ -243,7 +248,6 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
   public void tearDown() {
     // Restore the original default timezone
     TimeZone.setDefault(_currentSystemTimeZone);
-    DataTableBuilderFactory.setDataTableVersion(DataTableBuilderFactory.DEFAULT_VERSION);
     for (QueryServerEnclosure server : _servers.values()) {
       server.shutDown();
     }
@@ -256,9 +260,9 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       boolean keepOutputRowOrder)
       throws Exception {
     // query pinot
-    runQuery(sql, expect, null).ifPresent(resultTable -> {
+    runQuery(sql, expect, false).ifPresent(queryResult -> {
       try {
-        compareRowEquals(resultTable, queryH2(h2Sql), keepOutputRowOrder);
+        compareRowEquals(queryResult.getResultTable(), queryH2(h2Sql), keepOutputRowOrder);
       } catch (Exception e) {
         Assert.fail(e.getMessage(), e);
       }
@@ -269,74 +273,80 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
   public void testQueryTestCasesWithOutput(String testCaseName, boolean isIgnored, String sql, String h2Sql,
       List<Object[]> expectedRows, String expect, boolean keepOutputRowOrder)
       throws Exception {
-    runQuery(sql, expect, null).ifPresent(
-        resultTable -> compareRowEquals(resultTable, expectedRows, keepOutputRowOrder));
+    runQuery(sql, expect, false).ifPresent(
+        queryResult -> compareRowEquals(queryResult.getResultTable(), expectedRows, keepOutputRowOrder));
+  }
+
+  private Map<String, JsonNode> tableToStats(String sql, QueryDispatcher.QueryResult queryResult) {
+
+    List<PlanNode> planNodes = planQuery(sql).getQueryPlan().getQueryStageList().stream()
+        .map(DispatchablePlanFragment::getPlanFragment)
+        .map(PlanFragment::getFragmentRoot)
+        .collect(Collectors.toList());
+
+    MultiStageStatsTreeBuilder multiStageStatsTreeBuilder =
+        new MultiStageStatsTreeBuilder(planNodes, queryResult.getQueryStats());
+    ObjectNode jsonNodes = multiStageStatsTreeBuilder.jsonStatsByStage(1);
+
+    Map<String, JsonNode> map = new HashMap<>();
+    tableToStatsRec(map, jsonNodes);
+    return map;
+  }
+
+  private void tableToStatsRec(Map<String, JsonNode> map, ObjectNode node) {
+    JsonNode type = node.get("type");
+    if (type == null || !type.equals("LEAF")) {
+      return;
+    }
+    String tableName = node.get("table").asText();
+    JsonNode old = map.put(tableName, node);
+    if (old != null) {
+      throw new RuntimeException("Found at least two leaf stages for table " + tableName);
+    }
+    JsonNode children = node.get("children");
+    if (children != null) {
+      for (JsonNode child : children) {
+        tableToStatsRec(map, (ObjectNode) child);
+      }
+    }
   }
 
   @Test(dataProvider = "testResourceQueryTestCaseProviderWithMetadata")
   public void testQueryTestCasesWithMetadata(String testCaseName, boolean isIgnored, String sql, String h2Sql,
       String expect, int numSegments)
       throws Exception {
-    Map<Integer, ExecutionStatsAggregator> executionStatsAggregatorMap = new HashMap<>();
-    runQuery(sql, expect, executionStatsAggregatorMap).ifPresent(resultTable -> {
+    runQuery(sql, expect, true).ifPresent(queryResult -> {
       BrokerResponseNativeV2 brokerResponseNative = new BrokerResponseNativeV2();
-      executionStatsAggregatorMap.get(0).setStats(brokerResponseNative);
-      Assert.assertFalse(executionStatsAggregatorMap.isEmpty());
-      for (Integer stageId : executionStatsAggregatorMap.keySet()) {
-        if (stageId > 0) {
-          BrokerResponseStats brokerResponseStats = new BrokerResponseStats();
-          executionStatsAggregatorMap.get(stageId).setStageLevelStats(null, brokerResponseStats, null);
-          brokerResponseNative.addStageStat(stageId, brokerResponseStats);
-        }
+      for (MultiStageQueryStats.StageStats.Closed stageStats : queryResult.getQueryStats()) {
+        stageStats.forEach((type, stats) -> type.mergeInto(brokerResponseNative, stats));
       }
 
       Assert.assertEquals(brokerResponseNative.getNumSegmentsQueried(), numSegments);
 
-      Map<Integer, BrokerResponseStats> stageIdStats = brokerResponseNative.getStageIdStats();
-      int numTables = 0;
-      for (Integer stageId : stageIdStats.keySet()) {
-        // check stats only for leaf stage
-        BrokerResponseStats brokerResponseStats = stageIdStats.get(stageId);
-
-        if (brokerResponseStats.getTableNames().isEmpty()) {
-          continue;
-        }
-
-        String tableName = brokerResponseStats.getTableNames().get(0);
-        Assert.assertEquals(brokerResponseStats.getTableNames().size(), 1);
-        numTables++;
+      Map<String, JsonNode> tableToStats = tableToStats(sql, queryResult);
+      for (Map.Entry<String, JsonNode> entry : tableToStats.entrySet()) {
+        String tableName = entry.getKey();
         TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
         if (tableType == null) {
           tableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
         }
 
         Assert.assertNotNull(_tableToSegmentMap.get(tableName));
-        Assert.assertEquals(brokerResponseStats.getNumSegmentsQueried(), _tableToSegmentMap.get(tableName).size());
-
-        Assert.assertFalse(brokerResponseStats.getOperatorStats().isEmpty());
-        Map<String, Map<String, String>> operatorStats = brokerResponseStats.getOperatorStats();
-        for (Map.Entry<String, Map<String, String>> entry : operatorStats.entrySet()) {
-          if (entry.getKey().contains("LEAF_STAGE")) {
-            Assert.assertNotNull(entry.getValue().get(DataTable.MetadataKey.NUM_SEGMENTS_QUERIED.getName()));
-          } else {
-            Assert.assertNotNull(entry.getValue().get(DataTable.MetadataKey.NUM_BLOCKS.getName()));
-          }
-        }
+        String statName = LeafStageTransferableBlockOperator.StatKey.NUM_SEGMENTS_QUERIED.getStatName();
+        int numSegmentsQueried = entry.getValue().get(statName).asInt();
+        Assert.assertEquals(numSegmentsQueried, _tableToSegmentMap.get(tableName).size());
       }
-
-      Assert.assertTrue(numTables > 0);
     });
   }
 
-  private Optional<ResultTable> runQuery(String sql, final String except,
-      Map<Integer, ExecutionStatsAggregator> executionStatsAggregatorMap)
+  private Optional<QueryDispatcher.QueryResult> runQuery(String sql, final String except, boolean trace)
       throws Exception {
     try {
       // query pinot
-      ResultTable resultTable = queryRunner(sql, executionStatsAggregatorMap);
+      QueryDispatcher.QueryResult queryResult = queryRunner(sql, trace);
       Assert.assertNull(except, "Expected error with message '" + except + "'. But instead rows were returned: "
-          + JsonUtils.objectToPrettyString(resultTable));
-      return Optional.of(resultTable);
+          + JsonUtils.objectToPrettyString(queryResult.getResultTable()));
+      return Optional.of(queryResult);
     } catch (Exception e) {
       if (except == null) {
         throw e;

@@ -18,34 +18,34 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import it.unimi.dsi.fastutil.ints.IntSet;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.Function;
-import java.util.stream.Collectors;
-import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelFieldCollation;
-import org.apache.commons.collections.CollectionUtils;
+import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.common.datablock.DataBlock;
+import org.apache.pinot.common.datatable.StatMap;
+import org.apache.pinot.common.exception.QueryException;
+import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.utils.AggregationUtils;
 import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
-import org.apache.pinot.query.runtime.operator.window.ValueWindowFunction;
+import org.apache.pinot.query.runtime.operator.window.WindowFunction;
+import org.apache.pinot.query.runtime.operator.window.WindowFunctionFactory;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.WindowOverFlowMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -82,276 +82,233 @@ import org.slf4j.LoggerFactory;
 public class WindowAggregateOperator extends MultiStageOperator {
   private static final String EXPLAIN_NAME = "WINDOW";
   private static final Logger LOGGER = LoggerFactory.getLogger(WindowAggregateOperator.class);
+  private static final int DEFAULT_MAX_ROWS_IN_WINDOW = 1024 * 1024; // 2^20, around 1MM rows
+  private static final WindowOverFlowMode DEFAULT_WINDOW_OVERFLOW_MODE = WindowOverFlowMode.THROW;
 
   // List of window functions which can only be applied as ROWS window frame type
-  private static final Set<String> ROWS_ONLY_FUNCTION_NAMES = ImmutableSet.of("ROW_NUMBER");
+  public static final Set<String> ROWS_ONLY_FUNCTION_NAMES = Set.of("ROW_NUMBER");
   // List of ranking window functions whose output depends on the ordering of input rows and not on the actual values
-  private static final Set<String> RANKING_FUNCTION_NAMES = ImmutableSet.of("RANK", "DENSE_RANK");
+  public static final Set<String> RANKING_FUNCTION_NAMES = Set.of("RANK", "DENSE_RANK");
 
-  private final MultiStageOperator _inputOperator;
-  private final List<RexExpression> _groupSet;
-  private final OrderSetInfo _orderSetInfo;
-  private final WindowFrame _windowFrame;
-  private final List<RexExpression.FunctionCall> _aggCalls;
-  private final List<RexExpression> _constants;
+  private final MultiStageOperator _input;
   private final DataSchema _resultSchema;
-  private final WindowAggregateAccumulator[] _windowAccumulators;
-  private final Map<Key, List<Object[]>> _partitionRows;
-  private final boolean _isPartitionByOnly;
+  private final int[] _keys;
+  private final WindowFrame _windowFrame;
+  private final WindowFunction[] _windowFunctions;
+  private final Map<Key, List<Object[]>> _partitionRows = new HashMap<>();
+  private final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
+
+  // Below are specific parameters to protect the window cache from growing too large.
+  // Once the window cache reaches the limit, we will throw exception or break the cache build process.
+  /**
+   * Max rows allowed to build the right table hash collection.
+   */
+  private final int _maxRowsInWindowCache;
+  /**
+   * Mode when window overflow happens, supported values: THROW or BREAK.
+   * THROW(default): Break window cache build process, and throw exception, no WINDOW operation performed.
+   * BREAK: Break window cache build process, continue to perform WINDOW operation, results might be partial or wrong.
+   */
+  private final WindowOverFlowMode _windowOverflowMode;
 
   private int _numRows;
   private boolean _hasReturnedWindowAggregateBlock;
+  private TransferableBlock _eosBlock;
 
-  public WindowAggregateOperator(OpChainExecutionContext context, MultiStageOperator inputOperator,
-      List<RexExpression> groupSet, List<RexExpression> orderSet, List<RelFieldCollation.Direction> orderSetDirection,
-      List<RelFieldCollation.NullDirection> orderSetNullDirection, List<RexExpression> aggCalls, int lowerBound,
-      int upperBound, WindowNode.WindowFrameType windowFrameType, List<RexExpression> constants,
-      DataSchema resultSchema, DataSchema inputSchema) {
-    this(context, inputOperator, groupSet, orderSet, orderSetDirection, orderSetNullDirection, aggCalls, lowerBound,
-        upperBound, windowFrameType, constants, resultSchema, inputSchema, WindowAggregateAccumulator.WIN_AGG_MERGERS);
-  }
-
-  @VisibleForTesting
-  public WindowAggregateOperator(OpChainExecutionContext context, MultiStageOperator inputOperator,
-      List<RexExpression> groupSet, List<RexExpression> orderSet, List<RelFieldCollation.Direction> orderSetDirection,
-      List<RelFieldCollation.NullDirection> orderSetNullDirection, List<RexExpression> aggCalls, int lowerBound,
-      int upperBound, WindowNode.WindowFrameType windowFrameType, List<RexExpression> constants,
-      DataSchema resultSchema, DataSchema inputSchema,
-      Map<String, Function<ColumnDataType, AggregationUtils.Merger>> mergers) {
+  public WindowAggregateOperator(OpChainExecutionContext context, MultiStageOperator input, DataSchema inputSchema,
+      WindowNode node) {
     super(context);
 
-    _inputOperator = inputOperator;
-    _groupSet = groupSet;
-    _isPartitionByOnly = isPartitionByOnlyQuery(groupSet, orderSet);
-    _orderSetInfo = new OrderSetInfo(orderSet, orderSetDirection, orderSetNullDirection, _isPartitionByOnly);
-    _windowFrame = new WindowFrame(lowerBound, upperBound, windowFrameType);
-
+    _input = input;
+    _resultSchema = node.getDataSchema();
+    List<Integer> keys = node.getKeys();
+    int numKeys = keys.size();
+    _keys = new int[numKeys];
+    for (int i = 0; i < numKeys; i++) {
+      _keys[i] = keys.get(i);
+    }
+    _windowFrame = new WindowFrame(node.getWindowFrameType(), node.getLowerBound(), node.getUpperBound());
     Preconditions.checkState(_windowFrame.isUnboundedPreceding(),
         "Only default frame is supported, lowerBound must be UNBOUNDED PRECEDING");
     Preconditions.checkState(_windowFrame.isUnboundedFollowing() || _windowFrame.isUpperBoundCurrentRow(),
         "Only default frame is supported, upperBound must be UNBOUNDED FOLLOWING or CURRENT ROW");
-
-    // we expect all agg calls to be aggregate function calls
-    _aggCalls = aggCalls.stream().map(RexExpression.FunctionCall.class::cast).collect(Collectors.toList());
-    _constants = constants;
-    _resultSchema = resultSchema;
-
-    _windowAccumulators = new WindowAggregateAccumulator[_aggCalls.size()];
-    int aggCallsSize = _aggCalls.size();
-    for (int i = 0; i < aggCallsSize; i++) {
-      RexExpression.FunctionCall agg = _aggCalls.get(i);
-      String functionName = agg.getFunctionName();
-      validateAggregationCalls(functionName, mergers);
-      _windowAccumulators[i] = new WindowAggregateAccumulator(agg, mergers, functionName, inputSchema, _orderSetInfo);
+    List<RelFieldCollation> collations = node.getCollations();
+    boolean partitionByOnly = isPartitionByOnlyQuery(_keys, collations);
+    List<RexExpression.FunctionCall> aggCalls = node.getAggCalls();
+    int numAggCalls = aggCalls.size();
+    _windowFunctions = new WindowFunction[numAggCalls];
+    for (int i = 0; i < numAggCalls; i++) {
+      RexExpression.FunctionCall aggCall = aggCalls.get(i);
+      validateAggregationCalls(aggCall.getFunctionName());
+      _windowFunctions[i] =
+          WindowFunctionFactory.construnctWindowFunction(aggCall, inputSchema, collations, partitionByOnly);
     }
 
-    _partitionRows = new HashMap<>();
+    Map<String, String> metadata = context.getOpChainMetadata();
+    PlanNode.NodeHint nodeHint = node.getNodeHint();
+    _maxRowsInWindowCache = getMaxRowInWindow(metadata, nodeHint);
+    _windowOverflowMode = getWindowOverflowMode(metadata, nodeHint);
+  }
 
-    _numRows = 0;
-    _hasReturnedWindowAggregateBlock = false;
+  @Override
+  public void registerExecution(long time, int numRows) {
+    _statMap.merge(StatKey.EXECUTION_TIME_MS, time);
+    _statMap.merge(StatKey.EMITTED_ROWS, numRows);
+  }
+
+  @Override
+  protected Logger logger() {
+    return LOGGER;
+  }
+
+  private int getMaxRowInWindow(Map<String, String> opChainMetadata, PlanNode.NodeHint nodeHint) {
+    Map<String, String> windowOptions = nodeHint.getHintOptions().get(PinotHintOptions.WINDOW_HINT_OPTIONS);
+    if (windowOptions != null) {
+      String maxRowsInWindowStr = windowOptions.get(PinotHintOptions.WindowHintOptions.MAX_ROWS_IN_WINDOW);
+      if (maxRowsInWindowStr != null) {
+        return Integer.parseInt(maxRowsInWindowStr);
+      }
+    }
+    Integer maxRowsInWindow = QueryOptionsUtils.getMaxRowsInWindow(opChainMetadata);
+    return maxRowsInWindow != null ? maxRowsInWindow : DEFAULT_MAX_ROWS_IN_WINDOW;
+  }
+
+  private WindowOverFlowMode getWindowOverflowMode(Map<String, String> contextMetadata, PlanNode.NodeHint nodeHint) {
+    Map<String, String> windowOptions = nodeHint.getHintOptions().get(PinotHintOptions.WINDOW_HINT_OPTIONS);
+    if (windowOptions != null) {
+      String windowOverflowModeStr = windowOptions.get(PinotHintOptions.WindowHintOptions.WINDOW_OVERFLOW_MODE);
+      if (windowOverflowModeStr != null) {
+        return WindowOverFlowMode.valueOf(windowOverflowModeStr);
+      }
+    }
+    WindowOverFlowMode windowOverflowMode = QueryOptionsUtils.getWindowOverflowMode(contextMetadata);
+    return windowOverflowMode != null ? windowOverflowMode : DEFAULT_WINDOW_OVERFLOW_MODE;
   }
 
   @Override
   public List<MultiStageOperator> getChildOperators() {
-    return ImmutableList.of(_inputOperator);
+    return List.of(_input);
   }
 
-  @Nullable
+  @Override
+  public Type getOperatorType() {
+    return Type.WINDOW;
+  }
+
   @Override
   public String toExplainString() {
     return EXPLAIN_NAME;
   }
 
   @Override
-  protected TransferableBlock getNextBlock() {
+  protected TransferableBlock getNextBlock()
+      throws ProcessingException {
     if (_hasReturnedWindowAggregateBlock) {
-      return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+      return _eosBlock;
     }
-    TransferableBlock finalBlock = consumeInputBlocks();
-    if (finalBlock.isErrorBlock()) {
-      return finalBlock;
-    }
-    return produceWindowAggregatedBlock();
+    return computeBlocks();
   }
 
-  private void validateAggregationCalls(String functionName,
-      Map<String, Function<ColumnDataType, AggregationUtils.Merger>> mergers) {
-    if (ValueWindowFunction.VALUE_WINDOW_FUNCTION_MAP.containsKey(functionName)) {
-      Preconditions.checkState(_windowFrame.getWindowFrameType() == WindowNode.WindowFrameType.RANGE,
-          String.format("Only RANGE type frames are supported at present for VALUE function: %s", functionName));
-      return;
-    }
-    if (!mergers.containsKey(functionName)) {
-      throw new IllegalStateException("Unexpected aggregation function name: " + functionName);
-    }
-
+  private void validateAggregationCalls(String functionName) {
     if (ROWS_ONLY_FUNCTION_NAMES.contains(functionName)) {
       Preconditions.checkState(
-          _windowFrame.getWindowFrameType() == WindowNode.WindowFrameType.ROWS && _windowFrame.isUpperBoundCurrentRow(),
+          _windowFrame._type == WindowNode.WindowFrameType.ROWS && _windowFrame.isUpperBoundCurrentRow(),
           String.format("%s must be of ROW frame type and have CURRENT ROW as the upper bound", functionName));
     } else {
-      Preconditions.checkState(_windowFrame.getWindowFrameType() == WindowNode.WindowFrameType.RANGE,
+      Preconditions.checkState(_windowFrame._type == WindowNode.WindowFrameType.RANGE,
           String.format("Only RANGE type frames are supported at present for function: %s", functionName));
     }
   }
 
-  private boolean isPartitionByOnlyQuery(List<RexExpression> groupSet, List<RexExpression> orderSet) {
-    if (CollectionUtils.isEmpty(orderSet)) {
+  private boolean isPartitionByOnlyQuery(int[] keys, List<RelFieldCollation> collations) {
+    if (collations.isEmpty()) {
       return true;
     }
-
-    if (CollectionUtils.isEmpty(groupSet) || (groupSet.size() != orderSet.size())) {
+    int numKeys = keys.length;
+    if (numKeys != collations.size()) {
       return false;
     }
-
-    Set<Integer> partitionByInputRefIndexes = new HashSet<>();
-    Set<Integer> orderByInputRefIndexes = new HashSet<>();
-    int groupSetSize = groupSet.size();
-    for (int i = 0; i < groupSetSize; i++) {
-      partitionByInputRefIndexes.add(((RexExpression.InputRef) groupSet.get(i)).getIndex());
-      orderByInputRefIndexes.add(((RexExpression.InputRef) orderSet.get(i)).getIndex());
+    IntSet keyIndices = new IntOpenHashSet(numKeys);
+    IntSet orderFieldIndices = new IntOpenHashSet(numKeys);
+    for (int i = 0; i < numKeys; i++) {
+      keyIndices.add(keys[i]);
+      orderFieldIndices.add(collations.get(i).getFieldIndex());
     }
-
-    return partitionByInputRefIndexes.equals(orderByInputRefIndexes);
-  }
-
-  private TransferableBlock produceWindowAggregatedBlock() {
-    Key emptyOrderKey = AggregationUtils.extractEmptyKey();
-    ColumnDataType[] resultStoredTypes = _resultSchema.getStoredColumnDataTypes();
-    List<Object[]> rows = new ArrayList<>(_numRows);
-    if (_windowFrame.getWindowFrameType() == WindowNode.WindowFrameType.RANGE) {
-      // All aggregation window functions only support RANGE type today (SUM/AVG/MIN/MAX/COUNT/BOOL_AND/BOOL_OR)
-      // RANK and DENSE_RANK ranking window functions also only support RANGE type today
-      for (Map.Entry<Key, List<Object[]>> e : _partitionRows.entrySet()) {
-        Key partitionKey = e.getKey();
-        List<Object[]> rowList = e.getValue();
-        for (int rowId = 0; rowId < rowList.size(); rowId++) {
-          Object[] existingRow = rowList.get(rowId);
-          Object[] row = new Object[existingRow.length + _aggCalls.size()];
-          Key orderKey = (_isPartitionByOnly && CollectionUtils.isEmpty(_orderSetInfo.getOrderSet())) ? emptyOrderKey
-              : AggregationUtils.extractRowKey(existingRow, _orderSetInfo.getOrderSet());
-          System.arraycopy(existingRow, 0, row, 0, existingRow.length);
-          for (int i = 0; i < _windowAccumulators.length; i++) {
-            if (_windowAccumulators[i]._valueWindowFunction == null) {
-              row[i + existingRow.length] = _windowAccumulators[i].getRangeResultForKeys(partitionKey, orderKey);
-            } else {
-              row[i + existingRow.length] = _windowAccumulators[i].getValueResultForKeys(orderKey, rowId, rowList);
-            }
-          }
-          // Convert the results from Accumulator to the desired type
-          TypeUtils.convertRow(row, resultStoredTypes);
-          rows.add(row);
-        }
-      }
-    } else {
-      // Only ROW_NUMBER() window function is supported as ROWS type today
-      Key previousPartitionKey = null;
-      Object[] previousRowValues = new Object[_windowAccumulators.length];
-      for (int i = 0; i < _windowAccumulators.length; i++) {
-        previousRowValues[i] = null;
-      }
-      for (Map.Entry<Key, List<Object[]>> e : _partitionRows.entrySet()) {
-        Key partitionKey = e.getKey();
-        List<Object[]> rowList = e.getValue();
-        for (Object[] existingRow : rowList) {
-          Object[] row = new Object[existingRow.length + _aggCalls.size()];
-          System.arraycopy(existingRow, 0, row, 0, existingRow.length);
-          for (int i = 0; i < _windowAccumulators.length; i++) {
-            row[i + existingRow.length] =
-                _windowAccumulators[i].computeRowResultForCurrentRow(partitionKey, previousPartitionKey, row,
-                    previousRowValues[i]);
-            previousRowValues[i] = row[i + existingRow.length];
-          }
-          // Convert the results from Accumulator to the desired type
-          TypeUtils.convertRow(row, resultStoredTypes);
-          rows.add(row);
-          previousPartitionKey = partitionKey;
-        }
-      }
-    }
-    _hasReturnedWindowAggregateBlock = true;
-    if (rows.size() == 0) {
-      return TransferableBlockUtils.getEndOfStreamTransferableBlock();
-    } else {
-      return new TransferableBlock(rows, _resultSchema, DataBlock.Type.ROW);
-    }
+    return keyIndices.equals(orderFieldIndices);
   }
 
   /**
    * @return the final block, which must be either an end of stream or an error.
    */
-  private TransferableBlock consumeInputBlocks() {
-    Key emptyOrderKey = AggregationUtils.extractEmptyKey();
-    TransferableBlock block = _inputOperator.nextBlock();
-    while (!TransferableBlockUtils.isEndOfStream(block)) {
+  private TransferableBlock computeBlocks()
+      throws ProcessingException {
+    TransferableBlock block = _input.nextBlock();
+    while (block.isDataBlock()) {
       List<Object[]> container = block.getContainer();
-      if (_windowFrame.getWindowFrameType() == WindowNode.WindowFrameType.RANGE) {
-        // Only need to accumulate the aggregate function values for RANGE type. ROW type can be calculated as
-        // we output the rows since the aggregation value depends on the neighboring rows.
-        for (Object[] row : container) {
-          _numRows++;
-          // TODO: Revisit null direction handling for all query types
-          Key key = AggregationUtils.extractRowKey(row, _groupSet);
-          _partitionRows.computeIfAbsent(key, k -> new ArrayList<>()).add(row);
-          // Only need to accumulate the aggregate function values for RANGE type. ROW type can be calculated as
-          // we output the rows since the aggregation value depends on the neighboring rows.
-          Key orderKey = (_isPartitionByOnly && CollectionUtils.isEmpty(_orderSetInfo.getOrderSet())) ? emptyOrderKey
-              : AggregationUtils.extractRowKey(row, _orderSetInfo.getOrderSet());
-          int aggCallsSize = _aggCalls.size();
-          for (int i = 0; i < aggCallsSize; i++) {
-            if (_windowAccumulators[i]._valueWindowFunction == null) {
-              _windowAccumulators[i].accumulateRangeResults(key, orderKey, row);
-            }
-          }
-        }
-      } else {
-        for (Object[] row : container) {
-          _numRows++;
-          // TODO: Revisit null direction handling for all query types
-          Key key = AggregationUtils.extractRowKey(row, _groupSet);
-          _partitionRows.computeIfAbsent(key, k -> new ArrayList<>()).add(row);
+      int containerSize = container.size();
+      if (_numRows + containerSize > _maxRowsInWindowCache) {
+        if (_windowOverflowMode == WindowOverFlowMode.THROW) {
+          ProcessingException resourceLimitExceededException =
+              new ProcessingException(QueryException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE);
+          resourceLimitExceededException.setMessage(
+              "Cannot build in memory window cache for WINDOW operator, reach number of rows limit: "
+                  + _maxRowsInWindowCache);
+          throw resourceLimitExceededException;
+        } else {
+          // Just fill up the buffer.
+          int remainingRows = _maxRowsInWindowCache - _numRows;
+          container = container.subList(0, remainingRows);
+          _statMap.merge(StatKey.MAX_ROWS_IN_WINDOW_REACHED, true);
+          // setting the inputOperator to be early terminated and awaits EOS block next.
+          _input.earlyTerminate();
         }
       }
-      block = _inputOperator.nextBlock();
+      for (Object[] row : container) {
+        // TODO: Revisit null direction handling for all query types
+        Key key = AggregationUtils.extractRowKey(row, _keys);
+        _partitionRows.computeIfAbsent(key, k -> new ArrayList<>()).add(row);
+      }
+      _numRows += containerSize;
+      block = _input.nextBlock();
     }
-    return block;
-  }
+    // Early termination if the block is an error block
+    if (block.isErrorBlock()) {
+      return block;
+    }
+    assert block.isSuccessfulEndOfStreamBlock();
+    _eosBlock = updateEosBlock(block, _statMap);
 
-  /**
-   * Contains all the ORDER BY key related information such as the keys, direction, and null direction
-   */
-  private static class OrderSetInfo {
-    // List of order keys
-    final List<RexExpression> _orderSet;
-    // List of order direction for each key
-    final List<RelFieldCollation.Direction> _orderSetDirection;
-    // List of null direction for each key
-    final List<RelFieldCollation.NullDirection> _orderSetNullDirection;
-    // Set to 'true' if this is a partition by only query
-    final boolean _isPartitionByOnly;
+    ColumnDataType[] resultStoredTypes = _resultSchema.getStoredColumnDataTypes();
+    List<Object[]> rows = new ArrayList<>(_numRows);
+    for (Map.Entry<Key, List<Object[]>> e : _partitionRows.entrySet()) {
+      List<Object[]> rowList = e.getValue();
 
-    OrderSetInfo(List<RexExpression> orderSet, List<RelFieldCollation.Direction> orderSetDirection,
-        List<RelFieldCollation.NullDirection> orderSetNullDirection, boolean isPartitionByOnly) {
-      _orderSet = orderSet;
-      _orderSetDirection = orderSetDirection;
-      _orderSetNullDirection = orderSetNullDirection;
-      _isPartitionByOnly = isPartitionByOnly;
+      // Each window function will return a list of results for each row in the input set
+      List<List<Object>> windowFunctionResults = new ArrayList<>();
+      for (WindowFunction windowFunction : _windowFunctions) {
+        List<Object> processRows = windowFunction.processRows(rowList);
+        assert processRows.size() == rowList.size();
+        windowFunctionResults.add(processRows);
+      }
+
+      for (int rowId = 0; rowId < rowList.size(); rowId++) {
+        Object[] existingRow = rowList.get(rowId);
+        Object[] row = new Object[existingRow.length + _windowFunctions.length];
+        System.arraycopy(existingRow, 0, row, 0, existingRow.length);
+        for (int i = 0; i < _windowFunctions.length; i++) {
+          row[i + existingRow.length] = windowFunctionResults.get(i).get(rowId);
+        }
+        // Convert the results from WindowFunction to the desired type
+        TypeUtils.convertRow(row, resultStoredTypes);
+        rows.add(row);
+      }
     }
 
-    List<RexExpression> getOrderSet() {
-      return _orderSet;
-    }
-
-    List<RelFieldCollation.Direction> getOrderSetDirection() {
-      return _orderSetDirection;
-    }
-
-    List<RelFieldCollation.NullDirection> getOrderSetNullDirection() {
-      return _orderSetNullDirection;
-    }
-
-    boolean isPartitionByOnly() {
-      return _isPartitionByOnly;
+    _hasReturnedWindowAggregateBlock = true;
+    if (rows.isEmpty()) {
+      return _eosBlock;
+    } else {
+      return new TransferableBlock(rows, _resultSchema, DataBlock.Type.ROW);
     }
   }
 
@@ -360,17 +317,17 @@ public class WindowAggregateOperator extends MultiStageOperator {
    * boundaries to be used. Whereas, 'isRows' is used to differentiate between RANGE and ROWS type frames.
    */
   private static class WindowFrame {
+    // Enum to denote the FRAME type, can be either ROW or RANGE types
+    final WindowNode.WindowFrameType _type;
     // The lower bound of the frame. Set to Integer.MIN_VALUE if UNBOUNDED PRECEDING
     final int _lowerBound;
     // The lower bound of the frame. Set to Integer.MAX_VALUE if UNBOUNDED FOLLOWING. Set to 0 if CURRENT ROW
     final int _upperBound;
-    // Enum to denote the FRAME type, can be either ROW or RANGE types
-    final WindowNode.WindowFrameType _windowFrameType;
 
-    WindowFrame(int lowerBound, int upperBound, WindowNode.WindowFrameType windowFrameType) {
+    WindowFrame(WindowNode.WindowFrameType type, int lowerBound, int upperBound) {
+      _type = type;
       _lowerBound = lowerBound;
       _upperBound = upperBound;
-      _windowFrameType = windowFrameType;
     }
 
     boolean isUnboundedPreceding() {
@@ -384,195 +341,34 @@ public class WindowAggregateOperator extends MultiStageOperator {
     boolean isUpperBoundCurrentRow() {
       return _upperBound == 0;
     }
-
-    WindowNode.WindowFrameType getWindowFrameType() {
-      return _windowFrameType;
-    }
-
-    int getLowerBound() {
-      return _lowerBound;
-    }
-
-    int getUpperBound() {
-      return _upperBound;
-    }
   }
 
-  private static class MergeRowNumber implements AggregationUtils.Merger {
+  public enum StatKey implements StatMap.Key {
+    //@formatter:off
+    EXECUTION_TIME_MS(StatMap.Type.LONG) {
+      @Override
+      public boolean includeDefaultInJson() {
+        return true;
+      }
+    },
+    EMITTED_ROWS(StatMap.Type.LONG) {
+      @Override
+      public boolean includeDefaultInJson() {
+        return true;
+      }
+    },
+    MAX_ROWS_IN_WINDOW_REACHED(StatMap.Type.BOOLEAN);
+    //@formatter:on
 
-    @Override
-    public Long init(@Nullable Object value, ColumnDataType dataType) {
-      return 1L;
-    }
+    private final StatMap.Type _type;
 
-    @Override
-    public Long merge(Object agg, @Nullable Object value) {
-      return (long) agg + 1;
-    }
-  }
-
-  private static class MergeRank implements AggregationUtils.Merger {
-
-    @Override
-    public Long init(Object other, ColumnDataType dataType) {
-      return 1L;
-    }
-
-    @Override
-    public Long merge(Object left, Object right) {
-      // RANK always increase by the number of duplicate entries seen for the given ORDER BY key.
-      return ((Number) left).longValue() + ((Number) right).longValue();
-    }
-  }
-
-  private static class MergeDenseRank implements AggregationUtils.Merger {
-
-    @Override
-    public Long init(Object other, ColumnDataType dataType) {
-      return 1L;
+    StatKey(StatMap.Type type) {
+      _type = type;
     }
 
     @Override
-    public Long merge(Object left, Object right) {
-      long rightValueInLong = ((Number) right).longValue();
-      // DENSE_RANK always increase the rank by 1, irrespective of the number of duplicate ORDER BY keys seen
-      return (rightValueInLong == 0L) ? ((Number) left).longValue() : ((Number) left).longValue() + 1L;
-    }
-  }
-
-  private static class WindowAggregateAccumulator extends AggregationUtils.Accumulator {
-    private static final Map<String, Function<ColumnDataType, AggregationUtils.Merger>> WIN_AGG_MERGERS =
-        ImmutableMap.<String, Function<ColumnDataType, AggregationUtils.Merger>>builder()
-            .putAll(AggregationUtils.Accumulator.MERGERS)
-            .put("ROW_NUMBER", cdt -> new MergeRowNumber())
-            .put("RANK", cdt -> new MergeRank())
-            .put("DENSE_RANK", cdt -> new MergeDenseRank())
-            .build();
-
-    private final boolean _isPartitionByOnly;
-    private final boolean _isRankingWindowFunction;
-    private final ValueWindowFunction _valueWindowFunction;
-
-    // Fields needed only for RANGE frame type queries (ORDER BY)
-    private final Map<Key, OrderKeyResult> _orderByResults = new HashMap<>();
-
-    WindowAggregateAccumulator(RexExpression.FunctionCall aggCall,
-        Map<String, Function<ColumnDataType, AggregationUtils.Merger>> merger, String functionName,
-        DataSchema inputSchema, OrderSetInfo orderSetInfo) {
-      super(aggCall, merger, functionName, inputSchema);
-      _isPartitionByOnly = CollectionUtils.isEmpty(orderSetInfo.getOrderSet()) || orderSetInfo.isPartitionByOnly();
-      _isRankingWindowFunction = RANKING_FUNCTION_NAMES.contains(functionName);
-      _valueWindowFunction = ValueWindowFunction.construnctValueWindowFunction(functionName);
-    }
-
-    /**
-     * For ROW type queries the aggregation function value depends on the order of the rows rather than on the actual
-     * keys. For such queries compute the current row value based on the previous row and previous partition key.
-     * This should only be called for ROW type queries.
-     */
-    public Object computeRowResultForCurrentRow(Key currentPartitionKey, Key previousPartitionKey, Object[] row,
-        Object previousRowOutputValue) {
-      Object value = _inputRef == -1 ? _literal : row[_inputRef];
-      if (previousPartitionKey == null || !currentPartitionKey.equals(previousPartitionKey)) {
-        return _merger.init(currentPartitionKey, _dataType);
-      } else {
-        return _merger.merge(previousRowOutputValue, value);
-      }
-    }
-
-    /**
-     * For RANGE type queries, accumulate the function values for each PARTITION BY key and ORDER BY key based on
-     * the current row. Should only be called for RANGE type queries where the aggregation values are tied to the
-     * RANGE key and not to the row ordering. This should only be called for RANGE type queries.
-     */
-    public void accumulateRangeResults(Key key, Key orderKey, Object[] row) {
-      // Ranking functions don't use the row value, thus cannot reuse the AggregationUtils accumulate function for them
-      if (_isPartitionByOnly && !_isRankingWindowFunction) {
-        accumulate(key, row);
-        return;
-      }
-
-      // TODO: fix that single agg result (original type) has different type from multiple agg results (double).
-      Key previousOrderKeyIfPresent =
-          _orderByResults.get(key) == null ? null : _orderByResults.get(key).getPreviousOrderByKey();
-      Object currentRes = previousOrderKeyIfPresent == null ? null
-          : _orderByResults.get(key).getOrderByResults().get(previousOrderKeyIfPresent);
-      Object value = _inputRef == -1 ? _literal : row[_inputRef];
-
-      // The ranking functions do not depend on the actual value of the data, but are calculated based on the
-      // position of the data ordered by the ORDER BY key. Thus they need to be handled differently and require setting
-      // whether the rank has changed or not and if changed then by how much.
-      _orderByResults.putIfAbsent(key, new OrderKeyResult());
-      if (currentRes == null) {
-        value = _isRankingWindowFunction ? 0 : value;
-        _orderByResults.get(key).addOrderByResult(orderKey, _merger.init(value, _dataType));
-      } else {
-        Object mergedResult;
-        if (orderKey.equals(previousOrderKeyIfPresent)) {
-          value = _isRankingWindowFunction ? 0 : value;
-          mergedResult = _merger.merge(currentRes, value);
-        } else {
-          Object previousValue = _orderByResults.get(key).getOrderByResults().get(previousOrderKeyIfPresent);
-          value = _isRankingWindowFunction ? _orderByResults.get(key).getCountOfDuplicateOrderByKeys() : value;
-          mergedResult = _merger.merge(previousValue, value);
-        }
-        _orderByResults.get(key).addOrderByResult(orderKey, mergedResult);
-      }
-    }
-
-    public Object getRangeResultForKeys(Key key, Key orderKey) {
-      if (_isPartitionByOnly && !_isRankingWindowFunction) {
-        return _results.get(key);
-      } else {
-        return _orderByResults.get(key).getOrderByResults().get(orderKey);
-      }
-    }
-
-    public Map<Key, OrderKeyResult> getRangeOrderByResults() {
-      return _orderByResults;
-    }
-
-    public Object getValueResultForKeys(Key orderKey, int rowId, List<Object[]> partitionRows) {
-      Object[] row = _valueWindowFunction.processRow(rowId, partitionRows);
-      if (row == null) {
-        return null;
-      }
-      return _inputRef == -1 ? _literal : row[_inputRef];
-    }
-
-    static class OrderKeyResult {
-      final Map<Key, Object> _orderByResults;
-      Key _previousOrderByKey;
-      // Store the counts of duplicate ORDER BY keys seen for this PARTITION BY key for calculating RANK/DENSE_RANK
-      long _countOfDuplicateOrderByKeys;
-
-      OrderKeyResult() {
-        _orderByResults = new HashMap<>();
-        _previousOrderByKey = null;
-        _countOfDuplicateOrderByKeys = 0;
-      }
-
-      public void addOrderByResult(Key orderByKey, Object value) {
-        // We expect to get the rows in order based on the ORDER BY key so it is safe to blindly assign the
-        // current key as the previous key
-        _orderByResults.put(orderByKey, value);
-        _countOfDuplicateOrderByKeys =
-            (_previousOrderByKey != null && _previousOrderByKey.equals(orderByKey)) ? _countOfDuplicateOrderByKeys + 1
-                : 1;
-        _previousOrderByKey = orderByKey;
-      }
-
-      public Map<Key, Object> getOrderByResults() {
-        return _orderByResults;
-      }
-
-      public Key getPreviousOrderByKey() {
-        return _previousOrderByKey;
-      }
-
-      public long getCountOfDuplicateOrderByKeys() {
-        return _countOfDuplicateOrderByKeys;
-      }
+    public StatMap.Type getType() {
+      return _type;
     }
   }
 }

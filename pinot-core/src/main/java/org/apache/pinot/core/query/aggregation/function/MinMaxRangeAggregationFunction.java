@@ -180,6 +180,14 @@ public class MinMaxRangeAggregationFunction extends NullableSingleInputAggregati
 
   @Override
   public MinMaxRangePair merge(MinMaxRangePair intermediateResult1, MinMaxRangePair intermediateResult2) {
+    if (_nullHandlingEnabled) {
+      if (intermediateResult1 == null) {
+        return intermediateResult2;
+      }
+      if (intermediateResult2 == null) {
+        return intermediateResult1;
+      }
+    }
     intermediateResult1.apply(intermediateResult2);
     return intermediateResult1;
   }

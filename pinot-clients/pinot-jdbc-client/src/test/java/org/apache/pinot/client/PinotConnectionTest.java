@@ -18,14 +18,22 @@
  */
 package org.apache.pinot.client;
 
+import java.sql.DatabaseMetaData;
 import java.sql.Statement;
 import org.testng.Assert;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 
 public class PinotConnectionTest {
-  private DummyPinotClientTransport _dummyPinotClientTransport = new DummyPinotClientTransport();
-  private DummyPinotControllerTransport _dummyPinotControllerTransport = DummyPinotControllerTransport.create();
+  private DummyPinotClientTransport _dummyPinotClientTransport;
+  private DummyPinotControllerTransport _dummyPinotControllerTransport;
+
+  @BeforeMethod
+  public void beforeTestMethod() {
+    _dummyPinotClientTransport = new DummyPinotClientTransport();
+    _dummyPinotControllerTransport = DummyPinotControllerTransport.create();
+  }
 
   @Test
   public void createStatementTest()
@@ -34,6 +42,31 @@ public class PinotConnectionTest {
         new PinotConnection("dummy", _dummyPinotClientTransport, "dummy", _dummyPinotControllerTransport);
     Statement statement = pinotConnection.createStatement();
     Assert.assertNotNull(statement);
+  }
+
+  @Test
+  public void getMetaDataTest()
+          throws Exception {
+    try (PinotConnection pinotConnection =
+                 new PinotConnection("dummy", _dummyPinotClientTransport, "dummy", _dummyPinotControllerTransport)) {
+      DatabaseMetaData metaData = pinotConnection.getMetaData();
+      Assert.assertNotNull(metaData);
+      Assert.assertTrue(metaData.getDatabaseMajorVersion() > 0);
+      Assert.assertTrue(metaData.getDatabaseMinorVersion() >= 0);
+      Assert.assertEquals(metaData.getDatabaseProductName(), "APACHE_PINOT");
+      Assert.assertEquals(metaData.getDriverName(), "APACHE_PINOT_DRIVER");
+      Assert.assertNotNull(metaData.getConnection());
+    }
+  }
+
+  @Test
+  public void isClosedTest()
+          throws Exception {
+    PinotConnection pinotConnection =
+                 new PinotConnection("dummy", _dummyPinotClientTransport, "dummy", _dummyPinotControllerTransport);
+    Assert.assertFalse(pinotConnection.isClosed());
+    pinotConnection.close();
+    Assert.assertTrue(pinotConnection.isClosed());
   }
 
   @Test

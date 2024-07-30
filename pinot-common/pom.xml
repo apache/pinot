@@ -19,13 +19,12 @@
     under the License.
 
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <artifactId>pinot</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>1.2.0-SNAPSHOT</version>
+    <version>1.3.0-SNAPSHOT</version>
     <relativePath>..</relativePath>
   </parent>
   <artifactId>pinot-common</artifactId>
@@ -60,6 +59,19 @@
       <plugin>
         <groupId>org.xolstice.maven.plugins</groupId>
         <artifactId>protobuf-maven-plugin</artifactId>
+      </plugin>
+
+      <plugin>
+        <groupId>com.diffplug.spotless</groupId>
+        <artifactId>spotless-maven-plugin</artifactId>
+        <configuration>
+          <java>
+            <excludes>
+              <exclude>src/main/java/org/apache/pinot/common/request/*.java</exclude>
+              <exclude>src/main/java/org/apache/pinot/common/response/ProcessingException.java</exclude>
+            </excludes>
+          </java>
+        </configuration>
       </plugin>
 
       <!-- Following plugins and their configurations are used to generate the custom Calcite's SQL parser -->
@@ -129,31 +141,6 @@
         </executions>
       </plugin>
     </plugins>
-
-    <pluginManagement>
-      <plugins>
-        <plugin>
-          <groupId>com.diffplug.spotless</groupId>
-          <artifactId>spotless-maven-plugin</artifactId>
-          <configuration>
-            <java>
-              <includes>
-                <include>src/main/java/**/*.java</include>
-                <include>src/test/java/**/*.java</include>
-              </includes>
-              <excludes>
-                <exclude>src/main/java/org/apache/pinot/common/request/*.java</exclude>
-                <exclude>src/main/java/org/apache/pinot/common/response/ProcessingException.java</exclude>
-              </excludes>
-              <importOrder>
-                <order>,\#</order>
-              </importOrder>
-              <removeUnusedImports/>
-            </java>
-          </configuration>
-        </plugin>
-      </plugins>
-    </pluginManagement>
   </build>
   <dependencies>
     <dependency>
@@ -170,16 +157,8 @@
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>org.apache.httpcomponents</groupId>
-      <artifactId>httpmime</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.httpcomponents</groupId>
-      <artifactId>httpclient</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.httpcomponents</groupId>
-      <artifactId>httpcore</artifactId>
+      <groupId>org.apache.httpcomponents.client5</groupId>
+      <artifactId>httpclient5</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.calcite</groupId>
@@ -189,6 +168,12 @@
       <groupId>org.apache.calcite</groupId>
       <artifactId>calcite-babel</artifactId>
     </dependency>
+    <dependency>
+      <groupId>org.immutables</groupId>
+      <artifactId>value-annotations</artifactId>
+    </dependency>
+
+    <!-- Jersey Libraries -->
     <dependency>
       <groupId>org.glassfish.jersey.core</groupId>
       <artifactId>jersey-server</artifactId>
@@ -218,10 +203,14 @@
       <artifactId>swagger-jersey2-jaxrs</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.testng</groupId>
-      <artifactId>testng</artifactId>
-      <scope>test</scope>
+      <groupId>org.webjars</groupId>
+      <artifactId>swagger-ui</artifactId>
     </dependency>
+    <dependency>
+      <groupId>jakarta.servlet</groupId>
+      <artifactId>jakarta.servlet-api</artifactId>
+    </dependency>
+
     <dependency>
       <groupId>com.google.guava</groupId>
       <artifactId>guava</artifactId>
@@ -275,19 +264,6 @@
       <artifactId>jopt-simple</artifactId>
     </dependency>
     <dependency>
-      <groupId>nl.jqno.equalsverifier</groupId>
-      <artifactId>equalsverifier</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.webjars</groupId>
-      <artifactId>swagger-ui</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.google.code.findbugs</groupId>
-      <artifactId>jsr305</artifactId>
-    </dependency>
-    <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
       <artifactId>jackson-annotations</artifactId>
     </dependency>
@@ -298,11 +274,6 @@
     <dependency>
       <groupId>com.jayway.jsonpath</groupId>
       <artifactId>json-path</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.mockito</groupId>
-      <artifactId>mockito-core</artifactId>
-      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.slf4j</groupId>
@@ -353,6 +324,27 @@
       <groupId>io.github.hakky54</groupId>
       <artifactId>sslcontext-kickstart-for-netty</artifactId>
     </dependency>
+    <dependency>
+      <groupId>com.google.re2j</groupId>
+      <artifactId>re2j</artifactId>
+      <version>1.7</version>
+    </dependency>
+    <!-- Test -->
+    <dependency>
+      <groupId>org.testng</groupId>
+      <artifactId>testng</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.mockito</groupId>
+      <artifactId>mockito-core</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>nl.jqno.equalsverifier</groupId>
+      <artifactId>equalsverifier</artifactId>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
   <profiles>
     <profile>
@@ -375,34 +367,35 @@
                 <id>generate-sources</id>
                 <phase>generate-sources</phase>
                 <configuration>
-                  <tasks>
-                    <delete dir="target/generated-sources/gen-javabean"/>
-                    <mkdir dir="target/generated-sources"/>
+                  <target>
+                    <delete dir="target/generated-sources/gen-javabean" />
+                    <mkdir dir="target/generated-sources" />
                     <exec executable="/usr/local/bin/thrift">
-                      <arg value="--gen"/>
-                      <arg value="java:beans"/>
-                      <arg value="-o"/>
-                      <arg value="target/generated-sources"/>
-                      <arg value="src/thrift/query.thrift"/>
+                      <arg value="--gen" />
+                      <arg value="java:beans" />
+                      <arg value="-o" />
+                      <arg value="target/generated-sources" />
+                      <arg value="src/thrift/query.thrift" />
                     </exec>
                     <exec executable="/usr/local/bin/thrift">
-                      <arg value="--gen"/>
-                      <arg value="java:beans"/>
-                      <arg value="-o"/>
-                      <arg value="target/generated-sources"/>
-                      <arg value="src/thrift/request.thrift"/>
+                      <arg value="--gen" />
+                      <arg value="java:beans" />
+                      <arg value="-o" />
+                      <arg value="target/generated-sources" />
+                      <arg value="src/thrift/request.thrift" />
                     </exec>
                     <exec executable="/usr/local/bin/thrift">
-                      <arg value="--gen"/>
-                      <arg value="java:beans"/>
-                      <arg value="-o"/>
-                      <arg value="target/generated-sources"/>
-                      <arg value="src/thrift/response.thrift"/>
+                      <arg value="--gen" />
+                      <arg value="java:beans" />
+                      <arg value="-o" />
+                      <arg value="target/generated-sources" />
+                      <arg value="src/thrift/response.thrift" />
                     </exec>
-                    <copy todir="src/main/java/">
-                      <fileset dir="target/generated-sources/gen-javabean"/>
-                    </copy>
-                  </tasks>
+                    <move todir="src/main/java/">
+                      <fileset dir="target/generated-sources/gen-javabean" />
+                    </move>
+                    <delete dir="target/generated-sources/gen-javabean" />
+                  </target>
                 </configuration>
                 <goals>
                   <goal>run</goal>

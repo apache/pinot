@@ -55,7 +55,7 @@ public class LuceneFSTIndexCreator implements FSTIndexCreator {
    */
   public LuceneFSTIndexCreator(File indexDir, String columnName, String[] sortedEntries)
       throws IOException {
-    _fstIndexFile = new File(indexDir, columnName + V1Constants.Indexes.LUCENE_V9_FST_INDEX_FILE_EXTENSION);
+    _fstIndexFile = new File(indexDir, columnName + V1Constants.Indexes.LUCENE_V99_FST_INDEX_FILE_EXTENSION);
 
     _fstBuilder = new FSTBuilder();
     _dictId = 0;
@@ -90,7 +90,7 @@ public class LuceneFSTIndexCreator implements FSTIndexCreator {
   @Override
   public void seal()
       throws IOException {
-    LOGGER.info("Sealing FST index: " + _fstIndexFile.getAbsolutePath());
+    LOGGER.info("Sealing FST index: {}", _fstIndexFile.getAbsolutePath());
     FileOutputStream fileOutputStream = null;
     try {
       fileOutputStream = new FileOutputStream(_fstIndexFile);

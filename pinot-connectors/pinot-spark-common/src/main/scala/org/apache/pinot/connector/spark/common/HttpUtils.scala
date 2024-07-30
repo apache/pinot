@@ -18,12 +18,15 @@
  */
 package org.apache.pinot.connector.spark.common
 
-import java.net.URI
+import org.apache.hc.client5.http.config.RequestConfig
+import org.apache.hc.client5.http.impl.classic.HttpClients
+import org.apache.hc.core5.http.io.entity.EntityUtils
+import org.apache.hc.core5.http.io.support.ClassicRequestBuilder
+import org.apache.hc.core5.http.ClassicHttpRequest
+import org.apache.hc.core5.util.Timeout
 
-import org.apache.http.client.config.RequestConfig
-import org.apache.http.client.methods.{HttpUriRequest, RequestBuilder}
-import org.apache.http.impl.client.HttpClients
-import org.apache.http.util.EntityUtils
+import java.net.URI
+import java.util.concurrent.TimeUnit
 
 /**
  * Helper Http methods to get metadata information from Pinot controller/broker.
@@ -32,24 +35,25 @@ private[pinot] object HttpUtils extends Logging {
   private val GET_REQUEST_SOCKET_TIMEOUT_MS = 5 * 1000 // 5 mins
   private val GET_REQUEST_CONNECT_TIMEOUT_MS = 10 * 1000 // 10 mins
 
-  private val httpClient = HttpClients.custom().build()
-
-  def sendGetRequest(uri: URI): String = {
-    val requestConfig = RequestConfig
+  private val requestConfig = RequestConfig
       .custom()
-      .setConnectTimeout(GET_REQUEST_CONNECT_TIMEOUT_MS)
-      .setSocketTimeout(GET_REQUEST_SOCKET_TIMEOUT_MS)
+      .setConnectTimeout(Timeout.of(GET_REQUEST_CONNECT_TIMEOUT_MS, TimeUnit.MILLISECONDS))
+      .setResponseTimeout(Timeout.of(GET_REQUEST_SOCKET_TIMEOUT_MS, TimeUnit.MILLISECONDS))
       .build()
 
-    val requestBuilder = RequestBuilder.get(uri)
-    requestBuilder.setConfig(requestConfig)
+  private val httpClient = HttpClients.custom()
+    .setDefaultRequestConfig(requestConfig)
+    .build()
+
+  def sendGetRequest(uri: URI): String = {
+    val requestBuilder = ClassicRequestBuilder.get(uri)
     executeRequest(requestBuilder.build())
   }
 
-  private def executeRequest(httpRequest: HttpUriRequest): String = {
+  private def executeRequest(httpRequest: ClassicHttpRequest): String = {
     val response = httpClient.execute(httpRequest)
     try {
-      val statusCode = response.getStatusLine.getStatusCode
+      val statusCode = response.getCode
       if (statusCode >= 200 && statusCode < 300) {
         if (response.getEntity != null) {
           EntityUtils.toString(response.getEntity, "UTF-8")
@@ -58,7 +62,7 @@ private[pinot] object HttpUtils extends Logging {
         }
       } else {
         throw HttpStatusCodeException(
-          s"Got error status code '$statusCode' with reason '${response.getStatusLine.getReasonPhrase}'",
+          s"Got error status code '$statusCode' with reason '${response.getReasonPhrase}'",
           statusCode
         )
       }

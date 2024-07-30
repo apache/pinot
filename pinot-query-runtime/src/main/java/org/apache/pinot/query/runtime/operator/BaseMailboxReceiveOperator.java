@@ -19,14 +19,15 @@
 package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.base.Preconditions;
-import java.util.Collections;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
+import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
 import org.apache.pinot.query.planner.physical.MailboxIdUtils;
+import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.routing.MailboxInfos;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.operator.utils.AsyncStream;
@@ -45,32 +46,44 @@ import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
  */
 public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
   protected final MailboxService _mailboxService;
-  protected final RelDistribution.Type _exchangeType;
+  protected final RelDistribution.Type _distributionType;
   protected final List<String> _mailboxIds;
   protected final BlockingMultiStreamConsumer.OfTransferableBlock _multiConsumer;
+  protected final List<StatMap<ReceivingMailbox.StatKey>> _receivingStats;
+  protected final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
 
-  public BaseMailboxReceiveOperator(OpChainExecutionContext context, RelDistribution.Type exchangeType,
-      int senderStageId) {
+  public BaseMailboxReceiveOperator(OpChainExecutionContext context, MailboxReceiveNode node) {
     super(context);
     _mailboxService = context.getMailboxService();
-    Preconditions.checkState(MailboxSendOperator.SUPPORTED_EXCHANGE_TYPES.contains(exchangeType),
-        "Unsupported exchange type: %s", exchangeType);
-    _exchangeType = exchangeType;
+    RelDistribution.Type distributionType = node.getDistributionType();
+    Preconditions.checkState(MailboxSendOperator.SUPPORTED_EXCHANGE_TYPES.contains(distributionType),
+        "Unsupported exchange type: %s", distributionType);
+    _distributionType = distributionType;
 
     long requestId = context.getRequestId();
+    int senderStageId = node.getSenderStageId();
     MailboxInfos mailboxInfos = context.getWorkerMetadata().getMailboxInfosMap().get(senderStageId);
     if (mailboxInfos != null) {
       _mailboxIds =
           MailboxIdUtils.toMailboxIds(requestId, senderStageId, mailboxInfos.getMailboxInfos(), context.getStageId(),
               context.getWorkerId());
+      int numMailboxes = _mailboxIds.size();
+      List<ReadMailboxAsyncStream> asyncStreams = new ArrayList<>(numMailboxes);
+      _receivingStats = new ArrayList<>(numMailboxes);
+      for (String mailboxId : _mailboxIds) {
+        ReadMailboxAsyncStream asyncStream =
+            new ReadMailboxAsyncStream(_mailboxService.getReceivingMailbox(mailboxId), this);
+        asyncStreams.add(asyncStream);
+        _receivingStats.add(asyncStream._mailbox.getStatMap());
+      }
+      _multiConsumer = new BlockingMultiStreamConsumer.OfTransferableBlock(context, asyncStreams);
     } else {
-      _mailboxIds = Collections.emptyList();
+      // TODO: Revisit if we should throw exception here.
+      _mailboxIds = List.of();
+      _receivingStats = List.of();
+      _multiConsumer = new BlockingMultiStreamConsumer.OfTransferableBlock(context, List.of());
     }
-    List<ReadMailboxAsyncStream> asyncStreams = _mailboxIds.stream()
-        .map(mailboxId -> new ReadMailboxAsyncStream(_mailboxService.getReceivingMailbox(mailboxId), this))
-        .collect(Collectors.toList());
-    _multiConsumer =
-        new BlockingMultiStreamConsumer.OfTransferableBlock(context.getId(), context.getDeadlineMs(), asyncStreams);
+    _statMap.merge(StatKey.FAN_IN, _mailboxIds.size());
   }
 
   @Override
@@ -80,8 +93,13 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
   }
 
   @Override
+  public Type getOperatorType() {
+    return Type.MAILBOX_RECEIVE;
+  }
+
+  @Override
   public List<MultiStageOperator> getChildOperators() {
-    return Collections.emptyList();
+    return List.of();
   }
 
   @Override
@@ -96,11 +114,34 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
     _multiConsumer.cancel(t);
   }
 
-  private static class ReadMailboxAsyncStream implements AsyncStream<TransferableBlock> {
-    private final ReceivingMailbox _mailbox;
-    private final BaseMailboxReceiveOperator _operator;
+  @Override
+  protected TransferableBlock updateEosBlock(TransferableBlock upstreamEos, StatMap<?> statMap) {
+    for (StatMap<ReceivingMailbox.StatKey> receivingStats : _receivingStats) {
+      addReceivingStats(receivingStats);
+    }
+    return super.updateEosBlock(upstreamEos, statMap);
+  }
 
-    public ReadMailboxAsyncStream(ReceivingMailbox mailbox, BaseMailboxReceiveOperator operator) {
+  @Override
+  public void registerExecution(long time, int numRows) {
+    _statMap.merge(StatKey.EXECUTION_TIME_MS, time);
+    _statMap.merge(StatKey.EMITTED_ROWS, numRows);
+  }
+
+  private void addReceivingStats(StatMap<ReceivingMailbox.StatKey> from) {
+    _statMap.merge(StatKey.RAW_MESSAGES, from.getInt(ReceivingMailbox.StatKey.DESERIALIZED_MESSAGES));
+    _statMap.merge(StatKey.DESERIALIZED_BYTES, from.getLong(ReceivingMailbox.StatKey.DESERIALIZED_BYTES));
+    _statMap.merge(StatKey.DESERIALIZATION_TIME_MS, from.getLong(ReceivingMailbox.StatKey.DESERIALIZATION_TIME_MS));
+    _statMap.merge(StatKey.IN_MEMORY_MESSAGES, from.getInt(ReceivingMailbox.StatKey.IN_MEMORY_MESSAGES));
+    _statMap.merge(StatKey.DOWNSTREAM_WAIT_MS, from.getLong(ReceivingMailbox.StatKey.OFFER_CPU_TIME_MS));
+    _statMap.merge(StatKey.UPSTREAM_WAIT_MS, from.getLong(ReceivingMailbox.StatKey.WAIT_CPU_TIME_MS));
+  }
+
+  private static class ReadMailboxAsyncStream implements AsyncStream<TransferableBlock> {
+    final ReceivingMailbox _mailbox;
+    final BaseMailboxReceiveOperator _operator;
+
+    ReadMailboxAsyncStream(ReceivingMailbox mailbox, BaseMailboxReceiveOperator operator) {
       _mailbox = mailbox;
       _operator = operator;
     }
@@ -116,7 +157,6 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
       TransferableBlock block = _mailbox.poll();
       if (block != null && block.isSuccessfulEndOfStreamBlock()) {
         _operator._mailboxService.releaseReceivingMailbox(_mailbox);
-        _operator._opChainStats.getOperatorStatsMap().putAll(block.getResultMetadata());
       }
       return block;
     }
@@ -134,6 +174,75 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
     @Override
     public void cancel() {
       _mailbox.cancel();
+    }
+  }
+
+  public enum StatKey implements StatMap.Key {
+    //@formatter:off
+    EXECUTION_TIME_MS(StatMap.Type.LONG) {
+      @Override
+      public boolean includeDefaultInJson() {
+        return true;
+      }
+    },
+    EMITTED_ROWS(StatMap.Type.LONG) {
+      @Override
+      public boolean includeDefaultInJson() {
+        return true;
+      }
+    },
+    /**
+     * How many send mailboxes are being read by this receive operator.
+     * <p>
+     * Clock time will be proportional to this number and the parallelism of the stage.
+     */
+    FAN_IN(StatMap.Type.INT) {
+      @Override
+      public int merge(int value1, int value2) {
+        return Math.max(value1, value2);
+      }
+    },
+    /**
+     * How many messages have been received in heap format by this mailbox.
+     * <p>
+     * The lower the relation between RAW_MESSAGES and IN_MEMORY_MESSAGES, the more efficient the exchange is.
+     */
+    IN_MEMORY_MESSAGES(StatMap.Type.INT),
+    /**
+     * How many messages have been received in raw format and therefore deserialized by this mailbox.
+     * <p>
+     * The higher the relation between RAW_MESSAGES and IN_MEMORY_MESSAGES, the less efficient the exchange is.
+     */
+    RAW_MESSAGES(StatMap.Type.INT),
+    /**
+     * How many bytes have been deserialized by this mailbox.
+     * <p>
+     * A high number here indicates that the mailbox is receiving a lot of data from other servers.
+     */
+    DESERIALIZED_BYTES(StatMap.Type.LONG),
+    /**
+     * How long (in CPU time) it took to deserialize the raw messages received by this mailbox.
+     */
+    DESERIALIZATION_TIME_MS(StatMap.Type.LONG),
+    /**
+     * How long (in CPU time) it took to offer the messages to downstream operator.
+     */
+    DOWNSTREAM_WAIT_MS(StatMap.Type.LONG),
+    /**
+     * How long (in CPU time) it took to wait for the messages to be offered to downstream operator.
+     */
+    UPSTREAM_WAIT_MS(StatMap.Type.LONG);
+    //@formatter:on
+
+    private final StatMap.Type _type;
+
+    StatKey(StatMap.Type type) {
+      _type = type;
+    }
+
+    @Override
+    public StatMap.Type getType() {
+      return _type;
     }
   }
 }

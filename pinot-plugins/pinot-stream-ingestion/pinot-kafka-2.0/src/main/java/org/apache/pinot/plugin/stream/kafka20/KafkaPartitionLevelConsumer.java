@@ -61,6 +61,7 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
       }
       _consumer.seek(_topicPartition, startOffset);
     }
+
     ConsumerRecords<String, Bytes> consumerRecords = _consumer.poll(Duration.ofMillis(timeoutMs));
     List<ConsumerRecord<String, Bytes>> records = consumerRecords.records(_topicPartition);
     List<BytesStreamMessage> filteredRecords = new ArrayList<>(records.size());
@@ -84,12 +85,15 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
         lastMessageMetadata = messageMetadata;
       }
     }
-    return new KafkaMessageBatch(filteredRecords, records.size(), offsetOfNextBatch, firstOffset, lastMessageMetadata);
+
+    return new KafkaMessageBatch(filteredRecords, records.size(), offsetOfNextBatch, firstOffset, lastMessageMetadata,
+        firstOffset > startOffset);
   }
 
   private StreamMessageMetadata extractMessageMetadata(ConsumerRecord<String, Bytes> record) {
     long timestamp = record.timestamp();
     long offset = record.offset();
+
     StreamMessageMetadata.Builder builder = new StreamMessageMetadata.Builder().setRecordIngestionTimeMs(timestamp)
         .setOffset(new LongMsgOffset(offset), new LongMsgOffset(offset + 1));
     if (_config.isPopulateMetadata()) {
@@ -102,7 +106,8 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
         builder.setHeaders(headerGenericRow);
       }
       builder.setMetadata(Map.of(KafkaStreamMessageMetadata.RECORD_TIMESTAMP_KEY, String.valueOf(timestamp),
-          KafkaStreamMessageMetadata.METADATA_OFFSET_KEY, String.valueOf(offset)));
+          KafkaStreamMessageMetadata.METADATA_OFFSET_KEY, String.valueOf(offset),
+          KafkaStreamMessageMetadata.METADATA_PARTITION_KEY, String.valueOf(record.partition())));
     }
     return builder.build();
   }

@@ -26,6 +26,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeoutException;
 import javax.annotation.Nullable;
 import org.apache.helix.HelixManager;
+import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
@@ -42,6 +43,7 @@ import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.executor.ExecutorServiceUtils;
 import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
+import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.query.runtime.plan.PhysicalPlanVisitor;
@@ -177,8 +179,9 @@ public class QueryRunner {
               receiverMailboxInfos);
       for (RoutingInfo routingInfo : routingInfos) {
         try {
+          StatMap<MailboxSendOperator.StatKey> statMap = new StatMap<>(MailboxSendOperator.StatKey.class);
           _mailboxService.getSendingMailbox(routingInfo.getHostname(), routingInfo.getPort(),
-              routingInfo.getMailboxId(), deadlineMs).send(errorBlock);
+              routingInfo.getMailboxId(), deadlineMs, statMap).send(errorBlock);
         } catch (TimeoutException e) {
           LOGGER.warn("Timed out sending error block to mailbox: {} for request: {}, stage: {}",
               routingInfo.getMailboxId(), requestId, stageId, e);

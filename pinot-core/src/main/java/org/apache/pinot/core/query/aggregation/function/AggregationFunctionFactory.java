@@ -33,7 +33,14 @@ import org.apache.pinot.core.query.aggregation.function.array.ArrayAggFloatFunct
 import org.apache.pinot.core.query.aggregation.function.array.ArrayAggIntFunction;
 import org.apache.pinot.core.query.aggregation.function.array.ArrayAggLongFunction;
 import org.apache.pinot.core.query.aggregation.function.array.ArrayAggStringFunction;
+import org.apache.pinot.core.query.aggregation.function.array.ListAggDistinctFunction;
+import org.apache.pinot.core.query.aggregation.function.array.ListAggFunction;
+import org.apache.pinot.core.query.aggregation.function.array.SumArrayDoubleAggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.array.SumArrayLongAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.funnel.FunnelCountAggregationFunctionFactory;
+import org.apache.pinot.core.query.aggregation.function.funnel.window.FunnelCompleteCountAggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.funnel.window.FunnelMatchStepAggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.funnel.window.FunnelMaxStepAggregationFunction;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
@@ -245,6 +252,29 @@ public class AggregationFunctionFactory {
                 throw new IllegalArgumentException("Unsupported data type for FIRST_WITH_TIME: " + dataType);
             }
           }
+          case LISTAGG: {
+            Preconditions.checkArgument(numArguments == 2 || numArguments == 3,
+                "LISTAGG expects 2 arguments, got: %s. The function can be used as "
+                    + "listAgg([distinct] expression, 'separator')", numArguments);
+            ExpressionContext separatorExpression = arguments.get(1);
+            Preconditions.checkArgument(separatorExpression.getType() == ExpressionContext.Type.LITERAL,
+                "LISTAGG expects the 2nd argument to be literal, got: %s. The function can be used as "
+                    + "listAgg([distinct] expression, 'separator')", separatorExpression.getType());
+            String separator = separatorExpression.getLiteral().getStringValue();
+            boolean isDistinct = false;
+            if (numArguments == 3) {
+              ExpressionContext isDistinctListAggExp = arguments.get(2);
+              isDistinct = isDistinctListAggExp.getLiteral().getBooleanValue();
+            }
+            if (isDistinct) {
+              return new ListAggDistinctFunction(arguments.get(0), separator, nullHandlingEnabled);
+            }
+            return new ListAggFunction(arguments.get(0), separator, nullHandlingEnabled);
+          }
+          case SUMARRAYLONG:
+            return new SumArrayLongAggregationFunction(arguments);
+          case SUMARRAYDOUBLE:
+            return new SumArrayDoubleAggregationFunction(arguments);
           case ARRAYAGG: {
             Preconditions.checkArgument(numArguments >= 2,
                 "ARRAY_AGG expects 2 or 3 arguments, got: %s. The function can be used as "
@@ -417,13 +447,13 @@ public class AggregationFunctionFactory {
             return new SumValuesIntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum);
           case AVGVALUEINTEGERSUMTUPLESKETCH:
             return new AvgValueIntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum);
-          case PARENTEXPRMAX:
+          case PINOTPARENTAGGEXPRMAX:
             return new ParentExprMinMaxAggregationFunction(arguments, true);
-          case PARENTEXPRMIN:
+          case PINOTPARENTAGGEXPRMIN:
             return new ParentExprMinMaxAggregationFunction(arguments, false);
-          case CHILDEXPRMAX:
+          case PINOTCHILDAGGEXPRMAX:
             return new ChildExprMinMaxAggregationFunction(arguments, true);
-          case CHILDEXPRMIN:
+          case PINOTCHILDAGGEXPRMIN:
             return new ChildExprMinMaxAggregationFunction(arguments, false);
           case EXPRMAX:
           case EXPRMIN:
@@ -431,6 +461,12 @@ public class AggregationFunctionFactory {
                 "Aggregation function: " + functionType + " is only supported in selection without alias.");
           case FUNNELCOUNT:
             return new FunnelCountAggregationFunctionFactory(arguments).get();
+          case FUNNELMAXSTEP:
+            return new FunnelMaxStepAggregationFunction(arguments);
+          case FUNNELMATCHSTEP:
+            return new FunnelMatchStepAggregationFunction(arguments);
+          case FUNNELCOMPLETECOUNT:
+            return new FunnelCompleteCountAggregationFunction(arguments);
           case FREQUENTSTRINGSSKETCH:
             return new FrequentStringsSketchAggregationFunction(arguments);
           case FREQUENTLONGSSKETCH:

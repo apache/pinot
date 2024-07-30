@@ -28,7 +28,7 @@ struct PinotQuery {
   7: optional Expression havingExpression;
   8: optional i32 limit = 10;
   9: optional i32 offset = 0;
-  10: optional map<string, string> debugOptions;
+//10: optional map<string, string> debugOptions;
   11: optional map<string, string> queryOptions;
   12: optional bool explain;
   13: optional map<Expression, Expression> expressionOverrideHints;

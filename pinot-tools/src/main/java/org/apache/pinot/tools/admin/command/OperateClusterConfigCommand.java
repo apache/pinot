@@ -22,8 +22,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
-import org.apache.commons.lang.StringUtils;
-import org.apache.http.Header;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.hc.core5.http.Header;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -39,13 +39,13 @@ import picocli.CommandLine;
 public class OperateClusterConfigCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(OperateClusterConfigCommand.class.getName());
 
-  @CommandLine.Option(names = {"-controllerHost"}, required = false, description = "host name for controller.")
+  @CommandLine.Option(names = {"-controllerHost"}, required = false, description = "Host name for controller.")
   private String _controllerHost;
 
-  @CommandLine.Option(names = {"-controllerPort"}, required = false, description = "http port for controller.")
+  @CommandLine.Option(names = {"-controllerPort"}, required = false, description = "Port number for controller.")
   private String _controllerPort = DEFAULT_CONTROLLER_PORT;
 
-  @CommandLine.Option(names = {"-controllerProtocol"}, required = false, description = "protocol for controller.")
+  @CommandLine.Option(names = {"-controllerProtocol"}, required = false, description = "Protocol for controller.")
   private String _controllerProtocol = CommonConstants.HTTP_PROTOCOL;
 
   @CommandLine.Option(names = {"-user"}, required = false, description = "Username for basic auth.")
@@ -149,7 +149,7 @@ public class OperateClusterConfigCommand extends AbstractBaseAdminCommand implem
     if (_controllerHost == null) {
       _controllerHost = NetUtils.getHostAddress();
     }
-    LOGGER.info("Executing command: " + toString());
+    LOGGER.info("Executing command: {}", toString());
     if (StringUtils.isEmpty(_config) && !_operation.equalsIgnoreCase("GET")) {
       throw new UnsupportedOperationException("Empty config: " + _config);
     }

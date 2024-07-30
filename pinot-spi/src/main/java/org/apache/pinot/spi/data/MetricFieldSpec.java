@@ -43,6 +43,11 @@ public final class MetricFieldSpec extends FieldSpec {
     super(name, dataType, true, defaultNullValue);
   }
 
+  public MetricFieldSpec(String name, DataType dataType, @Nullable Object defaultNullValue, int maxLength,
+      @Nullable MaxLengthExceedStrategy maxLengthExceedStrategy) {
+    super(name, dataType, true, maxLength, defaultNullValue, maxLengthExceedStrategy);
+  }
+
   @JsonIgnore
   @Override
   public FieldType getFieldType() {
@@ -58,6 +63,6 @@ public final class MetricFieldSpec extends FieldSpec {
   @Override
   public String toString() {
     return "< field type: METRIC, field name: " + _name + ", data type: " + _dataType + ", default null value: "
-        + _defaultNullValue + " >";
+        + _defaultNullValue + ", max length exceed strategy: " + _maxLengthExceedStrategy + " >";
   }
 }

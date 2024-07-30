@@ -65,4 +65,9 @@ public class DistinctCountMVAggregationFunction extends BaseDistinctAggregateAgg
   public Integer extractFinalResult(Set intermediateResult) {
     return intermediateResult.size();
   }
+
+  @Override
+  public Integer mergeFinalResult(Integer finalResult1, Integer finalResult2) {
+    return finalResult1 + finalResult2;
+  }
 }

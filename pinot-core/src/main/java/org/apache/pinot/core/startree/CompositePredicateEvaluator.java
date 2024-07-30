@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.startree;
 
+import it.unimi.dsi.fastutil.objects.ObjectBooleanPair;
 import java.util.List;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 
@@ -26,19 +27,19 @@ import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
  * Represents a composite predicate.
  *
  * A composite predicate evaluator represents a single predicate evaluator or multiple predicate evaluators conjoined
- * with OR.
- * Consider the given predicate: (d1 > 10 OR d1 < 50). A composite predicate will represent two predicates -- (d1 > 10)
- * and (d1 < 50) and represent that they are related by the operator OR.
+ * with OR. Each predicate evaluator is associated with a boolean value indicating whether the predicate is negated.
+ * Consider the given predicate: (d1 > 10 OR NOT d1 > 50). A composite predicate will represent two predicates:
+ * (d1 > 10) and NOT(d1 > 50) and represent that they are related by the operator OR.
  */
 public class CompositePredicateEvaluator {
-  private final List<PredicateEvaluator> _predicateEvaluators;
+  private final List<ObjectBooleanPair<PredicateEvaluator>> _predicateEvaluators;
 
-  public CompositePredicateEvaluator(List<PredicateEvaluator> predicateEvaluators) {
+  public CompositePredicateEvaluator(List<ObjectBooleanPair<PredicateEvaluator>> predicateEvaluators) {
     assert !predicateEvaluators.isEmpty();
     _predicateEvaluators = predicateEvaluators;
   }
 
-  public List<PredicateEvaluator> getPredicateEvaluators() {
+  public List<ObjectBooleanPair<PredicateEvaluator>> getPredicateEvaluators() {
     return _predicateEvaluators;
   }
 
@@ -47,8 +48,8 @@ public class CompositePredicateEvaluator {
    * predicate evaluator, {@code false} otherwise.
    */
   public boolean apply(int dictId) {
-    for (PredicateEvaluator predicateEvaluator : _predicateEvaluators) {
-      if (predicateEvaluator.applySV(dictId)) {
+    for (ObjectBooleanPair<PredicateEvaluator> predicateEvaluator : _predicateEvaluators) {
+      if (predicateEvaluator.left().applySV(dictId) != predicateEvaluator.rightBoolean()) {
         return true;
       }
     }

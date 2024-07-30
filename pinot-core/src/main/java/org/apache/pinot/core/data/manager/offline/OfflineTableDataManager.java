@@ -19,7 +19,10 @@
 package org.apache.pinot.core.data.manager.offline;
 
 import javax.annotation.concurrent.ThreadSafe;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.core.data.manager.BaseTableDataManager;
+import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
+import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 
 
 /**
@@ -39,5 +42,23 @@ public class OfflineTableDataManager extends BaseTableDataManager {
   @Override
   protected void doShutdown() {
     releaseAndRemoveAllSegments();
+  }
+
+  protected void doAddOnlineSegment(String segmentName)
+      throws Exception {
+    SegmentZKMetadata zkMetadata = fetchZKMetadata(segmentName);
+    IndexLoadingConfig indexLoadingConfig = fetchIndexLoadingConfig();
+    indexLoadingConfig.setSegmentTier(zkMetadata.getTier());
+    SegmentDataManager segmentDataManager = _segmentDataManagerMap.get(segmentName);
+    if (segmentDataManager == null) {
+      addNewOnlineSegment(zkMetadata, indexLoadingConfig);
+    } else {
+      replaceSegmentIfCrcMismatch(segmentDataManager, zkMetadata, indexLoadingConfig);
+    }
+  }
+
+  @Override
+  public void addConsumingSegment(String segmentName) {
+    throw new UnsupportedOperationException("Cannot add CONSUMING segment to OFFLINE table");
   }
 }

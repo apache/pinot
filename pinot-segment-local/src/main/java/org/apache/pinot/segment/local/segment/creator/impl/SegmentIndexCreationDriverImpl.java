@@ -34,7 +34,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
-import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.realtime.converter.stats.RealtimeSegmentSegmentCreationDataSource;
 import org.apache.pinot.segment.local.recordtransformer.ComplexTypeTransformer;
@@ -101,6 +101,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   private TreeMap<String, ColumnIndexCreationInfo> _indexCreationInfoMap;
   private SegmentCreator _indexCreator;
   private SegmentIndexCreationInfo _segmentIndexCreationInfo;
+  private SegmentCreationDataSource _dataSource;
   private Schema _dataSchema;
   private RecordEnricherPipeline _recordEnricherPipeline;
   private TransformPipeline _transformPipeline;
@@ -109,8 +110,8 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   private File _tempIndexDir;
   private String _segmentName;
   private long _totalRecordReadTimeNs = 0;
-  private long _totalIndexTime = 0;
-  private long _totalStatsCollectorTime = 0;
+  private long _totalIndexTimeNs = 0;
+  private long _totalStatsCollectorTimeNs = 0;
   private boolean _continueOnError;
 
   @Override
@@ -195,12 +196,11 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     // Optimization for realtime segment conversion
     if (dataSource instanceof RealtimeSegmentSegmentCreationDataSource) {
       _config.setRealtimeConversion(true);
+      _config.setConsumerDir(((RealtimeSegmentSegmentCreationDataSource) dataSource).getConsumerDir());
     }
 
-    // Initialize stats collection
-    _segmentStats = dataSource.gatherStats(
-        new StatsCollectorConfig(config.getTableConfig(), _dataSchema, config.getSegmentPartitionConfig()));
-    _totalDocs = _segmentStats.getTotalDocCount();
+    // For stats collection
+    _dataSource = dataSource;
 
     // Initialize index creation
     _segmentIndexCreationInfo = new SegmentIndexCreationInfo();
@@ -246,7 +246,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       throws Exception {
     // Count the number of documents and gather per-column statistics
     LOGGER.debug("Start building StatsCollector!");
-    buildIndexCreationInfo();
+    collectStatsAndIndexCreationInfo();
     LOGGER.info("Finished building StatsCollector!");
     LOGGER.info("Collected stats for {} documents", _totalDocs);
 
@@ -272,22 +272,20 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       GenericRow reuse = new GenericRow();
       TransformPipeline.Result reusedResult = new TransformPipeline.Result();
       while (_recordReader.hasNext()) {
-        long recordReadStopTime = System.nanoTime();
-        long indexStopTime;
+        long recordReadStopTimeNs;
         reuse.clear();
 
         try {
-          long recordReadStartTime = System.nanoTime();
           GenericRow decodedRow = _recordReader.next(reuse);
-          recordReadStartTime = System.nanoTime();
+          long recordReadStartTimeNs = System.nanoTime();
 
           // Should not be needed anymore.
           // Add row to indexes
           _recordEnricherPipeline.run(decodedRow);
           _transformPipeline.processRow(decodedRow, reusedResult);
 
-          recordReadStopTime = System.nanoTime();
-          _totalRecordReadTimeNs += (recordReadStopTime - recordReadStartTime);
+          recordReadStopTimeNs = System.nanoTime();
+          _totalRecordReadTimeNs += (recordReadStopTimeNs - recordReadStartTimeNs);
         } catch (Exception e) {
           if (!_continueOnError) {
             throw new RuntimeException("Error occurred while reading row during indexing", e);
@@ -301,8 +299,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
         for (GenericRow row : reusedResult.getTransformedRows()) {
           _indexCreator.indexRow(row);
         }
-        indexStopTime = System.currentTimeMillis();
-        _totalIndexTime += (indexStopTime - recordReadStopTime);
+        _totalIndexTimeNs += (System.nanoTime() - recordReadStopTimeNs);
         incompleteRowsFound += reusedResult.getIncompleteRowCount();
       }
     } catch (Exception e) {
@@ -326,7 +323,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       throws Exception {
     // Count the number of documents and gather per-column statistics
     LOGGER.debug("Start building StatsCollector!");
-    buildIndexCreationInfo();
+    collectStatsAndIndexCreationInfo();
     LOGGER.info("Finished building StatsCollector!");
     LOGGER.info("Collected stats for {} documents", _totalDocs);
 
@@ -437,9 +434,9 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     // Persist creation metadata to disk
     persistCreationMeta(segmentOutputDir, crc, creationTime);
 
-    LOGGER.info("Driver, record read time : {}", TimeUnit.NANOSECONDS.toMillis(_totalRecordReadTimeNs));
-    LOGGER.info("Driver, stats collector time : {}", _totalStatsCollectorTime);
-    LOGGER.info("Driver, indexing time : {}", _totalIndexTime);
+    LOGGER.info("Driver, record read time (in ms) : {}", TimeUnit.NANOSECONDS.toMillis(_totalRecordReadTimeNs));
+    LOGGER.info("Driver, stats collector time (in ms) : {}", TimeUnit.NANOSECONDS.toMillis(_totalStatsCollectorTimeNs));
+    LOGGER.info("Driver, indexing time (in ms) : {}", TimeUnit.NANOSECONDS.toMillis(_totalIndexTimeNs));
   }
 
   private void updatePostSegmentCreationIndexes(File indexDir)
@@ -533,8 +530,14 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   /**
    * Complete the stats gathering process and store the stats information in indexCreationInfoMap.
    */
-  void buildIndexCreationInfo()
-      throws Exception {
+  void collectStatsAndIndexCreationInfo() throws Exception {
+    long statsCollectorStartTime = System.nanoTime();
+
+    // Initialize stats collection
+    _segmentStats = _dataSource.gatherStats(
+        new StatsCollectorConfig(_config.getTableConfig(), _dataSchema, _config.getSegmentPartitionConfig()));
+    _totalDocs = _segmentStats.getTotalDocCount();
+
     Set<String> varLengthDictionaryColumns = new HashSet<>(_config.getVarLengthDictionaryColumns());
     Set<String> rawIndexCreationColumns = _config.getRawIndexCreationColumns();
     Set<String> rawIndexCompressionTypeKeys = _config.getRawIndexCompressionType().keySet();
@@ -560,6 +563,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
               defaultNullValue));
     }
     _segmentIndexCreationInfo.setTotalDocs(_totalDocs);
+    _totalStatsCollectorTimeNs = System.nanoTime() - statsCollectorStartTime;
   }
 
   /**

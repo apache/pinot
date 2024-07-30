@@ -48,6 +48,8 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
   private JsonIndexReader _jsonIndexReader;
   private Object _defaultValue;
   private Map<String, RoaringBitmap> _valueToMatchingDocsMap;
+  private boolean _isSingleValue;
+  private String _filterJsonPath;
 
   @Override
   public String getName() {
@@ -91,12 +93,12 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
       throw new IllegalArgumentException("Result type argument must be a literal");
     }
     String resultsType = ((LiteralTransformFunction) thirdArgument).getStringLiteral().toUpperCase();
-    boolean isSingleValue = !resultsType.endsWith("_ARRAY");
-    if (isSingleValue && _jsonPathString.contains("[*]")) {
+    _isSingleValue = !resultsType.endsWith("_ARRAY");
+    if (_isSingleValue && _jsonPathString.contains("[*]")) {
       throw new IllegalArgumentException(
           "[*] syntax in json path is unsupported for singleValue field json_extract_index");
     }
-    DataType dataType = isSingleValue ? DataType.valueOf(resultsType)
+    DataType dataType = _isSingleValue ? DataType.valueOf(resultsType)
         : DataType.valueOf(resultsType.substring(0, resultsType.length() - 6));
 
     if (arguments.size() >= 4) {
@@ -105,7 +107,7 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
         throw new IllegalArgumentException("Default value must be a literal");
       }
 
-      if (isSingleValue) {
+      if (_isSingleValue) {
         _defaultValue = dataType.convert(((LiteralTransformFunction) fourthArgument).getStringLiteral());
       } else {
         try {
@@ -124,21 +126,15 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
       }
     }
 
-    String filterJsonPath = null;
     if (arguments.size() == 5) {
       TransformFunction fifthArgument = arguments.get(4);
       if (!(fifthArgument instanceof LiteralTransformFunction)) {
         throw new IllegalArgumentException("JSON path filter argument must be a literal");
       }
-      filterJsonPath = ((LiteralTransformFunction) fifthArgument).getStringLiteral();
+      _filterJsonPath = ((LiteralTransformFunction) fifthArgument).getStringLiteral();
     }
 
-    _resultMetadata = new TransformResultMetadata(dataType, isSingleValue, false);
-    _valueToMatchingDocsMap = _jsonIndexReader.getMatchingFlattenedDocsMap(_jsonPathString, filterJsonPath);
-    if (isSingleValue) {
-      // For single value result type, it's more efficient to use original docIDs map
-      _jsonIndexReader.convertFlattenedDocIdsToDocIds(_valueToMatchingDocsMap);
-    }
+    _resultMetadata = new TransformResultMetadata(dataType, _isSingleValue, false);
   }
 
   @Override
@@ -152,9 +148,9 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
     int[] inputDocIds = valueBlock.getDocIds();
     initIntValuesSV(numDocs);
     String[] valuesFromIndex = _jsonIndexReader.getValuesSV(valueBlock.getDocIds(), valueBlock.getNumDocs(),
-        _valueToMatchingDocsMap, false);
+        getValueToMatchingDocsMap(), false);
     for (int i = 0; i < numDocs; i++) {
-      String value = valuesFromIndex[inputDocIds[i]];
+      String value = valuesFromIndex[i];
       if (value == null) {
         if (_defaultValue != null) {
           _intValuesSV[i] = (int) _defaultValue;
@@ -174,7 +170,7 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
     int[] inputDocIds = valueBlock.getDocIds();
     initLongValuesSV(numDocs);
     String[] valuesFromIndex = _jsonIndexReader.getValuesSV(valueBlock.getDocIds(), valueBlock.getNumDocs(),
-        _valueToMatchingDocsMap, false);
+        getValueToMatchingDocsMap(), false);
     for (int i = 0; i < numDocs; i++) {
       String value = valuesFromIndex[i];
       if (value == null) {
@@ -196,7 +192,7 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
     int[] inputDocIds = valueBlock.getDocIds();
     initFloatValuesSV(numDocs);
     String[] valuesFromIndex = _jsonIndexReader.getValuesSV(valueBlock.getDocIds(), valueBlock.getNumDocs(),
-        _valueToMatchingDocsMap, false);
+        getValueToMatchingDocsMap(), false);
     for (int i = 0; i < numDocs; i++) {
       String value = valuesFromIndex[i];
       if (value == null) {
@@ -218,7 +214,7 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
     int[] inputDocIds = valueBlock.getDocIds();
     initDoubleValuesSV(numDocs);
     String[] valuesFromIndex = _jsonIndexReader.getValuesSV(valueBlock.getDocIds(), valueBlock.getNumDocs(),
-        _valueToMatchingDocsMap, false);
+        getValueToMatchingDocsMap(), false);
     for (int i = 0; i < numDocs; i++) {
       String value = valuesFromIndex[i];
       if (value == null) {
@@ -240,7 +236,7 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
     int[] inputDocIds = valueBlock.getDocIds();
     initBigDecimalValuesSV(numDocs);
     String[] valuesFromIndex = _jsonIndexReader.getValuesSV(valueBlock.getDocIds(), valueBlock.getNumDocs(),
-        _valueToMatchingDocsMap, false);
+        getValueToMatchingDocsMap(), false);
     for (int i = 0; i < numDocs; i++) {
       String value = valuesFromIndex[i];
       if (value == null) {
@@ -262,7 +258,7 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
     int[] inputDocIds = valueBlock.getDocIds();
     initStringValuesSV(numDocs);
     String[] valuesFromIndex = _jsonIndexReader.getValuesSV(valueBlock.getDocIds(), valueBlock.getNumDocs(),
-        _valueToMatchingDocsMap, false);
+        getValueToMatchingDocsMap(), false);
     for (int i = 0; i < numDocs; i++) {
       String value = valuesFromIndex[i];
       if (value == null) {
@@ -283,7 +279,7 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
     int numDocs = valueBlock.getNumDocs();
     initIntValuesMV(numDocs);
     String[][] valuesFromIndex = _jsonIndexReader.getValuesMV(valueBlock.getDocIds(), valueBlock.getNumDocs(),
-        _valueToMatchingDocsMap);
+        getValueToMatchingDocsMap());
 
     for (int i = 0; i < numDocs; i++) {
       String[] value = valuesFromIndex[i];
@@ -311,7 +307,7 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
     int numDocs = valueBlock.getNumDocs();
     initLongValuesMV(numDocs);
     String[][] valuesFromIndex = _jsonIndexReader.getValuesMV(valueBlock.getDocIds(), valueBlock.getNumDocs(),
-        _valueToMatchingDocsMap);
+        getValueToMatchingDocsMap());
     for (int i = 0; i < numDocs; i++) {
       String[] value = valuesFromIndex[i];
       if (value.length == 0) {
@@ -338,7 +334,7 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
     int numDocs = valueBlock.getNumDocs();
     initFloatValuesMV(numDocs);
     String[][] valuesFromIndex = _jsonIndexReader.getValuesMV(valueBlock.getDocIds(), valueBlock.getNumDocs(),
-        _valueToMatchingDocsMap);
+        getValueToMatchingDocsMap());
     for (int i = 0; i < numDocs; i++) {
       String[] value = valuesFromIndex[i];
       if (value.length == 0) {
@@ -365,7 +361,7 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
     int numDocs = valueBlock.getNumDocs();
     initDoubleValuesMV(numDocs);
     String[][] valuesFromIndex = _jsonIndexReader.getValuesMV(valueBlock.getDocIds(), valueBlock.getNumDocs(),
-        _valueToMatchingDocsMap);
+        getValueToMatchingDocsMap());
     for (int i = 0; i < numDocs; i++) {
       String[] value = valuesFromIndex[i];
       if (value.length == 0) {
@@ -392,7 +388,7 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
     int numDocs = valueBlock.getNumDocs();
     initStringValuesMV(numDocs);
     String[][] valuesFromIndex = _jsonIndexReader.getValuesMV(valueBlock.getDocIds(), valueBlock.getNumDocs(),
-        _valueToMatchingDocsMap);
+        getValueToMatchingDocsMap());
     for (int i = 0; i < numDocs; i++) {
       String[] value = valuesFromIndex[i];
       if (value.length == 0) {
@@ -410,5 +406,19 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
       System.arraycopy(value, 0, _stringValuesMV[i], 0, value.length);
     }
     return _stringValuesMV;
+  }
+
+  /**
+   * Lazily initialize _valueToMatchingDocsMap, so that map generation is skipped when filtering excludes all values
+   */
+  private Map<String, RoaringBitmap> getValueToMatchingDocsMap() {
+    if (_valueToMatchingDocsMap == null) {
+      _valueToMatchingDocsMap = _jsonIndexReader.getMatchingFlattenedDocsMap(_jsonPathString, _filterJsonPath);
+      if (_isSingleValue) {
+        // For single value result type, it's more efficient to use original docIDs map
+        _jsonIndexReader.convertFlattenedDocIdsToDocIds(_valueToMatchingDocsMap);
+      }
+    }
+    return _valueToMatchingDocsMap;
   }
 }

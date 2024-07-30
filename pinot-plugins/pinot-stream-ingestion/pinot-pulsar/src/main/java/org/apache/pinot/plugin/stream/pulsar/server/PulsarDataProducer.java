@@ -73,7 +73,7 @@ public class PulsarDataProducer implements StreamDataProducer {
     try (Producer<byte[]> producer = _pulsarClient.newProducer().topic(topic).create()) {
       producer.send(payload);
     } catch (PulsarClientException e) {
-      LOGGER.error("Failed to produce message for topic: " + topic, e);
+      LOGGER.error("Failed to produce message for topic: {}", topic, e);
     }
   }
 
@@ -82,7 +82,7 @@ public class PulsarDataProducer implements StreamDataProducer {
     try (Producer<byte[]> producer = _pulsarClient.newProducer().topic(topic).create()) {
       producer.newMessage().key(Base64.getEncoder().encodeToString(key)).value(payload).send();
     } catch (PulsarClientException e) {
-      LOGGER.error("Failed to produce message for topic: " + topic, e);
+      LOGGER.error("Failed to produce message for topic: {}", topic, e);
     }
   }
 

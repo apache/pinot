@@ -111,7 +111,7 @@ public class VerifySegmentState extends AbstractBaseCommand implements Command {
             error = true;
           }
         }
-        LOGGER.info(resourceName + " = " + (error ? "ERROR" : "OK"));
+        LOGGER.info("{} = {}", resourceName, error ? "ERROR" : "OK");
       }
     }
     return true;

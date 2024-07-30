@@ -19,7 +19,6 @@
 package org.apache.pinot.core.query.optimizer.filter;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -147,16 +146,14 @@ public class MergeRangeFilterOptimizer implements FilterOptimizer {
    */
   @SuppressWarnings("rawtypes")
   private static Comparable getComparable(Expression literalExpression, DataType dataType) {
-    return dataType.convertInternal(literalExpression.getLiteral().getFieldValue().toString());
+    return dataType.convertInternal(RequestUtils.getLiteralString(literalExpression));
   }
 
   /**
    * Helper method to construct a RANGE predicate filter Expression from the given column and range.
    */
   private static Expression getRangeFilterExpression(String column, Range range) {
-    Expression rangeFilter = RequestUtils.getFunctionExpression(FilterKind.RANGE.name());
-    rangeFilter.getFunctionCall().setOperands(Arrays.asList(RequestUtils.getIdentifierExpression(column),
-        RequestUtils.getLiteralExpression(range.getRangeString())));
-    return rangeFilter;
+    return RequestUtils.getFunctionExpression(FilterKind.RANGE.name(), RequestUtils.getIdentifierExpression(column),
+        RequestUtils.getLiteralExpression(range.getRangeString()));
   }
 }

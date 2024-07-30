@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.startree;
 
+import it.unimi.dsi.fastutil.objects.ObjectBooleanPair;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -75,13 +76,13 @@ public class StarTreeUtils {
   }
 
   /**
-   * Extracts a map from the column to a list of {@link PredicateEvaluator}s for it. Returns {@code null} if the filter
-   * cannot be solved by the star-tree.
+   * Extracts a map from the column to a list of {@link CompositePredicateEvaluator}s for it. Returns {@code null} if
+   * the filter cannot be solved by the star-tree.
    *
    * A predicate can be simple (d1 > 10) or composite (d1 > 10 AND d2 < 50) or multi levelled
-   * (d1 > 50 AND (d2 > 10 OR d2 < 35)).
+   * (d1 > 50 AND (d2 > 10 OR NOT d2 > 35)).
    * This method represents a list of CompositePredicates per dimension. For each dimension, all CompositePredicates in
-   * the list are implicitly ANDed together. Any OR predicates are nested within a CompositePredicate.
+   * the list are implicitly ANDed together. Any OR and NOT predicates are nested within a CompositePredicate.
    *
    * A map from predicates to their evaluators is passed in to accelerate the computation.
    */
@@ -102,21 +103,50 @@ public class StarTreeUtils {
           queue.addAll(filterNode.getChildren());
           break;
         case OR:
-          Pair<String, List<PredicateEvaluator>> pair =
+          Pair<String, CompositePredicateEvaluator> pair =
               isOrClauseValidForStarTree(indexSegment, filterNode, predicateEvaluatorMapping);
           if (pair == null) {
             return null;
           }
-          List<PredicateEvaluator> predicateEvaluators = pair.getRight();
-          // NOTE: Empty list means always true
-          if (!predicateEvaluators.isEmpty()) {
-            predicateEvaluatorsMap.computeIfAbsent(pair.getLeft(), k -> new ArrayList<>())
-                .add(new CompositePredicateEvaluator(predicateEvaluators));
+          // NOTE: Null identifier means always true
+          if (pair.getLeft() != null) {
+            predicateEvaluatorsMap.computeIfAbsent(pair.getLeft(), k -> new ArrayList<>()).add(pair.getRight());
           }
           break;
         case NOT:
-          // TODO: Support NOT in star-tree
-          return null;
+          boolean negated = true;
+          FilterContext negatedChild = filterNode.getChildren().get(0);
+          while (true) {
+            FilterContext.Type type = negatedChild.getType();
+            if (type == FilterContext.Type.PREDICATE) {
+              Predicate predicate = negatedChild.getPredicate();
+              PredicateEvaluator predicateEvaluator =
+                  getPredicateEvaluator(indexSegment, predicate, predicateEvaluatorMapping);
+              // Do not use star-tree when the predicate cannot be solved with star-tree
+              if (predicateEvaluator == null) {
+                return null;
+              }
+              // Do not use star-tree when the predicate is always false
+              if ((predicateEvaluator.isAlwaysTrue() && negated) || (predicateEvaluator.isAlwaysFalse() && !negated)) {
+                return null;
+              }
+              // Skip adding always true predicate
+              if ((predicateEvaluator.isAlwaysTrue() && !negated) || (predicateEvaluator.isAlwaysFalse() && negated)) {
+                break;
+              }
+              predicateEvaluatorsMap.computeIfAbsent(predicate.getLhs().getIdentifier(), k -> new ArrayList<>())
+                  .add(new CompositePredicateEvaluator(List.of(ObjectBooleanPair.of(predicateEvaluator, negated))));
+              break;
+            }
+            if (type == FilterContext.Type.NOT) {
+              negated = !negated;
+              negatedChild = negatedChild.getChildren().get(0);
+              continue;
+            }
+            // Do not allow nested AND/OR under NOT
+            return null;
+          }
+          break;
         case PREDICATE:
           Predicate predicate = filterNode.getPredicate();
           PredicateEvaluator predicateEvaluator =
@@ -127,7 +157,7 @@ public class StarTreeUtils {
           }
           if (!predicateEvaluator.isAlwaysTrue()) {
             predicateEvaluatorsMap.computeIfAbsent(predicate.getLhs().getIdentifier(), k -> new ArrayList<>())
-                .add(new CompositePredicateEvaluator(Collections.singletonList(predicateEvaluator)));
+                .add(new CompositePredicateEvaluator(List.of(ObjectBooleanPair.of(predicateEvaluator, false))));
           }
           break;
         default:
@@ -177,70 +207,91 @@ public class StarTreeUtils {
    * StarTree supports OR predicates on a single dimension only (d1 < 10 OR d1 > 50).
    *
    * @return The pair of single identifier and predicate evaluators applied to it if true; {@code null} if the OR clause
-   *         cannot be solved with star-tree; empty predicate evaluator list if the OR clause always evaluates to true.
+   *         cannot be solved with star-tree; a pair of nulls if the OR clause always evaluates to true.
    */
   @Nullable
-  private static Pair<String, List<PredicateEvaluator>> isOrClauseValidForStarTree(IndexSegment indexSegment,
+  private static Pair<String, CompositePredicateEvaluator> isOrClauseValidForStarTree(IndexSegment indexSegment,
       FilterContext filter, List<Pair<Predicate, PredicateEvaluator>> predicateEvaluatorMapping) {
     assert filter.getType() == FilterContext.Type.OR;
 
-    List<Predicate> predicates = new ArrayList<>();
+    List<ObjectBooleanPair<Predicate>> predicates = new ArrayList<>();
     if (!extractOrClausePredicates(filter, predicates)) {
       return null;
     }
 
     String identifier = null;
-    List<PredicateEvaluator> predicateEvaluators = new ArrayList<>();
-    for (Predicate predicate : predicates) {
-      PredicateEvaluator predicateEvaluator = getPredicateEvaluator(indexSegment, predicate, predicateEvaluatorMapping);
+    List<ObjectBooleanPair<PredicateEvaluator>> predicateEvaluators = new ArrayList<>();
+    for (ObjectBooleanPair<Predicate> predicate : predicates) {
+      PredicateEvaluator predicateEvaluator =
+          getPredicateEvaluator(indexSegment, predicate.left(), predicateEvaluatorMapping);
       if (predicateEvaluator == null) {
         // The predicate cannot be solved with star-tree
         return null;
       }
-      if (predicateEvaluator.isAlwaysTrue()) {
-        // Use empty predicate evaluators to represent always true
-        return Pair.of(null, Collections.emptyList());
+      boolean negated = predicate.rightBoolean();
+      // Use a pair of null values to represent always true
+      if ((predicateEvaluator.isAlwaysTrue() && !negated) || (predicateEvaluator.isAlwaysFalse() && negated)) {
+        return Pair.of(null, null);
       }
-      if (!predicateEvaluator.isAlwaysFalse()) {
-        String predicateIdentifier = predicate.getLhs().getIdentifier();
-        if (identifier == null) {
-          identifier = predicateIdentifier;
-        } else {
-          if (!identifier.equals(predicateIdentifier)) {
-            // The predicates are applied to multiple columns
-            return null;
-          }
+      // Skip the always false predicate
+      if ((predicateEvaluator.isAlwaysTrue() && negated) || (predicateEvaluator.isAlwaysFalse() && !negated)) {
+        continue;
+      }
+      String predicateIdentifier = predicate.left().getLhs().getIdentifier();
+      if (identifier == null) {
+        identifier = predicateIdentifier;
+      } else {
+        if (!identifier.equals(predicateIdentifier)) {
+          // The predicates are applied to multiple columns
+          return null;
         }
-        predicateEvaluators.add(predicateEvaluator);
       }
+      predicateEvaluators.add(ObjectBooleanPair.of(predicateEvaluator, negated));
     }
     // When all predicates are always false, do not use star-tree
     if (predicateEvaluators.isEmpty()) {
       return null;
     }
-    return Pair.of(identifier, predicateEvaluators);
+    return Pair.of(identifier, new CompositePredicateEvaluator(predicateEvaluators));
   }
 
   /**
    * Extracts the predicates under the given OR clause, returns {@code false} if there is nested AND or NOT under OR
    * clause.
-   * TODO: Support NOT in star-tree
    */
-  private static boolean extractOrClausePredicates(FilterContext filter, List<Predicate> predicates) {
+  private static boolean extractOrClausePredicates(FilterContext filter,
+      List<ObjectBooleanPair<Predicate>> predicates) {
     assert filter.getType() == FilterContext.Type.OR;
 
     for (FilterContext child : filter.getChildren()) {
       switch (child.getType()) {
         case AND:
-        case NOT:
           return false;
         case OR:
           if (!extractOrClausePredicates(child, predicates)) {
             return false;
           }
           break;
+        case NOT:
+          boolean negated = true;
+          FilterContext negatedChild = child.getChildren().get(0);
+          while (true) {
+            FilterContext.Type type = negatedChild.getType();
+            if (type == FilterContext.Type.PREDICATE) {
+              predicates.add(ObjectBooleanPair.of(negatedChild.getPredicate(), negated));
+              break;
+            }
+            if (type == FilterContext.Type.NOT) {
+              negated = !negated;
+              negatedChild = negatedChild.getChildren().get(0);
+              continue;
+            }
+            // Do not allow nested AND/OR under NOT
+            return false;
+          }
+          break;
         case PREDICATE:
-          predicates.add(child.getPredicate());
+          predicates.add(ObjectBooleanPair.of(child.getPredicate(), false));
           break;
         default:
           throw new IllegalStateException();

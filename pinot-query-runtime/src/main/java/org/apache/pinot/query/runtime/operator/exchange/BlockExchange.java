@@ -18,11 +18,9 @@
  */
 package org.apache.pinot.query.runtime.operator.exchange;
 
-import com.google.common.base.Preconditions;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
-import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.query.mailbox.SendingMailbox;
@@ -44,14 +42,12 @@ public abstract class BlockExchange {
   private final BlockSplitter _splitter;
 
   public static BlockExchange getExchange(List<SendingMailbox> sendingMailboxes, RelDistribution.Type distributionType,
-      @Nullable List<Integer> distributionKeys, BlockSplitter splitter) {
+      List<Integer> keys, BlockSplitter splitter) {
     switch (distributionType) {
       case SINGLETON:
         return new SingletonExchange(sendingMailboxes, splitter);
       case HASH_DISTRIBUTED:
-        Preconditions.checkArgument(distributionKeys != null,
-            "Distribution keys must be provided for hash distribution");
-        return new HashExchange(sendingMailboxes, KeySelectorFactory.getKeySelector(distributionKeys), splitter);
+        return new HashExchange(sendingMailboxes, KeySelectorFactory.getKeySelector(keys), splitter);
       case RANDOM_DISTRIBUTED:
         return new RandomExchange(sendingMailboxes, splitter);
       case BROADCAST_DISTRIBUTED:
@@ -89,6 +85,7 @@ public abstract class BlockExchange {
       // Send metadata to only one randomly picked mailbox, and empty EOS block to other mailboxes
       int numMailboxes = _sendingMailboxes.size();
       int mailboxIdToSendMetadata = ThreadLocalRandom.current().nextInt(numMailboxes);
+      assert block.getQueryStats() != null;
       for (int i = 0; i < numMailboxes; i++) {
         SendingMailbox sendingMailbox = _sendingMailboxes.get(i);
         TransferableBlock blockToSend =

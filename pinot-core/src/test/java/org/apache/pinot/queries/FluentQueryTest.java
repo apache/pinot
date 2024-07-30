@@ -278,8 +278,8 @@ public class FluentQueryTest {
     }
 
     public QueryExecuted thenResultIs(Object[]... expectedResult) {
-      if (_brokerResponse.getExceptionsSize() < 0) {
-        Assert.fail("Query failed with " + _brokerResponse.getProcessingExceptions());
+      if (_brokerResponse.getExceptionsSize() > 0) {
+        Assert.fail("Query failed with " + _brokerResponse.getExceptions());
       }
 
       List<Object[]> actualRows = _brokerResponse.getResultTable().getRows();

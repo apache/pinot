@@ -89,6 +89,7 @@ public class ColumnIndexDirectoryTestHelper {
   static SegmentMetadataImpl writeMetadata(SegmentVersion version) {
     SegmentMetadataImpl segmentMetadata = Mockito.mock(SegmentMetadataImpl.class);
     when(segmentMetadata.getVersion()).thenReturn(version);
+    when(segmentMetadata.getStarTreeV2MetadataList()).thenReturn(null);
     ColumnMetadata columnMetadata = Mockito.mock(ColumnMetadata.class);
     when(columnMetadata.isSingleValue()).thenReturn(true);
     when(columnMetadata.isSorted()).thenReturn(false);

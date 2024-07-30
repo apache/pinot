@@ -19,13 +19,47 @@
 package org.apache.pinot.query.runtime.operator.window;
 
 import java.util.List;
+import org.apache.calcite.rel.RelFieldCollation;
+import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.query.runtime.operator.WindowAggregateOperator;
+import org.apache.pinot.query.runtime.operator.utils.AggregationUtils;
 
 
-public interface WindowFunction {
+/**
+ * This class provides the basic structure for window functions. It provides the batch row processing API:
+ * processRows(List<Object[]> rows) which processes a batch of rows at a time.
+ *
+ */
+public abstract class WindowFunction extends AggregationUtils.Accumulator {
+  protected final int[] _orderKeys;
+  protected final boolean _partitionByOnly;
+  protected final int[] _inputRefs;
+
+  public WindowFunction(RexExpression.FunctionCall aggCall, DataSchema inputSchema, List<RelFieldCollation> collations,
+      boolean partitionByOnly) {
+    super(aggCall, inputSchema);
+    int numOrderKeys = collations.size();
+    _orderKeys = new int[numOrderKeys];
+    for (int i = 0; i < numOrderKeys; i++) {
+      _orderKeys[i] = collations.get(i).getFieldIndex();
+    }
+    _partitionByOnly = partitionByOnly;
+    if (WindowAggregateOperator.RANKING_FUNCTION_NAMES.contains(aggCall.getFunctionName())) {
+      _inputRefs = _orderKeys;
+    } else {
+      _inputRefs = new int[]{_inputRef};
+    }
+  }
 
   /**
+   * Batch processing API for Window functions.
+   * This method processes a batch of rows at a time.
+   * Each row generates one object as output.
+   * Note, the input and output list size should be the same.
+   *
    * @param rows List of rows to process
    * @return List of rows with the window function applied
    */
-  List<Object[]> processRows(List<Object[]> rows);
+  public abstract List<Object> processRows(List<Object[]> rows);
 }

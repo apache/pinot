@@ -124,6 +124,14 @@ public interface AggregationFunction<IntermediateResult, FinalResult extends Com
    */
   FinalResult extractFinalResult(IntermediateResult intermediateResult);
 
+  /**
+   * Merges two final results. This can be used to optimized certain functions (e.g. DISTINCT_COUNT) when data is
+   * partitioned on each server, where we may directly request servers to return final result and merge them on broker.
+   */
+  default FinalResult mergeFinalResult(FinalResult finalResult1, FinalResult finalResult2) {
+    throw new UnsupportedOperationException("Cannot merge final results for function: " + getType());
+  }
+
   /** @return Description of this operator for Explain Plan */
   String toExplainString();
 }

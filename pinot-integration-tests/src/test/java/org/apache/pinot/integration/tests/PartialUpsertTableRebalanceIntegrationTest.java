@@ -90,7 +90,7 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
     // Start Kafka and push data into Kafka
     startKafka();
 
-    _resourceManager = getControllerStarter().getHelixResourceManager();
+    _resourceManager = _controllerStarter.getHelixResourceManager();
     _tableRebalancer = new TableRebalancer(_resourceManager.getHelixZkManager());
 
     createSchemaAndTable();
@@ -110,7 +110,7 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
     rebalanceConfig.setIncludeConsuming(true);
 
     // Add a new server
-    BaseServerStarter serverStarter1 = startOneServer(1234);
+    BaseServerStarter serverStarter1 = startOneServer(NUM_SERVERS);
 
     // Now we trigger a rebalance operation
     TableConfig tableConfig = _resourceManager.getTableConfig(REALTIME_TABLE_NAME);
@@ -128,7 +128,7 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
     verifySegmentAssignment(rebalanceResult.getSegmentAssignment(), 5, finalReplicas);
 
     // Add a new server
-    BaseServerStarter serverStarter2 = startOneServer(4567);
+    BaseServerStarter serverStarter2 = startOneServer(NUM_SERVERS + 1);
     rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
 
     // Check the number of replicas after rebalancing

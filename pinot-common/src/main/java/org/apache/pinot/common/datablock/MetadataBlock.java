@@ -18,16 +18,19 @@
  */
 package org.apache.pinot.common.datablock;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
+import java.io.DataOutputStream;
 import java.io.IOException;
+import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
-import java.util.HashMap;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import javax.annotation.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -36,108 +39,116 @@ import java.util.Map;
  */
 public class MetadataBlock extends BaseDataBlock {
 
-  private static final ObjectMapper JSON = new ObjectMapper();
-
+  private static final Logger LOGGER = LoggerFactory.getLogger(MetadataBlock.class);
   @VisibleForTesting
-  static final int VERSION = 1;
+  static final int VERSION = 2;
+  @Nullable
+  private List<ByteBuffer> _statsByStage;
 
-  public enum MetadataBlockType {
-    /**
-     * Indicates that this block is the final block to be sent
-     * (End Of Stream) as part of an operator chain computation.
-     */
-    EOS,
-
-    /**
-     * An {@code ERROR} metadata block indicates that there was
-     * some error during computation. To retrieve the error that
-     * occurred, use {@link MetadataBlock#getExceptions()}
-     */
-    ERROR
+  private MetadataBlock() {
+    this(Collections.emptyList());
   }
 
-  /**
-   * Used to serialize the contents of the metadata block conveniently and in
-   * a backwards compatible way. Use JSON because the performance of metadata block
-   * SerDe should not be a bottleneck.
-   */
-  @JsonIgnoreProperties(ignoreUnknown = true)
-  @VisibleForTesting
-  static class Contents {
-
-    private String _type;
-    private Map<String, String> _stats;
-
-    @JsonCreator
-    public Contents(@JsonProperty("type") String type, @JsonProperty("stats") Map<String, String> stats) {
-      _type = type;
-      _stats = stats;
-    }
-
-    @JsonCreator
-    public Contents() {
-      this(null, new HashMap<>());
-    }
-
-    public String getType() {
-      return _type;
-    }
-
-    public void setType(String type) {
-      _type = type;
-    }
-
-    public Map<String, String> getStats() {
-      return _stats;
-    }
-
-    public void setStats(Map<String, String> stats) {
-      _stats = stats;
-    }
+  public static MetadataBlock newEos() {
+    return new MetadataBlock();
   }
 
-  private final Contents _contents;
-
-  public MetadataBlock(MetadataBlockType type) {
-    this(type, new HashMap<>());
-  }
-
-  public MetadataBlock(MetadataBlockType type, Map<String, String> stats) {
-    super(0, null, new String[0], new byte[]{0}, toContents(new Contents(type.name(), stats)));
-    _contents = new Contents(type.name(), stats);
-  }
-
-  private static byte[] toContents(Contents type) {
-    try {
-      return JSON.writeValueAsBytes(type);
-    } catch (JsonProcessingException e) {
-      throw new RuntimeException(e);
+  public static MetadataBlock newError(Map<Integer, String> exceptions) {
+    MetadataBlock errorBlock = new MetadataBlock();
+    for (Map.Entry<Integer, String> exception : exceptions.entrySet()) {
+      errorBlock.addException(exception.getKey(), exception.getValue());
     }
+    return errorBlock;
   }
 
-  public MetadataBlock(ByteBuffer byteBuffer)
+  public MetadataBlock(List<ByteBuffer> statsByStage) {
+    super(0, null, new String[0], new byte[0], new byte[0]);
+    _statsByStage = statsByStage;
+  }
+
+  MetadataBlock(ByteBuffer byteBuffer)
       throws IOException {
     super(byteBuffer);
-    if (_variableSizeDataBytes != null && _variableSizeDataBytes.length > 0) {
-      _contents = JSON.readValue(_variableSizeDataBytes, Contents.class);
-    } else {
-      _contents = new Contents();
+  }
+
+  @Override
+  protected void serializeMetadata(DataOutputStream output)
+      throws IOException {
+    if (_statsByStage == null) {
+      output.writeInt(0);
+      return;
+    }
+    int size = _statsByStage.size();
+    output.writeInt(size);
+    if (size > 0) {
+      byte[] bytes = new byte[4096];
+      for (ByteBuffer stat : _statsByStage) {
+        if (stat == null) {
+          output.writeBoolean(false);
+        } else {
+          output.writeBoolean(true);
+          output.writeInt(stat.remaining());
+          ByteBuffer duplicate = stat.duplicate();
+          while (duplicate.hasRemaining()) {
+            int length = Math.min(duplicate.remaining(), bytes.length);
+            duplicate.get(bytes, 0, length);
+            output.write(bytes, 0, length);
+          }
+        }
+      }
+    }
+  }
+
+  public static MetadataBlock deserialize(ByteBuffer byteBuffer, int version)
+      throws IOException {
+    switch (version) {
+      case 1:
+      case 2:
+        return new MetadataBlock(byteBuffer);
+      default:
+        throw new IOException("Unsupported metadata block version: " + version);
+    }
+  }
+
+  @Override
+  protected void deserializeMetadata(ByteBuffer buffer)
+      throws IOException {
+    try {
+      int statsSize = buffer.getInt();
+
+      List<ByteBuffer> stats = new ArrayList<>(statsSize);
+
+      for (int i = 0; i < statsSize; i++) {
+        if (buffer.get() != 0) {
+          int length = buffer.getInt();
+          buffer.limit(buffer.position() + length);
+          stats.add(buffer.slice());
+          buffer.position(buffer.limit());
+          buffer.limit(buffer.capacity());
+        } else {
+          stats.add(null);
+        }
+      }
+      _statsByStage = stats;
+    } catch (BufferUnderflowException e) {
+      LOGGER.info("Failed to read stats from metadata block. Considering it empty", e);;
+    } catch (RuntimeException e) {
+      LOGGER.warn("Failed to read stats from metadata block. Considering it empty", e);;
     }
   }
 
   public MetadataBlockType getType() {
-    String type = _contents.getType();
-
-    // if type is null, then we're reading a legacy block where we didn't encode any
-    // data. assume that it is an EOS block if there's no exceptions and an ERROR block
-    // otherwise
-    return type == null
-        ? (getExceptions().isEmpty() ? MetadataBlockType.EOS : MetadataBlockType.ERROR)
-        : MetadataBlockType.valueOf(type);
+    return _errCodeToExceptionMap.isEmpty() ? MetadataBlockType.EOS : MetadataBlockType.ERROR;
   }
 
-  public Map<String, String> getStats() {
-    return _contents.getStats() != null ? _contents.getStats() : new HashMap<>();
+  /**
+   * Returns the list of serialized stats.
+   * <p>
+   * The returned list may contain nulls, which would mean that no stats were available for that stage.
+   */
+  @Nullable
+  public List<ByteBuffer> getStatsByStage() {
+    return _statsByStage;
   }
 
   @Override
@@ -156,12 +167,35 @@ public class MetadataBlock extends BaseDataBlock {
   }
 
   @Override
-  public MetadataBlock toMetadataOnlyDataTable() {
-    return this;
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (!(o instanceof MetadataBlock)) {
+      return false;
+    }
+    MetadataBlock that = (MetadataBlock) o;
+    return Objects.equals(_statsByStage, that._statsByStage)
+        && _errCodeToExceptionMap.equals(that._errCodeToExceptionMap);
   }
 
   @Override
-  public MetadataBlock toDataOnlyDataTable() {
-    throw new UnsupportedOperationException();
+  public int hashCode() {
+    return Objects.hash(_statsByStage, _errCodeToExceptionMap);
+  }
+
+  public enum MetadataBlockType {
+    /**
+     * Indicates that this block is the final block to be sent
+     * (End Of Stream) as part of an operator chain computation.
+     */
+    EOS,
+
+    /**
+     * An {@code ERROR} metadata block indicates that there was
+     * some error during computation. To retrieve the error that
+     * occurred, use {@link MetadataBlock#getExceptions()}
+     */
+    ERROR
   }
 }

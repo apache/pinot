@@ -65,13 +65,16 @@ public class PinotInstanceAssignmentRestletResourceStatelessTest extends Control
 
   private static final String TIER_NAME = "tier1";
 
+  @Override
+  protected void overrideControllerConf(Map<String, Object> properties) {
+    properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, false);
+  }
+
   @BeforeClass
   public void setUp()
       throws Exception {
     startZk();
-    Map<String, Object> properties = getDefaultControllerConfiguration();
-    properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, false);
-    startController(properties);
+    startController();
 
     addFakeBrokerInstancesToAutoJoinHelixCluster(1, false);
     addFakeServerInstancesToAutoJoinHelixCluster(2, false);
@@ -372,7 +375,7 @@ public class PinotInstanceAssignmentRestletResourceStatelessTest extends Control
 
   private Map<String, InstancePartitions> deserializeInstancePartitionsMap(String instancePartitionsMapString)
       throws Exception {
-    return JsonUtils.stringToObject(instancePartitionsMapString, new TypeReference<Map<String, InstancePartitions>>() {
+    return JsonUtils.stringToObject(instancePartitionsMapString, new TypeReference<>() {
     });
   }
 

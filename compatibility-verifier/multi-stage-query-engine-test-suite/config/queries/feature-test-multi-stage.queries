@@ -1,0 +1,31 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+# Joins
+SELECT COUNT(*) FROM FeatureTest1 ft1 INNER JOIN FeatureTest2 ft2 ON ft1.stringDimSV1 = ft2.stringDimSV1 WHERE ft1.generationNumber = __GENERATION_NUMBER__ AND ft2.generationNumber = __GENERATION_NUMBER__
+SELECT ft1.stringDimSV1, COUNT(ft1.stringDimSV1) FROM FeatureTest1 ft1 INNER JOIN FeatureTest2 ft2 ON ft1.stringDimSV1 = ft2.stringDimSV1 WHERE ft1.generationNumber = __GENERATION_NUMBER__ AND ft2.generationNumber = __GENERATION_NUMBER__ GROUP BY ft1.stringDimSV1
+SELECT ft1.stringDimSV2, SUM(ft1.doubleMetric1) FROM FeatureTest1 ft1 INNER JOIN FeatureTest2 ft2 ON ft1.stringDimSV1 = ft2.stringDimSV1 WHERE ft1.generationNumber = __GENERATION_NUMBER__ AND ft2.generationNumber = __GENERATION_NUMBER__ GROUP BY ft1.stringDimSV2
+SELECT ft1.stringDimSV1 FROM FeatureTest1 ft1 WHERE ft1.generationNumber = __GENERATION_NUMBER__ AND EXISTS (SELECT 1 FROM FeatureTest2 ft2 WHERE ft2.generationNumber = __GENERATION_NUMBER__ AND ft2.stringDimSV2 = ft1.stringDimSV1)
+
+# Set operations
+SELECT * FROM (SELECT stringDimSV1 FROM FeatureTest1 WHERE generationNumber = __GENERATION_NUMBER__) INTERSECT (SELECT stringDimSV1 FROM FeatureTest2 WHERE generationNumber = __GENERATION_NUMBER__)
+SELECT * FROM (SELECT stringDimSV1 FROM FeatureTest1 WHERE generationNumber = __GENERATION_NUMBER__) UNION (SELECT stringDimSV1 FROM FeatureTest2 WHERE generationNumber = __GENERATION_NUMBER__)
+
+# Windows
+SELECT stringDimSV1, longMetric1, SUM(longMetric1) OVER (PARTITION BY stringDimSV1) FROM FeatureTest1 WHERE generationNumber = __GENERATION_NUMBER__

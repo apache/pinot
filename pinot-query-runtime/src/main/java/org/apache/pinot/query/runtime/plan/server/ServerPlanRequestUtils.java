@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.runtime.plan.server;
 
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -45,7 +44,6 @@ import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.optimizer.QueryOptimizer;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
-import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.StagePlan;
@@ -229,14 +227,13 @@ public class ServerPlanRequestUtils {
     String timeColumn = timeBoundaryInfo.getTimeColumn();
     String timeValue = timeBoundaryInfo.getTimeValue();
     Expression timeFilterExpression = RequestUtils.getFunctionExpression(
-        isOfflineRequest ? FilterKind.LESS_THAN_OR_EQUAL.name() : FilterKind.GREATER_THAN.name());
-    timeFilterExpression.getFunctionCall().setOperands(
-        Arrays.asList(RequestUtils.getIdentifierExpression(timeColumn), RequestUtils.getLiteralExpression(timeValue)));
+        isOfflineRequest ? FilterKind.LESS_THAN_OR_EQUAL.name() : FilterKind.GREATER_THAN.name(),
+        RequestUtils.getIdentifierExpression(timeColumn), RequestUtils.getLiteralExpression(timeValue));
 
     Expression filterExpression = pinotQuery.getFilterExpression();
     if (filterExpression != null) {
-      Expression andFilterExpression = RequestUtils.getFunctionExpression(FilterKind.AND.name());
-      andFilterExpression.getFunctionCall().setOperands(Arrays.asList(filterExpression, timeFilterExpression));
+      Expression andFilterExpression =
+          RequestUtils.getFunctionExpression(FilterKind.AND.name(), filterExpression, timeFilterExpression);
       pinotQuery.setFilterExpression(andFilterExpression);
     } else {
       pinotQuery.setFilterExpression(timeFilterExpression);
@@ -246,28 +243,31 @@ public class ServerPlanRequestUtils {
   /**
    * attach the dynamic filter to the given PinotQuery.
    */
-  static void attachDynamicFilter(PinotQuery pinotQuery, JoinNode.JoinKeys joinKeys, List<Object[]> dataContainer,
-      DataSchema dataSchema) {
-    List<Integer> leftJoinKeys = joinKeys.getLeftKeys();
-    List<Integer> rightJoinKeys = joinKeys.getRightKeys();
+  static void attachDynamicFilter(PinotQuery pinotQuery, List<Integer> leftKeys, List<Integer> rightKeys,
+      List<Object[]> dataContainer, DataSchema dataSchema) {
     List<Expression> expressions = new ArrayList<>();
-    for (int i = 0; i < leftJoinKeys.size(); i++) {
-      Expression leftExpr = pinotQuery.getSelectList().get(leftJoinKeys.get(i));
-      if (dataContainer.size() == 0) {
+    for (int i = 0; i < leftKeys.size(); i++) {
+      Expression leftExpr = pinotQuery.getSelectList().get(leftKeys.get(i));
+      if (dataContainer.isEmpty()) {
         // put a constant false expression
-        Expression constantFalseExpr = RequestUtils.getLiteralExpression(false);
-        expressions.add(constantFalseExpr);
+        expressions.add(RequestUtils.getLiteralExpression(false));
       } else {
-        int rightIdx = rightJoinKeys.get(i);
-        Expression inFilterExpr = RequestUtils.getFunctionExpression(FilterKind.IN.name());
+        int rightIdx = rightKeys.get(i);
         List<Expression> operands = new ArrayList<>(dataContainer.size() + 1);
         operands.add(leftExpr);
         operands.addAll(computeInOperands(dataContainer, dataSchema, rightIdx));
-        inFilterExpr.getFunctionCall().setOperands(operands);
-        expressions.add(inFilterExpr);
+        expressions.add(RequestUtils.getFunctionExpression(FilterKind.IN.name(), operands));
       }
     }
-    attachFilterExpression(pinotQuery, FilterKind.AND, expressions);
+    Expression filterExpression = pinotQuery.getFilterExpression();
+    if (filterExpression != null) {
+      expressions.add(filterExpression);
+    }
+    if (expressions.size() > 1) {
+      pinotQuery.setFilterExpression(RequestUtils.getFunctionExpression(FilterKind.AND.name(), expressions));
+    } else {
+      pinotQuery.setFilterExpression(expressions.get(0));
+    }
   }
 
   private static List<Expression> computeInOperands(List<Object[]> dataContainer, DataSchema dataSchema, int colIdx) {
@@ -303,11 +303,7 @@ public class ServerPlanRequestUtils {
         }
         Arrays.sort(arrFloat);
         for (int rowIdx = 0; rowIdx < numRows; rowIdx++) {
-          // TODO: Create float literal when it is supported
-          // NOTE: We cannot directly cast float to double here because we want to preserve the exact value. E.g. 0.05f
-          //       will be casted to 0.05000000074505806. Predicate evaluation uses string format to match the values,
-          //       so here we need to create the double value based on the string format of the float value.
-          expressions.add(RequestUtils.getLiteralExpression(Double.parseDouble(Float.toString(arrFloat[rowIdx]))));
+          expressions.add(RequestUtils.getLiteralExpression(arrFloat[rowIdx]));
         }
         break;
       case DOUBLE:
@@ -334,24 +330,5 @@ public class ServerPlanRequestUtils {
         throw new IllegalStateException("Illegal SV data type for ID_SET aggregation function: " + storedType);
     }
     return expressions;
-  }
-
-  /**
-   * Attach Filter Expression to existing PinotQuery.
-   */
-  private static void attachFilterExpression(PinotQuery pinotQuery, FilterKind attachKind, List<Expression> exprs) {
-    Preconditions.checkState(attachKind == FilterKind.AND || attachKind == FilterKind.OR);
-    Expression filterExpression = pinotQuery.getFilterExpression();
-    List<Expression> arrayList = new ArrayList<>(exprs);
-    if (filterExpression != null) {
-      arrayList.add(filterExpression);
-    }
-    if (arrayList.size() > 1) {
-      Expression attachFilterExpression = RequestUtils.getFunctionExpression(attachKind.name());
-      attachFilterExpression.getFunctionCall().setOperands(arrayList);
-      pinotQuery.setFilterExpression(attachFilterExpression);
-    } else {
-      pinotQuery.setFilterExpression(arrayList.get(0));
-    }
   }
 }

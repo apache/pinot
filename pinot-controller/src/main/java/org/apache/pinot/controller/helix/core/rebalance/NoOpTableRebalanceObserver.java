@@ -30,6 +30,10 @@ public class NoOpTableRebalanceObserver implements TableRebalanceObserver {
   }
 
   @Override
+  public void onNoop(String msg) {
+  }
+
+  @Override
   public void onSuccess(String msg) {
   }
 

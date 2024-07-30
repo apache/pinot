@@ -37,24 +37,29 @@ public class MaxHitRateTrackerTest {
     long latestTimeStamp = currentTimestamp + (timeInSec - 1) * 1000;
     Assert.assertNotNull(hitCounter);
     Assert.assertEquals(5, hitCounter.getMaxCountPerBucket(latestTimeStamp));
+    Assert.assertEquals(5 * 60, hitCounter.getHitCount(latestTimeStamp));
 
     // 2 seconds have passed, the hit counter should return 5 as well since the count in the last bucket could increase.
     latestTimeStamp = latestTimeStamp + 2000L;
     Assert.assertEquals(5, hitCounter.getMaxCountPerBucket(latestTimeStamp));
+    Assert.assertEquals(5 * (60 - 2), hitCounter.getHitCount(latestTimeStamp));
 
     // This time it should return 0 as the internal lastAccessTimestamp has already been updated and there is no more
     // hits between the gap.
     latestTimeStamp = latestTimeStamp + 2000L;
     Assert.assertEquals(0, hitCounter.getMaxCountPerBucket(latestTimeStamp));
+    Assert.assertEquals(5 * (60 - 4), hitCounter.getHitCount(latestTimeStamp));
 
     // Increment the hit in this second and we should see the result becomes 1.
     hitCounter.hit(latestTimeStamp);
     latestTimeStamp = latestTimeStamp + 2000L;
     Assert.assertEquals(1, hitCounter.getMaxCountPerBucket(latestTimeStamp));
+    Assert.assertEquals(5 * (60 - 6) + 1, hitCounter.getHitCount(latestTimeStamp));
 
     // More than a time range period has passed and the hit counter should return 0 as there is no hits.
     hitCounter.hit(latestTimeStamp);
     latestTimeStamp = latestTimeStamp + timeInSec * 2 * 1000L + 2000L;
     Assert.assertEquals(0, hitCounter.getMaxCountPerBucket(latestTimeStamp));
+    Assert.assertEquals(0, hitCounter.getHitCount(latestTimeStamp));
   }
 }

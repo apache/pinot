@@ -52,20 +52,18 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixProperty;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
-import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.pinot.common.exception.InvalidConfigException;
-import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.restlet.resources.SegmentConsumerInfo;
 import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.common.restlet.resources.SegmentServerDebugInfo;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.controller.ControllerConf;
-import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.api.debug.TableDebugInfo;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -98,7 +96,8 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
     @Authorization(value = DATABASE)})
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = {
     @ApiKeyAuthDefinition(name = HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER,
-        key = SWAGGER_AUTHORIZATION_KEY),
+        key = SWAGGER_AUTHORIZATION_KEY,
+        description = "The format of the key is ```\"Basic <token>\" or \"Bearer <token>\"```"),
     @ApiKeyAuthDefinition(name = DATABASE, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = DATABASE,
         description = "Database context passed through http header. If no context is provided 'default' database "
             + "context will be considered.")}))
@@ -119,13 +118,10 @@ public class DebugResource {
   HttpClientConnectionManager _connectionManager;
 
   @Inject
-  ControllerMetrics _controllerMetrics;
-
-  @Inject
   ControllerConf _controllerConf;
 
   @Inject
-  LeadControllerManager _leadControllerManager;
+  TableSizeReader _tableSizeReader;
 
   @GET
   @Path("tables/{tableName}")
@@ -241,12 +237,9 @@ public class DebugResource {
   }
 
   private TableDebugInfo.TableSizeSummary getTableSize(String tableNameWithType) {
-    TableSizeReader tableSizeReader =
-        new TableSizeReader(_executor, _connectionManager, _controllerMetrics, _pinotHelixResourceManager,
-            _leadControllerManager);
     TableSizeReader.TableSizeDetails tableSizeDetails;
     try {
-      tableSizeDetails = tableSizeReader
+      tableSizeDetails = _tableSizeReader
           .getTableSizeDetails(tableNameWithType, _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
     } catch (Throwable t) {
       tableSizeDetails = null;

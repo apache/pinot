@@ -23,7 +23,7 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.operator.OpChainStats;
+import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 
 
 /**
@@ -33,14 +33,14 @@ public class PipelineBreakerResult {
   private final Map<PlanNode, Integer> _nodeIdMap;
   private final Map<Integer, List<TransferableBlock>> _resultMap;
   private final TransferableBlock _errorBlock;
-  private final OpChainStats _opChainStats;
+  private final MultiStageQueryStats _multiStageQueryStats;
 
   public PipelineBreakerResult(Map<PlanNode, Integer> nodeIdMap, Map<Integer, List<TransferableBlock>> resultMap,
-      @Nullable TransferableBlock errorBlock, @Nullable OpChainStats opChainStats) {
+      @Nullable TransferableBlock errorBlock, @Nullable MultiStageQueryStats multiStageQueryStats) {
     _nodeIdMap = nodeIdMap;
     _resultMap = resultMap;
     _errorBlock = errorBlock;
-    _opChainStats = opChainStats;
+    _multiStageQueryStats = multiStageQueryStats;
   }
 
   public Map<PlanNode, Integer> getNodeIdMap() {
@@ -57,7 +57,7 @@ public class PipelineBreakerResult {
   }
 
   @Nullable
-  public OpChainStats getOpChainStats() {
-    return _opChainStats;
+  public MultiStageQueryStats getStageQueryStats() {
+    return _multiStageQueryStats;
   }
 }

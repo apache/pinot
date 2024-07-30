@@ -34,8 +34,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.collections.MapUtils;
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
@@ -127,11 +127,23 @@ public final class TableConfigUtils {
       ImmutableSet.of(RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE,
           RoutingConfig.MULTI_STAGE_REPLICA_GROUP_SELECTOR_TYPE);
 
+  private static boolean _disableGroovy;
+
+  private static boolean _enforcePoolBasedAssignment;
+
+  public static void setDisableGroovy(boolean disableGroovy) {
+    _disableGroovy = disableGroovy;
+  }
+
+  public static void setEnforcePoolBasedAssignment(boolean enforcePoolBasedAssignment) {
+    _enforcePoolBasedAssignment = enforcePoolBasedAssignment;
+  }
+
   /**
-   * @see TableConfigUtils#validate(TableConfig, Schema, String, boolean)
+   * @see TableConfigUtils#validate(TableConfig, Schema, String)
    */
   public static void validate(TableConfig tableConfig, @Nullable Schema schema) {
-    validate(tableConfig, schema, null, false);
+    validate(tableConfig, schema, null);
   }
 
   /**
@@ -141,11 +153,11 @@ public final class TableConfigUtils {
    * 3. TierConfigs
    * 4. Indexing config
    * 5. Field Config List
+   * 6. Instance pool and replica group, if enabled
    *
    * TODO: Add more validations for each section (e.g. validate conditions are met for aggregateMetrics)
    */
-  public static void validate(TableConfig tableConfig, @Nullable Schema schema, @Nullable String typesToSkip,
-      boolean disableGroovy) {
+  public static void validate(TableConfig tableConfig, @Nullable Schema schema, @Nullable String typesToSkip) {
     Set<ValidationType> skipTypes = parseTypesToSkipString(typesToSkip);
     if (tableConfig.getTableType() == TableType.REALTIME) {
       Preconditions.checkState(schema != null, "Schema should not be null for REALTIME table");
@@ -157,7 +169,7 @@ public final class TableConfigUtils {
     if (!skipTypes.contains(ValidationType.ALL)) {
       validateTableSchemaConfig(tableConfig);
       validateValidationConfig(tableConfig, schema);
-      validateIngestionConfig(tableConfig, schema, disableGroovy);
+      validateIngestionConfig(tableConfig, schema);
 
       // Only allow realtime tables with non-null stream.type and LLC consumer.type
       if (tableConfig.getTableType() == TableType.REALTIME) {
@@ -183,7 +195,40 @@ public final class TableConfigUtils {
       if (!skipTypes.contains(ValidationType.TASK)) {
         validateTaskConfigs(tableConfig, schema);
       }
+
+      if (_enforcePoolBasedAssignment) {
+        validateInstancePoolsNReplicaGroups(tableConfig);
+      }
     }
+  }
+
+  /**
+   * Validates the table config is using instance pool and replica group configuration.
+   * @param tableConfig Table config to validate
+   * @return true if the table config is using instance pool and replica group configuration, false otherwise
+   */
+  static boolean isTableUsingInstancePoolAndReplicaGroup(@Nonnull TableConfig tableConfig) {
+    boolean status = true;
+    Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = tableConfig.getInstanceAssignmentConfigMap();
+    if (instanceAssignmentConfigMap != null) {
+      for (InstanceAssignmentConfig instanceAssignmentConfig : instanceAssignmentConfigMap.values()) {
+        if (instanceAssignmentConfig != null) {
+          status &= (instanceAssignmentConfig.getTagPoolConfig().isPoolBased()
+              && instanceAssignmentConfig.getReplicaGroupPartitionConfig().isReplicaGroupBased());
+        } else {
+          status = false;
+        }
+      }
+    } else {
+      status = false;
+    }
+
+    return status;
+  }
+
+  public static void validateInstancePoolsNReplicaGroups(TableConfig tableConfig) {
+    Preconditions.checkState(isTableUsingInstancePoolAndReplicaGroup(tableConfig),
+        "Instance pool and replica group configurations must be enabled");
   }
 
   private static Set<ValidationType> parseTypesToSkipString(@Nullable String typesToSkip) {
@@ -307,11 +352,6 @@ public final class TableConfigUtils {
     validateRetentionConfig(tableConfig);
   }
 
-  @VisibleForTesting
-  public static void validateIngestionConfig(TableConfig tableConfig, @Nullable Schema schema) {
-    validateIngestionConfig(tableConfig, schema, false);
-  }
-
   /**
    * Validates the following:
    * 1. validity of filter function
@@ -322,7 +362,7 @@ public final class TableConfigUtils {
    * 6. ingestion type for dimension tables
    */
   @VisibleForTesting
-  public static void validateIngestionConfig(TableConfig tableConfig, @Nullable Schema schema, boolean disableGroovy) {
+  public static void validateIngestionConfig(TableConfig tableConfig, @Nullable Schema schema) {
     IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
 
     if (ingestionConfig != null) {
@@ -365,7 +405,7 @@ public final class TableConfigUtils {
       if (filterConfig != null) {
         String filterFunction = filterConfig.getFilterFunction();
         if (filterFunction != null) {
-          if (disableGroovy && FunctionEvaluatorFactory.isGroovyExpression(filterFunction)) {
+          if (_disableGroovy && FunctionEvaluatorFactory.isGroovyExpression(filterFunction)) {
             throw new IllegalStateException(
                 "Groovy filter functions are disabled for table config. Found '" + filterFunction + "'");
           }
@@ -508,10 +548,9 @@ public final class TableConfigUtils {
       if (enrichmentConfigs != null) {
         for (EnrichmentConfig enrichmentConfig : enrichmentConfigs) {
           RecordEnricherRegistry.validateEnrichmentConfig(enrichmentConfig,
-              new RecordEnricherValidationConfig(disableGroovy));
+              new RecordEnricherValidationConfig(_disableGroovy));
         }
       }
-
 
       // Transform configs
       List<TransformConfig> transformConfigs = ingestionConfig.getTransformConfigs();
@@ -535,7 +574,7 @@ public final class TableConfigUtils {
                     + "aggregations");
           }
           FunctionEvaluator expressionEvaluator;
-          if (disableGroovy && FunctionEvaluatorFactory.isGroovyExpression(transformFunction)) {
+          if (_disableGroovy && FunctionEvaluatorFactory.isGroovyExpression(transformFunction)) {
             throw new IllegalStateException(
                 "Groovy transform functions are disabled for table config. Found '" + transformFunction
                     + "' for column '" + columnName + "'");
@@ -652,6 +691,15 @@ public final class TableConfigUtils {
                 String.format("Task %s contains an invalid cron schedule: %s", taskTypeConfigName, cronExprStr), e);
           }
         }
+        boolean isAllowDownloadFromServer = Boolean.parseBoolean(
+            taskTypeConfig.getOrDefault(TableTaskConfig.MINION_ALLOW_DOWNLOAD_FROM_SERVER,
+                String.valueOf(TableTaskConfig.DEFAULT_MINION_ALLOW_DOWNLOAD_FROM_SERVER)));
+        if (isAllowDownloadFromServer) {
+          Preconditions.checkState(tableConfig.getValidationConfig().getPeerSegmentDownloadScheme() != null,
+              String.format("Table %s has task %s with allowDownloadFromServer set to true, but "
+                      + "peerSegmentDownloadScheme is not set in the table config", tableConfig.getTableName(),
+                  taskTypeConfigName));
+        }
         // Task Specific validation for REALTIME_TO_OFFLINE_TASK_TYPE
         // TODO task specific validate logic should directly call to PinotTaskGenerator API
         if (taskTypeConfigName.equals(REALTIME_TO_OFFLINE_TASK_TYPE)) {
@@ -697,11 +745,11 @@ public final class TableConfigUtils {
           if (taskTypeConfig.containsKey("bufferTimePeriod")) {
             TimeUtils.convertPeriodToMillis(taskTypeConfig.get("bufferTimePeriod"));
           }
-          // check maxNumRecordsPerSegment
+          // check invalidRecordsThresholdPercent
           if (taskTypeConfig.containsKey("invalidRecordsThresholdPercent")) {
-            Preconditions.checkState(Double.parseDouble(taskTypeConfig.get("invalidRecordsThresholdPercent")) > 0
+            Preconditions.checkState(Double.parseDouble(taskTypeConfig.get("invalidRecordsThresholdPercent")) >= 0
                     && Double.parseDouble(taskTypeConfig.get("invalidRecordsThresholdPercent")) <= 100,
-                "invalidRecordsThresholdPercent must be > 0 and <= 100");
+                "invalidRecordsThresholdPercent must be >= 0 and <= 100");
           }
           // check invalidRecordsThresholdCount
           if (taskTypeConfig.containsKey("invalidRecordsThresholdCount")) {
@@ -764,9 +812,9 @@ public final class TableConfigUtils {
         tableConfig.getRoutingConfig() != null && isRoutingStrategyAllowedForUpsert(tableConfig.getRoutingConfig()),
         "Upsert/Dedup table must use strict replica-group (i.e. strictReplicaGroup) based routing");
     Preconditions.checkState(tableConfig.getTenantConfig().getTagOverrideConfig() == null || (
-        tableConfig.getTenantConfig().getTagOverrideConfig().getRealtimeConsuming() == null
-            && tableConfig.getTenantConfig().getTagOverrideConfig().getRealtimeCompleted()
-            == null), "Invalid tenant tag override used for Upsert/Dedup table");
+            tableConfig.getTenantConfig().getTagOverrideConfig().getRealtimeConsuming() == null
+                && tableConfig.getTenantConfig().getTagOverrideConfig().getRealtimeCompleted() == null),
+        "Invalid tenant tag override used for Upsert/Dedup table");
 
     // specifically for upsert
     UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
@@ -793,15 +841,13 @@ public final class TableConfigUtils {
         Preconditions.checkState(fieldSpec.isSingleValueField(),
             String.format("The deleteRecordColumn - %s must be a single-valued column", deleteRecordColumn));
         DataType dataType = fieldSpec.getDataType();
-        Preconditions.checkState(
-            dataType == DataType.BOOLEAN || dataType == DataType.STRING || dataType.isNumeric(),
+        Preconditions.checkState(dataType == DataType.BOOLEAN || dataType == DataType.STRING || dataType.isNumeric(),
             String.format("The deleteRecordColumn - %s must be of type: String / Boolean / Numeric",
                 deleteRecordColumn));
       }
 
       String outOfOrderRecordColumn = upsertConfig.getOutOfOrderRecordColumn();
-      Preconditions.checkState(
-          outOfOrderRecordColumn == null || !upsertConfig.isDropOutOfOrderRecord(),
+      Preconditions.checkState(outOfOrderRecordColumn == null || !upsertConfig.isDropOutOfOrderRecord(),
           "outOfOrderRecordColumn and dropOutOfOrderRecord shouldn't exist together for upsert table");
 
       if (outOfOrderRecordColumn != null) {
@@ -837,8 +883,8 @@ public final class TableConfigUtils {
       String comparisonColumn = comparisonColumns.get(0);
       DataType comparisonColumnDataType = schema.getFieldSpecFor(comparisonColumn).getDataType();
       Preconditions.checkState(comparisonColumnDataType.isNumeric(),
-          "MetadataTTL / DeletedKeysTTL must have comparison column: %s in numeric type, found: %s",
-          comparisonColumn, comparisonColumnDataType);
+          "MetadataTTL / DeletedKeysTTL must have comparison column: %s in numeric type, found: %s", comparisonColumn,
+          comparisonColumnDataType);
     }
 
     if (upsertConfig.getMetadataTTL() > 0) {
@@ -869,14 +915,11 @@ public final class TableConfigUtils {
             tableConfig.getInstanceAssignmentConfigMap().get(instancePartitionsType.toString());
         if (instanceAssignmentConfig.getPartitionSelector()
             == InstanceAssignmentConfig.PartitionSelector.MIRROR_SERVER_SET_PARTITION_SELECTOR) {
-          Preconditions.checkState(
-              tableConfig.getInstancePartitionsMap().containsKey(instancePartitionsType),
+          Preconditions.checkState(tableConfig.getInstancePartitionsMap().containsKey(instancePartitionsType),
               String.format("Both InstanceAssignmentConfigMap and InstancePartitionsMap needed for %s, as "
-                      + "MIRROR_SERVER_SET_PARTITION_SELECTOR is used",
-                  instancePartitionsType));
+                  + "MIRROR_SERVER_SET_PARTITION_SELECTOR is used", instancePartitionsType));
         } else {
-          Preconditions.checkState(
-              !tableConfig.getInstancePartitionsMap().containsKey(instancePartitionsType),
+          Preconditions.checkState(!tableConfig.getInstancePartitionsMap().containsKey(instancePartitionsType),
               String.format("Both InstanceAssignmentConfigMap and InstancePartitionsMap set for %s",
                   instancePartitionsType));
         }
@@ -1100,7 +1143,6 @@ public final class TableConfigUtils {
     }
 
     List<StarTreeIndexConfig> starTreeIndexConfigList = indexingConfig.getStarTreeIndexConfigs();
-    Set<AggregationFunctionColumnPair> storedTypes = new HashSet<>();
     if (starTreeIndexConfigList != null) {
       for (StarTreeIndexConfig starTreeIndexConfig : starTreeIndexConfigList) {
         // Dimension split order cannot be null
@@ -1108,6 +1150,10 @@ public final class TableConfigUtils {
           columnNameToConfigMap.put(columnName, STAR_TREE_CONFIG_NAME);
         }
         List<String> functionColumnPairs = starTreeIndexConfig.getFunctionColumnPairs();
+        List<StarTreeAggregationConfig> aggregationConfigs = starTreeIndexConfig.getAggregationConfigs();
+        Preconditions.checkState(functionColumnPairs == null || aggregationConfigs == null,
+            "Only one of 'functionColumnPairs' or 'aggregationConfigs' can be specified in StarTreeIndexConfig");
+        Set<AggregationFunctionColumnPair> storedTypes = new HashSet<>();
         if (functionColumnPairs != null) {
           for (String functionColumnPair : functionColumnPairs) {
             AggregationFunctionColumnPair columnPair;
@@ -1128,7 +1174,6 @@ public final class TableConfigUtils {
             }
           }
         }
-        List<StarTreeAggregationConfig> aggregationConfigs = starTreeIndexConfig.getAggregationConfigs();
         if (aggregationConfigs != null) {
           for (StarTreeAggregationConfig aggregationConfig : aggregationConfigs) {
             AggregationFunctionColumnPair columnPair;
@@ -1332,9 +1377,8 @@ public final class TableConfigUtils {
     }
 
     Preconditions.checkState(!indexingConfig.isOptimizeDictionaryForMetrics() && !indexingConfig.isOptimizeDictionary(),
-        String.format(
-            "Dictionary override optimization options (OptimizeDictionary, optimizeDictionaryForMetrics)"
-                + " not supported with forward index for column: %s, disabled", columnName));
+        String.format("Dictionary override optimization options (OptimizeDictionary, optimizeDictionaryForMetrics)"
+            + " not supported with forward index for column: %s, disabled", columnName));
 
     boolean hasDictionary = fieldConfig.getEncodingType() == EncodingType.DICTIONARY;
     boolean hasInvertedIndex =
@@ -1413,8 +1457,8 @@ public final class TableConfigUtils {
         } else {
           if (quotaConfig.getStorageInBytes() > maxAllowedSizeInBytes) {
             throw new IllegalStateException(
-                String.format("Invalid storage quota: %d, max allowed size: %d", quotaConfig.getStorageInBytes(),
-                    maxAllowedSizeInBytes));
+                String.format("Exceeded storage size for dimension table. Requested size: %d, Max allowed size: %d",
+                    quotaConfig.getStorageInBytes(), maxAllowedSizeInBytes));
           }
         }
       }

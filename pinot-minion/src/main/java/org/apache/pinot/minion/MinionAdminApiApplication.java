@@ -18,12 +18,12 @@
  */
 package org.apache.pinot.minion;
 
-import io.swagger.jaxrs.config.BeanConfig;
+import io.swagger.jaxrs.listing.SwaggerSerializers;
 import java.io.IOException;
-import java.net.URL;
-import java.net.URLClassLoader;
 import java.time.Instant;
 import java.util.List;
+import org.apache.pinot.common.swagger.SwaggerApiListingResource;
+import org.apache.pinot.common.swagger.SwaggerSetupUtils;
 import org.apache.pinot.common.utils.log.DummyLogFileServer;
 import org.apache.pinot.common.utils.log.LocalLogFileServer;
 import org.apache.pinot.common.utils.log.LogFileServer;
@@ -32,8 +32,6 @@ import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.PinotReflectionUtils;
-import org.glassfish.grizzly.http.server.CLStaticHttpHandler;
-import org.glassfish.grizzly.http.server.HttpHandler;
 import org.glassfish.grizzly.http.server.HttpServer;
 import org.glassfish.jersey.internal.inject.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
@@ -76,8 +74,8 @@ public class MinionAdminApiApplication extends ResourceConfig {
       }
     });
 
-    registerClasses(io.swagger.jaxrs.listing.ApiListingResource.class);
-    registerClasses(io.swagger.jaxrs.listing.SwaggerSerializers.class);
+    register(SwaggerApiListingResource.class);
+    register(SwaggerSerializers.class);
   }
 
   public void start(List<ListenerConfig> listenerConfigs) {
@@ -88,38 +86,17 @@ public class MinionAdminApiApplication extends ResourceConfig {
     } catch (IOException e) {
       throw new RuntimeException("Failed to start http server", e);
     }
-    PinotReflectionUtils.runWithLock(this::setupSwagger);
-  }
-
-  private void setupSwagger() {
-    BeanConfig beanConfig = new BeanConfig();
-    beanConfig.setTitle("Pinot Minion API");
-    beanConfig.setDescription("APIs for accessing Pinot Minion information");
-    beanConfig.setContact("https://github.com/apache/pinot");
-    beanConfig.setVersion("1.0");
-    beanConfig.setExpandSuperTypes(false);
-    if (_useHttps) {
-      beanConfig.setSchemes(new String[]{CommonConstants.HTTPS_PROTOCOL});
-    } else {
-      beanConfig.setSchemes(new String[]{CommonConstants.HTTP_PROTOCOL, CommonConstants.HTTPS_PROTOCOL});
-    }
-    beanConfig.setBasePath("/");
-    beanConfig.setResourcePackage(RESOURCE_PACKAGE);
-    beanConfig.setScan(true);
-
-    HttpHandler httpHandler = new CLStaticHttpHandler(MinionAdminApiApplication.class.getClassLoader(), "/api/");
-    // map both /api and /help to swagger docs. /api because it looks nice. /help for backward compatibility
-    _httpServer.getServerConfiguration().addHttpHandler(httpHandler, "/api/", "/help/");
-
-    URL swaggerDistLocation =
-        MinionAdminApiApplication.class.getClassLoader().getResource(CommonConstants.CONFIG_OF_SWAGGER_RESOURCES_PATH);
-    CLStaticHttpHandler swaggerDist = new CLStaticHttpHandler(new URLClassLoader(new URL[]{swaggerDistLocation}));
-    _httpServer.getServerConfiguration().addHttpHandler(swaggerDist, "/swaggerui-dist/");
+    PinotReflectionUtils.runWithLock(() ->
+        SwaggerSetupUtils.setupSwagger("Minion", RESOURCE_PACKAGE, _useHttps, "/", _httpServer));
   }
 
   public void stop() {
     if (_httpServer != null) {
       _httpServer.shutdownNow();
     }
+  }
+
+  public HttpServer getHttpServer() {
+    return _httpServer;
   }
 }

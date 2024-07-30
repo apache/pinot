@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import java.util.List;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
-import org.apache.pinot.query.runtime.operator.utils.OperatorUtils;
 
 
 public class TransformOperandFactory {
@@ -44,8 +43,7 @@ public class TransformOperandFactory {
   private static TransformOperand getTransformOperand(RexExpression.FunctionCall functionCall, DataSchema dataSchema) {
     List<RexExpression> operands = functionCall.getFunctionOperands();
     int numOperands = operands.size();
-    String canonicalName = OperatorUtils.canonicalizeFunctionName(functionCall.getFunctionName());
-    switch (canonicalName) {
+    switch (functionCall.getFunctionName()) {
       case "AND":
         Preconditions.checkState(numOperands >= 2, "AND takes >=2 arguments, got: %s", numOperands);
         return new FilterOperand.And(operands, dataSchema);
@@ -61,26 +59,26 @@ public class TransformOperandFactory {
       case "NOT_IN":
         Preconditions.checkState(numOperands >= 2, "NOT_IN takes >=2 arguments, got: %s", numOperands);
         return new FilterOperand.In(operands, dataSchema, true);
-      case "ISTRUE":
+      case "IS_TRUE":
         Preconditions.checkState(numOperands == 1, "IS_TRUE takes one argument, got: %s", numOperands);
         return new FilterOperand.IsTrue(operands.get(0), dataSchema);
-      case "ISNOTTRUE":
+      case "IS_NOT_TRUE":
         Preconditions.checkState(numOperands == 1, "IS_NOT_TRUE takes one argument, got: %s", numOperands);
         return new FilterOperand.IsNotTrue(operands.get(0), dataSchema);
-      case "equals":
+      case "EQUALS":
         return new FilterOperand.Predicate(operands, dataSchema, v -> v == 0);
-      case "notEquals":
+      case "NOT_EQUALS":
         return new FilterOperand.Predicate(operands, dataSchema, v -> v != 0);
-      case "greaterThan":
+      case "GREATER_THAN":
         return new FilterOperand.Predicate(operands, dataSchema, v -> v > 0);
-      case "greaterThanOrEqual":
+      case "GREATER_THAN_OR_EQUAL":
         return new FilterOperand.Predicate(operands, dataSchema, v -> v >= 0);
-      case "lessThan":
+      case "LESS_THAN":
         return new FilterOperand.Predicate(operands, dataSchema, v -> v < 0);
-      case "lessThanOrEqual":
+      case "LESS_THAN_OR_EQUAL":
         return new FilterOperand.Predicate(operands, dataSchema, v -> v <= 0);
       default:
-        return new FunctionOperand(functionCall, canonicalName, dataSchema);
+        return new FunctionOperand(functionCall, dataSchema);
     }
   }
 }

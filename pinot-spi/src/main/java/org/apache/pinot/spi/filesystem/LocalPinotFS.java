@@ -23,15 +23,16 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
@@ -112,8 +113,9 @@ public class LocalPinotFS extends BasePinotFS {
     if (!recursive) {
       return Arrays.stream(file.list()).map(s -> new File(file, s)).map(File::getAbsolutePath).toArray(String[]::new);
     } else {
-      return Files.walk(Paths.get(fileUri)).
-          filter(s -> !s.equals(file.toPath())).map(Path::toString).toArray(String[]::new);
+      try (Stream<Path> pathStream = Files.walk(Paths.get(fileUri))) {
+        return pathStream.filter(s -> !s.equals(file.toPath())).map(Path::toString).toArray(String[]::new);
+      }
     }
   }
 
@@ -124,8 +126,10 @@ public class LocalPinotFS extends BasePinotFS {
     if (!recursive) {
       return Arrays.stream(file.list()).map(s -> getFileMetadata(new File(file, s))).collect(Collectors.toList());
     } else {
-      return Files.walk(Paths.get(fileUri)).filter(s -> !s.equals(file.toPath())).map(p -> getFileMetadata(p.toFile()))
-          .collect(Collectors.toList());
+      try (Stream<Path> pathStream = Files.walk(Paths.get(fileUri))) {
+        return pathStream.filter(s -> !s.equals(file.toPath())).map(p -> getFileMetadata(p.toFile()))
+            .collect(Collectors.toList());
+      }
     }
   }
 
@@ -184,11 +188,7 @@ public class LocalPinotFS extends BasePinotFS {
   private static File toFile(URI uri) {
     // NOTE: Do not use new File(uri) because scheme might not exist and it does not decode '+' to ' '
     //       Do not use uri.getPath() because it does not decode '+' to ' '
-    try {
-      return new File(URLDecoder.decode(uri.getRawPath(), "UTF-8"));
-    } catch (UnsupportedEncodingException e) {
-      throw new RuntimeException(e);
-    }
+    return new File(URLDecoder.decode(uri.getRawPath(), StandardCharsets.UTF_8));
   }
 
   private static void copy(File srcFile, File dstFile, boolean recursive)

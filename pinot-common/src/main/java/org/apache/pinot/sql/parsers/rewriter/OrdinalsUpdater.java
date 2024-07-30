@@ -18,10 +18,11 @@
  */
 package org.apache.pinot.sql.parsers.rewriter;
 
-import java.util.Collections;
+import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.Function;
+import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlCompilationException;
@@ -32,25 +33,28 @@ public class OrdinalsUpdater implements QueryRewriter {
   public PinotQuery rewrite(PinotQuery pinotQuery) {
     // handle GROUP BY clause
     for (int i = 0; i < pinotQuery.getGroupByListSize(); i++) {
-      final Expression groupByExpr = pinotQuery.getGroupByList().get(i);
-      if (groupByExpr.isSetLiteral() && groupByExpr.getLiteral().isSetLongValue()) {
-        final int ordinal = (int) groupByExpr.getLiteral().getLongValue();
+      Expression groupByExpr = pinotQuery.getGroupByList().get(i);
+      Literal literal = groupByExpr.getLiteral();
+      if (literal != null && literal.isSetIntValue()) {
+        int ordinal = literal.getIntValue();
         pinotQuery.getGroupByList().set(i, getExpressionFromOrdinal(pinotQuery.getSelectList(), ordinal));
       }
     }
 
     // handle ORDER BY clause
     for (int i = 0; i < pinotQuery.getOrderByListSize(); i++) {
-      Expression orderByExpr = CalciteSqlParser.removeOrderByFunctions(pinotQuery.getOrderByList().get(i));
-      Boolean isNullsLast = CalciteSqlParser.isNullsLast(pinotQuery.getOrderByList().get(i));
-      if (orderByExpr.isSetLiteral() && orderByExpr.getLiteral().isSetLongValue()) {
-        final int ordinal = (int) orderByExpr.getLiteral().getLongValue();
-        Function functionToSet = pinotQuery.getOrderByList().get(i).getFunctionCall();
-        if (isNullsLast != null) {
+      Expression orderByExpr = pinotQuery.getOrderByList().get(i);
+      Literal literal = CalciteSqlParser.removeOrderByFunctions(orderByExpr).getLiteral();
+      if (literal != null && literal.isSetIntValue()) {
+        int ordinal = literal.getIntValue();
+        Function functionToSet = orderByExpr.getFunctionCall();
+        if (CalciteSqlParser.isNullsLast(orderByExpr) != null) {
           functionToSet = functionToSet.getOperands().get(0).getFunctionCall();
         }
-        functionToSet.setOperands(
-            Collections.singletonList(getExpressionFromOrdinal(pinotQuery.getSelectList(), ordinal)));
+        // NOTE: Create an ArrayList because we might need to modify the list later
+        List<Expression> newOperands = new ArrayList<>(1);
+        newOperands.add(getExpressionFromOrdinal(pinotQuery.getSelectList(), ordinal));
+        functionToSet.setOperands(newOperands);
       }
     }
     return pinotQuery;

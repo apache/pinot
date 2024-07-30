@@ -34,6 +34,7 @@ public class Actions {
     public static final String CREATE_TENANT = "CreateTenant";
     public static final String CREATE_USER = "CreateUser";
     public static final String DEBUG_TASK = "DebugTask";
+    public static final String DEBUG_RESOURCE_USAGE = "DebugResourceUsage";
     public static final String DELETE_CLUSTER_CONFIG = "DeleteClusterConfig";
     public static final String DELETE_INSTANCE = "DeleteInstance";
     public static final String DELETE_TASK = "DeleteTask";
@@ -131,6 +132,7 @@ public class Actions {
     public static final String GET_TABLE_CONFIGS = "GetTableConfigs";
     public static final String GET_TABLE_LEADER = "GetTableLeader";
     public static final String GET_TIME_BOUNDARY = "GetTimeBoundary";
+    public static final String GET_SCHEDULER_JOB_DETAILS = "GetSchedulerJobDetails";
     public static final String PAUSE_CONSUMPTION = "PauseConsumption";
     public static final String QUERY = "Query";
     public static final String REBALANCE_TABLE = "RebalanceTable";

@@ -41,6 +41,7 @@ import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
@@ -133,8 +134,8 @@ public class QueryExecutorExceptionsTest {
     InstanceDataManagerConfig instanceDataManagerConfig = mock(InstanceDataManagerConfig.class);
     when(instanceDataManagerConfig.getInstanceDataDir()).thenReturn(INDEX_DIR.getAbsolutePath());
     TableDataManager tableDataManager =
-        new TableDataManagerProvider(instanceDataManagerConfig).getTableDataManager(tableConfig,
-            mock(HelixManager.class));
+        new TableDataManagerProvider(instanceDataManagerConfig, mock(HelixManager.class),
+            new SegmentLocks()).getTableDataManager(tableConfig);
     tableDataManager.start();
     //we don't add index segments to the data manager to simulate numSegmentsAcquired < numSegmentsQueried
     InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);

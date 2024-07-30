@@ -489,6 +489,11 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
     return _scale == null ? result : result.setScale(_scale, RoundingMode.HALF_EVEN);
   }
 
+  @Override
+  public BigDecimal mergeFinalResult(BigDecimal finalResult1, BigDecimal finalResult2) {
+    return merge(finalResult1, finalResult2);
+  }
+
   public BigDecimal getDefaultResult(AggregationResultHolder aggregationResultHolder) {
     BigDecimal result = aggregationResultHolder.getResult();
     return result != null ? result : BigDecimal.ZERO;

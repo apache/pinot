@@ -26,16 +26,16 @@ import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.commons.io.IOUtils;
+import org.apache.hc.client5.http.classic.methods.HttpDelete;
+import org.apache.hc.client5.http.classic.methods.HttpGet;
+import org.apache.hc.client5.http.classic.methods.HttpPost;
+import org.apache.hc.client5.http.entity.mime.MultipartEntityBuilder;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
+import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
+import org.apache.hc.core5.http.HttpEntity;
+import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
-import org.apache.http.HttpEntity;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpDelete;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.entity.mime.MultipartEntityBuilder;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClientBuilder;
-import org.apache.http.util.EntityUtils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
@@ -79,17 +79,15 @@ public class SchemaUtils {
    * @return schema on success.
    * <P><code>null</code> on failure.
    */
-  public static @Nullable
-  Schema getSchema(@Nonnull String host, int port, @Nonnull String schemaName) {
+  public static @Nullable Schema getSchema(@Nonnull String host, int port, @Nonnull String schemaName) {
     Preconditions.checkNotNull(host);
     Preconditions.checkNotNull(schemaName);
 
     try {
       URL url = new URL(CommonConstants.HTTP_PROTOCOL, host, port, "/schemas/" + schemaName);
       HttpGet httpGet = new HttpGet(url.toString());
-      try {
-        CloseableHttpResponse response = HTTP_CLIENT.execute(httpGet);
-        int responseCode = response.getStatusLine().getStatusCode();
+      try (CloseableHttpResponse response = HTTP_CLIENT.execute(httpGet)) {
+        int responseCode = response.getCode();
         String responseString = EntityUtils.toString(response.getEntity());
         if (responseCode >= 400) {
           // File not find error code.
@@ -101,8 +99,6 @@ public class SchemaUtils {
           return null;
         }
         return Schema.fromString(responseString);
-      } finally {
-        httpGet.releaseConnection();
       }
     } catch (Exception e) {
       LOGGER.error("Caught exception while getting the schema: {} from host: {}, port: {}", schemaName, host, port, e);
@@ -123,20 +119,17 @@ public class SchemaUtils {
     try {
       URL url = new URL(CommonConstants.HTTP_PROTOCOL, host, port, "/schemas");
       HttpPost httpPost = new HttpPost(url.toString());
-      try {
-        HttpEntity requestEntity = MultipartEntityBuilder.create()
-            .addTextBody(schema.getSchemaName(), schema.toSingleLineJsonString()).build();
-        httpPost.setEntity(requestEntity);
-        CloseableHttpResponse response = HTTP_CLIENT.execute(httpPost);
-        int responseCode = response.getStatusLine().getStatusCode();
+      HttpEntity requestEntity =
+          MultipartEntityBuilder.create().addTextBody(schema.getSchemaName(), schema.toSingleLineJsonString()).build();
+      httpPost.setEntity(requestEntity);
+      try (CloseableHttpResponse response = HTTP_CLIENT.execute(httpPost)) {
+        int responseCode = response.getCode();
         if (responseCode >= 400) {
           String responseString = IOUtils.toString(response.getEntity().getContent(), Charset.defaultCharset());
           LOGGER.warn("Got error response code: {}, response: {}", responseCode, responseString);
           return false;
         }
         return true;
-      } finally {
-        httpPost.releaseConnection();
       }
     } catch (Exception e) {
       LOGGER.error("Caught exception while posting the schema: {} to host: {}, port: {}", schema.getSchemaName(), host,
@@ -158,17 +151,14 @@ public class SchemaUtils {
     try {
       URL url = new URL(CommonConstants.HTTP_PROTOCOL, host, port, "/schemas/" + schemaName);
       HttpDelete httpDelete = new HttpDelete(url.toString());
-      try {
-        CloseableHttpResponse response = HTTP_CLIENT.execute(httpDelete);
-        int responseCode = response.getStatusLine().getStatusCode();
+      try (CloseableHttpResponse response = HTTP_CLIENT.execute(httpDelete)) {
+        int responseCode = response.getCode();
         if (responseCode >= 400) {
           String responseString = EntityUtils.toString(response.getEntity());
           LOGGER.warn("Got error response code: {}, response: {}", responseCode, responseString);
           return false;
         }
         return true;
-      } finally {
-        httpDelete.releaseConnection();
       }
     } catch (Exception e) {
       LOGGER.error("Caught exception while getting the schema: {} from host: {}, port: {}", schemaName, host, port, e);

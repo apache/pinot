@@ -26,7 +26,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URLEncoder;
@@ -78,6 +77,7 @@ import software.amazon.awssdk.services.s3.model.PutObjectResponse;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 import software.amazon.awssdk.services.s3.model.S3Object;
 import software.amazon.awssdk.services.s3.model.ServerSideEncryption;
+import software.amazon.awssdk.services.s3.model.StorageClass;
 import software.amazon.awssdk.services.s3.model.UploadPartRequest;
 import software.amazon.awssdk.services.s3.model.UploadPartResponse;
 import software.amazon.awssdk.services.sts.StsClient;
@@ -100,6 +100,7 @@ public class S3PinotFS extends BasePinotFS {
   private String _ssekmsEncryptionContext;
   private long _minObjectSizeToUploadInParts;
   private long _multiPartUploadPartSize;
+  private @Nullable StorageClass _storageClass;
 
   @Override
   public void init(PinotConfiguration config) {
@@ -150,6 +151,12 @@ public class S3PinotFS extends BasePinotFS {
       if (s3Config.getHttpClientBuilder() != null) {
         s3ClientBuilder.httpClientBuilder(s3Config.getHttpClientBuilder());
       }
+
+      if (s3Config.getStorageClass() != null) {
+        _storageClass = StorageClass.fromValue(s3Config.getStorageClass());
+        assert (_storageClass != StorageClass.UNKNOWN_TO_SDK_VERSION);
+      }
+
       _s3Client = s3ClientBuilder.build();
       setMultiPartUploadConfigs(s3Config);
     } catch (S3Exception e) {
@@ -179,6 +186,17 @@ public class S3PinotFS extends BasePinotFS {
     setServerSideEncryption(serverSideEncryption, s3Config);
     setMultiPartUploadConfigs(s3Config);
     setDisableAcl(s3Config);
+  }
+
+  @VisibleForTesting
+  void setStorageClass(@Nullable StorageClass storageClass) {
+    _storageClass = storageClass;
+  }
+
+  @VisibleForTesting
+  @Nullable
+  StorageClass getStorageClass() {
+    return _storageClass;
   }
 
   private void setServerSideEncryption(@Nullable String serverSideEncryption, S3Config s3Config) {
@@ -325,12 +343,7 @@ public class S3PinotFS extends BasePinotFS {
   private boolean copyFile(URI srcUri, URI dstUri)
       throws IOException {
     try {
-      String encodedUrl = null;
-      try {
-        encodedUrl = URLEncoder.encode(srcUri.getHost() + srcUri.getPath(), StandardCharsets.UTF_8.toString());
-      } catch (UnsupportedEncodingException e) {
-        throw new RuntimeException(e);
-      }
+      String encodedUrl = URLEncoder.encode(srcUri.getHost() + srcUri.getPath(), StandardCharsets.UTF_8);
 
       String dstPath = sanitizePath(dstUri.getPath());
       CopyObjectRequest copyReq = generateCopyObjectRequest(encodedUrl, dstUri, dstPath, null);
@@ -587,8 +600,13 @@ public class S3PinotFS extends BasePinotFS {
       throws Exception {
     String bucket = dstUri.getHost();
     String prefix = sanitizePath(getBase(dstUri).relativize(dstUri).getPath());
+    CreateMultipartUploadRequest.Builder createMultipartUploadRequestBuilder = CreateMultipartUploadRequest.builder();
+    createMultipartUploadRequestBuilder.bucket(bucket).key(prefix);
+    if (_storageClass != null) {
+      createMultipartUploadRequestBuilder.storageClass(_storageClass);
+    }
     CreateMultipartUploadResponse multipartUpload =
-        _s3Client.createMultipartUpload(CreateMultipartUploadRequest.builder().bucket(bucket).key(prefix).build());
+        _s3Client.createMultipartUpload(createMultipartUploadRequestBuilder.build());
     String uploadId = multipartUpload.uploadId();
     // Upload parts sequentially to overcome the 5GB limit of a single PutObject call.
     // TODO: parts can be uploaded in parallel for higher throughput, given a thread pool.
@@ -674,12 +692,7 @@ public class S3PinotFS extends BasePinotFS {
       throws IOException {
     try {
       HeadObjectResponse s3ObjectMetadata = getS3ObjectMetadata(uri);
-      String encodedUrl = null;
-      try {
-        encodedUrl = URLEncoder.encode(uri.getHost() + uri.getPath(), StandardCharsets.UTF_8.toString());
-      } catch (UnsupportedEncodingException e) {
-        throw new RuntimeException(e);
-      }
+      String encodedUrl = URLEncoder.encode(uri.getHost() + uri.getPath(), StandardCharsets.UTF_8);
 
       String path = sanitizePath(uri.getPath());
       CopyObjectRequest request = generateCopyObjectRequest(encodedUrl, uri, path,
@@ -710,6 +723,11 @@ public class S3PinotFS extends BasePinotFS {
         putReqBuilder.ssekmsEncryptionContext(_ssekmsEncryptionContext);
       }
     }
+
+    if (_storageClass != null) {
+      putReqBuilder.storageClass(_storageClass);
+    }
+
     return putReqBuilder.build();
   }
 
@@ -717,6 +735,9 @@ public class S3PinotFS extends BasePinotFS {
       Map<String, String> metadata) {
     CopyObjectRequest.Builder copyReqBuilder =
         CopyObjectRequest.builder().copySource(copySource).destinationBucket(dest.getHost()).destinationKey(path);
+    if (_storageClass != null) {
+      copyReqBuilder.storageClass(_storageClass);
+    }
     if (metadata != null) {
       copyReqBuilder.metadata(metadata).metadataDirective(MetadataDirective.REPLACE);
     }

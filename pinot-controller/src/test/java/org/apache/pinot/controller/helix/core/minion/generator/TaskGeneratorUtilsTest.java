@@ -108,12 +108,7 @@ public class TaskGeneratorUtilsTest {
   @Test
   public void testExtractMinionInstanceTag() {
     // correct minionInstanceTag extraction
-    Map<String, String> tableTaskConfigs = new HashMap<>();
-    tableTaskConfigs.put("100days.mergeType", "concat");
-    tableTaskConfigs.put("100days.bufferTimePeriod", "1d");
-    tableTaskConfigs.put("100days.bucketTimePeriod", "100d");
-    tableTaskConfigs.put("100days.maxNumRecordsPerSegment", "15000");
-    tableTaskConfigs.put("100days.maxNumRecordsPerTask", "15000");
+    Map<String, String> tableTaskConfigs = getDummyTaskConfig();
     tableTaskConfigs.put(PinotTaskManager.MINION_INSTANCE_TAG_CONFIG, "minionInstance1");
     TableTaskConfig tableTaskConfig =
         new TableTaskConfig(Collections.singletonMap(MinionConstants.MergeRollupTask.TASK_TYPE, tableTaskConfigs));
@@ -123,17 +118,22 @@ public class TaskGeneratorUtilsTest {
         MinionConstants.MergeRollupTask.TASK_TYPE), "minionInstance1");
 
     // no minionInstanceTag passed
-    tableTaskConfigs = new HashMap<>();
-    tableTaskConfigs.put("100days.mergeType", "concat");
-    tableTaskConfigs.put("100days.bufferTimePeriod", "1d");
-    tableTaskConfigs.put("100days.bucketTimePeriod", "100d");
-    tableTaskConfigs.put("100days.maxNumRecordsPerSegment", "15000");
-    tableTaskConfigs.put("100days.maxNumRecordsPerTask", "15000");
+    tableTaskConfigs = getDummyTaskConfig();
     tableTaskConfig =
         new TableTaskConfig(Collections.singletonMap(MinionConstants.MergeRollupTask.TASK_TYPE, tableTaskConfigs));
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("sampleTable")
         .setTaskConfig(tableTaskConfig).build();
     assertEquals(TaskGeneratorUtils.extractMinionInstanceTag(tableConfig,
         MinionConstants.MergeRollupTask.TASK_TYPE), CommonConstants.Helix.UNTAGGED_MINION_INSTANCE);
+  }
+
+  private Map<String, String> getDummyTaskConfig() {
+    Map<String, String> tableTaskConfigs = new HashMap<>();
+    tableTaskConfigs.put("100days.mergeType", "concat");
+    tableTaskConfigs.put("100days.bufferTimePeriod", "1d");
+    tableTaskConfigs.put("100days.bucketTimePeriod", "100d");
+    tableTaskConfigs.put("100days.maxNumRecordsPerSegment", "15000");
+    tableTaskConfigs.put("100days.maxNumRecordsPerTask", "15000");
+    return tableTaskConfigs;
   }
 }

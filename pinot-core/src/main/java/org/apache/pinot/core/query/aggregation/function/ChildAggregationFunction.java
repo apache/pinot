@@ -119,6 +119,11 @@ public abstract class ChildAggregationFunction implements AggregationFunction<Lo
     return 0L;
   }
 
+  @Override
+  public Long mergeFinalResult(Long finalResult1, Long finalResult2) {
+    return 0L;
+  }
+
   /**
    * The name of the column as follows:
    * CHILD_AGGREGATION_NAME_PREFIX + actual function type + operands + CHILD_AGGREGATION_SEPERATOR

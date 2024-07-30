@@ -20,6 +20,8 @@ package org.apache.pinot.common.datablock;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
+import java.util.Objects;
 import org.apache.pinot.common.utils.DataSchema;
 
 
@@ -27,7 +29,7 @@ import org.apache.pinot.common.utils.DataSchema;
  * Wrapper for row-wise data table. It stores data in row-major format.
  */
 public class RowDataBlock extends BaseDataBlock {
-  private static final int VERSION = 1;
+  private static final int VERSION = 2;
   protected int[] _columnOffsets;
   protected int _rowSizeInBytes;
 
@@ -72,22 +74,25 @@ public class RowDataBlock extends BaseDataBlock {
     return _fixedSizeData.getInt(offset + 4);
   }
 
-  @Override
-  public RowDataBlock toMetadataOnlyDataTable() {
-    RowDataBlock metadataOnlyDataTable = new RowDataBlock();
-    metadataOnlyDataTable._metadata.putAll(_metadata);
-    metadataOnlyDataTable._errCodeToExceptionMap.putAll(_errCodeToExceptionMap);
-    return metadataOnlyDataTable;
-  }
-
-  @Override
-  public RowDataBlock toDataOnlyDataTable() {
-    return new RowDataBlock(_numRows, _dataSchema, _stringDictionary, _fixedSizeDataBytes, _variableSizeDataBytes);
-  }
-
   public int getRowSizeInBytes() {
     return _rowSizeInBytes;
   }
 
-  // TODO: add whole-row access methods.
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (!(o instanceof RowDataBlock)) {
+      return false;
+    }
+    RowDataBlock that = (RowDataBlock) o;
+    return _rowSizeInBytes == that._rowSizeInBytes && Objects.deepEquals(_columnOffsets, that._columnOffsets);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(Arrays.hashCode(_columnOffsets), _rowSizeInBytes);
+  }
+// TODO: add whole-row access methods.
 }
