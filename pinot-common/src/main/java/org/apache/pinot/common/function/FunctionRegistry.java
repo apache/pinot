@@ -312,7 +312,7 @@ public class FunctionRegistry {
     private static SqlTypeFamily getSqlTypeFamily(Class<?> clazz) {
       // NOTE: Pinot allows some non-standard type conversions such as Timestamp <-> long, boolean <-> int etc. Do not
       //       restrict the type family for now. We only restrict the type family for String so that cast can be added.
-      //       Explicit cast is required to correctly convert boolean and Timestamp to String. Without explicit case,
+      //       Explicit cast is required to correctly convert boolean and Timestamp to String. Without explicit cast,
       //       BOOLEAN and TIMESTAMP type will be converted with their internal stored format which is INT and LONG
       //       respectively. E.g. true will be converted to "1", timestamp will be converted to long value string.
       // TODO: Revisit this.

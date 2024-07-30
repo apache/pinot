@@ -705,6 +705,57 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   }
 
   @Test
+  public void testPolymorphicScalarComparisonFunctions() throws Exception {
+    // Queries written this way will trigger the PinotEvaluateLiteralRule which will call the scalar equals function
+    // on the literals
+    String sqlQuery = "WITH data as (SELECT 'test' as \"foo\" FROM mytable) "
+        + "SELECT * FROM data WHERE \"foo\" = 'test';";
+    JsonNode jsonNode = postQuery(sqlQuery);
+    assertNoError(jsonNode);
+
+    assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").size(), 1);
+    assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "STRING");
+    assertEquals(jsonNode.get("numRowsResultSet").asLong(), DEFAULT_COUNT_STAR_RESULT);
+    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asText(), "test");
+
+    sqlQuery = "WITH data as (SELECT 1 as \"foo\" FROM mytable) "
+        + "SELECT * FROM data WHERE \"foo\" = 1";
+    jsonNode = postQuery(sqlQuery);
+    assertNoError(jsonNode);
+
+    assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").size(), 1);
+    assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "INT");
+    assertEquals(jsonNode.get("numRowsResultSet").asLong(), DEFAULT_COUNT_STAR_RESULT);
+    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asInt(), 1);
+
+    // Don't support equals comparison for literals with different types
+    sqlQuery = "WITH data as (SELECT 1 as \"foo\" FROM mytable) "
+        + "SELECT * FROM data WHERE \"foo\" = 'test'";
+    jsonNode = postQuery(sqlQuery);
+    assertFalse(jsonNode.get("exceptions").isEmpty());
+
+    sqlQuery = "WITH data as (SELECT 'test' as \"foo\" FROM mytable) "
+        + "SELECT * FROM data WHERE \"foo\" != 'abc';";
+    jsonNode = postQuery(sqlQuery);
+    assertNoError(jsonNode);
+
+    assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").size(), 1);
+    assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "STRING");
+    assertEquals(jsonNode.get("numRowsResultSet").asLong(), DEFAULT_COUNT_STAR_RESULT);
+    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asText(), "test");
+
+    sqlQuery = "WITH data as (SELECT 1 as \"foo\" FROM mytable) "
+        + "SELECT * FROM data WHERE \"foo\" != 0";
+    jsonNode = postQuery(sqlQuery);
+    assertNoError(jsonNode);
+
+    assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").size(), 1);
+    assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "INT");
+    assertEquals(jsonNode.get("numRowsResultSet").asLong(), DEFAULT_COUNT_STAR_RESULT);
+    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asInt(), 1);
+  }
+
+  @Test
   public void skipArrayToMvOptimization()
       throws Exception {
     String sqlQuery = "SELECT 1 "
