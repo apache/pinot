@@ -539,7 +539,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
       if (!pinotQuery.isExplain() && _enableMultistageMigrationMetric) {
         // Check if the query is a v2 supported query
-        String database = DatabaseUtils.extractDatabaseFromQueryRequest(sqlNodeAndOptions.getOptions(), httpHeaders);
+        database = DatabaseUtils.extractDatabaseFromQueryRequest(sqlNodeAndOptions.getOptions(), httpHeaders);
         // Attempt to add the query to the compile queue; drop if queue is full
         if (!_multistageCompileQueryQueue.offer(Pair.of(query, database))) {
           LOGGER.trace("Not compiling query `{}` using the multi-stage query engine because the query queue is full",
