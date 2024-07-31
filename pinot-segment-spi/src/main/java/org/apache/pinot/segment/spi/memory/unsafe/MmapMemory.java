@@ -171,9 +171,7 @@ public class MmapMemory implements Memory {
 
     protected void madvise(long size) {
       String defaultAdvice = System.getenv("PINOT_MMAP_ADVICE");
-      if (defaultAdvice == null) {
-        madvise(size, LibC.POSIX_MADV_RANDOM);
-      } else {
+      if (defaultAdvice != null) {
         try {
           int advice = Integer.parseInt(defaultAdvice);
           madvise(size, advice);
