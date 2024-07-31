@@ -32,10 +32,12 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Consumer;
 import org.apache.calcite.runtime.PairList;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.proto.Worker;
@@ -106,78 +108,22 @@ public class QueryDispatcher {
       throws Exception {
     Deadline deadline = Deadline.after(timeoutMs, TimeUnit.MILLISECONDS);
 
-    // Serialize the stage plans in parallel
     List<DispatchablePlanFragment> stagePlans = dispatchableSubPlan.getQueryStageList();
     Set<QueryServerInstance> serverInstances = new HashSet<>();
-    // Ignore the reduce stage (stage 0)
-    int numStages = stagePlans.size() - 1;
-    List<CompletableFuture<StageInfo>> stageInfoFutures = new ArrayList<>(numStages);
-    for (int i = 0; i < numStages; i++) {
-      DispatchablePlanFragment stagePlan = stagePlans.get(i + 1);
-      serverInstances.addAll(stagePlan.getServerInstanceToWorkerIdMap().keySet());
-      stageInfoFutures.add(CompletableFuture.supplyAsync(() -> {
-        ByteString rootNode = PlanNodeSerializer.process(stagePlan.getPlanFragment().getFragmentRoot()).toByteString();
-        ByteString customProperty = QueryPlanSerDeUtils.toProtoProperties(stagePlan.getCustomProperties());
-        return new StageInfo(rootNode, customProperty);
-      }, _executorService));
-    }
-    List<StageInfo> stageInfos = new ArrayList<>(numStages);
-    try {
-      for (CompletableFuture<StageInfo> future : stageInfoFutures) {
-        stageInfos.add(future.get(deadline.timeRemaining(TimeUnit.MILLISECONDS), TimeUnit.MILLISECONDS));
-      }
-    } finally {
-      for (CompletableFuture<?> future : stageInfoFutures) {
-        if (!future.isDone()) {
-          future.cancel(true);
-        }
-      }
-    }
 
-    Map<String, String> requestMetadata = new HashMap<>();
-    requestMetadata.put(CommonConstants.Query.Request.MetadataKeys.REQUEST_ID, Long.toString(requestId));
-    requestMetadata.put(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS,
-        Long.toString(deadline.timeRemaining(TimeUnit.MILLISECONDS)));
-    requestMetadata.putAll(queryOptions);
+    List<DispatchablePlanFragment> plansWithoutRoot = stagePlans.subList(1, stagePlans.size());
+    // stageInfo.get(i) is the serialized info for plansWithoutRoot.get(i) (which is equal to stagePlans.get(i + 1))
+    List<StageInfo> stageInfos = serializePlanFragments(plansWithoutRoot, serverInstances, deadline);
+
+    Map<String, String> requestMetadata = prepareRequestMetadata(requestId, queryOptions, deadline);
     ByteString protoRequestMetadata = QueryPlanSerDeUtils.toProtoProperties(requestMetadata);
 
     // Submit the query plan to all servers in parallel
     int numServers = serverInstances.size();
     BlockingQueue<AsyncQueryDispatchResponse> dispatchCallbacks = new ArrayBlockingQueue<>(numServers);
     for (QueryServerInstance serverInstance : serverInstances) {
-      _executorService.submit(() -> {
-        try {
-          Worker.QueryRequest.Builder requestBuilder = Worker.QueryRequest.newBuilder();
-          requestBuilder.setVersion(CommonConstants.MultiStageQueryRunner.PlanVersions.V1);
-          for (int i = 0; i < numStages; i++) {
-            int stageId = i + 1;
-            DispatchablePlanFragment stagePlan = stagePlans.get(stageId);
-            List<Integer> workerIds = stagePlan.getServerInstanceToWorkerIdMap().get(serverInstance);
-            if (workerIds != null) {
-              List<WorkerMetadata> stageWorkerMetadataList = stagePlan.getWorkerMetadataList();
-              List<WorkerMetadata> workerMetadataList = new ArrayList<>(workerIds.size());
-              for (int workerId : workerIds) {
-                workerMetadataList.add(stageWorkerMetadataList.get(workerId));
-              }
-              List<Worker.WorkerMetadata> protoWorkerMetadataList =
-                  QueryPlanSerDeUtils.toProtoWorkerMetadataList(workerMetadataList);
-              StageInfo stageInfo = stageInfos.get(i);
-              Worker.StageMetadata stageMetadata =
-                  Worker.StageMetadata.newBuilder().setStageId(stageId).addAllWorkerMetadata(protoWorkerMetadataList)
-                      .setCustomProperty(stageInfo._customProperty).build();
-              requestBuilder.addStagePlan(
-                  Worker.StagePlan.newBuilder().setRootNode(stageInfo._rootNode).setStageMetadata(stageMetadata)
-                      .build());
-            }
-          }
-          requestBuilder.setMetadata(protoRequestMetadata);
-          getOrCreateDispatchClient(serverInstance).submit(requestBuilder.build(), serverInstance, deadline,
-              dispatchCallbacks::offer);
-        } catch (Throwable t) {
-          LOGGER.warn("Caught exception while dispatching query: {} to server: {}", requestId, serverInstance, t);
-          dispatchCallbacks.offer(new AsyncQueryDispatchResponse(serverInstance, null, t));
-        }
-      });
+      _executorService.submit(() -> submitStagesToServer(
+          requestId, serverInstance, plansWithoutRoot, stageInfos, protoRequestMetadata, deadline, dispatchCallbacks));
     }
 
     int numSuccessCalls = 0;
@@ -207,6 +153,96 @@ public class QueryDispatcher {
     if (deadline.isExpired()) {
       throw new TimeoutException("Timed out waiting for response of async query-dispatch");
     }
+  }
+
+  private void submitStagesToServer(long requestId, QueryServerInstance serverInstance,
+      List<DispatchablePlanFragment> stagePlans, List<StageInfo> stageInfos, ByteString protoRequestMetadata,
+      Deadline deadline, BlockingQueue<AsyncQueryDispatchResponse> dispatchCallbacks) {
+
+    Consumer<AsyncQueryDispatchResponse> callbackConsumer = response -> {
+      if (!dispatchCallbacks.offer(response)) {
+        LOGGER.warn("Failed to offer response to dispatchCallbacks queue for query: {} on server: {}", requestId,
+            serverInstance);
+      }
+    };
+
+    try {
+      Worker.QueryRequest.Builder requestBuilder = Worker.QueryRequest.newBuilder();
+      requestBuilder.setVersion(CommonConstants.MultiStageQueryRunner.PlanVersions.V1);
+      for (int i = 0; i < stagePlans.size(); i++) {
+        DispatchablePlanFragment stagePlan = stagePlans.get(i);
+        List<Integer> workerIds = stagePlan.getServerInstanceToWorkerIdMap().get(serverInstance);
+        if (workerIds != null) {
+          List<WorkerMetadata> stageWorkerMetadataList = stagePlan.getWorkerMetadataList();
+          List<WorkerMetadata> workerMetadataList = new ArrayList<>(workerIds.size());
+          for (int workerId : workerIds) {
+            workerMetadataList.add(stageWorkerMetadataList.get(workerId));
+          }
+          List<Worker.WorkerMetadata> protoWorkerMetadataList =
+              QueryPlanSerDeUtils.toProtoWorkerMetadataList(workerMetadataList);
+          StageInfo stageInfo = stageInfos.get(i);
+
+          //@formatter:off
+          Worker.StagePlan requestStagePlan = Worker.StagePlan.newBuilder()
+              .setRootNode(stageInfo._rootNode)
+              .setStageMetadata(
+                  Worker.StageMetadata.newBuilder()
+                      .setStageId(i + 1)
+                      .addAllWorkerMetadata(protoWorkerMetadataList)
+                      .setCustomProperty(stageInfo._customProperty)
+                      .build()
+              )
+              .build();
+          //@formatter:on
+          requestBuilder.addStagePlan(requestStagePlan);
+        }
+      }
+      requestBuilder.setMetadata(protoRequestMetadata);
+      DispatchClient dispatchClient = getOrCreateDispatchClient(serverInstance);
+      dispatchClient.submit(requestBuilder.build(), serverInstance, deadline, callbackConsumer);
+    } catch (Throwable t) {
+      LOGGER.warn("Caught exception while dispatching query: {} to server: {}", requestId, serverInstance, t);
+      callbackConsumer.accept(new AsyncQueryDispatchResponse(serverInstance, null, t));
+    }
+  }
+
+  private static Map<String, String> prepareRequestMetadata(long requestId, Map<String, String> queryOptions,
+      Deadline deadline) {
+    Map<String, String> requestMetadata = new HashMap<>();
+    requestMetadata.put(CommonConstants.Query.Request.MetadataKeys.REQUEST_ID, Long.toString(requestId));
+    requestMetadata.put(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS,
+        Long.toString(deadline.timeRemaining(TimeUnit.MILLISECONDS)));
+    requestMetadata.putAll(queryOptions);
+    return requestMetadata;
+  }
+
+  private List<StageInfo> serializePlanFragments(List<DispatchablePlanFragment> stagePlans,
+      Set<QueryServerInstance> serverInstances, Deadline deadline)
+      throws InterruptedException, ExecutionException, TimeoutException {
+    List<CompletableFuture<StageInfo>> stageInfoFutures = new ArrayList<>(stagePlans.size());
+    for (DispatchablePlanFragment stagePlan : stagePlans) {
+      serverInstances.addAll(stagePlan.getServerInstanceToWorkerIdMap().keySet());
+      stageInfoFutures.add(CompletableFuture.supplyAsync(() -> serializePlanFragment(stagePlan), _executorService));
+    }
+    List<StageInfo> stageInfos = new ArrayList<>(stagePlans.size());
+    try {
+      for (CompletableFuture<StageInfo> future : stageInfoFutures) {
+        stageInfos.add(future.get(deadline.timeRemaining(TimeUnit.MILLISECONDS), TimeUnit.MILLISECONDS));
+      }
+    } finally {
+      for (CompletableFuture<?> future : stageInfoFutures) {
+        if (!future.isDone()) {
+          future.cancel(true);
+        }
+      }
+    }
+    return stageInfos;
+  }
+
+  private static StageInfo serializePlanFragment(DispatchablePlanFragment stagePlan) {
+    ByteString rootNode = PlanNodeSerializer.process(stagePlan.getPlanFragment().getFragmentRoot()).toByteString();
+    ByteString customProperty = QueryPlanSerDeUtils.toProtoProperties(stagePlan.getCustomProperties());
+    return new StageInfo(rootNode, customProperty);
   }
 
   private static class StageInfo {
