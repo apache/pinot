@@ -82,8 +82,8 @@ public class TextIndexConfig extends IndexConfig {
     _rawValueForTextIndex = rawValueForTextIndex;
     _enableQueryCache = enableQueryCache;
     _useANDForMultiTermQueries = useANDForMultiTermQueries;
-    _stopWordsInclude = null == stopWordsInclude ? Collections.emptyList() : stopWordsInclude;
-    _stopWordsExclude = null == stopWordsExclude ? Collections.emptyList() : stopWordsExclude;
+    _stopWordsInclude = stopWordsInclude;
+    _stopWordsExclude = stopWordsExclude;
     _luceneUseCompoundFile =
         luceneUseCompoundFile == null ? LUCENE_INDEX_DEFAULT_USE_COMPOUND_FILE : luceneUseCompoundFile;
     _luceneMaxBufferSizeMB =
