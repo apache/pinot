@@ -35,15 +35,11 @@ public class ParserUtils {
    */
   public static boolean canCompileWithMultiStageEngine(String query, String database, TableCache tableCache) {
     // try to parse and compile the query with the Calcite planner used by the multi-stage query engine
-    try {
-      LOGGER.info("Trying to compile query `{}` using the multi-stage query engine", query);
-      QueryEnvironment queryEnvironment = new QueryEnvironment(database, tableCache, null);
-      queryEnvironment.getTableNamesForQuery(query);
-      LOGGER.info("Successfully compiled query using the multi-stage query engine: `{}`", query);
-      return true;
-    } catch (Exception e) {
-      LOGGER.error("Encountered an error while compiling query `{}` using the multi-stage query engine", query, e);
-      return false;
-    }
+    long compileStartTime = System.currentTimeMillis();
+    LOGGER.debug("Trying to compile query `{}` using the multi-stage query engine", query);
+    QueryEnvironment queryEnvironment = new QueryEnvironment(database, tableCache, null);
+    boolean canCompile = queryEnvironment.canCompileQuery(query);
+    LOGGER.debug("Multi-stage query compilation time = {}ms", System.currentTimeMillis() - compileStartTime);
+    return canCompile;
   }
 }

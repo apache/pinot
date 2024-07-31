@@ -36,6 +36,13 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
    */
   QUERIES("queries", false),
   /**
+   * Number of single-stage queries that have been started.
+   * <p>
+   * Unlike {@link #QUERIES}, this metric is global and not attached to a particular table.
+   * That means it can be used to know how many single-stage queries have been started in total.
+   */
+  QUERIES_GLOBAL("queries", true),
+  /**
    * Number of multi-stage queries that have been started.
    * <p>
    * Unlike {@link #MULTI_STAGE_QUERIES}, this metric is global and not attached to a particular table.
@@ -49,7 +56,10 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
    * sum of this metric across all tables should be greater or equal than {@link #MULTI_STAGE_QUERIES_GLOBAL}.
    */
   MULTI_STAGE_QUERIES("queries", false),
-
+  /**
+   * Number of single-stage queries executed that would not have successfully run on the multi-stage query engine as is.
+   */
+  SINGLE_STAGE_QUERIES_INVALID_MULTI_STAGE("queries", true),
   // These metrics track the exceptions caught during query execution in broker side.
   // Query rejected by Jersey thread pool executor
   QUERY_REJECTED_EXCEPTIONS("exceptions", true),

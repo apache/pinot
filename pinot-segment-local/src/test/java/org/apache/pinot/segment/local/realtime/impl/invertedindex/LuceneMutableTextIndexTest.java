@@ -19,14 +19,15 @@
 package org.apache.pinot.segment.local.realtime.impl.invertedindex;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import org.apache.commons.io.FileUtils;
-import org.apache.lucene.search.SearcherManager;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
+import org.apache.pinot.util.TestUtils;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.annotations.AfterClass;
@@ -46,6 +47,7 @@ public class LuceneMutableTextIndexTest {
   private RealtimeLuceneTextIndex _realtimeLuceneTextIndex;
 
   public LuceneMutableTextIndexTest() {
+    RealtimeLuceneIndexRefreshManager.init(1, 10);
     ServerMetrics.register(mock(ServerMetrics.class));
   }
 
@@ -80,13 +82,6 @@ public class LuceneMutableTextIndexTest {
         _realtimeLuceneTextIndex.add(row);
       }
     }
-
-    SearcherManager searcherManager = _realtimeLuceneTextIndex.getSearcherManager();
-    try {
-      searcherManager.maybeRefresh();
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
   }
 
   @AfterClass
@@ -96,6 +91,14 @@ public class LuceneMutableTextIndexTest {
 
   @Test
   public void testQueries() {
+    TestUtils.waitForCondition(aVoid -> {
+          try {
+            return _realtimeLuceneTextIndex.getSearcherManager().isSearcherCurrent();
+          } catch (IOException e) {
+            return false;
+          }
+        }, 10000,
+        "Background pool did not refresh the searcher manager in time");
     assertEquals(_realtimeLuceneTextIndex.getDocIds("stream"), ImmutableRoaringBitmap.bitmapOf(0));
     assertEquals(_realtimeLuceneTextIndex.getDocIds("/.*house.*/"), ImmutableRoaringBitmap.bitmapOf(1));
     assertEquals(_realtimeLuceneTextIndex.getDocIds("invalid"), ImmutableRoaringBitmap.bitmapOf());
