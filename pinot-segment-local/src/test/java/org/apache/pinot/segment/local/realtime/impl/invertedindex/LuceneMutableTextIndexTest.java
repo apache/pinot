@@ -163,8 +163,7 @@ public class LuceneMutableTextIndexTest {
 
   private void configureIndex(String analyzerClass, String analyzerClassArgs, String analyzerClassArgTypes,
                               String queryParserClass) {
-    FSTType fstType = null;
-    TextIndexConfigBuilder builder = new TextIndexConfigBuilder(fstType);
+    TextIndexConfigBuilder builder = new TextIndexConfigBuilder();
     if (null != analyzerClass) {
       builder.withLuceneAnalyzerClass(analyzerClass);
     }
