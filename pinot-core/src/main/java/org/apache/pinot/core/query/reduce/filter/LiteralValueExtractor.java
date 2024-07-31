@@ -39,7 +39,9 @@ public class LiteralValueExtractor implements ValueExtractor {
 
   @Override
   public ColumnDataType getColumnDataType() {
-    return ColumnDataType.fromDataType(_literal.getType(), _literal.isSingleValue());
+    ColumnDataType columnDataType = ColumnDataType.fromDataType(_literal.getType(), _literal.isSingleValue());
+    // Handle unrecognized result class with STRING
+    return columnDataType == ColumnDataType.UNKNOWN ? ColumnDataType.STRING : columnDataType;
   }
 
   @Override
