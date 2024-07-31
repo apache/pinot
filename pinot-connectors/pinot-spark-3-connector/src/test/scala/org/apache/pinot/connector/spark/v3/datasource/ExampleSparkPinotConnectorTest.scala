@@ -72,9 +72,6 @@ object ExampleSparkPinotConnectorTest extends Logging {
       .option("segmentFormat", "mysegment_%d")
       .option("timeColumnName", "ts")
       .save("myPath")
-
-
-
   }
 
   def readOffline()(implicit spark: SparkSession): Unit = {
