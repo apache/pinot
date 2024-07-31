@@ -53,9 +53,6 @@ import org.testng.annotations.AfterTest;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.spi.utils.CommonConstants.DEFAULT_DATABASE;
-import static org.apache.pinot.spi.utils.CommonConstants.Helix.DATABASE_QUERY_RATE_LIMIT;
-
 
 public class HelixExternalViewBasedQueryQuotaManagerTest {
   private ZkHelixPropertyStore<ZNRecord> _testPropertyStore;
@@ -140,11 +137,11 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
       _testPropertyStore.reset();
       ZKMetadataProvider.removeResourceConfigFromPropertyStore(_testPropertyStore, OFFLINE_TABLE_NAME);
       ZKMetadataProvider.removeResourceConfigFromPropertyStore(_testPropertyStore, REALTIME_TABLE_NAME);
-      ZKMetadataProvider.removeDatabaseConfig(_testPropertyStore, DEFAULT_DATABASE);
+      ZKMetadataProvider.removeDatabaseConfig(_testPropertyStore, CommonConstants.DEFAULT_DATABASE);
       CLUSTER_CONFIG_MAP.clear();
     }
     _queryQuotaManager.cleanUpRateLimiterMap();
-    _queryQuotaManager.cleanUpDatabaseRateLimiterMap();
+    _queryQuotaManager.getDatabaseRateLimiterMap().clear();
   }
 
   @AfterTest
@@ -181,8 +178,8 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
     setQps(tableConfig);
     _queryQuotaManager.initOrUpdateTableQueryQuota(tableConfig, brokerResource);
     Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 1);
-    _queryQuotaManager.createOrUpdateDatabaseRateLimiter(Collections.singletonList(DEFAULT_DATABASE));
-    Assert.assertEquals(_queryQuotaManager.getDatabaseRateLimiterMapSize(), 1);
+    _queryQuotaManager.createOrUpdateDatabaseRateLimiter(Collections.singletonList(CommonConstants.DEFAULT_DATABASE));
+    Assert.assertEquals(_queryQuotaManager.getDatabaseRateLimiterMap().size(), 1);
 
     setDefaultDatabaseQps("40");
     // qps withing table and default database qps quota
@@ -203,8 +200,8 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
     setQps(tableConfig);
     _queryQuotaManager.initOrUpdateTableQueryQuota(tableConfig, brokerResource);
     Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 1);
-    _queryQuotaManager.createOrUpdateDatabaseRateLimiter(Collections.singletonList(DEFAULT_DATABASE));
-    Assert.assertEquals(_queryQuotaManager.getDatabaseRateLimiterMapSize(), 1);
+    _queryQuotaManager.createOrUpdateDatabaseRateLimiter(Collections.singletonList(CommonConstants.DEFAULT_DATABASE));
+    Assert.assertEquals(_queryQuotaManager.getDatabaseRateLimiterMap().size(), 1);
 
     setDefaultDatabaseQps(DATABASE_LOW_QPS_STR);
     // qps withing table and default database qps quota
@@ -475,7 +472,7 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
   }
 
   private DatabaseConfig generateDefaultDatabaseConfig() {
-    return new DatabaseConfig(DEFAULT_DATABASE, null);
+    return new DatabaseConfig(CommonConstants.DEFAULT_DATABASE, null);
   }
 
   private void setLowerDatabaseQps(DatabaseConfig databaseConfig) {
@@ -487,8 +484,8 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
   }
 
   private void setDefaultDatabaseQps(String maxQps) {
-    ZKMetadataProvider.removeDatabaseConfig(_testPropertyStore, DEFAULT_DATABASE);
-    CLUSTER_CONFIG_MAP.put(DATABASE_QUERY_RATE_LIMIT, maxQps);
+    ZKMetadataProvider.removeDatabaseConfig(_testPropertyStore, CommonConstants.DEFAULT_DATABASE);
+    CLUSTER_CONFIG_MAP.put(CommonConstants.Helix.DATABASE_QUERY_RATE_LIMIT, maxQps);
     _queryQuotaManager.processQueryRateLimitingClusterConfigChange();
   }
 
@@ -496,7 +493,7 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
     QuotaConfig quotaConfig = new QuotaConfig(null, maxQps);
     databaseConfig.setQuotaConfig(quotaConfig);
     ZKMetadataProvider.setDatabaseConfig(_testPropertyStore, databaseConfig);
-    _queryQuotaManager.createOrUpdateDatabaseRateLimiter(Collections.singletonList(DEFAULT_DATABASE));
+    _queryQuotaManager.createOrUpdateDatabaseRateLimiter(Collections.singletonList(CommonConstants.DEFAULT_DATABASE));
   }
 
   private void setQps(TableConfig tableConfig) {
@@ -525,7 +522,7 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
     int failCount = 0;
     long sleepMillis = (long) (1000 / qps);
     for (int i = 0; i < qps; i++) {
-      if (!_queryQuotaManager.acquireDatabase(DEFAULT_DATABASE)) {
+      if (!_queryQuotaManager.acquireDatabase(CommonConstants.DEFAULT_DATABASE)) {
         failCount++;
       }
       if (!_queryQuotaManager.acquire(RAW_TABLE_NAME)) {

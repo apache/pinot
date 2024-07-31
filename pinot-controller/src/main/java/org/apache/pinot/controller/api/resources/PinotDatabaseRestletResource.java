@@ -54,12 +54,11 @@ import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.spi.config.DatabaseConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
-import static org.apache.pinot.spi.utils.CommonConstants.Helix.DATABASE_QUERY_RATE_LIMIT;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
 
@@ -68,7 +67,8 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
     @ApiKeyAuthDefinition(name = HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER,
         key = SWAGGER_AUTHORIZATION_KEY,
         description = "The format of the key is  ```\"Basic <token>\" or \"Bearer <token>\"```"),
-    @ApiKeyAuthDefinition(name = DATABASE, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = DATABASE,
+    @ApiKeyAuthDefinition(name = CommonConstants.DATABASE, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER,
+        key = CommonConstants.DATABASE,
         description = "Database context passed through http header. If no context is provided 'default' database "
             + "context will be considered.")}))
 @Path("/")
@@ -182,8 +182,9 @@ public class PinotDatabaseRestletResource {
     HelixAdmin helixAdmin = _pinotHelixResourceManager.getHelixAdmin();
     HelixConfigScope configScope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER)
         .forCluster(_pinotHelixResourceManager.getHelixClusterName()).build();
-    String defaultQueryQuota = helixAdmin.getConfig(configScope, Collections.singletonList(DATABASE_QUERY_RATE_LIMIT))
-            .getOrDefault(DATABASE_QUERY_RATE_LIMIT, null);
+    String defaultQueryQuota = helixAdmin.getConfig(configScope,
+            Collections.singletonList(CommonConstants.Helix.DATABASE_QUERY_RATE_LIMIT))
+            .getOrDefault(CommonConstants.Helix.DATABASE_QUERY_RATE_LIMIT, null);
     return new QuotaConfig(null, defaultQueryQuota);
   }
 }

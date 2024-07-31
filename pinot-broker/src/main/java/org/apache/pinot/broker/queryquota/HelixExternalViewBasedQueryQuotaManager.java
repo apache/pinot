@@ -55,16 +55,18 @@ import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.spi.utils.CommonConstants.Helix.DATABASE_QUERY_RATE_LIMIT;
-
 
 /**
  * This class is to support the qps quota feature.
  * It allows performing qps quota check at table level and database level
  * For table level check it depends on the broker source change to update the dynamic rate limit,
  *  which means it gets updated when a new table added or a broker restarted.
- * For database level check it depends on the broker as well as cluster config change to update the dynamic rate limit,
- *  which means it gets updated when the default query quota at cluster config is updated or a broker restarted.
+ * For database level check it depends on the broker as well as cluster config and database config change
+ * to update the dynamic rate limit, which means it gets updated when
+ * - the default query quota at cluster config is updated
+ * - the database config is updated
+ * - new table is assigned to the broker (rate limiter is created if not present)
+ * - broker added or removed from cluster
  */
 public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHandler, QueryQuotaManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixExternalViewBasedQueryQuotaManager.class);
@@ -262,25 +264,57 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
     createOrUpdateDatabaseRateLimiter(Collections.singletonList(databaseName));
   }
 
-  public void createOrUpdateDatabaseRateLimiter(List<String> databaseNames) {
+  public synchronized void createOrUpdateDatabaseRateLimiter(List<String> databaseNames) {
     ExternalView brokerResource = HelixHelper
         .getExternalViewForResource(_helixManager.getClusterManagmentTool(), _helixManager.getClusterName(),
             CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
-    // Tables in database can span across broker tags as we don't maintain a broker tag to database mapping as of now.
-    // Hence, we consider all online brokers for the rate distribution.
-    int onlineBrokers = HelixHelper.getOnlineInstanceFromExternalView(brokerResource).size();
     for (String databaseName : databaseNames) {
       double databaseQpsQuota = getEffectiveQueryQuotaOnDatabase(databaseName);
       if (databaseQpsQuota < 0) {
-        buildEmptyOrResetRateLimiterInDatabaseQueryQuotaEntity(databaseName);
+        buildEmptyOrResetDatabaseRateLimiter(databaseName);
         continue;
       }
-      double perBrokerQpsQuota = databaseQpsQuota / onlineBrokers;
+      int quotaSplitFactor = getPerBrokerQpsQuotaSplit(databaseName, brokerResource);
+      double perBrokerQpsQuota = databaseQpsQuota / quotaSplitFactor;
+      QueryQuotaEntity oldRateLimiter = _databaseRateLimiterMap.get(databaseName);
+      String message;
+      if (oldRateLimiter == null) {
+        message = String.format("New query rate limiter added for database %s with rate %s.", databaseName,
+            perBrokerQpsQuota);
+      } else {
+        boolean changeDetected = false;
+        double oldRate = oldRateLimiter.getRateLimiter() != null ? oldRateLimiter.getRateLimiter().getRate() : -1;
+        message = String.format("Updated existing query rate limiter for database %s from rate %s to %s", databaseName,
+            oldRate, perBrokerQpsQuota);
+        if (oldRateLimiter.getOverallRate() != databaseQpsQuota) {
+          changeDetected = true;
+          message += ". Overall quota changed for the database from " + oldRateLimiter.getOverallRate() + " to "
+              + databaseQpsQuota;
+        }
+        if (oldRateLimiter.getNumOnlineBrokers() != quotaSplitFactor) {
+          changeDetected = true;
+          message += ". Quota split factor changed for the database from " + oldRateLimiter.getOverallRate() + " to "
+              + quotaSplitFactor;
+        }
+        if (!changeDetected) {
+          LOGGER.info("No change detected with the query rate limiter for database {}", databaseName);
+          return;
+        }
+      }
       QueryQuotaEntity queryQuotaEntity = new QueryQuotaEntity(RateLimiter.create(perBrokerQpsQuota),
           new HitCounter(ONE_SECOND_TIME_RANGE_IN_SECOND), new MaxHitRateTracker(ONE_MINUTE_TIME_RANGE_IN_SECOND),
-          onlineBrokers, databaseQpsQuota, -1);
+          quotaSplitFactor, databaseQpsQuota, -1);
       _databaseRateLimiterMap.put(databaseName, queryQuotaEntity);
+      LOGGER.info(message);
     }
+  }
+
+  // Pulling this logic to a separate placeholder method so that the quota split logic
+  // can be enhanced further in isolation.
+  private int getPerBrokerQpsQuotaSplit(String databaseName, ExternalView brokerResource) {
+    // Tables in database can span across broker tags as we don't maintain a broker tag to database mapping as of now.
+    // Hence, we consider all online brokers for the rate distribution.
+    return HelixHelper.getOnlineInstanceFromExternalView(brokerResource).size();
   }
 
   /**
@@ -314,7 +348,7 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
    * Build an empty rate limiter in the new query quota entity, or set the rate limiter to null in an existing query
    * quota entity.
    */
-  private void buildEmptyOrResetRateLimiterInDatabaseQueryQuotaEntity(String databaseName) {
+  private void buildEmptyOrResetDatabaseRateLimiter(String databaseName) {
     QueryQuotaEntity queryQuotaEntity = _databaseRateLimiterMap.get(databaseName);
     if (queryQuotaEntity == null) {
       // Create an QueryQuotaEntity object without setting a rate limiter.
@@ -382,9 +416,12 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
     if (isQueryRateLimitDisabled()) {
       return true;
     }
-    LOGGER.info("Trying to acquire token for database: {}", databaseName);
     QueryQuotaEntity queryQuota = _databaseRateLimiterMap.get(databaseName);
-    return queryQuota == null || tryAcquireToken(databaseName, queryQuota);
+    if (queryQuota == null) {
+      return true;
+    }
+    LOGGER.debug("Trying to acquire token for database: {}", databaseName);
+    return tryAcquireToken(databaseName, queryQuota);
   }
 
   /**
@@ -399,7 +436,6 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
     if (isQueryRateLimitDisabled()) {
       return true;
     }
-    LOGGER.debug("Trying to acquire token for table: {}", tableName);
     String offlineTableName = null;
     String realtimeTableName = null;
     QueryQuotaEntity offlineTableQueryQuotaEntity = null;
@@ -419,10 +455,16 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
       realtimeTableQueryQuotaEntity = _rateLimiterMap.get(realtimeTableName);
     }
 
-    boolean offlineQuotaOk =
-        offlineTableQueryQuotaEntity == null || tryAcquireToken(offlineTableName, offlineTableQueryQuotaEntity);
-    boolean realtimeQuotaOk =
-        realtimeTableQueryQuotaEntity == null || tryAcquireToken(realtimeTableName, realtimeTableQueryQuotaEntity);
+    boolean offlineQuotaOk = true;
+    if (offlineTableQueryQuotaEntity != null) {
+      LOGGER.debug("Trying to acquire token for table: {}", offlineTableName);
+      offlineQuotaOk = tryAcquireToken(offlineTableName, offlineTableQueryQuotaEntity);
+    }
+    boolean realtimeQuotaOk = true;
+    if (realtimeTableQueryQuotaEntity != null) {
+      LOGGER.debug("Trying to acquire token for table: {}", realtimeTableName);
+      realtimeQuotaOk = tryAcquireToken(realtimeTableName, realtimeTableQueryQuotaEntity);
+    }
 
     return offlineQuotaOk && realtimeQuotaOk;
   }
@@ -462,8 +504,8 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
   }
 
   @VisibleForTesting
-  public int getDatabaseRateLimiterMapSize() {
-    return _databaseRateLimiterMap.size();
+  public Map<String, QueryQuotaEntity> getDatabaseRateLimiterMap() {
+    return _databaseRateLimiterMap;
   }
 
   @VisibleForTesting
@@ -474,16 +516,6 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
   @VisibleForTesting
   public void cleanUpRateLimiterMap() {
     _rateLimiterMap.clear();
-  }
-
-  @VisibleForTesting
-  public void cleanUpDatabaseRateLimiterMap() {
-    _databaseRateLimiterMap.clear();
-  }
-
-  @VisibleForTesting
-  public void reloadPropertyStore() {
-    _propertyStore = _helixManager.getHelixPropertyStore();
   }
 
   /**
@@ -611,8 +643,8 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
     HelixConfigScope configScope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER)
         .forCluster(_helixManager.getClusterName()).build();
     return Double.parseDouble(
-        helixAdmin.getConfig(configScope, Collections.singletonList(DATABASE_QUERY_RATE_LIMIT))
-            .getOrDefault(DATABASE_QUERY_RATE_LIMIT, "-1"));
+        helixAdmin.getConfig(configScope, Collections.singletonList(CommonConstants.Helix.DATABASE_QUERY_RATE_LIMIT))
+            .getOrDefault(CommonConstants.Helix.DATABASE_QUERY_RATE_LIMIT, "-1"));
   }
 
   /**

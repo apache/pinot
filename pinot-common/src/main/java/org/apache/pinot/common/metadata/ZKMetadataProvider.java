@@ -84,17 +84,11 @@ public class ZKMetadataProvider {
    *
    * @return true if creation is successful.
    */
-  public static boolean createDatabaseConfig(
-      ZkHelixPropertyStore<ZNRecord> propertyStore, DatabaseConfig databaseConfig) {
+  public static boolean createDatabaseConfig(ZkHelixPropertyStore<ZNRecord> propertyStore,
+      DatabaseConfig databaseConfig) {
     String databaseName = databaseConfig.getDatabaseName();
     String databaseConfigPath = constructPropertyStorePathForDatabaseConfig(databaseName);
-    ZNRecord databaseConfigZNRecord;
-    try {
-      databaseConfigZNRecord = toZNRecord(databaseConfig);
-    } catch (Exception e) {
-      LOGGER.error("Caught exception constructing ZNRecord from database config for database: {}", databaseName, e);
-      return false;
-    }
+    ZNRecord databaseConfigZNRecord = toZNRecord(databaseConfig);
     return propertyStore.create(databaseConfigPath, databaseConfigZNRecord, AccessOption.PERSISTENT);
   }
 
@@ -105,13 +99,7 @@ public class ZKMetadataProvider {
    */
   public static boolean setDatabaseConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, DatabaseConfig databaseConfig) {
     String databaseName = databaseConfig.getDatabaseName();
-    ZNRecord databaseConfigZNRecord;
-    try {
-      databaseConfigZNRecord = toZNRecord(databaseConfig);
-    } catch (Exception e) {
-      LOGGER.error("Caught exception constructing ZNRecord from database config for database : {}", databaseName, e);
-      return false;
-    }
+    ZNRecord databaseConfigZNRecord = toZNRecord(databaseConfig);
     return propertyStore.set(constructPropertyStorePathForDatabaseConfig(databaseName), databaseConfigZNRecord,
         -1, AccessOption.PERSISTENT);
   }
