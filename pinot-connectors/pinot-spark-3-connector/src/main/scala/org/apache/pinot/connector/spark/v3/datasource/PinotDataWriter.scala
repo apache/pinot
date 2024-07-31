@@ -8,12 +8,13 @@ import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig
 import org.apache.pinot.spi.config.table.{IndexingConfig, SegmentsValidationAndRetentionConfig, TableConfig, TableCustomConfig, TenantConfig}
 import org.apache.pinot.spi.data.readers.GenericRow
 import org.apache.pinot.spi.data.Schema
-import org.apache.pinot.spi.ingestion.batch.spec.{Constants, SegmentGenerationTaskSpec}
+import org.apache.pinot.spi.ingestion.batch.spec.Constants
 import org.apache.pinot.spi.utils.DataSizeUtils
 import org.apache.spark.sql.catalyst
 import org.apache.spark.sql.types.StructType
 
 import java.io.File
+import java.nio.file.Files
 
 class PinotDataWriter[InternalRow](
                                     physicalWriteInfo: PhysicalWriteInfo,
@@ -34,6 +35,7 @@ class PinotDataWriter[InternalRow](
   private val bufferedRecordReader = new PinotBufferedRecordReader()
   private var tableConfig: TableConfig = null
   private var segmentGeneratorConfig: SegmentGeneratorConfig = null
+  private var localOutputTempDir: File = null
 
   override def write(record: catalyst.InternalRow): Unit = {
     bufferedRecordReader.write(internalRowToGenericRow(record))
@@ -48,7 +50,14 @@ class PinotDataWriter[InternalRow](
 
     // tar segment
     val segmentTarFile = tarSegmentDir(segmentGeneratorConfig.getSegmentName)
-    printf("Segment tar file: %s", segmentTarFile.getAbsolutePath)
+    printf("Segment tar file: %s\n", segmentTarFile.getAbsolutePath)
+
+    // push to savePath
+    val fs = org.apache.hadoop.fs.FileSystem.get(new java.net.URI(savePath), new org.apache.hadoop.conf.Configuration())
+    val destPath = new org.apache.hadoop.fs.Path(savePath+ "/" + segmentTarFile.getName)
+
+    fs.copyFromLocalFile(new org.apache.hadoop.fs.Path(segmentTarFile.getAbsolutePath), destPath)
+    printf("Copied segment tar file to: %s\n", savePath)
 
     new SuccessWriterCommitMessage
   }
@@ -88,10 +97,14 @@ class PinotDataWriter[InternalRow](
         null,
         null);
 
+    // create a temp dir to store artifacts
+    // TODO: savePath could be used directly
+    localOutputTempDir = Files.createTempDirectory("pinot-spark-connector").toFile
+
     segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, pinotSchema)
     segmentGeneratorConfig.setTableName(tableName)
     segmentGeneratorConfig.setSegmentName(segmentNameFormat.format(partitionId))
-    segmentGeneratorConfig.setOutDir(savePath)
+    segmentGeneratorConfig.setOutDir(localOutputTempDir.getAbsolutePath)
   }
 
   private def internalRowToGenericRow(record: catalyst.InternalRow): GenericRow = {
@@ -125,16 +138,15 @@ class PinotDataWriter[InternalRow](
   }
 
   private def tarSegmentDir(segmentName: String): File = {
-    val localOutputTempDir = savePath
     val localSegmentDir = new File(localOutputTempDir, segmentName)
     val segmentTarFileName = segmentName + Constants.TAR_GZ_FILE_EXT
-    val localSegmentTarFile = new File(localOutputTempDir, segmentTarFileName)
-    printf("Tarring segment from: {} to: {}", localSegmentDir, localSegmentTarFile)
-    TarGzCompressionUtils.createTarGzFile(localSegmentDir, localSegmentTarFile)
+    val tarFile = new File(localOutputTempDir, segmentTarFileName)
+    printf("Local segment dir: %s\n", localSegmentDir.getAbsolutePath)
+    TarGzCompressionUtils.createTarGzFile(localSegmentDir, tarFile)
     val uncompressedSegmentSize = FileUtils.sizeOf(localSegmentDir)
-    val compressedSegmentSize = FileUtils.sizeOf(localSegmentTarFile)
-    printf("Size for segment: {}, uncompressed: {}, compressed: {}", segmentName, DataSizeUtils.fromBytes(uncompressedSegmentSize), DataSizeUtils.fromBytes(compressedSegmentSize))
-    localSegmentTarFile
+    val compressedSegmentSize = FileUtils.sizeOf(tarFile)
+    printf("Size for segment: %s, uncompressed: %s, compressed: %s\n", segmentName, DataSizeUtils.fromBytes(uncompressedSegmentSize), DataSizeUtils.fromBytes(compressedSegmentSize))
+    tarFile
   }
 
 }
