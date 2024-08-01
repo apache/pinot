@@ -65,6 +65,7 @@ public class RealtimeSegmentConfig {
   private final String _upsertOutOfOrderRecordColumn;
   private final boolean _upsertDropOutOfOrderRecord;
   private final PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
+  private final String _dedupTimeColumn;
   private final PartitionDedupMetadataManager _partitionDedupMetadataManager;
   private final String _consumerDir;
   private final List<FieldConfig> _fieldConfigList;
@@ -78,7 +79,7 @@ public class RealtimeSegmentConfig {
       PartitionFunction partitionFunction, int partitionId, boolean aggregateMetrics, boolean nullHandlingEnabled,
       String consumerDir, UpsertConfig.Mode upsertMode, List<String> upsertComparisonColumns,
       String upsertDeleteRecordColumn, String upsertOutOfOrderRecordColumn, boolean upsertDropOutOfOrderRecord,
-      PartitionUpsertMetadataManager partitionUpsertMetadataManager,
+      PartitionUpsertMetadataManager partitionUpsertMetadataManager, String dedupTimeColumn,
       PartitionDedupMetadataManager partitionDedupMetadataManager, List<FieldConfig> fieldConfigList,
       List<AggregationConfig> ingestionAggregationConfigs) {
     _tableNameWithType = tableNameWithType;
@@ -105,6 +106,7 @@ public class RealtimeSegmentConfig {
     _upsertOutOfOrderRecordColumn = upsertOutOfOrderRecordColumn;
     _upsertDropOutOfOrderRecord = upsertDropOutOfOrderRecord;
     _partitionUpsertMetadataManager = partitionUpsertMetadataManager;
+    _dedupTimeColumn = dedupTimeColumn;
     _partitionDedupMetadataManager = partitionDedupMetadataManager;
     _fieldConfigList = fieldConfigList;
     _ingestionAggregationConfigs = ingestionAggregationConfigs;
@@ -210,6 +212,10 @@ public class RealtimeSegmentConfig {
     return _partitionUpsertMetadataManager;
   }
 
+  public String getDedupTimeColumn() {
+    return _dedupTimeColumn;
+  }
+
   public PartitionDedupMetadataManager getPartitionDedupMetadataManager() {
     return _partitionDedupMetadataManager;
   }
@@ -247,6 +253,7 @@ public class RealtimeSegmentConfig {
     private String _upsertOutOfOrderRecordColumn;
     private boolean _upsertDropOutOfOrderRecord;
     private PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
+    private String _dedupTimeColumn;
     private PartitionDedupMetadataManager _partitionDedupMetadataManager;
     private List<FieldConfig> _fieldConfigList;
     private List<AggregationConfig> _ingestionAggregationConfigs;
@@ -401,6 +408,11 @@ public class RealtimeSegmentConfig {
       return this;
     }
 
+    public Builder setDedupTimeColumn(String dedupTimeColumn) {
+      _dedupTimeColumn = dedupTimeColumn;
+      return this;
+    }
+
     public Builder setPartitionDedupMetadataManager(PartitionDedupMetadataManager partitionDedupMetadataManager) {
       _partitionDedupMetadataManager = partitionDedupMetadataManager;
       return this;
@@ -427,7 +439,7 @@ public class RealtimeSegmentConfig {
           _memoryManager, _statsHistory, _partitionColumn, _partitionFunction, _partitionId, _aggregateMetrics,
           _nullHandlingEnabled, _consumerDir, _upsertMode, _upsertComparisonColumns, _upsertDeleteRecordColumn,
           _upsertOutOfOrderRecordColumn, _upsertDropOutOfOrderRecord,
-          _partitionUpsertMetadataManager, _partitionDedupMetadataManager, _fieldConfigList,
+          _partitionUpsertMetadataManager, _dedupTimeColumn, _partitionDedupMetadataManager, _fieldConfigList,
           _ingestionAggregationConfigs);
     }
   }

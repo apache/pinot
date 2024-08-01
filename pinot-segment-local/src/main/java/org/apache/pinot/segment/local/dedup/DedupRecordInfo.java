@@ -18,10 +18,27 @@
  */
 package org.apache.pinot.segment.local.dedup;
 
-class ConcurrentMapTableDedupMetadataManager extends BaseTableDedupMetadataManager {
+import org.apache.pinot.spi.data.readers.PrimaryKey;
 
-  protected PartitionDedupMetadataManager createPartitionDedupMetadataManager(Integer partitionId) {
-    return new ConcurrentMapPartitionDedupMetadataManager(_tableNameWithType, _primaryKeyColumns, partitionId,
-        _serverMetrics, _hashFunction, _metadataTTL, _metadataTimeColumn);
+
+public class DedupRecordInfo {
+  private final PrimaryKey _primaryKey;
+  private final double _dedupTime;
+
+  public DedupRecordInfo(PrimaryKey primaryKey, double dedupTime) {
+    _primaryKey = primaryKey;
+    _dedupTime = dedupTime;
+  }
+
+  public DedupRecordInfo(PrimaryKey primaryKey) {
+    this(primaryKey, Double.MIN_VALUE);
+  }
+
+  public PrimaryKey getPrimaryKey() {
+    return _primaryKey;
+  }
+
+  public double getDedupTime() {
+    return _dedupTime;
   }
 }

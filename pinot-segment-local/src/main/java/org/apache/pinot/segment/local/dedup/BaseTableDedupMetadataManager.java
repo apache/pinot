@@ -37,6 +37,8 @@ abstract class BaseTableDedupMetadataManager implements TableDedupMetadataManage
   protected List<String> _primaryKeyColumns;
   protected ServerMetrics _serverMetrics;
   protected HashFunction _hashFunction;
+  protected double _metadataTTL;
+  protected String _metadataTimeColumn;
 
   @Override
   public void init(TableConfig tableConfig, Schema schema, TableDataManager tableDataManager,
@@ -52,6 +54,16 @@ abstract class BaseTableDedupMetadataManager implements TableDedupMetadataManage
     DedupConfig dedupConfig = tableConfig.getDedupConfig();
     Preconditions.checkArgument(dedupConfig != null, "Dedup must be enabled for table: %s", _tableNameWithType);
     _hashFunction = dedupConfig.getHashFunction();
+    _metadataTTL = dedupConfig.getMetadataTTL();
+    if (_metadataTTL > 0) {
+      _metadataTimeColumn = dedupConfig.getMetadataTimeColumn();
+      if (_metadataTimeColumn == null) {
+        _metadataTimeColumn = tableConfig.getValidationConfig().getTimeColumnName();
+      }
+      Preconditions.checkArgument(_metadataTimeColumn != null,
+          "When metadataTTL is configured, metadata time column or time column must be configured for "
+              + "dedup enabled table: %s", _tableNameWithType);
+    }
   }
 
   public PartitionDedupMetadataManager getOrCreatePartitionManager(int partitionId) {
