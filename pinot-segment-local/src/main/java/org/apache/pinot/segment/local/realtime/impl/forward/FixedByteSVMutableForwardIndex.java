@@ -82,9 +82,6 @@ public class FixedByteSVMutableForwardIndex implements MutableForwardIndex {
     }
     _numRowsPerChunk = numRowsPerChunk;
     _chunkSizeInBytes = (long) numRowsPerChunk * _valueSizeInBytes;
-    Preconditions.checkState(_chunkSizeInBytes < Integer.MAX_VALUE,
-        "Chunk size is too large: %s (numRowsPerChunk: %s, valueSizeInBytes: %s)", _chunkSizeInBytes, numRowsPerChunk,
-        _valueSizeInBytes);
     _memoryManager = memoryManager;
     _allocationContext = allocationContext;
     addBuffer();

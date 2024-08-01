@@ -420,7 +420,7 @@ public abstract class BaseOffHeapMutableDictionary implements MutableDictionary 
     ValueToDictId valueToDictId = _valueToDict;
     long size = 0;
     for (IntBuffer iBuf : valueToDictId._iBufList) {
-      size = size + iBuf.capacity() * Integer.BYTES;
+      size = size + (long) iBuf.capacity() * Integer.BYTES;
     }
     return size;
   }

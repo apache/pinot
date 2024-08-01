@@ -68,7 +68,7 @@ public final class FixedBitMVForwardIndexReader implements ForwardIndexReader<Fi
     _numValues = numValues;
     _numDocsPerChunk = (int) (Math.ceil((float) PREFERRED_NUM_VALUES_PER_CHUNK / (numValues / numDocs)));
     int numChunks = (numDocs + _numDocsPerChunk - 1) / _numDocsPerChunk;
-    long endOffset = numChunks * Integer.BYTES;
+    long endOffset = (long) numChunks * Integer.BYTES;
     _bitmapReaderStartOffset = endOffset;
     _chunkOffsetReader = new FixedByteValueReaderWriter(dataBuffer.view(0L, endOffset));
     int bitmapSize = (numValues + Byte.SIZE - 1) / Byte.SIZE;
