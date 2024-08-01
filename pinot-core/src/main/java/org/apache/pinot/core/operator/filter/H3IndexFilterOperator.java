@@ -19,10 +19,12 @@
 package org.apache.pinot.core.operator.filter;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import com.uber.h3core.LengthUnit;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.predicate.Predicate;
@@ -253,5 +255,19 @@ public class H3IndexFilterOperator extends BaseFilterOperator {
     stringBuilder.append(",operator:").append(_predicate.getType());
     stringBuilder.append(",predicate:").append(_predicate.toString());
     return stringBuilder.append(')').toString();
+  }
+
+  @Override
+  protected String getExplainName() {
+    return EXPLAIN_NAME;
+  }
+
+  @Override
+  protected Map<String, ? super Object> getExplainAttributes() {
+    return ImmutableMap.of(
+        "indexLookUp", "h3_index",
+        "operator", _predicate.getType(),
+        "predicate", _predicate.toString()
+    );
   }
 }

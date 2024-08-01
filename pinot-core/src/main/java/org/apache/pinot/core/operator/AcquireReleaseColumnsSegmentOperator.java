@@ -23,6 +23,7 @@ import java.util.List;
 import org.apache.pinot.core.common.ExplainPlanRows;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
+import org.apache.pinot.core.plan.PinotExplainedRelNode;
 import org.apache.pinot.core.plan.PlanNode;
 import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -95,6 +96,16 @@ public class AcquireReleaseColumnsSegmentOperator extends BaseOperator<BaseResul
   @Override
   public void postExplainPlan(ExplainPlanRows explainPlanRows) {
     release();
+  }
+
+  @Override
+  public PinotExplainedRelNode.Info getOperatorInfo() {
+    acquire();
+    try {
+      return super.getOperatorInfo();
+    } finally {
+      release();
+    }
   }
 
   @Override

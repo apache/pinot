@@ -90,6 +90,15 @@ public class TransformOperator extends BaseProjectOperator<TransformBlock> {
   }
 
   @Override
+  protected Map<String, ? super Object> getExplainAttributes() {
+    List<String> expressions = _transformFunctionMap.keySet().stream()
+        .map(ExpressionContext::toString)
+        .sorted()
+        .collect(Collectors.toList());
+    return Collections.singletonMap("expressions", expressions);
+  }
+
+  @Override
   public List<BaseProjectOperator<?>> getChildOperators() {
     return Collections.singletonList(_projectOperator);
   }

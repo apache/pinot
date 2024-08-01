@@ -36,6 +36,7 @@ import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
+import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.apache.pinot.query.planner.plannode.SetOpNode;
@@ -73,6 +74,8 @@ public class PlanNodeDeserializer {
         return deserializeValueNode(protoNode);
       case WINDOWNODE:
         return deserializeWindowNode(protoNode);
+      case EXPLAINNODE:
+        return deserializeExplainedNode(protoNode);
       default:
         throw new IllegalStateException("Unsupported PlanNode type: " + protoNode.getNodeCase());
     }
@@ -155,6 +158,12 @@ public class PlanNodeDeserializer {
         convertFunctionCalls(protoWindowNode.getAggCallsList()),
         convertWindowFrameType(protoWindowNode.getWindowFrameType()), protoWindowNode.getLowerBound(),
         protoWindowNode.getUpperBound(), convertLiterals(protoWindowNode.getConstantsList()));
+  }
+
+  private static ExplainedNode deserializeExplainedNode(Plan.PlanNode protoNode) {
+    Plan.ExplainNode protoExplainNode = protoNode.getExplainNode();
+    return new ExplainedNode(protoNode.getStageId(), extractDataSchema(protoNode), extractNodeHint(protoNode),
+        extractInputs(protoNode), protoExplainNode.getType(), protoExplainNode.getAttributesMap());
   }
 
   private static DataSchema extractDataSchema(Plan.PlanNode protoNode) {

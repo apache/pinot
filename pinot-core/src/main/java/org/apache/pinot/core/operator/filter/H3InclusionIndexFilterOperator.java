@@ -18,10 +18,12 @@
  */
 package org.apache.pinot.core.operator.filter;
 
+import com.google.common.collect.ImmutableMap;
 import it.unimi.dsi.fastutil.longs.LongIterator;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.predicate.EqPredicate;
@@ -142,7 +144,20 @@ public class H3InclusionIndexFilterOperator extends BaseFilterOperator {
   public String toExplainString() {
     StringBuilder stringBuilder = new StringBuilder(EXPLAIN_NAME).append("(inclusionIndex:h3_index");
     stringBuilder.append(",operator:").append(_predicate.getType());
-    stringBuilder.append(",predicate:").append(_predicate.toString());
+    stringBuilder.append(",predicate:").append(_predicate);
     return stringBuilder.append(')').toString();
+  }
+
+  @Override
+  protected String getExplainName() {
+    return EXPLAIN_NAME;
+  }
+
+  @Override
+  protected Map<String, ? super Object> getExplainAttributes() {
+    return ImmutableMap.<String, Object>builder()
+        .put("operator", _predicate.getType())
+        .put("predicate", _predicate.toString())
+        .build();
   }
 }

@@ -85,7 +85,7 @@ public class QueryContext {
   private final int _offset;
   private final Map<String, String> _queryOptions;
   private final Map<ExpressionContext, ExpressionContext> _expressionOverrideHints;
-  private final boolean _explain;
+  private final ExplainMode _explain;
 
   private final Function<Class<?>, Map<?, ?>> _sharedValues = MemoizedClassAssociation.of(ConcurrentHashMap::new);
 
@@ -134,7 +134,7 @@ public class QueryContext {
       @Nullable FilterContext filter, @Nullable List<ExpressionContext> groupByExpressions,
       @Nullable FilterContext havingFilter, @Nullable List<OrderByExpressionContext> orderByExpressions, int limit,
       int offset, Map<String, String> queryOptions,
-      @Nullable Map<ExpressionContext, ExpressionContext> expressionOverrideHints, boolean explain) {
+      @Nullable Map<ExpressionContext, ExpressionContext> expressionOverrideHints, ExplainMode explain) {
     _tableName = tableName;
     _subquery = subquery;
     _selectExpressions = selectExpressions;
@@ -250,8 +250,18 @@ public class QueryContext {
 
   /**
    * Returns {@code true} if the query is an EXPLAIN query, {@code false} otherwise.
+   * <p>
+   * This is just an alias on top of {@link #getExplain() != ExplainMode.NONE}
+   *
    */
   public boolean isExplain() {
+    return _explain != ExplainMode.NONE;
+  }
+
+  /**
+   * Returns the explain mode of the query.
+   */
+  public ExplainMode getExplain() {
     return _explain;
   }
 
@@ -461,7 +471,7 @@ public class QueryContext {
     private int _offset;
     private Map<String, String> _queryOptions;
     private Map<ExpressionContext, ExpressionContext> _expressionOverrideHints;
-    private boolean _explain;
+    private ExplainMode _explain;
 
     public Builder setTableName(String tableName) {
       _tableName = tableName;
@@ -528,7 +538,16 @@ public class QueryContext {
       return this;
     }
 
+    /**
+     * @deprecated Use {@link #setExplain(ExplainMode)} instead.
+     */
+    @Deprecated
     public Builder setExplain(boolean explain) {
+      _explain = explain ? ExplainMode.DESCRIPTION : ExplainMode.NONE;
+      return this;
+    }
+
+    public Builder setExplain(ExplainMode explain) {
       _explain = explain;
       return this;
     }

@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.core.operator.filter;
 
+import com.google.common.collect.ImmutableMap;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
@@ -226,6 +228,20 @@ public class RangeIndexBasedFilterOperator extends BaseColumnFilterOperator {
   public String toExplainString() {
     return EXPLAIN_NAME + "(indexLookUp:range_index" + ",operator:" + _predicateEvaluator.getPredicateType()
         + ",predicate:" + _predicateEvaluator.getPredicate().toString() + ')';
+  }
+
+  @Override
+  protected String getExplainName() {
+    return EXPLAIN_NAME;
+  }
+
+  @Override
+  protected Map<String, ? super Object> getExplainAttributes() {
+    return ImmutableMap.of(
+        "indexLookUp", "range_index",
+        "operator", _predicateEvaluator.getPredicateType().name(),
+        "predicate", _predicateEvaluator.getPredicate().toString()
+    );
   }
 
   static RuntimeException unsupportedPredicateType(Predicate.Type type) {

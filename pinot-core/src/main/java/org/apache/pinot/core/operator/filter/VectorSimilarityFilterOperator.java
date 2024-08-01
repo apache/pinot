@@ -18,9 +18,11 @@
  */
 package org.apache.pinot.core.operator.filter;
 
+import com.google.common.collect.ImmutableMap;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import org.apache.pinot.common.request.context.predicate.VectorSimilarityPredicate;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
@@ -103,6 +105,22 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
         + ", vector literal:" + Arrays.toString(_predicate.getValue())
         + ", topK to search:" + _predicate.getTopK()
         + ')';
+  }
+
+  @Override
+  protected String getExplainName() {
+    return EXPLAIN_NAME;
+  }
+
+  @Override
+  protected Map<String, ? super Object> getExplainAttributes() {
+    return ImmutableMap.of(
+        "indexLookUp", "vector_index",
+        "operator", _predicate.getType(),
+        "vectorIdentifier", _predicate.getLhs().getIdentifier(),
+        "vectorLiteral", Arrays.toString(_predicate.getValue()),
+        "topKtoSearch", _predicate.getTopK()
+    );
   }
 
   private void record(ImmutableRoaringBitmap matches) {

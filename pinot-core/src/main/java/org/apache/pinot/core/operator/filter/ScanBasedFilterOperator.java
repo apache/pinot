@@ -19,8 +19,10 @@
 package org.apache.pinot.core.operator.filter;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
@@ -75,6 +77,18 @@ public class ScanBasedFilterOperator extends BaseColumnFilterOperator {
         new StringBuilder(EXPLAIN_NAME).append("(operator:").append(_predicateEvaluator.getPredicateType());
     stringBuilder.append(",predicate:").append(_predicateEvaluator.getPredicate().toString());
     return stringBuilder.append(')').toString();
+  }
+
+  @Override
+  protected String getExplainName() {
+    return EXPLAIN_NAME;
+  }
+
+  @Override
+  protected Map<String, ? super Object> getExplainAttributes() {
+    return ImmutableMap.of(
+        "operator", _predicateEvaluator.getPredicateType(),
+        "predicate", _predicateEvaluator.getPredicate().toString());
   }
 
   /**

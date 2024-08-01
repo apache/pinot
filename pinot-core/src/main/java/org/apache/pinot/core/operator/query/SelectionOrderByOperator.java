@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
@@ -122,6 +123,20 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
       }
     }
     return stringBuilder.append(')').toString();
+  }
+
+  @Override
+  protected String getExplainName() {
+    return EXPLAIN_NAME;
+  }
+
+  @Override
+  protected Map<String, ? super Object> getExplainAttributes() {
+    if (_expressions.isEmpty()) {
+      return Collections.emptyMap();
+    }
+    return Collections.singletonMap("selectList",
+        _expressions.stream().map(ExpressionContext::toString).collect(Collectors.toList()));
   }
 
   @Override

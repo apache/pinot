@@ -21,11 +21,13 @@ package org.apache.pinot.broker.requesthandler;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.ws.rs.WebApplicationException;
@@ -59,6 +61,7 @@ import org.apache.pinot.query.catalog.PinotCatalog;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
+import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.runtime.MultiStageStatsTreeBuilder;
@@ -137,7 +140,10 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       QueryEnvironment queryEnvironment = new QueryEnvironment(database, _tableCache, _workerManager);
       switch (sqlNodeAndOptions.getSqlNode().getKind()) {
         case EXPLAIN:
-          queryPlanResult = queryEnvironment.explainQuery(query, sqlNodeAndOptions, requestId);
+          Function<DispatchablePlanFragment, PlanNode> fragmentToPlanNode = fragment ->
+              requestPhysicalPlan(fragment, requestContext, queryTimeoutMs, queryOptions);
+
+          queryPlanResult = queryEnvironment.explainQuery(query, sqlNodeAndOptions, requestId, fragmentToPlanNode);
           String plan = queryPlanResult.getExplainPlan();
           Set<String> tableNames = queryPlanResult.getTableNames();
           TableAuthorizationResult tableAuthorizationResult =
@@ -266,6 +272,32 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         new QueryLogger.QueryLogParams(requestContext, tableNames.toString(), brokerResponse, requesterIdentity, null));
 
     return brokerResponse;
+  }
+
+  private PlanNode requestPhysicalPlan(DispatchablePlanFragment fragment,
+      RequestContext requestContext, long queryTimeoutMs, Map<String, String> queryOptions) {
+    List<PlanNode> stagePlans;
+    try {
+      stagePlans =
+          _queryDispatcher.explain(requestContext, fragment, queryTimeoutMs, queryOptions);
+    } catch (Exception e) {
+      // TODO: Define what to do in this case
+      throw new RuntimeException(e);
+    }
+
+    switch (stagePlans.size()) {
+      case 0: {
+        return new ExplainedNode(-1, new DataSchema(new String[0], new DataSchema.ColumnDataType[0]), null,
+            Collections.emptyList(), "Empty", Collections.emptyMap());
+      }
+      case 1: {
+        return stagePlans.get(0);
+      }
+      default: {
+        // TODO: Merge nodes in this case
+        return stagePlans.get(0);
+      }
+    }
   }
 
   private void fillOldBrokerResponseStats(BrokerResponseNativeV2 brokerResponse,

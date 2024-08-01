@@ -20,6 +20,7 @@ package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Maps;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -45,13 +46,18 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.ExplainV2ResultBlock;
 import org.apache.pinot.core.operator.blocks.results.MetadataResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
+import org.apache.pinot.core.plan.PinotExplainedRelNode;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.executor.ResultsBlockStreamer;
 import org.apache.pinot.core.query.logger.ServerQueryLogger;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
+import org.apache.pinot.core.query.request.context.ExplainMode;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.query.planner.plannode.ExplainedNode;
+import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
@@ -265,6 +271,64 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
   private TransferableBlock constructMetadataBlock() {
     MultiStageQueryStats multiStageQueryStats = MultiStageQueryStats.createLeaf(_context.getStageId(), _statMap);
     return TransferableBlockUtils.getEndOfStreamTransferableBlock(multiStageQueryStats);
+  }
+
+  public ExplainedNode explain() {
+    Preconditions.checkState(_requests.stream()
+        .allMatch(request -> request.getQueryContext().getExplain() == ExplainMode.NODE),
+        "All requests must have explain mode set to PHYSICAL_REL_NODE");
+
+    if (_executionFuture == null) {
+      _executionFuture = startExecution();
+    }
+
+    List<PlanNode> childNodes = new ArrayList<>();
+    while (true) {
+      BaseResultsBlock resultsBlock;
+      try {
+        resultsBlock =
+            _blockingQueue.poll(_context.getDeadlineMs() - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new RuntimeException("Interrupted while waiting for results block", e);
+      }
+      if (resultsBlock == null) {
+        throw new RuntimeException("Timed out waiting for results block");
+      }
+      // Terminate when receiving exception block
+      Map<Integer, String> exceptions = _exceptions;
+      if (exceptions != null) {
+        throw new RuntimeException("Received exception block: " + exceptions);
+      }
+      if (_isEarlyTerminated || resultsBlock == LAST_RESULTS_BLOCK) {
+        break;
+      } else if (!(resultsBlock instanceof ExplainV2ResultBlock)) {
+        throw new IllegalArgumentException("Expected ExplainV2ResultBlock, got: " + resultsBlock.getClass().getName());
+      } else {
+        ExplainV2ResultBlock block = (ExplainV2ResultBlock) resultsBlock;
+        for (PinotExplainedRelNode.Info physicalPlan : block.getPhysicalPlans()) {
+          childNodes.add(asNode(physicalPlan));
+        }
+      }
+    }
+    return new ExplainedNode(_context.getStageId(), _dataSchema, null, childNodes,
+        "LEAF_STAGE_COMBINE_OPERATOR", Collections.emptyMap());
+  }
+
+  private ExplainedNode asNode(PinotExplainedRelNode.Info info) {
+    int size = info.getInputs().size();
+    List<PlanNode> inputs = new ArrayList<>(size);
+    for (int i = 0; i < size; i++) {
+      inputs.add(asNode(info.getInputs().get(i)));
+    }
+    Map<String, String> attributes = Maps.newHashMapWithExpectedSize(info.getAttributes().size());
+    for (Map.Entry<String, Object> attribute : info.getAttributes().entrySet()) {
+      // TODO: Define how to convert the values in the attributes
+      attributes.put(attribute.getKey(), attribute.getValue().toString());
+    }
+
+    return new ExplainedNode(_context.getStageId(), _dataSchema, null, inputs, info.getType(),
+        attributes);
   }
 
   private Future<Void> startExecution() {

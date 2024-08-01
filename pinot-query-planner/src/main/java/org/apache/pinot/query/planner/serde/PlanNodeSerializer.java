@@ -36,6 +36,7 @@ import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
+import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.PlanNode.NodeHint;
 import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
@@ -194,6 +195,16 @@ public class PlanNodeSerializer {
     @Override
     public Void visitExchange(ExchangeNode exchangeNode, Plan.PlanNode.Builder context) {
       throw new IllegalStateException("ExchangeNode should not be visited by SerializationVisitor");
+    }
+
+    @Override
+    public Void visitExplained(ExplainedNode node, Plan.PlanNode.Builder builder) {
+      Plan.ExplainNode explainNode = Plan.ExplainNode.newBuilder()
+          .setType(node.getType())
+          .putAllAttributes(node.getAttributes())
+          .build();
+      builder.setExplainNode(explainNode);
+      return null;
     }
 
     private static List<Expressions.Expression> convertExpressions(List<RexExpression> expressions) {

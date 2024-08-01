@@ -60,6 +60,11 @@ public class SortNode extends BasePlanNode {
   }
 
   @Override
+  public PlanNode withInputs(List<PlanNode> inputs) {
+    return new SortNode(_stageId, _dataSchema, _nodeHint, inputs, _collations, _fetch, _offset);
+  }
+
+  @Override
   public boolean equals(Object o) {
     if (this == o) {
       return true;

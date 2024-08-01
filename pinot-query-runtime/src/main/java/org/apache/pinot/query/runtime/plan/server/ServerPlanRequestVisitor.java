@@ -34,6 +34,7 @@ import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
+import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
@@ -212,6 +213,11 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
   @Override
   public Void visitValue(ValueNode node, ServerPlanRequestContext context) {
     throw new UnsupportedOperationException("Leaf stage should not visit ValueNode!");
+  }
+
+  @Override
+  public Void visitExplained(ExplainedNode node, ServerPlanRequestContext context) {
+    throw new UnsupportedOperationException("Leaf stage should not visit ExplainedNode!");
   }
 
   private boolean visit(PlanNode node, ServerPlanRequestContext context) {

@@ -18,9 +18,13 @@
  */
 package org.apache.pinot.core.operator.query;
 
+import com.google.common.collect.ImmutableMap;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
@@ -167,5 +171,26 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
     }
 
     return stringBuilder.append(')').toString();
+  }
+
+  @Override
+  protected String getExplainName() {
+    return EXPLAIN_NAME;
+  }
+
+  @Override
+  protected Map<String, ? super Object> getExplainAttributes() {
+    ImmutableMap.Builder<String, Object> attributes = ImmutableMap.builder();
+    List<String> groupKeys = Arrays.stream(_groupByExpressions)
+        .map(ExpressionContext::toString)
+        .collect(Collectors.toList());
+    attributes.put("groupKeys", groupKeys);
+
+    List<String> aggregations = Arrays.stream(_aggregationFunctions)
+        .map(AggregationFunction::toExplainString)
+        .collect(Collectors.toList());
+    attributes.put("aggregations", aggregations);
+
+    return attributes.build();
   }
 }
