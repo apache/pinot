@@ -36,42 +36,20 @@ object ExampleSparkPinotConnectorTest extends Logging {
       .master("local")
       .getOrCreate()
 
-      writeOffline()
-    
-//    readOffline()
-//    readHybrid()
-//    readHybridWithSpecificSchema()
-//    readHybridWithFilters()
-//    readHybridViaGrpc()
-//    readRealtimeViaGrpc()
-//    readRealtimeWithFilterViaGrpc()
-//    readHybridWithFiltersViaGrpc()
-//    readRealtimeWithSelectionColumns()
-//    applyJustSomeFilters()
-  }
+    // reader tests
+    readOffline()
+    readHybrid()
+    readHybridWithSpecificSchema()
+    readHybridWithFilters()
+    readHybridViaGrpc()
+    readRealtimeViaGrpc()
+    readRealtimeWithFilterViaGrpc()
+    readHybridWithFiltersViaGrpc()
+    readRealtimeWithSelectionColumns()
+    applyJustSomeFilters()
 
-  def writeOffline()(implicit spark: SparkSession): Unit = {
-    log.info("Writing some data to a Pinot table...")
-    // create sample data
-    val data = Seq(
-          ("ORD", "Florida", 1000, true, 1722025994),
-          ("ORD", "Florida", 1000, false, 1722025994),
-          ("ORD", "Florida", 1000, false, 1722025994),
-          ("NYC", "New York", 20, true, 1722025994),
-    )
-
-    val airports = spark.createDataFrame(data)
-      .toDF("airport", "state", "distance", "active", "ts")
-      .repartition(2)
-
-    airports.write.format("pinot")
-      .mode("append")
-      .option("table", "airlineStats")
-      .option("tableType", "OFFLINE")
-      .option("mode", "tar") // probably unnecessary
-      .option("segmentFormat", "mysegment_%d")
-      .option("timeColumnName", "ts")
-      .save("myPath")
+    // writer tests
+    writeOffline()
   }
 
   def readOffline()(implicit spark: SparkSession): Unit = {
@@ -234,6 +212,29 @@ object ExampleSparkPinotConnectorTest extends Logging {
       .select($"DestStateName", $"Origin", $"Distance", $"AirlineID")
 
     data.show()
+  }
+
+  def writeOffline()(implicit spark: SparkSession): Unit = {
+    log.info("Writing some data to a Pinot table...")
+    // create sample data
+    val data = Seq(
+      ("ORD", "Florida", 1000, true, 1722025994),
+      ("ORD", "Florida", 1000, false, 1722025994),
+      ("ORD", "Florida", 1000, false, 1722025994),
+      ("NYC", "New York", 20, true, 1722025994),
+    )
+
+    val airports = spark.createDataFrame(data)
+      .toDF("airport", "state", "distance", "active", "ts")
+      .repartition(2)
+
+    airports.write.format("pinot")
+      .mode("append")
+      .option("table", "airlineStats")
+      .option("tableType", "OFFLINE")
+      .option("segmentFormat", "mysegment_%d")
+      .option("timeColumnName", "ts")
+      .save("myPath")
   }
 
 }

@@ -6,7 +6,7 @@ import org.apache.pinot.spi.data.Schema.SchemaBuilder
 import org.apache.spark.sql.types._
 
 
-object SparkToPinotSchemaTranslator {
+object SparkToPinotTypeTranslator {
   // TODO: incorpoate time column
   // TODO: add support for multi-value columns
   def translate(sparkSchema: StructType): Schema = {

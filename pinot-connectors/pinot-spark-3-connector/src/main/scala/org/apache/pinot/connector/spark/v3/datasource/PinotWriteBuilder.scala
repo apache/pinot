@@ -5,7 +5,7 @@ import org.apache.spark.sql.sources.Filter
 
 class PinotWriteBuilder(
                          filters: Array[Filter],
-                       logicalWriteInfo: LogicalWriteInfo,
+                         logicalWriteInfo: LogicalWriteInfo,
                        )
   extends WriteBuilder with SupportsOverwrite {
 
