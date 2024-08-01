@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 import java.util.Set;
+import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.apache.calcite.config.CalciteConnectionConfig;
 import org.apache.calcite.config.CalciteConnectionConfigImpl;
@@ -58,13 +59,18 @@ import org.apache.pinot.calcite.sql2rel.PinotConvertletTable;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.query.catalog.PinotCatalog;
 import org.apache.pinot.query.context.PlannerContext;
+import org.apache.pinot.query.planner.ImplementationExplainUtils;
 import org.apache.pinot.query.planner.PlannerUtils;
 import org.apache.pinot.query.planner.SubPlan;
 import org.apache.pinot.query.planner.explain.PhysicalExplainPlanVisitor;
+import org.apache.pinot.query.planner.logical.TransformationTracker;
 import org.apache.pinot.query.planner.logical.PinotLogicalQueryPlanner;
+import org.apache.pinot.query.planner.logical.PlanNodeToRelConverter;
 import org.apache.pinot.query.planner.logical.RelToPlanNodeConverter;
+import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
 import org.apache.pinot.query.planner.physical.PinotDispatchPlanner;
+import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.type.TypeFactory;
 import org.apache.pinot.query.validate.BytesCastVisitor;
@@ -154,9 +160,12 @@ public class QueryEnvironment {
    *
    * @param sqlQuery SQL query string.
    * @param sqlNodeAndOptions parsed SQL query.
+   * @param fragmentToPlanNode a function that converts a {@link DispatchablePlanFragment} to a {@link PlanNode}.
+   *                           This function may for example ask each server to explain its own plan.
    * @return QueryPlannerResult containing the explained query plan and the relRoot.
    */
-  public QueryPlannerResult explainQuery(String sqlQuery, SqlNodeAndOptions sqlNodeAndOptions, long requestId) {
+  public QueryPlannerResult explainQuery(String sqlQuery, SqlNodeAndOptions sqlNodeAndOptions, long requestId,
+      Function<DispatchablePlanFragment, PlanNode> fragmentToPlanNode) {
     try (PlannerContext plannerContext = getPlannerContext()) {
       SqlExplain explain = (SqlExplain) sqlNodeAndOptions.getSqlNode();
       plannerContext.setOptions(sqlNodeAndOptions.getOptions());
@@ -172,7 +181,28 @@ public class QueryEnvironment {
         SqlExplainLevel level =
             explain.getDetailLevel() == null ? SqlExplainLevel.DIGEST_ATTRIBUTES : explain.getDetailLevel();
         Set<String> tableNames = RelToPlanNodeConverter.getTableNamesFromRelRoot(relRoot.rel);
-        return new QueryPlannerResult(null, PlannerUtils.explainPlan(relRoot.rel, format, level), tableNames);
+        if (!explain.withImplementation()) {
+          return new QueryPlannerResult(null, PlannerUtils.explainPlan(relRoot.rel, format, level), tableNames);
+        } else {
+          // A map from the actual PlanNodes to the original RelNode in the logical rel tree
+          TransformationTracker.ByIdentity.Builder<PlanNode, RelNode> nodeTracker =
+              new TransformationTracker.ByIdentity.Builder<>();
+          // Transform RelNodes into DispatchableSubPlan
+          DispatchableSubPlan dispatchableSubPlan =
+              toDispatchableSubPlan(relRoot, plannerContext, requestId, nodeTracker);
+
+          Function<DispatchablePlanFragment, RelNode> fragmentExplainer = fragment -> {
+            PlanNode planNode = fragmentToPlanNode.apply(fragment);
+            return PlanNodeToRelConverter.convert(RelBuilder.create(_config), planNode);
+          };
+
+          ImplementationExplainUtils.modifyRel(relRoot.rel, dispatchableSubPlan.getQueryStageList(), nodeTracker,
+              fragmentExplainer);
+
+          String explainStr = PlannerUtils.explainPlan(relRoot.rel, format, level);
+
+          return new QueryPlannerResult(null, explainStr, dispatchableSubPlan.getTableNames());
+        }
       }
     } catch (Exception e) {
       throw new RuntimeException("Error explain query plan for: " + sqlQuery, e);
@@ -186,7 +216,11 @@ public class QueryEnvironment {
 
   @VisibleForTesting
   public String explainQuery(String sqlQuery, long requestId) {
-    return explainQuery(sqlQuery, CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery), requestId).getExplainPlan();
+    Function<DispatchablePlanFragment, PlanNode> fragmentToPlanNode =
+        fragment -> fragment.getPlanFragment().getFragmentRoot();
+    SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery);
+    QueryPlannerResult queryPlannerResult = explainQuery(sqlQuery, sqlNodeAndOptions, requestId, fragmentToPlanNode);
+    return queryPlannerResult.getExplainPlan();
   }
 
   public List<String> getTableNamesForQuery(String sqlQuery) {
@@ -314,7 +348,12 @@ public class QueryEnvironment {
   }
 
   private DispatchableSubPlan toDispatchableSubPlan(RelRoot relRoot, PlannerContext plannerContext, long requestId) {
-    SubPlan plan = PinotLogicalQueryPlanner.makePlan(relRoot);
+    return toDispatchableSubPlan(relRoot, plannerContext, requestId, null);
+  }
+
+  private DispatchableSubPlan toDispatchableSubPlan(RelRoot relRoot, PlannerContext plannerContext, long requestId,
+      @Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker) {
+    SubPlan plan = PinotLogicalQueryPlanner.makePlan(relRoot, tracker);
     PinotDispatchPlanner pinotDispatchPlanner =
         new PinotDispatchPlanner(plannerContext, _workerManager, requestId, _tableCache);
     return pinotDispatchPlanner.createDispatchableSubPlan(plan);

@@ -67,6 +67,11 @@ public class JoinNode extends BasePlanNode {
   }
 
   @Override
+  public PlanNode withInputs(List<PlanNode> inputs) {
+    return new JoinNode(_stageId, _dataSchema, _nodeHint, inputs, _joinType, _leftKeys, _rightKeys, _nonEquiConditions);
+  }
+
+  @Override
   public boolean equals(Object o) {
     if (this == o) {
       return true;

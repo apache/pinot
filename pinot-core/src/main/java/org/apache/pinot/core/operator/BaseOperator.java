@@ -18,8 +18,14 @@
  */
 package org.apache.pinot.core.operator;
 
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.plan.PinotExplainedRelNode;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.trace.InvocationScope;
 import org.apache.pinot.spi.trace.Tracing;
@@ -46,4 +52,24 @@ public abstract class BaseOperator<T extends Block> implements Operator<T> {
 
   // Make it protected because we should always call nextBlock()
   protected abstract T getNextBlock();
+
+  @Override
+  public PinotExplainedRelNode.Info getOperatorInfo() {
+    return new PinotExplainedRelNode.Info(getExplainName(), getExplainAttributes(), getChildrenOperatorInfo());
+  }
+
+  protected List<PinotExplainedRelNode.Info> getChildrenOperatorInfo() {
+    return getChildOperators().stream()
+        .filter(Objects::nonNull)
+        .map(Operator::getOperatorInfo)
+        .collect(Collectors.toList());
+  }
+
+  protected String getExplainName() {
+    return toExplainString();
+  }
+
+  protected Map<String, ? super Object> getExplainAttributes() {
+    return Collections.emptyMap();
+  }
 }

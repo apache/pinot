@@ -66,6 +66,11 @@ public class AggregateNode extends BasePlanNode {
   }
 
   @Override
+  public PlanNode withInputs(List<PlanNode> inputs) {
+    return new AggregateNode(_stageId, _dataSchema, _nodeHint, inputs, _aggCalls, _filterArgs, _groupKeys, _aggType);
+  }
+
+  @Override
   public boolean equals(Object o) {
     if (this == o) {
       return true;

@@ -19,11 +19,13 @@
 package org.apache.pinot.query.runtime;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeoutException;
+import java.util.function.BiConsumer;
 import javax.annotation.Nullable;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.datatable.StatMap;
@@ -35,6 +37,8 @@ import org.apache.pinot.core.query.executor.ServerQueryExecutorV1Impl;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.physical.MailboxIdUtils;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
+import org.apache.pinot.query.planner.plannode.ExplainedNode;
+import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.routing.MailboxInfo;
 import org.apache.pinot.query.routing.RoutingInfo;
 import org.apache.pinot.query.routing.StageMetadata;
@@ -43,7 +47,9 @@ import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.executor.ExecutorServiceUtils;
 import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
+import org.apache.pinot.query.runtime.operator.LeafStageTransferableBlockOperator;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
+import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.query.runtime.plan.PhysicalPlanVisitor;
@@ -202,7 +208,7 @@ public class QueryRunner {
       opChain = ServerPlanRequestUtils.compileLeafStage(executionContext, stagePlan, _helixManager, _serverMetrics,
           _leafQueryExecutor, _executorService);
     } else {
-      opChain = PhysicalPlanVisitor.walkPlanNode(stagePlan.getRootNode(), executionContext);
+      opChain = PhysicalPlanVisitor.planToOperators(stagePlan.getRootNode(), executionContext);
     }
     _opChainScheduler.register(opChain);
   }
@@ -252,5 +258,67 @@ public class QueryRunner {
 
   public void cancel(long requestId) {
     _opChainScheduler.cancel(requestId);
+  }
+
+  public StagePlan explainQuery(
+      WorkerMetadata workerMetadata, StagePlan stagePlan, Map<String, String> requestMetadata) {
+
+    if (!workerMetadata.isLeafStageWorker()) {
+      LOGGER.debug("Explain query on intermediate stages is a NOOP");
+      return stagePlan;
+    }
+    long requestId = Long.parseLong(requestMetadata.get(CommonConstants.Query.Request.MetadataKeys.REQUEST_ID));
+    long timeoutMs = Long.parseLong(requestMetadata.get(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS));
+    long deadlineMs = System.currentTimeMillis() + timeoutMs;
+
+    StageMetadata stageMetadata = stagePlan.getStageMetadata();
+    Map<String, String> opChainMetadata = consolidateMetadata(stageMetadata.getCustomProperties(), requestMetadata);
+
+    if (PipelineBreakerExecutor.hasPipelineBreakers(stagePlan)) {
+      // TODO: Support pipeline breakers before merging this feature.
+      LOGGER.error("Pipeline breaker is not supported in explain query");
+      return stagePlan;
+    }
+
+    Map<PlanNode, ExplainedNode> leafNodes = new HashMap<>();
+    BiConsumer<PlanNode, MultiStageOperator> leafNodesConsumer = (node, operator) -> {
+      if (operator instanceof LeafStageTransferableBlockOperator) {
+        LeafStageTransferableBlockOperator leafOperator = (LeafStageTransferableBlockOperator) operator;
+        ExplainedNode explainedNode = leafOperator.explain();
+        leafNodes.put(node, explainedNode);
+      }
+    };
+    // compile OpChain
+    OpChainExecutionContext executionContext = new OpChainExecutionContext(_mailboxService, requestId, deadlineMs,
+        opChainMetadata, stageMetadata, workerMetadata, null);
+
+    OpChain opChain = ServerPlanRequestUtils.compileLeafStage(executionContext, stagePlan, _helixManager,
+        _serverMetrics, _leafQueryExecutor, _executorService, leafNodesConsumer, true);
+    opChain.close(); // probably unnecessary, but formally needed
+
+    PlanNode rootNode = substituteNode(stagePlan.getRootNode(), leafNodes);
+
+    return new StagePlan(rootNode, stagePlan.getStageMetadata());
+  }
+
+  private PlanNode substituteNode(PlanNode node, Map<PlanNode, ? extends PlanNode> substitutions) {
+    if (substitutions.containsKey(node)) {
+      return substitutions.get(node);
+    }
+    List<PlanNode> oldInputs = node.getInputs();
+    List<PlanNode> newInputs = new ArrayList<>(oldInputs.size());
+    boolean requiresNewNode = false;
+    for (PlanNode oldInput : oldInputs) {
+      PlanNode newInput = substituteNode(oldInput, substitutions);
+      newInputs.add(newInput);
+      if (oldInput != newInput) {
+        requiresNewNode = true;
+      }
+    }
+    if (requiresNewNode) {
+      return node.withInputs(newInputs);
+    } else {
+      return node;
+    }
   }
 }

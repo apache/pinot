@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.core.operator.filter;
 
+import com.google.common.collect.ImmutableMap;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
@@ -153,7 +155,20 @@ public class InvertedIndexFilterOperator extends BaseColumnFilterOperator {
     StringBuilder stringBuilder = new StringBuilder(EXPLAIN_NAME).append("(indexLookUp:inverted_index");
     Predicate predicate = _predicateEvaluator.getPredicate();
     stringBuilder.append(",operator:").append(predicate.getType());
-    stringBuilder.append(",predicate:").append(predicate.toString());
+    stringBuilder.append(",predicate:").append(predicate);
     return stringBuilder.append(')').toString();
+  }
+
+  @Override
+  protected String getExplainName() {
+    return EXPLAIN_NAME;
+  }
+
+  @Override
+  protected Map<String, ? super Object> getExplainAttributes() {
+    return ImmutableMap.of(
+        "indexLookUp", "inverted_index",
+        "operator", _predicateEvaluator.getPredicate().getType(),
+        "predicate", _predicateEvaluator.getPredicate().toString());
   }
 }

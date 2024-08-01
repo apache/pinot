@@ -39,6 +39,7 @@ message PlanNode {
     TableScanNode tableScanNode = 13;
     ValueNode valueNode = 14;
     WindowNode windowNode = 15;
+    ExplainNode explainNode = 16;
   }
 }
 
@@ -192,4 +193,9 @@ message WindowNode {
   int32 lowerBound = 5;
   int32 upperBound = 6;
   repeated Literal constants = 7;
+}
+
+message ExplainNode {
+  string type = 1;
+  map<string, string> attributes = 2;
 }

@@ -21,14 +21,19 @@ package org.apache.pinot.query.runtime.operator;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Stopwatch;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.plan.PinotExplainedRelNode;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
@@ -165,6 +170,26 @@ public abstract class MultiStageOperator
     assert queryStats != null;
     addStats(queryStats, statMap);
     return upstreamEos;
+  }
+
+  @Override
+  public PinotExplainedRelNode.Info getOperatorInfo() {
+    return new PinotExplainedRelNode.Info(getExplainName(), getExplainAttributes(), getChildrenOperatorInfo());
+  }
+
+  protected List<PinotExplainedRelNode.Info> getChildrenOperatorInfo() {
+    return getChildOperators().stream()
+        .filter(Objects::nonNull)
+        .map(Operator::getOperatorInfo)
+        .collect(Collectors.toList());
+  }
+
+  protected String getExplainName() {
+    return toExplainString();
+  }
+
+  protected Map<String, ? super Object> getExplainAttributes() {
+    return Collections.emptyMap();
   }
 
   /**

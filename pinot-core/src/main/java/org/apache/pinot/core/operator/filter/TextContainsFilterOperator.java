@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.core.operator.filter;
 
+import com.google.common.collect.ImmutableMap;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import org.apache.pinot.common.request.context.predicate.TextContainsPredicate;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
@@ -82,8 +84,22 @@ public class TextContainsFilterOperator extends BaseFilterOperator {
   public String toExplainString() {
     StringBuilder stringBuilder = new StringBuilder(EXPLAIN_NAME).append("(indexLookUp:text_index");
     stringBuilder.append(",operator:").append(_predicate.getType());
-    stringBuilder.append(",predicate:").append(_predicate.toString());
+    stringBuilder.append(",predicate:").append(_predicate);
     return stringBuilder.append(')').toString();
+  }
+
+  @Override
+  protected String getExplainName() {
+    return EXPLAIN_NAME;
+  }
+
+  @Override
+  protected Map<String, ? super Object> getExplainAttributes() {
+    return ImmutableMap.of(
+        "indexLookUp", "text_index",
+        "operator", _predicate.getType(),
+        "predicate", _predicate.toString()
+    );
   }
 
   private void record(ImmutableRoaringBitmap matches) {

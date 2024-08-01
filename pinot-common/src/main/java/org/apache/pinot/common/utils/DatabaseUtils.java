@@ -32,6 +32,10 @@ public class DatabaseUtils {
   private DatabaseUtils() {
   }
 
+  public static String[] splitTableName(String tableName) {
+    return StringUtils.split(tableName, '.');
+  }
+
   /**
    * Construct the fully qualified table name i.e. {databaseName}.{tableName} from given table name and database name
    * @param tableName table/schema name
