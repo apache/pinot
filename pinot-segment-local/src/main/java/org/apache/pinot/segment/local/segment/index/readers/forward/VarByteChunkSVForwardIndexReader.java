@@ -99,7 +99,8 @@ public final class VarByteChunkSVForwardIndexReader extends BaseChunkForwardInde
 
     // These offsets are offset in the data buffer
     long chunkStartOffset = getChunkPosition(chunkId);
-    long valueStartOffset = chunkStartOffset + _dataBuffer.getInt(chunkStartOffset + (long) chunkRowId * ROW_OFFSET_SIZE);
+    long valueStartOffset =
+        chunkStartOffset + _dataBuffer.getInt(chunkStartOffset + (long) chunkRowId * ROW_OFFSET_SIZE);
     long valueEndOffset = getValueEndOffset(chunkId, chunkRowId, chunkStartOffset);
 
     int length = (int) (valueEndOffset - valueStartOffset);
@@ -152,7 +153,8 @@ public final class VarByteChunkSVForwardIndexReader extends BaseChunkForwardInde
 
     // These offsets are offset in the data buffer
     long chunkStartOffset = getChunkPosition(chunkId);
-    long valueStartOffset = chunkStartOffset + _dataBuffer.getInt(chunkStartOffset + (long) chunkRowId * ROW_OFFSET_SIZE);
+    long valueStartOffset =
+        chunkStartOffset + _dataBuffer.getInt(chunkStartOffset + (long) chunkRowId * ROW_OFFSET_SIZE);
     long valueEndOffset = getValueEndOffset(chunkId, chunkRowId, chunkStartOffset);
 
     byte[] bytes = new byte[(int) (valueEndOffset - valueStartOffset)];
