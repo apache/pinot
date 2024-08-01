@@ -19,9 +19,13 @@
 
 package org.apache.pinot.segment.local.indexsegment.mutable;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.File;
+import java.io.IOException;
 import java.net.URL;
 import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
@@ -30,6 +34,7 @@ import org.apache.pinot.segment.local.dedup.TableDedupMetadataManagerFactory;
 import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
 import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.HashFunction;
+import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
@@ -48,7 +53,7 @@ public class MutableSegmentDedupeTest {
   private static final String DATA_FILE_PATH = "data/test_dedup_data.json";
   private MutableSegmentImpl _mutableSegmentImpl;
 
-  private void setup(boolean dedupEnabled)
+  private void setup(boolean dedupEnabled, double metadataTTL, String metadataTimeColumn)
       throws Exception {
     URL schemaResourceUrl = this.getClass().getClassLoader().getResource(SCHEMA_FILE_PATH);
     URL dataResourceUrl = this.getClass().getClassLoader().getResource(DATA_FILE_PATH);
@@ -57,11 +62,13 @@ public class MutableSegmentDedupeTest {
         .setDedupConfig(new DedupConfig(dedupEnabled, HashFunction.NONE)).build();
     CompositeTransformer recordTransformer = CompositeTransformer.getDefaultTransformer(tableConfig, schema);
     File jsonFile = new File(dataResourceUrl.getFile());
+    DedupConfig dedupConfig = new DedupConfig(true, HashFunction.NONE, null, metadataTTL, metadataTimeColumn);
     PartitionDedupMetadataManager partitionDedupMetadataManager =
-        (dedupEnabled) ? getTableDedupMetadataManager(schema).getOrCreatePartitionManager(0) : null;
+        (dedupEnabled) ? getTableDedupMetadataManager(schema, dedupConfig).getOrCreatePartitionManager(0) : null;
     _mutableSegmentImpl =
         MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, Collections.emptySet(), Collections.emptySet(),
-            Collections.emptySet(), false, true, null, "secondsSinceEpoch", null, partitionDedupMetadataManager);
+            Collections.emptySet(), false, true, null, "secondsSinceEpoch", null, dedupConfig,
+            partitionDedupMetadataManager);
     GenericRow reuse = new GenericRow();
     try (RecordReader recordReader = RecordReaderFactory.getRecordReader(FileFormat.JSON, jsonFile,
         schema.getColumnNames(), null)) {
@@ -74,25 +81,84 @@ public class MutableSegmentDedupeTest {
     }
   }
 
-  private static TableDedupMetadataManager getTableDedupMetadataManager(Schema schema) {
+  private static TableDedupMetadataManager getTableDedupMetadataManager(Schema schema, DedupConfig dedupConfig) {
     TableConfig tableConfig = Mockito.mock(TableConfig.class);
     Mockito.when(tableConfig.getTableName()).thenReturn("testTable_REALTIME");
-    Mockito.when(tableConfig.getDedupConfig()).thenReturn(new DedupConfig(true, HashFunction.NONE));
+    Mockito.when(tableConfig.getDedupConfig()).thenReturn(dedupConfig);
+    SegmentsValidationAndRetentionConfig segmentsValidationAndRetentionConfig
+        = Mockito.mock(SegmentsValidationAndRetentionConfig.class);
+    Mockito.when(tableConfig.getValidationConfig()).thenReturn(segmentsValidationAndRetentionConfig);
+    Mockito.when(segmentsValidationAndRetentionConfig.getTimeColumnName()).thenReturn("secondsSinceEpoch");
     return TableDedupMetadataManagerFactory.create(tableConfig, schema, Mockito.mock(TableDataManager.class),
         Mockito.mock(ServerMetrics.class));
+  }
+
+  public List<Map<String, String>> loadJsonFile(String filePath) throws IOException {
+    URL resourceUrl = this.getClass().getClassLoader().getResource(filePath);
+    if (resourceUrl == null) {
+      throw new IllegalArgumentException("File not found: " + filePath);
+    }
+    File jsonFile = new File(resourceUrl.getFile());
+    ObjectMapper objectMapper = new ObjectMapper();
+    return objectMapper.readValue(jsonFile, List.class);
   }
 
   @Test
   public void testDedupeEnabled()
       throws Exception {
-    setup(true);
+    setup(true, 0, null);
     Assert.assertEquals(_mutableSegmentImpl.getNumDocsIndexed(), 2);
+    List<Map<String, String>> rawData = loadJsonFile(DATA_FILE_PATH);
+    for (int i = 0; i < 2; i++) {
+      verifyGeneratedSegmentDataAgainstRawData(i, i, rawData);
+    }
   }
 
   @Test
   public void testDedupeDisabled()
       throws Exception {
-    setup(false);
+    setup(false, 0, null);
     Assert.assertEquals(_mutableSegmentImpl.getNumDocsIndexed(), 4);
+    List<Map<String, String>> rawData = loadJsonFile(DATA_FILE_PATH);
+    for (int i = 0; i < 4; i++) {
+      verifyGeneratedSegmentDataAgainstRawData(i, i, rawData);
+    }
+  }
+
+  @Test
+  public void testDedupWithMetadataTTLWithTableTimeColumn()
+      throws Exception {
+    setup(true, 1000, "secondsSinceEpoch");
+    Assert.assertEquals(_mutableSegmentImpl.getNumDocsIndexed(), 2);
+    List<Map<String, String>> rawData = loadJsonFile(DATA_FILE_PATH);
+    verifyGeneratedSegmentDataAgainstRawData(0, 0, rawData);
+    verifyGeneratedSegmentDataAgainstRawData(1, 3, rawData);
+  }
+
+  @Test
+  public void testDedupWithMetadataTTLWithMetadataTimeColumn()
+      throws Exception {
+    setup(true, 1000, "metadataTime");
+    Assert.assertEquals(_mutableSegmentImpl.getNumDocsIndexed(), 1);
+    List<Map<String, String>> rawData = loadJsonFile(DATA_FILE_PATH);
+    verifyGeneratedSegmentDataAgainstRawData(0, 0, rawData);
+  }
+
+  @Test
+  public void testDedupWithMetadataTTLWithoutMetadataTimeColumn()
+      throws Exception {
+    setup(true, 1000, null);
+    Assert.assertEquals(_mutableSegmentImpl.getNumDocsIndexed(), 2);
+    List<Map<String, String>> rawData = loadJsonFile(DATA_FILE_PATH);
+    verifyGeneratedSegmentDataAgainstRawData(0, 0, rawData);
+    verifyGeneratedSegmentDataAgainstRawData(1, 3, rawData);
+  }
+
+  private void verifyGeneratedSegmentDataAgainstRawData(
+      int docId, int rawDataIndex, List<Map<String, String>> rawData) {
+      for (String columnName : rawData.get(0).keySet()) {
+        Assert.assertEquals(String.valueOf(_mutableSegmentImpl.getValue(docId, columnName)),
+            String.valueOf(rawData.get(rawDataIndex).get(columnName)));
+      }
   }
 }
