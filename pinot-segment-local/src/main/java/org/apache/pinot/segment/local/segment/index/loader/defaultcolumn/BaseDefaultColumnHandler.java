@@ -25,6 +25,7 @@ import java.io.File;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -393,7 +394,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
           }
 
           try {
-            createDerivedColumnV1Indices(column, functionEvaluator, argumentsMetadata);
+            createDerivedColumnV1Indices(column, functionEvaluator, argumentsMetadata, errorOnFailure);
             return true;
           } catch (Exception e) {
             LOGGER.error("Caught exception while creating derived column: {} with transform function: {}", column,
@@ -553,10 +554,11 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
    * Helper method to create the V1 indices (dictionary and forward index) for a column with derived values.
    * TODO:
    *   - Support chained derived column
+   *   - Support raw derived column
    *   - Support forward index disabled derived column
    */
   private void createDerivedColumnV1Indices(String column, FunctionEvaluator functionEvaluator,
-      List<ColumnMetadata> argumentsMetadata)
+      List<ColumnMetadata> argumentsMetadata, boolean errorOnFailure)
       throws Exception {
     // Initialize value readers for all arguments
     int numArguments = argumentsMetadata.size();
@@ -571,21 +573,53 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
       int numDocs = _segmentMetadata.getTotalDocs();
       Object[] outputValues = new Object[numDocs];
       PinotDataType outputValueType = null;
+
+      FieldSpec fieldSpec = _schema.getFieldSpecFor(column);
+      Object defaultNullValue = fieldSpec.getDefaultNullValue();
+      // Just log the first function evaluation error
+      int functionEvaluateErrorCount = 0;
+      Exception functionEvalError = null;
+      Object[] inputValuesWithError = null;
+
       for (int i = 0; i < numDocs; i++) {
         for (int j = 0; j < numArguments; j++) {
           inputValues[j] = valueReaders.get(j).getValue(i);
         }
-        Object outputValue = functionEvaluator.evaluate(inputValues);
-        outputValues[i] = outputValue;
-        if (outputValueType == null) {
-          Class<?> outputValueClass = outputValue.getClass();
-          outputValueType = FunctionUtils.getArgumentType(outputValueClass);
-          Preconditions.checkState(outputValueType != null, "Unsupported output value class: %s", outputValueClass);
+        try {
+          Object outputValue = functionEvaluator.evaluate(inputValues);
+          outputValues[i] = outputValue;
+          if (outputValueType == null) {
+            Class<?> outputValueClass = outputValue.getClass();
+            outputValueType = FunctionUtils.getArgumentType(outputValueClass);
+            Preconditions.checkState(outputValueType != null, "Unsupported output value class: %s", outputValueClass);
+          }
+        } catch (Exception e) {
+          if (!errorOnFailure) {
+            functionEvaluateErrorCount++;
+            // Just record one error to log after the loop
+            if (functionEvalError == null) {
+              functionEvalError = e;
+              inputValuesWithError = Arrays.copyOf(inputValues, inputValues.length);
+            }
+            outputValues[i] = defaultNullValue;
+          } else {
+            throw e;
+          }
         }
       }
 
+      if (outputValueType == null) {
+        // If no output value type is determined, it means all the function evaluations failed and fieldSpec default
+        // null value is set.
+        outputValueType = PinotDataType.getPinotDataTypeForIngestion(fieldSpec);
+      }
+
+      if (functionEvaluateErrorCount > 0) {
+        LOGGER.warn("Caught {} exceptions while evaluating derived column: {} with function: {} and arguments: {}",
+            functionEvaluateErrorCount, column, functionEvaluator, inputValuesWithError, functionEvalError);
+      }
+
       boolean createDictionary = !_indexLoadingConfig.getNoDictionaryColumns().contains(column);
-      FieldSpec fieldSpec = _schema.getFieldSpecFor(column);
       StatsCollectorConfig statsCollectorConfig =
           new StatsCollectorConfig(_indexLoadingConfig.getTableConfig(), _schema, null);
       ColumnIndexCreationInfo indexCreationInfo;
@@ -601,14 +635,14 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
                 // Use array of primitive wrapper class for dictionary
                 Integer[] values = outputValueType.toIntegerArray(outputValue);
                 if (values.length == 0) {
-                  values = new Integer[]{(Integer) fieldSpec.getDefaultNullValue()};
+                  values = new Integer[]{(Integer) defaultNullValue};
                 }
                 outputValues[i] = values;
               } else {
                 // Use primitive array for raw encoded
                 int[] values = outputValueType.toPrimitiveIntArray(outputValue);
                 if (values.length == 0) {
-                  values = new int[]{(int) fieldSpec.getDefaultNullValue()};
+                  values = new int[]{(int) defaultNullValue};
                 }
                 outputValues[i] = values;
               }
@@ -622,7 +656,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
           statsCollector.seal();
           indexCreationInfo =
               new ColumnIndexCreationInfo(statsCollector, createDictionary, false, true,
-                  fieldSpec.getDefaultNullValue());
+                  defaultNullValue);
           break;
         }
         case LONG: {
@@ -635,14 +669,14 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
                 // Use array of primitive wrapper class for dictionary
                 Long[] values = outputValueType.toLongArray(outputValue);
                 if (values.length == 0) {
-                  values = new Long[]{(Long) fieldSpec.getDefaultNullValue()};
+                  values = new Long[]{(Long) defaultNullValue};
                 }
                 outputValues[i] = values;
               } else {
                 // Use primitive array for raw encoded
                 long[] values = outputValueType.toPrimitiveLongArray(outputValue);
                 if (values.length == 0) {
-                  values = new long[]{(long) fieldSpec.getDefaultNullValue()};
+                  values = new long[]{(long) defaultNullValue};
                 }
                 outputValues[i] = values;
               }
@@ -656,7 +690,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
           statsCollector.seal();
           indexCreationInfo =
               new ColumnIndexCreationInfo(statsCollector, createDictionary, false, true,
-                  fieldSpec.getDefaultNullValue());
+                  defaultNullValue);
           break;
         }
         case FLOAT: {
@@ -669,14 +703,14 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
                 // Use array of primitive wrapper class for dictionary
                 Float[] values = outputValueType.toFloatArray(outputValue);
                 if (values.length == 0) {
-                  values = new Float[]{(Float) fieldSpec.getDefaultNullValue()};
+                  values = new Float[]{(Float) defaultNullValue};
                 }
                 outputValues[i] = values;
               } else {
                 // Use primitive array for raw encoded
                 float[] values = outputValueType.toPrimitiveFloatArray(outputValue);
                 if (values.length == 0) {
-                  values = new float[]{(float) fieldSpec.getDefaultNullValue()};
+                  values = new float[]{(float) defaultNullValue};
                 }
                 outputValues[i] = values;
               }
@@ -690,7 +724,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
           statsCollector.seal();
           indexCreationInfo =
               new ColumnIndexCreationInfo(statsCollector, createDictionary, false, true,
-                  fieldSpec.getDefaultNullValue());
+                  defaultNullValue);
           break;
         }
         case DOUBLE: {
@@ -703,14 +737,14 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
                 // Use array of primitive wrapper class for dictionary
                 Double[] values = outputValueType.toDoubleArray(outputValue);
                 if (values.length == 0) {
-                  values = new Double[]{(Double) fieldSpec.getDefaultNullValue()};
+                  values = new Double[]{(Double) defaultNullValue};
                 }
                 outputValues[i] = values;
               } else {
                 // Use primitive array for raw encoded
                 double[] values = outputValueType.toPrimitiveDoubleArray(outputValue);
                 if (values.length == 0) {
-                  values = new double[]{(double) fieldSpec.getDefaultNullValue()};
+                  values = new double[]{(double) defaultNullValue};
                 }
                 outputValues[i] = values;
               }
@@ -724,7 +758,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
           statsCollector.seal();
           indexCreationInfo =
               new ColumnIndexCreationInfo(statsCollector, createDictionary, false, true,
-                  fieldSpec.getDefaultNullValue());
+                  defaultNullValue);
           break;
         }
         case BIG_DECIMAL: {
@@ -740,7 +774,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
           statsCollector.seal();
           indexCreationInfo =
               new ColumnIndexCreationInfo(statsCollector, createDictionary, false, true,
-                  fieldSpec.getDefaultNullValue());
+                  defaultNullValue);
           break;
         }
         case STRING: {
@@ -751,7 +785,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
             } else {
               String[] values = outputValueType.toStringArray(outputValue);
               if (values.length == 0) {
-                values = new String[]{(String) fieldSpec.getDefaultNullValue()};
+                values = new String[]{(String) defaultNullValue};
               }
               outputValues[i] = values;
             }
@@ -764,7 +798,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
           statsCollector.seal();
           indexCreationInfo = new ColumnIndexCreationInfo(statsCollector, createDictionary,
               _indexLoadingConfig.getVarLengthDictionaryColumns().contains(column), true,
-              fieldSpec.getDefaultNullValue());
+              defaultNullValue);
           break;
         }
         case BYTES: {
@@ -775,7 +809,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
             } else {
               byte[][] values = outputValueType.toBytesArray(outputValue);
               if (values.length == 0) {
-                values = new byte[][]{(byte[]) fieldSpec.getDefaultNullValue()};
+                values = new byte[][]{(byte[]) defaultNullValue};
               }
               outputValues[i] = values;
             }
@@ -793,7 +827,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
             useVarLengthDictionary = _indexLoadingConfig.getVarLengthDictionaryColumns().contains(column);
           }
           indexCreationInfo = new ColumnIndexCreationInfo(statsCollector, createDictionary, useVarLengthDictionary,
-              true, new ByteArray((byte[]) fieldSpec.getDefaultNullValue()));
+              true, new ByteArray((byte[]) defaultNullValue));
           break;
         }
         default:

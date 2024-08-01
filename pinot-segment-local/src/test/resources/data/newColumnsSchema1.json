@@ -37,6 +37,10 @@
       "dataType": "STRING",
       "name": "newRawStringSVDimension",
       "defaultNullValue": "null"
+    },
+    {
+      "name": "newWrongArgDateTruncDerivedColumn",
+      "dataType": "LONG"
     }
   ]
 }
