@@ -12,7 +12,7 @@ class PinotWrite (
   val _logicalWriteInfo: LogicalWriteInfo = logicalWriteInfo
   val tableName: String = logicalWriteInfo.options().get("table")
   val writeSchema: StructType = logicalWriteInfo.schema()
-  val pinotSchema: Schema = SparkToPinotSchemaTranslator.translate(writeSchema)
+  val pinotSchema: Schema = SparkToPinotTypeTranslator.translate(writeSchema)
 
   var segmentFormat: String = logicalWriteInfo.options().get("segmentFormat")
   val savePath: String = logicalWriteInfo.options().get("path")
