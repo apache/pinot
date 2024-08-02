@@ -27,7 +27,7 @@ import org.apache.spark.sql.types.{DataTypes, StructField, StructType}
  * To run this class, first of all,
  * run pinot locally(https://docs.pinot.apache.org/basics/getting-started/running-pinot-locally)
  */
-object ExampleSparkPinotConnectorTest extends Logging {
+object ExampleSparkPinotConnectorReadTest extends Logging {
 
   def main(args: Array[String]): Unit = {
     implicit val spark: SparkSession = SparkSession
@@ -36,7 +36,6 @@ object ExampleSparkPinotConnectorTest extends Logging {
       .master("local")
       .getOrCreate()
 
-    // reader tests
     readOffline()
     readHybrid()
     readHybridWithSpecificSchema()
@@ -47,9 +46,6 @@ object ExampleSparkPinotConnectorTest extends Logging {
     readHybridWithFiltersViaGrpc()
     readRealtimeWithSelectionColumns()
     applyJustSomeFilters()
-
-    // writer tests
-    writeOffline()
   }
 
   def readOffline()(implicit spark: SparkSession): Unit = {
@@ -213,31 +209,4 @@ object ExampleSparkPinotConnectorTest extends Logging {
 
     data.show()
   }
-
-  def writeOffline()(implicit spark: SparkSession): Unit = {
-    log.info("Writing some data to a Pinot table...")
-    // create sample data
-    val data = Seq(
-      ("ORD", "Florida", 1000, true, 1722025994),
-      ("ORD", "Florida", 1000, false, 1722025994),
-      ("ORD", "Florida", 1000, false, 1722025994),
-      ("NYC", "New York", 20, true, 1722025994),
-    )
-
-    val airports = spark.createDataFrame(data)
-      .toDF("airport", "state", "distance", "active", "ts")
-      .repartition(2)
-
-    airports.write.format("pinot")
-      .mode("append")
-      .option("table", "airlineStats")
-      .option("tableType", "OFFLINE")
-      .option("segmentFormat", "mysegment_%d")
-      .option("invertedIndexColumns", "airport")
-      .option("noDictionaryColumns", "airport,state")
-      .option("bloomFilterColumns", "airport")
-      .option("timeColumnName", "ts")
-      .save("myPath")
-  }
-
 }
