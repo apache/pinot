@@ -58,7 +58,6 @@ object SparkToPinotTypeTranslator {
     case _: DateType => FieldSpec.DataType.INT
     case ArrayType(elementType, _) => translateType(elementType)
     case _ =>
-      // TODO add full support
       null
   }
 }
