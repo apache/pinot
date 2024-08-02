@@ -118,7 +118,6 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   LARGE_QUERY_RESPONSES_SENT("largeResponses", false),
   TOTAL_THREAD_CPU_TIME_MILLIS("millis", false),
   LARGE_QUERY_RESPONSE_SIZE_EXCEPTIONS("exceptions", false),
-  STREAM_DATA_LOSS("streamDataLoss", false),
 
   // Multi-stage
   /**
