@@ -274,46 +274,48 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
         buildEmptyOrResetDatabaseRateLimiter(databaseName);
         continue;
       }
-      int quotaSplitFactor = getPerBrokerQpsQuotaSplit(databaseName, brokerResource);
-      double perBrokerQpsQuota = databaseQpsQuota / quotaSplitFactor;
-      QueryQuotaEntity oldRateLimiter = _databaseRateLimiterMap.get(databaseName);
-      String message;
-      if (oldRateLimiter == null) {
-        message = String.format("New query rate limiter added for database %s with rate %s.", databaseName,
-            perBrokerQpsQuota);
-      } else {
-        boolean changeDetected = false;
-        double oldRate = oldRateLimiter.getRateLimiter() != null ? oldRateLimiter.getRateLimiter().getRate() : -1;
-        message = String.format("Updated existing query rate limiter for database %s from rate %s to %s", databaseName,
-            oldRate, perBrokerQpsQuota);
-        if (oldRateLimiter.getOverallRate() != databaseQpsQuota) {
-          changeDetected = true;
-          message += ". Overall quota changed for the database from " + oldRateLimiter.getOverallRate() + " to "
-              + databaseQpsQuota;
-        }
-        if (oldRateLimiter.getNumOnlineBrokers() != quotaSplitFactor) {
-          changeDetected = true;
-          message += ". Quota split factor changed for the database from " + oldRateLimiter.getOverallRate() + " to "
-              + quotaSplitFactor;
-        }
-        if (!changeDetected) {
-          LOGGER.info("No change detected with the query rate limiter for database {}", databaseName);
-          return;
-        }
+      int numOnlineBrokers = getNumOnlineBrokers(databaseName, brokerResource);
+      double perBrokerQpsQuota = databaseQpsQuota / numOnlineBrokers;
+      QueryQuotaEntity oldQueryQuotaEntity = _databaseRateLimiterMap.get(databaseName);
+      if (oldQueryQuotaEntity == null) {
+        LOGGER.info("Adding new query rate limiter for database {} with rate {}.", databaseName, perBrokerQpsQuota);
+        QueryQuotaEntity queryQuotaEntity = new QueryQuotaEntity(RateLimiter.create(perBrokerQpsQuota),
+            new HitCounter(ONE_SECOND_TIME_RANGE_IN_SECOND), new MaxHitRateTracker(ONE_MINUTE_TIME_RANGE_IN_SECOND),
+            numOnlineBrokers, databaseQpsQuota, -1);
+        _databaseRateLimiterMap.put(databaseName, queryQuotaEntity);
+        continue;
       }
-      QueryQuotaEntity queryQuotaEntity = new QueryQuotaEntity(RateLimiter.create(perBrokerQpsQuota),
-          new HitCounter(ONE_SECOND_TIME_RANGE_IN_SECOND), new MaxHitRateTracker(ONE_MINUTE_TIME_RANGE_IN_SECOND),
-          quotaSplitFactor, databaseQpsQuota, -1);
-      _databaseRateLimiterMap.put(databaseName, queryQuotaEntity);
-      LOGGER.info(message);
+      boolean changeDetected = false;
+      double oldQuota = oldQueryQuotaEntity.getRateLimiter() != null ? oldQueryQuotaEntity.getRateLimiter().getRate()
+          : -1;
+      if (oldQueryQuotaEntity.getOverallRate() != databaseQpsQuota) {
+        changeDetected = true;
+        LOGGER.info("Overall quota changed for the database from {} to {}", oldQueryQuotaEntity.getOverallRate(),
+            databaseQpsQuota);
+        oldQueryQuotaEntity.setOverallRate(databaseQpsQuota);
+      }
+      if (oldQueryQuotaEntity.getNumOnlineBrokers() != numOnlineBrokers) {
+        changeDetected = true;
+        LOGGER.info("Number of online brokers changed for the database from {} to {}",
+            oldQueryQuotaEntity.getNumOnlineBrokers(), numOnlineBrokers);
+        oldQueryQuotaEntity.setNumOnlineBrokers(numOnlineBrokers);
+      }
+      if (!changeDetected) {
+        LOGGER.info("No change detected with the query rate limiter for database {}", databaseName);
+        continue;
+      }
+      LOGGER.info("Updating existing query rate limiter for database {} from rate {} to {}", databaseName, oldQuota,
+          perBrokerQpsQuota);
+      oldQueryQuotaEntity.setRateLimiter(RateLimiter.create(perBrokerQpsQuota));
     }
   }
 
   // Pulling this logic to a separate placeholder method so that the quota split logic
   // can be enhanced further in isolation.
-  private int getPerBrokerQpsQuotaSplit(String databaseName, ExternalView brokerResource) {
+  private int getNumOnlineBrokers(String databaseName, ExternalView brokerResource) {
     // Tables in database can span across broker tags as we don't maintain a broker tag to database mapping as of now.
     // Hence, we consider all online brokers for the rate distribution.
+    // TODO consider computing only the online brokers which serve the tables under the database
     return HelixHelper.getOnlineInstanceFromExternalView(brokerResource).size();
   }
 

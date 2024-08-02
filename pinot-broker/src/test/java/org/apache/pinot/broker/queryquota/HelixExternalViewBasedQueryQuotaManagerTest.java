@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.broker.queryquota;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -253,6 +254,33 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
 
     _queryQuotaManager.dropTableQueryQuota(OFFLINE_TABLE_NAME);
     Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 0);
+  }
+
+  @Test
+  public void testCreateOrUpdateDatabaseRateLimiter() {
+    List<String> dbList = new ArrayList<>(2);
+    dbList.add("db1");
+    dbList.add("db2");
+    dbList.add("db3");
+    DatabaseConfig db1 = new DatabaseConfig(dbList.get(0), new QuotaConfig(null, null));
+    DatabaseConfig db2 = new DatabaseConfig(dbList.get(1), new QuotaConfig(null, "1"));
+    DatabaseConfig db3 = new DatabaseConfig(dbList.get(2), new QuotaConfig(null, "2"));
+    ZKMetadataProvider.setDatabaseConfig(_testPropertyStore, db1);
+    ZKMetadataProvider.setDatabaseConfig(_testPropertyStore, db2);
+    ZKMetadataProvider.setDatabaseConfig(_testPropertyStore, db3);
+    _queryQuotaManager.createOrUpdateDatabaseRateLimiter(dbList);
+    Map<String, QueryQuotaEntity> dbQuotaMap = _queryQuotaManager.getDatabaseRateLimiterMap();
+    Assert.assertNull(dbQuotaMap.get(dbList.get(0)).getRateLimiter());
+    Assert.assertEquals(dbQuotaMap.get(dbList.get(1)).getRateLimiter().getRate(), 1);
+    Assert.assertEquals(dbQuotaMap.get(dbList.get(2)).getRateLimiter().getRate(), 2);
+    db1.setQuotaConfig(new QuotaConfig(null, "1"));
+    db2.setQuotaConfig(new QuotaConfig(null, "2"));
+    ZKMetadataProvider.setDatabaseConfig(_testPropertyStore, db1);
+    ZKMetadataProvider.setDatabaseConfig(_testPropertyStore, db2);
+    _queryQuotaManager.createOrUpdateDatabaseRateLimiter(dbList);
+    Assert.assertEquals(dbQuotaMap.get(dbList.get(0)).getRateLimiter().getRate(), 1);
+    Assert.assertEquals(dbQuotaMap.get(dbList.get(1)).getRateLimiter().getRate(), 2);
+    Assert.assertEquals(dbQuotaMap.get(dbList.get(2)).getRateLimiter().getRate(), 2);
   }
 
   @Test
