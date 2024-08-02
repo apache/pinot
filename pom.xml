@@ -890,6 +890,7 @@
         <groupId>com.google.auto.service</groupId>
         <artifactId>auto-service</artifactId>
         <version>${google.auto-service.version}</version>
+        <scope>provided</scope>
         <optional>true</optional> <!-- This is only needed at compilation time as an annotation processor -->
       </dependency>
       <!-- Solve the dependency converge issue between guava and calcite-core -->
@@ -1894,6 +1895,42 @@
             <target>${jdk.version}</target>
             <fork>true</fork>
             <encoding>${project.build.sourceEncoding}</encoding>
+            <annotationProcessorPaths>
+              <path>
+                <groupId>com.google.errorprone</groupId>
+                <artifactId>error_prone_core</artifactId>
+                <version>${google.errorprone.version}</version>
+              </path>
+              <path>
+                <groupId>com.google.auto.service</groupId>
+                <artifactId>auto-service</artifactId>
+                <version>${google.auto-service.version}</version>
+              </path>
+              <path>
+                <groupId>org.immutables</groupId>
+                <artifactId>value-annotations</artifactId>
+                <version>${immutables.version}</version>
+              </path>
+              <path>
+                <groupId>com.uber.nullaway</groupId>
+                <artifactId>nullaway</artifactId>
+                <version>0.10.15</version>
+              </path>
+            </annotationProcessorPaths>
+            <compilerArgs>
+              <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED</arg>
+              <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED</arg>
+              <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.main=ALL-UNNAMED</arg>
+              <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.model=ALL-UNNAMED</arg>
+              <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED</arg>
+              <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.processing=ALL-UNNAMED</arg>
+              <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED</arg>
+              <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED</arg>
+              <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED</arg>
+              <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED</arg>
+              <arg>-XDcompilePolicy=simple</arg>
+              <arg>-Xplugin:ErrorProne -XepOpt:NullAway:AnnotatedPackages=org.apache.pinot</arg>
+            </compilerArgs>
           </configuration>
         </plugin>
         <plugin>
