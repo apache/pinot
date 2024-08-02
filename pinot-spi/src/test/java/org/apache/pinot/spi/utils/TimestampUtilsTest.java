@@ -99,7 +99,7 @@ public class TimestampUtilsTest {
 
     // ISO8601 with milliseconds and various timezones
     assertEquals(TimestampUtils.toTimestamp("2024-07-12T15:32:36.123Z"),
-        Timestamp.from(ZonedDateTime.of(2024, 7, 12, 15, 32, 36, 123000000, ZoneId.of("Z")).toInstant()));
+        Timestamp.from(ZonedDateTime.of(2024, 7, 12, 15, 32, 36, 123000000, ZoneOffset.UTC).toInstant()));
     assertEquals(TimestampUtils.toTimestamp("2024-07-12T15:32:36.123+01:30"),
         Timestamp.from(ZonedDateTime.of(2024, 7, 12, 15, 32, 36, 123000000, ZoneId.of("+01:30")).toInstant()));
     assertEquals(TimestampUtils.toTimestamp("2024-07-12T15:32:36.123-08:00"),

@@ -118,7 +118,7 @@ public abstract class PriorityScheduler extends QueryScheduler {
             request.setResultFuture(queryFutureTask);
             request.getSchedulerGroup().startQuery();
             queryRequest.getTimerContext().getPhaseTimer(ServerQueryPhase.SCHEDULER_WAIT).stopAndRecord();
-            _resourceManager.getQueryRunners().submit(queryFutureTask);
+            ListenableFuture<?> unused = _resourceManager.getQueryRunners().submit(queryFutureTask);
           } catch (Throwable t) {
             LOGGER.error(
                 "Error in scheduler thread. This is indicative of a bug. Please report this. Server will continue "

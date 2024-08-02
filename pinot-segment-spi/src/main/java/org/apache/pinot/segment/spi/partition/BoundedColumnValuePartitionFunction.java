@@ -50,7 +50,7 @@ public class BoundedColumnValuePartitionFunction implements PartitionFunction {
 
   public BoundedColumnValuePartitionFunction(int numPartitions, Map<String, String> functionConfig) {
     Preconditions.checkArgument(functionConfig != null && functionConfig.size() > 0,
-        "'functionConfig' should be present, specified", functionConfig);
+        "'functionConfig' should be present, specified %s", functionConfig);
     Preconditions.checkState(functionConfig.get(COLUMN_VALUES) != null, "columnValues must be configured");
     Preconditions.checkState(functionConfig.get(COLUMN_VALUES_DELIMITER) != null,
         "'columnValuesDelimiter' must be configured");

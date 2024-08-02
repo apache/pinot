@@ -33,6 +33,7 @@ public class IngestionJobLauncherTest {
   private Map<String, String> _defaultEnvironmentValues;
 
   @BeforeMethod
+  @SuppressWarnings("DoubleBraceInitialization")
   public void setup() {
     _defaultEnvironmentValues = new HashMap<String, String>() {{
       put("year", "2022");

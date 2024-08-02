@@ -77,7 +77,8 @@ public class OrderByExpressionContext {
       return false;
     }
     OrderByExpressionContext that = (OrderByExpressionContext) o;
-    return Objects.equals(_expression, that._expression) && _isAsc == that._isAsc && _isNullsLast == that._isNullsLast;
+    return Objects.equals(_expression, that._expression) && Objects.equals(_isAsc, that._isAsc)
+        && Objects.equals(_isNullsLast, that._isNullsLast);
   }
 
   @Override

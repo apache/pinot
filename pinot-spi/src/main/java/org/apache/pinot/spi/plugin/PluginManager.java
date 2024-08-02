@@ -36,7 +36,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
+@SuppressWarnings("DoubleBraceInitialization")
 public class PluginManager {
 
   public static final String PLUGINS_DIR_PROPERTY_NAME = "plugins.dir";

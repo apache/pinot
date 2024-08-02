@@ -62,10 +62,6 @@ public class MutableFSTImpl implements MutableFST {
     _start = start;
   }
 
-  public MutableState newStartState() {
-    return newStartState();
-  }
-
   public MutableArc addArc(MutableState startState, int outputSymbol, MutableState endState) {
     MutableArc newArc = new MutableArc(outputSymbol, endState);
     startState.addArc(newArc);

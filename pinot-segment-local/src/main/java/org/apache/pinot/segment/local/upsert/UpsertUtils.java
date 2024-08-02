@@ -219,6 +219,7 @@ public class UpsertUtils {
       }
     }
 
+    @Override
     public Comparable getComparisonValue(int docId) {
       Comparable[] comparisonColumns = new Comparable[_comparisonColumnReaders.length];
 

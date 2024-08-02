@@ -66,6 +66,7 @@ public class NullValueVectorCreator implements IndexCreator {
     _bitmapWriter.add(docId);
   }
 
+  @Override
   public void seal()
       throws IOException {
     // Create null value vector file only if the bitmap is not empty
