@@ -45,7 +45,14 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 /**
  * Implementation of {@link PartitionUpsertMetadataManager} that is backed by a {@link ConcurrentHashMap} and ensures
- * consistent deletions. This should be used when the table is configured with 'consistentDeletes' set to true.
+ * consistent deletions. This should be used when the table is configured with 'enableConsistentDeletes' set to true.
+ *
+ * Consistent deletion ensures that when deletedKeysTTL is enabled with UpsertCompaction, the key metadata is
+ * removed from the HashMap only after all other records in the old segments are compacted. This guarantees
+ * data consistency. Without this, there can be a scenario where a deleted record is compacted first, while an
+ * old record remains non-compacted in a previous segment. During a server restart, this could lead to the old
+ * record reappearing. For the end-user, this would result in a data loss or inconsistency scenario, as the
+ * record was marked for deletion.
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
 @ThreadSafe
@@ -116,10 +123,11 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
                   if (validDocIdsForOldSegment != null) {
                     validDocIdsForOldSegment.remove(currentDocId);
                   }
-                  return new RecordLocation(segment, newDocId, newComparisonValue, currentDistinctSegmentCount + 1);
+                  return new RecordLocation(segment, newDocId, newComparisonValue,
+                      RecordLocation.incrementSegmentCount(currentDistinctSegmentCount));
                 } else {
                   return new RecordLocation(currentSegment, currentDocId, currentComparisonValue,
-                      currentDistinctSegmentCount + 1);
+                      RecordLocation.incrementSegmentCount(currentDistinctSegmentCount));
                 }
               }
 
@@ -130,7 +138,8 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
                 numKeysInWrongSegment.getAndIncrement();
                 if (comparisonResult >= 0) {
                   addDocId(segment, validDocIds, queryableDocIds, newDocId, recordInfo);
-                  return new RecordLocation(segment, newDocId, newComparisonValue, currentDistinctSegmentCount + 1);
+                  return new RecordLocation(segment, newDocId, newComparisonValue,
+                      RecordLocation.incrementSegmentCount(currentDistinctSegmentCount));
                 } else {
                   return currentRecordLocation;
                 }
@@ -144,10 +153,11 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
                   currentSegmentName, segment.getSegmentMetadata().getIndexCreationTime(),
                   currentSegment.getSegmentMetadata().getIndexCreationTime()))) {
                 replaceDocId(segment, validDocIds, queryableDocIds, currentSegment, currentDocId, newDocId, recordInfo);
-                return new RecordLocation(segment, newDocId, newComparisonValue, currentDistinctSegmentCount + 1);
+                return new RecordLocation(segment, newDocId, newComparisonValue,
+                    RecordLocation.incrementSegmentCount(currentDistinctSegmentCount));
               } else {
                 return new RecordLocation(currentSegment, currentDocId, currentComparisonValue,
-                    currentDistinctSegmentCount + 1);
+                    RecordLocation.incrementSegmentCount(currentDistinctSegmentCount));
               }
             } else {
               // New primary key
@@ -166,15 +176,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
   @Override
   protected void addSegmentWithoutUpsert(ImmutableSegmentImpl segment, ThreadSafeMutableRoaringBitmap validDocIds,
       @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, Iterator<RecordInfo> recordInfoIterator) {
-    segment.enableUpsert(this, validDocIds, queryableDocIds);
-    while (recordInfoIterator.hasNext()) {
-      RecordInfo recordInfo = recordInfoIterator.next();
-      int newDocId = recordInfo.getDocId();
-      Comparable newComparisonValue = recordInfo.getComparisonValue();
-      addDocId(segment, validDocIds, queryableDocIds, newDocId, recordInfo);
-      _primaryKeyToRecordLocationMap.put(HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), _hashFunction),
-          new RecordLocation(segment, newDocId, newComparisonValue, 1));
-    }
+    throw new UnsupportedOperationException("Consistent-deletion does not support preloading of segments.");
   }
 
   @Override
@@ -216,7 +218,8 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
               return null;
             }
             return new RecordLocation(recordLocation.getSegment(), recordLocation.getDocId(),
-                recordLocation.getComparisonValue(), recordLocation.getDistinctSegmentCount() - 1);
+                recordLocation.getComparisonValue(),
+                RecordLocation.decrementSegmentCount(recordLocation.getDistinctSegmentCount()));
           });
     }
   }
@@ -286,7 +289,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
               } else {
                 replaceDocId(segment, validDocIds, queryableDocIds, currentSegment, currentDocId, newDocId, recordInfo);
                 return new RecordLocation(segment, newDocId, newComparisonValue,
-                    currentRecordLocation.getDistinctSegmentCount() + 1);
+                    RecordLocation.incrementSegmentCount(currentRecordLocation.getDistinctSegmentCount()));
               }
             } else {
               // Out-of-order record
@@ -297,7 +300,8 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
               } else {
                 return new RecordLocation(currentSegment, currentRecordLocation.getDocId(),
                     currentRecordLocation.getComparisonValue(),
-                    currentRecordLocation.getDistinctSegmentCount() + (_context.isDropOutOfOrderRecord() ? 0 : 1));
+                    _context.isDropOutOfOrderRecord() ? currentRecordLocation.getDistinctSegmentCount()
+                        : RecordLocation.incrementSegmentCount(currentRecordLocation.getDistinctSegmentCount()));
               }
             }
           } else {
@@ -352,6 +356,14 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
       _docId = docId;
       _comparisonValue = comparisonValue;
       _distinctSegmentCount = distinctSegmentCount;
+    }
+
+    public static int incrementSegmentCount(int count) {
+      return count + 1;
+    }
+
+    public static int decrementSegmentCount(int count) {
+      return count - 1;
     }
 
     public IndexSegment getSegment() {
