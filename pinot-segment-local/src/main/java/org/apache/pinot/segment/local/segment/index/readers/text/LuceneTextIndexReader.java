@@ -21,15 +21,16 @@ package org.apache.pinot.segment.local.segment.index.readers.text;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Constructor;
 import java.nio.ByteOrder;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.lucene.analysis.Analyzer;
-import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.queryparser.classic.QueryParser;
+import org.apache.lucene.queryparser.classic.QueryParserBase;
 import org.apache.lucene.search.Collector;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Query;
@@ -67,6 +68,8 @@ public class LuceneTextIndexReader implements TextIndexReader {
   private final DocIdTranslator _docIdTranslator;
   private final Analyzer _analyzer;
   private boolean _useANDForMultiTermQueries = false;
+  private final String _queryParserClass;
+  private Constructor<QueryParserBase> _queryParserClassConstructor;
   private boolean _enablePrefixSuffixMatchingInPhraseQueries = false;
 
   public LuceneTextIndexReader(String column, File indexDir, int numDocs, TextIndexConfig config) {
@@ -90,10 +93,10 @@ public class LuceneTextIndexReader implements TextIndexReader {
       // TODO: consider using a threshold of num docs per segment to decide between building
       // mapping file upfront on segment load v/s on-the-fly during query processing
       _docIdTranslator = new DocIdTranslator(indexDir, _column, numDocs, _indexSearcher);
-      String luceneAnalyzerClass = config.getLuceneAnalyzerClass();
-      _analyzer = luceneAnalyzerClass.equals(StandardAnalyzer.class.getName())
-          ? TextIndexUtils.getStandardAnalyzerWithCustomizedStopWords(config.getStopWordsInclude(),
-          config.getStopWordsExclude()) : TextIndexUtils.getAnalyzerFromClassName(luceneAnalyzerClass);
+      _analyzer = TextIndexUtils.getAnalyzer(config);
+      _queryParserClass = config.getLuceneQueryParserClass();
+      _queryParserClassConstructor =
+              TextIndexUtils.getQueryParserWithStringAndAnalyzerTypeConstructor(_queryParserClass);
       LOGGER.info("Successfully read lucene index for {} from {}", _column, indexDir);
     } catch (Exception e) {
       LOGGER.error("Failed to instantiate Lucene text index reader for column {}, exception {}", column,
@@ -151,20 +154,20 @@ public class LuceneTextIndexReader implements TextIndexReader {
     MutableRoaringBitmap docIds = new MutableRoaringBitmap();
     Collector docIDCollector = new LuceneDocIdCollector(docIds, _docIdTranslator);
     try {
-      // Lucene Query Parser is JavaCC based. It is stateful and should
-      // be instantiated per query. Analyzer on the other hand is stateless
-      // and can be created upfront.
-      QueryParser parser = new QueryParser(_column, _analyzer);
+      // Lucene query parsers are generally stateful and a new instance must be created per query.
+      QueryParserBase parser = _queryParserClassConstructor.newInstance(_column, _analyzer);
       // Phrase search with prefix/suffix matching may have leading *. E.g., `*pache pinot` which can be stripped by
       // the query parser. To support the feature, we need to explicitly set the config to be true.
-      if (_enablePrefixSuffixMatchingInPhraseQueries) {
+      if (_queryParserClass.equals("org.apache.lucene.queryparser.classic.QueryParser")
+              && _enablePrefixSuffixMatchingInPhraseQueries) {
         parser.setAllowLeadingWildcard(true);
       }
-      if (_useANDForMultiTermQueries) {
+      if (_queryParserClass.equals("org.apache.lucene.queryparser.classic.QueryParser") && _useANDForMultiTermQueries) {
         parser.setDefaultOperator(QueryParser.Operator.AND);
       }
       Query query = parser.parse(searchQuery);
-      if (_enablePrefixSuffixMatchingInPhraseQueries) {
+      if (_queryParserClass.equals("org.apache.lucene.queryparser.classic.QueryParser")
+              && _enablePrefixSuffixMatchingInPhraseQueries) {
         query = LuceneTextIndexUtils.convertToMultiTermSpanQuery(query);
       }
       _indexSearcher.search(query, docIDCollector);
