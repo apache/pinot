@@ -24,7 +24,7 @@ import org.scalatest.funsuite.AnyFunSuite
 
 class SparkToPinotTypeTranslatorTest extends AnyFunSuite {
 
-  test("Translate data types") {
+  test("Translate single value data types") {
     val typeMappings = List(
       (StringType, FieldSpec.DataType.STRING),
       (IntegerType, FieldSpec.DataType.INT),
@@ -42,6 +42,28 @@ class SparkToPinotTypeTranslatorTest extends AnyFunSuite {
       val sparkSchema = StructType(Array(StructField(fieldName, sparkType)))
       val pinotSchema = SparkToPinotTypeTranslator.translate(sparkSchema, "table")
       assert(pinotSchema.getFieldSpecFor(fieldName).getDataType == expectedPinotType)
+    }
+  }
+
+  test("Translate multi value data types") {
+    val arrayTypeMappings = List(
+      (ArrayType(StringType), FieldSpec.DataType.STRING),
+      (ArrayType(IntegerType), FieldSpec.DataType.INT),
+      (ArrayType(LongType), FieldSpec.DataType.LONG),
+      (ArrayType(FloatType), FieldSpec.DataType.FLOAT),
+      (ArrayType(DoubleType), FieldSpec.DataType.DOUBLE),
+      (ArrayType(BooleanType), FieldSpec.DataType.BOOLEAN),
+      (ArrayType(BinaryType), FieldSpec.DataType.BYTES),
+      (ArrayType(TimestampType), FieldSpec.DataType.LONG),
+      (ArrayType(DateType), FieldSpec.DataType.INT)
+    )
+
+    for ((sparkArrayType, expectedPinotType) <- arrayTypeMappings) {
+      val fieldName = s"${sparkArrayType.simpleString}Field"
+      val sparkSchema = StructType(Array(StructField(fieldName, sparkArrayType)))
+      val pinotSchema = SparkToPinotTypeTranslator.translate(sparkSchema, "table")
+      assert(pinotSchema.getFieldSpecFor(fieldName).getDataType == expectedPinotType)
+      assert(!pinotSchema.getFieldSpecFor(fieldName).isSingleValueField)
     }
   }
 }
