@@ -144,8 +144,27 @@ class PinotDataWriter[InternalRow](
           gr.putValue(field.name, record.getByte(idx))
         case org.apache.spark.sql.types.ShortType =>
           gr.putValue(field.name, record.getShort(idx))
-        case org.apache.spark.sql.types.BinaryType =>
-          gr.putValue(field.name, record.getBinary(idx))
+        case org.apache.spark.sql.types.ArrayType(elementType, _) =>
+          elementType match {
+            case org.apache.spark.sql.types.StringType =>
+              gr.putValue(field.name, record.getArray(idx).array.map(_.asInstanceOf[String]))
+            case org.apache.spark.sql.types.IntegerType =>
+              gr.putValue(field.name, record.getArray(idx).array.map(_.asInstanceOf[Int]))
+            case org.apache.spark.sql.types.LongType =>
+              gr.putValue(field.name, record.getArray(idx).array.map(_.asInstanceOf[Long]))
+            case org.apache.spark.sql.types.FloatType =>
+              gr.putValue(field.name, record.getArray(idx).array.map(_.asInstanceOf[Float]))
+            case org.apache.spark.sql.types.DoubleType =>
+              gr.putValue(field.name, record.getArray(idx).array.map(_.asInstanceOf[Double]))
+            case org.apache.spark.sql.types.BooleanType =>
+              gr.putValue(field.name, record.getArray(idx).array.map(_.asInstanceOf[Boolean]))
+            case org.apache.spark.sql.types.ByteType =>
+              gr.putValue(field.name, record.getArray(idx).array.map(_.asInstanceOf[Byte]))
+            case org.apache.spark.sql.types.ShortType =>
+              gr.putValue(field.name, record.getArray(idx).array.map(_.asInstanceOf[Short]))
+            case _ =>
+              throw new UnsupportedOperationException("Unsupported data type")
+          }
         case _ =>
           throw new UnsupportedOperationException("Unsupported data type")
       }
@@ -178,7 +197,6 @@ class PinotDataWriter[InternalRow](
     logger.info("Closing writer")
     bufferedRecordReader.close()
   }
-
 }
 
 class SuccessWriterCommitMessage(segmentName: String) extends WriterCommitMessage {
