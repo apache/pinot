@@ -40,7 +40,7 @@ class SparkToPinotTypeTranslatorTest extends AnyFunSuite {
     for ((sparkType, expectedPinotType) <- typeMappings) {
       val fieldName = s"${sparkType.simpleString}Field"
       val sparkSchema = StructType(Array(StructField(fieldName, sparkType)))
-      val pinotSchema = SparkToPinotTypeTranslator.translate(sparkSchema)
+      val pinotSchema = SparkToPinotTypeTranslator.translate(sparkSchema, "table")
       assert(pinotSchema.getFieldSpecFor(fieldName).getDataType == expectedPinotType)
     }
   }

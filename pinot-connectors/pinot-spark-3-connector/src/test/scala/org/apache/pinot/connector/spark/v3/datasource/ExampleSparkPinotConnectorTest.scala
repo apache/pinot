@@ -233,6 +233,9 @@ object ExampleSparkPinotConnectorTest extends Logging {
       .option("table", "airlineStats")
       .option("tableType", "OFFLINE")
       .option("segmentFormat", "mysegment_%d")
+      .option("invertedIndexColumns", "airport")
+      .option("noDictionaryColumns", "airport,state")
+      .option("bloomFilterColumns", "airport")
       .option("timeColumnName", "ts")
       .save("myPath")
   }

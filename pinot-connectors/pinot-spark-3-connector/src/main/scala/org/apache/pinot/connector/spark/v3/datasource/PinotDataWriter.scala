@@ -1,7 +1,26 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 package org.apache.pinot.connector.spark.v3.datasource
 
 import org.apache.commons.io.FileUtils
 import org.apache.pinot.common.utils.TarGzCompressionUtils
+import org.apache.pinot.connector.spark.common.PinotDataSourceWriteOptions
 import org.apache.spark.sql.connector.write.{DataWriter, PhysicalWriteInfo, WriterCommitMessage}
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig
@@ -12,99 +31,96 @@ import org.apache.pinot.spi.ingestion.batch.spec.Constants
 import org.apache.pinot.spi.utils.DataSizeUtils
 import org.apache.spark.sql.catalyst
 import org.apache.spark.sql.types.StructType
+import org.slf4j.{Logger, LoggerFactory}
 
 import java.io.File
 import java.nio.file.Files
 
 class PinotDataWriter[InternalRow](
-                                    physicalWriteInfo: PhysicalWriteInfo,
                                     partitionId: Int,
                                     taskId: Long,
-                                    tableName: String,
-                                    segmentNameFormat: String,
-                                    savePath: String,
+                                    writeOptions: PinotDataSourceWriteOptions,
                                     writeSchema: StructType,
-                                    pinotSchema: Schema,
-                                  )
+                                    pinotSchema: Schema)
   extends DataWriter[org.apache.spark.sql.catalyst.InternalRow] with AutoCloseable {
+  private val logger: Logger = LoggerFactory.getLogger(classOf[PinotDataWriter[InternalRow]])
+  logger.info("PinotDataWriter created with writeOptions: {}, partitionId: {}, taskId: {}",
+    (writeOptions, partitionId, taskId))
 
-  println("PinotDataWriter created with " +
-    "physicalWriteInfo: " + physicalWriteInfo +
-    ", partitionId: " + partitionId + ", taskId: " + taskId)
-
+  private val tableName = writeOptions.tableName
+  private val savePath = writeOptions.savePath
   private val bufferedRecordReader = new PinotBufferedRecordReader()
-  private var tableConfig: TableConfig = null
-  private var segmentGeneratorConfig: SegmentGeneratorConfig = null
-  private var localOutputTempDir: File = null
 
   override def write(record: catalyst.InternalRow): Unit = {
     bufferedRecordReader.write(internalRowToGenericRow(record))
   }
 
   override def commit(): WriterCommitMessage = {
-    initSegmentCreator()
+    val segmentName = getSegmentName
+    val segmentDir = generateSegment(segmentName)
+    val segmentTarFile = tarSegmentDir(segmentName, segmentDir)
+    pushSegmentTarFile(segmentTarFile)
+    new SuccessWriterCommitMessage(segmentName)
+  }
 
+  private def getSegmentName: String = {
+    writeOptions.segmentFormat.format(partitionId)
+  }
+
+  private def generateSegment(segmentName: String): File = {
+    val outputDir = Files.createTempDirectory(classOf[PinotDataWriter[InternalRow]].getName).toFile
+    val indexingConfig = getIndexConfig
+
+    logger.info("Index config: {}", indexingConfig)
+
+    val segmentGeneratorConfig = getSegmentGenerationConfig(segmentName, indexingConfig, outputDir)
+
+    // create segment and return output directory
     val driver = new SegmentIndexCreationDriverImpl()
     driver.init(segmentGeneratorConfig, bufferedRecordReader)
     driver.build()
-
-    // tar segment
-    val segmentTarFile = tarSegmentDir(segmentGeneratorConfig.getSegmentName)
-    printf("Segment tar file: %s\n", segmentTarFile.getAbsolutePath)
-
-    // push to savePath
-    val fs = org.apache.hadoop.fs.FileSystem.get(new java.net.URI(savePath), new org.apache.hadoop.conf.Configuration())
-    val destPath = new org.apache.hadoop.fs.Path(savePath+ "/" + segmentTarFile.getName)
-
-    fs.copyFromLocalFile(new org.apache.hadoop.fs.Path(segmentTarFile.getAbsolutePath), destPath)
-    printf("Copied segment tar file to: %s\n", savePath)
-
-    new SuccessWriterCommitMessage
+    outputDir
   }
 
-  override def abort(): Unit = {
-    println("Abort called")
-  }
-
-  override def close(): Unit = {
-    println("Close called")
-  }
-
-  private def initSegmentCreator(): Unit = {
+  private def getIndexConfig: IndexingConfig = {
     val indexingConfig = new IndexingConfig
-    val segmentsValidationAndRetentionConfig = new SegmentsValidationAndRetentionConfig();
-    tableConfig =
-      new TableConfig(
-        tableName,
-        "OFFLINE",
-        segmentsValidationAndRetentionConfig,
-        new TenantConfig(null, null, null),
-        indexingConfig,
-        new TableCustomConfig(null),
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        false,
-        null,
-        null,
-        null);
+    indexingConfig.setInvertedIndexColumns(java.util.Arrays.asList(writeOptions.invertedIndexColumns:_*))
+    indexingConfig.setNoDictionaryColumns(java.util.Arrays.asList(writeOptions.noDictionaryColumns:_*))
+    indexingConfig.setBloomFilterColumns(java.util.Arrays.asList(writeOptions.bloomFilterColumns:_*))
+    indexingConfig.setRangeIndexColumns(java.util.Arrays.asList(writeOptions.rangeIndexColumns:_*))
+    indexingConfig
+  }
 
-    // create a temp dir to store artifacts
-    // TODO: savePath could be used directly
-    localOutputTempDir = Files.createTempDirectory("pinot-spark-connector").toFile
+  private def getSegmentGenerationConfig(segmentName: String,
+                                         indexingConfig: IndexingConfig,
+                                         outputDir: File,
+                                        ): SegmentGeneratorConfig = {
+    // Mostly dummy tableConfig, sufficient for segment generation purposes
+    val tableConfig = new TableConfig(
+      tableName,
+      "OFFLINE",
+      new SegmentsValidationAndRetentionConfig(),
+      new TenantConfig(null, null, null),
+      indexingConfig,
+      new TableCustomConfig(null),
+      null, null, null, null, null, null, null,
+      null, null, null, null, false, null, null,
+      null)
 
-    segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, pinotSchema)
+    val segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, pinotSchema)
     segmentGeneratorConfig.setTableName(tableName)
-    segmentGeneratorConfig.setSegmentName(segmentNameFormat.format(partitionId))
-    segmentGeneratorConfig.setOutDir(localOutputTempDir.getAbsolutePath)
+    segmentGeneratorConfig.setSegmentName(segmentName)
+    segmentGeneratorConfig.setOutDir(outputDir.getAbsolutePath)
+    segmentGeneratorConfig
+  }
+
+  private def pushSegmentTarFile(segmentTarFile: File): Unit = {
+    // TODO Support file systems other than local and HDFS
+    val fs = org.apache.hadoop.fs.FileSystem.get(new java.net.URI(savePath), new org.apache.hadoop.conf.Configuration())
+    val destPath = new org.apache.hadoop.fs.Path(savePath + "/" + segmentTarFile.getName)
+    fs.copyFromLocalFile(new org.apache.hadoop.fs.Path(segmentTarFile.getAbsolutePath), destPath)
+
+    logger.info("Pushed segment tar file to: {}", destPath)
   }
 
   private def internalRowToGenericRow(record: catalyst.InternalRow): GenericRow = {
@@ -137,19 +153,39 @@ class PinotDataWriter[InternalRow](
     gr
   }
 
-  private def tarSegmentDir(segmentName: String): File = {
-    val localSegmentDir = new File(localOutputTempDir, segmentName)
-    val segmentTarFileName = segmentName + Constants.TAR_GZ_FILE_EXT
-    val tarFile = new File(localOutputTempDir, segmentTarFileName)
-    printf("Local segment dir: %s\n", localSegmentDir.getAbsolutePath)
+  private def tarSegmentDir(segmentName: String, segmentDir: File): File = {
+    val localSegmentDir = new File(segmentDir, segmentName)
+    val tarFile = new File(segmentDir, s"$segmentName${Constants.TAR_GZ_FILE_EXT}")
+    logger.info("Local segment dir: {}", localSegmentDir.getAbsolutePath)
+
     TarGzCompressionUtils.createTarGzFile(localSegmentDir, tarFile)
     val uncompressedSegmentSize = FileUtils.sizeOf(localSegmentDir)
     val compressedSegmentSize = FileUtils.sizeOf(tarFile)
-    printf("Size for segment: %s, uncompressed: %s, compressed: %s\n", segmentName, DataSizeUtils.fromBytes(uncompressedSegmentSize), DataSizeUtils.fromBytes(compressedSegmentSize))
+
+    logger.info("Size for segment: {}, uncompressed: {}, compressed: {}",
+      segmentName,
+      DataSizeUtils.fromBytes(uncompressedSegmentSize),
+      DataSizeUtils.fromBytes(compressedSegmentSize))
     tarFile
+  }
+
+  override def abort(): Unit = {
+    logger.info("Aborting writer")
+    bufferedRecordReader.close()
+  }
+
+  override def close(): Unit = {
+    logger.info("Closing writer")
+    bufferedRecordReader.close()
   }
 
 }
 
-class SuccessWriterCommitMessage extends WriterCommitMessage {}
+class SuccessWriterCommitMessage(segmentName: String) extends WriterCommitMessage {
+  override def toString: String = {
+    "SuccessWriterCommitMessage{" +
+      "segmentName='" + segmentName + '\'' +
+      '}'
+  }
+}
 
