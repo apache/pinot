@@ -19,7 +19,6 @@
 package org.apache.pinot.broker.queryquota;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -179,7 +178,7 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
     setQps(tableConfig);
     _queryQuotaManager.initOrUpdateTableQueryQuota(tableConfig, brokerResource);
     Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 1);
-    _queryQuotaManager.createOrUpdateDatabaseRateLimiter(Collections.singletonList(CommonConstants.DEFAULT_DATABASE));
+    _queryQuotaManager.createDatabaseRateLimiter(CommonConstants.DEFAULT_DATABASE);
     Assert.assertEquals(_queryQuotaManager.getDatabaseRateLimiterMap().size(), 1);
 
     setDefaultDatabaseQps("40");
@@ -201,7 +200,7 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
     setQps(tableConfig);
     _queryQuotaManager.initOrUpdateTableQueryQuota(tableConfig, brokerResource);
     Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 1);
-    _queryQuotaManager.createOrUpdateDatabaseRateLimiter(Collections.singletonList(CommonConstants.DEFAULT_DATABASE));
+    _queryQuotaManager.createDatabaseRateLimiter(CommonConstants.DEFAULT_DATABASE);
     Assert.assertEquals(_queryQuotaManager.getDatabaseRateLimiterMap().size(), 1);
 
     setDefaultDatabaseQps(DATABASE_LOW_QPS_STR);
@@ -268,7 +267,7 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
     ZKMetadataProvider.setDatabaseConfig(_testPropertyStore, db1);
     ZKMetadataProvider.setDatabaseConfig(_testPropertyStore, db2);
     ZKMetadataProvider.setDatabaseConfig(_testPropertyStore, db3);
-    _queryQuotaManager.createOrUpdateDatabaseRateLimiter(dbList);
+    dbList.forEach(db -> _queryQuotaManager.createDatabaseRateLimiter(db));
     Map<String, QueryQuotaEntity> dbQuotaMap = _queryQuotaManager.getDatabaseRateLimiterMap();
     Assert.assertNull(dbQuotaMap.get(dbList.get(0)).getRateLimiter());
     Assert.assertEquals(dbQuotaMap.get(dbList.get(1)).getRateLimiter().getRate(), 1);
@@ -277,7 +276,7 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
     db2.setQuotaConfig(new QuotaConfig(null, "2"));
     ZKMetadataProvider.setDatabaseConfig(_testPropertyStore, db1);
     ZKMetadataProvider.setDatabaseConfig(_testPropertyStore, db2);
-    _queryQuotaManager.createOrUpdateDatabaseRateLimiter(dbList);
+    dbList.forEach(db -> _queryQuotaManager.updateDatabaseRateLimiter(db));
     Assert.assertEquals(dbQuotaMap.get(dbList.get(0)).getRateLimiter().getRate(), 1);
     Assert.assertEquals(dbQuotaMap.get(dbList.get(1)).getRateLimiter().getRate(), 2);
     Assert.assertEquals(dbQuotaMap.get(dbList.get(2)).getRateLimiter().getRate(), 2);
@@ -513,7 +512,7 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
 
   private void setDefaultDatabaseQps(String maxQps) {
     ZKMetadataProvider.removeDatabaseConfig(_testPropertyStore, CommonConstants.DEFAULT_DATABASE);
-    CLUSTER_CONFIG_MAP.put(CommonConstants.Helix.DATABASE_QUERY_RATE_LIMIT, maxQps);
+    CLUSTER_CONFIG_MAP.put(CommonConstants.Helix.DATABASE_MAX_QUERIES_PER_SECOND, maxQps);
     _queryQuotaManager.processQueryRateLimitingClusterConfigChange();
   }
 
@@ -521,7 +520,7 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
     QuotaConfig quotaConfig = new QuotaConfig(null, maxQps);
     databaseConfig.setQuotaConfig(quotaConfig);
     ZKMetadataProvider.setDatabaseConfig(_testPropertyStore, databaseConfig);
-    _queryQuotaManager.createOrUpdateDatabaseRateLimiter(Collections.singletonList(CommonConstants.DEFAULT_DATABASE));
+    _queryQuotaManager.createDatabaseRateLimiter(CommonConstants.DEFAULT_DATABASE);
   }
 
   private void setQps(TableConfig tableConfig) {

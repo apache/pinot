@@ -194,9 +194,10 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
       throws Exception {
     if (maxQps == null) {
       HttpClient.wrapAndThrowHttpException(_httpClient.sendDeleteRequest(new URI(
-        _controllerRequestURLBuilder.forClusterConfigs() + "/" + CommonConstants.Helix.DATABASE_QUERY_RATE_LIMIT)));
+        _controllerRequestURLBuilder.forClusterConfigs() + "/"
+            + CommonConstants.Helix.DATABASE_MAX_QUERIES_PER_SECOND)));
     } else {
-      String payload = "{\"" + CommonConstants.Helix.DATABASE_QUERY_RATE_LIMIT + "\":\"" + maxQps + "\"}";
+      String payload = "{\"" + CommonConstants.Helix.DATABASE_MAX_QUERIES_PER_SECOND + "\":\"" + maxQps + "\"}";
       HttpClient.wrapAndThrowHttpException(
           _httpClient.sendJsonPostRequest(new URI(_controllerRequestURLBuilder.forClusterConfigs()), payload));
     }

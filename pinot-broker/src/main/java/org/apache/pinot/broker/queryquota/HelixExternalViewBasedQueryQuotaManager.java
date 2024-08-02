@@ -264,7 +264,9 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
     createOrUpdateDatabaseRateLimiter(Collections.singletonList(databaseName));
   }
 
-  public synchronized void createOrUpdateDatabaseRateLimiter(List<String> databaseNames) {
+  // Caller method need not worry about getting lock on _databaseRateLimiterMap
+  // as this method will do idempotent updates to the database rate limiters
+  private synchronized void createOrUpdateDatabaseRateLimiter(List<String> databaseNames) {
     ExternalView brokerResource = HelixHelper
         .getExternalViewForResource(_helixManager.getClusterManagmentTool(), _helixManager.getClusterName(),
             CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
@@ -644,9 +646,9 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
     HelixAdmin helixAdmin = _helixManager.getClusterManagmentTool();
     HelixConfigScope configScope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER)
         .forCluster(_helixManager.getClusterName()).build();
-    return Double.parseDouble(
-        helixAdmin.getConfig(configScope, Collections.singletonList(CommonConstants.Helix.DATABASE_QUERY_RATE_LIMIT))
-            .getOrDefault(CommonConstants.Helix.DATABASE_QUERY_RATE_LIMIT, "-1"));
+    return Double.parseDouble(helixAdmin.getConfig(configScope,
+            Collections.singletonList(CommonConstants.Helix.DATABASE_MAX_QUERIES_PER_SECOND))
+            .getOrDefault(CommonConstants.Helix.DATABASE_MAX_QUERIES_PER_SECOND, "-1"));
   }
 
   /**

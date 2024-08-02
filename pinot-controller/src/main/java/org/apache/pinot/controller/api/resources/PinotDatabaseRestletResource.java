@@ -183,8 +183,8 @@ public class PinotDatabaseRestletResource {
     HelixConfigScope configScope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER)
         .forCluster(_pinotHelixResourceManager.getHelixClusterName()).build();
     String defaultQueryQuota = helixAdmin.getConfig(configScope,
-            Collections.singletonList(CommonConstants.Helix.DATABASE_QUERY_RATE_LIMIT))
-            .getOrDefault(CommonConstants.Helix.DATABASE_QUERY_RATE_LIMIT, null);
+            Collections.singletonList(CommonConstants.Helix.DATABASE_MAX_QUERIES_PER_SECOND))
+            .getOrDefault(CommonConstants.Helix.DATABASE_MAX_QUERIES_PER_SECOND, null);
     return new QuotaConfig(null, defaultQueryQuota);
   }
 }
