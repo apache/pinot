@@ -153,7 +153,7 @@ public class AdaptiveServerSelectorTest {
     }
     for (int ii = 0; ii < 10; ii++) {
       for (String server : _servers) {
-        serverRoutingStatsManager.recordStatsAfterQuerySubmission(-1, server);
+        serverRoutingStatsManager.recordStatsForQuerySubmission(-1, server);
         waitForStatsUpdate(serverRoutingStatsManager, ++taskCount);
       }
     }
@@ -187,7 +187,7 @@ public class AdaptiveServerSelectorTest {
 
     for (int ii = 0; ii < _servers.size(); ii++) {
       for (int jj = 0; jj < ii; jj++) {
-        serverRoutingStatsManager.recordStatsAfterQuerySubmission(-1, _servers.get(ii));
+        serverRoutingStatsManager.recordStatsForQuerySubmission(-1, _servers.get(ii));
         waitForStatsUpdate(serverRoutingStatsManager, ++taskCount);
       }
     }
@@ -232,15 +232,15 @@ public class AdaptiveServerSelectorTest {
     numInflightReqMap.put("server2", 11);
     numInflightReqMap.put("server3", 15);
     numInflightReqMap.put("server4", 13);
-    serverRoutingStatsManager.recordStatsAfterQuerySubmission(-1, _servers.get(0));
+    serverRoutingStatsManager.recordStatsForQuerySubmission(-1, _servers.get(0));
     waitForStatsUpdate(serverRoutingStatsManager, ++taskCount);
-    serverRoutingStatsManager.recordStatsAfterQuerySubmission(-1, _servers.get(0));
+    serverRoutingStatsManager.recordStatsForQuerySubmission(-1, _servers.get(0));
     waitForStatsUpdate(serverRoutingStatsManager, ++taskCount);
-    serverRoutingStatsManager.recordStatsAfterQuerySubmission(-1, _servers.get(2));
+    serverRoutingStatsManager.recordStatsForQuerySubmission(-1, _servers.get(2));
     waitForStatsUpdate(serverRoutingStatsManager, ++taskCount);
-    serverRoutingStatsManager.recordStatsAfterQuerySubmission(-1, _servers.get(2));
+    serverRoutingStatsManager.recordStatsForQuerySubmission(-1, _servers.get(2));
     waitForStatsUpdate(serverRoutingStatsManager, ++taskCount);
-    serverRoutingStatsManager.recordStatsAfterQuerySubmission(-1, _servers.get(2));
+    serverRoutingStatsManager.recordStatsForQuerySubmission(-1, _servers.get(2));
     waitForStatsUpdate(serverRoutingStatsManager, ++taskCount);
 
     serverRankingWithVal = selector.fetchAllServerRankingsWithScores();
@@ -290,7 +290,7 @@ public class AdaptiveServerSelectorTest {
 
       // Route the request to the best server.
       selectedServer = serverRankingWithVal.get(0).getLeft();
-      serverRoutingStatsManager.recordStatsAfterQuerySubmission(-1, selectedServer);
+      serverRoutingStatsManager.recordStatsForQuerySubmission(-1, selectedServer);
       waitForStatsUpdate(serverRoutingStatsManager, ++taskCount);
       int numReq = numInflightReqMap.get(selectedServer) + 1;
       numInflightReqMap.put(selectedServer, numReq);
@@ -484,7 +484,7 @@ public class AdaptiveServerSelectorTest {
     // TEST 2: Populate all servers with equal numInFlightRequests and latencies.
     for (int ii = 0; ii < 10; ii++) {
       for (String server : _servers) {
-        serverRoutingStatsManager.recordStatsAfterQuerySubmission(-1, server);
+        serverRoutingStatsManager.recordStatsForQuerySubmission(-1, server);
         waitForStatsUpdate(serverRoutingStatsManager, ++taskCount);
       }
     }
@@ -571,7 +571,7 @@ public class AdaptiveServerSelectorTest {
 
       // Route the request to the best server.
       selectedServer = serverRankingWithVal.get(0).getLeft();
-      serverRoutingStatsManager.recordStatsAfterQuerySubmission(-1, selectedServer);
+      serverRoutingStatsManager.recordStatsForQuerySubmission(-1, selectedServer);
       waitForStatsUpdate(serverRoutingStatsManager, ++taskCount);
 
       if (rand.nextBoolean()) {

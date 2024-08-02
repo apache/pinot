@@ -21,7 +21,6 @@ package org.apache.pinot.query.runtime.plan.server;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
@@ -70,10 +69,10 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
     if (visit(node.getInputs().get(0), context)) {
       PinotQuery pinotQuery = context.getPinotQuery();
       if (pinotQuery.getGroupByList() == null) {
-        List<Expression> groupByList = CalciteRexExpressionParser.convertRexNodes(node.getGroupSet(), pinotQuery);
+        List<Expression> groupByList = CalciteRexExpressionParser.convertInputRefs(node.getGroupKeys(), pinotQuery);
         pinotQuery.setGroupByList(groupByList);
         pinotQuery.setSelectList(
-            CalciteRexExpressionParser.convertAggregateList(groupByList, node.getAggCalls(), node.getFilterArgIndices(),
+            CalciteRexExpressionParser.convertAggregateList(groupByList, node.getAggCalls(), node.getFilterArgs(),
                 pinotQuery));
         if (node.getAggType() == AggregateNode.AggType.DIRECT) {
           pinotQuery.putToQueryOptions(CommonConstants.Broker.Request.QueryOptionKey.SERVER_RETURN_FINAL_RESULT,
@@ -144,8 +143,8 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
           resultDataContainer.addAll(block.getContainer());
         }
       }
-      ServerPlanRequestUtils.attachDynamicFilter(context.getPinotQuery(), node.getJoinKeys(), resultDataContainer,
-          dataSchema);
+      ServerPlanRequestUtils.attachDynamicFilter(context.getPinotQuery(), node.getLeftKeys(), node.getRightKeys(),
+          resultDataContainer, dataSchema);
     }
     return null;
   }
@@ -177,7 +176,7 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
     if (visit(node.getInputs().get(0), context)) {
       PinotQuery pinotQuery = context.getPinotQuery();
       if (pinotQuery.getOrderByList() == null) {
-        if (!node.getCollationKeys().isEmpty()) {
+        if (!node.getCollations().isEmpty()) {
           pinotQuery.setOrderByList(CalciteRexExpressionParser.convertOrderByList(node, pinotQuery));
         }
         if (node.getFetch() >= 0) {
@@ -201,8 +200,12 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
     String rawTableName = TableNameBuilder.extractRawTableName(node.getTableName());
     dataSource.setTableName(rawTableName);
     context.getPinotQuery().setDataSource(dataSource);
-    context.getPinotQuery().setSelectList(
-        node.getTableScanColumns().stream().map(RequestUtils::getIdentifierExpression).collect(Collectors.toList()));
+    List<String> columns = node.getColumns();
+    List<Expression> selectList = new ArrayList<>(columns.size());
+    for (String column : columns) {
+      selectList.add(RequestUtils.getIdentifierExpression(column));
+    }
+    context.getPinotQuery().setSelectList(selectList);
     return null;
   }
 

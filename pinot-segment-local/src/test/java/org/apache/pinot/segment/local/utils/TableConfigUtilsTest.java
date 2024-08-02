@@ -41,14 +41,17 @@ import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.StarTreeAggregationConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableCustomConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TagOverrideConfig;
+import org.apache.pinot.spi.config.table.TenantConfig;
 import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.table.assignment.InstanceReplicaGroupPartitionConfig;
+import org.apache.pinot.spi.config.table.assignment.InstanceTagPoolConfig;
 import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
@@ -322,7 +325,10 @@ public class TableConfigUtilsTest {
 
     // invalid transform config since Groovy is disabled
     try {
-      TableConfigUtils.validate(tableConfig, schema, null, true);
+      TableConfigUtils.setDisableGroovy(true);
+      TableConfigUtils.validate(tableConfig, schema, null);
+      // Reset to false
+      TableConfigUtils.setDisableGroovy(false);
       Assert.fail("Should fail when Groovy functions disabled but found in transform config");
     } catch (IllegalStateException e) {
       // expected
@@ -355,7 +361,10 @@ public class TableConfigUtilsTest {
     // invalid filter config since Groovy is disabled
     ingestionConfig.setFilterConfig(new FilterConfig("Groovy({timestamp > 0}, timestamp)"));
     try {
-      TableConfigUtils.validate(tableConfig, schema, null, true);
+      TableConfigUtils.setDisableGroovy(true);
+      TableConfigUtils.validate(tableConfig, schema, null);
+      // Reset to false
+      TableConfigUtils.setDisableGroovy(false);
       Assert.fail("Should fail when Groovy functions disabled but found in filter config");
     } catch (IllegalStateException e) {
       // expected
@@ -2110,7 +2119,7 @@ public class TableConfigUtilsTest {
     }
 
     // validate that TASK config will be skipped with skip string.
-    TableConfigUtils.validate(tableConfig, schema, "TASK,UPSERT", false);
+    TableConfigUtils.validate(tableConfig, schema, "TASK,UPSERT");
 
     // invalid period
     HashMap<String, String> invalidPeriodConfig = new HashMap<>(realtimeToOfflineTaskConfig);
@@ -2346,14 +2355,22 @@ public class TableConfigUtilsTest {
 
     TableConfigUtils.validateTaskConfigs(tableConfig, schema);
 
-    // test with invalid invalidRecordsThresholdPercents
+    // test with invalidRecordsThresholdPercents as 0
     upsertCompactionTaskConfig = ImmutableMap.of("invalidRecordsThresholdPercent", "0");
     TableConfig zeroPercentTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
         .setUpsertConfig(upsertConfig)
         .setTaskConfig(new TableTaskConfig(ImmutableMap.of("UpsertCompactionTask", upsertCompactionTaskConfig)))
         .build();
+    TableConfigUtils.validateTaskConfigs(zeroPercentTableConfig, schema);
+
+    // test with invalid invalidRecordsThresholdPercents as -1 and 110
+    upsertCompactionTaskConfig = ImmutableMap.of("invalidRecordsThresholdPercent", "-1");
+    TableConfig negativePercentTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setUpsertConfig(upsertConfig)
+        .setTaskConfig(new TableTaskConfig(ImmutableMap.of("UpsertCompactionTask", upsertCompactionTaskConfig)))
+        .build();
     Assert.assertThrows(IllegalStateException.class,
-        () -> TableConfigUtils.validateTaskConfigs(zeroPercentTableConfig, schema));
+        () -> TableConfigUtils.validateTaskConfigs(negativePercentTableConfig, schema));
     upsertCompactionTaskConfig = ImmutableMap.of("invalidRecordsThresholdPercent", "110");
     TableConfig hundredTenPercentTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
         .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL))
@@ -2451,5 +2468,115 @@ public class TableConfigUtilsTest {
     streamConfigs.put("stream.pulsar.decoder.class.name",
         "org.apache.pinot.plugin.inputformat.protobuf.ProtoBufMessageDecoder");
     return streamConfigs;
+  }
+
+  @Test
+  public void testValidIGnRGOfflineTable() {
+    InstanceAssignmentConfig config =
+        new InstanceAssignmentConfig(new InstanceTagPoolConfig("DefaultTenant", true, 0, null), null,
+            new InstanceReplicaGroupPartitionConfig(true, 0, 0, 0, 0, 0, false, null), null, false);
+
+    TableConfig tableConfig =
+        new TableConfig("table", TableType.OFFLINE.name(), new SegmentsValidationAndRetentionConfig(),
+            new TenantConfig("DefaultTenant", "DefaultTenant", null), new IndexingConfig(), new TableCustomConfig(null),
+            null, null, null, null, Map.of("OFFLINE", config), null, null, null, null, null, null, false, null, null,
+            null);
+
+    Assert.assertTrue(TableConfigUtils.isTableUsingInstancePoolAndReplicaGroup(tableConfig));
+  }
+
+  @Test
+  public void testValidIGnRGRealtimeTable() {
+    InstanceAssignmentConfig config =
+        new InstanceAssignmentConfig(new InstanceTagPoolConfig("DefaultTenant", true, 0, null), null,
+            new InstanceReplicaGroupPartitionConfig(true, 0, 0, 0, 0, 0, false, null), null, false);
+
+    TableConfig tableConfig =
+        new TableConfig("table", TableType.REALTIME.name(), new SegmentsValidationAndRetentionConfig(),
+            new TenantConfig("DefaultTenant", "DefaultTenant", null), new IndexingConfig(), new TableCustomConfig(null),
+            null, null, null, null, Map.of("CONSUMING", config), null, null, null, null, null, null, false, null, null,
+            null);
+
+    Assert.assertTrue(TableConfigUtils.isTableUsingInstancePoolAndReplicaGroup(tableConfig));
+  }
+
+  @Test
+  public void testNoIACOfflineTable() {
+    TableConfig tableConfig =
+        new TableConfig("table", TableType.OFFLINE.name(), new SegmentsValidationAndRetentionConfig(),
+            new TenantConfig("DefaultTenant", "DefaultTenant", null), new IndexingConfig(), new TableCustomConfig(null),
+            null, null, null, null, null, null, null, null, null, null, null, false, null, null, null);
+
+    Assert.assertFalse(TableConfigUtils.isTableUsingInstancePoolAndReplicaGroup(tableConfig));
+  }
+
+  @Test
+  public void testNoIACRealtimeTable() {
+    TableConfig tableConfig =
+        new TableConfig("table", TableType.REALTIME.name(), new SegmentsValidationAndRetentionConfig(),
+            new TenantConfig("DefaultTenant", "DefaultTenant", null), new IndexingConfig(), new TableCustomConfig(null),
+            null, null, null, null, null, null, null, null, null, null, null, false, null, null, null);
+
+    Assert.assertFalse(TableConfigUtils.isTableUsingInstancePoolAndReplicaGroup(tableConfig));
+  }
+
+  @Test
+  public void testNoPoolsOfflineTable() {
+    InstanceAssignmentConfig config =
+        new InstanceAssignmentConfig(new InstanceTagPoolConfig("DefaultTenant", false, 0, null), null,
+            new InstanceReplicaGroupPartitionConfig(true, 0, 0, 0, 0, 0, false, null), null, false);
+
+    TableConfig tableConfig =
+        new TableConfig("table", TableType.OFFLINE.name(), new SegmentsValidationAndRetentionConfig(),
+            new TenantConfig("DefaultTenant", "DefaultTenant", null), new IndexingConfig(), new TableCustomConfig(null),
+            null, null, null, null, Map.of("OFFLINE", config), null, null, null, null, null, null, false, null, null,
+            null);
+
+    Assert.assertFalse(TableConfigUtils.isTableUsingInstancePoolAndReplicaGroup(tableConfig));
+  }
+
+  @Test
+  public void testNoPoolsRealtimeTable() {
+    InstanceAssignmentConfig config =
+        new InstanceAssignmentConfig(new InstanceTagPoolConfig("DefaultTenant", false, 0, null), null,
+            new InstanceReplicaGroupPartitionConfig(true, 0, 0, 0, 0, 0, false, null), null, false);
+
+    TableConfig tableConfig =
+        new TableConfig("table", TableType.REALTIME.name(), new SegmentsValidationAndRetentionConfig(),
+            new TenantConfig("DefaultTenant", "DefaultTenant", null), new IndexingConfig(), new TableCustomConfig(null),
+            null, null, null, null, Map.of("CONSUMING", config), null, null, null, null, null, null, false, null, null,
+            null);
+
+    Assert.assertFalse(TableConfigUtils.isTableUsingInstancePoolAndReplicaGroup(tableConfig));
+  }
+
+  @Test
+  public void testNoRgOfflineTable() {
+    InstanceAssignmentConfig config =
+        new InstanceAssignmentConfig(new InstanceTagPoolConfig("DefaultTenant", true, 0, null), null,
+            new InstanceReplicaGroupPartitionConfig(false, 0, 0, 0, 0, 0, false, null), null, false);
+
+    TableConfig tableConfig =
+        new TableConfig("table", TableType.OFFLINE.name(), new SegmentsValidationAndRetentionConfig(),
+            new TenantConfig("DefaultTenant", "DefaultTenant", null), new IndexingConfig(), new TableCustomConfig(null),
+            null, null, null, null, Map.of("OFFLINE", config), null, null, null, null, null, null, false, null, null,
+            null);
+
+    Assert.assertFalse(TableConfigUtils.isTableUsingInstancePoolAndReplicaGroup(tableConfig));
+  }
+
+  @Test
+  public void testNoRGRealtimeTable() {
+    InstanceAssignmentConfig config =
+        new InstanceAssignmentConfig(new InstanceTagPoolConfig("DefaultTenant", true, 0, null), null,
+            new InstanceReplicaGroupPartitionConfig(false, 0, 0, 0, 0, 0, false, null), null, false);
+
+    TableConfig tableConfig =
+        new TableConfig("table", TableType.REALTIME.name(), new SegmentsValidationAndRetentionConfig(),
+            new TenantConfig("DefaultTenant", "DefaultTenant", null), new IndexingConfig(), new TableCustomConfig(null),
+            null, null, null, null, Map.of("CONSUMING", config), null, null, null, null, null, null, false, null, null,
+            null);
+
+    Assert.assertFalse(TableConfigUtils.isTableUsingInstancePoolAndReplicaGroup(tableConfig));
   }
 }

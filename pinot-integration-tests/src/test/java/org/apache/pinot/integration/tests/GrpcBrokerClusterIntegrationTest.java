@@ -53,6 +53,11 @@ public class GrpcBrokerClusterIntegrationTest extends BaseClusterIntegrationTest
   }
 
   @Override
+  protected void overrideControllerConf(Map<String, Object> properties) {
+    properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, false);
+  }
+
+  @Override
   protected void overrideBrokerConf(PinotConfiguration brokerConf) {
     brokerConf.setProperty(Broker.BROKER_REQUEST_HANDLER_TYPE, "grpc");
   }
@@ -98,16 +103,11 @@ public class GrpcBrokerClusterIntegrationTest extends BaseClusterIntegrationTest
 
   protected void startHybridCluster()
       throws Exception {
-    // Start Zk and Kafka
     startZk();
-    startKafka();
-
-    // Start the Pinot cluster
-    Map<String, Object> properties = getDefaultControllerConfiguration();
-    properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, false);
-    startController(properties);
-    startBrokers(1);
+    startController();
+    startBroker();
     startServers(2);
+    startKafka();
 
     // Create tenants
     createBrokerTenant(TENANT_NAME, 1);

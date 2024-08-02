@@ -19,6 +19,7 @@
 package org.apache.pinot.broker.requesthandler;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -30,15 +31,14 @@ import javax.annotation.Nullable;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
-import org.apache.commons.lang.StringUtils;
-import org.apache.http.conn.HttpClientConnectionManager;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.broker.api.AccessControl;
 import org.apache.pinot.broker.api.RequesterIdentity;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.querylog.QueryLogger;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.broker.routing.BrokerRoutingManager;
-import org.apache.pinot.calcite.jdbc.CalciteSchemaBuilder;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.BrokerMeter;
@@ -64,8 +64,6 @@ import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.runtime.MultiStageStatsTreeBuilder;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
-import org.apache.pinot.query.type.TypeFactory;
-import org.apache.pinot.query.type.TypeSystem;
 import org.apache.pinot.spi.auth.TableAuthorizationResult;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.DatabaseConflictException;
@@ -80,8 +78,11 @@ import org.slf4j.LoggerFactory;
 public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(MultiStageBrokerRequestHandler.class);
 
+  private static final int NUM_UNAVAILABLE_SEGMENTS_TO_LOG = 10;
+
   private final WorkerManager _workerManager;
   private final QueryDispatcher _queryDispatcher;
+  private final PinotCatalog _catalog;
 
   public MultiStageBrokerRequestHandler(PinotConfiguration config, String brokerId, BrokerRoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache) {
@@ -90,6 +91,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     int port = Integer.parseInt(config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT));
     _workerManager = new WorkerManager(hostname, port, _routingManager);
     _queryDispatcher = new QueryDispatcher(new MailboxService(hostname, port, config));
+    _catalog = new PinotCatalog(tableCache);
     LOGGER.info("Initialized MultiStageBrokerRequestHandler on host: {}, port: {} with broker id: {}, timeout: {}ms, "
             + "query log max length: {}, query log max rate: {}", hostname, port, _brokerId, _brokerTimeoutMs,
         _queryLogger.getMaxQueryLengthToLog(), _queryLogger.getLogRateLimit());
@@ -131,9 +133,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       Long timeoutMsFromQueryOption = QueryOptionsUtils.getTimeoutMs(queryOptions);
       queryTimeoutMs = timeoutMsFromQueryOption != null ? timeoutMsFromQueryOption : _brokerTimeoutMs;
       String database = DatabaseUtils.extractDatabaseFromQueryRequest(queryOptions, httpHeaders);
-      QueryEnvironment queryEnvironment = new QueryEnvironment(new TypeFactory(new TypeSystem()),
-          CalciteSchemaBuilder.asRootSchema(new PinotCatalog(database, _tableCache), database), _workerManager,
-          _tableCache);
+      QueryEnvironment queryEnvironment = new QueryEnvironment(database, _tableCache, _workerManager);
       switch (sqlNodeAndOptions.getSqlNode().getKind()) {
         case EXPLAIN:
           queryPlanResult = queryEnvironment.explainQuery(query, sqlNodeAndOptions, requestId);
@@ -241,9 +241,11 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     for (Map.Entry<String, Set<String>> entry : dispatchableSubPlan.getTableToUnavailableSegmentsMap().entrySet()) {
       String tableName = entry.getKey();
       Set<String> unavailableSegments = entry.getValue();
-      numUnavailableSegments += unavailableSegments.size();
+      int unavailableSegmentsInSubPlan = unavailableSegments.size();
+      numUnavailableSegments += unavailableSegmentsInSubPlan;
       brokerResponse.addException(QueryException.getException(QueryException.SERVER_SEGMENT_MISSING_ERROR,
-          String.format("Find unavailable segments: %s for table: %s", unavailableSegments, tableName)));
+          String.format("Found %d unavailable segments for table %s: %s", unavailableSegmentsInSubPlan, tableName,
+              toSizeLimitedString(unavailableSegments, NUM_UNAVAILABLE_SEGMENTS_TO_LOG))));
     }
     requestContext.setNumUnavailableSegments(numUnavailableSegments);
 
@@ -267,17 +269,25 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
   private void fillOldBrokerResponseStats(BrokerResponseNativeV2 brokerResponse,
       List<MultiStageQueryStats.StageStats.Closed> queryStats, DispatchableSubPlan dispatchableSubPlan) {
-    List<DispatchablePlanFragment> stagePlans = dispatchableSubPlan.getQueryStageList();
-    List<PlanNode> planNodes = new ArrayList<>(stagePlans.size());
-    for (DispatchablePlanFragment stagePlan : stagePlans) {
-      planNodes.add(stagePlan.getPlanFragment().getFragmentRoot());
-    }
-    MultiStageStatsTreeBuilder treeBuilder = new MultiStageStatsTreeBuilder(planNodes, queryStats);
-    brokerResponse.setStageStats(treeBuilder.jsonStatsByStage(0));
-    for (MultiStageQueryStats.StageStats.Closed stageStats : queryStats) {
-      if (stageStats != null) { // for example pipeline breaker may not have stats
-        stageStats.forEach((type, stats) -> type.mergeInto(brokerResponse, stats));
+    try {
+      List<DispatchablePlanFragment> stagePlans = dispatchableSubPlan.getQueryStageList();
+      List<PlanNode> planNodes = new ArrayList<>(stagePlans.size());
+      for (DispatchablePlanFragment stagePlan : stagePlans) {
+        planNodes.add(stagePlan.getPlanFragment().getFragmentRoot());
       }
+      MultiStageStatsTreeBuilder treeBuilder = new MultiStageStatsTreeBuilder(planNodes, queryStats);
+      brokerResponse.setStageStats(treeBuilder.jsonStatsByStage(0));
+      for (MultiStageQueryStats.StageStats.Closed stageStats : queryStats) {
+        if (stageStats != null) { // for example pipeline breaker may not have stats
+          stageStats.forEach((type, stats) -> type.mergeInto(brokerResponse, stats));
+        }
+      }
+    } catch (Exception e) {
+      LOGGER.warn("Error encountered while collecting multi-stage stats", e);
+      brokerResponse.setStageStats(JsonNodeFactory.instance.objectNode().put(
+          "error",
+          "Error encountered while collecting multi-stage stats - " + e)
+      );
     }
   }
 
@@ -358,5 +368,16 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       Map<String, Integer> serverResponses) {
     // TODO: Support query cancellation for multi-stage engine
     throw new UnsupportedOperationException();
+  }
+
+  /**
+   * Returns the string representation of the Set of Strings with a limit on the number of elements.
+   * @param setOfStrings Set of strings
+   * @param limit Limit on the number of elements
+   * @return String representation of the set of the form [a,b,c...].
+   */
+  private static String toSizeLimitedString(Set<String> setOfStrings, int limit) {
+    return setOfStrings.stream().limit(limit)
+        .collect(Collectors.joining(", ", "[", setOfStrings.size() > limit ? "...]" : "]"));
   }
 }

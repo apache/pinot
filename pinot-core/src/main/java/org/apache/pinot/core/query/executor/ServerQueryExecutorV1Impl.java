@@ -30,7 +30,7 @@ import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.configuration2.ex.ConfigurationException;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.function.TransformFunctionType;
@@ -41,6 +41,7 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
+import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.common.ExplainPlanRowData;
 import org.apache.pinot.core.common.ExplainPlanRows;
 import org.apache.pinot.core.common.Operator;
@@ -72,7 +73,6 @@ import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.SegmentMetadata;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.exception.QueryCancelledException;
@@ -236,8 +236,8 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
           if (indexTimeMs > 0) {
             minIndexTimeMs = Math.min(minIndexTimeMs, indexTimeMs);
           }
-          long ingestionTimeMs = ((RealtimeTableDataManager)
-              tableDataManager).getPartitionIngestionTimeMs(indexSegment.getSegmentName());
+          long ingestionTimeMs =
+              ((RealtimeTableDataManager) tableDataManager).getPartitionIngestionTimeMs(indexSegment.getSegmentName());
           if (ingestionTimeMs > 0) {
             minIngestionTimeMs = Math.min(minIngestionTimeMs, ingestionTimeMs);
           }
@@ -602,8 +602,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
           result != null ? result.getClass().getSimpleName() : null);
       // Rewrite the expression
       function.setFunctionName(TransformFunctionType.IN_ID_SET.name());
-      arguments.set(1,
-          ExpressionContext.forLiteralContext(FieldSpec.DataType.STRING, ((IdSet) result).toBase64String()));
+      arguments.set(1, ExpressionContext.forLiteral(RequestUtils.getLiteral(((IdSet) result).toBase64String())));
     } else {
       for (ExpressionContext argument : arguments) {
         handleSubquery(argument, tableDataManager, indexSegments, timerContext, executorService, endTimeMs);

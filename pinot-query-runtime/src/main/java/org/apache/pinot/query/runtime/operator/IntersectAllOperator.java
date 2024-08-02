@@ -19,7 +19,6 @@
 package org.apache.pinot.query.runtime.operator;
 
 import java.util.List;
-import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
@@ -35,9 +34,9 @@ public class IntersectAllOperator extends SetOperator {
   private static final String EXPLAIN_NAME = "INTERSECT_ALL";
 
   public IntersectAllOperator(OpChainExecutionContext opChainExecutionContext,
-      List<MultiStageOperator> upstreamOperators,
+      List<MultiStageOperator> inputOperators,
       DataSchema dataSchema) {
-    super(opChainExecutionContext, upstreamOperators, dataSchema);
+    super(opChainExecutionContext, inputOperators, dataSchema);
   }
 
   @Override
@@ -50,7 +49,6 @@ public class IntersectAllOperator extends SetOperator {
     return LOGGER;
   }
 
-  @Nullable
   @Override
   public String toExplainString() {
     return EXPLAIN_NAME;

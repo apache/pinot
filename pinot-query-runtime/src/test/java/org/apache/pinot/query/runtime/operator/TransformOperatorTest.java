@@ -18,35 +18,35 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
-import com.google.common.collect.ImmutableList;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.mockito.Mock;
-import org.mockito.Mockito;
-import org.mockito.MockitoAnnotations;
-import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.when;
+import static org.mockito.MockitoAnnotations.openMocks;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
+
 
 public class TransformOperatorTest {
   private AutoCloseable _mocks;
-
   @Mock
-  private MultiStageOperator _upstreamOp;
+  private MultiStageOperator _input;
 
   @BeforeMethod
   public void setUp() {
-    _mocks = MockitoAnnotations.openMocks(this);
+    _mocks = openMocks(this);
   }
 
   @AfterMethod
@@ -57,180 +57,125 @@ public class TransformOperatorTest {
 
   @Test
   public void shouldHandleRefTransform() {
-    DataSchema upStreamSchema = new DataSchema(new String[]{"intCol", "strCol"}, new ColumnDataType[]{
+    DataSchema inputSchema = new DataSchema(new String[]{"intCol", "strCol"}, new ColumnDataType[]{
         ColumnDataType.INT, ColumnDataType.STRING
     });
+    when(_input.nextBlock()).thenReturn(
+        OperatorTestUtil.block(inputSchema, new Object[]{1, "a"}, new Object[]{2, "b"}));
     DataSchema resultSchema = new DataSchema(new String[]{"inCol", "strCol"},
         new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.STRING});
-    Mockito.when(_upstreamOp.nextBlock())
-        .thenReturn(OperatorTestUtil.block(upStreamSchema, new Object[]{1, "a"}, new Object[]{2, "b"}));
-    // Output column value
-    RexExpression.InputRef ref0 = new RexExpression.InputRef(0);
-    RexExpression.InputRef ref1 = new RexExpression.InputRef(1);
-    TransformOperator op = new TransformOperator(OperatorTestUtil.getTracingContext(), _upstreamOp, resultSchema,
-        ImmutableList.of(ref0, ref1), upStreamSchema);
-    TransferableBlock result = op.nextBlock();
-
-    Assert.assertTrue(!result.isErrorBlock());
-    List<Object[]> resultRows = result.getContainer();
-    List<Object[]> expectedRows = Arrays.asList(new Object[]{1, "a"}, new Object[]{2, "b"});
-    Assert.assertEquals(resultRows.size(), expectedRows.size());
-    Assert.assertEquals(resultRows.get(0), expectedRows.get(0));
-    Assert.assertEquals(resultRows.get(1), expectedRows.get(1));
+    List<RexExpression> projects = List.of(new RexExpression.InputRef(0), new RexExpression.InputRef(1));
+    TransformOperator operator = getOperator(inputSchema, resultSchema, projects);
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    assertEquals(resultRows.size(), 2);
+    assertEquals(resultRows.get(0), new Object[]{1, "a"});
+    assertEquals(resultRows.get(1), new Object[]{2, "b"});
   }
 
   @Test
   public void shouldHandleLiteralTransform() {
-    DataSchema upStreamSchema = new DataSchema(new String[]{"boolCol", "strCol"}, new ColumnDataType[]{
+    DataSchema inputSchema = new DataSchema(new String[]{"boolCol", "strCol"}, new ColumnDataType[]{
         ColumnDataType.BOOLEAN, ColumnDataType.STRING
     });
+    when(_input.nextBlock()).thenReturn(
+        OperatorTestUtil.block(inputSchema, new Object[]{1, "a"}, new Object[]{2, "b"}));
     DataSchema resultSchema = new DataSchema(new String[]{"boolCol", "strCol"},
         new ColumnDataType[]{ColumnDataType.BOOLEAN, ColumnDataType.STRING});
-    Mockito.when(_upstreamOp.nextBlock())
-        .thenReturn(OperatorTestUtil.block(upStreamSchema, new Object[]{1, "a"}, new Object[]{2, "b"}));
-    // Set up literal operands
-    RexExpression.Literal boolLiteral = new RexExpression.Literal(ColumnDataType.BOOLEAN, 1);
-    RexExpression.Literal strLiteral = new RexExpression.Literal(ColumnDataType.STRING, "str");
-    TransformOperator op = new TransformOperator(OperatorTestUtil.getTracingContext(), _upstreamOp, resultSchema,
-        ImmutableList.of(boolLiteral, strLiteral), upStreamSchema);
-    TransferableBlock result = op.nextBlock();
-    // Literal operands should just output original literals.
-    Assert.assertTrue(!result.isErrorBlock());
-    List<Object[]> resultRows = result.getContainer();
-    List<Object[]> expectedRows = Arrays.asList(new Object[]{1, "str"}, new Object[]{1, "str"});
-    Assert.assertEquals(resultRows.size(), expectedRows.size());
-    Assert.assertEquals(resultRows.get(0), expectedRows.get(0));
-    Assert.assertEquals(resultRows.get(1), expectedRows.get(1));
+    List<RexExpression> projects =
+        List.of(RexExpression.Literal.TRUE, new RexExpression.Literal(ColumnDataType.STRING, "str"));
+    TransformOperator operator = getOperator(inputSchema, resultSchema, projects);
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    assertEquals(resultRows.size(), 2);
+    assertEquals(resultRows.get(0), new Object[]{1, "str"});
+    assertEquals(resultRows.get(1), new Object[]{1, "str"});
   }
 
   @Test
   public void shouldHandlePlusMinusFuncTransform() {
-    DataSchema upStreamSchema = new DataSchema(new String[]{"doubleCol1", "doubleCol2"}, new ColumnDataType[]{
+    DataSchema inputSchema = new DataSchema(new String[]{"doubleCol1", "doubleCol2"}, new ColumnDataType[]{
         ColumnDataType.DOUBLE, ColumnDataType.DOUBLE
     });
-    Mockito.when(_upstreamOp.nextBlock())
-        .thenReturn(OperatorTestUtil.block(upStreamSchema, new Object[]{1.0, 1.0}, new Object[]{2.0, 3.0}));
-    // Run a plus and minus function operand on double columns.
-    RexExpression.InputRef ref0 = new RexExpression.InputRef(0);
-    RexExpression.InputRef ref1 = new RexExpression.InputRef(1);
-    List<RexExpression> functionOperands = ImmutableList.of(ref0, ref1);
-    RexExpression.FunctionCall plus01 =
-        new RexExpression.FunctionCall(ColumnDataType.DOUBLE, SqlKind.PLUS.name(), functionOperands);
-    RexExpression.FunctionCall minus01 =
-        new RexExpression.FunctionCall(ColumnDataType.DOUBLE, SqlKind.MINUS.name(), functionOperands);
+    when(_input.nextBlock()).thenReturn(
+        OperatorTestUtil.block(inputSchema, new Object[]{1.0, 1.0}, new Object[]{2.0, 3.0}));
     DataSchema resultSchema = new DataSchema(new String[]{"plusR", "minusR"},
         new ColumnDataType[]{ColumnDataType.DOUBLE, ColumnDataType.DOUBLE});
-    TransformOperator op = new TransformOperator(OperatorTestUtil.getTracingContext(), _upstreamOp, resultSchema,
-        ImmutableList.of(plus01, minus01), upStreamSchema);
-    TransferableBlock result = op.nextBlock();
-    Assert.assertTrue(!result.isErrorBlock());
-    List<Object[]> resultRows = result.getContainer();
-    List<Object[]> expectedRows = Arrays.asList(new Object[]{2.0, 0.0}, new Object[]{5.0, -1.0});
-    Assert.assertEquals(resultRows.size(), expectedRows.size());
-    Assert.assertEquals(resultRows.get(0), expectedRows.get(0));
-    Assert.assertEquals(resultRows.get(1), expectedRows.get(1));
+    List<RexExpression> operands = List.of(new RexExpression.InputRef(0), new RexExpression.InputRef(1));
+    List<RexExpression> projects =
+        List.of(new RexExpression.FunctionCall(ColumnDataType.DOUBLE, SqlKind.PLUS.name(), operands),
+            new RexExpression.FunctionCall(ColumnDataType.DOUBLE, SqlKind.MINUS.name(), operands));
+    TransformOperator operator = getOperator(inputSchema, resultSchema, projects);
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    assertEquals(resultRows.size(), 2);
+    assertEquals(resultRows.get(0), new Object[]{2.0, 0.0});
+    assertEquals(resultRows.get(1), new Object[]{5.0, -1.0});
   }
 
   @Test
   public void shouldThrowOnTypeMismatchFuncTransform() {
-    DataSchema upStreamSchema = new DataSchema(new String[]{"string1", "string2"}, new ColumnDataType[]{
+    DataSchema inputSchema = new DataSchema(new String[]{"string1", "string2"}, new ColumnDataType[]{
         ColumnDataType.STRING, ColumnDataType.STRING
     });
-    Mockito.when(_upstreamOp.nextBlock())
-        .thenReturn(OperatorTestUtil.block(upStreamSchema, new Object[]{"str1", "str1"}, new Object[]{"str2", "str3"}));
-    // Run a plus and minus function operand on string columns.
-    RexExpression.InputRef ref0 = new RexExpression.InputRef(0);
-    RexExpression.InputRef ref1 = new RexExpression.InputRef(1);
-    List<RexExpression> functionOperands = ImmutableList.of(ref0, ref1);
-    RexExpression.FunctionCall plus01 =
-        new RexExpression.FunctionCall(ColumnDataType.DOUBLE, SqlKind.PLUS.name(), functionOperands);
-    RexExpression.FunctionCall minus01 =
-        new RexExpression.FunctionCall(ColumnDataType.DOUBLE, SqlKind.MINUS.name(), functionOperands);
+    when(_input.nextBlock()).thenReturn(
+        OperatorTestUtil.block(inputSchema, new Object[]{"str1", "str1"}, new Object[]{"str2", "str3"}));
     DataSchema resultSchema = new DataSchema(new String[]{"plusR", "minusR"},
         new ColumnDataType[]{ColumnDataType.DOUBLE, ColumnDataType.DOUBLE});
-    TransformOperator op = new TransformOperator(OperatorTestUtil.getTracingContext(), _upstreamOp, resultSchema,
-        ImmutableList.of(plus01, minus01), upStreamSchema);
-
-    TransferableBlock result = op.nextBlock();
-    Assert.assertTrue(result.isErrorBlock());
-    Assert.assertTrue(result.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains("NumberFormatException"));
+    List<RexExpression> operands = List.of(new RexExpression.InputRef(0), new RexExpression.InputRef(1));
+    List<RexExpression> projects =
+        List.of(new RexExpression.FunctionCall(ColumnDataType.DOUBLE, SqlKind.PLUS.name(), operands),
+            new RexExpression.FunctionCall(ColumnDataType.DOUBLE, SqlKind.MINUS.name(), operands));
+    TransformOperator operator = getOperator(inputSchema, resultSchema, projects);
+    TransferableBlock block = operator.nextBlock();
+    assertTrue(block.isErrorBlock());
+    assertTrue(block.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains("NumberFormatException"));
   }
 
   @Test
   public void shouldPropagateUpstreamError() {
-    DataSchema upStreamSchema = new DataSchema(new String[]{"string1", "string2"}, new ColumnDataType[]{
+    DataSchema inputSchema = new DataSchema(new String[]{"string1", "string2"}, new ColumnDataType[]{
         ColumnDataType.STRING, ColumnDataType.STRING
     });
-    Mockito.when(_upstreamOp.nextBlock())
-        .thenReturn(TransferableBlockUtils.getErrorTransferableBlock(new Exception("transformError")));
-    RexExpression.Literal boolLiteral = new RexExpression.Literal(ColumnDataType.BOOLEAN, 1);
-    RexExpression.Literal strLiteral = new RexExpression.Literal(ColumnDataType.STRING, "str");
+    when(_input.nextBlock()).thenReturn(
+        TransferableBlockUtils.getErrorTransferableBlock(new Exception("transformError")));
     DataSchema resultSchema = new DataSchema(new String[]{"inCol", "strCol"},
         new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.STRING});
-    TransformOperator op = new TransformOperator(OperatorTestUtil.getTracingContext(), _upstreamOp, resultSchema,
-        ImmutableList.of(boolLiteral, strLiteral), upStreamSchema);
-    TransferableBlock result = op.nextBlock();
-    Assert.assertTrue(result.isErrorBlock());
-    Assert.assertTrue(result.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains("transformError"));
+    List<RexExpression> projects =
+        List.of(RexExpression.Literal.TRUE, new RexExpression.Literal(ColumnDataType.STRING, "str"));
+    TransformOperator operator = getOperator(inputSchema, resultSchema, projects);
+    TransferableBlock block = operator.nextBlock();
+    assertTrue(block.isErrorBlock());
+    assertTrue(block.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains("transformError"));
   }
 
   @Test
   public void testNoopBlock() {
-    DataSchema upStreamSchema = new DataSchema(new String[]{"string1", "string2"}, new ColumnDataType[]{
+    DataSchema inputSchema = new DataSchema(new String[]{"string1", "string2"}, new ColumnDataType[]{
         ColumnDataType.STRING, ColumnDataType.STRING
     });
-    Mockito.when(_upstreamOp.nextBlock())
-        .thenReturn(OperatorTestUtil.block(upStreamSchema, new Object[]{"a", "a"}, new Object[]{"b", "b"}))
-        .thenReturn(OperatorTestUtil.block(upStreamSchema, new Object[]{"c", "c"}, new Object[]{"d", "d"}, new Object[]{
+    when(_input.nextBlock()).thenReturn(
+            OperatorTestUtil.block(inputSchema, new Object[]{"a", "a"}, new Object[]{"b", "b"}))
+        .thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{"c", "c"}, new Object[]{"d", "d"}, new Object[]{
             "e", "e"
         }));
-    RexExpression.Literal boolLiteral = new RexExpression.Literal(ColumnDataType.BOOLEAN, 1);
-    RexExpression.Literal strLiteral = new RexExpression.Literal(ColumnDataType.STRING, "str");
     DataSchema resultSchema = new DataSchema(new String[]{"boolCol", "strCol"},
         new ColumnDataType[]{ColumnDataType.BOOLEAN, ColumnDataType.STRING});
-    TransformOperator op = new TransformOperator(OperatorTestUtil.getTracingContext(), _upstreamOp, resultSchema,
-        ImmutableList.of(boolLiteral, strLiteral), upStreamSchema);
-    TransferableBlock result = op.nextBlock();
-    // First block has two rows
-    Assert.assertFalse(result.isErrorBlock());
-    List<Object[]> resultRows = result.getContainer();
-    List<Object[]> expectedRows = Arrays.asList(new Object[]{1, "str"}, new Object[]{1, "str"});
-    Assert.assertEquals(resultRows.size(), expectedRows.size());
-    Assert.assertEquals(resultRows.get(0), expectedRows.get(0));
-    Assert.assertEquals(resultRows.get(1), expectedRows.get(1));
-    // Second block has one row.
-    result = op.nextBlock();
-    Assert.assertFalse(result.isErrorBlock());
-    resultRows = result.getContainer();
-    expectedRows = Arrays.asList(new Object[]{1, "str"}, new Object[]{1, "str"}, new Object[]{1, "str"});
-    Assert.assertEquals(resultRows.size(), expectedRows.size());
-    Assert.assertEquals(resultRows.get(0), expectedRows.get(0));
-    Assert.assertEquals(resultRows.get(1), expectedRows.get(1));
-    Assert.assertEquals(resultRows.get(2), expectedRows.get(2));
+    List<RexExpression> projects =
+        List.of(RexExpression.Literal.TRUE, new RexExpression.Literal(ColumnDataType.STRING, "str"));
+    TransformOperator operator = getOperator(inputSchema, resultSchema, projects);
+    // First block has 1 row.
+    List<Object[]> resultRows1 = operator.nextBlock().getContainer();
+    assertEquals(resultRows1.size(), 2);
+    assertEquals(resultRows1.get(0), new Object[]{1, "str"});
+    assertEquals(resultRows1.get(1), new Object[]{1, "str"});
+    // Second block has 2 rows.
+    List<Object[]> resultRows2 = operator.nextBlock().getContainer();
+    assertEquals(resultRows2.size(), 3);
+    assertEquals(resultRows2.get(0), new Object[]{1, "str"});
+    assertEquals(resultRows2.get(1), new Object[]{1, "str"});
+    assertEquals(resultRows2.get(2), new Object[]{1, "str"});
   }
 
-  @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*transform operand "
-      + "should not be empty.*")
-  public void testWrongNumTransform() {
-    DataSchema resultSchema = new DataSchema(new String[]{"inCol", "strCol"},
-        new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.STRING});
-    DataSchema upStreamSchema = new DataSchema(new String[]{"string1", "string2"}, new ColumnDataType[]{
-        ColumnDataType.STRING, ColumnDataType.STRING
-    });
-    new TransformOperator(OperatorTestUtil.getTracingContext(), _upstreamOp, resultSchema, new ArrayList<>(),
-        upStreamSchema);
+  private TransformOperator getOperator(DataSchema inputSchema, DataSchema resultSchema, List<RexExpression> projects) {
+    return new TransformOperator(OperatorTestUtil.getTracingContext(), _input, inputSchema,
+        new ProjectNode(-1, resultSchema, PlanNode.NodeHint.EMPTY, List.of(), projects));
   }
-
-  @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*doesn't match "
-      + "transform operand size.*")
-  public void testMismatchedSchemaOperandSize() {
-    DataSchema resultSchema = new DataSchema(new String[]{"inCol", "strCol"},
-        new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.STRING});
-    DataSchema upStreamSchema = new DataSchema(new String[]{"string1", "string2"}, new ColumnDataType[]{
-        ColumnDataType.STRING, ColumnDataType.STRING
-    });
-    RexExpression.InputRef ref0 = new RexExpression.InputRef(0);
-    new TransformOperator(OperatorTestUtil.getTracingContext(), _upstreamOp, resultSchema, ImmutableList.of(ref0),
-        upStreamSchema);
-  }
-};
+}

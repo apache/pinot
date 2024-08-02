@@ -31,7 +31,7 @@ import java.net.URL;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
-import org.apache.http.HttpException;
+import org.apache.hc.core5.http.HttpException;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.minion.MinionClient;
 import org.apache.pinot.common.utils.tls.TlsUtils;

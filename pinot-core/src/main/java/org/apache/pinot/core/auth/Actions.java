@@ -34,6 +34,7 @@ public class Actions {
     public static final String CREATE_TENANT = "CreateTenant";
     public static final String CREATE_USER = "CreateUser";
     public static final String DEBUG_TASK = "DebugTask";
+    public static final String DEBUG_RESOURCE_USAGE = "DebugResourceUsage";
     public static final String DELETE_CLUSTER_CONFIG = "DeleteClusterConfig";
     public static final String DELETE_INSTANCE = "DeleteInstance";
     public static final String DELETE_TASK = "DeleteTask";

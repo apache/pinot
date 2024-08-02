@@ -20,8 +20,8 @@ package org.apache.pinot.core.operator.filter.predicate;
 
 import java.math.BigDecimal;
 import java.util.Random;
-import org.apache.commons.lang.ArrayUtils;
-import org.apache.commons.lang.RandomStringUtils;
+import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.predicate.EqPredicate;
 import org.apache.pinot.common.request.context.predicate.NotEqPredicate;
@@ -257,11 +257,11 @@ public class NoDictionaryEqualsPredicateEvaluatorsTest {
 
     EqPredicate eqPredicate = new EqPredicate(COLUMN_EXPRESSION, jsonString);
     PredicateEvaluator eqPredicateEvaluator =
-        EqualsPredicateEvaluatorFactory.newRawValueBasedEvaluator(eqPredicate, FieldSpec.DataType.STRING);
+        EqualsPredicateEvaluatorFactory.newRawValueBasedEvaluator(eqPredicate, FieldSpec.DataType.JSON);
 
     NotEqPredicate notEqPredicate = new NotEqPredicate(COLUMN_EXPRESSION, jsonString);
     PredicateEvaluator neqPredicateEvaluator =
-        NotEqualsPredicateEvaluatorFactory.newRawValueBasedEvaluator(notEqPredicate, FieldSpec.DataType.STRING);
+        NotEqualsPredicateEvaluatorFactory.newRawValueBasedEvaluator(notEqPredicate, FieldSpec.DataType.JSON);
 
     Assert.assertTrue(eqPredicateEvaluator.applySV(jsonString));
     Assert.assertFalse(neqPredicateEvaluator.applySV(jsonString));

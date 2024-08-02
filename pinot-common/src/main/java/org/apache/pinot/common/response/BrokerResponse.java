@@ -20,6 +20,7 @@ package org.apache.pinot.common.response;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -39,6 +40,14 @@ public interface BrokerResponse {
   default String toJsonString()
       throws IOException {
     return JsonUtils.objectToString(this);
+  }
+
+  /**
+   * Write the object JSON to the output stream.
+   */
+  default void toOutputStream(OutputStream outputStream)
+      throws IOException {
+    JsonUtils.objectToOutputStream(this, outputStream);
   }
 
   /**

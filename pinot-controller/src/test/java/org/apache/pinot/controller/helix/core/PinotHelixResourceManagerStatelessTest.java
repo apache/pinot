@@ -101,13 +101,16 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
   private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(RAW_TABLE_NAME);
   private static final String REALTIME_TABLE_NAME = TableNameBuilder.REALTIME.tableNameWithType(RAW_TABLE_NAME);
 
+  @Override
+  protected void overrideControllerConf(Map<String, Object> properties) {
+    properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, false);
+  }
+
   @BeforeClass
   public void setUp()
       throws Exception {
     startZk();
-    Map<String, Object> properties = getDefaultControllerConfiguration();
-    properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, false);
-    startController(properties);
+    startController();
 
     addFakeBrokerInstancesToAutoJoinHelixCluster(NUM_BROKER_INSTANCES, false);
     addFakeServerInstancesToAutoJoinHelixCluster(NUM_SERVER_INSTANCES, false);
@@ -153,7 +156,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     List<InstanceConfig> controllerConfigs = _helixResourceManager.getAllControllerInstanceConfigs();
 
     assertEquals(controllersByTag.size(), controllerConfigs.size());
-    for (InstanceConfig c: controllerConfigs) {
+    for (InstanceConfig c : controllerConfigs) {
       assertTrue(controllersByTag.contains(c.getInstanceName()));
     }
   }
@@ -838,7 +841,8 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
    * @throws Exception
    */
   @Test
-  public void testSegmentReplacementWithCustomToSegments() throws Exception {
+  public void testSegmentReplacementWithCustomToSegments()
+      throws Exception {
     // Create the table
     addDummySchema(RAW_TABLE_NAME);
     TableConfig tableConfig =
@@ -921,8 +925,8 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     assertThrows(RuntimeException.class,
         () -> _helixResourceManager.endReplaceSegments(REALTIME_TABLE_NAME, lineageEntryId1, null));
     // Invalid lineage entry id
-    assertThrows(RuntimeException.class, () -> _helixResourceManager.
-        endReplaceSegments(OFFLINE_TABLE_NAME, "invalid", null));
+    assertThrows(RuntimeException.class,
+        () -> _helixResourceManager.endReplaceSegments(OFFLINE_TABLE_NAME, "invalid", null));
 
     // New segments not available in the table
     assertThrows(RuntimeException.class,

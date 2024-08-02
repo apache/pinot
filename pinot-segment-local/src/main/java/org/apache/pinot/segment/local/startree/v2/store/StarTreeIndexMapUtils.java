@@ -24,16 +24,18 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import javax.annotation.Nonnull;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
+import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 
 
@@ -119,10 +121,8 @@ public class StarTreeIndexMapUtils {
 
     @Override
     public int compareTo(IndexKey other) {
-      return Comparator
-          .comparing((IndexKey i) -> i._column, Comparator.nullsLast(Comparator.naturalOrder()))
-          .thenComparing((IndexKey i) -> i._indexType)
-          .compare(this, other);
+      return Comparator.comparing((IndexKey i) -> i._column, Comparator.nullsLast(Comparator.naturalOrder()))
+          .thenComparing((IndexKey i) -> i._indexType).compare(this, other);
     }
   }
 
@@ -142,7 +142,7 @@ public class StarTreeIndexMapUtils {
     }
 
     @Override
-    public int compareTo(@Nonnull IndexValue o) {
+    public int compareTo(IndexValue o) {
       return Long.compare(_offset, o._offset);
     }
   }
@@ -171,10 +171,15 @@ public class StarTreeIndexMapUtils {
   /**
    * Loads the index maps for multiple star-trees from an input stream.
    */
-  public static List<Map<IndexKey, IndexValue>> loadFromInputStream(InputStream indexMapInputStream, int numStarTrees)
+  public static List<Map<IndexKey, IndexValue>> loadFromInputStream(InputStream indexMapInputStream,
+      List<StarTreeV2Metadata> starTreeMetadataList)
       throws ConfigurationException {
+    assert starTreeMetadataList != null;
+    int numStarTrees = starTreeMetadataList.size();
+    List<Set<String>> dimensionSets = new ArrayList<>(numStarTrees);
     List<Map<IndexKey, IndexValue>> indexMaps = new ArrayList<>(numStarTrees);
-    for (int i = 0; i < numStarTrees; i++) {
+    for (StarTreeV2Metadata starTreeMetadata : starTreeMetadataList) {
+      dimensionSets.add(new HashSet<>(starTreeMetadata.getDimensionsSplitOrder()));
       indexMaps.add(new HashMap<>());
     }
 
@@ -182,6 +187,7 @@ public class StarTreeIndexMapUtils {
     for (String key : CommonsConfigurationUtils.getKeys(configuration)) {
       String[] split = StringUtils.split(key, KEY_SEPARATOR);
       int starTreeId = Integer.parseInt(split[0]);
+      Set<String> dimensionSet = dimensionSets.get(starTreeId);
       Map<IndexKey, IndexValue> indexMap = indexMaps.get(starTreeId);
 
       int columnSplitEndIndex = split.length - 2;
@@ -198,13 +204,9 @@ public class StarTreeIndexMapUtils {
           column = StringUtils.join(split, KEY_SEPARATOR, 1, columnSplitEndIndex);
         }
         // Convert metric (function-column pair) to stored name for backward-compatibility
-        if (column.contains(AggregationFunctionColumnPair.DELIMITER)) {
-          try {
-            AggregationFunctionColumnPair functionColumnPair = AggregationFunctionColumnPair.fromColumnName(column);
-            column = AggregationFunctionColumnPair.resolveToStoredType(functionColumnPair).toColumnName();
-          } catch (Exception e) {
-            // Ignoring this exception for columns that are not metric (function-column pair)
-          }
+        if (!dimensionSet.contains(column)) {
+          AggregationFunctionColumnPair functionColumnPair = AggregationFunctionColumnPair.fromColumnName(column);
+          column = AggregationFunctionColumnPair.resolveToStoredType(functionColumnPair).toColumnName();
         }
         indexKey = new IndexKey(IndexType.FORWARD_INDEX, column);
       }

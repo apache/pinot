@@ -27,6 +27,11 @@ public class MultiStageEngineCustomTenantIntegrationTest extends MultiStageEngin
   private static final String TEST_TENANT = "TestTenant";
 
   @Override
+  protected void overrideControllerConf(Map<String, Object> properties) {
+    properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, false);
+  }
+
+  @Override
   protected String getBrokerTenant() {
     return TEST_TENANT;
   }
@@ -40,12 +45,5 @@ public class MultiStageEngineCustomTenantIntegrationTest extends MultiStageEngin
       throws IOException {
     createBrokerTenant(getBrokerTenant(), 1);
     createServerTenant(getServerTenant(), 1, 0);
-  }
-
-  @Override
-  public Map<String, Object> getDefaultControllerConfiguration() {
-    Map<String, Object> properties = super.getDefaultControllerConfiguration();
-    properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, false);
-    return properties;
   }
 }

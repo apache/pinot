@@ -27,7 +27,6 @@ import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.CharArraySet;
-import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.StoredField;
@@ -36,11 +35,11 @@ import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
-import org.apache.lucene.index.NoMergeScheduler;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.store.NRTCachingDirectory;
+import org.apache.pinot.segment.local.realtime.impl.invertedindex.LuceneNRTCachingMergePolicy;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndex;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentColumnarIndexCreator;
 import org.apache.pinot.segment.local.segment.index.text.AbstractTextIndexCreator;
@@ -113,44 +112,30 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
     _textColumn = column;
     _commitOnClose = commit;
 
-    // to reuse the mutable index, it must be (1) not the realtime index, i.e. commit is set to false
-    // and (2) happens during realtime segment conversion
-    _reuseMutableIndex = commit && realtimeConversion;
     String luceneAnalyzerClass = config.getLuceneAnalyzerClass();
     try {
       // segment generation is always in V1 and later we convert (as part of post creation processing)
       // to V3 if segmentVersion is set to V3 in SegmentGeneratorConfig.
       _indexFile = getV1TextIndexFile(segmentIndexDir);
 
-      Analyzer luceneAnalyzer;
-      if (luceneAnalyzerClass.isEmpty() || luceneAnalyzerClass.equals(StandardAnalyzer.class.getName())) {
-        luceneAnalyzer = TextIndexUtils.getStandardAnalyzerWithCustomizedStopWords(config.getStopWordsInclude(),
-            config.getStopWordsExclude());
-      } else {
-        luceneAnalyzer = TextIndexUtils.getAnalyzerFromClassName(luceneAnalyzerClass);
-      }
-
+      Analyzer luceneAnalyzer = TextIndexUtils.getAnalyzer(config);
       IndexWriterConfig indexWriterConfig = new IndexWriterConfig(luceneAnalyzer);
       indexWriterConfig.setRAMBufferSizeMB(config.getLuceneMaxBufferSizeMB());
       indexWriterConfig.setCommitOnClose(commit);
       indexWriterConfig.setUseCompoundFile(config.isLuceneUseCompoundFile());
 
-      // For the realtime segment, prevent background merging. The realtime segment will call .commit()
-      // on the IndexWriter when segment conversion occurs. By default, Lucene will sometimes choose to
-      // merge segments in the background, which is problematic because the lucene index directory's
-      // contents is copied to create the immutable segment. If a background merge occurs during this
-      // copy, a FileNotFoundException will be triggered and segment build will fail.
-      //
       // Also, for the realtime segment, we set the OpenMode to CREATE to ensure that any existing artifacts
       // will be overwritten. This is necessary because the realtime segment can be created multiple times
       // during a server crash and restart scenario. If the existing artifacts are appended to, the realtime
       // query results will be accurate, but after segment conversion the mapping file generated will be loaded
       // for only the first numDocs lucene docIds, which can cause IndexOutOfBounds errors.
-      if (!_commitOnClose) {
-        indexWriterConfig.setMergeScheduler(NoMergeScheduler.INSTANCE);
+      if (!_commitOnClose && config.isReuseMutableIndex()) {
         indexWriterConfig.setOpenMode(IndexWriterConfig.OpenMode.CREATE);
       }
 
+      // to reuse the mutable index, it must be (1) not the realtime index, i.e. commit is set to true
+      // and (2) happens during realtime segment conversion
+      _reuseMutableIndex = config.isReuseMutableIndex() && commit && realtimeConversion;
       if (_reuseMutableIndex) {
         LOGGER.info("Reusing the realtime lucene index for segment {} and column {}", segmentIndexDir, column);
         indexWriterConfig.setOpenMode(IndexWriterConfig.OpenMode.CREATE_OR_APPEND);
@@ -158,15 +143,19 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
         return;
       }
 
-      if (_commitOnClose) {
-        _indexDirectory = FSDirectory.open(_indexFile.toPath());
-      } else {
+      if (!_commitOnClose && config.getLuceneNRTCachingDirectoryMaxBufferSizeMB() > 0) {
         // For realtime index, use NRTCachingDirectory to reduce the number of open files. This buffers the
         // flushes triggered by the near real-time refresh and writes them to disk when the buffer is full,
         // reducing the number of small writes.
-        _indexDirectory =
-            new NRTCachingDirectory(FSDirectory.open(_indexFile.toPath()), config.getLuceneMaxBufferSizeMB(),
-                config.getLuceneMaxBufferSizeMB());
+        int bufSize = config.getLuceneNRTCachingDirectoryMaxBufferSizeMB();
+        LOGGER.info(
+            "Using NRTCachingDirectory for realtime lucene index for segment {} and column {} with buffer size: {}MB",
+            segmentIndexDir, column, bufSize);
+        NRTCachingDirectory dir = new NRTCachingDirectory(FSDirectory.open(_indexFile.toPath()), bufSize, bufSize);
+        indexWriterConfig.setMergePolicy(new LuceneNRTCachingMergePolicy(dir));
+        _indexDirectory = dir;
+      } else {
+        _indexDirectory = FSDirectory.open(_indexFile.toPath());
       }
       _indexWriter = new IndexWriter(_indexDirectory, indexWriterConfig);
     } catch (ReflectiveOperationException e) {
@@ -373,5 +362,9 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
     // tmpSegmentName format: tmp-tableName__9__1__20240227T0254Z-1709002522086
     String tmpSegmentName = indexDir.getParentFile().getName();
     return tmpSegmentName.substring(tmpSegmentName.indexOf("tmp-") + 4, tmpSegmentName.lastIndexOf('-'));
+  }
+
+  public int getNumDocs() {
+    return _nextDocId;
   }
 }

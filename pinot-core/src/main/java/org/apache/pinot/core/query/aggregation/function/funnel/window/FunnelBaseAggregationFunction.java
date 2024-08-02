@@ -105,11 +105,17 @@ public abstract class FunnelBaseAggregationFunction<F extends Comparable>
       aggregationResultHolder.setValue(stepEvents);
     }
     for (int i = 0; i < length; i++) {
+      boolean stepFound = false;
       for (int j = 0; j < _numSteps; j++) {
         if (stepBlocks.get(j)[i] == 1) {
           stepEvents.add(new FunnelStepEvent(timestampBlock[i], j));
+          stepFound = true;
           break;
         }
+      }
+      // If the mode is KEEP_ALL and no step is found, add a dummy step event with step -1
+      if (_modes.hasKeepAll() && !stepFound) {
+        stepEvents.add(new FunnelStepEvent(timestampBlock[i], -1));
       }
     }
   }
@@ -124,16 +130,19 @@ public abstract class FunnelBaseAggregationFunction<F extends Comparable>
     }
     for (int i = 0; i < length; i++) {
       int groupKey = groupKeyArray[i];
+      boolean stepFound = false;
       for (int j = 0; j < _numSteps; j++) {
         if (stepBlocks.get(j)[i] == 1) {
-          PriorityQueue<FunnelStepEvent> stepEvents = groupByResultHolder.getResult(groupKey);
-          if (stepEvents == null) {
-            stepEvents = new PriorityQueue<>();
-            groupByResultHolder.setValueForKey(groupKey, stepEvents);
-          }
+          PriorityQueue<FunnelStepEvent> stepEvents = getFunnelStepEvents(groupByResultHolder, groupKey);
           stepEvents.add(new FunnelStepEvent(timestampBlock[i], j));
+          stepFound = true;
           break;
         }
+      }
+      // If the mode is KEEP_ALL and no step is found, add a dummy step event with step -1
+      if (_modes.hasKeepAll() && !stepFound) {
+        PriorityQueue<FunnelStepEvent> stepEvents = getFunnelStepEvents(groupByResultHolder, groupKey);
+        stepEvents.add(new FunnelStepEvent(timestampBlock[i], -1));
       }
     }
   }
@@ -148,20 +157,35 @@ public abstract class FunnelBaseAggregationFunction<F extends Comparable>
     }
     for (int i = 0; i < length; i++) {
       int[] groupKeys = groupKeysArray[i];
+      boolean stepFound = false;
       for (int j = 0; j < _numSteps; j++) {
         if (stepBlocks.get(j)[i] == 1) {
           for (int groupKey : groupKeys) {
-            PriorityQueue<FunnelStepEvent> stepEvents = groupByResultHolder.getResult(groupKey);
-            if (stepEvents == null) {
-              stepEvents = new PriorityQueue<>();
-              groupByResultHolder.setValueForKey(groupKey, stepEvents);
-            }
+            PriorityQueue<FunnelStepEvent> stepEvents = getFunnelStepEvents(groupByResultHolder, groupKey);
             stepEvents.add(new FunnelStepEvent(timestampBlock[i], j));
           }
+          stepFound = true;
           break;
         }
       }
+      // If the mode is KEEP_ALL and no step is found, add a dummy step event with step -1
+      if (_modes.hasKeepAll() && !stepFound) {
+        for (int groupKey : groupKeys) {
+          PriorityQueue<FunnelStepEvent> stepEvents = getFunnelStepEvents(groupByResultHolder, groupKey);
+          stepEvents.add(new FunnelStepEvent(timestampBlock[i], -1));
+        }
+      }
     }
+  }
+
+  private static PriorityQueue<FunnelStepEvent> getFunnelStepEvents(GroupByResultHolder groupByResultHolder,
+      int groupKey) {
+    PriorityQueue<FunnelStepEvent> stepEvents = groupByResultHolder.getResult(groupKey);
+    if (stepEvents == null) {
+      stepEvents = new PriorityQueue<>();
+      groupByResultHolder.setValueForKey(groupKey, stepEvents);
+    }
+    return stepEvents;
   }
 
   @Override
@@ -233,7 +257,7 @@ public abstract class FunnelBaseAggregationFunction<F extends Comparable>
   }
 
   protected enum Mode {
-    STRICT_DEDUPLICATION(1), STRICT_ORDER(2), STRICT_INCREASE(4);
+    STRICT_DEDUPLICATION(1), STRICT_ORDER(2), STRICT_INCREASE(4), KEEP_ALL(8);
 
     private final int _value;
 
@@ -271,6 +295,10 @@ public abstract class FunnelBaseAggregationFunction<F extends Comparable>
 
     public boolean hasStrictIncrease() {
       return contains(Mode.STRICT_INCREASE);
+    }
+
+    public boolean hasKeepAll() {
+      return contains(Mode.KEEP_ALL);
     }
   }
 }

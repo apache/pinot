@@ -31,8 +31,8 @@ import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.query.planner.PlannerUtils;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
-import org.apache.pinot.query.planner.plannode.AbstractPlanNode;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.BasePlanNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
@@ -385,19 +385,26 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     assertEquals(tableNames.get(0), "a");
   }
 
+  @Test
+  public void testDuplicateWithAlias() {
+    String query = "WITH tmp AS (SELECT * FROM a LIMIT 1), tmp AS (SELECT * FROM a LIMIT 2) SELECT * FROM tmp";
+    RuntimeException e = expectThrows(RuntimeException.class, () -> _queryEnvironment.getTableNamesForQuery(query));
+    assertTrue(e.getCause().getMessage().contains("Duplicate alias in WITH: 'tmp'"));
+  }
+
   // --------------------------------------------------------------------------
   // Test Utils.
   // --------------------------------------------------------------------------
 
-  private static void assertNodeTypeNotIn(PlanNode node, List<Class<? extends AbstractPlanNode>> bannedNodeType) {
+  private static void assertNodeTypeNotIn(PlanNode node, List<Class<? extends BasePlanNode>> bannedNodeType) {
     assertFalse(isOneOf(bannedNodeType, node));
     for (PlanNode child : node.getInputs()) {
       assertNodeTypeNotIn(child, bannedNodeType);
     }
   }
 
-  private static boolean isOneOf(List<Class<? extends AbstractPlanNode>> allowedNodeTypes, PlanNode node) {
-    for (Class<? extends AbstractPlanNode> allowedNodeType : allowedNodeTypes) {
+  private static boolean isOneOf(List<Class<? extends BasePlanNode>> allowedNodeTypes, PlanNode node) {
+    for (Class<? extends BasePlanNode> allowedNodeType : allowedNodeTypes) {
       if (node.getClass() == allowedNodeType) {
         return true;
       }

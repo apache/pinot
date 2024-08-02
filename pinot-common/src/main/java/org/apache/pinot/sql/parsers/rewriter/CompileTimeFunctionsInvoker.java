@@ -68,9 +68,9 @@ public class CompileTimeFunctionsInvoker implements QueryRewriter {
       }
       operands.set(i, operand);
     }
-    String functionName = function.getOperator();
     if (compilable) {
-      FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(functionName, numOperands);
+      String canonicalName = FunctionRegistry.canonicalize(function.getOperator());
+      FunctionInfo functionInfo = FunctionRegistry.lookupFunctionInfo(canonicalName, numOperands);
       if (functionInfo != null) {
         Object[] arguments = new Object[numOperands];
         for (int i = 0; i < numOperands; i++) {

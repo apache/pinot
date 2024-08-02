@@ -24,14 +24,14 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
+import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import org.apache.commons.lang3.RandomUtils;
+import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.helix.ClusterMessagingService;
 import org.apache.helix.Criteria;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
-import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.pinot.common.messages.SegmentReloadMessage;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.ControllerConf;
@@ -122,11 +122,12 @@ public class SegmentRelocatorTest {
         new SegmentRelocator(mock(PinotHelixResourceManager.class), mock(LeadControllerManager.class), conf,
             mock(ControllerMetrics.class), mock(ExecutorService.class), mock(HttpClientConnectionManager.class));
     int cnt = 10;
+    Random random = new Random();
     for (int i = 0; i < cnt; i++) {
       relocator.putTableToWait("t_" + i);
     }
     for (int i = 0; i < cnt; i++) {
-      relocator.putTableToWait("t_" + RandomUtils.nextInt(0, cnt));
+      relocator.putTableToWait("t_" + random.nextInt(cnt));
     }
     // All tables are tracked and no duplicate table names.
     Queue<String> waitingQueue = relocator.getWaitingQueue();
@@ -152,19 +153,20 @@ public class SegmentRelocatorTest {
         new SegmentRelocator(mock(PinotHelixResourceManager.class), mock(LeadControllerManager.class), conf,
             mock(ControllerMetrics.class), mock(ExecutorService.class), mock(HttpClientConnectionManager.class));
     ExecutorService runner = Executors.newCachedThreadPool();
+    Random random = new Random();
     int cnt = 10;
     // Three threads to submit tables randomly.
     runner.submit(() -> {
       for (int i = 0; i < cnt; i++) {
-        relocator.putTableToWait("t_" + RandomUtils.nextInt(0, cnt));
-        Thread.sleep(RandomUtils.nextLong(10, 30));
+        relocator.putTableToWait("t_" + random.nextInt(cnt));
+        Thread.sleep(10 + random.nextInt(30 - 10));
       }
       return null;
     });
     runner.submit(() -> {
       for (int i = 0; i < cnt; i++) {
-        relocator.putTableToWait("t_" + RandomUtils.nextInt(0, cnt));
-        Thread.sleep(RandomUtils.nextLong(10, 30));
+        relocator.putTableToWait("t_" + random.nextInt(cnt));
+        Thread.sleep(10 + random.nextInt(30 - 10));
       }
       return null;
     });
@@ -173,7 +175,7 @@ public class SegmentRelocatorTest {
       Thread.sleep(100);
       for (int i = 0; i < cnt; i++) {
         relocator.putTableToWait("t_" + i);
-        Thread.sleep(RandomUtils.nextLong(10, 30));
+        Thread.sleep(10 + random.nextInt(30 - 10));
       }
       return null;
     });

@@ -139,6 +139,10 @@ public class QueryOptionsUtils {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.SKIP_UPSERT));
   }
 
+  public static boolean isSkipUpsertView(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.SKIP_UPSERT_VIEW));
+  }
+
   public static long getUpsertViewFreshnessMs(Map<String, String> queryOptions) {
     String freshnessMsString = queryOptions.get(QueryOptionKey.UPSERT_VIEW_FRESHNESS_MS);
     return freshnessMsString != null ? Long.parseLong(freshnessMsString) : -1;
@@ -301,5 +305,9 @@ public class QueryOptionsUtils {
   public static WindowOverFlowMode getWindowOverflowMode(Map<String, String> queryOptions) {
     String windowOverflowModeStr = queryOptions.get(QueryOptionKey.WINDOW_OVERFLOW_MODE);
     return windowOverflowModeStr != null ? WindowOverFlowMode.valueOf(windowOverflowModeStr) : null;
+  }
+
+  public static boolean isSkipUnavailableServers(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.SKIP_UNAVAILABLE_SERVERS));
   }
 }

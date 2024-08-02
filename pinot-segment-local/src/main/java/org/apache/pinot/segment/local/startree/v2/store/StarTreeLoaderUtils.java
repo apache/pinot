@@ -55,6 +55,7 @@ public class StarTreeLoaderUtils {
       SegmentMetadataImpl segmentMetadata, Map<String, ColumnIndexContainer> indexContainerMap)
       throws IOException {
     List<StarTreeV2Metadata> starTreeMetadataList = segmentMetadata.getStarTreeV2MetadataList();
+    assert starTreeMetadataList != null;
     int numStarTrees = starTreeMetadataList.size();
     List<StarTreeV2> starTrees = new ArrayList<>(numStarTrees);
     for (int i = 0; i < numStarTrees; i++) {

@@ -20,13 +20,17 @@ package org.apache.pinot.query.parser;
 
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelFieldCollation.Direction;
 import org.apache.calcite.rel.RelFieldCollation.NullDirection;
 import org.apache.pinot.common.request.Expression;
+import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.SortNode;
+import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.sql.parsers.ParserUtils;
 
@@ -65,14 +69,23 @@ public class CalciteRexExpressionParser {
     return expressions;
   }
 
-  public static List<Expression> convertAggregateList(List<Expression> groupByList, List<RexExpression> aggCallList,
-      List<Integer> filterArgIndices, PinotQuery pinotQuery) {
-    int numAggCalls = aggCallList.size();
+  public static List<Expression> convertInputRefs(List<Integer> inputRefs, PinotQuery pinotQuery) {
+    List<Expression> selectList = pinotQuery.getSelectList();
+    List<Expression> expressions = new ArrayList<>(inputRefs.size());
+    for (Integer inputRef : inputRefs) {
+      expressions.add(selectList.get(inputRef));
+    }
+    return expressions;
+  }
+
+  public static List<Expression> convertAggregateList(List<Expression> groupByList,
+      List<RexExpression.FunctionCall> aggCalls, List<Integer> filterArgs, PinotQuery pinotQuery) {
+    int numAggCalls = aggCalls.size();
     List<Expression> expressions = new ArrayList<>(groupByList.size() + numAggCalls);
     expressions.addAll(groupByList);
     for (int i = 0; i < numAggCalls; i++) {
-      Expression aggFunction = toExpression(aggCallList.get(i), pinotQuery);
-      int filterArgIdx = filterArgIndices.get(i);
+      Expression aggFunction = compileFunctionExpression(aggCalls.get(i), pinotQuery);
+      int filterArgIdx = filterArgs.get(i);
       if (filterArgIdx == -1) {
         expressions.add(aggFunction);
       } else {
@@ -84,31 +97,28 @@ public class CalciteRexExpressionParser {
   }
 
   public static List<Expression> convertOrderByList(SortNode node, PinotQuery pinotQuery) {
-    List<RexExpression> collationKeys = node.getCollationKeys();
-    List<Direction> collationDirections = node.getCollationDirections();
-    List<NullDirection> collationNullDirections = node.getCollationNullDirections();
-    int numKeys = collationKeys.size();
-    List<Expression> orderByExpressions = new ArrayList<>(numKeys);
-    for (int i = 0; i < numKeys; i++) {
-      orderByExpressions.add(
-          convertOrderBy(collationKeys.get(i), collationDirections.get(i), collationNullDirections.get(i), pinotQuery));
+    List<RelFieldCollation> collations = node.getCollations();
+    List<Expression> orderByExpressions = new ArrayList<>(collations.size());
+    for (RelFieldCollation collation : collations) {
+      orderByExpressions.add(convertOrderBy(collation, pinotQuery));
     }
     return orderByExpressions;
   }
 
-  private static Expression convertOrderBy(RexExpression rexNode, Direction direction, NullDirection nullDirection,
-      PinotQuery pinotQuery) {
-    Expression expression = toExpression(rexNode, pinotQuery);
-    if (direction == Direction.ASCENDING) {
-      Expression asc = RequestUtils.getFunctionExpression(ASC, expression);
+  private static Expression convertOrderBy(RelFieldCollation collation, PinotQuery pinotQuery) {
+    Expression key = pinotQuery.getSelectList().get(collation.getFieldIndex());
+    if (collation.direction == Direction.ASCENDING) {
+      Expression asc = RequestUtils.getFunctionExpression(ASC, key);
       // NOTE: Add explicit NULL direction only if it is not the default behavior (default behavior treats NULL as the
       //       largest value)
-      return nullDirection == NullDirection.FIRST ? RequestUtils.getFunctionExpression(NULLS_FIRST, asc) : asc;
+      return collation.nullDirection == NullDirection.FIRST ? RequestUtils.getFunctionExpression(NULLS_FIRST, asc)
+          : asc;
     } else {
-      Expression desc = RequestUtils.getFunctionExpression(DESC, expression);
+      Expression desc = RequestUtils.getFunctionExpression(DESC, key);
       // NOTE: Add explicit NULL direction only if it is not the default behavior (default behavior treats NULL as the
       //       largest value)
-      return nullDirection == NullDirection.LAST ? RequestUtils.getFunctionExpression(NULLS_LAST, desc) : desc;
+      return collation.nullDirection == NullDirection.LAST ? RequestUtils.getFunctionExpression(NULLS_LAST, desc)
+          : desc;
     }
   }
 
@@ -116,27 +126,33 @@ public class CalciteRexExpressionParser {
     if (rexNode instanceof RexExpression.InputRef) {
       return inputRefToIdentifier((RexExpression.InputRef) rexNode, pinotQuery);
     } else if (rexNode instanceof RexExpression.Literal) {
-      return compileLiteralExpression(((RexExpression.Literal) rexNode).getValue());
+      return RequestUtils.getLiteralExpression(toLiteral((RexExpression.Literal) rexNode));
     } else {
       assert rexNode instanceof RexExpression.FunctionCall;
       return compileFunctionExpression((RexExpression.FunctionCall) rexNode, pinotQuery);
     }
   }
 
-  /**
-   * Copy and modify from {@link RequestUtils#getLiteralExpression(Object)}.
-   * TODO: Revisit whether we should use internal value type (e.g. 0/1 for BOOLEAN, ByteArray for BYTES) here.
-   */
-  private static Expression compileLiteralExpression(Object object) {
-    if (object instanceof ByteArray) {
-      return RequestUtils.getLiteralExpression(((ByteArray) object).getBytes());
-    }
-    return RequestUtils.getLiteralExpression(object);
-  }
-
   private static Expression inputRefToIdentifier(RexExpression.InputRef inputRef, PinotQuery pinotQuery) {
     List<Expression> selectList = pinotQuery.getSelectList();
     return selectList.get(inputRef.getIndex());
+  }
+
+  public static Literal toLiteral(RexExpression.Literal literal) {
+    Object value = literal.getValue();
+    if (value == null) {
+      return RequestUtils.getNullLiteral();
+    }
+    // NOTE: Value is stored in internal format in RexExpression.Literal.
+    //       Do not convert TIMESTAMP/BOOLEAN_ARRAY/TIMESTAMP_ARRAY to external format because they are not explicitly
+    //       supported in single-stage engine Literal.
+    ColumnDataType dataType = literal.getDataType();
+    if (dataType == ColumnDataType.BOOLEAN) {
+      value = BooleanUtils.isTrueInternalValue(value);
+    } else if (dataType == ColumnDataType.BYTES) {
+      value = ((ByteArray) value).getBytes();
+    }
+    return RequestUtils.getLiteral(value);
   }
 
   private static Expression compileFunctionExpression(RexExpression.FunctionCall rexCall, PinotQuery pinotQuery) {

@@ -184,11 +184,11 @@ public class BrokerRequestToQueryContextConverterTest {
               Arrays.asList(ExpressionContext.forIdentifier("foo"), ExpressionContext.forFunction(
                   new FunctionContext(FunctionContext.Type.TRANSFORM, "add",
                       Arrays.asList(ExpressionContext.forIdentifier("bar"),
-                          ExpressionContext.forLiteralContext(FieldSpec.DataType.INT, Integer.valueOf(123)))))))));
+                          ExpressionContext.forLiteral(FieldSpec.DataType.INT, Integer.valueOf(123)))))))));
       assertEquals(selectExpressions.get(0).toString(), "add(foo,add(bar,'123'))");
       assertEquals(selectExpressions.get(1), ExpressionContext.forFunction(
           new FunctionContext(FunctionContext.Type.TRANSFORM, "sub",
-              Arrays.asList(ExpressionContext.forLiteralContext(FieldSpec.DataType.STRING, "456"),
+              Arrays.asList(ExpressionContext.forLiteral(FieldSpec.DataType.STRING, "456"),
                   ExpressionContext.forIdentifier("foobar")))));
       assertEquals(selectExpressions.get(1).toString(), "sub('456',foobar)");
       assertFalse(queryContext.isDistinct());
@@ -200,7 +200,7 @@ public class BrokerRequestToQueryContextConverterTest {
       assertEquals(orderByExpressions.size(), 1);
       assertEquals(orderByExpressions.get(0), new OrderByExpressionContext(ExpressionContext.forFunction(
           new FunctionContext(FunctionContext.Type.TRANSFORM, "sub",
-              Arrays.asList(ExpressionContext.forLiteralContext(FieldSpec.DataType.INT, Integer.valueOf(456)),
+              Arrays.asList(ExpressionContext.forLiteral(FieldSpec.DataType.INT, Integer.valueOf(456)),
                   ExpressionContext.forIdentifier("foobar")))), true));
       assertEquals(orderByExpressions.get(0).toString(), "sub('456',foobar) ASC");
       assertNull(queryContext.getHavingFilter());
@@ -219,7 +219,7 @@ public class BrokerRequestToQueryContextConverterTest {
       assertEquals(queryContext.getTableName(), "testTable");
       List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
       assertEquals(selectExpressions.size(), 1);
-      assertEquals(selectExpressions.get(0), ExpressionContext.forLiteralContext(FieldSpec.DataType.BOOLEAN, true));
+      assertEquals(selectExpressions.get(0), ExpressionContext.forLiteral(FieldSpec.DataType.BOOLEAN, true));
       assertEquals(selectExpressions.get(0).toString(), "'true'");
     }
 
@@ -507,12 +507,10 @@ public class BrokerRequestToQueryContextConverterTest {
       assertEquals(function.getFunctionName(), "distinctcountthetasketch");
       List<ExpressionContext> arguments = function.getArguments();
       assertEquals(arguments.get(0), ExpressionContext.forIdentifier("foo"));
-      assertEquals(arguments.get(1),
-          ExpressionContext.forLiteralContext(FieldSpec.DataType.STRING, "nominalEntries=1000"));
-      assertEquals(arguments.get(2), ExpressionContext.forLiteralContext(FieldSpec.DataType.STRING, "bar='a'"));
-      assertEquals(arguments.get(3), ExpressionContext.forLiteralContext(FieldSpec.DataType.STRING, "bar='b'"));
-      assertEquals(arguments.get(4),
-          ExpressionContext.forLiteralContext(FieldSpec.DataType.STRING, "SET_INTERSECT($1, $2)"));
+      assertEquals(arguments.get(1), ExpressionContext.forLiteral(FieldSpec.DataType.STRING, "nominalEntries=1000"));
+      assertEquals(arguments.get(2), ExpressionContext.forLiteral(FieldSpec.DataType.STRING, "bar='a'"));
+      assertEquals(arguments.get(3), ExpressionContext.forLiteral(FieldSpec.DataType.STRING, "bar='b'"));
+      assertEquals(arguments.get(4), ExpressionContext.forLiteral(FieldSpec.DataType.STRING, "SET_INTERSECT($1, $2)"));
       assertEquals(queryContext.getColumns(), new HashSet<>(Arrays.asList("foo", "bar")));
       assertFalse(QueryContextUtils.isSelectionQuery(queryContext));
       assertTrue(QueryContextUtils.isAggregationQuery(queryContext));

@@ -319,3 +319,14 @@ The name of the pinot minion stateless config.
 {{- define "pinot.minionStateless.config" -}}
 {{- printf "%s-config" (include "pinot.minionStateless.fullname" .) | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
+
+{{/*
+Return pinot namespace to use
+*/}}
+{{- define "pinot.namespace" -}}
+{{- if .Values.namespaceOverride -}}
+    {{- .Values.namespaceOverride -}}
+{{- else -}}
+    {{- .Release.Namespace -}}
+{{- end -}}
+{{- end -}}

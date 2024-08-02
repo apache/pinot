@@ -38,6 +38,7 @@ import org.apache.pinot.core.common.datablock.DataBlockBuilder;
 import org.apache.pinot.core.util.DataBlockExtractUtils;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 
+
 /**
  * A {@code TransferableBlock} is a wrapper around {@link DataBlock} for transferring data using
  * {@link org.apache.pinot.common.proto.Mailbox}.
@@ -61,6 +62,8 @@ public class TransferableBlock implements Block {
         "Container cannot be used to construct block of type: %s", type);
     _type = type;
     _numRows = _container.size();
+    // NOTE: Use assert to avoid breaking production code.
+    assert _numRows > 0 : "Container should not be empty";
     _errCodeToExceptionMap = new HashMap<>();
     _queryStats = null;
   }

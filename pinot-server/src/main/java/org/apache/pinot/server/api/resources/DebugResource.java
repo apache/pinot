@@ -26,6 +26,7 @@ import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -52,8 +53,12 @@ import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.server.starter.ServerInstance;
+import org.apache.pinot.spi.accounting.QueryResourceTracker;
+import org.apache.pinot.spi.accounting.ThreadResourceTracker;
+import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.stream.ConsumerPartitionState;
+import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
@@ -67,7 +72,8 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
     @Authorization(value = DATABASE)})
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = {
     @ApiKeyAuthDefinition(name = HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER,
-        key = SWAGGER_AUTHORIZATION_KEY),
+        key = SWAGGER_AUTHORIZATION_KEY,
+        description = "The format of the key is  ```\"Basic <token>\" or \"Bearer <token>\"```"),
     @ApiKeyAuthDefinition(name = DATABASE, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = DATABASE,
         description = "Database context passed through http header. If no context is provided 'default' database "
             + "context will be considered.")}))
@@ -120,6 +126,27 @@ public class DebugResource {
         tableDataManager.releaseSegment(segmentDataManager);
       }
     }
+  }
+
+  @GET
+  @Path("threads/resourceUsage")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Get current resource usage of threads",
+      notes = "This is a debug endpoint, and won't maintain backward compatibility")
+  public Collection<? extends ThreadResourceTracker> getThreadUsage() {
+    ThreadResourceUsageAccountant threadAccountant = Tracing.getThreadAccountant();
+    return threadAccountant.getThreadResources();
+  }
+
+  @GET
+  @Path("queries/resourceUsage")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Get current resource usage of queries in this service",
+      notes = "This is a debug endpoint, and won't maintain backward compatibility")
+  public Collection<? extends QueryResourceTracker> getQueryUsage() {
+    ThreadResourceUsageAccountant threadAccountant = Tracing.getThreadAccountant();
+    Collection<? extends QueryResourceTracker> resources = threadAccountant.getQueryResources().values();
+    return resources;
   }
 
   private List<SegmentServerDebugInfo> getSegmentServerDebugInfo(String tableNameWithType, TableType tableType) {

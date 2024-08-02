@@ -47,6 +47,11 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
+/**
+ * This class implements the valueIn function for multi-valued columns. It takes at least 2 arguments, where the first
+ * argument is a multi-valued column, and the following arguments are constant values. The transform function will
+ * filter the values from the multi-valued column with the given constant values.
+ */
 public class ValueInTransformFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "valueIn";
 

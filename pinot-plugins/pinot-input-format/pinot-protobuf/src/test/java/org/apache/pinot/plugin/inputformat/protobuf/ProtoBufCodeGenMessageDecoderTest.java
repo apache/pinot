@@ -27,7 +27,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.jetbrains.annotations.NotNull;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -235,8 +234,8 @@ public class ProtoBufCodeGenMessageDecoderTest {
         new Object[] {FLOAT_FIELD, 0f, 0f},
         new Object[] {NULLABLE_FLOAT_FIELD, 0f, 0f},
 
-        new Object[] {BYTES_FIELD, ByteString.empty(), new byte[] {}},
-        new Object[] {NULLABLE_BYTES_FIELD, ByteString.empty(), new byte[] {}},
+        new Object[] {BYTES_FIELD, ByteString.EMPTY, new byte[] {}},
+        new Object[] {NULLABLE_BYTES_FIELD, ByteString.EMPTY, new byte[] {}},
 
         new Object[] {BOOL_FIELD, false, "false"},
         new Object[] {NULLABLE_BOOL_FIELD, false, "false"}
@@ -348,7 +347,6 @@ public class ProtoBufCodeGenMessageDecoderTest {
         NULLABLE_BOOL_FIELD, NULLABLE_BYTES_FIELD);
   }
 
-  @NotNull
   private ProtoBufCodeGenMessageDecoder setupDecoder(String name, String value,
       Set<String> sourceFieldsForComplexType)
       throws Exception {

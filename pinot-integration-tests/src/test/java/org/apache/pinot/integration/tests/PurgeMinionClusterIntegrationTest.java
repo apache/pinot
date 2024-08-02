@@ -78,8 +78,8 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
     // Start the Pinot cluster
     startZk();
     startController();
-    startBrokers(1);
-    startServers(1);
+    startBroker();
+    startServer();
 
     List<String> allTables = List.of(PURGE_FIRST_RUN_TABLE, PURGE_DELTA_PASSED_TABLE, PURGE_DELTA_NOT_PASSED_TABLE,
         PURGE_OLD_SEGMENTS_WITH_NEW_INDICES_TABLE);
