@@ -65,7 +65,7 @@ public class ConnectionFailureDetectorTest {
   @Test
   public void testConnectionFailure() {
     QueryResponse queryResponse = mock(QueryResponse.class);
-    when(queryResponse.getFailedServer()).thenReturn(new ServerRoutingInstance("localhost", 1234, TableType.OFFLINE));
+    when(queryResponse.getFailedServer()).thenReturn(new ServerRoutingInstance("localhost", 1234));
 
     // No failure detection when submitting the query
     _failureDetector.notifyQuerySubmitted(queryResponse);
