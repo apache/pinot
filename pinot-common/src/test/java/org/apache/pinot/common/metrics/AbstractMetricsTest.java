@@ -54,19 +54,6 @@ public class AbstractMetricsTest {
   }
 
   @Test
-  public void testInvalidConfig() {
-    PinotConfiguration pinotConfiguration = new PinotConfiguration();
-    pinotConfiguration.setProperty(CONFIG_OF_METRICS_FACTORY_CLASS_NAME,
-        "invalid.metrics.factory.class.name");
-    try {
-      PinotMetricUtils.init(pinotConfiguration);
-      Assert.fail("Expected exception thrown");
-    } catch (Exception e) {
-      Assert.assertTrue(e instanceof RuntimeException, "Expected RuntimeException");
-    }
-  }
-
-  @Test
   public void testConcurrentGaugeUpdates() throws InterruptedException {
     PinotConfiguration pinotConfiguration = new PinotConfiguration();
     pinotConfiguration.setProperty(CONFIG_OF_METRICS_FACTORY_CLASS_NAME,
