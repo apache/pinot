@@ -47,9 +47,9 @@ class PinotDataWriter[InternalRow](
   logger.info("PinotDataWriter created with writeOptions: {}, partitionId: {}, taskId: {}",
     (writeOptions, partitionId, taskId))
 
-  private val tableName = writeOptions.tableName
-  private val savePath = writeOptions.savePath
-  private val bufferedRecordReader = new PinotBufferedRecordReader()
+  val tableName = writeOptions.tableName
+  val savePath = writeOptions.savePath
+  val bufferedRecordReader = new PinotBufferedRecordReader()
 
   override def write(record: catalyst.InternalRow): Unit = {
     bufferedRecordReader.write(internalRowToGenericRow(record))
@@ -63,11 +63,11 @@ class PinotDataWriter[InternalRow](
     new SuccessWriterCommitMessage(segmentName)
   }
 
-  private def getSegmentName: String = {
+  private[pinot] def getSegmentName: String = {
     writeOptions.segmentFormat.format(partitionId)
   }
 
-  private def generateSegment(segmentName: String): File = {
+  private[pinot] def generateSegment(segmentName: String): File = {
     val outputDir = Files.createTempDirectory(classOf[PinotDataWriter[InternalRow]].getName).toFile
     val indexingConfig = getIndexConfig
 
