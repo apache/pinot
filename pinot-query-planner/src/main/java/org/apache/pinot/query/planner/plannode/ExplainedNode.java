@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.planner.plannode;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -35,6 +36,11 @@ public class ExplainedNode extends BasePlanNode {
 
   private final String _type;
   private final Map<String, String> _attributes;
+
+  public ExplainedNode(int stageId, DataSchema dataSchema, @Nullable NodeHint nodeHint, PlanNode input,
+      String type, Map<String, String> attributes) {
+    this(stageId, dataSchema, nodeHint, Collections.singletonList(input), type, attributes);
+  }
 
   public ExplainedNode(int stageId, DataSchema dataSchema, @Nullable NodeHint nodeHint, List<PlanNode> inputs,
       String type, Map<String, String> attributes) {

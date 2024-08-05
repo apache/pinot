@@ -20,6 +20,8 @@ package org.apache.pinot.query;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
 import java.util.Set;
@@ -64,7 +66,6 @@ import org.apache.pinot.query.planner.PlannerUtils;
 import org.apache.pinot.query.planner.SubPlan;
 import org.apache.pinot.query.planner.explain.PhysicalExplainPlanVisitor;
 import org.apache.pinot.query.planner.logical.PinotLogicalQueryPlanner;
-import org.apache.pinot.query.planner.logical.PlanNodeToRelConverter;
 import org.apache.pinot.query.planner.logical.RelToPlanNodeConverter;
 import org.apache.pinot.query.planner.logical.TransformationTracker;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
@@ -160,12 +161,13 @@ public class QueryEnvironment {
    *
    * @param sqlQuery SQL query string.
    * @param sqlNodeAndOptions parsed SQL query.
-   * @param fragmentToPlanNode a function that converts a {@link DispatchablePlanFragment} to a {@link PlanNode}.
+   * @param fragmentToPlanNodes a function that converts a {@link DispatchablePlanFragment} to a collection of
+   *                           {@link PlanNode PlanNodes}.
    *                           This function may for example ask each server to explain its own plan.
    * @return QueryPlannerResult containing the explained query plan and the relRoot.
    */
   public QueryPlannerResult explainQuery(String sqlQuery, SqlNodeAndOptions sqlNodeAndOptions, long requestId,
-      Function<DispatchablePlanFragment, PlanNode> fragmentToPlanNode, boolean askServers) {
+      Function<DispatchablePlanFragment, Collection<PlanNode>> fragmentToPlanNodes, boolean askServers) {
     try (PlannerContext plannerContext = getPlannerContext()) {
       SqlExplain explain = (SqlExplain) sqlNodeAndOptions.getSqlNode();
       plannerContext.setOptions(sqlNodeAndOptions.getOptions());
@@ -191,13 +193,8 @@ public class QueryEnvironment {
           DispatchableSubPlan dispatchableSubPlan =
               toDispatchableSubPlan(relRoot, plannerContext, requestId, nodeTracker);
 
-          Function<DispatchablePlanFragment, RelNode> fragmentExplainer = fragment -> {
-            PlanNode planNode = fragmentToPlanNode.apply(fragment);
-            return PlanNodeToRelConverter.convert(RelBuilder.create(_config), planNode);
-          };
-
           ImplementationExplainUtils.modifyRel(relRoot.rel, dispatchableSubPlan.getQueryStageList(), nodeTracker,
-              fragmentExplainer);
+              fragmentToPlanNodes, RelBuilder.create(_config));
 
           String explainStr = PlannerUtils.explainPlan(relRoot.rel, format, level);
 
@@ -216,8 +213,8 @@ public class QueryEnvironment {
 
   @VisibleForTesting
   public String explainQuery(String sqlQuery, long requestId) {
-    Function<DispatchablePlanFragment, PlanNode> fragmentToPlanNode =
-        fragment -> fragment.getPlanFragment().getFragmentRoot();
+    Function<DispatchablePlanFragment, Collection<PlanNode>> fragmentToPlanNode =
+        fragment -> Collections.singletonList(fragment.getPlanFragment().getFragmentRoot());
     SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery);
     QueryPlannerResult queryPlannerResult
         = explainQuery(sqlQuery, sqlNodeAndOptions, requestId, fragmentToPlanNode, false);

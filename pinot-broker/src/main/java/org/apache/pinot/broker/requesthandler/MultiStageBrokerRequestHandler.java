@@ -21,7 +21,7 @@ package org.apache.pinot.broker.requesthandler;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -61,7 +61,6 @@ import org.apache.pinot.query.catalog.PinotCatalog;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
-import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.runtime.MultiStageStatsTreeBuilder;
@@ -140,7 +139,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       QueryEnvironment queryEnvironment = new QueryEnvironment(database, _tableCache, _workerManager);
       switch (sqlNodeAndOptions.getSqlNode().getKind()) {
         case EXPLAIN:
-          Function<DispatchablePlanFragment, PlanNode> fragmentToPlanNode = fragment ->
+          Function<DispatchablePlanFragment, Collection<PlanNode>> fragmentToPlanNode = fragment ->
               requestPhysicalPlan(fragment, requestContext, queryTimeoutMs, queryOptions);
 
           boolean askServers = _config.getProperty(CommonConstants.MultiStageQueryRunner.ASK_SERVERS_FOR_EXPLAIN_PLAN,
@@ -278,7 +277,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     return brokerResponse;
   }
 
-  private PlanNode requestPhysicalPlan(DispatchablePlanFragment fragment,
+  private Collection<PlanNode> requestPhysicalPlan(DispatchablePlanFragment fragment,
       RequestContext requestContext, long queryTimeoutMs, Map<String, String> queryOptions) {
     List<PlanNode> stagePlans;
     try {
@@ -289,19 +288,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       throw new RuntimeException(e);
     }
 
-    switch (stagePlans.size()) {
-      case 0: {
-        return new ExplainedNode(-1, new DataSchema(new String[0], new DataSchema.ColumnDataType[0]), null,
-            Collections.emptyList(), "Empty", Collections.emptyMap());
-      }
-      case 1: {
-        return stagePlans.get(0);
-      }
-      default: {
-        // TODO: Merge nodes in this case
-        return stagePlans.get(0);
-      }
-    }
+    return stagePlans;
   }
 
   private void fillOldBrokerResponseStats(BrokerResponseNativeV2 brokerResponse,

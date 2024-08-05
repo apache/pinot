@@ -18,9 +18,11 @@
  */
 package org.apache.pinot.core.operator.streaming;
 
+import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
@@ -126,6 +128,14 @@ public class StreamingSelectionOnlyOperator extends BaseOperator<SelectionResult
   @Override
   public String toExplainString() {
     return EXPLAIN_NAME;
+  }
+
+  @Override
+  protected Map<String, ? super Object> getExplainAttributes() {
+    return ImmutableMap.<String, Object>builder()
+        .put("segment", _indexSegment.getSegmentName())
+        .put("totalDocs", _indexSegment.getSegmentMetadata().getTotalDocs())
+        .build();
   }
 
   @Override
