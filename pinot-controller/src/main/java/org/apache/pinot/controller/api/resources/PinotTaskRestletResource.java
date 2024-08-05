@@ -192,7 +192,12 @@ public class PinotTaskRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation("List all tasks for the given task type")
   public Set<String> getTasks(@ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType) {
-    return _pinotHelixTaskResourceManager.getTasks(taskType);
+    Set<String> tasks = _pinotHelixTaskResourceManager.getTasks(taskType);
+    if (tasks == null) {
+      throw new NotFoundException("No tasks found for task type: " + taskType);
+    }
+
+    return tasks;
   }
 
   @GET
