@@ -506,6 +506,14 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       }
 
       // Validate QPS quota
+      String database = DatabaseUtils.extractDatabaseFromFullyQualifiedTableName(tableName);
+      if (!_queryQuotaManager.acquireDatabase(database)) {
+        String errorMessage =
+            String.format("Request %d: %s exceeds query quota for database: %s", requestId, query, database);
+        LOGGER.info(errorMessage);
+        requestContext.setErrorCode(QueryException.TOO_MANY_REQUESTS_ERROR_CODE);
+        return new BrokerResponseNative(QueryException.getException(QueryException.QUOTA_EXCEEDED_ERROR, errorMessage));
+      }
       if (!_queryQuotaManager.acquire(tableName)) {
         String errorMessage =
             String.format("Request %d: %s exceeds query quota for table: %s", requestId, query, tableName);
@@ -531,7 +539,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
       if (!pinotQuery.isExplain() && _enableMultistageMigrationMetric) {
         // Check if the query is a v2 supported query
-        String database = DatabaseUtils.extractDatabaseFromQueryRequest(sqlNodeAndOptions.getOptions(), httpHeaders);
+        database = DatabaseUtils.extractDatabaseFromQueryRequest(sqlNodeAndOptions.getOptions(), httpHeaders);
         // Attempt to add the query to the compile queue; drop if queue is full
         if (!_multistageCompileQueryQueue.offer(Pair.of(query, database))) {
           LOGGER.trace("Not compiling query `{}` using the multi-stage query engine because the query queue is full",

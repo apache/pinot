@@ -33,7 +33,7 @@
 
   <properties>
     <pinot.root>${basedir}/..</pinot.root>
-    <testcontainers.version>1.20.0</testcontainers.version>
+    <testcontainers.version>1.20.1</testcontainers.version>
   </properties>
 
   <profiles>
