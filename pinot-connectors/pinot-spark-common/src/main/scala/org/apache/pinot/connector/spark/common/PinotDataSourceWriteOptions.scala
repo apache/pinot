@@ -39,7 +39,7 @@ object PinotDataSourceWriteOptions {
     }
 
     val tableName = options.get(CONFIG_TABLE_NAME)
-    val segmentNameFormat = options.getOrDefault(CONFIG_SEGMENT_NAME_FORMAT, s"""$tableName-%d""")
+    val segmentNameFormat = options.getOrDefault(CONFIG_SEGMENT_NAME_FORMAT, s"""$tableName-{partitionId:03}""")
     val savePath = options.get(CONFIG_PATH)
     val invertedIndexColumns = options.getOrDefault(CONFIG_INVERTED_INDEX_COLUMNS, "").split(",").filter(_.nonEmpty)
     val noDictionaryColumns = options.getOrDefault(CONFIG_NO_DICTIONARY_COLUMNS, "").split(",").filter(_.nonEmpty)
