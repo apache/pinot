@@ -61,7 +61,7 @@ import org.apache.pinot.calcite.sql2rel.PinotConvertletTable;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.query.catalog.PinotCatalog;
 import org.apache.pinot.query.context.PlannerContext;
-import org.apache.pinot.query.planner.ImplementationExplainUtils;
+import org.apache.pinot.query.planner.MultiStageExplainAskingServersUtils;
 import org.apache.pinot.query.planner.PlannerUtils;
 import org.apache.pinot.query.planner.SubPlan;
 import org.apache.pinot.query.planner.explain.PhysicalExplainPlanVisitor;
@@ -193,8 +193,8 @@ public class QueryEnvironment {
           DispatchableSubPlan dispatchableSubPlan =
               toDispatchableSubPlan(relRoot, plannerContext, requestId, nodeTracker);
 
-          ImplementationExplainUtils.modifyRel(relRoot.rel, dispatchableSubPlan.getQueryStageList(), nodeTracker,
-              fragmentToPlanNodes, RelBuilder.create(_config));
+          MultiStageExplainAskingServersUtils.modifyRel(relRoot.rel, dispatchableSubPlan.getQueryStageList(),
+              nodeTracker, fragmentToPlanNodes, RelBuilder.create(_config));
 
           String explainStr = PlannerUtils.explainPlan(relRoot.rel, format, level);
 
