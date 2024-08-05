@@ -21,7 +21,7 @@ package org.apache.pinot.connector.spark.v3.datasource
 import org.apache.commons.io.FileUtils
 import org.apache.pinot.common.utils.TarGzCompressionUtils
 import org.apache.pinot.connector.spark.common.PinotDataSourceWriteOptions
-import org.apache.spark.sql.connector.write.{DataWriter, PhysicalWriteInfo, WriterCommitMessage}
+import org.apache.spark.sql.connector.write.{DataWriter, WriterCommitMessage}
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig
 import org.apache.pinot.spi.config.table.{IndexingConfig, SegmentsValidationAndRetentionConfig, TableConfig, TableCustomConfig, TenantConfig}
@@ -35,6 +35,7 @@ import org.slf4j.{Logger, LoggerFactory}
 
 import java.io.File
 import java.nio.file.Files
+import java.util.regex.Pattern
 
 class PinotDataWriter[InternalRow](
                                     partitionId: Int,
@@ -47,9 +48,9 @@ class PinotDataWriter[InternalRow](
   logger.info("PinotDataWriter created with writeOptions: {}, partitionId: {}, taskId: {}",
     (writeOptions, partitionId, taskId))
 
-  val tableName = writeOptions.tableName
-  val savePath = writeOptions.savePath
-  val bufferedRecordReader = new PinotBufferedRecordReader()
+  val tableName: String = writeOptions.tableName
+  val savePath: String = writeOptions.savePath
+  val bufferedRecordReader: PinotBufferedRecordReader = new PinotBufferedRecordReader()
 
   override def write(record: catalyst.InternalRow): Unit = {
     bufferedRecordReader.write(internalRowToGenericRow(record))
@@ -63,17 +64,53 @@ class PinotDataWriter[InternalRow](
     new SuccessWriterCommitMessage(segmentName)
   }
 
+  // This method is used to generate the segment name based on the format provided in the write options
+  // The format can contain variables like {partitionId}
+  // Currently supported variables are `partitionId`, `table`
+  // It also supports the following, python inspired format specifier for digit formatting:
+  //  `{partitionId:05}`
+  // which will zero pad partitionId up to five characters.
+  //
+  // Some examples:
+  //  "{partitionId}_{table}" -> "12_airlineStats"
+  //  "{partitionId:05}_{table}" -> "00012_airlineStats"
+  //  "{table}_{partitionId}" -> "airlineStats_12"
+  //  "{table}_20240805" -> "airlineStats_20240805"
   private[pinot] def getSegmentName: String = {
-    writeOptions.segmentFormat.format(partitionId)
+    val format = writeOptions.segmentNameFormat
+    val variables = Map(
+      "partitionId" -> partitionId,
+      "table" -> tableName,
+    )
+
+    val pattern = Pattern.compile("\\{(\\w+)(?::(\\d+))?}")
+    val matcher = pattern.matcher(format)
+
+    val buffer = new StringBuffer()
+    while (matcher.find()) {
+      val variableName = matcher.group(1)
+      val formatSpecifier = matcher.group(2)
+      val value = variables(variableName)
+
+      val formattedValue = formatSpecifier match {
+        case null => value.toString
+        case spec => String.format(s"%${spec}d", value.asInstanceOf[Number])
+      }
+
+      matcher.appendReplacement(buffer, formattedValue)
+    }
+    matcher.appendTail(buffer)
+
+    buffer.toString
   }
 
   private[pinot] def generateSegment(segmentName: String): File = {
     val outputDir = Files.createTempDirectory(classOf[PinotDataWriter[InternalRow]].getName).toFile
     val indexingConfig = getIndexConfig
-
-    logger.info("Index config: {}", indexingConfig)
-
     val segmentGeneratorConfig = getSegmentGenerationConfig(segmentName, indexingConfig, outputDir)
+
+    logger.info("Creating segment with indexConfig: {} and segmentGeneratorConfig config: {}",
+      (indexingConfig, segmentGeneratorConfig))
 
     // create segment and return output directory
     val driver = new SegmentIndexCreationDriverImpl()
@@ -120,7 +157,7 @@ class PinotDataWriter[InternalRow](
     val destPath = new org.apache.hadoop.fs.Path(savePath + "/" + segmentTarFile.getName)
     fs.copyFromLocalFile(new org.apache.hadoop.fs.Path(segmentTarFile.getAbsolutePath), destPath)
 
-    logger.info("Pushed segment tar file to: {}", destPath)
+    logger.info("Pushed segment tar file {} to: {}", (segmentTarFile.getName, destPath))
   }
 
   private def internalRowToGenericRow(record: catalyst.InternalRow): GenericRow = {

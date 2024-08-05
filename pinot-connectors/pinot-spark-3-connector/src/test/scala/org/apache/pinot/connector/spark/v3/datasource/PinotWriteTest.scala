@@ -51,7 +51,7 @@ class PinotWriteTest extends AnyFunSuite with Matchers {
     val pinotWrite = new PinotWrite(logicalWriteInfo)
 
     pinotWrite.writeOptions.tableName shouldEqual "testTable"
-    pinotWrite.writeOptions.segmentFormat shouldEqual "my_segment_format"
+    pinotWrite.writeOptions.segmentNameFormat shouldEqual "my_segment_format"
     pinotWrite.writeOptions.savePath shouldEqual "/path/to/save"
     pinotWrite.writeOptions.timeColumnName shouldEqual "timeCol"
     pinotWrite.writeOptions.invertedIndexColumns shouldEqual Array("col1", "col2")

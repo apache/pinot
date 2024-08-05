@@ -48,7 +48,7 @@ class PinotDataSourceWriteOptionsTest extends BaseTest {
     )
 
     pinotDataSourceWriteOptions.tableName shouldEqual expected.tableName
-    pinotDataSourceWriteOptions.segmentFormat shouldEqual expected.segmentFormat
+    pinotDataSourceWriteOptions.segmentNameFormat shouldEqual expected.segmentNameFormat
     pinotDataSourceWriteOptions.savePath shouldEqual expected.savePath
     pinotDataSourceWriteOptions.timeColumnName shouldEqual expected.timeColumnName
     pinotDataSourceWriteOptions.invertedIndexColumns shouldEqual expected.invertedIndexColumns.deep
