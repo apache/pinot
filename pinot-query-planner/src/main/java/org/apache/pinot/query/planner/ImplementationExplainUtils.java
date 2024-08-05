@@ -18,14 +18,21 @@
  */
 package org.apache.pinot.query.planner;
 
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.tools.RelBuilder;
+import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.query.planner.logical.PlanNodeToRelConverter;
 import org.apache.pinot.query.planner.logical.TransformationTracker;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
+import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 
 
@@ -45,25 +52,29 @@ public class ImplementationExplainUtils {
    * @param queryStages a collection of {@link DispatchablePlanFragment}s that represent the stages of the query.
    * @param tracker a {@link TransformationTracker} that keeps track of the creator of each {@link PlanNode}.
    *                This is used to find the RelNodes that need to be substituted.
-   * @param fragmentExplainer a function that converts a {@link DispatchablePlanFragment} to a {@link PlanNode}.
+   * @param fragmentToPlanNodes a function that converts a {@link DispatchablePlanFragment} to a collection of
+   *                          {@link PlanNode PlanNodes}.
    *                          This function may for example ask each server to explain its own plan.
    */
   public static void modifyRel(RelNode rootNode, Collection<DispatchablePlanFragment> queryStages,
-      TransformationTracker<PlanNode, RelNode> tracker, Function<DispatchablePlanFragment, RelNode> fragmentExplainer) {
+      TransformationTracker<PlanNode, RelNode> tracker,
+      Function<DispatchablePlanFragment, Collection<PlanNode>> fragmentToPlanNodes,
+      RelBuilder relBuilder) {
     // extract a key node operator
     Map<DispatchablePlanFragment, PlanNode> leafNodes = queryStages.stream()
         .filter(fragment -> !fragment.getWorkerIdToSegmentsMap().isEmpty()) // ignore root and intermediate stages
         .collect(Collectors.toMap(Function.identity(), fragment -> fragment.getPlanFragment().getFragmentRoot()));
 
     // creates a map where each leaf node is converted into another RelNode that may contain physical information
-    Map<RelNode, RelNode> leafToRel = createSubstitutionMap(leafNodes, tracker, fragmentExplainer);
+    Map<RelNode, RelNode> leafToRel = createSubstitutionMap(leafNodes, tracker, fragmentToPlanNodes, relBuilder);
 
     // replace leaf operator with explain nodes
     replaceRecursive(rootNode, leafToRel);
   }
 
   private static Map<RelNode, RelNode> createSubstitutionMap(Map<DispatchablePlanFragment, PlanNode> leafNodes,
-      TransformationTracker<PlanNode, RelNode> tracker, Function<DispatchablePlanFragment, RelNode> fragmentExplainer) {
+      TransformationTracker<PlanNode, RelNode> tracker,
+      Function<DispatchablePlanFragment, Collection<PlanNode>> fragmentToPlanNodes, RelBuilder relBuilder) {
     Map<RelNode, RelNode> explainNodes = new HashMap<>(leafNodes.size());
 
     for (Map.Entry<DispatchablePlanFragment, PlanNode> entry : leafNodes.entrySet()) {
@@ -76,7 +87,7 @@ public class ImplementationExplainUtils {
       if (explainNodes.containsKey(stageRootNode)) {
         throw new IllegalStateException("Duplicate RelNode found in the leaf nodes: " + stageRootNode);
       }
-      RelNode explainNode = fragmentExplainer.apply(fragment);
+      RelNode explainNode = explainFragment(fragmentToPlanNodes, fragment, relBuilder);
       explainNodes.put(stageRootNode, explainNode);
     }
     return explainNodes;
@@ -92,5 +103,52 @@ public class ImplementationExplainUtils {
         replaceRecursive(input, substitutionMap);
       }
     }
+  }
+
+  private static RelNode explainFragment(Function<DispatchablePlanFragment, Collection<PlanNode>> fragmentToPlanNode,
+      DispatchablePlanFragment fragment, RelBuilder relBuilder) {
+    relBuilder.clear();
+    Collection<PlanNode> planNodes = fragmentToPlanNode.apply(fragment);
+
+    HashMap<PlanNode, Integer> planNodesMap = new HashMap<>();
+    planNodes.forEach(planNode -> mergePlans(planNodesMap, planNode));
+
+    PlanNode mergedNode;
+    PlanNode fragmentRoot = fragment.getPlanFragment().getFragmentRoot();
+    int stageId = fragmentRoot.getStageId();
+    DataSchema schema = fragmentRoot.getDataSchema();
+    switch (planNodesMap.size()) {
+      case 0: {
+        mergedNode =
+            new ExplainedNode(stageId, schema, null, Collections.emptyList(), "Empty", Collections.emptyMap());
+        break;
+      }
+      case 1: {
+        mergedNode = planNodesMap.keySet().iterator().next();
+        break;
+      }
+      default: {
+        List<PlanNode> inputs = new ArrayList<>(planNodesMap.size());
+
+        for (Map.Entry<PlanNode, Integer> entry : planNodesMap.entrySet()) {
+          Map<String, String> attributes =
+              Collections.singletonMap("servers", Integer.toString(entry.getValue()));
+
+          inputs.add(new ExplainedNode(stageId, entry.getKey().getDataSchema(), null,
+              Collections.singletonList(entry.getKey()), "ALTERNATIVE", attributes));
+        }
+
+        mergedNode = new ExplainedNode(stageId, schema, null, inputs, "INTERMEDIATE_COMBINE",
+            Collections.emptyMap());
+        break;
+      }
+    }
+
+    return PlanNodeToRelConverter.convert(relBuilder, mergedNode);
+  }
+
+  private static void mergePlans(Map<PlanNode, Integer> planNodesMap, PlanNode planNode) {
+    // TODO: Actually merge nodes
+    planNodesMap.put(planNode, planNodesMap.getOrDefault(planNode, 0) + 1);
   }
 }

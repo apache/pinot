@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.planner.logical;
 
+import com.google.common.collect.Lists;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -65,7 +66,6 @@ public final class PlanNodeToRelConverter {
   }
 
   public static RelNode convert(RelBuilder builder, PlanNode planNode) {
-    // TODO: Merge nodes
     ConverterVisitor visitor = new ConverterVisitor(builder);
     planNode.visit(visitor, null);
 
@@ -157,7 +157,7 @@ public final class PlanNodeToRelConverter {
     public Void visitSort(SortNode node, Void context) {
       visitChildren(node);
 
-      RelNode child = _builder.peek();
+      RelNode child = _builder.build();
       RexLiteral offset = _builder.literal(node.getOffset());
       RexLiteral fetch = _builder.literal(node.getFetch());
       RelCollation relCollation = RelCollations.of(node.getCollations());
@@ -208,10 +208,11 @@ public final class PlanNodeToRelConverter {
       visitChildren(node);
 
       int size = node.getInputs().size();
-      List<RelNode> children = new ArrayList<>(size);
+      List<RelNode> inverseChildren = new ArrayList<>(size);
       for (int i = 0; i < size; i++) {
-        children.add(_builder.peek());
+        inverseChildren.add(_builder.build());
       }
+      List<RelNode> children = Lists.reverse(inverseChildren);
 
       RelOptCluster cluster = _builder.getCluster();
       RelTraitSet empty = RelTraitSet.createEmpty();
