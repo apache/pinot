@@ -115,7 +115,6 @@ public class PinotExplainedRelNode extends AbstractRelNode {
   @Override
   public RelWriter explainTerms(RelWriter pw) {
     RelWriter relWriter = super.explainTerms(pw);
-    relWriter.item("type", _type);
     for (Map.Entry<String, ?> entry : _attributes.entrySet()) {
       relWriter.item(entry.getKey(), entry.getValue());
     }
