@@ -36,7 +36,7 @@ public interface PartitionDedupMetadataManager {
   /**
    * Remove the expired primary keys from the metadata when TTL is enabled.
    */
-  void removeExpiredPrimaryKeys();
+  int removeExpiredPrimaryKeys();
 
   /**
    * Add the primary key to the given segment to the dedup matadata if it is absent.
@@ -48,6 +48,9 @@ public interface PartitionDedupMetadataManager {
   /**
    * Add the primary key to the given segment to the dedup matadata if it is absent and with in the retention time.
    * Returns true if the key is dropped.
+   * @param dedupRecordInfo  The primary key and the dedup time.
+   * @param indexSegment  The segment to which the record belongs.
+   * @return true if the key is dropped.
    */
   default boolean dropOrAddRecord(DedupRecordInfo dedupRecordInfo, IndexSegment indexSegment) {
     return checkRecordPresentOrUpdate(dedupRecordInfo.getPrimaryKey(), indexSegment);

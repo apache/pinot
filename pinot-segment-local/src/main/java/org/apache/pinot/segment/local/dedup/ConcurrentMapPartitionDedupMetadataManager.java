@@ -32,8 +32,8 @@ class ConcurrentMapPartitionDedupMetadataManager implements PartitionDedupMetada
       String metadataTimeColumn) {
     if (metadataTTL > 0) {
       _partitionDedupMetadataManagerDelegate =
-          new RetentionConcurrentMapPartitionDedupMetadataManager(tableNameWithType, primaryKeyColumns, partitionId,
-              serverMetrics, hashFunction, metadataTTL, metadataTimeColumn);
+          new WriteOptimizedRetentionConcurrentMapPartitionDedupMetadataManager(tableNameWithType, primaryKeyColumns,
+              partitionId, serverMetrics, hashFunction, metadataTTL, metadataTimeColumn);
     } else {
       _partitionDedupMetadataManagerDelegate =
           new NoRetentionConcurrentMapPartitionDedupMetadataManager(tableNameWithType, primaryKeyColumns, partitionId,
@@ -52,8 +52,8 @@ class ConcurrentMapPartitionDedupMetadataManager implements PartitionDedupMetada
   }
 
   @Override
-  public void removeExpiredPrimaryKeys() {
-    _partitionDedupMetadataManagerDelegate.removeExpiredPrimaryKeys();
+  public int removeExpiredPrimaryKeys() {
+    return _partitionDedupMetadataManagerDelegate.removeExpiredPrimaryKeys();
   }
 
   @Override
