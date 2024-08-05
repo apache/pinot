@@ -631,8 +631,6 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       long routingStartTimeNs = System.nanoTime();
       Map<ServerInstance, Pair<List<String>, List<String>>> offlineRoutingTable = null;
       Map<ServerInstance, Pair<List<String>, List<String>>> realtimeRoutingTable = null;
-      String offlineRoutingPolicy = null;
-      String realtimeRoutingPolicy = null;
       List<String> unavailableSegments = new ArrayList<>();
       int numPrunedSegmentsTotal = 0;
       if (offlineBrokerRequest != null) {
@@ -644,7 +642,6 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
               routingTable.getServerInstanceToSegmentsMap();
           if (!serverInstanceToSegmentsMap.isEmpty()) {
             offlineRoutingTable = serverInstanceToSegmentsMap;
-            offlineRoutingPolicy = getRoutingPolicy(offlineTableConfig);
           } else {
             offlineBrokerRequest = null;
           }
@@ -662,7 +659,6 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
               routingTable.getServerInstanceToSegmentsMap();
           if (!serverInstanceToSegmentsMap.isEmpty()) {
             realtimeRoutingTable = serverInstanceToSegmentsMap;
-            realtimeRoutingPolicy = getRoutingPolicy(realtimeTableConfig);
           } else {
             realtimeBrokerRequest = null;
           }
@@ -677,23 +673,16 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       List<ProcessingException> exceptions = new ArrayList<>();
       if (numUnavailableSegments > 0) {
         String errorMessage;
-        String routingPolicy;
-        if (offlineRoutingPolicy != null && realtimeRoutingPolicy != null) {
-          routingPolicy = String.format("%s [realtime], %s [offline]", realtimeRoutingPolicy, offlineRoutingPolicy);
-        } else if (offlineRoutingPolicy != null) {
-          routingPolicy = offlineRoutingPolicy;
-        } else {
-          routingPolicy = realtimeRoutingPolicy;
-        }
         if (numUnavailableSegments > MAX_UNAVAILABLE_SEGMENTS_TO_PRINT_IN_QUERY_EXCEPTION) {
-          errorMessage =
-              String.format("%d segments unavailable, sampling %d: %s, with routing policy: %s", numUnavailableSegments,
-                  MAX_UNAVAILABLE_SEGMENTS_TO_PRINT_IN_QUERY_EXCEPTION,
-                  unavailableSegments.subList(0, MAX_UNAVAILABLE_SEGMENTS_TO_PRINT_IN_QUERY_EXCEPTION), routingPolicy);
+          errorMessage = String.format("%d segments unavailable, sampling %d: %s", numUnavailableSegments,
+              MAX_UNAVAILABLE_SEGMENTS_TO_PRINT_IN_QUERY_EXCEPTION,
+              unavailableSegments.subList(0, MAX_UNAVAILABLE_SEGMENTS_TO_PRINT_IN_QUERY_EXCEPTION));
         } else {
-          errorMessage = String.format("%d segments unavailable: %s, with routing policy: %s", numUnavailableSegments,
-              unavailableSegments, routingPolicy);
+          errorMessage = String.format("%d segments unavailable: %s", numUnavailableSegments, unavailableSegments);
         }
+        String realtimeRoutingPolicy = realtimeBrokerRequest != null ? getRoutingPolicy(realtimeTableConfig) : null;
+        String offlineRoutingPolicy = offlineBrokerRequest != null ? getRoutingPolicy(offlineTableConfig) : null;
+        errorMessage = addRoutingPolicyInErrMsg(errorMessage, realtimeRoutingPolicy, offlineRoutingPolicy);
         exceptions.add(QueryException.getException(QueryException.BROKER_SEGMENT_UNAVAILABLE_ERROR, errorMessage));
         _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_UNAVAILABLE_SEGMENTS, 1);
       }
@@ -849,6 +838,22 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     } finally {
       Tracing.ThreadAccountantOps.clear();
     }
+  }
+
+  @VisibleForTesting
+  static String addRoutingPolicyInErrMsg(String errorMessage, String realtimeRoutingPolicy,
+      String offlineRoutingPolicy) {
+    if (realtimeRoutingPolicy != null && offlineRoutingPolicy != null) {
+      return String.format("%s, with routing policy: %s [realtime], %s [offline]", errorMessage, realtimeRoutingPolicy,
+          offlineRoutingPolicy);
+    }
+    if (realtimeRoutingPolicy != null) {
+      return String.format("%s, with routing policy: %s [realtime]", errorMessage, realtimeRoutingPolicy);
+    }
+    if (offlineRoutingPolicy != null) {
+      return String.format("%s, with routing policy: %s [offline]", errorMessage, offlineRoutingPolicy);
+    }
+    return errorMessage;
   }
 
   private static String getRoutingPolicy(TableConfig tableConfig) {
