@@ -92,7 +92,7 @@ class PinotDataSourceWriteOptionsTest extends BaseTest {
 
     val expected = PinotDataSourceWriteOptions(
       "tbl",
-      "tbl-%d",
+      "tbl-{partitionId:03}",
       "/path/to/save",
       null,
       Array.empty,

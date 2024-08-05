@@ -55,7 +55,7 @@ class PinotDataWriterTest extends AnyFunSuite with Matchers with BeforeAndAfter 
       tableName = "testTable",
       savePath = "/tmp/pinot",
       timeColumnName = "ts",
-      segmentNameFormat = "segment_%d",
+      segmentNameFormat = "{table}_{partitionId:03}",
       invertedIndexColumns = Array("name"),
       noDictionaryColumns = Array("age"),
       bloomFilterColumns = Array("name"),
@@ -92,7 +92,7 @@ class PinotDataWriterTest extends AnyFunSuite with Matchers with BeforeAndAfter 
       tableName = "testTable",
       savePath = tmpDir.getAbsolutePath,
       timeColumnName = "ts",
-      segmentNameFormat = "segment_%d",
+      segmentNameFormat = "{table}_{partitionId:03}",
       invertedIndexColumns = Array("name"),
       noDictionaryColumns = Array("age"),
       bloomFilterColumns = Array("name"),
@@ -112,14 +112,14 @@ class PinotDataWriterTest extends AnyFunSuite with Matchers with BeforeAndAfter 
 
     // Verify that the segment is created and stored in the target location
     val fs = FileSystem.get(new URI(writeOptions.savePath), new org.apache.hadoop.conf.Configuration())
-    val segmentPath = new Path(writeOptions.savePath + "/segment_0.tar.gz")
+    val segmentPath = new Path(writeOptions.savePath + "/testTable_000.tar.gz")
     fs.exists(segmentPath) shouldBe true
 
     // Verify the contents of the segment tar file
     TarGzCompressionUtils.untar(
-      new File(writeOptions.savePath + "/segment_0.tar.gz"),
+      new File(writeOptions.savePath + "/testTable_000.tar.gz"),
       new File(writeOptions.savePath))
-    val untarDir = Paths.get(writeOptions.savePath + "/segment_0/v3/")
+    val untarDir = Paths.get(writeOptions.savePath + "/testTable_000/v3/")
     Files.exists(untarDir) shouldBe true
 
     val segmentFiles = Files.list(untarDir).toArray.map(_.toString)
@@ -132,7 +132,7 @@ class PinotDataWriterTest extends AnyFunSuite with Matchers with BeforeAndAfter 
     val metadataSrc = Source.fromFile(untarDir + "/metadata.properties")
     val metadataContent = metadataSrc.getLines.mkString("\n")
     metadataSrc.close()
-    metadataContent should include ("segment.name = segment_0")
+    metadataContent should include ("segment.name = testTable_000")
   }
 
   test("getSegmentName should format segment name correctly with custom format") {
