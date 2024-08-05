@@ -36,9 +36,9 @@ import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 
 
-public class ImplementationExplainUtils {
+public class MultiStageExplainAskingServersUtils {
 
-  private ImplementationExplainUtils() {
+  private MultiStageExplainAskingServersUtils() {
   }
 
   /**
