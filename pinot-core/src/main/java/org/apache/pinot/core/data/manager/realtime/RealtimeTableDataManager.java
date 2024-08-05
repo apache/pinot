@@ -383,17 +383,11 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
         && _tableUpsertMetadataManager.getUpsertMode() == UpsertConfig.Mode.PARTIAL;
   }
 
-  private boolean isUpsertPreloadEnabled() {
-    UpsertConfig upsertConfig = _tableConfig.getUpsertConfig();
-    return _tableUpsertMetadataManager != null && _segmentPreloadExecutor != null && upsertConfig != null
-        && upsertConfig.isEnableSnapshot() && upsertConfig.isEnablePreload();
-  }
-
   /**
-   * Handles upsert preload, and returns whether the upsert preload is enabled.
+   * Handles upsert preload if the upsert preload is enabled.
    */
   private void handleUpsertPreload(SegmentZKMetadata zkMetadata, IndexLoadingConfig indexLoadingConfig) {
-    if (!isUpsertPreloadEnabled()) {
+    if (_tableUpsertMetadataManager == null || !_tableUpsertMetadataManager.isEnablePreload()) {
       return;
     }
     String segmentName = zkMetadata.getSegmentName();

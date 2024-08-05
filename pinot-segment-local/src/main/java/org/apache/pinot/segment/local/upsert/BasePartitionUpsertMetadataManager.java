@@ -162,7 +162,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     _partialUpsertHandler = context.getPartialUpsertHandler();
     _enableSnapshot = context.isSnapshotEnabled();
     _snapshotLock = _enableSnapshot ? new ReentrantReadWriteLock() : null;
-    _isPreloading = _enableSnapshot && context.isPreloadEnabled();
+    _isPreloading = context.isPreloadEnabled();
     _metadataTTL = context.getMetadataTTL();
     _deletedKeysTTL = context.getDeletedKeysTTL();
     _tableIndexDir = context.getTableIndexDir();
@@ -933,6 +933,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
 
     int numImmutableSegments = 0;
     int numConsumingSegments = 0;
+    int numUnchangedSegments = 0;
     // The segments without validDocIds snapshots should take their snapshots at last. So that when there is failure
     // to take snapshots, the validDocIds snapshot on disk still keep track of an exclusive set of valid docs across
     // segments. Because the valid docs as tracked by the existing validDocIds snapshots can only get less. That no
@@ -945,6 +946,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       }
       if (!_updatedSegmentsSinceLastSnapshot.contains(segment)) {
         // if no updates since last snapshot then skip
+        numUnchangedSegments++;
         continue;
       }
       try {
@@ -976,7 +978,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         ServerGauge.UPSERT_VALID_DOC_ID_SNAPSHOT_COUNT, numImmutableSegments);
     _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId,
         ServerGauge.UPSERT_PRIMARY_KEYS_IN_SNAPSHOT_COUNT, numPrimaryKeysInSnapshot);
-    int numMissedSegments = numTrackedSegments - numImmutableSegments - numConsumingSegments;
+    int numMissedSegments = numTrackedSegments - numImmutableSegments - numConsumingSegments - numUnchangedSegments;
     if (numMissedSegments > 0) {
       _serverMetrics.addMeteredTableValue(_tableNameWithType, String.valueOf(_partitionId),
           ServerMeter.UPSERT_MISSED_VALID_DOC_ID_SNAPSHOT_COUNT, numMissedSegments);
