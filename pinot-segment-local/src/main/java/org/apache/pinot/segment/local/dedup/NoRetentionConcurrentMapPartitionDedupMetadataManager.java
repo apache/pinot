@@ -32,29 +32,15 @@ import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.utils.ByteArray;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
-class NoRetentionConcurrentMapPartitionDedupMetadataManager implements PartitionDedupMetadataManager {
-  private final String _tableNameWithType;
-  private final List<String> _primaryKeyColumns;
-  private final int _partitionId;
-  private final ServerMetrics _serverMetrics;
-  private final HashFunction _hashFunction;
-  private final Logger _logger;
-
+class NoRetentionConcurrentMapPartitionDedupMetadataManager extends BasePartitionDedupMetadataManager {
   @VisibleForTesting
   final ConcurrentHashMap<Object, IndexSegment> _primaryKeyToSegmentMap = new ConcurrentHashMap<>();
 
   public NoRetentionConcurrentMapPartitionDedupMetadataManager(String tableNameWithType, List<String> primaryKeyColumns,
       int partitionId, ServerMetrics serverMetrics, HashFunction hashFunction) {
-    _tableNameWithType = tableNameWithType;
-    _primaryKeyColumns = primaryKeyColumns;
-    _partitionId = partitionId;
-    _serverMetrics = serverMetrics;
-    _hashFunction = hashFunction;
-    _logger = LoggerFactory.getLogger(tableNameWithType + "-" + partitionId + "-" + getClass().getSimpleName());
+    super(tableNameWithType, primaryKeyColumns, partitionId, serverMetrics, hashFunction);
   }
 
 
@@ -121,9 +107,10 @@ class NoRetentionConcurrentMapPartitionDedupMetadataManager implements Partition
   }
 
   @Override
-  public void removeExpiredPrimaryKeys() {
+  public int removeExpiredPrimaryKeys() {
     _logger.warn(
         "removeExpiredPrimaryKeys() is not supported for NoRetentionConcurrentMapPartitionDedupMetadataManager");
+    return -1;
   }
 
   @Override

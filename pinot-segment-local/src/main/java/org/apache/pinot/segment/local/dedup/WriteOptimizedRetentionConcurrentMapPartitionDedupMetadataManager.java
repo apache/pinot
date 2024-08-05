@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.local.dedup;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
@@ -35,16 +34,9 @@ import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 
 
-class RetentionConcurrentMapPartitionDedupMetadataManager implements PartitionDedupMetadataManager {
-  // Number of retention buckets to keep
-  private static final int RETENTION_BUCKET_COUNT = 100;
-  private final String _tableNameWithType;
-  private final List<String> _primaryKeyColumns;
-  private final int _partitionId;
-  private final ServerMetrics _serverMetrics;
-  private final HashFunction _hashFunction;
-  private final double _metadataTTL;
-  private final String _metadataTimeColumn;
+class WriteOptimizedRetentionConcurrentMapPartitionDedupMetadataManager
+    extends BaseRetentionPartitionDedupMetadataManager {
+  private static final int DEFAULT_RETENTION_BUCKET_COUNT = 100;
 
   @VisibleForTesting
   final AtomicLong _largestSeenTimeBucketId = new AtomicLong(0);
@@ -55,46 +47,36 @@ class RetentionConcurrentMapPartitionDedupMetadataManager implements PartitionDe
   // expensive when there are a lot of primary keys
   @VisibleForTesting
   final ConcurrentHashMap<Long, Set<Object>> _bucketIdToPrimaryKeySetMap = new ConcurrentHashMap<>();
+  // Number of retention buckets to keep
+  @VisibleForTesting
+  private final int _retentionBucketCount;
 
-  public RetentionConcurrentMapPartitionDedupMetadataManager(String tableNameWithType, List<String> primaryKeyColumns,
-      int partitionId, ServerMetrics serverMetrics, HashFunction hashFunction, double metadataTTL,
-      String metadataTimeColumn) {
-    _tableNameWithType = tableNameWithType;
-    _primaryKeyColumns = primaryKeyColumns;
-    _partitionId = partitionId;
-    _serverMetrics = serverMetrics;
-    _hashFunction = hashFunction;
-    Preconditions.checkArgument(metadataTTL > 0, "metadataTTL: %s for table: %s must be positive when "
-        + "RetentionConcurrentMapPartitionDedupMetadataManager is used", metadataTTL, tableNameWithType);
-    _metadataTTL = metadataTTL;
-    Preconditions.checkArgument(metadataTimeColumn != null,
-        "When metadataTTL is configured, metadata time column must be configured for dedup enabled table: %s",
-        tableNameWithType);
-    _metadataTimeColumn = metadataTimeColumn;
-  }
-
-  @Override
-  public void addSegment(IndexSegment segment) {
-    try (DedupUtils.DedupRecordInfoReader dedupRecordInfoReader = new DedupUtils.DedupRecordInfoReader(segment,
-        _primaryKeyColumns, _metadataTimeColumn)) {
-      addSegment(segment, dedupRecordInfoReader);
-    } catch (Exception e) {
-      throw new RuntimeException(String.format("Caught exception while adding segment: %s of table: %s to "
-          + "RetentionConcurrentMapPartitionDedupMetadataManager", segment.getSegmentName(), _tableNameWithType), e);
-    }
+  public WriteOptimizedRetentionConcurrentMapPartitionDedupMetadataManager(String tableNameWithType,
+      List<String> primaryKeyColumns, int partitionId, ServerMetrics serverMetrics, HashFunction hashFunction,
+      double metadataTTL, String metadataTimeColumn) {
+    this(tableNameWithType, primaryKeyColumns, partitionId, serverMetrics, hashFunction, metadataTTL,
+        metadataTimeColumn, DEFAULT_RETENTION_BUCKET_COUNT);
   }
 
   @VisibleForTesting
-  void addSegment(IndexSegment segment, DedupUtils.DedupRecordInfoReader dedupRecordInfoReader) {
-    Iterator<DedupRecordInfo> dedupRecordInfoIterator =
-        DedupUtils.getDedupRecordInfoIterator(dedupRecordInfoReader, segment.getSegmentMetadata().getTotalDocs());
+  WriteOptimizedRetentionConcurrentMapPartitionDedupMetadataManager(String tableNameWithType,
+      List<String> primaryKeyColumns, int partitionId, ServerMetrics serverMetrics, HashFunction hashFunction,
+      double metadataTTL, String metadataTimeColumn, int retentionBucketCount) {
+    super(tableNameWithType, primaryKeyColumns, partitionId, serverMetrics, hashFunction, metadataTTL,
+        metadataTimeColumn);
+    _retentionBucketCount = retentionBucketCount;
+  }
+
+  @VisibleForTesting
+  @Override
+  void addSegment(IndexSegment segment, Iterator<DedupRecordInfo> dedupRecordInfoIterator) {
     while (dedupRecordInfoIterator.hasNext()) {
       DedupRecordInfo dedupRecordInfo = dedupRecordInfoIterator.next();
       PrimaryKey pk = dedupRecordInfo.getPrimaryKey();
       double metadataTime = dedupRecordInfo.getDedupTime();
       long bucketId = getTimeBucketId(metadataTime, _metadataTTL);
       // Skip the primary key if the time is out of retention
-      if (bucketId >= _largestSeenTimeBucketId.get() - RETENTION_BUCKET_COUNT) {
+      if (bucketId >= _largestSeenTimeBucketId.get() - _retentionBucketCount) {
         // advance the largest seen time bucket id no matter the primary key is already present or not
         _largestSeenTimeBucketId.getAndUpdate(largestSeenTimeBucketId -> Math.max(largestSeenTimeBucketId, bucketId));
         Object primaryKeyHash = HashUtils.hashPrimaryKey(pk, _hashFunction);
@@ -104,26 +86,11 @@ class RetentionConcurrentMapPartitionDedupMetadataManager implements PartitionDe
         }
       }
     }
-    removeExpiredPrimaryKeys();
-    _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.DEDUP_PRIMARY_KEYS_COUNT,
-        _primaryKeyToSegmentAndTimeMap.size());
-  }
-
-  @Override
-  public void removeSegment(IndexSegment segment) {
-    try (DedupUtils.DedupRecordInfoReader dedupRecordInfoReader = new DedupUtils.DedupRecordInfoReader(segment,
-        _primaryKeyColumns, _metadataTimeColumn)) {
-      removeSegment(segment, dedupRecordInfoReader);
-    } catch (Exception e) {
-      throw new RuntimeException(String.format("Caught exception while removing segment: %s of table: %s from "
-          + "RetentionConcurrentMapPartitionDedupMetadataManager", segment.getSegmentName(), _tableNameWithType), e);
-    }
   }
 
   @VisibleForTesting
-  void removeSegment(IndexSegment segment, DedupUtils.DedupRecordInfoReader dedupRecordInfoReader) {
-    Iterator<DedupRecordInfo> dedupRecordInfoIterator =
-        DedupUtils.getDedupRecordInfoIterator(dedupRecordInfoReader, segment.getSegmentMetadata().getTotalDocs());
+  @Override
+  void removeSegment(IndexSegment segment, Iterator<DedupRecordInfo> dedupRecordInfoIterator) {
     while (dedupRecordInfoIterator.hasNext()) {
       DedupRecordInfo dedupRecordInfo = dedupRecordInfoIterator.next();
       PrimaryKey pk = dedupRecordInfo.getPrimaryKey();
@@ -149,14 +116,11 @@ class RetentionConcurrentMapPartitionDedupMetadataManager implements PartitionDe
         });
       }
     }
-    removeExpiredPrimaryKeys();
-    _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.DEDUP_PRIMARY_KEYS_COUNT,
-        _primaryKeyToSegmentAndTimeMap.size());
   }
 
   @Override
-  public void removeExpiredPrimaryKeys() {
-    long smallestTimeBucketIdToKeep = _largestSeenTimeBucketId.get() - RETENTION_BUCKET_COUNT;
+  public int removeExpiredPrimaryKeys() {
+    long smallestTimeBucketIdToKeep = _largestSeenTimeBucketId.get() - _retentionBucketCount;
     _bucketIdToPrimaryKeySetMap.forEach((bucketId, primaryKeySet) -> {
       if (bucketId < smallestTimeBucketIdToKeep) {
         if (primaryKeySet != null) {
@@ -172,12 +136,7 @@ class RetentionConcurrentMapPartitionDedupMetadataManager implements PartitionDe
         _bucketIdToPrimaryKeySetMap.remove(bucketId);
       }
     });
-  }
-
-  @Override
-  public boolean checkRecordPresentOrUpdate(PrimaryKey pk, IndexSegment indexSegment) {
-    throw new UnsupportedOperationException("checkRecordPresentOrUpdate(PrimaryKey pk, IndexSegment indexSegment) is "
-        + "not supported for RetentionConcurrentMapPartitionDedupMetadataManager");
+    return _primaryKeyToSegmentAndTimeMap.size();
   }
 
   @Override
@@ -185,7 +144,7 @@ class RetentionConcurrentMapPartitionDedupMetadataManager implements PartitionDe
     PrimaryKey pk = dedupRecordInfo.getPrimaryKey();
     double metadataTime = dedupRecordInfo.getDedupTime();
     long bucketId = getTimeBucketId(metadataTime, _metadataTTL);
-    if (bucketId < _largestSeenTimeBucketId.get() - RETENTION_BUCKET_COUNT) {
+    if (bucketId < _largestSeenTimeBucketId.get() - _retentionBucketCount) {
       // Skip the primary key if the time is out of retention
       return true;
     }
@@ -203,7 +162,7 @@ class RetentionConcurrentMapPartitionDedupMetadataManager implements PartitionDe
   }
 
   @VisibleForTesting
-  static long getTimeBucketId(double time, double metadataTTL) {
-    return (long) (time / metadataTTL * RETENTION_BUCKET_COUNT);
+  long getTimeBucketId(double time, double metadataTTL) {
+    return (long) (time / metadataTTL * _retentionBucketCount);
   }
 }
