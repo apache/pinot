@@ -32,7 +32,7 @@ class ConcurrentMapPartitionDedupMetadataManager implements PartitionDedupMetada
       String metadataTimeColumn) {
     if (metadataTTL > 0) {
       _partitionDedupMetadataManagerDelegate =
-          new WriteOptimizedRetentionConcurrentMapPartitionDedupMetadataManager(tableNameWithType, primaryKeyColumns,
+          new RemoveOptimizedRetentionConcurrentMapPartitionDedupMetadataManager(tableNameWithType, primaryKeyColumns,
               partitionId, serverMetrics, hashFunction, metadataTTL, metadataTimeColumn);
     } else {
       _partitionDedupMetadataManagerDelegate =
