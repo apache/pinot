@@ -18,22 +18,19 @@
  */
 package org.apache.pinot.connector.spark.v3.datasource
 
-import org.apache.commons.compress.archivers.tar.{TarArchiveEntry, TarArchiveInputStream}
-import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream
 import org.apache.pinot.connector.spark.common.PinotDataSourceWriteOptions
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.types.{DataType, IntegerType, StringType, StructField, StructType}
+import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
 import org.apache.spark.sql.connector.write.WriterCommitMessage
 import org.scalatest.matchers.should.Matchers
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.pinot.common.utils.TarGzCompressionUtils
 import org.apache.pinot.spi.data.readers.GenericRow
-import org.apache.spark.sql.catalyst.expressions.{GenericInternalRow, UnsafeRow}
-import org.apache.spark.unsafe.types.UTF8String
+import org.apache.spark.sql.catalyst.expressions.GenericInternalRow
 import org.scalatest.BeforeAndAfter
 import org.scalatest.funsuite.AnyFunSuite
 
-import java.io.{ByteArrayInputStream, ByteArrayOutputStream, File}
+import java.io.File
 import java.net.URI
 import java.nio.file.{Files, Paths}
 import scala.io.Source
@@ -58,7 +55,7 @@ class PinotDataWriterTest extends AnyFunSuite with Matchers with BeforeAndAfter 
       tableName = "testTable",
       savePath = "/tmp/pinot",
       timeColumnName = "ts",
-      segmentFormat = "segment_%d",
+      segmentNameFormat = "segment_%d",
       invertedIndexColumns = Array("name"),
       noDictionaryColumns = Array("age"),
       bloomFilterColumns = Array("name"),
@@ -95,7 +92,7 @@ class PinotDataWriterTest extends AnyFunSuite with Matchers with BeforeAndAfter 
       tableName = "testTable",
       savePath = tmpDir.getAbsolutePath,
       timeColumnName = "ts",
-      segmentFormat = "segment_%d",
+      segmentNameFormat = "segment_%d",
       invertedIndexColumns = Array("name"),
       noDictionaryColumns = Array("age"),
       bloomFilterColumns = Array("name"),
@@ -136,6 +133,38 @@ class PinotDataWriterTest extends AnyFunSuite with Matchers with BeforeAndAfter 
     val metadataContent = metadataSrc.getLines.mkString("\n")
     metadataSrc.close()
     metadataContent should include ("segment.name = segment_0")
+  }
+
+  test("getSegmentName should format segment name correctly with custom format") {
+    val testCases = Seq(
+      ("{table}_{partitionId}", "airlineStats_12"),
+      ("{partitionId:05}_{table}", "00012_airlineStats"),
+      ("{table}_20240805", "airlineStats_20240805")
+    )
+
+    testCases.foreach { case (format, expected) =>
+      val writeOptions = PinotDataSourceWriteOptions(
+        tableName = "airlineStats",
+        savePath = "/tmp/pinot",
+        timeColumnName = "ts",
+        segmentNameFormat = format,
+        invertedIndexColumns = Array("name"),
+        noDictionaryColumns = Array("age"),
+        bloomFilterColumns = Array("name"),
+        rangeIndexColumns = Array()
+      )
+      val writeSchema = StructType(Seq(
+        StructField("name", StringType, nullable = false),
+        StructField("age", IntegerType, nullable = false)
+      ))
+
+      val pinotSchema = SparkToPinotTypeTranslator.translate(writeSchema, writeOptions.tableName)
+      val writer = new PinotDataWriter[InternalRow](12, 0, writeOptions, writeSchema, pinotSchema)
+
+      val segmentName = writer.getSegmentName
+
+      segmentName shouldBe expected
+    }
   }
 }
 

@@ -39,7 +39,7 @@ object PinotDataSourceWriteOptions {
     }
 
     val tableName = options.get(CONFIG_TABLE_NAME)
-    val segmentFormat = options.getOrDefault(CONFIG_SEGMENT_NAME_FORMAT, s"""$tableName-%d""")
+    val segmentNameFormat = options.getOrDefault(CONFIG_SEGMENT_NAME_FORMAT, s"""$tableName-%d""")
     val savePath = options.get(CONFIG_PATH)
     val invertedIndexColumns = options.getOrDefault(CONFIG_INVERTED_INDEX_COLUMNS, "").split(",").filter(_.nonEmpty)
     val noDictionaryColumns = options.getOrDefault(CONFIG_NO_DICTIONARY_COLUMNS, "").split(",").filter(_.nonEmpty)
@@ -56,7 +56,7 @@ object PinotDataSourceWriteOptions {
 
     PinotDataSourceWriteOptions(
       tableName,
-      segmentFormat,
+      segmentNameFormat,
       savePath,
       timeColumnName,
       invertedIndexColumns,
@@ -70,7 +70,7 @@ object PinotDataSourceWriteOptions {
 // Serializable options for writing data to Pinot
 private[pinot] case class PinotDataSourceWriteOptions(
                                                        tableName: String,
-                                                       segmentFormat: String,
+                                                       segmentNameFormat: String,
                                                        savePath: String,
                                                        timeColumnName: String,
                                                        invertedIndexColumns: Array[String],

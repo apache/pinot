@@ -50,7 +50,7 @@ object ExampleSparkPinotConnectorWriteTest extends Logging {
       .mode("append")
       .option("table", "airlineStats")
       .option("tableType", "OFFLINE")
-      .option("segmentFormat", "mysegment_%d")
+      .option("segmentNameFormat", "{table}_{partitionId:03}")
       .option("invertedIndexColumns", "airport")
       .option("noDictionaryColumns", "airport,state")
       .option("bloomFilterColumns", "airport")

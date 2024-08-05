@@ -31,7 +31,7 @@ class PinotWrite(
   val pinotSchema: Schema = SparkToPinotTypeTranslator.translate(writeSchema, writeOptions.tableName)
 
   override def createBatchWriterFactory(physicalWriteInfo: PhysicalWriteInfo): DataWriterFactory = {
-    // serialized options
+    // capture the values to allow lambda serialization
     val _writeOptions = writeOptions
     val _writeSchema = writeSchema
     val _pinotSchema = pinotSchema
