@@ -143,7 +143,11 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
           Function<DispatchablePlanFragment, PlanNode> fragmentToPlanNode = fragment ->
               requestPhysicalPlan(fragment, requestContext, queryTimeoutMs, queryOptions);
 
-          queryPlanResult = queryEnvironment.explainQuery(query, sqlNodeAndOptions, requestId, fragmentToPlanNode);
+          boolean askServers = _config.getProperty(CommonConstants.MultiStageQueryRunner.ASK_SERVERS_FOR_EXPLAIN_PLAN,
+                  CommonConstants.MultiStageQueryRunner.DEFAULT_ASK_SERVERS_FOR_EXPLAIN_PLAN);
+
+          queryPlanResult = queryEnvironment.explainQuery(
+              query, sqlNodeAndOptions, requestId, fragmentToPlanNode, askServers);
           String plan = queryPlanResult.getExplainPlan();
           Set<String> tableNames = queryPlanResult.getTableNames();
           TableAuthorizationResult tableAuthorizationResult =
