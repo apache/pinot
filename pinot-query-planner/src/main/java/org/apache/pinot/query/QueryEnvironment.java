@@ -165,7 +165,7 @@ public class QueryEnvironment {
    * @return QueryPlannerResult containing the explained query plan and the relRoot.
    */
   public QueryPlannerResult explainQuery(String sqlQuery, SqlNodeAndOptions sqlNodeAndOptions, long requestId,
-      Function<DispatchablePlanFragment, PlanNode> fragmentToPlanNode) {
+      Function<DispatchablePlanFragment, PlanNode> fragmentToPlanNode, boolean askServers) {
     try (PlannerContext plannerContext = getPlannerContext()) {
       SqlExplain explain = (SqlExplain) sqlNodeAndOptions.getSqlNode();
       plannerContext.setOptions(sqlNodeAndOptions.getOptions());
@@ -181,7 +181,7 @@ public class QueryEnvironment {
         SqlExplainLevel level =
             explain.getDetailLevel() == null ? SqlExplainLevel.DIGEST_ATTRIBUTES : explain.getDetailLevel();
         Set<String> tableNames = RelToPlanNodeConverter.getTableNamesFromRelRoot(relRoot.rel);
-        if (!explain.withImplementation()) {
+        if (!explain.withImplementation() && askServers) {
           return new QueryPlannerResult(null, PlannerUtils.explainPlan(relRoot.rel, format, level), tableNames);
         } else {
           // A map from the actual PlanNodes to the original RelNode in the logical rel tree
@@ -219,7 +219,8 @@ public class QueryEnvironment {
     Function<DispatchablePlanFragment, PlanNode> fragmentToPlanNode =
         fragment -> fragment.getPlanFragment().getFragmentRoot();
     SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery);
-    QueryPlannerResult queryPlannerResult = explainQuery(sqlQuery, sqlNodeAndOptions, requestId, fragmentToPlanNode);
+    QueryPlannerResult queryPlannerResult
+        = explainQuery(sqlQuery, sqlNodeAndOptions, requestId, fragmentToPlanNode, false);
     return queryPlannerResult.getExplainPlan();
   }
 
