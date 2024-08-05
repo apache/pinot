@@ -181,7 +181,7 @@ public class QueryEnvironment {
         SqlExplainLevel level =
             explain.getDetailLevel() == null ? SqlExplainLevel.DIGEST_ATTRIBUTES : explain.getDetailLevel();
         Set<String> tableNames = RelToPlanNodeConverter.getTableNamesFromRelRoot(relRoot.rel);
-        if (!explain.withImplementation() && askServers) {
+        if (!explain.withImplementation() || !askServers) {
           return new QueryPlannerResult(null, PlannerUtils.explainPlan(relRoot.rel, format, level), tableNames);
         } else {
           // A map from the actual PlanNodes to the original RelNode in the logical rel tree
