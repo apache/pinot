@@ -58,9 +58,7 @@ import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.utils.DatabaseUtils;
-import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
-import org.apache.pinot.controller.api.access.AccessControlUtils;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.events.MetadataEventNotifierFactory;
@@ -264,7 +262,8 @@ public class PinotSchemaRestletResource {
     validateSchemaName(schema);
     String schemaName = DatabaseUtils.translateTableName(schema.getSchemaName(), httpHeaders);
     schema.setSchemaName(schemaName);
-    checkPermissionAndAccess(schemaName, request, httpHeaders, AccessType.CREATE, Actions.Table.CREATE_SCHEMA);
+    ResourceUtils.checkPermissionAndAccess(schemaName, request, httpHeaders,
+        AccessType.CREATE, Actions.Table.CREATE_SCHEMA, _accessControlFactory, LOGGER);
     SuccessResponse successResponse = addSchema(schema, override, force);
     return new ConfigSuccessResponse(successResponse.getStatus(), schemaAndUnrecognizedProps.getRight());
   }
@@ -295,7 +294,8 @@ public class PinotSchemaRestletResource {
     validateSchemaName(schema);
     String schemaName = DatabaseUtils.translateTableName(schema.getSchemaName(), httpHeaders);
     schema.setSchemaName(schemaName);
-    checkPermissionAndAccess(schemaName, request, httpHeaders, AccessType.CREATE, Actions.Table.CREATE_SCHEMA);
+    ResourceUtils.checkPermissionAndAccess(schemaName, request, httpHeaders,
+        AccessType.CREATE, Actions.Table.CREATE_SCHEMA, _accessControlFactory, LOGGER);
     SuccessResponse successResponse = addSchema(schema, override, force);
     return new ConfigSuccessResponse(successResponse.getStatus(), schemaAndUnrecognizedProperties.getRight());
   }
@@ -320,7 +320,8 @@ public class PinotSchemaRestletResource {
     String schemaName = DatabaseUtils.translateTableName(schema.getSchemaName(), httpHeaders);
     schema.setSchemaName(schemaName);
     validateSchemaInternal(schema);
-    checkPermissionAndAccess(schemaName, request, httpHeaders, AccessType.READ, Actions.Table.VALIDATE_SCHEMA);
+    ResourceUtils.checkPermissionAndAccess(schemaName, request, httpHeaders,
+        AccessType.READ, Actions.Table.VALIDATE_SCHEMA, _accessControlFactory, LOGGER);
     ObjectNode response = schema.toJsonObject();
     response.set("unrecognizedProperties", JsonUtils.objectToJsonNode(schemaAndUnrecognizedProps.getRight()));
     try {
@@ -350,7 +351,8 @@ public class PinotSchemaRestletResource {
     String schemaName = DatabaseUtils.translateTableName(schema.getSchemaName(), httpHeaders);
     schema.setSchemaName(schemaName);
     validateSchemaInternal(schema);
-    checkPermissionAndAccess(schemaName, request, httpHeaders, AccessType.READ, Actions.Table.VALIDATE_SCHEMA);
+    ResourceUtils.checkPermissionAndAccess(schemaName, request, httpHeaders,
+        AccessType.READ, Actions.Table.VALIDATE_SCHEMA, _accessControlFactory, LOGGER);
     ObjectNode response = schema.toJsonObject();
     response.set("unrecognizedProperties", JsonUtils.objectToJsonNode(schemaAndUnrecognizedProps.getRight()));
     try {
@@ -550,32 +552,6 @@ public class PinotSchemaRestletResource {
     } else {
       throw new ControllerApplicationException(LOGGER, String.format("Failed to delete schema %s", schemaName),
           Response.Status.INTERNAL_SERVER_ERROR);
-    }
-  }
-
-  /**
-   * Validates the permission and access for a given schema based on the request and HTTP headers.
-   * This method checks if the current user has the necessary permissions to perform an action on the specified schema.
-   * It utilizes the {@link AccessControl} mechanism to determine access rights
-   * and throws a {@link ControllerApplicationException} with a {@link Response.Status#FORBIDDEN} status
-   * if the access is denied.
-   *
-   * @param schemaName The name of the schema for which the permission and access are being checked.
-   * @param request The {@link Request} object containing information about the current request,
-   *                used to extract the endpoint URL.
-   * @param httpHeaders The {@link HttpHeaders} associated with the request,
-   *                    used for authorization and other header-based access control checks.
-   * @param accessType The type of access being requested (e.g., CREATE, READ, UPDATE, DELETE).
-   * @param action The specific action being checked against the access control policies.
-   * @throws ControllerApplicationException if the user does not have the required permissions or access.
-   */
-  private void checkPermissionAndAccess(String schemaName, Request request, HttpHeaders httpHeaders,
-      AccessType accessType, String action) {
-    String endpointUrl = request.getRequestURL().toString();
-    AccessControl accessControl = _accessControlFactory.create();
-    AccessControlUtils.validatePermission(schemaName, accessType, httpHeaders, endpointUrl, accessControl);
-    if (!accessControl.hasAccess(httpHeaders, TargetType.TABLE, schemaName, action)) {
-      throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
     }
   }
 }
