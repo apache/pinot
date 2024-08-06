@@ -49,7 +49,8 @@ public class DedupUtils {
     }
 
     @VisibleForTesting
-    DedupRecordInfoReader(PrimaryKeyReader primaryKeyReader, @Nullable PinotSegmentColumnReader dedupTimeColumnReader) {
+    public DedupRecordInfoReader(PrimaryKeyReader primaryKeyReader,
+        @Nullable PinotSegmentColumnReader dedupTimeColumnReader) {
       _primaryKeyReader = primaryKeyReader;
       _dedupTimeColumnReader = dedupTimeColumnReader;
     }
