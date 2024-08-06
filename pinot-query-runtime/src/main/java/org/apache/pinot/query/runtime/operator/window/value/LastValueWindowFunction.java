@@ -18,27 +18,27 @@
  */
 package org.apache.pinot.query.runtime.operator.window.value;
 
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
-import org.apache.pinot.query.runtime.operator.WindowAggregateOperator;
 
 
 public class LastValueWindowFunction extends ValueWindowFunction {
 
-  public LastValueWindowFunction(RexExpression.FunctionCall aggCall,
-      String functionName, DataSchema inputSchema,
-      WindowAggregateOperator.OrderSetInfo orderSetInfo) {
-    super(aggCall, functionName, inputSchema, orderSetInfo);
+  public LastValueWindowFunction(RexExpression.FunctionCall aggCall, DataSchema inputSchema,
+      List<RelFieldCollation> collations, boolean partitionByOnly) {
+    super(aggCall, inputSchema, collations, partitionByOnly);
   }
 
   @Override
   public List<Object> processRows(List<Object[]> rows) {
-    List<Object> result = new ArrayList<>();
-    for (int i = 0; i < rows.size(); i++) {
-      result.add(extractValueFromRow(rows.get(rows.size() - 1)));
-    }
-    return result;
+    int numRows = rows.size();
+    assert numRows > 0;
+    Object value = extractValueFromRow(rows.get(numRows - 1));
+    Object[] result = new Object[numRows];
+    Arrays.fill(result, value);
+    return Arrays.asList(result);
   }
 }

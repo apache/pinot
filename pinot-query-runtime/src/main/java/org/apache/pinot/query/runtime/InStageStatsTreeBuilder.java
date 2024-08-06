@@ -25,8 +25,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.function.IntFunction;
-import org.apache.pinot.query.planner.plannode.AbstractPlanNode;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.BasePlanNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
@@ -72,7 +72,7 @@ public class InStageStatsTreeBuilder implements PlanNodeVisitor<ObjectNode, Void
     return json;
   }
 
-  private ObjectNode recursiveCase(AbstractPlanNode node, MultiStageOperator.Type expectedType) {
+  private ObjectNode recursiveCase(BasePlanNode node, MultiStageOperator.Type expectedType) {
     MultiStageOperator.Type type = _stageStats.getOperatorType(_index);
     /*
      Sometimes the operator type is not what we expect, but we can still build the tree

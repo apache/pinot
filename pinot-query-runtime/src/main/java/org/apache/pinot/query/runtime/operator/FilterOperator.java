@@ -19,15 +19,13 @@
 package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.List;
-import javax.annotation.Nullable;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperandFactory;
@@ -55,17 +53,16 @@ public class FilterOperator extends MultiStageOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(FilterOperator.class);
   private static final String EXPLAIN_NAME = "FILTER";
 
-  private final MultiStageOperator _upstreamOperator;
+  private final MultiStageOperator _input;
   private final TransformOperand _filterOperand;
   private final DataSchema _dataSchema;
   private final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
 
-  public FilterOperator(OpChainExecutionContext context, MultiStageOperator upstreamOperator, DataSchema dataSchema,
-      RexExpression filter) {
+  public FilterOperator(OpChainExecutionContext context, MultiStageOperator input, FilterNode node) {
     super(context);
-    _upstreamOperator = upstreamOperator;
-    _dataSchema = dataSchema;
-    _filterOperand = TransformOperandFactory.getTransformOperand(filter, dataSchema);
+    _input = input;
+    _dataSchema = node.getDataSchema();
+    _filterOperand = TransformOperandFactory.getTransformOperand(node.getCondition(), _dataSchema);
     Preconditions.checkState(_filterOperand.getResultType() == ColumnDataType.BOOLEAN,
         "Filter operand must return BOOLEAN, got: %s", _filterOperand.getResultType());
   }
@@ -88,10 +85,9 @@ public class FilterOperator extends MultiStageOperator {
 
   @Override
   public List<MultiStageOperator> getChildOperators() {
-    return ImmutableList.of(_upstreamOperator);
+    return List.of(_input);
   }
 
-  @Nullable
   @Override
   public String toExplainString() {
     return EXPLAIN_NAME;
@@ -99,24 +95,32 @@ public class FilterOperator extends MultiStageOperator {
 
   @Override
   protected TransferableBlock getNextBlock() {
-    TransferableBlock block = _upstreamOperator.nextBlock();
-    if (block.isEndOfStreamBlock()) {
+    // Keep reading the input blocks until we find a match row or all blocks are processed.
+    // TODO: Consider batching the rows to improve performance.
+    while (true) {
+      TransferableBlock block = _input.nextBlock();
       if (block.isErrorBlock()) {
         return block;
       }
-      return updateEosBlock(block, _statMap);
-    }
-    List<Object[]> resultRows = new ArrayList<>();
-    for (Object[] row : block.getContainer()) {
-      Object filterResult = _filterOperand.apply(row);
-      if (BooleanUtils.isTrueInternalValue(filterResult)) {
-        resultRows.add(row);
+      if (block.isSuccessfulEndOfStreamBlock()) {
+        return updateEosBlock(block, _statMap);
+      }
+      assert block.isDataBlock();
+      List<Object[]> rows = new ArrayList<>();
+      for (Object[] row : block.getContainer()) {
+        Object filterResult = _filterOperand.apply(row);
+        if (BooleanUtils.isTrueInternalValue(filterResult)) {
+          rows.add(row);
+        }
+      }
+      if (!rows.isEmpty()) {
+        return new TransferableBlock(rows, _dataSchema, DataBlock.Type.ROW);
       }
     }
-    return new TransferableBlock(resultRows, _dataSchema, DataBlock.Type.ROW);
   }
 
   public enum StatKey implements StatMap.Key {
+    //@formatter:off
     EXECUTION_TIME_MS(StatMap.Type.LONG) {
       @Override
       public boolean includeDefaultInJson() {
@@ -129,6 +133,8 @@ public class FilterOperator extends MultiStageOperator {
         return true;
       }
     };
+    //@formatter:on
+
     private final StatMap.Type _type;
 
     StatKey(StatMap.Type type) {

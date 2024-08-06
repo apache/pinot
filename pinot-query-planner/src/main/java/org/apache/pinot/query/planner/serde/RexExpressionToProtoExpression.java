@@ -19,13 +19,18 @@
 package org.apache.pinot.query.planner.serde;
 
 import com.google.protobuf.ByteString;
-import java.io.Serializable;
+import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
+import it.unimi.dsi.fastutil.floats.FloatArrayList;
+import it.unimi.dsi.fastutil.ints.IntArrayList;
+import it.unimi.dsi.fastutil.longs.LongArrayList;
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
-import java.util.stream.Collectors;
-import org.apache.commons.lang3.SerializationUtils;
 import org.apache.pinot.common.proto.Expressions;
-import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 
 
@@ -36,69 +41,92 @@ public class RexExpressionToProtoExpression {
   private RexExpressionToProtoExpression() {
   }
 
-  public static Expressions.RexExpression process(RexExpression expression) {
+  public static Expressions.Expression convertExpression(RexExpression expression) {
+    Expressions.Expression.Builder expressionBuilder = Expressions.Expression.newBuilder();
     if (expression instanceof RexExpression.InputRef) {
-      return serializeInputRef((RexExpression.InputRef) expression);
+      expressionBuilder.setInputRef(convertInputRef((RexExpression.InputRef) expression));
     } else if (expression instanceof RexExpression.Literal) {
-      return serializeLiteral((RexExpression.Literal) expression);
-    } else if (expression instanceof RexExpression.FunctionCall) {
-      return serializeFunctionCall((RexExpression.FunctionCall) expression);
-    }
-
-    throw new RuntimeException(String.format("Unknown Type Expression Type: %s", expression.getKind()));
-  }
-
-  private static Expressions.RexExpression serializeInputRef(RexExpression.InputRef inputRef) {
-    return Expressions.RexExpression.newBuilder()
-        .setInputRef(Expressions.InputRef.newBuilder().setIndex(inputRef.getIndex())).build();
-  }
-
-  private static Expressions.RexExpression serializeFunctionCall(RexExpression.FunctionCall functionCall) {
-    List<Expressions.RexExpression> functionOperands =
-        functionCall.getFunctionOperands().stream().map(RexExpressionToProtoExpression::process)
-            .collect(Collectors.toList());
-    Expressions.FunctionCall.Builder protoFunctionCallBuilder =
-        Expressions.FunctionCall.newBuilder().setSqlKind(functionCall.getKind().ordinal())
-            .setDataType(convertColumnDataType(functionCall.getDataType()))
-            .setFunctionName(functionCall.getFunctionName()).addAllFunctionOperands(functionOperands)
-            .setIsDistinct(functionCall.isDistinct());
-
-    return Expressions.RexExpression.newBuilder().setFunctionCall(protoFunctionCallBuilder).build();
-  }
-
-  private static Expressions.RexExpression serializeLiteral(RexExpression.Literal literal) {
-    Expressions.Literal.Builder literalBuilder = Expressions.Literal.newBuilder();
-    literalBuilder.setDataType(convertColumnDataType(literal.getDataType()));
-    Object literalValue = literal.getValue();
-    if (literalValue != null) {
-      if (literalValue instanceof Boolean) {
-        literalBuilder.setBoolField((Boolean) literalValue);
-      } else if (literalValue instanceof Integer) {
-        literalBuilder.setIntField((Integer) literalValue);
-      } else if (literalValue instanceof Long) {
-        literalBuilder.setLongField((Long) literalValue);
-      } else if (literalValue instanceof Float) {
-        literalBuilder.setFloatField((Float) literalValue);
-      } else if (literalValue instanceof Double) {
-        literalBuilder.setDoubleField((Double) literalValue);
-      } else if (literalValue instanceof String) {
-        literalBuilder.setStringField((String) literalValue);
-      } else if (literalValue instanceof ByteArray) {
-        literalBuilder.setBytesField(ByteString.copyFrom(((ByteArray) literalValue).getBytes()));
-      } else {
-        Serializable value = literal.getDataType().convert(literal.getValue());
-        byte[] data = SerializationUtils.serialize(value);
-        literalBuilder.setSerializedField(ByteString.copyFrom(data));
-      }
-      literalBuilder.setIsValueNull(false);
+      expressionBuilder.setLiteral(convertLiteral((RexExpression.Literal) expression));
     } else {
-      literalBuilder.setIsValueNull(true);
+      assert expression instanceof RexExpression.FunctionCall;
+      expressionBuilder.setFunctionCall(convertFunctionCall((RexExpression.FunctionCall) expression));
     }
-
-    return Expressions.RexExpression.newBuilder().setLiteral(literalBuilder).build();
+    return expressionBuilder.build();
   }
 
-  public static Expressions.ColumnDataType convertColumnDataType(DataSchema.ColumnDataType dataType) {
+  public static Expressions.InputRef convertInputRef(RexExpression.InputRef inputRef) {
+    return Expressions.InputRef.newBuilder().setIndex(inputRef.getIndex()).build();
+  }
+
+  public static Expressions.FunctionCall convertFunctionCall(RexExpression.FunctionCall functionCall) {
+    List<RexExpression> operands = functionCall.getFunctionOperands();
+    List<Expressions.Expression> protoOperands = new ArrayList<>(operands.size());
+    for (RexExpression operand : operands) {
+      protoOperands.add(convertExpression(operand));
+    }
+    return Expressions.FunctionCall.newBuilder().setDataType(convertColumnDataType(functionCall.getDataType()))
+        .setFunctionName(functionCall.getFunctionName()).addAllFunctionOperands(protoOperands)
+        .setIsDistinct(functionCall.isDistinct()).build();
+  }
+
+  public static Expressions.Literal convertLiteral(RexExpression.Literal literal) {
+    Expressions.Literal.Builder literalBuilder = Expressions.Literal.newBuilder();
+    ColumnDataType dataType = literal.getDataType();
+    literalBuilder.setDataType(convertColumnDataType(dataType));
+    Object value = literal.getValue();
+    if (value == null) {
+      literalBuilder.setNull(true);
+    } else {
+      switch (dataType.getStoredType()) {
+        case INT:
+          literalBuilder.setInt((Integer) value);
+          break;
+        case LONG:
+          literalBuilder.setLong((Long) value);
+          break;
+        case FLOAT:
+          literalBuilder.setFloat((Float) value);
+          break;
+        case DOUBLE:
+          literalBuilder.setDouble((Double) value);
+          break;
+        case BIG_DECIMAL:
+          literalBuilder.setBytes(ByteString.copyFrom(BigDecimalUtils.serialize((BigDecimal) value)));
+          break;
+        case STRING:
+          literalBuilder.setString((String) value);
+          break;
+        case BYTES:
+          literalBuilder.setBytes(ByteString.copyFrom(((ByteArray) value).getBytes()));
+          break;
+        case INT_ARRAY:
+          literalBuilder.setIntArray(
+              Expressions.IntArray.newBuilder().addAllValues(IntArrayList.wrap((int[]) value)).build());
+          break;
+        case LONG_ARRAY:
+          literalBuilder.setLongArray(
+              Expressions.LongArray.newBuilder().addAllValues(LongArrayList.wrap((long[]) value)).build());
+          break;
+        case FLOAT_ARRAY:
+          literalBuilder.setFloatArray(
+              Expressions.FloatArray.newBuilder().addAllValues(FloatArrayList.wrap((float[]) value)).build());
+          break;
+        case DOUBLE_ARRAY:
+          literalBuilder.setDoubleArray(
+              Expressions.DoubleArray.newBuilder().addAllValues(DoubleArrayList.wrap((double[]) value)).build());
+          break;
+        case STRING_ARRAY:
+          literalBuilder.setStringArray(
+              Expressions.StringArray.newBuilder().addAllValues(Arrays.asList((String[]) value)).build());
+          break;
+        default:
+          throw new IllegalStateException("Unsupported ColumnDataType: " + dataType);
+      }
+    }
+    return literalBuilder.build();
+  }
+
+  public static Expressions.ColumnDataType convertColumnDataType(ColumnDataType dataType) {
     switch (dataType) {
       case INT:
         return Expressions.ColumnDataType.INT;
@@ -138,8 +166,10 @@ public class RexExpressionToProtoExpression {
         return Expressions.ColumnDataType.BYTES_ARRAY;
       case OBJECT:
         return Expressions.ColumnDataType.OBJECT;
-      default:
+      case UNKNOWN:
         return Expressions.ColumnDataType.UNKNOWN;
+      default:
+        throw new IllegalArgumentException("Unsupported ColumnDataType: " + dataType);
     }
   }
 }

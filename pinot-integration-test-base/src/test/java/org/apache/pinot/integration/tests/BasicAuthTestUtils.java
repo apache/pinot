@@ -18,23 +18,20 @@
  */
 package org.apache.pinot.integration.tests;
 
-import java.util.Collections;
 import java.util.Map;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 
 public final class BasicAuthTestUtils {
-  public static final String AUTH_TOKEN = "Basic YWRtaW46dmVyeXNlY3JldA=====";
-  public static final String AUTH_TOKEN_USER = "Basic dXNlcjpzZWNyZXQ==";
-
-  public static final Map<String, String> AUTH_HEADER = Collections.singletonMap("Authorization", AUTH_TOKEN);
-  public static final Map<String, String> AUTH_HEADER_USER = Collections.singletonMap("Authorization", AUTH_TOKEN_USER);
-
   private BasicAuthTestUtils() {
-    // left blank
   }
 
-  public static Map<String, Object> addControllerConfiguration(Map<String, Object> properties) {
+  public static final String AUTH_TOKEN = "Basic YWRtaW46dmVyeXNlY3JldA=====";
+  public static final String AUTH_TOKEN_USER = "Basic dXNlcjpzZWNyZXQ==";
+  public static final Map<String, String> AUTH_HEADER = Map.of("Authorization", AUTH_TOKEN);
+  public static final Map<String, String> AUTH_HEADER_USER = Map.of("Authorization", AUTH_TOKEN_USER);
+
+  public static void addControllerConfiguration(Map<String, Object> properties) {
     properties.put("controller.segment.fetcher.auth.token", AUTH_TOKEN);
     properties.put("controller.admin.access.control.factory.class",
         "org.apache.pinot.controller.api.access.BasicAuthAccessControlFactory");
@@ -43,29 +40,26 @@ public final class BasicAuthTestUtils {
     properties.put("controller.admin.access.control.principals.user.password", "secret");
     properties.put("controller.admin.access.control.principals.user.tables", "userTableOnly");
     properties.put("controller.admin.access.control.principals.user.permissions", "read");
-    return properties;
   }
 
-  public static PinotConfiguration addBrokerConfiguration(Map<String, Object> properties) {
-    properties.put("pinot.broker.access.control.class", "org.apache.pinot.broker.broker.BasicAuthAccessControlFactory");
-    properties.put("pinot.broker.access.control.principals", "admin, user");
-    properties.put("pinot.broker.access.control.principals.admin.password", "verysecret");
-    properties.put("pinot.broker.access.control.principals.user.password", "secret");
-    properties.put("pinot.broker.access.control.principals.user.tables", "userTableOnly");
-    properties.put("pinot.broker.access.control.principals.user.permissions", "read");
-    return new PinotConfiguration(properties);
+  public static void addBrokerConfiguration(PinotConfiguration brokerConf) {
+    brokerConf.setProperty("pinot.broker.access.control.class",
+        "org.apache.pinot.broker.broker.BasicAuthAccessControlFactory");
+    brokerConf.setProperty("pinot.broker.access.control.principals", "admin, user");
+    brokerConf.setProperty("pinot.broker.access.control.principals.admin.password", "verysecret");
+    brokerConf.setProperty("pinot.broker.access.control.principals.user.password", "secret");
+    brokerConf.setProperty("pinot.broker.access.control.principals.user.tables", "userTableOnly");
+    brokerConf.setProperty("pinot.broker.access.control.principals.user.permissions", "read");
   }
 
-  public static PinotConfiguration addServerConfiguration(Map<String, Object> properties) {
-    properties.put("pinot.server.segment.fetcher.auth.token", AUTH_TOKEN);
-    properties.put("pinot.server.segment.uploader.auth.token", AUTH_TOKEN);
-    properties.put("pinot.server.instance.auth.token", AUTH_TOKEN);
-    return new PinotConfiguration(properties);
+  public static void addServerConfiguration(PinotConfiguration serverConf) {
+    serverConf.setProperty("pinot.server.segment.fetcher.auth.token", AUTH_TOKEN);
+    serverConf.setProperty("pinot.server.segment.uploader.auth.token", AUTH_TOKEN);
+    serverConf.setProperty("pinot.server.instance.auth.token", AUTH_TOKEN);
   }
 
-  public static PinotConfiguration addMinionConfiguration(Map<String, Object> properties) {
-    properties.put("segment.fetcher.auth.token", AUTH_TOKEN);
-    properties.put("task.auth.token", AUTH_TOKEN);
-    return new PinotConfiguration(properties);
+  public static void addMinionConfiguration(PinotConfiguration minionConf) {
+    minionConf.setProperty("segment.fetcher.auth.token", AUTH_TOKEN);
+    minionConf.setProperty("task.auth.token", AUTH_TOKEN);
   }
 }

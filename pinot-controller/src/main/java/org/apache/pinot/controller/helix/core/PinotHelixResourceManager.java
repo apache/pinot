@@ -59,7 +59,7 @@ import javax.ws.rs.BadRequestException;
 import javax.ws.rs.ClientErrorException;
 import javax.ws.rs.NotFoundException;
 import javax.ws.rs.core.Response;
-import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.AccessOption;
@@ -103,6 +103,7 @@ import org.apache.pinot.common.lineage.LineageEntryState;
 import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
 import org.apache.pinot.common.lineage.SegmentLineageUtils;
+import org.apache.pinot.common.messages.DatabaseConfigRefreshMessage;
 import org.apache.pinot.common.messages.RoutingTableRebuildMessage;
 import org.apache.pinot.common.messages.RunPeriodicTaskMessage;
 import org.apache.pinot.common.messages.SegmentRefreshMessage;
@@ -157,6 +158,7 @@ import org.apache.pinot.controller.helix.core.rebalance.ZkBasedTableRebalanceObs
 import org.apache.pinot.controller.helix.core.util.ZKMetadataUtils;
 import org.apache.pinot.controller.helix.starter.HelixConfig;
 import org.apache.pinot.segment.spi.SegmentMetadata;
+import org.apache.pinot.spi.config.DatabaseConfig;
 import org.apache.pinot.spi.config.instance.Instance;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableStats;
@@ -355,6 +357,15 @@ public class PinotHelixResourceManager {
    */
   public String getHelixClusterName() {
     return _helixClusterName;
+  }
+
+  /**
+   * Get the data directory path.
+   *
+   * @return Data directory path
+   */
+  public String getDataDir() {
+    return _dataDir;
   }
 
   /**
@@ -1002,13 +1013,16 @@ public class PinotHelixResourceManager {
       LOGGER.info("Trying to delete segments: {} from table: {} ", segmentNames, tableNameWithType);
       Preconditions.checkArgument(TableNameBuilder.isTableResource(tableNameWithType),
           "Table name: %s is not a valid table name with type suffix", tableNameWithType);
-      HelixHelper.removeSegmentsFromIdealState(_helixZkManager, tableNameWithType, segmentNames);
-      if (retentionPeriod != null) {
-        _segmentDeletionManager.deleteSegments(tableNameWithType, segmentNames,
-            TimeUtils.convertPeriodToMillis(retentionPeriod));
-      } else {
-        TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
-        _segmentDeletionManager.deleteSegments(tableNameWithType, segmentNames, tableConfig);
+
+      synchronized (getTableUpdaterLock(tableNameWithType)) {
+        HelixHelper.removeSegmentsFromIdealState(_helixZkManager, tableNameWithType, segmentNames);
+        if (retentionPeriod != null) {
+          _segmentDeletionManager.deleteSegments(tableNameWithType, segmentNames,
+              TimeUtils.convertPeriodToMillis(retentionPeriod));
+        } else {
+          TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
+          _segmentDeletionManager.deleteSegments(tableNameWithType, segmentNames, tableConfig);
+        }
       }
       return PinotResourceManagerResponse.success("Segment " + segmentNames + " deleted");
     } catch (final Exception e) {
@@ -1628,6 +1642,29 @@ public class PinotHelixResourceManager {
     ZKMetadataProvider.setUserConfig(_propertyStore, usernamePrefix,
         AccessControlUserConfigUtils.toZNRecord(userConfig));
     LOGGER.info("Successfully add user:{}", usernamePrefix);
+  }
+
+  /**
+   * Creates database config and sends out a database config refresh message.
+   * @param databaseConfig database config to be created
+   */
+  public void addDatabaseConfig(DatabaseConfig databaseConfig) {
+    if (!ZKMetadataProvider.createDatabaseConfig(_propertyStore, databaseConfig)) {
+      throw new RuntimeException("Failed to create database config for database: " + databaseConfig.getDatabaseName());
+    }
+    sendDatabaseConfigRefreshMessage(databaseConfig.getDatabaseName());
+  }
+
+  /**
+   * Updates database config and sends out a database config refresh message.
+   * @param databaseConfig database config to be created
+   */
+  public void updateDatabaseConfig(DatabaseConfig databaseConfig) {
+    if (!ZKMetadataProvider.setDatabaseConfig(_propertyStore, databaseConfig)) {
+      throw new RuntimeException(
+          "Failed to update database config in Zookeeper for database: " + databaseConfig.getDatabaseName());
+    }
+    sendDatabaseConfigRefreshMessage(databaseConfig.getDatabaseName());
   }
 
   /**
@@ -2746,6 +2783,26 @@ public class PinotHelixResourceManager {
     }
   }
 
+  private void sendDatabaseConfigRefreshMessage(String databaseName) {
+    DatabaseConfigRefreshMessage databaseConfigRefreshMessage = new DatabaseConfigRefreshMessage(databaseName);
+
+    // Send database config refresh message to brokers
+    Criteria recipientCriteria = new Criteria();
+    recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
+    recipientCriteria.setInstanceName("%");
+    recipientCriteria.setResource(Helix.BROKER_RESOURCE_INSTANCE);
+    recipientCriteria.setSessionSpecific(true);
+    // Send message with no callback and infinite timeout on the recipient
+    int numMessagesSent =
+        _helixZkManager.getMessagingService().send(recipientCriteria, databaseConfigRefreshMessage, null, -1);
+    if (numMessagesSent > 0) {
+      LOGGER.info("Sent {} database config refresh messages to brokers for database: {}", numMessagesSent,
+          databaseName);
+    } else {
+      LOGGER.warn("No database config refresh message sent to brokers for database: {}", databaseName);
+    }
+  }
+
   private void sendRoutingTableRebuildMessage(String tableNameWithType) {
     RoutingTableRebuildMessage routingTableRebuildMessage = new RoutingTableRebuildMessage(tableNameWithType);
 
@@ -2991,6 +3048,17 @@ public class PinotHelixResourceManager {
   @Nullable
   public ExternalView getTableExternalView(String tableNameWithType) {
     return _helixAdmin.getResourceExternalView(_helixClusterName, tableNameWithType);
+  }
+
+  /**
+   * Get the database config for the given database name.
+   *
+   * @param databaseName database name
+   * @return Database config
+   */
+  @Nullable
+  public DatabaseConfig getDatabaseConfig(String databaseName) {
+    return ZKMetadataProvider.getDatabaseConfig(_propertyStore, databaseName);
   }
 
   /**

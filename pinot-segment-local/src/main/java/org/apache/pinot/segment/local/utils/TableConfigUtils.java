@@ -34,8 +34,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.collections.MapUtils;
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
@@ -127,11 +127,23 @@ public final class TableConfigUtils {
       ImmutableSet.of(RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE,
           RoutingConfig.MULTI_STAGE_REPLICA_GROUP_SELECTOR_TYPE);
 
+  private static boolean _disableGroovy;
+
+  private static boolean _enforcePoolBasedAssignment;
+
+  public static void setDisableGroovy(boolean disableGroovy) {
+    _disableGroovy = disableGroovy;
+  }
+
+  public static void setEnforcePoolBasedAssignment(boolean enforcePoolBasedAssignment) {
+    _enforcePoolBasedAssignment = enforcePoolBasedAssignment;
+  }
+
   /**
-   * @see TableConfigUtils#validate(TableConfig, Schema, String, boolean)
+   * @see TableConfigUtils#validate(TableConfig, Schema, String)
    */
   public static void validate(TableConfig tableConfig, @Nullable Schema schema) {
-    validate(tableConfig, schema, null, false);
+    validate(tableConfig, schema, null);
   }
 
   /**
@@ -141,11 +153,11 @@ public final class TableConfigUtils {
    * 3. TierConfigs
    * 4. Indexing config
    * 5. Field Config List
+   * 6. Instance pool and replica group, if enabled
    *
    * TODO: Add more validations for each section (e.g. validate conditions are met for aggregateMetrics)
    */
-  public static void validate(TableConfig tableConfig, @Nullable Schema schema, @Nullable String typesToSkip,
-      boolean disableGroovy) {
+  public static void validate(TableConfig tableConfig, @Nullable Schema schema, @Nullable String typesToSkip) {
     Set<ValidationType> skipTypes = parseTypesToSkipString(typesToSkip);
     if (tableConfig.getTableType() == TableType.REALTIME) {
       Preconditions.checkState(schema != null, "Schema should not be null for REALTIME table");
@@ -157,7 +169,7 @@ public final class TableConfigUtils {
     if (!skipTypes.contains(ValidationType.ALL)) {
       validateTableSchemaConfig(tableConfig);
       validateValidationConfig(tableConfig, schema);
-      validateIngestionConfig(tableConfig, schema, disableGroovy);
+      validateIngestionConfig(tableConfig, schema);
 
       // Only allow realtime tables with non-null stream.type and LLC consumer.type
       if (tableConfig.getTableType() == TableType.REALTIME) {
@@ -183,7 +195,40 @@ public final class TableConfigUtils {
       if (!skipTypes.contains(ValidationType.TASK)) {
         validateTaskConfigs(tableConfig, schema);
       }
+
+      if (_enforcePoolBasedAssignment) {
+        validateInstancePoolsNReplicaGroups(tableConfig);
+      }
     }
+  }
+
+  /**
+   * Validates the table config is using instance pool and replica group configuration.
+   * @param tableConfig Table config to validate
+   * @return true if the table config is using instance pool and replica group configuration, false otherwise
+   */
+  static boolean isTableUsingInstancePoolAndReplicaGroup(@Nonnull TableConfig tableConfig) {
+    boolean status = true;
+    Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = tableConfig.getInstanceAssignmentConfigMap();
+    if (instanceAssignmentConfigMap != null) {
+      for (InstanceAssignmentConfig instanceAssignmentConfig : instanceAssignmentConfigMap.values()) {
+        if (instanceAssignmentConfig != null) {
+          status &= (instanceAssignmentConfig.getTagPoolConfig().isPoolBased()
+              && instanceAssignmentConfig.getReplicaGroupPartitionConfig().isReplicaGroupBased());
+        } else {
+          status = false;
+        }
+      }
+    } else {
+      status = false;
+    }
+
+    return status;
+  }
+
+  public static void validateInstancePoolsNReplicaGroups(TableConfig tableConfig) {
+    Preconditions.checkState(isTableUsingInstancePoolAndReplicaGroup(tableConfig),
+        "Instance pool and replica group configurations must be enabled");
   }
 
   private static Set<ValidationType> parseTypesToSkipString(@Nullable String typesToSkip) {
@@ -307,11 +352,6 @@ public final class TableConfigUtils {
     validateRetentionConfig(tableConfig);
   }
 
-  @VisibleForTesting
-  public static void validateIngestionConfig(TableConfig tableConfig, @Nullable Schema schema) {
-    validateIngestionConfig(tableConfig, schema, false);
-  }
-
   /**
    * Validates the following:
    * 1. validity of filter function
@@ -322,7 +362,7 @@ public final class TableConfigUtils {
    * 6. ingestion type for dimension tables
    */
   @VisibleForTesting
-  public static void validateIngestionConfig(TableConfig tableConfig, @Nullable Schema schema, boolean disableGroovy) {
+  public static void validateIngestionConfig(TableConfig tableConfig, @Nullable Schema schema) {
     IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
 
     if (ingestionConfig != null) {
@@ -365,7 +405,7 @@ public final class TableConfigUtils {
       if (filterConfig != null) {
         String filterFunction = filterConfig.getFilterFunction();
         if (filterFunction != null) {
-          if (disableGroovy && FunctionEvaluatorFactory.isGroovyExpression(filterFunction)) {
+          if (_disableGroovy && FunctionEvaluatorFactory.isGroovyExpression(filterFunction)) {
             throw new IllegalStateException(
                 "Groovy filter functions are disabled for table config. Found '" + filterFunction + "'");
           }
@@ -508,7 +548,7 @@ public final class TableConfigUtils {
       if (enrichmentConfigs != null) {
         for (EnrichmentConfig enrichmentConfig : enrichmentConfigs) {
           RecordEnricherRegistry.validateEnrichmentConfig(enrichmentConfig,
-              new RecordEnricherValidationConfig(disableGroovy));
+              new RecordEnricherValidationConfig(_disableGroovy));
         }
       }
 
@@ -534,7 +574,7 @@ public final class TableConfigUtils {
                     + "aggregations");
           }
           FunctionEvaluator expressionEvaluator;
-          if (disableGroovy && FunctionEvaluatorFactory.isGroovyExpression(transformFunction)) {
+          if (_disableGroovy && FunctionEvaluatorFactory.isGroovyExpression(transformFunction)) {
             throw new IllegalStateException(
                 "Groovy transform functions are disabled for table config. Found '" + transformFunction
                     + "' for column '" + columnName + "'");
@@ -705,11 +745,11 @@ public final class TableConfigUtils {
           if (taskTypeConfig.containsKey("bufferTimePeriod")) {
             TimeUtils.convertPeriodToMillis(taskTypeConfig.get("bufferTimePeriod"));
           }
-          // check maxNumRecordsPerSegment
+          // check invalidRecordsThresholdPercent
           if (taskTypeConfig.containsKey("invalidRecordsThresholdPercent")) {
-            Preconditions.checkState(Double.parseDouble(taskTypeConfig.get("invalidRecordsThresholdPercent")) > 0
+            Preconditions.checkState(Double.parseDouble(taskTypeConfig.get("invalidRecordsThresholdPercent")) >= 0
                     && Double.parseDouble(taskTypeConfig.get("invalidRecordsThresholdPercent")) <= 100,
-                "invalidRecordsThresholdPercent must be > 0 and <= 100");
+                "invalidRecordsThresholdPercent must be >= 0 and <= 100");
           }
           // check invalidRecordsThresholdCount
           if (taskTypeConfig.containsKey("invalidRecordsThresholdCount")) {

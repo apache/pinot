@@ -48,7 +48,6 @@ import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
-import org.apache.pinot.query.planner.plannode.AbstractPlanNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.serde.PlanNodeSerializer;
@@ -117,8 +116,7 @@ public class QueryDispatcher {
       DispatchablePlanFragment stagePlan = stagePlans.get(i + 1);
       serverInstances.addAll(stagePlan.getServerInstanceToWorkerIdMap().keySet());
       stageInfoFutures.add(CompletableFuture.supplyAsync(() -> {
-        ByteString rootNode = PlanNodeSerializer.process(
-            (AbstractPlanNode) stagePlan.getPlanFragment().getFragmentRoot()).toByteString();
+        ByteString rootNode = PlanNodeSerializer.process(stagePlan.getPlanFragment().getFragmentRoot()).toByteString();
         ByteString customProperty = QueryPlanSerDeUtils.toProtoProperties(stagePlan.getCustomProperties());
         return new StageInfo(rootNode, customProperty);
       }, _executorService));
@@ -150,6 +148,7 @@ public class QueryDispatcher {
       _executorService.submit(() -> {
         try {
           Worker.QueryRequest.Builder requestBuilder = Worker.QueryRequest.newBuilder();
+          requestBuilder.setVersion(CommonConstants.MultiStageQueryRunner.PlanVersions.V1);
           for (int i = 0; i < numStages; i++) {
             int stageId = i + 1;
             DispatchablePlanFragment stagePlan = stagePlans.get(stageId);
@@ -279,8 +278,7 @@ public class QueryDispatcher {
 
     ArrayList<Object[]> resultRows = new ArrayList<>();
     TransferableBlock block;
-    try (MailboxReceiveOperator receiveOperator = new MailboxReceiveOperator(opChainExecutionContext,
-        receiveNode.getDistributionType(), receiveNode.getSenderStageId())) {
+    try (MailboxReceiveOperator receiveOperator = new MailboxReceiveOperator(opChainExecutionContext, receiveNode)) {
       block = receiveOperator.nextBlock();
       while (!TransferableBlockUtils.isEndOfStream(block)) {
         DataBlock dataBlock = block.getDataBlock();

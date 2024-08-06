@@ -24,6 +24,9 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.rel.type.RelDataTypeFactory;
+import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -34,7 +37,7 @@ public class FunctionUtils {
   }
 
   // Types allowed as the function parameter (in the function signature) for type conversion
-  private static final Map<Class<?>, PinotDataType> PARAMETER_TYPE_MAP = new HashMap<Class<?>, PinotDataType>() {{
+  private static final Map<Class<?>, PinotDataType> PARAMETER_TYPE_MAP = new HashMap<>() {{
     put(int.class, PinotDataType.INTEGER);
     put(Integer.class, PinotDataType.INTEGER);
     put(long.class, PinotDataType.LONG);
@@ -58,7 +61,7 @@ public class FunctionUtils {
   }};
 
   // Types allowed as the function argument (actual value passed into the function) for type conversion
-  private static final Map<Class<?>, PinotDataType> ARGUMENT_TYPE_MAP = new HashMap<Class<?>, PinotDataType>() {{
+  private static final Map<Class<?>, PinotDataType> ARGUMENT_TYPE_MAP = new HashMap<>() {{
     put(Byte.class, PinotDataType.BYTE);
     put(Boolean.class, PinotDataType.BOOLEAN);
     put(Character.class, PinotDataType.CHARACTER);
@@ -84,7 +87,7 @@ public class FunctionUtils {
     put(Object[].class, PinotDataType.OBJECT_ARRAY);
   }};
 
-  private static final Map<Class<?>, DataType> DATA_TYPE_MAP = new HashMap<Class<?>, DataType>() {{
+  private static final Map<Class<?>, DataType> DATA_TYPE_MAP = new HashMap<>() {{
     put(int.class, DataType.INT);
     put(Integer.class, DataType.INT);
     put(long.class, DataType.LONG);
@@ -106,7 +109,7 @@ public class FunctionUtils {
     put(String[].class, DataType.STRING);
   }};
 
-  private static final Map<Class<?>, ColumnDataType> COLUMN_DATA_TYPE_MAP = new HashMap<Class<?>, ColumnDataType>() {{
+  private static final Map<Class<?>, ColumnDataType> COLUMN_DATA_TYPE_MAP = new HashMap<>() {{
     put(int.class, ColumnDataType.INT);
     put(Integer.class, ColumnDataType.INT);
     put(long.class, ColumnDataType.LONG);
@@ -162,5 +165,54 @@ public class FunctionUtils {
   @Nullable
   public static ColumnDataType getColumnDataType(Class<?> clazz) {
     return COLUMN_DATA_TYPE_MAP.get(clazz);
+  }
+
+  /**
+   * Returns the corresponding RelDataType for the given class, or OTHER if there is no one matching.
+   */
+  public static RelDataType getRelDataType(RelDataTypeFactory typeFactory, Class<?> clazz) {
+    ColumnDataType columnDataType = getColumnDataType(clazz);
+    if (columnDataType == null) {
+      return typeFactory.createSqlType(SqlTypeName.OTHER);
+    }
+    switch (columnDataType) {
+      case INT:
+        return typeFactory.createSqlType(SqlTypeName.INTEGER);
+      case LONG:
+        return typeFactory.createSqlType(SqlTypeName.BIGINT);
+      case FLOAT:
+        return typeFactory.createSqlType(SqlTypeName.FLOAT);
+      case DOUBLE:
+        return typeFactory.createSqlType(SqlTypeName.DOUBLE);
+      case BIG_DECIMAL:
+        return typeFactory.createSqlType(SqlTypeName.DECIMAL);
+      case BOOLEAN:
+        return typeFactory.createSqlType(SqlTypeName.BOOLEAN);
+      case TIMESTAMP:
+        return typeFactory.createSqlType(SqlTypeName.TIMESTAMP);
+      case STRING:
+      case JSON:
+        return typeFactory.createSqlType(SqlTypeName.VARCHAR);
+      case BYTES:
+        return typeFactory.createSqlType(SqlTypeName.VARBINARY);
+      case INT_ARRAY:
+        return typeFactory.createArrayType(typeFactory.createSqlType(SqlTypeName.INTEGER), -1);
+      case LONG_ARRAY:
+        return typeFactory.createArrayType(typeFactory.createSqlType(SqlTypeName.BIGINT), -1);
+      case FLOAT_ARRAY:
+        return typeFactory.createArrayType(typeFactory.createSqlType(SqlTypeName.FLOAT), -1);
+      case DOUBLE_ARRAY:
+        return typeFactory.createArrayType(typeFactory.createSqlType(SqlTypeName.DOUBLE), -1);
+      case BOOLEAN_ARRAY:
+        return typeFactory.createArrayType(typeFactory.createSqlType(SqlTypeName.BOOLEAN), -1);
+      case TIMESTAMP_ARRAY:
+        return typeFactory.createArrayType(typeFactory.createSqlType(SqlTypeName.TIMESTAMP), -1);
+      case STRING_ARRAY:
+        return typeFactory.createArrayType(typeFactory.createSqlType(SqlTypeName.VARCHAR), -1);
+      case BYTES_ARRAY:
+        return typeFactory.createArrayType(typeFactory.createSqlType(SqlTypeName.VARBINARY), -1);
+      default:
+        return typeFactory.createSqlType(SqlTypeName.OTHER);
+    }
   }
 }

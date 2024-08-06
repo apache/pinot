@@ -41,9 +41,9 @@
         "sql": "EXPLAIN PLAN FOR SELECT col1, col2 FROM a UNION SELECT col1, col2 FROM b UNION SELECT col1, col2 FROM c",
         "output": [
           "Execution Plan",
-          "\nLogicalAggregate(group=[{0, 1}])",
+          "\nPinotLogicalAggregate(group=[{0, 1}])",
           "\n  PinotLogicalExchange(distribution=[hash[0, 1]])",
-          "\n    LogicalAggregate(group=[{0, 1}])",
+          "\n    PinotLogicalAggregate(group=[{0, 1}])",
           "\n      LogicalUnion(all=[true])",
           "\n        PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n          LogicalUnion(all=[true])",

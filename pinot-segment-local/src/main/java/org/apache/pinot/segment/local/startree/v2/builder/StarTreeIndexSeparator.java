@@ -29,8 +29,6 @@ import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.configuration2.Configuration;
-import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.startree.v2.store.StarTreeIndexMapUtils;
@@ -44,53 +42,26 @@ import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
  * The {@code StarTreeIndexSeparator} pulls out the individual star-trees from the common star-tree index file
  */
 public class StarTreeIndexSeparator implements Closeable {
-
-  private final FileChannel _indexFileChannel;
   private final List<Map<StarTreeIndexMapUtils.IndexKey, StarTreeIndexMapUtils.IndexValue>> _indexMapList;
   private final List<StarTreeV2BuilderConfig> _builderConfigList;
-  private final List<Integer> _totalDocsList;
+  private final List<Integer> _numDocsList;
+  private final FileChannel _indexFileChannel;
 
-  public StarTreeIndexSeparator(File indexMapFile, File indexFile, PropertiesConfiguration metadataProperties)
+  public StarTreeIndexSeparator(File indexMapFile, File indexFile, List<StarTreeV2Metadata> starTreeMetadataList)
       throws IOException {
-    _indexMapList =
-        extractIndexMap(indexMapFile, metadataProperties.getInt(StarTreeV2Constants.MetadataKey.STAR_TREE_COUNT));
-    _indexFileChannel = new RandomAccessFile(indexFile, "r").getChannel();
-    _builderConfigList = extractBuilderConfigs(metadataProperties);
-    _totalDocsList = extractTotalDocsList(metadataProperties);
-  }
-
-  private List<Map<StarTreeIndexMapUtils.IndexKey, StarTreeIndexMapUtils.IndexValue>> extractIndexMap(File indexMapFile,
-      int numStarTrees) {
     try (InputStream inputStream = new FileInputStream(indexMapFile)) {
-      return StarTreeIndexMapUtils.loadFromInputStream(inputStream, numStarTrees);
-    } catch (IOException | ConfigurationException e) {
+      _indexMapList = StarTreeIndexMapUtils.loadFromInputStream(inputStream, starTreeMetadataList);
+    } catch (ConfigurationException e) {
       throw new RuntimeException(e);
     }
-  }
-
-  public List<Integer> extractTotalDocsList(PropertiesConfiguration metadataProperties) {
-    List<Integer> totalDocsList = new ArrayList<>(_indexMapList.size());
-    for (int i = 0; i < _indexMapList.size(); i++) {
-      Configuration metadata = metadataProperties.subset(StarTreeV2Constants.MetadataKey.getStarTreePrefix(i));
-      totalDocsList.add(i, metadata.getInt(StarTreeV2Constants.MetadataKey.TOTAL_DOCS));
+    int numStarTrees = starTreeMetadataList.size();
+    _builderConfigList = new ArrayList<>(numStarTrees);
+    _numDocsList = new ArrayList<>(numStarTrees);
+    for (StarTreeV2Metadata starTreeMetadata : starTreeMetadataList) {
+      _builderConfigList.add(StarTreeV2BuilderConfig.fromMetadata(starTreeMetadata));
+      _numDocsList.add(starTreeMetadata.getNumDocs());
     }
-    return totalDocsList;
-  }
-
-  /**
-   * Extract the list of {@link StarTreeV2BuilderConfig} for each of the star-tree present in the given metadata
-   * properties.
-   * @param metadataProperties index metadata properties
-   * @return List of {@link StarTreeV2BuilderConfig}
-   */
-  public List<StarTreeV2BuilderConfig> extractBuilderConfigs(PropertiesConfiguration metadataProperties) {
-    List<StarTreeV2BuilderConfig> builderConfigList = new ArrayList<>(_indexMapList.size());
-    for (int i = 0; i < _indexMapList.size(); i++) {
-      Configuration metadata = metadataProperties.subset(StarTreeV2Constants.MetadataKey.getStarTreePrefix(i));
-      StarTreeV2Metadata starTreeV2Metadata = new StarTreeV2Metadata(metadata);
-      builderConfigList.add(i, StarTreeV2BuilderConfig.fromMetadata(starTreeV2Metadata));
-    }
-    return builderConfigList;
+    _indexFileChannel = new RandomAccessFile(indexFile, "r").getChannel();
   }
 
   /**
@@ -109,7 +80,7 @@ public class StarTreeIndexSeparator implements Closeable {
       return -1;
     }
     separate(starTreeOutputDir, treeIndex);
-    return _totalDocsList.get(treeIndex);
+    return _numDocsList.get(treeIndex);
   }
 
   private void separate(File starTreeOutputDir, int treeIndex)

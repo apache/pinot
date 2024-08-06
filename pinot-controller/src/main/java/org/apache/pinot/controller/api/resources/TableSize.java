@@ -27,8 +27,6 @@ import io.swagger.annotations.ApiResponses;
 import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
-import java.util.HashMap;
-import java.util.concurrent.Executor;
 import javax.inject.Inject;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
@@ -40,13 +38,9 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.apache.http.conn.HttpClientConnectionManager;
-import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.controller.ControllerConf;
-import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
-import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
@@ -62,7 +56,8 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
     @Authorization(value = DATABASE)})
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = {
     @ApiKeyAuthDefinition(name = HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER,
-        key = SWAGGER_AUTHORIZATION_KEY),
+        key = SWAGGER_AUTHORIZATION_KEY,
+        description = "The format of the key is  ```\"Basic <token>\" or \"Bearer <token>\"```"),
     @ApiKeyAuthDefinition(name = DATABASE, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = DATABASE,
         description = "Database context passed through http header. If no context is provided 'default' database "
             + "context will be considered.")}))
@@ -73,17 +68,7 @@ public class TableSize {
   @Inject
   ControllerConf _controllerConf;
   @Inject
-  PinotHelixResourceManager _pinotHelixResourceManager;
-  @Inject
-  Executor _executor;
-  @Inject
-  HttpClientConnectionManager _connectionManager;
-
-  @Inject
-  ControllerMetrics _controllerMetrics;
-
-  @Inject
-  LeadControllerManager _leadControllerManager;
+  TableSizeReader _tableSizeReader;
 
   @GET
   @Path("/tables/{tableName}/size")
@@ -101,21 +86,10 @@ public class TableSize {
       @ApiParam(value = "Provide detailed information") @DefaultValue("true") @QueryParam("detailed") boolean detailed,
       @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
-    TableSizeReader tableSizeReader =
-        new TableSizeReader(_executor, _connectionManager, _controllerMetrics, _pinotHelixResourceManager,
-            _leadControllerManager);
     TableSizeReader.TableSizeDetails tableSizeDetails = null;
     try {
       tableSizeDetails =
-          tableSizeReader.getTableSizeDetails(tableName, _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
-      if (!detailed) {
-        if (tableSizeDetails._offlineSegments != null) {
-          tableSizeDetails._offlineSegments._segments = new HashMap<>();
-        }
-        if (tableSizeDetails._realtimeSegments != null) {
-          tableSizeDetails._realtimeSegments._segments = new HashMap<>();
-        }
-      }
+          _tableSizeReader.getTableSizeDetails(tableName, _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
     } catch (Throwable t) {
       throw new ControllerApplicationException(LOGGER, String.format("Failed to read table size for %s", tableName),
           Response.Status.INTERNAL_SERVER_ERROR, t);

@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.segment.store;
 
-import com.google.common.base.Preconditions;
 import java.io.Closeable;
 import java.io.File;
 import java.io.FileInputStream;
@@ -51,10 +50,10 @@ public class StarTreeIndexReader implements Closeable {
   private static final Logger LOGGER = LoggerFactory.getLogger(StarTreeIndexReader.class);
 
   private final File _segmentDirectory;
-  private final SegmentMetadataImpl _segmentMetadata;
+  private final List<StarTreeV2Metadata> _starTreeMetadataList;
+  private final int _numStarTrees;
   private final ReadMode _readMode;
   private final File _indexFile;
-  private final int _numStarTrees;
 
   // StarTree index can contain multiple index instances, identified by ids like 0, 1, etc.
   private final List<Map<IndexKey, StarTreeIndexEntry>> _indexColumnEntries;
@@ -67,17 +66,11 @@ public class StarTreeIndexReader implements Closeable {
    */
   public StarTreeIndexReader(File segmentDirectory, SegmentMetadataImpl segmentMetadata, ReadMode readMode)
       throws IOException, ConfigurationException {
-    Preconditions.checkNotNull(segmentDirectory);
-    Preconditions.checkArgument(segmentDirectory.exists(), "SegmentDirectory: " + segmentDirectory + " does not exist");
-    Preconditions.checkArgument(segmentDirectory.isDirectory(),
-        "SegmentDirectory: " + segmentDirectory + " is not a directory");
-    Preconditions.checkNotNull(segmentMetadata);
-    Preconditions.checkNotNull(readMode);
-
     _segmentDirectory = segmentDirectory;
-    _segmentMetadata = segmentMetadata;
+    _starTreeMetadataList = segmentMetadata.getStarTreeV2MetadataList();
+    assert _starTreeMetadataList != null;
+    _numStarTrees = _starTreeMetadataList.size();
     _readMode = readMode;
-    _numStarTrees = _segmentMetadata.getStarTreeV2MetadataList().size();
     _indexFile = new File(_segmentDirectory, StarTreeV2Constants.INDEX_FILE_NAME);
     _indexColumnEntries = new ArrayList<>(_numStarTrees);
     load();
@@ -88,7 +81,7 @@ public class StarTreeIndexReader implements Closeable {
     List<Map<StarTreeIndexMapUtils.IndexKey, StarTreeIndexMapUtils.IndexValue>> indexMapList;
     try (InputStream inputStream = new FileInputStream(
         new File(_segmentDirectory, StarTreeV2Constants.INDEX_MAP_FILE_NAME))) {
-      indexMapList = StarTreeIndexMapUtils.loadFromInputStream(inputStream, _numStarTrees);
+      indexMapList = StarTreeIndexMapUtils.loadFromInputStream(inputStream, _starTreeMetadataList);
     }
     if (_readMode == ReadMode.heap) {
       _dataBuffer = PinotDataBuffer.loadFile(_indexFile, 0, _indexFile.length(), ByteOrder.LITTLE_ENDIAN,
@@ -112,8 +105,7 @@ public class StarTreeIndexReader implements Closeable {
     columnEntries.put(new IndexKey(String.valueOf(starTreeId), StandardIndexes.inverted()),
         new StarTreeIndexEntry(indexMap.get(StarTreeIndexMapUtils.STAR_TREE_INDEX_KEY), _dataBuffer,
             ByteOrder.LITTLE_ENDIAN));
-    List<StarTreeV2Metadata> starTreeMetadataList = _segmentMetadata.getStarTreeV2MetadataList();
-    StarTreeV2Metadata starTreeMetadata = starTreeMetadataList.get(starTreeId);
+    StarTreeV2Metadata starTreeMetadata = _starTreeMetadataList.get(starTreeId);
     // Load dimension forward indexes
     for (String dimension : starTreeMetadata.getDimensionsSplitOrder()) {
       columnEntries.put(new IndexKey(dimension, StandardIndexes.forward()), new StarTreeIndexEntry(

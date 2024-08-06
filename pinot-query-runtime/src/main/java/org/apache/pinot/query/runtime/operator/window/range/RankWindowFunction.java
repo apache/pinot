@@ -20,31 +20,31 @@ package org.apache.pinot.query.runtime.operator.window.range;
 
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
-import org.apache.pinot.query.runtime.operator.WindowAggregateOperator;
 
 
 public class RankWindowFunction extends RangeWindowFunction {
 
-  public RankWindowFunction(RexExpression.FunctionCall aggCall, String functionName, DataSchema inputSchema,
-      WindowAggregateOperator.OrderSetInfo orderSetInfo) {
-    super(aggCall, functionName, inputSchema, orderSetInfo);
+  public RankWindowFunction(RexExpression.FunctionCall aggCall, DataSchema inputSchema,
+      List<RelFieldCollation> collations, boolean partitionByOnly) {
+    super(aggCall, inputSchema, collations, partitionByOnly);
   }
 
   @Override
   public List<Object> processRows(List<Object[]> rows) {
+    int numRows = rows.size();
+    List<Object> result = new ArrayList<>(numRows);
+    Object[] prevRow = null;
     int rank = 1;
-    List<Object> result = new ArrayList<>();
-    for (int i = 0; i < rows.size(); i++) {
-      if (i > 0) {
-        Object[] prevRow = rows.get(i - 1);
-        Object[] currentRow = rows.get(i);
-        if (compareRows(prevRow, currentRow) != 0) {
-          rank = i + 1;
-        }
+    for (int i = 0; i < numRows; i++) {
+      Object[] row = rows.get(i);
+      if (prevRow != null && compareRows(prevRow, row) != 0) {
+        rank = i + 1;
       }
       result.add(rank);
+      prevRow = row;
     }
     return result;
   }

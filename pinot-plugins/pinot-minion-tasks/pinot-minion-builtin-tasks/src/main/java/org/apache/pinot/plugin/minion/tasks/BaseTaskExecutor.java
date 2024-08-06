@@ -122,7 +122,8 @@ public abstract class BaseTaskExecutor implements PinotTaskExecutor {
     } catch (Exception e) {
       LOGGER.error("Segment download failed from deepstore for {}, crypter:{}", deepstoreURL, crypterName, e);
       String peerDownloadScheme = tableConfig.getValidationConfig().getPeerSegmentDownloadScheme();
-      if (MinionTaskUtils.extractMinionAllowDownloadFromServer(tableConfig, taskType) && peerDownloadScheme != null) {
+      if (MinionTaskUtils.extractMinionAllowDownloadFromServer(tableConfig, taskType,
+          MINION_CONTEXT.isAllowDownloadFromServer()) && peerDownloadScheme != null) {
         LOGGER.info("Trying to download from servers for segment {} post deepstore download failed", segmentName);
         SegmentFetcherFactory.fetchAndDecryptSegmentToLocal(segmentName, peerDownloadScheme, () -> {
           List<URI> uris =

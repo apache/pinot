@@ -26,4 +26,11 @@ public interface QueryQuotaManager {
    * @return {@code true} if the table quota has not been reached, {@code false} otherwise
    */
   boolean acquire(String tableName);
+
+  /**
+   * Try to acquire a quota for the given database.
+   * @param databaseName database name
+   * @return {@code true} if the database quota has not been reached, {@code false} otherwise
+   */
+  boolean acquireDatabase(String databaseName);
 }

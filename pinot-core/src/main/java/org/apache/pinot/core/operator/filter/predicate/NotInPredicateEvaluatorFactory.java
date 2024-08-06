@@ -128,7 +128,8 @@ public class NotInPredicateEvaluatorFactory {
         }
         return new LongRawValueBasedNotInPredicateEvaluator(notInPredicate, nonMatchingValues);
       }
-      case STRING: {
+      case STRING:
+      case JSON: {
         List<String> stringValues = notInPredicate.getValues();
         Set<String> nonMatchingValues = new ObjectOpenHashSet<>(HashUtil.getMinHashSetSize(stringValues.size()));
         // NOTE: Add value-by-value to avoid overhead

@@ -53,7 +53,8 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.apache.http.conn.HttpClientConnectionManager;
+import javax.ws.rs.core.StreamingOutput;
+import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.broker.api.HttpRequesterIdentity;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
 import org.apache.pinot.common.exception.QueryException;
@@ -84,7 +85,8 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
 
 @Api(tags = "Query", authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY)})
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = @ApiKeyAuthDefinition(name =
-    HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = SWAGGER_AUTHORIZATION_KEY)))
+    HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = SWAGGER_AUTHORIZATION_KEY,
+    description = "The format of the key is  ```\"Basic <token>\" or \"Bearer <token>\"```")))
 @Path("/")
 public class PinotClientRequest {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotClientRequest.class);
@@ -374,6 +376,7 @@ public class PinotClientRequest {
     // returning the Response with OK status and header value.
     return Response.ok()
         .header(PINOT_QUERY_ERROR_CODE_HEADER, queryErrorCodeHeaderValue)
-        .entity(brokerResponse.toJsonString()).build();
+        .entity((StreamingOutput) brokerResponse::toOutputStream).type(MediaType.APPLICATION_JSON)
+        .build();
   }
 }

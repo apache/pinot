@@ -263,32 +263,25 @@ public class CalciteSqlCompilerTest {
   @Test
   public void testExtract() {
     {
-      // Case 1 -- Year and date format ('2017-06-15')
-      PinotQuery pinotQuery = compileToPinotQuery("SELECT EXTRACT(YEAR FROM '2017-06-15')");
-      Function function = pinotQuery.getSelectList().get(0).getFunctionCall();
-      Assert.assertEquals(function.getOperands().get(0).getLiteral().getStringValue(), "YEAR");
-      Assert.assertEquals(function.getOperands().get(1).getLiteral().getStringValue(), "2017-06-15");
+      // Case 1 -- Year
+      PinotQuery pinotQuery = compileToPinotQuery("SELECT EXTRACT(YEAR FROM 1719573611000)");
+      // The CompileTimeFunctionsInvoker will rewrite the query to replace the function call with the resultant literal
+      // value
+      Assert.assertEquals(pinotQuery.getSelectList().get(0).getLiteral().getIntValue(), 2024);
     }
     {
-      // Case 2 -- date format ('2017-06-15 09:34:21')
-      PinotQuery pinotQuery = compileToPinotQuery("SELECT EXTRACT(YEAR FROM '2017-06-15 09:34:21')");
-      Function function = pinotQuery.getSelectList().get(0).getFunctionCall();
-      Assert.assertEquals(function.getOperands().get(0).getLiteral().getStringValue(), "YEAR");
-      Assert.assertEquals(function.getOperands().get(1).getLiteral().getStringValue(), "2017-06-15 09:34:21");
+      // Case 2 -- Month
+      PinotQuery pinotQuery = compileToPinotQuery("SELECT EXTRACT(MONTH FROM '1719573611000')");
+      // The CompileTimeFunctionsInvoker will rewrite the query to replace the function call with the resultant literal
+      // value
+      Assert.assertEquals(pinotQuery.getSelectList().get(0).getLiteral().getIntValue(), 6);
     }
     {
-      // Case 3 -- Month
-      PinotQuery pinotQuery = compileToPinotQuery("SELECT EXTRACT(MONTH FROM '2017-06-15')");
-      Function function = pinotQuery.getSelectList().get(0).getFunctionCall();
-      Assert.assertEquals(function.getOperands().get(0).getLiteral().getStringValue(), "MONTH");
-      Assert.assertEquals(function.getOperands().get(1).getLiteral().getStringValue(), "2017-06-15");
-    }
-    {
-      // Case 4 -- Day
-      PinotQuery pinotQuery = compileToPinotQuery("SELECT EXTRACT(DAY FROM '2017-06-15')");
-      Function function = pinotQuery.getSelectList().get(0).getFunctionCall();
-      Assert.assertEquals(function.getOperands().get(0).getLiteral().getStringValue(), "DAY");
-      Assert.assertEquals(function.getOperands().get(1).getLiteral().getStringValue(), "2017-06-15");
+      // Case 3 -- Day
+      PinotQuery pinotQuery = compileToPinotQuery("SELECT EXTRACT(DAY FROM 1719573611000)");
+      // The CompileTimeFunctionsInvoker will rewrite the query to replace the function call with the resultant literal
+      // value
+      Assert.assertEquals(pinotQuery.getSelectList().get(0).getLiteral().getIntValue(), 28);
     }
   }
 

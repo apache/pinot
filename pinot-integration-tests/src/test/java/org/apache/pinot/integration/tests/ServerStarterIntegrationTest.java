@@ -73,7 +73,6 @@ public class ServerStarterIntegrationTest extends ControllerTest {
   public void testDefaultServerConf()
       throws Exception {
     String expectedHost = NetUtils.getHostAddress();
-    int customPort = NetUtils.findOpenPort(CUSTOM_PORT);
     String expectedInstanceId = PREFIX_OF_SERVER_INSTANCE + expectedHost + "_" + DEFAULT_SERVER_NETTY_PORT;
     verifyInstanceConfig(new PinotConfiguration(), expectedInstanceId, expectedHost, DEFAULT_SERVER_NETTY_PORT);
   }

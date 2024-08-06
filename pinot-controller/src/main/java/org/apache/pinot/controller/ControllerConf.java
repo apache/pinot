@@ -316,6 +316,9 @@ public class ControllerConf extends PinotConfiguration {
   public static final String DISABLE_GROOVY = "controller.disable.ingestion.groovy";
   public static final boolean DEFAULT_DISABLE_GROOVY = true;
 
+  public static final String ENFORCE_POOL_BASED_ASSIGNMENT_KEY = "enforce.pool.based.assignment";
+  public static final boolean DEFAULT_ENFORCE_POOL_BASED_ASSIGNMENT = false;
+
   public ControllerConf() {
     super(new HashMap<>());
   }
@@ -1064,5 +1067,9 @@ public class ControllerConf extends PinotConfiguration {
     String value = getProperty(property, CommonConstants.HTTP_PROTOCOL);
     Preconditions.checkArgument(SUPPORTED_PROTOCOLS.contains(value), "Unsupported %s protocol '%s'", property, value);
     return value;
+  }
+
+  public boolean isEnforcePoolBasedAssignmentEnabled() {
+    return getProperty(ENFORCE_POOL_BASED_ASSIGNMENT_KEY, DEFAULT_ENFORCE_POOL_BASED_ASSIGNMENT);
   }
 }

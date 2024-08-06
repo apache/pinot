@@ -62,15 +62,17 @@ public class PinotHelixResourceManagerAssignmentTest extends ControllerTest {
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(RAW_TABLE_NAME);
 
+  @Override
+  protected void overrideControllerConf(Map<String, Object> properties) {
+    properties.put(ControllerConf.CONTROLLER_ENABLE_TIERED_SEGMENT_ASSIGNMENT, true);
+    properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, false);
+  }
+
   @BeforeClass
   public void setUp()
       throws Exception {
     startZk();
-
-    Map<String, Object> properties = getDefaultControllerConfiguration();
-    properties.put(ControllerConf.CONTROLLER_ENABLE_TIERED_SEGMENT_ASSIGNMENT, true);
-    properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, false);
-    startController(properties);
+    startController();
 
     addFakeBrokerInstancesToAutoJoinHelixCluster(NUM_BROKER_INSTANCES, false);
     addFakeServerInstancesToAutoJoinHelixCluster(NUM_SERVER_INSTANCES, false);
@@ -116,9 +118,8 @@ public class PinotHelixResourceManagerAssignmentTest extends ControllerTest {
     _helixResourceManager.createServerTenant(serverTenant);
 
     // Create cold tenant
-    Tenant coldTenant =
-        new Tenant(TenantRole.SERVER, SERVER_COLD_TENANT_NAME, NUM_OFFLINE_COLD_SERVER_INSTANCES,
-            NUM_OFFLINE_COLD_SERVER_INSTANCES, 0);
+    Tenant coldTenant = new Tenant(TenantRole.SERVER, SERVER_COLD_TENANT_NAME, NUM_OFFLINE_COLD_SERVER_INSTANCES,
+        NUM_OFFLINE_COLD_SERVER_INSTANCES, 0);
     _helixResourceManager.createServerTenant(coldTenant);
 
     assertEquals(_helixResourceManager.getOnlineUnTaggedServerInstanceList().size(), 0);

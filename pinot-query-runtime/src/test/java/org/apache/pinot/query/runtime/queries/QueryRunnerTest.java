@@ -25,7 +25,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.response.broker.ResultTable;
-import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.QueryServerEnclosure;
 import org.apache.pinot.query.mailbox.MailboxService;
@@ -52,10 +51,15 @@ import org.testng.annotations.Test;
  * pattern goes here.
  */
 public class QueryRunnerTest extends QueryRunnerTestBase {
+  //@formatter:off
   public static final Object[][] ROWS = new Object[][]{
-      new Object[]{"foo", "foo", 1}, new Object[]{"bar", "bar", 42}, new Object[]{"alice", "alice", 1}, new Object[]{
-          "bob", "foo", 42}, new Object[]{"charlie", "bar", 1},
+      new Object[]{"foo", "foo", 1},
+      new Object[]{"bar", "bar", 42},
+      new Object[]{"alice", "alice", 1},
+      new Object[]{"bob", "foo", 42},
+      new Object[]{"charlie", "bar", 1}
   };
+  //@formatter:on
   public static final Schema.SchemaBuilder SCHEMA_BUILDER;
 
   static {
@@ -143,7 +147,6 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
 
   @AfterClass
   public void tearDown() {
-    DataTableBuilderFactory.setDataTableVersion(DataTableBuilderFactory.DEFAULT_VERSION);
     for (QueryServerEnclosure server : _servers.values()) {
       server.shutDown();
     }
@@ -201,18 +204,21 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
 
   @DataProvider(name = "testDataWithSqlToFinalRowCount")
   private Object[][] provideTestSqlAndRowCount() {
+    //@formatter:off
     return new Object[][]{
         // special hint test, the table is not actually partitioned by col1, thus this hint gives wrong result. but
         // b/c in order to test whether this hint produces the proper optimized plan, we are making this assumption
         new Object[]{
-            "SELECT /*+ aggOptions(is_partitioned_by_group_by_keys='true') */ col1, COUNT(*) FROM a "
-                + " GROUP BY 1 ORDER BY 2", 10
+            "SELECT /*+ aggOptions(is_partitioned_by_group_by_keys='true') */ col1, COUNT(*) FROM a GROUP BY 1 "
+                + "ORDER BY 2",
+            10
         },
 
         // special hint test, we want to try if dynamic broadcast works for just any random table */
         new Object[]{
-            "SELECT /*+ joinOptions(join_strategy='dynamic_broadcast') */ col1 FROM a "
-                + " WHERE a.col1 IN (SELECT b.col2 FROM b WHERE b.col3 < 10) AND a.col3 > 0", 9
+            "SELECT /*+ joinOptions(join_strategy='dynamic_broadcast') */ col1 FROM a WHERE a.col1 IN "
+                + "(SELECT b.col2 FROM b WHERE b.col3 < 10) AND a.col3 > 0",
+            9
         },
 
         // using join clause
@@ -233,13 +239,14 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
         // test function can be used in predicate/leaf/intermediate stage (using regexpLike)
         new Object[]{"SELECT a.col1, b.col1 FROM a JOIN b ON a.col3 = b.col3 WHERE regexpLike(a.col2, b.col1)", 9},
         new Object[]{"SELECT a.col1, b.col1 FROM a JOIN b ON a.col3 = b.col3 WHERE regexp_like(a.col2, b.col1)", 9},
-        new Object[]{"SELECT regexpLike(a.col1, b.col1) FROM a JOIN b ON a.col3 = b.col3", 39}, new Object[]{"SELECT "
-        + "regexp_like(a.col1, b.col1) FROM a JOIN b ON a.col3 = b.col3", 39},
+        new Object[]{"SELECT regexpLike(a.col1, b.col1) FROM a JOIN b ON a.col3 = b.col3", 39},
+        new Object[]{"SELECT regexp_like(a.col1, b.col1) FROM a JOIN b ON a.col3 = b.col3", 39},
 
         // test function with @ScalarFunction annotation and alias works (using round_decimal)
-        new Object[]{"SELECT roundDecimal(col3) FROM a", 15}, new Object[]{"SELECT round_decimal(col3) FROM a", 15},
-        new Object[]{"SELECT col1, roundDecimal(COUNT(*)) FROM a GROUP BY col1", 5}, new Object[]{"SELECT col1, "
-        + "round_decimal(COUNT(*)) FROM a GROUP BY col1", 5},
+        new Object[]{"SELECT roundDecimal(col3) FROM a", 15},
+        new Object[]{"SELECT round_decimal(col3) FROM a", 15},
+        new Object[]{"SELECT col1, roundDecimal(COUNT(*)) FROM a GROUP BY col1", 5},
+        new Object[]{"SELECT col1, round_decimal(COUNT(*)) FROM a GROUP BY col1", 5},
 
         // test queries with special query options attached
         //   - when leaf limit is set, each server returns multiStageLeafLimit number of rows only.
@@ -248,61 +255,74 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
         // test groups limit in both leaf and intermediate stage
         new Object[]{"SET numGroupsLimit = 1; SELECT col1, COUNT(*) FROM a GROUP BY col1", 1},
         new Object[]{"SET numGroupsLimit = 2; SELECT col1, COUNT(*) FROM a GROUP BY col1", 2},
-        new Object[]{"SET numGroupsLimit = 1; "
-            + "SELECT a.col2, b.col2, COUNT(*) FROM a JOIN b USING (col1) GROUP BY a.col2, b.col2", 1},
-        new Object[]{"SET numGroupsLimit = 2; "
-            + "SELECT a.col2, b.col2, COUNT(*) FROM a JOIN b USING (col1) GROUP BY a.col2, b.col2", 2},
+        new Object[]{
+            "SET numGroupsLimit = 1; "
+                + "SELECT a.col2, b.col2, COUNT(*) FROM a JOIN b USING (col1) GROUP BY a.col2, b.col2",
+            1
+        },
+        new Object[]{
+            "SET numGroupsLimit = 2; "
+                + "SELECT a.col2, b.col2, COUNT(*) FROM a JOIN b USING (col1) GROUP BY a.col2, b.col2",
+            2
+        },
         // TODO: Consider pushing down hint to the leaf stage
-        new Object[]{"SET numGroupsLimit = 2; SELECT /*+ aggOptions(num_groups_limit='1') */ "
-            + "col1, COUNT(*) FROM a GROUP BY col1", 2},
-        new Object[]{"SET numGroupsLimit = 2; SELECT /*+ aggOptions(num_groups_limit='1') */ "
-            + "a.col2, b.col2, COUNT(*) FROM a JOIN b USING (col1) GROUP BY a.col2, b.col2", 1},
+        new Object[]{
+            "SET numGroupsLimit = 2; "
+                + "SELECT /*+ aggOptions(num_groups_limit='1') */ col1, COUNT(*) FROM a GROUP BY col1",
+            2
+        },
+        new Object[]{
+            "SET numGroupsLimit = 2; "
+                + "SELECT /*+ aggOptions(num_groups_limit='1') */ a.col2, b.col2, COUNT(*) FROM a JOIN b USING (col1) "
+                + "GROUP BY a.col2, b.col2",
+            1
+        },
         new Object[]{"SELECT * FROM \"default.tbl-escape-naming\"", 5}
     };
+    //@formatter:on
   }
 
   @DataProvider(name = "testDataWithSqlExecutionExceptions")
   private Object[][] provideTestSqlWithExecutionException() {
+    //@formatter:off
     return new Object[][]{
         // Missing index
-        new Object[]{
-            "SELECT col1 FROM a WHERE textMatch(col1, 'f') LIMIT 10", "without text index"
-        },
+        new Object[]{"SELECT col1 FROM a WHERE textMatch(col1, 'f') LIMIT 10", "without text index"},
 
         // Query hint with dynamic broadcast pipeline breaker should return error upstream
         new Object[]{
-            "SELECT /*+ joinOptions(join_strategy='dynamic_broadcast') */ col1 FROM a "
-                + " WHERE a.col1 IN (SELECT b.col2 FROM b WHERE textMatch(col1, 'f')) AND a.col3 > 0", "without text "
-            + "index"
+            "SELECT /*+ joinOptions(join_strategy='dynamic_broadcast') */ col1 FROM a WHERE a.col1 IN "
+                + "(SELECT b.col2 FROM b WHERE textMatch(col1, 'f')) AND a.col3 > 0",
+            "without text index"
         },
 
         // Timeout exception should occur with this option:
-        new Object[]{
-            "SET timeoutMs = 1; SELECT * FROM a JOIN b ON a.col1 = b.col1 JOIN c ON a.col1 = c.col1", "Timeout"
-        },
+        new Object[]{"SET timeoutMs = 1; SELECT * FROM a JOIN b ON a.col1 = b.col1 JOIN c ON a.col1 = c.col1",
+            "Timeout"},
 
         // Function with incorrect argument signature should throw runtime exception when casting string to numeric
-        new Object[]{
-            "SELECT least(a.col2, b.col3) FROM a JOIN b ON a.col1 = b.col1", "For input string:"
-        },
+        new Object[]{"SELECT least(a.col2, b.col3) FROM a JOIN b ON a.col1 = b.col1", "For input string:"},
 
         // Scalar function that doesn't have a valid use should throw an exception on the leaf stage
         //   - predicate only functions:
-        new Object[]{"SELECT * FROM a WHERE textMatch(col1, 'f')", "without text index"}, new Object[]{"SELECT * FROM"
-        + " a WHERE text_match(col1, 'f')", "without text index"}, new Object[]{"SELECT * FROM a WHERE textContains"
-        + "(col1, 'f')", "supported only on native text index"}, new Object[]{"SELECT * FROM a WHERE text_contains"
-        + "(col1, 'f')", "supported only on native text index"},
+        new Object[]{"SELECT * FROM a WHERE textMatch(col1, 'f')", "without text index"},
+        new Object[]{"SELECT * FROM a WHERE text_match(col1, 'f')", "without text index"},
+        new Object[]{"SELECT * FROM a WHERE textContains(col1, 'f')", "supported only on native text index"},
+        new Object[]{"SELECT * FROM a WHERE text_contains(col1, 'f')", "supported only on native text index"},
 
         //  - transform only functions
-        new Object[]{"SELECT jsonExtractKey(col1, 'path') FROM a", "was expecting (JSON String"}, new Object[]{
-            "SELECT json_extract_key(col1, 'path') FROM a", "was expecting (JSON String"},
+        new Object[]{"SELECT jsonExtractKey(col1, 'path') FROM a", "was expecting (JSON String"},
+        new Object[]{"SELECT json_extract_key(col1, 'path') FROM a", "was expecting (JSON String"},
 
         //  - PlaceholderScalarFunction registered will throw on intermediate stage, but works on leaf stage.
         //    - checked "Illegal Json Path" as col1 is not actually a json string, but the call is correctly triggered.
-        new Object[]{"SELECT CAST(jsonExtractScalar(col1, 'path', 'INT') AS INT) FROM a", "Illegal Json Path"},
+        new Object[]{"SELECT CAST(jsonExtractScalar(col1, 'path', 'INT') AS INT) FROM a", "Cannot resolve JSON path"},
         //    - checked function cannot be found b/c there's no intermediate stage impl for json_extract_scalar
-        new Object[]{"SELECT CAST(json_extract_scalar(a.col1, b.col2, 'INT') AS INT)"
-            + "FROM a JOIN b ON a.col1 = b.col1", "Cannot find function with name: JSON_EXTRACT_SCALAR"},
+        new Object[]{
+            "SELECT CAST(json_extract_scalar(a.col1, b.col2, 'INT') AS INT) FROM a JOIN b ON a.col1 = b.col1",
+            "Unsupported function: JSONEXTRACTSCALAR"
+        }
     };
+    //@formatter:on
   }
 }

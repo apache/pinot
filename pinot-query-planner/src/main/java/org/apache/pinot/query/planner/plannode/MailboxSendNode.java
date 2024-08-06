@@ -18,125 +18,68 @@
  */
 package org.apache.pinot.query.planner.plannode;
 
-import com.google.common.base.Preconditions;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelFieldCollation;
-import org.apache.calcite.rel.logical.PinotRelExchangeType;
-import org.apache.commons.collections.CollectionUtils;
+import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.query.planner.logical.RexExpression;
-import org.apache.pinot.query.planner.serde.ProtoProperties;
 
 
-public class MailboxSendNode extends AbstractPlanNode {
-  @ProtoProperties
-  private int _receiverStageId;
-  @ProtoProperties
+public class MailboxSendNode extends BasePlanNode {
+  private final int _receiverStageId;
+  private final PinotRelExchangeType _exchangeType;
   private RelDistribution.Type _distributionType;
-  @ProtoProperties
-  private PinotRelExchangeType _exchangeType;
-  @ProtoProperties
-  private List<Integer> _distributionKeys;
-  @ProtoProperties
-  private List<RexExpression> _collationKeys;
-  @ProtoProperties
-  private List<RelFieldCollation.Direction> _collationDirections;
-  @ProtoProperties
-  private boolean _isSortOnSender;
-  @ProtoProperties
-  private boolean _isPrePartitioned;
+  private final List<Integer> _keys;
+  private final boolean _prePartitioned;
+  private final List<RelFieldCollation> _collations;
+  private final boolean _sort;
 
-  public MailboxSendNode(int planFragmentId) {
-    super(planFragmentId);
-  }
-
-  public MailboxSendNode(int planFragmentId, DataSchema dataSchema, int receiverStageId,
-      RelDistribution.Type distributionType, PinotRelExchangeType exchangeType,
-      @Nullable List<Integer> distributionKeys, @Nullable List<RelFieldCollation> fieldCollations,
-      boolean isSortOnSender, boolean isPrePartitioned) {
-    super(planFragmentId, dataSchema);
+  // NOTE: null List is converted to empty List because there is no way to differentiate them in proto during ser/de.
+  public MailboxSendNode(int stageId, DataSchema dataSchema, List<PlanNode> inputs, int receiverStageId,
+      PinotRelExchangeType exchangeType, RelDistribution.Type distributionType, @Nullable List<Integer> keys,
+      boolean prePartitioned, @Nullable List<RelFieldCollation> collations, boolean sort) {
+    super(stageId, dataSchema, null, inputs);
     _receiverStageId = receiverStageId;
-    _distributionType = distributionType;
     _exchangeType = exchangeType;
-    _distributionKeys = distributionKeys;
-    // TODO: Support ordering here if the 'fieldCollations' aren't empty and 'sortOnSender' is true
-    Preconditions.checkState(!isSortOnSender, "Ordering is not yet supported on Mailbox Send");
-    if (!CollectionUtils.isEmpty(fieldCollations) && isSortOnSender) {
-      _collationKeys = new ArrayList<>(fieldCollations.size());
-      _collationDirections = new ArrayList<>(fieldCollations.size());
-      for (RelFieldCollation fieldCollation : fieldCollations) {
-        _collationDirections.add(fieldCollation.getDirection());
-        _collationKeys.add(new RexExpression.InputRef(fieldCollation.getFieldIndex()));
-      }
-    } else {
-      _collationKeys = Collections.emptyList();
-      _collationDirections = Collections.emptyList();
-    }
-    _isSortOnSender = isSortOnSender;
-    _isPrePartitioned = isPrePartitioned;
-  }
-
-  public MailboxSendNode(int planFragmentId, DataSchema dataSchema, int receiverStageId,
-      RelDistribution.Type distributionType, PinotRelExchangeType exchangeType, List<Integer> distributionKeys,
-      List<RexExpression> collationKeys, List<RelFieldCollation.Direction> collationDirections, boolean sortOnSender,
-      boolean prePartitioned) {
-    super(planFragmentId, dataSchema);
-    _receiverStageId = receiverStageId;
     _distributionType = distributionType;
-    _exchangeType = exchangeType;
-    _distributionKeys = distributionKeys;
-    _collationKeys = collationKeys;
-    _collationDirections = collationDirections;
-    _isSortOnSender = sortOnSender;
-    _isPrePartitioned = prePartitioned;
+    _keys = keys != null ? keys : List.of();
+    _prePartitioned = prePartitioned;
+    _collations = collations != null ? collations : List.of();
+    _sort = sort;
   }
 
   public int getReceiverStageId() {
     return _receiverStageId;
   }
 
-  public void setReceiverStageId(int receiverStageId) {
-    _receiverStageId = receiverStageId;
-  }
-
-  public void setDistributionType(RelDistribution.Type distributionType) {
-    _distributionType = distributionType;
+  public PinotRelExchangeType getExchangeType() {
+    return _exchangeType;
   }
 
   public RelDistribution.Type getDistributionType() {
     return _distributionType;
   }
 
-  public void setExchangeType(PinotRelExchangeType exchangeType) {
-    _exchangeType = exchangeType;
+  public void setDistributionType(RelDistribution.Type distributionType) {
+    _distributionType = distributionType;
   }
 
-  public PinotRelExchangeType getExchangeType() {
-    return _exchangeType;
-  }
-
-  public List<Integer> getDistributionKeys() {
-    return _distributionKeys;
-  }
-
-  public List<RexExpression> getCollationKeys() {
-    return _collationKeys;
-  }
-
-  public List<RelFieldCollation.Direction> getCollationDirections() {
-    return _collationDirections;
-  }
-
-  public boolean isSortOnSender() {
-    return _isSortOnSender;
+  public List<Integer> getKeys() {
+    return _keys;
   }
 
   public boolean isPrePartitioned() {
-    return _isPrePartitioned;
+    return _prePartitioned;
+  }
+
+  public List<RelFieldCollation> getCollations() {
+    return _collations;
+  }
+
+  public boolean isSort() {
+    return _sort;
   }
 
   @Override
@@ -148,7 +91,7 @@ public class MailboxSendNode extends AbstractPlanNode {
     if (isPrePartitioned()) {
       sb.append("[PARTITIONED]");
     }
-    if (isSortOnSender()) {
+    if (isSort()) {
       sb.append("[SORTED]");
     }
     return sb.toString();
@@ -157,5 +100,28 @@ public class MailboxSendNode extends AbstractPlanNode {
   @Override
   public <T, C> T visit(PlanNodeVisitor<T, C> visitor, C context) {
     return visitor.visitMailboxSend(this, context);
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (!(o instanceof MailboxSendNode)) {
+      return false;
+    }
+    if (!super.equals(o)) {
+      return false;
+    }
+    MailboxSendNode that = (MailboxSendNode) o;
+    return _receiverStageId == that._receiverStageId && _prePartitioned == that._prePartitioned && _sort == that._sort
+        && _exchangeType == that._exchangeType && _distributionType == that._distributionType && Objects.equals(_keys,
+        that._keys) && Objects.equals(_collations, that._collations);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(super.hashCode(), _receiverStageId, _exchangeType, _distributionType, _keys, _prePartitioned,
+        _collations, _sort);
   }
 }

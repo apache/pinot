@@ -31,8 +31,8 @@ import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.query.planner.PlannerUtils;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
-import org.apache.pinot.query.planner.plannode.AbstractPlanNode;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.BasePlanNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
@@ -84,9 +84,9 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     assertEquals(explain,
         "Execution Plan\n"
         + "LogicalProject(EXPR$0=[CASE(=($1, 0), null:BIGINT, $0)])\n"
-        + "  LogicalAggregate(group=[{}], agg#0=[COUNT($0)], agg#1=[COUNT($1)])\n"
+        + "  PinotLogicalAggregate(group=[{}], agg#0=[COUNT($0)], agg#1=[COUNT($1)])\n"
         + "    PinotLogicalExchange(distribution=[hash])\n"
-        + "      LogicalAggregate(group=[{}], agg#0=[COUNT() FILTER $0], agg#1=[COUNT()])\n"
+        + "      PinotLogicalAggregate(group=[{}], agg#0=[COUNT() FILTER $0], agg#1=[COUNT()])\n"
         + "        LogicalProject($f1=[=($0, _UTF-8'a')])\n"
         + "          LogicalTableScan(table=[[default, a]])\n");
   }
@@ -255,7 +255,8 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
   public void testQueryWithHint() {
     // Hinting the query to use final stage aggregation makes server directly return final result
     // This is useful when data is already partitioned by col1
-    String query = "SELECT /*+ aggOptionsInternal(agg_type='DIRECT') */ col1, COUNT(*) FROM b GROUP BY col1";
+    String query =
+        "SELECT /*+ aggOptions(is_partitioned_by_group_by_keys='true') */ col1, COUNT(*) FROM b GROUP BY col1";
     DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(query);
     List<DispatchablePlanFragment> stagePlans = dispatchableSubPlan.getQueryStageList();
     int numStages = stagePlans.size();
@@ -384,19 +385,26 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     assertEquals(tableNames.get(0), "a");
   }
 
+  @Test
+  public void testDuplicateWithAlias() {
+    String query = "WITH tmp AS (SELECT * FROM a LIMIT 1), tmp AS (SELECT * FROM a LIMIT 2) SELECT * FROM tmp";
+    RuntimeException e = expectThrows(RuntimeException.class, () -> _queryEnvironment.getTableNamesForQuery(query));
+    assertTrue(e.getCause().getMessage().contains("Duplicate alias in WITH: 'tmp'"));
+  }
+
   // --------------------------------------------------------------------------
   // Test Utils.
   // --------------------------------------------------------------------------
 
-  private static void assertNodeTypeNotIn(PlanNode node, List<Class<? extends AbstractPlanNode>> bannedNodeType) {
+  private static void assertNodeTypeNotIn(PlanNode node, List<Class<? extends BasePlanNode>> bannedNodeType) {
     assertFalse(isOneOf(bannedNodeType, node));
     for (PlanNode child : node.getInputs()) {
       assertNodeTypeNotIn(child, bannedNodeType);
     }
   }
 
-  private static boolean isOneOf(List<Class<? extends AbstractPlanNode>> allowedNodeTypes, PlanNode node) {
-    for (Class<? extends AbstractPlanNode> allowedNodeType : allowedNodeTypes) {
+  private static boolean isOneOf(List<Class<? extends BasePlanNode>> allowedNodeTypes, PlanNode node) {
+    for (Class<? extends BasePlanNode> allowedNodeType : allowedNodeTypes) {
       if (node.getClass() == allowedNodeType) {
         return true;
       }
@@ -457,10 +465,11 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
         new Object[]{"EXPLAIN PLAN EXCLUDING ATTRIBUTES AS DOT FOR SELECT col1, COUNT(*) FROM a GROUP BY col1",
               "Execution Plan\n"
             + "digraph {\n"
-            + "\"PinotLogicalExchange\\n\" -> \"LogicalAggregate\\n\" [label=\"0\"]\n"
-            + "\"LogicalAggregate\\n\" -> \"PinotLogicalExchange\\n\" [label=\"0\"]\n"
-            + "\"LogicalTableScan\\n\" -> \"LogicalAggregate\\n\" [label=\"0\"]\n"
-            + "}\n"},
+            + "\"PinotLogicalExchange\\n\" -> \"PinotLogicalAggregat\\ne\\n\" [label=\"0\"]\n"
+            + "\"PinotLogicalAggregat\\ne\\n\" -> \"PinotLogicalExchange\\n\" [label=\"0\"]\n"
+            + "\"LogicalTableScan\\n\" -> \"PinotLogicalAggregat\\ne\\n\" [label=\"0\"]\n"
+            + "}\n"
+        },
         new Object[]{"EXPLAIN PLAN FOR SELECT a.col1, b.col3 FROM a JOIN b ON a.col1 = b.col1",
               "Execution Plan\n"
             + "LogicalProject(col1=[$0], col3=[$2])\n"

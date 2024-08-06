@@ -42,11 +42,11 @@ public class MailboxAssignmentVisitor extends DefaultPostOrderTraversalVisitor<V
   public Void process(PlanNode node, DispatchablePlanContext context) {
     if (node instanceof MailboxSendNode) {
       MailboxSendNode sendNode = (MailboxSendNode) node;
-      int senderFragmentId = sendNode.getPlanFragmentId();
-      int receiverFragmentId = sendNode.getReceiverStageId();
+      int senderStageId = sendNode.getStageId();
+      int receiverStageId = sendNode.getReceiverStageId();
       Map<Integer, DispatchablePlanMetadata> metadataMap = context.getDispatchablePlanMetadataMap();
-      DispatchablePlanMetadata senderMetadata = metadataMap.get(senderFragmentId);
-      DispatchablePlanMetadata receiverMetadata = metadataMap.get(receiverFragmentId);
+      DispatchablePlanMetadata senderMetadata = metadataMap.get(senderStageId);
+      DispatchablePlanMetadata receiverMetadata = metadataMap.get(receiverStageId);
       Map<Integer, QueryServerInstance> senderServerMap = senderMetadata.getWorkerIdToServerInstanceMap();
       Map<Integer, QueryServerInstance> receiverServerMap = receiverMetadata.getWorkerIdToServerInstanceMap();
       Map<Integer, Map<Integer, MailboxInfos>> senderMailboxesMap = senderMetadata.getWorkerIdToMailboxesMap();
@@ -68,8 +68,8 @@ public class MailboxAssignmentVisitor extends DefaultPostOrderTraversalVisitor<V
           MailboxInfos mailboxInfos = new SharedMailboxInfos(
               new MailboxInfo(senderServer.getHostname(), senderServer.getQueryMailboxPort(),
                   ImmutableList.of(workerId)));
-          senderMailboxesMap.computeIfAbsent(workerId, k -> new HashMap<>()).put(receiverFragmentId, mailboxInfos);
-          receiverMailboxesMap.computeIfAbsent(workerId, k -> new HashMap<>()).put(senderFragmentId, mailboxInfos);
+          senderMailboxesMap.computeIfAbsent(workerId, k -> new HashMap<>()).put(receiverStageId, mailboxInfos);
+          receiverMailboxesMap.computeIfAbsent(workerId, k -> new HashMap<>()).put(senderStageId, mailboxInfos);
         }
       } else if (senderMetadata.isPrePartitioned() && isDirectExchangeCompatible(senderMetadata, receiverMetadata)) {
         // - direct exchange possible:
@@ -96,9 +96,8 @@ public class MailboxAssignmentVisitor extends DefaultPostOrderTraversalVisitor<V
                   new MailboxInfo(receiverServer.getHostname(), receiverServer.getQueryMailboxPort(), workerIds));
             }
             senderMailboxesMap.computeIfAbsent(workerId, k -> new HashMap<>())
-                .put(receiverFragmentId, receiverMailboxInfos);
-            receiverMailboxesMap.computeIfAbsent(workerId, k -> new HashMap<>())
-                .put(senderFragmentId, senderMailboxInfos);
+                .put(receiverStageId, receiverMailboxInfos);
+            receiverMailboxesMap.computeIfAbsent(workerId, k -> new HashMap<>()).put(senderStageId, senderMailboxInfos);
           }
         } else {
           // 1-to-<partition_parallelism> mapping
@@ -107,7 +106,7 @@ public class MailboxAssignmentVisitor extends DefaultPostOrderTraversalVisitor<V
             QueryServerInstance senderServer = senderServerMap.get(senderWorkerId);
             QueryServerInstance receiverServer = receiverServerMap.get(receiverWorkerId);
             List<Integer> receiverWorkerIds = new ArrayList<>(partitionParallelism);
-            senderMailboxesMap.computeIfAbsent(senderWorkerId, k -> new HashMap<>()).put(receiverFragmentId,
+            senderMailboxesMap.computeIfAbsent(senderWorkerId, k -> new HashMap<>()).put(receiverStageId,
                 new MailboxInfos(new MailboxInfo(receiverServer.getHostname(), receiverServer.getQueryMailboxPort(),
                     receiverWorkerIds)));
             MailboxInfos senderMailboxInfos = new SharedMailboxInfos(
@@ -116,7 +115,7 @@ public class MailboxAssignmentVisitor extends DefaultPostOrderTraversalVisitor<V
             for (int i = 0; i < partitionParallelism; i++) {
               receiverWorkerIds.add(receiverWorkerId);
               receiverMailboxesMap.computeIfAbsent(receiverWorkerId, k -> new HashMap<>())
-                  .put(senderFragmentId, senderMailboxInfos);
+                  .put(senderStageId, senderMailboxInfos);
               receiverWorkerId++;
             }
           }
@@ -129,14 +128,14 @@ public class MailboxAssignmentVisitor extends DefaultPostOrderTraversalVisitor<V
             : new MailboxInfos(receiverMailboxInfoList);
         for (int senderWorkerId = 0; senderWorkerId < numSenders; senderWorkerId++) {
           senderMailboxesMap.computeIfAbsent(senderWorkerId, k -> new HashMap<>())
-              .put(receiverFragmentId, receiverMailboxInfos);
+              .put(receiverStageId, receiverMailboxInfos);
         }
         List<MailboxInfo> senderMailboxInfoList = getMailboxInfos(senderServerMap);
         MailboxInfos senderMailboxInfos =
             numReceivers > 1 ? new SharedMailboxInfos(senderMailboxInfoList) : new MailboxInfos(senderMailboxInfoList);
         for (int receiverWorkerId = 0; receiverWorkerId < numReceivers; receiverWorkerId++) {
           receiverMailboxesMap.computeIfAbsent(receiverWorkerId, k -> new HashMap<>())
-              .put(senderFragmentId, senderMailboxInfos);
+              .put(senderStageId, senderMailboxInfos);
         }
       }
     }

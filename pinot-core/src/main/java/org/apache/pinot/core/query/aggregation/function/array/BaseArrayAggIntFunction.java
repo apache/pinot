@@ -98,6 +98,9 @@ public abstract class BaseArrayAggIntFunction<I extends AbstractIntCollection>
 
   @Override
   public IntArrayList extractFinalResult(I intArrayList) {
+    if (intArrayList == null) {
+      return new IntArrayList();
+    }
     return new IntArrayList(intArrayList);
   }
 }

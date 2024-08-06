@@ -29,11 +29,11 @@ import java.net.URLClassLoader;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.pinot.plugin.inputformat.protobuf.codegen.MessageCodeGen;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
 import org.codehaus.janino.SimpleCompiler;
-import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

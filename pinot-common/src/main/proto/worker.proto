@@ -40,6 +40,7 @@ message CancelResponse {
 message QueryRequest {
   repeated StagePlan stagePlan = 1;
   bytes metadata = 2; // Serialized Properties
+  int32 version = 3;
 }
 
 // QueryResponse is the dispatched response from worker, it doesn't contain actual data, only dispatch status.

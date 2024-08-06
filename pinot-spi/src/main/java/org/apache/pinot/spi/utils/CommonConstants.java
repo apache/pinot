@@ -22,6 +22,7 @@ import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.spi.config.instance.InstanceType;
 
 
@@ -51,7 +52,7 @@ public class CommonConstants {
       "org.apache.pinot.spi.eventlistener.query.NoOpBrokerQueryEventListener";
 
   public static final String SWAGGER_AUTHORIZATION_KEY = "oauth";
-  public static final String CONFIG_OF_SWAGGER_RESOURCES_PATH = "META-INF/resources/webjars/swagger-ui/5.17.0/";
+  public static final String CONFIG_OF_SWAGGER_RESOURCES_PATH = "META-INF/resources/webjars/swagger-ui/5.17.14/";
   public static final String CONFIG_OF_TIMEZONE = "pinot.timezone";
 
   public static final String DATABASE = "database";
@@ -77,6 +78,7 @@ public class CommonConstants {
     public static final String IS_SHUTDOWN_IN_PROGRESS = "shutdownInProgress";
     public static final String QUERIES_DISABLED = "queriesDisabled";
     public static final String QUERY_RATE_LIMIT_DISABLED = "queryRateLimitDisabled";
+    public static final String DATABASE_MAX_QUERIES_PER_SECOND = "databaseMaxQueriesPerSecond";
 
     public static final String INSTANCE_CONNECTED_METRIC_NAME = "helix.connected";
 
@@ -350,6 +352,17 @@ public class CommonConstants {
     // precedence over "query.response.size" (i.e., "query.response.size" will be ignored).
     public static final String CONFIG_OF_MAX_SERVER_RESPONSE_SIZE_BYTES = "pinot.broker.max.server.response.size.bytes";
 
+    public static final String CONFIG_OF_NEW_SEGMENT_EXPIRATION_SECONDS = "pinot.broker.new.segment.expiration.seconds";
+    public static final long DEFAULT_VALUE_OF_NEW_SEGMENT_EXPIRATION_SECONDS = TimeUnit.MINUTES.toSeconds(5);
+
+    // If this config is set to true, the broker will check every query executed using the v1 query engine and attempt
+    // to determine whether the query could have successfully been run on the v2 / multi-stage query engine. If not,
+    // a counter metric will be incremented - if this counter remains 0 during regular query workload execution, it
+    // signals that users can potentially migrate their query workload to the multistage query engine.
+    public static final String CONFIG_OF_BROKER_ENABLE_MULTISTAGE_MIGRATION_METRIC
+        = "pinot.broker.enable.multistage.migration.metric";
+    public static final boolean DEFAULT_ENABLE_MULTISTAGE_MIGRATION_METRIC = false;
+
     public static class Request {
       public static final String SQL = "sql";
       public static final String TRACE = "trace";
@@ -358,6 +371,7 @@ public class CommonConstants {
       public static class QueryOptionKey {
         public static final String TIMEOUT_MS = "timeoutMs";
         public static final String SKIP_UPSERT = "skipUpsert";
+        public static final String SKIP_UPSERT_VIEW = "skipUpsertView";
         public static final String UPSERT_VIEW_FRESHNESS_MS = "upsertViewFreshnessMs";
         public static final String USE_STAR_TREE = "useStarTree";
         public static final String SCAN_STAR_TREE_NODES = "scanStarTreeNodes";
@@ -417,6 +431,9 @@ public class CommonConstants {
         // Indicates the maximum length of serialized response across all servers for a query. This value is equally
         // divided across all servers processing the query.
         public static final String MAX_QUERY_RESPONSE_SIZE_BYTES = "maxQueryResponseSizeBytes";
+
+        // If query submission causes an exception, still continue to submit the query to other servers
+        public static final String SKIP_UNAVAILABLE_SERVERS = "skipUnavailableServers";
       }
 
       public static class QueryOptionValue {
@@ -724,6 +741,11 @@ public class CommonConstants {
 
     public static final String CONFIG_OF_REALTIME_SEGMENT_CONSUMER_CLIENT_ID_SUFFIX = "consumer.client.id.suffix";
 
+    public static final String LUCENE_MAX_REFRESH_THREADS = "pinot.server.lucene.max.refresh.threads";
+    public static final int DEFAULT_LUCENE_MAX_REFRESH_THREADS = 1;
+    public static final String LUCENE_MIN_REFRESH_INTERVAL_MS = "pinot.server.lucene.min.refresh.interval.ms";
+    public static final int DEFAULT_LUCENE_MIN_REFRESH_INTERVAL_MS = 10;
+
     public static class SegmentCompletionProtocol {
       public static final String PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER = "pinot.server.segment.uploader";
 
@@ -852,6 +874,8 @@ public class CommonConstants {
     public static final String CONFIG_OF_EVENT_OBSERVER_CLEANUP_DELAY_IN_SEC =
         "pinot.minion.event.observer.cleanupDelayInSec";
     public static final char TASK_LIST_SEPARATOR = ',';
+    public static final String CONFIG_OF_ALLOW_DOWNLOAD_FROM_SERVER = "pinot.minion.task.allow.download.from.server";
+    public static final String DEFAULT_ALLOW_DOWNLOAD_FROM_SERVER = "false";
   }
 
   public static class ControllerJob {
@@ -1101,8 +1125,8 @@ public class CommonConstants {
   }
 
   public static class RewriterConstants {
-    public static final String PARENT_AGGREGATION_NAME_PREFIX = "parent";
-    public static final String CHILD_AGGREGATION_NAME_PREFIX = "child";
+    public static final String PARENT_AGGREGATION_NAME_PREFIX = "pinotparentagg";
+    public static final String CHILD_AGGREGATION_NAME_PREFIX = "pinotchildagg";
     public static final String CHILD_AGGREGATION_SEPERATOR = "@";
     public static final String CHILD_KEY_SEPERATOR = "_";
   }
@@ -1150,6 +1174,13 @@ public class CommonConstants {
 
     public enum WindowOverFlowMode {
       THROW, BREAK
+    }
+
+    /**
+     * Constants related to plan versions.
+     */
+    public static class PlanVersions {
+      public static final int V1 = 1;
     }
   }
 

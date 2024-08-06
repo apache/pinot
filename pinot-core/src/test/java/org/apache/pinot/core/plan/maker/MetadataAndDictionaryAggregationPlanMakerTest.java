@@ -32,7 +32,6 @@ import org.apache.pinot.core.operator.query.FastFilteredCountOperator;
 import org.apache.pinot.core.operator.query.GroupByOperator;
 import org.apache.pinot.core.operator.query.NonScanBasedAggregationOperator;
 import org.apache.pinot.core.operator.query.SelectionOnlyOperator;
-import org.apache.pinot.core.plan.TestUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
@@ -40,6 +39,7 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoa
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.upsert.ConcurrentMapPartitionUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.UpsertContext;
+import org.apache.pinot.segment.local.upsert.UpsertUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
@@ -161,7 +161,7 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
     assertTrue(operatorClass.isInstance(operator));
 
     SegmentContext segmentContext = new SegmentContext(_upsertIndexSegment);
-    segmentContext.setQueryableDocIdsSnapshot(TestUtils.getQueryableDocIdsSnapshotFromSegment(_upsertIndexSegment));
+    segmentContext.setQueryableDocIdsSnapshot(UpsertUtils.getQueryableDocIdsSnapshotFromSegment(_upsertIndexSegment));
     Operator<?> upsertOperator = PLAN_MAKER.makeSegmentPlanNode(segmentContext, queryContext).run();
     assertTrue(upsertOperatorClass.isInstance(upsertOperator));
   }

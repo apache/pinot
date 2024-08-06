@@ -36,7 +36,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 import javax.annotation.concurrent.ThreadSafe;
-import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.Utils;
@@ -74,6 +74,7 @@ import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.spi.utils.TimeUtils;
@@ -265,10 +266,15 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
    * Method used by RealtimeSegmentManagers to update their partition delays
    *
    * @param ingestionTimeMs Ingestion delay being reported.
+   * @param firstStreamIngestionTimeMs Ingestion time of the first message in the stream.
    * @param partitionGroupId Partition ID for which delay is being updated.
+   * @param offset last offset received for the partition.
+   * @param latestOffset latest upstream offset for the partition.
    */
-  public void updateIngestionDelay(long ingestionTimeMs, long firstStreamIngestionTimeMs, int partitionGroupId) {
-    _ingestionDelayTracker.updateIngestionDelay(ingestionTimeMs, firstStreamIngestionTimeMs, partitionGroupId);
+  public void updateIngestionMetrics(long ingestionTimeMs, long firstStreamIngestionTimeMs,
+      StreamPartitionMsgOffset offset, StreamPartitionMsgOffset latestOffset, int partitionGroupId) {
+    _ingestionDelayTracker.updateIngestionMetrics(ingestionTimeMs, firstStreamIngestionTimeMs, offset, latestOffset,
+        partitionGroupId);
   }
 
   /*

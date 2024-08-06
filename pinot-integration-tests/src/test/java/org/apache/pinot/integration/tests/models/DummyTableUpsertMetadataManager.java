@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.local.upsert.BasePartitionUpsertMetadataManager;
@@ -91,10 +92,9 @@ public class DummyTableUpsertMetadataManager extends BaseTableUpsertMetadataMana
     }
 
     @Override
-    protected void addOrReplaceSegment(ImmutableSegmentImpl segment, ThreadSafeMutableRoaringBitmap validDocIds,
-        @org.jetbrains.annotations.Nullable ThreadSafeMutableRoaringBitmap queryableDocIds,
-        Iterator<RecordInfo> recordInfoIterator, @org.jetbrains.annotations.Nullable IndexSegment oldSegment,
-        @org.jetbrains.annotations.Nullable MutableRoaringBitmap validDocIdsForOldSegment) {
+    protected void doAddOrReplaceSegment(ImmutableSegmentImpl segment, ThreadSafeMutableRoaringBitmap validDocIds,
+        @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, Iterator<RecordInfo> recordInfoIterator,
+        @Nullable IndexSegment oldSegment, @Nullable MutableRoaringBitmap validDocIdsForOldSegment) {
     }
 
     @Override

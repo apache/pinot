@@ -67,6 +67,11 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     return TENANT_NAME;
   }
 
+  @Override
+  protected void overrideControllerConf(Map<String, Object> properties) {
+    properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, false);
+  }
+
   protected void overrideBrokerConf(PinotConfiguration configuration) {
     configuration.setProperty(CommonConstants.Broker.CONFIG_OF_BROKER_INSTANCE_TAGS,
         TagNameUtils.getBrokerTagForTenant(TENANT_NAME));
@@ -116,18 +121,11 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
 
   protected void startHybridCluster()
       throws Exception {
-    // Start Zk and Kafka
     startZk();
-    startKafka();
-
-    // Start the Pinot cluster
-    Map<String, Object> properties = getDefaultControllerConfiguration();
-    properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, false);
-
-    startController(properties);
-
+    startController();
     startBroker();
     startServers(2);
+    startKafka();
 
     // Create tenants
     createServerTenant(TENANT_NAME, 1, 1);
@@ -160,6 +158,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
 
     // Stop the broker
     brokerStarter.stop();
+    _brokerPorts.remove(_brokerPorts.size() - 1);
 
     // Dropping the broker should fail because it is still in the broker resource
     try {
@@ -279,6 +278,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
   public void testQueryTracing(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    // Tracing is a v1 only concept and the v2 query engine has separate multi-stage stats that are enabled by default
     notSupportedInV2();
     JsonNode jsonNode = postQuery("SET trace = true; SELECT COUNT(*) FROM " + getTableName());
     Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asLong(), getCountStarResult());
@@ -293,6 +293,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
   public void testQueryTracingWithLiteral(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    // Tracing is a v1 only concept and the v2 query engine has separate multi-stage stats that are enabled by default
     notSupportedInV2();
     JsonNode jsonNode =
         postQuery("SET trace = true; SELECT 1, \'test\', ArrDelay FROM " + getTableName() + " LIMIT 10");
@@ -331,7 +332,6 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
   public void testHardcodedQueries(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    notSupportedInV2();
     super.testHardcodedQueries();
   }
 
@@ -339,6 +339,8 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
   public void testQueriesFromQueryFile(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    // Some of the hardcoded queries in the query file need to be adapted for v2 (for instance, using the arrayToMV
+    // with multi-value columns in filters / aggregations)
     notSupportedInV2();
     super.testQueriesFromQueryFile();
   }
@@ -347,15 +349,13 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
   public void testGeneratedQueries(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    notSupportedInV2();
-    super.testGeneratedQueries();
+    super.testGeneratedQueries(true, useMultiStageQueryEngine);
   }
 
   @Test(dataProvider = "useBothQueryEngines")
   public void testQueryExceptions(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    notSupportedInV2();
     super.testQueryExceptions();
   }
 

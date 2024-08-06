@@ -20,22 +20,23 @@ package org.apache.pinot.query.runtime.operator.window.range;
 
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
-import org.apache.pinot.query.runtime.operator.WindowAggregateOperator;
 
 
 public class RowNumberWindowFunction extends RangeWindowFunction {
 
-  public RowNumberWindowFunction(RexExpression.FunctionCall aggCall, String functionName, DataSchema inputSchema,
-      WindowAggregateOperator.OrderSetInfo orderSetInfo) {
-    super(aggCall, functionName, inputSchema, orderSetInfo);
+  public RowNumberWindowFunction(RexExpression.FunctionCall aggCall, DataSchema inputSchema,
+      List<RelFieldCollation> collations, boolean partitionByOnly) {
+    super(aggCall, inputSchema, collations, partitionByOnly);
   }
 
   @Override
   public List<Object> processRows(List<Object[]> rows) {
-    List<Object> result = new ArrayList<>();
-    for (long i = 1; i <= rows.size(); i++) {
+    int numRows = rows.size();
+    List<Object> result = new ArrayList<>(numRows);
+    for (long i = 1; i <= numRows; i++) {
       result.add(i);
     }
     return result;

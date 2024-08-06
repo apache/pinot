@@ -24,7 +24,7 @@ import java.io.FileInputStream;
 import java.net.URI;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
-import org.apache.http.Header;
+import org.apache.hc.core5.http.Header;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;

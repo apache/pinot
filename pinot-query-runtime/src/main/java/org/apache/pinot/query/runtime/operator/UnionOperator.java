@@ -40,9 +40,9 @@ public class UnionOperator extends SetOperator {
   private MultiStageQueryStats _queryStats = null;
   private int _finishedChildren = 0;
 
-  public UnionOperator(OpChainExecutionContext opChainExecutionContext, List<MultiStageOperator> upstreamOperators,
+  public UnionOperator(OpChainExecutionContext opChainExecutionContext, List<MultiStageOperator> inputOperators,
       DataSchema dataSchema) {
-    super(opChainExecutionContext, upstreamOperators, dataSchema);
+    super(opChainExecutionContext, inputOperators, dataSchema);
   }
 
   @Override
@@ -55,7 +55,6 @@ public class UnionOperator extends SetOperator {
     return Type.UNION;
   }
 
-  @Nullable
   @Override
   public String toExplainString() {
     return EXPLAIN_NAME;

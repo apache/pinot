@@ -17,11 +17,12 @@
 # under the License.
 #
 
-{{- if .Values.controller.pdb.enabled -}}
+{{- if .Values.controller.pdb.enabled }}
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
   name: {{ include "pinot.controller.fullname" . }}
+  namespace: {{ include "pinot.namespace" . }}
 spec:
   {{- if .Values.controller.pdb.minAvailable }}
   minAvailable: {{ .Values.controller.pdb.minAvailable }}
@@ -30,5 +31,6 @@ spec:
   maxUnavailable: {{ .Values.controller.pdb.maxUnavailable }}
   {{- end }}
   selector:
-    {{- include "pinot.controllerMatchLabels" . | nindent 4 }}
+    matchLabels:
+      {{- include "pinot.controllerMatchLabels" . | nindent 6 }}
 {{- end }}

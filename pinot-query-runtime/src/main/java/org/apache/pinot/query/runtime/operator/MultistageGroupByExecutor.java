@@ -36,8 +36,8 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.util.DataBlockExtractUtils;
-import org.apache.pinot.query.planner.plannode.AbstractPlanNode;
 import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
+import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.operator.groupby.GroupIdGenerator;
 import org.apache.pinot.query.runtime.operator.groupby.GroupIdGeneratorFactory;
@@ -69,7 +69,7 @@ public class MultistageGroupByExecutor {
 
   public MultistageGroupByExecutor(int[] groupKeyIds, AggregationFunction[] aggFunctions, int[] filterArgIds,
       int maxFilterArgId, AggType aggType, DataSchema resultSchema, Map<String, String> opChainMetadata,
-      @Nullable AbstractPlanNode.NodeHint nodeHint) {
+      @Nullable PlanNode.NodeHint nodeHint) {
     _groupKeyIds = groupKeyIds;
     _aggFunctions = aggFunctions;
     _filterArgIds = filterArgIds;
@@ -97,9 +97,9 @@ public class MultistageGroupByExecutor {
             _numGroupsLimit);
   }
 
-  private int getNumGroupsLimit(Map<String, String> opChainMetadata, @Nullable AbstractPlanNode.NodeHint nodeHint) {
+  private int getNumGroupsLimit(Map<String, String> opChainMetadata, @Nullable PlanNode.NodeHint nodeHint) {
     if (nodeHint != null) {
-      Map<String, String> aggregateOptions = nodeHint._hintOptions.get(PinotHintOptions.AGGREGATE_HINT_OPTIONS);
+      Map<String, String> aggregateOptions = nodeHint.getHintOptions().get(PinotHintOptions.AGGREGATE_HINT_OPTIONS);
       if (aggregateOptions != null) {
         String numGroupsLimitStr = aggregateOptions.get(PinotHintOptions.AggregateOptions.NUM_GROUPS_LIMIT);
         if (numGroupsLimitStr != null) {
@@ -112,9 +112,9 @@ public class MultistageGroupByExecutor {
   }
 
   private int getMaxInitialResultHolderCapacity(Map<String, String> opChainMetadata,
-      @Nullable AbstractPlanNode.NodeHint nodeHint) {
+      @Nullable PlanNode.NodeHint nodeHint) {
     if (nodeHint != null) {
-      Map<String, String> aggregateOptions = nodeHint._hintOptions.get(PinotHintOptions.AGGREGATE_HINT_OPTIONS);
+      Map<String, String> aggregateOptions = nodeHint.getHintOptions().get(PinotHintOptions.AGGREGATE_HINT_OPTIONS);
       if (aggregateOptions != null) {
         String maxInitialResultHolderCapacityStr =
             aggregateOptions.get(PinotHintOptions.AggregateOptions.MAX_INITIAL_RESULT_HOLDER_CAPACITY);

@@ -19,78 +19,81 @@
 package org.apache.pinot.query.planner.plannode;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelFieldCollation;
-import org.apache.calcite.rel.logical.PinotRelExchangeType;
+import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.query.planner.serde.ProtoProperties;
+import org.apache.pinot.query.planner.logical.PlanFragmenter;
 
 
 /**
  * ExchangeNode represents the exchange stage in the query plan.
  * It is used to exchange the data between the instances.
+ * NOTE: ExchangeNode will be replaced by {@link PlanFragmenter} into {@link MailboxSendNode} and
+ *       {@link MailboxReceiveNode} pair, so it is never serialized.
  */
-public class ExchangeNode extends AbstractPlanNode {
+public class ExchangeNode extends BasePlanNode {
+  private final PinotRelExchangeType _exchangeType;
+  private final RelDistribution.Type _distributionType;
+  private final List<Integer> _keys;
+  private final boolean _prePartitioned;
+  private final List<RelFieldCollation> _collations;
+  private final boolean _sortOnSender;
+  private final boolean _sortOnReceiver;
+  // Table names should be set for SUB_PLAN exchange type.
+  private final Set<String> _tableNames;
 
-  @ProtoProperties
-  private PinotRelExchangeType _exchangeType;
-
-  @ProtoProperties
-  private RelDistribution.Type _distributionType;
-
-  @ProtoProperties
-  private List<Integer> _keys;
-
-  @ProtoProperties
-  private boolean _isSortOnSender = false;
-
-  @ProtoProperties
-  private boolean _isSortOnReceiver = false;
-
-  @ProtoProperties
-  private boolean _isPrePartitioned = false;
-
-  // FIXME: Ser/de doesn't work on this field. Currently it is always empty.
-  @ProtoProperties
-  private List<RelFieldCollation> _collations;
-
-  /**
-   * The set of tables that are scanned in this planFragment.
-   */
-  @ProtoProperties
-  private Set<String> _tableNames;
-
-  public ExchangeNode(int planFragmentId) {
-    super(planFragmentId);
-  }
-
-  public ExchangeNode(int currentStageId, DataSchema dataSchema, PinotRelExchangeType exchangeType,
-      Set<String> tableNames, RelDistribution distribution, List<RelFieldCollation> collations, boolean isSortOnSender,
-      boolean isSortOnReceiver, boolean isPrePartitioned) {
-    super(currentStageId, dataSchema);
+  public ExchangeNode(int stageId, DataSchema dataSchema, List<PlanNode> inputs, PinotRelExchangeType exchangeType,
+      RelDistribution.Type distributionType, @Nullable List<Integer> keys, boolean prePartitioned,
+      @Nullable List<RelFieldCollation> collations, boolean sortOnSender, boolean sortOnReceiver,
+      @Nullable Set<String> tableNames) {
+    super(stageId, dataSchema, null, inputs);
     _exchangeType = exchangeType;
-    _keys = distribution.getKeys();
-    _distributionType = distribution.getType();
-    _isSortOnSender = isSortOnSender;
-    _isSortOnReceiver = isSortOnReceiver;
-    _isPrePartitioned = isPrePartitioned;
-    _collations = collations;
-    _tableNames = tableNames;
-  }
-
-  public ExchangeNode(int currentStageId, DataSchema dataSchema, PinotRelExchangeType exchangeType,
-      Set<String> tableNames, List<Integer> keys, RelDistribution.Type distributionType,
-      List<RelFieldCollation> collations, boolean isSortOnSender, boolean isSortOnReceiver, boolean isPrePartitioned) {
-    super(currentStageId, dataSchema);
-    _exchangeType = exchangeType;
-    _keys = keys;
     _distributionType = distributionType;
-    _isSortOnSender = isSortOnSender;
-    _isSortOnReceiver = isSortOnReceiver;
-    _isPrePartitioned = isPrePartitioned;
+    _keys = keys;
+    _prePartitioned = prePartitioned;
     _collations = collations;
+    _sortOnSender = sortOnSender;
+    _sortOnReceiver = sortOnReceiver;
     _tableNames = tableNames;
+  }
+
+  public PinotRelExchangeType getExchangeType() {
+    return _exchangeType;
+  }
+
+  public RelDistribution.Type getDistributionType() {
+    return _distributionType;
+  }
+
+  @Nullable
+  public List<Integer> getKeys() {
+    return _keys;
+  }
+
+  public boolean isPrePartitioned() {
+    return _prePartitioned;
+  }
+
+  @Nullable
+  public List<RelFieldCollation> getCollations() {
+    return _collations;
+  }
+
+  public boolean isSortOnSender() {
+    return _sortOnSender;
+  }
+
+  public boolean isSortOnReceiver() {
+    return _sortOnReceiver;
+  }
+
+  @Nullable
+  public Set<String> getTableNames() {
+    return _tableNames;
   }
 
   @Override
@@ -103,35 +106,27 @@ public class ExchangeNode extends AbstractPlanNode {
     return visitor.visitExchange(this, context);
   }
 
-  public PinotRelExchangeType getExchangeType() {
-    return _exchangeType;
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (!(o instanceof ExchangeNode)) {
+      return false;
+    }
+    if (!super.equals(o)) {
+      return false;
+    }
+    ExchangeNode that = (ExchangeNode) o;
+    return _sortOnSender == that._sortOnSender && _sortOnReceiver == that._sortOnReceiver
+        && _prePartitioned == that._prePartitioned && _exchangeType == that._exchangeType
+        && _distributionType == that._distributionType && Objects.equals(_keys, that._keys) && Objects.equals(
+        _collations, that._collations) && Objects.equals(_tableNames, that._tableNames);
   }
 
-  public RelDistribution.Type getDistributionType() {
-    return _distributionType;
-  }
-
-  public List<Integer> getDistributionKeys() {
-    return _keys;
-  }
-
-  public boolean isSortOnSender() {
-    return _isSortOnSender;
-  }
-
-  public boolean isSortOnReceiver() {
-    return _isSortOnReceiver;
-  }
-
-  public boolean isPrePartitioned() {
-    return _isPrePartitioned;
-  }
-
-  public List<RelFieldCollation> getCollations() {
-    return _collations;
-  }
-
-  public Set<String> getTableNames() {
-    return _tableNames;
+  @Override
+  public int hashCode() {
+    return Objects.hash(super.hashCode(), _exchangeType, _distributionType, _keys, _sortOnSender, _sortOnReceiver,
+        _prePartitioned, _collations, _tableNames);
   }
 }

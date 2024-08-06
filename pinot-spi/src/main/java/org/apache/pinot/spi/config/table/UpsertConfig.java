@@ -23,7 +23,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
@@ -93,6 +93,9 @@ public class UpsertConfig extends BaseJsonConfig {
 
   @JsonPropertyDescription("Whether to drop out-of-order record")
   private boolean _dropOutOfOrderRecord;
+
+  @JsonPropertyDescription("Whether to pause partial upsert table's partition consumption during commit")
+  private boolean _allowPartialUpsertConsumptionDuringCommit;
 
   public UpsertConfig(Mode mode) {
     _mode = mode;
@@ -273,5 +276,14 @@ public class UpsertConfig extends BaseJsonConfig {
 
   public void setMetadataManagerConfigs(Map<String, String> metadataManagerConfigs) {
     _metadataManagerConfigs = metadataManagerConfigs;
+  }
+
+  public void setAllowPartialUpsertConsumptionDuringCommit(
+      boolean allowPartialUpsertConsumptionDuringCommit) {
+    _allowPartialUpsertConsumptionDuringCommit = allowPartialUpsertConsumptionDuringCommit;
+  }
+
+  public boolean isAllowPartialUpsertConsumptionDuringCommit() {
+    return _allowPartialUpsertConsumptionDuringCommit;
   }
 }

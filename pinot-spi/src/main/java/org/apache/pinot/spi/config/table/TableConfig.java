@@ -390,6 +390,11 @@ public class TableConfig extends BaseJsonConfig {
   }
 
   @JsonIgnore
+  public double getUpsertMetadataTTL() {
+    return _upsertConfig == null ? 0 : _upsertConfig.getMetadataTTL();
+  }
+
+  @JsonIgnore
   @Nullable
   public String getUpsertDeleteRecordColumn() {
     return _upsertConfig == null ? null : _upsertConfig.getDeleteRecordColumn();

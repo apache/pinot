@@ -35,8 +35,12 @@ import org.apache.pinot.core.query.aggregation.function.array.ArrayAggLongFuncti
 import org.apache.pinot.core.query.aggregation.function.array.ArrayAggStringFunction;
 import org.apache.pinot.core.query.aggregation.function.array.ListAggDistinctFunction;
 import org.apache.pinot.core.query.aggregation.function.array.ListAggFunction;
+import org.apache.pinot.core.query.aggregation.function.array.SumArrayDoubleAggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.array.SumArrayLongAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.funnel.FunnelCountAggregationFunctionFactory;
-import org.apache.pinot.core.query.aggregation.function.funnel.FunnelMaxStepAggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.funnel.window.FunnelCompleteCountAggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.funnel.window.FunnelMatchStepAggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.funnel.window.FunnelMaxStepAggregationFunction;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
@@ -267,6 +271,10 @@ public class AggregationFunctionFactory {
             }
             return new ListAggFunction(arguments.get(0), separator, nullHandlingEnabled);
           }
+          case SUMARRAYLONG:
+            return new SumArrayLongAggregationFunction(arguments);
+          case SUMARRAYDOUBLE:
+            return new SumArrayDoubleAggregationFunction(arguments);
           case ARRAYAGG: {
             Preconditions.checkArgument(numArguments >= 2,
                 "ARRAY_AGG expects 2 or 3 arguments, got: %s. The function can be used as "
@@ -439,13 +447,13 @@ public class AggregationFunctionFactory {
             return new SumValuesIntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum);
           case AVGVALUEINTEGERSUMTUPLESKETCH:
             return new AvgValueIntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum);
-          case PARENTEXPRMAX:
+          case PINOTPARENTAGGEXPRMAX:
             return new ParentExprMinMaxAggregationFunction(arguments, true);
-          case PARENTEXPRMIN:
+          case PINOTPARENTAGGEXPRMIN:
             return new ParentExprMinMaxAggregationFunction(arguments, false);
-          case CHILDEXPRMAX:
+          case PINOTCHILDAGGEXPRMAX:
             return new ChildExprMinMaxAggregationFunction(arguments, true);
-          case CHILDEXPRMIN:
+          case PINOTCHILDAGGEXPRMIN:
             return new ChildExprMinMaxAggregationFunction(arguments, false);
           case EXPRMAX:
           case EXPRMIN:
@@ -455,6 +463,10 @@ public class AggregationFunctionFactory {
             return new FunnelCountAggregationFunctionFactory(arguments).get();
           case FUNNELMAXSTEP:
             return new FunnelMaxStepAggregationFunction(arguments);
+          case FUNNELMATCHSTEP:
+            return new FunnelMatchStepAggregationFunction(arguments);
+          case FUNNELCOMPLETECOUNT:
+            return new FunnelCompleteCountAggregationFunction(arguments);
           case FREQUENTSTRINGSSKETCH:
             return new FrequentStringsSketchAggregationFunction(arguments);
           case FREQUENTLONGSSKETCH:

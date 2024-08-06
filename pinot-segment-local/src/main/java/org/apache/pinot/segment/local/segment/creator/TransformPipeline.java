@@ -100,6 +100,9 @@ public class TransformPipeline {
       if (Boolean.TRUE.equals(transformedRow.getValue(GenericRow.INCOMPLETE_RECORD_KEY))) {
         reusedResult.incIncompleteRowCount();
       }
+      if (Boolean.TRUE.equals(transformedRow.getValue(GenericRow.SANITIZED_RECORD_KEY))) {
+        reusedResult.incSanitizedRowCount();
+      }
     } else {
       reusedResult.incSkippedRowCount();
     }
@@ -112,6 +115,7 @@ public class TransformPipeline {
     private final List<GenericRow> _transformedRows = new ArrayList<>();
     private int _skippedRowCount = 0;
     private int _incompleteRowCount = 0;
+    private int _sanitizedRowCount = 0;
 
     public List<GenericRow> getTransformedRows() {
       return _transformedRows;
@@ -135,6 +139,14 @@ public class TransformPipeline {
 
     public void incIncompleteRowCount() {
       _incompleteRowCount++;
+    }
+
+    public void incSanitizedRowCount() {
+      _sanitizedRowCount++;
+    }
+
+    public int getSanitizedRowCount() {
+      return _sanitizedRowCount;
     }
 
     public void reset() {

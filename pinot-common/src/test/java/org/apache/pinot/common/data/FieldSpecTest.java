@@ -312,10 +312,11 @@ public class FieldSpecTest {
     // Multi-value dimension field with default null value.
     dimensionFields = new String[]{
         "\"name\":\"dimension\"", "\"dataType\":\"STRING\"", "\"singleValueField\":false",
-        "\"defaultNullValue\":\"default\""
+        "\"defaultNullValue\":\"default\", \"maxLengthExceedStrategy\": \"TRIM_LENGTH\""
     };
     dimensionFieldSpec1 = JsonUtils.stringToObject(getRandomOrderJsonString(dimensionFields), DimensionFieldSpec.class);
     dimensionFieldSpec2 = new DimensionFieldSpec("dimension", STRING, false, "default");
+    dimensionFieldSpec2.setMaxLengthExceedStrategy(FieldSpec.MaxLengthExceedStrategy.TRIM_LENGTH);
     Assert.assertEquals(dimensionFieldSpec1, dimensionFieldSpec2, ERROR_MESSAGE);
     Assert.assertEquals(dimensionFieldSpec1.getDefaultNullValue(), "default", ERROR_MESSAGE);
 

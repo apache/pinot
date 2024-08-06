@@ -20,7 +20,6 @@ package org.apache.pinot.query.catalog;
 
 import com.google.common.base.Preconditions;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Set;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
@@ -32,7 +31,6 @@ import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.schema.SchemaVersion;
 import org.apache.calcite.schema.Schemas;
 import org.apache.calcite.schema.Table;
-import org.apache.pinot.calcite.jdbc.CalciteSchemaBuilder;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -87,8 +85,7 @@ public class PinotCatalog implements Schema {
    */
   @Override
   public Set<String> getTableNames() {
-    return _tableCache.getTableNameMap().keySet().stream()
-        .filter(n -> DatabaseUtils.isPartOfDatabase(n, _databaseName))
+    return _tableCache.getTableNameMap().keySet().stream().filter(n -> DatabaseUtils.isPartOfDatabase(n, _databaseName))
         .collect(Collectors.toSet());
   }
 
@@ -99,25 +96,17 @@ public class PinotCatalog implements Schema {
 
   @Override
   public Set<String> getTypeNames() {
-    return Collections.emptySet();
+    return Set.of();
   }
 
-  /**
-   * {@code PinotCatalog} doesn't need to return function collections b/c they are already registered.
-   * see: {@link CalciteSchemaBuilder#asRootSchema(Schema, String)}
-   */
   @Override
   public Collection<Function> getFunctions(String name) {
-    return Collections.emptyList();
+    return Set.of();
   }
 
-  /**
-   * {@code PinotCatalog} doesn't need to return function name set b/c they are already registered.
-   * see: {@link CalciteSchemaBuilder#asRootSchema(Schema, String)}
-   */
   @Override
   public Set<String> getFunctionNames() {
-    return Collections.emptySet();
+    return Set.of();
   }
 
   @Override
@@ -127,7 +116,7 @@ public class PinotCatalog implements Schema {
 
   @Override
   public Set<String> getSubSchemaNames() {
-    return Collections.emptySet();
+    return Set.of();
   }
 
   @Override

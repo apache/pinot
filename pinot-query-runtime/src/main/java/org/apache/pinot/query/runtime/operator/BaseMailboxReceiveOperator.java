@@ -19,15 +19,15 @@
 package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.base.Preconditions;
-import java.util.Collections;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
 import org.apache.pinot.query.planner.physical.MailboxIdUtils;
+import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.routing.MailboxInfos;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.operator.utils.AsyncStream;
@@ -46,34 +46,43 @@ import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
  */
 public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
   protected final MailboxService _mailboxService;
-  protected final RelDistribution.Type _exchangeType;
+  protected final RelDistribution.Type _distributionType;
   protected final List<String> _mailboxIds;
   protected final BlockingMultiStreamConsumer.OfTransferableBlock _multiConsumer;
   protected final List<StatMap<ReceivingMailbox.StatKey>> _receivingStats;
   protected final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
 
-  public BaseMailboxReceiveOperator(OpChainExecutionContext context, RelDistribution.Type exchangeType,
-      int senderStageId) {
+  public BaseMailboxReceiveOperator(OpChainExecutionContext context, MailboxReceiveNode node) {
     super(context);
     _mailboxService = context.getMailboxService();
-    Preconditions.checkState(MailboxSendOperator.SUPPORTED_EXCHANGE_TYPES.contains(exchangeType),
-        "Unsupported exchange type: %s", exchangeType);
-    _exchangeType = exchangeType;
+    RelDistribution.Type distributionType = node.getDistributionType();
+    Preconditions.checkState(MailboxSendOperator.SUPPORTED_EXCHANGE_TYPES.contains(distributionType),
+        "Unsupported exchange type: %s", distributionType);
+    _distributionType = distributionType;
 
     long requestId = context.getRequestId();
+    int senderStageId = node.getSenderStageId();
     MailboxInfos mailboxInfos = context.getWorkerMetadata().getMailboxInfosMap().get(senderStageId);
     if (mailboxInfos != null) {
       _mailboxIds =
           MailboxIdUtils.toMailboxIds(requestId, senderStageId, mailboxInfos.getMailboxInfos(), context.getStageId(),
               context.getWorkerId());
+      int numMailboxes = _mailboxIds.size();
+      List<ReadMailboxAsyncStream> asyncStreams = new ArrayList<>(numMailboxes);
+      _receivingStats = new ArrayList<>(numMailboxes);
+      for (String mailboxId : _mailboxIds) {
+        ReadMailboxAsyncStream asyncStream =
+            new ReadMailboxAsyncStream(_mailboxService.getReceivingMailbox(mailboxId), this);
+        asyncStreams.add(asyncStream);
+        _receivingStats.add(asyncStream._mailbox.getStatMap());
+      }
+      _multiConsumer = new BlockingMultiStreamConsumer.OfTransferableBlock(context, asyncStreams);
     } else {
-      _mailboxIds = Collections.emptyList();
+      // TODO: Revisit if we should throw exception here.
+      _mailboxIds = List.of();
+      _receivingStats = List.of();
+      _multiConsumer = new BlockingMultiStreamConsumer.OfTransferableBlock(context, List.of());
     }
-    List<ReadMailboxAsyncStream> asyncStreams = _mailboxIds.stream()
-        .map(mailboxId -> new ReadMailboxAsyncStream(_mailboxService.getReceivingMailbox(mailboxId), this))
-        .collect(Collectors.toList());
-    _receivingStats = asyncStreams.stream().map(stream -> stream._mailbox.getStatMap()).collect(Collectors.toList());
-    _multiConsumer = new BlockingMultiStreamConsumer.OfTransferableBlock(context, asyncStreams);
     _statMap.merge(StatKey.FAN_IN, _mailboxIds.size());
   }
 
@@ -90,7 +99,7 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
 
   @Override
   public List<MultiStageOperator> getChildOperators() {
-    return Collections.emptyList();
+    return List.of();
   }
 
   @Override
@@ -129,10 +138,10 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
   }
 
   private static class ReadMailboxAsyncStream implements AsyncStream<TransferableBlock> {
-    private final ReceivingMailbox _mailbox;
-    private final BaseMailboxReceiveOperator _operator;
+    final ReceivingMailbox _mailbox;
+    final BaseMailboxReceiveOperator _operator;
 
-    public ReadMailboxAsyncStream(ReceivingMailbox mailbox, BaseMailboxReceiveOperator operator) {
+    ReadMailboxAsyncStream(ReceivingMailbox mailbox, BaseMailboxReceiveOperator operator) {
       _mailbox = mailbox;
       _operator = operator;
     }
@@ -169,6 +178,7 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
   }
 
   public enum StatKey implements StatMap.Key {
+    //@formatter:off
     EXECUTION_TIME_MS(StatMap.Type.LONG) {
       @Override
       public boolean includeDefaultInJson() {
@@ -222,6 +232,7 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
      * How long (in CPU time) it took to wait for the messages to be offered to downstream operator.
      */
     UPSTREAM_WAIT_MS(StatMap.Type.LONG);
+    //@formatter:on
 
     private final StatMap.Type _type;
 
