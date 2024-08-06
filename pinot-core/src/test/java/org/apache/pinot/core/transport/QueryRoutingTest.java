@@ -20,7 +20,6 @@ package org.apache.pinot.core.transport;
 
 import com.google.common.util.concurrent.Futures;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -173,11 +172,11 @@ public class QueryRoutingTest {
     // OFFLINE only
     AsyncQueryResponse asyncQueryResponse =
         _queryRouter.submitQuery(requestId, "testTable", OFFLINE_ROUTING_TABLE, 600_000L);
-    Map<ServerRoutingInstance, Map<Integer, ServerResponse>> response = asyncQueryResponse.getFinalResponses();
+    Map<ServerRoutingInstance, List<ServerResponse>> response = asyncQueryResponse.getFinalResponses();
     assertEquals(response.size(), 1);
     assertTrue(response.containsKey(SERVER_ROUTING_INSTANCE));
     assertEquals(response.get(SERVER_ROUTING_INSTANCE).size(), 1);
-    ServerResponse serverResponse = new ArrayList<>(response.get(SERVER_ROUTING_INSTANCE).values()).get(0);
+    ServerResponse serverResponse = response.get(SERVER_ROUTING_INSTANCE).get(0);
     assertNotNull(serverResponse.getDataTable());
     assertEquals(serverResponse.getResponseSize(), offlineResponseBytes.length);
     // 2 requests - query submit and query response.
@@ -191,7 +190,7 @@ public class QueryRoutingTest {
     assertEquals(response.size(), 1);
     assertTrue(response.containsKey(SERVER_ROUTING_INSTANCE));
     assertEquals(response.get(SERVER_ROUTING_INSTANCE).size(), 1);
-    serverResponse = new ArrayList<>(response.get(SERVER_ROUTING_INSTANCE).values()).get(0);
+    serverResponse = response.get(SERVER_ROUTING_INSTANCE).get(0);
     assertNotNull(serverResponse.getDataTable());
     assertEquals(serverResponse.getResponseSize(), realtimeResponseBytes.length);
     _requestCount += 2;
@@ -206,7 +205,7 @@ public class QueryRoutingTest {
     assertEquals(response.get(SERVER_ROUTING_INSTANCE).size(), 2);
 
     int accountedFor = 0;
-    for (ServerResponse serverResponse1 : response.get(SERVER_ROUTING_INSTANCE).values()) {
+    for (ServerResponse serverResponse1 : response.get(SERVER_ROUTING_INSTANCE)) {
       assertNotNull(serverResponse1.getDataTable());
       if (serverResponse1.getDataTable().getMetadata().get(MetadataKey.QUERY_HASH.getName())
           .equals(offlineDataTable.getMetadata().get(MetadataKey.QUERY_HASH.getName()))) {
@@ -240,11 +239,11 @@ public class QueryRoutingTest {
     long startTimeMs = System.currentTimeMillis();
     AsyncQueryResponse asyncQueryResponse =
         _queryRouter.submitQuery(requestId, "testTable", OFFLINE_ROUTING_TABLE, 1_000L);
-    Map<ServerRoutingInstance, Map<Integer, ServerResponse>> response = asyncQueryResponse.getFinalResponses();
+    Map<ServerRoutingInstance, List<ServerResponse>> response = asyncQueryResponse.getFinalResponses();
     assertEquals(response.size(), 1);
     assertTrue(response.containsKey(SERVER_ROUTING_INSTANCE));
     assertEquals(response.get(SERVER_ROUTING_INSTANCE).size(), 1);
-    ServerResponse serverResponse = new ArrayList<>(response.get(SERVER_ROUTING_INSTANCE).values()).get(0);
+    ServerResponse serverResponse = response.get(SERVER_ROUTING_INSTANCE).get(0);
     assertNull(serverResponse.getDataTable());
     assertEquals(serverResponse.getResponseDelayMs(), -1);
     assertEquals(serverResponse.getResponseSize(), 0);
@@ -281,11 +280,11 @@ public class QueryRoutingTest {
     long startTimeMs = System.currentTimeMillis();
     AsyncQueryResponse asyncQueryResponse =
         _queryRouter.submitQuery(requestId + 1, "testTable", OFFLINE_ROUTING_TABLE, 1_000L);
-    Map<ServerRoutingInstance, Map<Integer, ServerResponse>> response = asyncQueryResponse.getFinalResponses();
+    Map<ServerRoutingInstance, List<ServerResponse>> response = asyncQueryResponse.getFinalResponses();
     assertEquals(response.size(), 1);
     assertTrue(response.containsKey(SERVER_ROUTING_INSTANCE));
     assertEquals(response.get(SERVER_ROUTING_INSTANCE).size(), 1);
-    ServerResponse serverResponse = new ArrayList<>(response.get(SERVER_ROUTING_INSTANCE).values()).get(0);
+    ServerResponse serverResponse = response.get(SERVER_ROUTING_INSTANCE).get(0);
     assertNull(serverResponse.getDataTable());
     assertEquals(serverResponse.getResponseDelayMs(), -1);
     assertEquals(serverResponse.getResponseSize(), 0);
@@ -330,11 +329,11 @@ public class QueryRoutingTest {
     // Shut down the server before getting the response
     queryServer.shutDown();
 
-    Map<ServerRoutingInstance, Map<Integer, ServerResponse>> response = asyncQueryResponse.getFinalResponses();
+    Map<ServerRoutingInstance, List<ServerResponse>> response = asyncQueryResponse.getFinalResponses();
     assertEquals(response.size(), 1);
     assertTrue(response.containsKey(SERVER_ROUTING_INSTANCE));
     assertEquals(response.get(SERVER_ROUTING_INSTANCE).size(), 1);
-    ServerResponse serverResponse = new ArrayList<>(response.get(SERVER_ROUTING_INSTANCE).values()).get(0);
+    ServerResponse serverResponse = response.get(SERVER_ROUTING_INSTANCE).get(0);
     assertNull(serverResponse.getDataTable());
     assertEquals(serverResponse.getResponseDelayMs(), -1);
     assertEquals(serverResponse.getResponseSize(), 0);
@@ -352,7 +351,7 @@ public class QueryRoutingTest {
     assertEquals(response.size(), 1);
     assertTrue(response.containsKey(SERVER_ROUTING_INSTANCE));
     assertEquals(response.get(SERVER_ROUTING_INSTANCE).size(), 1);
-    serverResponse = new ArrayList<>(response.get(SERVER_ROUTING_INSTANCE).values()).get(0);
+    serverResponse = response.get(SERVER_ROUTING_INSTANCE).get(0);
     assertNull(serverResponse.getDataTable());
     assertEquals(serverResponse.getSubmitDelayMs(), -1);
     assertEquals(serverResponse.getResponseDelayMs(), -1);
@@ -413,13 +412,13 @@ public class QueryRoutingTest {
     // Submit the query with skipUnavailableServers=true, the single started server should return a valid response
     long startTime = System.currentTimeMillis();
     AsyncQueryResponse asyncQueryResponse = _queryRouter.submitQuery(requestId, "testTable", routingTable, 10_000L);
-    Map<ServerRoutingInstance, Map<Integer, ServerResponse>> response = asyncQueryResponse.getFinalResponses();
+    Map<ServerRoutingInstance, List<ServerResponse>> response = asyncQueryResponse.getFinalResponses();
     assertEquals(response.size(), 2);
     assertTrue(response.containsKey(serverRoutingInstance1));
     assertTrue(response.containsKey(serverRoutingInstance2));
 
-    ServerResponse serverResponse1 = new ArrayList<>(response.get(serverRoutingInstance1).values()).get(0);
-    ServerResponse serverResponse2 = new ArrayList<>(response.get(serverRoutingInstance2).values()).get(0);
+    ServerResponse serverResponse1 = response.get(serverRoutingInstance1).get(0);
+    ServerResponse serverResponse2 = response.get(serverRoutingInstance2).get(0);
     assertNotNull(serverResponse1.getDataTable());
     assertNull(serverResponse2.getDataTable());
     assertTrue(serverResponse1.getResponseDelayMs() > 500);   // > response delay set by getQueryServer
@@ -458,8 +457,8 @@ public class QueryRoutingTest {
     assertTrue(response.containsKey(serverRoutingInstance1));
     assertTrue(response.containsKey(serverRoutingInstance2));
 
-    serverResponse1 = new ArrayList<>(response.get(serverRoutingInstance1).values()).get(0);
-    serverResponse2 = new ArrayList<>(response.get(serverRoutingInstance2).values()).get(0);
+    serverResponse1 = response.get(serverRoutingInstance1).get(0);
+    serverResponse2 = response.get(serverRoutingInstance2).get(0);
     assertNull(serverResponse1.getDataTable());
     assertNull(serverResponse2.getDataTable());
     assertTrue(serverResponse1.getResponseDelayMs() < 100);

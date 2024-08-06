@@ -112,7 +112,7 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
     AsyncQueryResponse asyncQueryResponse =
         _queryRouter.submitQuery(requestId, rawTableName, queryRoutingTable, timeoutMs);
     _failureDetector.notifyQuerySubmitted(asyncQueryResponse);
-    Map<ServerRoutingInstance, Map<Integer, ServerResponse>> finalResponses = asyncQueryResponse.getFinalResponses();
+    Map<ServerRoutingInstance, List<ServerResponse>> finalResponses = asyncQueryResponse.getFinalResponses();
     if (asyncQueryResponse.getStatus() == QueryResponse.Status.TIMED_OUT) {
       _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_TIMEOUTS, 1);
     }
@@ -126,9 +126,8 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
     long totalResponseSize = 0;
     Map<ServerRoutingInstance, Collection<DataTable>> dataTableMap = Maps.newHashMapWithExpectedSize(numServersQueried);
     List<ServerRoutingInstance> serversNotResponded = new ArrayList<>();
-    for (Map.Entry<ServerRoutingInstance, Map<Integer, ServerResponse>> serverResponses : finalResponses.entrySet()) {
-      for (Map.Entry<Integer, ServerResponse> responsePair : serverResponses.getValue().entrySet()) {
-        ServerResponse response = responsePair.getValue();
+    for (Map.Entry<ServerRoutingInstance, List<ServerResponse>> serverResponses : finalResponses.entrySet()) {
+      for (ServerResponse response : serverResponses.getValue()) {
         DataTable dataTable = response.getDataTable();
         if (dataTable != null) {
           dataTableMap.computeIfAbsent(serverResponses.getKey(), k -> new ArrayList<>()).add(dataTable);

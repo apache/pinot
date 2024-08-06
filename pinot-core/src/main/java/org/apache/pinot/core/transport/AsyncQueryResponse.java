@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.transport;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -90,25 +91,37 @@ public class AsyncQueryResponse implements QueryResponse {
     return _numServersResponded.get();
   }
 
-  @Override
-  public Map<ServerRoutingInstance, Map<Integer, ServerResponse>> getCurrentResponses() {
-    return _responses;
+  private Map<ServerRoutingInstance, List<ServerResponse>> getFlatResponses() {
+    Map<ServerRoutingInstance, List<ServerResponse>> flattened = new HashMap<>();
+    for (Map.Entry<ServerRoutingInstance, Map<Integer, ServerResponse>> serverResponses : _responses.entrySet()) {
+      ServerRoutingInstance serverRoutingInstance = serverResponses.getKey();
+
+      for (ServerResponse serverResponse : serverResponses.getValue().values()) {
+        flattened.computeIfAbsent(serverRoutingInstance, k -> new ArrayList<>()).add(serverResponse);
+      }
+    }
+
+    return flattened;
   }
 
   @Override
-  public Map<ServerRoutingInstance, Map<Integer, ServerResponse>> getFinalResponses()
+  public Map<ServerRoutingInstance, List<ServerResponse>> getCurrentResponses() {
+    return getFlatResponses();
+  }
+
+  @Override
+  public Map<ServerRoutingInstance, List<ServerResponse>> getFinalResponses()
       throws InterruptedException {
+    Map<ServerRoutingInstance, List<ServerResponse>> flatResponses = getFlatResponses();
     try {
       boolean finish = _countDownLatch.await(_maxEndTimeMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
       _status.compareAndSet(Status.IN_PROGRESS, finish ? Status.COMPLETED : Status.TIMED_OUT);
-      return _responses;
+      return flatResponses;
     } finally {
       // Update ServerRoutingStats for query completion. This is done here to ensure that the stats are updated for
       // servers even if the query times out or if servers have not responded.
-      for (Map.Entry<ServerRoutingInstance, Map<Integer, ServerResponse>> serverResponses : _responses.entrySet()) {
-        for (Map.Entry<Integer, ServerResponse> responsePair : serverResponses.getValue().entrySet()) {
-          ServerResponse response = responsePair.getValue();
-
+      for (Map.Entry<ServerRoutingInstance, List<ServerResponse>> serverResponses : flatResponses.entrySet()) {
+        for (ServerResponse response : serverResponses.getValue()) {
           // ServerResponse returns -1 if responseDelayMs is not set. This indicates that a response was not received
           // from the server. Hence we set the latency to the timeout value.
           long latency =
