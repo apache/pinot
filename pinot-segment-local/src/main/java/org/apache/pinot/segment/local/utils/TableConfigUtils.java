@@ -34,8 +34,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.collections.MapUtils;
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
@@ -745,11 +745,11 @@ public final class TableConfigUtils {
           if (taskTypeConfig.containsKey("bufferTimePeriod")) {
             TimeUtils.convertPeriodToMillis(taskTypeConfig.get("bufferTimePeriod"));
           }
-          // check maxNumRecordsPerSegment
+          // check invalidRecordsThresholdPercent
           if (taskTypeConfig.containsKey("invalidRecordsThresholdPercent")) {
-            Preconditions.checkState(Double.parseDouble(taskTypeConfig.get("invalidRecordsThresholdPercent")) > 0
+            Preconditions.checkState(Double.parseDouble(taskTypeConfig.get("invalidRecordsThresholdPercent")) >= 0
                     && Double.parseDouble(taskTypeConfig.get("invalidRecordsThresholdPercent")) <= 100,
-                "invalidRecordsThresholdPercent must be > 0 and <= 100");
+                "invalidRecordsThresholdPercent must be >= 0 and <= 100");
           }
           // check invalidRecordsThresholdCount
           if (taskTypeConfig.containsKey("invalidRecordsThresholdCount")) {

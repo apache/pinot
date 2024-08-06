@@ -50,8 +50,9 @@ public class BalancedInstanceSelector extends BaseInstanceSelector {
 
   public BalancedInstanceSelector(String tableNameWithType, ZkHelixPropertyStore<ZNRecord> propertyStore,
       BrokerMetrics brokerMetrics, @Nullable AdaptiveServerSelector adaptiveServerSelector, Clock clock,
-      boolean useFixedReplica) {
-    super(tableNameWithType, propertyStore, brokerMetrics, adaptiveServerSelector, clock, useFixedReplica);
+      boolean useFixedReplica, long newSegmentExpirationTimeInSeconds) {
+    super(tableNameWithType, propertyStore, brokerMetrics, adaptiveServerSelector, clock, useFixedReplica,
+        newSegmentExpirationTimeInSeconds);
   }
 
   @Override

@@ -105,7 +105,7 @@
           "\n  PinotLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      PinotLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)])",
-          "\n        LogicalProject(EXPR$1=[ARRAYTOMV($6)], col3=[$2])",
+          "\n        LogicalProject(EXPR$1=[ARRAY_TO_MV($6)], col3=[$2])",
           "\n          LogicalTableScan(table=[[default, e]])",
           "\n"
         ]

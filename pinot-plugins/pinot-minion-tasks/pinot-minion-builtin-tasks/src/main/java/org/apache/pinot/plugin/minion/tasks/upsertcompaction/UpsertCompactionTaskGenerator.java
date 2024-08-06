@@ -57,7 +57,7 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
   private static final Logger LOGGER = LoggerFactory.getLogger(UpsertCompactionTaskGenerator.class);
   private static final String DEFAULT_BUFFER_PERIOD = "7d";
   private static final double DEFAULT_INVALID_RECORDS_THRESHOLD_PERCENT = 0.0;
-  private static final long DEFAULT_INVALID_RECORDS_THRESHOLD_COUNT = 0;
+  private static final long DEFAULT_INVALID_RECORDS_THRESHOLD_COUNT = 1;
   private static final int DEFAULT_NUM_SEGMENTS_BATCH_PER_SERVER_REQUEST = 500;
 
   public static class SegmentSelectionResult {
@@ -165,8 +165,8 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
                 validDocIdsType));
       }
 
-      List<ValidDocIdsMetadataInfo> validDocIdsMetadataList =
-          serverSegmentMetadataReader.getValidDocIdsMetadataFromServer(tableNameWithType, serverToSegments,
+      Map<String, List<ValidDocIdsMetadataInfo>> validDocIdsMetadataList =
+          serverSegmentMetadataReader.getSegmentToValidDocIdsMetadataFromServer(tableNameWithType, serverToSegments,
               serverToEndpoints, null, 60_000, validDocIdsType.toString(), numSegmentsBatchPerServerRequest);
 
       Map<String, SegmentZKMetadata> completedSegmentsMap =
@@ -209,7 +209,8 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
 
   @VisibleForTesting
   public static SegmentSelectionResult processValidDocIdsMetadata(Map<String, String> taskConfigs,
-      Map<String, SegmentZKMetadata> completedSegmentsMap, List<ValidDocIdsMetadataInfo> validDocIdsMetadataInfoList) {
+      Map<String, SegmentZKMetadata> completedSegmentsMap,
+      Map<String, List<ValidDocIdsMetadataInfo>> validDocIdsMetadataInfoMap) {
     double invalidRecordsThresholdPercent = Double.parseDouble(
         taskConfigs.getOrDefault(UpsertCompactionTask.INVALID_RECORDS_THRESHOLD_PERCENT,
             String.valueOf(DEFAULT_INVALID_RECORDS_THRESHOLD_PERCENT)));
@@ -218,30 +219,31 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
             String.valueOf(DEFAULT_INVALID_RECORDS_THRESHOLD_COUNT)));
     List<Pair<SegmentZKMetadata, Long>> segmentsForCompaction = new ArrayList<>();
     List<String> segmentsForDeletion = new ArrayList<>();
-    for (ValidDocIdsMetadataInfo validDocIdsMetadata : validDocIdsMetadataInfoList) {
-      long totalInvalidDocs = validDocIdsMetadata.getTotalInvalidDocs();
-      String segmentName = validDocIdsMetadata.getSegmentName();
-
-      // Skip segments if the crc from zk metadata and server does not match. They may be being reloaded.
-      SegmentZKMetadata segment = completedSegmentsMap.get(segmentName);
-      if (segment == null) {
+    for (String segmentName : validDocIdsMetadataInfoMap.keySet()) {
+      // check if segment is part of completed segments
+      if (!completedSegmentsMap.containsKey(segmentName)) {
         LOGGER.warn("Segment {} is not found in the completed segments list, skipping it for compaction", segmentName);
         continue;
       }
+      SegmentZKMetadata segment = completedSegmentsMap.get(segmentName);
+      for (ValidDocIdsMetadataInfo validDocIdsMetadata : validDocIdsMetadataInfoMap.get(segmentName)) {
+        long totalInvalidDocs = validDocIdsMetadata.getTotalInvalidDocs();
 
-      if (segment.getCrc() != Long.parseLong(validDocIdsMetadata.getSegmentCrc())) {
-        LOGGER.warn(
-            "CRC mismatch for segment: {}, skipping it for compaction (segmentZKMetadata={}, validDocIdsMetadata={})",
-            segmentName, segment.getCrc(), validDocIdsMetadata.getSegmentCrc());
-        continue;
-      }
-      long totalDocs = validDocIdsMetadata.getTotalDocs();
-      double invalidRecordPercent = ((double) totalInvalidDocs / totalDocs) * 100;
-      if (totalInvalidDocs == totalDocs) {
-        segmentsForDeletion.add(segment.getSegmentName());
-      } else if (invalidRecordPercent > invalidRecordsThresholdPercent
-          && totalInvalidDocs > invalidRecordsThresholdCount) {
-        segmentsForCompaction.add(Pair.of(segment, totalInvalidDocs));
+        // Skip segments if the crc from zk metadata and server does not match. They may be being reloaded.
+        if (segment.getCrc() != Long.parseLong(validDocIdsMetadata.getSegmentCrc())) {
+          LOGGER.warn("CRC mismatch for segment: {}, (segmentZKMetadata={}, validDocIdsMetadata={})", segmentName,
+              segment.getCrc(), validDocIdsMetadata.getSegmentCrc());
+          continue;
+        }
+        long totalDocs = validDocIdsMetadata.getTotalDocs();
+        double invalidRecordPercent = ((double) totalInvalidDocs / totalDocs) * 100;
+        if (totalInvalidDocs == totalDocs) {
+          segmentsForDeletion.add(segment.getSegmentName());
+        } else if (invalidRecordPercent >= invalidRecordsThresholdPercent
+            && totalInvalidDocs >= invalidRecordsThresholdCount) {
+          segmentsForCompaction.add(Pair.of(segment, totalInvalidDocs));
+        }
+        break;
       }
     }
     segmentsForCompaction.sort((o1, o2) -> {
@@ -254,8 +256,7 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
     });
 
     return new SegmentSelectionResult(
-        segmentsForCompaction.stream().map(Map.Entry::getKey).collect(Collectors.toList()),
-        segmentsForDeletion);
+        segmentsForCompaction.stream().map(Map.Entry::getKey).collect(Collectors.toList()), segmentsForDeletion);
   }
 
   @VisibleForTesting

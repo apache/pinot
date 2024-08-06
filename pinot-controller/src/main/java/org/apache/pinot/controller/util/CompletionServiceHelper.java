@@ -28,8 +28,8 @@ import java.util.concurrent.CompletionService;
 import java.util.concurrent.Executor;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.http.conn.HttpClientConnectionManager;
-import org.apache.http.util.EntityUtils;
+import org.apache.hc.client5.http.io.HttpClientConnectionManager;
+import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.pinot.common.http.MultiHttpRequest;
 import org.apache.pinot.common.http.MultiHttpRequestResponse;
 import org.slf4j.Logger;
@@ -126,9 +126,9 @@ public class CompletionServiceHelper {
         URI uri = multiHttpRequestResponse.getURI();
         String instance =
             _endpointsToServers.get(String.format("%s://%s:%d", uri.getScheme(), uri.getHost(), uri.getPort()));
-        int statusCode = multiHttpRequestResponse.getResponse().getStatusLine().getStatusCode();
+        int statusCode = multiHttpRequestResponse.getResponse().getCode();
         if (statusCode >= 300) {
-          String reason = multiHttpRequestResponse.getResponse().getStatusLine().getReasonPhrase();
+          String reason = multiHttpRequestResponse.getResponse().getReasonPhrase();
           LOGGER.error("Server: {} returned error: {}, reason: {} for uri: {}", instance, statusCode, reason, uri);
           completionServiceResponse._failedResponseCount++;
           continue;

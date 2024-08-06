@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.spi.memory;
 
+import net.openhft.chronicle.core.Jvm;
 import org.apache.pinot.segment.spi.utils.JavaVersion;
 import org.testng.SkipException;
 import org.testng.annotations.BeforeClass;
@@ -35,6 +36,10 @@ public class PinotLArrayByteBufferTest extends PinotDataBufferTest {
 
   @BeforeClass
   public void abortOnModernJava() {
+    //larray isn't supported on Mac/aarch64
+    if (Jvm.isMacArm()) {
+      throw new SkipException("Skipping LArray tests because they cannot run on Mac/aarch64");
+    }
     if (JavaVersion.VERSION > 15) {
       throw new SkipException("Skipping LArray tests because they cannot run in Java " + JavaVersion.VERSION);
     }

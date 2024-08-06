@@ -694,6 +694,37 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   }
 
   @Test
+  public void testVariadicFunction() throws Exception {
+    String sqlQuery = "SELECT ARRAY_TO_MV(VALUE_IN(RandomAirports, 'MFR', 'SUN', 'GTR')) as airport, count(*) "
+        + "FROM mytable WHERE ARRAY_TO_MV(RandomAirports) IN ('MFR', 'SUN', 'GTR') GROUP BY airport";
+    JsonNode jsonNode = postQuery(sqlQuery);
+    assertNoError(jsonNode);
+    assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "STRING");
+    assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").get(1).asText(), "LONG");
+    assertEquals(jsonNode.get("numRowsResultSet").asInt(), 3);
+  }
+
+  @Test
+  public void skipArrayToMvOptimization()
+      throws Exception {
+    String sqlQuery = "SELECT 1 "
+        + "FROM mytable "
+        + "WHERE ARRAY_TO_MV(RandomAirports) = 'MFR' and ARRAY_TO_MV(RandomAirports) = 'GTR'";
+
+    JsonNode jsonNode = postQuery("Explain plan for " + sqlQuery);
+    JsonNode plan = jsonNode.get("resultTable").get("rows").get(0).get(1);
+
+    Pattern pattern = Pattern.compile("LogicalValues\\(tuples=\\[\\[]]\\)");
+    String planAsText = plan.asText();
+    boolean matches = pattern.matcher(planAsText).find();
+    Assert.assertFalse(matches, "Plan should not contain contain LogicalValues node but plan is \n"
+        + planAsText);
+
+    jsonNode = postQuery(sqlQuery);
+    Assert.assertNotEquals(jsonNode.get("resultTable").get("rows").size(), 0);
+  }
+
+  @Test
   public void testMultiValueColumnGroupByOrderBy()
       throws Exception {
     String pinotQuery =
@@ -791,6 +822,14 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
 
     jsonNode = postQuery(sqlQuery);
     assertNoError(jsonNode);
+  }
+
+  @Test
+  public void testMVNumericCastInFilter() throws Exception {
+    String sqlQuery = "SELECT COUNT(*) FROM mytable WHERE arrayToMV(CAST(DivAirportIDs AS BIGINT ARRAY)) > 0";
+    JsonNode jsonNode = postQuery(sqlQuery);
+    assertNoError(jsonNode);
+    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asInt(), 15482);
   }
 
   @Override

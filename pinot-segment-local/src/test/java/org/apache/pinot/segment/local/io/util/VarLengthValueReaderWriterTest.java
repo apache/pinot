@@ -21,7 +21,7 @@ package org.apache.pinot.segment.local.io.util;
 import java.io.File;
 import java.io.IOException;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang.RandomStringUtils;
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;

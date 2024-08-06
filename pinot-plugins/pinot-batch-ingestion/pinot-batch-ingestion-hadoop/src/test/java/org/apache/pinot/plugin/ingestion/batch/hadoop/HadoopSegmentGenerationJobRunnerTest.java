@@ -27,7 +27,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang.WordUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.plugin.inputformat.csv.CSVRecordReader;
 import org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -96,7 +96,7 @@ public class HadoopSegmentGenerationJobRunnerTest {
     File pluginsDir = new File(testDir, "plugins");
     File myPluginDir = new File(pluginsDir, "my-plugin");
     myPluginDir.mkdirs();
-    File pluginJar = new File(WordUtils.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+    File pluginJar = new File(StringUtils.class.getProtectionDomain().getCodeSource().getLocation().toURI());
     FileUtils.copyFile(pluginJar, new File(myPluginDir, pluginJar.getName()));
 
     // Set up dependency jars dir.

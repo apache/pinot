@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.realtime.converter;
 
-import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import java.io.File;
@@ -33,14 +32,17 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentConfig;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentStatsHistory;
+import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneIndexRefreshManager;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndexSearcherPool;
 import org.apache.pinot.segment.local.segment.index.column.PhysicalColumnIndexContainer;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
 import org.apache.pinot.segment.local.segment.store.SegmentLocalFSDirectory;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProviderFactory;
 import org.apache.pinot.segment.spi.ColumnMetadata;
@@ -65,9 +67,11 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.mock;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
@@ -88,8 +92,9 @@ public class RealtimeSegmentConverterTest {
   private static final File TMP_DIR =
       new File(FileUtils.getTempDirectory(), RealtimeSegmentConverterTest.class.getName());
 
+  @BeforeClass
   public void setup() {
-    Preconditions.checkState(TMP_DIR.mkdirs());
+    ServerMetrics.register(mock(ServerMetrics.class));
   }
 
   @Test
@@ -444,17 +449,21 @@ public class RealtimeSegmentConverterTest {
   @DataProvider
   public static Object[][] reuseParams() {
     List<Boolean> enabledColumnMajorSegmentBuildParams = Arrays.asList(false, true);
-    String[] sortedColumnParams = new String[]{null, STRING_COLUMN1};
+    List<String> sortedColumnParams = Arrays.asList(null, STRING_COLUMN1);
+    List<Boolean> reuseMutableIndex = Arrays.asList(true, false);
+    List<Integer> luceneNRTCachingDirectoryMaxBufferSizeMB = Arrays.asList(0, 5);
 
-    return enabledColumnMajorSegmentBuildParams.stream().flatMap(
-            columnMajor -> Arrays.stream(sortedColumnParams).map(sortedColumn -> new Object[]{columnMajor,
-                sortedColumn}))
+    return enabledColumnMajorSegmentBuildParams.stream().flatMap(columnMajor -> sortedColumnParams.stream().flatMap(
+            sortedColumn -> reuseMutableIndex.stream().flatMap(
+                reuseIndex -> luceneNRTCachingDirectoryMaxBufferSizeMB.stream()
+                    .map(cacheSize -> new Object[]{columnMajor, sortedColumn, reuseIndex, cacheSize}))))
         .toArray(Object[][]::new);
   }
 
   // Test the realtime segment conversion of a table with an index that reuses mutable index artifacts during conversion
   @Test(dataProvider = "reuseParams")
-  public void testSegmentBuilderWithReuse(boolean columnMajorSegmentBuilder, String sortedColumn)
+  public void testSegmentBuilderWithReuse(boolean columnMajorSegmentBuilder, String sortedColumn,
+      boolean reuseMutableIndex, int luceneNRTCachingDirectoryMaxBufferSizeMB)
       throws Exception {
     File tmpDir = new File(TMP_DIR, "tmp_" + System.currentTimeMillis());
     FieldConfig textIndexFieldConfig =
@@ -472,9 +481,11 @@ public class RealtimeSegmentConverterTest {
     String tableNameWithType = tableConfig.getTableName();
     String segmentName = "testTable__0__0__123456";
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
-    TextIndexConfig textIndexConfig =
-        new TextIndexConfig(false, null, null, false, false, Collections.emptyList(), Collections.emptyList(), false,
-            500, null, false);
+    TextIndexConfig textIndexConfig = new TextIndexConfigBuilder()
+            .withUseANDForMultiTermQueries(false)
+            .withReuseMutableIndex(reuseMutableIndex)
+            .withLuceneNRTCachingDirectoryMaxBufferSizeMB(luceneNRTCachingDirectoryMaxBufferSizeMB)
+            .build();
 
     RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder =
         new RealtimeSegmentConfig.Builder().setTableNameWithType(tableNameWithType).setSegmentName(segmentName)
@@ -488,6 +499,7 @@ public class RealtimeSegmentConverterTest {
 
     // create mutable segment impl
     RealtimeLuceneTextIndexSearcherPool.init(1);
+    RealtimeLuceneIndexRefreshManager.init(1, 10);
     MutableSegmentImpl mutableSegmentImpl = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), null);
     List<GenericRow> rows = generateTestDataForReusePath();
 

@@ -18,10 +18,12 @@
  */
 package org.apache.pinot.core.accounting;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
+import org.apache.pinot.spi.accounting.ThreadResourceTracker;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
@@ -34,7 +36,7 @@ public class CPUMemThreadLevelAccountingObjects {
    * Entry to track the task execution status and usage stats of a Thread
    * (including but not limited to server worker thread, runner thread, broker jetty thread, or broker netty thread)
    */
-  public static class ThreadEntry {
+  public static class ThreadEntry implements ThreadResourceTracker {
     // current query_id, task_id of the thread; this field is accessed by the thread itself and the accountant
     AtomicReference<TaskEntry> _currentThreadTaskStatus = new AtomicReference<>();
     // current sample of thread memory usage/cputime ; this field is accessed by the thread itself and the accountant
@@ -77,9 +79,28 @@ public class CPUMemThreadLevelAccountingObjects {
      *
      * @return the current query id on the thread, {@code null} if idle
      */
+    @JsonIgnore
     @Nullable
     public TaskEntry getCurrentThreadTaskStatus() {
       return _currentThreadTaskStatus.get();
+    }
+
+    public long getCPUTimeMS() {
+      return _currentThreadCPUTimeSampleMS;
+    }
+
+    public long getAllocatedBytes() {
+      return _currentThreadMemoryAllocationSampleBytes;
+    }
+
+    public String getQueryId() {
+      TaskEntry taskEntry = _currentThreadTaskStatus.get();
+      return taskEntry == null ? "" : taskEntry.getQueryId();
+    }
+
+    public int getTaskId() {
+      TaskEntry taskEntry = _currentThreadTaskStatus.get();
+      return taskEntry == null ? -1 : taskEntry.getTaskId();
     }
 
     public void setThreadTaskStatus(@Nonnull String queryId, int taskId, @Nonnull Thread anchorThread) {

@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.runtime.operator.utils;
 
-import com.google.common.collect.ImmutableMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -170,25 +169,18 @@ public class AggregationUtils {
    */
   public static class Accumulator {
     //@formatter:off
-    public static final Map<String, Function<DataSchema.ColumnDataType, AggregationUtils.Merger>> MERGERS =
-        ImmutableMap.<String, Function<DataSchema.ColumnDataType, AggregationUtils.Merger>>builder()
-            .put("SUM", cdt -> AggregationUtils::mergeSum)
-            .put("$SUM", cdt -> AggregationUtils::mergeSum)
-            .put("$SUM0", cdt -> AggregationUtils::mergeSum)
-            .put("MIN", cdt -> AggregationUtils::mergeMin)
-            .put("$MIN", cdt -> AggregationUtils::mergeMin)
-            .put("$MIN0", cdt -> AggregationUtils::mergeMin)
-            .put("MAX", cdt -> AggregationUtils::mergeMax)
-            .put("$MAX", cdt -> AggregationUtils::mergeMax)
-            .put("$MAX0", cdt -> AggregationUtils::mergeMax)
-            .put("COUNT", cdt -> new AggregationUtils.MergeCounts())
-            .put("BOOL_AND", cdt -> AggregationUtils::mergeBoolAnd)
-            .put("$BOOL_AND", cdt -> AggregationUtils::mergeBoolAnd)
-            .put("$BOOL_AND0", cdt -> AggregationUtils::mergeBoolAnd)
-            .put("BOOL_OR", cdt -> AggregationUtils::mergeBoolOr)
-            .put("$BOOL_OR", cdt -> AggregationUtils::mergeBoolOr)
-            .put("$BOOL_OR0", cdt -> AggregationUtils::mergeBoolOr)
-            .build();
+    public static final Map<String, Function<DataSchema.ColumnDataType, AggregationUtils.Merger>> MERGERS = Map.of(
+        "SUM", cdt -> AggregationUtils::mergeSum,
+        // NOTE: Keep both 'SUM0' and '$SUM0' for backward compatibility where 'SUM0' is SqlKind and '$SUM0' is function
+        //       name.
+        "SUM0", cdt -> AggregationUtils::mergeSum,
+        "$SUM0", cdt -> AggregationUtils::mergeSum,
+        "MIN", cdt -> AggregationUtils::mergeMin,
+        "MAX", cdt -> AggregationUtils::mergeMax,
+        "COUNT", cdt -> new AggregationUtils.MergeCounts(),
+        "BOOLAND", cdt -> AggregationUtils::mergeBoolAnd,
+        "BOOLOR", cdt -> AggregationUtils::mergeBoolOr
+    );
     //@formatter:on
 
     protected final int _inputRef;

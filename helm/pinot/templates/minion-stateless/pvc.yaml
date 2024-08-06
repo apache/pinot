@@ -23,6 +23,7 @@ kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
   name: {{ .Values.minionStateless.persistence.pvcName }}
+  namespace: {{ include "pinot.namespace" . }}
 spec:
   accessModes:
     - {{ .Values.minionStateless.persistence.accessMode | quote }}

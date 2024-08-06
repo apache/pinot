@@ -39,17 +39,10 @@ public class SegmentUtils {
   @Nullable
   public static Integer getRealtimeSegmentPartitionId(String segmentName, String realtimeTableName,
       HelixManager helixManager, @Nullable String partitionColumn) {
-    // A fast path if the segmentName is an LLC segment name: get the partition id from the name directly
-    LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentName);
-    if (llcSegmentName != null) {
-      return llcSegmentName.getPartitionGroupId();
+    Integer partitionId = getPartitionIdFromRealtimeSegmentName(segmentName);
+    if (partitionId != null) {
+      return partitionId;
     }
-
-    UploadedRealtimeSegmentName uploadedRealtimeSegmentName = UploadedRealtimeSegmentName.of(segmentName);
-    if (uploadedRealtimeSegmentName != null) {
-      return uploadedRealtimeSegmentName.getPartitionId();
-    }
-
     // Otherwise, retrieve the partition id from the segment zk metadata.
     SegmentZKMetadata segmentZKMetadata =
         ZKMetadataProvider.getSegmentZKMetadata(helixManager.getHelixPropertyStore(), realtimeTableName, segmentName);
@@ -61,13 +54,26 @@ public class SegmentUtils {
   @Nullable
   public static Integer getRealtimeSegmentPartitionId(String segmentName, SegmentZKMetadata segmentZKMetadata,
       @Nullable String partitionColumn) {
-    // A fast path if the segmentName is an LLC segment name: get the partition id from the name directly
+    Integer partitionId = getPartitionIdFromRealtimeSegmentName(segmentName);
+    if (partitionId != null) {
+      return partitionId;
+    }
+    // Otherwise, retrieve the partition id from the segment zk metadata.
+    return getRealtimeSegmentPartitionId(segmentZKMetadata, partitionColumn);
+  }
+
+  @Nullable
+  private static Integer getPartitionIdFromRealtimeSegmentName(String segmentName) {
+    // A fast path to get partition id if the segmentName is in a known format like LLC.
     LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentName);
     if (llcSegmentName != null) {
       return llcSegmentName.getPartitionGroupId();
     }
-    // Otherwise, retrieve the partition id from the segment zk metadata.
-    return getRealtimeSegmentPartitionId(segmentZKMetadata, partitionColumn);
+    UploadedRealtimeSegmentName uploadedRealtimeSegmentName = UploadedRealtimeSegmentName.of(segmentName);
+    if (uploadedRealtimeSegmentName != null) {
+      return uploadedRealtimeSegmentName.getPartitionId();
+    }
+    return null;
   }
 
   @Nullable

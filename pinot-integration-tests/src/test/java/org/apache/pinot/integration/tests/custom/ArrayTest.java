@@ -34,6 +34,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
@@ -42,6 +43,8 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
 
   private static final String DEFAULT_TABLE_NAME = "ArrayTest";
   private static final String BOOLEAN_COLUMN = "boolCol";
+  private static final String BOOLEAN_FROM_INT_COLUMN = "boolColFromInt";
+  private static final String BOOLEAN_FROM_STRING_COLUMN = "boolColFromString";
   private static final String INT_COLUMN = "intCol";
   private static final String LONG_COLUMN = "longCol";
   private static final String FLOAT_COLUMN = "floatCol";
@@ -49,6 +52,9 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
   private static final String STRING_COLUMN = "stringCol";
   private static final String TIMESTAMP_COLUMN = "timestampCol";
   private static final String GROUP_BY_COLUMN = "groupKey";
+  private static final String BOOLEAN_ARRAY_COLUMN = "booleanArrayCol";
+  private static final String BOOLEAN_FROM_INT_ARRAY_COLUMN = "booleanArrayColFromIntArray";
+  private static final String BOOLEAN_FROM_STRING_ARRAY_COLUMN = "booleanArrayColFromStringArray";
   private static final String LONG_ARRAY_COLUMN = "longArrayCol";
   private static final String DOUBLE_ARRAY_COLUMN = "doubleArrayCol";
 
@@ -58,15 +64,15 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
   }
 
   @Test(dataProvider = "useBothQueryEngines")
-  public void testArrayAggWithEmptyPredicate(boolean useMultiStageQueryEngine) throws Exception {
+  public void testArrayAggWithEmptyPredicate(boolean useMultiStageQueryEngine)
+      throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String query =
         String.format("SELECT "
             + "arrayAgg(boolCol, 'BOOLEAN'), "
             + "arrayAgg(intCol, 'INT'), "
             + "arrayAgg(longCol, 'LONG'), "
-            // NOTE: FLOAT array is auto converted to DOUBLE array
-            + (useMultiStageQueryEngine ? "arrayAgg(floatCol, 'DOUBLE'), " : "arrayAgg(floatCol, 'FLOAT'), ")
+            + "arrayAgg(floatCol, 'FLOAT'), "
             + "arrayAgg(doubleCol, 'DOUBLE'), "
             + "arrayAgg(stringCol, 'STRING'), "
             + "arrayAgg(timestampCol, 'TIMESTAMP') "
@@ -90,8 +96,7 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
             + "arrayAgg(boolCol, 'BOOLEAN'), "
             + "arrayAgg(intCol, 'INT'), "
             + "arrayAgg(longCol, 'LONG'), "
-            // NOTE: FLOAT array is auto converted to DOUBLE array
-            + (useMultiStageQueryEngine ? "arrayAgg(floatCol, 'DOUBLE'), " : "arrayAgg(floatCol, 'FLOAT'), ")
+            + "arrayAgg(floatCol, 'FLOAT'), "
             + "arrayAgg(doubleCol, 'DOUBLE'), "
             + "arrayAgg(stringCol, 'STRING'), "
             + "arrayAgg(timestampCol, 'TIMESTAMP') "
@@ -119,8 +124,7 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
             + "arrayAgg(boolCol, 'BOOLEAN'), "
             + "arrayAgg(intCol, 'INT'), "
             + "arrayAgg(longCol, 'LONG'), "
-            // NOTE: FLOAT array is auto converted to DOUBLE array
-            + (useMultiStageQueryEngine ? "arrayAgg(floatCol, 'DOUBLE'), " : "arrayAgg(floatCol, 'FLOAT'), ")
+            + "arrayAgg(floatCol, 'FLOAT'), "
             + "arrayAgg(doubleCol, 'DOUBLE'), "
             + "arrayAgg(stringCol, 'STRING'), "
             + "arrayAgg(timestampCol, 'TIMESTAMP'), "
@@ -367,9 +371,7 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
             + "arrayAgg(boolCol, 'BOOLEAN', true), "
             + "arrayAgg(intCol, 'INT', true), "
             + "arrayAgg(longCol, 'LONG', true), "
-            // NOTE: FLOAT array is auto converted to DOUBLE array
-            + (useMultiStageQueryEngine ? "arrayAgg(floatCol, 'DOUBLE', true), "
-            : "arrayAgg(floatCol, 'FLOAT', true), ")
+            + "arrayAgg(floatCol, 'FLOAT', true), "
             + "arrayAgg(doubleCol, 'DOUBLE', true), "
             + "arrayAgg(stringCol, 'STRING', true), "
             + "arrayAgg(timestampCol, 'TIMESTAMP', true) "
@@ -397,9 +399,7 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
             + "arrayAgg(boolCol, 'BOOLEAN', true), "
             + "arrayAgg(intCol, 'INT', true), "
             + "arrayAgg(longCol, 'LONG', true), "
-            // NOTE: FLOAT array is auto converted to DOUBLE array
-            + (useMultiStageQueryEngine ? "arrayAgg(floatCol, 'DOUBLE', true), "
-            : "arrayAgg(floatCol, 'FLOAT', true), ")
+            + "arrayAgg(floatCol, 'FLOAT', true), "
             + "arrayAgg(doubleCol, 'DOUBLE', true), "
             + "arrayAgg(stringCol, 'STRING', true), "
             + "arrayAgg(timestampCol, 'TIMESTAMP', true), "
@@ -581,6 +581,273 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
     }
   }
 
+  @Test(dataProvider = "useV1QueryEngine")
+  public void testGenerateIntArray(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query =
+        String.format("SELECT "
+            + "GENERATE_ARRAY(1, 3, 1) "
+            + "FROM %s LIMIT 1", getTableName());
+    JsonNode jsonNode = postQuery(query);
+    JsonNode rows = jsonNode.get("resultTable").get("rows");
+    assertEquals(rows.size(), 1);
+    JsonNode row = rows.get(0);
+    assertEquals(row.size(), 1);
+    assertEquals(row.get(0).size(), 3);
+    assertEquals(row.get(0).get(0).asInt(), 1);
+    assertEquals(row.get(0).get(1).asInt(), 2);
+    assertEquals(row.get(0).get(2).asInt(), 3);
+  }
+
+  @Test(dataProvider = "useV1QueryEngine")
+  public void testGenerateIntArrayWithoutStepValue(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query =
+        String.format("SELECT "
+            + "GENERATE_ARRAY(1, 3) "
+            + "FROM %s LIMIT 1", getTableName());
+    JsonNode jsonNode = postQuery(query);
+    JsonNode rows = jsonNode.get("resultTable").get("rows");
+    assertEquals(rows.size(), 1);
+    JsonNode row = rows.get(0);
+    assertEquals(row.size(), 1);
+    assertEquals(row.get(0).size(), 3);
+    assertEquals(row.get(0).get(0).asInt(), 1);
+    assertEquals(row.get(0).get(1).asInt(), 2);
+    assertEquals(row.get(0).get(2).asInt(), 3);
+  }
+
+  @Test(dataProvider = "useV1QueryEngine")
+  public void testGenerateIntArrayWithIncorrectStepValue(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query =
+        String.format("SELECT "
+            + "GENERATE_ARRAY(1, 3, -1) "
+            + "FROM %s LIMIT 1", getTableName());
+    JsonNode jsonNode = postQuery(query);
+    assertEquals(jsonNode.get("exceptions").size(), 1);
+  }
+
+  @Test(dataProvider = "useV1QueryEngine")
+  public void testGenerateLongArray(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query =
+        String.format("SELECT "
+            + "GENERATE_ARRAY(2147483648, 2147483650, 2) "
+            + "FROM %s LIMIT 1", getTableName());
+    JsonNode jsonNode = postQuery(query);
+    JsonNode rows = jsonNode.get("resultTable").get("rows");
+    assertEquals(rows.size(), 1);
+    JsonNode row = rows.get(0);
+    assertEquals(row.size(), 1);
+    assertEquals(row.get(0).size(), 2);
+    assertEquals(row.get(0).get(0).asLong(), 2147483648L);
+    assertEquals(row.get(0).get(1).asLong(), 2147483650L);
+  }
+
+  @Test(dataProvider = "useV1QueryEngine")
+  public void testGenerateLongArrayWithoutStepValue(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query =
+        String.format("SELECT "
+            + "GENERATE_ARRAY(2147483648, 2147483650) "
+            + "FROM %s LIMIT 1", getTableName());
+    JsonNode jsonNode = postQuery(query);
+    JsonNode rows = jsonNode.get("resultTable").get("rows");
+    assertEquals(rows.size(), 1);
+    JsonNode row = rows.get(0);
+    assertEquals(row.size(), 1);
+    assertEquals(row.get(0).size(), 3);
+    assertEquals(row.get(0).get(0).asLong(), 2147483648L);
+    assertEquals(row.get(0).get(1).asLong(), 2147483649L);
+    assertEquals(row.get(0).get(2).asLong(), 2147483650L);
+  }
+
+  @Test(dataProvider = "useV1QueryEngine")
+  public void testGenerateLongArrayWithIncorrectStepValue(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query =
+        String.format("SELECT "
+            + "GENERATE_ARRAY(2147483648, 2147483650, -1) "
+            + "FROM %s LIMIT 1", getTableName());
+    JsonNode jsonNode = postQuery(query);
+    assertEquals(jsonNode.get("exceptions").size(), 1);
+  }
+
+  @Test(dataProvider = "useV1QueryEngine")
+  public void testGenerateFloatArray(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query =
+        String.format("SELECT "
+            + "GENERATE_ARRAY(0.1, 0.3, 0.1) "
+            + "FROM %s LIMIT 1", getTableName());
+    JsonNode jsonNode = postQuery(query);
+    JsonNode rows = jsonNode.get("resultTable").get("rows");
+    assertEquals(rows.size(), 1);
+    JsonNode row = rows.get(0);
+    assertEquals(row.size(), 1);
+    assertEquals(row.get(0).size(), 3);
+    assertEquals(row.get(0).get(0).asDouble(), 0.1);
+    assertEquals(row.get(0).get(1).asDouble(), 0.1 + 0.1 * 1);
+    assertEquals(row.get(0).get(2).asDouble(), 0.1 + 0.1 * 2);
+  }
+
+  @Test(dataProvider = "useV1QueryEngine")
+  public void testGenerateFloatArrayWithoutStepValue(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query =
+        String.format("SELECT "
+            + "GENERATE_ARRAY(0.3, 3.1) "
+            + "FROM %s LIMIT 1", getTableName());
+    JsonNode jsonNode = postQuery(query);
+    JsonNode rows = jsonNode.get("resultTable").get("rows");
+    assertEquals(rows.size(), 1);
+    JsonNode row = rows.get(0);
+    assertEquals(row.size(), 1);
+    assertEquals(row.get(0).size(), 3);
+    assertEquals(row.get(0).get(0).asDouble(), 0.3);
+    assertEquals(row.get(0).get(1).asDouble(), 1.3);
+    assertEquals(row.get(0).get(2).asDouble(), 2.3);
+  }
+
+  @Test(dataProvider = "useV1QueryEngine")
+  public void testGenerateFloatArrayWithIncorrectStepValue(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query =
+        String.format("SELECT "
+            + "GENERATE_ARRAY(0.3, 0.1, 1.1) "
+            + "FROM %s LIMIT 1", getTableName());
+    JsonNode jsonNode = postQuery(query);
+    assertEquals(jsonNode.get("exceptions").size(), 1);
+  }
+
+  @Test(dataProvider = "useV1QueryEngine")
+  public void testGenerateDoubleArray(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query =
+        String.format("SELECT "
+            + "GENERATE_ARRAY(CAST(0.1 AS DOUBLE), CAST(0.3 AS DOUBLE), CAST(0.1 AS DOUBLE)) "
+            + "FROM %s LIMIT 1", getTableName());
+    JsonNode jsonNode = postQuery(query);
+    JsonNode rows = jsonNode.get("resultTable").get("rows");
+    assertEquals(rows.size(), 1);
+    JsonNode row = rows.get(0);
+    assertEquals(row.size(), 1);
+    assertEquals(row.get(0).size(), 3);
+    assertEquals(row.get(0).get(0).asDouble(), 0.1);
+    assertEquals(row.get(0).get(1).asDouble(), 0.1 + 0.1 * 1);
+    assertEquals(row.get(0).get(2).asDouble(), 0.1 + 0.1 * 2);
+  }
+
+  @Test(dataProvider = "useV1QueryEngine")
+  public void testGenerateDoubleArrayWithoutStepValue(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query =
+        String.format("SELECT "
+            + "GENERATE_ARRAY(CAST(0.3 AS DOUBLE), CAST(3.1 AS DOUBLE)) "
+            + "FROM %s LIMIT 1", getTableName());
+    JsonNode jsonNode = postQuery(query);
+    JsonNode rows = jsonNode.get("resultTable").get("rows");
+    assertEquals(rows.size(), 1);
+    JsonNode row = rows.get(0);
+    assertEquals(row.size(), 1);
+    assertEquals(row.get(0).size(), 3);
+    assertEquals(row.get(0).get(0).asDouble(), 0.3);
+    assertEquals(row.get(0).get(1).asDouble(), 1.3);
+    assertEquals(row.get(0).get(2).asDouble(), 2.3);
+  }
+
+  @Test(dataProvider = "useV1QueryEngine")
+  public void testGenerateDoubleArrayWithIncorrectStepValue(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query =
+        String.format("SELECT "
+            + "GENERATE_ARRAY(CAST(0.3 AS DOUBLE), CAST(0.1 AS DOUBLE), CAST(1.1 AS DOUBLE)) "
+            + "FROM %s LIMIT 1", getTableName());
+    JsonNode jsonNode = postQuery(query);
+    assertEquals(jsonNode.get("exceptions").size(), 1);
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testBooleanTypes(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query =
+        String.format("SELECT %s, %s, %s, %s FROM %s LIMIT %d", INT_COLUMN, BOOLEAN_COLUMN, BOOLEAN_FROM_INT_COLUMN,
+            BOOLEAN_FROM_STRING_COLUMN, getTableName(), getCountStarResult());
+    JsonNode result = postQuery(query).get("resultTable");
+    System.out.println("result = " + result);
+    JsonNode columnDataTypesNode = result.get("dataSchema").get("columnDataTypes");
+    assertEquals(columnDataTypesNode.get(0).textValue(), "INT");
+    assertEquals(columnDataTypesNode.get(1).textValue(), "BOOLEAN");
+    assertEquals(columnDataTypesNode.get(2).textValue(), "BOOLEAN");
+    assertEquals(columnDataTypesNode.get(3).textValue(), "BOOLEAN");
+    JsonNode rows = result.get("rows");
+    assertEquals(rows.size(), getCountStarResult());
+    for (int rowId = 0; rowId < rows.size(); rowId++) {
+      JsonNode row = rows.get(rowId);
+      assertEquals(row.size(), 4);
+      assertEquals(row.get(0).asInt() % 4 < 2, row.get(1).asBoolean());
+      assertEquals(row.get(1).asBoolean(), row.get(2).asBoolean());
+      assertEquals(row.get(2).asBoolean(), row.get(2).asBoolean());
+    }
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testBooleanArrayTypes(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query =
+        String.format("SELECT %s, %s, %s FROM %s LIMIT %d", BOOLEAN_ARRAY_COLUMN, BOOLEAN_FROM_INT_ARRAY_COLUMN,
+            BOOLEAN_FROM_STRING_ARRAY_COLUMN, getTableName(), getCountStarResult());
+    JsonNode result = postQuery(query).get("resultTable");
+    System.out.println("result = " + result);
+    JsonNode columnDataTypesNode = result.get("dataSchema").get("columnDataTypes");
+    assertEquals(columnDataTypesNode.get(0).textValue(), "BOOLEAN_ARRAY");
+    assertEquals(columnDataTypesNode.get(1).textValue(), "BOOLEAN_ARRAY");
+    assertEquals(columnDataTypesNode.get(2).textValue(), "BOOLEAN_ARRAY");
+    JsonNode rows = result.get("rows");
+    assertEquals(rows.size(), getCountStarResult());
+
+    for (int rowId = 0; rowId < rows.size(); rowId++) {
+      JsonNode row = rows.get(rowId);
+      assertEquals(row.size(), 3);
+      JsonNode booleanArray0 = row.get(0);
+      JsonNode booleanArray1 = row.get(1);
+      JsonNode booleanArray2 = row.get(2);
+      assertEquals(booleanArray0.size(), 4);
+      assertEquals(booleanArray1.size(), 4);
+      assertEquals(booleanArray2.size(), 4);
+
+      assertTrue(booleanArray0.get(0).asBoolean());
+      assertTrue(booleanArray0.get(1).asBoolean());
+      assertFalse(booleanArray0.get(2).asBoolean());
+      assertFalse(booleanArray0.get(3).asBoolean());
+
+      assertTrue(booleanArray1.get(0).asBoolean());
+      assertTrue(booleanArray1.get(1).asBoolean());
+      assertFalse(booleanArray1.get(2).asBoolean());
+      assertFalse(booleanArray1.get(3).asBoolean());
+
+      assertTrue(booleanArray2.get(0).asBoolean());
+      assertTrue(booleanArray2.get(1).asBoolean());
+      assertFalse(booleanArray2.get(2).asBoolean());
+      assertFalse(booleanArray2.get(3).asBoolean());
+    }
+  }
+
   @Override
   public String getTableName() {
     return DEFAULT_TABLE_NAME;
@@ -590,6 +857,8 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
   public Schema createSchema() {
     return new Schema.SchemaBuilder().setSchemaName(getTableName())
         .addSingleValueDimension(BOOLEAN_COLUMN, FieldSpec.DataType.BOOLEAN)
+        .addSingleValueDimension(BOOLEAN_FROM_INT_COLUMN, FieldSpec.DataType.BOOLEAN)
+        .addSingleValueDimension(BOOLEAN_FROM_STRING_COLUMN, FieldSpec.DataType.BOOLEAN)
         .addSingleValueDimension(INT_COLUMN, FieldSpec.DataType.INT)
         .addSingleValueDimension(LONG_COLUMN, FieldSpec.DataType.LONG)
         .addSingleValueDimension(FLOAT_COLUMN, FieldSpec.DataType.FLOAT)
@@ -597,6 +866,9 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
         .addSingleValueDimension(STRING_COLUMN, FieldSpec.DataType.STRING)
         .addSingleValueDimension(TIMESTAMP_COLUMN, FieldSpec.DataType.TIMESTAMP)
         .addSingleValueDimension(GROUP_BY_COLUMN, FieldSpec.DataType.STRING)
+        .addMultiValueDimension(BOOLEAN_ARRAY_COLUMN, FieldSpec.DataType.BOOLEAN)
+        .addMultiValueDimension(BOOLEAN_FROM_INT_ARRAY_COLUMN, FieldSpec.DataType.BOOLEAN)
+        .addMultiValueDimension(BOOLEAN_FROM_STRING_ARRAY_COLUMN, FieldSpec.DataType.BOOLEAN)
         .addMultiValueDimension(LONG_ARRAY_COLUMN, FieldSpec.DataType.LONG)
         .addMultiValueDimension(DOUBLE_ARRAY_COLUMN, FieldSpec.DataType.DOUBLE)
         .build();
@@ -610,6 +882,12 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
     avroSchema.setFields(ImmutableList.of(
         new org.apache.avro.Schema.Field(BOOLEAN_COLUMN,
             org.apache.avro.Schema.create(org.apache.avro.Schema.Type.BOOLEAN),
+            null, null),
+        new org.apache.avro.Schema.Field(BOOLEAN_FROM_INT_COLUMN,
+            org.apache.avro.Schema.create(org.apache.avro.Schema.Type.INT),
+            null, null),
+        new org.apache.avro.Schema.Field(BOOLEAN_FROM_STRING_COLUMN,
+            org.apache.avro.Schema.create(org.apache.avro.Schema.Type.STRING),
             null, null),
         new org.apache.avro.Schema.Field(INT_COLUMN, org.apache.avro.Schema.create(org.apache.avro.Schema.Type.INT),
             null, null),
@@ -628,6 +906,15 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
             null, null),
         new org.apache.avro.Schema.Field(GROUP_BY_COLUMN,
             org.apache.avro.Schema.create(org.apache.avro.Schema.Type.STRING),
+            null, null),
+        new org.apache.avro.Schema.Field(BOOLEAN_ARRAY_COLUMN,
+            org.apache.avro.Schema.createArray(org.apache.avro.Schema.create(org.apache.avro.Schema.Type.BOOLEAN)),
+            null, null),
+        new org.apache.avro.Schema.Field(BOOLEAN_FROM_INT_ARRAY_COLUMN,
+            org.apache.avro.Schema.createArray(org.apache.avro.Schema.create(org.apache.avro.Schema.Type.INT)),
+            null, null),
+        new org.apache.avro.Schema.Field(BOOLEAN_FROM_STRING_ARRAY_COLUMN,
+            org.apache.avro.Schema.createArray(org.apache.avro.Schema.create(org.apache.avro.Schema.Type.STRING)),
             null, null),
         new org.apache.avro.Schema.Field(LONG_ARRAY_COLUMN,
             org.apache.avro.Schema.createArray(org.apache.avro.Schema.create(org.apache.avro.Schema.Type.LONG)),
@@ -649,6 +936,8 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
               // create avro record
               GenericData.Record record = new GenericData.Record(avroSchema);
               record.put(BOOLEAN_COLUMN, finalI % 4 == 0 || finalI % 4 == 1);
+              record.put(BOOLEAN_FROM_INT_COLUMN, finalI % 4 == 0 || finalI % 4 == 1 ? 1 : 0);
+              record.put(BOOLEAN_FROM_STRING_COLUMN, finalI % 4 == 0 || finalI % 4 == 1 ? "true" : "false");
               record.put(INT_COLUMN, finalI);
               record.put(LONG_COLUMN, finalI);
               record.put(FLOAT_COLUMN, finalI + RANDOM.nextFloat());
@@ -656,6 +945,9 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
               record.put(STRING_COLUMN, RandomStringUtils.random(finalI));
               record.put(TIMESTAMP_COLUMN, finalI);
               record.put(GROUP_BY_COLUMN, String.valueOf(finalI % 10));
+              record.put(BOOLEAN_ARRAY_COLUMN, ImmutableList.of(true, true, false, false));
+              record.put(BOOLEAN_FROM_INT_ARRAY_COLUMN, ImmutableList.of(1, 1, 0, 0));
+              record.put(BOOLEAN_FROM_STRING_ARRAY_COLUMN, ImmutableList.of("true", "true", "false", "false"));
               record.put(LONG_ARRAY_COLUMN, ImmutableList.of(0, 1, 2, 3));
               record.put(DOUBLE_ARRAY_COLUMN, ImmutableList.of(0.0, 0.1, 0.2, 0.3));
               return record;

@@ -19,19 +19,19 @@
     under the License.
 
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
     <groupId>org.apache</groupId>
     <artifactId>apache</artifactId>
-    <version>32</version>
+    <version>33</version>
+    <relativePath />
   </parent>
 
   <groupId>org.apache.pinot</groupId>
   <artifactId>pinot</artifactId>
-  <version>1.2.0-SNAPSHOT</version>
+  <version>1.3.0-SNAPSHOT</version>
   <packaging>pom</packaging>
   <name>Pinot</name>
   <description>A realtime distributed OLAP datastore</description>
@@ -110,6 +110,11 @@
     <jdk.version>11</jdk.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
+    <!-- Setting maven.compiler flags to the jdk version. These are used by maven plugins like maven-javadoc-plugin -->
+    <maven.compiler.release>${jdk.version}</maven.compiler.release>
+    <maven.compiler.source>${jdk.version}</maven.compiler.source>
+    <maven.compiler.target>${jdk.version}</maven.compiler.target>
+
     <!-- Configuration for unit/integration tests
       Property for running integration tests with profiles
       at the command line, where you do:
@@ -121,7 +126,7 @@
     <!-- Sets the VM argument line used when unit tests are run. -->
     <argLine>-Xms4g -Xmx4g</argLine>
     <SKIP_INTEGRATION_TESTS>true</SKIP_INTEGRATION_TESTS>
-    <surefire.version>3.3.0</surefire.version>
+    <surefire.version>3.3.1</surefire.version>
     <maven-enforcer-plugin.version>3.5.0</maven-enforcer-plugin.version>
 
     <!-- Checkstyle violation prop.-->
@@ -130,7 +135,7 @@
 
     <!-- Configuration for Packaging -->
     <shade.prefix>org.apache.pinot.shaded</shade.prefix>
-    <maven-jar-plugin.version>3.4.1</maven-jar-plugin.version>
+    <maven-jar-plugin.version>3.4.2</maven-jar-plugin.version>
     <maven-shade-plugin.version>3.6.0</maven-shade-plugin.version>
     <shade.phase.prop>none</shade.phase.prop>
 
@@ -140,7 +145,7 @@
     <hive.version>2.8.1</hive.version>
     <helix.version>1.3.1</helix.version>
     <zkclient.version>0.11</zkclient.version>
-    <jackson.version>2.12.7.20221012</jackson.version>
+    <jackson.version>2.17.2</jackson.version>
     <zookeeper.version>3.9.2</zookeeper.version>
     <async-http-client.version>2.12.3</async-http-client.version>
     <jersey.version>2.42</jersey.version>
@@ -148,23 +153,24 @@
     <javassist.version>3.30.2-GA</javassist.version>
     <swagger.version>1.6.14</swagger.version>
     <swagger-ui.version>5.17.14</swagger-ui.version>
-    <hadoop.version>3.3.6</hadoop.version>
+    <hadoop.version>3.4.0</hadoop.version>
     <jsonpath.version>2.9.0</jsonpath.version>
     <jsonsmart.version>2.5.1</jsonsmart.version>
     <quartz.version>2.3.2</quartz.version>
     <calcite.version>1.37.0</calcite.version>
-    <lucene.version>9.11.0</lucene.version>
+    <immutables.version>2.10.1</immutables.version>
+    <lucene.version>9.11.1</lucene.version>
     <reflections.version>0.10.2</reflections.version>
     <dynatrace.hash4j.version>0.17.0</dynatrace.hash4j.version>
     <!-- helix-core, spark-core use libraries from io.dropwizard.metrics -->
     <dropwizard-metrics.version>4.2.26</dropwizard-metrics.version>
     <snappy-java.version>1.1.10.5</snappy-java.version>
-    <zstd-jni.version>1.5.6-3</zstd-jni.version>
+    <zstd-jni.version>1.5.6-4</zstd-jni.version>
     <lz4-java.version>1.8.0</lz4-java.version>
     <libthrift.verion>0.18.1</libthrift.verion>
     <log4j.version>2.23.1</log4j.version>
     <slf4j.version>2.0.13</slf4j.version>
-    <netty.version>4.1.111.Final</netty.version>
+    <netty.version>4.1.112.Final</netty.version>
     <reactivestreams.version>1.0.4</reactivestreams.version>
     <jts.version>1.19.0</jts.version>
     <h3.version>4.1.1</h3.version>
@@ -172,19 +178,19 @@
     <audienceannotations.version>0.15.0</audienceannotations.version>
     <clp-ffi.version>0.4.4</clp-ffi.version>
     <stax2-api.version>4.2.2</stax2-api.version>
-    <aws.sdk.version>2.26.4</aws.sdk.version>
+    <aws.sdk.version>2.26.21</aws.sdk.version>
     <joda-time.version>2.12.7</joda-time.version>
     <janino.version>3.1.12</janino.version>
     <testng.version>7.10.2</testng.version>
-    <woodstox.version>6.6.2</woodstox.version>
+    <woodstox.version>7.0.0</woodstox.version>
     <sslcontext.kickstart.version>8.3.6</sslcontext.kickstart.version>
 
-    <confluent.version>7.6.1</confluent.version>
-    <pulsar.version>3.3.0</pulsar.version>
-    <flink.version>1.19.1</flink.version>
+    <confluent.version>7.7.0</confluent.version>
+    <pulsar.version>3.3.1</pulsar.version>
+    <flink.version>1.20.0</flink.version>
 
     <!-- Apache Commons Libraries -->
-    <commons-lang3.version>3.14.0</commons-lang3.version>
+    <commons-lang3.version>3.15.0</commons-lang3.version>
     <commons-collections4.version>4.4</commons-collections4.version>
     <commons-text.version>1.12.0</commons-text.version>
     <commons-compress.version>1.26.2</commons-compress.version>
@@ -192,14 +198,10 @@
     <commons-csv.version>1.11.0</commons-csv.version>
     <commons-configuration2.version>2.11.0</commons-configuration2.version>
     <commons-io.version>2.16.1</commons-io.version>
-    <commons-codec.version>1.17.0</commons-codec.version>
+    <commons-codec.version>1.17.1</commons-codec.version>
     <commons-cli.version>1.8.0</commons-cli.version>
     <commons-net.version>3.11.1</commons-net.version>
     <commons-validator.version>1.9.0</commons-validator.version>
-    <!-- Legacy Apache Commons Libraries -->
-    <commons-lang.version>2.6</commons-lang.version>
-    <commons-collections.version>3.2.2</commons-collections.version>
-    <commons-math.version>2.2</commons-math.version>
 
     <!-- Java EE Libraries -->
     <!-- Include both newer jakarta ones and older javax ones, but not migrate to Jakarta EE yet -->
@@ -220,14 +222,14 @@
     <httpclient.version>4.5.14</httpclient.version>
     <httpcore.version>4.4.16</httpcore.version>
     <httpclient5.version>5.3.1</httpclient5.version>
-    <httpcore5.version>5.2.4</httpcore5.version>
+    <httpcore5.version>5.2.5</httpcore5.version>
 
     <!-- Google Libraries -->
     <protobuf.version>3.25.3</protobuf.version>
-    <grpc.version>1.64.0</grpc.version>
-    <google.cloud.libraries.version>26.41.0</google.cloud.libraries.version>
+    <grpc.version>1.65.1</grpc.version>
+    <google.cloud.libraries.version>26.43.0</google.cloud.libraries.version>
     <google.auto-service.version>1.1.1</google.auto-service.version>
-    <google.errorprone.version>2.28.0</google.errorprone.version>
+    <google.errorprone.version>2.29.2</google.errorprone.version>
     <google.j2objc.version>3.0.0</google.j2objc.version>
     <google.jsr305.version>3.0.2</google.jsr305.version>
 
@@ -236,13 +238,14 @@
     <scala.compat.version>2.12</scala.compat.version>
 
     <!-- Solve conflict across dependencies -->
-    <kotlin.stdlib.version>1.9.24</kotlin.stdlib.version>
+    <jetbrains.annotations.version>24.1.0</jetbrains.annotations.version>
+    <kotlin.stdlib.version>2.0.0</kotlin.stdlib.version>
     <okio.version>3.9.0</okio.version>
     <kerby.version>2.0.3</kerby.version>
-    <jline.version>3.26.2</jline.version>
+    <jline.version>3.26.3</jline.version>
     <wildfly.version>2.0.0</wildfly.version>
     <jettison.version>1.5.4</jettison.version>
-    <eclipse.jetty.version>9.4.54.v20240208</eclipse.jetty.version>
+    <eclipse.jetty.version>9.4.55.v20240627</eclipse.jetty.version>
     <nimbus-jose-jwt.version>9.40</nimbus-jose-jwt.version>
     <bouncycastle.version>1.78.1</bouncycastle.version>
     <aircompressor.version>0.27</aircompressor.version>
@@ -250,6 +253,58 @@
   </properties>
 
   <profiles>
+    <!--build profile for linux-aarch64. We exclude certain tests as they use runtime JNI bindings not supported for linux-aarch64-->
+    <profile>
+      <id>linux-aarch64</id>
+      <activation>
+        <!--os info is taken from the output of mvn -version-->
+        <os>
+          <name>linux</name>
+          <arch>aarch64</arch>
+        </os>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <version>${surefire.version}</version>
+            <configuration>
+              <systemPropertyVariables>
+                <os.arch>aarch64</os.arch>
+              </systemPropertyVariables>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <!--build profile for osx-aarch64. We exclude certain tests as they use runtime JNI bindings not supported for linux-aarch64-->
+    <profile>
+      <id>osx-aarch64</id>
+      <activation>
+        <!--os info is taken from the output of mvn -version-->
+        <os>
+          <name>mac os x</name>
+          <arch>aarch64</arch>
+        </os>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <version>${surefire.version}</version>
+            <configuration>
+              <excludes>
+              </excludes>
+              <systemPropertyVariables>
+                <os.arch>aarch64</os.arch>
+              </systemPropertyVariables>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
     <profile>
       <id>github-actions</id>
       <activation>
@@ -418,7 +473,7 @@
       <dependency>
         <groupId>org.checkerframework</groupId>
         <artifactId>checker-qual</artifactId>
-        <version>3.44.0</version>
+        <version>3.46.0</version>
       </dependency>
       <dependency>
         <groupId>org.codehaus.groovy</groupId>
@@ -438,7 +493,7 @@
       <dependency>
         <groupId>org.roaringbitmap</groupId>
         <artifactId>RoaringBitmap</artifactId>
-        <version>1.0.6</version>
+        <version>1.2.1</version>
       </dependency>
       <dependency>
         <groupId>com.101tec</groupId>
@@ -478,7 +533,7 @@
       <dependency>
         <groupId>it.unimi.dsi</groupId>
         <artifactId>fastutil</artifactId>
-        <version>8.5.13</version>
+        <version>8.5.14</version>
       </dependency>
       <dependency>
         <groupId>joda-time</groupId>
@@ -545,10 +600,6 @@
         <artifactId>helix-core</artifactId>
         <version>${helix.version}</version>
         <exclusions>
-          <exclusion>
-            <groupId>com.github.sgroschupf</groupId>
-            <artifactId>zkclient</artifactId>
-          </exclusion>
           <exclusion>
             <groupId>org.jboss.netty</groupId>
             <artifactId>netty</artifactId>
@@ -724,22 +775,6 @@
         <artifactId>commons-validator</artifactId>
         <version>${commons-validator.version}</version>
       </dependency>
-      <!-- Legacy Apache Commons Libraries -->
-      <dependency>
-        <groupId>commons-lang</groupId>
-        <artifactId>commons-lang</artifactId>
-        <version>${commons-lang.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>commons-collections</groupId>
-        <artifactId>commons-collections</artifactId>
-        <version>${commons-collections.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.commons</groupId>
-        <artifactId>commons-math</artifactId>
-        <version>${commons-math.version}</version>
-      </dependency>
 
       <!-- Java EE Libraries -->
       <dependency>
@@ -799,11 +834,6 @@
       </dependency>
 
       <!-- HTTP Components Libraries -->
-      <dependency>
-        <groupId>org.apache.httpcomponents</groupId>
-        <artifactId>httpmime</artifactId>
-        <version>${httpclient.version}</version>
-      </dependency>
       <dependency>
         <groupId>org.apache.httpcomponents</groupId>
         <artifactId>httpclient</artifactId>
@@ -1088,6 +1118,24 @@
         <version>${hadoop.version}</version>
         <scope>provided</scope>
       </dependency>
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-client-runtime</artifactId>
+        <version>${hadoop.version}</version>
+        <scope>provided</scope>
+        <exclusions>
+          <exclusion>
+            <groupId>commons-logging</groupId>
+            <artifactId>commons-logging</artifactId>
+          </exclusion>
+        </exclusions>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-client-api</artifactId>
+        <version>${hadoop.version}</version>
+        <scope>provided</scope>
+      </dependency>
       <!-- Solve the dependency converge issue within hadoop libraries -->
       <dependency>
         <groupId>ch.qos.reload4j</groupId>
@@ -1222,6 +1270,7 @@
         <artifactId>json-smart</artifactId>
         <version>${jsonsmart.version}</version>
       </dependency>
+
       <dependency>
         <groupId>org.apache.calcite</groupId>
         <artifactId>calcite-core</artifactId>
@@ -1250,6 +1299,13 @@
         <artifactId>calcite-babel</artifactId>
         <version>${calcite.version}</version>
       </dependency>
+      <!-- Required by Calcite -->
+      <dependency>
+        <groupId>org.immutables</groupId>
+        <artifactId>value-annotations</artifactId>
+        <version>${immutables.version}</version>
+      </dependency>
+
       <dependency>
         <groupId>org.codehaus.janino</groupId>
         <artifactId>janino</artifactId>
@@ -1349,7 +1405,7 @@
       <dependency>
         <groupId>com.h2database</groupId>
         <artifactId>h2</artifactId>
-        <version>2.2.224</version>
+        <version>2.3.230</version>
       </dependency>
       <dependency>
         <groupId>com.github.jnr</groupId>
@@ -1374,7 +1430,7 @@
       <dependency>
         <groupId>org.glassfish.tyrus.bundles</groupId>
         <artifactId>tyrus-standalone-client</artifactId>
-        <version>2.1.5</version>
+        <version>2.2.0</version>
       </dependency>
       <!-- kafka_2.10 & jmh-core use jopt-simple -->
       <dependency>
@@ -1407,7 +1463,7 @@
       <dependency>
         <groupId>net.openhft</groupId>
         <artifactId>posix</artifactId>
-        <version>2.26ea0</version>
+        <version>2.26ea2</version>
       </dependency>
       <dependency>
         <groupId>net.openhft</groupId>
@@ -1495,6 +1551,11 @@
         <groupId>org.jetbrains.kotlin</groupId>
         <artifactId>kotlin-stdlib-common</artifactId>
         <version>${kotlin.stdlib.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.jetbrains</groupId>
+        <artifactId>annotations</artifactId>
+        <version>${jetbrains.annotations.version}</version>
       </dependency>
       <dependency>
         <groupId>com.squareup.okio</groupId>
@@ -1603,7 +1664,7 @@
               <importOrder>
                 <order>,\#</order>
               </importOrder>
-              <removeUnusedImports/>
+              <removeUnusedImports />
             </java>
           </configuration>
         </plugin>
@@ -1653,12 +1714,12 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-dependency-plugin</artifactId>
-          <version>3.7.0</version>
+          <version>3.7.1</version>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-javadoc-plugin</artifactId>
-          <version>3.7.0</version>
+          <version>3.8.0</version>
           <configuration>
             <!-- Remove this after fixing all javadoc warnings -->
             <doclint>none</doclint>
@@ -1672,7 +1733,7 @@
             <execution>
               <id>attach-sources</id>
               <goals>
-                <goal>jar</goal>
+                <goal>jar-no-fork</goal>
               </goals>
             </execution>
           </executions>
@@ -1778,7 +1839,7 @@
           </executions>
           <configuration>
             <rules>
-              <dependencyConvergence/>
+              <dependencyConvergence />
             </rules>
           </configuration>
         </plugin>
@@ -1790,7 +1851,7 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-release-plugin</artifactId>
-          <version>3.1.0</version>
+          <version>3.1.1</version>
           <dependencies>
             <dependency>
               <groupId>org.apache.maven.scm</groupId>
@@ -1861,7 +1922,7 @@
         <plugin>
           <groupId>net.alchim31.maven</groupId>
           <artifactId>scala-maven-plugin</artifactId>
-          <version>4.9.1</version>
+          <version>4.9.2</version>
           <executions>
             <execution>
               <id>add-source</id>
@@ -1989,6 +2050,7 @@
         <artifactId>maven-javadoc-plugin</artifactId>
         <configuration>
           <!-- Default configuration for all reports -->
+          <excludePackageNames>protobuf.grpc-java.org.apache.pinot.common.proto</excludePackageNames>
         </configuration>
         <executions>
           <execution>
@@ -2277,7 +2339,7 @@
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>versions-maven-plugin</artifactId>
-        <version>2.16.2</version>
+        <version>2.17.1</version>
       </plugin>
       <plugin>
         <artifactId>maven-shade-plugin</artifactId>
@@ -2294,8 +2356,8 @@
           <shadedArtifactAttached>true</shadedArtifactAttached>
           <createDependencyReducedPom>false</createDependencyReducedPom>
           <transformers>
-            <transformer implementation="org.apache.maven.plugins.shade.resource.ApacheLicenseResourceTransformer"/>
-            <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+            <transformer implementation="org.apache.maven.plugins.shade.resource.ApacheLicenseResourceTransformer" />
+            <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
             <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
               <mainClass>${mainClass}</mainClass>
               <manifestEntries>
@@ -2386,7 +2448,7 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-project-info-reports-plugin</artifactId>
-        <version>3.6.0</version>
+        <version>3.6.2</version>
         <configuration>
           <dependencyLocationsEnabled>false</dependencyLocationsEnabled>
         </configuration>
@@ -2394,6 +2456,10 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-javadoc-plugin</artifactId>
+        <configuration>
+          <!-- Default configuration for all reports -->
+          <excludePackageNames>protobuf.grpc-java.org.apache.pinot.common.proto</excludePackageNames>
+        </configuration>
         <reportSets>
           <reportSet>
             <id>non-aggregate</id>

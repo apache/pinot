@@ -21,6 +21,7 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: {{ include "pinot.controller.fullname" . }}
+  namespace: {{ include "pinot.namespace" . }}
   labels:
     {{- include "pinot.controllerLabels" . | nindent 4 }}
 spec:

@@ -774,38 +774,38 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
               // Keep this in memory, but wait for the online transition, and download when it comes in.
               _state = State.DISCARDED;
               break;
-            case KEEP:
+            case KEEP: {
+              if (_segmentCompletionMode == CompletionMode.DOWNLOAD) {
+                _state = State.DISCARDED;
+                break;
+              }
               _state = State.RETAINING;
-              switch (_segmentCompletionMode) {
-                case DOWNLOAD:
-                  _state = State.DISCARDED;
-                  break;
-                case DEFAULT:
-                  // Lock the segment to avoid multiple threads touching the same segment.
-                  Lock segmentLock = _realtimeTableDataManager.getSegmentLock(_segmentNameStr);
-                  segmentLock.lock();
-                  try {
-                    if (buildSegmentAndReplace()) {
-                      _state = State.RETAINED;
-                      break;
-                    }
-                  } finally {
-                    segmentLock.unlock();
-                  }
+              // Lock the segment to avoid multiple threads touching the same segment.
+              Lock segmentLock = _realtimeTableDataManager.getSegmentLock(_segmentNameStr);
+              // NOTE: We need to lock interruptibly because the lock might already be held by the Helix thread for the
+              //       CONSUMING -> ONLINE state transition.
+              segmentLock.lockInterruptibly();
+              try {
+                if (buildSegmentAndReplace()) {
+                  _state = State.RETAINED;
+                } else {
                   // Could not build segment for some reason. We can only download it.
                   _state = State.ERROR;
                   _segmentLogger.error("Could not build segment for {}", _segmentNameStr);
-                  break;
-                default:
-                  break;
+                }
+              } finally {
+                segmentLock.unlock();
               }
               break;
-            case COMMIT:
+            }
+            case COMMIT: {
               _state = State.COMMITTING;
               _currentOffset = _partitionGroupConsumer.checkpoint(_currentOffset);
               // Lock the segment to avoid multiple threads touching the same segment.
               Lock segmentLock = _realtimeTableDataManager.getSegmentLock(_segmentNameStr);
-              segmentLock.lock();
+              // NOTE: We need to lock interruptibly because the lock might already be held by the Helix thread for the
+              //       CONSUMING -> ONLINE state transition.
+              segmentLock.lockInterruptibly();
               try {
                 long buildTimeSeconds = response.getBuildTimeSeconds();
                 buildSegmentForCommit(buildTimeSeconds * 1000L);
@@ -828,6 +828,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
               _segmentLogger.info("Could not commit segment. Retrying after hold");
               hold();
               break;
+            }
             default:
               _segmentLogger.error("Holding after response from Controller: {}", response.toJsonString());
               hold();
@@ -835,13 +836,18 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           }
         }
       } catch (Exception e) {
-        String errorMessage = "Exception while in work";
-        _segmentLogger.error(errorMessage, e);
-        postStopConsumedMsg(e.getClass().getName());
-        _state = State.ERROR;
-        _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(), errorMessage, e));
-        _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.LLC_PARTITION_CONSUMING, 0);
-        return;
+        if (_shouldStop) {
+          _segmentLogger.info("Caught exception in consumer thread after stop() is invoked: {}, ignoring the exception",
+              e.toString());
+        } else {
+          String errorMessage = "Exception while in work";
+          _segmentLogger.error(errorMessage, e);
+          postStopConsumedMsg(e.getClass().getName());
+          _state = State.ERROR;
+          _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(), errorMessage, e));
+          _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.LLC_PARTITION_CONSUMING, 0);
+          return;
+        }
       }
 
       removeSegmentFile();
@@ -945,7 +951,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
    */
   private void reportDataLoss(MessageBatch messageBatch) {
     if (messageBatch.hasDataLoss()) {
-      _serverMetrics.addMeteredTableValue(_tableStreamName, ServerMeter.STREAM_DATA_LOSS, 1L);
+      _serverMetrics.setValueOfTableGauge(_tableStreamName, ServerGauge.STREAM_DATA_LOSS, 1L);
       String message = String.format("Message loss detected in stream partition: %s for table: %s startOffset: %s "
               + "batchFirstOffset: %s", _partitionGroupId, _tableNameWithType, _startOffset,
           messageBatch.getFirstMessageOffset());
@@ -1191,14 +1197,12 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
    */
   private void cleanupMetrics() {
     _serverMetrics.removeTableGauge(_clientId, ServerGauge.LLC_PARTITION_CONSUMING);
+    _serverMetrics.removeTableGauge(_clientId, ServerGauge.STREAM_DATA_LOSS);
   }
 
-  protected void hold() {
-    try {
-      Thread.sleep(SegmentCompletionProtocol.MAX_HOLD_TIME_MS);
-    } catch (InterruptedException e) {
-      _segmentLogger.warn("Interrupted while holding");
-    }
+  protected void hold()
+      throws InterruptedException {
+    Thread.sleep(SegmentCompletionProtocol.MAX_HOLD_TIME_MS);
   }
 
   private static class ConsumptionStopIndicator {
@@ -1269,13 +1273,11 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       // Remove the segment file before we do anything else.
       removeSegmentFile();
       _leaseExtender.removeSegment(_segmentNameStr);
-      final StreamPartitionMsgOffset endOffset =
-          _streamPartitionMsgOffsetFactory.create(segmentZKMetadata.getEndOffset());
-      _segmentLogger
-          .info("State: {}, transitioning from CONSUMING to ONLINE (startOffset: {}, endOffset: {})", _state.toString(),
-              _startOffset, endOffset);
+      StreamPartitionMsgOffset endOffset = _streamPartitionMsgOffsetFactory.create(segmentZKMetadata.getEndOffset());
+      _segmentLogger.info("State: {}, transitioning from CONSUMING to ONLINE (startOffset: {}, endOffset: {})", _state,
+          _startOffset, endOffset);
       stop();
-      _segmentLogger.info("Consumer thread stopped in state {}", _state.toString());
+      _segmentLogger.info("Consumer thread stopped in state {}", _state);
 
       switch (_state) {
         case COMMITTED:
@@ -1381,8 +1383,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   public void doOffload() {
     try {
       stop();
-    } catch (InterruptedException e) {
-      _segmentLogger.error("Could not stop consumer thread");
+    } catch (Exception e) {
+      _segmentLogger.error("Caught exception while stopping the consumer thread", e);
     }
     closeStreamConsumers();
     cleanupMetrics();
@@ -1402,19 +1404,21 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
   /**
    * Stop the consuming thread.
+   *
+   * This method is invoked in 2 places:
+   * 1. By the Helix thread when handling the segment state transition from CONSUMING to ONLINE. When this method is
+   *    invoked, Helix thread should already hold the segment lock, and the consumer thread is not building the segment.
+   *    We can safely interrupt the consumer thread and wait for it to join.
+   * 2. By either the Helix thread or consumer thread to offload the segment. In this case, we can also safely interrupt
+   *    the consumer thread because there is no need to build the segment.
    */
   public void stop()
       throws InterruptedException {
     _shouldStop = true;
-    // This method could be called either when we get an ONLINE transition or
-    // when we commit a segment and replace the realtime segment with a committed
-    // one. In the latter case, we don't want to call join.
-    if (Thread.currentThread() != _consumerThread) {
-      Uninterruptibles.joinUninterruptibly(_consumerThread, 10, TimeUnit.MINUTES);
-
-      if (_consumerThread.isAlive()) {
-        _segmentLogger.warn("Failed to stop consumer thread within 10 minutes");
-      }
+    if (Thread.currentThread() != _consumerThread && _consumerThread.isAlive()) {
+      // Interrupt the consumer thread and wait for it to join.
+      _consumerThread.interrupt();
+      _consumerThread.join();
     }
   }
 
@@ -1679,25 +1683,38 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     return _idleTimer.getTimeSinceEventLastConsumedMs();
   }
 
+  public StreamPartitionMsgOffset fetchLatestStreamOffset(long maxWaitTimeMs, boolean useDebugLog) {
+    return fetchStreamOffset(OffsetCriteria.LARGEST_OFFSET_CRITERIA, maxWaitTimeMs, useDebugLog);
+  }
+
   public StreamPartitionMsgOffset fetchLatestStreamOffset(long maxWaitTimeMs) {
-    return fetchStreamOffset(OffsetCriteria.LARGEST_OFFSET_CRITERIA, maxWaitTimeMs);
+    return fetchLatestStreamOffset(maxWaitTimeMs, false);
+  }
+
+  public StreamPartitionMsgOffset fetchEarliestStreamOffset(long maxWaitTimeMs, boolean useDebugLog) {
+    return fetchStreamOffset(OffsetCriteria.SMALLEST_OFFSET_CRITERIA, maxWaitTimeMs, useDebugLog);
   }
 
   public StreamPartitionMsgOffset fetchEarliestStreamOffset(long maxWaitTimeMs) {
-    return fetchStreamOffset(OffsetCriteria.SMALLEST_OFFSET_CRITERIA, maxWaitTimeMs);
+    return fetchEarliestStreamOffset(maxWaitTimeMs, false);
   }
 
-  private StreamPartitionMsgOffset fetchStreamOffset(OffsetCriteria offsetCriteria, long maxWaitTimeMs) {
+  private StreamPartitionMsgOffset fetchStreamOffset(OffsetCriteria offsetCriteria, long maxWaitTimeMs,
+      boolean useDebugLog) {
     if (_partitionMetadataProvider == null) {
       createPartitionMetadataProvider("Fetch latest stream offset");
     }
     try {
       return _partitionMetadataProvider.fetchStreamPartitionOffset(offsetCriteria, maxWaitTimeMs);
     } catch (Exception e) {
-      _segmentLogger.warn(
-          String.format(
-              "Cannot fetch stream offset with criteria %s for clientId %s and partitionGroupId %d with maxWaitTime %d",
-              offsetCriteria, _clientId, _partitionGroupId, maxWaitTimeMs), e);
+      String logMessage = String.format(
+          "Cannot fetch stream offset with criteria %s for clientId %s and partitionGroupId %d with maxWaitTime %d",
+          offsetCriteria, _clientId, _partitionGroupId, maxWaitTimeMs);
+      if (!useDebugLog) {
+        _segmentLogger.warn(logMessage, e);
+      } else {
+        _segmentLogger.debug(logMessage, e);
+      }
     }
     return null;
   }
@@ -1807,8 +1824,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private void updateIngestionMetrics(RowMetadata metadata) {
     if (metadata != null) {
       try {
-        StreamPartitionMsgOffset latestOffset =
-            _partitionMetadataProvider.fetchStreamPartitionOffset(OffsetCriteria.LARGEST_OFFSET_CRITERIA, 5000);
+        StreamPartitionMsgOffset latestOffset = fetchLatestStreamOffset(5000, true);
         _realtimeTableDataManager.updateIngestionMetrics(metadata.getRecordIngestionTimeMs(),
             metadata.getFirstStreamRecordIngestionTimeMs(), metadata.getOffset(), latestOffset, _partitionGroupId);
       } catch (Exception e) {

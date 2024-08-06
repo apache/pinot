@@ -70,7 +70,8 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
           childNodes[i] = planExecution(arguments.get(i));
         }
         String functionName = function.getFunctionName();
-        switch (functionName) {
+        String canonicalName = FunctionRegistry.canonicalize(functionName);
+        switch (canonicalName) {
           case "and":
             return new AndExecutionNode(childNodes);
           case "or":
@@ -86,14 +87,13 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
             }
             return new ArrayConstantExecutionNode(values);
           default:
-            FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(functionName, numArguments);
+            FunctionInfo functionInfo = FunctionRegistry.lookupFunctionInfo(canonicalName, numArguments);
             if (functionInfo == null) {
-              if (FunctionRegistry.containsFunction(functionName)) {
+              if (FunctionRegistry.contains(canonicalName)) {
                 throw new IllegalStateException(
-                    String.format("Unsupported function: %s with %d parameters", functionName, numArguments));
+                    String.format("Unsupported function: %s with %d arguments", functionName, numArguments));
               } else {
-                throw new IllegalStateException(
-                    String.format("Unsupported function: %s not found", functionName));
+                throw new IllegalStateException(String.format("Unsupported function: %s", functionName));
               }
             }
             return new FunctionExecutionNode(functionInfo, childNodes);

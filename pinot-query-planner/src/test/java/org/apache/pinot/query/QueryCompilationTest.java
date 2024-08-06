@@ -385,6 +385,13 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     assertEquals(tableNames.get(0), "a");
   }
 
+  @Test
+  public void testDuplicateWithAlias() {
+    String query = "WITH tmp AS (SELECT * FROM a LIMIT 1), tmp AS (SELECT * FROM a LIMIT 2) SELECT * FROM tmp";
+    RuntimeException e = expectThrows(RuntimeException.class, () -> _queryEnvironment.getTableNamesForQuery(query));
+    assertTrue(e.getCause().getMessage().contains("Duplicate alias in WITH: 'tmp'"));
+  }
+
   // --------------------------------------------------------------------------
   // Test Utils.
   // --------------------------------------------------------------------------
