@@ -26,12 +26,15 @@ import org.apache.pinot.common.function.FunctionInvoker;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.Function;
+import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.sql.parsers.SqlCompilationException;
 
 
 public class CompileTimeFunctionsInvoker implements QueryRewriter {
+
   @Override
   public PinotQuery rewrite(PinotQuery pinotQuery) {
     for (int i = 0; i < pinotQuery.getSelectListSize(); i++) {
@@ -61,38 +64,40 @@ public class CompileTimeFunctionsInvoker implements QueryRewriter {
     List<Expression> operands = function.getOperands();
     int numOperands = operands.size();
     boolean compilable = true;
+    ColumnDataType[] argumentTypes = new ColumnDataType[numOperands];
+    Object[] arguments = new Object[numOperands];
     for (int i = 0; i < numOperands; i++) {
       Expression operand = invokeCompileTimeFunctionExpression(operands.get(i));
-      if (operand.getLiteral() == null) {
+      operands.set(i, operand);
+      Literal literal = operand.getLiteral();
+      if (compilable && literal != null) {
+        RequestUtils.getLiteralTypeAndValue(literal, argumentTypes, arguments, i);
+      } else {
         compilable = false;
       }
-      operands.set(i, operand);
     }
-    if (compilable) {
-      String canonicalName = FunctionRegistry.canonicalize(function.getOperator());
-      FunctionInfo functionInfo = FunctionRegistry.lookupFunctionInfo(canonicalName, numOperands);
-      if (functionInfo != null) {
-        Object[] arguments = new Object[numOperands];
-        for (int i = 0; i < numOperands; i++) {
-          arguments[i] = RequestUtils.getLiteralValue(function.getOperands().get(i).getLiteral());
-        }
-        try {
-          FunctionInvoker invoker = new FunctionInvoker(functionInfo);
-          Object result;
-          if (invoker.getMethod().isVarArgs()) {
-            result = invoker.invoke(new Object[] {arguments});
-          } else {
-            invoker.convertTypes(arguments);
-            result = invoker.invoke(arguments);
-          }
-          return RequestUtils.getLiteralExpression(result);
-        } catch (Exception e) {
-          throw new SqlCompilationException(
-              "Caught exception while invoking method: " + functionInfo.getMethod() + " with arguments: "
-                  + Arrays.toString(arguments), e);
-        }
+    if (!compilable) {
+      return expression;
+    }
+    String canonicalName = FunctionRegistry.canonicalize(function.getOperator());
+    FunctionInfo functionInfo = FunctionRegistry.lookupFunctionInfo(canonicalName, argumentTypes);
+    if (functionInfo == null) {
+      return expression;
+    }
+    try {
+      FunctionInvoker invoker = new FunctionInvoker(functionInfo);
+      Object result;
+      if (invoker.getMethod().isVarArgs()) {
+        result = invoker.invoke(new Object[]{arguments});
+      } else {
+        invoker.convertTypes(arguments);
+        result = invoker.invoke(arguments);
       }
+      return RequestUtils.getLiteralExpression(result);
+    } catch (Exception e) {
+      throw new SqlCompilationException(
+          "Caught exception while invoking method: " + functionInfo.getMethod() + " with arguments: " + Arrays.toString(
+              arguments), e);
     }
-    return expression;
   }
 }
