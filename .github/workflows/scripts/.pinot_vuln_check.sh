@@ -40,4 +40,6 @@ docker build \
     --tag ${DOCKER_IMAGE_NAME}:${PINOT_SHA} \
     .
 
+docker builder prune -a -f
+
 docker image ls
