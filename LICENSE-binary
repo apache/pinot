@@ -279,7 +279,7 @@ com.typesafe.netty:netty-reactive-streams:2.0.4
 com.typesafe.scala-logging:scala-logging_2.12:3.9.2
 com.uber:h3:4.1.1
 com.yammer.metrics:metrics-core:2.2.0
-com.yscope.clp:clp-ffi:0.4.4
+com.yscope.clp:clp-ffi:0.4.5
 com.zaxxer:HikariCP-java7:2.4.13
 commons-cli:commons-cli:1.8.0
 commons-codec:commons-codec:1.17.0

@@ -26,11 +26,8 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import net.openhft.chronicle.core.Jvm;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.sql.parsers.rewriter.ClpRewriter;
-import org.testng.SkipException;
-import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.plugin.inputformat.clplog.CLPLogRecordExtractorConfig.FIELDS_FOR_CLP_ENCODING_CONFIG_KEY;
@@ -52,15 +49,6 @@ public class CLPLogRecordExtractorTest {
   private static final String _MESSAGE_2_FIELD_NAME = "message2";
   private static final String _MESSAGE_2_FIELD_VALUE = "Stopped job_123 on node-987: 3 cores, 6 threads and "
       + "22.0% memory used.";
-
-  @BeforeClass
-  public void setup() {
-    //skip this test if the underlying arch is aarch64 as CLP isn't supported on ARM yet:
-    // https://github.com/y-scope/clp-ffi-java/issues/46
-    if (Jvm.isArm()) {
-      throw new SkipException("Skipping test as the underlying architecture is ARM");
-    }
-  }
 
   @Test
   public void testCLPEncoding() {
