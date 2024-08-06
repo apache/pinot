@@ -18,32 +18,38 @@
  */
 package org.apache.pinot.query.runtime.operator.window.aggregate;
 
+import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.collections.CollectionUtils;
+import java.util.function.Function;
+import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.query.planner.logical.RexExpression;
-import org.apache.pinot.query.runtime.operator.WindowAggregateOperator;
 import org.apache.pinot.query.runtime.operator.utils.AggregationUtils;
+import org.apache.pinot.query.runtime.operator.utils.AggregationUtils.Merger;
 import org.apache.pinot.query.runtime.operator.window.WindowFunction;
 
 
 public class AggregateWindowFunction extends WindowFunction {
-  private final AggregationUtils.Merger _merger;
+  private final Merger _merger;
 
-  public AggregateWindowFunction(RexExpression.FunctionCall aggCall, String functionName,
-      DataSchema inputSchema, WindowAggregateOperator.OrderSetInfo orderSetInfo) {
-    super(aggCall, functionName, inputSchema, orderSetInfo);
-    _merger = AggregationUtils.Accumulator.MERGERS.get(_functionName).apply(_dataType);
+  public AggregateWindowFunction(RexExpression.FunctionCall aggCall, DataSchema inputSchema,
+      List<RelFieldCollation> collations, boolean partitionByOnly) {
+    super(aggCall, inputSchema, collations, partitionByOnly);
+    String functionName = aggCall.getFunctionName();
+    Function<ColumnDataType, Merger> mergerCreator = AggregationUtils.Accumulator.MERGERS.get(functionName);
+    Preconditions.checkArgument(mergerCreator != null, "Unsupported aggregate function: %s", functionName);
+    _merger = mergerCreator.apply(_dataType);
   }
 
   @Override
   public final List<Object> processRows(List<Object[]> rows) {
-    if (_isPartitionByOnly) {
+    if (_partitionByOnly) {
       return processPartitionOnlyRows(rows);
     } else {
       return processRowsInternal(rows);
@@ -72,12 +78,12 @@ public class AggregateWindowFunction extends WindowFunction {
     for (Object[] row : rows) {
       // Only need to accumulate the aggregate function values for RANGE type. ROW type can be calculated as
       // we output the rows since the aggregation value depends on the neighboring rows.
-      Key orderKey = (_isPartitionByOnly && CollectionUtils.isEmpty(_orderSet)) ? emptyOrderKey
-          : AggregationUtils.extractRowKey(row, _orderSet);
+      Key orderKey = (_partitionByOnly && _orderKeys.length == 0) ? emptyOrderKey
+          : AggregationUtils.extractRowKey(row, _orderKeys);
 
       Key previousOrderKeyIfPresent = orderByResult.getPreviousOrderByKey();
-      Object currentRes = previousOrderKeyIfPresent == null ? null
-          : orderByResult.getOrderByResults().get(previousOrderKeyIfPresent);
+      Object currentRes =
+          previousOrderKeyIfPresent == null ? null : orderByResult.getOrderByResults().get(previousOrderKeyIfPresent);
       Object value = _inputRef == -1 ? _literal : row[_inputRef];
       if (currentRes == null) {
         orderByResult.addOrderByResult(orderKey, _merger.init(value, _dataType));
@@ -89,8 +95,8 @@ public class AggregateWindowFunction extends WindowFunction {
     for (Object[] row : rows) {
       // Only need to accumulate the aggregate function values for RANGE type. ROW type can be calculated as
       // we output the rows since the aggregation value depends on the neighboring rows.
-      Key orderKey = (_isPartitionByOnly && CollectionUtils.isEmpty(_orderSet)) ? emptyOrderKey
-          : AggregationUtils.extractRowKey(row, _orderSet);
+      Key orderKey = (_partitionByOnly && _orderKeys.length == 0) ? emptyOrderKey
+          : AggregationUtils.extractRowKey(row, _orderKeys);
       Object value = orderByResult.getOrderByResults().get(orderKey);
       results.add(value);
     }

@@ -119,6 +119,8 @@ public class V1Constants {
       public static final String DATETIME_GRANULARITY = "datetimeGranularity";
 
       public static final String COLUMN_PROPS_KEY_PREFIX = "column.";
+      public static final String SCHEMA_MAX_LENGTH = "schemaMaxLength";
+      public static final String SCHEMA_MAX_LENGTH_EXCEED_STRATEGY = "schemaMaxLengthExceedStrategy";
 
       public static String getKeyFor(String column, String key) {
         return COLUMN_PROPS_KEY_PREFIX + column + "." + key;

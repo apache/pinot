@@ -92,6 +92,7 @@ public interface SegmentMetadata {
    */
   long getLatestIngestionTimestamp();
 
+  @Nullable
   List<StarTreeV2Metadata> getStarTreeV2MetadataList();
 
   Map<String, String> getCustomMap();

@@ -18,11 +18,13 @@
  */
 package org.apache.pinot.segment.spi;
 
+import javax.annotation.Nullable;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 public class SegmentContext {
   private final IndexSegment _indexSegment;
+  @Nullable
   private MutableRoaringBitmap _queryableDocIdsSnapshot = null;
 
   public SegmentContext(IndexSegment indexSegment) {
@@ -33,11 +35,12 @@ public class SegmentContext {
     return _indexSegment;
   }
 
+  @Nullable
   public MutableRoaringBitmap getQueryableDocIdsSnapshot() {
     return _queryableDocIdsSnapshot;
   }
 
-  public void setQueryableDocIdsSnapshot(MutableRoaringBitmap queryableDocIdsSnapshot) {
+  public void setQueryableDocIdsSnapshot(@Nullable MutableRoaringBitmap queryableDocIdsSnapshot) {
     _queryableDocIdsSnapshot = queryableDocIdsSnapshot;
   }
 }

@@ -29,7 +29,7 @@ This package contains code for Pinot Controller UI.
 ```shell
 cd pinot-controller/src/main/resources
 ```
-3. Install Required Packages. Make sure you are using node v14 or more specifially v14.18.1
+3. Install Required Packages. Make sure you are using node v16 or more specifically v16.15.0
 ```shell
 npm install 
 ```

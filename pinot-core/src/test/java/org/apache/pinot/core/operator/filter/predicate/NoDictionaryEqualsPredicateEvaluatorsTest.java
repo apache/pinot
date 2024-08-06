@@ -20,8 +20,8 @@ package org.apache.pinot.core.operator.filter.predicate;
 
 import java.math.BigDecimal;
 import java.util.Random;
-import org.apache.commons.lang.ArrayUtils;
-import org.apache.commons.lang.RandomStringUtils;
+import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.predicate.EqPredicate;
 import org.apache.pinot.common.request.context.predicate.NotEqPredicate;
@@ -245,6 +245,46 @@ public class NoDictionaryEqualsPredicateEvaluatorsTest {
           ArrayUtils.contains(randomStrings, stringValue));
       Assert.assertEquals(neqPredicateEvaluator.applyMV(randomStrings, NUM_MULTI_VALUES),
           !ArrayUtils.contains(randomStrings, stringValue));
+    }
+  }
+
+  @Test
+  public void testJsonPredicateEvaluators() {
+    String jsonStringTemplate = "{\"id\": %s, \"name\": %s}";
+    String jsonString = String.format(jsonStringTemplate,
+        RandomStringUtils.randomAlphanumeric(MAX_STRING_LENGTH),
+        RandomStringUtils.randomAlphanumeric(MAX_STRING_LENGTH));
+
+    EqPredicate eqPredicate = new EqPredicate(COLUMN_EXPRESSION, jsonString);
+    PredicateEvaluator eqPredicateEvaluator =
+        EqualsPredicateEvaluatorFactory.newRawValueBasedEvaluator(eqPredicate, FieldSpec.DataType.JSON);
+
+    NotEqPredicate notEqPredicate = new NotEqPredicate(COLUMN_EXPRESSION, jsonString);
+    PredicateEvaluator neqPredicateEvaluator =
+        NotEqualsPredicateEvaluatorFactory.newRawValueBasedEvaluator(notEqPredicate, FieldSpec.DataType.JSON);
+
+    Assert.assertTrue(eqPredicateEvaluator.applySV(jsonString));
+    Assert.assertFalse(neqPredicateEvaluator.applySV(jsonString));
+
+    String[] randomJsonStrings = new String[NUM_MULTI_VALUES];
+    PredicateEvaluatorTestUtils.fillRandomJson(randomJsonStrings, jsonStringTemplate, 2, MAX_STRING_LENGTH);
+    randomJsonStrings[_random.nextInt(NUM_MULTI_VALUES)] = jsonString;
+
+    Assert.assertTrue(eqPredicateEvaluator.applyMV(randomJsonStrings, NUM_MULTI_VALUES));
+    Assert.assertFalse(neqPredicateEvaluator.applyMV(randomJsonStrings, NUM_MULTI_VALUES));
+
+    for (int i = 0; i < 100; i++) {
+      String randomJson = String.format(jsonStringTemplate,
+          RandomStringUtils.randomAlphanumeric(MAX_STRING_LENGTH),
+          RandomStringUtils.randomAlphanumeric(MAX_STRING_LENGTH));
+      Assert.assertEquals(eqPredicateEvaluator.applySV(randomJson), (randomJson.equals(jsonString)));
+      Assert.assertEquals(neqPredicateEvaluator.applySV(randomJson), (!randomJson.equals(jsonString)));
+
+      PredicateEvaluatorTestUtils.fillRandomJson(randomJsonStrings, jsonStringTemplate, 2, MAX_STRING_LENGTH);
+      Assert.assertEquals(eqPredicateEvaluator.applyMV(randomJsonStrings, NUM_MULTI_VALUES),
+          ArrayUtils.contains(randomJsonStrings, jsonString));
+      Assert.assertEquals(neqPredicateEvaluator.applyMV(randomJsonStrings, NUM_MULTI_VALUES),
+          !ArrayUtils.contains(randomJsonStrings, jsonString));
     }
   }
 

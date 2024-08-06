@@ -46,10 +46,9 @@ import org.apache.pinot.segment.spi.IndexSegment;
 public abstract class SetOperator extends MultiStageOperator {
   protected final Multiset<Record> _rightRowSet;
 
-  private final List<MultiStageOperator> _upstreamOperators;
+  private final List<MultiStageOperator> _inputOperators;
   private final MultiStageOperator _leftChildOperator;
   private final MultiStageOperator _rightChildOperator;
-
   private final DataSchema _dataSchema;
 
   private boolean _isRightSetBuilt;
@@ -58,11 +57,11 @@ public abstract class SetOperator extends MultiStageOperator {
   private MultiStageQueryStats _rightQueryStats = null;
   protected final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
 
-  public SetOperator(OpChainExecutionContext opChainExecutionContext, List<MultiStageOperator> upstreamOperators,
+  public SetOperator(OpChainExecutionContext opChainExecutionContext, List<MultiStageOperator> inputOperators,
       DataSchema dataSchema) {
     super(opChainExecutionContext);
     _dataSchema = dataSchema;
-    _upstreamOperators = upstreamOperators;
+    _inputOperators = inputOperators;
     _leftChildOperator = getChildOperators().get(0);
     _rightChildOperator = getChildOperators().get(1);
     _rightRowSet = HashMultiset.create();
@@ -77,7 +76,7 @@ public abstract class SetOperator extends MultiStageOperator {
 
   @Override
   public List<MultiStageOperator> getChildOperators() {
-    return _upstreamOperators;
+    return _inputOperators;
   }
 
   @Override
@@ -109,9 +108,7 @@ public abstract class SetOperator extends MultiStageOperator {
     if (_upstreamErrorBlock != null) {
       return _upstreamErrorBlock;
     }
-    // UNION each left block with the constructed right block set.
-    TransferableBlock leftBlock = _leftChildOperator.nextBlock();
-    return constructResultBlockSet(leftBlock);
+    return constructResultBlockSet();
   }
 
   protected void constructRightBlockSet() {
@@ -133,28 +130,33 @@ public abstract class SetOperator extends MultiStageOperator {
     }
   }
 
-  protected TransferableBlock constructResultBlockSet(TransferableBlock leftBlock) {
-    List<Object[]> rows = new ArrayList<>();
-    // TODO: Other operators keep the first erroneous block, while this keep the last.
-    //  We should decide what is what we want to do and be consistent with that.
-    if (_upstreamErrorBlock != null || leftBlock.isErrorBlock()) {
-      _upstreamErrorBlock = leftBlock;
-      return _upstreamErrorBlock;
-    }
-    if (leftBlock.isSuccessfulEndOfStreamBlock()) {
-      assert _rightQueryStats != null;
-      MultiStageQueryStats leftQueryStats = leftBlock.getQueryStats();
-      assert leftQueryStats != null;
-      _rightQueryStats.mergeInOrder(leftQueryStats, getOperatorType(), _statMap);
-      _rightQueryStats.getCurrentStats().concat(leftQueryStats.getCurrentStats());
-      return TransferableBlockUtils.getEndOfStreamTransferableBlock(_rightQueryStats);
-    }
-    for (Object[] row : leftBlock.getContainer()) {
-      if (handleRowMatched(row)) {
-        rows.add(row);
+  protected TransferableBlock constructResultBlockSet() {
+    // Keep reading the input blocks until we find a match row or all blocks are processed.
+    // TODO: Consider batching the rows to improve performance.
+    while (true) {
+      TransferableBlock leftBlock = _leftChildOperator.nextBlock();
+      if (leftBlock.isErrorBlock()) {
+        return leftBlock;
+      }
+      if (leftBlock.isSuccessfulEndOfStreamBlock()) {
+        assert _rightQueryStats != null;
+        MultiStageQueryStats leftQueryStats = leftBlock.getQueryStats();
+        assert leftQueryStats != null;
+        _rightQueryStats.mergeInOrder(leftQueryStats, getOperatorType(), _statMap);
+        _rightQueryStats.getCurrentStats().concat(leftQueryStats.getCurrentStats());
+        return TransferableBlockUtils.getEndOfStreamTransferableBlock(_rightQueryStats);
+      }
+      assert leftBlock.isDataBlock();
+      List<Object[]> rows = new ArrayList<>();
+      for (Object[] row : leftBlock.getContainer()) {
+        if (handleRowMatched(row)) {
+          rows.add(row);
+        }
+      }
+      if (!rows.isEmpty()) {
+        return new TransferableBlock(rows, _dataSchema, DataBlock.Type.ROW);
       }
     }
-    return new TransferableBlock(rows, _dataSchema, DataBlock.Type.ROW);
   }
 
   /**
@@ -166,6 +168,7 @@ public abstract class SetOperator extends MultiStageOperator {
   protected abstract boolean handleRowMatched(Object[] row);
 
   public enum StatKey implements StatMap.Key {
+    //@formatter:off
     EXECUTION_TIME_MS(StatMap.Type.LONG) {
       @Override
       public boolean includeDefaultInJson() {
@@ -178,6 +181,8 @@ public abstract class SetOperator extends MultiStageOperator {
         return true;
       }
     };
+    //@formatter:on
+
     private final StatMap.Type _type;
 
     StatKey(StatMap.Type type) {

@@ -141,4 +141,8 @@ public class AdminApiApplication extends ResourceConfig {
   public void stop() {
     _httpServer.shutdownNow();
   }
+
+  public HttpServer getHttpServer() {
+    return _httpServer;
+  }
 }

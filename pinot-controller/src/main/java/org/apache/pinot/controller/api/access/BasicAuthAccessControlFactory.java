@@ -77,11 +77,6 @@ public class BasicAuthAccessControlFactory implements AccessControlFactory {
     }
 
     @Override
-    public boolean hasDataAccess(HttpHeaders httpHeaders, String tableName) {
-      return getPrincipal(httpHeaders).filter(p -> p.hasTable(tableName)).isPresent();
-    }
-
-    @Override
     public boolean hasAccess(String tableName, AccessType accessType, HttpHeaders httpHeaders, String endpointUrl) {
       return getPrincipal(httpHeaders)
           .filter(p -> p.hasTable(tableName) && p.hasPermission(Objects.toString(accessType))).isPresent();

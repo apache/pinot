@@ -213,8 +213,7 @@ public class PrioritySchedulerTest {
     group.addLast(createQueryRequest("1", METRICS));
     results.add(scheduler.submit(createServerQueryRequest("1", METRICS)));
     DataTable dataTable = DataTableFactory.getDataTable(results.get(1).get());
-    assertTrue(dataTable.getMetadata()
-        .containsKey(DataTable.EXCEPTION_METADATA_KEY + QueryException.SERVER_OUT_OF_CAPACITY_ERROR.getErrorCode()));
+    assertTrue(dataTable.getExceptions().containsKey(QueryException.SERVER_OUT_OF_CAPACITY_ERROR.getErrorCode()));
     scheduler.stop();
   }
 

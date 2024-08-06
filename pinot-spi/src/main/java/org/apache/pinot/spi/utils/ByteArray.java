@@ -23,6 +23,7 @@ import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.util.Arrays;
+import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,6 +59,14 @@ public class ByteArray implements Comparable<ByteArray>, Serializable {
 
   public ByteArray(byte[] bytes) {
     _bytes = bytes;
+  }
+
+  public ByteArray(byte[] bytes, @Nullable FALFInterner<byte[]> byteInterner) {
+    if (byteInterner == null) {
+      _bytes = bytes;
+    } else {
+      _bytes = byteInterner.intern(bytes);
+    }
   }
 
   public byte[] getBytes() {

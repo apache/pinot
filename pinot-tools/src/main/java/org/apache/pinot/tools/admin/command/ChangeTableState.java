@@ -19,12 +19,12 @@
 package org.apache.pinot.tools.admin.command;
 
 import java.net.URI;
-import org.apache.http.HttpException;
-import org.apache.http.HttpResponse;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClientBuilder;
-import org.apache.http.util.EntityUtils;
+import org.apache.hc.client5.http.classic.methods.HttpGet;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
+import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
+import org.apache.hc.core5.http.HttpException;
+import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -98,11 +98,12 @@ public class ChangeTableState extends AbstractBaseAdminCommand implements Comman
               AuthProviderUtils.makeAuthProvider(_authProvider, _authTokenUrl, _authToken, _user, _password))
           .forEach(header -> httpGet.addHeader(header.getName(), header.getValue()));
 
-      HttpResponse response = httpClient.execute(httpGet);
-      int status = response.getStatusLine().getStatusCode();
-      if (status != 200) {
-        String responseString = EntityUtils.toString(response.getEntity());
-        throw new HttpException("Failed to change table state, error: " + responseString);
+      try (CloseableHttpResponse response = httpClient.execute(httpGet)) {
+        int status = response.getCode();
+        if (status != 200) {
+          String responseString = EntityUtils.toString(response.getEntity());
+          throw new HttpException("Failed to change table state, error: " + responseString);
+        }
       }
     }
     return true;

@@ -22,6 +22,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ include "pinot.minionStateless.fullname" . }}
+  namespace: {{ include "pinot.namespace" . }}
   labels:
     {{- include "pinot.minionStatelessLabels" . | nindent 4 }}
 spec:

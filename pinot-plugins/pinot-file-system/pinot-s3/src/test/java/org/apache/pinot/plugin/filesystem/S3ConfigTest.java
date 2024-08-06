@@ -21,6 +21,7 @@ package org.apache.pinot.plugin.filesystem;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.testng.Assert;
 import org.testng.annotations.Test;
+import software.amazon.awssdk.services.s3.model.StorageClass;
 
 
 public class S3ConfigTest {
@@ -43,5 +44,27 @@ public class S3ConfigTest {
   public void testParseDuration() {
     Assert.assertEquals(S3Config.parseDuration("P1DT2H30S"), S3Config.parseDuration("1d2h30s"));
     S3Config.parseDuration("10");
+  }
+
+  @Test
+  public void testDefaultStorageClassIsNull() {
+    PinotConfiguration pinotConfig = new PinotConfiguration();
+    S3Config cfg = new S3Config(pinotConfig);
+    Assert.assertNull(cfg.getStorageClass());
+  }
+
+  @Test
+  public void testIntelligentTieringStorageClass() {
+    PinotConfiguration pinotConfig = new PinotConfiguration();
+    pinotConfig.setProperty("storageClass", StorageClass.INTELLIGENT_TIERING.toString());
+    S3Config cfg = new S3Config(pinotConfig);
+    Assert.assertEquals(cfg.getStorageClass(), "INTELLIGENT_TIERING");
+  }
+
+  @Test(expectedExceptions = IllegalStateException.class)
+  public void testInvalidStorageClass() {
+    PinotConfiguration pinotConfig = new PinotConfiguration();
+    pinotConfig.setProperty("storageClass", "invalid-storage-class");
+    S3Config cfg = new S3Config(pinotConfig);
   }
 }

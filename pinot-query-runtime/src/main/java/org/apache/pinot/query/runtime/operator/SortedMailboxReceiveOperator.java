@@ -21,15 +21,12 @@ package org.apache.pinot.query.runtime.operator;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
-import javax.annotation.Nullable;
-import org.apache.calcite.rel.RelDistribution;
-import org.apache.calcite.rel.RelFieldCollation.Direction;
-import org.apache.calcite.rel.RelFieldCollation.NullDirection;
-import org.apache.commons.collections.CollectionUtils;
+import org.apache.calcite.rel.RelFieldCollation;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
-import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.operator.utils.SortUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
@@ -39,7 +36,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * This {@code SortedMailboxReceiveOperator} receives data from a {@link ReceivingMailbox} and serve it out from the
- * {@link MultiStageOperator#getNextBlock()}()} API in a sorted manner.
+ * {@link #nextBlock()} API in a sorted manner.
  *
  *  TODO: Once sorting on the {@code MailboxSendOperator} is available, modify this to use a k-way merge instead of
  *        resorting via the PriorityQueue.
@@ -50,24 +47,17 @@ public class SortedMailboxReceiveOperator extends BaseMailboxReceiveOperator {
   private static final String EXPLAIN_NAME = "SORTED_MAILBOX_RECEIVE";
 
   private final DataSchema _dataSchema;
-  private final List<RexExpression> _collationKeys;
-  private final List<Direction> _collationDirections;
-  private final List<NullDirection> _collationNullDirections;
-  private final boolean _isSortOnSender;
+  private final List<RelFieldCollation> _collations;
   private final List<Object[]> _rows = new ArrayList<>();
 
   private TransferableBlock _eosBlock;
 
-  public SortedMailboxReceiveOperator(OpChainExecutionContext context, RelDistribution.Type exchangeType,
-      DataSchema dataSchema, List<RexExpression> collationKeys, List<Direction> collationDirections,
-      List<NullDirection> collationNullDirections, boolean isSortOnSender, int senderStageId) {
-    super(context, exchangeType, senderStageId);
-    Preconditions.checkState(!CollectionUtils.isEmpty(collationKeys), "Collation keys must be set");
-    _dataSchema = dataSchema;
-    _collationKeys = collationKeys;
-    _collationDirections = collationDirections;
-    _collationNullDirections = collationNullDirections;
-    _isSortOnSender = isSortOnSender;
+  // TODO: Support merge sort when sender side sort is supported.
+  public SortedMailboxReceiveOperator(OpChainExecutionContext context, MailboxReceiveNode node) {
+    super(context, node);
+    Preconditions.checkState(!CollectionUtils.isEmpty(node.getCollations()), "Field collations must be set");
+    _dataSchema = node.getDataSchema();
+    _collations = node.getCollations();
   }
 
   @Override
@@ -75,7 +65,6 @@ public class SortedMailboxReceiveOperator extends BaseMailboxReceiveOperator {
     return LOGGER;
   }
 
-  @Nullable
   @Override
   public String toExplainString() {
     return EXPLAIN_NAME;
@@ -101,9 +90,7 @@ public class SortedMailboxReceiveOperator extends BaseMailboxReceiveOperator {
         if (!_rows.isEmpty()) {
           // TODO: This might not be efficient because we are sorting all the received rows. We should use a k-way merge
           //       when sender side is sorted.
-          _rows.sort(
-              new SortUtils.SortComparator(_collationKeys, _collationDirections, _collationNullDirections, _dataSchema,
-                  false));
+          _rows.sort(new SortUtils.SortComparator(_dataSchema, _collations, false));
           return new TransferableBlock(_rows, _dataSchema, DataBlock.Type.ROW);
         } else {
           return block;

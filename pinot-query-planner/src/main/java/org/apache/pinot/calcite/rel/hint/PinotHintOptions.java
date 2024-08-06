@@ -20,7 +20,6 @@ package org.apache.pinot.calcite.rel.hint;
 
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.hint.RelHint;
-import org.apache.pinot.query.planner.logical.LiteralHintUtils;
 
 
 /**
@@ -31,35 +30,13 @@ import org.apache.pinot.query.planner.logical.LiteralHintUtils;
  * in {@link RelHint#kvOptions}</p>
  */
 public class PinotHintOptions {
+  private PinotHintOptions() {
+  }
+
   public static final String AGGREGATE_HINT_OPTIONS = "aggOptions";
   public static final String JOIN_HINT_OPTIONS = "joinOptions";
   public static final String TABLE_HINT_OPTIONS = "tableOptions";
   public static final String WINDOW_HINT_OPTIONS = "windowOptions";
-
-  /**
-   * Hint to denote that the aggregation node is the final aggregation stage which extracts the final result.
-   */
-  public static final String INTERNAL_AGG_OPTIONS = "aggOptionsInternal";
-
-  private PinotHintOptions() {
-    // do not instantiate.
-  }
-
-  public static class InternalAggregateOptions {
-    public static final String AGG_TYPE = "agg_type";
-    /**
-     * agg call signature is used to store LITERAL inputs to the Aggregate Call. which is not supported in Calcite
-     * here
-     * 1. we store the Map of Pair[aggCallIdx, argListIdx] to RexLiteral to indicate the RexLiteral being passed into
-     *     the aggregateCalls[aggCallIdx].operandList[argListIdx] is supposed to be a RexLiteral.
-     * 2. not all RexLiteral types are supported to be part of the input constant call signature.
-     * 3. RexLiteral are encoded as String and decoded as Pinot Literal objects.
-     *
-     * see: {@link LiteralHintUtils}.
-     * see: https://issues.apache.org/jira/projects/CALCITE/issues/CALCITE-5833
-     */
-    public static final String AGG_CALL_SIGNATURE = "agg_call_signature";
-  }
 
   public static class AggregateOptions {
     public static final String IS_PARTITIONED_BY_GROUP_BY_KEYS = "is_partitioned_by_group_by_keys";

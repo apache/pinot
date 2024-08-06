@@ -1,0 +1,94 @@
+{
+  "dimensionFieldSpecs": [
+    {
+      "dataType": "INT",
+      "name": "generationNumber"
+    },
+    {
+      "dataType": "STRING",
+      "name": "stringDimSV1"
+    },
+    {
+      "dataType": "STRING",
+      "name": "stringDimSV2"
+    },
+    {
+      "dataType": "LONG",
+      "name": "longDimSV1"
+    },
+    {
+      "dataType": "LONG",
+      "name": "longDimSV2"
+    },
+    {
+      "dataType": "STRING",
+      "name": "stringDimMV1",
+      "singleValueField": false
+    },
+    {
+      "dataType": "STRING",
+      "name": "stringDimMV2",
+      "singleValueField": false
+    },
+    {
+      "dataType": "INT",
+      "name": "intDimMV1",
+      "singleValueField": false
+    },
+    {
+      "dataType": "INT",
+      "name": "intDimMV2",
+      "singleValueField": false
+    },
+    {
+      "dataType": "STRING",
+      "maxLength": 1000,
+      "name": "textDim1"
+    },
+    {
+      "dataType": "BYTES",
+      "name": "bytesDimSV1"
+    },
+    {
+      "dataType": "STRING",
+      "name": "mapDim1__KEYS",
+      "singleValueField": false
+    },
+    {
+      "dataType": "INT",
+      "name": "mapDim1__VALUES",
+      "singleValueField": false
+    },
+    {
+      "dataType": "STRING",
+      "name": "mapDim2json"
+    }
+  ],
+  "metricFieldSpecs": [
+    {
+      "dataType": "INT",
+      "name": "intMetric1"
+    },
+    {
+      "dataType": "LONG",
+      "name": "longMetric1"
+    },
+    {
+      "dataType": "FLOAT",
+      "name": "floatMetric1"
+    },
+    {
+      "dataType": "DOUBLE",
+      "name": "doubleMetric1"
+    }
+  ],
+  "dateTimeFieldSpecs" : [
+    {
+      "name" : "HoursSinceEpoch",
+      "dataType" : "INT",
+      "format" : "1:HOURS:EPOCH",
+      "granularity": "1:HOURS"
+    }
+  ],
+  "schemaName": "FeatureTest1"
+}

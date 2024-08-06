@@ -265,6 +265,7 @@ public class SegmentProcessorFramework {
       // SegmentNameGenerator will be inferred by the SegmentGeneratorConfig.
       generatorConfig.setSegmentNamePrefix(segmentNamePrefix);
       generatorConfig.setSegmentNamePostfix(segmentNamePostfix);
+      generatorConfig.setSegmentName(fixedSegmentName);
     }
 
     for (Map.Entry<String, GenericRowFileManager> entry : partitionToFileManagerMap.entrySet()) {

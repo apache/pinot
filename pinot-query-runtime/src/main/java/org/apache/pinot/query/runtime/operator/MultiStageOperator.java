@@ -24,6 +24,9 @@ import com.google.common.base.Stopwatch;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.datatable.StatMap;
+import org.apache.pinot.common.metrics.ServerMeter;
+import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
@@ -63,6 +66,11 @@ public abstract class MultiStageOperator
 
   public abstract void registerExecution(long time, int numRows);
 
+  /**
+   * Returns the next block from the operator. It should return non-empty data blocks followed by an end-of-stream (EOS)
+   * block when all the data is processed, or an error block if an error occurred. After it returns EOS or error block,
+   * no more call should be made.
+   */
   @Override
   public TransferableBlock nextBlock() {
     if (Tracing.ThreadAccountantOps.isInterrupted()) {
@@ -174,6 +182,17 @@ public abstract class MultiStageOperator
         response.mergeNumGroupsLimitReached(stats.getBoolean(AggregateOperator.StatKey.NUM_GROUPS_LIMIT_REACHED));
         response.mergeMaxRowsInOperator(stats.getLong(AggregateOperator.StatKey.EMITTED_ROWS));
       }
+
+      @Override
+      public void updateServerMetrics(StatMap<?> map, ServerMetrics serverMetrics) {
+        super.updateServerMetrics(map, serverMetrics);
+        @SuppressWarnings("unchecked")
+        StatMap<AggregateOperator.StatKey> stats = (StatMap<AggregateOperator.StatKey>) map;
+        boolean limitReached = stats.getBoolean(AggregateOperator.StatKey.NUM_GROUPS_LIMIT_REACHED);
+        if (limitReached) {
+          serverMetrics.addMeteredGlobalValue(ServerMeter.AGGREGATE_TIMES_NUM_GROUPS_LIMIT_REACHED, 1);
+        }
+      }
     },
     FILTER(FilterOperator.StatKey.class) {
       @Override
@@ -190,6 +209,19 @@ public abstract class MultiStageOperator
         StatMap<HashJoinOperator.StatKey> stats = (StatMap<HashJoinOperator.StatKey>) map;
         response.mergeMaxRowsInOperator(stats.getLong(HashJoinOperator.StatKey.EMITTED_ROWS));
         response.mergeMaxRowsInJoinReached(stats.getBoolean(HashJoinOperator.StatKey.MAX_ROWS_IN_JOIN_REACHED));
+      }
+
+      @Override
+      public void updateServerMetrics(StatMap<?> map, ServerMetrics serverMetrics) {
+        super.updateServerMetrics(map, serverMetrics);
+        @SuppressWarnings("unchecked")
+        StatMap<HashJoinOperator.StatKey> stats = (StatMap<HashJoinOperator.StatKey>) map;
+        boolean maxRowsInJoinReached = stats.getBoolean(HashJoinOperator.StatKey.MAX_ROWS_IN_JOIN_REACHED);
+        if (maxRowsInJoinReached) {
+          serverMetrics.addMeteredGlobalValue(ServerMeter.HASH_JOIN_TIMES_MAX_ROWS_REACHED, 1);
+        }
+        serverMetrics.addTimedValue(ServerTimer.HASH_JOIN_BUILD_TABLE_CPU_TIME_MS,
+            stats.getLong(HashJoinOperator.StatKey.TIME_BUILDING_HASH_TABLE_MS), TimeUnit.MILLISECONDS);
       }
     },
     INTERSECT(SetOperator.StatKey.class) {
@@ -228,6 +260,27 @@ public abstract class MultiStageOperator
         StatMap<BaseMailboxReceiveOperator.StatKey> stats = (StatMap<BaseMailboxReceiveOperator.StatKey>) map;
         response.mergeMaxRowsInOperator(stats.getLong(BaseMailboxReceiveOperator.StatKey.EMITTED_ROWS));
       }
+
+      @Override
+      public void updateServerMetrics(StatMap<?> map, ServerMetrics serverMetrics) {
+        super.updateServerMetrics(map, serverMetrics);
+        @SuppressWarnings("unchecked")
+        StatMap<BaseMailboxReceiveOperator.StatKey> stats = (StatMap<BaseMailboxReceiveOperator.StatKey>) map;
+
+        serverMetrics.addMeteredGlobalValue(ServerMeter.MULTI_STAGE_IN_MEMORY_MESSAGES,
+            stats.getInt(BaseMailboxReceiveOperator.StatKey.IN_MEMORY_MESSAGES));
+        serverMetrics.addMeteredGlobalValue(ServerMeter.MULTI_STAGE_RAW_MESSAGES,
+            stats.getInt(BaseMailboxReceiveOperator.StatKey.RAW_MESSAGES));
+        serverMetrics.addMeteredGlobalValue(ServerMeter.MULTI_STAGE_RAW_BYTES,
+            stats.getLong(BaseMailboxReceiveOperator.StatKey.DESERIALIZED_BYTES));
+
+        serverMetrics.addTimedValue(ServerTimer.MULTI_STAGE_DESERIALIZATION_CPU_TIME_MS,
+            stats.getLong(BaseMailboxReceiveOperator.StatKey.DESERIALIZATION_TIME_MS), TimeUnit.MILLISECONDS);
+        serverMetrics.addTimedValue(ServerTimer.RECEIVE_DOWNSTREAM_WAIT_CPU_TIME_MS,
+            stats.getLong(BaseMailboxReceiveOperator.StatKey.DOWNSTREAM_WAIT_MS), TimeUnit.MILLISECONDS);
+        serverMetrics.addTimedValue(ServerTimer.RECEIVE_UPSTREAM_WAIT_CPU_TIME_MS,
+            stats.getLong(BaseMailboxReceiveOperator.StatKey.UPSTREAM_WAIT_MS), TimeUnit.MILLISECONDS);
+      }
     },
     MAILBOX_SEND(MailboxSendOperator.StatKey.class) {
       @Override
@@ -235,6 +288,14 @@ public abstract class MultiStageOperator
         @SuppressWarnings("unchecked")
         StatMap<MailboxSendOperator.StatKey> stats = (StatMap<MailboxSendOperator.StatKey>) map;
         response.mergeMaxRowsInOperator(stats.getLong(MailboxSendOperator.StatKey.EMITTED_ROWS));
+      }
+
+      @Override
+      public void updateServerMetrics(StatMap<?> map, ServerMetrics serverMetrics) {
+        @SuppressWarnings("unchecked")
+        StatMap<MailboxSendOperator.StatKey> stats = (StatMap<MailboxSendOperator.StatKey>) map;
+        serverMetrics.addTimedValue(ServerTimer.MULTI_STAGE_SERIALIZATION_CPU_TIME_MS,
+            stats.getLong(MailboxSendOperator.StatKey.SERIALIZATION_TIME_MS), TimeUnit.MILLISECONDS);
       }
     },
     MINUS(SetOperator.StatKey.class) {
@@ -286,6 +347,15 @@ public abstract class MultiStageOperator
         response.mergeMaxRowsInWindowReached(
             stats.getBoolean(WindowAggregateOperator.StatKey.MAX_ROWS_IN_WINDOW_REACHED));
       }
+
+      @Override
+      public void updateServerMetrics(StatMap<?> map, ServerMetrics serverMetrics) {
+        @SuppressWarnings("unchecked")
+        StatMap<WindowAggregateOperator.StatKey> stats = (StatMap<WindowAggregateOperator.StatKey>) map;
+        if (stats.getBoolean(WindowAggregateOperator.StatKey.MAX_ROWS_IN_WINDOW_REACHED)) {
+          serverMetrics.addMeteredGlobalValue(ServerMeter.WINDOW_TIMES_MAX_ROWS_REACHED, 1);
+        }
+      }
     },;
 
     private final Class _statKeyClass;
@@ -311,5 +381,9 @@ public abstract class MultiStageOperator
      * (compatible with {@link #getStatKeyClass()}). This is a way to avoid casting in the caller.
      */
     public abstract void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map);
+
+    public void updateServerMetrics(StatMap<?> map, ServerMetrics serverMetrics) {
+      // Do nothing by default
+    }
   }
 }

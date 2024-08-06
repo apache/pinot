@@ -18,8 +18,12 @@
  */
 package org.apache.pinot.common.request.context;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.Literal;
@@ -52,101 +56,147 @@ public class LiteralContext {
   private String _stringValue;
   private byte[] _bytesValue;
 
-  public LiteralContext(DataType type, Object value) {
-    _type = type;
-    _value = value;
-    _pinotDataType = getPinotDataType(type);
-  }
-
   public LiteralContext(Literal literal) {
     switch (literal.getSetField()) {
+      case NULL_VALUE:
+        _type = DataType.UNKNOWN;
+        _value = null;
+        _pinotDataType = null;
+        break;
       case BOOL_VALUE:
         _type = DataType.BOOLEAN;
         _value = literal.getBoolValue();
+        _pinotDataType = PinotDataType.BOOLEAN;
         break;
       case INT_VALUE:
         _type = DataType.INT;
         _value = literal.getIntValue();
+        _pinotDataType = PinotDataType.INTEGER;
         break;
       case LONG_VALUE:
         _type = DataType.LONG;
         _value = literal.getLongValue();
+        _pinotDataType = PinotDataType.LONG;
         break;
       case FLOAT_VALUE:
         _type = DataType.FLOAT;
         _value = Float.intBitsToFloat(literal.getFloatValue());
+        _pinotDataType = PinotDataType.FLOAT;
         break;
       case DOUBLE_VALUE:
         _type = DataType.DOUBLE;
         _value = literal.getDoubleValue();
+        _pinotDataType = PinotDataType.DOUBLE;
         break;
       case BIG_DECIMAL_VALUE:
         _type = DataType.BIG_DECIMAL;
         _value = BigDecimalUtils.deserialize(literal.getBigDecimalValue());
+        _pinotDataType = PinotDataType.BIG_DECIMAL;
         break;
       case STRING_VALUE:
         _type = DataType.STRING;
         _value = literal.getStringValue();
+        _pinotDataType = PinotDataType.STRING;
         break;
       case BINARY_VALUE:
         _type = DataType.BYTES;
         _value = literal.getBinaryValue();
+        _pinotDataType = PinotDataType.BYTES;
         break;
-      // TODO: Revisit the type handling and whether we should convert value to primitive array for ARRAY types
-      case INT_ARRAY_VALUE:
+      case INT_ARRAY_VALUE: {
         _type = DataType.INT;
-        _value = literal.getIntArrayValue();
+        List<Integer> valueList = literal.getIntArrayValue();
+        int numValues = valueList.size();
+        int[] values = new int[numValues];
+        for (int i = 0; i < numValues; i++) {
+          values[i] = valueList.get(i);
+        }
+        _value = values;
+        _pinotDataType = PinotDataType.PRIMITIVE_INT_ARRAY;
         break;
-      case LONG_ARRAY_VALUE:
+      }
+      case LONG_ARRAY_VALUE: {
         _type = DataType.LONG;
-        _value = literal.getLongArrayValue();
+        List<Long> valueList = literal.getLongArrayValue();
+        int numValues = valueList.size();
+        long[] values = new long[numValues];
+        for (int i = 0; i < numValues; i++) {
+          values[i] = valueList.get(i);
+        }
+        _value = values;
+        _pinotDataType = PinotDataType.PRIMITIVE_LONG_ARRAY;
         break;
-      // TODO: Revisit the FLOAT_ARRAY handling. Currently the values are stored as int bits.
-      case FLOAT_ARRAY_VALUE:
+      }
+      case FLOAT_ARRAY_VALUE: {
         _type = DataType.FLOAT;
-        _value = literal.getFloatArrayValue();
+        List<Integer> valueList = literal.getFloatArrayValue();
+        int numValues = valueList.size();
+        float[] values = new float[numValues];
+        for (int i = 0; i < numValues; i++) {
+          values[i] = Float.intBitsToFloat(valueList.get(i));
+        }
+        _value = values;
+        _pinotDataType = PinotDataType.PRIMITIVE_FLOAT_ARRAY;
         break;
-      case DOUBLE_ARRAY_VALUE:
+      }
+      case DOUBLE_ARRAY_VALUE: {
         _type = DataType.DOUBLE;
-        _value = literal.getDoubleArrayValue();
+        List<Double> valueList = literal.getDoubleArrayValue();
+        int numValues = valueList.size();
+        double[] values = new double[numValues];
+        for (int i = 0; i < numValues; i++) {
+          values[i] = valueList.get(i);
+        }
+        _value = values;
+        _pinotDataType = PinotDataType.PRIMITIVE_DOUBLE_ARRAY;
         break;
+      }
       case STRING_ARRAY_VALUE:
         _type = DataType.STRING;
-        _value = literal.getStringArrayValue();
-        break;
-      case NULL_VALUE:
-        _type = DataType.UNKNOWN;
-        _value = null;
+        _value = literal.getStringArrayValue().toArray(new String[0]);
+        _pinotDataType = PinotDataType.STRING_ARRAY;
         break;
       default:
         throw new IllegalStateException("Unsupported field type: " + literal.getSetField());
     }
-    _pinotDataType = getPinotDataType(_type);
+  }
+
+  @VisibleForTesting
+  public LiteralContext(DataType type, @Nullable Object value) {
+    _type = type;
+    _value = value;
+    _pinotDataType = getPinotDataType(type, value);
   }
 
   @Nullable
-  private static PinotDataType getPinotDataType(DataType type) {
+  private static PinotDataType getPinotDataType(DataType type, @Nullable Object value) {
+    if (value == null) {
+      return null;
+    }
+    if (type == DataType.BYTES) {
+      Preconditions.checkState(value.getClass().getComponentType() == byte.class, "Bytes array is not supported");
+      return PinotDataType.BYTES;
+    }
+    boolean singleValue = !value.getClass().isArray();
     switch (type) {
       case BOOLEAN:
+        Preconditions.checkState(singleValue, "Boolean array is not supported");
         return PinotDataType.BOOLEAN;
       case INT:
-        return PinotDataType.INTEGER;
+        return singleValue ? PinotDataType.INTEGER : PinotDataType.PRIMITIVE_INT_ARRAY;
       case LONG:
-        return PinotDataType.LONG;
+        return singleValue ? PinotDataType.LONG : PinotDataType.PRIMITIVE_LONG_ARRAY;
       case FLOAT:
-        return PinotDataType.FLOAT;
+        return singleValue ? PinotDataType.FLOAT : PinotDataType.PRIMITIVE_FLOAT_ARRAY;
       case DOUBLE:
-        return PinotDataType.DOUBLE;
+        return singleValue ? PinotDataType.DOUBLE : PinotDataType.PRIMITIVE_DOUBLE_ARRAY;
       case BIG_DECIMAL:
+        Preconditions.checkState(singleValue, "BigDecimal array is not supported");
         return PinotDataType.BIG_DECIMAL;
       case STRING:
-        return PinotDataType.STRING;
-      case BYTES:
-        return PinotDataType.BYTES;
-      case UNKNOWN:
-        return null;
+        return singleValue ? PinotDataType.STRING : PinotDataType.STRING_ARRAY;
       default:
-        throw new IllegalStateException("Unsupported data type: " + type);
+        throw new IllegalStateException("Unsupported DataType: " + type);
     }
   }
 
@@ -157,6 +207,10 @@ public class LiteralContext {
   @Nullable
   public Object getValue() {
     return _value;
+  }
+
+  public boolean isSingleValue() {
+    return _pinotDataType == null || _pinotDataType.isSingleValue();
   }
 
   public boolean getBooleanValue() {
@@ -281,8 +335,21 @@ public class LiteralContext {
     //       https://github.com/apache/pinot/pull/11762)
     if (isNull()) {
       return "'null'";
-    } else {
+    }
+    if (isSingleValue()) {
       return "'" + getStringValue() + "'";
+    }
+    switch (_pinotDataType) {
+      case PRIMITIVE_INT_ARRAY:
+        return "'" + Arrays.toString((int[]) _value) + "'";
+      case PRIMITIVE_LONG_ARRAY:
+        return "'" + Arrays.toString((long[]) _value) + "'";
+      case PRIMITIVE_FLOAT_ARRAY:
+        return "'" + Arrays.toString((float[]) _value) + "'";
+      case PRIMITIVE_DOUBLE_ARRAY:
+        return "'" + Arrays.toString((double[]) _value) + "'";
+      default:
+        throw new IllegalStateException("Unsupported PinotDataType: " + _pinotDataType);
     }
   }
 }

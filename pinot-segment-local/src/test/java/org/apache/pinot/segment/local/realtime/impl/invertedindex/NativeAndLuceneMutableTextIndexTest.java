@@ -23,11 +23,14 @@ import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.lucene.search.SearcherManager;
+import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.mock;
 import static org.testng.Assert.assertEquals;
 
 
@@ -71,14 +74,18 @@ public class NativeAndLuceneMutableTextIndexTest {
   @BeforeClass
   public void setUp()
       throws Exception {
-    TextIndexConfig config =
-        new TextIndexConfig(false, null, null, false, false, null, null, true, 500, null, false);
+    RealtimeLuceneIndexRefreshManager.init(1, 10);
+    ServerMetrics.register(mock(ServerMetrics.class));
+    TextIndexConfig config = new TextIndexConfigBuilder()
+            .withUseANDForMultiTermQueries(false)
+            .build();
+
     _realtimeLuceneTextIndex =
-        new RealtimeLuceneTextIndex(TEXT_COLUMN_NAME, INDEX_DIR, "fooBar", config);
+        new RealtimeLuceneTextIndex(TEXT_COLUMN_NAME, INDEX_DIR, "table__0__1__20240602T0014Z", config);
     _nativeMutableTextIndex = new NativeMutableTextIndex(TEXT_COLUMN_NAME);
 
     _realtimeLuceneMVTextIndex =
-        new RealtimeLuceneTextIndex(MV_TEXT_COLUMN_NAME, INDEX_DIR, "fooBar", config);
+        new RealtimeLuceneTextIndex(MV_TEXT_COLUMN_NAME, INDEX_DIR, "table__0__1__20240602T0014Z", config);
     _nativeMutableMVTextIndex = new NativeMutableTextIndex(MV_TEXT_COLUMN_NAME);
 
     String[] documents = getTextData();
@@ -98,7 +105,7 @@ public class NativeAndLuceneMutableTextIndexTest {
     searcherManagers.add(_realtimeLuceneMVTextIndex.getSearcherManager());
     try {
       for (SearcherManager searcherManager : searcherManagers) {
-        searcherManager.maybeRefresh();
+        searcherManager.maybeRefreshBlocking();
       }
     } catch (Exception e) {
       throw new RuntimeException(e);

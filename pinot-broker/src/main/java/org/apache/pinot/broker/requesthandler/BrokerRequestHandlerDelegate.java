@@ -23,7 +23,7 @@ import java.util.Map;
 import java.util.concurrent.Executor;
 import javax.annotation.Nullable;
 import javax.ws.rs.core.HttpHeaders;
-import org.apache.http.conn.HttpClientConnectionManager;
+import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.broker.api.RequesterIdentity;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.BrokerResponse;
@@ -71,6 +71,13 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
   public BrokerResponse handleRequest(JsonNode request, @Nullable SqlNodeAndOptions sqlNodeAndOptions,
       @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext, @Nullable HttpHeaders httpHeaders)
       throws Exception {
+    // Pinot installations may either use PinotClientRequest or this class in order to process a query that
+    // arrives via their custom container. The custom code may add its own overhead in either pre-processing
+    // or post-processing stages, and should be measured independently.
+    // In order to accommodate for both code paths, we set the request arrival time only if it is not already set.
+    if (requestContext.getRequestArrivalTimeMillis() <= 0) {
+      requestContext.setRequestArrivalTimeMillis(System.currentTimeMillis());
+    }
     // Parse the query if needed
     if (sqlNodeAndOptions == null) {
       try {
@@ -81,10 +88,15 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
         return new BrokerResponseNative(QueryException.getException(QueryException.SQL_PARSING_ERROR, e));
       }
     }
-    if (_multiStageBrokerRequestHandler != null && QueryOptionsUtils.isUseMultistageEngine(
-        sqlNodeAndOptions.getOptions())) {
-      return _multiStageBrokerRequestHandler.handleRequest(request, sqlNodeAndOptions, requesterIdentity,
-          requestContext, httpHeaders);
+
+    if (QueryOptionsUtils.isUseMultistageEngine(sqlNodeAndOptions.getOptions())) {
+      if (_multiStageBrokerRequestHandler != null) {
+        return _multiStageBrokerRequestHandler.handleRequest(request, sqlNodeAndOptions, requesterIdentity,
+            requestContext, httpHeaders);
+      } else {
+        return new BrokerResponseNative(QueryException.getException(QueryException.INTERNAL_ERROR,
+            "V2 Multi-Stage query engine not enabled."));
+      }
     } else {
       return _singleStageBrokerRequestHandler.handleRequest(request, sqlNodeAndOptions, requesterIdentity,
           requestContext, httpHeaders);

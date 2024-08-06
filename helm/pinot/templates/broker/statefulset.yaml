@@ -21,6 +21,7 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: {{ include "pinot.broker.fullname" . }}
+  namespace: {{ include "pinot.namespace" . }}
   labels:
     {{- include "pinot.brokerLabels" . | nindent 4 }}
 spec:
@@ -38,9 +39,11 @@ spec:
         {{- include "pinot.brokerLabels" . | nindent 8 }}
       annotations:
         {{- if .Values.broker.automaticReload.enabled }}
-        checksum/config: {{- include (print $.Template.BasePath "/broker/configmap.yaml") . | sha256sum }}
+        checksum/config: {{ include (print $.Template.BasePath "/broker/configmap.yaml") . | sha256sum }}
         {{- end }}
-{{ toYaml .Values.broker.podAnnotations | nindent 8 }}
+        {{- with .Values.broker.podAnnotations }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
     spec:
       terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
       serviceAccountName: {{ include "pinot.serviceAccountName" . }}

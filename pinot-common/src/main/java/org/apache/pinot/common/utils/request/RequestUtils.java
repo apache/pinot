@@ -23,8 +23,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
+import it.unimi.dsi.fastutil.ints.IntArrayList;
+import it.unimi.dsi.fastutil.longs.LongArrayList;
 import java.math.BigDecimal;
+import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -32,7 +37,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 import javax.annotation.Nullable;
 import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.SqlNumericLiteral;
@@ -101,8 +105,116 @@ public class RequestUtils {
     return expression;
   }
 
-  public static Expression getLiteralExpression(SqlLiteral node) {
-    Expression expression = new Expression(ExpressionType.LITERAL);
+  public static Literal getNullLiteral() {
+    return Literal.nullValue(true);
+  }
+
+  public static Literal getLiteral(boolean value) {
+    return Literal.boolValue(value);
+  }
+
+  public static Literal getLiteral(int value) {
+    return Literal.intValue(value);
+  }
+
+  public static Literal getLiteral(long value) {
+    return Literal.longValue(value);
+  }
+
+  public static Literal getLiteral(float value) {
+    return Literal.floatValue(Float.floatToRawIntBits(value));
+  }
+
+  public static Literal getLiteral(double value) {
+    return Literal.doubleValue(value);
+  }
+
+  public static Literal getLiteral(BigDecimal value) {
+    return Literal.bigDecimalValue(BigDecimalUtils.serialize(value));
+  }
+
+  public static Literal getLiteral(String value) {
+    return Literal.stringValue(value);
+  }
+
+  public static Literal getLiteral(byte[] value) {
+    return Literal.binaryValue(value);
+  }
+
+  public static Literal getLiteral(int[] value) {
+    return Literal.intArrayValue(IntArrayList.wrap(value));
+  }
+
+  public static Literal getLiteral(long[] value) {
+    return Literal.longArrayValue(LongArrayList.wrap(value));
+  }
+
+  public static Literal getLiteral(float[] value) {
+    IntArrayList intBitsList = new IntArrayList(value.length);
+    for (float floatValue : value) {
+      intBitsList.add(Float.floatToRawIntBits(floatValue));
+    }
+    return Literal.floatArrayValue(intBitsList);
+  }
+
+  public static Literal getLiteral(double[] value) {
+    return Literal.doubleArrayValue(DoubleArrayList.wrap(value));
+  }
+
+  public static Literal getLiteral(String[] value) {
+    return Literal.stringArrayValue(Arrays.asList(value));
+  }
+
+  public static Literal getLiteral(@Nullable Object object) {
+    if (object == null) {
+      return getNullLiteral();
+    }
+    if (object instanceof Boolean) {
+      return getLiteral((boolean) object);
+    }
+    if (object instanceof Integer) {
+      return getLiteral((int) object);
+    }
+    if (object instanceof Long) {
+      return getLiteral((long) object);
+    }
+    if (object instanceof Float) {
+      return getLiteral((float) object);
+    }
+    if (object instanceof Double) {
+      return getLiteral((double) object);
+    }
+    if (object instanceof BigDecimal) {
+      return getLiteral((BigDecimal) object);
+    }
+    if (object instanceof Timestamp) {
+      return getLiteral(((Timestamp) object).getTime());
+    }
+    if (object instanceof String) {
+      return getLiteral((String) object);
+    }
+    if (object instanceof byte[]) {
+      return getLiteral((byte[]) object);
+    }
+    if (object instanceof int[]) {
+      return getLiteral((int[]) object);
+    }
+    if (object instanceof long[]) {
+      return getLiteral((long[]) object);
+    }
+    if (object instanceof float[]) {
+      return getLiteral((float[]) object);
+    }
+    if (object instanceof double[]) {
+      return getLiteral((double[]) object);
+    }
+    if (object instanceof String[]) {
+      return getLiteral((String[]) object);
+    }
+    return getLiteral(object.toString());
+  }
+
+  public static Literal getLiteral(SqlLiteral node) {
     Literal literal = new Literal();
     if (node instanceof SqlNumericLiteral) {
       BigDecimal bigDecimalValue = node.bigDecimalValue();
@@ -132,146 +244,77 @@ public class RequestUtils {
           break;
       }
     }
-    expression.setLiteral(literal);
-    return expression;
+    return literal;
   }
 
-  public static Expression createNewLiteralExpression() {
+  public static Expression getLiteralExpression(Literal literal) {
     Expression expression = new Expression(ExpressionType.LITERAL);
-    Literal literal = new Literal();
     expression.setLiteral(literal);
-    return expression;
-  }
-
-  public static Expression getLiteralExpression(boolean value) {
-    Expression expression = createNewLiteralExpression();
-    expression.getLiteral().setBoolValue(value);
-    return expression;
-  }
-
-  public static Expression getLiteralExpression(int value) {
-    Expression expression = createNewLiteralExpression();
-    expression.getLiteral().setIntValue(value);
-    return expression;
-  }
-
-  public static Expression getLiteralExpression(long value) {
-    Expression expression = createNewLiteralExpression();
-    expression.getLiteral().setLongValue(value);
-    return expression;
-  }
-
-  public static Expression getLiteralExpression(float value) {
-    Expression expression = createNewLiteralExpression();
-    expression.getLiteral().setFloatValue(Float.floatToRawIntBits(value));
-    return expression;
-  }
-
-  public static Expression getLiteralExpression(double value) {
-    Expression expression = createNewLiteralExpression();
-    expression.getLiteral().setDoubleValue(value);
-    return expression;
-  }
-
-  public static Expression getLiteralExpression(BigDecimal value) {
-    Expression expression = createNewLiteralExpression();
-    expression.getLiteral().setBigDecimalValue(BigDecimalUtils.serialize(value));
-    return expression;
-  }
-
-  public static Expression getLiteralExpression(String value) {
-    Expression expression = createNewLiteralExpression();
-    expression.getLiteral().setStringValue(value);
-    return expression;
-  }
-
-  public static Expression getLiteralExpression(byte[] value) {
-    Expression expression = createNewLiteralExpression();
-    expression.getLiteral().setBinaryValue(value);
-    return expression;
-  }
-
-  public static Expression getLiteralExpression(int[] value) {
-    Expression expression = createNewLiteralExpression();
-    expression.getLiteral().setIntArrayValue(Arrays.stream(value).boxed().collect(Collectors.toList()));
-    return expression;
-  }
-
-  public static Expression getLiteralExpression(long[] value) {
-    Expression expression = createNewLiteralExpression();
-    expression.getLiteral().setLongArrayValue(Arrays.stream(value).boxed().collect(Collectors.toList()));
-    return expression;
-  }
-
-  public static Expression getLiteralExpression(float[] value) {
-    Expression expression = createNewLiteralExpression();
-    expression.getLiteral().setFloatArrayValue(
-        IntStream.range(0, value.length).mapToObj(i -> Float.floatToRawIntBits(value[i])).collect(Collectors.toList()));
-    return expression;
-  }
-
-  public static Expression getLiteralExpression(double[] value) {
-    Expression expression = createNewLiteralExpression();
-    expression.getLiteral().setDoubleArrayValue(Arrays.stream(value).boxed().collect(Collectors.toList()));
-    return expression;
-  }
-
-  public static Expression getLiteralExpression(String[] value) {
-    Expression expression = createNewLiteralExpression();
-    expression.getLiteral().setStringArrayValue(Arrays.asList(value));
     return expression;
   }
 
   public static Expression getNullLiteralExpression() {
-    Expression expression = createNewLiteralExpression();
-    expression.getLiteral().setNullValue(true);
-    return expression;
+    return getLiteralExpression(getNullLiteral());
+  }
+
+  public static Expression getLiteralExpression(boolean value) {
+    return getLiteralExpression(getLiteral(value));
+  }
+
+  public static Expression getLiteralExpression(int value) {
+    return getLiteralExpression(getLiteral(value));
+  }
+
+  public static Expression getLiteralExpression(long value) {
+    return getLiteralExpression(getLiteral(value));
+  }
+
+  public static Expression getLiteralExpression(float value) {
+    return getLiteralExpression(getLiteral(value));
+  }
+
+  public static Expression getLiteralExpression(double value) {
+    return getLiteralExpression(getLiteral(value));
+  }
+
+  public static Expression getLiteralExpression(BigDecimal value) {
+    return getLiteralExpression(getLiteral(value));
+  }
+
+  public static Expression getLiteralExpression(String value) {
+    return getLiteralExpression(getLiteral(value));
+  }
+
+  public static Expression getLiteralExpression(byte[] value) {
+    return getLiteralExpression(getLiteral(value));
+  }
+
+  public static Expression getLiteralExpression(int[] value) {
+    return getLiteralExpression(getLiteral(value));
+  }
+
+  public static Expression getLiteralExpression(long[] value) {
+    return getLiteralExpression(getLiteral(value));
+  }
+
+  public static Expression getLiteralExpression(float[] value) {
+    return getLiteralExpression(getLiteral(value));
+  }
+
+  public static Expression getLiteralExpression(double[] value) {
+    return getLiteralExpression(getLiteral(value));
+  }
+
+  public static Expression getLiteralExpression(String[] value) {
+    return getLiteralExpression(getLiteral(value));
+  }
+
+  public static Expression getLiteralExpression(SqlLiteral node) {
+    return getLiteralExpression(getLiteral(node));
   }
 
   public static Expression getLiteralExpression(@Nullable Object object) {
-    if (object == null) {
-      return getNullLiteralExpression();
-    }
-    if (object instanceof Boolean) {
-      return RequestUtils.getLiteralExpression((boolean) object);
-    }
-    if (object instanceof Integer) {
-      return RequestUtils.getLiteralExpression((int) object);
-    }
-    if (object instanceof Long) {
-      return RequestUtils.getLiteralExpression((long) object);
-    }
-    if (object instanceof Float) {
-      return RequestUtils.getLiteralExpression((float) object);
-    }
-    if (object instanceof Double) {
-      return RequestUtils.getLiteralExpression((double) object);
-    }
-    if (object instanceof BigDecimal) {
-      return RequestUtils.getLiteralExpression((BigDecimal) object);
-    }
-    if (object instanceof String) {
-      return RequestUtils.getLiteralExpression((String) object);
-    }
-    if (object instanceof byte[]) {
-      return RequestUtils.getLiteralExpression((byte[]) object);
-    }
-    if (object instanceof int[]) {
-      return RequestUtils.getLiteralExpression((int[]) object);
-    }
-    if (object instanceof long[]) {
-      return RequestUtils.getLiteralExpression((long[]) object);
-    }
-    if (object instanceof float[]) {
-      return RequestUtils.getLiteralExpression((float[]) object);
-    }
-    if (object instanceof double[]) {
-      return RequestUtils.getLiteralExpression((double[]) object);
-    }
-    if (object instanceof String[]) {
-      return RequestUtils.getLiteralExpression((String[]) object);
-    }
-    return RequestUtils.getLiteralExpression(object.toString());
+    return getLiteralExpression(getLiteral(object));
   }
 
   /**
@@ -408,18 +451,16 @@ public class RequestUtils {
   private static final Map<String, String> CANONICAL_NAME_TO_SPECIAL_KEY_MAP;
 
   static {
-    CANONICAL_NAME_TO_SPECIAL_KEY_MAP = new HashMap<>();
+    ImmutableMap.Builder<String, String> builder = ImmutableMap.builder();
     for (FilterKind filterKind : FilterKind.values()) {
-      CANONICAL_NAME_TO_SPECIAL_KEY_MAP.put(canonicalizeFunctionName(filterKind.name()), filterKind.name());
+      builder.put(canonicalizeFunctionName(filterKind.name()), filterKind.name());
     }
-    CANONICAL_NAME_TO_SPECIAL_KEY_MAP.put("stdistance", "st_distance");
+    CANONICAL_NAME_TO_SPECIAL_KEY_MAP = builder.build();
   }
 
   /**
    * Converts the function name into its canonical form, but preserving the special keys.
    * - Keep FilterKind.name() as is because we need to read the FilterKind via FilterKind.valueOf().
-   * - Keep ST_Distance as is because we use exact match when applying geo-spatial index up to release 0.10.0.
-   * TODO: Remove the ST_Distance special handling after releasing 0.11.0.
    */
   public static String canonicalizeFunctionNamePreservingSpecialKey(String functionName) {
     String canonicalName = canonicalizeFunctionName(functionName);

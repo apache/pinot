@@ -35,6 +35,7 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   DELETED_SEGMENT_COUNT("segments", false),
   DELETE_TABLE_FAILURES("tables", false),
   REALTIME_ROWS_CONSUMED("rows", true),
+  REALTIME_ROWS_SANITIZED("rows", true),
   REALTIME_ROWS_FETCHED("rows", false),
   REALTIME_ROWS_FILTERED("rows", false),
   INVALID_REALTIME_ROWS_DROPPED("rows", false),
@@ -117,7 +118,45 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   LARGE_QUERY_RESPONSES_SENT("largeResponses", false),
   TOTAL_THREAD_CPU_TIME_MILLIS("millis", false),
   LARGE_QUERY_RESPONSE_SIZE_EXCEPTIONS("exceptions", false),
-  STREAM_DATA_LOSS("streamDataLoss", false);
+
+  // Multi-stage
+  /**
+   * Number of times the max number of rows in the hash table has been reached.
+   * It is increased at most one by one each time per stage.
+   * That means that if a stage has 10 workers and all of them reach the limit, this will be increased by 1.
+   * But if a single query has 2 different join operators and each one reaches the limit, this will be increased by 2.
+   */
+  HASH_JOIN_TIMES_MAX_ROWS_REACHED("times", true),
+  /**
+   * Number of times the max number of groups has been reached.
+   * It is increased at most one by one each time per stage.
+   * That means that if a stage has 10 workers and all of them reach the limit, this will be increased by 1.
+   * But if a single query has 2 different aggregate operators and each one reaches the limit, this will be increased
+   * by 2.
+   */
+  AGGREGATE_TIMES_NUM_GROUPS_LIMIT_REACHED("times", true),
+  /**
+   * The number of blocks that have been sent to the next stage without being serialized.
+   * This is the sum of all blocks sent by all workers in the stage.
+   */
+  MULTI_STAGE_IN_MEMORY_MESSAGES("messages", true),
+  /**
+   * The number of blocks that have been sent to the next stage in serialized format.
+   * This is the sum of all blocks sent by all workers in the stage.
+   */
+  MULTI_STAGE_RAW_MESSAGES("messages", true),
+  /**
+   * The number of bytes that have been sent to the next stage in serialized format.
+   * This is the sum of all bytes sent by all workers in the stage.
+   */
+  MULTI_STAGE_RAW_BYTES("bytes", true),
+  /**
+   * Number of times the max number of rows in window has been reached.
+   * It is increased at most one by one each time per stage.
+   * That means that if a stage has 10 workers and all of them reach the limit, this will be increased by 1.
+   * But if a single query has 2 different window operators and each one reaches the limit, this will be increased by 2.
+   */
+  WINDOW_TIMES_MAX_ROWS_REACHED("times", true);
 
   private final String _meterName;
   private final String _unit;

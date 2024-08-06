@@ -18,17 +18,18 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.calcite.rel.RelDistribution;
+import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
 import org.apache.pinot.query.planner.physical.MailboxIdUtils;
+import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.routing.MailboxInfo;
 import org.apache.pinot.query.routing.MailboxInfos;
 import org.apache.pinot.query.routing.SharedMailboxInfos;
@@ -39,7 +40,6 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlockTestUtils;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeMethod;
@@ -47,8 +47,10 @@ import org.testng.annotations.Test;
 
 import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.INT;
 import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.MockitoAnnotations.openMocks;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
@@ -72,21 +74,22 @@ public class MailboxReceiveOperatorTest {
 
   @BeforeClass
   public void setUp() {
-    MailboxInfos mailboxInfosBoth = new SharedMailboxInfos(new MailboxInfo("localhost", 1234, ImmutableList.of(0, 1)));
-    _stageMetadataBoth = new StageMetadata(0, Stream.of(0, 1)
-        .map(workerId -> new WorkerMetadata(workerId, ImmutableMap.of(1, mailboxInfosBoth), ImmutableMap.of()))
-        .collect(Collectors.toList()), ImmutableMap.of());
-    MailboxInfos mailboxInfos1 = new SharedMailboxInfos(new MailboxInfo("localhost", 1234, ImmutableList.of(0)));
-    _stageMetadata1 = new StageMetadata(0,
-        ImmutableList.of(new WorkerMetadata(0, ImmutableMap.of(1, mailboxInfos1), ImmutableMap.of())),
-        ImmutableMap.of());
+    MailboxInfos mailboxInfosBoth = new SharedMailboxInfos(new MailboxInfo("localhost", 1234, List.of(0, 1)));
+    _stageMetadataBoth = new StageMetadata(0,
+        Stream.of(0, 1).map(workerId -> new WorkerMetadata(workerId, Map.of(1, mailboxInfosBoth), Map.of()))
+            .collect(Collectors.toList()), Map.of());
+    MailboxInfos mailboxInfos1 = new SharedMailboxInfos(new MailboxInfo("localhost", 1234, List.of(0)));
+    _stageMetadata1 =
+        new StageMetadata(0, List.of(new WorkerMetadata(0, Map.of(1, mailboxInfos1), Map.of())), Map.of());
   }
 
   @BeforeMethod
   public void setUpMethod() {
-    _mocks = MockitoAnnotations.openMocks(this);
+    _mocks = openMocks(this);
     when(_mailboxService.getHostname()).thenReturn("localhost");
     when(_mailboxService.getPort()).thenReturn(1234);
+    when(_mailbox1.getStatMap()).thenReturn(new StatMap<>(ReceivingMailbox.StatKey.class));
+    when(_mailbox2.getStatMap()).thenReturn(new StatMap<>(ReceivingMailbox.StatKey.class));
   }
 
   @AfterMethod
@@ -97,22 +100,15 @@ public class MailboxReceiveOperatorTest {
 
   @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*RANGE_DISTRIBUTED.*")
   public void shouldThrowRangeDistributionNotSupported() {
-    OpChainExecutionContext context =
-        OperatorTestUtil.getOpChainContext(_mailboxService, Long.MAX_VALUE, _stageMetadata1);
-    //noinspection resource
-    new MailboxReceiveOperator(context, RelDistribution.Type.RANGE_DISTRIBUTED, 1);
+    getOperator(_stageMetadata1, RelDistribution.Type.RANGE_DISTRIBUTED);
   }
 
   @Test
-  public void shouldTimeout()
-      throws InterruptedException {
+  public void shouldTimeout() {
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
-
-    OpChainExecutionContext context =
-        OperatorTestUtil.getOpChainContext(_mailboxService, System.currentTimeMillis() + 1000L, _stageMetadata1);
-    try (MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(context, RelDistribution.Type.SINGLETON, 1)) {
-      Thread.sleep(100L);
-      TransferableBlock block = receiveOp.nextBlock();
+    try (MailboxReceiveOperator operator = getOperator(_stageMetadata1, RelDistribution.Type.SINGLETON,
+        System.currentTimeMillis() + 100L)) {
+      TransferableBlock block = operator.nextBlock();
       assertTrue(block.isErrorBlock());
       assertTrue(block.getExceptions().containsKey(QueryException.EXECUTION_TIMEOUT_ERROR_CODE));
     }
@@ -122,11 +118,8 @@ public class MailboxReceiveOperatorTest {
   public void shouldReceiveEosDirectlyFromSender() {
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
     when(_mailbox1.poll()).thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
-
-    OpChainExecutionContext context =
-        OperatorTestUtil.getOpChainContext(_mailboxService, Long.MAX_VALUE, _stageMetadata1);
-    try (MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(context, RelDistribution.Type.SINGLETON, 1)) {
-      assertTrue(receiveOp.nextBlock().isEndOfStreamBlock());
+    try (MailboxReceiveOperator operator = getOperator(_stageMetadata1, RelDistribution.Type.SINGLETON)) {
+      assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock());
     }
   }
 
@@ -136,14 +129,11 @@ public class MailboxReceiveOperatorTest {
     Object[] row = new Object[]{1, 1};
     when(_mailbox1.poll()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row),
         TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
-
-    OpChainExecutionContext context =
-        OperatorTestUtil.getOpChainContext(_mailboxService, Long.MAX_VALUE, _stageMetadata1);
-    try (MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(context, RelDistribution.Type.SINGLETON, 1)) {
-      List<Object[]> actualRows = receiveOp.nextBlock().getContainer();
-      assertEquals(actualRows.size(), 1);
-      assertEquals(actualRows.get(0), row);
-      assertTrue(receiveOp.nextBlock().isEndOfStreamBlock());
+    try (MailboxReceiveOperator operator = getOperator(_stageMetadata1, RelDistribution.Type.SINGLETON)) {
+      List<Object[]> resultRows = operator.nextBlock().getContainer();
+      assertEquals(resultRows.size(), 1);
+      assertEquals(resultRows.get(0), row);
+      assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock());
     }
   }
 
@@ -153,11 +143,8 @@ public class MailboxReceiveOperatorTest {
     String errorMessage = "TEST ERROR";
     when(_mailbox1.poll()).thenReturn(
         TransferableBlockUtils.getErrorTransferableBlock(new RuntimeException(errorMessage)));
-
-    OpChainExecutionContext context =
-        OperatorTestUtil.getOpChainContext(_mailboxService, Long.MAX_VALUE, _stageMetadata1);
-    try (MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(context, RelDistribution.Type.SINGLETON, 1)) {
-      TransferableBlock block = receiveOp.nextBlock();
+    try (MailboxReceiveOperator operator = getOperator(_stageMetadata1, RelDistribution.Type.SINGLETON)) {
+      TransferableBlock block = operator.nextBlock();
       assertTrue(block.isErrorBlock());
       assertTrue(block.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains(errorMessage));
     }
@@ -171,15 +158,11 @@ public class MailboxReceiveOperatorTest {
     Object[] row = new Object[]{1, 1};
     when(_mailbox2.poll()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row),
         TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
-
-    OpChainExecutionContext context =
-        OperatorTestUtil.getOpChainContext(_mailboxService, Long.MAX_VALUE, _stageMetadataBoth);
-    try (MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(context, RelDistribution.Type.HASH_DISTRIBUTED,
-        1)) {
-      List<Object[]> actualRows = receiveOp.nextBlock().getContainer();
-      assertEquals(actualRows.size(), 1);
-      assertEquals(actualRows.get(0), row);
-      assertTrue(receiveOp.nextBlock().isEndOfStreamBlock());
+    try (MailboxReceiveOperator operator = getOperator(_stageMetadataBoth, RelDistribution.Type.HASH_DISTRIBUTED)) {
+      List<Object[]> resultRows = operator.nextBlock().getContainer();
+      assertEquals(resultRows.size(), 1);
+      assertEquals(resultRows.get(0), row);
+      assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock());
     }
   }
 
@@ -194,18 +177,14 @@ public class MailboxReceiveOperatorTest {
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_2))).thenReturn(_mailbox2);
     when(_mailbox2.poll()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row2),
         TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
-
-    OpChainExecutionContext context =
-        OperatorTestUtil.getOpChainContext(_mailboxService, Long.MAX_VALUE, _stageMetadataBoth);
-    try (MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(context, RelDistribution.Type.HASH_DISTRIBUTED,
-        1)) {
+    try (MailboxReceiveOperator operator = getOperator(_stageMetadataBoth, RelDistribution.Type.HASH_DISTRIBUTED)) {
       // Receive first block from server1
-      assertEquals(receiveOp.nextBlock().getContainer().get(0), row1);
+      assertEquals(operator.nextBlock().getContainer().get(0), row1);
       // Receive second block from server2
-      assertEquals(receiveOp.nextBlock().getContainer().get(0), row2);
+      assertEquals(operator.nextBlock().getContainer().get(0), row2);
       // Receive third block from server1
-      assertEquals(receiveOp.nextBlock().getContainer().get(0), row3);
-      assertTrue(receiveOp.nextBlock().isEndOfStreamBlock());
+      assertEquals(operator.nextBlock().getContainer().get(0), row3);
+      assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock());
     }
   }
 
@@ -219,12 +198,8 @@ public class MailboxReceiveOperatorTest {
     Object[] row = new Object[]{3, 3};
     when(_mailbox2.poll()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row),
         TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
-
-    OpChainExecutionContext context =
-        OperatorTestUtil.getOpChainContext(_mailboxService, Long.MAX_VALUE, _stageMetadataBoth);
-    try (MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(context, RelDistribution.Type.HASH_DISTRIBUTED,
-        1)) {
-      TransferableBlock block = receiveOp.nextBlock();
+    try (MailboxReceiveOperator operator = getOperator(_stageMetadataBoth, RelDistribution.Type.HASH_DISTRIBUTED)) {
+      TransferableBlock block = operator.nextBlock();
       assertTrue(block.isErrorBlock());
       assertTrue(block.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains(errorMessage));
     }
@@ -241,20 +216,29 @@ public class MailboxReceiveOperatorTest {
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_2))).thenReturn(_mailbox2);
     when(_mailbox2.poll()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row2),
         TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
-
-    OpChainExecutionContext context =
-        OperatorTestUtil.getOpChainContext(_mailboxService, Long.MAX_VALUE, _stageMetadataBoth);
-    try (MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(context, RelDistribution.Type.HASH_DISTRIBUTED,
-        1)) {
+    try (MailboxReceiveOperator operator = getOperator(_stageMetadataBoth, RelDistribution.Type.HASH_DISTRIBUTED)) {
       // Receive first block from server1
-      assertEquals(receiveOp.nextBlock().getContainer().get(0), row1);
+      assertEquals(operator.nextBlock().getContainer().get(0), row1);
       // at this point operator received a signal to early terminate
-      receiveOp.earlyTerminate();
+      operator.earlyTerminate();
       // Receive next block should be EOS even if upstream keep sending normal block.
-      assertTrue(receiveOp.nextBlock().isEndOfStreamBlock());
+      assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock());
       // Assure that early terminate signal goes into each mailbox
       verify(_mailbox1).earlyTerminate();
       verify(_mailbox2).earlyTerminate();
     }
+  }
+
+  private MailboxReceiveOperator getOperator(StageMetadata stageMetadata, RelDistribution.Type distributionType,
+      long deadlineMs) {
+    OpChainExecutionContext context = OperatorTestUtil.getOpChainContext(_mailboxService, deadlineMs, stageMetadata);
+    MailboxReceiveNode node = mock(MailboxReceiveNode.class);
+    when(node.getDistributionType()).thenReturn(distributionType);
+    when(node.getSenderStageId()).thenReturn(1);
+    return new MailboxReceiveOperator(context, node);
+  }
+
+  private MailboxReceiveOperator getOperator(StageMetadata stageMetadata, RelDistribution.Type distributionType) {
+    return getOperator(stageMetadata, distributionType, Long.MAX_VALUE);
   }
 }

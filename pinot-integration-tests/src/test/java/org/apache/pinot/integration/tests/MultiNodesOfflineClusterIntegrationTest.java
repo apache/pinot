@@ -96,6 +96,7 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
 
     // Stop the broker
     brokerStarter.stop();
+    _brokerPorts.remove(_brokerPorts.size() - 1);
 
     // Dropping the broker should fail because it is still in the broker resource
     try {
@@ -288,7 +289,7 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
 
   // Disabled because with multiple replicas, there is no guarantee that all replicas are reloaded
   @Test(enabled = false)
-  public void testStarTreeTriggering(boolean useMultiStageQueryEngine) {
+  public void testStarTreeTriggering() {
     // Ignored
   }
 

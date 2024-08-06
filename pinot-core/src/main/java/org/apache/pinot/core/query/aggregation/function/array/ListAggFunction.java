@@ -152,6 +152,9 @@ public class ListAggFunction
 
   @Override
   public String extractFinalResult(AbstractObjectCollection<String> strings) {
+    if (strings == null) {
+      return null;
+    }
     return StringUtils.join(strings, _separator);
   }
 }

@@ -32,6 +32,7 @@ public class SegmentNameGeneratorFactory {
   public static final String FIXED_SEGMENT_NAME_GENERATOR = "fixed";
   public static final String SIMPLE_SEGMENT_NAME_GENERATOR = "simple";
   public static final String NORMALIZED_DATE_SEGMENT_NAME_GENERATOR = "normalizeddate";
+  public static final String UPLOADED_REALTIME = "uploadedrealtime";
 
   private SegmentNameGeneratorFactory() {
   }

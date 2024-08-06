@@ -72,6 +72,9 @@ public class SqlResultComparator {
   private static final String FIELD_NUM_ENTRIES_SCANNED_IN_FILTER = "numEntriesScannedInFilter";
   private static final String FIELD_NUM_ENTRIES_SCANNED_POST_FILTER = "numEntriesScannedPostFilter";
   private static final String FIELD_NUM_GROUPS_LIMIT_REACHED = "numGroupsLimitReached";
+  private static final String FIELD_MULTI_STAGE_STATS = "stageStats";
+  private static final String FIELD_MULTI_STAGE_STATS_TYPE = "type";
+  private static final String FIELD_MULTI_STAGE_STATS_CHILDREN = "children";
 
   private static final String FIELD_TYPE_INT = "INT";
   private static final String FIELD_TYPE_LONG = "LONG";
@@ -161,6 +164,47 @@ public class SqlResultComparator {
       }
     }
     return areResultsEqual;
+  }
+
+  public static boolean areMultiStageQueriesEqual(JsonNode actual, JsonNode expected, String query)
+      throws IOException {
+    if (hasExceptions(actual)) {
+      return false;
+    }
+
+    if (areEmpty(actual, expected)) {
+      return true;
+    }
+
+    if (!areDataSchemaEqual(actual, expected)) {
+      return false;
+    }
+
+    ArrayNode actualRows = (ArrayNode) actual.get(FIELD_RESULT_TABLE).get(FIELD_ROWS);
+    ArrayNode expectedRows = (ArrayNode) expected.get(FIELD_RESULT_TABLE).get(FIELD_ROWS);
+    ArrayNode columnDataTypes = (ArrayNode) expected.get(FIELD_RESULT_TABLE).get(FIELD_DATA_SCHEMA).
+        get(FIELD_COLUMN_DATA_TYPES);
+
+    convertNumbersToString(expectedRows, columnDataTypes);
+    convertNumbersToString(actualRows, columnDataTypes);
+
+    List<String> actualElementsSerialized = new ArrayList<>();
+    List<String> expectedElementsSerialized = new ArrayList<>();
+    for (int i = 0; i < actualRows.size(); i++) {
+      actualElementsSerialized.add(actualRows.get(i).toString());
+    }
+    for (int i = 0; i < expectedRows.size(); i++) {
+      expectedElementsSerialized.add(expectedRows.get(i).toString());
+    }
+
+    if (!areLengthsEqual(actual, expected)) {
+      return false;
+    }
+
+    // For now, just directly compare elements in result set
+    return areNonOrderByQueryElementsEqual(actualElementsSerialized, expectedElementsSerialized);
+
+    // Not verifying stage stats for now since they're still subject to change across versions
   }
 
   private static boolean areOrderByQueryElementsEqual(ArrayNode actualElements, ArrayNode expectedElements,

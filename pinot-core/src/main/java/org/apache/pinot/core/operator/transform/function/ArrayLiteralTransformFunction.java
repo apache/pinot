@@ -56,10 +56,9 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
   private String[][] _stringArrayResult;
 
   public ArrayLiteralTransformFunction(LiteralContext literalContext) {
-    List literalArray = (List) literalContext.getValue();
-    Preconditions.checkNotNull(literalArray);
-    if (literalArray.isEmpty()) {
-      _dataType = DataType.UNKNOWN;
+    _dataType = literalContext.getType();
+    Object value = literalContext.getValue();
+    if (value == null) {
       _intArrayLiteral = new int[0];
       _longArrayLiteral = new long[0];
       _floatArrayLiteral = new float[0];
@@ -67,53 +66,37 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
       _stringArrayLiteral = new String[0];
       return;
     }
-    _dataType = literalContext.getType();
     switch (_dataType) {
       case INT:
-        _intArrayLiteral = new int[literalArray.size()];
-        for (int i = 0; i < _intArrayLiteral.length; i++) {
-          _intArrayLiteral[i] = (int) literalArray.get(i);
-        }
+        _intArrayLiteral = (int[]) value;
         _longArrayLiteral = null;
         _floatArrayLiteral = null;
         _doubleArrayLiteral = null;
         _stringArrayLiteral = null;
         break;
       case LONG:
-        _longArrayLiteral = new long[literalArray.size()];
-        for (int i = 0; i < _longArrayLiteral.length; i++) {
-          _longArrayLiteral[i] = (long) literalArray.get(i);
-        }
+        _longArrayLiteral = (long[]) value;
         _intArrayLiteral = null;
         _floatArrayLiteral = null;
         _doubleArrayLiteral = null;
         _stringArrayLiteral = null;
         break;
       case FLOAT:
-        _floatArrayLiteral = new float[literalArray.size()];
-        for (int i = 0; i < _floatArrayLiteral.length; i++) {
-          _floatArrayLiteral[i] = (float) literalArray.get(i);
-        }
+        _floatArrayLiteral = (float[]) value;
         _intArrayLiteral = null;
         _longArrayLiteral = null;
         _doubleArrayLiteral = null;
         _stringArrayLiteral = null;
         break;
       case DOUBLE:
-        _doubleArrayLiteral = new double[literalArray.size()];
-        for (int i = 0; i < _doubleArrayLiteral.length; i++) {
-          _doubleArrayLiteral[i] = (double) literalArray.get(i);
-        }
+        _doubleArrayLiteral = (double[]) value;
         _intArrayLiteral = null;
         _longArrayLiteral = null;
         _floatArrayLiteral = null;
         _stringArrayLiteral = null;
         break;
       case STRING:
-        _stringArrayLiteral = new String[literalArray.size()];
-        for (int i = 0; i < _stringArrayLiteral.length; i++) {
-          _stringArrayLiteral[i] = (String) literalArray.get(i);
-        }
+        _stringArrayLiteral = (String[]) value;
         _intArrayLiteral = null;
         _longArrayLiteral = null;
         _floatArrayLiteral = null;
@@ -121,8 +104,8 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
         break;
       default:
         throw new IllegalStateException(
-            "Illegal data type for ArrayLiteralTransformFunction: " + _dataType + ", literal contexts: "
-                + Arrays.toString(literalArray.toArray()));
+            "Illegal data type for ArrayLiteralTransformFunction: " + _dataType + ", literal context: "
+                + literalContext);
     }
   }
 
