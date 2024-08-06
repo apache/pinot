@@ -39,7 +39,7 @@ public abstract class BaseRetentionPartitionDedupMetadataManager
       String metadataTimeColumn) {
     super(tableNameWithType, primaryKeyColumns, partitionId, serverMetrics, hashFunction);
     Preconditions.checkArgument(metadataTTL > 0, "metadataTTL: %s for table: %s must be positive when "
-        + "WriteOptimizedRetentionConcurrentMapPartitionDedupMetadataManager is used", metadataTTL, tableNameWithType);
+        + "RetentionConcurrentMapPartitionDedupMetadataManager is used", metadataTTL, tableNameWithType);
     _metadataTTL = metadataTTL;
     Preconditions.checkArgument(metadataTimeColumn != null,
         "When metadataTTL is configured, metadata time column must be configured for dedup enabled table: %s",
@@ -71,7 +71,7 @@ public abstract class BaseRetentionPartitionDedupMetadataManager
   }
 
   @VisibleForTesting
-  abstract void addSegment(IndexSegment segment, Iterator<DedupRecordInfo> dedupRecordInfoIterator);
+  protected abstract void addSegment(IndexSegment segment, Iterator<DedupRecordInfo> dedupRecordInfoIterator);
 
   @Override
   public void removeSegment(IndexSegment segment) {
@@ -91,5 +91,5 @@ public abstract class BaseRetentionPartitionDedupMetadataManager
   }
 
   @VisibleForTesting
-  abstract void removeSegment(IndexSegment segment, Iterator<DedupRecordInfo> dedupRecordInfoIterator);
+  protected abstract void removeSegment(IndexSegment segment, Iterator<DedupRecordInfo> dedupRecordInfoIterator);
 }
