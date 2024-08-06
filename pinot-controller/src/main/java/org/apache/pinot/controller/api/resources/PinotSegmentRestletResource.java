@@ -231,23 +231,52 @@ public class PinotSegmentRestletResource {
   @Path("segments/{tableName}/servers")
   @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_SERVER_MAP)
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Get a map from server to segments hosted by the server",
-      notes = "Get a map from server to segments hosted by the server")
+  @ApiOperation(value = "Get a map from server to segments hosted by the server", notes = "Get a map from server to "
+      + "segments hosted by the server")
   public List<Map<String, Object>> getServerToSegmentsMap(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr, @Context HttpHeaders headers) {
+      @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
+      @QueryParam("detailed") @DefaultValue("true") boolean detailed, @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
-    List<String> tableNamesWithType = ResourceUtils
-        .getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, Constants.validateTableType(tableTypeStr),
-            LOGGER);
+    List<String> tableNamesWithType = ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName,
+        Constants.validateTableType(tableTypeStr), LOGGER);
     List<Map<String, Object>> resultList = new ArrayList<>(tableNamesWithType.size());
     for (String tableNameWithType : tableNamesWithType) {
       Map<String, Object> resultForTable = new LinkedHashMap<>();
       resultForTable.put("tableName", tableNameWithType);
-      resultForTable.put("serverToSegmentsMap", _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType));
+      if (detailed) {
+        resultForTable.put("serverToSegmentsMap", _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType));
+      } else {
+        resultForTable.put("serverToSegmentsCountMap",
+            _pinotHelixResourceManager.getServerToSegmentsCountMap(tableNameWithType));
+      }
       resultList.add(resultForTable);
     }
     return resultList;
+  }
+
+  @GET
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/segments/{tableName}/info")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_SEGMENT_STATUS)
+  @ApiOperation(value = "Get segment names to segment status map", notes = "Get segment statuses of each segment")
+  public String getSegmentsStatusDetails(
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "realtime|offline", required = false) @QueryParam("tableType") String tableTypeStr,
+      @DefaultValue("0") @QueryParam("offset") int offset,
+      @DefaultValue("10") @QueryParam("pagesize") int pageSize, @Context HttpHeaders headers)
+      throws JsonProcessingException {
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
+    TableType tableType = _pinotHelixResourceManager.validateTableType(tableTypeStr);
+    TableViews.TableView externalView =
+        _pinotHelixResourceManager.getTableState(tableName, TableViews.EXTERNALVIEW, tableType);
+    TableViews.TableView idealStateView =
+        _pinotHelixResourceManager.getTableState(tableName, TableViews.IDEALSTATE, tableType);
+    List<SegmentStatusInfo> segmentStatusInfoListMap = new ArrayList<>();
+    segmentStatusInfoListMap = _pinotHelixResourceManager.getSegmentStatuses(externalView, idealStateView);
+    List<SegmentStatusInfo> segmentStatusPaginationList =
+        Utils.paginateResults(segmentStatusInfoListMap, offset, pageSize);
+    return JsonUtils.objectToPrettyString(segmentStatusPaginationList);
   }
 
   @GET

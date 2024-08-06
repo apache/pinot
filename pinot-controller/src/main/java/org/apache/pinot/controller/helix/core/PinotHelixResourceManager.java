@@ -53,6 +53,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.ws.rs.BadRequestException;
 import javax.ws.rs.ClientErrorException;
@@ -139,7 +140,9 @@ import org.apache.pinot.controller.api.exception.UserAlreadyExistsException;
 import org.apache.pinot.controller.api.resources.InstanceInfo;
 import org.apache.pinot.controller.api.resources.OperationValidationResponse;
 import org.apache.pinot.controller.api.resources.PeriodicTaskInvocationResponse;
+import org.apache.pinot.controller.api.resources.SegmentStatusInfo;
 import org.apache.pinot.controller.api.resources.StateType;
+import org.apache.pinot.controller.api.resources.TableViews;
 import org.apache.pinot.controller.helix.core.assignment.instance.InstanceAssignmentDriver;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignment;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentFactory;
@@ -2856,6 +2859,26 @@ public class PinotHelixResourceManager {
   }
 
   /**
+   * Returns a map from server instance to count of segments it serves for the given table. Ignore OFFLINE segments from
+   * the ideal state because they are not supposed to be served.
+   */
+  public Map<String, Integer> getServerToSegmentsCountMap(String tableNameWithType) {
+    Map<String, Integer> serverToSegmentCountMap = new TreeMap<>();
+    IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableNameWithType);
+    if (idealState == null) {
+      throw new IllegalStateException("Ideal state does not exist for table: " + tableNameWithType);
+    }
+    for (Map.Entry<String, Map<String, String>> entry : idealState.getRecord().getMapFields().entrySet()) {
+      for (Map.Entry<String, String> instanceStateEntry : entry.getValue().entrySet()) {
+        if (!instanceStateEntry.getValue().equals(SegmentStateModel.OFFLINE)) {
+          serverToSegmentCountMap.merge(instanceStateEntry.getKey(), 1, Integer::sum);
+        }
+      }
+    }
+    return serverToSegmentCountMap;
+  }
+
+  /**
    * Returns a set of server instances for a given table and segment. Ignore OFFLINE segments from the ideal state
    * because they are not supposed to be served.
    */
@@ -3114,6 +3137,153 @@ public class PinotHelixResourceManager {
       tableConfigs.add(realtimeTableConfig);
     }
     return tableConfigs;
+  }
+
+  // we use name "view" to closely match underlying names and to not
+  // confuse with table state of enable/disable
+  public TableViews.TableView getTableState(String tableName, String view, TableType tableType) {
+    TableViews.TableView tableView;
+    if (view.equalsIgnoreCase(TableViews.IDEALSTATE)) {
+      tableView = getTableIdealState(tableName, tableType);
+    } else if (view.equalsIgnoreCase(TableViews.EXTERNALVIEW)) {
+      tableView = getTableExternalView(tableName, tableType);
+    } else {
+      throw new ControllerApplicationException(LOGGER,
+          "Bad view name: " + view + ". Expected idealstate or externalview", Response.Status.BAD_REQUEST);
+    }
+
+    if (tableView._offline == null && tableView._realtime == null) {
+      throw new ControllerApplicationException(LOGGER, "Table not found", Response.Status.NOT_FOUND);
+    }
+    return tableView;
+  }
+
+  public TableViews.TableView getTableIdealState(String tableNameOptType, TableType tableType) {
+    TableViews.TableView tableView = new TableViews.TableView();
+    if (tableType == null || tableType == TableType.OFFLINE) {
+      tableView._offline = getIdealState(tableNameOptType, TableType.OFFLINE);
+    }
+    if (tableType == null || tableType == TableType.REALTIME) {
+      tableView._realtime = getIdealState(tableNameOptType, TableType.REALTIME);
+    }
+    return tableView;
+  }
+
+  public TableViews.TableView getTableExternalView(@Nonnull String tableNameOptType, @Nullable TableType tableType) {
+    TableViews.TableView tableView = new TableViews.TableView();
+    if (tableType == null || tableType == TableType.OFFLINE) {
+      tableView._offline = getExternalView(tableNameOptType, TableType.OFFLINE);
+    }
+    if (tableType == null || tableType == TableType.REALTIME) {
+      tableView._realtime = getExternalView(tableNameOptType, TableType.REALTIME);
+    }
+    return tableView;
+  }
+
+  public TableType validateTableType(String tableTypeStr) {
+    if (tableTypeStr == null) {
+      return null;
+    }
+    try {
+      return TableType.valueOf(tableTypeStr.toUpperCase());
+    } catch (IllegalArgumentException e) {
+      String errStr = "Illegal table type '" + tableTypeStr + "'";
+      throw new ControllerApplicationException(LOGGER, errStr, Response.Status.BAD_REQUEST, e);
+    }
+  }
+
+  public String getTableStatus(TableViews.TableView externalView, TableViews.TableView idealStateView) {
+    List<SegmentStatusInfo> segmentStatusMap = getSegmentStatuses(externalView, idealStateView);
+    Set<String> segmentNamesSet = getStateMap(idealStateView).keySet();
+
+    // Using streams to get the key-value pairs
+    List<String> segmentStatusList =
+        segmentStatusMap.stream().filter(info -> segmentNamesSet.contains(info.getSegmentName()))
+            .map(SegmentStatusInfo::getSegmentStatus).collect(Collectors.toList());
+    if (segmentStatusList.contains(CommonConstants.Helix.StateModel.DisplaySegmentStatus.BAD)) {
+      return Helix.StateModel.DisplaySegmentStatus.BAD;
+    } else if (segmentStatusList.contains(Helix.StateModel.DisplaySegmentStatus.UPDATING)) {
+      return Helix.StateModel.DisplaySegmentStatus.UPDATING;
+    }
+    return Helix.StateModel.DisplaySegmentStatus.GOOD;
+  }
+
+  public List<SegmentStatusInfo> getSegmentStatuses(TableViews.TableView externalView,
+      TableViews.TableView idealStateView) {
+    Map<String, Map<String, String>> idealStateMap = getStateMap(idealStateView);
+    Map<String, Map<String, String>> externalViewMap = getStateMap(externalView);
+    List<SegmentStatusInfo> segmentStatusInfoList = new ArrayList<>();
+
+    for (Map.Entry<String, Map<String, String>> entry : externalViewMap.entrySet()) {
+      String segment = entry.getKey();
+      Map<String, String> externalViewEntryValue = entry.getValue();
+      if (isErrorSegment(externalViewEntryValue)) {
+        segmentStatusInfoList.add(
+            new SegmentStatusInfo(segment, CommonConstants.Helix.StateModel.DisplaySegmentStatus.BAD));
+      } else if (isOnlineOrConsumingSegment(externalViewEntryValue) && externalViewMap.equals(idealStateMap)) {
+        segmentStatusInfoList.add(
+            new SegmentStatusInfo(segment, CommonConstants.Helix.StateModel.DisplaySegmentStatus.GOOD));
+      } else if (isOfflineSegment(externalViewEntryValue) && externalViewMap.equals(idealStateMap)) {
+        segmentStatusInfoList.add(
+            new SegmentStatusInfo(segment, CommonConstants.Helix.StateModel.DisplaySegmentStatus.GOOD));
+      } else {
+        segmentStatusInfoList.add(new SegmentStatusInfo(segment, Helix.StateModel.DisplaySegmentStatus.UPDATING));
+      }
+    }
+    return segmentStatusInfoList;
+  }
+
+  private Map<String, Map<String, String>> getStateMap(TableViews.TableView view) {
+    if (view != null && view._offline != null && !view._offline.isEmpty()) {
+      return view._offline;
+    } else if (view != null && view._realtime != null && !view._realtime.isEmpty()) {
+      return view._realtime;
+    } else {
+      return new HashMap<>();
+    }
+  }
+
+  private boolean isErrorSegment(Map<String, String> stateMap) {
+    return stateMap.values().contains(CommonConstants.Helix.StateModel.SegmentStateModel.ERROR);
+  }
+
+  private boolean isOnlineOrConsumingSegment(Map<String, String> stateMap) {
+    return stateMap.values().stream().allMatch(
+        state -> state.equals(CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING) || state.equals(
+            CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE));
+  }
+
+  private boolean isOfflineSegment(Map<String, String> stateMap) {
+    return stateMap.values().contains(CommonConstants.Helix.StateModel.SegmentStateModel.OFFLINE);
+  }
+
+  @Nullable
+  public Map<String, Map<String, String>> getIdealState(@Nonnull String tableNameOptType,
+      @Nullable TableType tableType) {
+    String tableNameWithType = getTableNameWithType(tableNameOptType, tableType);
+    IdealState resourceIdealState = getHelixAdmin()
+        .getResourceIdealState(getHelixClusterName(), tableNameWithType);
+    return resourceIdealState == null ? null : resourceIdealState.getRecord().getMapFields();
+  }
+
+  @Nullable
+  public Map<String, Map<String, String>> getExternalView(@Nonnull String tableNameOptType, TableType tableType) {
+    String tableNameWithType = getTableNameWithType(tableNameOptType, tableType);
+    ExternalView resourceEV = getHelixAdmin()
+        .getResourceExternalView(getHelixClusterName(), tableNameWithType);
+    return resourceEV == null ? null : resourceEV.getRecord().getMapFields();
+  }
+
+  public String getTableNameWithType(@Nonnull String tableNameOptType, @Nullable TableType tableType) {
+    if (tableType != null) {
+      if (tableType == TableType.OFFLINE) {
+        return TableNameBuilder.OFFLINE.tableNameWithType(tableNameOptType);
+      } else {
+        return TableNameBuilder.REALTIME.tableNameWithType(tableNameOptType);
+      }
+    } else {
+      return tableNameOptType;
+    }
   }
 
   public List<String> getServerInstancesForTable(String tableName, TableType tableType) {

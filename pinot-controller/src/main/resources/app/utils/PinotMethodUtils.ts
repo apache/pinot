@@ -34,6 +34,7 @@ import {
   getTaskTypeDebug,
   getTables,
   getTaskTypeTasks,
+  getTaskTypeTasksCount,
   getTaskTypeState,
   stopTasks,
   resumeTasks,
@@ -94,7 +95,8 @@ import {
   requestUpdateUser,
   getTaskProgress,
   getSegmentReloadStatus,
-  getTaskRuntimeConfig
+  getTaskRuntimeConfig,
+  getSchemaInfo
 } from '../requests';
 import { baseApi } from './axios-config';
 import Utils, { getDisplaySegmentStatus } from './Utils';
@@ -380,17 +382,13 @@ const allSchemaDetailsColumnHeader = ["Schema Name", "Dimension Columns", "Date-
 
 const getAllSchemaDetails = async (schemaList) => {
   let schemaDetails:Array<any> = [];
-  let promiseArr = [];
-  promiseArr = schemaList.map(async (o)=>{
-    return await getSchema(o);
-  });
-  const results = await Promise.all(promiseArr);
+  const results = await getSchemaDataInfo();
   schemaDetails = results.map((obj)=>{
     let schemaObj = [];
-    schemaObj.push(obj.data.schemaName);
-    schemaObj.push(obj.data.dimensionFieldSpecs ? obj.data.dimensionFieldSpecs.length : 0);
-    schemaObj.push(obj.data.dateTimeFieldSpecs ? obj.data.dateTimeFieldSpecs.length : 0);
-    schemaObj.push(obj.data.metricFieldSpecs ? obj.data.metricFieldSpecs.length : 0);
+    schemaObj.push(obj.schemaName);
+    schemaObj.push(obj.dimensionFieldSpecsCount);
+    schemaObj.push(obj.dateTimeFieldSpecsCount);
+    schemaObj.push(obj.metricFieldSpecsCount);
     schemaObj.push(schemaObj[1] + schemaObj[2] + schemaObj[3]);
     return schemaObj;
   })
@@ -409,7 +407,7 @@ const allTableDetailsColumnHeader = [
 ];
 
 const getTableSizes = (tableName: string) => {
-  return getTableSize(tableName).then(result => {
+  return getTableSize(tableName, false).then(result => {
     return {
       reported_size: Utils.formatBytes(result.data.reportedSizeInBytes),
       estimated_size: Utils.formatBytes(result.data.estimatedSizeInBytes),
@@ -436,7 +434,7 @@ const getAllTableDetails = (tablesList) => {
   if (tablesList.length) {
     const promiseArr = [];
     tablesList.map((name) => {
-      promiseArr.push(getTableSize(name));
+      promiseArr.push(getTableSize(name, false));
       promiseArr.push(getIdealState(name));
       promiseArr.push(getExternalView(name));
     });
@@ -497,7 +495,7 @@ const getAllTableDetails = (tablesList) => {
 // API: /tables/:tableName/size
 // Expected Output: {tableName: '', reportedSize: '', estimatedSize: ''}
 const getTableSummaryData = (tableName) => {
-  return getTableSize(tableName).then(({ data }) => {
+  return getTableSize(tableName, false).then(({ data }) => {
     return {
       tableName: data.tableName,
       reportedSize: data.reportedSizeInBytes,
@@ -806,7 +804,7 @@ const getAllTaskTypes = async () => {
 };
 
 const getTaskInfo = async (taskType) => {
-  const tasksRes = await getTaskTypeTasks(taskType);
+  const tasksResLength = await getTaskTypeTasksCount(taskType);
   const stateRes = await getTaskTypeState(taskType);
 
   let state = get(stateRes, 'data', '');
@@ -814,7 +812,7 @@ const getTaskInfo = async (taskType) => {
   if(typeof state !== "string") {
     state = "";
   }
-  return [tasksRes?.data?.length || 0, state];
+  return [tasksResLength.data || 0, state];
 };
 
 const stopAllTasks = (taskType) => {
@@ -1003,6 +1001,12 @@ const saveTableAction = (tableObj) => {
 
 const getSchemaData = (schemaName) => {
   return getSchema(schemaName).then((response)=>{
+    return response.data;
+  });
+};
+
+const getSchemaDataInfo = () => {
+  return getSchemaInfo().then((response)=>{
     return response.data;
   });
 };
