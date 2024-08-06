@@ -21,11 +21,8 @@ package org.apache.pinot.segment.local.dedup;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.Iterator;
-import java.util.List;
 import org.apache.pinot.common.metrics.ServerGauge;
-import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.spi.IndexSegment;
-import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 
 
@@ -34,17 +31,16 @@ public abstract class BaseRetentionPartitionDedupMetadataManager
   protected final double _metadataTTL;
   protected final String _metadataTimeColumn;
 
-  protected BaseRetentionPartitionDedupMetadataManager(String tableNameWithType, List<String> primaryKeyColumns,
-      int partitionId, ServerMetrics serverMetrics, HashFunction hashFunction, double metadataTTL,
-      String metadataTimeColumn) {
-    super(tableNameWithType, primaryKeyColumns, partitionId, serverMetrics, hashFunction);
-    Preconditions.checkArgument(metadataTTL > 0, "metadataTTL: %s for table: %s must be positive when "
-        + "RetentionConcurrentMapPartitionDedupMetadataManager is used", metadataTTL, tableNameWithType);
-    _metadataTTL = metadataTTL;
-    Preconditions.checkArgument(metadataTimeColumn != null,
+  protected BaseRetentionPartitionDedupMetadataManager(String tableNameWithType, int partitionId,
+      DedupContext dedupContext) {
+    super(tableNameWithType, partitionId, dedupContext);
+    _metadataTTL = dedupContext.getMetadataTTL();
+    Preconditions.checkArgument(_metadataTTL > 0, "metadataTTL: %s for table: %s must be positive when "
+        + "RetentionConcurrentMapPartitionDedupMetadataManager is used", _metadataTTL, tableNameWithType);
+    _metadataTimeColumn = dedupContext.getMetadataTimeColumn();
+    Preconditions.checkArgument(_metadataTimeColumn != null,
         "When metadataTTL is configured, metadata time column must be configured for dedup enabled table: %s",
         tableNameWithType);
-    _metadataTimeColumn = metadataTimeColumn;
   }
 
   @Override
@@ -65,8 +61,7 @@ public abstract class BaseRetentionPartitionDedupMetadataManager
           dedupPrimaryKeyCount);
     } catch (Exception e) {
       throw new RuntimeException(String.format("Caught exception while adding segment: %s of table: %s to "
-              + "RetentionConcurrentMapPartitionDedupMetadataManager",
-          segment.getSegmentName(), _tableNameWithType), e);
+          + "RetentionConcurrentMapPartitionDedupMetadataManager", segment.getSegmentName(), _tableNameWithType), e);
     }
   }
 
@@ -85,8 +80,7 @@ public abstract class BaseRetentionPartitionDedupMetadataManager
           dedupPrimaryKeyCount);
     } catch (Exception e) {
       throw new RuntimeException(String.format("Caught exception while removing segment: %s of table: %s from "
-              + "RetentionConcurrentMapPartitionDedupMetadataManager",
-          segment.getSegmentName(), _tableNameWithType), e);
+          + "RetentionConcurrentMapPartitionDedupMetadataManager", segment.getSegmentName(), _tableNameWithType), e);
     }
   }
 

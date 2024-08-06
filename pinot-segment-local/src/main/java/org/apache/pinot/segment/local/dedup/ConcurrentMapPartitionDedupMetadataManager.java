@@ -18,26 +18,20 @@
  */
 package org.apache.pinot.segment.local.dedup;
 
-import java.util.List;
-import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.spi.IndexSegment;
-import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 
 class ConcurrentMapPartitionDedupMetadataManager implements PartitionDedupMetadataManager {
   private final PartitionDedupMetadataManager _partitionDedupMetadataManagerDelegate;
 
-  public ConcurrentMapPartitionDedupMetadataManager(String tableNameWithType, List<String> primaryKeyColumns,
-      int partitionId, ServerMetrics serverMetrics, HashFunction hashFunction, double metadataTTL,
-      String metadataTimeColumn) {
-    if (metadataTTL > 0) {
+  public ConcurrentMapPartitionDedupMetadataManager(String tableNameWithType, int partitionId,
+      DedupContext dedupContext) {
+    if (dedupContext.getMetadataTTL() > 0) {
       _partitionDedupMetadataManagerDelegate =
-          new RetentionConcurrentMapPartitionDedupMetadataManager(tableNameWithType, primaryKeyColumns,
-              partitionId, serverMetrics, hashFunction, metadataTTL, metadataTimeColumn);
+          new RetentionConcurrentMapPartitionDedupMetadataManager(tableNameWithType, partitionId, dedupContext);
     } else {
       _partitionDedupMetadataManagerDelegate =
-          new NoRetentionConcurrentMapPartitionDedupMetadataManager(tableNameWithType, primaryKeyColumns, partitionId,
-              serverMetrics, hashFunction);
+          new NoRetentionConcurrentMapPartitionDedupMetadataManager(tableNameWithType, partitionId, dedupContext);
     }
   }
 

@@ -26,44 +26,48 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.spi.config.table.DedupConfig;
-import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 
 
-abstract class BaseTableDedupMetadataManager implements TableDedupMetadataManager {
+public abstract class BaseTableDedupMetadataManager implements TableDedupMetadataManager {
   protected final Map<Integer, PartitionDedupMetadataManager> _partitionMetadataManagerMap = new ConcurrentHashMap<>();
   protected String _tableNameWithType;
-  protected List<String> _primaryKeyColumns;
-  protected ServerMetrics _serverMetrics;
-  protected HashFunction _hashFunction;
-  protected double _metadataTTL;
-  protected String _metadataTimeColumn;
+  protected DedupContext _dedupContext;
 
   @Override
   public void init(TableConfig tableConfig, Schema schema, TableDataManager tableDataManager,
       ServerMetrics serverMetrics) {
     _tableNameWithType = tableConfig.getTableName();
 
-    _primaryKeyColumns = schema.getPrimaryKeyColumns();
-    Preconditions.checkArgument(!CollectionUtils.isEmpty(_primaryKeyColumns),
+    List<String> primaryKeyColumns = schema.getPrimaryKeyColumns();
+    Preconditions.checkArgument(!CollectionUtils.isEmpty(primaryKeyColumns),
         "Primary key columns must be configured for dedup enabled table: %s", _tableNameWithType);
-
-    _serverMetrics = serverMetrics;
 
     DedupConfig dedupConfig = tableConfig.getDedupConfig();
     Preconditions.checkArgument(dedupConfig != null, "Dedup must be enabled for table: %s", _tableNameWithType);
-    _hashFunction = dedupConfig.getHashFunction();
-    _metadataTTL = dedupConfig.getMetadataTTL();
-    if (_metadataTTL > 0) {
-      _metadataTimeColumn = dedupConfig.getMetadataTimeColumn();
-      if (_metadataTimeColumn == null) {
-        _metadataTimeColumn = tableConfig.getValidationConfig().getTimeColumnName();
+    double metadataTTL = dedupConfig.getMetadataTTL();
+    String metadataTimeColumn = dedupConfig.getMetadataTimeColumn();
+    if (metadataTTL > 0) {
+      metadataTimeColumn = dedupConfig.getMetadataTimeColumn();
+      if (metadataTimeColumn == null) {
+        metadataTimeColumn = tableConfig.getValidationConfig().getTimeColumnName();
       }
-      Preconditions.checkArgument(_metadataTimeColumn != null,
+      Preconditions.checkArgument(metadataTimeColumn != null,
           "When metadataTTL is configured, metadata time column or time column must be configured for "
               + "dedup enabled table: %s", _tableNameWithType);
     }
+
+    DedupContext.Builder dedupContextBuider = new DedupContext.Builder();
+    dedupContextBuider
+        .setTableConfig(tableConfig)
+        .setSchema(schema)
+        .setPrimaryKeyColumns(primaryKeyColumns)
+        .setHashFunction(dedupConfig.getHashFunction())
+        .setMetadataTTL(metadataTTL)
+        .setMetadataTimeColumn(metadataTimeColumn)
+        .setServerMetrics(serverMetrics);
+    _dedupContext = dedupContextBuider.build();
   }
 
   public PartitionDedupMetadataManager getOrCreatePartitionManager(int partitionId) {

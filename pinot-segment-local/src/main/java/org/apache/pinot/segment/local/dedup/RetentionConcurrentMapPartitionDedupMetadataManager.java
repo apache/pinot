@@ -21,15 +21,12 @@ package org.apache.pinot.segment.local.dedup;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.AtomicDouble;
 import java.util.Iterator;
-import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.metrics.ServerGauge;
-import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.utils.HashUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
-import org.apache.pinot.spi.config.table.HashFunction;
 
 
 class RetentionConcurrentMapPartitionDedupMetadataManager extends BaseRetentionPartitionDedupMetadataManager {
@@ -39,11 +36,9 @@ class RetentionConcurrentMapPartitionDedupMetadataManager extends BaseRetentionP
   final ConcurrentHashMap<Object, Pair<IndexSegment, Double>> _primaryKeyToSegmentAndTimeMap =
       new ConcurrentHashMap<>();
 
-  protected RetentionConcurrentMapPartitionDedupMetadataManager(String tableNameWithType,
-      List<String> primaryKeyColumns, int partitionId, ServerMetrics serverMetrics, HashFunction hashFunction,
-      double metadataTTL, String metadataTimeColumn) {
-    super(tableNameWithType, primaryKeyColumns, partitionId, serverMetrics, hashFunction, metadataTTL,
-        metadataTimeColumn);
+  protected RetentionConcurrentMapPartitionDedupMetadataManager(String tableNameWithType, int partitionId,
+      DedupContext dedupContext) {
+    super(tableNameWithType, partitionId, dedupContext);
   }
 
   @Override
