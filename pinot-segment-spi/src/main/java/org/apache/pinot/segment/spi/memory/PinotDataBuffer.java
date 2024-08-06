@@ -167,13 +167,8 @@ public abstract class PinotDataBuffer implements DataBuffer {
     String factoryClassName;
     factoryClassName = System.getenv("PINOT_BUFFER_LIBRARY");
     if (factoryClassName == null) {
-      if (JavaVersion.VERSION < 16) {
-        LOGGER.info("Using LArray as buffer on JVM version {}", JavaVersion.VERSION);
-        factoryClassName = LArrayPinotBufferFactory.class.getCanonicalName();
-      } else {
-        LOGGER.info("Using Unsafe as buffer on JVM version {}", JavaVersion.VERSION);
-        factoryClassName = UnsafePinotBufferFactory.class.getCanonicalName();
-      }
+      LOGGER.info("Using Unsafe as buffer on JVM version {}", JavaVersion.VERSION);
+      factoryClassName = UnsafePinotBufferFactory.class.getCanonicalName();
     }
     return createFactory(factoryClassName, prioritizeByteBuffer);
   }

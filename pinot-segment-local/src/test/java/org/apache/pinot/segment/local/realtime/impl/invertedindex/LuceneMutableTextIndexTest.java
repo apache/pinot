@@ -19,14 +19,20 @@
 package org.apache.pinot.segment.local.realtime.impl.invertedindex;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.io.FileUtils;
-import org.apache.lucene.search.SearcherManager;
+import org.apache.lucene.analysis.Analyzer;
+import org.apache.lucene.analysis.core.KeywordTokenizer;
+import org.apache.lucene.queryparser.classic.QueryParser;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
+import org.apache.pinot.util.TestUtils;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.annotations.AfterClass;
@@ -38,15 +44,108 @@ import static org.testng.Assert.assertEquals;
 
 
 public class LuceneMutableTextIndexTest {
+  private static final AtomicInteger SEGMENT_NAME_SUFFIX_COUNTER = new AtomicInteger(0);
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "LuceneMutableIndexTest");
   private static final String TEXT_COLUMN_NAME = "testColumnName";
+  private static final String CUSTOM_ANALYZER_FQCN = CustomAnalyzer.class.getName();
+  private static final String CUSTOM_QUERY_PARSER_FQCN = CustomQueryParser.class.getName();
   private static final RealtimeLuceneTextIndexSearcherPool SEARCHER_POOL =
       RealtimeLuceneTextIndexSearcherPool.init(1);
-
   private RealtimeLuceneTextIndex _realtimeLuceneTextIndex;
 
   public LuceneMutableTextIndexTest() {
+    RealtimeLuceneIndexRefreshManager.init(1, 10);
     ServerMetrics.register(mock(ServerMetrics.class));
+  }
+
+  @Test
+  public void testDefaultAnalyzerAndDefaultQueryParser() {
+    // Test queries with standard analyzer with default configurations used by Pinot
+    configureIndex(null, null, null, null);
+    assertEquals(_realtimeLuceneTextIndex.getDocIds("stream"), ImmutableRoaringBitmap.bitmapOf(0));
+    assertEquals(_realtimeLuceneTextIndex.getDocIds("/.*house.*/"), ImmutableRoaringBitmap.bitmapOf(1));
+    assertEquals(_realtimeLuceneTextIndex.getDocIds("invalid"), ImmutableRoaringBitmap.bitmapOf());
+  }
+
+  @Test
+  public void testCustomAnalyzerWithNoArgsAndDefaultQueryParser() {
+    // Test query with CustomKeywordAnalyzer without any args
+    configureIndex(CUSTOM_ANALYZER_FQCN, null, null, null);
+    assertEquals(_realtimeLuceneTextIndex.getDocIds(
+            "/.*processing for data ware.*/"), ImmutableRoaringBitmap.bitmapOf(1));
+    assertEquals(_realtimeLuceneTextIndex.getDocIds(
+            "columnar processing for data warehouses"), ImmutableRoaringBitmap.bitmapOf(1));
+  }
+
+  @Test
+  public void testCustomAnalyzerWithNoArgsAndCustomQueryParser() {
+    // Test queries with CustomKeywordAnalyzer without any args and CustomQueryParser
+    configureIndex(CUSTOM_ANALYZER_FQCN, null, null, CUSTOM_QUERY_PARSER_FQCN);
+    assertEquals(_realtimeLuceneTextIndex.getDocIds(
+            "/.*processing for data ware.*/"), ImmutableRoaringBitmap.bitmapOf(1));
+    assertEquals(_realtimeLuceneTextIndex.getDocIds(
+            "columnar processing for data warehouses"), ImmutableRoaringBitmap.bitmapOf(1));
+  }
+
+  @Test
+  public void testCustomAnalyzerWithTwoStringArgsAndCustomQueryParser() {
+    // Test queries with CustomKeywordAnalyzer with two java.lang.String args and CustomQueryParser
+    configureIndex(CUSTOM_ANALYZER_FQCN,
+            "a,b", "java.lang.String, java.lang.String", CUSTOM_QUERY_PARSER_FQCN);
+    assertEquals(_realtimeLuceneTextIndex.getDocIds(
+            "/.*processing for data ware.*/"), ImmutableRoaringBitmap.bitmapOf(1));
+    assertEquals(_realtimeLuceneTextIndex.getDocIds(
+            "columnar processing for data warehouses"), ImmutableRoaringBitmap.bitmapOf(1));
+  }
+
+  @Test
+  public void testCustomAnalyzerWithOneStringOneIntegerParametersAndCustomQueryParser() {
+    // Test queries with CustomKeywordAnalyzer w/ two String.class args and ExtendedQueryParser
+    configureIndex(CUSTOM_ANALYZER_FQCN,
+            "a,123", "java.lang.String,java.lang.Integer", CUSTOM_QUERY_PARSER_FQCN);
+    assertEquals(_realtimeLuceneTextIndex.getDocIds(
+            "/.*processing for data ware.*/"), ImmutableRoaringBitmap.bitmapOf(1));
+    assertEquals(_realtimeLuceneTextIndex.getDocIds(
+            "columnar processing for data warehouses"), ImmutableRoaringBitmap.bitmapOf(1));
+  }
+
+  @Test
+  public void testCustomAnalyzerWithOnePrimitiveIntParametersAndCustomQueryParser() {
+    // Test queries with CustomKeywordAnalyzer w/ two String.class args and ExtendedQueryParser
+    configureIndex(CUSTOM_ANALYZER_FQCN,
+            "123", "java.lang.Integer.TYPE", CUSTOM_QUERY_PARSER_FQCN);
+    assertEquals(_realtimeLuceneTextIndex.getDocIds(
+            "/.*processing for data ware.*/"), ImmutableRoaringBitmap.bitmapOf(1));
+    assertEquals(_realtimeLuceneTextIndex.getDocIds(
+            "columnar processing for data warehouses"), ImmutableRoaringBitmap.bitmapOf(1));
+  }
+
+  private static class CustomQueryParser extends QueryParser {
+    public CustomQueryParser(String field, Analyzer analyzer) {
+      super(field, analyzer);
+    }
+  }
+
+  public static class CustomAnalyzer extends Analyzer {
+    public CustomAnalyzer() {
+      super();
+    }
+
+    public CustomAnalyzer(String stringArg1, String stringArg2) {
+      super();
+    }
+
+    public CustomAnalyzer(String stringArg1, Integer integerArg2) {
+      super();
+    }
+
+    public CustomAnalyzer(int intArg2) {
+      super();
+    }
+
+    protected Analyzer.TokenStreamComponents createComponents(String fieldName) {
+      return new Analyzer.TokenStreamComponents(new KeywordTokenizer());
+    }
   }
 
   private String[][] getTextData() {
@@ -61,13 +160,27 @@ public class LuceneMutableTextIndexTest {
     };
   }
 
-  @BeforeClass
-  public void setUp()
-      throws Exception {
-    TextIndexConfig config =
-        new TextIndexConfig(false, null, null, false, false, null, null, true, 500, null, false, false, 0);
-    _realtimeLuceneTextIndex =
-        new RealtimeLuceneTextIndex(TEXT_COLUMN_NAME, INDEX_DIR, "table__0__1__20240602T0014Z", config);
+  private void configureIndex(String analyzerClass, String analyzerClassArgs, String analyzerClassArgTypes,
+                              String queryParserClass) {
+    TextIndexConfigBuilder builder = new TextIndexConfigBuilder();
+    if (null != analyzerClass) {
+      builder.withLuceneAnalyzerClass(analyzerClass);
+    }
+    if (null != analyzerClassArgs) {
+      builder.withLuceneAnalyzerClassArgs(analyzerClassArgs);
+    }
+    if (null != analyzerClassArgTypes) {
+      builder.withLuceneAnalyzerClassArgTypes(analyzerClassArgTypes);
+    }
+    if (null != queryParserClass) {
+      builder.withLuceneQueryParserClass(queryParserClass);
+    }
+    TextIndexConfig config = builder.withUseANDForMultiTermQueries(false).build();
+
+    // Note that segment name must be unique on each query setup, otherwise `testQueryCancellationIsSuccessful` method
+    // will cause unit test to fail due to inability to release a lock.
+    _realtimeLuceneTextIndex = new RealtimeLuceneTextIndex(TEXT_COLUMN_NAME, INDEX_DIR,
+        "table__0__1__20240601T1818Z" + SEGMENT_NAME_SUFFIX_COUNTER.getAndIncrement(), config);
     String[][] documents = getTextData();
     String[][] repeatedDocuments = getRepeatedData();
 
@@ -81,12 +194,21 @@ public class LuceneMutableTextIndexTest {
       }
     }
 
-    SearcherManager searcherManager = _realtimeLuceneTextIndex.getSearcherManager();
+    // ensure searches work after .commit() is called
+    _realtimeLuceneTextIndex.commit();
+
+    // sleep for index refresh
     try {
-      searcherManager.maybeRefresh();
+      Thread.sleep(100);
     } catch (Exception e) {
-      throw new RuntimeException(e);
+      // no-op
     }
+  }
+
+  @BeforeClass
+  public void setUp()
+      throws Exception {
+    RealtimeLuceneIndexRefreshManager.getInstance().reset();
   }
 
   @AfterClass
@@ -96,6 +218,14 @@ public class LuceneMutableTextIndexTest {
 
   @Test
   public void testQueries() {
+    TestUtils.waitForCondition(aVoid -> {
+          try {
+            return _realtimeLuceneTextIndex.getSearcherManager().isSearcherCurrent();
+          } catch (IOException e) {
+            return false;
+          }
+        }, 10000,
+        "Background pool did not refresh the searcher manager in time");
     assertEquals(_realtimeLuceneTextIndex.getDocIds("stream"), ImmutableRoaringBitmap.bitmapOf(0));
     assertEquals(_realtimeLuceneTextIndex.getDocIds("/.*house.*/"), ImmutableRoaringBitmap.bitmapOf(1));
     assertEquals(_realtimeLuceneTextIndex.getDocIds("invalid"), ImmutableRoaringBitmap.bitmapOf());

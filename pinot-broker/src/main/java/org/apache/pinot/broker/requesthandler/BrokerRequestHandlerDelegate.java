@@ -88,10 +88,15 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
         return new BrokerResponseNative(QueryException.getException(QueryException.SQL_PARSING_ERROR, e));
       }
     }
-    if (_multiStageBrokerRequestHandler != null && QueryOptionsUtils.isUseMultistageEngine(
-        sqlNodeAndOptions.getOptions())) {
-      return _multiStageBrokerRequestHandler.handleRequest(request, sqlNodeAndOptions, requesterIdentity,
-          requestContext, httpHeaders);
+
+    if (QueryOptionsUtils.isUseMultistageEngine(sqlNodeAndOptions.getOptions())) {
+      if (_multiStageBrokerRequestHandler != null) {
+        return _multiStageBrokerRequestHandler.handleRequest(request, sqlNodeAndOptions, requesterIdentity,
+            requestContext, httpHeaders);
+      } else {
+        return new BrokerResponseNative(QueryException.getException(QueryException.INTERNAL_ERROR,
+            "V2 Multi-Stage query engine not enabled."));
+      }
     } else {
       return _singleStageBrokerRequestHandler.handleRequest(request, sqlNodeAndOptions, requesterIdentity,
           requestContext, httpHeaders);

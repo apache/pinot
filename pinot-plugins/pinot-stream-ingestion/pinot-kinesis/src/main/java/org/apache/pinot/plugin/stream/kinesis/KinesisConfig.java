@@ -70,7 +70,13 @@ public class KinesisConfig {
   public static final String DEFAULT_IAM_ROLE_BASED_ACCESS_ENABLED = "false";
   public static final String DEFAULT_SESSION_DURATION_SECONDS = "900";
   public static final String DEFAULT_ASYNC_SESSION_UPDATED_ENABLED = "true";
-  public static final String DEFAULT_RPS_LIMIT = "5";
+
+  // Kinesis has a default limit of 5 getRecord requests per second per shard.
+  // This limit is enforced by Kinesis and is not configurable.
+  // We are setting it to 1 to avoid hitting the limit  in a replicated setup,
+  // where multiple replicas are fetching from the same shard.
+  // see - https://docs.aws.amazon.com/kinesis/latest/APIReference/API_GetRecords.html
+  public static final String DEFAULT_RPS_LIMIT = "1";
 
   private final String _streamTopicName;
   private final String _awsRegion;

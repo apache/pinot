@@ -70,6 +70,7 @@ public class Actions {
     public static final String GET_USER = "GetUser";
     public static final String GET_VERSION = "GetVersion";
     public static final String GET_ZNODE = "GetZnode";
+    public static final String GET_DATABASE_QUOTA = "GetDatabaseQuota";
     public static final String INGEST_FILE = "IngestFile";
     public static final String RECOMMEND_CONFIG = "RecommendConfig";
     public static final String RESET_SEGMENT = "ResetSegment";
@@ -86,6 +87,7 @@ public class Actions {
     public static final String REBALANCE_TENANT_TABLES = "RebalanceTenantTables";
     public static final String UPDATE_TIME_INTERVAL = "UpdateTimeInterval";
     public static final String UPDATE_USER = "UpdateUser";
+    public static final String UPDATE_DATABASE_QUOTA = "UpdateDatabaseQuota";
     public static final String UPDATE_ZNODE = "UpdateZnode";
     public static final String UPLOAD_SEGMENT = "UploadSegment";
     public static final String GET_INSTANCE_PARTITIONS = "GetInstancePartitions";

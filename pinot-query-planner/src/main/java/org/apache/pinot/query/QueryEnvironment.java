@@ -71,6 +71,8 @@ import org.apache.pinot.query.validate.BytesCastVisitor;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.apache.pinot.sql.parsers.parser.SqlPhysicalExplain;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -79,6 +81,7 @@ import org.apache.pinot.sql.parsers.parser.SqlPhysicalExplain;
  * <p>It provide the higher level entry interface to convert a SQL string into a {@link DispatchableSubPlan}.
  */
 public class QueryEnvironment {
+  private static final Logger LOGGER = LoggerFactory.getLogger(QueryEnvironment.class);
   private static final CalciteConnectionConfig CONNECTION_CONFIG;
 
   static {
@@ -197,6 +200,24 @@ public class QueryEnvironment {
       return new ArrayList<>(tableNames);
     } catch (Throwable t) {
       throw new RuntimeException("Error composing query plan for: " + sqlQuery, t);
+    }
+  }
+
+  /**
+   * Returns whether the query can be successfully compiled in this query environment
+   */
+  public boolean canCompileQuery(String query) {
+    try (PlannerContext plannerContext = getPlannerContext()) {
+      SqlNode sqlNode = CalciteSqlParser.compileToSqlNodeAndOptions(query).getSqlNode();
+      if (sqlNode.getKind().equals(SqlKind.EXPLAIN)) {
+        sqlNode = ((SqlExplain) sqlNode).getExplicandum();
+      }
+      compileQuery(sqlNode, plannerContext);
+      LOGGER.debug("Successfully compiled query using the multi-stage query engine: `{}`", query);
+      return true;
+    } catch (Exception e) {
+      LOGGER.warn("Encountered an error while compiling query `{}` using the multi-stage query engine", query, e);
+      return false;
     }
   }
 

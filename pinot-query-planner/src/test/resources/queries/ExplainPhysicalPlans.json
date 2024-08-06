@@ -449,6 +449,58 @@
           "                                    └── [5]@localhost:1|[0] TABLE SCAN (b) null\n",
           ""
         ]
+      },
+      {
+        "description": "explain plan with colocated join and a projection that is not mapping",
+        "sql": "EXPLAIN IMPLEMENTATION PLAN FOR SELECT a.mySum, b.col3 FROM (select col2, col3 + col2 as mySum from a /*+ tableOptions(partition_function='hashcode', partition_key='col2', partition_size='4') */) as a JOIN b /*+ tableOptions(partition_function='hashcode', partition_key='col1', partition_size='4') */ ON a.col2 = b.col1",
+        "output": [
+          "[0]@localhost:3|[0] MAIL_RECEIVE(BROADCAST_DISTRIBUTED)\n",
+          "├── [1]@localhost:2|[2] MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost:3|[0]} (Subtree Omitted)\n",
+          "├── [1]@localhost:2|[3] MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost:3|[0]} (Subtree Omitted)\n",
+          "├── [1]@localhost:1|[0] MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost:3|[0]} (Subtree Omitted)\n",
+          "└── [1]@localhost:1|[1] MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost:3|[0]}\n",
+          "    └── [1]@localhost:1|[1] PROJECT\n",
+          "        └── [1]@localhost:1|[1] JOIN\n",
+          "            ├── [1]@localhost:1|[1] MAIL_RECEIVE(HASH_DISTRIBUTED)\n",
+          "            │   ├── [2]@localhost:2|[2] MAIL_SEND(HASH_DISTRIBUTED)[PARTITIONED]->{[1]@localhost:2|[2]} (Subtree Omitted)\n",
+          "            │   ├── [2]@localhost:2|[3] MAIL_SEND(HASH_DISTRIBUTED)[PARTITIONED]->{[1]@localhost:2|[3]} (Subtree Omitted)\n",
+          "            │   ├── [2]@localhost:1|[0] MAIL_SEND(HASH_DISTRIBUTED)[PARTITIONED]->{[1]@localhost:1|[0]} (Subtree Omitted)\n",
+          "            │   └── [2]@localhost:1|[1] MAIL_SEND(HASH_DISTRIBUTED)[PARTITIONED]->{[1]@localhost:1|[1]}\n",
+          "            │       └── [2]@localhost:1|[1] PROJECT\n",
+          "            │           └── [2]@localhost:1|[1] TABLE SCAN (a) null\n",
+          "            └── [1]@localhost:1|[1] MAIL_RECEIVE(HASH_DISTRIBUTED)\n",
+          "                ├── [3]@localhost:2|[2] MAIL_SEND(HASH_DISTRIBUTED)[PARTITIONED]->{[1]@localhost:2|[2]} (Subtree Omitted)\n",
+          "                ├── [3]@localhost:2|[3] MAIL_SEND(HASH_DISTRIBUTED)[PARTITIONED]->{[1]@localhost:2|[3]} (Subtree Omitted)\n",
+          "                ├── [3]@localhost:1|[0] MAIL_SEND(HASH_DISTRIBUTED)[PARTITIONED]->{[1]@localhost:1|[0]} (Subtree Omitted)\n",
+          "                └── [3]@localhost:1|[1] MAIL_SEND(HASH_DISTRIBUTED)[PARTITIONED]->{[1]@localhost:1|[1]}\n",
+          "                    └── [3]@localhost:1|[1] PROJECT\n",
+          "                        └── [3]@localhost:1|[1] TABLE SCAN (b) null\n"
+        ]
+      },
+      {
+        "description": "explain plan with colocated join and a projection that doesn't keep the key column",
+        "sql": "EXPLAIN IMPLEMENTATION PLAN FOR SELECT a.mySum, b.col3 FROM (select col3 as col2, col3 + col2 as mySum from a /*+ tableOptions(partition_function='hashcode', partition_key='col2', partition_size='4') */) as a JOIN b /*+ tableOptions(partition_function='hashcode', partition_key='col1', partition_size='4') */ ON a.col2 = b.col1",
+        "output": [
+          "[0]@localhost:3|[0] MAIL_RECEIVE(BROADCAST_DISTRIBUTED)\n",
+          "├── [1]@localhost:1|[1] MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost:3|[0]} (Subtree Omitted)\n",
+          "└── [1]@localhost:2|[0] MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost:3|[0]}\n",
+          "    └── [1]@localhost:2|[0] PROJECT\n",
+          "        └── [1]@localhost:2|[0] JOIN\n",
+          "            ├── [1]@localhost:2|[0] MAIL_RECEIVE(HASH_DISTRIBUTED)\n",
+          "            │   ├── [2]@localhost:2|[2] MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost:1|[1],[1]@localhost:2|[0]} (Subtree Omitted)\n",
+          "            │   ├── [2]@localhost:2|[3] MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost:1|[1],[1]@localhost:2|[0]} (Subtree Omitted)\n",
+          "            │   ├── [2]@localhost:1|[0] MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost:1|[1],[1]@localhost:2|[0]} (Subtree Omitted)\n",
+          "            │   └── [2]@localhost:1|[1] MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost:1|[1],[1]@localhost:2|[0]}\n",
+          "            │       └── [2]@localhost:1|[1] PROJECT\n",
+          "            │           └── [2]@localhost:1|[1] TABLE SCAN (a) null\n",
+          "            └── [1]@localhost:2|[0] MAIL_RECEIVE(HASH_DISTRIBUTED)\n",
+          "                ├── [3]@localhost:2|[2] MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost:1|[1],[1]@localhost:2|[0]} (Subtree Omitted)\n",
+          "                ├── [3]@localhost:2|[3] MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost:1|[1],[1]@localhost:2|[0]} (Subtree Omitted)\n",
+          "                ├── [3]@localhost:1|[0] MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost:1|[1],[1]@localhost:2|[0]} (Subtree Omitted)\n",
+          "                └── [3]@localhost:1|[1] MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost:1|[1],[1]@localhost:2|[0]}\n",
+          "                    └── [3]@localhost:1|[1] PROJECT\n",
+          "                        └── [3]@localhost:1|[1] TABLE SCAN (b) null\n"
+        ]
       }
     ]
   }

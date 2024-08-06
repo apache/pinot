@@ -951,7 +951,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
    */
   private void reportDataLoss(MessageBatch messageBatch) {
     if (messageBatch.hasDataLoss()) {
-      _serverMetrics.addMeteredTableValue(_tableStreamName, ServerMeter.STREAM_DATA_LOSS, 1L);
+      _serverMetrics.setValueOfTableGauge(_tableStreamName, ServerGauge.STREAM_DATA_LOSS, 1L);
       String message = String.format("Message loss detected in stream partition: %s for table: %s startOffset: %s "
               + "batchFirstOffset: %s", _partitionGroupId, _tableNameWithType, _startOffset,
           messageBatch.getFirstMessageOffset());
@@ -1197,6 +1197,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
    */
   private void cleanupMetrics() {
     _serverMetrics.removeTableGauge(_clientId, ServerGauge.LLC_PARTITION_CONSUMING);
+    _serverMetrics.removeTableGauge(_clientId, ServerGauge.STREAM_DATA_LOSS);
   }
 
   protected void hold()
