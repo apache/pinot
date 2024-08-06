@@ -41,8 +41,11 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
+import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
+import org.apache.hc.client5.http.ssl.SSLConnectionSocketFactoryBuilder;
 import org.apache.hc.core5.http.io.SocketConfig;
+import org.apache.hc.core5.http.ssl.TLS;
 import org.apache.hc.core5.util.Timeout;
 import org.apache.helix.AccessOption;
 import org.apache.helix.HelixManager;
@@ -482,11 +485,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
 
     _sqlQueryExecutor = new SqlQueryExecutor(_config.generateVipUrl());
 
-    _connectionManager = new PoolingHttpClientConnectionManager();
-    _connectionManager.setDefaultSocketConfig(
-        SocketConfig.custom()
-            .setSoTimeout(Timeout.of(_config.getServerAdminRequestTimeoutSeconds() * 1000, TimeUnit.MILLISECONDS))
-            .build());
+    _connectionManager = getPoolingHttpClientConnectionManager(_config.getServerAdminRequestTimeoutSeconds());
+    
     _tableSizeReader =
         new TableSizeReader(_executorService, _connectionManager, _controllerMetrics, _helixResourceManager,
             _leadControllerManager);
@@ -822,6 +822,17 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     if (updated) {
       HelixHelper.updateInstanceConfig(_helixParticipantManager, instanceConfig);
     }
+  }
+
+  private static PoolingHttpClientConnectionManager getPoolingHttpClientConnectionManager(
+      final int serverAdminRequestTimeoutSeconds) {
+    return PoolingHttpClientConnectionManagerBuilder.create()
+        .setSSLSocketFactory(SSLConnectionSocketFactoryBuilder.create()
+            .setSslContext(TlsUtils.getSslContext()).build())
+        .setDefaultSocketConfig(SocketConfig.custom()
+            .setSoTimeout(Timeout.of(serverAdminRequestTimeoutSeconds * 1000L,
+                TimeUnit.MILLISECONDS)).build())
+        .build();
   }
 
   public ControllerConf.ControllerMode getControllerMode() {
