@@ -90,6 +90,14 @@ SELECT sum(clicks), sum(impressions) FROM AdAnalyticsTable
 ## Building Pinot
 More detailed instructions can be found at [Quick Demo](https://docs.pinot.apache.org/basics/getting-started/quick-start) section in the documentation.
 ```
+
+
+
+
+
+
+
+
 # Clone a repo
 $ git clone https://github.com/apache/pinot.git
 $ cd pinot
