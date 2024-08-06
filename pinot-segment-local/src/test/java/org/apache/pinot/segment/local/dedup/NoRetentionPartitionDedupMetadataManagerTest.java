@@ -27,8 +27,11 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImp
 import org.apache.pinot.segment.local.utils.HashUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.config.table.HashFunction;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.testng.Assert;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
@@ -37,12 +40,25 @@ import static org.testng.Assert.assertSame;
 
 
 public class NoRetentionPartitionDedupMetadataManagerTest {
+  private TestMetadataManager _metadataManager;
+
+  @BeforeMethod
+  public void setUp() {
+    DedupContext.Builder dedupContextBuider = new DedupContext.Builder();
+    dedupContextBuider
+        .setTableConfig(mock(TableConfig.class))
+        .setSchema(mock(Schema.class))
+        .setPrimaryKeyColumns(List.of("primaryKeyColumn"))
+        .setHashFunction(HashFunction.NONE)
+        .setServerMetrics(mock(ServerMetrics.class));
+    DedupContext dedupContext = dedupContextBuider.build();
+    _metadataManager = new TestMetadataManager("tableName", 0, dedupContext);
+  }
+
   @Test
   public void verifyAddRemoveSegment() {
     HashFunction hashFunction = HashFunction.NONE;
-    TestMetadataManager metadataManager =
-        new TestMetadataManager(DedupTestUtils.REALTIME_TABLE_NAME, null, 0, mock(ServerMetrics.class), hashFunction);
-    Map<Object, IndexSegment> recordLocationMap = metadataManager._primaryKeyToSegmentMap;
+    Map<Object, IndexSegment> recordLocationMap = _metadataManager._primaryKeyToSegmentMap;
 
     // Add the first segment
     List<PrimaryKey> pkList1 = new ArrayList<>();
@@ -52,24 +68,22 @@ public class NoRetentionPartitionDedupMetadataManagerTest {
     pkList1.add(DedupTestUtils.getPrimaryKey(0));
     pkList1.add(DedupTestUtils.getPrimaryKey(1));
     pkList1.add(DedupTestUtils.getPrimaryKey(0));
-    metadataManager._primaryKeyIterator = pkList1.iterator();
+    _metadataManager._primaryKeyIterator = pkList1.iterator();
     ImmutableSegmentImpl segment1 = DedupTestUtils.mockSegment(1, 6);
-    metadataManager.addSegment(segment1);
+    _metadataManager.addSegment(segment1);
     checkRecordLocation(recordLocationMap, 0, segment1, hashFunction);
     checkRecordLocation(recordLocationMap, 1, segment1, hashFunction);
     checkRecordLocation(recordLocationMap, 2, segment1, hashFunction);
 
-    metadataManager._primaryKeyIterator = pkList1.iterator();
-    metadataManager.removeSegment(segment1);
+    _metadataManager._primaryKeyIterator = pkList1.iterator();
+    _metadataManager.removeSegment(segment1);
     Assert.assertEquals(recordLocationMap.size(), 0);
   }
 
   @Test
   public void verifyReloadSegment() {
     HashFunction hashFunction = HashFunction.NONE;
-    TestMetadataManager metadataManager =
-        new TestMetadataManager(DedupTestUtils.REALTIME_TABLE_NAME, null, 0, mock(ServerMetrics.class), hashFunction);
-    Map<Object, IndexSegment> recordLocationMap = metadataManager._primaryKeyToSegmentMap;
+    Map<Object, IndexSegment> recordLocationMap = _metadataManager._primaryKeyToSegmentMap;
 
     // Add the first segment
     List<PrimaryKey> pkList1 = new ArrayList<>();
@@ -79,14 +93,14 @@ public class NoRetentionPartitionDedupMetadataManagerTest {
     pkList1.add(DedupTestUtils.getPrimaryKey(0));
     pkList1.add(DedupTestUtils.getPrimaryKey(1));
     pkList1.add(DedupTestUtils.getPrimaryKey(0));
-    metadataManager._primaryKeyIterator = pkList1.iterator();
+    _metadataManager._primaryKeyIterator = pkList1.iterator();
     ImmutableSegmentImpl segment1 = DedupTestUtils.mockSegment(1, 6);
-    metadataManager.addSegment(segment1);
+    _metadataManager.addSegment(segment1);
 
     // Remove another segment with same PK rows
-    metadataManager._primaryKeyIterator = pkList1.iterator();
+    _metadataManager._primaryKeyIterator = pkList1.iterator();
     ImmutableSegmentImpl segment2 = DedupTestUtils.mockSegment(1, 6);
-    metadataManager.removeSegment(segment2);
+    _metadataManager.removeSegment(segment2);
     Assert.assertEquals(recordLocationMap.size(), 3);
 
     // Keys should still exist
@@ -98,9 +112,7 @@ public class NoRetentionPartitionDedupMetadataManagerTest {
   @Test
   public void verifyAddRow() {
     HashFunction hashFunction = HashFunction.NONE;
-    TestMetadataManager metadataManager =
-        new TestMetadataManager(DedupTestUtils.REALTIME_TABLE_NAME, null, 0, mock(ServerMetrics.class), hashFunction);
-    Map<Object, IndexSegment> recordLocationMap = metadataManager._primaryKeyToSegmentMap;
+    Map<Object, IndexSegment> recordLocationMap = _metadataManager._primaryKeyToSegmentMap;
 
     // Add the first segment
     List<PrimaryKey> pkList1 = new ArrayList<>();
@@ -110,21 +122,21 @@ public class NoRetentionPartitionDedupMetadataManagerTest {
     pkList1.add(DedupTestUtils.getPrimaryKey(0));
     pkList1.add(DedupTestUtils.getPrimaryKey(1));
     pkList1.add(DedupTestUtils.getPrimaryKey(0));
-    metadataManager._primaryKeyIterator = pkList1.iterator();
+    _metadataManager._primaryKeyIterator = pkList1.iterator();
     ImmutableSegmentImpl segment1 = DedupTestUtils.mockSegment(1, 6);
-    metadataManager.addSegment(segment1);
+    _metadataManager.addSegment(segment1);
 
     // Same PK exists
     ImmutableSegmentImpl segment2 = DedupTestUtils.mockSegment(2, 6);
-    Assert.assertTrue(metadataManager.checkRecordPresentOrUpdate(DedupTestUtils.getPrimaryKey(0), segment2));
+    Assert.assertTrue(_metadataManager.checkRecordPresentOrUpdate(DedupTestUtils.getPrimaryKey(0), segment2));
     checkRecordLocation(recordLocationMap, 0, segment1, hashFunction);
 
     // New PK
-    Assert.assertFalse(metadataManager.checkRecordPresentOrUpdate(DedupTestUtils.getPrimaryKey(3), segment2));
+    Assert.assertFalse(_metadataManager.checkRecordPresentOrUpdate(DedupTestUtils.getPrimaryKey(3), segment2));
     checkRecordLocation(recordLocationMap, 3, segment2, hashFunction);
 
     // Same PK as the one recently ingested
-    Assert.assertTrue(metadataManager.checkRecordPresentOrUpdate(DedupTestUtils.getPrimaryKey(3), segment2));
+    Assert.assertTrue(_metadataManager.checkRecordPresentOrUpdate(DedupTestUtils.getPrimaryKey(3), segment2));
   }
 
   private static void checkRecordLocation(Map<Object, IndexSegment> recordLocationMap, int keyValue,
@@ -138,9 +150,8 @@ public class NoRetentionPartitionDedupMetadataManagerTest {
   private static class TestMetadataManager extends NoRetentionConcurrentMapPartitionDedupMetadataManager {
     Iterator<PrimaryKey> _primaryKeyIterator;
 
-    TestMetadataManager(String tableNameWithType, List<String> primaryKeyColumns, int partitionId,
-        ServerMetrics serverMetrics, HashFunction hashFunction) {
-      super(tableNameWithType, primaryKeyColumns, partitionId, serverMetrics, hashFunction);
+    TestMetadataManager(String tableNameWithType, int partitionId, DedupContext dedupContext) {
+      super(tableNameWithType, partitionId, dedupContext);
     }
 
     @Override

@@ -21,15 +21,12 @@ package org.apache.pinot.segment.local.dedup;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.pinot.common.metrics.ServerGauge;
-import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.utils.HashUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
-import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.utils.ByteArray;
 
@@ -38,11 +35,10 @@ class NoRetentionConcurrentMapPartitionDedupMetadataManager extends BasePartitio
   @VisibleForTesting
   final ConcurrentHashMap<Object, IndexSegment> _primaryKeyToSegmentMap = new ConcurrentHashMap<>();
 
-  public NoRetentionConcurrentMapPartitionDedupMetadataManager(String tableNameWithType, List<String> primaryKeyColumns,
-      int partitionId, ServerMetrics serverMetrics, HashFunction hashFunction) {
-    super(tableNameWithType, primaryKeyColumns, partitionId, serverMetrics, hashFunction);
+  public NoRetentionConcurrentMapPartitionDedupMetadataManager(String tableNameWithType, int partitionId,
+      DedupContext dedupContext) {
+    super(tableNameWithType, partitionId, dedupContext);
   }
-
 
   @Override
   public void addSegment(IndexSegment segment) {

@@ -33,13 +33,12 @@ public abstract class BasePartitionDedupMetadataManager implements PartitionDedu
   protected final HashFunction _hashFunction;
   protected final Logger _logger;
 
-  protected BasePartitionDedupMetadataManager(String tableNameWithType, List<String> primaryKeyColumns,
-      int partitionId, ServerMetrics serverMetrics, HashFunction hashFunction) {
+  protected BasePartitionDedupMetadataManager(String tableNameWithType, int partitionId, DedupContext dedupContext) {
     _tableNameWithType = tableNameWithType;
-    _primaryKeyColumns = primaryKeyColumns;
     _partitionId = partitionId;
-    _serverMetrics = serverMetrics;
-    _hashFunction = hashFunction;
+    _primaryKeyColumns = dedupContext.getPrimaryKeyColumns();
+    _hashFunction = dedupContext.getHashFunction();
+    _serverMetrics = dedupContext.getServerMetrics();
     _logger = LoggerFactory.getLogger(tableNameWithType + "-" + partitionId + "-" + getClass().getSimpleName());
   }
 }

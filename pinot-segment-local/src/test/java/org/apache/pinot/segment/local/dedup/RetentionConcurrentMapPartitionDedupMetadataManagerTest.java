@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.dedup;
 
 import java.util.Iterator;
+import java.util.List;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
@@ -27,6 +28,8 @@ import org.apache.pinot.segment.local.segment.readers.PrimaryKeyReader;
 import org.apache.pinot.segment.local.utils.HashUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.config.table.HashFunction;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.mockito.Mockito;
 import org.testng.annotations.BeforeMethod;
@@ -42,19 +45,31 @@ public class RetentionConcurrentMapPartitionDedupMetadataManagerTest {
 
   @BeforeMethod
   public void setUp() {
+    DedupContext.Builder dedupContextBuider = new DedupContext.Builder();
+    dedupContextBuider.setTableConfig(mock(TableConfig.class)).setSchema(mock(Schema.class))
+        .setPrimaryKeyColumns(List.of("primaryKeyColumn")).setHashFunction(HashFunction.NONE)
+        .setMetadataTTL(METADATA_TTL).setMetadataTimeColumn("metadataTimeColumn")
+        .setServerMetrics(mock(ServerMetrics.class));
+    DedupContext dedupContext = dedupContextBuider.build();
     _metadataManager =
-        new RetentionConcurrentMapPartitionDedupMetadataManager(DedupTestUtils.REALTIME_TABLE_NAME, null, 0,
-            mock(ServerMetrics.class), HashFunction.NONE, METADATA_TTL, "metadataTimeColumn");
+        new RetentionConcurrentMapPartitionDedupMetadataManager(DedupTestUtils.REALTIME_TABLE_NAME, 0, dedupContext);
   }
 
   @Test
   public void creatingMetadataManagerThrowsExceptions() {
+    DedupContext.Builder dedupContextBuider = new DedupContext.Builder();
+    dedupContextBuider.setTableConfig(mock(TableConfig.class)).setSchema(mock(Schema.class))
+        .setPrimaryKeyColumns(List.of("primaryKeyColumn")).setHashFunction(HashFunction.NONE).setMetadataTTL(0)
+        .setMetadataTimeColumn(null).setServerMetrics(mock(ServerMetrics.class));
+    DedupContext dedupContext = dedupContextBuider.build();
     assertThrows(IllegalArgumentException.class,
-        () -> new RetentionConcurrentMapPartitionDedupMetadataManager(DedupTestUtils.REALTIME_TABLE_NAME, null, 0, null,
-            HashFunction.NONE, 0, null));
+        () -> new RetentionConcurrentMapPartitionDedupMetadataManager(DedupTestUtils.REALTIME_TABLE_NAME, 0,
+            dedupContext));
+
+    dedupContextBuider.setMetadataTTL(1);
     assertThrows(IllegalArgumentException.class,
-        () -> new RetentionConcurrentMapPartitionDedupMetadataManager(DedupTestUtils.REALTIME_TABLE_NAME, null, 0, null,
-            HashFunction.NONE, 1, null));
+        () -> new RetentionConcurrentMapPartitionDedupMetadataManager(DedupTestUtils.REALTIME_TABLE_NAME, 0,
+            dedupContext));
   }
 
   @Test
