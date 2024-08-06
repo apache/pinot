@@ -21,6 +21,7 @@ package org.apache.pinot.client;
 import com.google.common.collect.ImmutableList;
 import java.util.List;
 import java.util.Random;
+import org.apache.pinot.common.broker.BrokerSelector;
 
 
 /**

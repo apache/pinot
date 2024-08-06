@@ -24,6 +24,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import org.I0Itec.zkclient.ZkClient;
+import org.apache.pinot.common.broker.BrokerInfo;
+import org.apache.pinot.common.broker.DynamicBrokerSelector;
+import org.apache.pinot.common.broker.ExternalViewReader;
 import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -37,6 +40,8 @@ public class ConnectionFactoryTest {
   public void testZkConnection() {
     // Create a dummy Helix structure
     final String givenZkServers = "127.0.0.1:1234";
+    final BrokerInfo givenBrokerInfo = new BrokerInfo("localhost", 2345);
+
     DynamicBrokerSelector dynamicBrokerSelector = Mockito.spy(new DynamicBrokerSelector(givenZkServers) {
       @Override
       protected ZkClient getZkClient(String zkServers) {
@@ -46,6 +51,11 @@ public class ConnectionFactoryTest {
       @Override
       protected ExternalViewReader getEvReader(ZkClient zkClient) {
         return Mockito.mock(ExternalViewReader.class);
+      }
+
+      @Override
+      public List<BrokerInfo> getBrokerInfoList() {
+        return ImmutableList.of(givenBrokerInfo);
       }
     });
 
@@ -57,7 +67,7 @@ public class ConnectionFactoryTest {
             pinotClientTransport);
 
     // Check that the broker list has the right length and has the same servers
-    Assert.assertEquals(connection.getBrokerList(), ImmutableList.of(givenZkServers));
+    Assert.assertEquals(connection.getBrokerList(), ImmutableList.of(givenBrokerInfo.getHostPort(false)));
   }
 
   @Test

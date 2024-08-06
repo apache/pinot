@@ -16,10 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.client;
+package org.apache.pinot.common.broker;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -33,28 +32,27 @@ import javax.annotation.Nullable;
 import org.I0Itec.zkclient.IZkDataListener;
 import org.I0Itec.zkclient.ZkClient;
 import org.I0Itec.zkclient.serialize.BytesPushThroughSerializer;
-import org.apache.pinot.client.utils.BrokerSelectorUtils;
 
 
 /**
  * Maintains a mapping between table name and list of brokers
  */
-public class DynamicBrokerSelector implements BrokerSelector, IZkDataListener {
-  private static final Random RANDOM = new Random();
+public class DynamicBrokerSelector extends BrokerInfoSelector implements IZkDataListener {
+  protected static final Random RANDOM = new Random();
 
-  private final AtomicReference<Map<String, List<String>>> _tableToBrokerListMapRef = new AtomicReference<>();
-  private final AtomicReference<List<String>> _allBrokerListRef = new AtomicReference<>();
-  private final ZkClient _zkClient;
-  private final ExternalViewReader _evReader;
-  private final List<String> _brokerList;
+  protected final AtomicReference<Map<String, List<BrokerInfo>>> _tableToBrokerListMapRef = new AtomicReference<>();
+  protected final AtomicReference<List<BrokerInfo>> _allBrokerListRef = new AtomicReference<>();
+  protected final ZkClient _zkClient;
+  protected final ExternalViewReader _evReader;
+
   //The preferTlsPort will be mapped to client config in the future, when we support full TLS
   public DynamicBrokerSelector(String zkServers, boolean preferTlsPort) {
+    super(preferTlsPort);
     _zkClient = getZkClient(zkServers);
     _zkClient.setZkSerializer(new BytesPushThroughSerializer());
     _zkClient.waitUntilConnected(60, TimeUnit.SECONDS);
     _zkClient.subscribeDataChanges(ExternalViewReader.BROKER_EXTERNAL_VIEW_PATH, this);
     _evReader = getEvReader(_zkClient, preferTlsPort);
-    _brokerList = ImmutableList.of(zkServers);
     refresh();
   }
   public DynamicBrokerSelector(String zkServers) {
@@ -77,38 +75,38 @@ public class DynamicBrokerSelector implements BrokerSelector, IZkDataListener {
   }
 
   private void refresh() {
-    Map<String, List<String>> tableToBrokerListMap = _evReader.getTableToBrokersMap();
+    Map<String, List<BrokerInfo>> tableToBrokerListMap = _evReader.getTableToBrokerInfosMap();
     _tableToBrokerListMapRef.set(tableToBrokerListMap);
-    Set<String> brokerSet = new HashSet<>();
-    for (List<String> brokerList : tableToBrokerListMap.values()) {
-      brokerSet.addAll(brokerList);
+    Set<BrokerInfo> brokerInfoSet = new HashSet<>();
+    for (List<BrokerInfo> brokerInfoList : tableToBrokerListMap.values()) {
+      brokerInfoSet.addAll(brokerInfoList);
     }
-    _allBrokerListRef.set(new ArrayList<>(brokerSet));
+    _allBrokerListRef.set(new ArrayList<>(brokerInfoSet));
   }
 
   @Nullable
   @Override
-  public String selectBroker(String... tableNames) {
+  public BrokerInfo selectBrokerInfo(String... tableNames) {
+    List<BrokerInfo> brokerInfoList = _allBrokerListRef.get();
     if (!(tableNames == null || tableNames.length == 0 || tableNames[0] == null)) {
       // getting list of brokers hosting all the tables.
-      List<String> list = BrokerSelectorUtils.getTablesCommonBrokers(Arrays.asList(tableNames),
+      List<BrokerInfo> commonBrokers = BrokerSelectorUtils.getTablesCommonBrokers(Arrays.asList(tableNames),
           _tableToBrokerListMapRef.get());
-      if (list != null && !list.isEmpty()) {
-        return list.get(RANDOM.nextInt(list.size()));
+      if (commonBrokers != null && !commonBrokers.isEmpty()) {
+        brokerInfoList = commonBrokers;
       }
     }
 
     // Return a broker randomly if table is null or no broker is found for the specified table.
-    List<String> list = _allBrokerListRef.get();
-    if (list != null && !list.isEmpty()) {
-      return list.get(RANDOM.nextInt(list.size()));
+    if (!brokerInfoList.isEmpty()) {
+      return brokerInfoList.get(RANDOM.nextInt(brokerInfoList.size()));
     }
     return null;
   }
 
   @Override
-  public List<String> getBrokers() {
-    return _brokerList;
+  public List<BrokerInfo> getBrokerInfoList() {
+    return _allBrokerListRef.get();
   }
 
   @Override
