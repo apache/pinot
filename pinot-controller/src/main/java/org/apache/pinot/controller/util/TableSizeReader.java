@@ -60,6 +60,7 @@ import org.slf4j.LoggerFactory;
 public class TableSizeReader {
   private static final Logger LOGGER = LoggerFactory.getLogger(TableSizeReader.class);
   public static final long DEFAULT_SIZE_WHEN_MISSING_OR_ERROR = -1L;
+  public static final int DATABASE_SIZE_TTL_SECONDS = 300;
 
   private final PinotHelixResourceManager _helixResourceManager;
   private final ControllerMetrics _controllerMetrics;
@@ -75,7 +76,7 @@ public class TableSizeReader {
     _leadControllerManager = leadControllerManager;
     _serverTableSizeReader = new ServerTableSizeReader(executor, connectionManager, controllerConf);
     _databaseSizeBytes = CacheBuilder.newBuilder()
-        .refreshAfterWrite(Duration.ofMinutes(5))
+        .refreshAfterWrite(Duration.ofSeconds(DATABASE_SIZE_TTL_SECONDS))
         .build(new CacheLoader<>() {
           @Override
           public Long load(String key)

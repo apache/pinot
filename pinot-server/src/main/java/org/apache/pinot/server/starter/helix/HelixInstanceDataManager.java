@@ -86,6 +86,7 @@ import org.slf4j.LoggerFactory;
 @ThreadSafe
 public class HelixInstanceDataManager implements InstanceDataManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixInstanceDataManager.class);
+  public static final int DATABASE_SIZE_TTL_SECONDS = 60;
 
   private final ConcurrentHashMap<String, TableDataManager> _tableDataManagerMap = new ConcurrentHashMap<>();
   private LoadingCache<String, Long> _databaseSizeBytes;
@@ -168,7 +169,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
         });
 
     _databaseSizeBytes = CacheBuilder.newBuilder()
-        .refreshAfterWrite(Duration.ofMinutes(1))
+        .refreshAfterWrite(Duration.ofSeconds(DATABASE_SIZE_TTL_SECONDS))
         .build(new CacheLoader<>() {
           @Override
           public Long load(String database)
