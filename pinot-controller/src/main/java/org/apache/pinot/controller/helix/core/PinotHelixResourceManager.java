@@ -714,6 +714,12 @@ public class PinotHelixResourceManager {
     return false;
   }
 
+  public Map<String, String> getClusterConfigsByKeys(List<String> keys) {
+    HelixConfigScope configScope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER)
+        .forCluster(_helixClusterName).build();
+    return _helixAdmin.getConfig(configScope, keys);
+  }
+
   /**
    * Tenant related APIs
    */
