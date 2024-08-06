@@ -246,9 +246,11 @@ public class PinotSegmentRestletResource {
       resultForTable.put("tableName", tableNameWithType);
       if (detailed) {
         resultForTable.put("serverToSegmentsMap", _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType));
+        resultForTable.put("serverToSegmentsCountMap",
+            _pinotHelixResourceManager.getServerToSegmentCountMap());
       } else {
         resultForTable.put("serverToSegmentsCountMap",
-            _pinotHelixResourceManager.getServerToSegmentsCountMap(tableNameWithType));
+            _pinotHelixResourceManager.getServerToSegmentCountMap());
       }
       resultList.add(resultForTable);
     }

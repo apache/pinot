@@ -156,6 +156,7 @@ import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
 import org.apache.pinot.controller.helix.core.rebalance.ZkBasedTableRebalanceObserver;
 import org.apache.pinot.controller.helix.core.util.ZKMetadataUtils;
 import org.apache.pinot.controller.helix.starter.HelixConfig;
+import org.apache.pinot.core.data.table.BaseTable;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.instance.Instance;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -196,6 +197,7 @@ public class PinotHelixResourceManager {
   public static final String APPEND = "APPEND";
   private static final int DEFAULT_TABLE_UPDATER_LOCKERS_SIZE = 100;
   private static final String API_REQUEST_ID_PREFIX = "api-";
+  private Map<String, Integer> _serverToSegmentCountMap;
 
   private enum LineageUpdateType {
     START, END, REVERT
@@ -438,6 +440,13 @@ public class PinotHelixResourceManager {
    */
   public List<InstanceConfig> getAllHelixInstanceConfigs() {
     return HelixHelper.getInstanceConfigs(_helixZkManager);
+  }
+
+  /**
+   * returns server to segments count
+   */
+  public Map<String, Integer> getServerToSegmentCountMap() {
+    return _serverToSegmentCountMap;
   }
 
   /**
@@ -2786,6 +2795,7 @@ public class PinotHelixResourceManager {
    */
   public Map<String, List<String>> getServerToSegmentsMap(String tableNameWithType) {
     Map<String, List<String>> serverToSegmentsMap = new TreeMap<>();
+    _serverToSegmentCountMap = new TreeMap<>();
     IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableNameWithType);
     if (idealState == null) {
       throw new IllegalStateException("Ideal state does not exist for table: " + tableNameWithType);
@@ -2795,30 +2805,11 @@ public class PinotHelixResourceManager {
       for (Map.Entry<String, String> instanceStateEntry : entry.getValue().entrySet()) {
         if (!instanceStateEntry.getValue().equals(SegmentStateModel.OFFLINE)) {
           serverToSegmentsMap.computeIfAbsent(instanceStateEntry.getKey(), key -> new ArrayList<>()).add(segmentName);
+          _serverToSegmentCountMap.merge(instanceStateEntry.getKey(), 1, Integer::sum);
         }
       }
     }
     return serverToSegmentsMap;
-  }
-
-  /**
-   * Returns a map from server instance to count of segments it serves for the given table. Ignore OFFLINE segments from
-   * the ideal state because they are not supposed to be served.
-   */
-  public Map<String, Integer> getServerToSegmentsCountMap(String tableNameWithType) {
-    Map<String, Integer> serverToSegmentCountMap = new TreeMap<>();
-    IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableNameWithType);
-    if (idealState == null) {
-      throw new IllegalStateException("Ideal state does not exist for table: " + tableNameWithType);
-    }
-    for (Map.Entry<String, Map<String, String>> entry : idealState.getRecord().getMapFields().entrySet()) {
-      for (Map.Entry<String, String> instanceStateEntry : entry.getValue().entrySet()) {
-        if (!instanceStateEntry.getValue().equals(SegmentStateModel.OFFLINE)) {
-          serverToSegmentCountMap.merge(instanceStateEntry.getKey(), 1, Integer::sum);
-        }
-      }
-    }
-    return serverToSegmentCountMap;
   }
 
   /**

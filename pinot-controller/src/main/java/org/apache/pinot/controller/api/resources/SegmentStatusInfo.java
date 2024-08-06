@@ -25,19 +25,19 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  *
  */
 public class SegmentStatusInfo {
+  @JsonProperty("schemaName")
+  String _segmentName;
+
+  @JsonProperty("schemaStatus")
+  String _segmentStatus;
+
   public String getSegmentName() {
     return _segmentName;
   }
 
-  @JsonProperty("schemaName")
-  String _segmentName;
-
   public String getSegmentStatus() {
     return _segmentStatus;
   }
-
-  @JsonProperty("schemaStatus")
-  String _segmentStatus;
 
   public SegmentStatusInfo(String segmentName, String segmentStatus) {
     _segmentName = segmentName;
