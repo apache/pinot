@@ -61,15 +61,19 @@ public class StarTreeIndexSeparator implements Closeable {
     int numStarTrees = starTreeMetadataList.size();
     _builderConfigList = new ArrayList<>(numStarTrees);
     _numDocsList = new ArrayList<>(numStarTrees);
-    StringBuilder logExistingStarTrees = new StringBuilder();
-    logExistingStarTrees.append("Existing star-tree configs :");
     for (StarTreeV2Metadata starTreeMetadata : starTreeMetadataList) {
       StarTreeV2BuilderConfig config = StarTreeV2BuilderConfig.fromMetadata(starTreeMetadata);
       _builderConfigList.add(config);
-      logExistingStarTrees.append("\n").append(config);
       _numDocsList.add(starTreeMetadata.getNumDocs());
     }
-    LOGGER.debug(logExistingStarTrees.toString());
+    if (LOGGER.isDebugEnabled()) {
+      StringBuilder logExistingStarTrees = new StringBuilder();
+      logExistingStarTrees.append("Existing star-tree configs :");
+      for (StarTreeV2BuilderConfig config : _builderConfigList) {
+        logExistingStarTrees.append("\n").append(config);
+      }
+      LOGGER.debug(logExistingStarTrees.toString());
+    }
     _indexFileChannel = new RandomAccessFile(indexFile, "r").getChannel();
   }
 

@@ -91,12 +91,14 @@ public class MultipleTreesBuilder implements Closeable {
         CommonsConfigurationUtils.fromFile(new File(_segmentDirectory, V1Constants.MetadataKeys.METADATA_FILE_NAME));
     _separator = getSeparator();
     // log the updated star-tree configs
-    StringBuilder logUpdatedStarTrees = new StringBuilder();
-    logUpdatedStarTrees.append("Updated star-tree configs :");
-    for (StarTreeV2BuilderConfig startree : _builderConfigs) {
-      logUpdatedStarTrees.append("\n").append(startree);
+    if (LOGGER.isDebugEnabled()) {
+      StringBuilder logUpdatedStarTrees = new StringBuilder();
+      logUpdatedStarTrees.append("Updated star-tree configs :");
+      for (StarTreeV2BuilderConfig startree : _builderConfigs) {
+        logUpdatedStarTrees.append("\n").append(startree);
+      }
+      LOGGER.debug(logUpdatedStarTrees.toString());
     }
-    LOGGER.debug(logUpdatedStarTrees.toString());
     _segment = ImmutableSegmentLoader.load(indexDir, ReadMode.mmap);
   }
 
