@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
-import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
@@ -75,12 +74,12 @@ public class GrpcBrokerRequestHandler extends BaseSingleStageBrokerRequestHandle
   @Override
   protected BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
       BrokerRequest serverBrokerRequest,
-      @Nullable Map<ServerInstance, List<ServerQueryRoutingContext>> queryRoutingTable, long timeoutMs,
+      Map<ServerInstance, List<ServerQueryRoutingContext>> queryRoutingTable, long timeoutMs,
       ServerStats serverStats, RequestContext requestContext)
       throws Exception {
     // TODO: Support failure detection
     // TODO: Add servers queried/responded stats
-    assert queryRoutingTable != null && !queryRoutingTable.isEmpty();
+    assert !queryRoutingTable.isEmpty();
     Map<ServerRoutingInstance, Iterator<Server.ServerResponse>> responseMap = new HashMap<>();
     sendRequest(requestId, queryRoutingTable, responseMap, requestContext.isSampledRequest());
     long reduceStartTimeNs = System.nanoTime();

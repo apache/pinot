@@ -25,6 +25,7 @@ import com.google.common.collect.ImmutableMap;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -621,7 +622,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       // Calculate routing table for the query
       // TODO: Modify RoutingManager interface to directly take PinotQuery
       long routingStartTimeNs = System.nanoTime();
-      Map<ServerInstance, List<ServerQueryRoutingContext>> queryRoutingTable = null;
+      Map<ServerInstance, List<ServerQueryRoutingContext>> queryRoutingTable = new HashMap<>();
       List<String> unavailableSegments = new ArrayList<>();
       int numPrunedSegmentsTotal = 0;
 
@@ -635,7 +636,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         }
       }
 
-      if (realtimeBrokerRequest != null) {
+      // TODO: Assess if the Explain Plan Query should also be routed to REALTIME servers for HYBRID tables
+      if (realtimeBrokerRequest != null && (!pinotQuery.isExplain() || offlineBrokerRequest != null)) {
+        // Don't send explain queries to realtime for OFFLINE or HYBRID tables
         Integer numPrunedSegments =
             updateRoutingTable(requestId, realtimeBrokerRequest, queryRoutingTable, unavailableSegments);
         if (numPrunedSegments == null) {
@@ -741,15 +744,14 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       //       - Compile time function invocation
       //       - Literal only queries
       //       - Any rewrites
-      if (pinotQuery.isExplain()) {
+//      if (pinotQuery.isExplain()) {
         // Update routing tables to only send request to offline servers for OFFLINE and HYBRID tables.
-        // TODO: Assess if the Explain Plan Query should also be routed to REALTIME servers for HYBRID tables
 //        if (offlineRoutingTable != null) {
 //          // For OFFLINE and HYBRID tables, don't send EXPLAIN query to realtime servers.
 //          realtimeBrokerRequest = null;
 //          realtimeRoutingTable = null;
 //        }
-      }
+//      }
       BrokerResponseNative brokerResponse;
       if (_queriesById != null) {
         // Start to track the running query for cancellation just before sending it out to servers to avoid any
@@ -1882,7 +1884,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
    */
   protected abstract BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
       BrokerRequest serverBrokerRequest,
-      @Nullable Map<ServerInstance, List<ServerQueryRoutingContext>> queryRoutingTable, long timeoutMs,
+      Map<ServerInstance, List<ServerQueryRoutingContext>> queryRoutingTable, long timeoutMs,
       ServerStats serverStats, RequestContext requestContext)
       throws Exception;
 

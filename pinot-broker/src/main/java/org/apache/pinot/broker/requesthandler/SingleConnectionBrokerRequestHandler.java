@@ -24,7 +24,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.failuredetector.FailureDetector;
@@ -99,10 +98,10 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
   @Override
   protected BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
       BrokerRequest serverBrokerRequest,
-      @Nullable Map<ServerInstance, List<ServerQueryRoutingContext>> queryRoutingTable, long timeoutMs,
+      Map<ServerInstance, List<ServerQueryRoutingContext>> queryRoutingTable, long timeoutMs,
       ServerStats serverStats, RequestContext requestContext)
       throws Exception {
-    assert queryRoutingTable != null && !queryRoutingTable.isEmpty();
+    assert !queryRoutingTable.isEmpty();
     if (requestContext.isSampledRequest()) {
       serverBrokerRequest.getPinotQuery().putToQueryOptions(CommonConstants.Broker.Request.TRACE, "true");
     }
