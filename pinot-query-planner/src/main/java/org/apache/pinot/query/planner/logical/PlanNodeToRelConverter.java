@@ -21,7 +21,9 @@ package org.apache.pinot.query.planner.logical;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelTraitSet;
@@ -164,14 +166,53 @@ public final class PlanNodeToRelConverter {
 
     @Override
     public Void visitMailboxReceive(MailboxReceiveNode node, Void context) {
-      // TODO: decide what to do in this case
-      throw new UnsupportedOperationException("MailboxReceiveNode is not supported in RelNode");
+      visitChildren(node);
+
+      Map<String, Object> attributes = new HashMap<>();
+      if (node.isSortedOnSender()) {
+        attributes.put("sortedOnSender", true);
+      }
+
+      List<RelNode> inputs = readAlreadyPushedChildren(node);
+
+      PinotExplainedRelNode explained = new PinotExplainedRelNode(_builder.getCluster(), RelTraitSet.createEmpty(),
+          "MailboxReceive", attributes, node.getDataSchema(), inputs);
+      _builder.push(explained);
+      return null;
     }
 
     @Override
     public Void visitMailboxSend(MailboxSendNode node, Void context) {
-      // TODO: decide what to do in this case
       visitChildren(node);
+
+      Map<String, Object> attributes = new HashMap<>();
+      attributes.put("distributionType", node.getDistributionType().toString());
+      if (!node.getKeys().isEmpty()) {
+        switch (node.getDistributionType()) {
+          case HASH_DISTRIBUTED:
+            List<String> keys = node.getKeys().stream()
+                .map(key -> _builder.field(1, 0, key).toString())
+                .collect(Collectors.toList());
+            attributes.put("keys", keys);
+            break;
+          case RANGE_DISTRIBUTED:
+            attributes.put("range", node.getKeys());
+            break;
+          default:
+        }
+      }
+      if (node.isSort()) {
+        attributes.put("sort", true);
+      }
+      if (node.isPrePartitioned()) {
+        attributes.put("prePartitioned", true);
+      }
+
+      List<RelNode> inputs = readAlreadyPushedChildren(node);
+
+      PinotExplainedRelNode explained = new PinotExplainedRelNode(_builder.getCluster(), RelTraitSet.createEmpty(),
+          "MailboxSend", attributes, node.getDataSchema(), inputs);
+      _builder.push(explained);
       return null;
     }
 
