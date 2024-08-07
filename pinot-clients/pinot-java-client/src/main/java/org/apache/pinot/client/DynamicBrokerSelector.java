@@ -34,12 +34,15 @@ import org.I0Itec.zkclient.IZkDataListener;
 import org.I0Itec.zkclient.ZkClient;
 import org.I0Itec.zkclient.serialize.BytesPushThroughSerializer;
 import org.apache.pinot.client.utils.BrokerSelectorUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
  * Maintains a mapping between table name and list of brokers
  */
 public class DynamicBrokerSelector implements BrokerSelector, IZkDataListener {
+  private static final Logger LOGGER = LoggerFactory.getLogger(DynamicBrokerSelector.class);
   private static final Random RANDOM = new Random();
 
   private final AtomicReference<Map<String, List<String>>> _tableToBrokerListMapRef = new AtomicReference<>();
@@ -84,6 +87,7 @@ public class DynamicBrokerSelector implements BrokerSelector, IZkDataListener {
       brokerSet.addAll(brokerList);
     }
     _allBrokerListRef.set(new ArrayList<>(brokerSet));
+    LOGGER.info("Refreshed table to broker list map: {}", _tableToBrokerListMapRef.get());
   }
 
   @Nullable
