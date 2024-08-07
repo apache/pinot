@@ -26,9 +26,9 @@ import org.apache.spark.sql.types.StructType
 class PinotWrite(
                   logicalWriteInfo: LogicalWriteInfo
                 ) extends Write with BatchWrite {
-  val writeOptions: PinotDataSourceWriteOptions = PinotDataSourceWriteOptions.from(logicalWriteInfo.options())
-  val writeSchema: StructType = logicalWriteInfo.schema()
-  val pinotSchema: Schema = SparkToPinotTypeTranslator.translate(writeSchema, writeOptions.tableName)
+  private[pinot] val writeOptions: PinotDataSourceWriteOptions = PinotDataSourceWriteOptions.from(logicalWriteInfo.options())
+  private[pinot] val writeSchema: StructType = logicalWriteInfo.schema()
+  private[pinot] val pinotSchema: Schema = SparkToPinotTypeTranslator.translate(writeSchema, writeOptions.tableName)
 
   override def createBatchWriterFactory(physicalWriteInfo: PhysicalWriteInfo): DataWriterFactory = {
     // capture the values to allow lambda serialization
