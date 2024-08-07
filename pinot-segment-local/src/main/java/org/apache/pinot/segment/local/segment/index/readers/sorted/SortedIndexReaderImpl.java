@@ -36,7 +36,7 @@ public class SortedIndexReaderImpl implements SortedIndexReader<SortedIndexReade
 
   public SortedIndexReaderImpl(PinotDataBuffer dataBuffer, int cardinality) {
     // 2 values per dictionary id
-    Preconditions.checkState(dataBuffer.size() == 2 * cardinality * Integer.BYTES);
+    Preconditions.checkState(dataBuffer.size() == 2L * cardinality * Integer.BYTES);
     _reader = new FixedByteValueReaderWriter(dataBuffer);
     _cardinality = cardinality;
   }

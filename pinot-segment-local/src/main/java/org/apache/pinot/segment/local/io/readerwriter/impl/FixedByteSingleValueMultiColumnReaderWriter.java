@@ -43,10 +43,10 @@ public class FixedByteSingleValueMultiColumnReaderWriter implements Closeable {
 
   private final int[] _columnSizesInBytes;
   private final PinotDataBufferMemoryManager _memoryManager;
-  private String _allocationContext;
+  private final String _allocationContext;
   private final long _chunkSizeInBytes;
   private int _capacityInRows;
-  private int _numColumns;
+  private final int _numColumns;
 
   /**
    * Constructor for the class.
@@ -74,7 +74,7 @@ public class FixedByteSingleValueMultiColumnReaderWriter implements Closeable {
     }
 
     _numColumns = _columnSizesInBytes.length;
-    _chunkSizeInBytes = rowSizeInBytes * numRowsPerChunk;
+    _chunkSizeInBytes = (long) rowSizeInBytes * numRowsPerChunk;
   }
 
   public int getInt(int row, int column) {
