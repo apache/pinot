@@ -155,6 +155,7 @@ public abstract class QueryScheduler {
       Map<String, String> responseMetadata = instanceResponse.getResponseMetadata();
       responseMetadata.put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
       responseMetadata.put(MetadataKey.QUERY_HASH.getName(), Integer.toString(queryRequest.getQueryHash()));
+      responseMetadata.put(MetadataKey.TABLE.getName(), queryRequest.getTableNameWithType());
       byte[] responseBytes = serializeResponse(queryRequest, instanceResponse);
 
       // Log the statistics
