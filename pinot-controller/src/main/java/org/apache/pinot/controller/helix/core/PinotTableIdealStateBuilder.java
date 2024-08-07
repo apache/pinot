@@ -99,4 +99,28 @@ public class PinotTableIdealStateBuilder {
       throw new RuntimeException(fetcherException);
     }
   }
+
+  /**
+   * Fetches the list of {@link PartitionGroupMetadata} for the new partition groups for the stream,
+   * with the help of the {@link PartitionGroupConsumptionStatus} of the current partitionGroups.
+   * In particular, this method is used to fetch from multiple stream topics.
+   * @param streamConfigs
+   * @param partitionGroupConsumptionStatusList
+   * @return
+   */
+  public static List<PartitionGroupMetadata> getPartitionGroupMetadataList(List<StreamConfig> streamConfigs,
+      List<PartitionGroupConsumptionStatus> partitionGroupConsumptionStatusList) {
+    PartitionGroupMetadataFetcher partitionGroupMetadataFetcher =
+        new PartitionGroupMetadataFetcher(streamConfigs, partitionGroupConsumptionStatusList);
+    try {
+      DEFAULT_IDEALSTATE_UPDATE_RETRY_POLICY.attempt(partitionGroupMetadataFetcher);
+      return partitionGroupMetadataFetcher.getPartitionGroupMetadataList();
+    } catch (Exception e) {
+      Exception fetcherException = partitionGroupMetadataFetcher.getException();
+      LOGGER.error("Could not get PartitionGroupMetadata for topic: {} of table: {}",
+          streamConfigs.stream().map(streamConfig -> streamConfig.getTopicName()).reduce((a, b) -> a + "," + b),
+          streamConfigs.get(0).getTableNameWithType(), fetcherException);
+      throw new RuntimeException(fetcherException);
+    }
+  }
 }
