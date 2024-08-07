@@ -64,6 +64,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
@@ -264,9 +265,7 @@ public class PinotSegmentRestletResource {
   @ApiOperation(value = "Get segment names to segment status map", notes = "Get segment statuses of each segment")
   public String getSegmentsStatusDetails(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "realtime|offline", required = false) @QueryParam("tableType") String tableTypeStr,
-      @DefaultValue("0") @QueryParam("offset") int offset,
-      @DefaultValue("10") @QueryParam("pagesize") int pageSize, @Context HttpHeaders headers)
+      @ApiParam(value = "realtime|offline", required = false) @QueryParam("tableType") String tableTypeStr, @Context HttpHeaders headers)
       throws JsonProcessingException {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     TableType tableType = _pinotHelixResourceManager.validateTableType(tableTypeStr);
@@ -276,9 +275,7 @@ public class PinotSegmentRestletResource {
         _pinotHelixResourceManager.getTableState(tableName, TableViews.IDEALSTATE, tableType);
     List<SegmentStatusInfo> segmentStatusInfoListMap = new ArrayList<>();
     segmentStatusInfoListMap = _pinotHelixResourceManager.getSegmentStatuses(externalView, idealStateView);
-    List<SegmentStatusInfo> segmentStatusPaginationList =
-        Utils.paginateResults(segmentStatusInfoListMap, offset, pageSize);
-    return JsonUtils.objectToPrettyString(segmentStatusPaginationList);
+    return JsonUtils.objectToPrettyString(segmentStatusInfoListMap);
   }
 
   @GET
