@@ -26,9 +26,12 @@ import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.Identifier;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.sql.parsers.SqlCompilationException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class AliasApplier implements QueryRewriter {
+  private static final Logger LOGGER = LoggerFactory.getLogger(AliasApplier.class);
 
   @Override
   public PinotQuery rewrite(PinotQuery pinotQuery) {
@@ -53,6 +56,10 @@ public class AliasApplier implements QueryRewriter {
   }
 
   private static void applyAlias(Map<String, Expression> aliasMap, PinotQuery pinotQuery) {
+    Expression filterExpression = pinotQuery.getFilterExpression();
+    if (filterExpression != null) {
+      applyAliasForFilter(aliasMap, filterExpression);
+    }
     List<Expression> groupByList = pinotQuery.getGroupByList();
     if (groupByList != null) {
       for (Expression expression : groupByList) {
@@ -87,6 +94,27 @@ public class AliasApplier implements QueryRewriter {
     if (function != null) {
       for (Expression operand : function.getOperands()) {
         applyAlias(aliasMap, operand);
+      }
+    }
+  }
+
+  private static void applyAliasForFilter(Map<String, Expression> aliasMap, Expression expression) {
+    Identifier identifier = expression.getIdentifier();
+    if (identifier != null) {
+      Expression aliasExpression = aliasMap.get(identifier.getName());
+      if (aliasExpression != null) {
+        LOGGER.error("LEGACY QUERY: Cannot apply alias for filter: {}", expression);
+        expression.setType(aliasExpression.getType());
+        expression.setIdentifier(aliasExpression.getIdentifier());
+        expression.setFunctionCall(aliasExpression.getFunctionCall());
+        expression.setLiteral(aliasExpression.getLiteral());
+      }
+      return;
+    }
+    Function function = expression.getFunctionCall();
+    if (function != null) {
+      for (Expression operand : function.getOperands()) {
+        applyAliasForFilter(aliasMap, operand);
       }
     }
   }
