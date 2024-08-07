@@ -68,6 +68,8 @@ public abstract class BaseTableDedupMetadataManager implements TableDedupMetadat
         .setMetadataTimeColumn(metadataTimeColumn)
         .setServerMetrics(serverMetrics);
     _dedupContext = dedupContextBuider.build();
+
+    initCustomVariables();
   }
 
   public PartitionDedupMetadataManager getOrCreatePartitionManager(int partitionId) {
@@ -78,4 +80,10 @@ public abstract class BaseTableDedupMetadataManager implements TableDedupMetadat
    * Create PartitionDedupMetadataManager for given partition id.
    */
   abstract protected PartitionDedupMetadataManager createPartitionDedupMetadataManager(Integer partitionId);
+
+  /**
+   * Can be overridden to initialize custom variables after other variables are set
+   */
+  protected void initCustomVariables() {
+  }
 }
