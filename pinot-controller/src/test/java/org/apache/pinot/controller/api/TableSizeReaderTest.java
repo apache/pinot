@@ -213,14 +213,6 @@ public class TableSizeReaderTest {
     return subset;
   }
 
-  private Map<String, Integer> subsetOfServerSegmentsCount(String... servers) {
-    Map<String, Integer> subset = new HashMap<>();
-    for (String server : servers) {
-      subset.put(server, _serverMap.get(server)._segments.size());
-    }
-    return subset;
-  }
-
   private BiMap<String, String> serverEndpoints(String... servers) {
     BiMap<String, String> endpoints = HashBiMap.create(servers.length);
     for (String server : servers) {
@@ -243,12 +235,6 @@ public class TableSizeReaderTest {
       @Override
       public Object answer(InvocationOnMock invocationOnMock) throws Throwable {
         return subsetOfServerSegments(servers);
-      }
-    });
-    when(_helix.getServerToSegmentsCountMap(anyString())).thenAnswer(new Answer<Object>() {
-      @Override
-      public Object answer(InvocationOnMock invocationOnMock) throws Throwable {
-        return subsetOfServerSegmentsCount(servers);
       }
     });
 
@@ -324,23 +310,6 @@ public class TableSizeReaderTest {
       assertTrue(tableSize._reportedSizeInBytes != tableSize._estimatedSizeInBytes);
       assertTrue(tableSize._missingSegments > 0);
     }
-  }
-
-  @Test
-  public void testGetServerToSegmentsMap() throws InvalidConfigException {
-    final String[] servers = {"server0", "server1"};
-    String table = "offline";
-    TableSizeReader.TableSizeDetails tableSizeDetails = testRunner(servers, table);
-    TableSizeReader.TableSubTypeSizeDetails offlineSizes = tableSizeDetails._offlineSegments;
-    assertNotNull(offlineSizes);
-    validateTableSubTypeSize(servers, offlineSizes);
-    assertNull(tableSizeDetails._realtimeSegments);
-    List server0Segments = new ArrayList<String>();
-    server0Segments.add("s2");
-    server0Segments.add("s3");
-    server0Segments.add("s6");
-    assertEquals(_helix.getServerToSegmentsMap(table).get("server0"), server0Segments);
-    assertEquals(_helix.getServerToSegmentsCountMap(table).get("server0"), 3);
   }
 
   @Test
