@@ -183,7 +183,6 @@
     <azure.msal4j.version>1.16.2</azure.msal4j.version>
     <joda-time.version>2.12.7</joda-time.version>
     <janino.version>3.1.12</janino.version>
-    <testng.version>7.10.2</testng.version>
     <woodstox.version>7.0.0</woodstox.version>
     <sslcontext.kickstart.version>8.3.6</sslcontext.kickstart.version>
 
@@ -252,6 +251,12 @@
     <bouncycastle.version>1.78.1</bouncycastle.version>
     <aircompressor.version>0.27</aircompressor.version>
     <jna.version>5.14.0</jna.version>
+
+    <!-- Test Libraries -->
+    <testng.version>7.10.2</testng.version>
+    <mockito-core.version>5.12.0</mockito-core.version>
+    <equalsverifier.version>3.16.1</equalsverifier.version>
+    <testcontainers.version>1.20.1</testcontainers.version>
   </properties>
 
   <profiles>
@@ -672,12 +677,6 @@
       </dependency>
 
       <dependency>
-        <groupId>nl.jqno.equalsverifier</groupId>
-        <artifactId>equalsverifier</artifactId>
-        <version>3.16.1</version>
-        <scope>test</scope>
-      </dependency>
-      <dependency>
         <groupId>org.checkerframework</groupId>
         <artifactId>checker-qual</artifactId>
         <version>3.46.0</version>
@@ -691,11 +690,6 @@
         <groupId>xml-apis</groupId>
         <artifactId>xml-apis</artifactId>
         <version>2.0.2</version>
-      </dependency>
-      <dependency>
-        <groupId>org.testng</groupId>
-        <artifactId>testng</artifactId>
-        <version>${testng.version}</version>
       </dependency>
       <dependency>
         <groupId>org.roaringbitmap</groupId>
@@ -1604,12 +1598,6 @@
         <version>${surefire.version}</version>
       </dependency>
       <dependency>
-        <groupId>org.mockito</groupId>
-        <artifactId>mockito-core</artifactId>
-        <version>5.12.0</version>
-        <scope>test</scope>
-      </dependency>
-      <dependency>
         <groupId>com.h2database</groupId>
         <artifactId>h2</artifactId>
         <version>2.3.230</version>
@@ -1738,7 +1726,6 @@
         <groupId>org.apache.flink</groupId>
         <artifactId>flink-clients</artifactId>
         <version>${flink.version}</version>
-        <scope>test</scope>
       </dependency>
       <dependency>
         <groupId>org.apache.flink</groupId>
@@ -1850,6 +1837,45 @@
         <artifactId>aircompressor</artifactId>
         <version>${aircompressor.version}</version>
       </dependency>
+
+      <!-- Test Libraries -->
+      <dependency>
+        <groupId>org.testng</groupId>
+        <artifactId>testng</artifactId>
+        <version>${testng.version}</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.mockito</groupId>
+        <artifactId>mockito-core</artifactId>
+        <version>${mockito-core.version}</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>nl.jqno.equalsverifier</groupId>
+        <artifactId>equalsverifier</artifactId>
+        <version>${equalsverifier.version}</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.testcontainers</groupId>
+        <artifactId>testcontainers</artifactId>
+        <version>${testcontainers.version}</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.testcontainers</groupId>
+        <artifactId>kafka</artifactId>
+        <version>${testcontainers.version}</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.testcontainers</groupId>
+        <artifactId>pulsar</artifactId>
+        <version>${testcontainers.version}</version>
+        <scope>test</scope>
+      </dependency>
+
     </dependencies>
   </dependencyManagement>
 
