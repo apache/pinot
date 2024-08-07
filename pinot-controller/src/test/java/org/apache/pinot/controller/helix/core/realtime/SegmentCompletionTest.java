@@ -30,6 +30,8 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.realtime.segment.CommittingSegmentDescriptor;
+import org.apache.pinot.controller.validation.StorageQuotaChecker;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.LongMsgOffsetFactory;
@@ -43,6 +45,7 @@ import org.testng.annotations.Test;
 
 import static org.apache.pinot.common.protocols.SegmentCompletionProtocol.ControllerResponseStatus;
 import static org.apache.pinot.common.protocols.SegmentCompletionProtocol.Request;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -1355,6 +1358,12 @@ public class SegmentCompletionTest {
     return helixManager;
   }
 
+  private static StorageQuotaChecker createMockStorageQuotaChecker() {
+    StorageQuotaChecker storageQuotaChecker = mock(StorageQuotaChecker.class);
+    when(storageQuotaChecker.isTableStorageQuotaExceeded(any())).thenReturn(false);
+    return storageQuotaChecker;
+  }
+
   public static class MockPinotLLCRealtimeSegmentManager extends PinotLLCRealtimeSegmentManager {
     public SegmentZKMetadata _segmentMetadata;
     public MockSegmentCompletionManager _segmentCompletionMgr;
@@ -1369,7 +1378,7 @@ public class SegmentCompletionTest {
 
     protected MockPinotLLCRealtimeSegmentManager(PinotHelixResourceManager pinotHelixResourceManager,
         ControllerMetrics controllerMetrics) {
-      super(pinotHelixResourceManager, CONTROLLER_CONF, controllerMetrics);
+      super(pinotHelixResourceManager, CONTROLLER_CONF, createMockStorageQuotaChecker(), controllerMetrics);
     }
 
     @Override
@@ -1395,6 +1404,11 @@ public class SegmentCompletionTest {
       _stoppedSegmentName = llcSegmentName;
       _stoppedInstance = instanceName;
     }
+
+    @Override
+    public TableConfig getTableConfig(String realtimeTableName) {
+      return mock(TableConfig.class);
+    }
   }
 
   public static class MockSegmentCompletionManager extends SegmentCompletionManager {
@@ -1416,6 +1430,7 @@ public class SegmentCompletionTest {
       super(helixManager, segmentManager, controllerMetrics,
           new LeadControllerManager("localhost_1234", helixManager, controllerMetrics),
           SegmentCompletionProtocol.getDefaultMaxSegmentCommitTimeSeconds());
+
       _isLeader = isLeader;
     }
 

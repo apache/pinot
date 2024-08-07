@@ -355,7 +355,7 @@ public class PinotSegmentUploadDownloadRestletResource {
         untarredSegmentSizeInBytes = FileUtils.sizeOfDirectory(tempSegmentDir);
       }
       SegmentValidationUtils.checkStorageQuota(segmentName, untarredSegmentSizeInBytes, tableConfig,
-          _controllerConf, _storageQuotaChecker);
+          _storageQuotaChecker);
 
       // Encrypt segment
       String crypterNameInTableConfig = tableConfig.getValidationConfig().getCrypterClassName();

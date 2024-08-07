@@ -160,7 +160,8 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
 
   TABLE_DISABLED("tableDisabled", false),
 
-  TABLE_REBALANCE_IN_PROGRESS("tableRebalanceInProgress", false);
+  TABLE_REBALANCE_IN_PROGRESS("tableRebalanceInProgress", false),
+  TABLE_STORAGE_QUOTA_EXCEEDED("tableStorageQuotaExceeded", true);
 
   private final String _gaugeName;
   private final String _unit;
