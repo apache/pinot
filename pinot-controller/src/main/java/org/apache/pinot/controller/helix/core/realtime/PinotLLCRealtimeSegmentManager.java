@@ -36,8 +36,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
@@ -168,8 +166,6 @@ public class PinotLLCRealtimeSegmentManager {
   private final ControllerConf _controllerConf;
   private final ControllerMetrics _controllerMetrics;
   private final MetadataEventNotifierFactory _metadataEventNotifierFactory;
-  private final int _numIdealStateUpdateLocks;
-  private final Lock[] _idealStateUpdateLocks;
   private final FlushThresholdUpdateManager _flushThresholdUpdateManager;
   private final boolean _isDeepStoreLLCSegmentUploadRetryEnabled;
   private final boolean _isTmpSegmentAsyncDeletionEnabled;
@@ -193,11 +189,6 @@ public class PinotLLCRealtimeSegmentManager {
     _metadataEventNotifierFactory =
         MetadataEventNotifierFactory.loadFactory(controllerConf.subset(METADATA_EVENT_NOTIFIER_PREFIX),
             helixResourceManager);
-    _numIdealStateUpdateLocks = controllerConf.getRealtimeSegmentMetadataCommitNumLocks();
-    _idealStateUpdateLocks = new Lock[_numIdealStateUpdateLocks];
-    for (int i = 0; i < _numIdealStateUpdateLocks; i++) {
-      _idealStateUpdateLocks[i] = new ReentrantLock();
-    }
     _flushThresholdUpdateManager = new FlushThresholdUpdateManager();
     _isDeepStoreLLCSegmentUploadRetryEnabled = controllerConf.isDeepStoreRetryUploadLLCSegmentEnabled();
     _isTmpSegmentAsyncDeletionEnabled = controllerConf.isTmpSegmentAsyncDeletionEnabled();
@@ -584,15 +575,9 @@ public class PinotLLCRealtimeSegmentManager {
     // the idealstate update fails due to contention. We serialize the updates to the idealstate
     // to reduce this contention. We may still contend with RetentionManager, or other updates
     // to idealstate from other controllers, but then we have the retry mechanism to get around that.
-    // hash code can be negative, so make sure we are getting a positive lock index
-    int lockIndex = (realtimeTableName.hashCode() & Integer.MAX_VALUE) % _numIdealStateUpdateLocks;
-    Lock lock = _idealStateUpdateLocks[lockIndex];
-    try {
-      lock.lock();
+    synchronized (_helixResourceManager.getIdealStateUpdaterLock(realtimeTableName)) {
       updateIdealStateOnSegmentCompletion(realtimeTableName, committingSegmentName, newConsumingSegmentName,
           segmentAssignment, instancePartitionsMap);
-    } finally {
-      lock.unlock();
     }
 
     long endTimeNs = System.nanoTime();

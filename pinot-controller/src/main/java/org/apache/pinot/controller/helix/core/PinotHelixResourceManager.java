@@ -191,9 +191,10 @@ public class PinotHelixResourceManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotHelixResourceManager.class);
   private static final long CACHE_ENTRY_EXPIRE_TIME_HOURS = 6L;
   private static final RetryPolicy DEFAULT_RETRY_POLICY = RetryPolicies.exponentialBackoffRetryPolicy(5, 1000L, 2.0f);
-  private static final int DEFAULT_SEGMENT_LINEAGE_UPDATE_NUM_RETRY = 10;
+  private static final int DEFAULT_SEGMENT_LINEAGE_UPDATE_NUM_RETRY = 5;
   public static final String APPEND = "APPEND";
-  private static final int DEFAULT_TABLE_UPDATER_LOCKERS_SIZE = 100;
+  private static final int DEFAULT_IDEAL_STATE_UPDATER_LOCKERS_SIZE = 500;
+  private static final int DEFAULT_LINEAGE_UPDATER_LOCKERS_SIZE = 500;
   private static final String API_REQUEST_ID_PREFIX = "api-";
 
   private enum LineageUpdateType {
@@ -211,7 +212,8 @@ public class PinotHelixResourceManager {
 
   private final Map<String, Map<String, Long>> _segmentCrcMap = new HashMap<>();
   private final Map<String, Map<String, Integer>> _lastKnownSegmentMetadataVersionMap = new HashMap<>();
-  private final Object[] _tableUpdaterLocks;
+  private final Object[] _idealStateUpdaterLocks;
+  private final Object[] _lineageUpdaterLocks;
 
   private final LoadingCache<String, String> _instanceAdminEndpointCache;
 
@@ -254,9 +256,13 @@ public class PinotHelixResourceManager {
                 return InstanceUtils.getServerAdminEndpoint(instanceConfig);
               }
             });
-    _tableUpdaterLocks = new Object[DEFAULT_TABLE_UPDATER_LOCKERS_SIZE];
-    for (int i = 0; i < _tableUpdaterLocks.length; i++) {
-      _tableUpdaterLocks[i] = new Object();
+    _idealStateUpdaterLocks = new Object[DEFAULT_IDEAL_STATE_UPDATER_LOCKERS_SIZE];
+    for (int i = 0; i < _idealStateUpdaterLocks.length; i++) {
+      _idealStateUpdaterLocks[i] = new Object();
+    }
+    _lineageUpdaterLocks = new Object[DEFAULT_LINEAGE_UPDATER_LOCKERS_SIZE];
+    for (int i = 0; i < _lineageUpdaterLocks.length; i++) {
+      _lineageUpdaterLocks[i] = new Object();
     }
     _lineageManager = lineageManager;
   }
@@ -992,7 +998,7 @@ public class PinotHelixResourceManager {
     return partitionIdToLastLLCCompletedSegmentMap.values();
   }
 
-  public synchronized PinotResourceManagerResponse deleteSegments(String tableNameWithType, List<String> segmentNames) {
+  public PinotResourceManagerResponse deleteSegments(String tableNameWithType, List<String> segmentNames) {
     return deleteSegments(tableNameWithType, segmentNames, null);
   }
 
@@ -1004,14 +1010,14 @@ public class PinotHelixResourceManager {
    * @param retentionPeriod The retention period of the deleted segments.
    * @return Request response
    */
-  public synchronized PinotResourceManagerResponse deleteSegments(String tableNameWithType, List<String> segmentNames,
+  public PinotResourceManagerResponse deleteSegments(String tableNameWithType, List<String> segmentNames,
       @Nullable String retentionPeriod) {
     try {
       LOGGER.info("Trying to delete segments: {} from table: {} ", segmentNames, tableNameWithType);
       Preconditions.checkArgument(TableNameBuilder.isTableResource(tableNameWithType),
           "Table name: %s is not a valid table name with type suffix", tableNameWithType);
 
-      synchronized (getTableUpdaterLock(tableNameWithType)) {
+      synchronized (getIdealStateUpdaterLock(tableNameWithType)) {
         HelixHelper.removeSegmentsFromIdealState(_helixZkManager, tableNameWithType, segmentNames);
         if (retentionPeriod != null) {
           _segmentDeletionManager.deleteSegments(tableNameWithType, segmentNames,
@@ -2318,7 +2324,7 @@ public class PinotHelixResourceManager {
 
       SegmentAssignment segmentAssignment =
           SegmentAssignmentFactory.getSegmentAssignment(_helixZkManager, tableConfig, _controllerMetrics);
-      synchronized (getTableUpdaterLock(tableNameWithType)) {
+      synchronized (getIdealStateUpdaterLock(tableNameWithType)) {
         Map<InstancePartitionsType, InstancePartitions> finalInstancePartitionsMap = instancePartitionsMap;
         HelixHelper.updateIdealState(_helixZkManager, tableNameWithType, idealState -> {
           assert idealState != null;
@@ -2392,8 +2398,12 @@ public class PinotHelixResourceManager {
     return ((upsertConfig != null) && upsertConfig.getMode() != UpsertConfig.Mode.NONE);
   }
 
-  private Object getTableUpdaterLock(String offlineTableName) {
-    return _tableUpdaterLocks[(offlineTableName.hashCode() & Integer.MAX_VALUE) % _tableUpdaterLocks.length];
+  public Object getIdealStateUpdaterLock(String tableNameWithType) {
+    return _idealStateUpdaterLocks[(tableNameWithType.hashCode() & Integer.MAX_VALUE) % _idealStateUpdaterLocks.length];
+  }
+
+  public Object getLineageUpdaterLock(String tableNameWithType) {
+    return _lineageUpdaterLocks[(tableNameWithType.hashCode() & Integer.MAX_VALUE) % _lineageUpdaterLocks.length];
   }
 
   @Nullable
@@ -3516,6 +3526,7 @@ public class PinotHelixResourceManager {
    */
   public String startReplaceSegments(String tableNameWithType, List<String> segmentsFrom, List<String> segmentsTo,
       boolean forceCleanup, Map<String, String> customMap) {
+    long startReplaceSegmentsTs = System.currentTimeMillis();
     // Create a segment lineage entry id
     String segmentLineageEntryId = SegmentLineageUtils.generateLineageEntryId();
 
@@ -3531,167 +3542,173 @@ public class PinotHelixResourceManager {
       Preconditions.checkState(!segmentsForTable.contains(segment), "Segment: %s from 'segmentsTo' exists in table: %s",
           segment, tableNameWithType);
     }
+    List<String> segmentsToCleanUp = new ArrayList<>();
+    int attemptCount;
+    synchronized (getLineageUpdaterLock(tableNameWithType)) {
+      try {
+        attemptCount = DEFAULT_RETRY_POLICY.attempt(() -> {
+          long startReplaceSegmentsTsForAttempt = System.currentTimeMillis();
+          // Fetch table config
+          TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
+          Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", tableNameWithType);
 
-    try {
-      DEFAULT_RETRY_POLICY.attempt(() -> {
-        // Fetch table config
-        TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
-        Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", tableNameWithType);
-
-        // Fetch the segment lineage metadata
-        ZNRecord segmentLineageZNRecord =
-            SegmentLineageAccessHelper.getSegmentLineageZNRecord(_propertyStore, tableNameWithType);
-        SegmentLineage segmentLineage;
-        int expectedVersion;
-        if (segmentLineageZNRecord == null) {
-          segmentLineage = new SegmentLineage(tableNameWithType);
-          expectedVersion = -1;
-        } else {
-          segmentLineage = SegmentLineage.fromZNRecord(segmentLineageZNRecord);
-          expectedVersion = segmentLineageZNRecord.getVersion();
-        }
-        // Check that the segment lineage entry id doesn't exist in the segment lineage
-        Preconditions.checkState(segmentLineage.getLineageEntry(segmentLineageEntryId) == null,
-            "Entry id: %s already exists in the segment lineage for table: %s", segmentLineageEntryId,
-            tableNameWithType);
-
-        List<String> segmentsToCleanUp = new ArrayList<>();
-        Iterator<Map.Entry<String, LineageEntry>> entryIterator =
-            segmentLineage.getLineageEntries().entrySet().iterator();
-        while (entryIterator.hasNext()) {
-          Map.Entry<String, LineageEntry> entry = entryIterator.next();
-          String entryId = entry.getKey();
-          LineageEntry lineageEntry = entry.getValue();
-
-          // If the lineage entry is in 'REVERTED' state, no need to go through the validation because we can regard
-          // the entry as not existing.
-          if (lineageEntry.getState() == LineageEntryState.REVERTED) {
-            // When 'forceCleanup' is enabled, proactively clean up 'segmentsTo' since it's safe to do so.
-            if (forceCleanup) {
-              segmentsToCleanUp.addAll(lineageEntry.getSegmentsTo());
-            }
-            continue;
-          }
-
-          // By here, the lineage entry is either 'IN_PROGRESS' or 'COMPLETED'.
-
-          // When 'forceCleanup' is enabled, we need to proactively clean up at the following cases:
-          // 1. Revert the lineage entry when we find the lineage entry with overlapped 'segmentsFrom' or 'segmentsTo'
-          //    values. This is used to un-block the segment replacement protocol if the previous attempt failed in the
-          //    middle.
-          // 2. Proactively delete the oldest data snapshot to make sure that we only keep at most 2 data snapshots
-          //    at any time in case of REFRESH use case.
-          if (forceCleanup) {
-            if (lineageEntry.getState() == LineageEntryState.IN_PROGRESS && (
-                !Collections.disjoint(segmentsFrom, lineageEntry.getSegmentsFrom()) || !Collections.disjoint(segmentsTo,
-                    lineageEntry.getSegmentsTo()))) {
-              LOGGER.info(
-                  "Detected the incomplete lineage entry with overlapped 'segmentsFrom' or 'segmentsTo'. Deleting or "
-                      + "reverting the lineage entry to unblock the new segment protocol. tableNameWithType={}, "
-                      + "entryId={}, segmentsFrom={}, segmentsTo={}", tableNameWithType, entryId,
-                  lineageEntry.getSegmentsFrom(), lineageEntry.getSegmentsTo());
-
-              // Delete the 'IN_PROGRESS' entry or update it to 'REVERTED'
-              // Delete or update segmentsTo of the entry to revert to handle the case of rerunning the protocol:
-              // Initial state:
-              //   Entry1: { segmentsFrom: [s1, s2], segmentsTo: [s3, s4], status: IN_PROGRESS}
-              // 1. Rerunning the protocol with s4 and s5, s4 should not be deleted to avoid race conditions of
-              // concurrent data pushes and deletions:
-              //   Entry1: { segmentsFrom: [s1, s2], segmentsTo: [s3], status: REVERTED}
-              //   Entry2: { segmentsFrom: [s1, s2], segmentsTo: [s4, s5], status: IN_PROGRESS}
-              // 2. Rerunning the protocol with s3 and s4, we can simply remove the 'IN_PROGRESS' entry:
-              //   Entry2: { segmentsFrom: [s1, s2], segmentsTo: [s3, s4], status: IN_PROGRESS}
-              List<String> segmentsToForEntryToRevert = new ArrayList<>(lineageEntry.getSegmentsTo());
-              segmentsToForEntryToRevert.removeAll(segmentsTo);
-              if (segmentsToForEntryToRevert.isEmpty()) {
-                // Delete 'IN_PROGRESS' entry if the segmentsTo is empty
-                entryIterator.remove();
-              } else {
-                // Update the lineage entry to 'REVERTED'
-                entry.setValue(new LineageEntry(lineageEntry.getSegmentsFrom(), segmentsToForEntryToRevert,
-                    LineageEntryState.REVERTED, System.currentTimeMillis()));
-              }
-
-              // Add segments for proactive clean-up.
-              segmentsToCleanUp.addAll(segmentsToForEntryToRevert);
-            } else if (lineageEntry.getState() == LineageEntryState.COMPLETED && "REFRESH".equalsIgnoreCase(
-                IngestionConfigUtils.getBatchSegmentIngestionType(tableConfig)) && CollectionUtils.isEqualCollection(
-                segmentsFrom, lineageEntry.getSegmentsTo())) {
-              // This part of code assumes that we only allow at most 2 data snapshots at a time by proactively
-              // deleting the older snapshots (for REFRESH tables).
-              //
-              // e.g. (Seg_0, Seg_1, Seg_2) -> (Seg_3, Seg_4, Seg_5)  // previous lineage
-              //      (Seg_3, Seg_4, Seg_5) -> (Seg_6, Seg_7, Seg_8)  // current lineage to be updated
-              // -> proactively delete (Seg_0, Seg_1, Seg_2) since we want to keep 2 data snapshots
-              //    (Seg_3, Seg_4, Seg_5), (Seg_6, Seg_7, Seg_8) only to avoid the disk space waste.
-              //
-              // TODO: make the number of allowed snapshots configurable to allow users to keep at most N snapshots
-              //       of data. We need to traverse the lineage by N steps instead of 2 steps. We can build the reverse
-              //       hash map (segmentsTo -> segmentsFrom) and traverse up to N times before deleting.
-              //
-              LOGGER.info(
-                  "Proactively deleting the replaced segments for REFRESH table to avoid the excessive disk waste. "
-                      + "tableNameWithType={}, segmentsToCleanUp={}", tableNameWithType,
-                  lineageEntry.getSegmentsFrom());
-              segmentsToCleanUp.addAll(lineageEntry.getSegmentsFrom());
-            }
+          // Fetch the segment lineage metadata
+          ZNRecord segmentLineageZNRecord =
+              SegmentLineageAccessHelper.getSegmentLineageZNRecord(_propertyStore, tableNameWithType);
+          SegmentLineage segmentLineage;
+          int expectedVersion;
+          if (segmentLineageZNRecord == null) {
+            segmentLineage = new SegmentLineage(tableNameWithType);
+            expectedVersion = -1;
           } else {
-            // Check that any segment from 'segmentsFrom' does not appear twice.
-            if (!segmentsFrom.isEmpty()) {
-              Set<String> segmentsFromInLineageEntry = new HashSet<>(lineageEntry.getSegmentsFrom());
-              if (!segmentsFromInLineageEntry.isEmpty()) {
-                for (String segment : segmentsFrom) {
-                  Preconditions.checkState(!segmentsFromInLineageEntry.contains(segment),
-                      "Segment: %s from 'segmentsFrom' exists in table: %s, entry id: %s as 'segmentsFrom'"
-                          + " (replacing a replaced segment)", segment, tableNameWithType, entryId);
-                }
+            segmentLineage = SegmentLineage.fromZNRecord(segmentLineageZNRecord);
+            expectedVersion = segmentLineageZNRecord.getVersion();
+          }
+          // Check that the segment lineage entry id doesn't exist in the segment lineage
+          Preconditions.checkState(segmentLineage.getLineageEntry(segmentLineageEntryId) == null,
+              "Entry id: %s already exists in the segment lineage for table: %s", segmentLineageEntryId,
+              tableNameWithType);
+
+          Iterator<Map.Entry<String, LineageEntry>> entryIterator =
+              segmentLineage.getLineageEntries().entrySet().iterator();
+          while (entryIterator.hasNext()) {
+            Map.Entry<String, LineageEntry> entry = entryIterator.next();
+            String entryId = entry.getKey();
+            LineageEntry lineageEntry = entry.getValue();
+
+            // If the lineage entry is in 'REVERTED' state, no need to go through the validation because we can regard
+            // the entry as not existing.
+            if (lineageEntry.getState() == LineageEntryState.REVERTED) {
+              // When 'forceCleanup' is enabled, proactively clean up 'segmentsTo' since it's safe to do so.
+              if (forceCleanup) {
+                segmentsToCleanUp.addAll(lineageEntry.getSegmentsTo());
               }
+              continue;
             }
 
-            if (!segmentsTo.isEmpty()) {
-              Set<String> segmentsToInLineageEntry = new HashSet<>(lineageEntry.getSegmentsTo());
-              if (!segmentsToInLineageEntry.isEmpty()) {
-                for (String segment : segmentsTo) {
-                  Preconditions.checkState(!segmentsToInLineageEntry.contains(segment),
-                      "Segment: %s from 'segmentsTo' exists in table: %s, entry id: %s as 'segmentTo'"
-                          + " (name conflict)", segment, tableNameWithType, entryId);
+            // By here, the lineage entry is either 'IN_PROGRESS' or 'COMPLETED'.
+
+            // When 'forceCleanup' is enabled, we need to proactively clean up at the following cases:
+            // 1. Revert the lineage entry when we find the lineage entry with overlapped 'segmentsFrom' or 'segmentsTo'
+            //    values. This is used to un-block the segment replacement protocol if the previous attempt failed in
+            //    the middle.
+            // 2. Proactively delete the oldest data snapshot to make sure that we only keep at most 2 data snapshots
+            //    at any time in case of REFRESH use case.
+            if (forceCleanup) {
+              if (lineageEntry.getState() == LineageEntryState.IN_PROGRESS && (
+                  !Collections.disjoint(segmentsFrom, lineageEntry.getSegmentsFrom()) || !Collections.disjoint(
+                      segmentsTo, lineageEntry.getSegmentsTo()))) {
+                LOGGER.info(
+                    "Detected the incomplete lineage entry with overlapped 'segmentsFrom' or 'segmentsTo'. Deleting or "
+                        + "reverting the lineage entry to unblock the new segment protocol. tableNameWithType={}, "
+                        + "entryId={}, segmentsFrom={}, segmentsTo={}", tableNameWithType, entryId,
+                    lineageEntry.getSegmentsFrom(), lineageEntry.getSegmentsTo());
+
+                // Delete the 'IN_PROGRESS' entry or update it to 'REVERTED'
+                // Delete or update segmentsTo of the entry to revert to handle the case of rerunning the protocol:
+                // Initial state:
+                //   Entry1: { segmentsFrom: [s1, s2], segmentsTo: [s3, s4], status: IN_PROGRESS}
+                // 1. Rerunning the protocol with s4 and s5, s4 should not be deleted to avoid race conditions of
+                // concurrent data pushes and deletions:
+                //   Entry1: { segmentsFrom: [s1, s2], segmentsTo: [s3], status: REVERTED}
+                //   Entry2: { segmentsFrom: [s1, s2], segmentsTo: [s4, s5], status: IN_PROGRESS}
+                // 2. Rerunning the protocol with s3 and s4, we can simply remove the 'IN_PROGRESS' entry:
+                //   Entry2: { segmentsFrom: [s1, s2], segmentsTo: [s3, s4], status: IN_PROGRESS}
+                List<String> segmentsToForEntryToRevert = new ArrayList<>(lineageEntry.getSegmentsTo());
+                segmentsToForEntryToRevert.removeAll(segmentsTo);
+                if (segmentsToForEntryToRevert.isEmpty()) {
+                  // Delete 'IN_PROGRESS' entry if the segmentsTo is empty
+                  entryIterator.remove();
+                } else {
+                  // Update the lineage entry to 'REVERTED'
+                  entry.setValue(new LineageEntry(lineageEntry.getSegmentsFrom(), segmentsToForEntryToRevert,
+                      LineageEntryState.REVERTED, System.currentTimeMillis()));
+                }
+
+                // Add segments for proactive clean-up.
+                segmentsToCleanUp.addAll(segmentsToForEntryToRevert);
+              } else if (lineageEntry.getState() == LineageEntryState.COMPLETED && "REFRESH".equalsIgnoreCase(
+                  IngestionConfigUtils.getBatchSegmentIngestionType(tableConfig)) && CollectionUtils.isEqualCollection(
+                  segmentsFrom, lineageEntry.getSegmentsTo())) {
+                // This part of code assumes that we only allow at most 2 data snapshots at a time by proactively
+                // deleting the older snapshots (for REFRESH tables).
+                //
+                // e.g. (Seg_0, Seg_1, Seg_2) -> (Seg_3, Seg_4, Seg_5)  // previous lineage
+                //      (Seg_3, Seg_4, Seg_5) -> (Seg_6, Seg_7, Seg_8)  // current lineage to be updated
+                // -> proactively delete (Seg_0, Seg_1, Seg_2) since we want to keep 2 data snapshots
+                //    (Seg_3, Seg_4, Seg_5), (Seg_6, Seg_7, Seg_8) only to avoid the disk space waste.
+                //
+                // TODO: make the number of allowed snapshots configurable to allow users to keep at most N snapshots
+                //       of data. We need to traverse the lineage by N steps instead of 2 steps. We can build the
+                //       reverse hash map (segmentsTo -> segmentsFrom) and traverse up to N times before deleting.
+                LOGGER.info(
+                    "Proactively deleting the replaced segments for REFRESH table to avoid the excessive disk waste. "
+                        + "tableNameWithType={}, segmentsToCleanUp={}", tableNameWithType,
+                    lineageEntry.getSegmentsFrom());
+                segmentsToCleanUp.addAll(lineageEntry.getSegmentsFrom());
+              }
+            } else {
+              // Check that any segment from 'segmentsFrom' does not appear twice.
+              if (!segmentsFrom.isEmpty()) {
+                Set<String> segmentsFromInLineageEntry = new HashSet<>(lineageEntry.getSegmentsFrom());
+                if (!segmentsFromInLineageEntry.isEmpty()) {
+                  for (String segment : segmentsFrom) {
+                    Preconditions.checkState(!segmentsFromInLineageEntry.contains(segment),
+                        "Segment: %s from 'segmentsFrom' exists in table: %s, entry id: %s as 'segmentsFrom'"
+                            + " (replacing a replaced segment)", segment, tableNameWithType, entryId);
+                  }
+                }
+              }
+
+              if (!segmentsTo.isEmpty()) {
+                Set<String> segmentsToInLineageEntry = new HashSet<>(lineageEntry.getSegmentsTo());
+                if (!segmentsToInLineageEntry.isEmpty()) {
+                  for (String segment : segmentsTo) {
+                    Preconditions.checkState(!segmentsToInLineageEntry.contains(segment),
+                        "Segment: %s from 'segmentsTo' exists in table: %s, entry id: %s as 'segmentTo'"
+                            + " (name conflict)", segment, tableNameWithType, entryId);
+                  }
                 }
               }
             }
           }
-        }
 
-        // Update lineage entry
-        segmentLineage.addLineageEntry(segmentLineageEntryId,
-            new LineageEntry(segmentsFrom, segmentsTo, LineageEntryState.IN_PROGRESS, System.currentTimeMillis()));
+          // Update lineage entry
+          segmentLineage.addLineageEntry(segmentLineageEntryId,
+              new LineageEntry(segmentsFrom, segmentsTo, LineageEntryState.IN_PROGRESS, System.currentTimeMillis()));
 
-        _lineageManager.updateLineageForStartReplaceSegments(tableConfig, segmentLineageEntryId, customMap,
-            segmentLineage);
-        // Write back to the lineage entry to the property store
-        if (SegmentLineageAccessHelper.writeSegmentLineage(_propertyStore, segmentLineage, expectedVersion)) {
-          // Trigger the proactive segment clean up if needed. Once the lineage is updated in the property store, it
-          // is safe to physically delete segments.
-          if (!segmentsToCleanUp.isEmpty()) {
-            LOGGER.info("Cleaning up the segments while startReplaceSegments: {}", segmentsToCleanUp);
-            deleteSegments(tableNameWithType, segmentsToCleanUp);
+          _lineageManager.updateLineageForStartReplaceSegments(tableConfig, segmentLineageEntryId, customMap,
+              segmentLineage);
+          // Write back to the lineage entry to the property store
+          if (SegmentLineageAccessHelper.writeSegmentLineage(_propertyStore, segmentLineage, expectedVersion)) {
+            LOGGER.info("startReplaceSegments completed in {} ms.",
+                System.currentTimeMillis() - startReplaceSegmentsTsForAttempt);
+            return true;
+          } else {
+            LOGGER.warn("Failed to write segment lineage for table: {}", tableNameWithType);
+            return false;
           }
-          return true;
-        } else {
-          LOGGER.warn("Failed to write segment lineage for table: {}", tableNameWithType);
-          return false;
-        }
-      });
-    } catch (Exception e) {
-      String errorMsg = String.format("Failed to update the segment lineage during startReplaceSegments. "
-          + "(tableName = %s, segmentsFrom = %s, segmentsTo = %s)", tableNameWithType, segmentsFrom, segmentsTo);
-      LOGGER.error(errorMsg, e);
-      throw new RuntimeException(errorMsg, e);
+        });
+      } catch (Exception e) {
+        String errorMsg = String.format("Failed to update the segment lineage during startReplaceSegments. "
+            + "(tableName = %s, segmentsFrom = %s, segmentsTo = %s)", tableNameWithType, segmentsFrom, segmentsTo);
+        LOGGER.error(errorMsg, e);
+        throw new RuntimeException(errorMsg, e);
+      }
+    }
+
+    // Trigger the proactive segment clean up if needed. Once the lineage is updated in the property store, it
+    // is safe to physically delete segments.
+    if (!segmentsToCleanUp.isEmpty()) {
+      LOGGER.info("Cleaning up the segments while startReplaceSegments: {}", segmentsToCleanUp);
+      deleteSegments(tableNameWithType, segmentsToCleanUp);
     }
 
     // Only successful attempt can reach here
-    LOGGER.info("startReplaceSegments is successfully processed. (tableNameWithType = {}, segmentsFrom = {}, "
-            + "segmentsTo = {}, segmentLineageEntryId = {})", tableNameWithType, segmentsFrom, segmentsTo,
-        segmentLineageEntryId);
+    LOGGER.info("startReplaceSegments is successfully processed in {} ms on attempt: {}. "
+            + "(tableNameWithType = {}, segmentsFrom = {}, segmentsTo = {}, segmentLineageEntryId = {})",
+        System.currentTimeMillis() - startReplaceSegmentsTs, attemptCount + 1, tableNameWithType, segmentsFrom,
+        segmentsTo, segmentLineageEntryId);
     return segmentLineageEntryId;
   }
 
@@ -3709,8 +3726,11 @@ public class PinotHelixResourceManager {
    */
   public void endReplaceSegments(String tableNameWithType, String segmentLineageEntryId,
       @Nullable EndReplaceSegmentsRequest endReplaceSegmentsRequest) {
+    long endReplaceSegmentsTs = System.currentTimeMillis();
+    int attemptCount;
     try {
-      DEFAULT_RETRY_POLICY.attempt(() -> {
+      attemptCount = DEFAULT_RETRY_POLICY.attempt(() -> {
+        long endReplaceSegmentsTsForAttempt = System.currentTimeMillis();
         // Fetch the segment lineage and look up the lineage entry based on the entry id.
         SegmentLineage segmentLineage = SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, tableNameWithType);
         Preconditions.checkState(segmentLineage != null, "Failed to find segment lineage for table: %s",
@@ -3766,12 +3786,14 @@ public class PinotHelixResourceManager {
         TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
         Map<String, String> customMap =
             endReplaceSegmentsRequest == null ? null : endReplaceSegmentsRequest.getCustomMap();
-        if (writeLineageEntryWithTightLoop(tableConfig, segmentLineageEntryId, lineageEntryToUpdate, lineageEntry,
+        if (writeLineageEntryWithLock(tableConfig, segmentLineageEntryId, lineageEntryToUpdate, lineageEntry,
             _propertyStore, LineageUpdateType.END, customMap)) {
           // If the segment lineage metadata is successfully updated, we need to trigger brokers to rebuild the
           // routing table because it is possible that there has been no EV change but the routing result may be
           // different after updating the lineage entry.
           sendRoutingTableRebuildMessage(tableNameWithType);
+          LOGGER.info("endReplaceSegments completed in {} ms.",
+              System.currentTimeMillis() - endReplaceSegmentsTsForAttempt);
           return true;
         } else {
           LOGGER.warn("Failed to write segment lineage for table: {}", tableNameWithType);
@@ -3786,7 +3808,8 @@ public class PinotHelixResourceManager {
     }
 
     // Only successful attempt can reach here
-    LOGGER.info("endReplaceSegments is successfully processed. (tableNameWithType = {}, segmentLineageEntryId = {})",
+    LOGGER.info("endReplaceSegments is successfully processed in {} ms on attempt: {}. (tableNameWithType = {}, "
+            + "segmentLineageEntryId = {})", System.currentTimeMillis() - endReplaceSegmentsTs, attemptCount + 1,
         tableNameWithType, segmentLineageEntryId);
   }
 
@@ -3879,7 +3902,7 @@ public class PinotHelixResourceManager {
         TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
         Map<String, String> customMap =
             revertReplaceSegmentsRequest == null ? null : revertReplaceSegmentsRequest.getCustomMap();
-        if (writeLineageEntryWithTightLoop(tableConfig, segmentLineageEntryId, lineageEntryToUpdate, lineageEntry,
+        if (writeLineageEntryWithLock(tableConfig, segmentLineageEntryId, lineageEntryToUpdate, lineageEntry,
             _propertyStore, LineageUpdateType.REVERT, customMap)) {
           // If the segment lineage metadata is successfully updated, we need to trigger brokers to rebuild the
           // routing table because it is possible that there has been no EV change but the routing result may be
@@ -3909,7 +3932,7 @@ public class PinotHelixResourceManager {
   }
 
   /**
-   * Update the lineage entry with the tight loop to increase the chance for successful ZK write.
+   * Update the lineage entry post acquiring the lineage update lock to increase the chance for successful ZK write.
    * @param tableConfig table config
    * @param lineageEntryId lineage entry id
    * @param lineageEntryToUpdate lineage entry that needs to be updated
@@ -3918,49 +3941,52 @@ public class PinotHelixResourceManager {
    * @param lineageUpdateType
    * @param customMap
    */
-  private boolean writeLineageEntryWithTightLoop(TableConfig tableConfig, String lineageEntryId,
+  private boolean writeLineageEntryWithLock(TableConfig tableConfig, String lineageEntryId,
       LineageEntry lineageEntryToUpdate, LineageEntry lineageEntryToMatch, ZkHelixPropertyStore<ZNRecord> propertyStore,
       LineageUpdateType lineageUpdateType, Map<String, String> customMap) {
-    for (int i = 0; i < DEFAULT_SEGMENT_LINEAGE_UPDATE_NUM_RETRY; i++) {
-      // Fetch the segment lineage
-      ZNRecord segmentLineageToUpdateZNRecord =
-          SegmentLineageAccessHelper.getSegmentLineageZNRecord(propertyStore, tableConfig.getTableName());
-      int expectedVersion = segmentLineageToUpdateZNRecord.getVersion();
-      SegmentLineage segmentLineageToUpdate = SegmentLineage.fromZNRecord(segmentLineageToUpdateZNRecord);
-      LineageEntry currentLineageEntry = segmentLineageToUpdate.getLineageEntry(lineageEntryId);
+    String tableNameWithType = tableConfig.getTableName();
+      synchronized (getLineageUpdaterLock(tableNameWithType)) {
+        // retry attempts are made to account for the distributed update from other controllers
+        for (int i = 0; i < DEFAULT_SEGMENT_LINEAGE_UPDATE_NUM_RETRY; i++) {
+          // Fetch the segment lineage
+          ZNRecord segmentLineageToUpdateZNRecord =
+              SegmentLineageAccessHelper.getSegmentLineageZNRecord(propertyStore, tableConfig.getTableName());
+          int expectedVersion = segmentLineageToUpdateZNRecord.getVersion();
+          SegmentLineage segmentLineageToUpdate = SegmentLineage.fromZNRecord(segmentLineageToUpdateZNRecord);
+          LineageEntry currentLineageEntry = segmentLineageToUpdate.getLineageEntry(lineageEntryId);
 
-      // If the lineage entry doesn't match with the previously fetched lineage, we need to fail the request.
-      if (!currentLineageEntry.equals(lineageEntryToMatch)) {
-        String errorMsg = String.format(
-            "Aborting the to update lineage entry since we find that the entry has been modified for table %s, "
-                + "entry id: %s", tableConfig.getTableName(), lineageEntryId);
-        LOGGER.error(errorMsg);
-        throw new RuntimeException(errorMsg);
-      }
+          // If the lineage entry doesn't match with the previously fetched lineage, we need to fail the request.
+          if (!currentLineageEntry.equals(lineageEntryToMatch)) {
+            String errorMsg = String.format(
+                "Aborting the to update lineage entry since we find that the entry has been modified for table %s, "
+                    + "entry id: %s", tableConfig.getTableName(), lineageEntryId);
+            LOGGER.error(errorMsg);
+            throw new RuntimeException(errorMsg);
+          }
 
-      // Update lineage entry
-      segmentLineageToUpdate.updateLineageEntry(lineageEntryId, lineageEntryToUpdate);
-      switch (lineageUpdateType) {
-        case START:
-          _lineageManager.updateLineageForStartReplaceSegments(tableConfig, lineageEntryId, customMap,
-              segmentLineageToUpdate);
-          break;
-        case END:
-          _lineageManager.updateLineageForEndReplaceSegments(tableConfig, lineageEntryId, customMap,
-              segmentLineageToUpdate);
-          break;
-        case REVERT:
-          _lineageManager.updateLineageForRevertReplaceSegments(tableConfig, lineageEntryId, customMap,
-              segmentLineageToUpdate);
-          break;
-        default:
-      }
+          // Update lineage entry
+          segmentLineageToUpdate.updateLineageEntry(lineageEntryId, lineageEntryToUpdate);
+          switch (lineageUpdateType) {
+            case END:
+              _lineageManager.updateLineageForEndReplaceSegments(tableConfig, lineageEntryId, customMap,
+                  segmentLineageToUpdate);
+              break;
+            case REVERT:
+              _lineageManager.updateLineageForRevertReplaceSegments(tableConfig, lineageEntryId, customMap,
+                  segmentLineageToUpdate);
+              break;
+            default:
+              String errorMsg = String.format("Aborting the lineage entry update with type: %s, as the allowed update"
+                  + "types in this method are END and REVERT", lineageUpdateType);
+              throw new IllegalStateException(errorMsg);
+          }
 
-      // Write back to the lineage entry
-      if (SegmentLineageAccessHelper.writeSegmentLineage(propertyStore, segmentLineageToUpdate, expectedVersion)) {
-        return true;
+          // Write back to the lineage entry
+          if (SegmentLineageAccessHelper.writeSegmentLineage(propertyStore, segmentLineageToUpdate, expectedVersion)) {
+            return true;
+          }
+        }
       }
-    }
     return false;
   }
 
