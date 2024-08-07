@@ -21,10 +21,8 @@ package org.apache.pinot.common;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
-import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.jar.Attributes;
@@ -146,21 +144,5 @@ public class Utils {
     }
 
     return componentVersions;
-  }
-
-  /**
-   * For a list of objects, return the paginated results
-   * @param list the list of objects
-   * @param offset the start pos
-   * @param limit the maximum number of objects returned
-   * @param <T> the type for the objects
-   * @return the sublist for the paginated result
-   */
-  public static <T> List<T> paginateResults(List<T> list, int offset, int limit) {
-    if (offset >= list.size()) {
-      // requested page is out of bound
-      return Collections.emptyList();
-    }
-    return list.subList(offset, Math.min(offset + limit, list.size()));
   }
 }
