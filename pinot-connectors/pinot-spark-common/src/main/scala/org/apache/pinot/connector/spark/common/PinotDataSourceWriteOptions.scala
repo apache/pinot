@@ -39,8 +39,8 @@ object PinotDataSourceWriteOptions {
     }
 
     val tableName = options.get(CONFIG_TABLE_NAME)
-    val segmentNameFormat = options.getOrDefault(CONFIG_SEGMENT_NAME_FORMAT, s"""$tableName-{partitionId:03}""")
     val savePath = options.get(CONFIG_PATH)
+    val segmentNameFormat = options.getOrDefault(CONFIG_SEGMENT_NAME_FORMAT, s"""$tableName-{partitionId:03}""")
     val invertedIndexColumns = options.getOrDefault(CONFIG_INVERTED_INDEX_COLUMNS, "").split(",").filter(_.nonEmpty)
     val noDictionaryColumns = options.getOrDefault(CONFIG_NO_DICTIONARY_COLUMNS, "").split(",").filter(_.nonEmpty)
     val bloomFilterColumns = options.getOrDefault(CONFIG_BLOOM_FILTER_COLUMNS, "").split(",").filter(_.nonEmpty)
@@ -52,6 +52,9 @@ object PinotDataSourceWriteOptions {
     }
     if (savePath == null) {
       throw new IllegalArgumentException("Save path is required")
+    }
+    if (segmentNameFormat == "") {
+      throw new IllegalArgumentException("Segment name format cannot be empty string")
     }
 
     PinotDataSourceWriteOptions(

@@ -82,6 +82,20 @@ class PinotDataSourceWriteOptionsTest extends BaseTest {
     exception.getMessage shouldEqual "Save path must be specified."
   }
 
+  test("Should throw exception if `segmentNameFormat` is empty string") {
+    val options = Map(
+      PinotDataSourceWriteOptions.CONFIG_TABLE_NAME -> "tbl",
+      PinotDataSourceWriteOptions.CONFIG_PATH -> "/path/to/save",
+      PinotDataSourceWriteOptions.CONFIG_SEGMENT_NAME_FORMAT -> ""
+    )
+
+    val exception = intercept[IllegalArgumentException] {
+      PinotDataSourceWriteOptions.from(options.asJava)
+    }
+
+    exception.getMessage shouldEqual "Segment name format cannot be empty string"
+  }
+
   test("Default values should be applied for optional configurations") {
     val options = Map(
       PinotDataSourceWriteOptions.CONFIG_TABLE_NAME -> "tbl",

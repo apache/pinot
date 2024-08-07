@@ -37,6 +37,16 @@ import java.io.File
 import java.nio.file.Files
 import java.util.regex.Pattern
 
+/** This class implements the Spark DataWriter interface for Pinot and is executed on the Spark executor side.
+ *  It takes in Spark records through the `write` method and creates and pushes a segment to the destination on `commit`.
+ *
+ *  In current design, records are written to a buffered record reader, which adheres to the Pinot RecordReader interface.
+ *  The reason for this is the Pinot SegmentIndexCreationDriverImpl expects a RecordReader and does two passes over the data:
+ *  one for statistics generation and one for actual segment creation.
+ *
+ *  Segment name generation is also executed here in order to make it possible for segment names which derive some
+ *  parts from actual data (records), such as minTimestamp, maxTimestamp, etc.
+ */
 class PinotDataWriter[InternalRow](
                                     partitionId: Int,
                                     taskId: Long,
@@ -48,9 +58,9 @@ class PinotDataWriter[InternalRow](
   logger.info("PinotDataWriter created with writeOptions: {}, partitionId: {}, taskId: {}",
     (writeOptions, partitionId, taskId))
 
-  val tableName: String = writeOptions.tableName
-  val savePath: String = writeOptions.savePath
-  val bufferedRecordReader: PinotBufferedRecordReader = new PinotBufferedRecordReader()
+  private[pinot] val tableName: String = writeOptions.tableName
+  private[pinot] val savePath: String = writeOptions.savePath
+  private[pinot] val bufferedRecordReader: PinotBufferedRecordReader = new PinotBufferedRecordReader()
 
   override def write(record: catalyst.InternalRow): Unit = {
     bufferedRecordReader.write(internalRowToGenericRow(record))
@@ -64,18 +74,21 @@ class PinotDataWriter[InternalRow](
     new SuccessWriterCommitMessage(segmentName)
   }
 
-  // This method is used to generate the segment name based on the format provided in the write options
-  // The format can contain variables like {partitionId}
-  // Currently supported variables are `partitionId`, `table`
-  // It also supports the following, python inspired format specifier for digit formatting:
-  //  `{partitionId:05}`
-  // which will zero pad partitionId up to five characters.
-  //
-  // Some examples:
-  //  "{partitionId}_{table}" -> "12_airlineStats"
-  //  "{partitionId:05}_{table}" -> "00012_airlineStats"
-  //  "{table}_{partitionId}" -> "airlineStats_12"
-  //  "{table}_20240805" -> "airlineStats_20240805"
+  /** This method is used to generate the segment name based on the format
+   *  provided in the write options (segmentNameFormat).
+   *  The format can contain variables like {partitionId}.
+   *  Currently supported variables are `partitionId`, `table`
+   *
+   *  It also supports the following, python inspired format specifier for digit formatting:
+   *  `{partitionId:05}`
+   *  which will zero pad partitionId up to five characters.
+   *
+   *  Some examples:
+   *    "{partitionId}_{table}" -> "12_airlineStats"
+   *    "{partitionId:05}_{table}" -> "00012_airlineStats"
+   *    "{table}_{partitionId}" -> "airlineStats_12"
+   *    "{table}_20240805" -> "airlineStats_20240805"
+   */
   private[pinot] def getSegmentName: String = {
     val format = writeOptions.segmentNameFormat
     val variables = Map(
@@ -200,10 +213,10 @@ class PinotDataWriter[InternalRow](
             case org.apache.spark.sql.types.ShortType =>
               gr.putValue(field.name, record.getArray(idx).array.map(_.asInstanceOf[Short]))
             case _ =>
-              throw new UnsupportedOperationException("Unsupported data type")
+              throw new UnsupportedOperationException(s"Unsupported data type: Array[${elementType}]")
           }
         case _ =>
-          throw new UnsupportedOperationException("Unsupported data type")
+          throw new UnsupportedOperationException("Unsupported data type: " + field.dataType)
       }
     }
     gr

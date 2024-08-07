@@ -28,8 +28,7 @@ import java.util
  * This is useful to satisfy the RecordReader interface in Pinot, and also allow for Spark executor
  * to write records.
  *
- * To improve resilience, we may write records to disk when memory is full,
- * but for now we keep it simple.
+ * TODO: To improve resilience, write records to disk when memory is full.
  */
 class PinotBufferedRecordReader extends RecordReader {
   private val recordBuffer = new util.ArrayList[GenericRow]()
