@@ -243,5 +243,10 @@ public class MetadataBlockTest {
     public Type getDataBlockType() {
       return Type.METADATA;
     }
+
+    @Override
+    protected int getFixDataSize() {
+      return 0;
+    }
   }
 }

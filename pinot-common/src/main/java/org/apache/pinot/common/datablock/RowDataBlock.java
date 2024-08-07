@@ -29,6 +29,7 @@ public class RowDataBlock extends BaseDataBlock {
   private static final int VERSION = 2;
   protected int[] _columnOffsets;
   protected int _rowSizeInBytes;
+  private int _fixDataSize;
 
   public RowDataBlock(int numRows, DataSchema dataSchema, String[] stringDictionary,
       byte[] fixedSizeDataBytes, byte[] variableSizeDataBytes) {
@@ -48,6 +49,11 @@ public class RowDataBlock extends BaseDataBlock {
       _rowSizeInBytes = DataBlockUtils.computeColumnOffsets(_dataSchema, _columnOffsets);
       _fixDataSize = _numRows * _rowSizeInBytes;
     }
+  }
+
+  @Override
+  protected int getFixDataSize() {
+    return _fixDataSize;
   }
 
   @Override

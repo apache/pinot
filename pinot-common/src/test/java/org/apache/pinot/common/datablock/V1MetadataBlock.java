@@ -166,4 +166,9 @@ public class V1MetadataBlock extends BaseDataBlock {
   public Type getDataBlockType() {
     return Type.METADATA;
   }
+
+  @Override
+  protected int getFixDataSize() {
+    return 0;
+  }
 }

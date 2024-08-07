@@ -29,6 +29,7 @@ public class ColumnarDataBlock extends BaseDataBlock {
   private static final int VERSION = 2;
   protected int[] _cumulativeColumnOffsetSizeInBytes;
   protected int[] _columnSizeInBytes;
+  private int _fixDataSize;
 
   public ColumnarDataBlock(int numRows, DataSchema dataSchema, String[] stringDictionary,
       byte[] fixedSizeDataBytes, byte[] variableSizeDataBytes) {
@@ -65,6 +66,11 @@ public class ColumnarDataBlock extends BaseDataBlock {
   @Override
   public Type getDataBlockType() {
     return Type.COLUMNAR;
+  }
+
+  @Override
+  protected int getFixDataSize() {
+    return _fixDataSize;
   }
 
 // TODO: add whole-column access methods.

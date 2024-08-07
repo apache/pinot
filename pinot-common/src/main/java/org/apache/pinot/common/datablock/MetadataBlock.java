@@ -86,6 +86,11 @@ public class MetadataBlock extends BaseDataBlock {
     throw new UnsupportedOperationException("Not supported in metadata block");
   }
 
+  @Override
+  protected int getFixDataSize() {
+    return 0;
+  }
+
   public enum MetadataBlockType {
     /**
      * Indicates that this block is the final block to be sent
