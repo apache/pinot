@@ -122,14 +122,13 @@ public class TableViews {
   @ApiOperation(value = "Get segment names to segment status map", notes = "Get segment statuses of each segment")
   public String getSegmentsStatusDetails(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "realtime|offline", required = false) @QueryParam("tableType") String tableTypeStr, @Context HttpHeaders headers)
+      @ApiParam(value = "realtime|offline", required = false) @QueryParam("tableType") String tableTypeStr,
+      @Context HttpHeaders headers)
       throws JsonProcessingException {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     TableType tableType = validateTableType(tableTypeStr);
-    TableViews.TableView externalView =
-        getTableState(tableName, TableViews.EXTERNALVIEW, tableType);
-    TableViews.TableView idealStateView =
-        getTableState(tableName, TableViews.IDEALSTATE, tableType);
+    TableViews.TableView externalView = getTableState(tableName, TableViews.EXTERNALVIEW, tableType);
+    TableViews.TableView idealStateView = getTableState(tableName, TableViews.IDEALSTATE, tableType);
     List<SegmentStatusInfo> segmentStatusInfoListMap = new ArrayList<>();
     segmentStatusInfoListMap = getSegmentStatuses(externalView, idealStateView);
     return JsonUtils.objectToPrettyString(segmentStatusInfoListMap);
