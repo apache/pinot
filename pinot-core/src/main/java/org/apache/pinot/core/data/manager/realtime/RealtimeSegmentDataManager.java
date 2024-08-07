@@ -964,6 +964,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     return _currentOffset;
   }
 
+  @Nullable
   public StreamPartitionMsgOffset getLatestStreamOffsetAtStartupTime() {
     return _latestStreamOffsetAtStartupTime;
   }
@@ -1683,22 +1684,27 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     return _idleTimer.getTimeSinceEventLastConsumedMs();
   }
 
+  @Nullable
   public StreamPartitionMsgOffset fetchLatestStreamOffset(long maxWaitTimeMs, boolean useDebugLog) {
     return fetchStreamOffset(OffsetCriteria.LARGEST_OFFSET_CRITERIA, maxWaitTimeMs, useDebugLog);
   }
 
+  @Nullable
   public StreamPartitionMsgOffset fetchLatestStreamOffset(long maxWaitTimeMs) {
     return fetchLatestStreamOffset(maxWaitTimeMs, false);
   }
 
+  @Nullable
   public StreamPartitionMsgOffset fetchEarliestStreamOffset(long maxWaitTimeMs, boolean useDebugLog) {
     return fetchStreamOffset(OffsetCriteria.SMALLEST_OFFSET_CRITERIA, maxWaitTimeMs, useDebugLog);
   }
 
+  @Nullable
   public StreamPartitionMsgOffset fetchEarliestStreamOffset(long maxWaitTimeMs) {
     return fetchEarliestStreamOffset(maxWaitTimeMs, false);
   }
 
+  @Nullable
   private StreamPartitionMsgOffset fetchStreamOffset(OffsetCriteria offsetCriteria, long maxWaitTimeMs,
       boolean useDebugLog) {
     if (_partitionMetadataProvider == null) {
@@ -1797,9 +1803,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
    * Assumes there is a valid instance of {@link PartitionGroupConsumer}
    */
   private void recreateStreamConsumer(String reason) {
-      _segmentLogger.info("Recreating stream consumer for topic partition {}, reason: {}", _clientId, reason);
-      _currentOffset = _partitionGroupConsumer.checkpoint(_currentOffset);
-      closePartitionGroupConsumer();
+    _segmentLogger.info("Recreating stream consumer for topic partition {}, reason: {}", _clientId, reason);
+    _currentOffset = _partitionGroupConsumer.checkpoint(_currentOffset);
+    closePartitionGroupConsumer();
     try {
       _partitionGroupConsumer =
           _streamConsumerFactory.createPartitionGroupConsumer(_clientId, _partitionGroupConsumptionStatus);
@@ -1825,20 +1831,23 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     if (metadata != null) {
       try {
         StreamPartitionMsgOffset latestOffset = fetchLatestStreamOffset(5000, true);
-        _realtimeTableDataManager.updateIngestionMetrics(metadata.getRecordIngestionTimeMs(),
-            metadata.getFirstStreamRecordIngestionTimeMs(), metadata.getOffset(), latestOffset, _partitionGroupId);
+        _realtimeTableDataManager.updateIngestionMetrics(_segmentNameStr, _partitionGroupId,
+            metadata.getRecordIngestionTimeMs(), metadata.getFirstStreamRecordIngestionTimeMs(), metadata.getOffset(),
+            latestOffset);
       } catch (Exception e) {
         _segmentLogger.warn("Failed to fetch latest offset for updating ingestion delay", e);
       }
     }
   }
 
-  /*
+  /**
    * Sets ingestion delay to zero in situations where we are caught up processing events.
+   * TODO: Revisit if we should preserve the offset info.
    */
   private void setIngestionDelayToZero() {
     long currentTimeMs = System.currentTimeMillis();
-    _realtimeTableDataManager.updateIngestionMetrics(currentTimeMs, currentTimeMs, null, null, _partitionGroupId);
+    _realtimeTableDataManager.updateIngestionMetrics(_segmentNameStr, _partitionGroupId, currentTimeMs, currentTimeMs,
+        null, null);
   }
 
   // This should be done during commit? We may not always commit when we build a segment....
@@ -1878,14 +1887,12 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   /**
    * Creates a {@link StreamMessageDecoder} using properties in {@link StreamConfig}.
    *
-   * @param streamConfig The stream config from the table config
    * @param fieldsToRead The fields to read from the source stream
    * @return The initialized StreamMessageDecoder
    */
   private StreamMessageDecoder createMessageDecoder(Set<String> fieldsToRead) {
     String decoderClass = _streamConfig.getDecoderClass();
     try {
-      Map<String, String> decoderProperties = _streamConfig.getDecoderProperties();
       StreamMessageDecoder decoder = PluginManager.get().createInstance(decoderClass);
       decoder.init(fieldsToRead, _streamConfig, _tableConfig, _schema);
       return decoder;
