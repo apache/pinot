@@ -283,6 +283,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
   private Thread _consumerThread;
   private final int _partitionGroupId;
+  private final int _streamPatitionGroupId;
   private final PartitionGroupConsumptionStatus _partitionGroupConsumptionStatus;
   final String _clientId;
   private final TransformPipeline _transformPipeline;
@@ -1496,12 +1497,16 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     String timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
     // TODO Validate configs
     IndexingConfig indexingConfig = _tableConfig.getIndexingConfig();
-    _streamConfig = new StreamConfig(_tableNameWithType, IngestionConfigUtils.getStreamConfigMap(_tableConfig));
+    _partitionGroupId = llcSegmentName.getPartitionGroupId();
+    _streamPatitionGroupId = IngestionConfigUtils.getStreamPartitionIdFromPinotPartitionId(_partitionGroupId);
+    _streamConfig = new StreamConfig(
+        _tableNameWithType,
+        IngestionConfigUtils.getStreamConfigMaps(_tableConfig)
+            .get(IngestionConfigUtils.getStreamConfigIndexFromPinotPartitionId(_partitionGroupId)));
     _streamConsumerFactory = StreamConsumerFactoryProvider.create(_streamConfig);
     _streamPartitionMsgOffsetFactory = _streamConsumerFactory.createStreamMsgOffsetFactory();
     String streamTopic = _streamConfig.getTopicName();
     _segmentNameStr = _segmentZKMetadata.getSegmentName();
-    _partitionGroupId = llcSegmentName.getPartitionGroupId();
     _partitionGroupConsumptionStatus =
         new PartitionGroupConsumptionStatus(_partitionGroupId, llcSegmentName.getSequenceNumber(),
             _streamPartitionMsgOffsetFactory.create(_segmentZKMetadata.getStartOffset()),
@@ -1514,9 +1519,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     String clientIdSuffix =
         instanceDataManagerConfig != null ? instanceDataManagerConfig.getConsumerClientIdSuffix() : null;
     if (StringUtils.isNotBlank(clientIdSuffix)) {
-      _clientId = _tableNameWithType + "-" + streamTopic + "-" + _partitionGroupId + "-" + clientIdSuffix;
+      _clientId = _tableNameWithType + "-" + streamTopic + "-" + _streamPatitionGroupId + "-" + clientIdSuffix;
     } else {
-      _clientId = _tableNameWithType + "-" + streamTopic + "-" + _partitionGroupId;
+      _clientId = _tableNameWithType + "-" + streamTopic + "-" + _streamPatitionGroupId;
     }
     _segmentLogger = LoggerFactory.getLogger(RealtimeSegmentDataManager.class.getName() + "_" + _segmentNameStr);
     _tableStreamName = _tableNameWithType + "_" + streamTopic;
@@ -1832,7 +1837,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private void createPartitionMetadataProvider(String reason) {
     closePartitionMetadataProvider();
     _segmentLogger.info("Creating new partition metadata provider, reason: {}", reason);
-    _partitionMetadataProvider = _streamConsumerFactory.createPartitionMetadataProvider(_clientId, _partitionGroupId);
+    _partitionMetadataProvider = _streamConsumerFactory.createPartitionMetadataProvider(
+        _clientId, _streamPatitionGroupId);
   }
 
   private void updateIngestionMetrics(RowMetadata metadata) {

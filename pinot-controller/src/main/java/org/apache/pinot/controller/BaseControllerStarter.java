@@ -577,10 +577,13 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     _helixResourceManager.getAllRealtimeTables().forEach(rt -> {
       TableConfig tableConfig = _helixResourceManager.getTableConfig(rt);
       if (tableConfig != null) {
-        Map<String, String> streamConfigMap = IngestionConfigUtils.getStreamConfigMap(tableConfig);
+        List<Map<String, String>> streamConfigMaps = IngestionConfigUtils.getStreamConfigMaps(tableConfig);
         try {
-          StreamConfig.validateConsumerType(streamConfigMap.getOrDefault(StreamConfigProperties.STREAM_TYPE, "kafka"),
-              streamConfigMap);
+          for (Map<String, String> streamConfigMap : streamConfigMaps) {
+            StreamConfig.validateConsumerType(
+                streamConfigMap.getOrDefault(StreamConfigProperties.STREAM_TYPE, "kafka"),
+                streamConfigMap);
+          }
         } catch (Exception e) {
           existingHlcTables.add(rt);
         }

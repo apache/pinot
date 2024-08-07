@@ -18,14 +18,18 @@
  */
 package org.apache.pinot.spi.stream;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.Callable;
+import java.util.stream.Collectors;
+import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 /**
- * Fetches the list of {@link PartitionGroupMetadata} for all partition groups of the stream,
+ * Fetches the list of {@link PartitionGroupMetadata} for all partition groups of the streams,
  * using the {@link StreamMetadataProvider}
  */
 public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
@@ -33,18 +37,17 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
   private static final Logger LOGGER = LoggerFactory.getLogger(PartitionGroupMetadataFetcher.class);
 
   private List<PartitionGroupMetadata> _newPartitionGroupMetadataList;
-  private final StreamConfig _streamConfig;
+  private final List<StreamConfig> _streamConfigs;
   private final List<PartitionGroupConsumptionStatus> _partitionGroupConsumptionStatusList;
-  private final StreamConsumerFactory _streamConsumerFactory;
   private Exception _exception;
-  private final String _topicName;
+  private final List<String> _topicNames;
 
   public PartitionGroupMetadataFetcher(StreamConfig streamConfig,
       List<PartitionGroupConsumptionStatus> partitionGroupConsumptionStatusList) {
-    _streamConsumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
-    _topicName = streamConfig.getTopicName();
-    _streamConfig = streamConfig;
+    _topicNames = Arrays.asList(streamConfig.getTopicName());
+    _streamConfigs = Arrays.asList(streamConfig);
     _partitionGroupConsumptionStatusList = partitionGroupConsumptionStatusList;
+    _newPartitionGroupMetadataList = new ArrayList<>();
   }
 
   public List<PartitionGroupMetadata> getPartitionGroupMetadataList() {
@@ -63,25 +66,36 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
   @Override
   public Boolean call()
       throws Exception {
-    String clientId = PartitionGroupMetadataFetcher.class.getSimpleName() + "-"
-            + _streamConfig.getTableNameWithType() + "-" + _topicName;
-    try (
-        StreamMetadataProvider streamMetadataProvider = _streamConsumerFactory.createStreamMetadataProvider(clientId)) {
-      _newPartitionGroupMetadataList = streamMetadataProvider.computePartitionGroupMetadata(clientId, _streamConfig,
-          _partitionGroupConsumptionStatusList, /*maxWaitTimeMs=*/15000);
-      if (_exception != null) {
-        // We had at least one failure, but succeeded now. Log an info
-        LOGGER.info("Successfully retrieved PartitionGroupMetadata for topic {}", _topicName);
+    for (int i = 0; i < _streamConfigs.size(); i++) {
+      String clientId = PartitionGroupMetadataFetcher.class.getSimpleName() + "-"
+          + _streamConfigs.get(i).getTableNameWithType() + "-" + _topicNames.get(i);
+      StreamConsumerFactory streamConsumerFactory = StreamConsumerFactoryProvider.create(_streamConfigs.get(i));
+      try (
+          StreamMetadataProvider streamMetadataProvider =
+              streamConsumerFactory.createStreamMetadataProvider(clientId)) {
+        final int index = i;
+        _newPartitionGroupMetadataList.addAll(streamMetadataProvider.computePartitionGroupMetadata(clientId,
+            _streamConfigs.get(i),
+            _partitionGroupConsumptionStatusList, /*maxWaitTimeMs=*/15000).stream().map(
+                metadata -> new PartitionGroupMetadata(
+                    IngestionConfigUtils.getPinotPartitionIdFromStreamPartitionId(
+                        metadata.getPartitionGroupId(), index),
+                metadata.getStartOffset())).collect(Collectors.toList())
+        );
+        if (_exception != null) {
+          // We had at least one failure, but succeeded now. Log an info
+          LOGGER.info("Successfully retrieved PartitionGroupMetadata for topic {}", _topicNames.get(i));
+        }
+      } catch (TransientConsumerException e) {
+        LOGGER.warn("Transient Exception: Could not get partition count for topic {}", _topicNames.get(i), e);
+        _exception = e;
+        return Boolean.FALSE;
+      } catch (Exception e) {
+        LOGGER.warn("Could not get partition count for topic {}", _topicNames.get(i), e);
+        _exception = e;
+        throw e;
       }
-      return Boolean.TRUE;
-    } catch (TransientConsumerException e) {
-      LOGGER.warn("Transient Exception: Could not get partition count for topic {}", _topicName, e);
-      _exception = e;
-      return Boolean.FALSE;
-    } catch (Exception e) {
-      LOGGER.warn("Could not get partition count for topic {}", _topicName, e);
-      _exception = e;
-      throw e;
     }
+    return Boolean.TRUE;
   }
 }

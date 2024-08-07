@@ -102,7 +102,7 @@ public class SegmentCompletionManager {
     String rawTableName = llcSegmentName.getTableName();
     TableConfig tableConfig = _segmentManager.getTableConfig(TableNameBuilder.REALTIME.tableNameWithType(rawTableName));
     StreamConfig streamConfig =
-        new StreamConfig(tableConfig.getTableName(), IngestionConfigUtils.getStreamConfigMap(tableConfig));
+        new StreamConfig(tableConfig.getTableName(), IngestionConfigUtils.getStreamConfigMaps(tableConfig).get(0));
     return StreamConsumerFactoryProvider.create(streamConfig).createStreamMsgOffsetFactory();
   }
 
