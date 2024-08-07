@@ -67,9 +67,10 @@ public class RetentionConcurrentMapPartitionDedupMetadataManagerTest {
             dedupContext));
 
     dedupContextBuider.setMetadataTTL(1);
+    DedupContext newDedupContext = dedupContextBuider.build();
     assertThrows(IllegalArgumentException.class,
         () -> new RetentionConcurrentMapPartitionDedupMetadataManager(DedupTestUtils.REALTIME_TABLE_NAME, 0,
-            dedupContext));
+            newDedupContext));
   }
 
   @Test
