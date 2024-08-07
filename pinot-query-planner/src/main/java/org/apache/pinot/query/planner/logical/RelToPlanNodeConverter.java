@@ -205,6 +205,7 @@ public final class RelToPlanNodeConverter {
     //       InputRef to the constants array offset by the input array length. These need to be extracted here and
     //       set to the bounds.
     // Lower bound can only be unbounded preceding for now, set to Integer.MIN_VALUE
+    // Change PlanNodeToRelConverted once this limitation is removed here
     int lowerBound = Integer.MIN_VALUE;
     // Upper bound can only be unbounded following or current row for now
     int upperBound = windowGroup.upperBound.isUnbounded() ? Integer.MAX_VALUE : 0;
