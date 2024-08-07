@@ -179,6 +179,8 @@
     <clp-ffi.version>0.4.5</clp-ffi.version>
     <stax2-api.version>4.2.2</stax2-api.version>
     <aws.sdk.version>2.26.30</aws.sdk.version>
+    <azure.sdk.version>1.2.26</azure.sdk.version>
+    <azure.msal4j.version>1.16.2</azure.msal4j.version>
     <joda-time.version>2.12.7</joda-time.version>
     <janino.version>3.1.12</janino.version>
     <testng.version>7.10.2</testng.version>
@@ -1703,14 +1705,27 @@
         <version>${stax2-api.version}</version>
       </dependency>
 
-      <!-- This configures all aws sdk dependencies. -->
-      <!-- See https://reflectoring.io/maven-bom/ to understand how this work -->
+      <!-- AWS SDK -->
       <dependency>
         <groupId>software.amazon.awssdk</groupId>
         <artifactId>bom</artifactId>
         <version>${aws.sdk.version}</version>
         <type>pom</type>
         <scope>import</scope>
+      </dependency>
+
+      <!-- Azure SDK -->
+      <dependency>
+        <groupId>com.azure</groupId>
+        <artifactId>azure-sdk-bom</artifactId>
+        <version>${azure.sdk.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>com.microsoft.azure</groupId>
+        <artifactId>msal4j</artifactId>
+        <version>${azure.msal4j.version}</version>
       </dependency>
 
       <dependency>

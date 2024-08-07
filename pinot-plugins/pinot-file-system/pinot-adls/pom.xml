@@ -38,36 +38,10 @@
     <dependency>
       <groupId>com.azure</groupId>
       <artifactId>azure-storage-file-datalake</artifactId>
-      <version>12.20.0</version>
     </dependency>
     <dependency>
       <groupId>com.azure</groupId>
       <artifactId>azure-identity</artifactId>
-      <version>1.13.1</version>
     </dependency>
   </dependencies>
-  <dependencyManagement>
-    <dependencies>
-      <dependency>
-        <groupId>com.azure</groupId>
-        <artifactId>azure-core-http-netty</artifactId>
-        <version>1.15.2</version>
-      </dependency>
-      <dependency>
-        <groupId>com.azure</groupId>
-        <artifactId>azure-core</artifactId>
-        <version>1.50.0</version>
-      </dependency>
-      <dependency>
-        <groupId>io.projectreactor</groupId>
-        <artifactId>reactor-core</artifactId>
-        <version>3.6.8</version>
-      </dependency>
-      <dependency>
-        <groupId>com.microsoft.azure</groupId>
-        <artifactId>msal4j</artifactId>
-        <version>1.16.2</version>
-      </dependency>
-    </dependencies>
-  </dependencyManagement>
 </project>
