@@ -169,15 +169,18 @@ public final class TableConfigUtils {
 
       // Only allow realtime tables with non-null stream.type and LLC consumer.type
       if (tableConfig.getTableType() == TableType.REALTIME) {
-        Map<String, String> streamConfigMap = IngestionConfigUtils.getStreamConfigMap(tableConfig);
+        List<Map<String, String>> streamConfigMaps = IngestionConfigUtils.getStreamConfigMaps(tableConfig);
+        // TODO: validate stream configs in the map are identical in most fields
         StreamConfig streamConfig;
-        try {
-          // Validate that StreamConfig can be created
-          streamConfig = new StreamConfig(tableConfig.getTableName(), streamConfigMap);
-        } catch (Exception e) {
-          throw new IllegalStateException("Could not create StreamConfig using the streamConfig map", e);
+        for (Map<String, String> streamConfigMap : streamConfigMaps) {
+          try {
+            // Validate that StreamConfig can be created
+            streamConfig = new StreamConfig(tableConfig.getTableName(), streamConfigMap);
+          } catch (Exception e) {
+            throw new IllegalStateException("Could not create StreamConfig using the streamConfig map", e);
+          }
+          validateStreamConfig(streamConfig);
         }
-        validateStreamConfig(streamConfig);
       }
       validateTierConfigList(tableConfig.getTierConfigsList());
       validateIndexingConfig(tableConfig.getIndexingConfig(), schema);
@@ -390,7 +393,8 @@ public final class TableConfigUtils {
         Preconditions.checkState(indexingConfig == null || MapUtils.isEmpty(indexingConfig.getStreamConfigs()),
             "Should not use indexingConfig#getStreamConfigs if ingestionConfig#StreamIngestionConfig is provided");
         List<Map<String, String>> streamConfigMaps = ingestionConfig.getStreamIngestionConfig().getStreamConfigMaps();
-        Preconditions.checkState(streamConfigMaps.size() == 1, "Only 1 stream is supported in REALTIME table");
+        Preconditions.checkState(streamConfigMaps.size() > 0, "Must have at least 1 stream in REALTIME table");
+        // TODO: for multiple stream configs, validate them
       }
 
       // Filter config
