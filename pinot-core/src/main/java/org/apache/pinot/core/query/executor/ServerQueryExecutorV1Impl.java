@@ -220,11 +220,11 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     } else {
       RealtimeTableDataManager rtdm = (RealtimeTableDataManager) tableDataManager;
       TableUpsertMetadataManager tumm = rtdm.getTableUpsertMetadataManager();
-      tumm.lockTrackedSegmentsForContexts();
+      tumm.lockForSegmentContexts();
       try {
-        // Server can start consuming segment before broker can update its routing table upon IdealState changes,
-        // so broker can miss the new consuming segment even with the previous fix #11978. So for a complete data view,
-        // we should acquire the consuming segment if it's not included by the broker.
+        // Server can start consuming segment before broker can update its routing table upon IdealState changes, so
+        // broker can miss the new consuming segment even with the previous fix #11978. For a complete upsert data view,
+        // the consuming segment should be acquired all the time speculatively if it's not included by the broker.
         Set<String> allSegmentsToQuery = new HashSet<>(segmentsToQuery);
         if (optionalSegments == null) {
           optionalSegments = new ArrayList<>();
@@ -255,7 +255,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
           providedSegmentContexts.put(sc.getIndexSegment(), sc);
         }
       } finally {
-        tumm.unlockTrackedSegmentsForContexts();
+        tumm.unlockForSegmentContexts();
       }
     }
     if (LOGGER.isDebugEnabled()) {

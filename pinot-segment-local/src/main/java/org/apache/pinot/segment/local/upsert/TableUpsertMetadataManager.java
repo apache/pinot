@@ -62,10 +62,10 @@ public interface TableUpsertMetadataManager extends Closeable {
   default void setSegmentContexts(List<SegmentContext> segmentContexts, Map<String, String> queryOptions) {
   }
 
-  default void lockTrackedSegmentsForContexts() {
+  default void lockForSegmentContexts() {
   }
 
-  default void unlockTrackedSegmentsForContexts() {
+  default void unlockForSegmentContexts() {
   }
 
   default Set<String> getOptionalSegments() {

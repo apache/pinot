@@ -49,7 +49,7 @@ import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.SegmentUtils;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.data.manager.BaseTableDataManager;
-import org.apache.pinot.core.data.manager.MultiSegmentDataManager;
+import org.apache.pinot.core.data.manager.DuoSegmentDataManager;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
@@ -593,12 +593,11 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       partitionUpsertMetadataManager.addSegment(immutableSegment);
       _logger.info("Added new immutable segment: {} with upsert enabled", segmentName);
     } else {
-      replaceUpsertSegment(partitionId, segmentName, oldSegmentManager, newSegmentManager,
-          partitionUpsertMetadataManager);
+      replaceUpsertSegment(segmentName, oldSegmentManager, newSegmentManager, partitionUpsertMetadataManager);
     }
   }
 
-  private void replaceUpsertSegment(int partitionId, String segmentName, SegmentDataManager oldSegmentManager,
+  private void replaceUpsertSegment(String segmentName, SegmentDataManager oldSegmentManager,
       ImmutableSegmentDataManager newSegmentManager, PartitionUpsertMetadataManager partitionUpsertMetadataManager) {
     // When replacing a segment, we should register the new segment 'after' it is fully initialized by
     // partitionUpsertMetadataManager to fill up its validDocId bitmap. Otherwise, the queries will lose the access
@@ -614,14 +613,11 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       // By default, when replacing a segment, the old segment is kept intact and visible to query until the new
       // segment is registered as in the if-branch above. But the newly ingested records will invalidate valid
       // docs in the new segment as the upsert metadata gets updated during replacement, so the query will miss the
-      // the new updates in the new segment, until it's registered after the replacement is done.
+      // new updates in the new segment, until it's registered after the replacement is done.
       // For consistent data view, we make both old and new segment visible to the query and update both in place
-      // as the segment replacement and new data ingestion are happening.
-      // TODO: as this logic gets matured, we can always do this even when not using consistency mode. For now,
-      //       put those under the consistency mode feature flag to enable as needed.
-      SegmentDataManager multiSegmentDataManager =
-          new MultiSegmentDataManager(newSegmentManager, List.of(oldSegmentManager, newSegmentManager));
-      registerSegment(segmentName, multiSegmentDataManager, partitionUpsertMetadataManager);
+      // when segment replacement and new data ingestion are happening in parallel.
+      SegmentDataManager duoSegmentDataManager = new DuoSegmentDataManager(newSegmentManager, oldSegmentManager);
+      registerSegment(segmentName, duoSegmentDataManager, partitionUpsertMetadataManager);
       partitionUpsertMetadataManager.replaceSegment(immutableSegment, oldSegment);
       registerSegment(segmentName, newSegmentManager);
     }

@@ -68,22 +68,22 @@ public class ConcurrentMapTableUpsertMetadataManager extends BaseTableUpsertMeta
   }
 
   @Override
-  public void lockTrackedSegmentsForContexts() {
+  public void lockForSegmentContexts() {
     _partitionMetadataManagerMap.forEach(
-        (partitionID, upsertMetadataManager) -> upsertMetadataManager.lockTrackedSegmentsForContexts());
+        (partitionID, upsertMetadataManager) -> upsertMetadataManager.getUpsertViewManager().lockTrackedSegments());
   }
 
   @Override
-  public void unlockTrackedSegmentsForContexts() {
+  public void unlockForSegmentContexts() {
     _partitionMetadataManagerMap.forEach(
-        (partitionID, upsertMetadataManager) -> upsertMetadataManager.unlockTrackedSegmentsForContexts());
+        (partitionID, upsertMetadataManager) -> upsertMetadataManager.getUpsertViewManager().unlockTrackedSegments());
   }
 
   @Override
   public Set<String> getOptionalSegments() {
     Set<String> optionalSegments = new HashSet<>();
-    _partitionMetadataManagerMap.forEach(
-        (partitionID, upsertMetadataManager) -> optionalSegments.addAll(upsertMetadataManager.getOptionalSegments()));
+    _partitionMetadataManagerMap.forEach((partitionID, upsertMetadataManager) -> optionalSegments.addAll(
+        upsertMetadataManager.getUpsertViewManager().getOptionalSegments()));
     return optionalSegments;
   }
 
@@ -100,8 +100,8 @@ public class ConcurrentMapTableUpsertMetadataManager extends BaseTableUpsertMeta
     }
     // All segments should have been tracked by partitionMetadataManagers to provide queries consistent upsert view.
     _partitionMetadataManagerMap.forEach(
-        (partitionID, upsertMetadataManager) -> upsertMetadataManager.setSegmentContexts(segmentContexts,
-            queryOptions));
+        (partitionID, upsertMetadataManager) -> upsertMetadataManager.getUpsertViewManager()
+            .setSegmentContexts(segmentContexts, queryOptions));
     if (LOGGER.isDebugEnabled()) {
       for (SegmentContext segmentContext : segmentContexts) {
         IndexSegment segment = segmentContext.getIndexSegment();
