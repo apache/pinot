@@ -20,12 +20,9 @@ package org.apache.pinot.segment.local.dedup;
 
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
-import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
-import org.apache.pinot.segment.local.segment.readers.PrimaryKeyReader;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
-import org.mockito.Mockito;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -36,19 +33,6 @@ public class DedupTestUtils {
   public static final String REALTIME_TABLE_NAME = TableNameBuilder.REALTIME.tableNameWithType(RAW_TABLE_NAME);
 
   private DedupTestUtils() {
-  }
-
-  public static DedupUtils.DedupRecordInfoReader generateDedupRecordInfoReader(int numberOfDocs,
-      int startPrimaryKeyValue) {
-    PrimaryKeyReader primaryKeyReader = Mockito.mock(PrimaryKeyReader.class);
-    PinotSegmentColumnReader dedupTimeColumnReader = Mockito.mock(PinotSegmentColumnReader.class);
-    for (int i = 0; i < numberOfDocs; i++) {
-      int primaryKeyValue = startPrimaryKeyValue + i;
-      Mockito.when(primaryKeyReader.getPrimaryKey(i)).thenReturn(DedupTestUtils.getPrimaryKey(primaryKeyValue));
-      double time = primaryKeyValue * 1000;
-      Mockito.when(dedupTimeColumnReader.getValue(i)).thenReturn(time);
-    }
-    return new DedupUtils.DedupRecordInfoReader(primaryKeyReader, dedupTimeColumnReader);
   }
 
   public static ImmutableSegmentImpl mockSegment(int sequenceNumber, int totalDocs) {

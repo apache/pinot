@@ -35,6 +35,7 @@ public interface PartitionDedupMetadataManager {
 
   /**
    * Remove the expired primary keys from the metadata when TTL is enabled.
+   * Returns the number of primary keys left.
    */
   int removeExpiredPrimaryKeys();
 

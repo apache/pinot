@@ -18,45 +18,82 @@
  */
 package org.apache.pinot.segment.local.dedup;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.util.concurrent.AtomicDouble;
+import java.util.Iterator;
+import java.util.concurrent.ConcurrentHashMap;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.common.metrics.ServerGauge;
+import org.apache.pinot.segment.local.utils.HashUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
-import org.apache.pinot.spi.data.readers.PrimaryKey;
 
-class ConcurrentMapPartitionDedupMetadataManager implements PartitionDedupMetadataManager {
-  private final PartitionDedupMetadataManager _partitionDedupMetadataManagerDelegate;
 
-  public ConcurrentMapPartitionDedupMetadataManager(String tableNameWithType, int partitionId,
+class ConcurrentMapPartitionDedupMetadataManager extends BasePartitionDedupMetadataManager {
+  @VisibleForTesting
+  final AtomicDouble _largestSeenTime = new AtomicDouble(0);
+  @VisibleForTesting
+  final ConcurrentHashMap<Object, Pair<IndexSegment, Double>> _primaryKeyToSegmentAndTimeMap =
+      new ConcurrentHashMap<>();
+
+  protected ConcurrentMapPartitionDedupMetadataManager(String tableNameWithType, int partitionId,
       DedupContext dedupContext) {
-    if (dedupContext.getMetadataTTL() > 0) {
-      _partitionDedupMetadataManagerDelegate =
-          new RetentionConcurrentMapPartitionDedupMetadataManager(tableNameWithType, partitionId, dedupContext);
-    } else {
-      _partitionDedupMetadataManagerDelegate =
-          new NoRetentionConcurrentMapPartitionDedupMetadataManager(tableNameWithType, partitionId, dedupContext);
+    super(tableNameWithType, partitionId, dedupContext);
+  }
+
+  @Override
+  protected void addSegment(IndexSegment segment, Iterator<DedupRecordInfo> dedupRecordInfoIterator) {
+    while (dedupRecordInfoIterator.hasNext()) {
+      DedupRecordInfo dedupRecordInfo = dedupRecordInfoIterator.next();
+      double metadataTime = dedupRecordInfo.getDedupTime();
+      _largestSeenTime.getAndUpdate(time -> Math.max(time, metadataTime));
+      _primaryKeyToSegmentAndTimeMap.compute(HashUtils.hashPrimaryKey(dedupRecordInfo.getPrimaryKey(), _hashFunction),
+            (primaryKey, segmentAndTime) -> {
+            if (segmentAndTime == null || segmentAndTime.getRight() < metadataTime) {
+              return Pair.of(segment, metadataTime);
+            } else {
+              return segmentAndTime;
+            }
+          });
     }
   }
 
   @Override
-  public void addSegment(IndexSegment segment) {
-    _partitionDedupMetadataManagerDelegate.addSegment(segment);
-  }
-
-  @Override
-  public void removeSegment(IndexSegment segment) {
-    _partitionDedupMetadataManagerDelegate.removeSegment(segment);
+  protected void removeSegment(IndexSegment segment, Iterator<DedupRecordInfo> dedupRecordInfoIterator) {
+    while (dedupRecordInfoIterator.hasNext()) {
+      DedupRecordInfo dedupRecordInfo = dedupRecordInfoIterator.next();
+      _primaryKeyToSegmentAndTimeMap.computeIfPresent(
+          HashUtils.hashPrimaryKey(dedupRecordInfo.getPrimaryKey(), _hashFunction), (primaryKey, segmentAndTime) -> {
+            if (segmentAndTime.getLeft() == segment && segmentAndTime.getRight() == dedupRecordInfo.getDedupTime()) {
+              return null;
+            } else {
+              return segmentAndTime;
+            }
+          });
+    }
   }
 
   @Override
   public int removeExpiredPrimaryKeys() {
-    return _partitionDedupMetadataManagerDelegate.removeExpiredPrimaryKeys();
-  }
-
-  @Override
-  public boolean checkRecordPresentOrUpdate(PrimaryKey pk, IndexSegment indexSegment) {
-    return _partitionDedupMetadataManagerDelegate.checkRecordPresentOrUpdate(pk, indexSegment);
+    if (_metadataTTL > 0) {
+      double smallestTimeToKeep = _largestSeenTime.get() - _metadataTTL;
+      _primaryKeyToSegmentAndTimeMap.entrySet().removeIf(entry -> entry.getValue().getRight() < smallestTimeToKeep);
+    }
+    return _primaryKeyToSegmentAndTimeMap.size();
   }
 
   @Override
   public boolean dropOrAddRecord(DedupRecordInfo dedupRecordInfo, IndexSegment indexSegment) {
-    return _partitionDedupMetadataManagerDelegate.dropOrAddRecord(dedupRecordInfo, indexSegment);
+    if (_metadataTTL > 0 && dedupRecordInfo.getDedupTime() < _largestSeenTime.get() - _metadataTTL) {
+      return true;
+    }
+    _largestSeenTime.getAndUpdate(time -> Math.max(time, dedupRecordInfo.getDedupTime()));
+    boolean present = _primaryKeyToSegmentAndTimeMap.putIfAbsent(
+        HashUtils.hashPrimaryKey(dedupRecordInfo.getPrimaryKey(), _hashFunction),
+        Pair.of(indexSegment, dedupRecordInfo.getDedupTime())) != null;
+    if (!present) {
+      _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.DEDUP_PRIMARY_KEYS_COUNT,
+          _primaryKeyToSegmentAndTimeMap.size());
+    }
+    return present;
   }
 }
