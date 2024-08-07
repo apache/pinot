@@ -134,6 +134,8 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   // be updated for a maximum of this time.
   private static final String EXTERNAL_VIEW_DROPPED_MAX_WAIT_MS = "external.view.dropped.max.wait.ms";
   private static final String EXTERNAL_VIEW_DROPPED_CHECK_INTERVAL_MS = "external.view.dropped.check.interval.ms";
+  // Cluster level config to check if empty segments committing is allowed during realtime ingestion
+  private static final String ALLOW_EMPTY_SEGMENT_COMMIT = "allow.empty.segment.commit";
 
   private final static String[] REQUIRED_KEYS = {INSTANCE_ID};
   private static final long DEFAULT_ERROR_CACHE_SIZE = 100L;
@@ -308,6 +310,11 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   @Override
   public long getExternalViewDroppedMaxWaitMs() {
     return _serverConfig.getProperty(EXTERNAL_VIEW_DROPPED_MAX_WAIT_MS, DEFAULT_EXTERNAL_VIEW_DROPPED_MAX_WAIT_MS);
+  }
+
+  @Override
+  public boolean isAllowEmptySegmentCommit() {
+    return _serverConfig.getProperty(ALLOW_EMPTY_SEGMENT_COMMIT, false);
   }
 
   @Override
