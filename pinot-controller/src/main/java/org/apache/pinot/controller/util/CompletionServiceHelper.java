@@ -57,15 +57,15 @@ public class CompletionServiceHelper {
     _endpointsToServers = endpointsToServers;
   }
 
-  public CompletionServiceResponse doMultiGetRequest(List<String> serverURLs, String tableNameWithType,
+  public CompletionServiceResponse doMultiGetRequest(List<String> serverURLs, String resourceName,
       boolean multiRequestPerServer, int timeoutMs) {
-    return doMultiGetRequest(serverURLs, tableNameWithType, multiRequestPerServer, null, timeoutMs, null);
+    return doMultiGetRequest(serverURLs, resourceName, multiRequestPerServer, null, timeoutMs, null);
   }
 
   /**
    * This method makes a MultiGet call to all given URLs.
    * @param serverURLs server urls to send GET request.
-   * @param tableNameWithType table name with type suffix
+   * @param resourceName resource name for which the requests are being made. Resource can be a table or database
    * @param multiRequestPerServer it's possible that need to send multiple requests to a same server.
    *                              If multiRequestPerServer is set as false, return as long as one of the requests get
    *                              response; If multiRequestPerServer is set as true, wait until all requests
@@ -77,20 +77,20 @@ public class CompletionServiceHelper {
    * @return CompletionServiceResponse Map of the endpoint(server instance, or full request path if
    * multiRequestPerServer is true) to the response from that endpoint.
    */
-  public CompletionServiceResponse doMultiGetRequest(List<String> serverURLs, String tableNameWithType,
+  public CompletionServiceResponse doMultiGetRequest(List<String> serverURLs, String resourceName,
       boolean multiRequestPerServer, @Nullable Map<String, String> requestHeaders, int timeoutMs,
       @Nullable String useCase) {
     // TODO: use some service other than completion service so that we know which server encounters the error
     CompletionService<MultiHttpRequestResponse> completionService =
         new MultiHttpRequest(_executor, _httpConnectionManager).executeGet(serverURLs, requestHeaders, timeoutMs);
 
-    return collectResponse(tableNameWithType, serverURLs.size(), completionService, multiRequestPerServer, useCase);
+    return collectResponse(resourceName, serverURLs.size(), completionService, multiRequestPerServer, useCase);
   }
 
   /**
    * This method makes a MultiPost call to all given URLs and its corresponding bodies.
    * @param serverURLsAndRequestBodies server urls to send POST request.
-   * @param tableNameWithType table name with type suffix
+   * @param resourceName resource name for which the requests are being made. Resource can be a table or database
    * @param multiRequestPerServer it's possible that need to send multiple requests to a same server.
    *                              If multiRequestPerServer is set as false, return as long as one of the requests return
    *                              response; If multiRequestPerServer is set as true, wait until all requests
@@ -103,18 +103,18 @@ public class CompletionServiceHelper {
    * multiRequestPerServer is true) to the response from that endpoint.
    */
   public CompletionServiceResponse doMultiPostRequest(List<Pair<String, String>> serverURLsAndRequestBodies,
-      String tableNameWithType, boolean multiRequestPerServer, @Nullable Map<String, String> requestHeaders,
+      String resourceName, boolean multiRequestPerServer, @Nullable Map<String, String> requestHeaders,
       int timeoutMs, @Nullable String useCase) {
 
     CompletionService<MultiHttpRequestResponse> completionService =
         new MultiHttpRequest(_executor, _httpConnectionManager).executePost(serverURLsAndRequestBodies, requestHeaders,
             timeoutMs);
 
-    return collectResponse(tableNameWithType, serverURLsAndRequestBodies.size(), completionService,
+    return collectResponse(resourceName, serverURLsAndRequestBodies.size(), completionService,
         multiRequestPerServer, useCase);
   }
 
-  private CompletionServiceResponse collectResponse(String tableNameWithType, int size,
+  private CompletionServiceResponse collectResponse(String resourceName, int size,
       CompletionService<MultiHttpRequestResponse> completionService, boolean multiRequestPerServer,
       @Nullable String useCase) {
     CompletionServiceResponse completionServiceResponse = new CompletionServiceResponse();
@@ -160,22 +160,22 @@ public class CompletionServiceHelper {
 
     int numServerRequestsResponded = completionServiceResponse._httpResponses.size();
     if (numServerRequestsResponded != size) {
-      LOGGER.warn("Finished reading information for table: {} with {}/{} server-request responses", tableNameWithType,
+      LOGGER.warn("Finished reading information for resource: {} with {}/{} server-request responses", resourceName,
           numServerRequestsResponded, size);
     } else {
-      LOGGER.info("Finished reading information for table: {}", tableNameWithType);
+      LOGGER.info("Finished reading information for resource: {}", resourceName);
     }
     return completionServiceResponse;
   }
 
-  public CompletionServiceResponse doMultiGetRequest(List<String> serverURLs, String tableNameWithType,
+  public CompletionServiceResponse doMultiGetRequest(List<String> serverURLs, String resourceName,
       boolean multiRequestPerServer, int timeoutMs, @Nullable String useCase) {
-    return doMultiGetRequest(serverURLs, tableNameWithType, multiRequestPerServer, null, timeoutMs, useCase);
+    return doMultiGetRequest(serverURLs, resourceName, multiRequestPerServer, null, timeoutMs, useCase);
   }
 
-  public CompletionServiceResponse doMultiGetRequest(List<String> serverURLs, String tableNameWithType,
+  public CompletionServiceResponse doMultiGetRequest(List<String> serverURLs, String resourceName,
       boolean multiRequestPerServer, @Nullable Map<String, String> requestHeaders, int timeoutMs) {
-    return doMultiGetRequest(serverURLs, tableNameWithType, multiRequestPerServer, requestHeaders, timeoutMs, null);
+    return doMultiGetRequest(serverURLs, resourceName, multiRequestPerServer, requestHeaders, timeoutMs, null);
   }
 
 

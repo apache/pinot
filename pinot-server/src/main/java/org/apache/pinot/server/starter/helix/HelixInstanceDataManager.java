@@ -25,15 +25,18 @@ import com.google.common.cache.LoadingCache;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.function.Supplier;
@@ -52,6 +55,7 @@ import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
+import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.offline.TableDataManagerProvider;
 import org.apache.pinot.core.data.manager.realtime.PinotFSSegmentUploader;
@@ -82,8 +86,10 @@ import org.slf4j.LoggerFactory;
 @ThreadSafe
 public class HelixInstanceDataManager implements InstanceDataManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixInstanceDataManager.class);
+  public static final int DATABASE_SIZE_TTL_SECONDS = 60;
 
   private final ConcurrentHashMap<String, TableDataManager> _tableDataManagerMap = new ConcurrentHashMap<>();
+  private LoadingCache<String, Long> _databaseSizeBytes;
   // TODO: Consider making segment locks per table instead of per instance
   private final SegmentLocks _segmentLocks = new SegmentLocks();
 
@@ -159,6 +165,20 @@ public class HelixInstanceDataManager implements InstanceDataManager {
           public SegmentErrorInfo load(Pair<String, String> tableSegmentPair) {
             // This cache is populated only via the put api.
             return null;
+          }
+        });
+
+    _databaseSizeBytes = CacheBuilder.newBuilder()
+        .refreshAfterWrite(Duration.ofSeconds(DATABASE_SIZE_TTL_SECONDS))
+        .build(new CacheLoader<>() {
+          @Override
+          public Long load(String database)
+              throws Exception {
+            AtomicLong sizeInBytes = new AtomicLong();
+            _tableDataManagerMap.entrySet().stream()
+                .filter(entry -> DatabaseUtils.isPartOfDatabase(entry.getKey(), database))
+                .forEach(entry -> sizeInBytes.addAndGet(entry.getValue().getTableSizeBytes()));
+            return sizeInBytes.get();
           }
         });
   }
@@ -280,6 +300,16 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       throws Exception {
     _tableDataManagerMap.computeIfAbsent(realtimeTableName, this::createTableDataManager)
         .addConsumingSegment(segmentName);
+  }
+
+  @Override
+  public long getDatabaseSizeBytes(String databaseName) {
+    try {
+      return _databaseSizeBytes.get(databaseName);
+    } catch (ExecutionException e) {
+      LOGGER.error("Error while computing database size.", e);
+      return 0;
+    }
   }
 
   private TableDataManager createTableDataManager(String tableNameWithType) {

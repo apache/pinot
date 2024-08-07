@@ -139,14 +139,14 @@ public class PinotDatabaseRestletResource {
   @ApiOperation(value = "Update database quotas", notes = "Update database quotas")
   public SuccessResponse addTable(
       @PathParam("databaseName") String databaseName, @QueryParam("maxQueriesPerSecond") String queryQuota,
-      @Context HttpHeaders httpHeaders) {
+      @QueryParam("storage") String storage, @Context HttpHeaders httpHeaders) {
     if (!databaseName.equals(DatabaseUtils.extractDatabaseFromHttpHeaders(httpHeaders))) {
       throw new ControllerApplicationException(LOGGER, "Database config name and request context does not match",
           Response.Status.BAD_REQUEST);
     }
     try {
       DatabaseConfig databaseConfig = _pinotHelixResourceManager.getDatabaseConfig(databaseName);
-      QuotaConfig quotaConfig = new QuotaConfig(null, queryQuota);
+      QuotaConfig quotaConfig = new QuotaConfig(storage, queryQuota);
       if (databaseConfig == null) {
          databaseConfig = new DatabaseConfig(databaseName, quotaConfig);
         _pinotHelixResourceManager.addDatabaseConfig(databaseConfig);
