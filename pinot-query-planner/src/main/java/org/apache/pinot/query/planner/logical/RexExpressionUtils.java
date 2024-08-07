@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.calcite.avatica.util.ByteString;
+import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.rel.core.AggregateCall;
 import org.apache.calcite.rel.core.Window;
 import org.apache.calcite.rex.RexBuilder;
@@ -167,11 +168,17 @@ public class RexExpressionUtils {
     for (RexExpression functionOperand : functionOperands) {
       operands.add(toRexNode(builder, functionOperand));
     }
+    SqlAggFunction sqlAggFunction = getAggFunction(functionCall, builder.getCluster());
+
+    return builder.aggregateCall(sqlAggFunction, operands);
+  }
+
+  public static SqlAggFunction getAggFunction(RexExpression.FunctionCall functionCall, RelOptCluster cluster) {
     // TODO: This needs to be improved.
     String functionName = functionCall.getFunctionName();
     SqlIdentifier sqlIdentifier = new SqlIdentifier(functionName, SqlParserPos.ZERO);
     ArrayList<SqlOperator> operators = new ArrayList<>();
-    builder.getCluster().getRexBuilder().getOpTab().lookupOperatorOverloads(sqlIdentifier, null, SqlSyntax.FUNCTION,
+    cluster.getRexBuilder().getOpTab().lookupOperatorOverloads(sqlIdentifier, null, SqlSyntax.FUNCTION,
         operators, SqlNameMatchers.liberal());
 
     ArrayList<SqlAggFunction> aggFunctions = new ArrayList<>(operators.size());
@@ -186,9 +193,7 @@ public class RexExpressionUtils {
     if (aggFunctions.size() > 1) {
       LOGGER.info("Multiple agg operators found for function: {}, using the first one", functionName);
     }
-    SqlAggFunction sqlAggFunction = aggFunctions.get(0);
-
-    return builder.aggregateCall(sqlAggFunction, operands);
+    return aggFunctions.get(0);
   }
 
   public static RexExpression fromRexNode(RexNode rexNode) {

@@ -18,8 +18,9 @@
  */
 package org.apache.pinot.query.planner.logical;
 
-import com.google.common.collect.Lists;
+import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.calcite.plan.RelOptCluster;
@@ -29,11 +30,21 @@ import org.apache.calcite.rel.RelCollations;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.core.SetOp;
+import org.apache.calcite.rel.core.Window;
+import org.apache.calcite.rel.logical.LogicalIntersect;
+import org.apache.calcite.rel.logical.LogicalMinus;
 import org.apache.calcite.rel.logical.LogicalSort;
+import org.apache.calcite.rel.logical.LogicalUnion;
+import org.apache.calcite.rel.logical.LogicalWindow;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
+import org.apache.calcite.rex.RexWindowBound;
+import org.apache.calcite.rex.RexWindowBounds;
+import org.apache.calcite.sql.SqlAggFunction;
 import org.apache.calcite.tools.RelBuilder;
+import org.apache.calcite.util.ImmutableBitSet;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.core.plan.PinotExplainedRelNode;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
@@ -51,6 +62,8 @@ import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -61,6 +74,7 @@ import org.apache.pinot.query.planner.plannode.WindowNode;
  * required to create an actual executable plan but not necessary in order to describe the plan.
  */
 public final class PlanNodeToRelConverter {
+  private static final Logger LOGGER = LoggerFactory.getLogger(PlanNodeToRelConverter.class);
 
   private PlanNodeToRelConverter() {
   }
@@ -87,14 +101,20 @@ public final class PlanNodeToRelConverter {
     public Void visitAggregate(AggregateNode node, Void context) {
       visitChildren(node);
 
-      int[] groupKeyArr = node.getGroupKeys().stream().mapToInt(Integer::intValue).toArray();
-      RelBuilder.GroupKey groupKey = _builder.groupKey(groupKeyArr);
+      try {
+        int[] groupKeyArr = node.getGroupKeys().stream().mapToInt(Integer::intValue).toArray();
+        RelBuilder.GroupKey groupKey = _builder.groupKey(groupKeyArr);
 
-      List<RelBuilder.AggCall> aggCalls = node.getAggCalls().stream()
-          .map(functionCall -> RexExpressionUtils.toAggCall(_builder, functionCall))
-          .collect(Collectors.toList());
+        List<RelBuilder.AggCall> aggCalls =
+            node.getAggCalls().stream().map(functionCall -> RexExpressionUtils.toAggCall(_builder, functionCall))
+                .collect(Collectors.toList());
 
-      _builder.aggregate(groupKey, aggCalls);
+        _builder.aggregate(groupKey, aggCalls);
+      } catch (RuntimeException e) {
+        LOGGER.warn("Failed to convert aggregate node: {}", node, e);
+        _builder.push(new PinotExplainedRelNode(_builder.getCluster(), RelTraitSet.createEmpty(), "UnknownAggregate",
+            Collections.emptyMap(), node.getDataSchema(), readAlreadyPushedChildren(node)));
+      }
 
       return null;
     }
@@ -103,8 +123,14 @@ public final class PlanNodeToRelConverter {
     public Void visitFilter(FilterNode node, Void context) {
       visitChildren(node);
 
-      RexNode rexNode = RexExpressionUtils.toRexNode(_builder, node.getCondition());
-      _builder.filter(rexNode);
+      try {
+        RexNode rexNode = RexExpressionUtils.toRexNode(_builder, node.getCondition());
+        _builder.filter(rexNode);
+      } catch (RuntimeException e) {
+        LOGGER.warn("Failed to convert filter node: {}", node, e);
+        _builder.push(new PinotExplainedRelNode(_builder.getCluster(), RelTraitSet.createEmpty(), "UnknownFilter",
+            Collections.emptyMap(), node.getDataSchema(), readAlreadyPushedChildren(node)));
+      }
 
       return null;
     }
@@ -113,19 +139,25 @@ public final class PlanNodeToRelConverter {
     public Void visitJoin(JoinNode node, Void context) {
       visitChildren(node);
 
-      List<RexNode> conditions = new ArrayList<>(node.getLeftKeys().size() + node.getRightKeys().size()
-          + node.getNonEquiConditions().size());
-      for (Integer leftKey : node.getLeftKeys()) {
-        conditions.add(_builder.field(2, 0, leftKey));
-      }
-      for (Integer rightKey : node.getRightKeys()) {
-        conditions.add(_builder.field(2, 1, rightKey));
-      }
-      for (RexExpression nonEquiCondition : node.getNonEquiConditions()) {
-        conditions.add(RexExpressionUtils.toRexNode(_builder, nonEquiCondition));
-      }
+      try {
+        List<RexNode> conditions = new ArrayList<>(
+            node.getLeftKeys().size() + node.getRightKeys().size() + node.getNonEquiConditions().size());
+        for (Integer leftKey : node.getLeftKeys()) {
+          conditions.add(_builder.field(2, 0, leftKey));
+        }
+        for (Integer rightKey : node.getRightKeys()) {
+          conditions.add(_builder.field(2, 1, rightKey));
+        }
+        for (RexExpression nonEquiCondition : node.getNonEquiConditions()) {
+          conditions.add(RexExpressionUtils.toRexNode(_builder, nonEquiCondition));
+        }
 
-      _builder.join(node.getJoinType(), conditions);
+        _builder.join(node.getJoinType(), conditions);
+      } catch (RuntimeException e) {
+        LOGGER.warn("Failed to convert join node: {}", node, e);
+        _builder.push(new PinotExplainedRelNode(_builder.getCluster(), RelTraitSet.createEmpty(), "UnknownJoin",
+            Collections.emptyMap(), node.getDataSchema(), readAlreadyPushedChildren(node)));
+      }
 
       return null;
     }
@@ -146,10 +178,17 @@ public final class PlanNodeToRelConverter {
     @Override
     public Void visitProject(ProjectNode node, Void context) {
       visitChildren(node);
-      List<RexNode> projects = node.getProjects().stream()
-          .map(project -> RexExpressionUtils.toRexNode(_builder, project))
-          .collect(Collectors.toList());
-      _builder.project(projects);
+
+      try {
+        List<RexNode> projects =
+            node.getProjects().stream().map(project -> RexExpressionUtils.toRexNode(_builder, project))
+                .collect(Collectors.toList());
+        _builder.project(projects);
+      } catch (RuntimeException e) {
+        LOGGER.warn("Failed to convert project node: {}", node, e);
+        _builder.push(new PinotExplainedRelNode(_builder.getCluster(), RelTraitSet.createEmpty(), "UnknownProject",
+            Collections.emptyMap(), node.getDataSchema(), readAlreadyPushedChildren(node)));
+      }
       return null;
     }
 
@@ -157,19 +196,32 @@ public final class PlanNodeToRelConverter {
     public Void visitSort(SortNode node, Void context) {
       visitChildren(node);
 
-      RelNode child = _builder.build();
-      RexLiteral offset = _builder.literal(node.getOffset());
-      RexLiteral fetch = _builder.literal(node.getFetch());
-      RelCollation relCollation = RelCollations.of(node.getCollations());
-      LogicalSort logicalSort = LogicalSort.create(child, relCollation, offset, fetch);
-      _builder.push(logicalSort);
+      try {
+        RelNode child = _builder.build();
+        RexLiteral offset = _builder.literal(node.getOffset());
+        RexLiteral fetch = _builder.literal(node.getFetch());
+        RelCollation relCollation = RelCollations.of(node.getCollations());
+        LogicalSort logicalSort = LogicalSort.create(child, relCollation, offset, fetch);
+        _builder.push(logicalSort);
+      } catch (RuntimeException e) {
+        LOGGER.warn("Failed to convert sort node: {}", node, e);
+        _builder.push(new PinotExplainedRelNode(_builder.getCluster(), RelTraitSet.createEmpty(), "UnknownSort",
+            Collections.emptyMap(), node.getDataSchema(), readAlreadyPushedChildren(node)));
+      }
       return null;
     }
 
     @Override
     public Void visitTableScan(TableScanNode node, Void context) {
       visitChildren(node);
-      _builder.scan(DatabaseUtils.splitTableName(node.getTableName()));
+
+      try {
+        _builder.scan(DatabaseUtils.splitTableName(node.getTableName()));
+      } catch (RuntimeException e) {
+        LOGGER.warn("Failed to convert table scan node: {}", node, e);
+        _builder.push(new PinotExplainedRelNode(_builder.getCluster(), RelTraitSet.createEmpty(), "UnknownTableScan",
+            Collections.emptyMap(), node.getDataSchema(), readAlreadyPushedChildren(node)));
+      }
       return null;
     }
 
@@ -177,48 +229,119 @@ public final class PlanNodeToRelConverter {
     public Void visitValue(ValueNode node, Void context) {
       visitChildren(node);
 
-      List<List<RexLiteral>> values = new ArrayList<>(node.getLiteralRows().size());
-      for (List<RexExpression.Literal> literalRow : node.getLiteralRows()) {
-        List<RexLiteral> rexRow = new ArrayList<>(literalRow.size());
-        for (RexExpression.Literal literal : literalRow) {
-          rexRow.add(RexExpressionUtils.toRexLiteral(_builder, literal));
+      try {
+        List<List<RexLiteral>> values = new ArrayList<>(node.getLiteralRows().size());
+        for (List<RexExpression.Literal> literalRow : node.getLiteralRows()) {
+          List<RexLiteral> rexRow = new ArrayList<>(literalRow.size());
+          for (RexExpression.Literal literal : literalRow) {
+            rexRow.add(RexExpressionUtils.toRexLiteral(_builder, literal));
+          }
+          values.add(rexRow);
         }
-        values.add(rexRow);
-      }
 
-      RelDataType relDataType = node.getDataSchema().toRelDataType(_builder.getTypeFactory());
-      _builder.values(values, relDataType);
+        RelDataType relDataType = node.getDataSchema().toRelDataType(_builder.getTypeFactory());
+        _builder.values(values, relDataType);
+      } catch (RuntimeException e) {
+        LOGGER.warn("Failed to convert value node: {}", node, e);
+        _builder.push(new PinotExplainedRelNode(_builder.getCluster(), RelTraitSet.createEmpty(), "UnknownValue",
+            Collections.emptyMap(), node.getDataSchema(), readAlreadyPushedChildren(node)));
+      }
       return null;
     }
 
     @Override
     public Void visitWindow(WindowNode node, Void context) {
-      // TODO: Implement Window
-      throw new UnsupportedOperationException("WindowNode is not supported in RelNode");
+      try {
+        Preconditions.checkArgument(node.getInputs().size() == 1, "Window node should have exactly one input");
+        node.getInputs().get(0).visit(this, null);
+        RelNode input = _builder.build();
+
+        ImmutableBitSet keys = ImmutableBitSet.of(node.getKeys());
+        boolean isRow = node.getWindowFrameType() == WindowNode.WindowFrameType.ROWS;
+        // As explained in RelToPlanNodeConverter, Pinot only supports UNBOUND_PRECEDING
+        RexWindowBound lowerBound = RexWindowBounds.UNBOUNDED_PRECEDING;
+        RexWindowBound upperBound = node.getUpperBound() == Integer.MAX_VALUE ? RexWindowBounds.UNBOUNDED_FOLLOWING
+            : RexWindowBounds.CURRENT_ROW;
+        RelCollation orderKeys = RelCollations.of(node.getCollations());
+
+        List<Window.RexWinAggCall> aggCalls = new ArrayList<>();
+        for (RexExpression.FunctionCall funCall : node.getAggCalls()) {
+          SqlAggFunction aggFunction = RexExpressionUtils.getAggFunction(funCall, _builder.getCluster());
+          List<RexExpression> functionOperands = funCall.getFunctionOperands();
+          List<RexNode> operands = new ArrayList<>(functionOperands.size());
+          for (RexExpression functionOperand : functionOperands) {
+            operands.add(RexExpressionUtils.toRexNode(_builder, functionOperand));
+          }
+          RelDataType relDataType = funCall.getDataType().toType(_builder.getTypeFactory());
+          Window.RexWinAggCall winCall = new Window.RexWinAggCall(aggFunction, relDataType, operands, aggCalls.size(),
+              // same as the one used in LogicalWindow.create
+              funCall.isDistinct(), false);
+          aggCalls.add(winCall);
+        }
+
+        Window.Group group = new Window.Group(keys, isRow, lowerBound, upperBound, orderKeys, aggCalls);
+
+        List<RexLiteral> constants =
+            node.getConstants().stream().map(constant -> RexExpressionUtils.toRexLiteral(_builder, constant))
+                .collect(Collectors.toList());
+        RelDataType rowType = node.getDataSchema().toRelDataType(_builder.getTypeFactory());
+        ;
+
+        LogicalWindow window = LogicalWindow.create(RelTraitSet.createEmpty(), input, constants, rowType,
+            Collections.singletonList(group));
+        _builder.push(window);
+      } catch (RuntimeException e) {
+        LOGGER.warn("Failed to convert window node: {}", node, e);
+        _builder.push(new PinotExplainedRelNode(_builder.getCluster(), RelTraitSet.createEmpty(), "UnknownWindow",
+            Collections.emptyMap(), node.getDataSchema(), readAlreadyPushedChildren(node)));
+      }
+      return null;
     }
 
     @Override
-    public Void visitSetOp(SetOpNode setOpNode, Void context) {
-      // TODO: Implement setOp
-      throw new UnsupportedOperationException("SetOpNode is not supported in RelNode");
+    public Void visitSetOp(SetOpNode node, Void context) {
+      List<RelNode> inputs = inputsAsList(node);
+
+      try {
+        SetOp setOp;
+        switch (node.getSetOpType()) {
+          case INTERSECT:
+            setOp = new LogicalIntersect(_builder.getCluster(), RelTraitSet.createEmpty(), inputs, node.isAll());
+            break;
+          case MINUS:
+            setOp = new LogicalMinus(_builder.getCluster(), RelTraitSet.createEmpty(), inputs, node.isAll());
+            break;
+          case UNION:
+            setOp = new LogicalUnion(_builder.getCluster(), RelTraitSet.createEmpty(), inputs, node.isAll());
+            break;
+          default:
+            throw new UnsupportedOperationException("Unsupported set op node: " + node.getSetOpType());
+        }
+        _builder.push(setOp);
+      } catch (RuntimeException e) {
+        LOGGER.warn("Failed to convert set op node: {}", node, e);
+        _builder.push(new PinotExplainedRelNode(_builder.getCluster(), RelTraitSet.createEmpty(), "UnknownSetOp",
+            Collections.emptyMap(), node.getDataSchema(), inputs));
+      }
+      return null;
     }
 
     @Override
     public Void visitExplained(ExplainedNode node, Void context) {
-      visitChildren(node);
+      List<RelNode> inputs = inputsAsList(node);
 
-      int size = node.getInputs().size();
-      List<RelNode> inverseChildren = new ArrayList<>(size);
-      for (int i = 0; i < size; i++) {
-        inverseChildren.add(_builder.build());
+      try {
+        RelOptCluster cluster = _builder.getCluster();
+        RelTraitSet empty = RelTraitSet.createEmpty();
+        PinotExplainedRelNode explainedNode =
+            new PinotExplainedRelNode(cluster, empty, node.getType(), node.getAttributes(), node.getDataSchema(),
+                inputs);
+        _builder.push(explainedNode);
+      } catch (RuntimeException e) {
+        LOGGER.warn("Failed to convert explained node: {}", node, e);
+        _builder.push(new PinotExplainedRelNode(_builder.getCluster(), RelTraitSet.createEmpty(), "UnknownExplained",
+            Collections.emptyMap(), node.getDataSchema(), inputs));
       }
-      List<RelNode> children = Lists.reverse(inverseChildren);
-
-      RelOptCluster cluster = _builder.getCluster();
-      RelTraitSet empty = RelTraitSet.createEmpty();
-      PinotExplainedRelNode explainedNode = new PinotExplainedRelNode(
-          cluster, empty, node.getType(), node.getAttributes(), node.getDataSchema(), children);
-      _builder.push(explainedNode);
       return null;
     }
 
@@ -226,45 +349,68 @@ public final class PlanNodeToRelConverter {
     public Void visitExchange(ExchangeNode exchangeNode, Void context) {
       visitChildren(exchangeNode);
 
-      RelDistribution distribution;
-      switch (exchangeNode.getDistributionType()) {
-        case HASH_DISTRIBUTED: {
-          List<Integer> keys = exchangeNode.getKeys();
-          assert keys != null;
-          distribution = RelDistributions.hash(keys);
-          break;
+      try {
+        RelDistribution distribution;
+        switch (exchangeNode.getDistributionType()) {
+          case HASH_DISTRIBUTED: {
+            List<Integer> keys = exchangeNode.getKeys();
+            assert keys != null;
+            distribution = RelDistributions.hash(keys);
+            break;
+          }
+          case ANY:
+            distribution = RelDistributions.ANY;
+            break;
+          case RANDOM_DISTRIBUTED:
+            distribution = RelDistributions.RANDOM_DISTRIBUTED;
+            break;
+          case SINGLETON:
+            distribution = RelDistributions.SINGLETON;
+            break;
+          case BROADCAST_DISTRIBUTED:
+            distribution = RelDistributions.BROADCAST_DISTRIBUTED;
+            break;
+          case ROUND_ROBIN_DISTRIBUTED:
+            distribution = RelDistributions.ROUND_ROBIN_DISTRIBUTED;
+            break;
+          case RANGE_DISTRIBUTED: {
+            List<Integer> keys = exchangeNode.getKeys();
+            assert keys != null;
+            distribution = RelDistributions.range(keys);
+            break;
+          }
+          default:
+            throw new IllegalStateException("Unsupported distribution type: " + exchangeNode.getDistributionType());
         }
-        case ANY:
-          distribution = RelDistributions.ANY;
-          break;
-        case RANDOM_DISTRIBUTED:
-          distribution = RelDistributions.RANDOM_DISTRIBUTED;
-          break;
-        case SINGLETON:
-          distribution = RelDistributions.SINGLETON;
-          break;
-        case BROADCAST_DISTRIBUTED:
-          distribution = RelDistributions.BROADCAST_DISTRIBUTED;
-          break;
-        case ROUND_ROBIN_DISTRIBUTED:
-          distribution = RelDistributions.ROUND_ROBIN_DISTRIBUTED;
-          break;
-        case RANGE_DISTRIBUTED: {
-          List<Integer> keys = exchangeNode.getKeys();
-          assert keys != null;
-          distribution = RelDistributions.range(keys);
-          break;
-        }
-        default:
-          throw new IllegalStateException("Unsupported distribution type: " + exchangeNode.getDistributionType());
+        _builder.exchange(distribution);
+      } catch (RuntimeException e) {
+        LOGGER.warn("Failed to convert exchange node: {}", exchangeNode, e);
+        _builder.push(new PinotExplainedRelNode(_builder.getCluster(), RelTraitSet.createEmpty(), "UnknownExchange",
+            Collections.emptyMap(), exchangeNode.getDataSchema(), readAlreadyPushedChildren(exchangeNode)));
       }
-      _builder.exchange(distribution);
 
       return null;
     }
 
     RelNode build() {
       return _builder.build();
+    }
+
+    private List<RelNode> inputsAsList(PlanNode node) {
+      visitChildren(node);
+      return readAlreadyPushedChildren(node);
+    }
+
+    private List<RelNode> readAlreadyPushedChildren(PlanNode node) {
+      int inputSize = node.getInputs().size();
+      List<RelNode> inputs = new ArrayList<>(inputSize);
+      for (int i = 0; i < inputSize; i++) {
+        inputs.add(null);
+      }
+      for (int size = inputSize - 1; size >= 0; size--) {
+        inputs.set(size, _builder.build());
+      }
+      return inputs;
     }
   }
 }
