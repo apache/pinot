@@ -259,26 +259,6 @@ public class PinotSegmentRestletResource {
   }
 
   @GET
-  @Produces(MediaType.APPLICATION_JSON)
-  @Path("/segments/{tableName}/info")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_SEGMENT_STATUS)
-  @ApiOperation(value = "Get segment names to segment status map", notes = "Get segment statuses of each segment")
-  public String getSegmentsStatusDetails(
-      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "realtime|offline", required = false) @QueryParam("tableType") String tableTypeStr, @Context HttpHeaders headers)
-      throws JsonProcessingException {
-    tableName = DatabaseUtils.translateTableName(tableName, headers);
-    TableType tableType = _pinotHelixResourceManager.validateTableType(tableTypeStr);
-    TableViews.TableView externalView =
-        _pinotHelixResourceManager.getTableState(tableName, TableViews.EXTERNALVIEW, tableType);
-    TableViews.TableView idealStateView =
-        _pinotHelixResourceManager.getTableState(tableName, TableViews.IDEALSTATE, tableType);
-    List<SegmentStatusInfo> segmentStatusInfoListMap = new ArrayList<>();
-    segmentStatusInfoListMap = _pinotHelixResourceManager.getSegmentStatuses(externalView, idealStateView);
-    return JsonUtils.objectToPrettyString(segmentStatusInfoListMap);
-  }
-
-  @GET
   @Path("segments/{tableName}/lineage")
   @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_SEGMENT_LINEAGE)
   @Authenticate(AccessType.READ)
