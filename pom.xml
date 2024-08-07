@@ -169,7 +169,7 @@
     <lz4-java.version>1.8.0</lz4-java.version>
     <libthrift.verion>0.18.1</libthrift.verion>
     <log4j.version>2.23.1</log4j.version>
-    <slf4j.version>2.0.13</slf4j.version>
+    <slf4j.version>2.0.14</slf4j.version>
     <netty.version>4.1.112.Final</netty.version>
     <reactivestreams.version>1.0.4</reactivestreams.version>
     <jts.version>1.19.0</jts.version>
