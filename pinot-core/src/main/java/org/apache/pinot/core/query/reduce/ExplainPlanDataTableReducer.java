@@ -19,6 +19,7 @@
 package org.apache.pinot.core.query.reduce;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -55,7 +56,7 @@ public class ExplainPlanDataTableReducer implements DataTableReducer {
 
   @Override
   public void reduceAndSetResults(String tableName, DataSchema dataSchema,
-      Map<ServerRoutingInstance, DataTable> dataTableMap, BrokerResponseNative brokerResponseNative,
+      Map<ServerRoutingInstance, Collection<DataTable>> dataTableMap, BrokerResponseNative brokerResponseNative,
       DataTableReducerContext reducerContext, BrokerMetrics brokerMetrics) {
 
     List<Object[]> reducedRows = new ArrayList<>();
@@ -103,14 +104,13 @@ public class ExplainPlanDataTableReducer implements DataTableReducer {
    * Extract the combine node to use as the global combine step if present. If no combine node is found, return null.
    * A combine node may not be found if all segments were pruned across all servers.
    */
-  private Object[] extractCombineNode(Map<ServerRoutingInstance, DataTable> dataTableMap) {
+  private Object[] extractCombineNode(Map<ServerRoutingInstance, Collection<DataTable>> dataTableMap) {
     if (dataTableMap.isEmpty()) {
       return null;
     }
 
     Object[] combineRow = null;
-    for (Map.Entry<ServerRoutingInstance, DataTable> entry : dataTableMap.entrySet()) {
-      DataTable dataTable = entry.getValue();
+    for (DataTable dataTable : getFlatDataTables(dataTableMap)) {
       int numRows = dataTable.getNumberOfRows();
       if (numRows > 0) {
         // First row should be the combine row data, unless all segments were pruned from the Server side
@@ -129,12 +129,11 @@ public class ExplainPlanDataTableReducer implements DataTableReducer {
    * Extract a list of all the unique explain plans across all servers
    */
   private List<ExplainPlanRows> extractUniqueExplainPlansAcrossServers(
-      Map<ServerRoutingInstance, DataTable> dataTableMap, Object[] combinedRow) {
+      Map<ServerRoutingInstance, Collection<DataTable>> dataTableMap, Object[] combinedRow) {
     List<ExplainPlanRows> explainPlanRowsList = new ArrayList<>();
     HashSet<Integer> explainPlanHashCodeSet = new HashSet<>();
 
-    for (Map.Entry<ServerRoutingInstance, DataTable> entry : dataTableMap.entrySet()) {
-      DataTable dataTable = entry.getValue();
+    for (DataTable dataTable : getFlatDataTables(dataTableMap)) {
       int numRows = dataTable.getNumberOfRows();
 
       ExplainPlanRows explainPlanRows = null;

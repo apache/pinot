@@ -27,6 +27,6 @@ public class ServerRoutingInstanceTest {
   @Test
   public void equalsVerifier() {
     EqualsVerifier.configure().forClass(ServerRoutingInstance.class)
-        .withOnlyTheseFields("_hostname", "_port", "_tableType").suppress(Warning.NULL_FIELDS).verify();
+        .withOnlyTheseFields("_hostname", "_port").suppress(Warning.NULL_FIELDS).verify();
   }
 }

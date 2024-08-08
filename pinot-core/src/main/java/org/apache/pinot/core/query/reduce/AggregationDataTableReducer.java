@@ -57,7 +57,7 @@ public class AggregationDataTableReducer implements DataTableReducer {
    */
   @Override
   public void reduceAndSetResults(String tableName, DataSchema dataSchema,
-      Map<ServerRoutingInstance, DataTable> dataTableMap, BrokerResponseNative brokerResponseNative,
+      Map<ServerRoutingInstance, Collection<DataTable>> dataTableMap, BrokerResponseNative brokerResponseNative,
       DataTableReducerContext reducerContext, BrokerMetrics brokerMetrics) {
     dataSchema = ReducerDataSchemaUtils.canonicalizeDataSchemaForAggregation(_queryContext, dataSchema);
 
@@ -68,7 +68,9 @@ public class AggregationDataTableReducer implements DataTableReducer {
       return;
     }
 
-    Collection<DataTable> dataTables = dataTableMap.values();
+    // flatten the data tables from all servers responding to the query into a single collection of DataTables
+    Collection<DataTable> dataTables = getFlatDataTables(dataTableMap);
+
     if (_queryContext.isServerReturnFinalResult()) {
       if (dataTables.size() == 1) {
         processSingleFinalResult(dataSchema, dataTables.iterator().next(), brokerResponseNative);
