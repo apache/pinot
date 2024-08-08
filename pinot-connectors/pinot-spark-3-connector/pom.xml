@@ -55,10 +55,6 @@
               <artifactId>curator-recipes</artifactId>
             </exclusion>
             <exclusion>
-              <groupId>com.thoughtworks.paranamer</groupId>
-              <artifactId>paranamer</artifactId>
-            </exclusion>
-            <exclusion>
               <groupId>org.scala-lang.modules</groupId>
               <artifactId>scala-xml_${scala.compat.version}</artifactId>
             </exclusion>

@@ -33,7 +33,6 @@
   <properties>
     <pinot.root>${basedir}/../..</pinot.root>
     <circe.version>0.14.9</circe.version>
-    <paranameter.version>2.8</paranameter.version>
     <scalaxml.version>2.3.0</scalaxml.version>
     <scalatest.version>3.2.18</scalatest.version>
   </properties>
@@ -46,18 +45,9 @@
       </activation>
       <dependencies>
         <dependency>
-          <groupId>com.thoughtworks.paranamer</groupId>
-          <artifactId>paranamer</artifactId>
-          <version>${paranameter.version}</version>
-        </dependency>
-        <dependency>
           <groupId>com.fasterxml.jackson.module</groupId>
           <artifactId>jackson-module-scala_${scala.compat.version}</artifactId>
           <exclusions>
-            <exclusion>
-              <groupId>com.thoughtworks.paranamer</groupId>
-              <artifactId>paranamer</artifactId>
-            </exclusion>
             <exclusion>
               <groupId>org.scala-lang</groupId>
               <artifactId>scala-library</artifactId>
