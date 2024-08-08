@@ -46,8 +46,10 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
   // Root of the execution tree
   private final ExecutableNode _rootNode;
   private final List<String> _arguments;
+  private final String _functionExpression;
 
   public InbuiltFunctionEvaluator(String functionExpression) {
+    _functionExpression = functionExpression;
     _arguments = new ArrayList<>();
     _rootNode = planExecution(RequestContextUtils.getExpression(functionExpression));
   }
@@ -116,6 +118,11 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
   @Override
   public Object evaluate(Object[] values) {
     return _rootNode.execute(values);
+  }
+
+  @Override
+  public String toString() {
+    return _functionExpression;
   }
 
   private interface ExecutableNode {
