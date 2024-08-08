@@ -30,6 +30,7 @@ import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.ExecutionStatistics;
+import org.apache.pinot.core.operator.ExplainAttributeBuilder;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
@@ -90,12 +91,13 @@ public class TransformOperator extends BaseProjectOperator<TransformBlock> {
   }
 
   @Override
-  protected Map<String, ? super Object> getExplainAttributes() {
+  protected void explainAttributes(ExplainAttributeBuilder attributeBuilder) {
+    super.explainAttributes(attributeBuilder);
     List<String> expressions = _transformFunctionMap.keySet().stream()
         .map(ExpressionContext::toString)
         .sorted()
         .collect(Collectors.toList());
-    return Collections.singletonMap("expressions", expressions);
+    attributeBuilder.putJson("expressions", expressions);
   }
 
   @Override

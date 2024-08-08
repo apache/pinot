@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.utils.DataSchema;
 
 
@@ -35,15 +36,15 @@ import org.apache.pinot.common.utils.DataSchema;
 public class ExplainedNode extends BasePlanNode {
 
   private final String _type;
-  private final Map<String, String> _attributes;
+  private final Map<String, Plan.ExplainNode.AttributeValue> _attributes;
 
   public ExplainedNode(int stageId, DataSchema dataSchema, @Nullable NodeHint nodeHint, PlanNode input,
-      String type, Map<String, String> attributes) {
+      String type, Map<String, Plan.ExplainNode.AttributeValue> attributes) {
     this(stageId, dataSchema, nodeHint, Collections.singletonList(input), type, attributes);
   }
 
   public ExplainedNode(int stageId, DataSchema dataSchema, @Nullable NodeHint nodeHint, List<PlanNode> inputs,
-      String type, Map<String, String> attributes) {
+      String type, Map<String, Plan.ExplainNode.AttributeValue> attributes) {
     super(stageId, dataSchema, nodeHint, inputs);
     _type = type;
     _attributes = attributes;
@@ -53,7 +54,7 @@ public class ExplainedNode extends BasePlanNode {
     return _type;
   }
 
-  public Map<String, String> getAttributes() {
+  public Map<String, Plan.ExplainNode.AttributeValue> getAttributes() {
     return _attributes;
   }
 

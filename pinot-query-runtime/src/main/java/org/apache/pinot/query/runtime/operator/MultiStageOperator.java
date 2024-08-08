@@ -31,6 +31,7 @@ import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerTimer;
+import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.plan.PinotExplainedRelNode;
@@ -188,7 +189,7 @@ public abstract class MultiStageOperator
     return toExplainString();
   }
 
-  protected Map<String, ? super Object> getExplainAttributes() {
+  protected Map<String, Plan.ExplainNode.AttributeValue> getExplainAttributes() {
     return Collections.emptyMap();
   }
 

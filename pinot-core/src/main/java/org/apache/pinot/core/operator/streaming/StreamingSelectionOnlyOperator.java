@@ -18,12 +18,11 @@
  */
 package org.apache.pinot.core.operator.streaming;
 
-import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.BlockValSet;
@@ -32,6 +31,7 @@ import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.ExecutionStatistics;
+import org.apache.pinot.core.operator.ExplainAttributeBuilder;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -131,11 +131,14 @@ public class StreamingSelectionOnlyOperator extends BaseOperator<SelectionResult
   }
 
   @Override
-  protected Map<String, ? super Object> getExplainAttributes() {
-    return ImmutableMap.<String, Object>builder()
-        .put("segment", _indexSegment.getSegmentName())
-        .put("totalDocs", _indexSegment.getSegmentMetadata().getTotalDocs())
+  protected void explainAttributes(ExplainAttributeBuilder attributeBuilder) {
+    super.explainAttributes(attributeBuilder);
+    Plan.ExplainNode.AttributeValue segment = Plan.ExplainNode.AttributeValue.newBuilder()
+        .setString(_indexSegment.getSegmentName())
+        .setMergeType(Plan.ExplainNode.AttributeValue.MergeType.IGNORABLE)
         .build();
+    attributeBuilder.putAttribute("segment", segment);
+    attributeBuilder.putLong("totalDocs", _indexSegment.getSegmentMetadata().getTotalDocs());
   }
 
   @Override

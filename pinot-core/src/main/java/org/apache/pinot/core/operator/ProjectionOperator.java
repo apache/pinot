@@ -106,8 +106,9 @@ public class ProjectionOperator extends BaseProjectOperator<ProjectionBlock> {
   }
 
   @Override
-  protected Map<String, ? super Object> getExplainAttributes() {
-    return Collections.singletonMap("columns", _dataSourceMap.keySet());
+  protected void explainAttributes(ExplainAttributeBuilder attributeBuilder) {
+    super.explainAttributes(attributeBuilder);
+    attributeBuilder.putJson("columns", _dataSourceMap.keySet());
   }
 
   @Override

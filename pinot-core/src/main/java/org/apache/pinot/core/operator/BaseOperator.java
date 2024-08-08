@@ -18,9 +18,7 @@
  */
 package org.apache.pinot.core.operator;
 
-import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 import org.apache.pinot.core.common.Block;
@@ -55,7 +53,9 @@ public abstract class BaseOperator<T extends Block> implements Operator<T> {
 
   @Override
   public PinotExplainedRelNode.Info getOperatorInfo() {
-    return new PinotExplainedRelNode.Info(getExplainName(), getExplainAttributes(), getChildrenOperatorInfo());
+    ExplainAttributeBuilder attributeBuilder = new ExplainAttributeBuilder();
+    explainAttributes(attributeBuilder);
+    return new PinotExplainedRelNode.Info(getExplainName(), attributeBuilder.build(), getChildrenOperatorInfo());
   }
 
   protected List<PinotExplainedRelNode.Info> getChildrenOperatorInfo() {
@@ -69,7 +69,6 @@ public abstract class BaseOperator<T extends Block> implements Operator<T> {
     return toExplainString();
   }
 
-  protected Map<String, ? super Object> getExplainAttributes() {
-    return Collections.emptyMap();
+  protected void explainAttributes(ExplainAttributeBuilder attributeBuilder) {
   }
 }

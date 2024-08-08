@@ -21,7 +21,6 @@ package org.apache.pinot.core.operator;
 import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
@@ -97,8 +96,8 @@ public class DocIdSetOperator extends BaseOperator<DocIdSetBlock> {
   }
 
   @Override
-  protected Map<String, ? super Object> getExplainAttributes() {
-    return Collections.singletonMap("maxDocs", _maxSizeOfDocIdSet);
+  protected void explainAttributes(ExplainAttributeBuilder attributeBuilder) {
+    attributeBuilder.putLong("maxDocs", _maxSizeOfDocIdSet);
   }
 
   @Override

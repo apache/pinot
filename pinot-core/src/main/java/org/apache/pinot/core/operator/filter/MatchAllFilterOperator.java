@@ -20,10 +20,10 @@ package org.apache.pinot.core.operator.filter;
 
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.ExplainPlanRows;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.operator.ExplainAttributeBuilder;
 import org.apache.pinot.core.operator.docidsets.MatchAllDocIdSet;
 
 
@@ -71,8 +71,9 @@ public class MatchAllFilterOperator extends BaseFilterOperator {
   }
 
   @Override
-  protected Map<String, ? super Object> getExplainAttributes() {
-    return Collections.singletonMap("numDocs", _numDocs);
+  protected void explainAttributes(ExplainAttributeBuilder attributeBuilder) {
+    super.explainAttributes(attributeBuilder);
+    attributeBuilder.putLong("numDocs", _numDocs);
   }
 
   @Override

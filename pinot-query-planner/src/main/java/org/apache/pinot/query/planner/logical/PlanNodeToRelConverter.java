@@ -21,9 +21,7 @@ package org.apache.pinot.query.planner.logical;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelTraitSet;
@@ -48,6 +46,7 @@ import org.apache.calcite.sql.SqlAggFunction;
 import org.apache.calcite.tools.RelBuilder;
 import org.apache.calcite.util.ImmutableBitSet;
 import org.apache.pinot.common.utils.DatabaseUtils;
+import org.apache.pinot.core.operator.ExplainAttributeBuilder;
 import org.apache.pinot.core.plan.PinotExplainedRelNode;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
@@ -168,15 +167,15 @@ public final class PlanNodeToRelConverter {
     public Void visitMailboxReceive(MailboxReceiveNode node, Void context) {
       visitChildren(node);
 
-      Map<String, Object> attributes = new HashMap<>();
+      ExplainAttributeBuilder attributes = new ExplainAttributeBuilder();
       if (node.isSortedOnSender()) {
-        attributes.put("sortedOnSender", true);
+        attributes.putBool("sortedOnSender", true);
       }
 
       List<RelNode> inputs = readAlreadyPushedChildren(node);
 
       PinotExplainedRelNode explained = new PinotExplainedRelNode(_builder.getCluster(), RelTraitSet.createEmpty(),
-          "MailboxReceive", attributes, node.getDataSchema(), inputs);
+          "MailboxReceive", attributes.build(), node.getDataSchema(), inputs);
       _builder.push(explained);
       return null;
     }
@@ -185,33 +184,34 @@ public final class PlanNodeToRelConverter {
     public Void visitMailboxSend(MailboxSendNode node, Void context) {
       visitChildren(node);
 
-      Map<String, Object> attributes = new HashMap<>();
-      attributes.put("distributionType", node.getDistributionType().toString());
+      ExplainAttributeBuilder attributes = new ExplainAttributeBuilder();
+
+      attributes.putString("distributionType", node.getDistributionType().toString());
       if (!node.getKeys().isEmpty()) {
         switch (node.getDistributionType()) {
           case HASH_DISTRIBUTED:
             List<String> keys = node.getKeys().stream()
                 .map(key -> _builder.field(1, 0, key).toString())
                 .collect(Collectors.toList());
-            attributes.put("keys", keys);
+            attributes.putJson("keys", keys);
             break;
           case RANGE_DISTRIBUTED:
-            attributes.put("range", node.getKeys());
+            attributes.putJson("range", node.getKeys());
             break;
           default:
         }
       }
       if (node.isSort()) {
-        attributes.put("sort", true);
+        attributes.putBool("sort", true);
       }
       if (node.isPrePartitioned()) {
-        attributes.put("prePartitioned", true);
+        attributes.putBool("prePartitioned", true);
       }
 
       List<RelNode> inputs = readAlreadyPushedChildren(node);
 
       PinotExplainedRelNode explained = new PinotExplainedRelNode(_builder.getCluster(), RelTraitSet.createEmpty(),
-          "MailboxSend", attributes, node.getDataSchema(), inputs);
+          "MailboxSend", attributes.build(), node.getDataSchema(), inputs);
       _builder.push(explained);
       return null;
     }

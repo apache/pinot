@@ -18,15 +18,14 @@
  */
 package org.apache.pinot.core.operator.query;
 
-import com.google.common.collect.ImmutableMap;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
+import org.apache.pinot.core.operator.ExplainAttributeBuilder;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.query.aggregation.AggregationExecutor;
@@ -111,13 +110,14 @@ public class AggregationOperator extends BaseOperator<AggregationResultsBlock> {
   }
 
   @Override
-  protected Map<String, ? super Object> getExplainAttributes() {
+  protected void explainAttributes(ExplainAttributeBuilder attributeBuilder) {
+    super.explainAttributes(attributeBuilder);
     if (_aggregationFunctions.length == 0) {
-      return Collections.emptyMap();
+      return;
     }
     List<String> aggregations = Arrays.stream(_aggregationFunctions)
         .map(AggregationFunction::toExplainString)
         .collect(Collectors.toList());
-    return ImmutableMap.of("aggregations", aggregations);
+    attributeBuilder.putLongIdempotent("numAggregations", aggregations.size());
   }
 }

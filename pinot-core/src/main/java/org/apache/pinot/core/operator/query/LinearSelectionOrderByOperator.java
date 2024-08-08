@@ -20,13 +20,11 @@ package org.apache.pinot.core.operator.query;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.function.IntFunction;
 import java.util.function.Supplier;
@@ -40,6 +38,7 @@ import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.ExecutionStatistics;
+import org.apache.pinot.core.operator.ExplainAttributeBuilder;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -202,12 +201,17 @@ public abstract class LinearSelectionOrderByOperator extends BaseOperator<Select
   }
 
   @Override
-  protected Map<String, ? super Object> getExplainAttributes() {
+  protected void explainAttributes(ExplainAttributeBuilder attributeBuilder) {
+    super.explainAttributes(attributeBuilder);
     List<ExpressionContext> rest = _expressions.subList(_alreadySorted.size() + _toSort.size(), _expressions.size());
-    return ImmutableMap.of(
-        "sortedList", _alreadySorted.stream().map(ExpressionContext::toString).collect(Collectors.toList()),
-        "unsortedList", _toSort.stream().map(ExpressionContext::toString).collect(Collectors.toList()),
-        "rest", rest.stream().map(ExpressionContext::toString).collect(Collectors.toList()));
+
+    List<String> sortedList = _alreadySorted.stream().map(ExpressionContext::toString).collect(Collectors.toList());
+    List<String> toSort = _toSort.stream().map(ExpressionContext::toString).collect(Collectors.toList());
+    List<String> restStr = rest.stream().map(ExpressionContext::toString).collect(Collectors.toList());
+
+    attributeBuilder.putJson("sortedList", sortedList)
+        .putJson("unsortedList", toSort)
+        .putJson("rest", restStr);
   }
 
   private void concatList(StringBuilder sb, List<?> list) {

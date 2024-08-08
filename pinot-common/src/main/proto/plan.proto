@@ -197,5 +197,26 @@ message WindowNode {
 
 message ExplainNode {
   string type = 1;
-  map<string, string> attributes = 2;
+  map<string, AttributeValue> attributes = 2;
+
+  message AttributeValue {
+    MergeType mergeType = 1;
+
+    oneof value {
+      string string = 2;
+      int64 long = 3;
+      bool bool = 4;
+      string json = 5;
+    };
+
+    enum MergeType {
+      // Longs will be added, other types will behave like IDEMPOTENT.
+      DEFAULT = 0;
+      // When being merge, values must be the same. Otherwise cannot be merged.
+      IDEMPOTENT = 1;
+      // When being merge, if values are different, the value can be ignored.
+      // This may be used for example to support verbose explain mode
+      IGNORABLE = 2;
+    }
+  }
 }

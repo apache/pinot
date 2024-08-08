@@ -35,6 +35,7 @@ import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rel.type.RelDataTypeFieldImpl;
 import org.apache.calcite.rel.type.RelRecordType;
 import org.apache.calcite.rel.type.StructKind;
+import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.utils.DataSchema;
 
 
@@ -63,17 +64,17 @@ public class PinotExplainedRelNode extends AbstractRelNode {
    * The name of this node, whose role is like a title in the explain plan.
    */
   private final String _type;
-  private final Map<String, ?> _attributes;
+  private final Map<String, Plan.ExplainNode.AttributeValue> _attributes;
   private final List<RelNode> _inputs;
   private final DataSchema _dataSchema;
 
   public PinotExplainedRelNode(RelOptCluster cluster, RelTraitSet traitSet, String type,
-      Map<String, ?> attributes, DataSchema dataSchema, RelNode input) {
+      Map<String, Plan.ExplainNode.AttributeValue> attributes, DataSchema dataSchema, RelNode input) {
     this(cluster, traitSet, type, attributes, dataSchema, Lists.newArrayList(input));
   }
 
   public PinotExplainedRelNode(RelOptCluster cluster, RelTraitSet traitSet, String type,
-      Map<String, ?> attributes, DataSchema dataSchema, List<? extends RelNode> inputs) {
+      Map<String, Plan.ExplainNode.AttributeValue> attributes, DataSchema dataSchema, List<? extends RelNode> inputs) {
     super(cluster, traitSet);
     _type = type;
     _attributes = attributes;
@@ -115,15 +116,30 @@ public class PinotExplainedRelNode extends AbstractRelNode {
   @Override
   public RelWriter explainTerms(RelWriter pw) {
     RelWriter relWriter = super.explainTerms(pw);
-    for (Map.Entry<String, ?> entry : _attributes.entrySet()) {
-      relWriter.item(entry.getKey(), entry.getValue());
+    for (Map.Entry<String, Plan.ExplainNode.AttributeValue> entry : _attributes.entrySet()) {
+      Plan.ExplainNode.AttributeValue value = entry.getValue();
+      if (value.hasString()) {
+        relWriter.item(entry.getKey(), value.getString());
+      } else if (value.hasLong()) {
+        relWriter.item(entry.getKey(), value.getLong());
+      } else if (value.hasBool()) {
+        relWriter.item(entry.getKey(), value.getBool());
+      } else if (value.hasJson()) {
+        relWriter.item(entry.getKey(), value.getJson());
+      } else {
+        relWriter.item(entry.getKey(), "unknown value");
+      }
     }
     return relWriter;
   }
 
+  public Map<String, Plan.ExplainNode.AttributeValue> getAttributes() {
+    return Collections.unmodifiableMap(_attributes);
+  }
+
   public static class Info {
     private final String _type;
-    private final Map<String, Object> _attributes;
+    private final Map<String, Plan.ExplainNode.AttributeValue> _attributes;
     private final List<Info> _inputs;
 
     public Info(String type) {
@@ -133,7 +149,7 @@ public class PinotExplainedRelNode extends AbstractRelNode {
     }
 
     @JsonCreator
-    public Info(String type, Map<String, Object> attributes, List<Info> inputs) {
+    public Info(String type, Map<String, Plan.ExplainNode.AttributeValue> attributes, List<Info> inputs) {
       _type = type;
       _attributes = attributes;
       _inputs = inputs;
@@ -143,7 +159,7 @@ public class PinotExplainedRelNode extends AbstractRelNode {
       return _type;
     }
 
-    public Map<String, Object> getAttributes() {
+    public Map<String, Plan.ExplainNode.AttributeValue> getAttributes() {
       return _attributes;
     }
 
