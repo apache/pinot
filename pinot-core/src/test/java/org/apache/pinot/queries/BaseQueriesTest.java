@@ -61,6 +61,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.ReadMode;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 
