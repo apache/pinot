@@ -18,9 +18,6 @@
  */
 package org.apache.pinot.common.metrics;
 
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.IntStream;
 import org.apache.pinot.plugin.metrics.yammer.YammerMetricsRegistry;
 import org.apache.pinot.spi.env.PinotConfiguration;
