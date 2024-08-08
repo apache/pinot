@@ -153,7 +153,8 @@ public class TableViews {
         segmentStatusInfoList.add(
             new SegmentStatusInfo(segment, CommonConstants.Helix.StateModel.DisplaySegmentStatus.GOOD));
       } else {
-        segmentStatusInfoList.add(new SegmentStatusInfo(segment, CommonConstants.Helix.StateModel.DisplaySegmentStatus.UPDATING));
+        segmentStatusInfoList.add(
+            new SegmentStatusInfo(segment, CommonConstants.Helix.StateModel.DisplaySegmentStatus.UPDATING));
       }
     }
     return segmentStatusInfoList;
