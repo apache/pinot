@@ -116,4 +116,17 @@ public interface PartitionUpsertMetadataManager extends Closeable {
    * Stops the metadata manager. After invoking this method, no access to the metadata will be accepted.
    */
   void stop();
+
+  /**
+   * Track segments for upsert view, and this method must be called before registering segment to the table manager,
+   * so that the segment is included in the upsert view before it becomes visible to the query.
+   */
+  void trackSegmentForUpsertView(IndexSegment segment);
+
+  /**
+   * Untrack segments for upsert view, and this method must be called when segment is to be destroyed, when the
+   * segment is not used by any queries. Untrack segment after unregistering the segment is not safe, as there may be
+   * ongoing queries that are still accessing the segment.
+   */
+  void untrackSegmentForUpsertView(IndexSegment segment);
 }

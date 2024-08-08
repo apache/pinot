@@ -18,7 +18,8 @@
  */
 package org.apache.pinot.segment.local.data.manager;
 
-import com.google.common.annotations.VisibleForTesting;
+import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.pinot.segment.spi.IndexSegment;
 
@@ -36,7 +37,6 @@ public abstract class SegmentDataManager {
     return _loadTimeMs;
   }
 
-  @VisibleForTesting
   public synchronized int getReferenceCount() {
     return _referenceCount;
   }
@@ -73,6 +73,14 @@ public abstract class SegmentDataManager {
   public abstract String getSegmentName();
 
   public abstract IndexSegment getSegment();
+
+  public boolean hasMultiSegments() {
+    return false;
+  }
+
+  public List<IndexSegment> getSegments() {
+    return Collections.emptyList();
+  }
 
   /**
    * Offloads the segment from the metadata management (e.g. upsert metadata), but not releases the resources yet

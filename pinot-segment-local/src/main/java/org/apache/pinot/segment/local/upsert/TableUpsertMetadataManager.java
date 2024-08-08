@@ -19,8 +19,10 @@
 package org.apache.pinot.segment.local.upsert;
 
 import java.io.Closeable;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.spi.SegmentContext;
@@ -41,6 +43,8 @@ public interface TableUpsertMetadataManager extends Closeable {
 
   UpsertConfig.Mode getUpsertMode();
 
+  UpsertConfig.ConsistencyMode getUpsertConsistencyMode();
+
   boolean isEnablePreload();
 
   /**
@@ -56,5 +60,15 @@ public interface TableUpsertMetadataManager extends Closeable {
   Map<Integer, Long> getPartitionToPrimaryKeyCount();
 
   default void setSegmentContexts(List<SegmentContext> segmentContexts, Map<String, String> queryOptions) {
+  }
+
+  default void lockForSegmentContexts() {
+  }
+
+  default void unlockForSegmentContexts() {
+  }
+
+  default Set<String> getOptionalSegments() {
+    return Collections.emptySet();
   }
 }
