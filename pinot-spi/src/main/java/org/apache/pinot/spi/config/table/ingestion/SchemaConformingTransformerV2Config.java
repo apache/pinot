@@ -16,15 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+
 package org.apache.pinot.spi.config.table.ingestion;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
@@ -54,11 +53,23 @@ public class SchemaConformingTransformerV2Config extends BaseJsonConfig {
       + "input. This will also skip building mergedTextIndex for the field.")
   private Set<String> _fieldPathsToPreserveInput = new HashSet<>();
 
+  @JsonPropertyDescription("Array of flattened (dot-delimited) object paths not to store but only build "
+      + "mergedTextIndex for the field.")
+  private Set<String> _fieldPathsToSkipStorage = Set.of("message");
+
   @JsonPropertyDescription("Map from customized meaningful column name to json key path")
   private Map<String, String> _columnNameToJsonKeyPathMap = new HashMap<>();
 
-  @JsonPropertyDescription("mergedTextIndex field")
-  private String _mergedTextIndexField = "__mergedTextIndex";
+  @JsonPropertyDescription("mergedTextIndex fields")
+  private Set<String> _mergedTextIndexFields = Set.of("__mergedTextIndex");
+
+  @JsonPropertyDescription("Whether to store extra lower cases value:key pairs in __mergedTextIndex to optimize case "
+      + "insensitive queries")
+  private Boolean _optimizeCaseInsensitiveSearch = false;
+
+  @JsonPropertyDescription("Whether to store key and value in reverse order, if true store as value:key, else store"
+      + " as key:value")
+  private Boolean _reverseTextIndexKeyValueOrder = true;
 
   @JsonPropertyDescription("mergedTextIndex document max length")
   private int _mergedTextIndexDocumentMaxLength = 32766;
@@ -79,25 +90,27 @@ public class SchemaConformingTransformerV2Config extends BaseJsonConfig {
   @JsonPropertyDescription("Array of paths to exclude from merged text index.")
   private Set<String> _mergedTextIndexPathToExclude = new HashSet<>();
 
-  // TODO: set default value from CLPRewriter once it open sourced
-  @JsonPropertyDescription("Array of suffix to exclude from merged text index.")
-  private List<String> _mergedTextIndexSuffixToExclude = Arrays.asList("_logtype", "_dictionaryVars", "_encodedVars");
-
   @JsonPropertyDescription("Dedicated fields to double ingest into json_data column")
   private Set<String> _fieldsToDoubleIngest = new HashSet<>();
 
   @JsonCreator
   public SchemaConformingTransformerV2Config(
       @JsonProperty("enableIndexableExtras") @Nullable Boolean enableIndexableExtras,
-      @JsonProperty("indexableExtrasField") String indexableExtrasField,
+      @JsonProperty("indexableExtrasField") @Nullable String indexableExtrasField,
       @JsonProperty("enableUnindexableExtras") @Nullable Boolean enableUnindexableExtras,
       @JsonProperty("unindexableExtrasField") @Nullable String unindexableExtrasField,
       @JsonProperty("unindexableFieldSuffix") @Nullable String unindexableFieldSuffix,
       @JsonProperty("fieldPathsToDrop") @Nullable Set<String> fieldPathsToDrop,
       @JsonProperty("fieldPathsToKeepSameAsInput") @Nullable Set<String> fieldPathsToPreserveInput,
-      @JsonProperty("mergedTextIndexField") @Nullable String mergedTextIndexField,
+      @JsonProperty("fieldPathsToSkipStorage") @Nullable Set<String> fieldPathsToSkipStorage,
+      @JsonProperty("columnNameToJsonKeyPathMap") @Nullable Map<String, String> columnNameToJsonKeyPathMap,
+      @JsonProperty("mergedTextIndexFields") @Nullable Set<String> mergedTextIndexFields,
+      @JsonProperty("optimizeCaseInsensitiveSearch") @Nullable Boolean optimizeCaseInsensitiveSearch,
+      @JsonProperty("reverseTextIndexKeyValueOrder") @Nullable Boolean reverseTextIndexKeyValueOrder,
       @JsonProperty("mergedTextIndexDocumentMaxLength") @Nullable Integer mergedTextIndexDocumentMaxLength,
       @JsonProperty("mergedTextIndexShinglingOverlapLength") @Nullable Integer mergedTextIndexShinglingOverlapLength,
+      @JsonProperty("mergedTextIndexBinaryTokenDetectionMinLength")
+      @Nullable Integer mergedTextIndexBinaryTokenDetectionMinLength, // Deprecated, add it to be backward compatible
       @JsonProperty("mergedTextIndexBinaryDocumentDetectionMinLength")
       @Nullable Integer mergedTextIndexBinaryDocumentDetectionMinLength,
       @JsonProperty("mergedTextIndexPathToExclude") @Nullable Set<String> mergedTextIndexPathToExclude,
@@ -110,17 +123,27 @@ public class SchemaConformingTransformerV2Config extends BaseJsonConfig {
     setUnindexableFieldSuffix(unindexableFieldSuffix);
     setFieldPathsToDrop(fieldPathsToDrop);
     setFieldPathsToPreserveInput(fieldPathsToPreserveInput);
+    setFieldPathsToSkipStorage(fieldPathsToSkipStorage);
+    setColumnNameToJsonKeyPathMap(columnNameToJsonKeyPathMap);
 
-    setMergedTextIndexField(mergedTextIndexField);
+    setMergedTextIndexFields(mergedTextIndexFields);
+    setOptimizeCaseInsensitiveSearch(optimizeCaseInsensitiveSearch);
+    setReverseTextIndexKeyValueOrder(reverseTextIndexKeyValueOrder);
     setMergedTextIndexDocumentMaxLength(mergedTextIndexDocumentMaxLength);
     setMergedTextIndexShinglingDocumentOverlapLength(mergedTextIndexShinglingOverlapLength);
+    mergedTextIndexBinaryDocumentDetectionMinLength = mergedTextIndexBinaryDocumentDetectionMinLength == null
+        ? mergedTextIndexBinaryTokenDetectionMinLength : mergedTextIndexBinaryDocumentDetectionMinLength;
     setMergedTextIndexBinaryDocumentDetectionMinLength(mergedTextIndexBinaryDocumentDetectionMinLength);
     setMergedTextIndexPathToExclude(mergedTextIndexPathToExclude);
     setFieldsToDoubleIngest(fieldsToDoubleIngest);
   }
 
+  public Boolean isEnableIndexableExtras() {
+    return _enableIndexableExtras;
+  }
+
   public SchemaConformingTransformerV2Config setEnableIndexableExtras(Boolean enableIndexableExtras) {
-    _enableIndexableExtras = enableIndexableExtras == null ? _enableUnindexableExtras : enableIndexableExtras;
+    _enableIndexableExtras = enableIndexableExtras == null ? _enableIndexableExtras : enableIndexableExtras;
     return this;
   }
 
@@ -131,6 +154,10 @@ public class SchemaConformingTransformerV2Config extends BaseJsonConfig {
   public SchemaConformingTransformerV2Config setIndexableExtrasField(String indexableExtrasField) {
     _indexableExtrasField = indexableExtrasField == null ? _indexableExtrasField : indexableExtrasField;
     return this;
+  }
+
+  public Boolean isEnableUnindexableExtras() {
+    return _enableUnindexableExtras;
   }
 
   public SchemaConformingTransformerV2Config setEnableUnindexableExtras(Boolean enableUnindexableExtras) {
@@ -175,6 +202,16 @@ public class SchemaConformingTransformerV2Config extends BaseJsonConfig {
     return this;
   }
 
+  public Set<String> getFieldPathsToSkipStorage() {
+    return _fieldPathsToSkipStorage;
+  }
+
+  public SchemaConformingTransformerV2Config setFieldPathsToSkipStorage(Set<String> fieldPathsToSkipStorage) {
+    _fieldPathsToSkipStorage = fieldPathsToSkipStorage == null ? _fieldPathsToSkipStorage
+        : fieldPathsToSkipStorage;
+    return this;
+  }
+
   public Map<String, String> getColumnNameToJsonKeyPathMap() {
     return _columnNameToJsonKeyPathMap;
   }
@@ -186,12 +223,32 @@ public class SchemaConformingTransformerV2Config extends BaseJsonConfig {
     return this;
   }
 
-  public String getMergedTextIndexField() {
-    return _mergedTextIndexField;
+  public Set<String> getMergedTextIndexFields() {
+    return _mergedTextIndexFields;
   }
 
-  public SchemaConformingTransformerV2Config setMergedTextIndexField(String mergedTextIndexField) {
-    _mergedTextIndexField = mergedTextIndexField == null ? _mergedTextIndexField : mergedTextIndexField;
+  public SchemaConformingTransformerV2Config setMergedTextIndexFields(Set<String> mergedTextIndexFields) {
+    _mergedTextIndexFields = mergedTextIndexFields == null ? _mergedTextIndexFields : mergedTextIndexFields;
+    return this;
+  }
+
+  public Boolean isOptimizeCaseInsensitiveSearch() {
+    return _optimizeCaseInsensitiveSearch;
+  }
+
+  public SchemaConformingTransformerV2Config setOptimizeCaseInsensitiveSearch(Boolean optimizeCaseInsensitiveSearch) {
+    _optimizeCaseInsensitiveSearch = optimizeCaseInsensitiveSearch == null ? _optimizeCaseInsensitiveSearch
+        : optimizeCaseInsensitiveSearch;
+    return this;
+  }
+
+  public Boolean isReverseTextIndexKeyValueOrder() {
+    return _reverseTextIndexKeyValueOrder;
+  }
+
+  public SchemaConformingTransformerV2Config setReverseTextIndexKeyValueOrder(Boolean reverseTextIndexKeyValueOrder) {
+    _reverseTextIndexKeyValueOrder = reverseTextIndexKeyValueOrder == null ? _reverseTextIndexKeyValueOrder
+        : reverseTextIndexKeyValueOrder;
     return this;
   }
 
@@ -230,10 +287,6 @@ public class SchemaConformingTransformerV2Config extends BaseJsonConfig {
 
   public Set<String> getMergedTextIndexPathToExclude() {
     return _mergedTextIndexPathToExclude;
-  }
-
-  public List<String> getMergedTextIndexSuffixToExclude() {
-    return _mergedTextIndexSuffixToExclude;
   }
 
   public SchemaConformingTransformerV2Config setMergedTextIndexPathToExclude(Set<String> mergedTextIndexPathToExclude) {
