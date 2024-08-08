@@ -197,7 +197,8 @@ public class UpsertViewManager {
     }
   }
 
-  private boolean needForceRefresh() {
+  @VisibleForTesting
+  boolean needForceRefresh() {
     // Check if any segment membership changes against the current upsert view, if so, force refresh. Need this check
     // because when replacing segment, we need to include the new segment into the upsert view for the query, and we
     // need to remove the old segment from upsert view when replacement is done for the query. This check is done by
@@ -226,7 +227,8 @@ public class UpsertViewManager {
     return _lastUpsertViewRefreshTimeMs + upsertViewFreshnessMs > System.currentTimeMillis();
   }
 
-  private void doBatchRefreshUpsertView(long upsertViewFreshnessMs, boolean forceRefresh) {
+  @VisibleForTesting
+  void doBatchRefreshUpsertView(long upsertViewFreshnessMs, boolean forceRefresh) {
     // Always refresh if the current view is still empty.
     if (!forceRefresh && skipUpsertViewRefresh(upsertViewFreshnessMs) && _segmentQueryableDocIdsMap != null) {
       return;
