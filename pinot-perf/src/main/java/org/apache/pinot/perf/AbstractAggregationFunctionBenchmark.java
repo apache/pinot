@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.perf;
 
+import com.google.common.base.Preconditions;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
@@ -28,7 +29,6 @@ import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.Level;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.infra.Blackhole;
-import org.testng.Assert;
 
 
 public abstract class AbstractAggregationFunctionBenchmark {
@@ -75,7 +75,8 @@ public abstract class AbstractAggregationFunctionBenchmark {
    * This method will be called in the benchmark method, so it must be fast.
    */
   protected void verifyResult(Blackhole bh, Comparable finalResult, Object expectedResult) {
-    Assert.assertEquals(finalResult, expectedResult);
+    Preconditions.checkState(finalResult.equals(expectedResult), "Result mismatch: expected: %s, actual: %s",
+        expectedResult, finalResult);
     bh.consume(finalResult);
   }
 
