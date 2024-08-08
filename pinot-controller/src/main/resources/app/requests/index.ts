@@ -93,7 +93,7 @@ export const putSchema = (name: string, params: string, reload?: boolean): Promi
 export const getSegmentMetadata = (tableName: string, segmentName: string): Promise<AxiosResponse<SegmentMetadata>> =>
   baseApi.get(`/segments/${tableName}/${segmentName}/metadata?columns=*`);
 
-export const getTableSize = (name: string, detailed: boolean): Promise<AxiosResponse<TableSize>> =>
+export const getTableSize = (name: string, detailed: boolean = false): Promise<AxiosResponse<TableSize>> =>
   baseApi.get(`/tables/${name}/size?detailed=${detailed}`);
 
 export const getIdealState = (name: string): Promise<AxiosResponse<IdealState>> =>
