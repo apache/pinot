@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.data.manager;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -38,7 +37,6 @@ public abstract class SegmentDataManager {
     return _loadTimeMs;
   }
 
-  @VisibleForTesting
   public synchronized int getReferenceCount() {
     return _referenceCount;
   }
