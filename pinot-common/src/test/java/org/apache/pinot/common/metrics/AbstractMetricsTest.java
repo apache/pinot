@@ -63,12 +63,9 @@ public class AbstractMetricsTest {
     String metricName = "testConcurrent";
 
     // update and remove gauge simultaneously
-    ExecutorService service = Executors.newFixedThreadPool(3);
     IntStream.range(0, 1000).forEach(i -> {
       controllerMetrics.setOrUpdateGauge(metricName, () -> (long) i);
     });
-    service.shutdown();
-    service.awaitTermination(1, TimeUnit.MINUTES);
 
     // Verify final value
     Assert.assertEquals(MetricValueUtils.getGaugeValue(controllerMetrics, metricName), 999);
@@ -78,7 +75,7 @@ public class AbstractMetricsTest {
   }
 
   @Test
-  public void testRemoveNoneExistentGauge() {
+  public void testRemoveNonExistentGauge() {
     PinotConfiguration pinotConfiguration = new PinotConfiguration();
     pinotConfiguration.setProperty(CONFIG_OF_METRICS_FACTORY_CLASS_NAME,
         "org.apache.pinot.plugin.metrics.yammer.YammerMetricsFactory");
