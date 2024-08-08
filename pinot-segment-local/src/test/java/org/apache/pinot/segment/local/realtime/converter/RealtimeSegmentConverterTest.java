@@ -473,16 +473,17 @@ public class RealtimeSegmentConverterTest {
       throws Exception {
     File tmpDir = new File(TMP_DIR, "tmp_" + System.nanoTime());
 
-    Map<String, String> fieldConfigColumnProperies = new HashMap<>();
-    fieldConfigColumnProperies.put(FieldConfig.TEXT_INDEX_LUCENE_REUSE_MUTABLE_INDEX, String.valueOf(reuseMutableIndex));
-    fieldConfigColumnProperies.put(FieldConfig.TEXT_INDEX_USE_AND_FOR_MULTI_TERM_QUERIES, "true");
+    Map<String, String> fieldConfigColumnProperties = new HashMap<>();
+    fieldConfigColumnProperties.put(FieldConfig.TEXT_INDEX_LUCENE_REUSE_MUTABLE_INDEX,
+        String.valueOf(reuseMutableIndex));
+    fieldConfigColumnProperties.put(FieldConfig.TEXT_INDEX_USE_AND_FOR_MULTI_TERM_QUERIES, "true");
     if (rawValueForTextIndex != null) {
-      fieldConfigColumnProperies.put(FieldConfig.TEXT_INDEX_RAW_VALUE, rawValueForTextIndex);
+      fieldConfigColumnProperties.put(FieldConfig.TEXT_INDEX_RAW_VALUE, rawValueForTextIndex);
     }
     FieldConfig textIndexFieldConfig =
         new FieldConfig.Builder(STRING_COLUMN1).withEncodingType(FieldConfig.EncodingType.RAW)
             .withIndexTypes(Collections.singletonList(FieldConfig.IndexType.TEXT))
-            .withProperties(fieldConfigColumnProperies).build();
+            .withProperties(fieldConfigColumnProperties).build();
     List<FieldConfig> fieldConfigList = Collections.singletonList(textIndexFieldConfig);
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName("testTable").setTimeColumnName(DATE_TIME_COLUMN)
