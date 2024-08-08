@@ -93,6 +93,7 @@ import org.apache.pinot.query.parser.utils.ParserUtils;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
+import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
@@ -508,6 +509,14 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       }
 
       // Validate QPS quota
+      String database = DatabaseUtils.extractDatabaseFromFullyQualifiedTableName(tableName);
+      if (!_queryQuotaManager.acquireDatabase(database)) {
+        String errorMessage =
+            String.format("Request %d: %s exceeds query quota for database: %s", requestId, query, database);
+        LOGGER.info(errorMessage);
+        requestContext.setErrorCode(QueryException.TOO_MANY_REQUESTS_ERROR_CODE);
+        return new BrokerResponseNative(QueryException.getException(QueryException.QUOTA_EXCEEDED_ERROR, errorMessage));
+      }
       if (!_queryQuotaManager.acquire(tableName)) {
         String errorMessage =
             String.format("Request %d: %s exceeds query quota for table: %s", requestId, query, tableName);
@@ -533,7 +542,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
       if (!pinotQuery.isExplain() && _enableMultistageMigrationMetric) {
         // Check if the query is a v2 supported query
-        String database = DatabaseUtils.extractDatabaseFromQueryRequest(sqlNodeAndOptions.getOptions(), httpHeaders);
+        database = DatabaseUtils.extractDatabaseFromQueryRequest(sqlNodeAndOptions.getOptions(), httpHeaders);
         // Attempt to add the query to the compile queue; drop if queue is full
         if (!_multistageCompileQueryQueue.offer(Pair.of(query, database))) {
           LOGGER.trace("Not compiling query `{}` using the multi-stage query engine because the query queue is full",
@@ -661,6 +670,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         } else {
           errorMessage = String.format("%d segments unavailable: %s", numUnavailableSegments, unavailableSegments);
         }
+        String realtimeRoutingPolicy = realtimeBrokerRequest != null ? getRoutingPolicy(realtimeTableConfig) : null;
+        String offlineRoutingPolicy = offlineBrokerRequest != null ? getRoutingPolicy(offlineTableConfig) : null;
+        errorMessage = addRoutingPolicyInErrMsg(errorMessage, realtimeRoutingPolicy, offlineRoutingPolicy);
         exceptions.add(QueryException.getException(QueryException.BROKER_SEGMENT_UNAVAILABLE_ERROR, errorMessage));
         _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_UNAVAILABLE_SEGMENTS, 1);
       }
@@ -837,6 +849,31 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     } else {
       return null;
     }
+  }
+
+  @VisibleForTesting
+  static String addRoutingPolicyInErrMsg(String errorMessage, String realtimeRoutingPolicy,
+      String offlineRoutingPolicy) {
+    if (realtimeRoutingPolicy != null && offlineRoutingPolicy != null) {
+      return errorMessage + ", with routing policy: " + realtimeRoutingPolicy + " [realtime], " + offlineRoutingPolicy
+          + " [offline]";
+    }
+    if (realtimeRoutingPolicy != null) {
+      return errorMessage + ", with routing policy: " + realtimeRoutingPolicy + " [realtime]";
+    }
+    if (offlineRoutingPolicy != null) {
+      return errorMessage + ", with routing policy: " + offlineRoutingPolicy + " [offline]";
+    }
+    return errorMessage;
+  }
+
+  private static String getRoutingPolicy(TableConfig tableConfig) {
+    RoutingConfig routingConfig = tableConfig.getRoutingConfig();
+    if (routingConfig == null) {
+      return RoutingConfig.DEFAULT_INSTANCE_SELECTOR_TYPE;
+    }
+    String selectorType = routingConfig.getInstanceSelectorType();
+    return selectorType != null ? selectorType : RoutingConfig.DEFAULT_INSTANCE_SELECTOR_TYPE;
   }
 
   private BrokerResponseNative getEmptyBrokerOnlyResponse(PinotQuery pinotQuery, RequestContext requestContext,

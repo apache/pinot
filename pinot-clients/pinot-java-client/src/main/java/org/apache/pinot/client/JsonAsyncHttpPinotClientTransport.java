@@ -24,6 +24,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.JdkSslContext;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -65,7 +66,7 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport<C
     _headers = new HashMap<>();
     _scheme = CommonConstants.HTTP_PROTOCOL;
     _extraOptionStr = DEFAULT_EXTRA_QUERY_OPTION_STRING;
-    _httpClient = Dsl.asyncHttpClient(Dsl.config().setRequestTimeout(_brokerReadTimeout));
+    _httpClient = Dsl.asyncHttpClient(Dsl.config().setRequestTimeout(Duration.ofMillis(_brokerReadTimeout)));
     _useMultistageEngine = false;
   }
 
@@ -83,9 +84,9 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport<C
       builder.setSslContext(new JdkSslContext(sslContext, true, ClientAuth.OPTIONAL));
     }
 
-    builder.setRequestTimeout(_brokerReadTimeout)
-        .setReadTimeout(connectionTimeouts.getReadTimeoutMs())
-        .setConnectTimeout(connectionTimeouts.getConnectTimeoutMs())
+    builder.setRequestTimeout(Duration.ofMillis(_brokerReadTimeout))
+        .setReadTimeout(Duration.ofMillis(connectionTimeouts.getReadTimeoutMs()))
+        .setConnectTimeout(Duration.ofMillis(connectionTimeouts.getConnectTimeoutMs()))
         .setHandshakeTimeout(connectionTimeouts.getHandshakeTimeoutMs())
         .setUserAgent(ConnectionUtils.getUserAgentVersionFromClassPath("ua", appId))
         .setEnabledProtocols(tlsProtocols.getEnabledProtocols().toArray(new String[0]));

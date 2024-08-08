@@ -50,7 +50,7 @@ public final class AccessControlUtils {
    * @param accessControl AccessControl object which does the actual validation
    */
   public static void validatePermission(@Nullable String tableName, AccessType accessType,
-      @Nullable HttpHeaders httpHeaders, @Nullable String endpointUrl, AccessControl accessControl) {
+      @Nullable HttpHeaders httpHeaders, String endpointUrl, AccessControl accessControl) {
     String userMessage = getUserMessage(tableName, accessType, endpointUrl);
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
 

@@ -40,9 +40,6 @@ public class CLPEncodingRealtimeIntegrationTest extends BaseClusterIntegrationTe
   @BeforeClass
   public void setUp()
       throws Exception {
-    //skip this test if the underlying arch is aarch64 as CLP isn't supported on ARM yet:
-    // https://github.com/y-scope/clp-ffi-java/issues/46
-    TestUtils.ensureArchitectureIsNotARM();
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
     _avroFiles = unpackAvroData(_tempDir);
 

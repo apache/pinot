@@ -27,7 +27,6 @@ import org.apache.pinot.segment.local.segment.creator.impl.stats.CLPStatsProvide
 import org.apache.pinot.segment.local.segment.creator.impl.stats.StringColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -39,9 +38,6 @@ public class CLPMutableForwardIndexTest {
 
   @BeforeClass
   public void setUp() {
-    //skip this test if the underlying arch is aarch64 as CLP isn't supported on ARM yet:
-    // https://github.com/y-scope/clp-ffi-java/issues/46
-    TestUtils.ensureArchitectureIsNotARM();
     _memoryManager = new DirectMemoryManager(VarByteSVMutableForwardIndexTest.class.getName());
   }
 
