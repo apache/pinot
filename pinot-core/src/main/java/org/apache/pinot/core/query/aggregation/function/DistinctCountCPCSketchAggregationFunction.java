@@ -97,7 +97,7 @@ public class DistinctCountCPCSketchAggregationFunction
     if (arguments.size() == 2) {
       ExpressionContext secondArgument = arguments.get(1);
       Preconditions.checkArgument(secondArgument.getType() == ExpressionContext.Type.LITERAL,
-          "CPC Sketch Aggregation Function expects the second argument to be a literal (parameters)," + " but got: ",
+          "CPC Sketch Aggregation Function expects the second argument to be a literal (parameters), but got: %s",
           secondArgument.getType());
 
       if (secondArgument.getLiteral().getType() == FieldSpec.DataType.STRING) {

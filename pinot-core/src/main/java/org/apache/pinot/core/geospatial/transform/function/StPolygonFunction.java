@@ -58,7 +58,7 @@ public class StPolygonFunction extends ConstructFromTextFunction {
         Preconditions.checkArgument(geometry instanceof Polygon, "The geometry object must be polygon");
         _results[i] = GeometrySerializer.serialize(geometry);
       } catch (ParseException e) {
-        new RuntimeException(String.format("Failed to parse geometry from string: %s", argumentValues[i]));
+        throw new RuntimeException(String.format("Failed to parse geometry from string: %s", argumentValues[i]));
       }
     }
     return _results;

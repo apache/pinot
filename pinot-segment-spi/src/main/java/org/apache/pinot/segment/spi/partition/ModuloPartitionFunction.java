@@ -37,7 +37,7 @@ public class ModuloPartitionFunction implements PartitionFunction {
    * @param numPartitions Number of partitions.
    */
   public ModuloPartitionFunction(int numPartitions) {
-    Preconditions.checkArgument(numPartitions > 0, "Number of partitions must be > 0, specified", numPartitions);
+    Preconditions.checkArgument(numPartitions > 0, "Number of partitions must be > 0, specified %s", numPartitions);
     _numPartitions = numPartitions;
   }
 

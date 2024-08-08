@@ -374,7 +374,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       return;
     }
     Preconditions.checkArgument(segment instanceof ImmutableSegmentImpl,
-        "Got unsupported segment implementation: {} for segment: {}, table: {}", segment.getClass(), segmentName,
+        "Got unsupported segment implementation: %s for segment: %s, table: %s", segment.getClass(), segmentName,
         _tableNameWithType);
     ImmutableSegmentImpl immutableSegment = (ImmutableSegmentImpl) segment;
 
@@ -470,7 +470,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         segmentName, _tableNameWithType);
     // Note that EmptyIndexSegment should not reach here either, as it doesn't have validDocIds snapshot.
     Preconditions.checkArgument(segment instanceof ImmutableSegmentImpl,
-        "Got unsupported segment implementation: {} for segment: {}, table: {}", segment.getClass(), segmentName,
+        "Got unsupported segment implementation: %s for segment: %s, table: %s", segment.getClass(), segmentName,
         _tableNameWithType);
     if (!startOperation()) {
       _logger.info("Skip preloading segment: {} because metadata manager is already stopped", segmentName);
@@ -665,7 +665,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   protected void doReplaceSegment(ImmutableSegment segment, IndexSegment oldSegment) {
     String segmentName = segment.getSegmentName();
     Preconditions.checkArgument(segmentName.equals(oldSegment.getSegmentName()),
-        "Cannot replace segment with different name for table: {}, old segment: {}, new segment: {}",
+        "Cannot replace segment with different name for table: %s, old segment: %s, new segment: %s",
         _tableNameWithType, oldSegment.getSegmentName(), segmentName);
     _logger.info("Replacing {} segment: {}, current primary key count: {}",
         oldSegment instanceof ImmutableSegment ? "immutable" : "mutable", segmentName, getNumPrimaryKeys());
@@ -712,7 +712,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         oldSegment.getValidDocIds() != null ? oldSegment.getValidDocIds().getMutableRoaringBitmap() : null;
     if (recordInfoIterator != null) {
       Preconditions.checkArgument(segment instanceof ImmutableSegmentImpl,
-          "Got unsupported segment implementation: {} for segment: {}, table: {}", segment.getClass(), segmentName,
+          "Got unsupported segment implementation: %s for segment: %s, table: %s", segment.getClass(), segmentName,
           _tableNameWithType);
       if (validDocIds == null) {
         validDocIds = new ThreadSafeMutableRoaringBitmap();

@@ -38,6 +38,7 @@ public class UnboundedResourceManager extends ResourceManager {
   public QueryExecutorService getExecutorService(ServerQueryRequest query, SchedulerGroupAccountant accountant) {
     return new QueryExecutorService() {
       @Override
+      @SuppressWarnings("CheckReturnValue")
       public void execute(Runnable command) {
         _queryWorkers.submit(command);
       }

@@ -84,8 +84,8 @@ public class FixedBitMVForwardIndexWriter implements Closeable {
     _rawDataSize = ((long) totalNumValues * numBitsPerValue + 7) / 8;
     _totalSize = _chunkOffsetHeaderSize + _bitsetSize + _rawDataSize;
     Preconditions
-        .checkState(_totalSize > 0 && _totalSize < Integer.MAX_VALUE, "Total size can not exceed 2GB for file: ",
-            file.toString());
+        .checkState(_totalSize > 0 && _totalSize < Integer.MAX_VALUE, "Total size can not exceed 2GB for file: %s",
+            file);
     // Backward-compatible: index file is always big-endian
     _indexDataBuffer =
         PinotDataBuffer.mapFile(file, false, 0, _totalSize, ByteOrder.BIG_ENDIAN, getClass().getSimpleName());

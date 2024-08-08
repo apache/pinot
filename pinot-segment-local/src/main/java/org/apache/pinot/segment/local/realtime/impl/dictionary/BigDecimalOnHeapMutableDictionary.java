@@ -202,11 +202,6 @@ public class BigDecimalOnHeapMutableDictionary extends BaseOnHeapMutableDictiona
     return getBigDecimalValue(dictId).toPlainString();
   }
 
-  @Override
-  public byte[] getBytesValue(int dictId) {
-    return getBytesValue(dictId);
-  }
-
   private void updateMinMax(BigDecimal value) {
     if (_min == null) {
       _min = value;

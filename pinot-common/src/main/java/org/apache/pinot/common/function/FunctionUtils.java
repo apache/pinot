@@ -37,6 +37,7 @@ public class FunctionUtils {
   }
 
   // Types allowed as the function parameter (in the function signature) for type conversion
+  @SuppressWarnings("DoubleBraceInitialization")
   private static final Map<Class<?>, PinotDataType> PARAMETER_TYPE_MAP = new HashMap<>() {{
     put(int.class, PinotDataType.INTEGER);
     put(Integer.class, PinotDataType.INTEGER);
@@ -61,6 +62,7 @@ public class FunctionUtils {
   }};
 
   // Types allowed as the function argument (actual value passed into the function) for type conversion
+  @SuppressWarnings("DoubleBraceInitialization")
   private static final Map<Class<?>, PinotDataType> ARGUMENT_TYPE_MAP = new HashMap<>() {{
     put(Byte.class, PinotDataType.BYTE);
     put(Boolean.class, PinotDataType.BOOLEAN);
@@ -87,6 +89,7 @@ public class FunctionUtils {
     put(Object[].class, PinotDataType.OBJECT_ARRAY);
   }};
 
+  @SuppressWarnings("DoubleBraceInitialization")
   private static final Map<Class<?>, DataType> DATA_TYPE_MAP = new HashMap<>() {{
     put(int.class, DataType.INT);
     put(Integer.class, DataType.INT);
@@ -109,6 +112,7 @@ public class FunctionUtils {
     put(String[].class, DataType.STRING);
   }};
 
+  @SuppressWarnings("DoubleBraceInitialization")
   private static final Map<Class<?>, ColumnDataType> COLUMN_DATA_TYPE_MAP = new HashMap<>() {{
     put(int.class, ColumnDataType.INT);
     put(Integer.class, ColumnDataType.INT);

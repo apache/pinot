@@ -54,7 +54,7 @@ public class TimeBasedTierSegmentSelector implements TierSegmentSelector {
     SegmentZKMetadata segmentZKMetadata =
         ZKMetadataProvider.getSegmentZKMetadata(_helixManager.getHelixPropertyStore(), tableNameWithType, segmentName);
     Preconditions
-        .checkNotNull(segmentZKMetadata, "Could not find zk metadata for segment: {} of table: {}", segmentName,
+        .checkNotNull(segmentZKMetadata, "Could not find zk metadata for segment: %s of table: %s", segmentName,
             tableNameWithType);
 
     // don't try to move consuming segments

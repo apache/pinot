@@ -22,6 +22,7 @@ import java.util.Base64;
 import org.apache.datasketches.common.ArrayOfStringsSerDe;
 import org.apache.datasketches.frequencies.ItemsSketch;
 
+@SuppressWarnings("ComparableType") // Ignored, but it should be fixed
 public class SerializedFrequentStringsSketch implements Comparable<ItemsSketch<String>> {
   private final ItemsSketch<String> _sketch;
 

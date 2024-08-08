@@ -45,6 +45,7 @@ public class FCFSQueryScheduler extends QueryScheduler {
   }
 
   @Override
+  @SuppressWarnings("CheckReturnValue")
   public ListenableFuture<byte[]> submit(ServerQueryRequest queryRequest) {
     if (!_isRunning) {
       return immediateErrorResponse(queryRequest, QueryException.SERVER_SCHEDULER_DOWN_ERROR);

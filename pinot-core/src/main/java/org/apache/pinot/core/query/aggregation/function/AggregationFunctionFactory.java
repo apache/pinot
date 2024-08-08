@@ -184,7 +184,7 @@ public class AggregationFunctionFactory {
           double percentile = arguments.get(1).getLiteral().getDoubleValue();
           Preconditions.checkArgument(percentile >= 0 && percentile <= 100, "Invalid percentile: %s", percentile);
           int compressionFactor = arguments.get(2).getLiteral().getIntValue();
-          Preconditions.checkArgument(compressionFactor >= 0, "Invalid compressionFactor: %d", compressionFactor);
+          Preconditions.checkArgument(compressionFactor >= 0, "Invalid compressionFactor: %s", compressionFactor);
           if (remainingFunctionName.equals("TDIGEST")) {
             // PercentileTDigest
             return new PercentileTDigestAggregationFunction(firstArgument, percentile, compressionFactor,

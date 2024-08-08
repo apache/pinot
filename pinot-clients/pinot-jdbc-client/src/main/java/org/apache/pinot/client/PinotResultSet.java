@@ -288,7 +288,7 @@ public class PinotResultSet extends AbstractBaseResultSet {
   public short getShort(int columnIndex)
       throws SQLException {
     Integer value = getInt(columnIndex);
-    return value == null ? null : value.shortValue();
+    return value.shortValue();
   }
 
   @Override
