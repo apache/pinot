@@ -177,6 +177,7 @@ public abstract class QueryScheduler {
         instanceResponse = new InstanceResponseBlock();
         instanceResponse.addException(QueryException.getException(QueryException.QUERY_CANCELLATION_ERROR, errMsg));
         instanceResponse.addMetadata(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
+        instanceResponse.addMetadata(MetadataKey.QUERY_HASH.getName(), Integer.toString(queryRequest.getQueryHash()));
         responseBytes = serializeResponse(queryRequest, instanceResponse);
       }
 
@@ -229,6 +230,7 @@ public abstract class QueryScheduler {
       LOGGER.error(errMsg);
       instanceResponse = new InstanceResponseBlock(new ExceptionResultsBlock(new QueryCancelledException(errMsg, e)));
       instanceResponse.addMetadata(MetadataKey.REQUEST_ID.getName(), Long.toString(queryRequest.getRequestId()));
+      instanceResponse.addMetadata(MetadataKey.QUERY_HASH.getName(), Integer.toString(queryRequest.getQueryHash()));
       return serializeResponse(queryRequest, instanceResponse);
     } catch (Exception e) {
       _serverMetrics.addMeteredGlobalValue(ServerMeter.RESPONSE_SERIALIZATION_EXCEPTIONS, 1);
@@ -251,6 +253,7 @@ public abstract class QueryScheduler {
       ProcessingException error) {
     InstanceResponseBlock instanceResponse = new InstanceResponseBlock();
     instanceResponse.addMetadata(MetadataKey.REQUEST_ID.getName(), Long.toString(queryRequest.getRequestId()));
+    instanceResponse.addMetadata(MetadataKey.QUERY_HASH.getName(), Integer.toString(queryRequest.getQueryHash()));
     instanceResponse.addException(error);
     return Futures.immediateFuture(serializeResponse(queryRequest, instanceResponse));
   }
