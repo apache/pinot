@@ -19,18 +19,17 @@
 package org.apache.pinot.core.operator.filter;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableMap;
 import com.uber.h3core.LengthUnit;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.request.context.predicate.RangePredicate;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.operator.ExplainAttributeBuilder;
 import org.apache.pinot.core.operator.dociditerators.ScanBasedDocIdIterator;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
 import org.apache.pinot.core.operator.docidsets.EmptyDocIdSet;
@@ -263,11 +262,10 @@ public class H3IndexFilterOperator extends BaseFilterOperator {
   }
 
   @Override
-  protected Map<String, ? super Object> getExplainAttributes() {
-    return ImmutableMap.of(
-        "indexLookUp", "h3_index",
-        "operator", _predicate.getType(),
-        "predicate", _predicate.toString()
-    );
+  protected void explainAttributes(ExplainAttributeBuilder attributeBuilder) {
+    super.explainAttributes(attributeBuilder);
+    attributeBuilder.putString("indexLookUp", "h3_index");
+    attributeBuilder.putString("operator", _predicate.getType().name());
+    attributeBuilder.putString("predicate", _predicate.toString());
   }
 }

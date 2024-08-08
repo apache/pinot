@@ -18,13 +18,12 @@
  */
 package org.apache.pinot.core.operator.filter;
 
-import com.google.common.collect.ImmutableMap;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import org.apache.pinot.common.request.context.predicate.JsonMatchPredicate;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.operator.ExplainAttributeBuilder;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.spi.trace.FilterType;
@@ -95,11 +94,11 @@ public class JsonMatchFilterOperator extends BaseFilterOperator {
   }
 
   @Override
-  protected Map<String, ? super Object> getExplainAttributes() {
-    return ImmutableMap.of(
-        "indexLookUp", "json_index",
-        "operator", _predicate.getType(),
-        "predicate", _predicate.toString());
+  protected void explainAttributes(ExplainAttributeBuilder attributeBuilder) {
+    super.explainAttributes(attributeBuilder);
+    attributeBuilder.putString("indexLookUp", "json_index");
+    attributeBuilder.putString("operator", _predicate.getType().name());
+    attributeBuilder.putString("predicate", _predicate.toString());
   }
 
   private void record(ImmutableRoaringBitmap bitmap) {

@@ -18,18 +18,17 @@
  */
 package org.apache.pinot.core.operator.filter;
 
-import com.google.common.collect.ImmutableMap;
 import it.unimi.dsi.fastutil.longs.LongIterator;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.predicate.EqPredicate;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.operator.ExplainAttributeBuilder;
 import org.apache.pinot.core.operator.dociditerators.ScanBasedDocIdIterator;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -154,10 +153,9 @@ public class H3InclusionIndexFilterOperator extends BaseFilterOperator {
   }
 
   @Override
-  protected Map<String, ? super Object> getExplainAttributes() {
-    return ImmutableMap.<String, Object>builder()
-        .put("operator", _predicate.getType())
-        .put("predicate", _predicate.toString())
-        .build();
+  protected void explainAttributes(ExplainAttributeBuilder attributeBuilder) {
+    super.explainAttributes(attributeBuilder);
+    attributeBuilder.putString("operator", _predicate.getType().name());
+    attributeBuilder.putString("predicate", _predicate.toString());
   }
 }

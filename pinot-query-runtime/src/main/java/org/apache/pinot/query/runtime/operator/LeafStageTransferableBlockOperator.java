@@ -20,7 +20,6 @@ package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Maps;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -321,14 +320,9 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
     for (int i = 0; i < size; i++) {
       inputs.add(asNode(info.getInputs().get(i)));
     }
-    Map<String, String> attributes = Maps.newHashMapWithExpectedSize(info.getAttributes().size());
-    for (Map.Entry<String, Object> attribute : info.getAttributes().entrySet()) {
-      // TODO: Define how to convert the values in the attributes
-      attributes.put(attribute.getKey(), attribute.getValue().toString());
-    }
 
     return new ExplainedNode(_context.getStageId(), _dataSchema, null, inputs, info.getType(),
-        attributes);
+        info.getAttributes());
   }
 
   private Future<Void> startExecution() {

@@ -29,6 +29,7 @@ import java.util.stream.Collectors;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.tools.RelBuilder;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.core.operator.ExplainAttributeBuilder;
 import org.apache.pinot.query.planner.logical.PlanNodeToRelConverter;
 import org.apache.pinot.query.planner.logical.TransformationTracker;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
@@ -119,26 +120,30 @@ public class MultiStageExplainAskingServersUtils {
     DataSchema schema = fragmentRoot.getDataSchema();
     switch (planNodesMap.size()) {
       case 0: {
-        mergedNode =
-            new ExplainedNode(stageId, schema, null, Collections.emptyList(), "Empty", Collections.emptyMap());
+        mergedNode = new ExplainedNode(stageId, schema, null, Collections.emptyList(), "NoPlanInformation",
+            Collections.emptyMap());
         break;
       }
       case 1: {
-        mergedNode = planNodesMap.keySet().iterator().next();
+        Map.Entry<PlanNode, Integer> entry = planNodesMap.entrySet().iterator().next();
+        ExplainAttributeBuilder attributes = new ExplainAttributeBuilder();
+        attributes.putLong("servers", entry.getValue());
+        mergedNode = new ExplainedNode(stageId, schema, null, entry.getKey(), "IntermediateCombine",
+            attributes.build());
         break;
       }
       default: {
         List<PlanNode> inputs = new ArrayList<>(planNodesMap.size());
 
         for (Map.Entry<PlanNode, Integer> entry : planNodesMap.entrySet()) {
-          Map<String, String> attributes =
-              Collections.singletonMap("servers", Integer.toString(entry.getValue()));
+          ExplainAttributeBuilder attributes = new ExplainAttributeBuilder();
+          attributes.putLong("servers", entry.getValue());
 
           inputs.add(new ExplainedNode(stageId, entry.getKey().getDataSchema(), null,
-              Collections.singletonList(entry.getKey()), "ALTERNATIVE", attributes));
+              Collections.singletonList(entry.getKey()), "Alternative", attributes.build()));
         }
 
-        mergedNode = new ExplainedNode(stageId, schema, null, inputs, "INTERMEDIATE_COMBINE",
+        mergedNode = new ExplainedNode(stageId, schema, null, inputs, "IntermediateCombine",
             Collections.emptyMap());
         break;
       }
@@ -148,7 +153,21 @@ public class MultiStageExplainAskingServersUtils {
   }
 
   private static void mergePlans(Map<PlanNode, Integer> planNodesMap, PlanNode planNode) {
-    // TODO: Actually merge nodes
-    planNodesMap.put(planNode, planNodesMap.getOrDefault(planNode, 0) + 1);
+    boolean merged = false;
+    for (Map.Entry<PlanNode, Integer> entry : planNodesMap.entrySet()) {
+      PlanNode originalPlan = entry.getKey();
+
+      // TODO: obtain whether verbose mode should be use or not
+      PlanNode mergedPlan = PlanNodeMerger.mergePlans(originalPlan, planNode, false);
+      if (mergedPlan != null) {
+        planNodesMap.remove(originalPlan);
+        planNodesMap.put(mergedPlan, entry.getValue() + 1);
+        merged = true;
+        break;
+      }
+    }
+    if (!merged) {
+      planNodesMap.put(planNode, 1);
+    }
   }
 }

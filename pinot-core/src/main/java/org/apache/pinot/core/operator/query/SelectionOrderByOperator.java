@@ -40,6 +40,7 @@ import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.BitmapDocIdSetOperator;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.ExecutionStatistics;
+import org.apache.pinot.core.operator.ExplainAttributeBuilder;
 import org.apache.pinot.core.operator.ProjectionOperator;
 import org.apache.pinot.core.operator.ProjectionOperatorUtils;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
@@ -131,11 +132,12 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
   }
 
   @Override
-  protected Map<String, ? super Object> getExplainAttributes() {
+  protected void explainAttributes(ExplainAttributeBuilder attributeBuilder) {
+    super.explainAttributes(attributeBuilder);
     if (_expressions.isEmpty()) {
-      return Collections.emptyMap();
+      return;
     }
-    return Collections.singletonMap("selectList",
+    attributeBuilder.putJson("selectList",
         _expressions.stream().map(ExpressionContext::toString).collect(Collectors.toList()));
   }
 

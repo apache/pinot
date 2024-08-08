@@ -21,7 +21,6 @@ package org.apache.pinot.core.operator.query;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
@@ -32,6 +31,7 @@ import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.ExecutionStatistics;
+import org.apache.pinot.core.operator.ExplainAttributeBuilder;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -100,12 +100,14 @@ public class SelectionOnlyOperator extends BaseOperator<SelectionResultsBlock> {
   }
 
   @Override
-  protected Map<String, ? super Object> getExplainAttributes() {
+  protected void explainAttributes(ExplainAttributeBuilder attributeBuilder) {
+    super.explainAttributes(attributeBuilder);
     if (_expressions.isEmpty()) {
-      return Collections.emptyMap();
+      return;
     }
-    return Collections.singletonMap("selectList",
-        _expressions.stream().map(ExpressionContext::toString).collect(Collectors.toList()));
+    attributeBuilder.putJson("selectList", _expressions.stream()
+        .map(ExpressionContext::toString)
+        .collect(Collectors.toList()));
   }
 
   @Override
