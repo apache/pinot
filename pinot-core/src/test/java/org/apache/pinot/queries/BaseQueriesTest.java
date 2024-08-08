@@ -225,11 +225,16 @@ public abstract class BaseQueriesTest {
     Map<ServerRoutingInstance, Collection<DataTable>> dataTableMap = new HashMap<>();
     try {
       // For multi-threaded BrokerReduceService, we cannot reuse the same data-table
-      byte[] serializedResponse = instanceResponse.toDataTable().toBytes();
       ServerRoutingInstance serverRoutingInstance = new ServerRoutingInstance("localhost", 1234);
       dataTableMap.put(serverRoutingInstance, new ArrayList<>());
-      dataTableMap.get(serverRoutingInstance).add(DataTableFactory.getDataTable(serializedResponse));
-      dataTableMap.get(serverRoutingInstance).add(DataTableFactory.getDataTable(serializedResponse));
+
+      DataTable dataTable = instanceResponse.toDataTable();
+      dataTable.getMetadata().put(DataTable.MetadataKey.TABLE.getName(),
+          TableNameBuilder.OFFLINE.tableNameWithType(serverQueryContext.getTableName()));
+      dataTableMap.get(serverRoutingInstance).add(DataTableFactory.getDataTable(dataTable.toBytes()));
+      dataTable.getMetadata().put(DataTable.MetadataKey.TABLE.getName(),
+          TableNameBuilder.REALTIME.tableNameWithType(serverQueryContext.getTableName()));
+      dataTableMap.get(serverRoutingInstance).add(DataTableFactory.getDataTable(dataTable.toBytes()));
     } catch (Exception e) {
       throw new RuntimeException(e);
     }

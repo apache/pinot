@@ -597,7 +597,7 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
 
   @Test
   public void testThreadCpuTime() {
-    String query = "SELECT * FROM testTable_OFFLINE";
+    String query = "SELECT * FROM testTable";
 
     ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(true);
     // NOTE: Need to check whether thread CPU time measurement is enabled because some environments might not support
