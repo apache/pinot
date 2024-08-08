@@ -413,7 +413,7 @@ public class TableCache implements PinotConfigProvider {
     }
   }
 
-  private List<Schema> getSchemas() {
+  public List<Schema> getSchemas() {
     List<Schema> schemas = new ArrayList<>(_schemaInfoMap.size());
     for (SchemaInfo schemaInfo : _schemaInfoMap.values()) {
       schemas.add(schemaInfo._schema);

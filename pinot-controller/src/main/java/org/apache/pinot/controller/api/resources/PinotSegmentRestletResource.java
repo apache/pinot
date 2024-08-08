@@ -244,13 +244,11 @@ public class PinotSegmentRestletResource {
     for (String tableNameWithType : tableNamesWithType) {
       Map<String, Object> resultForTable = new LinkedHashMap<>();
       resultForTable.put("tableName", tableNameWithType);
+      Map<String, List<String>> serverToSegmentsMap =
+          _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType);
+      resultForTable.put("serverToSegmentsCountMap", _pinotHelixResourceManager.getServerToSegmentCountMap());
       if (detailed) {
-        resultForTable.put("serverToSegmentsMap", _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType));
-        resultForTable.put("serverToSegmentsCountMap",
-            _pinotHelixResourceManager.getServerToSegmentCountMap());
-      } else {
-        resultForTable.put("serverToSegmentsCountMap",
-            _pinotHelixResourceManager.getServerToSegmentCountMap());
+        resultForTable.put("serverToSegmentsMap", serverToSegmentsMap);
       }
       resultList.add(resultForTable);
     }

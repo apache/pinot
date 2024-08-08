@@ -51,6 +51,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.exception.SchemaAlreadyExistsException;
 import org.apache.pinot.common.exception.SchemaBackwardIncompatibleException;
 import org.apache.pinot.common.exception.SchemaNotFoundException;
@@ -128,16 +129,12 @@ public class PinotSchemaRestletResource {
       + "count details")
   public List<SchemaInfo> getSchemaInfo(@Context HttpHeaders headers) {
     List<SchemaInfo> schemasInfo = new ArrayList<>();
-    List<String> schemaList = _pinotHelixResourceManager.getSchemaNames(headers.getHeaderString(DATABASE));
-    for (String schemaName : schemaList) {
-      Schema schema = _pinotHelixResourceManager.getSchema(schemaName);
-      if (schema != null) {
-        SchemaInfo schemaInfo = new SchemaInfo(schema.getSchemaName(), schema.getDimensionFieldSpecs().size(),
-            schema.getDateTimeFieldSpecs().size(), schema.getMetricFieldSpecs().size());
-        schemasInfo.add(schemaInfo);
-      } else {
-        LOGGER.info("Schema not found with name: " + schemaName + ", while fetching schema info.");
-      }
+    TableCache tableCache = _pinotHelixResourceManager.getTableCache();
+    List<Schema> schemaList = tableCache.getSchemas();
+    for (Schema schema : schemaList) {
+      SchemaInfo schemaInfo = new SchemaInfo(schema.getSchemaName(), schema.getDimensionFieldSpecs().size(),
+          schema.getDateTimeFieldSpecs().size(), schema.getMetricFieldSpecs().size());
+      schemasInfo.add(schemaInfo);
     }
     return schemasInfo;
   }
