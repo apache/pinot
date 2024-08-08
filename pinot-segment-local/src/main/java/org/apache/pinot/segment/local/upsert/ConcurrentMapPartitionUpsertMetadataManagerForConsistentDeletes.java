@@ -237,6 +237,10 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
 
     _primaryKeyToRecordLocationMap.forEach((primaryKey, recordLocation) -> {
       double comparisonValue = ((Number) recordLocation.getComparisonValue()).doubleValue();
+      // We need to verify that the record belongs to only one segment. If a record is part of multiple segments,
+      // an issue can arise where the upsert compaction might first process the segment containing the delete record
+      // while the previous segment(s) are not compacted. Upon restart, this can inadvertently revive the key
+      // that was originally marked for deletion.
       if (_deletedKeysTTL > 0 && comparisonValue < deletedKeysThreshold
           && recordLocation.getDistinctSegmentCount() <= 1) {
         ThreadSafeMutableRoaringBitmap currentQueryableDocIds = recordLocation.getSegment().getQueryableDocIds();
@@ -349,6 +353,8 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
     private final IndexSegment _segment;
     private final int _docId;
     private final Comparable _comparisonValue;
+    // The number of distinct segments in which the record is present. If this count is less than or equal to 1,
+    // we proceed to remove the record from the primary hashmap during the deletedKeysTTL process.
     private final int _distinctSegmentCount;
 
     public RecordLocation(IndexSegment indexSegment, int docId, Comparable comparisonValue, int distinctSegmentCount) {
