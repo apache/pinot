@@ -29,9 +29,13 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletionService;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
@@ -52,7 +56,6 @@ import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.querylog.QueryLogger;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.broker.routing.BrokerRoutingManager;
-import org.apache.pinot.calcite.jdbc.CalciteSchemaBuilder;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.http.MultiHttpRequest;
@@ -84,7 +87,6 @@ import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.util.GapfillUtils;
-import org.apache.pinot.query.catalog.PinotCatalog;
 import org.apache.pinot.query.parser.utils.ParserUtils;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.config.table.FieldConfig;
@@ -140,6 +142,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   protected final boolean _enableDistinctCountBitmapOverride;
   protected final int _queryResponseLimit;
   protected final Map<Long, QueryServers> _queriesById;
+  protected final boolean _enableMultistageMigrationMetric;
+  protected ExecutorService _multistageCompileExecutor;
+  protected BlockingQueue<Pair<String, String>> _multistageCompileQueryQueue;
 
   public BaseSingleStageBrokerRequestHandler(PinotConfiguration config, String brokerId,
       BrokerRoutingManager routingManager, AccessControlFactory accessControlFactory,
@@ -157,10 +162,51 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     boolean enableQueryCancellation =
         Boolean.parseBoolean(config.getProperty(Broker.CONFIG_OF_BROKER_ENABLE_QUERY_CANCELLATION));
     _queriesById = enableQueryCancellation ? new ConcurrentHashMap<>() : null;
+
+    _enableMultistageMigrationMetric = _config.getProperty(Broker.CONFIG_OF_BROKER_ENABLE_MULTISTAGE_MIGRATION_METRIC,
+        Broker.DEFAULT_ENABLE_MULTISTAGE_MIGRATION_METRIC);
+    if (_enableMultistageMigrationMetric) {
+      _multistageCompileExecutor = Executors.newSingleThreadExecutor();
+      _multistageCompileQueryQueue = new LinkedBlockingQueue<>(1000);
+    }
+
     LOGGER.info("Initialized {} with broker id: {}, timeout: {}ms, query response limit: {}, query log max length: {}, "
             + "query log max rate: {}, query cancellation enabled: {}", getClass().getSimpleName(), _brokerId,
         _brokerTimeoutMs, _queryResponseLimit, _queryLogger.getMaxQueryLengthToLog(), _queryLogger.getLogRateLimit(),
         enableQueryCancellation);
+  }
+
+  @Override
+  public void start() {
+    if (_enableMultistageMigrationMetric) {
+      _multistageCompileExecutor.submit(() -> {
+        while (!Thread.currentThread().isInterrupted()) {
+          Pair<String, String> query;
+          try {
+            query = _multistageCompileQueryQueue.take();
+          } catch (InterruptedException e) {
+            // Exit gracefully when the thread is interrupted, presumably when this single thread executor is shutdown.
+            // Since this task is all that this single thread is doing, there's no need to preserve the thread's
+            // interrupt status flag.
+            return;
+          }
+          String queryString = query.getLeft();
+          String database = query.getRight();
+
+          // Check if the query is a v2 supported query
+          if (!ParserUtils.canCompileWithMultiStageEngine(queryString, database, _tableCache)) {
+            _brokerMetrics.addMeteredGlobalValue(BrokerMeter.SINGLE_STAGE_QUERIES_INVALID_MULTI_STAGE, 1);
+          }
+        }
+      });
+    }
+  }
+
+  @Override
+  public void shutDown() {
+    if (_enableMultistageMigrationMetric) {
+      _multistageCompileExecutor.shutdownNow();
+    }
   }
 
   @Override
@@ -264,8 +310,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         // Check if the query is a v2 supported query
         Map<String, String> queryOptions = sqlNodeAndOptions.getOptions();
         String database = DatabaseUtils.extractDatabaseFromQueryRequest(queryOptions, httpHeaders);
-        if (ParserUtils.canCompileQueryUsingV2Engine(query, CalciteSchemaBuilder.asRootSchema(
-            new PinotCatalog(database, _tableCache), database))) {
+        if (ParserUtils.canCompileWithMultiStageEngine(query, database, _tableCache)) {
           return new BrokerResponseNative(QueryException.getException(QueryException.SQL_PARSING_ERROR, new Exception(
               "It seems that the query is only supported by the multi-stage query engine, please retry the query using "
                   + "the multi-stage query engine "
@@ -398,8 +443,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         if (StringUtils.isNotBlank(failureMessage)) {
           failureMessage = "Reason: " + failureMessage;
         }
-        throw new WebApplicationException("Permission denied." + failureMessage,
-            Response.Status.FORBIDDEN);
+        throw new WebApplicationException("Permission denied." + failureMessage, Response.Status.FORBIDDEN);
       }
 
       // Get the tables hit by the request
@@ -462,6 +506,14 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       }
 
       // Validate QPS quota
+      String database = DatabaseUtils.extractDatabaseFromFullyQualifiedTableName(tableName);
+      if (!_queryQuotaManager.acquireDatabase(database)) {
+        String errorMessage =
+            String.format("Request %d: %s exceeds query quota for database: %s", requestId, query, database);
+        LOGGER.info(errorMessage);
+        requestContext.setErrorCode(QueryException.TOO_MANY_REQUESTS_ERROR_CODE);
+        return new BrokerResponseNative(QueryException.getException(QueryException.QUOTA_EXCEEDED_ERROR, errorMessage));
+      }
       if (!_queryQuotaManager.acquire(tableName)) {
         String errorMessage =
             String.format("Request %d: %s exceeds query quota for table: %s", requestId, query, tableName);
@@ -482,7 +534,18 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       }
 
       _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.QUERIES, 1);
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.QUERIES_GLOBAL, 1);
       _brokerMetrics.addValueToTableGauge(rawTableName, BrokerGauge.REQUEST_SIZE, query.length());
+
+      if (!pinotQuery.isExplain() && _enableMultistageMigrationMetric) {
+        // Check if the query is a v2 supported query
+        database = DatabaseUtils.extractDatabaseFromQueryRequest(sqlNodeAndOptions.getOptions(), httpHeaders);
+        // Attempt to add the query to the compile queue; drop if queue is full
+        if (!_multistageCompileQueryQueue.offer(Pair.of(query, database))) {
+          LOGGER.trace("Not compiling query `{}` using the multi-stage query engine because the query queue is full",
+              query);
+        }
+      }
 
       // Prepare OFFLINE and REALTIME requests
       BrokerRequest offlineBrokerRequest = null;

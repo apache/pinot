@@ -172,6 +172,7 @@ public class BaseSingleStageBrokerRequestHandlerTest {
     when(routingManager.getRoutingTable(any(), Mockito.anyLong())).thenReturn(rt);
     QueryQuotaManager queryQuotaManager = mock(QueryQuotaManager.class);
     when(queryQuotaManager.acquire(anyString())).thenReturn(true);
+    when(queryQuotaManager.acquireDatabase(anyString())).thenReturn(true);
     CountDownLatch latch = new CountDownLatch(1);
     long[] testRequestId = {-1};
     BrokerMetrics.register(mock(BrokerMetrics.class));

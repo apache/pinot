@@ -50,7 +50,6 @@ import org.apache.hc.core5.http.message.BasicNameValuePair;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.client.PinotConnection;
 import org.apache.pinot.client.PinotDriver;
-import org.apache.pinot.common.datatable.DataTableFactory;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
@@ -59,7 +58,6 @@ import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.http.HttpClient;
-import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.operator.query.NonScanBasedAggregationOperator;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
@@ -190,7 +188,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   @BeforeClass
   public void setUp()
       throws Exception {
-    DataTableBuilderFactory.setDataTableVersion(DataTableFactory.VERSION_3);
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
 
     // Start the Pinot cluster
@@ -3012,9 +3009,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(postQuery(query).get("resultTable").get("rows").get(0).get(0).asLong(), expectedResults[10]);
   }
 
-  @Test
-  public void testAggregationFunctionsWithUnderscoreV1()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testAggregationFunctionsWithUnderscore(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String query;
 
     // The Accurate value is 6538.
@@ -3024,21 +3022,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // The Accurate value is 115545.
     query = "SELECT c_o_u_n_t(FlightNum) FROM mytable";
     assertEquals(postQuery(query).get("resultTable").get("rows").get(0).get(0).asInt(), 115545);
-  }
-
-  @Test
-  public void testAggregationFunctionsWithUnderscoreV2()
-      throws Exception {
-    setUseMultiStageQueryEngine(true);
-    String query;
-
-    // The Accurate value is 6538.
-    query = "SELECT distinct_count(FlightNum) FROM mytable";
-    assertEquals(postQuery(query).get("resultTable").get("rows").get(0).get(0).asInt(), 6538);
-
-    // This is not supported in V2.
-    query = "SELECT c_o_u_n_t(FlightNum) FROM mytable";
-    testQueryError(query, QueryException.QUERY_PLANNING_ERROR_CODE);
   }
 
   @Test

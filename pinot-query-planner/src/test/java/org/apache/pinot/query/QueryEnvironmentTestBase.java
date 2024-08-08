@@ -31,16 +31,12 @@ import java.util.Random;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.pinot.calcite.jdbc.CalciteSchemaBuilder;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.TablePartitionInfo;
 import org.apache.pinot.core.routing.TablePartitionInfo.PartitionInfo;
-import org.apache.pinot.query.catalog.PinotCatalog;
 import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.testutils.MockRoutingManagerFactory;
-import org.apache.pinot.query.type.TypeFactory;
-import org.apache.pinot.query.type.TypeSystem;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -278,9 +274,8 @@ public class QueryEnvironmentTestBase {
     }
     RoutingManager routingManager = factory.buildRoutingManager(partitionInfoMap);
     TableCache tableCache = factory.buildTableCache();
-    return new QueryEnvironment(new TypeFactory(new TypeSystem()),
-        CalciteSchemaBuilder.asRootSchema(new PinotCatalog(tableCache), CommonConstants.DEFAULT_DATABASE),
-        new WorkerManager("localhost", reducerPort, routingManager), tableCache);
+    return new QueryEnvironment(CommonConstants.DEFAULT_DATABASE, tableCache,
+        new WorkerManager("localhost", reducerPort, routingManager));
   }
 
   /**

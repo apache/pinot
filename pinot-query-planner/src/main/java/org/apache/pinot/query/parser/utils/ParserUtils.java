@@ -18,10 +18,8 @@
  */
 package org.apache.pinot.query.parser.utils;
 
-import org.apache.calcite.jdbc.CalciteSchema;
+import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.query.QueryEnvironment;
-import org.apache.pinot.query.type.TypeFactory;
-import org.apache.pinot.query.type.TypeSystem;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,22 +31,15 @@ public class ParserUtils {
   }
 
   /**
-   * @param query the query string to be parsed and compiled
-   * @param calciteSchema the Calcite schema to be used for compilation
-   * @return true if the query can be parsed and compiled using the v2 multi-stage query engine
+   * Returns whether the query can be parsed and compiled using the multi-stage query engine.
    */
-  public static boolean canCompileQueryUsingV2Engine(String query, CalciteSchema calciteSchema) {
+  public static boolean canCompileWithMultiStageEngine(String query, String database, TableCache tableCache) {
     // try to parse and compile the query with the Calcite planner used by the multi-stage query engine
-    try {
-      LOGGER.info("Trying to compile query `{}` using the multi-stage query engine", query);
-      QueryEnvironment queryEnvironment =
-          new QueryEnvironment(new TypeFactory(new TypeSystem()), calciteSchema, null, null);
-      queryEnvironment.getTableNamesForQuery(query);
-      LOGGER.info("Successfully compiled query using the multi-stage query engine: `{}`", query);
-      return true;
-    } catch (Exception e) {
-      LOGGER.error("Encountered an error while compiling query `{}` using the multi-stage query engine", query, e);
-      return false;
-    }
+    long compileStartTime = System.currentTimeMillis();
+    LOGGER.debug("Trying to compile query `{}` using the multi-stage query engine", query);
+    QueryEnvironment queryEnvironment = new QueryEnvironment(database, tableCache, null);
+    boolean canCompile = queryEnvironment.canCompileQuery(query);
+    LOGGER.debug("Multi-stage query compilation time = {}ms", System.currentTimeMillis() - compileStartTime);
+    return canCompile;
   }
 }

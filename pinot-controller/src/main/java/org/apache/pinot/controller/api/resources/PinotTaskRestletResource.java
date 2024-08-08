@@ -131,7 +131,8 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
     @Authorization(value = DATABASE)})
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = {
     @ApiKeyAuthDefinition(name = HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER,
-        key = SWAGGER_AUTHORIZATION_KEY),
+        key = SWAGGER_AUTHORIZATION_KEY,
+        description = "The format of the key is  ```\"Basic <token>\" or \"Bearer <token>\"```"),
     @ApiKeyAuthDefinition(name = DATABASE, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = DATABASE,
         description = "Database context passed through http header. If no context is provided 'default' database "
             + "context will be considered.")}))
@@ -191,7 +192,12 @@ public class PinotTaskRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation("List all tasks for the given task type")
   public Set<String> getTasks(@ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType) {
-    return _pinotHelixTaskResourceManager.getTasks(taskType);
+    Set<String> tasks = _pinotHelixTaskResourceManager.getTasks(taskType);
+    if (tasks == null) {
+      throw new NotFoundException("No tasks found for task type: " + taskType);
+    }
+
+    return tasks;
   }
 
   @GET
@@ -615,11 +621,15 @@ public class PinotTaskRestletResource {
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.CREATE_TASK)
   @Produces(MediaType.APPLICATION_JSON)
   @Authenticate(AccessType.UPDATE)
-  @ApiOperation("Schedule tasks and return a map from task type to task name scheduled")
+  @ApiOperation("Schedule tasks and return a map from task type to task name scheduled. If task type is missing, "
+      + "schedules all tasks. If table name is missing, schedules tasks for all tables in the database. If database "
+      + "is missing in headers, uses default.")
   @Nullable
   public Map<String, String> scheduleTasks(
-      @ApiParam(value = "Task type") @QueryParam("taskType") @Nullable String taskType,
-      @ApiParam(value = "Table name (with type suffix)") @QueryParam("tableName") @Nullable String tableName,
+      @ApiParam(value = "Task type. If missing, schedules all tasks.") @QueryParam("taskType") @Nullable
+      String taskType,
+      @ApiParam(value = "Table name (with type suffix). If missing, schedules tasks for all tables in the database.")
+      @QueryParam("tableName") @Nullable String tableName,
       @ApiParam(value = "Minion Instance tag to schedule the task explicitly on") @QueryParam("minionInstanceTag")
       @Nullable String minionInstanceTag, @Context HttpHeaders headers) {
     String database = headers != null ? headers.getHeaderString(DATABASE) : DEFAULT_DATABASE;

@@ -30,6 +30,7 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.broker.queryquota.HelixExternalViewBasedQueryQuotaManager;
 import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -81,6 +82,8 @@ public class BrokerResourceOnlineOfflineStateModelFactory extends StateModelFact
         TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
         _queryQuotaManager.initOrUpdateTableQueryQuota(tableConfig,
             _helixDataAccessor.getProperty(_helixDataAccessor.keyBuilder().externalView(BROKER_RESOURCE_INSTANCE)));
+        _queryQuotaManager.createDatabaseRateLimiter(
+            DatabaseUtils.extractDatabaseFromFullyQualifiedTableName(tableNameWithType));
       } catch (Exception e) {
         LOGGER.error("Caught exception while processing transition from OFFLINE to ONLINE for table: {}",
             tableNameWithType, e);

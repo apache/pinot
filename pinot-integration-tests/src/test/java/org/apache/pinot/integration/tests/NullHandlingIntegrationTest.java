@@ -23,7 +23,6 @@ import java.io.File;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -206,7 +205,6 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
     pinotQuery = "SELECT COUNT(1) FROM " + getTableName() + " option(enableNullHandling=true)";
     h2Query = "SELECT COUNT(1) FROM " + getTableName();
     testQuery(pinotQuery, h2Query);
-    DataTableBuilderFactory.setDataTableVersion(DataTableBuilderFactory.DEFAULT_VERSION);
   }
 
   @Test(dataProvider = "nullLiteralQueries")

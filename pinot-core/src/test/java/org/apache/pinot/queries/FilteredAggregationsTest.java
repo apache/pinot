@@ -24,10 +24,10 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Random;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.commons.lang3.RandomUtils;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -111,12 +111,13 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
 
   private List<GenericRow> createTestData() {
     List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
+    Random random = new Random();
     for (int i = 0; i < NUM_ROWS; i++) {
       GenericRow row = new GenericRow();
       row.putValue(INT_COL_NAME, i);
       row.putValue(NO_INDEX_INT_COL_NAME, i);
       row.putValue(STATIC_INT_COL_NAME, 10);
-      row.putValue(BOOLEAN_COL_NAME, RandomUtils.nextBoolean());
+      row.putValue(BOOLEAN_COL_NAME, random.nextBoolean());
       row.putValue(STRING_COL_NAME, RandomStringUtils.randomAlphabetic(4));
       rows.add(row);
     }

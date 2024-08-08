@@ -25,9 +25,11 @@ import org.apache.helix.messaging.handling.MessageHandlerFactory;
 import org.apache.helix.model.Message;
 import org.apache.pinot.broker.queryquota.HelixExternalViewBasedQueryQuotaManager;
 import org.apache.pinot.broker.routing.BrokerRoutingManager;
+import org.apache.pinot.common.messages.DatabaseConfigRefreshMessage;
 import org.apache.pinot.common.messages.RoutingTableRebuildMessage;
 import org.apache.pinot.common.messages.SegmentRefreshMessage;
 import org.apache.pinot.common.messages.TableConfigRefreshMessage;
+import org.apache.pinot.common.utils.DatabaseUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -61,6 +63,8 @@ public class BrokerUserDefinedMessageHandlerFactory implements MessageHandlerFac
         return new RefreshTableConfigMessageHandler(new TableConfigRefreshMessage(message), context);
       case RoutingTableRebuildMessage.REBUILD_ROUTING_TABLE_MSG_SUB_TYPE:
         return new RebuildRoutingTableMessageHandler(new RoutingTableRebuildMessage(message), context);
+      case DatabaseConfigRefreshMessage.REFRESH_DATABASE_CONFIG_MSG_SUB_TYPE:
+        return new RefreshDatabaseConfigMessageHandler(new DatabaseConfigRefreshMessage(message), context);
       default:
         // NOTE: Log a warning and return no-op message handler for unsupported message sub-types. This can happen when
         //       a new message sub-type is added, and the sender gets deployed first while receiver is still running the
@@ -117,6 +121,9 @@ public class BrokerUserDefinedMessageHandlerFactory implements MessageHandlerFac
       // TODO: Fetch the table config here and pass it into the managers, or consider merging these 2 managers
       _routingManager.buildRouting(_tableNameWithType);
       _queryQuotaManager.initOrUpdateTableQueryQuota(_tableNameWithType);
+      // only create the rate limiter if not present. This message has no reason to update the database rate limiter
+      _queryQuotaManager.createDatabaseRateLimiter(
+          DatabaseUtils.extractDatabaseFromFullyQualifiedTableName(_tableNameWithType));
       HelixTaskResult result = new HelixTaskResult();
       result.setSuccess(true);
       return result;
@@ -126,6 +133,32 @@ public class BrokerUserDefinedMessageHandlerFactory implements MessageHandlerFac
     public void onError(Exception e, ErrorCode code, ErrorType type) {
       LOGGER.error("Got error while refreshing table config for table: {} (error code: {}, error type: {})",
           _tableNameWithType, code, type, e);
+    }
+  }
+
+  private class RefreshDatabaseConfigMessageHandler extends MessageHandler {
+    final String _databaseName;
+
+    RefreshDatabaseConfigMessageHandler(DatabaseConfigRefreshMessage databaseConfigRefreshMessage,
+        NotificationContext context) {
+      super(databaseConfigRefreshMessage, context);
+      _databaseName = databaseConfigRefreshMessage.getDatabaseName();
+    }
+
+    @Override
+    public HelixTaskResult handleMessage() {
+      // only update the existing rate limiter.
+      // Database rate limiter creation should only be done through table based change triggers
+      _queryQuotaManager.updateDatabaseRateLimiter(_databaseName);
+      HelixTaskResult result = new HelixTaskResult();
+      result.setSuccess(true);
+      return result;
+    }
+
+    @Override
+    public void onError(Exception e, ErrorCode code, ErrorType type) {
+      LOGGER.error("Got error while refreshing database config for database: {} (error code: {}, error type: {})",
+          _databaseName, code, type, e);
     }
   }
 

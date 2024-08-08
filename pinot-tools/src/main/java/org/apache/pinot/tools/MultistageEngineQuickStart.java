@@ -27,6 +27,7 @@ import java.util.Map;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.tools.admin.PinotAdministrator;
 import org.apache.pinot.tools.admin.command.QuickstartRunner;
+import org.apache.pinot.tools.utils.SampleQueries;
 
 
 public class MultistageEngineQuickStart extends Quickstart {
@@ -58,28 +59,23 @@ public class MultistageEngineQuickStart extends Quickstart {
     printStatus(Quickstart.Color.YELLOW, "***** Multi-stage engine quickstart setup complete *****");
     Map<String, String> queryOptions = Collections.singletonMap("queryOptions",
         CommonConstants.Broker.Request.QueryOptionKey.USE_MULTISTAGE_ENGINE + "=true");
-    String q1 = "SELECT count(*) FROM baseballStats_OFFLINE LIMIT 10";
     printStatus(Quickstart.Color.YELLOW, "Total number of documents in the table");
-    printStatus(Quickstart.Color.CYAN, "Query : " + q1);
-    printStatus(Quickstart.Color.YELLOW, prettyPrintResponse(runner.runQuery(q1, queryOptions)));
+    printStatus(Quickstart.Color.CYAN, "Query : " + SampleQueries.COUNT_BASEBALL_STATS);
+    printStatus(Quickstart.Color.YELLOW,
+        prettyPrintResponse(runner.runQuery(SampleQueries.COUNT_BASEBALL_STATS, queryOptions)));
     printStatus(Quickstart.Color.GREEN, "***************************************************");
 
-    String q2 = "SELECT a.playerID, a.runs, a.yearID, b.runs, b.yearID"
-        + " FROM baseballStats_OFFLINE AS a JOIN baseballStats_OFFLINE AS b ON a.playerID = b.playerID"
-        + " WHERE a.runs > 160 AND b.runs < 2 LIMIT 10";
     printStatus(Quickstart.Color.YELLOW, "Correlate the same player(s) with more than 160-run some year(s) and"
         + " with less than 2-run some other year(s)");
-    printStatus(Quickstart.Color.CYAN, "Query : " + q2);
-    printStatus(Quickstart.Color.YELLOW, prettyPrintResponse(runner.runQuery(q2, queryOptions)));
+    printStatus(Quickstart.Color.CYAN, "Query : " + SampleQueries.BASEBALL_STATS_SELF_JOIN);
+    printStatus(Quickstart.Color.YELLOW,
+        prettyPrintResponse(runner.runQuery(SampleQueries.BASEBALL_STATS_SELF_JOIN, queryOptions)));
     printStatus(Quickstart.Color.GREEN, "***************************************************");
 
-    String q3 = "SELECT a.playerName, a.teamID, b.teamName \n"
-        + "FROM baseballStats_OFFLINE AS a\n"
-        + "JOIN dimBaseballTeams_OFFLINE AS b\n"
-        + "ON a.teamID = b.teamID LIMIT 10";
     printStatus(Quickstart.Color.YELLOW, "Baseball Stats with joined team names");
-    printStatus(Quickstart.Color.CYAN, "Query : " + q3);
-    printStatus(Quickstart.Color.YELLOW, prettyPrintResponse(runner.runQuery(q3, queryOptions)));
+    printStatus(Quickstart.Color.CYAN, "Query : " + SampleQueries.BASEBALL_JOIN_DIM_BASEBALL_TEAMS);
+    printStatus(Quickstart.Color.YELLOW,
+        prettyPrintResponse(runner.runQuery(SampleQueries.BASEBALL_JOIN_DIM_BASEBALL_TEAMS, queryOptions)));
     printStatus(Quickstart.Color.GREEN, "***************************************************");
 
     String q4 =

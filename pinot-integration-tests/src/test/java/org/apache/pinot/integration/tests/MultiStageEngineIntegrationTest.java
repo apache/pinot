@@ -705,6 +705,26 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   }
 
   @Test
+  public void skipArrayToMvOptimization()
+      throws Exception {
+    String sqlQuery = "SELECT 1 "
+        + "FROM mytable "
+        + "WHERE ARRAY_TO_MV(RandomAirports) = 'MFR' and ARRAY_TO_MV(RandomAirports) = 'GTR'";
+
+    JsonNode jsonNode = postQuery("Explain plan for " + sqlQuery);
+    JsonNode plan = jsonNode.get("resultTable").get("rows").get(0).get(1);
+
+    Pattern pattern = Pattern.compile("LogicalValues\\(tuples=\\[\\[]]\\)");
+    String planAsText = plan.asText();
+    boolean matches = pattern.matcher(planAsText).find();
+    Assert.assertFalse(matches, "Plan should not contain contain LogicalValues node but plan is \n"
+        + planAsText);
+
+    jsonNode = postQuery(sqlQuery);
+    Assert.assertNotEquals(jsonNode.get("resultTable").get("rows").size(), 0);
+  }
+
+  @Test
   public void testMultiValueColumnGroupByOrderBy()
       throws Exception {
     String pinotQuery =

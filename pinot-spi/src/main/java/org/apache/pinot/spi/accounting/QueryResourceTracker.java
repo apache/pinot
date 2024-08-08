@@ -16,21 +16,31 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.calcite.sql.fun;
+package org.apache.pinot.spi.accounting;
 
-import org.apache.calcite.sql.SqlCall;
-import org.apache.calcite.sql.SqlNode;
-import org.apache.calcite.sql.fun.SqlCoalesceFunction;
-import org.apache.calcite.sql.validate.SqlValidator;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 
 
 /**
- * Pinot supports native COALESCE function, thus no need to create CASE WHEN conversion.
+ * Tracks allocated bytes and CPU time for a query in a server or a broker.
  */
-public class PinotSqlCoalesceFunction extends SqlCoalesceFunction {
+@JsonSerialize
+public interface QueryResourceTracker {
+  /**
+   * QueryId tracked by the implementation.
+   * @return a string containing the query id.
+   */
+  String getQueryId();
 
-  @Override
-  public SqlNode rewriteCall(SqlValidator validator, SqlCall call) {
-    return call;
-  }
+  /**
+   * Allocated bytes for a query in a server or broker
+   * @return A long containing the number of bytes allocated to execute the query.
+   */
+  long getAllocatedBytes();
+
+  /**
+   * Total execution CPU Time(nanoseconds) of a query in a server or broker.
+   * @return A long containing the nanoseconds.
+   */
+  long getCpuTimeNs();
 }

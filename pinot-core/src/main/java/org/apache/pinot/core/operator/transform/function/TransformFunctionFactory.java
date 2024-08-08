@@ -158,7 +158,6 @@ public class TransformFunctionFactory {
     typeToImplementation.put(TransformFunctionType.ARRAY_MAX, ArrayMaxTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.ARRAY_MIN, ArrayMinTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.ARRAY_SUM, ArraySumTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.ARRAY_VALUE_CONSTRUCTOR, ArrayLiteralTransformFunction.class);
 
     typeToImplementation.put(TransformFunctionType.GROOVY, GroovyTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.CASE, CaseTransformFunction.class);
@@ -241,11 +240,11 @@ public class TransformFunctionFactory {
     typeToImplementation.put(TransformFunctionType.VECTOR_DIMS, VectorDimsTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.VECTOR_NORM, VectorNormTransformFunction.class);
 
-    Map<String, Class<? extends TransformFunction>> registry
-        = new HashMap<>(HashUtil.getHashMapCapacity(typeToImplementation.size()));
+    Map<String, Class<? extends TransformFunction>> registry =
+        new HashMap<>(HashUtil.getHashMapCapacity(typeToImplementation.size()));
     for (Map.Entry<TransformFunctionType, Class<? extends TransformFunction>> entry : typeToImplementation.entrySet()) {
-      for (String alias : entry.getKey().getAlternativeNames()) {
-        registry.put(canonicalize(alias), entry.getValue());
+      for (String name : entry.getKey().getNames()) {
+        registry.put(canonicalize(name), entry.getValue());
       }
     }
     return registry;
@@ -292,11 +291,17 @@ public class TransformFunctionFactory {
         List<ExpressionContext> arguments = function.getArguments();
         int numArguments = arguments.size();
 
-        // Check if the function is ArrayLiteraltransform function
+        // Check if the function is ArrayValueConstructor transform function
         if (functionName.equalsIgnoreCase(ArrayLiteralTransformFunction.FUNCTION_NAME)) {
           return queryContext.getOrComputeSharedValue(ArrayLiteralTransformFunction.class,
+              expression.getFunction().getArguments(), ArrayLiteralTransformFunction::new);
+        }
+
+        // Check if the function is GenerateArray transform function
+        if (functionName.equalsIgnoreCase(GenerateArrayTransformFunction.FUNCTION_NAME)) {
+          return queryContext.getOrComputeSharedValue(GenerateArrayTransformFunction.class,
               expression.getFunction().getArguments(),
-              ArrayLiteralTransformFunction::new);
+              GenerateArrayTransformFunction::new);
         }
 
         TransformFunction transformFunction;
@@ -310,13 +315,14 @@ public class TransformFunctionFactory {
           }
         } else {
           // Scalar function
-          FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(functionName, numArguments);
+          String canonicalName = FunctionRegistry.canonicalize(functionName);
+          FunctionInfo functionInfo = FunctionRegistry.lookupFunctionInfo(canonicalName, numArguments);
           if (functionInfo == null) {
-            if (FunctionRegistry.containsFunction(functionName)) {
+            if (FunctionRegistry.contains(canonicalName)) {
               throw new BadQueryRequestException(
-                  String.format("Unsupported function: %s with %d parameters", functionName, numArguments));
+                  String.format("Unsupported function: %s with %d arguments", functionName, numArguments));
             } else {
-              throw new BadQueryRequestException(String.format("Unsupported function: %s not found", functionName));
+              throw new BadQueryRequestException(String.format("Unsupported function: %s", functionName));
             }
           }
           transformFunction = new ScalarTransformFunctionWrapper(functionInfo);
@@ -350,15 +356,17 @@ public class TransformFunctionFactory {
     }
   }
 
+  // TODO: Move to a test util class
   @VisibleForTesting
   public static TransformFunction get(ExpressionContext expression, Map<String, DataSource> dataSourceMap) {
     Map<String, ColumnContext> columnContextMap = new HashMap<>(HashUtil.getHashMapCapacity(dataSourceMap.size()));
     dataSourceMap.forEach((k, v) -> columnContextMap.put(k, ColumnContext.fromDataSource(v)));
-    QueryContext dummy = QueryContextConverterUtils.getQueryContext(
-        CalciteSqlParser.compileToPinotQuery("SELECT * from testTable;"));
+    QueryContext dummy =
+        QueryContextConverterUtils.getQueryContext(CalciteSqlParser.compileToPinotQuery("SELECT * from testTable;"));
     return get(expression, columnContextMap, dummy);
   }
 
+  // TODO: Move to a test util class
   @VisibleForTesting
   public static TransformFunction getNullHandlingEnabled(ExpressionContext expression,
       Map<String, DataSource> dataSourceMap) {

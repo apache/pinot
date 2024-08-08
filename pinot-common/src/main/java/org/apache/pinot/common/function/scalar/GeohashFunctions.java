@@ -121,7 +121,7 @@ public class GeohashFunctions {
    * @param precision
    * @return the geohash value as a string
    */
-  @ScalarFunction(names = {"encodeGeoHash", "encode_geohash"})
+  @ScalarFunction
   public static String encodeGeoHash(double latitude, double longitude, int precision) {
     return longHashToStringGeohash(encode(latitude, longitude, precision));
   }
@@ -131,7 +131,7 @@ public class GeohashFunctions {
    * @param geohash
    * @return the latitude and longitude as a double array
    */
-  @ScalarFunction(names = {"decodeGeoHash", "decode_geohash"})
+  @ScalarFunction
   public static double[] decodeGeoHash(String geohash) {
     return decode(geohash);
   }
@@ -141,7 +141,7 @@ public class GeohashFunctions {
    * @param geohash
    * @return the latitude as a double
    */
-  @ScalarFunction(names = {"decodeGeoHashLatitude", "decode_geohash_latitude", "decode_geohash_lat"})
+  @ScalarFunction(names = {"decodeGeoHashLatitude", "decodeGeoHashLat"})
   public static double decodeGeoHashLatitude(String geohash) {
     double[] latLon = decode(geohash);
     return latLon[0];
@@ -152,7 +152,7 @@ public class GeohashFunctions {
    * @param geohash
    * @return the longitude as a double
    */
-  @ScalarFunction(names = {"decodeGeoHashLongitude", "decode_geohash_longitude", "decode_geohash_lon"})
+  @ScalarFunction(names = {"decodeGeoHashLongitude", "decodeGeoHashLon"})
   public static double decodeGeoHashLongitude(String geohash) {
     double[] latLon = decode(geohash);
     return latLon[1];

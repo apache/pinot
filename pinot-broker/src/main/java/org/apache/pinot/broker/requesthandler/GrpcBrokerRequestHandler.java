@@ -63,10 +63,12 @@ public class GrpcBrokerRequestHandler extends BaseSingleStageBrokerRequestHandle
 
   @Override
   public void start() {
+    super.start();
   }
 
   @Override
   public void shutDown() {
+    super.shutDown();
     _streamingQueryClient.shutdown();
     _streamingReduceService.shutDown();
   }
