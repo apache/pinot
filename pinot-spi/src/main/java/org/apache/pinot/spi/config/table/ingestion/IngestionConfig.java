@@ -42,6 +42,9 @@ public class IngestionConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Config related to enriching records during ingestion")
   private List<EnrichmentConfig> _enrichmentConfigs;
 
+  @JsonPropertyDescription("Config related to how computations are executed on the stream data ingested into the table")
+  private DecodeTransformIndexModeConfig _decodeTransformIndexModeConfig = DecodeTransformIndexModeConfig.SERIAL;
+
   @JsonPropertyDescription("Configs related to record transformation functions applied during ingestion")
   private List<TransformConfig> _transformConfigs;
 
@@ -70,6 +73,7 @@ public class IngestionConfig extends BaseJsonConfig {
   public IngestionConfig(@Nullable BatchIngestionConfig batchIngestionConfig,
       @Nullable StreamIngestionConfig streamIngestionConfig, @Nullable FilterConfig filterConfig,
       @Nullable List<EnrichmentConfig> enrichmentConfigs,
+      @Nullable DecodeTransformIndexModeConfig decodeTransformIndexModeConfig,
       @Nullable List<TransformConfig> transformConfigs, @Nullable ComplexTypeConfig complexTypeConfig,
       @Nullable SchemaConformingTransformerConfig schemaConformingTransformerConfig,
       @Nullable SchemaConformingTransformerV2Config schemaConformingTransformerV2Config,
@@ -78,6 +82,7 @@ public class IngestionConfig extends BaseJsonConfig {
     _streamIngestionConfig = streamIngestionConfig;
     _filterConfig = filterConfig;
     _enrichmentConfigs = enrichmentConfigs;
+    setDecodeTransformIndexModeConfig(decodeTransformIndexModeConfig);
     _transformConfigs = transformConfigs;
     _complexTypeConfig = complexTypeConfig;
     _schemaConformingTransformerConfig = schemaConformingTransformerConfig;
@@ -101,6 +106,10 @@ public class IngestionConfig extends BaseJsonConfig {
   @Nullable
   public FilterConfig getFilterConfig() {
     return _filterConfig;
+  }
+
+  public DecodeTransformIndexModeConfig getDecodeTransformIndexModeConfig() {
+    return _decodeTransformIndexModeConfig;
   }
 
   @Nullable
@@ -157,8 +166,15 @@ public class IngestionConfig extends BaseJsonConfig {
     _filterConfig = filterConfig;
   }
 
+
   public void setEnrichmentConfigs(List<EnrichmentConfig> enrichmentConfigs) {
     _enrichmentConfigs = enrichmentConfigs;
+  }
+
+  public void setDecodeTransformIndexModeConfig(DecodeTransformIndexModeConfig decodeTransformIndexModeConfig) {
+    if (decodeTransformIndexModeConfig != null) {
+      _decodeTransformIndexModeConfig = decodeTransformIndexModeConfig;
+    }
   }
 
   public void setTransformConfigs(List<TransformConfig> transformConfigs) {
