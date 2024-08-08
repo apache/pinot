@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.record.enricher.clp;
+package org.apache.pinot.segment.local.recordtransformer.clp;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -26,11 +26,11 @@ import java.util.List;
 /**
  * Configuration for the CLP enricher.
  */
-public class ClpEnricherConfig {
+public class ClpTransformerConfig {
   private final List<String> _fields;
 
   @JsonCreator
-  public ClpEnricherConfig(@JsonProperty("fields") List<String> fields) {
+  public ClpTransformerConfig(@JsonProperty("fields") List<String> fields) {
     _fields = fields;
   }
 

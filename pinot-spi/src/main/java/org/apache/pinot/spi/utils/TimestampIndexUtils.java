@@ -188,7 +188,8 @@ public class TimestampIndexUtils {
           }
           if (!tableConfigApplied) {
             transformConfigs.add(
-                new TransformConfig(columnWithGranularity, getTransformExpression(timestampColumn, granularity)));
+                new TransformConfig(columnWithGranularity, getTransformExpression(timestampColumn, granularity),
+                    null, null));
             rangeIndexColumns.add(columnWithGranularity);
           }
         }

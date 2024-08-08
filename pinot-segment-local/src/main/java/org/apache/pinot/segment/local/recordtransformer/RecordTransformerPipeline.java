@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.recordenricher;
+package org.apache.pinot.segment.local.recordtransformer;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -24,37 +24,39 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.ingestion.EnrichmentConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
-public class RecordEnricherPipeline {
-  private final List<RecordEnricher> _enrichers = new ArrayList<>();
+public class RecordTransformerPipeline {
+  private final List<RecordTransformer> _enrichers = new ArrayList<>();
   private final Set<String> _columnsToExtract = new HashSet<>();
 
-  public static RecordEnricherPipeline getPassThroughPipeline() {
-    return new RecordEnricherPipeline();
+  public static RecordTransformerPipeline getPassThroughPipeline() {
+    return new RecordTransformerPipeline();
   }
 
-  public static RecordEnricherPipeline fromIngestionConfig(IngestionConfig ingestionConfig) {
-    RecordEnricherPipeline pipeline = new RecordEnricherPipeline();
-    if (null == ingestionConfig || null == ingestionConfig.getEnrichmentConfigs()) {
+  public static RecordTransformerPipeline fromIngestionConfig(IngestionConfig ingestionConfig) {
+    RecordTransformerPipeline pipeline = new RecordTransformerPipeline();
+    if (null == ingestionConfig || null == ingestionConfig.getTransformConfigs()) {
       return pipeline;
     }
-    List<EnrichmentConfig> enrichmentConfigs = ingestionConfig.getEnrichmentConfigs();
-    for (EnrichmentConfig enrichmentConfig : enrichmentConfigs) {
+    List<TransformConfig> enrichmentConfigs = ingestionConfig.getTransformConfigs();
+    for (TransformConfig transformConfig : enrichmentConfigs) {
       try {
-        RecordEnricher enricher = RecordEnricherRegistry.createRecordEnricher(enrichmentConfig);
-        pipeline.add(enricher);
+        if (transformConfig.getEnricherType() != null) {
+          RecordTransformer enricher = RecordTransformerRegistry.createRecordTransformer(transformConfig);
+          pipeline.add(enricher);
+        }
       } catch (IOException e) {
-        throw new RuntimeException("Failed to instantiate record enricher " + enrichmentConfig.getEnricherType(), e);
+        throw new RuntimeException("Failed to instantiate record enricher " + transformConfig.getEnricherType(), e);
       }
     }
     return pipeline;
   }
 
-  public static RecordEnricherPipeline fromTableConfig(TableConfig tableConfig) {
+  public static RecordTransformerPipeline fromTableConfig(TableConfig tableConfig) {
     return fromIngestionConfig(tableConfig.getIngestionConfig());
   }
 
@@ -62,14 +64,14 @@ public class RecordEnricherPipeline {
     return _columnsToExtract;
   }
 
-  public void add(RecordEnricher enricher) {
+  public void add(RecordTransformer enricher) {
     _enrichers.add(enricher);
     _columnsToExtract.addAll(enricher.getInputColumns());
   }
 
   public void run(GenericRow record) {
-    for (RecordEnricher enricher : _enrichers) {
-      enricher.enrich(record);
+    for (RecordTransformer enricher : _enrichers) {
+      enricher.transform(record);
     }
   }
 }

@@ -16,34 +16,34 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.record.enricher.clp;
+package org.apache.pinot.segment.local.recordtransformer.clp;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.auto.service.AutoService;
 import java.io.IOException;
-import org.apache.pinot.spi.recordenricher.RecordEnricher;
-import org.apache.pinot.spi.recordenricher.RecordEnricherFactory;
-import org.apache.pinot.spi.recordenricher.RecordEnricherValidationConfig;
+import org.apache.pinot.segment.local.recordtransformer.RecordTransformer;
+import org.apache.pinot.segment.local.recordtransformer.RecordTransformerFactory;
+import org.apache.pinot.segment.local.recordtransformer.RecordTransformerValidationConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
 
-@AutoService(RecordEnricherFactory.class)
-public class CLPEncodingEnricherFactory implements RecordEnricherFactory {
+@AutoService(RecordTransformerFactory.class)
+public class CLPEncodingTransformerFactory implements RecordTransformerFactory {
   private static final String ENRICHER_TYPE = "clpEnricher";
   @Override
-  public String getEnricherType() {
+  public String getTransformerType() {
     return ENRICHER_TYPE;
   }
 
   @Override
-  public RecordEnricher createEnricher(JsonNode enricherProps)
+  public RecordTransformer createTransformer(JsonNode enricherProps)
       throws IOException {
-    return new CLPEncodingEnricher(enricherProps);
+    return new CLPEncodingTransformer(enricherProps);
   }
 
   @Override
-  public void validateEnrichmentConfig(JsonNode enricherProps, RecordEnricherValidationConfig validationConfig) {
+  public void validateTransformConfig(JsonNode enricherProps, RecordTransformerValidationConfig validationConfig) {
     try {
-      ClpEnricherConfig config = JsonUtils.jsonNodeToObject(enricherProps, ClpEnricherConfig.class);
+      ClpTransformerConfig config = JsonUtils.jsonNodeToObject(enricherProps, ClpTransformerConfig.class);
     } catch (IOException e) {
       throw new IllegalArgumentException("Failed to parse clp enricher config", e);
     }

@@ -21,6 +21,7 @@ package org.apache.pinot.spi.config.table.ingestion;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
+import com.fasterxml.jackson.databind.JsonNode;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
@@ -28,6 +29,12 @@ import org.apache.pinot.spi.config.BaseJsonConfig;
  * Configs needed for performing simple transformations on the column
  */
 public class TransformConfig extends BaseJsonConfig {
+
+  @JsonPropertyDescription("Enricher type")
+  private final String _enricherType;
+
+  @JsonPropertyDescription("Enricher properties")
+  private final JsonNode _properties;
 
   @JsonPropertyDescription("Column name")
   private final String _columnName;
@@ -37,9 +44,20 @@ public class TransformConfig extends BaseJsonConfig {
 
   @JsonCreator
   public TransformConfig(@JsonProperty("columnName") String columnName,
-      @JsonProperty("transformFunction") String transformFunction) {
+      @JsonProperty("transformFunction") String transformFunction, @JsonProperty("enricherType") String enricherType,
+      @JsonProperty("properties") JsonNode properties) {
     _columnName = columnName;
     _transformFunction = transformFunction;
+    _enricherType = enricherType;
+    _properties = properties;
+  }
+
+  public String getEnricherType() {
+    return _enricherType;
+  }
+
+  public JsonNode getProperties() {
+    return _properties;
   }
 
   public String getColumnName() {

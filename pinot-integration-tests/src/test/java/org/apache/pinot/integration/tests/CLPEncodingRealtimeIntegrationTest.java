@@ -140,7 +140,7 @@ public class CLPEncodingRealtimeIntegrationTest extends BaseClusterIntegrationTe
   @Override
   protected IngestionConfig getIngestionConfig() {
     List<TransformConfig> transforms = new ArrayList<>();
-    transforms.add(new TransformConfig("timestampInEpoch", "now()"));
+    transforms.add(new TransformConfig("timestampInEpoch", "now()", null, null));
 
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setTransformConfigs(transforms);
