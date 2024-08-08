@@ -43,7 +43,7 @@ public class AsyncQueryResponse implements QueryResponse {
   private final long _requestId;
   private final AtomicReference<Status> _status = new AtomicReference<>(Status.IN_PROGRESS);
   private final AtomicInteger _numServersResponded = new AtomicInteger();
-  private final Map<ServerRoutingInstance, Map<Integer, ServerResponse>> _responses;
+  private final ConcurrentHashMap<ServerRoutingInstance, ConcurrentHashMap<Integer, ServerResponse>> _responses;
   private final CountDownLatch _countDownLatch;
   private final long _maxEndTimeMs;
   private final long _timeoutMs;
@@ -68,7 +68,7 @@ public class AsyncQueryResponse implements QueryResponse {
         // submission stats.
         _serverRoutingStatsManager.recordStatsForQuerySubmission(requestId, serverRequests.getKey().getInstanceId());
 
-        _responses.computeIfAbsent(serverRequests.getKey(), k -> new HashMap<>())
+        _responses.computeIfAbsent(serverRequests.getKey(), k -> new ConcurrentHashMap<>())
             // we use query hash so that the same hash ID can be passed back from servers more easily than trying to
             // instantiate a valid InstanceRequest obj and send its hash
             .put(request.getQuery().getPinotQuery().hashCode(), new ServerResponse(startTimeMs));
@@ -93,7 +93,7 @@ public class AsyncQueryResponse implements QueryResponse {
 
   private Map<ServerRoutingInstance, List<ServerResponse>> getFlatResponses() {
     Map<ServerRoutingInstance, List<ServerResponse>> flattened = new HashMap<>();
-    for (Map.Entry<ServerRoutingInstance, Map<Integer, ServerResponse>> serverResponses : _responses.entrySet()) {
+    for (Map.Entry<ServerRoutingInstance, ConcurrentHashMap<Integer, ServerResponse>> serverResponses : _responses.entrySet()) {
       ServerRoutingInstance serverRoutingInstance = serverResponses.getKey();
 
       for (ServerResponse serverResponse : serverResponses.getValue().values()) {
@@ -138,7 +138,7 @@ public class AsyncQueryResponse implements QueryResponse {
   public String getServerStats() {
     StringBuilder stringBuilder = new StringBuilder(
         "(Server=SubmitDelayMs,ResponseDelayMs,ResponseSize,DeserializationTimeMs,RequestSentDelayMs)");
-    for (Map.Entry<ServerRoutingInstance, Map<Integer, ServerResponse>> serverResponses : _responses.entrySet()) {
+    for (Map.Entry<ServerRoutingInstance, ConcurrentHashMap<Integer, ServerResponse>> serverResponses : _responses.entrySet()) {
       for (Map.Entry<Integer, ServerResponse> responsePair : serverResponses.getValue().entrySet()) {
         ServerRoutingInstance serverRoutingInstance = serverResponses.getKey();
         stringBuilder.append(';').append(serverRoutingInstance.getShortName()).append('=')
