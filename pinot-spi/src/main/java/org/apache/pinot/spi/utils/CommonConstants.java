@@ -139,6 +139,12 @@ public class CommonConstants {
         public static final String CONSUMING = "CONSUMING";
       }
 
+      public static class DisplaySegmentStatus {
+        public static final String BAD = "BAD";
+        public static final String GOOD = "GOOD";
+        public static final String UPDATING = "UPDATING";
+      }
+
       public static class BrokerResourceStateModel {
         public static final String ONLINE = "ONLINE";
         public static final String OFFLINE = "OFFLINE";

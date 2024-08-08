@@ -130,6 +130,13 @@ declare module 'Models' {
     fieldType?: string
   };
 
+  export type SchemaInfo = {
+    schemaName: string
+    dimensionFieldSpecsCount: number
+    dateTimeFieldSpecsCount: number
+    metricFieldSpecsCount: number
+  };
+
   export type SQLResult = {
     resultTable: {
       dataSchema: {

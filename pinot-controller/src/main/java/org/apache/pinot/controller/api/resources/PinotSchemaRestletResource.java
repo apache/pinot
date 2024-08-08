@@ -31,6 +31,7 @@ import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import javax.inject.Inject;
@@ -50,6 +51,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.exception.SchemaAlreadyExistsException;
 import org.apache.pinot.common.exception.SchemaBackwardIncompatibleException;
 import org.apache.pinot.common.exception.SchemaNotFoundException;
@@ -72,6 +74,7 @@ import org.apache.pinot.segment.local.utils.SchemaUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.SchemaInfo;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.glassfish.grizzly.http.server.Request;
@@ -116,6 +119,24 @@ public class PinotSchemaRestletResource {
   @ApiOperation(value = "List all schema names", notes = "Lists all schema names")
   public List<String> listSchemaNames(@Context HttpHeaders headers) {
     return _pinotHelixResourceManager.getSchemaNames(headers.getHeaderString(DATABASE));
+  }
+
+  @GET
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/schemas/info")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_SCHEMA_INFO)
+  @ApiOperation(value = "List all schemas info with count of field specs", notes = "Lists all schemas with field "
+      + "count details")
+  public List<SchemaInfo> getSchemaInfo(@Context HttpHeaders headers) {
+    List<SchemaInfo> schemasInfo = new ArrayList<>();
+    TableCache tableCache = _pinotHelixResourceManager.getTableCache();
+    List<Schema> schemaList = tableCache.getSchemas();
+    for (Schema schema : schemaList) {
+      SchemaInfo schemaInfo = new SchemaInfo(schema.getSchemaName(), schema.getDimensionFieldSpecs().size(),
+          schema.getDateTimeFieldSpecs().size(), schema.getMetricFieldSpecs().size());
+      schemasInfo.add(schemaInfo);
+    }
+    return schemasInfo;
   }
 
   @GET

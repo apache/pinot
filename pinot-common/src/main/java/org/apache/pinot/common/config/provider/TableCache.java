@@ -412,7 +412,7 @@ public class TableCache implements PinotConfigProvider {
     }
   }
 
-  private List<Schema> getSchemas() {
+  public List<Schema> getSchemas() {
     List<Schema> schemas = new ArrayList<>(_schemaInfoMap.size());
     for (SchemaInfo schemaInfo : _schemaInfoMap.values()) {
       schemas.add(schemaInfo._schema);
@@ -546,10 +546,16 @@ public class TableCache implements PinotConfigProvider {
   private static class SchemaInfo {
     final Schema _schema;
     final Map<String, String> _columnNameMap;
+    final int _dimensionFieldSpecsCount;
+    final int _dateTimeFieldSpecsCount;
+    final int _metricFieldSpecsCount;
 
     private SchemaInfo(Schema schema, Map<String, String> columnNameMap) {
       _schema = schema;
       _columnNameMap = columnNameMap;
+      _dimensionFieldSpecsCount = schema.getDimensionFieldSpecs().size();
+      _dateTimeFieldSpecsCount = schema.getDateTimeFieldSpecs().size();
+      _metricFieldSpecsCount = schema.getMetricFieldSpecs().size();
     }
   }
 }

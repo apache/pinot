@@ -58,6 +58,7 @@ public class Actions {
     public static final String GET_RUNNING_QUERY = "GetRunningQuery";
     public static final String GET_SCHEDULER_INFO = "GetSchedulerInfo";
     public static final String GET_SCHEMA = "GetSchema";
+    public static final String GET_SCHEMA_INFO = "GetSchemasInfo";
     public static final String GET_SEGMENT = "GetSegment";
     public static final String GET_SEGMENT_RELOAD_STATUS = "GetSegmentReloadStatus";
     public static final String GET_SERVER_ROUTING_STATS = "GetServerRoutingStats";
@@ -66,6 +67,7 @@ public class Actions {
     public static final String GET_TABLE_CONFIG = "GetTableConfig";
     public static final String GET_TABLE_LEADER = "GetTableLeader";
     public static final String GET_TASK = "GetTask";
+    public static final String GET_TASKTYPE_COUNT = "GetTaskTypeCount";
     public static final String GET_TENANT = "GetTenant";
     public static final String GET_USER = "GetUser";
     public static final String GET_VERSION = "GetVersion";
@@ -116,6 +118,8 @@ public class Actions {
     public static final String GET_CONTROLLER_JOBS = "GetControllerJobs";
     public static final String GET_DEBUG_INFO = "GetDebugInfo";
     public static final String GET_EXTERNAL_VIEW = "GetExternalView";
+    public static final String GET_SEGMENT_STATUS = "GetSegmentStatus";
+    public static final String GET_TABLE_STATUS = "GetTableStatus";
     public static final String GET_IDEAL_STATE = "GetIdealState";
     public static final String GET_INSTANCE = "GetInstance";
     public static final String GET_INSTANCE_PARTITIONS = "GetInstancePartitions";
