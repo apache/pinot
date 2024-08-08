@@ -74,8 +74,10 @@ public class ExecutionStatsAggregator {
   public void aggregate(ServerRoutingInstance serverRoutingInstance, DataTable dataTable) {
     String instanceName = serverRoutingInstance.getShortName();
     Map<String, String> metadata = dataTable.getMetadata();
-    TableType tableType =
-        TableNameBuilder.getTableTypeFromTableName(metadata.get(DataTable.MetadataKey.TABLE.getName()));
+    TableType tableType = null;
+    if (metadata.get(DataTable.MetadataKey.TABLE.getName()) != null) {
+      tableType = TableNameBuilder.getTableTypeFromTableName(metadata.get(DataTable.MetadataKey.TABLE.getName()));
+    }
 
     // Reduce on trace info.
     if (_enableTrace && metadata.containsKey(DataTable.MetadataKey.TRACE_INFO.getName())) {
