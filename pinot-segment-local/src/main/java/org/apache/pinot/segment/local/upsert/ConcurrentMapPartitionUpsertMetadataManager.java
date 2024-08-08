@@ -47,12 +47,11 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 @ThreadSafe
 public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUpsertMetadataManager {
 
+  @VisibleForTesting
+  final ConcurrentHashMap<Object, RecordLocation> _primaryKeyToRecordLocationMap = new ConcurrentHashMap<>();
   // Used to initialize a reference to previous row for merging in partial upsert
   private final LazyRow _reusePreviousRow = new LazyRow();
   private final Map<String, Object> _reuseMergeResultHolder = new HashMap<>();
-
-  @VisibleForTesting
-  final ConcurrentHashMap<Object, RecordLocation> _primaryKeyToRecordLocationMap = new ConcurrentHashMap<>();
 
   public ConcurrentMapPartitionUpsertMetadataManager(String tableNameWithType, int partitionId, UpsertContext context) {
     super(tableNameWithType, partitionId, context);
@@ -172,11 +171,11 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
       PrimaryKey primaryKey = primaryKeyIterator.next();
       _primaryKeyToRecordLocationMap.computeIfPresent(HashUtils.hashPrimaryKey(primaryKey, _hashFunction),
           (pk, recordLocation) -> {
-        if (recordLocation.getSegment() == segment) {
-          return null;
-        }
-        return recordLocation;
-      });
+            if (recordLocation.getSegment() == segment) {
+              return null;
+            }
+            return recordLocation;
+          });
     }
   }
 

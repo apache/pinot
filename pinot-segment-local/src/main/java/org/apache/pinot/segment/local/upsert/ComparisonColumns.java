@@ -18,12 +18,11 @@
  */
 package org.apache.pinot.segment.local.upsert;
 
-
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class ComparisonColumns implements Comparable<ComparisonColumns> {
+  public static final int SEALED_SEGMENT_COMPARISON_INDEX = -1;
   private final Comparable[] _values;
   private final int _comparableIndex;
-  public static final int SEALED_SEGMENT_COMPARISON_INDEX = -1;
 
   public ComparisonColumns(Comparable[] values, int comparableIndex) {
     _values = values;

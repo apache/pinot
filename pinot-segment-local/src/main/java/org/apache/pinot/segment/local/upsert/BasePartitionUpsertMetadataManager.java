@@ -115,28 +115,12 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   // snapshotLock WLock and clear the tracking set to avoid keeping segment object references around.
   // Skip mutableSegments as only immutable segments are for taking snapshots.
   protected final Set<ImmutableSegment> _updatedSegmentsSinceLastSnapshot = ConcurrentHashMap.newKeySet();
-
-  // NOTE: We do not persist snapshot on the first consuming segment because most segments might not be loaded yet
-  // We only do this for Full-Upsert tables, for partial-upsert tables, we have a check allSegmentsLoaded
-  protected volatile boolean _gotFirstConsumingSegment = false;
   protected final ReadWriteLock _snapshotLock;
-
-  protected long _lastOutOfOrderEventReportTimeNs = Long.MIN_VALUE;
-  protected int _numOutOfOrderEvents = 0;
-
   // Used to maintain the largestSeenComparisonValue to avoid handling out-of-ttl segments/records.
   // If upsertTTL enabled, we will keep track of largestSeenComparisonValue to compute expired segments.
   protected final AtomicDouble _largestSeenComparisonValue;
-
-  // The following variables are always accessed within synchronized block
-  private boolean _stopped;
-  // Initialize with 1 pending operation to indicate the metadata manager can take more operations
-  private int _numPendingOperations = 1;
-  private boolean _closed;
   // The lock and boolean flag ensure only one thread can start preloading and preloading happens only once.
   private final Lock _preloadLock = new ReentrantLock();
-  private volatile boolean _isPreloading;
-
   // There are two consistency modes:
   // If using SYNC mode, the upsert threads take the WLock when the upsert involves two segments' bitmaps; and
   // the query threads take the RLock when getting bitmaps for all its selected segments.
@@ -148,6 +132,17 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   private final long _upsertViewRefreshIntervalMs;
   private final ReadWriteLock _upsertViewLock = new ReentrantReadWriteLock();
   private final Set<IndexSegment> _updatedSegmentsSinceLastRefresh = ConcurrentHashMap.newKeySet();
+  // NOTE: We do not persist snapshot on the first consuming segment because most segments might not be loaded yet
+  // We only do this for Full-Upsert tables, for partial-upsert tables, we have a check allSegmentsLoaded
+  protected volatile boolean _gotFirstConsumingSegment = false;
+  protected long _lastOutOfOrderEventReportTimeNs = Long.MIN_VALUE;
+  protected int _numOutOfOrderEvents = 0;
+  // The following variables are always accessed within synchronized block
+  private boolean _stopped;
+  // Initialize with 1 pending operation to indicate the metadata manager can take more operations
+  private int _numPendingOperations = 1;
+  private boolean _closed;
+  private volatile boolean _isPreloading;
   private volatile long _lastUpsertViewRefreshTimeMs = 0;
   private volatile Map<IndexSegment, MutableRoaringBitmap> _segmentQueryableDocIdsMap;
 
@@ -177,6 +172,58 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       _largestSeenComparisonValue = new AtomicDouble(Double.MIN_VALUE);
       deleteWatermark();
     }
+  }
+
+  private static boolean hasValidDocIdsSnapshot(TableDataManager tableDataManager, TableConfig tableConfig,
+      String segmentName, String segmentTier) {
+    try {
+      File indexDir = tableDataManager.getSegmentDataDir(segmentName, segmentTier, tableConfig);
+      File snapshotFile =
+          new File(SegmentDirectoryPaths.findSegmentDirectory(indexDir), V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME);
+      return snapshotFile.exists();
+    } catch (Exception e) {
+      return false;
+    }
+  }
+
+  /**
+   * When we have to process a new segment, if there are comparison value ties for the same primary-key within the
+   * segment, then for Partial Upsert tables we need to make sure that the record location map is updated only
+   * for the latest version of the record. This is specifically a concern for Partial Upsert tables because Realtime
+   * consumption can potentially end up reading the wrong version of a record, which will lead to permanent
+   * data-inconsistency.
+   *
+   * <p>
+   *  This function returns an iterator that will de-dup records with the same primary-key. Moreover, for comparison
+   *  ties, it will only keep the latest record. This iterator can then further be used to update the primary-key
+   *  record location map safely.
+   * </p>
+   *
+   * @param recordInfoIterator iterator over the new segment
+   * @param hashFunction       hash function configured for Upsert's primary keys
+   * @return iterator that returns de-duplicated records. To resolve ties for comparison column values, we prefer to
+   *         return the latest record.
+   */
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  protected static Iterator<RecordInfo> resolveComparisonTies(Iterator<RecordInfo> recordInfoIterator,
+      HashFunction hashFunction) {
+    Map<Object, RecordInfo> deDuplicatedRecordInfo = new HashMap<>();
+    while (recordInfoIterator.hasNext()) {
+      RecordInfo recordInfo = recordInfoIterator.next();
+      Comparable newComparisonValue = recordInfo.getComparisonValue();
+      deDuplicatedRecordInfo.compute(HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), hashFunction),
+          (key, maxComparisonValueRecordInfo) -> {
+            if (maxComparisonValueRecordInfo == null) {
+              return recordInfo;
+            }
+            int comparisonResult = newComparisonValue.compareTo(maxComparisonValueRecordInfo.getComparisonValue());
+            if (comparisonResult >= 0) {
+              return recordInfo;
+            }
+            return maxComparisonValueRecordInfo;
+          });
+    }
+    return deDuplicatedRecordInfo.values().iterator();
   }
 
   @Override
@@ -315,18 +362,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
 
   private String getInstanceId(TableDataManager tableDataManager) {
     return tableDataManager.getInstanceDataManagerConfig().getInstanceId();
-  }
-
-  private static boolean hasValidDocIdsSnapshot(TableDataManager tableDataManager, TableConfig tableConfig,
-      String segmentName, String segmentTier) {
-    try {
-      File indexDir = tableDataManager.getSegmentDataDir(segmentName, segmentTier, tableConfig);
-      File snapshotFile =
-          new File(SegmentDirectoryPaths.findSegmentDirectory(indexDir), V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME);
-      return snapshotFile.exists();
-    } catch (Exception e) {
-      return false;
-    }
   }
 
   @VisibleForTesting
@@ -605,10 +640,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     if (UploadedRealtimeSegmentName.of(currentSegmentName) != null) {
       return false;
     }
-    if (UploadedRealtimeSegmentName.of(segmentName) != null) {
-      return true;
-    }
-    return false;
+    return UploadedRealtimeSegmentName.of(segmentName) != null;
   }
 
   @Override
@@ -743,8 +775,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   }
 
   protected void removeSegment(IndexSegment segment, MutableRoaringBitmap validDocIds) {
-    try (UpsertUtils.PrimaryKeyReader primaryKeyReader = new UpsertUtils.PrimaryKeyReader(segment,
-        _primaryKeyColumns)) {
+    try (
+        UpsertUtils.PrimaryKeyReader primaryKeyReader = new UpsertUtils.PrimaryKeyReader(segment, _primaryKeyColumns)) {
       removeSegment(segment, UpsertUtils.getPrimaryKeyIterator(primaryKeyReader, validDocIds));
     } catch (Exception e) {
       throw new RuntimeException(
@@ -853,46 +885,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       _lastOutOfOrderEventReportTimeNs = currentTimeNs;
       _numOutOfOrderEvents = 0;
     }
-  }
-
-  /**
-   * When we have to process a new segment, if there are comparison value ties for the same primary-key within the
-   * segment, then for Partial Upsert tables we need to make sure that the record location map is updated only
-   * for the latest version of the record. This is specifically a concern for Partial Upsert tables because Realtime
-   * consumption can potentially end up reading the wrong version of a record, which will lead to permanent
-   * data-inconsistency.
-   *
-   * <p>
-   *  This function returns an iterator that will de-dup records with the same primary-key. Moreover, for comparison
-   *  ties, it will only keep the latest record. This iterator can then further be used to update the primary-key
-   *  record location map safely.
-   * </p>
-   *
-   * @param recordInfoIterator iterator over the new segment
-   * @param hashFunction       hash function configured for Upsert's primary keys
-   * @return iterator that returns de-duplicated records. To resolve ties for comparison column values, we prefer to
-   *         return the latest record.
-   */
-  @SuppressWarnings({"rawtypes", "unchecked"})
-  protected static Iterator<RecordInfo> resolveComparisonTies(Iterator<RecordInfo> recordInfoIterator,
-      HashFunction hashFunction) {
-    Map<Object, RecordInfo> deDuplicatedRecordInfo = new HashMap<>();
-    while (recordInfoIterator.hasNext()) {
-      RecordInfo recordInfo = recordInfoIterator.next();
-      Comparable newComparisonValue = recordInfo.getComparisonValue();
-      deDuplicatedRecordInfo.compute(HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), hashFunction),
-          (key, maxComparisonValueRecordInfo) -> {
-            if (maxComparisonValueRecordInfo == null) {
-              return recordInfo;
-            }
-            int comparisonResult = newComparisonValue.compareTo(maxComparisonValueRecordInfo.getComparisonValue());
-            if (comparisonResult >= 0) {
-              return recordInfo;
-            }
-            return maxComparisonValueRecordInfo;
-          });
-    }
-    return deDuplicatedRecordInfo.values().iterator();
   }
 
   @Override
