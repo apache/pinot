@@ -41,6 +41,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
+import org.apache.commons.compress.compressors.CompressorException;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -54,7 +55,7 @@ import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
-import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.config.TierConfigUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
@@ -792,7 +793,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
               failedAttempts.get());
         }
       } else {
-        File segmentTarFile = new File(tempRootDir, segmentName + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
+        File segmentTarFile = new File(tempRootDir, segmentName + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);
         SegmentFetcherFactory.fetchAndDecryptSegmentToLocal(downloadUrl, segmentTarFile, zkMetadata.getCrypterName());
         _logger.info("Downloaded tarred segment: {} from: {} to: {}, file length: {}", segmentName, downloadUrl,
             segmentTarFile, segmentTarFile.length());
@@ -819,7 +820,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
         _tableNameWithType);
     _logger.info("Downloading segment: {} from peers", segmentName);
     File tempRootDir = getTmpSegmentDataDir("tmp-" + segmentName + "-" + UUID.randomUUID());
-    File segmentTarFile = new File(tempRootDir, segmentName + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
+    File segmentTarFile = new File(tempRootDir, segmentName + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);
     try {
       SegmentFetcherFactory.fetchAndDecryptSegmentToLocal(segmentName, _peerDownloadScheme, () -> {
         List<URI> peerServerURIs =
@@ -842,13 +843,13 @@ public abstract class BaseTableDataManager implements TableDataManager {
   }
 
   private File untarSegment(String segmentName, File segmentTarFile, File tempRootDir)
-      throws IOException {
+      throws IOException, CompressorException {
     File untarDir = new File(tempRootDir, segmentName);
     _logger.info("Untarring segment: {} from: {} to: {}", segmentName, segmentTarFile, untarDir);
     try {
       // If an exception is thrown when untarring, it means the tar file is broken or not found after the retry. Thus,
       // there's no need to retry again.
-      File untarredSegmentDir = TarGzCompressionUtils.untar(segmentTarFile, untarDir).get(0);
+      File untarredSegmentDir = TarCompressionUtils.untar(segmentTarFile, untarDir).get(0);
       _logger.info("Untarred segment: {} into: {}", segmentName, untarredSegmentDir);
       return untarredSegmentDir;
     } catch (Exception e) {
@@ -872,7 +873,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
   @VisibleForTesting
   File untarAndMoveSegment(String segmentName, File segmentTarFile, File tempRootDir)
-      throws IOException {
+      throws IOException, CompressorException {
     return moveSegment(segmentName, untarSegment(segmentName, segmentTarFile, tempRootDir));
   }
 

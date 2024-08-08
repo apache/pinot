@@ -34,6 +34,7 @@ import javax.annotation.Nullable;
 import javax.net.ssl.SSLContext;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.collections4.MapUtils;
+import org.apache.commons.compress.compressors.CompressorException;
 import org.apache.commons.io.IOUtils;
 import org.apache.hc.client5.http.classic.methods.HttpPost;
 import org.apache.hc.client5.http.classic.methods.HttpPut;
@@ -64,7 +65,7 @@ import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.utils.SimpleHttpErrorInfo;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
-import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -441,7 +442,7 @@ public class HttpClient implements AutoCloseable {
    */
   public File downloadUntarFileStreamed(URI uri, int socketTimeoutMs, File dest, AuthProvider authProvider,
       List<Header> httpHeaders, long maxStreamRateInByte)
-      throws IOException, HttpErrorStatusException {
+      throws IOException, HttpErrorStatusException, CompressorException {
     ClassicHttpRequest request = getDownloadFileRequest(uri, authProvider, httpHeaders);
     File ret;
 
@@ -457,7 +458,7 @@ public class HttpClient implements AutoCloseable {
       }
 
       try (InputStream inputStream = response.getEntity().getContent()) {
-        ret = TarGzCompressionUtils.untarWithRateLimiter(inputStream, dest, maxStreamRateInByte).get(0);
+        ret = TarCompressionUtils.untarWithRateLimiter(inputStream, dest, maxStreamRateInByte).get(0);
       }
 
       LOGGER.info("Downloaded from: {} to: {} with rate limiter; Response status code: {}", uri, dest, statusCode);
