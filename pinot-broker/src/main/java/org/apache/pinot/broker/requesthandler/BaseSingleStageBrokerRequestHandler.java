@@ -844,14 +844,14 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   static String addRoutingPolicyInErrMsg(String errorMessage, String realtimeRoutingPolicy,
       String offlineRoutingPolicy) {
     if (realtimeRoutingPolicy != null && offlineRoutingPolicy != null) {
-      return String.format("%s, with routing policy: %s [realtime], %s [offline]", errorMessage, realtimeRoutingPolicy,
-          offlineRoutingPolicy);
+      return errorMessage + ", with routing policy: " + realtimeRoutingPolicy + " [realtime], " + offlineRoutingPolicy
+          + " [offline]";
     }
     if (realtimeRoutingPolicy != null) {
-      return String.format("%s, with routing policy: %s [realtime]", errorMessage, realtimeRoutingPolicy);
+      return errorMessage + ", with routing policy: " + realtimeRoutingPolicy + " [realtime]";
     }
     if (offlineRoutingPolicy != null) {
-      return String.format("%s, with routing policy: %s [offline]", errorMessage, offlineRoutingPolicy);
+      return errorMessage + ", with routing policy: " + offlineRoutingPolicy + " [offline]";
     }
     return errorMessage;
   }
