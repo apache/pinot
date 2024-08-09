@@ -68,6 +68,9 @@ public class FieldConfig extends BaseJsonConfig {
   public static final String DEFAULT_FORWARD_INDEX_DISABLED = Boolean.FALSE.toString();
   public static final String TEXT_INDEX_ENABLE_PREFIX_SUFFIX_PHRASE_QUERIES =
       "enablePrefixSuffixMatchingInPhraseQueries";
+  public static final String TEXT_INDEX_LUCENE_REUSE_MUTABLE_INDEX = "reuseMutableIndex";
+  public static final String TEXT_INDEX_LUCENE_NRT_CACHING_DIRECTORY_BUFFER_SIZE =
+      "luceneNRTCachingDirectoryMaxBufferSizeMB";
 
   private final String _name;
   private final EncodingType _encodingType;
