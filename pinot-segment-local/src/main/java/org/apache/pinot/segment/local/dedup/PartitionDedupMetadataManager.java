@@ -26,16 +26,34 @@ public interface PartitionDedupMetadataManager {
   /**
    * Initializes the dedup metadata for the given immutable segment.
    */
-  public void addSegment(IndexSegment segment);
+  void addSegment(IndexSegment segment);
 
   /**
    * Removes the dedup metadata for the given segment.
    */
-  public void removeSegment(IndexSegment segment);
+  void removeSegment(IndexSegment segment);
 
   /**
-   * Add the primary key to the given segment to the dedup matadata if it was absent.
+   * Remove the expired primary keys from the metadata when TTL is enabled.
+   * Returns the number of primary keys left.
+   */
+  int removeExpiredPrimaryKeys();
+
+  /**
+   * Add the primary key to the given segment to the dedup matadata if it is absent.
    * Returns true if the key was already present.
    */
+  @Deprecated
   boolean checkRecordPresentOrUpdate(PrimaryKey pk, IndexSegment indexSegment);
+
+  /**
+   * Add the primary key to the given segment to the dedup matadata if it is absent and with in the retention time.
+   * Returns true if the key is dropped.
+   * @param dedupRecordInfo  The primary key and the dedup time.
+   * @param indexSegment  The segment to which the record belongs.
+   * @return true if the key is dropped.
+   */
+  default boolean dropOrAddRecord(DedupRecordInfo dedupRecordInfo, IndexSegment indexSegment) {
+    return checkRecordPresentOrUpdate(dedupRecordInfo.getPrimaryKey(), indexSegment);
+  }
 }

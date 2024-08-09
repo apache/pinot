@@ -19,105 +19,80 @@
 package org.apache.pinot.segment.local.dedup;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.util.HashMap;
+import com.google.common.util.concurrent.AtomicDouble;
 import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.metrics.ServerGauge;
-import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.utils.HashUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
-import org.apache.pinot.spi.config.table.HashFunction;
-import org.apache.pinot.spi.data.readers.PrimaryKey;
-import org.apache.pinot.spi.utils.ByteArray;
 
-class ConcurrentMapPartitionDedupMetadataManager implements PartitionDedupMetadataManager {
-  private final String _tableNameWithType;
-  private final List<String> _primaryKeyColumns;
-  private final int _partitionId;
-  private final ServerMetrics _serverMetrics;
-  private final HashFunction _hashFunction;
 
+class ConcurrentMapPartitionDedupMetadataManager extends BasePartitionDedupMetadataManager {
   @VisibleForTesting
-  final ConcurrentHashMap<Object, IndexSegment> _primaryKeyToSegmentMap = new ConcurrentHashMap<>();
-
-  public ConcurrentMapPartitionDedupMetadataManager(String tableNameWithType, List<String> primaryKeyColumns,
-      int partitionId, ServerMetrics serverMetrics, HashFunction hashFunction) {
-    _tableNameWithType = tableNameWithType;
-    _primaryKeyColumns = primaryKeyColumns;
-    _partitionId = partitionId;
-    _serverMetrics = serverMetrics;
-    _hashFunction = hashFunction;
-  }
-
-  public void addSegment(IndexSegment segment) {
-    // Add all PKs to _primaryKeyToSegmentMap
-    Iterator<PrimaryKey> primaryKeyIterator = getPrimaryKeyIterator(segment);
-    while (primaryKeyIterator.hasNext()) {
-      PrimaryKey pk = primaryKeyIterator.next();
-      _primaryKeyToSegmentMap.put(HashUtils.hashPrimaryKey(pk, _hashFunction), segment);
-    }
-    _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.DEDUP_PRIMARY_KEYS_COUNT,
-        _primaryKeyToSegmentMap.size());
-  }
-
-  public void removeSegment(IndexSegment segment) {
-    // TODO(saurabh): Explain reload scenario here
-    Iterator<PrimaryKey> primaryKeyIterator = getPrimaryKeyIterator(segment);
-    while (primaryKeyIterator.hasNext()) {
-      PrimaryKey pk = primaryKeyIterator.next();
-      _primaryKeyToSegmentMap.compute(HashUtils.hashPrimaryKey(pk, _hashFunction), (primaryKey, currentSegment) -> {
-        if (currentSegment == segment) {
-          return null;
-        } else {
-          return currentSegment;
-        }
-      });
-    }
-    _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.DEDUP_PRIMARY_KEYS_COUNT,
-        _primaryKeyToSegmentMap.size());
-  }
-
+  final AtomicDouble _largestSeenTime = new AtomicDouble(0);
   @VisibleForTesting
-  Iterator<PrimaryKey> getPrimaryKeyIterator(IndexSegment segment) {
-    Map<String, PinotSegmentColumnReader> columnToReaderMap = new HashMap<>();
-    for (String primaryKeyColumn : _primaryKeyColumns) {
-      columnToReaderMap.put(primaryKeyColumn, new PinotSegmentColumnReader(segment, primaryKeyColumn));
-    }
-    int numTotalDocs = segment.getSegmentMetadata().getTotalDocs();
-    int numPrimaryKeyColumns = _primaryKeyColumns.size();
-    return new Iterator<PrimaryKey>() {
-      private int _docId = 0;
+  final ConcurrentHashMap<Object, Pair<IndexSegment, Double>> _primaryKeyToSegmentAndTimeMap =
+      new ConcurrentHashMap<>();
 
-      @Override
-      public boolean hasNext() {
-        return _docId < numTotalDocs;
-      }
-
-      @Override
-      public PrimaryKey next() {
-        Object[] values = new Object[numPrimaryKeyColumns];
-        for (int i = 0; i < numPrimaryKeyColumns; i++) {
-          Object value = columnToReaderMap.get(_primaryKeyColumns.get(i)).getValue(_docId);
-          if (value instanceof byte[]) {
-            value = new ByteArray((byte[]) value);
-          }
-          values[i] = value;
-        }
-        _docId++;
-        return new PrimaryKey(values);
-      }
-    };
+  protected ConcurrentMapPartitionDedupMetadataManager(String tableNameWithType, int partitionId,
+      DedupContext dedupContext) {
+    super(tableNameWithType, partitionId, dedupContext);
   }
 
-  public boolean checkRecordPresentOrUpdate(PrimaryKey pk, IndexSegment indexSegment) {
-    boolean present =
-        _primaryKeyToSegmentMap.putIfAbsent(HashUtils.hashPrimaryKey(pk, _hashFunction), indexSegment) != null;
+  @Override
+  protected void addSegment(IndexSegment segment, Iterator<DedupRecordInfo> dedupRecordInfoIterator) {
+    while (dedupRecordInfoIterator.hasNext()) {
+      DedupRecordInfo dedupRecordInfo = dedupRecordInfoIterator.next();
+      double metadataTime = dedupRecordInfo.getDedupTime();
+      _largestSeenTime.getAndUpdate(time -> Math.max(time, metadataTime));
+      _primaryKeyToSegmentAndTimeMap.compute(HashUtils.hashPrimaryKey(dedupRecordInfo.getPrimaryKey(), _hashFunction),
+            (primaryKey, segmentAndTime) -> {
+            if (segmentAndTime == null || segmentAndTime.getRight() < metadataTime) {
+              return Pair.of(segment, metadataTime);
+            } else {
+              return segmentAndTime;
+            }
+          });
+    }
+  }
+
+  @Override
+  protected void removeSegment(IndexSegment segment, Iterator<DedupRecordInfo> dedupRecordInfoIterator) {
+    while (dedupRecordInfoIterator.hasNext()) {
+      DedupRecordInfo dedupRecordInfo = dedupRecordInfoIterator.next();
+      _primaryKeyToSegmentAndTimeMap.computeIfPresent(
+          HashUtils.hashPrimaryKey(dedupRecordInfo.getPrimaryKey(), _hashFunction), (primaryKey, segmentAndTime) -> {
+            if (segmentAndTime.getLeft() == segment && segmentAndTime.getRight() == dedupRecordInfo.getDedupTime()) {
+              return null;
+            } else {
+              return segmentAndTime;
+            }
+          });
+    }
+  }
+
+  @Override
+  public int removeExpiredPrimaryKeys() {
+    if (_metadataTTL > 0) {
+      double smallestTimeToKeep = _largestSeenTime.get() - _metadataTTL;
+      _primaryKeyToSegmentAndTimeMap.entrySet().removeIf(entry -> entry.getValue().getRight() < smallestTimeToKeep);
+    }
+    return _primaryKeyToSegmentAndTimeMap.size();
+  }
+
+  @Override
+  public boolean dropOrAddRecord(DedupRecordInfo dedupRecordInfo, IndexSegment indexSegment) {
+    if (_metadataTTL > 0 && dedupRecordInfo.getDedupTime() < _largestSeenTime.get() - _metadataTTL) {
+      return true;
+    }
+    _largestSeenTime.getAndUpdate(time -> Math.max(time, dedupRecordInfo.getDedupTime()));
+    boolean present = _primaryKeyToSegmentAndTimeMap.putIfAbsent(
+        HashUtils.hashPrimaryKey(dedupRecordInfo.getPrimaryKey(), _hashFunction),
+        Pair.of(indexSegment, dedupRecordInfo.getDedupTime())) != null;
     if (!present) {
       _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.DEDUP_PRIMARY_KEYS_COUNT,
-          _primaryKeyToSegmentMap.size());
+          _primaryKeyToSegmentAndTimeMap.size());
     }
     return present;
   }

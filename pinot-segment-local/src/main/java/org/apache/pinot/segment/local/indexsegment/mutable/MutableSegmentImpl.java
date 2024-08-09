@@ -47,6 +47,7 @@ import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.segment.local.aggregator.ValueAggregator;
 import org.apache.pinot.segment.local.aggregator.ValueAggregatorFactory;
+import org.apache.pinot.segment.local.dedup.DedupRecordInfo;
 import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentConfig;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentStatsHistory;
@@ -158,6 +159,7 @@ public class MutableSegmentImpl implements MutableSegment {
   private volatile long _latestIngestionTimeMs = Long.MIN_VALUE;
 
   private final PartitionDedupMetadataManager _partitionDedupMetadataManager;
+  private final String _dedupTimeColumn;
 
   private final PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
   private final List<String> _upsertComparisonColumns;
@@ -354,6 +356,11 @@ public class MutableSegmentImpl implements MutableSegment {
     }
 
     _partitionDedupMetadataManager = config.getPartitionDedupMetadataManager();
+    if (_partitionDedupMetadataManager != null) {
+      _dedupTimeColumn = config.getDedupTimeColumn() == null ? _timeColumnName : config.getDedupTimeColumn();
+    } else {
+      _dedupTimeColumn = null;
+    }
 
     _partitionUpsertMetadataManager = config.getPartitionUpsertMetadataManager();
     if (_partitionUpsertMetadataManager != null) {
@@ -469,8 +476,8 @@ public class MutableSegmentImpl implements MutableSegment {
     int numDocsIndexed = _numDocsIndexed;
 
     if (isDedupEnabled()) {
-      PrimaryKey primaryKey = row.getPrimaryKey(_schema.getPrimaryKeyColumns());
-      if (_partitionDedupMetadataManager.checkRecordPresentOrUpdate(primaryKey, this)) {
+      DedupRecordInfo dedupRecordInfo = getDedupRecordInfo(row);
+      if (_partitionDedupMetadataManager.dropOrAddRecord(dedupRecordInfo, this)) {
         if (_serverMetrics != null) {
           _serverMetrics.addMeteredTableValue(_realtimeTableName, ServerMeter.REALTIME_DEDUP_DROPPED, 1);
         }
@@ -534,6 +541,16 @@ public class MutableSegmentImpl implements MutableSegment {
 
   private boolean isDedupEnabled() {
     return _partitionDedupMetadataManager != null;
+  }
+
+  private DedupRecordInfo getDedupRecordInfo(GenericRow row) {
+    PrimaryKey primaryKey = row.getPrimaryKey(_schema.getPrimaryKeyColumns());
+    // it is okay not having dedup time column if metadata ttl is not enabled
+    if (_dedupTimeColumn == null) {
+      return new DedupRecordInfo(primaryKey);
+    }
+    double dedupTime = ((Number) row.getValue(_dedupTimeColumn)).doubleValue();
+    return new DedupRecordInfo(primaryKey, dedupTime);
   }
 
   private RecordInfo getRecordInfo(GenericRow row, int docId) {
