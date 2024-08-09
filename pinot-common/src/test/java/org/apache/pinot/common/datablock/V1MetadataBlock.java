@@ -25,9 +25,11 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
-import java.nio.ByteBuffer;
+import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.pinot.segment.spi.memory.DataBuffer;
+import org.apache.pinot.segment.spi.memory.PinotInputStream;
 
 
 /**
@@ -35,9 +37,6 @@ import java.util.Map;
  * <p>
  * This version stored the metadata in a {@code Map<String, String>} which was encoded as JSON and stored in the
  * variable size data buffer.
- * <p>
- * Instances of this class are not actually seen by the operators. Instead, they are converted to {@link MetadataBlock}
- * in {@link MetadataBlock#deserialize(ByteBuffer, int)}.
  * <p>
  * The reason to keep it here is mostly for backwards compatibility and testing. In order to simplify the code, the
  * stats engine just ignores the metadata of these objects, but we need to be able to deserialize them anyway.
@@ -100,6 +99,11 @@ public class V1MetadataBlock extends BaseDataBlock {
     _contents = new Contents(type.name(), stats);
   }
 
+  private V1MetadataBlock(Contents content) {
+    super(0, null, new String[0], new byte[]{0}, toContents(content));
+    _contents = content;
+  }
+
   private static byte[] toContents(Contents type) {
     try {
       return JSON.writeValueAsBytes(type);
@@ -108,13 +112,33 @@ public class V1MetadataBlock extends BaseDataBlock {
     }
   }
 
-  public V1MetadataBlock(ByteBuffer byteBuffer)
+  public static V1MetadataBlock fromByteBuffer(DataBuffer dataBuffer)
       throws IOException {
-    super(byteBuffer);
-    if (_variableSizeDataBytes != null && _variableSizeDataBytes.length > 0) {
-      _contents = JSON.readValue(_variableSizeDataBytes, Contents.class);
-    } else {
-      _contents = new Contents();
+
+    try (PinotInputStream stream = dataBuffer.openInputStream()) {
+      // Read header.
+      ZeroCopyDataBlockSerde.Header header = ZeroCopyDataBlockSerde.Header.deserialize(stream);
+
+      // Read metadata.
+      stream.readInt();
+
+      Contents contents;
+      if (header.getVariableSizeDataLength() > 0) {
+        stream.seek(header.getVariableSizeDataStart());
+        contents = JSON.readValue((InputStream) stream, Contents.class);
+      } else {
+        contents = new Contents();
+      }
+      V1MetadataBlock v1MetadataBlock = new V1MetadataBlock(contents);
+
+      if (header._exceptionsLength > 0) {
+        Map<Integer, String> exceptions = ZeroCopyDataBlockSerde.deserializeExceptions(stream, header);
+        for (Map.Entry<Integer, String> exceptionByCode : exceptions.entrySet()) {
+          v1MetadataBlock.addException(exceptionByCode.getKey(), exceptionByCode.getValue());
+        }
+      }
+
+      return v1MetadataBlock;
     }
   }
 
@@ -134,17 +158,17 @@ public class V1MetadataBlock extends BaseDataBlock {
   }
 
   @Override
-  public int getDataBlockVersionType() {
-    return VERSION + (Type.METADATA.ordinal() << DataBlockUtils.VERSION_TYPE_SHIFT);
-  }
-
-  @Override
   protected int getOffsetInFixedBuffer(int rowId, int colId) {
     throw new UnsupportedOperationException("Metadata block uses JSON encoding for field access");
   }
 
   @Override
-  protected int positionOffsetInVariableBufferAndGetLength(int rowId, int colId) {
-    throw new UnsupportedOperationException("Metadata block uses JSON encoding for field access");
+  public Type getDataBlockType() {
+    return Type.METADATA;
+  }
+
+  @Override
+  protected int getFixDataSize() {
+    return 0;
   }
 }

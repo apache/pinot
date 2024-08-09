@@ -532,8 +532,9 @@ public class CompoundDataBuffer implements DataBuffer {
   public ImmutableRoaringBitmap viewAsRoaringBitmap(long offset, int length) {
     int bufferIndex = getBufferIndex(offset);
     DataBuffer buffer = _buffers[bufferIndex];
-    if (length < buffer.size()) {
-      return buffer.viewAsRoaringBitmap(offset, length);
+    long inBufferIndex = offset - _bufferOffsets[bufferIndex];
+    if (inBufferIndex + length < buffer.size()) {
+      return buffer.viewAsRoaringBitmap(inBufferIndex, length);
     } else {
       ByteBuffer copy = copy(offset, length);
       return new ImmutableRoaringBitmap(copy);
@@ -627,6 +628,7 @@ public class CompoundDataBuffer implements DataBuffer {
     private final ByteOrder _order;
     private final boolean _owner;
     private final ArrayList<DataBuffer> _buffers = new ArrayList<>();
+    private long _writtenBytes;
 
     public Builder() {
       this(ByteOrder.BIG_ENDIAN, false);
@@ -645,6 +647,21 @@ public class CompoundDataBuffer implements DataBuffer {
       _owner = owner;
     }
 
+    public long getWrittenBytes() {
+      return _writtenBytes;
+    }
+
+    public Builder addBuffer(ByteBuffer buffer) {
+      return addBuffer(PinotByteBuffer.wrap(buffer));
+    }
+
+    public Builder addBuffers(Iterable<ByteBuffer> buffers) {
+      for (ByteBuffer buffer : buffers) {
+        addBuffer(buffer);
+      }
+      return this;
+    }
+
     public Builder addBuffer(DataBuffer buffer) {
       if (buffer instanceof CompoundDataBuffer) {
         CompoundDataBuffer compoundBuffer = (CompoundDataBuffer) buffer;
@@ -653,14 +670,17 @@ public class CompoundDataBuffer implements DataBuffer {
         }
         return this;
       }
-      if (buffer.size() != 0) {
+      long size = buffer.size();
+      if (size != 0) {
         _buffers.add(buffer);
+        _writtenBytes += size;
       }
       return this;
     }
 
     public Builder addPagedOutputStream(PagedPinotOutputStream stream) {
       ByteBuffer[] pages = stream.getPages();
+      _buffers.ensureCapacity(_buffers.size() + pages.length);
       for (ByteBuffer page : pages) {
         addBuffer(PinotByteBuffer.wrap(page));
       }

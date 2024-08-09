@@ -19,7 +19,6 @@
 package org.apache.pinot.query.runtime.plan;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.List;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.query.runtime.operator.BaseMailboxReceiveOperator;
@@ -27,6 +26,7 @@ import org.apache.pinot.query.runtime.operator.LeafStageTransferableBlockOperato
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.SortOperator;
+import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -47,7 +47,7 @@ public class MultiStageQueryStatsTest {
     MultiStageQueryStats mergingHeap = MultiStageQueryStats.emptyStats(0);
     mergingHeap.mergeUpstream(stats);
 
-    List<ByteBuffer> buffers = stats.serialize();
+    List<DataBuffer> buffers = stats.serialize();
     MultiStageQueryStats rootStats = MultiStageQueryStats.emptyStats(0);
     rootStats.mergeUpstream(buffers);
 

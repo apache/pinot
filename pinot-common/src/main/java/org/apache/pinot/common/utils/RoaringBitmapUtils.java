@@ -35,6 +35,10 @@ public class RoaringBitmapUtils {
     return bytes;
   }
 
+  public static void serialize(ImmutableBitmapDataProvider bitmap, ByteBuffer into) {
+    bitmap.serialize(into);
+  }
+
   public static RoaringBitmap deserialize(byte[] bytes) {
     return deserialize(ByteBuffer.wrap(bytes));
   }

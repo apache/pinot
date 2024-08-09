@@ -23,7 +23,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
-import org.apache.commons.lang3.ArchUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -291,35 +290,8 @@ public class PagedPinotOutputStream extends PinotOutputStream {
   }
 
   public static abstract class PageAllocator {
-    public static final int MIN_RECOMMENDED_PAGE_SIZE;
-    public static final int MAX_RECOMMENDED_PAGE_SIZE;
-
-    static {
-      int minRecommendedPageSize = -1;
-      int maxRecommendedPageSize = -1;
-      try {
-        switch (ArchUtils.getProcessor().getType()) {
-          case AARCH_64:
-            // ARM processors support 4KB and 1MB pages
-            minRecommendedPageSize = 16 * 1024;
-            maxRecommendedPageSize = 1024 * 1024;
-            break;
-          case X86:
-          default:
-            // X86 processors support 4KB and 4MB pages
-            minRecommendedPageSize = 4 * 1024;
-            maxRecommendedPageSize = 4 * 1024 * 1024;
-            break;
-        }
-      } catch (Throwable t) {
-        LOGGER.warn("Could not determine processor architecture. Falling back to default values", t);
-        // Fallback to 4KB and 4MBs
-        minRecommendedPageSize = 4 * 1024;
-        maxRecommendedPageSize = 4 * 1024 * 1024;
-      }
-      MIN_RECOMMENDED_PAGE_SIZE = minRecommendedPageSize;
-      MAX_RECOMMENDED_PAGE_SIZE = maxRecommendedPageSize;
-    }
+    public static final int MIN_RECOMMENDED_PAGE_SIZE = 16 * 1024;
+    public static final int MAX_RECOMMENDED_PAGE_SIZE = 1024 * 1024;
 
     public abstract int pageSize();
 

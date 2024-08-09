@@ -98,7 +98,7 @@ public class ReceivingMailbox {
     _stats.merge(StatKey.DESERIALIZED_MESSAGES, 1);
 
     now = System.currentTimeMillis();
-    DataBlock dataBlock = DataBlockUtils.getDataBlock(byteBuffer);
+    DataBlock dataBlock = DataBlockUtils.readFrom(byteBuffer);
     _stats.merge(StatKey.DESERIALIZATION_TIME_MS, System.currentTimeMillis() - now);
 
     if (dataBlock instanceof MetadataBlock) {

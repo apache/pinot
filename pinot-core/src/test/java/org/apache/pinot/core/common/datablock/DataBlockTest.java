@@ -83,11 +83,19 @@ public class DataBlockTest {
     for (int colId = 0; colId < dataSchema.getColumnNames().length; colId++) {
       ColumnDataType columnDataType = dataSchema.getColumnDataType(colId);
       for (int rowId = 0; rowId < TEST_ROW_COUNT; rowId++) {
-        Object rowVal = DataBlockTestUtils.getElement(rowBlock, rowId, colId, columnDataType);
-        Object colVal = DataBlockTestUtils.getElement(columnarBlock, rowId, colId, columnDataType);
-        Assert.assertEquals(rowVal, colVal,
-            "Error comparing Row/Column Block at (" + rowId + "," + colId + ")" + " of Type: " + columnDataType
-                + "! rowValue: [" + rowVal + "], columnarValue: [" + colVal + "]");
+        try {
+          Object rowVal = DataBlockTestUtils.getElement(rowBlock, rowId, colId, columnDataType);
+          Object colVal = DataBlockTestUtils.getElement(columnarBlock, rowId, colId, columnDataType);
+          Assert.assertEquals(rowVal, colVal,
+              "Error comparing Row/Column Block at (" + rowId + "," + colId + ")" + " of Type: " + columnDataType
+                  + "! rowValue: [" + rowVal + "], columnarValue: [" + colVal + "]");
+        } catch (AssertionError e) {
+          throw new AssertionError(
+              "Error comparing Row/Column Block at (" + rowId + "," + colId + ") of Type: " + columnDataType + "!", e);
+        } catch (RuntimeException e) {
+          throw new RuntimeException(
+              "Error comparing Row/Column Block at (" + rowId + "," + colId + ") of Type: " + columnDataType + "!", e);
+        }
       }
     }
   }
@@ -121,7 +129,9 @@ public class DataBlockTest {
     rows.add(row);
     DataSchema dataSchema = new DataSchema(new String[]{"intArray"}, new ColumnDataType[]{ColumnDataType.INT_ARRAY});
     DataBlock dataBlock = DataBlockBuilder.buildFromRows(rows, dataSchema);
-    int[] intArray = DataBlockUtils.getDataBlock(ByteBuffer.wrap(dataBlock.toBytes())).getIntArray(0, 0);
+    List<ByteBuffer> serialize = dataBlock.serialize();
+    DataBlock deserialized = DataBlockUtils.deserialize(serialize);
+    int[] intArray = deserialized.getIntArray(0, 0);
     Assert.assertEquals(intArray.length, 0);
   }
 }

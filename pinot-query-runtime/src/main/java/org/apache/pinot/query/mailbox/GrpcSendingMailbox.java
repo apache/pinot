@@ -22,6 +22,8 @@ import com.google.protobuf.ByteString;
 import com.google.protobuf.UnsafeByteOperations;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datatable.StatMap;
@@ -133,12 +135,22 @@ public class GrpcSendingMailbox implements SendingMailbox {
     long start = System.currentTimeMillis();
     try {
       DataBlock dataBlock = block.getDataBlock();
-      byte[] bytes = dataBlock.toBytes();
-      ByteString byteString = UnsafeByteOperations.unsafeWrap(bytes);
-      if (LOGGER.isDebugEnabled()) {
-        LOGGER.debug("Serialized block: {} to {} bytes", block, bytes.length);
+      List<ByteBuffer> bytes = dataBlock.serialize();
+
+      ByteString byteString;
+      if (bytes.isEmpty()) {
+        byteString = ByteString.EMPTY;
+      } else {
+        byteString = UnsafeByteOperations.unsafeWrap(bytes.get(0));
+        for (int i = 1; i < bytes.size(); i++) {
+          byteString = byteString.concat(UnsafeByteOperations.unsafeWrap(bytes.get(i)));
+        }
       }
-      _statMap.merge(MailboxSendOperator.StatKey.SERIALIZED_BYTES, bytes.length);
+      int sizeInBytes = byteString.size();
+      if (LOGGER.isDebugEnabled()) {
+        LOGGER.debug("Serialized block: {} to {} bytes", block, sizeInBytes);
+      }
+      _statMap.merge(MailboxSendOperator.StatKey.SERIALIZED_BYTES, sizeInBytes);
       return MailboxContent.newBuilder().setMailboxId(_id).setPayload(byteString).build();
     } catch (Throwable t) {
       LOGGER.warn("Caught exception while serializing block: {}", block, t);
