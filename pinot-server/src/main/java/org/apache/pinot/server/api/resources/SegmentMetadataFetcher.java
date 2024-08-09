@@ -91,6 +91,22 @@ public class SegmentMetadataFetcher {
   }
 
   /**
+   * This is a helper method that fetches the segment column names for a given segment.
+   * @param columns Columns to include for metadata
+   */
+  public static Set<String> getSegmentColumns(SegmentDataManager segmentDataManager, List<String> columns) {
+    IndexSegment segment = segmentDataManager.getSegment();
+    Set<String> columnSet;
+    if (columns.size() == 1 && columns.get(0).equals("*")) {
+      // Making code consistent and returning metadata and indexes only for non-virtual columns.
+      columnSet = segment.getPhysicalColumnNames();
+    } else {
+      columnSet = new HashSet<>(columns);
+    }
+    return columnSet;
+  }
+
+  /**
    * Get the JSON object with the segment column's indexing metadata.
    * Lists all the columns if the parameter columnSet is null.
    */
