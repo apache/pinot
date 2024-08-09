@@ -959,8 +959,8 @@ public class TablesResource {
   @GET
   @Path("/tables/{tableName}/segments/mismatch")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Checks if there is any mismatch of columns in a segment", notes = "Returns true if reload is required on"
-      + " any segment in a given server")
+  @ApiOperation(value = "Checks if there is any mismatch of columns in a segment", notes =
+      "Returns true if reload is required on" + " any segment in a given server")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success", response = TableSegments.class), @ApiResponse(code = 500,
       message = "Server initialization error", response = ErrorInfo.class)
