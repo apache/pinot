@@ -687,9 +687,8 @@ public class TableConfigUtilsTest {
     // only 1 stream config allowed
     try {
       TableConfigUtils.validateIngestionConfig(tableConfig, null);
-      Assert.fail("Should fail for more than 1 stream config");
     } catch (IllegalStateException e) {
-      // expected
+      Assert.fail("Multiple stream configs should be supported");
     }
 
     // stream config should be valid
