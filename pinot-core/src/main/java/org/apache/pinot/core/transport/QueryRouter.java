@@ -182,8 +182,11 @@ public class QueryRouter {
 
   void receiveDataTable(ServerRoutingInstance serverRoutingInstance, DataTable dataTable, int responseSize,
       int deserializationTimeMs) {
-    // TODO(egalpin): read queryHash from dataTable metadata
     long requestId = Long.parseLong(dataTable.getMetadata().get(MetadataKey.REQUEST_ID.getName()));
+
+    // TODO(egalpin): How can we handle rolling out brokers expecting query_hash to be present, but while old server
+    //  versions are still running and not yet setting the query hash from their side? If possible, deploying servers
+    //  first would work.
     int queryHash = Integer.parseInt(dataTable.getMetadata().get(MetadataKey.QUERY_HASH.getName()));
     AsyncQueryResponse asyncQueryResponse = _asyncQueryResponseMap.get(requestId);
 
