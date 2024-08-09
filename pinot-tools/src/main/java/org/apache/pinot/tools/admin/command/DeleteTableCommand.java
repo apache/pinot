@@ -42,18 +42,9 @@ public class DeleteTableCommand extends AbstractDatabaseBaseAdminCommand {
       + "the cluster setting, then '7d'. Using 0d or -1d will instantly delete segments without retention.")
   private String _retention;
 
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true, description = "Print "
-      + "this message.")
-  private boolean _help = false;
-
   private String _controllerAddress;
 
   private AuthProvider _authProvider;
-
-  @Override
-  public boolean getHelp() {
-    return _help;
-  }
 
   @Override
   public String getName() {
