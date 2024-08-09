@@ -80,11 +80,12 @@ public class BrokerReduceService extends BaseReduceService {
     List<ServerRoutingInstance> serversWithConflictingDataSchema = new ArrayList<>();
 
     // Process server response metadata.
-    for (Map.Entry<ServerRoutingInstance, Collection<DataTable>> serverResponses : dataTableMap.entrySet()) {
-      Iterator<DataTable> tableIter = serverResponses.getValue().iterator();
+    Iterator<ServerRoutingInstance> serverIter = dataTableMap.keySet().iterator();
+    while (serverIter.hasNext()) {
+      ServerRoutingInstance serverRoutingInstance = serverIter.next();
+      Iterator<DataTable> tableIter = dataTableMap.get(serverRoutingInstance).iterator();
       while (tableIter.hasNext()) {
         DataTable dataTable = tableIter.next();
-        ServerRoutingInstance serverRoutingInstance = serverResponses.getKey();
 
         // aggregate metrics
         aggregator.aggregate(serverRoutingInstance, dataTable);
@@ -117,16 +118,10 @@ public class BrokerReduceService extends BaseReduceService {
         }
       }
       // Remove map entries where there are no longer any associated data tables (removed by above)
-      if (dataTableMap.get(serverResponses.getKey()).isEmpty()) {
-        dataTableMap.remove(serverResponses.getKey());
+      if (dataTableMap.get(serverRoutingInstance).isEmpty()) {
+        serverIter.remove();
       }
     }
-
-//    for (Map.Entry<ServerRoutingInstance, Collection<DataTable>> serverResponses : dataTableMap.entrySet()) {
-//      if (serverResponses.getValue().isEmpty()) {
-//        dataTableMap.remove(serverResponses.getKey());
-//      }
-//    }
 
     String tableName = serverBrokerRequest.getQuerySource().getTableName();
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
