@@ -137,14 +137,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       new StarTreeIndexConfig(Collections.singletonList("DestState"), null,
           Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
   private static final String TEST_STAR_TREE_QUERY_2 = "SELECT COUNT(*) FROM mytable WHERE DestState = 'CA'";
-  private static final String TEST_STAR_TREE_QUERY_FILTERED_AGG =
-      "SELECT COUNT(*), COUNT(*) FILTER (WHERE Carrier = 'UA') FROM mytable WHERE DestState = 'CA'";
-  // This query contains a filtered aggregation which cannot be solved with startree, but the COUNT(*) still should be
-  private static final String TEST_STAR_TREE_QUERY_FILTERED_AGG_MIXED =
-      "SELECT COUNT(*), AVG(ArrDelay) FILTER (WHERE Carrier = 'UA') FROM mytable WHERE DestState = 'CA'";
-  private static final StarTreeIndexConfig STAR_TREE_INDEX_CONFIG_3 =
-      new StarTreeIndexConfig(List.of("Carrier", "DestState"), null,
-          Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
 
   // For default columns test
   private static final String TEST_EXTRA_COLUMNS_QUERY = "SELECT COUNT(*) FROM mytable WHERE NewAddedIntMetric = 1";
@@ -3470,6 +3462,24 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       throws Exception {
     testQuery("SELECT BOOL_AND(CAST(Cancelled AS BOOLEAN)) FROM mytable");
     testQuery("SELECT BOOL_OR(CAST(Diverted AS BOOLEAN)) FROM mytable");
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testGroupByAggregationWithLimitZero(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    testQuery("SELECT Origin, SUM(ArrDelay) FROM mytable GROUP BY Origin LIMIT 0");
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testFilteredAggregationWithGroupByOrdering(boolean useMultiStageQueryEngine)
+    throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+
+    // Test the ordering is correctly applied to the correct aggregation (the one without FILTER clause)
+    // See https://github.com/apache/pinot/pull/13784
+    testQuery("SELECT DestCityName, COUNT(*) AS c1, COUNT(*) FILTER (WHERE AirTime = 0) AS c2 FROM mytable "
+        + "GROUP BY DestCityName ORDER BY c1 DESC LIMIT 10");
   }
 
   private String buildSkipIndexesOption(String columnsAndIndexes) {
