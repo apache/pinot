@@ -76,7 +76,7 @@ public class QueryServerTest extends QueryTestSet {
     for (int i = 0; i < QUERY_SERVER_COUNT; i++) {
       int availablePort = QueryTestUtils.getAvailablePort();
       QueryRunner queryRunner = mock(QueryRunner.class);
-      QueryServer queryServer = new QueryServer(availablePort, queryRunner);
+      QueryServer queryServer = new QueryServer(availablePort, queryRunner, null);
       queryServer.start();
       _queryServerMap.put(availablePort, queryServer);
       _queryRunnerMap.put(availablePort, queryRunner);
