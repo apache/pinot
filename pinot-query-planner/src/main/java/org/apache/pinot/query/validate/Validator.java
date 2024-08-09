@@ -37,9 +37,11 @@ import org.apache.calcite.sql.SqlWith;
 import org.apache.calcite.sql.SqlWithItem;
 import org.apache.calcite.sql.validate.SelectScope;
 import org.apache.calcite.sql.validate.SqlConformanceEnum;
+import org.apache.calcite.sql.validate.SqlValidator;
 import org.apache.calcite.sql.validate.SqlValidatorCatalogReader;
 import org.apache.calcite.sql.validate.SqlValidatorImpl;
 import org.apache.calcite.sql.validate.SqlValidatorScope;
+import org.apache.calcite.sql.validate.implicit.TypeCoercion;
 
 
 /**
@@ -47,9 +49,14 @@ import org.apache.calcite.sql.validate.SqlValidatorScope;
  */
 public class Validator extends SqlValidatorImpl {
 
+  public static TypeCoercion createTypeCoercion(RelDataTypeFactory typeFactory, SqlValidator validator) {
+    return new PinotTypeCoercionImpl(typeFactory, validator);
+  }
+
   public Validator(SqlOperatorTable opTab, SqlValidatorCatalogReader catalogReader, RelDataTypeFactory typeFactory) {
     super(opTab, catalogReader, typeFactory,
-        Config.DEFAULT.withConformance(SqlConformanceEnum.BABEL).withIdentifierExpansion(true));
+        Config.DEFAULT.withConformance(SqlConformanceEnum.BABEL).withIdentifierExpansion(true)
+            .withTypeCoercionFactory(Validator::createTypeCoercion));
   }
 
   /**
