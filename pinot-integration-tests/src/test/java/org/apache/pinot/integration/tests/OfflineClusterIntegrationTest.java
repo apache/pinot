@@ -3460,6 +3460,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
 
     // Test the ordering is correctly applied to the correct aggregation (the one without FILTER clause)
+    // See https://github.com/apache/pinot/pull/13784
     testQuery("SELECT DestCityName, COUNT(*) AS c1, COUNT(*) FILTER (WHERE AirTime = 0) AS c2 FROM mytable "
         + "GROUP BY DestCityName ORDER BY c1 DESC LIMIT 10");
   }
