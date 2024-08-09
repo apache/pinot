@@ -26,6 +26,8 @@ service PinotQueryWorker {
   rpc Submit(QueryRequest) returns (QueryResponse);
 
   rpc Cancel(CancelRequest) returns (CancelResponse);
+
+  rpc Explain(QueryRequest) returns (stream ExplainResponse);
 }
 
 message CancelRequest {
@@ -47,6 +49,11 @@ message QueryRequest {
 message QueryResponse {
   map<string, string> metadata = 1;
   bytes payload = 2;
+}
+
+message ExplainResponse {
+  repeated StagePlan stagePlan = 1;
+  map<string, string> metadata = 2;
 }
 
 message StagePlan {

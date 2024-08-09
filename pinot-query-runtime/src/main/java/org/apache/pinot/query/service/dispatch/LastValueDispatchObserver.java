@@ -19,39 +19,37 @@
 package org.apache.pinot.query.service.dispatch;
 
 import io.grpc.stub.StreamObserver;
-import javax.annotation.Nullable;
-import org.apache.pinot.common.proto.Worker;
+import java.util.function.Consumer;
 import org.apache.pinot.query.routing.QueryServerInstance;
 
 
 /**
- * Response returned by {@link DispatchClient} asynchronously using a callback. If the {@link StreamObserver#onError}
- * was called (i.e. the dispatch failed), then the exception is stored in the response and the caller should use
- * {@link #getThrowable()} to check if it is null.
+ * A {@link StreamObserver} used by {@link DispatchClient} to obtain the last the response of an async Query Dispatch
+ * call.
  */
-class AsyncQueryDispatchResponse {
+class LastValueDispatchObserver<E> implements StreamObserver<E> {
   private final QueryServerInstance _serverInstance;
-  private final Worker.QueryResponse _queryResponse;
-  private final Throwable _throwable;
+  private final Consumer<AsyncResponse<E>> _callback;
 
-  public AsyncQueryDispatchResponse(QueryServerInstance serverInstance, @Nullable Worker.QueryResponse queryResponse,
-      @Nullable Throwable throwable) {
+  private E _result;
+
+  public LastValueDispatchObserver(QueryServerInstance serverInstance, Consumer<AsyncResponse<E>> callback) {
     _serverInstance = serverInstance;
-    _queryResponse = queryResponse;
-    _throwable = throwable;
+    _callback = callback;
   }
 
-  public QueryServerInstance getServerInstance() {
-    return _serverInstance;
+  @Override
+  public void onNext(E result) {
+    _result = result;
   }
 
-  @Nullable
-  public Worker.QueryResponse getQueryResponse() {
-    return _queryResponse;
+  @Override
+  public void onError(Throwable throwable) {
+    _callback.accept(new AsyncResponse<>(_serverInstance, null, throwable));
   }
 
-  @Nullable
-  public Throwable getThrowable() {
-    return _throwable;
+  @Override
+  public void onCompleted() {
+    _callback.accept(new AsyncResponse<>(_serverInstance, _result, null));
   }
 }

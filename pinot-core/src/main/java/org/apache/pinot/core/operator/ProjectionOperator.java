@@ -101,6 +101,17 @@ public class ProjectionOperator extends BaseProjectOperator<ProjectionBlock> {
   }
 
   @Override
+  protected String getExplainName() {
+    return EXPLAIN_NAME;
+  }
+
+  @Override
+  protected void explainAttributes(ExplainAttributeBuilder attributeBuilder) {
+    super.explainAttributes(attributeBuilder);
+    attributeBuilder.putJson("columns", _dataSourceMap.keySet());
+  }
+
+  @Override
   public ExecutionStatistics getExecutionStatistics() {
     return _docIdSetOperator != null ? _docIdSetOperator.getExecutionStatistics() : new ExecutionStatistics(0, 0, 0, 0);
   }

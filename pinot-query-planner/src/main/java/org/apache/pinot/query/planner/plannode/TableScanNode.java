@@ -53,6 +53,11 @@ public class TableScanNode extends BasePlanNode {
   }
 
   @Override
+  public PlanNode withInputs(List<PlanNode> inputs) {
+    return new TableScanNode(_stageId, _dataSchema, _nodeHint, inputs, _tableName, _columns);
+  }
+
+  @Override
   public boolean equals(Object o) {
     if (this == o) {
       return true;

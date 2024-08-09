@@ -30,6 +30,7 @@ import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.ColumnContext;
+import org.apache.pinot.core.operator.ExplainAttributeBuilder;
 import org.apache.pinot.core.operator.dociditerators.ExpressionScanDocIdIterator;
 import org.apache.pinot.core.operator.docidsets.ExpressionDocIdSet;
 import org.apache.pinot.core.operator.docidsets.NotDocIdSet;
@@ -118,5 +119,16 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
         new StringBuilder(EXPLAIN_NAME).append("(operator:").append(_predicateEvaluator.getPredicateType());
     stringBuilder.append(",predicate:").append(_predicateEvaluator.getPredicate().toString());
     return stringBuilder.append(')').toString();
+  }
+
+  @Override
+  protected String getExplainName() {
+    return EXPLAIN_NAME;
+  }
+
+  @Override
+  protected void explainAttributes(ExplainAttributeBuilder attributeBuilder) {
+    attributeBuilder.putString("operator", _predicateEvaluator.getPredicateType().name());
+    attributeBuilder.putString("predicate", _predicateEvaluator.getPredicate().toString());
   }
 }

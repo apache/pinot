@@ -19,38 +19,38 @@
 package org.apache.pinot.query.service.dispatch;
 
 import io.grpc.stub.StreamObserver;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.function.Consumer;
-import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.query.routing.QueryServerInstance;
 
 
 /**
  * A {@link StreamObserver} used by {@link DispatchClient} to subscribe to the response of a async Query Dispatch call.
  */
-class DispatchObserver implements StreamObserver<Worker.QueryResponse> {
+class AllValuesDispatchObserver<E> implements StreamObserver<E> {
   private final QueryServerInstance _serverInstance;
-  private final Consumer<AsyncQueryDispatchResponse> _callback;
+  private final Consumer<AsyncResponse<List<E>>> _callback;
 
-  private Worker.QueryResponse _queryResponse;
+  private final List<E> _results = new ArrayList<>();
 
-  public DispatchObserver(QueryServerInstance serverInstance, Consumer<AsyncQueryDispatchResponse> callback) {
+  public AllValuesDispatchObserver(QueryServerInstance serverInstance, Consumer<AsyncResponse<List<E>>> callback) {
     _serverInstance = serverInstance;
     _callback = callback;
   }
 
   @Override
-  public void onNext(Worker.QueryResponse queryResponse) {
-    _queryResponse = queryResponse;
+  public void onNext(E result) {
+    _results.add(result);
   }
 
   @Override
   public void onError(Throwable throwable) {
-    _callback.accept(
-        new AsyncQueryDispatchResponse(_serverInstance, Worker.QueryResponse.getDefaultInstance(), throwable));
+    _callback.accept(new AsyncResponse<>(_serverInstance, null, throwable));
   }
 
   @Override
   public void onCompleted() {
-    _callback.accept(new AsyncQueryDispatchResponse(_serverInstance, _queryResponse, null));
+    _callback.accept(new AsyncResponse<>(_serverInstance, _results, null));
   }
 }

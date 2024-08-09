@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
@@ -39,6 +40,7 @@ import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.BitmapDocIdSetOperator;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.ExecutionStatistics;
+import org.apache.pinot.core.operator.ExplainAttributeBuilder;
 import org.apache.pinot.core.operator.ProjectionOperator;
 import org.apache.pinot.core.operator.ProjectionOperatorUtils;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
@@ -122,6 +124,21 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
       }
     }
     return stringBuilder.append(')').toString();
+  }
+
+  @Override
+  protected String getExplainName() {
+    return EXPLAIN_NAME;
+  }
+
+  @Override
+  protected void explainAttributes(ExplainAttributeBuilder attributeBuilder) {
+    super.explainAttributes(attributeBuilder);
+    if (_expressions.isEmpty()) {
+      return;
+    }
+    attributeBuilder.putJson("selectList",
+        _expressions.stream().map(ExpressionContext::toString).collect(Collectors.toList()));
   }
 
   @Override

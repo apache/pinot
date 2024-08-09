@@ -86,6 +86,12 @@ public class WindowNode extends BasePlanNode {
   }
 
   @Override
+  public PlanNode withInputs(List<PlanNode> inputs) {
+    return new WindowNode(_stageId, _dataSchema, _nodeHint, inputs, _keys, _collations, _aggCalls, _windowFrameType,
+        _lowerBound, _upperBound, _constants);
+  }
+
+  @Override
   public boolean equals(Object o) {
     if (this == o) {
       return true;

@@ -1059,6 +1059,15 @@ public class CommonConstants {
     public static final String BACKEND_PROP_DATA_DIR = "dataDir";
   }
 
+  public static class Explain {
+    public static class Response {
+      public static class ServerResponseStatus {
+        public static final String STATUS_ERROR = "ERROR";
+        public static final String STATUS_OK = "OK";
+      }
+    }
+  }
+
   public static class Query {
     public static class Request {
       public static class MetadataKeys {
@@ -1176,6 +1185,9 @@ public class CommonConstants {
     public static class PlanVersions {
       public static final int V1 = 1;
     }
+
+    public static final String ASK_SERVERS_FOR_EXPLAIN_PLAN = "pinot.query.explain.ask.servers";
+    public static final boolean DEFAULT_ASK_SERVERS_FOR_EXPLAIN_PLAN = true;
   }
 
   public static class NullValuePlaceHolder {

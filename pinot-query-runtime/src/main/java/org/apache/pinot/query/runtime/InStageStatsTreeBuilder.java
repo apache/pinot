@@ -28,6 +28,7 @@ import java.util.function.IntFunction;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.BasePlanNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
+import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
@@ -203,5 +204,10 @@ public class InStageStatsTreeBuilder implements PlanNodeVisitor<ObjectNode, Void
   @Override
   public ObjectNode visitExchange(ExchangeNode node, Void context) {
     throw new UnsupportedOperationException("ExchangeNode should not be visited");
+  }
+
+  @Override
+  public ObjectNode visitExplained(ExplainedNode node, Void context) {
+    throw new UnsupportedOperationException("ExplainedNode should not be visited");
   }
 }

@@ -25,12 +25,16 @@ import it.unimi.dsi.fastutil.ints.IntListIterator;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
+import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.SubPlan;
 import org.apache.pinot.query.planner.SubPlanMetadata;
+import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
@@ -46,9 +50,11 @@ public class PinotLogicalQueryPlanner {
   /**
    * Converts a Calcite {@link RelRoot} into a Pinot {@link SubPlan}.
    */
-  public static SubPlan makePlan(RelRoot relRoot) {
-    PlanNode rootNode = new RelToPlanNodeConverter().toPlanNode(relRoot.rel);
-    PlanFragment rootFragment = planNodeToPlanFragment(rootNode);
+  public static SubPlan makePlan(RelRoot relRoot,
+      @Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker) {
+    PlanNode rootNode = new RelToPlanNodeConverter(tracker).toPlanNode(relRoot.rel);
+
+    PlanFragment rootFragment = planNodeToPlanFragment(rootNode, tracker);
     return new SubPlan(rootFragment,
         new SubPlanMetadata(RelToPlanNodeConverter.getTableNamesFromRelRoot(relRoot.rel), relRoot.fields), List.of());
 
@@ -78,7 +84,8 @@ public class PinotLogicalQueryPlanner {
 //    return subPlanMap.get(0);
   }
 
-  private static PlanFragment planNodeToPlanFragment(PlanNode node) {
+  private static PlanFragment planNodeToPlanFragment(
+      PlanNode node, @Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker) {
     PlanFragmenter fragmenter = new PlanFragmenter();
     PlanFragmenter.Context fragmenterContext = fragmenter.createContext();
     node = node.visit(fragmenter, fragmenterContext);
@@ -104,6 +111,20 @@ public class PinotLogicalQueryPlanner {
     MailboxReceiveNode rootReceiveNode = new MailboxReceiveNode(0, node.getDataSchema(), List.of(), node.getStageId(),
         PinotRelExchangeType.getDefaultExchangeType(), RelDistribution.Type.BROADCAST_DISTRIBUTED, null, null, false,
         false, subPlanRootSenderNode);
+
+    if (tracker != null) {
+      for (Map.Entry<MailboxSendNode, ExchangeNode> entry : fragmenter.getMailboxSendToExchangeNodeMap().entrySet()) {
+        ExchangeNode exchangeNode = entry.getValue();
+        RelNode originalNode = tracker.getCreatorOf(exchangeNode);
+        tracker.trackCreation(originalNode, entry.getKey());
+      }
+      for (Map.Entry<MailboxSendNode, ExchangeNode> entry : fragmenter.getMailboxSendToExchangeNodeMap().entrySet()) {
+        ExchangeNode exchangeNode = entry.getValue();
+        RelNode originalNode = tracker.getCreatorOf(exchangeNode);
+        tracker.trackCreation(originalNode, entry.getKey());
+      }
+    }
+
     return new PlanFragment(0, rootReceiveNode, Collections.singletonList(planFragment1));
   }
 }

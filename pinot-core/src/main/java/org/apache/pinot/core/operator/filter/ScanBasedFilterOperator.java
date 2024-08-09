@@ -24,6 +24,7 @@ import java.util.List;
 import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.operator.ExplainAttributeBuilder;
 import org.apache.pinot.core.operator.docidsets.MVScanDocIdSet;
 import org.apache.pinot.core.operator.docidsets.SVScanDocIdSet;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
@@ -75,6 +76,18 @@ public class ScanBasedFilterOperator extends BaseColumnFilterOperator {
         new StringBuilder(EXPLAIN_NAME).append("(operator:").append(_predicateEvaluator.getPredicateType());
     stringBuilder.append(",predicate:").append(_predicateEvaluator.getPredicate().toString());
     return stringBuilder.append(')').toString();
+  }
+
+  @Override
+  protected String getExplainName() {
+    return EXPLAIN_NAME;
+  }
+
+  @Override
+  protected void explainAttributes(ExplainAttributeBuilder attributeBuilder) {
+    super.explainAttributes(attributeBuilder);
+    attributeBuilder.putString("operator", _predicateEvaluator.getPredicateType().name());
+    attributeBuilder.putString("predicate", _predicateEvaluator.getPredicate().toString());
   }
 
   /**

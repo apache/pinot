@@ -40,6 +40,8 @@ import org.apache.pinot.spi.data.Schema;
  */
 public class TypeFactory extends JavaTypeFactoryImpl {
 
+  public static final TypeFactory INSTANCE = new TypeFactory();
+
   public TypeFactory() {
     super(TypeSystem.INSTANCE);
   }

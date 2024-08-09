@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.PriorityQueue;
 import java.util.function.IntFunction;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
@@ -37,6 +38,7 @@ import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.ExecutionStatistics;
+import org.apache.pinot.core.operator.ExplainAttributeBuilder;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -181,8 +183,6 @@ public abstract class LinearSelectionOrderByOperator extends BaseOperator<Select
     return Collections.singletonList(_projectOperator);
   }
 
-  protected abstract String getExplainName();
-
   @Override
   public String toExplainString() {
     StringBuilder sb = new StringBuilder(getExplainName());
@@ -198,6 +198,20 @@ public abstract class LinearSelectionOrderByOperator extends BaseOperator<Select
 
     sb.append(')');
     return sb.toString();
+  }
+
+  @Override
+  protected void explainAttributes(ExplainAttributeBuilder attributeBuilder) {
+    super.explainAttributes(attributeBuilder);
+    List<ExpressionContext> rest = _expressions.subList(_alreadySorted.size() + _toSort.size(), _expressions.size());
+
+    List<String> sortedList = _alreadySorted.stream().map(ExpressionContext::toString).collect(Collectors.toList());
+    List<String> toSort = _toSort.stream().map(ExpressionContext::toString).collect(Collectors.toList());
+    List<String> restStr = rest.stream().map(ExpressionContext::toString).collect(Collectors.toList());
+
+    attributeBuilder.putJson("sortedList", sortedList)
+        .putJson("unsortedList", toSort)
+        .putJson("rest", restStr);
   }
 
   private void concatList(StringBuilder sb, List<?> list) {

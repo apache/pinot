@@ -23,6 +23,7 @@ import java.util.List;
 import org.apache.pinot.common.request.context.predicate.TextMatchPredicate;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.operator.ExplainAttributeBuilder;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.spi.trace.FilterType;
@@ -87,6 +88,19 @@ public class TextMatchFilterOperator extends BaseFilterOperator {
     stringBuilder.append(",operator:").append(_predicate.getType());
     stringBuilder.append(",predicate:").append(_predicate.toString());
     return stringBuilder.append(')').toString();
+  }
+
+  @Override
+  protected String getExplainName() {
+    return EXPLAIN_NAME;
+  }
+
+  @Override
+  protected void explainAttributes(ExplainAttributeBuilder attributeBuilder) {
+    super.explainAttributes(attributeBuilder);
+    attributeBuilder.putString("indexLookUp", "text_index");
+    attributeBuilder.putString("operator", _predicate.getType().name());
+    attributeBuilder.putString("predicate", _predicate.toString());
   }
 
   private void record(ImmutableRoaringBitmap matches) {

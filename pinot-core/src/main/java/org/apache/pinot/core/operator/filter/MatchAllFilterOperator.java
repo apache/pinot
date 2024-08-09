@@ -23,6 +23,7 @@ import java.util.List;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.ExplainPlanRows;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.operator.ExplainAttributeBuilder;
 import org.apache.pinot.core.operator.docidsets.MatchAllDocIdSet;
 
 
@@ -62,6 +63,17 @@ public class MatchAllFilterOperator extends BaseFilterOperator {
   @Override
   public String toExplainString() {
     return new StringBuilder(EXPLAIN_NAME).append("(docs:").append(_numDocs).append(')').toString();
+  }
+
+  @Override
+  protected String getExplainName() {
+    return EXPLAIN_NAME;
+  }
+
+  @Override
+  protected void explainAttributes(ExplainAttributeBuilder attributeBuilder) {
+    super.explainAttributes(attributeBuilder);
+    attributeBuilder.putLong("numDocs", _numDocs);
   }
 
   @Override

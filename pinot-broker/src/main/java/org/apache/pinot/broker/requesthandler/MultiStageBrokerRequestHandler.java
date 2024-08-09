@@ -21,11 +21,13 @@ package org.apache.pinot.broker.requesthandler;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.ws.rs.WebApplicationException;
@@ -137,7 +139,14 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       QueryEnvironment queryEnvironment = new QueryEnvironment(database, _tableCache, _workerManager);
       switch (sqlNodeAndOptions.getSqlNode().getKind()) {
         case EXPLAIN:
-          queryPlanResult = queryEnvironment.explainQuery(query, sqlNodeAndOptions, requestId);
+          Function<DispatchablePlanFragment, Collection<PlanNode>> fragmentToPlanNode = fragment ->
+              requestPhysicalPlan(fragment, requestContext, queryTimeoutMs, queryOptions);
+
+          boolean askServers = _config.getProperty(CommonConstants.MultiStageQueryRunner.ASK_SERVERS_FOR_EXPLAIN_PLAN,
+                  CommonConstants.MultiStageQueryRunner.DEFAULT_ASK_SERVERS_FOR_EXPLAIN_PLAN);
+
+          queryPlanResult = queryEnvironment.explainQuery(
+              query, sqlNodeAndOptions, requestId, fragmentToPlanNode, askServers);
           String plan = queryPlanResult.getExplainPlan();
           Set<String> tableNames = queryPlanResult.getTableNames();
           TableAuthorizationResult tableAuthorizationResult =
@@ -266,6 +275,20 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         new QueryLogger.QueryLogParams(requestContext, tableNames.toString(), brokerResponse, requesterIdentity, null));
 
     return brokerResponse;
+  }
+
+  private Collection<PlanNode> requestPhysicalPlan(DispatchablePlanFragment fragment,
+      RequestContext requestContext, long queryTimeoutMs, Map<String, String> queryOptions) {
+    List<PlanNode> stagePlans;
+    try {
+      stagePlans =
+          _queryDispatcher.explain(requestContext, fragment, queryTimeoutMs, queryOptions);
+    } catch (Exception e) {
+      // TODO: Define what to do in this case
+      throw new RuntimeException(e);
+    }
+
+    return stagePlans;
   }
 
   private void fillOldBrokerResponseStats(BrokerResponseNativeV2 brokerResponse,

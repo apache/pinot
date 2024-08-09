@@ -18,9 +18,11 @@
  */
 package org.apache.pinot.core.operator.query;
 
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
@@ -29,6 +31,7 @@ import org.apache.pinot.core.data.table.TableResizer;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
+import org.apache.pinot.core.operator.ExplainAttributeBuilder;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
@@ -167,5 +170,24 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
     }
 
     return stringBuilder.append(')').toString();
+  }
+
+  @Override
+  protected String getExplainName() {
+    return EXPLAIN_NAME;
+  }
+
+  @Override
+  protected void explainAttributes(ExplainAttributeBuilder attributeBuilder) {
+    super.explainAttributes(attributeBuilder);
+    List<String> groupKeys = Arrays.stream(_groupByExpressions)
+        .map(ExpressionContext::toString)
+        .collect(Collectors.toList());
+    attributeBuilder.putJson("groupKeys", groupKeys);
+
+    List<String> aggregations = Arrays.stream(_aggregationFunctions)
+        .map(AggregationFunction::toExplainString)
+        .collect(Collectors.toList());
+    attributeBuilder.putJson("aggregations", aggregations);
   }
 }

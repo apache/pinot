@@ -24,6 +24,7 @@ import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.operator.ExplainAttributeBuilder;
 import org.apache.pinot.core.operator.docidsets.SortedDocIdSet;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.RangePredicateEvaluatorFactory.SortedDictionaryBasedRangePredicateEvaluator;
@@ -227,5 +228,18 @@ public class SortedIndexBasedFilterOperator extends BaseColumnFilterOperator {
     stringBuilder.append(",operator:").append(_predicateEvaluator.getPredicateType());
     stringBuilder.append(",predicate:").append(_predicateEvaluator.getPredicate().toString());
     return stringBuilder.append(')').toString();
+  }
+
+  @Override
+  protected String getExplainName() {
+    return EXPLAIN_NAME;
+  }
+
+  @Override
+  protected void explainAttributes(ExplainAttributeBuilder attributeBuilder) {
+    super.explainAttributes(attributeBuilder);
+    attributeBuilder.putString("indexLookUp", "sorted_index");
+    attributeBuilder.putString("operator", _predicateEvaluator.getPredicateType().name());
+    attributeBuilder.putString("predicate", _predicateEvaluator.getPredicate().toString());
   }
 }

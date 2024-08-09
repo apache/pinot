@@ -23,6 +23,7 @@ import java.util.List;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.operator.ExplainAttributeBuilder;
 import org.apache.pinot.core.operator.dociditerators.ScanBasedDocIdIterator;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
@@ -226,6 +227,20 @@ public class RangeIndexBasedFilterOperator extends BaseColumnFilterOperator {
   public String toExplainString() {
     return EXPLAIN_NAME + "(indexLookUp:range_index" + ",operator:" + _predicateEvaluator.getPredicateType()
         + ",predicate:" + _predicateEvaluator.getPredicate().toString() + ')';
+  }
+
+  @Override
+  protected String getExplainName() {
+    return EXPLAIN_NAME;
+  }
+
+  @Override
+  protected void explainAttributes(ExplainAttributeBuilder attributeBuilder) {
+    super.explainAttributes(attributeBuilder);
+
+    attributeBuilder.putString("indexLookUp", "range_index");
+    attributeBuilder.putString("operator", _predicateEvaluator.getPredicateType().name());
+    attributeBuilder.putString("predicate", _predicateEvaluator.getPredicate().toString());
   }
 
   static RuntimeException unsupportedPredicateType(Predicate.Type type) {
