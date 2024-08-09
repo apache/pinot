@@ -53,7 +53,7 @@ public class MutableSegmentDedupeTest {
   private static final String DATA_FILE_PATH = "data/test_dedup_data.json";
   private MutableSegmentImpl _mutableSegmentImpl;
 
-  private void setup(boolean dedupEnabled, double metadataTTL, String metadataTimeColumn)
+  private void setup(boolean dedupEnabled, double metadataTTL, String dedupTimeColumn)
       throws Exception {
     URL schemaResourceUrl = this.getClass().getClassLoader().getResource(SCHEMA_FILE_PATH);
     URL dataResourceUrl = this.getClass().getClassLoader().getResource(DATA_FILE_PATH);
@@ -62,7 +62,7 @@ public class MutableSegmentDedupeTest {
         .setDedupConfig(new DedupConfig(dedupEnabled, HashFunction.NONE)).build();
     CompositeTransformer recordTransformer = CompositeTransformer.getDefaultTransformer(tableConfig, schema);
     File jsonFile = new File(dataResourceUrl.getFile());
-    DedupConfig dedupConfig = new DedupConfig(true, HashFunction.NONE, null, null, metadataTTL, metadataTimeColumn);
+    DedupConfig dedupConfig = new DedupConfig(true, HashFunction.NONE, null, null, metadataTTL, dedupTimeColumn);
     PartitionDedupMetadataManager partitionDedupMetadataManager =
         (dedupEnabled) ? getTableDedupMetadataManager(schema, dedupConfig).getOrCreatePartitionManager(0) : null;
     _mutableSegmentImpl =
@@ -136,16 +136,16 @@ public class MutableSegmentDedupeTest {
   }
 
   @Test
-  public void testDedupWithMetadataTTLWithMetadataTimeColumn()
+  public void testDedupWithMetadataTTLWithDedupTimeColumn()
       throws Exception {
-    setup(true, 1000, "metadataTime");
+    setup(true, 1000, "dedupTime");
     Assert.assertEquals(_mutableSegmentImpl.getNumDocsIndexed(), 1);
     List<Map<String, String>> rawData = loadJsonFile(DATA_FILE_PATH);
     verifyGeneratedSegmentDataAgainstRawData(0, 0, rawData);
   }
 
   @Test
-  public void testDedupWithMetadataTTLWithoutMetadataTimeColumn()
+  public void testDedupWithMetadataTTLWithoutDedupTimeColumn()
       throws Exception {
     setup(true, 1000, null);
     Assert.assertEquals(_mutableSegmentImpl.getNumDocsIndexed(), 2);

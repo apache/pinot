@@ -47,13 +47,13 @@ public abstract class BaseTableDedupMetadataManager implements TableDedupMetadat
     DedupConfig dedupConfig = tableConfig.getDedupConfig();
     Preconditions.checkArgument(dedupConfig != null, "Dedup must be enabled for table: %s", _tableNameWithType);
     double metadataTTL = dedupConfig.getMetadataTTL();
-    String metadataTimeColumn = dedupConfig.getMetadataTimeColumn();
+    String dedupTimeColumn = dedupConfig.getDedupTimeColumn();
     if (metadataTTL > 0) {
-      metadataTimeColumn = dedupConfig.getMetadataTimeColumn();
-      if (metadataTimeColumn == null) {
-        metadataTimeColumn = tableConfig.getValidationConfig().getTimeColumnName();
+      dedupTimeColumn = dedupConfig.getDedupTimeColumn();
+      if (dedupTimeColumn == null) {
+        dedupTimeColumn = tableConfig.getValidationConfig().getTimeColumnName();
       }
-      Preconditions.checkArgument(metadataTimeColumn != null,
+      Preconditions.checkArgument(dedupTimeColumn != null,
           "When metadataTTL is configured, metadata time column or time column must be configured for "
               + "dedup enabled table: %s", _tableNameWithType);
     }
@@ -65,7 +65,7 @@ public abstract class BaseTableDedupMetadataManager implements TableDedupMetadat
         .setPrimaryKeyColumns(primaryKeyColumns)
         .setHashFunction(dedupConfig.getHashFunction())
         .setMetadataTTL(metadataTTL)
-        .setMetadataTimeColumn(metadataTimeColumn)
+        .setDedupTimeColumn(dedupTimeColumn)
         .setServerMetrics(serverMetrics);
     _dedupContext = dedupContextBuider.build();
 

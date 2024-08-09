@@ -44,12 +44,12 @@ class ConcurrentMapPartitionDedupMetadataManager extends BasePartitionDedupMetad
   protected void addSegment(IndexSegment segment, Iterator<DedupRecordInfo> dedupRecordInfoIterator) {
     while (dedupRecordInfoIterator.hasNext()) {
       DedupRecordInfo dedupRecordInfo = dedupRecordInfoIterator.next();
-      double metadataTime = dedupRecordInfo.getDedupTime();
-      _largestSeenTime.getAndUpdate(time -> Math.max(time, metadataTime));
+      double dedupTime = dedupRecordInfo.getDedupTime();
+      _largestSeenTime.getAndUpdate(time -> Math.max(time, dedupTime));
       _primaryKeyToSegmentAndTimeMap.compute(HashUtils.hashPrimaryKey(dedupRecordInfo.getPrimaryKey(), _hashFunction),
             (primaryKey, segmentAndTime) -> {
-            if (segmentAndTime == null || segmentAndTime.getRight() < metadataTime) {
-              return Pair.of(segment, metadataTime);
+            if (segmentAndTime == null || segmentAndTime.getRight() < dedupTime) {
+              return Pair.of(segment, dedupTime);
             } else {
               return segmentAndTime;
             }
@@ -82,10 +82,7 @@ class ConcurrentMapPartitionDedupMetadataManager extends BasePartitionDedupMetad
   }
 
   @Override
-  public boolean dropOrAddRecord(DedupRecordInfo dedupRecordInfo, IndexSegment indexSegment) {
-    if (_metadataTTL > 0 && dedupRecordInfo.getDedupTime() < _largestSeenTime.get() - _metadataTTL) {
-      return true;
-    }
+  public boolean checkRecordPresentOrUpdate(DedupRecordInfo dedupRecordInfo, IndexSegment indexSegment) {
     _largestSeenTime.getAndUpdate(time -> Math.max(time, dedupRecordInfo.getDedupTime()));
     boolean present = _primaryKeyToSegmentAndTimeMap.putIfAbsent(
         HashUtils.hashPrimaryKey(dedupRecordInfo.getPrimaryKey(), _hashFunction),

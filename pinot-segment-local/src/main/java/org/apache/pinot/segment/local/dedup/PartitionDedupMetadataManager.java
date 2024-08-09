@@ -41,19 +41,22 @@ public interface PartitionDedupMetadataManager {
 
   /**
    * Add the primary key to the given segment to the dedup matadata if it is absent.
-   * Returns true if the key was already present.
+   * Returns true if the key was already present, i.e., the new record associated with the given {@link PrimaryKey}
+   * is a duplicate and should be skipped/dropped.
    */
   @Deprecated
   boolean checkRecordPresentOrUpdate(PrimaryKey pk, IndexSegment indexSegment);
 
   /**
    * Add the primary key to the given segment to the dedup matadata if it is absent and with in the retention time.
-   * Returns true if the key is dropped.
+   * Returns true if the key was already present, i.e., the new record associated with the given {@link DedupRecordInfo}
+   * is a duplicate and should be skipped/dropped.
    * @param dedupRecordInfo  The primary key and the dedup time.
    * @param indexSegment  The segment to which the record belongs.
-   * @return true if the key is dropped.
+   * @return true if the key was already present, i.e., the new record associated with the given {@link DedupRecordInfo}
+   * is a duplicate and should be skipped/dropped.
    */
-  default boolean dropOrAddRecord(DedupRecordInfo dedupRecordInfo, IndexSegment indexSegment) {
+  default boolean checkRecordPresentOrUpdate(DedupRecordInfo dedupRecordInfo, IndexSegment indexSegment) {
     return checkRecordPresentOrUpdate(dedupRecordInfo.getPrimaryKey(), indexSegment);
   }
 }

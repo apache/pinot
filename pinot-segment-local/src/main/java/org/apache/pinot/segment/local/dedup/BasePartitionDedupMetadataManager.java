@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.dedup;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.Iterator;
 import java.util.List;
@@ -38,7 +37,7 @@ public abstract class BasePartitionDedupMetadataManager implements PartitionDedu
   protected final ServerMetrics _serverMetrics;
   protected final HashFunction _hashFunction;
   protected final double _metadataTTL;
-  protected final String _metadataTimeColumn;
+  protected final String _dedupTimeColumn;
   protected final Logger _logger;
 
   protected BasePartitionDedupMetadataManager(String tableNameWithType, int partitionId,
@@ -49,9 +48,9 @@ public abstract class BasePartitionDedupMetadataManager implements PartitionDedu
     _hashFunction = dedupContext.getHashFunction();
     _serverMetrics = dedupContext.getServerMetrics();
     _metadataTTL = dedupContext.getMetadataTTL() >= 0 ? dedupContext.getMetadataTTL() : 0;
-    _metadataTimeColumn = dedupContext.getMetadataTimeColumn();
+    _dedupTimeColumn = dedupContext.getDedupTimeColumn();
     if (_metadataTTL > 0) {
-      Preconditions.checkArgument(_metadataTimeColumn != null,
+      Preconditions.checkArgument(_dedupTimeColumn != null,
           "When metadataTTL is configured, metadata time column must be configured for dedup enabled table: %s",
           tableNameWithType);
     }
@@ -67,7 +66,7 @@ public abstract class BasePartitionDedupMetadataManager implements PartitionDedu
   @Override
   public void addSegment(IndexSegment segment) {
     try (DedupUtils.DedupRecordInfoReader dedupRecordInfoReader = new DedupUtils.DedupRecordInfoReader(segment,
-        _primaryKeyColumns, _metadataTimeColumn)) {
+        _primaryKeyColumns, _dedupTimeColumn)) {
       Iterator<DedupRecordInfo> dedupRecordInfoIterator =
           DedupUtils.getDedupRecordInfoIterator(dedupRecordInfoReader, segment.getSegmentMetadata().getTotalDocs());
       addSegment(segment, dedupRecordInfoIterator);
@@ -75,18 +74,17 @@ public abstract class BasePartitionDedupMetadataManager implements PartitionDedu
       _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.DEDUP_PRIMARY_KEYS_COUNT,
           dedupPrimaryKeyCount);
     } catch (Exception e) {
-      throw new RuntimeException(String.format("Caught exception while adding segment: %s of table: %s to "
-          + "ConcurrentMapPartitionDedupMetadataManager", segment.getSegmentName(), _tableNameWithType), e);
+      throw new RuntimeException(String.format("Caught exception while adding segment: %s of table: %s to %s",
+          segment.getSegmentName(), _tableNameWithType, this.getClass().getSimpleName()), e);
     }
   }
 
-  @VisibleForTesting
   protected abstract void addSegment(IndexSegment segment, Iterator<DedupRecordInfo> dedupRecordInfoIterator);
 
   @Override
   public void removeSegment(IndexSegment segment) {
     try (DedupUtils.DedupRecordInfoReader dedupRecordInfoReader = new DedupUtils.DedupRecordInfoReader(segment,
-        _primaryKeyColumns, _metadataTimeColumn)) {
+        _primaryKeyColumns, _dedupTimeColumn)) {
       Iterator<DedupRecordInfo> dedupRecordInfoIterator =
           DedupUtils.getDedupRecordInfoIterator(dedupRecordInfoReader, segment.getSegmentMetadata().getTotalDocs());
       removeSegment(segment, dedupRecordInfoIterator);
@@ -94,11 +92,10 @@ public abstract class BasePartitionDedupMetadataManager implements PartitionDedu
       _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.DEDUP_PRIMARY_KEYS_COUNT,
           dedupPrimaryKeyCount);
     } catch (Exception e) {
-      throw new RuntimeException(String.format("Caught exception while removing segment: %s of table: %s from "
-          + "ConcurrentMapPartitionDedupMetadataManager", segment.getSegmentName(), _tableNameWithType), e);
+      throw new RuntimeException(String.format("Caught exception while removing segment: %s of table: %s from %s",
+          segment.getSegmentName(), _tableNameWithType, this.getClass().getSimpleName()), e);
     }
   }
 
-  @VisibleForTesting
   protected abstract void removeSegment(IndexSegment segment, Iterator<DedupRecordInfo> dedupRecordInfoIterator);
 }

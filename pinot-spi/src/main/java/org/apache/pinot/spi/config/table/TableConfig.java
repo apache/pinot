@@ -396,7 +396,7 @@ public class TableConfig extends BaseJsonConfig {
 
   @JsonIgnore
   public String getDedupTimeColumn() {
-    return _dedupConfig == null ? null : _dedupConfig.getMetadataTimeColumn();
+    return _dedupConfig == null ? null : _dedupConfig.getDedupTimeColumn();
   }
 
   @JsonIgnore

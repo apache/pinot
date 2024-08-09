@@ -33,17 +33,17 @@ public class DedupContext {
   private final List<String> _primaryKeyColumns;
   private final HashFunction _hashFunction;
   private final double _metadataTTL;
-  private final String _metadataTimeColumn;
+  private final String _dedupTimeColumn;
   private final ServerMetrics _serverMetrics;
 
   private DedupContext(TableConfig tableConfig, Schema schema, List<String> primaryKeyColumns,
-      HashFunction hashFunction, double metadataTTL, String metadataTimeColumn, ServerMetrics serverMetrics) {
+      HashFunction hashFunction, double metadataTTL, String dedupTimeColumn, ServerMetrics serverMetrics) {
     _tableConfig = tableConfig;
     _schema = schema;
     _primaryKeyColumns = primaryKeyColumns;
     _hashFunction = hashFunction;
     _metadataTTL = metadataTTL;
-    _metadataTimeColumn = metadataTimeColumn;
+    _dedupTimeColumn = dedupTimeColumn;
     _serverMetrics = serverMetrics;
   }
 
@@ -67,8 +67,8 @@ public class DedupContext {
     return _metadataTTL;
   }
 
-  public String getMetadataTimeColumn() {
-    return _metadataTimeColumn;
+  public String getDedupTimeColumn() {
+    return _dedupTimeColumn;
   }
 
   public ServerMetrics getServerMetrics() {
@@ -81,7 +81,7 @@ public class DedupContext {
     private List<String> _primaryKeyColumns;
     private HashFunction _hashFunction;
     private double _metadataTTL;
-    private String _metadataTimeColumn;
+    private String _dedupTimeColumn;
     private ServerMetrics _serverMetrics;
 
     public Builder setTableConfig(TableConfig tableConfig) {
@@ -109,8 +109,8 @@ public class DedupContext {
       return this;
     }
 
-    public Builder setMetadataTimeColumn(String metadataTimeColumn) {
-      _metadataTimeColumn = metadataTimeColumn;
+    public Builder setDedupTimeColumn(String deupTimeColumn) {
+      _dedupTimeColumn = deupTimeColumn;
       return this;
     }
 
@@ -124,8 +124,8 @@ public class DedupContext {
       Preconditions.checkState(_schema != null, "Schema must be set");
       Preconditions.checkState(CollectionUtils.isNotEmpty(_primaryKeyColumns), "Primary key columns must be set");
       Preconditions.checkState(_hashFunction != null, "Hash function must be set");
-      return new DedupContext(_tableConfig, _schema, _primaryKeyColumns, _hashFunction, _metadataTTL,
-          _metadataTimeColumn, _serverMetrics);
+      return new DedupContext(_tableConfig, _schema, _primaryKeyColumns, _hashFunction, _metadataTTL, _dedupTimeColumn,
+          _serverMetrics);
     }
   }
 }

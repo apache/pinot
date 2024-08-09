@@ -10,7 +10,7 @@
       "dataType": "STRING"
     },
     {
-      "name": "metadataTime",
+      "name": "dedupTime",
       "dataType": "LONG"
     }
   ],

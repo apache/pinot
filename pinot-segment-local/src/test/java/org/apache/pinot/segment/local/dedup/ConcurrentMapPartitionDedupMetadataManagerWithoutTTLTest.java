@@ -114,20 +114,20 @@ public class ConcurrentMapPartitionDedupMetadataManagerWithoutTTLTest {
     ImmutableSegmentImpl segment2 = DedupTestUtils.mockSegment(2, 6);
     while (dedupRecordInfoIterator.hasNext()) {
       DedupRecordInfo dedupRecordInfo = dedupRecordInfoIterator.next();
-      Assert.assertTrue(_metadataManager.dropOrAddRecord(dedupRecordInfo, segment2));
+      Assert.assertTrue(_metadataManager.checkRecordPresentOrUpdate(dedupRecordInfo, segment2));
     }
     checkRecordLocation(_metadataManager._primaryKeyToSegmentAndTimeMap, 0, segment1, hashFunction);
     checkRecordLocation(_metadataManager._primaryKeyToSegmentAndTimeMap, 1, segment1, hashFunction);
     checkRecordLocation(_metadataManager._primaryKeyToSegmentAndTimeMap, 2, segment1, hashFunction);
 
     // New PK
-    Assert.assertFalse(
-        _metadataManager.dropOrAddRecord(new DedupRecordInfo(DedupTestUtils.getPrimaryKey(3), 3000), segment2));
+    Assert.assertFalse(_metadataManager.checkRecordPresentOrUpdate(
+            new DedupRecordInfo(DedupTestUtils.getPrimaryKey(3), 3000), segment2));
     checkRecordLocation(_metadataManager._primaryKeyToSegmentAndTimeMap, 3, segment2, hashFunction);
 
     // Same PK as the one recently ingested
-    Assert.assertTrue(
-        _metadataManager.dropOrAddRecord(new DedupRecordInfo(DedupTestUtils.getPrimaryKey(3), 4000), segment2));
+    Assert.assertTrue(_metadataManager.checkRecordPresentOrUpdate(
+        new DedupRecordInfo(DedupTestUtils.getPrimaryKey(3), 4000), segment2));
   }
 
   private static DedupUtils.DedupRecordInfoReader generateDedupRecordInfoReader() {

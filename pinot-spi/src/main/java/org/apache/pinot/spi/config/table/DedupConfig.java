@@ -38,8 +38,8 @@ public class DedupConfig extends BaseJsonConfig {
       + "minus metadata TTL. Notice that the metadata may not be cleaned up immediately after the TTL, it depends on "
       + "the cleanup schedule.")
   private final double _metadataTTL;
-  @JsonPropertyDescription("Time column used to calculate metadata TTL.")
-  private final String _metadataTimeColumn;
+  @JsonPropertyDescription("Time column used to calculate dedup metadata TTL.")
+  private final String _dedupTimeColumn;
 
   public DedupConfig(@JsonProperty(value = "dedupEnabled", required = true) boolean dedupEnabled,
       @JsonProperty(value = "hashFunction") HashFunction hashFunction) {
@@ -52,13 +52,13 @@ public class DedupConfig extends BaseJsonConfig {
       @JsonProperty(value = "metadataManagerClass") String metadataManagerClass,
       @JsonProperty(value = "metadataManagerConfigs") Map<String, String> metadataManagerConfigs,
       @JsonProperty(value = "metadataTTL") double metadataTTL,
-      @JsonProperty(value = "metadataTimeColumn") String metadataTimeColumn) {
+      @JsonProperty(value = "dedupTimeColumn") String dedupTimeColumn) {
     _dedupEnabled = dedupEnabled;
     _hashFunction = hashFunction == null ? HashFunction.NONE : hashFunction;
     _metadataManagerClass = metadataManagerClass;
     _metadataManagerConfigs = metadataManagerConfigs;
     _metadataTTL = metadataTTL;
-    _metadataTimeColumn = metadataTimeColumn;
+    _dedupTimeColumn = dedupTimeColumn;
   }
 
   public HashFunction getHashFunction() {
@@ -81,7 +81,7 @@ public class DedupConfig extends BaseJsonConfig {
     return _metadataTTL;
   }
 
-  public String getMetadataTimeColumn() {
-    return _metadataTimeColumn;
+  public String getDedupTimeColumn() {
+    return _dedupTimeColumn;
   }
 }

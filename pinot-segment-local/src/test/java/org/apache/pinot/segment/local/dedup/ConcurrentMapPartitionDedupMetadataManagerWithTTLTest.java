@@ -48,7 +48,7 @@ public class ConcurrentMapPartitionDedupMetadataManagerWithTTLTest {
     DedupContext.Builder dedupContextBuider = new DedupContext.Builder();
     dedupContextBuider.setTableConfig(mock(TableConfig.class)).setSchema(mock(Schema.class))
         .setPrimaryKeyColumns(List.of("primaryKeyColumn")).setHashFunction(HashFunction.NONE)
-        .setMetadataTTL(METADATA_TTL).setMetadataTimeColumn("metadataTimeColumn")
+        .setMetadataTTL(METADATA_TTL).setDedupTimeColumn("dedupTimeColumn")
         .setServerMetrics(mock(ServerMetrics.class));
     DedupContext dedupContext = dedupContextBuider.build();
     _metadataManager =
@@ -60,7 +60,7 @@ public class ConcurrentMapPartitionDedupMetadataManagerWithTTLTest {
     DedupContext.Builder dedupContextBuider = new DedupContext.Builder();
     dedupContextBuider.setTableConfig(mock(TableConfig.class)).setSchema(mock(Schema.class))
         .setPrimaryKeyColumns(List.of("primaryKeyColumn")).setHashFunction(HashFunction.NONE).setMetadataTTL(1)
-        .setMetadataTimeColumn(null).setServerMetrics(mock(ServerMetrics.class));
+        .setDedupTimeColumn(null).setServerMetrics(mock(ServerMetrics.class));
     DedupContext dedupContext = dedupContextBuider.build();
     assertThrows(IllegalArgumentException.class,
         () -> new ConcurrentMapPartitionDedupMetadataManager(DedupTestUtils.REALTIME_TABLE_NAME, 0,
@@ -239,23 +239,23 @@ public class ConcurrentMapPartitionDedupMetadataManagerWithTTLTest {
     PrimaryKey primaryKey = DedupTestUtils.getPrimaryKey(0);
     DedupRecordInfo dedupRecordInfo = new DedupRecordInfo(primaryKey, 1000);
     ImmutableSegmentImpl immutableSegment = DedupTestUtils.mockSegment(1, 1);
-    assertTrue(_metadataManager.dropOrAddRecord(dedupRecordInfo, immutableSegment));
-    assertTrue(_metadataManager._primaryKeyToSegmentAndTimeMap.isEmpty());
+    assertFalse(_metadataManager.checkRecordPresentOrUpdate(dedupRecordInfo, immutableSegment));
+    assertFalse(_metadataManager._primaryKeyToSegmentAndTimeMap.isEmpty());
     assertEquals(_metadataManager._largestSeenTime.get(), 20000);
 
     Object primaryKeyHash = HashUtils.hashPrimaryKey(primaryKey, HashFunction.NONE);
     dedupRecordInfo = new DedupRecordInfo(primaryKey, 15000);
-    assertFalse(_metadataManager.dropOrAddRecord(dedupRecordInfo, immutableSegment));
+    assertTrue(_metadataManager.checkRecordPresentOrUpdate(dedupRecordInfo, immutableSegment));
     assertEquals(_metadataManager._primaryKeyToSegmentAndTimeMap.size(), 1);
     assertEquals(_metadataManager._primaryKeyToSegmentAndTimeMap.get(primaryKeyHash),
-        Pair.of(immutableSegment, 15000.0));
+        Pair.of(immutableSegment, 1000.0));
     assertEquals(_metadataManager._largestSeenTime.get(), 20000);
 
     dedupRecordInfo = new DedupRecordInfo(primaryKey, 25000);
-    assertTrue(_metadataManager.dropOrAddRecord(dedupRecordInfo, immutableSegment));
+    assertTrue(_metadataManager.checkRecordPresentOrUpdate(dedupRecordInfo, immutableSegment));
     assertEquals(_metadataManager._primaryKeyToSegmentAndTimeMap.size(), 1);
     assertEquals(_metadataManager._primaryKeyToSegmentAndTimeMap.get(primaryKeyHash),
-        Pair.of(immutableSegment, 15000.0));
+        Pair.of(immutableSegment, 1000.0));
     assertEquals(_metadataManager._largestSeenTime.get(), 25000);
   }
 

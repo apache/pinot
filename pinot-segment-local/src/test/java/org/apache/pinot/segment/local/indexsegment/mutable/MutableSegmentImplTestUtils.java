@@ -107,7 +107,7 @@ public class MutableSegmentImplTestUtils {
     List<String> comparisonColumns = upsertConfig == null ? null : upsertConfig.getComparisonColumns();
     boolean isUpsertDropOutOfOrderRecord = upsertConfig == null ? false : upsertConfig.isDropOutOfOrderRecord();
     String upsertOutOfOrderRecordColumn = upsertConfig == null ? null : upsertConfig.getOutOfOrderRecordColumn();
-    String dedupTimeColumn = dedupConfig == null ? null : dedupConfig.getMetadataTimeColumn();
+    String dedupTimeColumn = dedupConfig == null ? null : dedupConfig.getDedupTimeColumn();
     DictionaryIndexConfig varLengthDictConf = new DictionaryIndexConfig(false, true);
     RealtimeSegmentConfig.Builder segmentConfBuilder = new RealtimeSegmentConfig.Builder()
         .setTableNameWithType(TABLE_NAME_WITH_TYPE).setSegmentName(SEGMENT_NAME)

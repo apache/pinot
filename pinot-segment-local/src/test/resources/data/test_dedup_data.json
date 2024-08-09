@@ -2,25 +2,25 @@
   {
     "event_id": "aa",
     "description" : "first",
-    "metadataTime": 5000,
+    "dedupTime": 5000,
     "secondsSinceEpoch": 5000
   },
   {
     "event_id": "bb",
     "description" : "first",
-    "metadataTime": 2000,
+    "dedupTime": 2000,
     "secondsSinceEpoch": 1000
   },
   {
     "event_id": "aa",
     "description" : "second",
-    "metadataTime": 3000,
+    "dedupTime": 3000,
     "secondsSinceEpoch": 5500
   },
   {
     "event_id": "bb",
     "description" : "second",
-    "metadataTime": 1000,
+    "dedupTime": 1000,
     "secondsSinceEpoch": 7000
   }
 ]

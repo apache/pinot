@@ -270,7 +270,7 @@ public class TableConfigSerDeTest {
     }
     {
       // with dedup config - with metadata ttl and metadata time column
-      DedupConfig dedupConfig = new DedupConfig(true, HashFunction.MD5, null, null, 10, "metadataTimeColumn");
+      DedupConfig dedupConfig = new DedupConfig(true, HashFunction.MD5, null, null, 10, "dedupTimeColumn");
       TableConfig tableConfig = tableConfigBuilder.setDedupConfig(dedupConfig).build();
       // Serialize then de-serialize
       checkTableConfigWithDedupConfigWithTTL(JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class));
@@ -573,7 +573,7 @@ public class TableConfigSerDeTest {
     assertTrue(dedupConfig.isDedupEnabled());
     assertEquals(dedupConfig.getHashFunction(), HashFunction.MD5);
     assertEquals(dedupConfig.getMetadataTTL(), 0);
-    assertNull(dedupConfig.getMetadataTimeColumn());
+    assertNull(dedupConfig.getDedupTimeColumn());
   }
 
   private void checkTableConfigWithDedupConfigWithTTL(TableConfig tableConfig) {
@@ -583,6 +583,6 @@ public class TableConfigSerDeTest {
     assertTrue(dedupConfig.isDedupEnabled());
     assertEquals(dedupConfig.getHashFunction(), HashFunction.MD5);
     assertEquals(dedupConfig.getMetadataTTL(), 10);
-    assertEquals(dedupConfig.getMetadataTimeColumn(), "metadataTimeColumn");
+    assertEquals(dedupConfig.getDedupTimeColumn(), "dedupTimeColumn");
   }
 }

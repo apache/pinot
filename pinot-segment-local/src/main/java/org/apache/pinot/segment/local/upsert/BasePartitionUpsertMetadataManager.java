@@ -741,8 +741,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   }
 
   protected void removeSegment(IndexSegment segment, MutableRoaringBitmap validDocIds) {
-    try (PrimaryKeyReader primaryKeyReader = new PrimaryKeyReader(segment,
-        _primaryKeyColumns)) {
+    try (PrimaryKeyReader primaryKeyReader = new PrimaryKeyReader(segment, _primaryKeyColumns)) {
       removeSegment(segment, UpsertUtils.getPrimaryKeyIterator(primaryKeyReader, validDocIds));
     } catch (Exception e) {
       throw new RuntimeException(

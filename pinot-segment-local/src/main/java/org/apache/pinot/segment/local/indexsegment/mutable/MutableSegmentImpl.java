@@ -477,7 +477,7 @@ public class MutableSegmentImpl implements MutableSegment {
 
     if (isDedupEnabled()) {
       DedupRecordInfo dedupRecordInfo = getDedupRecordInfo(row);
-      if (_partitionDedupMetadataManager.dropOrAddRecord(dedupRecordInfo, this)) {
+      if (_partitionDedupMetadataManager.checkRecordPresentOrUpdate(dedupRecordInfo, this)) {
         if (_serverMetrics != null) {
           _serverMetrics.addMeteredTableValue(_realtimeTableName, ServerMeter.REALTIME_DEDUP_DROPPED, 1);
         }
