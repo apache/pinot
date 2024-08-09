@@ -20,6 +20,7 @@ package org.apache.pinot.segment.spi.index.reader;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
@@ -447,6 +448,12 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
    */
   default byte[] getBytes(int docId, T context) {
     throw new UnsupportedOperationException();
+  }
+
+  default Map<String, Object> getMap(int docId, T context) {
+    throw new UnsupportedOperationException("This ForwardIndexReader does not support MAP types. "
+        + "This indicates that either the column is getting mistyped or the wrong "
+        + "ForwardIndexReader is being created to read this column.");
   }
 
   /**

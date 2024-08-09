@@ -32,6 +32,7 @@ import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBytePow
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkForwardIndexReaderV4;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkMVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
+import org.apache.pinot.segment.local.segment.index.readers.map.ImmutableMapIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.sorted.SortedIndexReaderImpl;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
@@ -68,7 +69,9 @@ public class ForwardIndexReaderFactory extends IndexReaderFactory.Default<Forwar
   }
 
   public static ForwardIndexReader createIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata) {
-    if (metadata.hasDictionary()) {
+    if (metadata.getDataType().getStoredType() == DataType.MAP) {
+      return new ImmutableMapIndexReader(dataBuffer);
+    } else if (metadata.hasDictionary()) {
       if (metadata.isSingleValue()) {
         if (metadata.isSorted()) {
           return new SortedIndexReaderImpl(dataBuffer, metadata.getCardinality());
@@ -100,6 +103,10 @@ public class ForwardIndexReaderFactory extends IndexReaderFactory.Default<Forwar
   public static ForwardIndexReader createRawIndexReader(PinotDataBuffer dataBuffer, DataType storedType,
       boolean isSingleValue) {
     int version = dataBuffer.getInt(0);
+    if (storedType == DataType.MAP) {
+      return new ImmutableMapIndexReader(dataBuffer);
+    }
+
     if (isSingleValue && storedType.isFixedWidth()) {
       return version == FixedBytePower2ChunkSVForwardIndexReader.VERSION
           ? new FixedBytePower2ChunkSVForwardIndexReader(dataBuffer, storedType)

@@ -33,6 +33,7 @@ import org.apache.pinot.common.datatable.DataTableUtils;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.HashUtil;
+import org.apache.pinot.common.utils.MapUtils;
 import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
@@ -336,6 +337,14 @@ public abstract class BaseDataBlock implements DataBlock {
       strings[i] = _stringDictionary[_variableSizeData.getInt()];
     }
     return strings;
+  }
+
+  @Override
+  public Map<String, Object> getMap(int rowId, int colId) {
+    int size = positionOffsetInVariableBufferAndGetLength(rowId, colId);
+    ByteBuffer buffer = _variableSizeData.slice();
+    buffer.limit(size);
+    return MapUtils.deserializeMap(buffer);
   }
 
   @Nullable

@@ -161,6 +161,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
           .onHeap(segmentCreationSpec.isOnHeap())
           .withForwardIndexDisabled(forwardIndexDisabled)
           .withTextCommitOnClose(true)
+          .withColumnStatistics(columnIndexCreationInfo.getColumnStatistics())
           .withImmutableToMutableIdMap(immutableToMutableIdMap)
           .withRealtimeConversion(segmentCreationSpec.isRealtimeConversion())
           .withConsumerDir(segmentCreationSpec.getConsumerDir())
