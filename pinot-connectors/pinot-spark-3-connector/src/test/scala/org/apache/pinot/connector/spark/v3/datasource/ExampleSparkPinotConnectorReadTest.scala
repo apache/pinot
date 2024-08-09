@@ -27,7 +27,7 @@ import org.apache.spark.sql.types.{DataTypes, StructField, StructType}
  * To run this class, first of all,
  * run pinot locally(https://docs.pinot.apache.org/basics/getting-started/running-pinot-locally)
  */
-object ExampleSparkPinotConnectorTest extends Logging {
+object ExampleSparkPinotConnectorReadTest extends Logging {
 
   def main(args: Array[String]): Unit = {
     implicit val spark: SparkSession = SparkSession
@@ -209,5 +209,4 @@ object ExampleSparkPinotConnectorTest extends Logging {
 
     data.show()
   }
-
 }
