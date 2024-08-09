@@ -858,6 +858,31 @@ public final class TableConfigUtils {
       }
     }
 
+
+    if (upsertConfig != null && upsertConfig.isEnableConsistentDeletes()) {
+      // enableConsistentDeletes shouldn't exist with metadataTTL
+      Preconditions.checkState(upsertConfig.getMetadataTTL() == 0,
+          "enableConsistentDeletes and metadataTTL shouldn't exist together for upsert table");
+
+      // enableConsistentDeletes shouldn't exist with enablePreload
+      Preconditions.checkState(!upsertConfig.isEnablePreload(),
+          "enableConsistentDeletes and enablePreload shouldn't exist together for upsert table");
+
+      // enableConsistentDeletes should exist with deletedKeysTTL
+      Preconditions.checkState(upsertConfig.getDeletedKeysTTL() > 0,
+          "enableConsistentDeletes should exist with deletedKeysTTL for upsert table");
+
+      // enableConsistentDeletes should exist with enableSnapshot
+      Preconditions.checkState(upsertConfig.isEnableSnapshot(),
+          "enableConsistentDeletes should exist with enableSnapshot for upsert table");
+
+      // enableConsistentDeletes should exist with UpsertCompactionTask
+      TableTaskConfig taskConfig = tableConfig.getTaskConfig();
+      Preconditions.checkState(taskConfig != null
+              && taskConfig.getTaskTypeConfigsMap().containsKey(UPSERT_COMPACTION_TASK_TYPE),
+          "enableConsistentDeletes should exist with UpsertCompactionTask for upsert table");
+    }
+
     Preconditions.checkState(
         tableConfig.getInstanceAssignmentConfigMap() == null || !tableConfig.getInstanceAssignmentConfigMap()
             .containsKey(InstancePartitionsType.COMPLETED),
