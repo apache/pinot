@@ -118,6 +118,13 @@ public class BrokerReduceService extends BaseReduceService {
       }
     }
 
+    // Remove map entries where there are no longer any associated data tables (removed by above)
+    for (Map.Entry<ServerRoutingInstance, Collection<DataTable>> serverResponses : dataTableMap.entrySet()) {
+      if (serverResponses.getValue().isEmpty()) {
+        dataTableMap.remove(serverResponses.getKey());
+      }
+    }
+
     String tableName = serverBrokerRequest.getQuerySource().getTableName();
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
 
