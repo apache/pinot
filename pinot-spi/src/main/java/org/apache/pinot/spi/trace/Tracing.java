@@ -200,12 +200,14 @@ public class Tracing {
     }
 
     @Override
-    public final void createExecutionContext(String queryId, int taskId, ThreadExecutionContext parentContext) {
+    public final void createExecutionContext(String queryId, int taskId, ThreadExecutionContext.TaskType taskType,
+        ThreadExecutionContext parentContext) {
       _anchorThread.set(parentContext == null ? Thread.currentThread() : parentContext.getAnchorThread());
-      createExecutionContextInner(queryId, taskId, parentContext);
+      createExecutionContextInner(queryId, taskId, taskType, parentContext);
     }
 
-    public void createExecutionContextInner(String queryId, int taskId, ThreadExecutionContext parentContext) {
+    public void createExecutionContextInner(String queryId, int taskId, ThreadExecutionContext.TaskType taskType,
+        ThreadExecutionContext parentContext) {
     }
 
     @Override
@@ -219,6 +221,11 @@ public class Tracing {
         @Override
         public Thread getAnchorThread() {
           return _anchorThread.get();
+        }
+
+        @Override
+        public TaskType getTaskType() {
+          return TaskType.UNKNOWN;
         }
       };
     }
@@ -254,14 +261,25 @@ public class Tracing {
     }
 
     public static void setupRunner(String queryId) {
+      setupRunner(queryId, ThreadExecutionContext.TaskType.SSE);
+    }
+
+    public static void setupRunner(String queryId, ThreadExecutionContext.TaskType taskType) {
       Tracing.getThreadAccountant().setThreadResourceUsageProvider(new ThreadResourceUsageProvider());
-      Tracing.getThreadAccountant().createExecutionContext(queryId, CommonConstants.Accounting.ANCHOR_TASK_ID, null);
+      Tracing.getThreadAccountant()
+          .createExecutionContext(queryId, CommonConstants.Accounting.ANCHOR_TASK_ID, taskType, null);
     }
 
     public static void setupWorker(int taskId, ThreadResourceUsageProvider threadResourceUsageProvider,
         ThreadExecutionContext threadExecutionContext) {
+      setupWorker(taskId, ThreadExecutionContext.TaskType.SSE, threadResourceUsageProvider, threadExecutionContext);
+    }
+
+    public static void setupWorker(int taskId, ThreadExecutionContext.TaskType taskType,
+        ThreadResourceUsageProvider threadResourceUsageProvider,
+        ThreadExecutionContext threadExecutionContext) {
       Tracing.getThreadAccountant().setThreadResourceUsageProvider(threadResourceUsageProvider);
-      Tracing.getThreadAccountant().createExecutionContext(null, taskId, threadExecutionContext);
+      Tracing.getThreadAccountant().createExecutionContext(null, taskId, taskType, threadExecutionContext);
     }
 
     public static void sample() {

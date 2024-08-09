@@ -22,6 +22,7 @@ import java.util.function.Consumer;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,6 +37,7 @@ public class OpChain implements AutoCloseable {
   private final OpChainId _id;
   private final MultiStageOperator _root;
   private final Consumer<OpChainId> _finishCallback;
+  private final ThreadExecutionContext _parentContext;
 
   public OpChain(OpChainExecutionContext context, MultiStageOperator root) {
     this(context, root, (id) -> {
@@ -46,6 +48,7 @@ public class OpChain implements AutoCloseable {
     _id = context.getId();
     _root = root;
     _finishCallback = finishCallback;
+    _parentContext = context.getParentContext();
   }
 
   public OpChainId getId() {
@@ -54,6 +57,10 @@ public class OpChain implements AutoCloseable {
 
   public Operator<TransferableBlock> getRoot() {
     return _root;
+  }
+
+  public ThreadExecutionContext getParentContext() {
+    return _parentContext;
   }
 
   @Override

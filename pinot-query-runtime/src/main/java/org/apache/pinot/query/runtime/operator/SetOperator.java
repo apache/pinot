@@ -119,6 +119,7 @@ public abstract class SetOperator extends MultiStageOperator {
           _rightRowSet.add(new Record(row));
         }
       }
+      sampleAndCheckInterruption();
       block = _rightChildOperator.nextBlock();
     }
     if (block.isErrorBlock()) {

@@ -260,6 +260,7 @@ public class HashJoinOperator extends MultiStageOperator {
         hashCollection.add(row);
       }
       _currentRowsInHashTable += container.size();
+      sampleAndCheckInterruption();
       rightBlock = _rightInput.nextBlock();
     }
     if (rightBlock.isErrorBlock()) {

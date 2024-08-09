@@ -42,7 +42,8 @@ public interface ThreadResourceUsageAccountant {
    * @param taskId a unique task id
    * @param parentContext the parent execution context, null for root(runner) thread
    */
-  void createExecutionContext(String queryId, int taskId, @Nullable ThreadExecutionContext parentContext);
+  void createExecutionContext(String queryId, int taskId, ThreadExecutionContext.TaskType taskType,
+      @Nullable ThreadExecutionContext parentContext);
 
   /**
    * get the executon context of current thread
