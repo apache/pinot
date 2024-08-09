@@ -22,40 +22,7 @@ import org.apache.pinot.spi.annotations.ScalarFunction;
 
 public class ComparisonFunctions {
 
-  private static final double DOUBLE_COMPARISON_TOLERANCE = 1e-7d;
-
   private ComparisonFunctions() {
-  }
-
-  @ScalarFunction
-  public static boolean greaterThan(double a, double b) {
-    return a > b;
-  }
-
-  @ScalarFunction
-  public static boolean greaterThanOrEqual(double a, double b) {
-    return a >= b;
-  }
-
-  @ScalarFunction
-  public static boolean lessThan(double a, double b) {
-    return a < b;
-  }
-
-  @ScalarFunction
-  public static boolean lessThanOrEqual(double a, double b) {
-    return a <= b;
-  }
-
-  @ScalarFunction
-  public static boolean notEquals(double a, double b) {
-    return Math.abs(a - b) >= DOUBLE_COMPARISON_TOLERANCE;
-  }
-
-  @ScalarFunction
-  public static boolean equals(double a, double b) {
-    // To avoid approximation errors
-    return Math.abs(a - b) < DOUBLE_COMPARISON_TOLERANCE;
   }
 
   @ScalarFunction
