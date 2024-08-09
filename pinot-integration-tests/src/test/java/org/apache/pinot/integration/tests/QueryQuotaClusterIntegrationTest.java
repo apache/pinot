@@ -18,13 +18,17 @@
  */
 package org.apache.pinot.integration.tests;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import java.net.URI;
+import java.util.Iterator;
 import java.util.Properties;
 import org.apache.pinot.broker.broker.helix.BaseBrokerStarter;
 import org.apache.pinot.broker.queryquota.HelixExternalViewBasedQueryQuotaManagerTest;
+import org.apache.pinot.client.BrokerResponse;
 import org.apache.pinot.client.ConnectionFactory;
 import org.apache.pinot.client.JsonAsyncHttpPinotClientTransportFactory;
 import org.apache.pinot.client.PinotClientException;
+import org.apache.pinot.client.PinotClientTransport;
 import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.spi.config.table.QuotaConfig;
@@ -46,6 +50,7 @@ import static org.testng.Assert.assertTrue;
  * tested as part of {@link HelixExternalViewBasedQueryQuotaManagerTest}
  */
 public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest {
+  private PinotClientTransport _pinotClientTransport;
   @BeforeClass
   public void setUp()
       throws Exception {
@@ -65,9 +70,11 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
 
     Properties properties = new Properties();
     properties.put(FAIL_ON_EXCEPTIONS, "FALSE");
+    _pinotClientTransport = new JsonAsyncHttpPinotClientTransportFactory()
+        .withConnectionProperties(getPinotConnectionProperties())
+        .buildTransport();
     _pinotConnection = ConnectionFactory.fromZookeeper(properties, getZkUrl() + "/" + getHelixClusterName(),
-        new JsonAsyncHttpPinotClientTransportFactory().withConnectionProperties(getPinotConnectionProperties())
-            .buildTransport());
+        _pinotClientTransport);
   }
 
   @AfterMethod
@@ -125,12 +132,15 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
       addQueryQuotaToTableConfig(10);
       // Add one more broker such that quota gets distributed equally among them
       brokerStarter = startOneBroker(2);
+      _brokerBaseApiUrl = LOCAL_HOST + ":" + brokerStarter.getPort();
       // to allow change propagation to QueryQuotaManager
       Thread.sleep(1000);
-      testQueryRate(10);
+      // query only one broker across the divided quota
+      testQueryRateOnBroker(5);
       // drop table level quota so that database quota comes into effect
       addQueryQuotaToTableConfig(null);
-      testQueryRate(25);
+      // query only one broker across the divided quota
+      testQueryRateOnBroker(12);
     } finally {
       if (brokerStarter != null) {
         brokerStarter.stop();
@@ -148,6 +158,13 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
     runQueries(maxRate, false);
     //increase the qps and some of the queries should be throttled.
     runQueries(maxRate * 2, true);
+  }
+
+  void testQueryRateOnBroker(int maxRate)
+      throws Exception {
+    runQueriesOnBroker(maxRate, false);
+    //increase the qps and some of the queries should be throttled.
+    runQueriesOnBroker(maxRate * 2, true);
   }
 
   // try to keep the qps below 50 to ensure that the time lost between 2 query runs on top of the sleepMillis
@@ -169,6 +186,24 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
     assertTrue((failCount == 0 && !shouldFail) || (failCount != 0 && shouldFail));
   }
 
+  private void runQueriesOnBroker(double qps, boolean shouldFail)
+      throws Exception {
+    int failCount = 0;
+    long sleepMillis = (long) (1000 / qps);
+    for (int i = 0; i < qps * 2; i++) {
+      BrokerResponse resultSetGroup = _pinotClientTransport.executeQuery(_brokerBaseApiUrl,
+          "SELECT COUNT(*) FROM " + getTableName());
+      for (Iterator<JsonNode> it = resultSetGroup.getExceptions().elements(); it.hasNext(); ) {
+        JsonNode exception = it.next();
+        if (exception.toPrettyString().contains("QuotaExceededError")) {
+          failCount++;
+          break;
+        }
+      }
+      Thread.sleep(sleepMillis);
+    }
+    assertTrue((failCount == 0 && !shouldFail) || (failCount != 0 && shouldFail));
+  }
 
   public void addQueryQuotaToTableConfig(Integer maxQps)
       throws Exception {
