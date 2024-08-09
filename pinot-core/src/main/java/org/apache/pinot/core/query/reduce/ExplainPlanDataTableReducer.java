@@ -63,9 +63,10 @@ public class ExplainPlanDataTableReducer implements DataTableReducer {
 
     // Top node should be a BROKER_REDUCE node.
     addBrokerReduceOperation(reducedRows);
+    Collection<DataTable> dataTables = getFlatDataTables(dataTableMap);
 
     // Construct the combine node
-    Object[] combinedRow = extractCombineNode(dataTableMap);
+    Object[] combinedRow = extractCombineNode(dataTables);
     if (combinedRow != null) {
       reducedRows.add(combinedRow);
     }
@@ -75,7 +76,7 @@ public class ExplainPlanDataTableReducer implements DataTableReducer {
     boolean explainPlanVerbose = queryOptions != null && QueryOptionsUtils.isExplainPlanVerbose(queryOptions);
 
     // Add the rest of the rows for each unique Explain plan received from the servers
-    List<ExplainPlanRows> explainPlanRowsList = extractUniqueExplainPlansAcrossServers(dataTableMap, combinedRow);
+    List<ExplainPlanRows> explainPlanRowsList = extractUniqueExplainPlansAcrossServers(dataTables, combinedRow);
     if (!explainPlanVerbose && (explainPlanRowsList.size() > 1)) {
       // Pick the most appropriate plan if verbose option is disabled
       explainPlanRowsList = chooseBestExplainPlanToUse(explainPlanRowsList);
@@ -104,13 +105,13 @@ public class ExplainPlanDataTableReducer implements DataTableReducer {
    * Extract the combine node to use as the global combine step if present. If no combine node is found, return null.
    * A combine node may not be found if all segments were pruned across all servers.
    */
-  private Object[] extractCombineNode(Map<ServerRoutingInstance, Collection<DataTable>> dataTableMap) {
-    if (dataTableMap.isEmpty()) {
+  private Object[] extractCombineNode(Collection<DataTable> dataTables) {
+    if (dataTables.isEmpty()) {
       return null;
     }
 
     Object[] combineRow = null;
-    for (DataTable dataTable : getFlatDataTables(dataTableMap)) {
+    for (DataTable dataTable : dataTables) {
       int numRows = dataTable.getNumberOfRows();
       if (numRows > 0) {
         // First row should be the combine row data, unless all segments were pruned from the Server side
@@ -129,11 +130,11 @@ public class ExplainPlanDataTableReducer implements DataTableReducer {
    * Extract a list of all the unique explain plans across all servers
    */
   private List<ExplainPlanRows> extractUniqueExplainPlansAcrossServers(
-      Map<ServerRoutingInstance, Collection<DataTable>> dataTableMap, Object[] combinedRow) {
+      Collection<DataTable> dataTables, Object[] combinedRow) {
     List<ExplainPlanRows> explainPlanRowsList = new ArrayList<>();
     HashSet<Integer> explainPlanHashCodeSet = new HashSet<>();
 
-    for (DataTable dataTable : getFlatDataTables(dataTableMap)) {
+    for (DataTable dataTable : dataTables) {
       int numRows = dataTable.getNumberOfRows();
 
       ExplainPlanRows explainPlanRows = null;

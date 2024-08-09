@@ -61,15 +61,15 @@ public class AggregationDataTableReducer implements DataTableReducer {
       DataTableReducerContext reducerContext, BrokerMetrics brokerMetrics) {
     dataSchema = ReducerDataSchemaUtils.canonicalizeDataSchemaForAggregation(_queryContext, dataSchema);
 
-    if (dataTableMap.isEmpty()) {
+    // flatten the data tables from all servers responding to the query into a single collection of DataTables
+    Collection<DataTable> dataTables = getFlatDataTables(dataTableMap);
+
+    if (dataTables.isEmpty()) {
       DataSchema resultTableSchema =
           new PostAggregationHandler(_queryContext, getPrePostAggregationDataSchema(dataSchema)).getResultDataSchema();
       brokerResponseNative.setResultTable(new ResultTable(resultTableSchema, Collections.emptyList()));
       return;
     }
-
-    // flatten the data tables from all servers responding to the query into a single collection of DataTables
-    Collection<DataTable> dataTables = getFlatDataTables(dataTableMap);
 
     if (_queryContext.isServerReturnFinalResult()) {
       if (dataTables.size() == 1) {

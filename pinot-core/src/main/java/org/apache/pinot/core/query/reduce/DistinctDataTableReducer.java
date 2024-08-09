@@ -56,18 +56,20 @@ public class DistinctDataTableReducer implements DataTableReducer {
     DistinctTable distinctTable =
         new DistinctTable(dataSchema, _queryContext.getOrderByExpressions(), _queryContext.getLimit(),
             _queryContext.isNullHandlingEnabled());
+
+    Collection<DataTable> dataTables = getFlatDataTables(dataTableMap);
     if (distinctTable.hasOrderBy()) {
-      addToOrderByDistinctTable(dataSchema, dataTableMap, distinctTable);
+      addToOrderByDistinctTable(dataSchema, dataTables, distinctTable);
     } else {
-      addToNonOrderByDistinctTable(dataSchema, dataTableMap, distinctTable);
+      addToNonOrderByDistinctTable(dataSchema, dataTables, distinctTable);
     }
     brokerResponseNative.setResultTable(reduceToResultTable(distinctTable));
   }
 
   private void addToOrderByDistinctTable(DataSchema dataSchema,
-      Map<ServerRoutingInstance, Collection<DataTable>> dataTableMap, DistinctTable distinctTable) {
+      Collection<DataTable> dataTables, DistinctTable distinctTable) {
 
-    for (DataTable dataTable : getFlatDataTables(dataTableMap)) {
+    for (DataTable dataTable : dataTables) {
       Tracing.ThreadAccountantOps.sampleAndCheckInterruption();
       int numColumns = dataSchema.size();
       int numRows = dataTable.getNumberOfRows();
@@ -89,8 +91,8 @@ public class DistinctDataTableReducer implements DataTableReducer {
   }
 
   private void addToNonOrderByDistinctTable(DataSchema dataSchema,
-      Map<ServerRoutingInstance, Collection<DataTable>> dataTableMap, DistinctTable distinctTable) {
-    for (DataTable dataTable : getFlatDataTables(dataTableMap)) {
+      Collection<DataTable> dataTables, DistinctTable distinctTable) {
+    for (DataTable dataTable : dataTables) {
       Tracing.ThreadAccountantOps.sampleAndCheckInterruption();
       int numColumns = dataSchema.size();
       int numRows = dataTable.getNumberOfRows();

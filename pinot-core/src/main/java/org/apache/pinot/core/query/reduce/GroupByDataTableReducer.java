@@ -105,7 +105,8 @@ public class GroupByDataTableReducer implements DataTableReducer {
       DataTableReducerContext reducerContext, BrokerMetrics brokerMetrics) {
     dataSchema = ReducerDataSchemaUtils.canonicalizeDataSchemaForGroupBy(_queryContext, dataSchema);
 
-    if (dataTableMap.isEmpty()) {
+    Collection<DataTable> dataTables = getFlatDataTables(dataTableMap);
+    if (dataTables.isEmpty()) {
       PostAggregationHandler postAggregationHandler =
           new PostAggregationHandler(_queryContext, getPrePostAggregationDataSchema(dataSchema));
       DataSchema resultDataSchema = postAggregationHandler.getResultDataSchema();
@@ -114,7 +115,6 @@ public class GroupByDataTableReducer implements DataTableReducer {
       return;
     }
 
-    Collection<DataTable> dataTables = getFlatDataTables(dataTableMap);
     // NOTE: Use regular reduce when group keys are not partitioned even if there are only one data table because the
     //       records are not sorted yet.
     if (_queryContext.isServerReturnFinalResult() && dataTables.size() == 1) {
