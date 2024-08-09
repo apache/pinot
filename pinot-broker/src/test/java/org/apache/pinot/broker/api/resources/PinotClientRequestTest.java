@@ -18,9 +18,16 @@
  */
 package org.apache.pinot.broker.api.resources;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.util.ArrayList;
+import java.util.List;
 import javax.ws.rs.core.Response;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.utils.DataSchema;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -50,5 +57,54 @@ public class PinotClientRequestTest {
     Assert.assertEquals(tableDoesNotExistResponse.getHeaders().get(PINOT_QUERY_ERROR_CODE_HEADER).size(), 1);
     Assert.assertEquals(tableDoesNotExistResponse.getHeaders().get(PINOT_QUERY_ERROR_CODE_HEADER).get(0),
         TABLE_DOES_NOT_EXIST_ERROR_CODE);
+  }
+
+  @Test
+  public void testPinotQueryComparison() throws Exception {
+    // Aggregation type difference
+
+    BrokerResponse v1BrokerResponse = new BrokerResponseNative();
+    DataSchema v1DataSchema = new DataSchema(new String[]{"sum(col)"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.DOUBLE});
+    v1BrokerResponse.setResultTable(new ResultTable(v1DataSchema, List.<Object[]>of(new Object[]{1234})));
+
+    BrokerResponse v2BrokerResponse = new BrokerResponseNative();
+    DataSchema v2DataSchema = new DataSchema(new String[]{"EXPR$0"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.LONG});
+    v2BrokerResponse.setResultTable(new ResultTable(v2DataSchema, List.<Object[]>of(new Object[]{1234})));
+
+    ObjectNode comparisonResponse = (ObjectNode) PinotClientRequest.getPinotQueryComparisonResponse(
+        "SELECT SUM(col) FROM mytable", v1BrokerResponse, v2BrokerResponse).getEntity();
+
+    List<String> comparisonAnalysis = new ObjectMapper().readerFor(new TypeReference<List<String>>() { })
+        .readValue(comparisonResponse.get("comparisonAnalysis"));
+
+    Assert.assertEquals(comparisonAnalysis.size(), 1);
+    Assert.assertTrue(comparisonAnalysis.get(0).contains("v1 type: DOUBLE, v2 type: LONG"));
+
+    // Default limit in v1
+
+    v1DataSchema = new DataSchema(new String[]{"col1"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING});
+    v2DataSchema = new DataSchema(new String[]{"col1"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING});
+    List<Object[]> rows = new ArrayList<>();
+    for (int i = 0; i < 10; i++) {
+      rows.add(new Object[]{i});
+    }
+    v1BrokerResponse.setResultTable(new ResultTable(v1DataSchema, new ArrayList<>(rows)));
+    for (int i = 10; i < 100; i++) {
+      rows.add(new Object[]{i});
+    }
+    v2BrokerResponse.setResultTable(new ResultTable(v2DataSchema, new ArrayList<>(rows)));
+
+    comparisonResponse = (ObjectNode) PinotClientRequest.getPinotQueryComparisonResponse(
+        "SELECT col1 FROM mytable", v1BrokerResponse, v2BrokerResponse).getEntity();
+
+    comparisonAnalysis = new ObjectMapper().readerFor(new TypeReference<List<String>>() { })
+        .readValue(comparisonResponse.get("comparisonAnalysis"));
+
+    Assert.assertEquals(comparisonAnalysis.size(), 1);
+    Assert.assertTrue(comparisonAnalysis.get(0).contains("Mismatch in number of rows returned"));
   }
 }
