@@ -27,7 +27,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.hc.core5.http.Header;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
-import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -180,8 +180,8 @@ public class UploadSegmentCommand extends AbstractBaseAdminCommand implements Co
           // Tar the segment directory
           String segmentName = segmentFile.getName();
           LOGGER.info("Compressing segment: {}", segmentName);
-          segmentTarFile = new File(tempDir, segmentName + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
-          TarGzCompressionUtils.createTarGzFile(segmentFile, segmentTarFile);
+          segmentTarFile = new File(tempDir, segmentName + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);
+          TarCompressionUtils.createCompressedTarFile(segmentFile, segmentTarFile);
         } else {
           segmentTarFile = segmentFile;
         }

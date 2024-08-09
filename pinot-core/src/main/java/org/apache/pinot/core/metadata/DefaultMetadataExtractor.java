@@ -19,7 +19,7 @@
 package org.apache.pinot.core.metadata;
 
 import java.io.File;
-import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 
@@ -35,7 +35,7 @@ public class DefaultMetadataExtractor implements MetadataExtractor {
       throws Exception {
     // NOTE: While there is TarGzCompressionUtils.untarOneFile(), we use untar() here to unpack all files in the segment
     //       in order to ensure the segment is not corrupted.
-    File indexDir = TarGzCompressionUtils.untar(tarredSegmentFile, unzippedSegmentDir).get(0);
+    File indexDir = TarCompressionUtils.untar(tarredSegmentFile, unzippedSegmentDir).get(0);
     return new SegmentMetadataImpl(indexDir);
   }
 }

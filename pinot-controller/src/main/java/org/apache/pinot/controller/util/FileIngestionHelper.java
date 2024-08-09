@@ -32,7 +32,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.controller.api.resources.SuccessResponse;
 import org.apache.pinot.segment.local.utils.IngestionUtils;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
@@ -148,7 +148,7 @@ public class FileIngestionHelper {
       // Tar segment dir
       File segmentTarFile =
           new File(segmentTarDir, segmentName + org.apache.pinot.spi.ingestion.batch.spec.Constants.TAR_GZ_FILE_EXT);
-      TarGzCompressionUtils.createTarGzFile(new File(outputDir, segmentName), segmentTarFile);
+      TarCompressionUtils.createCompressedTarFile(new File(outputDir, segmentName), segmentTarFile);
 
       // Upload segment
       IngestionConfig ingestionConfigOverride = new IngestionConfig();

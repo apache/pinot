@@ -22,7 +22,7 @@ import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.tools.AbstractBaseCommand;
 import org.apache.pinot.tools.Command;
@@ -114,7 +114,7 @@ public class PinotSegmentConvertCommand extends AbstractBaseCommand implements C
           segmentPath.put(fileName, file.getAbsolutePath());
         } else if (fileName.toLowerCase().endsWith(".tar.gz") || fileName.toLowerCase().endsWith(".tgz")) {
           // Compressed segment.
-          File segment = TarGzCompressionUtils.untar(file, new File(tempDir, fileName)).get(0);
+          File segment = TarCompressionUtils.untar(file, new File(tempDir, fileName)).get(0);
           String segmentName = segment.getName();
           if (segmentPath.containsKey(segmentName)) {
             throw new RuntimeException("Multiple segments with the same segment name: " + fileName);

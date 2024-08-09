@@ -42,7 +42,7 @@ import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
-import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.segment.spi.V1Constants;
@@ -295,7 +295,7 @@ public class SegmentPushUtils implements Serializable {
       LOGGER.info("Checking if metadata tar gz file {} exists", metadataTarGzFilePath);
       if (spec.getPushJobSpec().isPreferMetadataTarGz() && fileSystem.exists(metadataTarGzFilePath)) {
         segmentMetadataFile = new File(FileUtils.getTempDirectory(),
-            "segmentMetadata-" + UUID.randomUUID() + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
+            "segmentMetadata-" + UUID.randomUUID() + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);
         if (segmentMetadataFile.exists()) {
           FileUtils.forceDelete(segmentMetadataFile);
         }
@@ -402,7 +402,7 @@ public class SegmentPushUtils implements Serializable {
       throws Exception {
     String uuid = UUID.randomUUID().toString();
     File tarFile =
-        new File(FileUtils.getTempDirectory(), "segmentTar-" + uuid + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
+        new File(FileUtils.getTempDirectory(), "segmentTar-" + uuid + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);
     File segmentMetadataDir = new File(FileUtils.getTempDirectory(), "segmentMetadataDir-" + uuid);
     try {
       if (fileSystem instanceof LocalPinotFS) {
@@ -419,21 +419,21 @@ public class SegmentPushUtils implements Serializable {
 
       // Extract metadata.properties
       LOGGER.info("Trying to untar Metadata file from: [{}] to [{}]", tarFile, segmentMetadataDir);
-      TarGzCompressionUtils.untarOneFile(tarFile, V1Constants.MetadataKeys.METADATA_FILE_NAME,
+      TarCompressionUtils.untarOneFile(tarFile, V1Constants.MetadataKeys.METADATA_FILE_NAME,
           new File(segmentMetadataDir, V1Constants.MetadataKeys.METADATA_FILE_NAME));
 
       // Extract creation.meta
       LOGGER.info("Trying to untar CreationMeta file from: [{}] to [{}]", tarFile, segmentMetadataDir);
-      TarGzCompressionUtils.untarOneFile(tarFile, V1Constants.SEGMENT_CREATION_META,
+      TarCompressionUtils.untarOneFile(tarFile, V1Constants.SEGMENT_CREATION_META,
           new File(segmentMetadataDir, V1Constants.SEGMENT_CREATION_META));
 
       File segmentMetadataTarFile = new File(FileUtils.getTempDirectory(),
-          "segmentMetadata-" + uuid + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
+          "segmentMetadata-" + uuid + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);
       if (segmentMetadataTarFile.exists()) {
         FileUtils.forceDelete(segmentMetadataTarFile);
       }
       LOGGER.info("Trying to tar segment metadata dir [{}] to [{}]", segmentMetadataDir, segmentMetadataTarFile);
-      TarGzCompressionUtils.createTarGzFile(segmentMetadataDir, segmentMetadataTarFile);
+      TarCompressionUtils.createCompressedTarFile(segmentMetadataDir, segmentMetadataTarFile);
       return segmentMetadataTarFile;
     } finally {
       if (!(fileSystem instanceof LocalPinotFS)) {

@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Response;
+import org.apache.commons.compress.compressors.CompressorException;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.server.TableIndexMetadataResponse;
@@ -36,7 +37,7 @@ import org.apache.pinot.common.restlet.resources.TablesList;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsBitmapResponse;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
 import org.apache.pinot.common.utils.RoaringBitmapUtils;
-import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.spi.ImmutableSegment;
@@ -351,7 +352,7 @@ public class TablesResourceTest extends BaseResourceTest {
 
   // Verify metadata file from segments.
   private void downLoadAndVerifySegmentContent(String tableNameWithType, IndexSegment segment)
-      throws IOException, ConfigurationException {
+      throws IOException, ConfigurationException, CompressorException {
     String segmentPath = "/segments/" + tableNameWithType + "/" + segment.getSegmentName();
 
     // Download the segment and save to a temp local file.
@@ -363,11 +364,11 @@ public class TablesResourceTest extends BaseResourceTest {
     FileUtils.forceMkdir(tempMetadataDir);
 
     // Extract metadata.properties
-    TarGzCompressionUtils.untarOneFile(segmentFile, V1Constants.MetadataKeys.METADATA_FILE_NAME,
+    TarCompressionUtils.untarOneFile(segmentFile, V1Constants.MetadataKeys.METADATA_FILE_NAME,
         new File(tempMetadataDir, V1Constants.MetadataKeys.METADATA_FILE_NAME));
 
     // Extract creation.meta
-    TarGzCompressionUtils.untarOneFile(segmentFile, V1Constants.SEGMENT_CREATION_META,
+    TarCompressionUtils.untarOneFile(segmentFile, V1Constants.SEGMENT_CREATION_META,
         new File(tempMetadataDir, V1Constants.SEGMENT_CREATION_META));
 
     // Load segment metadata

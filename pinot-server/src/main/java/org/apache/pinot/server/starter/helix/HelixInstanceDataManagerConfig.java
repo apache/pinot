@@ -25,7 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.apache.commons.configuration2.ex.ConfigurationException;
-import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -93,7 +93,7 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   private static final String STREAM_SEGMENT_DOWNLOAD_UNTAR_RATE_LIMIT =
       "segment.stream.download.untar.rate.limit.bytes.per.sec";
   private static final long DEFAULT_STREAM_SEGMENT_DOWNLOAD_UNTAR_RATE_LIMIT =
-      TarGzCompressionUtils.NO_DISK_WRITE_RATE_LIMIT;
+      TarCompressionUtils.NO_DISK_WRITE_RATE_LIMIT;
 
   // Key of whether to use streamed server segment download-untar
   private static final String ENABLE_STREAM_SEGMENT_DOWNLOAD_UNTAR = "segment.stream.download.untar";

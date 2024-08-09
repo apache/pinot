@@ -46,7 +46,7 @@ import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 import org.apache.pinot.common.segment.generation.SegmentGenerationUtils;
-import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationJobUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFS;
@@ -375,7 +375,7 @@ public class HadoopSegmentGenerationJobRunner extends Configured implements Inge
     File pluginsTarGzFile = new File(PINOT_PLUGINS_TAR_GZ);
     try {
       File[] files = validPluginDirectories.toArray(new File[0]);
-      TarGzCompressionUtils.createTarGzFile(files, pluginsTarGzFile);
+      TarCompressionUtils.createCompressedTarFile(files, pluginsTarGzFile);
 
       // Copy to staging directory
       Path cachedPluginsTarball = new Path(stagingDirURI.toString(), SegmentGenerationUtils.PINOT_PLUGINS_TAR_GZ);

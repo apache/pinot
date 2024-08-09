@@ -29,7 +29,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexCreatorFactory;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -215,7 +215,7 @@ public class DictionaryToRawIndexConverter {
     if (segmentDir.isFile()) {
       if (segmentDir.getName().endsWith(".tar.gz") || segmentDir.getName().endsWith(".tgz")) {
         LOGGER.info("Uncompressing input segment '{}'", segmentDir);
-        newSegment = TarGzCompressionUtils.untar(segmentDir, outputDir).get(0);
+        newSegment = TarCompressionUtils.untar(segmentDir, outputDir).get(0);
       } else {
         LOGGER.warn("Skipping non-segment file '{}'", segmentDir.getAbsoluteFile());
         return false;
@@ -236,8 +236,8 @@ public class DictionaryToRawIndexConverter {
 
     if (compressOutput) {
       LOGGER.info("Compressing segment '{}'", newSegment);
-      File segmentTarFile = new File(outputDir, newSegment.getName() + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
-      TarGzCompressionUtils.createTarGzFile(newSegment, segmentTarFile);
+      File segmentTarFile = new File(outputDir, newSegment.getName() + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);
+      TarCompressionUtils.createCompressedTarFile(newSegment, segmentTarFile);
       FileUtils.deleteQuietly(newSegment);
     }
     return true;

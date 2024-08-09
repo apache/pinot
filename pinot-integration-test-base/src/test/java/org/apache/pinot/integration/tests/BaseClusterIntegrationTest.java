@@ -39,7 +39,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.client.ConnectionFactory;
 import org.apache.pinot.client.JsonAsyncHttpPinotClientTransportFactory;
 import org.apache.pinot.client.ResultSetGroup;
-import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.plugin.inputformat.csv.CSVMessageDecoder;
 import org.apache.pinot.plugin.stream.kafka.KafkaStreamConfigProperties;
@@ -551,7 +551,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
       throws Exception {
     InputStream inputStream = getClass().getClassLoader().getResourceAsStream(tarFileName);
     Assert.assertNotNull(inputStream);
-    return TarGzCompressionUtils.untar(inputStream, outputDir);
+    return TarCompressionUtils.untar(inputStream, outputDir);
   }
 
   /**
