@@ -23,13 +23,18 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import javax.annotation.concurrent.ThreadSafe;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
+import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
+import org.apache.pinot.spi.config.table.UpsertConfig;
 
 
 /**
  * Implementation of {@link TableUpsertMetadataManager} that is backed by a {@link ConcurrentHashMap} and ensures
  * consistent deletions. This should be used when the table is configured with 'consistentDeletes' set to true.
  */
+@ThreadSafe
 public class ConcurrentMapTableUpsertMetadataManagerForConsistentDeletes extends BaseTableUpsertMetadataManager {
   private final Map<Integer, ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes>
       _partitionMetadataManagerMap = new ConcurrentHashMap<>();
@@ -59,9 +64,21 @@ public class ConcurrentMapTableUpsertMetadataManagerForConsistentDeletes extends
 
   @Override
   public void setSegmentContexts(List<SegmentContext> segmentContexts, Map<String, String> queryOptions) {
-    _partitionMetadataManagerMap.forEach(
-        (partitionID, upsertMetadataManager) -> upsertMetadataManager.setSegmentContexts(segmentContexts,
-            queryOptions));
+    if (_consistencyMode != UpsertConfig.ConsistencyMode.NONE && !QueryOptionsUtils.isSkipUpsertView(queryOptions)) {
+      // Get queryableDocIds bitmaps from partitionMetadataManagers if any consistency mode is used.
+      _partitionMetadataManagerMap.forEach(
+          (partitionID, upsertMetadataManager) -> upsertMetadataManager.setSegmentContexts(segmentContexts,
+              queryOptions));
+    }
+    // If no consistency mode is used, we get queryableDocIds bitmaps as kept by the segment objects directly.
+    // Even if consistency mode is used, we should still check if any segment doesn't get its validDocIds bitmap,
+    // because partitionMetadataManagers may not track all segments of the table, like those out of the metadata TTL.
+    for (SegmentContext segmentContext : segmentContexts) {
+      if (segmentContext.getQueryableDocIdsSnapshot() == null) {
+        IndexSegment segment = segmentContext.getIndexSegment();
+        segmentContext.setQueryableDocIdsSnapshot(UpsertUtils.getQueryableDocIdsSnapshotFromSegment(segment));
+      }
+    }
   }
 
   @Override
