@@ -230,6 +230,10 @@ public class TableCache implements PinotConfigProvider {
     return schemaInfo != null ? schemaInfo._schema : null;
   }
 
+  public Map<String, SchemaInfo> getSchemaInfoMap() {
+    return _schemaInfoMap;
+  }
+
   @Override
   public boolean registerSchemaChangeListener(SchemaChangeListener schemaChangeListener) {
     synchronized (_zkSchemaChangeListener) {
@@ -543,7 +547,7 @@ public class TableCache implements PinotConfigProvider {
     }
   }
 
-  private static class SchemaInfo {
+  public static class SchemaInfo {
     final Schema _schema;
     final Map<String, String> _columnNameMap;
     final int _dimensionFieldSpecsCount;

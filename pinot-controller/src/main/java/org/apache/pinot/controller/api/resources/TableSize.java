@@ -27,6 +27,7 @@ import io.swagger.annotations.ApiResponses;
 import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
+import java.util.HashMap;
 import javax.inject.Inject;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
@@ -90,6 +91,14 @@ public class TableSize {
     try {
       tableSizeDetails =
           _tableSizeReader.getTableSizeDetails(tableName, _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
+      if (!detailed) {
+        if (tableSizeDetails._offlineSegments != null) {
+          tableSizeDetails._offlineSegments._segments = new HashMap<>();
+        }
+        if (tableSizeDetails._realtimeSegments != null) {
+          tableSizeDetails._realtimeSegments._segments = new HashMap<>();
+        }
+      }
     } catch (Throwable t) {
       throw new ControllerApplicationException(LOGGER, String.format("Failed to read table size for %s", tableName),
           Response.Status.INTERNAL_SERVER_ERROR, t);
