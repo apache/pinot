@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.segment.index.loader;
 import java.io.File;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
@@ -180,40 +181,42 @@ public class SegmentPreProcessor implements AutoCloseable {
         DefaultColumnHandler defaultColumnHandler = DefaultColumnHandlerFactory
             .getDefaultColumnHandler(null, _segmentMetadata, _indexLoadingConfig, _schema, null);
         if (defaultColumnHandler.needUpdateDefaultColumns()) {
-          LOGGER.info("Found default columns need updates");
+          LOGGER.info("Found default columns need updates in segment: {}", _segmentMetadata.getName());
           return true;
         }
       }
       // Check if there is need to update single-column indices, like inverted index, json index etc.
       for (IndexType<?, ?, ?> type : IndexService.getInstance().getAllIndexes()) {
         if (createHandler(type).needUpdateIndices(segmentReader)) {
-          LOGGER.info("Found index type: {} needs updates", type);
+          LOGGER.info("Found index type: {} needs updates in segment: {}", type, _segmentMetadata.getName());
           return true;
         }
       }
       // Check if there is need to create/modify/remove star-trees.
       if (needProcessStarTrees()) {
-        LOGGER.info("Found startree index needs updates");
+        LOGGER.info("Found startree index needs updates in segment: {}", _segmentMetadata.getName());
         return true;
       }
       // Check if there is need to update column min max value.
-      if (needUpdateColumnMinMaxValue()) {
-        LOGGER.info("Found min max values need updates");
+      List<String> columnMinMaxValueUpdates = columnMinMaxValueUpdates();
+      if (!columnMinMaxValueUpdates.isEmpty()) {
+        LOGGER.info("Found min max values need updates for columns: {} in segment: {}",
+            columnMinMaxValueUpdates, _segmentMetadata.getName());
         return true;
       }
     }
     return false;
   }
 
-  private boolean needUpdateColumnMinMaxValue() {
+  private List<String> columnMinMaxValueUpdates() {
     ColumnMinMaxValueGeneratorMode columnMinMaxValueGeneratorMode =
         _indexLoadingConfig.getColumnMinMaxValueGeneratorMode();
     if (columnMinMaxValueGeneratorMode == ColumnMinMaxValueGeneratorMode.NONE) {
-      return false;
+      return Collections.emptyList();
     }
     ColumnMinMaxValueGenerator columnMinMaxValueGenerator =
         new ColumnMinMaxValueGenerator(_segmentMetadata, null, columnMinMaxValueGeneratorMode);
-    return columnMinMaxValueGenerator.needAddColumnMinMaxValue();
+    return columnMinMaxValueGenerator.columnMinMaxValueUpdates();
   }
 
   private boolean needProcessStarTrees() {
