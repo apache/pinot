@@ -23,21 +23,14 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.Callable;
-import javax.net.ssl.SSLContext;
-import org.apache.pinot.common.auth.AuthProviderUtils;
-import org.apache.pinot.common.utils.ClientSSLContextGenerator;
-import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.TableConfigs;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
-import org.apache.pinot.tools.Command;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
@@ -48,7 +41,7 @@ import picocli.CommandLine;
  *
  */
 @CommandLine.Command(name = "AddTable")
-public class AddTableCommand extends AbstractBaseAdminCommand implements Command {
+public class AddTableCommand extends AbstractDatabaseBaseAdminCommand {
   private static final Logger LOGGER = LoggerFactory.getLogger(AddTableCommand.class);
 
   @CommandLine.Option(names = {"-tableConfigFile", "-tableConf", "-tableConfig", "-filePath"}, description = "Path to"
@@ -69,50 +62,11 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
       + " table schema file.")
   private String _schemaFile = null;
 
-  @CommandLine.Option(names = {"-controllerHost"}, required = false, description = "Host name for controller.")
-  private String _controllerHost;
-
-  @CommandLine.Option(names = {"-controllerPort"}, required = false, description = "Port number for controller.")
-  private String _controllerPort = DEFAULT_CONTROLLER_PORT;
-
-  @CommandLine.Option(names = {"-controllerProtocol"}, required = false, description = "Protocol for controller.")
-  private String _controllerProtocol = CommonConstants.HTTP_PROTOCOL;
-
   @CommandLine.Option(names = {"-update"}, required = false, description = "Update the existing table instead of "
       + "creating new one")
   private boolean _update = false;
 
-  @CommandLine.Option(names = {"-exec"}, required = false, description = "Execute the command.")
-  private boolean _exec;
-
-  @CommandLine.Option(names = {"-skipControllerCertValidation"}, required = false, description = "Whether to skip"
-      + " controller certification validation.")
-  private boolean _skipControllerCertValidation = false;
-
-  @CommandLine.Option(names = {"-user"}, required = false, description = "Username for basic auth.")
-  private String _user;
-
-  @CommandLine.Option(names = {"-password"}, required = false, description = "Password for basic auth.")
-  private String _password;
-
-  @CommandLine.Option(names = {"-authToken"}, required = false, description = "Http auth token.")
-  private String _authToken;
-
-  @CommandLine.Option(names = {"-authTokenUrl"}, required = false, description = "Http auth token url.")
-  private String _authTokenUrl;
-
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true, description = "Print "
-      + "this message.")
-  private boolean _help = false;
-
   private String _controllerAddress;
-
-  private AuthProvider _authProvider;
-
-  @Override
-  public boolean getHelp() {
-    return _help;
-  }
 
   @Override
   public String getName() {
@@ -126,10 +80,12 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
 
   @Override
   public String toString() {
-    return "AddTable -tableConfigFile " + _tableConfigFile + " -offlineTableConfigFile " + _offlineTableConfigFile
-        + " -realtimeTableConfigFile " + _realtimeTableConfigFile + " -schemaFile " + _schemaFile
-        + " -controllerProtocol " + _controllerProtocol + " -controllerHost " + _controllerHost + " -controllerPort "
-        + _controllerPort + " -user " + _user + " -password [hidden]" + (_exec ? " -exec" : "");
+    String retString =
+        (getName() + " -tableConfigFile " + _tableConfigFile + " -offlineTableConfigFile " + _offlineTableConfigFile
+            + " -realtimeTableConfigFile " + _realtimeTableConfigFile + " -schemaFile " + _schemaFile
+            + super.toString());
+
+    return retString;
   }
 
   @Override
@@ -156,47 +112,10 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
     return this;
   }
 
-  public AddTableCommand setControllerHost(String controllerHost) {
-    _controllerHost = controllerHost;
-    return this;
-  }
-
-  public AddTableCommand setControllerPort(String controllerPort) {
-    _controllerPort = controllerPort;
-    return this;
-  }
-
-  public AddTableCommand setControllerProtocol(String controllerProtocol) {
-    _controllerProtocol = controllerProtocol;
-    return this;
-  }
-
-  public AddTableCommand setUser(String user) {
-    _user = user;
-    return this;
-  }
-
-  public AddTableCommand setPassword(String password) {
-    _password = password;
-    return this;
-  }
-
-  public AddTableCommand setExecute(boolean exec) {
-    _exec = exec;
-    return this;
-  }
-
-  public AddTableCommand setAuthProvider(AuthProvider authProvider) {
-    _authProvider = authProvider;
-    return this;
-  }
-
   public boolean sendTableCreationRequest(JsonNode node)
       throws IOException {
     String res = AbstractBaseAdminCommand.sendRequest("POST",
-        ControllerRequestURLBuilder.baseUrl(_controllerAddress).forTableConfigsCreate(), node.toString(),
-        AuthProviderUtils.makeAuthHeaders(
-            AuthProviderUtils.makeAuthProvider(_authProvider, _authTokenUrl, _authToken, _user, _password)),
+        ControllerRequestURLBuilder.baseUrl(_controllerAddress).forTableConfigsCreate(), node.toString(), getHeaders(),
         makeTrustAllSSLContext());
     LOGGER.info(res);
     return res.contains("successfully added");
@@ -206,20 +125,9 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
       throws IOException {
     String res = AbstractBaseAdminCommand.sendRequest("PUT",
         ControllerRequestURLBuilder.baseUrl(_controllerAddress).forTableConfigsUpdate(tableName), node.toString(),
-        AuthProviderUtils.makeAuthHeaders(
-            AuthProviderUtils.makeAuthProvider(_authProvider, _authTokenUrl, _authToken, _user, _password)),
-        makeTrustAllSSLContext());
+        getHeaders(), makeTrustAllSSLContext());
     LOGGER.info(res);
     return res.contains("TableConfigs updated");
-  }
-
-  private SSLContext makeTrustAllSSLContext() {
-    if (_skipControllerCertValidation) {
-      PinotConfiguration trustAllSslConfig = new PinotConfiguration();
-      return new ClientSSLContextGenerator(trustAllSslConfig).generate();
-    } else {
-      return null;
-    }
   }
 
   @Override
