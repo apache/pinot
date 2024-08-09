@@ -27,6 +27,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;
@@ -126,6 +128,14 @@ public class FileUploadDownloadClientTest {
       Assert.assertEquals(response.getStatusCode(), HttpStatus.SC_OK);
       Assert.assertEquals(response.getResponse(), "OK");
     }
+  }
+
+  @Test
+  public void testGetUploadSegmentListURI()
+      throws URISyntaxException {
+    URI controllerURI = new URI("https://myhost:9443");
+    URI uriWithEndpoint = FileUploadDownloadClient.getBatchSegmentUploadURI(controllerURI);
+    Assert.assertEquals(new URI("https://myhost:9443/segments/batchUpload"), uriWithEndpoint);
   }
 
   @AfterClass
