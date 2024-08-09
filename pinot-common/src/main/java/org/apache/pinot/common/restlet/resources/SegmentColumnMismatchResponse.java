@@ -34,8 +34,8 @@ public class SegmentColumnMismatchResponse {
   @JsonCreator
   public SegmentColumnMismatchResponse(@JsonProperty("isMismatch") boolean isMismatch,
       @JsonProperty("serverInstanceId") String serverInstanceId) {
-    this._isMismatch = isMismatch;
-    this._serverInstanceId = serverInstanceId;
+    _isMismatch = isMismatch;
+    _serverInstanceId = serverInstanceId;
   }
 
   public String getServerInstanceId() {
