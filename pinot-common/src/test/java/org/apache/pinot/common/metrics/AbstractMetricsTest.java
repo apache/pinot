@@ -51,13 +51,13 @@ public class AbstractMetricsTest {
   }
 
   @Test
-  public void testConcurrentGaugeUpdates() throws InterruptedException {
+  public void testMultipleUpdatesToGauge() throws InterruptedException {
     PinotConfiguration pinotConfiguration = new PinotConfiguration();
     pinotConfiguration.setProperty(CONFIG_OF_METRICS_FACTORY_CLASS_NAME,
         "org.apache.pinot.plugin.metrics.yammer.YammerMetricsFactory");
     PinotMetricUtils.init(pinotConfiguration);
     ControllerMetrics controllerMetrics = new ControllerMetrics(new YammerMetricsRegistry());
-    String metricName = "testConcurrent";
+    String metricName = "testMultipleUpgrades";
 
     // update and remove gauge simultaneously
     IntStream.range(0, 1000).forEach(i -> {
