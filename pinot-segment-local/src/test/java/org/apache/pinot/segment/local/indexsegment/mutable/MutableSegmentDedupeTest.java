@@ -132,16 +132,17 @@ public class MutableSegmentDedupeTest {
     Assert.assertEquals(_mutableSegmentImpl.getNumDocsIndexed(), 2);
     List<Map<String, String>> rawData = loadJsonFile(DATA_FILE_PATH);
     verifyGeneratedSegmentDataAgainstRawData(0, 0, rawData);
-    verifyGeneratedSegmentDataAgainstRawData(1, 3, rawData);
+    verifyGeneratedSegmentDataAgainstRawData(1, 1, rawData);
   }
 
   @Test
   public void testDedupWithMetadataTTLWithDedupTimeColumn()
       throws Exception {
     setup(true, 1000, "dedupTime");
-    Assert.assertEquals(_mutableSegmentImpl.getNumDocsIndexed(), 1);
+    Assert.assertEquals(_mutableSegmentImpl.getNumDocsIndexed(), 2);
     List<Map<String, String>> rawData = loadJsonFile(DATA_FILE_PATH);
     verifyGeneratedSegmentDataAgainstRawData(0, 0, rawData);
+    verifyGeneratedSegmentDataAgainstRawData(1, 1, rawData);
   }
 
   @Test
@@ -151,7 +152,7 @@ public class MutableSegmentDedupeTest {
     Assert.assertEquals(_mutableSegmentImpl.getNumDocsIndexed(), 2);
     List<Map<String, String>> rawData = loadJsonFile(DATA_FILE_PATH);
     verifyGeneratedSegmentDataAgainstRawData(0, 0, rawData);
-    verifyGeneratedSegmentDataAgainstRawData(1, 3, rawData);
+    verifyGeneratedSegmentDataAgainstRawData(1, 1, rawData);
   }
 
   private void verifyGeneratedSegmentDataAgainstRawData(
