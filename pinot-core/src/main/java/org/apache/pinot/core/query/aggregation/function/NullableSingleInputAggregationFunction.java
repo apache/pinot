@@ -107,7 +107,9 @@ public abstract class NullableSingleInputAggregationFunction<I, F extends Compar
   }
 
   /**
-   * Folds over the non-null ranges of the blockValSet using the reducer.
+   * Folds over the non-null ranges of the blockValSet using the reducer. Returns {@code initialAcum} if the entire
+   * block is null.
+   *
    * @param initialAcum the initial value of the accumulator
    * @param <A> The type of the accumulator
    */
@@ -116,7 +118,8 @@ public abstract class NullableSingleInputAggregationFunction<I, F extends Compar
   }
 
   /**
-   * Folds over the non-null ranges of the blockValSet using the reducer.
+   * Folds over the non-null ranges of the blockValSet using the reducer. Returns {@code initialAcum} if the entire
+   * block is null.
    * @param initialAcum the initial value of the accumulator
    * @param <A> The type of the accumulator
    */
@@ -139,6 +142,11 @@ public abstract class NullableSingleInputAggregationFunction<I, F extends Compar
    */
   public <A> A foldNotNull(int length, @Nullable IntIterator nullIndexIterator, A initialAcum, Reducer<A> reducer) {
     A acum = initialAcum;
+
+    if (length == 0) {
+      return acum;
+    }
+
     if (!_nullHandlingEnabled || nullIndexIterator == null || !nullIndexIterator.hasNext()) {
       return reducer.apply(initialAcum, 0, length);
     }

@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.perf;
+package org.apache.pinot.perf.aggregation;
 
 import java.util.Collections;
 import java.util.Comparator;
@@ -31,6 +31,8 @@ import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.ModeAggregationFunction;
+import org.apache.pinot.perf.SyntheticBlockValSets;
+import org.apache.pinot.perf.SyntheticNullBitmapFactories;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
 import org.openjdk.jmh.annotations.Level;
