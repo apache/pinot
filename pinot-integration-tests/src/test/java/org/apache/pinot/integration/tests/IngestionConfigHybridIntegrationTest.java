@@ -67,9 +67,9 @@ public class IngestionConfigHybridIntegrationTest extends BaseClusterIntegration
         new FilterConfig("Groovy({AirlineID == 19393 || ArrDelayMinutes <= 5 }, AirlineID, ArrDelayMinutes)");
     ingestionConfig.setFilterConfig(filterConfig);
     List<TransformConfig> transformConfigs = Arrays.asList(
-        new TransformConfig("AmPm", "Groovy({DepTime < 1200 ? \"AM\": \"PM\"}, DepTime)"),
-        new TransformConfig("millisSinceEpoch", "fromEpochDays(DaysSinceEpoch)"),
-        new TransformConfig("lowerCaseDestCityName", "lower(DestCityName)"));
+        new TransformConfig("AmPm", "Groovy({DepTime < 1200 ? \"AM\": \"PM\"}, DepTime)", null, null),
+        new TransformConfig("millisSinceEpoch", "fromEpochDays(DaysSinceEpoch)", null, null),
+        new TransformConfig("lowerCaseDestCityName", "lower(DestCityName)", null, null));
     ingestionConfig.setTransformConfigs(transformConfigs);
     return ingestionConfig;
   }

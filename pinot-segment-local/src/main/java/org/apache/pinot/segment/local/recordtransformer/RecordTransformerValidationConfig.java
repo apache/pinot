@@ -1,4 +1,4 @@
-package org.apache.pinot.spi.recordenricher;
+package org.apache.pinot.segment.local.recordtransformer;
 
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
@@ -22,10 +22,10 @@ package org.apache.pinot.spi.recordenricher;
 /**
  * Interface for cluster constrains, which can be used to validate the record enricher configs
  */
-public class RecordEnricherValidationConfig {
+public class RecordTransformerValidationConfig {
   private final boolean _groovyDisabled;
 
-  public RecordEnricherValidationConfig(boolean groovyDisabled) {
+  public RecordTransformerValidationConfig(boolean groovyDisabled) {
     _groovyDisabled = groovyDisabled;
   }
 

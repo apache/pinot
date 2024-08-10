@@ -96,7 +96,8 @@ public class SchemaUtilsTest {
     // schema doesn't have destination columns from transformConfigs
     schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).build();
     IngestionConfig ingestionConfig = new IngestionConfig();
-    ingestionConfig.setTransformConfigs(Collections.singletonList(new TransformConfig("colA", "round(colB, 1000)")));
+    ingestionConfig.setTransformConfigs(Collections.singletonList(new TransformConfig("colA",
+        "round(colB, 1000)", null, null)));
     tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIngestionConfig(ingestionConfig).build();
     try {

@@ -152,13 +152,14 @@ public class IngestionUtilsTest {
     schema = new Schema.SchemaBuilder().addSingleValueDimension("d1", FieldSpec.DataType.STRING).build();
     ingestionConfig = new IngestionConfig();
     ingestionConfig.setTransformConfigs(
-        Collections.singletonList(new TransformConfig("d1", "Groovy({function}, argument1, argument2)")));
+        Collections.singletonList(new TransformConfig("d1", "Groovy({function}, argument1, argument2)", null, null)));
     List<String> extract = new ArrayList<>(IngestionUtils.getFieldsForRecordExtractor(ingestionConfig, schema));
     Assert.assertEquals(extract.size(), 3);
     Assert.assertTrue(extract.containsAll(Arrays.asList("d1", "argument1", "argument2")));
 
     // groovy function, no arguments
-    ingestionConfig.setTransformConfigs(Collections.singletonList(new TransformConfig("d1", "Groovy({function})")));
+    ingestionConfig.setTransformConfigs(Collections.singletonList(new TransformConfig("d1",
+        "Groovy({function})", null, null)));
     extract = new ArrayList<>(IngestionUtils.getFieldsForRecordExtractor(ingestionConfig, schema));
     Assert.assertEquals(extract.size(), 1);
     Assert.assertTrue(extract.contains("d1"));
@@ -166,7 +167,7 @@ public class IngestionUtilsTest {
     // inbuilt functions
     schema = new Schema.SchemaBuilder().addSingleValueDimension("hoursSinceEpoch", FieldSpec.DataType.LONG).build();
     ingestionConfig.setTransformConfigs(
-        Collections.singletonList(new TransformConfig("hoursSinceEpoch", "toEpochHours(timestampColumn)")));
+        Collections.singletonList(new TransformConfig("hoursSinceEpoch", "toEpochHours(timestampColumn)", null, null)));
     extract = new ArrayList<>(IngestionUtils.getFieldsForRecordExtractor(ingestionConfig, schema));
     Assert.assertEquals(extract.size(), 2);
     Assert.assertTrue(extract.containsAll(Arrays.asList("timestampColumn", "hoursSinceEpoch")));
@@ -175,7 +176,7 @@ public class IngestionUtilsTest {
     schema =
         new Schema.SchemaBuilder().addSingleValueDimension("tenMinutesSinceEpoch", FieldSpec.DataType.LONG).build();
     ingestionConfig.setTransformConfigs(Collections.singletonList(
-        new TransformConfig("tenMinutesSinceEpoch", "toEpochMinutesBucket(timestampColumn, 10)")));
+        new TransformConfig("tenMinutesSinceEpoch", "toEpochMinutesBucket(timestampColumn, 10)", null, null)));
     extract = new ArrayList<>(IngestionUtils.getFieldsForRecordExtractor(ingestionConfig, schema));
     Assert.assertEquals(extract.size(), 2);
     Assert.assertTrue(extract.containsAll(Lists.newArrayList("tenMinutesSinceEpoch", "timestampColumn")));
@@ -184,7 +185,8 @@ public class IngestionUtilsTest {
     schema = new Schema.SchemaBuilder().addDateTime("dateColumn", FieldSpec.DataType.STRING,
         "1:DAYS:SIMPLE_DATE_FORMAT:yyyy-MM-dd", "1:DAYS").build();
     ingestionConfig.setTransformConfigs(
-        Collections.singletonList(new TransformConfig("dateColumn", "toDateTime(timestampColumn, 'yyyy-MM-dd')")));
+        Collections.singletonList(new TransformConfig("dateColumn", "toDateTime(timestampColumn, 'yyyy-MM-dd')",
+            null, null)));
     extract = new ArrayList<>(IngestionUtils.getFieldsForRecordExtractor(ingestionConfig, schema));
     Assert.assertEquals(extract.size(), 2);
     Assert.assertTrue(extract.containsAll(Lists.newArrayList("dateColumn", "timestampColumn")));

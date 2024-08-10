@@ -288,7 +288,8 @@ public class TableConfigUtilsTest {
     TableConfigUtils.validate(tableConfig, schema);
 
     // transformed column not in schema
-    ingestionConfig.setTransformConfigs(Collections.singletonList(new TransformConfig("myCol", "reverse(anotherCol)")));
+    ingestionConfig.setTransformConfigs(Collections.singletonList(new TransformConfig("myCol",
+        "reverse(anotherCol)", null, null)));
     try {
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should fail for transformedColumn not present in schema");
@@ -302,7 +303,7 @@ public class TableConfigUtilsTest {
     tableConfig.setIndexingConfig(indexingConfig);
     schema =
         new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addMetric("twiceSum", FieldSpec.DataType.DOUBLE).build();
-    ingestionConfig.setTransformConfigs(Collections.singletonList(new TransformConfig("twice", "col * 2")));
+    ingestionConfig.setTransformConfigs(Collections.singletonList(new TransformConfig("twice", "col * 2", null, null)));
     ingestionConfig.setAggregationConfigs(Collections.singletonList(new AggregationConfig("twiceSum", "SUM(twice)")));
     TableConfigUtils.validate(tableConfig, schema);
 
@@ -312,15 +313,16 @@ public class TableConfigUtilsTest {
             .build();
     indexingConfig.setNoDictionaryColumns(List.of("myCol"));
     ingestionConfig.setAggregationConfigs(null);
-    ingestionConfig.setTransformConfigs(Collections.singletonList(new TransformConfig("myCol", "reverse(anotherCol)")));
+    ingestionConfig.setTransformConfigs(Collections.singletonList(new TransformConfig("myCol",
+        "reverse(anotherCol)", null, null)));
     TableConfigUtils.validate(tableConfig, schema);
 
     // valid transform configs
     schema =
         new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
             .addMetric("transformedCol", FieldSpec.DataType.LONG).build();
-    ingestionConfig.setTransformConfigs(Arrays.asList(new TransformConfig("myCol", "reverse(anotherCol)"),
-        new TransformConfig("transformedCol", "Groovy({x+y}, x, y)")));
+    ingestionConfig.setTransformConfigs(Arrays.asList(new TransformConfig("myCol", "reverse(anotherCol)", null, null),
+        new TransformConfig("transformedCol", "Groovy({x+y}, x, y)", null, null)));
     TableConfigUtils.validate(tableConfig, schema);
 
     // invalid transform config since Groovy is disabled
@@ -372,7 +374,8 @@ public class TableConfigUtilsTest {
 
     // null transform column name
     ingestionConfig.setFilterConfig(null);
-    ingestionConfig.setTransformConfigs(Collections.singletonList(new TransformConfig(null, "reverse(anotherCol)")));
+    ingestionConfig.setTransformConfigs(Collections.singletonList(new TransformConfig(null,
+        "reverse(anotherCol)", null, null)));
     try {
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should fail for null column name in transform config");
@@ -381,7 +384,7 @@ public class TableConfigUtilsTest {
     }
 
     // null transform function string
-    ingestionConfig.setTransformConfigs(Collections.singletonList(new TransformConfig("myCol", null)));
+    ingestionConfig.setTransformConfigs(Collections.singletonList(new TransformConfig("myCol", null, null, null)));
     try {
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should fail for null transform function in transform config");
@@ -390,7 +393,8 @@ public class TableConfigUtilsTest {
     }
 
     // invalid function
-    ingestionConfig.setTransformConfigs(Collections.singletonList(new TransformConfig("myCol", "fakeFunction(col)")));
+    ingestionConfig.setTransformConfigs(Collections.singletonList(new TransformConfig("myCol",
+        "fakeFunction(col)", null, null)));
     try {
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should fail for invalid transform function in transform config");
@@ -399,7 +403,8 @@ public class TableConfigUtilsTest {
     }
 
     // invalid function
-    ingestionConfig.setTransformConfigs(Collections.singletonList(new TransformConfig("myCol", "Groovy(badExpr)")));
+    ingestionConfig.setTransformConfigs(Collections.singletonList(new TransformConfig("myCol",
+        "Groovy(badExpr)", null, null)));
     try {
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should fail for invalid transform function in transform config");
@@ -408,7 +413,8 @@ public class TableConfigUtilsTest {
     }
 
     // input field name used as destination field
-    ingestionConfig.setTransformConfigs(Collections.singletonList(new TransformConfig("myCol", "reverse(myCol)")));
+    ingestionConfig.setTransformConfigs(Collections.singletonList(new TransformConfig("myCol",
+        "reverse(myCol)", null, null)));
     try {
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should fail due to use of myCol as arguments and columnName");
@@ -418,7 +424,8 @@ public class TableConfigUtilsTest {
 
     // input field name used as destination field
     ingestionConfig.setTransformConfigs(
-        Collections.singletonList(new TransformConfig("myCol", "Groovy({x + y + myCol}, x, myCol, y)")));
+        Collections.singletonList(new TransformConfig("myCol", "Groovy({x + y + myCol}, x, myCol, y)",
+            null, null)));
     try {
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should fail due to use of myCol as arguments and columnName");
@@ -428,7 +435,10 @@ public class TableConfigUtilsTest {
 
     // duplicate transform config
     ingestionConfig.setTransformConfigs(
-        Arrays.asList(new TransformConfig("myCol", "reverse(x)"), new TransformConfig("myCol", "lower(y)")));
+        Arrays.asList(new TransformConfig("myCol", "reverse(x)", null, null),
+            new TransformConfig("myCol", "lower(y)",
+            null,
+            null)));
     try {
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should fail due to duplicate transform config");
@@ -437,8 +447,9 @@ public class TableConfigUtilsTest {
     }
 
     // derived columns - should pass
-    ingestionConfig.setTransformConfigs(Arrays.asList(new TransformConfig("transformedCol", "reverse(x)"),
-        new TransformConfig("myCol", "lower(transformedCol)")));
+    ingestionConfig.setTransformConfigs(Arrays.asList(new TransformConfig("transformedCol",
+            "reverse(x)", null, null),
+        new TransformConfig("myCol", "lower(transformedCol)", null, null)));
     TableConfigUtils.validate(tableConfig, schema);
 
     // invalid field name in schema with matching prefix from complexConfigType's prefixesToRename
