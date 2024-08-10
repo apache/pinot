@@ -8,7 +8,7 @@
   {
     "event_id": "bb",
     "description" : "first",
-    "dedupTime": 2000,
+    "dedupTime": 6000,
     "secondsSinceEpoch": 1000
   },
   {

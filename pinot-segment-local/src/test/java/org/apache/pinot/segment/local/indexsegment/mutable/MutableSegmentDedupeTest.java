@@ -76,6 +76,9 @@ public class MutableSegmentDedupeTest {
         recordReader.next(reuse);
         GenericRow transformedRow = recordTransformer.transform(reuse);
         _mutableSegmentImpl.index(transformedRow, null);
+        if (dedupEnabled) {
+          partitionDedupMetadataManager.removeExpiredPrimaryKeys();
+        }
         reuse.clear();
       }
     }
@@ -126,13 +129,27 @@ public class MutableSegmentDedupeTest {
   }
 
   @Test
+  public void testDedupWithMetadataTTLWithoutDedupTimeColumn()
+      throws Exception {
+    setup(true, 1000, null);
+    checkGeneratedSegmentDataWhenTableTimeColumnIsUsedAsDedupTimeColumn();
+  }
+
+  @Test
   public void testDedupWithMetadataTTLWithTableTimeColumn()
       throws Exception {
     setup(true, 1000, "secondsSinceEpoch");
-    Assert.assertEquals(_mutableSegmentImpl.getNumDocsIndexed(), 2);
+    checkGeneratedSegmentDataWhenTableTimeColumnIsUsedAsDedupTimeColumn();
+  }
+
+  private void checkGeneratedSegmentDataWhenTableTimeColumnIsUsedAsDedupTimeColumn()
+      throws IOException {
+    Assert.assertEquals(_mutableSegmentImpl.getNumDocsIndexed(), 3);
     List<Map<String, String>> rawData = loadJsonFile(DATA_FILE_PATH);
-    verifyGeneratedSegmentDataAgainstRawData(0, 0, rawData);
-    verifyGeneratedSegmentDataAgainstRawData(1, 1, rawData);
+    for (int i = 0; i < 2; i++) {
+      verifyGeneratedSegmentDataAgainstRawData(i, i, rawData);
+    }
+    verifyGeneratedSegmentDataAgainstRawData(2, 3, rawData);
   }
 
   @Test
@@ -141,18 +158,9 @@ public class MutableSegmentDedupeTest {
     setup(true, 1000, "dedupTime");
     Assert.assertEquals(_mutableSegmentImpl.getNumDocsIndexed(), 2);
     List<Map<String, String>> rawData = loadJsonFile(DATA_FILE_PATH);
-    verifyGeneratedSegmentDataAgainstRawData(0, 0, rawData);
-    verifyGeneratedSegmentDataAgainstRawData(1, 1, rawData);
-  }
-
-  @Test
-  public void testDedupWithMetadataTTLWithoutDedupTimeColumn()
-      throws Exception {
-    setup(true, 1000, null);
-    Assert.assertEquals(_mutableSegmentImpl.getNumDocsIndexed(), 2);
-    List<Map<String, String>> rawData = loadJsonFile(DATA_FILE_PATH);
-    verifyGeneratedSegmentDataAgainstRawData(0, 0, rawData);
-    verifyGeneratedSegmentDataAgainstRawData(1, 1, rawData);
+    for (int i = 0; i < 2; i++) {
+      verifyGeneratedSegmentDataAgainstRawData(i, i, rawData);
+    }
   }
 
   private void verifyGeneratedSegmentDataAgainstRawData(
