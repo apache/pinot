@@ -859,7 +859,7 @@ public final class TableConfigUtils {
     }
 
 
-    if (upsertConfig != null && upsertConfig.isEnableConsistentDeletes()) {
+    if (upsertConfig != null && upsertConfig.isEnableDeletedKeysCompactionConsistency()) {
       // enableConsistentDeletes shouldn't exist with metadataTTL
       Preconditions.checkState(upsertConfig.getMetadataTTL() == 0,
           "enableConsistentDeletes and metadataTTL shouldn't exist together for upsert table");

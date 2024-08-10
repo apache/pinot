@@ -49,12 +49,12 @@ public class TableUpsertMetadataManagerFactoryTest {
   public void testCreateForManagerClassWithConsistentDeletes() {
     UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
     upsertConfig.setHashFunction(HashFunction.NONE);
-    upsertConfig.setEnableConsistentDeletes(true);
+    upsertConfig.setEnableDeletedKeysCompactionConsistency(true);
     _tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setUpsertConfig(upsertConfig).build();
     TableUpsertMetadataManager tableUpsertMetadataManager =
         TableUpsertMetadataManagerFactory.create(_tableConfig, null);
     assertNotNull(tableUpsertMetadataManager);
-    assertTrue(tableUpsertMetadataManager instanceof ConcurrentMapTableUpsertMetadataManagerForConsistentDeletes);
+    assertTrue(tableUpsertMetadataManager instanceof BaseTableUpsertMetadataManager);
   }
 }

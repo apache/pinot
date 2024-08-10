@@ -35,18 +35,20 @@ import org.apache.pinot.spi.config.table.UpsertConfig;
  */
 @ThreadSafe
 public class ConcurrentMapTableUpsertMetadataManager extends BaseTableUpsertMetadataManager {
-  private final Map<Integer, ConcurrentMapPartitionUpsertMetadataManager> _partitionMetadataManagerMap =
+  private final Map<Integer, BasePartitionUpsertMetadataManager> _partitionMetadataManagerMap =
       new ConcurrentHashMap<>();
 
   @Override
-  public ConcurrentMapPartitionUpsertMetadataManager getOrCreatePartitionManager(int partitionId) {
+  public BasePartitionUpsertMetadataManager getOrCreatePartitionManager(int partitionId) {
     return _partitionMetadataManagerMap.computeIfAbsent(partitionId,
-        k -> new ConcurrentMapPartitionUpsertMetadataManager(_tableNameWithType, k, _context));
+        k -> _enableConsistentDeletes
+            ? new ConcurrentMapPartitionUpsertMetadataManager(_tableNameWithType, k, _context)
+            : new ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes(_tableNameWithType, k, _context));
   }
 
   @Override
   public void stop() {
-    for (ConcurrentMapPartitionUpsertMetadataManager metadataManager : _partitionMetadataManagerMap.values()) {
+    for (BasePartitionUpsertMetadataManager metadataManager : _partitionMetadataManagerMap.values()) {
       metadataManager.stop();
     }
   }
@@ -82,7 +84,7 @@ public class ConcurrentMapTableUpsertMetadataManager extends BaseTableUpsertMeta
   @Override
   public void close()
       throws IOException {
-    for (ConcurrentMapPartitionUpsertMetadataManager metadataManager : _partitionMetadataManagerMap.values()) {
+    for (BasePartitionUpsertMetadataManager metadataManager : _partitionMetadataManagerMap.values()) {
       metadataManager.close();
     }
   }

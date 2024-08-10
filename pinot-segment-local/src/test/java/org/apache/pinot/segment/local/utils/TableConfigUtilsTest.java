@@ -1964,7 +1964,7 @@ public class TableConfigUtilsTest {
 
     // test enableConsistentDeletes shouldn't exist with metadataTTL
     upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
-    upsertConfig.setEnableConsistentDeletes(true);
+    upsertConfig.setEnableDeletedKeysCompactionConsistency(true);
     upsertConfig.setMetadataTTL(1.0);
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setStreamConfigs(streamConfigs)
         .setUpsertConfig(upsertConfig).setRoutingConfig(
@@ -1979,7 +1979,7 @@ public class TableConfigUtilsTest {
 
     // test enableConsistentDeletes shouldn't exist with enablePreload
     upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
-    upsertConfig.setEnableConsistentDeletes(true);
+    upsertConfig.setEnableDeletedKeysCompactionConsistency(true);
     upsertConfig.setEnablePreload(true);
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setStreamConfigs(streamConfigs)
         .setUpsertConfig(upsertConfig).setRoutingConfig(
@@ -1994,7 +1994,7 @@ public class TableConfigUtilsTest {
 
     // test enableConsistentDeletes should exist with deletedKeysTTL
     upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
-    upsertConfig.setEnableConsistentDeletes(true);
+    upsertConfig.setEnableDeletedKeysCompactionConsistency(true);
     upsertConfig.setDeletedKeysTTL(0);
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setStreamConfigs(streamConfigs)
         .setUpsertConfig(upsertConfig).setRoutingConfig(
@@ -2009,7 +2009,7 @@ public class TableConfigUtilsTest {
 
     // test enableConsistentDeletes should exist with enableSnapshot
     upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
-    upsertConfig.setEnableConsistentDeletes(true);
+    upsertConfig.setEnableDeletedKeysCompactionConsistency(true);
     upsertConfig.setDeletedKeysTTL(100);
     upsertConfig.setEnableSnapshot(false);
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setStreamConfigs(streamConfigs)
@@ -2025,7 +2025,7 @@ public class TableConfigUtilsTest {
 
     // test enableConsistentDeletes should exist with UpsertCompactionTask
     upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
-    upsertConfig.setEnableConsistentDeletes(true);
+    upsertConfig.setEnableDeletedKeysCompactionConsistency(true);
     upsertConfig.setDeletedKeysTTL(100);
     upsertConfig.setEnableSnapshot(true);
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setStreamConfigs(streamConfigs)

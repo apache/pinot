@@ -76,11 +76,11 @@ public class UpsertConfig extends BaseJsonConfig {
   @JsonPropertyDescription("TTL for upsert metadata cleanup for deleted keys, it uses the same unit as comparison col")
   private double _deletedKeysTTL;
 
+  @JsonPropertyDescription("If we are using deletionKeysTTL + compaction we need to enable this for data consistency")
+  private boolean _enableDeletedKeysCompactionConsistency;
+
   @JsonPropertyDescription("Whether to preload segments for fast upsert metadata recovery")
   private boolean _enablePreload;
-
-  @JsonPropertyDescription("If we are using deletion + compaction we need to enable this for data consistency")
-  private boolean _enableConsistentDeletes;
 
   @JsonPropertyDescription("Configure the way to provide consistent view for upsert table")
   private ConsistencyMode _consistencyMode = ConsistencyMode.NONE;
@@ -163,8 +163,8 @@ public class UpsertConfig extends BaseJsonConfig {
     return _enablePreload;
   }
 
-  public boolean isEnableConsistentDeletes() {
-    return _enableConsistentDeletes;
+  public boolean isEnableDeletedKeysCompactionConsistency() {
+    return _enableDeletedKeysCompactionConsistency;
   }
 
   public ConsistencyMode getConsistencyMode() {
@@ -277,8 +277,8 @@ public class UpsertConfig extends BaseJsonConfig {
     _dropOutOfOrderRecord = dropOutOfOrderRecord;
   }
 
-  public void setEnableConsistentDeletes(boolean enableConsistentDeletes) {
-    _enableConsistentDeletes = enableConsistentDeletes;
+  public void setEnableDeletedKeysCompactionConsistency(boolean enableDeletedKeysCompactionConsistency) {
+    _enableDeletedKeysCompactionConsistency = enableDeletedKeysCompactionConsistency;
   }
 
   public void setMetadataManagerClass(String metadataManagerClass) {
