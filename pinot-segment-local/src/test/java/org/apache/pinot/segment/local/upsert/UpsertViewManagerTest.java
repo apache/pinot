@@ -20,8 +20,6 @@ package org.apache.pinot.segment.local.upsert;
 
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.Map;
-import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
@@ -57,40 +55,5 @@ public class UpsertViewManagerTest {
     segCtx1 = new SegmentContext(seg1);
     mgr.setSegmentContexts(Collections.singletonList(segCtx1), new HashMap<>());
     assertNull(segCtx1.getQueryableDocIdsSnapshot());
-  }
-
-  @Test
-  public void testNeedForceRefresh() {
-    UpsertViewManager mgr = new UpsertViewManager(UpsertConfig.ConsistencyMode.SYNC, mock(UpsertContext.class));
-    assertNull(mgr.getSegmentQueryableDocIdsMap());
-    assertTrue(mgr.needForceRefresh());
-
-    IndexSegment seg1 = mock(MutableSegment.class);
-    when(seg1.getSegmentName()).thenReturn("seg1");
-    IndexSegment seg2 = mock(ImmutableSegment.class);
-    when(seg2.getSegmentName()).thenReturn("seg2");
-    mgr.trackSegment(seg1);
-    mgr.trackSegment(seg2);
-    assertTrue(mgr.needForceRefresh());
-
-    mgr.doBatchRefreshUpsertView(-1, true);
-    Map<IndexSegment, MutableRoaringBitmap> upsertView = mgr.getSegmentQueryableDocIdsMap();
-    assertNotNull(upsertView);
-    // Empty bitmaps are set in segmentContexts for segments without validDocIds bitmaps.
-    assertTrue(upsertView.get(seg1).isEmpty());
-    assertTrue(upsertView.get(seg2).isEmpty());
-    assertFalse(mgr.needForceRefresh());
-
-    // Missing segment in upsert view.
-    IndexSegment seg3 = mock(ImmutableSegment.class);
-    when(seg3.getSegmentName()).thenReturn("seg3");
-    mgr.trackSegment(seg3);
-    assertTrue(mgr.needForceRefresh());
-
-    // Having extra segment in upsert view.
-    mgr.doBatchRefreshUpsertView(-1, true);
-    assertFalse(mgr.needForceRefresh());
-    mgr.untrackSegment(seg3);
-    assertTrue(mgr.needForceRefresh());
   }
 }

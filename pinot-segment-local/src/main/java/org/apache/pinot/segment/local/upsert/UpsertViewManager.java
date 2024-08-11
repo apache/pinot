@@ -186,7 +186,7 @@ public class UpsertViewManager {
     if (upsertViewFreshnessMs < 0) {
       upsertViewFreshnessMs = _upsertViewRefreshIntervalMs;
     }
-    doBatchRefreshUpsertView(upsertViewFreshnessMs, needForceRefresh());
+    doBatchRefreshUpsertView(upsertViewFreshnessMs, false);
     Map<IndexSegment, MutableRoaringBitmap> currentUpsertView = _segmentQueryableDocIdsMap;
     for (SegmentContext segmentContext : segmentContexts) {
       IndexSegment segment = segmentContext.getIndexSegment();
@@ -195,20 +195,6 @@ public class UpsertViewManager {
         segmentContext.setQueryableDocIdsSnapshot(segmentView);
       }
     }
-  }
-
-  @VisibleForTesting
-  boolean needForceRefresh() {
-    // Check if any segment membership changes against the current upsert view, if so, force refresh. Need this check
-    // because when replacing segment, we need to include the new segment into the upsert view for the query, and we
-    // need to remove the old segment from upsert view when replacement is done for the query. This check is done by
-    // the query thread after getting the _upsertViewTrackedSegmentsLock, so that the tracked segments are not changed.
-    Map<IndexSegment, MutableRoaringBitmap> currentView = _segmentQueryableDocIdsMap;
-    if (currentView == null) {
-      return true;
-    }
-    Set<IndexSegment> currentSegments = currentView.keySet();
-    return !_trackedSegments.containsAll(currentSegments) || !currentSegments.containsAll(_trackedSegments);
   }
 
   private void setSegmentContexts(List<SegmentContext> segmentContexts) {
@@ -244,10 +230,10 @@ public class UpsertViewManager {
         if (current == null) {
           LOGGER.debug("Current upsert view is still null");
         } else {
-          current.forEach((segment, bitmap) -> LOGGER.debug(
-              "Current upsert view of segment: {}, type: {}, ref: {}, total: {}, valid: {}", segment.getSegmentName(),
-              (segment instanceof ImmutableSegment ? "imm" : "mut"), segment.hashCode(),
-              segment.getSegmentMetadata().getTotalDocs(), bitmap.getCardinality()));
+          current.forEach(
+              (segment, bitmap) -> LOGGER.debug("Current upsert view of segment: {}, type: {}, total: {}, valid: {}",
+                  segment.getSegmentName(), (segment instanceof ImmutableSegment ? "imm" : "mut"),
+                  segment.getSegmentMetadata().getTotalDocs(), bitmap.getCardinality()));
         }
       }
       Map<IndexSegment, MutableRoaringBitmap> updated = new HashMap<>();
@@ -258,26 +244,21 @@ public class UpsertViewManager {
         if (current == null || current.get(segment) == null || _updatedSegmentsSinceLastRefresh.contains(segment)) {
           updated.put(segment, UpsertUtils.getQueryableDocIdsSnapshotFromSegment(segment, true));
           if (LOGGER.isDebugEnabled()) {
-            LOGGER.debug("Update upsert view of segment: {}, type: {}, ref: {}, total: {}, valid: {}, reason: {}",
-                segment.getSegmentName(), (segment instanceof ImmutableSegment ? "imm" : "mut"), segment.hashCode(),
+            LOGGER.debug("Update upsert view of segment: {}, type: {}, total: {}, valid: {}, reason: {}",
+                segment.getSegmentName(), (segment instanceof ImmutableSegment ? "imm" : "mut"),
                 segment.getSegmentMetadata().getTotalDocs(), updated.get(segment).getCardinality(),
                 current == null || current.get(segment) == null ? "no view yet" : "bitmap updated");
           }
         } else {
           updated.put(segment, current.get(segment));
-          if (LOGGER.isDebugEnabled()) {
-            LOGGER.debug("Reuse upsert view of segment: {}, type: {}, ref: {}, total: {}, valid: {}",
-                segment.getSegmentName(), (segment instanceof ImmutableSegment ? "imm" : "mut"), segment.hashCode(),
-                segment.getSegmentMetadata().getTotalDocs(), updated.get(segment).getCardinality());
-          }
         }
       }
       // Swap in the new consistent set of bitmaps.
       if (LOGGER.isDebugEnabled()) {
-        updated.forEach((segment, bitmap) -> LOGGER.debug(
-            "Updated upsert view of segment: {}, type: {}, ref: {}, total: {}, valid: {}", segment.getSegmentName(),
-            (segment instanceof ImmutableSegment ? "imm" : "mut"), segment.hashCode(),
-            segment.getSegmentMetadata().getTotalDocs(), bitmap.getCardinality()));
+        updated.forEach(
+            (segment, bitmap) -> LOGGER.debug("Updated upsert view of segment: {}, type: {}, total: {}, valid: {}",
+                segment.getSegmentName(), (segment instanceof ImmutableSegment ? "imm" : "mut"),
+                segment.getSegmentMetadata().getTotalDocs(), bitmap.getCardinality()));
       }
       _segmentQueryableDocIdsMap = updated;
       _updatedSegmentsSinceLastRefresh.clear();
@@ -306,6 +287,15 @@ public class UpsertViewManager {
       if (segment instanceof MutableSegment) {
         _optionalSegments.add(segment.getSegmentName());
       }
+      if (_consistencyMode == UpsertConfig.ConsistencyMode.SNAPSHOT) {
+        // Note: it's possible the segment is already tracked and the _trackedSegments doesn't really change here. But
+        // we should force to refresh the upsert view to include the latest bitmaps of the segments. This is
+        // important to fix a subtle race condition when commiting mutable segment. During segment replacement, the
+        // queries can access both mutable and immutable segments. But as replacement is done, the new queries can
+        // only access the immutable segment, thus require latest bitmap of the segment in the upsert view.
+        // It's required to refresh with _trackedSegmentsLock so queries are blocked until upsert view is updated.
+        doBatchRefreshUpsertView(0, true);
+      }
     } finally {
       _trackedSegmentsLock.writeLock().unlock();
     }
@@ -318,6 +308,8 @@ public class UpsertViewManager {
       if (segment instanceof MutableSegment) {
         _optionalSegments.remove(segment.getSegmentName());
       }
+      // No need to eagerly refresh the upsert view for SNAPSHOT mode when untracking a segment, as the untracked
+      // segment won't be used by any new queries, thus it can be removed when next refresh happens later.
     } finally {
       _trackedSegmentsLock.writeLock().unlock();
     }

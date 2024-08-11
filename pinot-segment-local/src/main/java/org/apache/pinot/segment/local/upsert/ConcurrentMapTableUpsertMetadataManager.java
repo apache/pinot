@@ -108,14 +108,13 @@ public class ConcurrentMapTableUpsertMetadataManager extends BaseTableUpsertMeta
       for (SegmentContext segmentContext : segmentContexts) {
         IndexSegment segment = segmentContext.getIndexSegment();
         if (segmentContext.getQueryableDocIdsSnapshot() == null) {
-          LOGGER.debug("No upsert view for segment: {}, type: {}, ref: {}, total: {}", segment.getSegmentName(),
-              (segment instanceof ImmutableSegment ? "imm" : "mut"), segment.hashCode(),
-              segment.getSegmentMetadata().getTotalDocs());
+          LOGGER.debug("No upsert view for segment: {}, type: {}, total: {}", segment.getSegmentName(),
+              (segment instanceof ImmutableSegment ? "imm" : "mut"), segment.getSegmentMetadata().getTotalDocs());
         } else {
           int cardCnt = segmentContext.getQueryableDocIdsSnapshot().getCardinality();
-          LOGGER.debug("Got upsert view of segment: {}, type: {}, ref: {}, total: {}, valid: {}",
-              segment.getSegmentName(), (segment instanceof ImmutableSegment ? "imm" : "mut"), segment.hashCode(),
-              segment.getSegmentMetadata().getTotalDocs(), cardCnt);
+          LOGGER.debug("Got upsert view of segment: {}, type: {}, total: {}, valid: {}", segment.getSegmentName(),
+              (segment instanceof ImmutableSegment ? "imm" : "mut"), segment.getSegmentMetadata().getTotalDocs(),
+              cardCnt);
         }
       }
     }

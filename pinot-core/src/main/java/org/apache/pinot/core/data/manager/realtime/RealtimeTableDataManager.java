@@ -644,7 +644,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       SegmentDataManager duoSegmentDataManager = new DuoSegmentDataManager(newSegmentManager, oldSegmentManager);
       registerSegment(segmentName, duoSegmentDataManager, partitionUpsertMetadataManager);
       partitionUpsertMetadataManager.replaceSegment(immutableSegment, oldSegment);
-      registerSegment(segmentName, newSegmentManager);
+      registerSegment(segmentName, newSegmentManager, partitionUpsertMetadataManager);
     }
     _logger.info("Replaced {} segment: {} with upsert enabled and consistency mode: {}",
         oldSegment instanceof ImmutableSegment ? "immutable" : "mutable", segmentName, consistencyMode);
@@ -655,7 +655,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   private void registerSegment(String segmentName, SegmentDataManager segmentDataManager,
       @Nullable PartitionUpsertMetadataManager partitionUpsertMetadataManager) {
     if (partitionUpsertMetadataManager != null) {
-      // Register segment to the upsert metadata manager before registering it to table manager, so that the upser
+      // Register segment to the upsert metadata manager before registering it to table manager, so that the upsert
       // metadata manger can update the upsert view before the segment becomes visible to queries.
       partitionUpsertMetadataManager.trackSegmentForUpsertView(segmentDataManager.getSegment());
     }
