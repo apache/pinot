@@ -24,18 +24,48 @@ import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.SocketException;
 import java.net.UnknownHostException;
-import org.mockito.MockedStatic;
+import org.mockito.MockedConstruction;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.*;
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
 
 
 public class NetUtilsTest {
   private static final String LOCAL_ADDRESS_IPV4 = "172.16.184.0";
   private static final String LOCAL_ADDRESS_IPV6 = "2001:db8::1";
+
+  private enum NetworkEnv {
+    IPV4, IPV6, DUAL_STACK
+  }
+
+  /**
+   * Initialize the mock DatagramSocket constructor with the given mock InetAddress and network environment.
+   */
+  private static MockedConstruction.MockInitializer<DatagramSocket> initDatagramSocket(InetAddress mockInetAddress,
+      NetworkEnv networkEnv) {
+    return (mockDatagramSocket, context) -> {
+      when(mockDatagramSocket.getLocalAddress()).thenReturn(mockInetAddress);
+      switch (networkEnv) {
+        case IPV4:
+          // IPv6 address is not available
+          doThrow(new java.io.UncheckedIOException(new java.net.NoRouteToHostException())).when(mockDatagramSocket)
+              .connect(isA(Inet6Address.class), anyInt());
+          break;
+        case IPV6:
+          doThrow(new java.io.UncheckedIOException(new java.net.SocketException())).when(mockDatagramSocket)
+              .connect(isA(Inet4Address.class), anyInt());
+          break;
+        case DUAL_STACK:
+          doNothing().when(mockDatagramSocket).connect(isA(InetAddress.class), anyInt());
+          break;
+        default:
+          throw new IllegalArgumentException("Invalid network environment: " + networkEnv);
+      }
+    };
+  }
 
   @BeforeMethod
   public void setUp() {
@@ -44,20 +74,17 @@ public class NetUtilsTest {
 
   @Test(description = "Test getHostAddress with no preferIPv6Addresses in IPv4 only environment")
   public void testGetHostAddressIPv4Env() {
-    DatagramSocket mockDatagramSocket = mock(DatagramSocket.class);
     InetAddress mockInetAddress = mock(InetAddress.class);
-    when(mockDatagramSocket.getLocalAddress()).thenReturn(mockInetAddress);
-    // IPv6 address is not available
-    doThrow(new java.io.UncheckedIOException(new java.net.NoRouteToHostException()))
-        .when(mockDatagramSocket).connect(isA(Inet6Address.class), anyInt());
     when(mockInetAddress.isAnyLocalAddress()).thenReturn(false);
     when(mockInetAddress.getHostAddress()).thenReturn(LOCAL_ADDRESS_IPV4);
 
-    try (MockedStatic<DatagramSocket> mockedStaticDatagramSocket = mockStatic(DatagramSocket.class)) {
-      mockedStaticDatagramSocket.when(DatagramSocket::new).thenReturn(mockDatagramSocket);
+    try (MockedConstruction<DatagramSocket> mockedConstructionDatagramSocket = mockConstruction(DatagramSocket.class,
+        initDatagramSocket(mockInetAddress, NetworkEnv.IPV4))) {
       String hostAddress = NetUtils.getHostAddress();
+      DatagramSocket mockDatagramSocket = mockedConstructionDatagramSocket.constructed().get(0);
 
       assertEquals(LOCAL_ADDRESS_IPV4, hostAddress);
+      assertEquals(1, mockedConstructionDatagramSocket.constructed().size());
       verify(mockDatagramSocket, times(1)).connect(any(), anyInt());
     } catch (SocketException | UnknownHostException e) {
       Assert.fail("Should not throw: " + e.getMessage());
@@ -68,20 +95,17 @@ public class NetUtilsTest {
   public void testGetHostAddressIPv4EnvIPv6Preferred() {
     System.setProperty("java.net.preferIPv6Addresses", "true");
 
-    DatagramSocket mockDatagramSocket = mock(DatagramSocket.class);
     InetAddress mockInetAddress = mock(InetAddress.class);
-    when(mockDatagramSocket.getLocalAddress()).thenReturn(mockInetAddress);
-    // IPv6 address is not available
-    doThrow(new java.io.UncheckedIOException(new java.net.NoRouteToHostException()))
-        .when(mockDatagramSocket).connect(isA(Inet6Address.class), anyInt());
     when(mockInetAddress.isAnyLocalAddress()).thenReturn(false);
     when(mockInetAddress.getHostAddress()).thenReturn(LOCAL_ADDRESS_IPV4);
 
-    try (MockedStatic<DatagramSocket> mockedStaticDatagramSocket = mockStatic(DatagramSocket.class)) {
-      mockedStaticDatagramSocket.when(DatagramSocket::new).thenReturn(mockDatagramSocket);
+    try (MockedConstruction<DatagramSocket> mockedConstructionDatagramSocket = mockConstruction(DatagramSocket.class,
+        initDatagramSocket(mockInetAddress, NetworkEnv.IPV4))) {
       String hostAddress = NetUtils.getHostAddress();
+      DatagramSocket mockDatagramSocket = mockedConstructionDatagramSocket.constructed().get(0);
 
       assertEquals(LOCAL_ADDRESS_IPV4, hostAddress);
+      assertEquals(1, mockedConstructionDatagramSocket.constructed().size());
       verify(mockDatagramSocket, times(2)).connect(any(), anyInt());
     } catch (SocketException | UnknownHostException e) {
       Assert.fail("Should not throw: " + e.getMessage());
@@ -90,19 +114,17 @@ public class NetUtilsTest {
 
   @Test(description = "Test getHostAddress with no preferIPv6Addresses in dual stack environment")
   public void testGetHostAddressDualStackEnv() {
-    DatagramSocket mockDatagramSocket = mock(DatagramSocket.class);
     InetAddress mockInetAddress = mock(InetAddress.class);
-    when(mockDatagramSocket.getLocalAddress()).thenReturn(mockInetAddress);
-    // Both IPv4/IPv6 address is available
-    doNothing().when(mockDatagramSocket).connect(isA(InetAddress.class), anyInt());
     when(mockInetAddress.isAnyLocalAddress()).thenReturn(false);
     when(mockInetAddress.getHostAddress()).thenReturn(LOCAL_ADDRESS_IPV4);
 
-    try (MockedStatic<DatagramSocket> mockedStaticDatagramSocket = mockStatic(DatagramSocket.class)) {
-      mockedStaticDatagramSocket.when(DatagramSocket::new).thenReturn(mockDatagramSocket);
+    try (MockedConstruction<DatagramSocket> mockedConstructionDatagramSocket = mockConstruction(DatagramSocket.class,
+        initDatagramSocket(mockInetAddress, NetworkEnv.DUAL_STACK))) {
       String hostAddress = NetUtils.getHostAddress();
+      DatagramSocket mockDatagramSocket = mockedConstructionDatagramSocket.constructed().get(0);
 
       assertEquals(LOCAL_ADDRESS_IPV4, hostAddress);
+      assertEquals(1, mockedConstructionDatagramSocket.constructed().size());
       verify(mockDatagramSocket, times(1)).connect(any(), anyInt());
     } catch (SocketException | UnknownHostException e) {
       Assert.fail("Should not throw: " + e.getMessage());
@@ -113,19 +135,17 @@ public class NetUtilsTest {
   public void testGetHostAddressDualStackEnvIPv6Preferred() {
     System.setProperty("java.net.preferIPv6Addresses", "true");
 
-    DatagramSocket mockDatagramSocket = mock(DatagramSocket.class);
     InetAddress mockInetAddress = mock(InetAddress.class);
-    when(mockDatagramSocket.getLocalAddress()).thenReturn(mockInetAddress);
-    // Both IPv4/IPv6 address is available
-    doNothing().when(mockDatagramSocket).connect(isA(InetAddress.class), anyInt());
     when(mockInetAddress.isAnyLocalAddress()).thenReturn(false);
     when(mockInetAddress.getHostAddress()).thenReturn(LOCAL_ADDRESS_IPV6);
 
-    try (MockedStatic<DatagramSocket> mockedStaticDatagramSocket = mockStatic(DatagramSocket.class)) {
-      mockedStaticDatagramSocket.when(DatagramSocket::new).thenReturn(mockDatagramSocket);
+    try (MockedConstruction<DatagramSocket> mockedConstructionDatagramSocket = mockConstruction(DatagramSocket.class,
+        initDatagramSocket(mockInetAddress, NetworkEnv.DUAL_STACK))) {
       String hostAddress = NetUtils.getHostAddress();
+      DatagramSocket mockDatagramSocket = mockedConstructionDatagramSocket.constructed().get(0);
 
       assertEquals(LOCAL_ADDRESS_IPV6, hostAddress);
+      assertEquals(1, mockedConstructionDatagramSocket.constructed().size());
       verify(mockDatagramSocket, times(1)).connect(any(), anyInt());
     } catch (SocketException | UnknownHostException e) {
       Assert.fail("Should not throw: " + e.getMessage());
@@ -134,21 +154,17 @@ public class NetUtilsTest {
 
   @Test(description = "Test getHostAddress with no preferIPv6Addresses in IPv6 only environment")
   public void testGetHostAddressIPv6Env() {
-    DatagramSocket mockDatagramSocket = mock(DatagramSocket.class);
     InetAddress mockInetAddress = mock(InetAddress.class);
-    when(mockDatagramSocket.getLocalAddress()).thenReturn(mockInetAddress);
-    // Only IPv6 address is available
-    doThrow(new java.io.UncheckedIOException(new java.net.SocketException()))
-        .when(mockDatagramSocket).connect(isA(Inet4Address.class), anyInt());
     when(mockInetAddress.isAnyLocalAddress()).thenReturn(false);
     when(mockInetAddress.getHostAddress()).thenReturn(LOCAL_ADDRESS_IPV6);
 
-    try (MockedStatic<DatagramSocket> mockedStaticDatagramSocket = mockStatic(DatagramSocket.class)) {
-      mockedStaticDatagramSocket.when(DatagramSocket::new).thenReturn(mockDatagramSocket);
+    try (MockedConstruction<DatagramSocket> mockedConstructionDatagramSocket = mockConstruction(DatagramSocket.class,
+        initDatagramSocket(mockInetAddress, NetworkEnv.IPV6))) {
       String hostAddress = NetUtils.getHostAddress();
+      DatagramSocket mockDatagramSocket = mockedConstructionDatagramSocket.constructed().get(0);
 
       assertEquals(LOCAL_ADDRESS_IPV6, hostAddress);
-      // Two attempts to connect because ipv4 is tried first
+      assertEquals(1, mockedConstructionDatagramSocket.constructed().size());
       verify(mockDatagramSocket, times(2)).connect(any(), anyInt());
     } catch (SocketException | UnknownHostException e) {
       Assert.fail("Should not throw: " + e.getMessage());
@@ -159,20 +175,17 @@ public class NetUtilsTest {
   public void testGetHostAddressIPv6EnvIPv6Preferred() {
     System.setProperty("java.net.preferIPv6Addresses", "true");
 
-    DatagramSocket mockDatagramSocket = mock(DatagramSocket.class);
     InetAddress mockInetAddress = mock(InetAddress.class);
-    when(mockDatagramSocket.getLocalAddress()).thenReturn(mockInetAddress);
-    // Only IPv6 address is available
-    doThrow(new java.io.UncheckedIOException(new java.net.SocketException()))
-        .when(mockDatagramSocket).connect(isA(Inet4Address.class), anyInt());
     when(mockInetAddress.isAnyLocalAddress()).thenReturn(false);
     when(mockInetAddress.getHostAddress()).thenReturn(LOCAL_ADDRESS_IPV6);
 
-    try (MockedStatic<DatagramSocket> mockedStaticDatagramSocket = mockStatic(DatagramSocket.class)) {
-      mockedStaticDatagramSocket.when(DatagramSocket::new).thenReturn(mockDatagramSocket);
+    try (MockedConstruction<DatagramSocket> mockedConstructionDatagramSocket = mockConstruction(DatagramSocket.class,
+        initDatagramSocket(mockInetAddress, NetworkEnv.IPV6))) {
       String hostAddress = NetUtils.getHostAddress();
+      DatagramSocket mockDatagramSocket = mockedConstructionDatagramSocket.constructed().get(0);
 
       assertEquals(LOCAL_ADDRESS_IPV6, hostAddress);
+      assertEquals(1, mockedConstructionDatagramSocket.constructed().size());
       verify(mockDatagramSocket, times(1)).connect(any(), anyInt());
     } catch (SocketException | UnknownHostException e) {
       Assert.fail("Should not throw: " + e.getMessage());
