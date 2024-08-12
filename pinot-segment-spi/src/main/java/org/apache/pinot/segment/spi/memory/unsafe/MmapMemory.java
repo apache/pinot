@@ -170,14 +170,9 @@ public class MmapMemory implements Memory {
     }
 
     protected void madvise(long size) {
-      String defaultAdvice = System.getenv("PINOT_MMAP_ADVICE");
-      if (defaultAdvice != null) {
-        try {
-          int advice = Integer.parseInt(defaultAdvice);
-          madvise(size, advice);
-        } catch (NumberFormatException ignored) {
-          LOGGER.warn("Invalid value specified for PINOT_MMAP_ADVICE. Expects a posix compatible integer");
-        }
+      int defaultAdvice = MmapMemoryConfig.getDefaultAdvice();
+      if (defaultAdvice >= 0) {
+        madvise(size, defaultAdvice);
       }
     }
   }
