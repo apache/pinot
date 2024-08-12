@@ -34,7 +34,6 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
@@ -75,6 +74,7 @@ import org.apache.pinot.segment.local.utils.SchemaUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.SchemaInfo;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.glassfish.grizzly.http.server.Request;
@@ -83,7 +83,6 @@ import org.glassfish.jersey.media.multipart.FormDataMultiPart;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static java.util.Arrays.stream;
 import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
@@ -128,10 +127,15 @@ public class PinotSchemaRestletResource {
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_SCHEMA_INFO)
   @ApiOperation(value = "List all schemas info with count of field specs", notes = "Lists all schemas with field "
       + "count details")
-  public List<TableCache.SchemaInfo> getSchemaInfo(@Context HttpHeaders headers) {
-    List<TableCache.SchemaInfo> schemasInfo = new ArrayList<>();
+  public List<SchemaInfo> getSchemaInfo(@Context HttpHeaders headers) {
+    List<SchemaInfo> schemasInfo = new ArrayList<>();
     TableCache tableCache = _pinotHelixResourceManager.getTableCache();
-    schemasInfo = new ArrayList<>(tableCache.getSchemaInfoMap().values());
+    Map<String, TableCache.SchemaInfo> schemaInfomap = tableCache.getSchemaInfoMap();
+    for (Map.Entry<String, TableCache.SchemaInfo> entry : schemaInfomap.entrySet()) {
+      TableCache.SchemaInfo schemaInfoEntry = entry.getValue();
+      schemasInfo.add(new SchemaInfo(entry.getKey(), schemaInfoEntry.getDimensionFieldSpecsCount(),
+          schemaInfoEntry.getDateTimeFieldSpecsCount(), schemaInfoEntry.getMetricFieldSpecsCount()));
+    }
     return schemasInfo;
   }
 

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.config.provider;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -353,9 +354,11 @@ public class TableCache implements PinotConfigProvider {
   private void putSchema(ZNRecord znRecord)
       throws IOException {
     Schema schema = SchemaUtils.fromZNRecord(znRecord);
+    Map<String, String> columnNameMap = new HashMap<>();
+    SchemaInfo schemaInfo = new SchemaInfo(schema, columnNameMap);
+    schemaInfo.setDimensionFieldSpecsCount(schema.getDimensionFieldSpecs().size());
     addBuiltInVirtualColumns(schema);
     String schemaName = schema.getSchemaName();
-    Map<String, String> columnNameMap = new HashMap<>();
     if (_ignoreCase) {
       for (String columnName : schema.getColumnNames()) {
         columnNameMap.put(columnName.toLowerCase(), columnName);
@@ -365,7 +368,7 @@ public class TableCache implements PinotConfigProvider {
         columnNameMap.put(columnName, columnName);
       }
     }
-    _schemaInfoMap.put(schemaName, new SchemaInfo(schema, columnNameMap));
+    _schemaInfoMap.put(schemaName, schemaInfo);
   }
 
   /**
@@ -550,14 +553,39 @@ public class TableCache implements PinotConfigProvider {
   public static class SchemaInfo {
     final Schema _schema;
     final Map<String, String> _columnNameMap;
-    final int _dimensionFieldSpecsCount;
+    int _dimensionFieldSpecsCount;
     final int _dateTimeFieldSpecsCount;
     final int _metricFieldSpecsCount;
+
+    public Schema getSchema() {
+      return _schema;
+    }
+
+    public Map<String, String> getColumnNameMap() {
+      return _columnNameMap;
+    }
+
+    public int getDimensionFieldSpecsCount() {
+      return _dimensionFieldSpecsCount;
+    }
+
+    public void setDimensionFieldSpecsCount(int dimensionFieldSpecsCount) {
+      _dimensionFieldSpecsCount = dimensionFieldSpecsCount;
+    }
+
+    public int getDateTimeFieldSpecsCount() {
+      return _dateTimeFieldSpecsCount;
+    }
+
+    public int getMetricFieldSpecsCount() {
+      return _metricFieldSpecsCount;
+    }
 
     private SchemaInfo(Schema schema, Map<String, String> columnNameMap) {
       _schema = schema;
       _columnNameMap = columnNameMap;
-      _dimensionFieldSpecsCount = schema.getDimensionFieldSpecs().size();
+      //dimensionFieldSpecsCount is already assigned before adding virtual column names before
+      // addBuiltInVirtualColumns()
       _dateTimeFieldSpecsCount = schema.getDateTimeFieldSpecs().size();
       _metricFieldSpecsCount = schema.getMetricFieldSpecs().size();
     }
