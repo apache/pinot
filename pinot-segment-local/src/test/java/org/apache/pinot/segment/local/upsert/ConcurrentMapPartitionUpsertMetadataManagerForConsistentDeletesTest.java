@@ -191,7 +191,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletesTest
   public void setUpContextBuilder() {
     _contextBuilder = new UpsertContext.Builder().setTableConfig(mock(TableConfig.class)).setSchema(mock(Schema.class))
         .setPrimaryKeyColumns(PRIMARY_KEY_COLUMNS).setComparisonColumns(COMPARISON_COLUMNS)
-        .setEnableConsistentDeletes(true).setTableIndexDir(INDEX_DIR).setEnableSnapshot(true)
+        .setEnableDeletedKeysCompactionConsistency(true).setTableIndexDir(INDEX_DIR).setEnableSnapshot(true)
         .setDeleteRecordColumn(DELETE_RECORD_COLUMN).setDeletedKeysTTL(20);
   }
 

@@ -46,7 +46,7 @@ public class UpsertContext {
   private final long _upsertViewRefreshIntervalMs;
   private final File _tableIndexDir;
   private final boolean _dropOutOfOrderRecord;
-  private final boolean _enableConsistentDeletes;
+  private final boolean _enableDeletedKeysCompactionConsistency;
   private final TableDataManager _tableDataManager;
 
   private UpsertContext(TableConfig tableConfig, Schema schema, List<String> primaryKeyColumns,
@@ -54,7 +54,7 @@ public class UpsertContext {
       @Nullable PartialUpsertHandler partialUpsertHandler, boolean enableSnapshot, boolean enablePreload,
       double metadataTTL, double deletedKeysTTL, UpsertConfig.ConsistencyMode consistencyMode,
       long upsertViewRefreshIntervalMs, File tableIndexDir, boolean dropOutOfOrderRecord,
-      boolean enableConsistentDeletes, @Nullable TableDataManager tableDataManager) {
+      boolean enableDeletedKeysCompactionConsistency, @Nullable TableDataManager tableDataManager) {
     _tableConfig = tableConfig;
     _schema = schema;
     _primaryKeyColumns = primaryKeyColumns;
@@ -70,7 +70,7 @@ public class UpsertContext {
     _upsertViewRefreshIntervalMs = upsertViewRefreshIntervalMs;
     _tableIndexDir = tableIndexDir;
     _dropOutOfOrderRecord = dropOutOfOrderRecord;
-    _enableConsistentDeletes = enableConsistentDeletes;
+    _enableDeletedKeysCompactionConsistency = enableDeletedKeysCompactionConsistency;
     _tableDataManager = tableDataManager;
   }
 
@@ -134,8 +134,8 @@ public class UpsertContext {
     return _dropOutOfOrderRecord;
   }
 
-  public boolean isEnableConsistentDeletes() {
-    return _enableConsistentDeletes;
+  public boolean isEnableDeletedKeysCompactionConsistency() {
+    return _enableDeletedKeysCompactionConsistency;
   }
 
   public TableDataManager getTableDataManager() {
@@ -158,7 +158,7 @@ public class UpsertContext {
     private long _upsertViewRefreshIntervalMs;
     private File _tableIndexDir;
     private boolean _dropOutOfOrderRecord;
-    private boolean _enableConsistentDeletes;
+    private boolean _enableDeletedKeysCompactionConsistency;
     private TableDataManager _tableDataManager;
 
     public Builder setTableConfig(TableConfig tableConfig) {
@@ -236,8 +236,8 @@ public class UpsertContext {
       return this;
     }
 
-    public Builder setEnableConsistentDeletes(boolean enableConsistentDeletes) {
-      _enableConsistentDeletes = enableConsistentDeletes;
+    public Builder setEnableDeletedKeysCompactionConsistency(boolean enableDeletedKeysCompactionConsistency) {
+      _enableDeletedKeysCompactionConsistency = enableDeletedKeysCompactionConsistency;
       return this;
     }
 
@@ -256,7 +256,7 @@ public class UpsertContext {
       return new UpsertContext(_tableConfig, _schema, _primaryKeyColumns, _comparisonColumns, _deleteRecordColumn,
           _hashFunction, _partialUpsertHandler, _enableSnapshot, _enablePreload, _metadataTTL, _deletedKeysTTL,
           _consistencyMode, _upsertViewRefreshIntervalMs, _tableIndexDir, _dropOutOfOrderRecord,
-          _enableConsistentDeletes, _tableDataManager);
+          _enableDeletedKeysCompactionConsistency, _tableDataManager);
     }
   }
 }

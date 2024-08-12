@@ -41,7 +41,7 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
   protected UpsertContext _context;
   protected UpsertConfig.ConsistencyMode _consistencyMode;
   protected boolean _enablePreload;
-  protected boolean _enableConsistentDeletes;
+  protected boolean _enableDeletedKeysCompactionConsistency;
 
   @Override
   public void init(TableConfig tableConfig, Schema schema, TableDataManager tableDataManager) {
@@ -72,7 +72,7 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
         enableSnapshot && upsertConfig.isEnablePreload() && tableDataManager.getSegmentPreloadExecutor() != null;
     double metadataTTL = upsertConfig.getMetadataTTL();
     double deletedKeysTTL = upsertConfig.getDeletedKeysTTL();
-    _enableConsistentDeletes = upsertConfig.isEnableDeletedKeysCompactionConsistency();
+    _enableDeletedKeysCompactionConsistency = upsertConfig.isEnableDeletedKeysCompactionConsistency();
     _consistencyMode = upsertConfig.getConsistencyMode();
     if (_consistencyMode == null) {
       _consistencyMode = UpsertConfig.ConsistencyMode.NONE;
@@ -86,7 +86,8 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
         .setEnablePreload(_enablePreload).setMetadataTTL(metadataTTL).setDeletedKeysTTL(deletedKeysTTL)
         .setConsistencyMode(_consistencyMode).setUpsertViewRefreshIntervalMs(upsertViewRefreshIntervalMs)
         .setTableIndexDir(tableIndexDir).setDropOutOfOrderRecord(upsertConfig.isDropOutOfOrderRecord())
-        .setEnableConsistentDeletes(_enableConsistentDeletes).setTableDataManager(tableDataManager).build();
+        .setEnableDeletedKeysCompactionConsistency(_enableDeletedKeysCompactionConsistency)
+        .setTableDataManager(tableDataManager).build();
     LOGGER.info(
         "Initialized {} for table: {} with primary key columns: {}, comparison columns: {}, delete record column: {},"
             + " hash function: {}, upsert mode: {}, enable snapshot: {}, enable preload: {}, metadata TTL: {},"
