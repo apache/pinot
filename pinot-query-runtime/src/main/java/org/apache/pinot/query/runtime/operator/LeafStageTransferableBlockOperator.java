@@ -285,8 +285,8 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
     while (true) {
       BaseResultsBlock resultsBlock;
       try {
-        resultsBlock =
-            _blockingQueue.poll(_context.getDeadlineMs() - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+        long timeout = _context.getDeadlineMs() - System.currentTimeMillis();
+        resultsBlock = _blockingQueue.poll(timeout, TimeUnit.MILLISECONDS);
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
         throw new RuntimeException("Interrupted while waiting for results block", e);
