@@ -18,13 +18,14 @@
  */
 package org.apache.pinot.segment.local.dedup;
 
+import java.io.Closeable;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 
 
-public interface TableDedupMetadataManager {
+public interface TableDedupMetadataManager extends Closeable {
   /**
    * Initialize TableDedupMetadataManager.
    */

@@ -93,4 +93,9 @@ class ConcurrentMapPartitionDedupMetadataManager extends BasePartitionDedupMetad
     }
     return present;
   }
+
+  @Override
+  public void close() {
+    _primaryKeyToSegmentAndTimeMap.clear();
+  }
 }

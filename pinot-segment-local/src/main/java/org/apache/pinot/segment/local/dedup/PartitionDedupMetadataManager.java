@@ -18,11 +18,12 @@
  */
 package org.apache.pinot.segment.local.dedup;
 
+import java.io.Closeable;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 
 
-public interface PartitionDedupMetadataManager {
+public interface PartitionDedupMetadataManager extends Closeable {
   /**
    * Initializes the dedup metadata for the given immutable segment.
    */

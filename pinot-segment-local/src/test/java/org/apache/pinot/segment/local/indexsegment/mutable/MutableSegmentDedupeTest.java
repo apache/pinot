@@ -165,9 +165,9 @@ public class MutableSegmentDedupeTest {
 
   private void verifyGeneratedSegmentDataAgainstRawData(
       int docId, int rawDataIndex, List<Map<String, String>> rawData) {
-      for (String columnName : rawData.get(0).keySet()) {
-        Assert.assertEquals(String.valueOf(_mutableSegmentImpl.getValue(docId, columnName)),
-            String.valueOf(rawData.get(rawDataIndex).get(columnName)));
-      }
+    for (String columnName : rawData.get(0).keySet()) {
+      Assert.assertEquals(String.valueOf(_mutableSegmentImpl.getValue(docId, columnName)),
+          String.valueOf(rawData.get(rawDataIndex).get(columnName)));
+    }
   }
 }
