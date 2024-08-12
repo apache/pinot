@@ -85,6 +85,8 @@ import org.apache.pinot.core.data.manager.realtime.SegmentUploader;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
+import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -972,14 +974,15 @@ public class TablesResource {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     TableDataManager tableDataManager = ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableName);
     Pair<TableConfig, Schema> tableConfigSchema = tableDataManager.fetchTableConfigAndSchema();
-    Schema schema = tableConfigSchema.getValue();
-    Set<String> schemaColumns = schema.getPhysicalColumnNames();
+    IndexLoadingConfig indexLoadingConfig =
+        tableDataManager.getIndexLoadingConfig(tableConfigSchema.getLeft(), tableConfigSchema.getRight());
     List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireAllSegments();
     try {
       boolean mismatchCheck = false;
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
-        Set<String> segmentColumns = SegmentMetadataFetcher.getSegmentColumns(segmentDataManager, columns);
-        if (!segmentColumns.containsAll(schemaColumns)) {
+        SegmentZKMetadata segmentZKMetadata = tableDataManager.fetchZKMetadata(segmentDataManager.getSegmentName());
+        if (tableDataManager.checkReloadSegment(segmentZKMetadata,
+            indexLoadingConfig)) {
           mismatchCheck = true;
           break;
         }

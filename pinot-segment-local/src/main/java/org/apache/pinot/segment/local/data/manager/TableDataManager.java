@@ -123,6 +123,19 @@ public interface TableDataManager {
   boolean tryLoadExistingSegment(SegmentZKMetadata zkMetadata, IndexLoadingConfig indexLoadingConfig);
 
   /**
+   *
+   * First tries to load a segment, and then processes to check if the segment reload is needed for the following
+   * three scenarios:
+   * 1) If the index config version and segment config version are different
+   * 2) If the default columns is updated according to the schema.
+   * 3) If there is addition or deletion of indexes
+   * 4) If there is any change in star trees
+   * 5) If there is any change in column min, max values
+   * @return true if the reload is needed on the segment
+   */
+  boolean checkReloadSegment(SegmentZKMetadata zkMetadata, IndexLoadingConfig indexLoadingConfig);
+
+  /**
    * Downloads a segment and loads it into the table.
    * NOTE: This method is part of the implementation detail of {@link #addOnlineSegment(String)}.
    */
