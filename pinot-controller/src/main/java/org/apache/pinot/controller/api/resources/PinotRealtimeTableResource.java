@@ -103,12 +103,13 @@ public class PinotRealtimeTableResource {
   @ApiOperation(value = "Pause consumption of a realtime table", notes = "Pause the consumption of a realtime table")
   public Response pauseConsumption(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "Description for pausing the consumption") @QueryParam("description") String description,
       @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
     validateTable(tableNameWithType);
     try {
-      return Response.ok(_pinotLLCRealtimeSegmentManager.pauseConsumption(tableNameWithType)).build();
+      return Response.ok(_pinotLLCRealtimeSegmentManager.pauseConsumption(tableNameWithType, description)).build();
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
