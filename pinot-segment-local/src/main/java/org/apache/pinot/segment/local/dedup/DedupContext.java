@@ -78,6 +78,14 @@ public class DedupContext {
     return _dedupTimeColumn;
   }
 
+  public File getTableIndexDir() {
+    return _tableIndexDir;
+  }
+
+  public TableDataManager getTableDataManager() {
+    return _tableDataManager;
+  }
+
   public ServerMetrics getServerMetrics() {
     return _serverMetrics;
   }
