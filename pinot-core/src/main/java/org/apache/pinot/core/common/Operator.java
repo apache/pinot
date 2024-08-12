@@ -21,7 +21,7 @@ package org.apache.pinot.core.common;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.operator.ExecutionStatistics;
-import org.apache.pinot.core.plan.PinotExplainedRelNode;
+import org.apache.pinot.core.plan.ExplainInfo;
 import org.apache.pinot.core.query.request.context.ExplainMode;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
@@ -51,7 +51,7 @@ public interface Operator<T extends Block> {
    *
    * This is the method that ends up being called when using {@link ExplainMode#NODE}.
    */
-  PinotExplainedRelNode.Info getOperatorInfo();
+  ExplainInfo getExplainInfo();
 
   /**
    * Returns the string representation of the operator in a string format.

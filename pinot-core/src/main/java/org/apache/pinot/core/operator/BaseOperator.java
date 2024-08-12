@@ -23,7 +23,7 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.plan.PinotExplainedRelNode;
+import org.apache.pinot.core.plan.ExplainInfo;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.trace.InvocationScope;
 import org.apache.pinot.spi.trace.Tracing;
@@ -52,16 +52,16 @@ public abstract class BaseOperator<T extends Block> implements Operator<T> {
   protected abstract T getNextBlock();
 
   @Override
-  public PinotExplainedRelNode.Info getOperatorInfo() {
+  public ExplainInfo getExplainInfo() {
     ExplainAttributeBuilder attributeBuilder = new ExplainAttributeBuilder();
     explainAttributes(attributeBuilder);
-    return new PinotExplainedRelNode.Info(getExplainName(), attributeBuilder.build(), getChildrenOperatorInfo());
+    return new ExplainInfo(getExplainName(), attributeBuilder.build(), getChildrenExplainInfo());
   }
 
-  protected List<PinotExplainedRelNode.Info> getChildrenOperatorInfo() {
+  protected List<ExplainInfo> getChildrenExplainInfo() {
     return getChildOperators().stream()
         .filter(Objects::nonNull)
-        .map(Operator::getOperatorInfo)
+        .map(Operator::getExplainInfo)
         .collect(Collectors.toList());
   }
 

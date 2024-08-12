@@ -56,7 +56,7 @@ import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.ExplainResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.ExplainV2ResultBlock;
 import org.apache.pinot.core.operator.blocks.results.ResultsBlockUtils;
-import org.apache.pinot.core.plan.PinotExplainedRelNode;
+import org.apache.pinot.core.plan.ExplainInfo;
 import org.apache.pinot.core.plan.Plan;
 import org.apache.pinot.core.plan.maker.PlanMaker;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
@@ -665,8 +665,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       @Nullable ResultsBlockStreamer streamer, List<IndexSegment> selectedSegments) {
 
     if (selectedSegments.isEmpty()) {
-      PinotExplainedRelNode.Info emptyNode =
-          new PinotExplainedRelNode.Info(ExplainPlanRows.ALL_SEGMENTS_PRUNED_ON_SERVER);
+      ExplainInfo emptyNode = new ExplainInfo(ExplainPlanRows.ALL_SEGMENTS_PRUNED_ON_SERVER);
       ExplainV2ResultBlock explainResults = new ExplainV2ResultBlock(queryContext, emptyNode);
 
       return new InstanceResponseBlock(explainResults);
@@ -682,8 +681,8 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     try {
       responseOperator.prefetchAll();
 
-      PinotExplainedRelNode.Info operatorInfo = responseOperator.getOperatorInfo();
-      ExplainV2ResultBlock block = new ExplainV2ResultBlock(queryContext, operatorInfo);
+      ExplainInfo explainInfo = responseOperator.getExplainInfo();
+      ExplainV2ResultBlock block = new ExplainV2ResultBlock(queryContext, explainInfo);
 
       instanceResponse = new InstanceResponseBlock(block);
       // TODO: Study if this metadata can/should be added

@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.plan;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import com.google.common.collect.Lists;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -135,36 +134,5 @@ public class PinotExplainedRelNode extends AbstractRelNode {
 
   public Map<String, Plan.ExplainNode.AttributeValue> getAttributes() {
     return Collections.unmodifiableMap(_attributes);
-  }
-
-  public static class Info {
-    private final String _type;
-    private final Map<String, Plan.ExplainNode.AttributeValue> _attributes;
-    private final List<Info> _inputs;
-
-    public Info(String type) {
-      _type = type;
-      _attributes = Collections.emptyMap();
-      _inputs = Collections.emptyList();
-    }
-
-    @JsonCreator
-    public Info(String type, Map<String, Plan.ExplainNode.AttributeValue> attributes, List<Info> inputs) {
-      _type = type;
-      _attributes = attributes;
-      _inputs = inputs;
-    }
-
-    public String getType() {
-      return _type;
-    }
-
-    public Map<String, Plan.ExplainNode.AttributeValue> getAttributes() {
-      return _attributes;
-    }
-
-    public List<Info> getInputs() {
-      return _inputs;
-    }
   }
 }

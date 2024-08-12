@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.query.request.context;
 
-import org.apache.pinot.core.plan.PinotExplainedRelNode;
+import org.apache.pinot.core.plan.ExplainInfo;
 
 
 public enum ExplainMode {
@@ -38,11 +38,11 @@ public enum ExplainMode {
    */
   DESCRIPTION,
   /**
-   * Information is returned in a {@link PinotExplainedRelNode.Info} object.
+   * Information is returned in a {@link ExplainInfo} object.
    * <p>
    * Each segment is returned as a row with the following columns:
    * <ol>
-   *   <li>plan: The plan in {@link PinotExplainedRelNode.Info}, encoded as JSON</li>
+   *   <li>plan: The plan in {@link ExplainInfo}, encoded as JSON</li>
    * </ol>
    */
   NODE

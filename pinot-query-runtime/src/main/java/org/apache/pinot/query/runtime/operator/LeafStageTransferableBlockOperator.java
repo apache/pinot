@@ -48,7 +48,7 @@ import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.ExplainV2ResultBlock;
 import org.apache.pinot.core.operator.blocks.results.MetadataResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
-import org.apache.pinot.core.plan.PinotExplainedRelNode;
+import org.apache.pinot.core.plan.ExplainInfo;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.executor.ResultsBlockStreamer;
 import org.apache.pinot.core.query.logger.ServerQueryLogger;
@@ -305,7 +305,7 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
         throw new IllegalArgumentException("Expected ExplainV2ResultBlock, got: " + resultsBlock.getClass().getName());
       } else {
         ExplainV2ResultBlock block = (ExplainV2ResultBlock) resultsBlock;
-        for (PinotExplainedRelNode.Info physicalPlan : block.getPhysicalPlans()) {
+        for (ExplainInfo physicalPlan : block.getPhysicalPlans()) {
           childNodes.add(asNode(physicalPlan));
         }
       }
@@ -314,7 +314,7 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
         "LEAF_STAGE_COMBINE_OPERATOR", Collections.emptyMap());
   }
 
-  private ExplainedNode asNode(PinotExplainedRelNode.Info info) {
+  private ExplainedNode asNode(ExplainInfo info) {
     int size = info.getInputs().size();
     List<PlanNode> inputs = new ArrayList<>(size);
     for (int i = 0; i < size; i++) {

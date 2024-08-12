@@ -34,7 +34,7 @@ import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.plan.PinotExplainedRelNode;
+import org.apache.pinot.core.plan.ExplainInfo;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
@@ -174,14 +174,14 @@ public abstract class MultiStageOperator
   }
 
   @Override
-  public PinotExplainedRelNode.Info getOperatorInfo() {
-    return new PinotExplainedRelNode.Info(getExplainName(), getExplainAttributes(), getChildrenOperatorInfo());
+  public ExplainInfo getExplainInfo() {
+    return new ExplainInfo(getExplainName(), getExplainAttributes(), getChildrenExplainInfo());
   }
 
-  protected List<PinotExplainedRelNode.Info> getChildrenOperatorInfo() {
+  protected List<ExplainInfo> getChildrenExplainInfo() {
     return getChildOperators().stream()
         .filter(Objects::nonNull)
-        .map(Operator::getOperatorInfo)
+        .map(Operator::getExplainInfo)
         .collect(Collectors.toList());
   }
 
