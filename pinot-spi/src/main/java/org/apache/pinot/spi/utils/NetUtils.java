@@ -53,6 +53,7 @@ public class NetUtils {
       ds.connect(isIPv6Preferred ? Inet6Address.getByName(DUMMY_OUT_IPV6) : Inet4Address.getByName(DUMMY_OUT_IPV4),
           HTTP_PORT);
     } catch (java.io.UncheckedIOException e) {
+      LOGGER.warn(e.getMessage());
       if (isIPv6Preferred) {
         LOGGER.warn("No IPv6 route available on host, falling back to IPv4");
         ds.connect(Inet4Address.getByName(DUMMY_OUT_IPV4), HTTP_PORT);
