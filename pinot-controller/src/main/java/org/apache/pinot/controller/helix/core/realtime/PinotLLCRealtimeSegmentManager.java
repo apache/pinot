@@ -133,6 +133,8 @@ import org.slf4j.LoggerFactory;
 public class PinotLLCRealtimeSegmentManager {
 
   // simple field in Ideal State representing pause status for the table
+  // Deprecated in favour of PAUSE_STATUS
+  @Deprecated
   public static final String IS_TABLE_PAUSED = "isTablePaused";
   public static final String PAUSE_STATUS = "pauseStatus";
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotLLCRealtimeSegmentManager.class);
