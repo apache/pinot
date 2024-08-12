@@ -435,7 +435,7 @@ public class BasePartitionUpsertMetadataManagerTest {
       throws Exception {
     UpsertContext upsertContext = mock(UpsertContext.class);
     when(upsertContext.getConsistencyMode()).thenReturn(UpsertConfig.ConsistencyMode.SNAPSHOT);
-    when(upsertContext.getUpsertViewRefreshIntervalMs()).thenReturn(3000L);
+    when(upsertContext.getUpsertViewRefreshIntervalMs()).thenReturn(5L);
     DummyPartitionUpsertMetadataManager upsertMetadataManager =
         new DummyPartitionUpsertMetadataManager("myTable", 0, upsertContext);
 
@@ -443,12 +443,6 @@ public class BasePartitionUpsertMetadataManagerTest {
     Map<IndexSegment, ThreadSafeMutableRoaringBitmap> segmentQueryableDocIdsMap = new HashMap<>();
     IndexSegment seg01 = mock(IndexSegment.class);
     ThreadSafeMutableRoaringBitmap validDocIds01 = createThreadSafeMutableRoaringBitmap(10);
-    AtomicBoolean called = new AtomicBoolean(false);
-    when(seg01.getValidDocIds()).then(invocationOnMock -> {
-      called.set(true);
-      latch.await();
-      return validDocIds01;
-    });
     upsertMetadataManager.trackSegmentForUpsertView(seg01);
     segmentQueryableDocIdsMap.put(seg01, validDocIds01);
 
@@ -466,8 +460,19 @@ public class BasePartitionUpsertMetadataManagerTest {
 
     List<SegmentContext> segmentContexts = new ArrayList<>();
     ExecutorService executor = Executors.newFixedThreadPool(2);
+
+    // Set up the awaiting logic here to not block the trackSegmentForUpsertView methods above, as they refresh the
+    // upsert view.
+    AtomicBoolean called = new AtomicBoolean(false);
+    when(seg01.getValidDocIds()).then(invocationOnMock -> {
+      called.set(true);
+      latch.await();
+      return validDocIds01;
+    });
     try {
-      // This thread does replaceDocId and takes WLock first, and it'll refresh the upsert view
+      // This thread does replaceDocId and takes WLock first, and it'll refresh the upsert view Sleep a bit here to
+      // make the upsert view stale before doing the replaceDocId, to force it to refresh the upsert view.
+      Thread.sleep(10);
       executor.submit(() -> {
         RecordInfo recordInfo = new RecordInfo(null, 5, null, false);
         upsertMetadataManager.replaceDocId(seg03, validDocIds03, null, seg01, 0, 12, recordInfo);
@@ -592,7 +597,9 @@ public class BasePartitionUpsertMetadataManagerTest {
 
     // We can force to refresh the upsert view by clearing up the current upsert view, even though there are no updated
     // segments tracked in _updatedSegmentsSinceLastRefresh.
-    assertTrue(upsertMetadataManager.getUpsertViewManager().getUpdatedSegmentsSinceLastRefresh().isEmpty());
+    assertEquals(upsertMetadataManager.getUpsertViewManager().getUpdatedSegmentsSinceLastRefresh().size(), 2);
+    assertTrue(upsertMetadataManager.getUpsertViewManager().getUpdatedSegmentsSinceLastRefresh().contains(seg01));
+    assertTrue(upsertMetadataManager.getUpsertViewManager().getUpdatedSegmentsSinceLastRefresh().contains(seg03));
     upsertMetadataManager.getUpsertViewManager().getSegmentQueryableDocIdsMap().clear();
 
     List<SegmentContext> refreshSegmentContexts = new ArrayList<>();
@@ -611,6 +618,7 @@ public class BasePartitionUpsertMetadataManagerTest {
       // The upsert view holds a clone of the original queryableDocIds held by the segment object.
       assertNotSame(refreshSC.getQueryableDocIdsSnapshot(), validDocIds.getMutableRoaringBitmap());
       assertEquals(refreshSC.getQueryableDocIdsSnapshot(), validDocIds.getMutableRoaringBitmap());
+      assertNotNull(refreshSC.getQueryableDocIdsSnapshot());
       // docId=0 in seg01 got invalidated.
       if (refreshSC.getIndexSegment() == seg01) {
         assertFalse(refreshSC.getQueryableDocIdsSnapshot().contains(0));
