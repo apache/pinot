@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.common.config.provider;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
