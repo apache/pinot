@@ -131,8 +131,8 @@ public class UpsertUtils {
     public RecordInfo getRecordInfo(int docId) {
       PrimaryKey primaryKey = _primaryKeyReader.getPrimaryKey(docId);
       Comparable comparisonValue = _comparisonColumnReader.getComparisonValue(docId);
-      boolean deleteRecord = _deleteRecordColumnReader != null
-          && BooleanUtils.toBoolean(_deleteRecordColumnReader.getValue(docId));
+      boolean deleteRecord =
+          _deleteRecordColumnReader != null && BooleanUtils.toBoolean(_deleteRecordColumnReader.getValue(docId));
       return new RecordInfo(primaryKey, docId, comparisonValue, deleteRecord);
     }
 

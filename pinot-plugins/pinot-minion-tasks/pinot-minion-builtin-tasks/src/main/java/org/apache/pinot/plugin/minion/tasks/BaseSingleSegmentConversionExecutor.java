@@ -143,7 +143,7 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
       if (numRecordsPurged != null) {
         reportTaskProcessingMetrics(tableNameWithType, taskType, segmentMetadata.getTotalDocs(),
             (int) numRecordsPurged);
-       } else {
+      } else {
         reportTaskProcessingMetrics(tableNameWithType, taskType, segmentMetadata.getTotalDocs());
       }
 

@@ -605,10 +605,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     if (UploadedRealtimeSegmentName.of(currentSegmentName) != null) {
       return false;
     }
-    if (UploadedRealtimeSegmentName.of(segmentName) != null) {
-      return true;
-    }
-    return false;
+    return UploadedRealtimeSegmentName.of(segmentName) != null;
   }
 
   @Override
@@ -743,8 +740,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   }
 
   protected void removeSegment(IndexSegment segment, MutableRoaringBitmap validDocIds) {
-    try (UpsertUtils.PrimaryKeyReader primaryKeyReader = new UpsertUtils.PrimaryKeyReader(segment,
-        _primaryKeyColumns)) {
+    try (
+        UpsertUtils.PrimaryKeyReader primaryKeyReader = new UpsertUtils.PrimaryKeyReader(segment, _primaryKeyColumns)) {
       removeSegment(segment, UpsertUtils.getPrimaryKeyIterator(primaryKeyReader, validDocIds));
     } catch (Exception e) {
       throw new RuntimeException(
