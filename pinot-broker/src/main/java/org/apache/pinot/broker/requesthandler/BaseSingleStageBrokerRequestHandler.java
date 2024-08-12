@@ -719,13 +719,13 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
       // Set the maximum serialized response size per server, and ask server to directly return final response when only
       // one server is queried
-      int numServers = queryRoutingTable.size();
+      int numQueriesIssued = queryRoutingTable.values().stream().mapToInt(List::size).sum();
 
       if (offlineBrokerRequest != null) {
         Map<String, String> queryOptions = offlineBrokerRequest.getPinotQuery().getQueryOptions();
-        setMaxServerResponseSizeBytes(numServers, queryOptions, offlineTableConfig);
+        setMaxServerResponseSizeBytes(numQueriesIssued, queryOptions, offlineTableConfig);
         // Set the query option to directly return final result for single server query unless it is explicitly disabled
-        if (numServers == 1) {
+        if (numQueriesIssued == 1) {
           // Set the same flag in the original server request to be used in the reduce phase for hybrid table
           if (queryOptions.putIfAbsent(QueryOptionKey.SERVER_RETURN_FINAL_RESULT, "true") == null
               && offlineBrokerRequest != serverBrokerRequest) {
@@ -736,9 +736,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       }
       if (realtimeBrokerRequest != null) {
         Map<String, String> queryOptions = realtimeBrokerRequest.getPinotQuery().getQueryOptions();
-        setMaxServerResponseSizeBytes(numServers, queryOptions, realtimeTableConfig);
+        setMaxServerResponseSizeBytes(numQueriesIssued, queryOptions, realtimeTableConfig);
         // Set the query option to directly return final result for single server query unless it is explicitly disabled
-        if (numServers == 1) {
+        if (numQueriesIssued == 1) {
           // Set the same flag in the original server request to be used in the reduce phase for hybrid table
           if (queryOptions.putIfAbsent(QueryOptionKey.SERVER_RETURN_FINAL_RESULT, "true") == null
               && realtimeBrokerRequest != serverBrokerRequest) {
@@ -1813,7 +1813,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
    * 5. BrokerConfig -> maxServerResponseSizeBytes
    * 6. BrokerConfig -> maxServerResponseSizeBytes
    */
-  private void setMaxServerResponseSizeBytes(int numServers, Map<String, String> queryOptions,
+  private void setMaxServerResponseSizeBytes(int numQueriesIssued, Map<String, String> queryOptions,
       @Nullable TableConfig tableConfig) {
     // QueryOption
     if (QueryOptionsUtils.getMaxServerResponseSizeBytes(queryOptions) != null) {
@@ -1822,7 +1822,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     Long maxQueryResponseSizeQueryOption = QueryOptionsUtils.getMaxQueryResponseSizeBytes(queryOptions);
     if (maxQueryResponseSizeQueryOption != null) {
       queryOptions.put(QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES,
-          Long.toString(maxQueryResponseSizeQueryOption / numServers));
+          Long.toString(maxQueryResponseSizeQueryOption / numQueriesIssued));
       return;
     }
 
@@ -1836,7 +1836,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       }
       if (queryConfig.getMaxQueryResponseSizeBytes() != null) {
         queryOptions.put(QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES,
-            Long.toString(queryConfig.getMaxQueryResponseSizeBytes() / numServers));
+            Long.toString(queryConfig.getMaxQueryResponseSizeBytes() / numQueriesIssued));
         return;
       }
     }
@@ -1852,7 +1852,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     String maxQueryResponseSizeBrokerConfig = _config.getProperty(Broker.CONFIG_OF_MAX_QUERY_RESPONSE_SIZE_BYTES);
     if (maxQueryResponseSizeBrokerConfig != null) {
       queryOptions.put(QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES,
-          Long.toString(DataSizeUtils.toBytes(maxQueryResponseSizeBrokerConfig) / numServers));
+          Long.toString(DataSizeUtils.toBytes(maxQueryResponseSizeBrokerConfig) / numQueriesIssued));
     }
   }
 
