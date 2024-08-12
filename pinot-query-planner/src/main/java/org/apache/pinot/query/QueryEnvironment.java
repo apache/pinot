@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.function.Function;
@@ -59,6 +60,7 @@ import org.apache.pinot.calcite.rel.rules.PinotRuleUtils;
 import org.apache.pinot.calcite.sql.fun.PinotOperatorTable;
 import org.apache.pinot.calcite.sql2rel.PinotConvertletTable;
 import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.query.catalog.PinotCatalog;
 import org.apache.pinot.query.context.PlannerContext;
 import org.apache.pinot.query.planner.MultiStageExplainAskingServersUtils;
@@ -186,6 +188,9 @@ public class QueryEnvironment {
         if (!explain.withImplementation() || !askServers) {
           return new QueryPlannerResult(null, PlannerUtils.explainPlan(relRoot.rel, format, level), tableNames);
         } else {
+          Map<String, String> options = sqlNodeAndOptions.getOptions();
+          boolean explainPlanVerbose = QueryOptionsUtils.isExplainPlanVerbose(options);
+
           // A map from the actual PlanNodes to the original RelNode in the logical rel tree
           TransformationTracker.ByIdentity.Builder<PlanNode, RelNode> nodeTracker =
               new TransformationTracker.ByIdentity.Builder<>();
@@ -194,7 +199,7 @@ public class QueryEnvironment {
               toDispatchableSubPlan(relRoot, plannerContext, requestId, nodeTracker);
 
           MultiStageExplainAskingServersUtils.modifyRel(relRoot.rel, dispatchableSubPlan.getQueryStageList(),
-              nodeTracker, fragmentToPlanNodes, RelBuilder.create(_config));
+              nodeTracker, fragmentToPlanNodes, RelBuilder.create(_config), explainPlanVerbose);
 
           String explainStr = PlannerUtils.explainPlan(relRoot.rel, format, level);
 

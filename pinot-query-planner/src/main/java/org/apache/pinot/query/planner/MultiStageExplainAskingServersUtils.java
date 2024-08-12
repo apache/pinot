@@ -60,14 +60,15 @@ public class MultiStageExplainAskingServersUtils {
   public static void modifyRel(RelNode rootNode, Collection<DispatchablePlanFragment> queryStages,
       TransformationTracker<PlanNode, RelNode> tracker,
       Function<DispatchablePlanFragment, Collection<PlanNode>> fragmentToPlanNodes,
-      RelBuilder relBuilder) {
+      RelBuilder relBuilder, boolean verbose) {
     // extract a key node operator
     Map<DispatchablePlanFragment, PlanNode> leafNodes = queryStages.stream()
         .filter(fragment -> !fragment.getWorkerIdToSegmentsMap().isEmpty()) // ignore root and intermediate stages
         .collect(Collectors.toMap(Function.identity(), fragment -> fragment.getPlanFragment().getFragmentRoot()));
 
     // creates a map where each leaf node is converted into another RelNode that may contain physical information
-    Map<RelNode, RelNode> leafToRel = createSubstitutionMap(leafNodes, tracker, fragmentToPlanNodes, relBuilder);
+    Map<RelNode, RelNode> leafToRel =
+        createSubstitutionMap(leafNodes, tracker, fragmentToPlanNodes, relBuilder, verbose);
 
     // replace leaf operator with explain nodes
     replaceRecursive(rootNode, leafToRel);
@@ -75,7 +76,8 @@ public class MultiStageExplainAskingServersUtils {
 
   private static Map<RelNode, RelNode> createSubstitutionMap(Map<DispatchablePlanFragment, PlanNode> leafNodes,
       TransformationTracker<PlanNode, RelNode> tracker,
-      Function<DispatchablePlanFragment, Collection<PlanNode>> fragmentToPlanNodes, RelBuilder relBuilder) {
+      Function<DispatchablePlanFragment, Collection<PlanNode>> fragmentToPlanNodes, RelBuilder relBuilder,
+      boolean verbose) {
     Map<RelNode, RelNode> explainNodes = new HashMap<>(leafNodes.size());
 
     for (Map.Entry<DispatchablePlanFragment, PlanNode> entry : leafNodes.entrySet()) {
@@ -88,7 +90,7 @@ public class MultiStageExplainAskingServersUtils {
       if (explainNodes.containsKey(stageRootNode)) {
         throw new IllegalStateException("Duplicate RelNode found in the leaf nodes: " + stageRootNode);
       }
-      RelNode explainNode = explainFragment(fragmentToPlanNodes, fragment, relBuilder);
+      RelNode explainNode = explainFragment(fragmentToPlanNodes, fragment, relBuilder, verbose);
       explainNodes.put(stageRootNode, explainNode);
     }
     return explainNodes;
@@ -107,12 +109,12 @@ public class MultiStageExplainAskingServersUtils {
   }
 
   private static RelNode explainFragment(Function<DispatchablePlanFragment, Collection<PlanNode>> fragmentToPlanNode,
-      DispatchablePlanFragment fragment, RelBuilder relBuilder) {
+      DispatchablePlanFragment fragment, RelBuilder relBuilder, boolean verbose) {
     relBuilder.clear();
     Collection<PlanNode> planNodes = fragmentToPlanNode.apply(fragment);
 
     HashMap<PlanNode, Integer> planNodesMap = new HashMap<>();
-    planNodes.forEach(planNode -> mergePlans(planNodesMap, planNode));
+    planNodes.forEach(planNode -> mergePlans(planNodesMap, planNode, verbose));
 
     PlanNode mergedNode;
     PlanNode fragmentRoot = fragment.getPlanFragment().getFragmentRoot();
@@ -152,13 +154,12 @@ public class MultiStageExplainAskingServersUtils {
     return PlanNodeToRelConverter.convert(relBuilder, mergedNode);
   }
 
-  private static void mergePlans(Map<PlanNode, Integer> planNodesMap, PlanNode planNode) {
+  private static void mergePlans(Map<PlanNode, Integer> planNodesMap, PlanNode planNode, boolean verbose) {
     boolean merged = false;
     for (Map.Entry<PlanNode, Integer> entry : planNodesMap.entrySet()) {
       PlanNode originalPlan = entry.getKey();
 
-      // TODO: obtain whether verbose mode should be use or not
-      PlanNode mergedPlan = PlanNodeMerger.mergePlans(originalPlan, planNode, false);
+      PlanNode mergedPlan = PlanNodeMerger.mergePlans(originalPlan, planNode, verbose);
       if (mergedPlan != null) {
         planNodesMap.remove(originalPlan);
         planNodesMap.put(mergedPlan, entry.getValue() + 1);
