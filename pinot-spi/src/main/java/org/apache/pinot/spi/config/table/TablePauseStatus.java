@@ -22,12 +22,10 @@ import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
 public class TablePauseStatus extends BaseJsonConfig {
-  public static final TablePauseStatus UNPAUSED = new TablePauseStatus();
-
-  private final boolean _paused;
-  private final ReasonCode _reasonCode;
-  private final String _comment;
-  private final long _timeInMillis;
+  private boolean _paused;
+  private ReasonCode _reasonCode;
+  private String _comment;
+  private long _timeInMillis;
 
   public TablePauseStatus(ReasonCode reasonCode, String comment) {
     _reasonCode = reasonCode;
@@ -37,10 +35,6 @@ public class TablePauseStatus extends BaseJsonConfig {
   }
 
   public TablePauseStatus() {
-    _reasonCode = null;
-    _comment = null;
-    _timeInMillis = System.currentTimeMillis();
-    _paused = false;
   }
 
   public boolean isPaused() {
@@ -57,6 +51,21 @@ public class TablePauseStatus extends BaseJsonConfig {
 
   public long getTimeInMillis() {
     return _timeInMillis;
+  }
+
+  public void setPaused(boolean paused) {
+    _paused = paused;
+    _timeInMillis = System.currentTimeMillis();
+  }
+
+  public void setReasonCode(ReasonCode reasonCode) {
+    _reasonCode = reasonCode;
+    _timeInMillis = System.currentTimeMillis();
+  }
+
+  public void setComment(String comment) {
+    _comment = comment;
+    _timeInMillis = System.currentTimeMillis();
   }
 
   public enum ReasonCode {

@@ -1701,7 +1701,8 @@ public class PinotLLCRealtimeSegmentManager {
       if (pause) {
         pauseStatus = new TablePauseStatus(TablePauseStatus.ReasonCode.ADMINISTRATIVE, comment);
       } else {
-        pauseStatus = TablePauseStatus.UNPAUSED;
+        pauseStatus = new TablePauseStatus();
+        pauseStatus.setPaused(false);
       }
       znRecord.setSimpleField(IS_TABLE_PAUSED, Boolean.valueOf(pause).toString());
       znRecord.setSimpleField(PAUSE_STATUS, pauseStatus.toJsonString());
