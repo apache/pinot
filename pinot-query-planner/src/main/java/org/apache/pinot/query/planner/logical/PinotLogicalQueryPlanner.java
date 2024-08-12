@@ -18,12 +18,14 @@
  */
 package org.apache.pinot.query.planner.logical;
 
+import com.google.common.collect.Iterators;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntList;
 import it.unimi.dsi.fastutil.ints.IntListIterator;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -34,6 +36,7 @@ import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.SubPlan;
 import org.apache.pinot.query.planner.SubPlanMetadata;
+import org.apache.pinot.query.planner.plannode.BasePlanNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
@@ -113,14 +116,17 @@ public class PinotLogicalQueryPlanner {
         false, subPlanRootSenderNode);
 
     if (tracker != null) {
-      for (Map.Entry<MailboxSendNode, ExchangeNode> entry : fragmenter.getMailboxSendToExchangeNodeMap().entrySet()) {
+      Iterator<Map.Entry<? extends BasePlanNode, ExchangeNode>> it = Iterators.concat(
+          fragmenter.getMailboxReceiveToExchangeNodeMap().entrySet().iterator(),
+          fragmenter.getMailboxReceiveToExchangeNodeMap().entrySet().iterator()
+      );
+      while (it.hasNext()) {
+        Map.Entry<? extends BasePlanNode, ExchangeNode> entry = it.next();
         ExchangeNode exchangeNode = entry.getValue();
         RelNode originalNode = tracker.getCreatorOf(exchangeNode);
-        tracker.trackCreation(originalNode, entry.getKey());
-      }
-      for (Map.Entry<MailboxSendNode, ExchangeNode> entry : fragmenter.getMailboxSendToExchangeNodeMap().entrySet()) {
-        ExchangeNode exchangeNode = entry.getValue();
-        RelNode originalNode = tracker.getCreatorOf(exchangeNode);
+        if (originalNode == null) {
+          throw new IllegalStateException("Original node not found for exchange node: " + exchangeNode);
+        }
         tracker.trackCreation(originalNode, entry.getKey());
       }
     }
