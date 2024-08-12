@@ -281,11 +281,10 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       RequestContext requestContext, long queryTimeoutMs, Map<String, String> queryOptions) {
     List<PlanNode> stagePlans;
     try {
-      stagePlans =
-          _queryDispatcher.explain(requestContext, fragment, queryTimeoutMs, queryOptions);
+      stagePlans = _queryDispatcher.explain(requestContext, fragment, queryTimeoutMs, queryOptions);
     } catch (Exception e) {
-      // TODO: Define what to do in this case
-      throw new RuntimeException(e);
+      PlanNode fragmentRoot = fragment.getPlanFragment().getFragmentRoot();
+      throw new RuntimeException("Cannot obtain physical plan for fragment " + fragmentRoot.explain(), e);
     }
 
     return stagePlans;
