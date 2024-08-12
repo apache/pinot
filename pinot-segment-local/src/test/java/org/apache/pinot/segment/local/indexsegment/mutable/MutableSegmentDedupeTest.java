@@ -92,7 +92,9 @@ public class MutableSegmentDedupeTest {
         = Mockito.mock(SegmentsValidationAndRetentionConfig.class);
     Mockito.when(tableConfig.getValidationConfig()).thenReturn(segmentsValidationAndRetentionConfig);
     Mockito.when(segmentsValidationAndRetentionConfig.getTimeColumnName()).thenReturn("secondsSinceEpoch");
-    return TableDedupMetadataManagerFactory.create(tableConfig, schema, Mockito.mock(TableDataManager.class),
+    TableDataManager tableDataManager = Mockito.mock(TableDataManager.class);
+    Mockito.when(tableDataManager.getTableDataDir()).thenReturn(Mockito.mock(File.class));
+    return TableDedupMetadataManagerFactory.create(tableConfig, schema, tableDataManager,
         Mockito.mock(ServerMetrics.class));
   }
 

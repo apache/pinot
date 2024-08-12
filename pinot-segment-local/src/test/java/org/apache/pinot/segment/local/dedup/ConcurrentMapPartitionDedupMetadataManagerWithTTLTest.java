@@ -278,4 +278,14 @@ public class ConcurrentMapPartitionDedupMetadataManagerWithTTLTest {
     }
     return new DedupUtils.DedupRecordInfoReader(primaryKeyReader, dedupTimeColumnReader);
   }
+
+  @Test
+  public void testAddSegmentAfterStop() {
+    IndexSegment segment = DedupTestUtils.mockSegment(1, 10);
+    // throws when not stopped
+    assertThrows(RuntimeException.class, () -> _metadataManager.addSegment(segment));
+    _metadataManager.stop();
+    // do not throw when stopped
+    _metadataManager.addSegment(segment);
+  }
 }
