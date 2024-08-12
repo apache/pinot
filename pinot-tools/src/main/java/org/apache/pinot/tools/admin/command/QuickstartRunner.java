@@ -47,6 +47,8 @@ public class QuickstartRunner {
 
   private static final int ZK_PORT = 2123;
   private static final String ZK_ADDRESS = "localhost:" + ZK_PORT;
+
+  public static final int DEFAULT_CONTROLLER_PORT = 9000;
   private static final int DEFAULT_BROKER_PORT = 8000;
   private static final int DEFAULT_SERVER_ADMIN_API_PORT = 7500;
   private static final int DEFAULT_SERVER_NETTY_PORT = 7050;
@@ -75,7 +77,6 @@ public class QuickstartRunner {
   private final List<Integer> _controllerPorts = new ArrayList<>();
   private final List<Integer> _brokerPorts = new ArrayList<>();
   private boolean _isStopped = false;
-  public static final int DEFAULT_CONTROLLER_PORT = 9000;
 
   public QuickstartRunner(List<QuickstartTableRequest> tableRequests, int numControllers, int numBrokers,
       int numServers, int numMinions, File tempDir, Map<String, Object> configOverrides)
