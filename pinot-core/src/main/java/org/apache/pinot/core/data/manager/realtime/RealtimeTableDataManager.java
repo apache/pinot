@@ -248,12 +248,22 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     // Make sure we do metric cleanup when we shut down the table.
     // Do this first, so we do not show ingestion lag during shutdown.
     _ingestionDelayTracker.shutdown();
-    if (_tableUpsertMetadataManager != null) {
+    if (_tableUpsertMetadataManager != null || _tableDedupMetadataManager != null) {
       // Stop the upsert metadata manager first to prevent removing metadata when destroying segments
-      _tableUpsertMetadataManager.stop();
+      if (_tableUpsertMetadataManager != null) {
+        _tableUpsertMetadataManager.stop();
+      }
+      if (_tableDedupMetadataManager != null) {
+        _tableDedupMetadataManager.stop();
+      }
       releaseAndRemoveAllSegments();
       try {
-        _tableUpsertMetadataManager.close();
+        if (_tableUpsertMetadataManager != null) {
+          _tableUpsertMetadataManager.close();
+        }
+        if (_tableDedupMetadataManager != null) {
+          _tableDedupMetadataManager.close();
+        }
       } catch (IOException e) {
         _logger.warn("Caught exception while closing upsert metadata manager", e);
       }

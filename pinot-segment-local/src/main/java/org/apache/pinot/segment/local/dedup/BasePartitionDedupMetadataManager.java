@@ -19,10 +19,13 @@
 package org.apache.pinot.segment.local.dedup;
 
 import com.google.common.base.Preconditions;
+import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
@@ -39,6 +42,12 @@ public abstract class BasePartitionDedupMetadataManager implements PartitionDedu
   protected final double _metadataTTL;
   protected final String _dedupTimeColumn;
   protected final Logger _logger;
+
+  // The following variables are always accessed within synchronized block
+  private boolean _stopped;
+  // Initialize with 1 pending operation to indicate the metadata manager can take more operations
+  private int _numPendingOperations = 1;
+  private boolean _closed;
 
   protected BasePartitionDedupMetadataManager(String tableNameWithType, int partitionId,
       DedupContext dedupContext) {
@@ -65,37 +74,139 @@ public abstract class BasePartitionDedupMetadataManager implements PartitionDedu
 
   @Override
   public void addSegment(IndexSegment segment) {
+    if (!startOperation()) {
+      _logger.info("Skip adding segment: {} because metadata manager is already stopped", segment.getSegmentName());
+      return;
+    }
     try (DedupUtils.DedupRecordInfoReader dedupRecordInfoReader = new DedupUtils.DedupRecordInfoReader(segment,
         _primaryKeyColumns, _dedupTimeColumn)) {
       Iterator<DedupRecordInfo> dedupRecordInfoIterator =
           DedupUtils.getDedupRecordInfoIterator(dedupRecordInfoReader, segment.getSegmentMetadata().getTotalDocs());
-      addSegment(segment, dedupRecordInfoIterator);
-      int dedupPrimaryKeyCount = removeExpiredPrimaryKeys();
-      _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.DEDUP_PRIMARY_KEYS_COUNT,
-          dedupPrimaryKeyCount);
+      doAddSegment(segment, dedupRecordInfoIterator);
+      removeExpiredPrimaryKeys();
+      updatePrimaryKeyGauge();
     } catch (Exception e) {
       throw new RuntimeException(String.format("Caught exception while adding segment: %s of table: %s to %s",
           segment.getSegmentName(), _tableNameWithType, this.getClass().getSimpleName()), e);
+    } finally {
+      finishOperation();
     }
   }
 
-  protected abstract void addSegment(IndexSegment segment, Iterator<DedupRecordInfo> dedupRecordInfoIterator);
+  protected abstract void doAddSegment(IndexSegment segment, Iterator<DedupRecordInfo> dedupRecordInfoIterator);
 
   @Override
   public void removeSegment(IndexSegment segment) {
+    if (!startOperation()) {
+      _logger.info("Skip removing segment: {} because metadata manager is already stopped", segment.getSegmentName());
+      return;
+    }
     try (DedupUtils.DedupRecordInfoReader dedupRecordInfoReader = new DedupUtils.DedupRecordInfoReader(segment,
         _primaryKeyColumns, _dedupTimeColumn)) {
       Iterator<DedupRecordInfo> dedupRecordInfoIterator =
           DedupUtils.getDedupRecordInfoIterator(dedupRecordInfoReader, segment.getSegmentMetadata().getTotalDocs());
-      removeSegment(segment, dedupRecordInfoIterator);
-      int dedupPrimaryKeyCount = removeExpiredPrimaryKeys();
-      _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.DEDUP_PRIMARY_KEYS_COUNT,
-          dedupPrimaryKeyCount);
+      doRemoveSegment(segment, dedupRecordInfoIterator);
+      removeExpiredPrimaryKeys();
+      updatePrimaryKeyGauge();
     } catch (Exception e) {
       throw new RuntimeException(String.format("Caught exception while removing segment: %s of table: %s from %s",
           segment.getSegmentName(), _tableNameWithType, this.getClass().getSimpleName()), e);
+    } finally {
+      finishOperation();
     }
   }
 
-  protected abstract void removeSegment(IndexSegment segment, Iterator<DedupRecordInfo> dedupRecordInfoIterator);
+  protected abstract void doRemoveSegment(IndexSegment segment, Iterator<DedupRecordInfo> dedupRecordInfoIterator);
+
+  @Override
+  public void removeExpiredPrimaryKeys() {
+    if (!startOperation()) {
+      _logger.info("Skip removing expired primary keys because metadata manager is already stopped");
+      return;
+    }
+    try {
+      long startTime = System.currentTimeMillis();
+      doRemoveExpiredPrimaryKeys();
+      long duration = System.currentTimeMillis() - startTime;
+      _serverMetrics.addTimedTableValue(_tableNameWithType, ServerTimer.DEDUP_REMOVE_EXPIRED_PRIMARY_KEYS_TIME_MS,
+          duration, TimeUnit.MILLISECONDS);
+    } finally {
+      finishOperation();
+    }
+  }
+
+  /**
+   * Removes all primary keys that have dedup time smaller than (largestSeenDedupTime - TTL).
+   */
+  protected abstract void doRemoveExpiredPrimaryKeys();
+
+
+  protected synchronized boolean startOperation() {
+    if (_stopped || _numPendingOperations == 0) {
+      return false;
+    }
+    _numPendingOperations++;
+    return true;
+  }
+
+  protected synchronized void finishOperation() {
+    _numPendingOperations--;
+    if (_numPendingOperations == 0) {
+      notifyAll();
+    }
+  }
+
+  @Override
+  public synchronized void stop() {
+    if (_stopped) {
+      _logger.warn("Metadata manager is already stopped");
+      return;
+    }
+    _stopped = true;
+    _numPendingOperations--;
+    _logger.info("Stopped the metadata manager with {} pending operations, current primary key count: {}",
+        _numPendingOperations, getNumPrimaryKeys());
+  }
+
+  @Override
+  public synchronized void close()
+      throws IOException {
+    Preconditions.checkState(_stopped, "Must stop the metadata manager before closing it");
+    if (_closed) {
+      _logger.warn("Metadata manager is already closed");
+      return;
+    }
+    _closed = true;
+    _logger.info("Closing the metadata manager");
+    while (_numPendingOperations != 0) {
+      _logger.info("Waiting for {} pending operations to finish", _numPendingOperations);
+      try {
+        wait();
+      } catch (InterruptedException e) {
+        throw new RuntimeException(
+            String.format("Interrupted while waiting for %d pending operations to finish", _numPendingOperations), e);
+      }
+    }
+    doClose();
+    // We don't remove the segment from the metadata manager when
+    // it's closed. This was done to make table deletion faster. Since we don't remove the segment, we never decrease
+    // the primary key count. So, we set the primary key count to 0 here.
+    updatePrimaryKeyGauge(0);
+    _logger.info("Closed the metadata manager");
+  }
+
+  protected abstract long getNumPrimaryKeys();
+
+  protected void updatePrimaryKeyGauge(long numPrimaryKeys) {
+    _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.DEDUP_PRIMARY_KEYS_COUNT,
+        numPrimaryKeys);
+  }
+
+  protected void updatePrimaryKeyGauge() {
+    updatePrimaryKeyGauge(getNumPrimaryKeys());
+  }
+
+  protected void doClose()
+      throws IOException {
+  }
 }

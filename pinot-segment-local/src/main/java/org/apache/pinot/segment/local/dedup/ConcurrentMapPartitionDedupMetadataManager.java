@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.dedup;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.AtomicDouble;
+import java.io.IOException;
 import java.util.Iterator;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.commons.lang3.tuple.Pair;
@@ -41,7 +42,7 @@ class ConcurrentMapPartitionDedupMetadataManager extends BasePartitionDedupMetad
   }
 
   @Override
-  protected void addSegment(IndexSegment segment, Iterator<DedupRecordInfo> dedupRecordInfoIterator) {
+  protected void doAddSegment(IndexSegment segment, Iterator<DedupRecordInfo> dedupRecordInfoIterator) {
     while (dedupRecordInfoIterator.hasNext()) {
       DedupRecordInfo dedupRecordInfo = dedupRecordInfoIterator.next();
       double dedupTime = dedupRecordInfo.getDedupTime();
@@ -58,7 +59,7 @@ class ConcurrentMapPartitionDedupMetadataManager extends BasePartitionDedupMetad
   }
 
   @Override
-  protected void removeSegment(IndexSegment segment, Iterator<DedupRecordInfo> dedupRecordInfoIterator) {
+  protected void doRemoveSegment(IndexSegment segment, Iterator<DedupRecordInfo> dedupRecordInfoIterator) {
     while (dedupRecordInfoIterator.hasNext()) {
       DedupRecordInfo dedupRecordInfo = dedupRecordInfoIterator.next();
       _primaryKeyToSegmentAndTimeMap.computeIfPresent(
@@ -73,29 +74,43 @@ class ConcurrentMapPartitionDedupMetadataManager extends BasePartitionDedupMetad
   }
 
   @Override
-  public int removeExpiredPrimaryKeys() {
+  protected void doRemoveExpiredPrimaryKeys() {
     if (_metadataTTL > 0) {
       double smallestTimeToKeep = _largestSeenTime.get() - _metadataTTL;
       _primaryKeyToSegmentAndTimeMap.entrySet().removeIf(entry -> entry.getValue().getRight() < smallestTimeToKeep);
     }
-    return _primaryKeyToSegmentAndTimeMap.size();
   }
 
   @Override
   public boolean checkRecordPresentOrUpdate(DedupRecordInfo dedupRecordInfo, IndexSegment indexSegment) {
-    _largestSeenTime.getAndUpdate(time -> Math.max(time, dedupRecordInfo.getDedupTime()));
-    boolean present = _primaryKeyToSegmentAndTimeMap.putIfAbsent(
-        HashUtils.hashPrimaryKey(dedupRecordInfo.getPrimaryKey(), _hashFunction),
-        Pair.of(indexSegment, dedupRecordInfo.getDedupTime())) != null;
-    if (!present) {
-      _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.DEDUP_PRIMARY_KEYS_COUNT,
-          _primaryKeyToSegmentAndTimeMap.size());
+    if (!startOperation()) {
+      _logger.info("Skip adding record to {} because metadata manager is already stopped",
+          indexSegment.getSegmentName());
+      return true;
     }
-    return present;
+    try {
+      _largestSeenTime.getAndUpdate(time -> Math.max(time, dedupRecordInfo.getDedupTime()));
+      boolean present = _primaryKeyToSegmentAndTimeMap.putIfAbsent(
+          HashUtils.hashPrimaryKey(dedupRecordInfo.getPrimaryKey(), _hashFunction),
+          Pair.of(indexSegment, dedupRecordInfo.getDedupTime())) != null;
+      if (!present) {
+        _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.DEDUP_PRIMARY_KEYS_COUNT,
+            _primaryKeyToSegmentAndTimeMap.size());
+      }
+      return present;
+    } finally {
+      finishOperation();
+    }
   }
 
   @Override
-  public void close() {
+  protected long getNumPrimaryKeys() {
+    return _primaryKeyToSegmentAndTimeMap.size();
+  }
+
+  @Override
+  protected void doClose()
+      throws IOException {
     _primaryKeyToSegmentAndTimeMap.clear();
   }
 }

@@ -18,11 +18,13 @@
  */
 package org.apache.pinot.segment.local.dedup;
 
+import java.io.File;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.segment.readers.PrimaryKeyReader;
@@ -49,6 +51,7 @@ public class ConcurrentMapPartitionDedupMetadataManagerWithoutTTLTest {
     DedupContext.Builder dedupContextBuider = new DedupContext.Builder();
     dedupContextBuider.setTableConfig(mock(TableConfig.class)).setSchema(mock(Schema.class))
         .setPrimaryKeyColumns(List.of("primaryKeyColumn")).setHashFunction(HashFunction.NONE)
+        .setTableIndexDir(mock(File.class)).setTableDataManager(mock(TableDataManager.class))
         .setServerMetrics(mock(ServerMetrics.class));
     DedupContext dedupContext = dedupContextBuider.build();
     _metadataManager =
@@ -63,7 +66,7 @@ public class ConcurrentMapPartitionDedupMetadataManagerWithoutTTLTest {
     DedupUtils.DedupRecordInfoReader dedupRecordInfoReader = generateDedupRecordInfoReader();
     Iterator<DedupRecordInfo> dedupRecordInfoIterator = DedupUtils.getDedupRecordInfoIterator(dedupRecordInfoReader, 6);
     ImmutableSegmentImpl segment1 = DedupTestUtils.mockSegment(1, 6);
-    _metadataManager.addSegment(segment1, dedupRecordInfoIterator);
+    _metadataManager.doAddSegment(segment1, dedupRecordInfoIterator);
     Assert.assertEquals(_metadataManager._primaryKeyToSegmentAndTimeMap.size(), 3);
     checkRecordLocation(_metadataManager._primaryKeyToSegmentAndTimeMap, 0, segment1, hashFunction);
     checkRecordLocation(_metadataManager._primaryKeyToSegmentAndTimeMap, 1, segment1, hashFunction);
@@ -71,7 +74,7 @@ public class ConcurrentMapPartitionDedupMetadataManagerWithoutTTLTest {
 
     // reset the iterator
     dedupRecordInfoIterator = DedupUtils.getDedupRecordInfoIterator(dedupRecordInfoReader, 6);
-    _metadataManager.removeSegment(segment1, dedupRecordInfoIterator);
+    _metadataManager.doRemoveSegment(segment1, dedupRecordInfoIterator);
     Assert.assertEquals(_metadataManager._primaryKeyToSegmentAndTimeMap.size(), 0);
   }
 
@@ -83,13 +86,13 @@ public class ConcurrentMapPartitionDedupMetadataManagerWithoutTTLTest {
     DedupUtils.DedupRecordInfoReader dedupRecordInfoReader = generateDedupRecordInfoReader();
     Iterator<DedupRecordInfo> dedupRecordInfoIterator = DedupUtils.getDedupRecordInfoIterator(dedupRecordInfoReader, 6);
     ImmutableSegmentImpl segment1 = DedupTestUtils.mockSegment(1, 6);
-    _metadataManager.addSegment(segment1, dedupRecordInfoIterator);
+    _metadataManager.doAddSegment(segment1, dedupRecordInfoIterator);
 
     // Remove another segment with same PK rows
     // reset the iterator
     dedupRecordInfoIterator = DedupUtils.getDedupRecordInfoIterator(dedupRecordInfoReader, 6);
     ImmutableSegmentImpl segment2 = DedupTestUtils.mockSegment(1, 6);
-    _metadataManager.removeSegment(segment2, dedupRecordInfoIterator);
+    _metadataManager.doRemoveSegment(segment2, dedupRecordInfoIterator);
     Assert.assertEquals(_metadataManager._primaryKeyToSegmentAndTimeMap.size(), 3);
 
     // Keys should still exist
@@ -106,7 +109,7 @@ public class ConcurrentMapPartitionDedupMetadataManagerWithoutTTLTest {
     DedupUtils.DedupRecordInfoReader dedupRecordInfoReader = generateDedupRecordInfoReader();
     Iterator<DedupRecordInfo> dedupRecordInfoIterator = DedupUtils.getDedupRecordInfoIterator(dedupRecordInfoReader, 6);
     ImmutableSegmentImpl segment1 = DedupTestUtils.mockSegment(1, 6);
-    _metadataManager.addSegment(segment1, dedupRecordInfoIterator);
+    _metadataManager.doAddSegment(segment1, dedupRecordInfoIterator);
 
     // Same PK exists
     // reset the iterator

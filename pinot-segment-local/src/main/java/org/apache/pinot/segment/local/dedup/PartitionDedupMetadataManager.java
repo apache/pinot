@@ -36,9 +36,8 @@ public interface PartitionDedupMetadataManager extends Closeable {
 
   /**
    * Remove the expired primary keys from the metadata when TTL is enabled.
-   * Returns the number of primary keys left.
    */
-  int removeExpiredPrimaryKeys();
+  void removeExpiredPrimaryKeys();
 
   /**
    * Add the primary key to the given segment to the dedup matadata if it is absent.
@@ -60,4 +59,9 @@ public interface PartitionDedupMetadataManager extends Closeable {
   default boolean checkRecordPresentOrUpdate(DedupRecordInfo dedupRecordInfo, IndexSegment indexSegment) {
     return checkRecordPresentOrUpdate(dedupRecordInfo.getPrimaryKey(), indexSegment);
   }
+
+  /**
+   * Stops the metadata manager. After invoking this method, no access to the metadata will be accepted.
+   */
+  void stop();
 }

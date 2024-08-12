@@ -35,4 +35,9 @@ public interface TableDedupMetadataManager extends Closeable {
    * Create a new PartitionDedupMetadataManager if not present already, otherwise return existing one.
    */
   PartitionDedupMetadataManager getOrCreatePartitionManager(int partitionId);
+
+  /**
+   * Stops the metadata manager. After invoking this method, no access to the metadata will be accepted.
+   */
+  void stop();
 }

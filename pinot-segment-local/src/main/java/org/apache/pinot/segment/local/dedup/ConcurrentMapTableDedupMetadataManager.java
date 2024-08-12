@@ -33,6 +33,13 @@ class ConcurrentMapTableDedupMetadataManager extends BaseTableDedupMetadataManag
   }
 
   @Override
+  public void stop() {
+    for (ConcurrentMapPartitionDedupMetadataManager metadataManager : _partitionMetadataManagerMap.values()) {
+      metadataManager.stop();
+    }
+  }
+
+  @Override
   public void close()
       throws IOException {
     for (ConcurrentMapPartitionDedupMetadataManager metadataManager : _partitionMetadataManagerMap.values()) {
