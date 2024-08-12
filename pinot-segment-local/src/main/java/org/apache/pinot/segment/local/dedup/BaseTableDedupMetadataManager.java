@@ -66,6 +66,8 @@ public abstract class BaseTableDedupMetadataManager implements TableDedupMetadat
         .setHashFunction(dedupConfig.getHashFunction())
         .setMetadataTTL(metadataTTL)
         .setDedupTimeColumn(dedupTimeColumn)
+        .setTableIndexDir(tableDataManager.getTableDataDir())
+        .setTableDataManager(tableDataManager)
         .setServerMetrics(serverMetrics);
     _dedupContext = dedupContextBuider.build();
 

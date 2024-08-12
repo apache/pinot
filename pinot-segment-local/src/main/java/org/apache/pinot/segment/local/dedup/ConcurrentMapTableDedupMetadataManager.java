@@ -28,7 +28,7 @@ class ConcurrentMapTableDedupMetadataManager extends BaseTableDedupMetadataManag
       new ConcurrentHashMap<>();
 
   protected PartitionDedupMetadataManager createPartitionDedupMetadataManager(Integer partitionId) {
-    return  _partitionMetadataManagerMap.computeIfAbsent(partitionId,
+    return _partitionMetadataManagerMap.computeIfAbsent(partitionId,
         k -> new ConcurrentMapPartitionDedupMetadataManager(_tableNameWithType, partitionId, _dedupContext));
   }
 
