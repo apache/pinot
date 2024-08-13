@@ -57,6 +57,7 @@ import org.apache.pinot.controller.util.ConsumingSegmentInfoReader;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
+import org.apache.pinot.spi.config.table.TablePauseStatus;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -109,7 +110,8 @@ public class PinotRealtimeTableResource {
     String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
     validateTable(tableNameWithType);
     try {
-      return Response.ok(_pinotLLCRealtimeSegmentManager.pauseConsumption(tableNameWithType, description)).build();
+      return Response.ok(_pinotLLCRealtimeSegmentManager.pauseConsumption(tableNameWithType,
+          TablePauseStatus.ReasonCode.ADMINISTRATIVE, description)).build();
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
@@ -126,6 +128,7 @@ public class PinotRealtimeTableResource {
           + "available offsets are picked to minimize the data loss.")
   public Response resumeConsumption(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "Description for resuming the consumption") @QueryParam("description") String description,
       @ApiParam(
           value = "lastConsumed (safer) | smallest (repeat rows) | largest (miss rows)",
           allowableValues = "lastConsumed, smallest, largest",
@@ -144,7 +147,8 @@ public class PinotRealtimeTableResource {
                   + "'largest'.", consumeFrom), Response.Status.BAD_REQUEST);
     }
     try {
-      return Response.ok(_pinotLLCRealtimeSegmentManager.resumeConsumption(tableNameWithType, consumeFrom)).build();
+      return Response.ok(_pinotLLCRealtimeSegmentManager.resumeConsumption(tableNameWithType, consumeFrom,
+          TablePauseStatus.ReasonCode.ADMINISTRATIVE, description)).build();
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }

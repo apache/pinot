@@ -1664,8 +1664,9 @@ public class PinotLLCRealtimeSegmentManager {
    *   1) update TablePauseStatus in the table ideal state and
    *   2) sending force commit messages to servers
    */
-  public PauseStatus pauseConsumption(String tableNameWithType, @Nullable String description) {
-    IdealState updatedIdealState = updatePauseStatusInIdealState(tableNameWithType, true, description);
+  public PauseStatus pauseConsumption(String tableNameWithType, TablePauseStatus.ReasonCode reasonCode,
+      @Nullable String description) {
+    IdealState updatedIdealState = updatePauseStatusInIdealState(tableNameWithType, true, reasonCode, description);
     Set<String> consumingSegments = findConsumingSegments(updatedIdealState);
     sendForceCommitMessageToServers(tableNameWithType, consumingSegments);
     return new PauseStatus(true, consumingSegments, consumingSegments.isEmpty() ? null : "Pause flag is set."
@@ -1678,8 +1679,9 @@ public class PinotLLCRealtimeSegmentManager {
    *   1) update TablePauseStatus by clearing all pause reasons in the table ideal state and
    *   2) triggering segment validation job to create new consuming segments in ideal states
    */
-  public PauseStatus resumeConsumption(String tableNameWithType, @Nullable String offsetCriteria) {
-    IdealState updatedIdealState = updatePauseStatusInIdealState(tableNameWithType, false, null);
+  public PauseStatus resumeConsumption(String tableNameWithType, @Nullable String offsetCriteria,
+      TablePauseStatus.ReasonCode reasonCode, @Nullable String comment) {
+    IdealState updatedIdealState = updatePauseStatusInIdealState(tableNameWithType, false, reasonCode, comment);
 
     // trigger realtime segment validation job to resume consumption
     Map<String, String> taskProperties = new HashMap<>();
@@ -1694,21 +1696,18 @@ public class PinotLLCRealtimeSegmentManager {
         + "Consuming segments are being created. Use /pauseStatus endpoint in a few moments to double check.");
   }
 
-  private IdealState updatePauseStatusInIdealState(String tableNameWithType, boolean pause, String comment) {
+  private IdealState updatePauseStatusInIdealState(String tableNameWithType, boolean pause,
+      TablePauseStatus.ReasonCode reasonCode, @Nullable String comment) {
+    TablePauseStatus pauseStatus = new TablePauseStatus(pause, reasonCode, comment, System.currentTimeMillis());
     IdealState updatedIdealState = HelixHelper.updateIdealState(_helixManager, tableNameWithType, idealState -> {
       ZNRecord znRecord = idealState.getRecord();
-      TablePauseStatus pauseStatus;
-      if (pause) {
-        pauseStatus = new TablePauseStatus(TablePauseStatus.ReasonCode.ADMINISTRATIVE, comment);
-      } else {
-        pauseStatus = new TablePauseStatus();
-        pauseStatus.setPaused(false);
-      }
-      znRecord.setSimpleField(IS_TABLE_PAUSED, Boolean.valueOf(pause).toString());
       znRecord.setSimpleField(PAUSE_STATUS, pauseStatus.toJsonString());
+      // maintain for backward compatibility
+      znRecord.setSimpleField(IS_TABLE_PAUSED, Boolean.valueOf(pause).toString());
       return new IdealState(znRecord);
     }, RetryPolicies.noDelayRetryPolicy(3));
-    LOGGER.info("Set 'isTablePaused' to {} in the Ideal State for table {}.", pause, tableNameWithType);
+    LOGGER.info("Set 'pauseStatus' to {} in the Ideal State for table {}. "
+        + "Also set 'isTablePaused' to {} for backward compatibility.", pauseStatus, tableNameWithType, pause);
     return updatedIdealState;
   }
 

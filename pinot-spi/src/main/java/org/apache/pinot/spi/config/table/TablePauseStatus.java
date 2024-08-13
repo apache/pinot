@@ -27,14 +27,11 @@ public class TablePauseStatus extends BaseJsonConfig {
   private String _comment;
   private long _timeInMillis;
 
-  public TablePauseStatus(ReasonCode reasonCode, String comment) {
+  public TablePauseStatus(boolean paused, ReasonCode reasonCode, String comment, long timeInMillis) {
+    _paused = paused;
     _reasonCode = reasonCode;
     _comment = comment;
-    _timeInMillis = System.currentTimeMillis();
-    _paused = true;
-  }
-
-  public TablePauseStatus() {
+    _timeInMillis = timeInMillis;
   }
 
   public boolean isPaused() {
@@ -55,20 +52,21 @@ public class TablePauseStatus extends BaseJsonConfig {
 
   public void setPaused(boolean paused) {
     _paused = paused;
-    _timeInMillis = System.currentTimeMillis();
   }
 
   public void setReasonCode(ReasonCode reasonCode) {
     _reasonCode = reasonCode;
-    _timeInMillis = System.currentTimeMillis();
   }
 
   public void setComment(String comment) {
     _comment = comment;
-    _timeInMillis = System.currentTimeMillis();
+  }
+
+  public void setTimeInMillis(long timeInMillis) {
+    _timeInMillis = timeInMillis;
   }
 
   public enum ReasonCode {
-    ADMINISTRATIVE, STORAGE_QUOTA_EXCEEDED;
+    ADMINISTRATIVE
   }
 }
