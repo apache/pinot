@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.dedup;
 
 import com.google.common.base.Preconditions;
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -87,5 +88,20 @@ public abstract class BaseTableDedupMetadataManager implements TableDedupMetadat
    * Can be overridden to initialize custom variables after other variables are set
    */
   protected void initCustomVariables() {
+  }
+
+  @Override
+  public void stop() {
+    for (PartitionDedupMetadataManager metadataManager : _partitionMetadataManagerMap.values()) {
+      metadataManager.stop();
+    }
+  }
+
+  @Override
+  public void close()
+      throws IOException {
+    for (PartitionDedupMetadataManager metadataManager : _partitionMetadataManagerMap.values()) {
+      metadataManager.close();
+    }
   }
 }

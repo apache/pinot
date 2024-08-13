@@ -18,32 +18,9 @@
  */
 package org.apache.pinot.segment.local.dedup;
 
-import java.io.IOException;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-
 
 class ConcurrentMapTableDedupMetadataManager extends BaseTableDedupMetadataManager {
-  private final Map<Integer, ConcurrentMapPartitionDedupMetadataManager> _partitionMetadataManagerMap =
-      new ConcurrentHashMap<>();
-
   protected PartitionDedupMetadataManager createPartitionDedupMetadataManager(Integer partitionId) {
-    return _partitionMetadataManagerMap.computeIfAbsent(partitionId,
-        k -> new ConcurrentMapPartitionDedupMetadataManager(_tableNameWithType, partitionId, _dedupContext));
-  }
-
-  @Override
-  public void stop() {
-    for (ConcurrentMapPartitionDedupMetadataManager metadataManager : _partitionMetadataManagerMap.values()) {
-      metadataManager.stop();
-    }
-  }
-
-  @Override
-  public void close()
-      throws IOException {
-    for (ConcurrentMapPartitionDedupMetadataManager metadataManager : _partitionMetadataManagerMap.values()) {
-      metadataManager.close();
-    }
+    return new ConcurrentMapPartitionDedupMetadataManager(_tableNameWithType, partitionId, _dedupContext);
   }
 }
