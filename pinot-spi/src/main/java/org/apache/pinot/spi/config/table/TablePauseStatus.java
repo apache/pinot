@@ -27,6 +27,9 @@ public class TablePauseStatus extends BaseJsonConfig {
   private String _comment;
   private long _timeInMillis;
 
+  public TablePauseStatus() {
+  }
+
   public TablePauseStatus(boolean paused, ReasonCode reasonCode, String comment, long timeInMillis) {
     _paused = paused;
     _reasonCode = reasonCode;

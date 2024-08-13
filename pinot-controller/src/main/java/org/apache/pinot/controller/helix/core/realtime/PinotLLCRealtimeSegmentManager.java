@@ -1665,12 +1665,12 @@ public class PinotLLCRealtimeSegmentManager {
    *   2) sending force commit messages to servers
    */
   public PauseStatus pauseConsumption(String tableNameWithType, TablePauseStatus.ReasonCode reasonCode,
-      @Nullable String description) {
-    IdealState updatedIdealState = updatePauseStatusInIdealState(tableNameWithType, true, reasonCode, description);
+      @Nullable String comment) {
+    IdealState updatedIdealState = updatePauseStatusInIdealState(tableNameWithType, true, reasonCode, comment);
     Set<String> consumingSegments = findConsumingSegments(updatedIdealState);
     sendForceCommitMessageToServers(tableNameWithType, consumingSegments);
-    return new PauseStatus(true, consumingSegments, consumingSegments.isEmpty() ? null : "Pause flag is set."
-        + " Consuming segments are being committed."
+    return new PauseStatus(true, consumingSegments, reasonCode, comment,
+        consumingSegments.isEmpty() ? null : "Pause flag is set. Consuming segments are being committed."
         + " Use /pauseStatus endpoint in a few moments to check if all consuming segments have been committed.");
   }
 
@@ -1692,8 +1692,8 @@ public class PinotLLCRealtimeSegmentManager {
     _helixResourceManager
         .invokeControllerPeriodicTask(tableNameWithType, Constants.REALTIME_SEGMENT_VALIDATION_MANAGER, taskProperties);
 
-    return new PauseStatus(false, findConsumingSegments(updatedIdealState), "Pause flag is cleared. "
-        + "Consuming segments are being created. Use /pauseStatus endpoint in a few moments to double check.");
+    return new PauseStatus(false, findConsumingSegments(updatedIdealState), reasonCode, comment, "Pause flag is cleared"
+        + ". Consuming segments are being created. Use /pauseStatus endpoint in a few moments to double check.");
   }
 
   private IdealState updatePauseStatusInIdealState(String tableNameWithType, boolean pause,
@@ -1754,10 +1754,11 @@ public class PinotLLCRealtimeSegmentManager {
     Set<String> consumingSegments = findConsumingSegments(idealState);
     TablePauseStatus pauseStatus = extractTablePauseStatus(idealState);
     if (pauseStatus != null) {
-      return new PauseStatus(pauseStatus.isPaused(), consumingSegments, pauseStatus.getComment());
+      return new PauseStatus(pauseStatus.isPaused(), consumingSegments, pauseStatus.getReasonCode(),
+          pauseStatus.getComment(), null);
     }
     String isTablePausedStr = idealState.getRecord().getSimpleField(IS_TABLE_PAUSED);
-    return new PauseStatus(Boolean.parseBoolean(isTablePausedStr), consumingSegments, null);
+    return new PauseStatus(Boolean.parseBoolean(isTablePausedStr), consumingSegments, null, null, null);
   }
 
   @VisibleForTesting

@@ -104,14 +104,14 @@ public class PinotRealtimeTableResource {
   @ApiOperation(value = "Pause consumption of a realtime table", notes = "Pause the consumption of a realtime table")
   public Response pauseConsumption(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "Description for pausing the consumption") @QueryParam("description") String description,
+      @ApiParam(value = "Comment on pausing the consumption") @QueryParam("comment") String comment,
       @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
     validateTable(tableNameWithType);
     try {
       return Response.ok(_pinotLLCRealtimeSegmentManager.pauseConsumption(tableNameWithType,
-          TablePauseStatus.ReasonCode.ADMINISTRATIVE, description)).build();
+          TablePauseStatus.ReasonCode.ADMINISTRATIVE, comment)).build();
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
@@ -128,7 +128,7 @@ public class PinotRealtimeTableResource {
           + "available offsets are picked to minimize the data loss.")
   public Response resumeConsumption(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "Description for resuming the consumption") @QueryParam("description") String description,
+      @ApiParam(value = "Comment on pausing the consumption") @QueryParam("comment") String comment,
       @ApiParam(
           value = "lastConsumed (safer) | smallest (repeat rows) | largest (miss rows)",
           allowableValues = "lastConsumed, smallest, largest",
@@ -148,7 +148,7 @@ public class PinotRealtimeTableResource {
     }
     try {
       return Response.ok(_pinotLLCRealtimeSegmentManager.resumeConsumption(tableNameWithType, consumeFrom,
-          TablePauseStatus.ReasonCode.ADMINISTRATIVE, description)).build();
+          TablePauseStatus.ReasonCode.ADMINISTRATIVE, comment)).build();
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }

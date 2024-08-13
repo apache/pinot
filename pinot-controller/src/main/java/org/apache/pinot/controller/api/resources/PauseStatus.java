@@ -22,20 +22,27 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.Set;
+import org.apache.pinot.spi.config.table.TablePauseStatus;
 
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class PauseStatus {
   private boolean _pauseFlag;
   private Set<String> _consumingSegments;
+  private TablePauseStatus.ReasonCode _reasonCode;
+  private String _comment;
   private String _description;
 
   @JsonCreator
   public PauseStatus(@JsonProperty("pauseFlag") boolean pauseFlag,
       @JsonProperty("consumingSegments") Set<String> consumingSegments,
+      @JsonProperty("reasonCode") TablePauseStatus.ReasonCode reasonCode,
+      @JsonProperty("comment") String comment,
       @JsonProperty("description") String description) {
     _pauseFlag = pauseFlag;
     _consumingSegments = consumingSegments;
+    _reasonCode = reasonCode;
+    _comment = comment;
     _description = description;
   }
 
@@ -45,6 +52,14 @@ public class PauseStatus {
 
   public Set<String> getConsumingSegments() {
     return _consumingSegments;
+  }
+
+  public TablePauseStatus.ReasonCode getReasonCode() {
+    return _reasonCode;
+  }
+
+  public String getComment() {
+    return _comment;
   }
 
   public String getDescription() {
