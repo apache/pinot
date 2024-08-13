@@ -186,32 +186,44 @@ public final class PlanNodeToRelConverter {
 
       ExplainAttributeBuilder attributes = new ExplainAttributeBuilder();
 
-      attributes.putString("distributionType", node.getDistributionType().toString());
-      if (!node.getKeys().isEmpty()) {
-        switch (node.getDistributionType()) {
-          case HASH_DISTRIBUTED:
-            List<String> keys = node.getKeys().stream()
-                .map(key -> _builder.field(1, 0, key).toString())
-                .collect(Collectors.toList());
-            attributes.putJson("keys", keys);
-            break;
-          case RANGE_DISTRIBUTED:
-            attributes.putJson("range", node.getKeys());
-            break;
-          default:
-        }
+      RelDistribution relDistribution;
+      switch (node.getDistributionType()) {
+        case HASH_DISTRIBUTED:
+          relDistribution = RelDistributions.hash(node.getKeys());
+          break;
+        case RANGE_DISTRIBUTED:
+          relDistribution = RelDistributions.range(node.getKeys());
+          break;
+        case SINGLETON:
+          relDistribution = RelDistributions.SINGLETON;
+          break;
+        case ANY:
+          relDistribution = RelDistributions.ANY;
+          break;
+        case BROADCAST_DISTRIBUTED:
+          relDistribution = RelDistributions.BROADCAST_DISTRIBUTED;
+          break;
+        case ROUND_ROBIN_DISTRIBUTED:
+          relDistribution = RelDistributions.ROUND_ROBIN_DISTRIBUTED;
+          break;
+        case RANDOM_DISTRIBUTED:
+          relDistribution = RelDistributions.RANDOM_DISTRIBUTED;
+          break;
+        default:
+          LOGGER.info("Unsupported distribution type: {}", node.getDistributionType());
+          relDistribution = RelDistributions.ANY;
+          break;
       }
-      if (node.isSort()) {
-        attributes.putBool("sort", true);
-      }
+      attributes.putString("distribution", relDistribution.toString());
       if (node.isPrePartitioned()) {
         attributes.putBool("prePartitioned", true);
       }
 
       List<RelNode> inputs = readAlreadyPushedChildren(node);
 
+      String type = node.isSort() ? "PinotLogicalSortExchange" : "PinotLogicalExchange";
       PinotExplainedRelNode explained = new PinotExplainedRelNode(_builder.getCluster(), RelTraitSet.createEmpty(),
-          "MailboxSend", attributes.build(), node.getDataSchema(), inputs);
+          type, attributes.build(), node.getDataSchema(), inputs);
       _builder.push(explained);
       return null;
     }
