@@ -25,8 +25,8 @@ import org.apache.commons.lang3.EnumUtils;
  * Simple singleton config for managing advanced mmap configurations
  */
 public class MmapMemoryConfig {
-  private MmapMemoryConfig() {}
-  private static final MmapMemoryConfig config = new MmapMemoryConfig();
+  private MmapMemoryConfig() { }
+  private static final MmapMemoryConfig INSTANCE = new MmapMemoryConfig();
 
   enum Advice {
     NORMAL(MmapMemory.LibC.POSIX_MADV_NORMAL),
@@ -57,7 +57,7 @@ public class MmapMemoryConfig {
   private int _defaultAdvice = -1;
 
   public static int getDefaultAdvice() {
-    return config._defaultAdvice;
+    return INSTANCE._defaultAdvice;
   }
 
   public static void setDefaultAdvice(int advice) {
@@ -66,7 +66,7 @@ public class MmapMemoryConfig {
         "Default advice for mmap buffers must be posix_madvise compatible (0-4): %d",
         advice
     );
-    config._defaultAdvice = advice;
+    INSTANCE._defaultAdvice = advice;
   }
 
   public static void setDefaultAdvice(String adviceString) {
