@@ -756,14 +756,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       //       - Compile time function invocation
       //       - Literal only queries
       //       - Any rewrites
-//      if (pinotQuery.isExplain()) {
-        // Update routing tables to only send request to offline servers for OFFLINE and HYBRID tables.
-//        if (offlineRoutingTable != null) {
-//          // For OFFLINE and HYBRID tables, don't send EXPLAIN query to realtime servers.
-//          realtimeBrokerRequest = null;
-//          realtimeRoutingTable = null;
-//        }
-//      }
+
       BrokerResponseNative brokerResponse;
       if (_queriesById != null) {
         // Start to track the running query for cancellation just before sending it out to servers to avoid any
