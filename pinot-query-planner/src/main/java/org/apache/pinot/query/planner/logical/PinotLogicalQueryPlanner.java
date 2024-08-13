@@ -117,7 +117,7 @@ public class PinotLogicalQueryPlanner {
 
     if (tracker != null) {
       Iterator<Map.Entry<? extends BasePlanNode, ExchangeNode>> it = Iterators.concat(
-          fragmenter.getMailboxReceiveToExchangeNodeMap().entrySet().iterator(),
+          fragmenter.getMailboxSendToExchangeNodeMap().entrySet().iterator(),
           fragmenter.getMailboxReceiveToExchangeNodeMap().entrySet().iterator()
       );
       while (it.hasNext()) {
