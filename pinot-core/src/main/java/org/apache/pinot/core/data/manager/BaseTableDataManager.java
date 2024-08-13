@@ -1013,38 +1013,24 @@ public abstract class BaseTableDataManager implements TableDataManager {
     }
   }
 
+  /**
+   * This method checks if any reload is needed on a segment.
+   * Scans through indices, columns, startree index and min max values to achieve the result
+   * True if reload is needed and false if no reload is needed.
+   */
   @Override
   public boolean checkReloadSegment(SegmentZKMetadata zkMetadata, IndexLoadingConfig indexLoadingConfig) {
     String segmentName = zkMetadata.getSegmentName();
-
-    // Creates the SegmentDirectory object to access the segment metadata.
-    // The metadata is null if the segment doesn't exist yet.
     SegmentDirectory segmentDirectory =
         tryInitSegmentDirectory(segmentName, String.valueOf(zkMetadata.getCrc()), indexLoadingConfig);
-    SegmentMetadataImpl segmentMetadata = (segmentDirectory == null) ? null : segmentDirectory.getSegmentMetadata();
-
-    // If the segment doesn't exist on server or its CRC has changed, then we
-    // need to fall back to download the segment from deep store to load it.
-    if (segmentMetadata == null || !hasSameCRC(zkMetadata, segmentMetadata)) {
-      if (segmentMetadata == null) {
-        _logger.info("Segment: {} does not exist", segmentName);
-      } else if (!hasSameCRC(zkMetadata, segmentMetadata)) {
-        _logger.info("Segment: {} has CRC changed from: {} to: {}", segmentName, segmentMetadata.getCrc(),
-            zkMetadata.getCrc());
-      }
-      closeSegmentDirectoryQuietly(segmentDirectory);
-      return true;
-    }
 
     try {
       Schema schema = indexLoadingConfig.getSchema();
       //if the reload of the segment is not needed then return false
       if (!ImmutableSegmentLoader.needPreprocess(segmentDirectory, indexLoadingConfig, schema)) {
-        _logger.info("Segment: {} is consistent with latest table config and schema", segmentName);
         return false;
       } else {
         //if re processing or reload is needed on a segment then return true
-        _logger.info("Segment: {} needs reprocess to reflect latest table config and schema", segmentName);
         return true;
       }
     } catch (Exception e) {
@@ -1055,14 +1041,34 @@ public abstract class BaseTableDataManager implements TableDataManager {
   }
 
   @Nullable
-  private SegmentDirectory tryInitSegmentDirectory(String segmentName, String segmentCrc,
-      IndexLoadingConfig indexLoadingConfig) {
+  SegmentDirectory tryInitSegmentDirectory(String segmentName, String segmentCrc, IndexLoadingConfig indexLoadingConfig) {
     try {
       return initSegmentDirectory(segmentName, segmentCrc, indexLoadingConfig);
     } catch (Exception e) {
       _logger.warn("Failed to initialize SegmentDirectory for segment: {} with error: {}", segmentName, e.getMessage());
       return null;
     }
+  }
+
+  @Override
+  public boolean needReloadSegments() {
+    IndexLoadingConfig indexLoadingConfig = fetchIndexLoadingConfig();
+    List<SegmentDataManager> segmentDataManagers = acquireAllSegments();
+    boolean mismatchCheck = false;
+    try {
+      for (SegmentDataManager segmentDataManager : segmentDataManagers) {
+        SegmentZKMetadata segmentZKMetadata = fetchZKMetadata(segmentDataManager.getSegmentName());
+        if (checkReloadSegment(segmentZKMetadata, indexLoadingConfig)) {
+          mismatchCheck = true;
+          break;
+        }
+      }
+    } finally {
+      for (SegmentDataManager segmentDataManager : segmentDataManagers) {
+        releaseSegment(segmentDataManager);
+      }
+    }
+    return mismatchCheck;
   }
 
   private SegmentDirectory initSegmentDirectory(String segmentName, String segmentCrc,

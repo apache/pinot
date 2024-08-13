@@ -27,14 +27,14 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  *
  * It has details of server id and returns true/false if there are any segments to be reloaded or not.
  */
-public class SegmentColumnMismatchResponse {
-  boolean _isMismatch;
-  String _serverInstanceId;
+public class SegmentsReloadCheckResponse {
+  private final boolean _isReload;
+  private final String _serverInstanceId;
 
   @JsonCreator
-  public SegmentColumnMismatchResponse(@JsonProperty("isMismatch") boolean isMismatch,
+  public SegmentsReloadCheckResponse(@JsonProperty("isReload") boolean isReload,
       @JsonProperty("serverInstanceId") String serverInstanceId) {
-    _isMismatch = isMismatch;
+    _isReload = isReload;
     _serverInstanceId = serverInstanceId;
   }
 
@@ -42,7 +42,7 @@ public class SegmentColumnMismatchResponse {
     return _serverInstanceId;
   }
 
-  public boolean getMismatch() {
-    return _isMismatch;
+  public boolean getReload() {
+    return _isReload;
   }
 }

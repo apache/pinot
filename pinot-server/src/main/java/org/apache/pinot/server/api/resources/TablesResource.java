@@ -63,7 +63,7 @@ import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.response.server.TableIndexMetadataResponse;
 import org.apache.pinot.common.restlet.resources.ResourceUtils;
-import org.apache.pinot.common.restlet.resources.SegmentColumnMismatchResponse;
+import org.apache.pinot.common.restlet.resources.SegmentsReloadCheckResponse;
 import org.apache.pinot.common.restlet.resources.SegmentConsumerInfo;
 import org.apache.pinot.common.restlet.resources.TableMetadataInfo;
 import org.apache.pinot.common.restlet.resources.TableSegmentValidationInfo;
@@ -85,7 +85,6 @@ import org.apache.pinot.core.data.manager.realtime.SegmentUploader;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
-import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -96,11 +95,9 @@ import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.server.access.AccessControlFactory;
 import org.apache.pinot.server.api.AdminApiApplication;
 import org.apache.pinot.server.starter.ServerInstance;
-import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.ConsumerPartitionState;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -958,40 +955,21 @@ public class TablesResource {
   }
 
   @GET
-  @Path("/tables/{tableName}/segments/mismatch")
+  @Path("/tables/{tableName}/segments/reload")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Checks if there is any mismatch of columns in a segment", notes =
-      "Returns true if reload is required on" + " any segment in a given server")
+  @ApiOperation(value = "Checks if reload is needed on any segment", notes = "Returns true if reload is required on"
+      + " any segment in this server")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success", response = TableSegments.class), @ApiResponse(code = 500,
       message = "Server initialization error", response = ErrorInfo.class)
   })
-  public String checkMismatchedSegments(
+  public String checkSegmentsReload(
       @ApiParam(value = "Table Name with type", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "Column name", allowMultiple = true) @QueryParam("columns") @DefaultValue("")
-      List<String> columns, @Context HttpHeaders headers) {
+      @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     TableDataManager tableDataManager = ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableName);
-    Pair<TableConfig, Schema> tableConfigSchema = tableDataManager.fetchTableConfigAndSchema();
-    IndexLoadingConfig indexLoadingConfig =
-        tableDataManager.getIndexLoadingConfig(tableConfigSchema.getLeft(), tableConfigSchema.getRight());
-    List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireAllSegments();
-    try {
-      boolean mismatchCheck = false;
-      for (SegmentDataManager segmentDataManager : segmentDataManagers) {
-        SegmentZKMetadata segmentZKMetadata = tableDataManager.fetchZKMetadata(segmentDataManager.getSegmentName());
-        if (tableDataManager.checkReloadSegment(segmentZKMetadata,
-            indexLoadingConfig)) {
-          mismatchCheck = true;
-          break;
-        }
-      }
-      return ResourceUtils.convertToJsonString(
-          new SegmentColumnMismatchResponse(mismatchCheck, tableDataManager.getInstanceId()));
-    } finally {
-      for (SegmentDataManager segmentDataManager : segmentDataManagers) {
-        tableDataManager.releaseSegment(segmentDataManager);
-      }
-    }
+    boolean isSegmentsReload = tableDataManager.needReloadSegments();
+    return ResourceUtils.convertToJsonString(
+        new SegmentsReloadCheckResponse(isSegmentsReload, tableDataManager.getInstanceId()));
   }
 }

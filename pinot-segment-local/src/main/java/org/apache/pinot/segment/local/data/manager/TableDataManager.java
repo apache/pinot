@@ -124,16 +124,16 @@ public interface TableDataManager {
 
   /**
    *
-   * First tries to load a segment, and then processes to check if the segment reload is needed for the following
-   * three scenarios:
-   * 1) If the index config version and segment config version are different
-   * 2) If the default columns is updated according to the schema.
-   * 3) If there is addition or deletion of indexes
-   * 4) If there is any change in star trees
-   * 5) If there is any change in column min, max values
+   * Checks for a particular segment, reload is needed or not
    * @return true if the reload is needed on the segment
    */
   boolean checkReloadSegment(SegmentZKMetadata zkMetadata, IndexLoadingConfig indexLoadingConfig);
+
+  /**
+   * Check if reload is needed for any of the segments of a table
+   * @return true if reload is needed for any of the segments and false otherwise
+   */
+  boolean needReloadSegments();
 
   /**
    * Downloads a segment and loads it into the table.
