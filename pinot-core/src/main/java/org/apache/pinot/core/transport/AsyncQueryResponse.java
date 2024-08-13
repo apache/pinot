@@ -185,7 +185,7 @@ public class AsyncQueryResponse implements QueryResponse {
 
   void markRequestSent(ServerRoutingInstance serverRoutingInstance, InstanceRequest instanceRequest,
       int requestSentLatencyMs) {
-    _responses.get(serverRoutingInstance).get(instanceRequest.getQuery().hashCode())
+    _responses.get(serverRoutingInstance).get(instanceRequest.getQuery().getPinotQuery().hashCode())
         .markRequestSent(requestSentLatencyMs);
   }
 
