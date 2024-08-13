@@ -115,6 +115,14 @@ public class PinotExplainedRelNode extends AbstractRelNode {
   @Override
   public RelWriter explainTerms(RelWriter pw) {
     RelWriter relWriter = super.explainTerms(pw);
+    int inputSize = getInputs().size();
+    if (inputSize == 1) {
+      relWriter.input("input", getInputs().get(0));
+    } else if (inputSize > 1) {
+      for (int i = 0; i < inputSize; i++) {
+        relWriter.input("input#" + i, getInputs().get(i));
+      }
+    }
     for (Map.Entry<String, Plan.ExplainNode.AttributeValue> entry : _attributes.entrySet()) {
       Plan.ExplainNode.AttributeValue value = entry.getValue();
       if (value.hasString()) {
