@@ -1026,13 +1026,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
     try {
       Schema schema = indexLoadingConfig.getSchema();
-      //if the reload of the segment is not needed then return false
-      if (!ImmutableSegmentLoader.needPreprocess(segmentDirectory, indexLoadingConfig, schema)) {
-        return false;
-      } else {
-        //if re processing or reload is needed on a segment then return true
-        return true;
-      }
+      //if re processing or reload is needed on a segment then return true
+      return ImmutableSegmentLoader.needPreprocess(segmentDirectory, indexLoadingConfig, schema);
     } catch (Exception e) {
       _logger.error("Failed to check if reload is needed for a segment {}", segmentName, e);
       closeSegmentDirectoryQuietly(segmentDirectory);
@@ -1041,7 +1036,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
   }
 
   @Nullable
-  SegmentDirectory tryInitSegmentDirectory(String segmentName, String segmentCrc, IndexLoadingConfig indexLoadingConfig) {
+  SegmentDirectory tryInitSegmentDirectory(String segmentName, String segmentCrc,
+      IndexLoadingConfig indexLoadingConfig) {
     try {
       return initSegmentDirectory(segmentName, segmentCrc, indexLoadingConfig);
     } catch (Exception e) {
