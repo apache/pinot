@@ -57,7 +57,7 @@ public class AbstractMetricsTest {
         "org.apache.pinot.plugin.metrics.yammer.YammerMetricsFactory");
     PinotMetricUtils.init(pinotConfiguration);
     ControllerMetrics controllerMetrics = new ControllerMetrics(new YammerMetricsRegistry());
-    String metricName = "testMultipleUpgrades";
+    String metricName = "testMultipleUpdates";
 
     // update and remove gauge simultaneously
     IntStream.range(0, 1000).forEach(i -> {
