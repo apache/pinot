@@ -114,7 +114,10 @@ public class MultiStageExplainAskingServersUtils {
     Collection<PlanNode> planNodes = fragmentToPlanNode.apply(fragment);
 
     HashMap<PlanNode, Integer> planNodesMap = new HashMap<>();
-    planNodes.forEach(planNode -> mergePlans(planNodesMap, planNode, verbose));
+    planNodes.forEach(planNode -> {
+      PlanNode simplifiedPlan = !verbose ? ExplainNodeSimplifier.simplifyNode(planNode) : planNode;
+      mergePlans(planNodesMap, simplifiedPlan, verbose);
+    });
 
     PlanNode mergedNode;
     PlanNode fragmentRoot = fragment.getPlanFragment().getFragmentRoot();
@@ -128,10 +131,7 @@ public class MultiStageExplainAskingServersUtils {
       }
       case 1: {
         Map.Entry<PlanNode, Integer> entry = planNodesMap.entrySet().iterator().next();
-        ExplainAttributeBuilder attributes = new ExplainAttributeBuilder();
-        attributes.putLong("servers", entry.getValue());
-        mergedNode = new ExplainedNode(stageId, schema, null, entry.getKey(), "IntermediateCombine",
-            attributes.build());
+        mergedNode = entry.getKey();
         break;
       }
       default: {
