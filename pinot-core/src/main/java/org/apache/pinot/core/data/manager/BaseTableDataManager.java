@@ -1050,12 +1050,12 @@ public abstract class BaseTableDataManager implements TableDataManager {
   public boolean needReloadSegments() {
     IndexLoadingConfig indexLoadingConfig = fetchIndexLoadingConfig();
     List<SegmentDataManager> segmentDataManagers = acquireAllSegments();
-    boolean mismatchCheck = false;
+    boolean segmentsReloadCheck = false;
     try {
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
         SegmentZKMetadata segmentZKMetadata = fetchZKMetadata(segmentDataManager.getSegmentName());
         if (checkReloadSegment(segmentZKMetadata, indexLoadingConfig)) {
-          mismatchCheck = true;
+          segmentsReloadCheck = true;
           break;
         }
       }
@@ -1064,7 +1064,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
         releaseSegment(segmentDataManager);
       }
     }
-    return mismatchCheck;
+    return segmentsReloadCheck;
   }
 
   private SegmentDirectory initSegmentDirectory(String segmentName, String segmentCrc,
