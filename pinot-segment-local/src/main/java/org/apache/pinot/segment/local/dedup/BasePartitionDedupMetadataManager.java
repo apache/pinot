@@ -83,7 +83,6 @@ public abstract class BasePartitionDedupMetadataManager implements PartitionDedu
       Iterator<DedupRecordInfo> dedupRecordInfoIterator =
           DedupUtils.getDedupRecordInfoIterator(dedupRecordInfoReader, segment.getSegmentMetadata().getTotalDocs());
       doAddSegment(segment, dedupRecordInfoIterator);
-      removeExpiredPrimaryKeys();
       updatePrimaryKeyGauge();
     } catch (Exception e) {
       throw new RuntimeException(String.format("Caught exception while adding segment: %s of table: %s to %s",
@@ -106,7 +105,6 @@ public abstract class BasePartitionDedupMetadataManager implements PartitionDedu
       Iterator<DedupRecordInfo> dedupRecordInfoIterator =
           DedupUtils.getDedupRecordInfoIterator(dedupRecordInfoReader, segment.getSegmentMetadata().getTotalDocs());
       doRemoveSegment(segment, dedupRecordInfoIterator);
-      removeExpiredPrimaryKeys();
       updatePrimaryKeyGauge();
     } catch (Exception e) {
       throw new RuntimeException(String.format("Caught exception while removing segment: %s of table: %s from %s",

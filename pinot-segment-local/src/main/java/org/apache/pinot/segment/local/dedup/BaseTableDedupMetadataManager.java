@@ -50,7 +50,6 @@ public abstract class BaseTableDedupMetadataManager implements TableDedupMetadat
     double metadataTTL = dedupConfig.getMetadataTTL();
     String dedupTimeColumn = dedupConfig.getDedupTimeColumn();
     if (metadataTTL > 0) {
-      dedupTimeColumn = dedupConfig.getDedupTimeColumn();
       if (dedupTimeColumn == null) {
         dedupTimeColumn = tableConfig.getValidationConfig().getTimeColumnName();
       }
