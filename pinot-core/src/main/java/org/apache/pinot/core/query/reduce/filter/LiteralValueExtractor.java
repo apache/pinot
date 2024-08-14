@@ -34,7 +34,7 @@ public class LiteralValueExtractor implements ValueExtractor {
 
   @Override
   public String getColumnName() {
-    return '\'' + _literal.getStringValue() + '\'';
+    return _literal.toString();
   }
 
   @Override
