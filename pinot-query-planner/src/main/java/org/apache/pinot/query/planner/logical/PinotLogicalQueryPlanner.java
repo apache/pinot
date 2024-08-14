@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.planner.logical;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterators;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
@@ -116,6 +117,9 @@ public class PinotLogicalQueryPlanner {
         false, subPlanRootSenderNode);
 
     if (tracker != null) {
+      RelNode rootRelNode = tracker.getCreatorOf(node);
+      Preconditions.checkState(rootRelNode != null, "Root RelNode not found for PlanNode: %s", node);
+      tracker.trackCreation(rootRelNode, subPlanRootSenderNode);
       Iterator<Map.Entry<? extends BasePlanNode, ExchangeNode>> it = Iterators.concat(
           fragmenter.getMailboxSendToExchangeNodeMap().entrySet().iterator(),
           fragmenter.getMailboxReceiveToExchangeNodeMap().entrySet().iterator()
