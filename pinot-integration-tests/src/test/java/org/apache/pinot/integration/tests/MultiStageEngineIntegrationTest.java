@@ -43,10 +43,13 @@ import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.util.TestUtils;
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.common.function.scalar.StringFunctions.*;
@@ -704,95 +707,97 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     assertEquals(jsonNode.get("numRowsResultSet").asInt(), 3);
   }
 
-  @Test
-  public void testPolymorphicScalarComparisonFunctions() throws Exception {
-    // Queries written this way will trigger the PinotEvaluateLiteralRule which will call the scalar equals function
+  @Test(dataProvider = "polymorphicScalarComparisonFunctionsDataProvider")
+  public void testPolymorphicScalarComparisonFunctions(String type, String literal, String lesserLiteral,
+      Object expectedValue) throws Exception {
+
+    // Queries written this way will trigger the PinotEvaluateLiteralRule which will call the scalar comparison function
     // on the literals
-    String sqlQuery = "WITH data as (SELECT 'test' as \"foo\" FROM mytable) "
-        + "SELECT * FROM data WHERE \"foo\" = 'test';";
-    JsonNode jsonNode = postQuery(sqlQuery);
-    assertNoError(jsonNode);
+    String sqlQueryPrefix = "WITH data as (SELECT " + literal + " as \"foo\" FROM mytable) "
+        + "SELECT * FROM data ";
 
-    assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").size(), 1);
-    assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "STRING");
-    assertEquals(jsonNode.get("numRowsResultSet").asLong(), DEFAULT_COUNT_STAR_RESULT);
-    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asText(), "test");
+    // Test equals
+    JsonNode result = postQuery(sqlQueryPrefix + "WHERE \"foo\" = " + literal);
+    assertNoError(result);
+    checkSingleColumnSameValueResult(result, DEFAULT_COUNT_STAR_RESULT, type, expectedValue);
 
-    sqlQuery = "WITH data as (SELECT 1 as \"foo\" FROM mytable) "
-        + "SELECT * FROM data WHERE \"foo\" = 1";
-    jsonNode = postQuery(sqlQuery);
-    assertNoError(jsonNode);
+    // Test not equals
+    result = postQuery(sqlQueryPrefix + "WHERE \"foo\" != " + lesserLiteral);
+    assertNoError(result);
+    checkSingleColumnSameValueResult(result, DEFAULT_COUNT_STAR_RESULT, type, expectedValue);
 
-    assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").size(), 1);
-    assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "INT");
-    assertEquals(jsonNode.get("numRowsResultSet").asLong(), DEFAULT_COUNT_STAR_RESULT);
-    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asInt(), 1);
+    // Test greater than
+    result = postQuery(sqlQueryPrefix + "WHERE \"foo\" > " + lesserLiteral);
+    assertNoError(result);
+    checkSingleColumnSameValueResult(result, DEFAULT_COUNT_STAR_RESULT, type, expectedValue);
 
-    // Don't support equals comparison for literals with different types
-    sqlQuery = "WITH data as (SELECT 1 as \"foo\" FROM mytable) "
-        + "SELECT * FROM data WHERE \"foo\" = 'test'";
-    jsonNode = postQuery(sqlQuery);
+    // Test greater than or equals
+    result = postQuery(sqlQueryPrefix + "WHERE \"foo\" >= " + lesserLiteral);
+    assertNoError(result);
+    checkSingleColumnSameValueResult(result, DEFAULT_COUNT_STAR_RESULT, type, expectedValue);
+
+    // Test less than
+    result = postQuery(sqlQueryPrefix + "WHERE " + lesserLiteral + " < \"foo\"");
+    assertNoError(result);
+    checkSingleColumnSameValueResult(result, DEFAULT_COUNT_STAR_RESULT, type, expectedValue);
+
+    // Test less than or equals
+    result = postQuery(sqlQueryPrefix + "WHERE " + lesserLiteral + " <= \"foo\"");
+    assertNoError(result);
+    checkSingleColumnSameValueResult(result, DEFAULT_COUNT_STAR_RESULT, type, expectedValue);
+  }
+
+  @Test
+  public void testPolymorphicScalarComparisonFunctionsDifferentType() throws Exception {
+    // Don't support comparison for literals with different types
+    String sqlQueryPrefix = "WITH data as (SELECT 1 as \"foo\" FROM mytable) "
+        + "SELECT * FROM data WHERE \"foo\" ";
+
+    JsonNode jsonNode = postQuery(sqlQueryPrefix + "= 'test'");
     assertFalse(jsonNode.get("exceptions").isEmpty());
 
-    sqlQuery = "WITH data as (SELECT 'test' as \"foo\" FROM mytable) "
-        + "SELECT * FROM data WHERE \"foo\" != 'abc';";
-    jsonNode = postQuery(sqlQuery);
-    assertNoError(jsonNode);
+    jsonNode = postQuery(sqlQueryPrefix + "!= 'test'");
+    assertFalse(jsonNode.get("exceptions").isEmpty());
 
-    assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").size(), 1);
-    assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "STRING");
-    assertEquals(jsonNode.get("numRowsResultSet").asLong(), DEFAULT_COUNT_STAR_RESULT);
-    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asText(), "test");
+    jsonNode = postQuery(sqlQueryPrefix + "> 'test'");
+    assertFalse(jsonNode.get("exceptions").isEmpty());
 
-    sqlQuery = "WITH data as (SELECT 1 as \"foo\" FROM mytable) "
-        + "SELECT * FROM data WHERE \"foo\" != 0";
-    jsonNode = postQuery(sqlQuery);
-    assertNoError(jsonNode);
+    jsonNode = postQuery(sqlQueryPrefix + ">= 'test'");
+    assertFalse(jsonNode.get("exceptions").isEmpty());
 
-    assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").size(), 1);
-    assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "INT");
-    assertEquals(jsonNode.get("numRowsResultSet").asLong(), DEFAULT_COUNT_STAR_RESULT);
-    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asInt(), 1);
+    jsonNode = postQuery(sqlQueryPrefix + "< 'test'");
+    assertFalse(jsonNode.get("exceptions").isEmpty());
 
-    sqlQuery = "WITH data as (SELECT 1 as \"foo\" FROM mytable) "
-        + "SELECT * FROM data WHERE \"foo\" > 0";
-    jsonNode = postQuery(sqlQuery);
-    assertNoError(jsonNode);
+    jsonNode = postQuery(sqlQueryPrefix + "<= 'test'");
+    assertFalse(jsonNode.get("exceptions").isEmpty());
+  }
 
-    assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").size(), 1);
-    assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "INT");
-    assertEquals(jsonNode.get("numRowsResultSet").asLong(), DEFAULT_COUNT_STAR_RESULT);
-    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asInt(), 1);
+  /**
+   * Helper method to verify the result of a query that is assumed to return a single column with the same value for
+   * all the rows. Only the first row value is checked.
+   */
+  private void checkSingleColumnSameValueResult(JsonNode result, long expectedRows, String type,
+      Object expectedValue) {
+    assertEquals(result.get("resultTable").get("dataSchema").get("columnDataTypes").size(), 1);
+    assertEquals(result.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), type);
+    assertEquals(result.get("numRowsResultSet").asLong(), expectedRows);
+    assertEquals(result.get("resultTable").get("rows").get(0).get(0).asText(), expectedValue);
+  }
 
-    sqlQuery = "WITH data as (SELECT 'test' as \"foo\" FROM mytable) "
-        + "SELECT * FROM data WHERE \"foo\" >= 'abc';";
-    jsonNode = postQuery(sqlQuery);
-    assertNoError(jsonNode);
+  @DataProvider(name = "polymorphicScalarComparisonFunctionsDataProvider")
+  Object[][] polymorphicScalarComparisonFunctionsDataProvider() {
+    List<Object[]> inputs = new ArrayList<>();
 
-    assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").size(), 1);
-    assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "STRING");
-    assertEquals(jsonNode.get("numRowsResultSet").asLong(), DEFAULT_COUNT_STAR_RESULT);
-    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asText(), "test");
+    inputs.add(new Object[]{"STRING", "'test'", "'abc'", "test"});
+    inputs.add(new Object[]{"INT", "1", "0", "1"});
+    inputs.add(new Object[]{"LONG", "12345678999", "12345678998", "12345678999"});
+    inputs.add(new Object[]{"FLOAT", "CAST(1.234 AS FLOAT)", "CAST(1.23 AS FLOAT)", "1.234"});
+    inputs.add(new Object[]{"DOUBLE", "1.234", "1.23", "1.234"});
+    inputs.add(new Object[]{"BOOLEAN", "CAST(true AS BOOLEAN)", "CAST(FALSE AS BOOLEAN)", "true"});
+    inputs.add(new Object[]{"TIMESTAMP", "CAST(1723593600000 AS TIMESTAMP)", "CAST (1623593600000 AS TIMESTAMP)",
+        new DateTime(1723593600000L, DateTimeZone.getDefault()).toString("yyyy-MM-dd HH:mm:ss.S")});
 
-    sqlQuery = "WITH data as (SELECT 1 as \"foo\" FROM mytable) "
-        + "SELECT * FROM data WHERE \"foo\" <= 2";
-    jsonNode = postQuery(sqlQuery);
-    assertNoError(jsonNode);
-
-    assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").size(), 1);
-    assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "INT");
-    assertEquals(jsonNode.get("numRowsResultSet").asLong(), DEFAULT_COUNT_STAR_RESULT);
-    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asInt(), 1);
-
-    sqlQuery = "WITH data as (SELECT 'test' as \"foo\" FROM mytable) "
-        + "SELECT * FROM data WHERE \"foo\" < 'xyz';";
-    jsonNode = postQuery(sqlQuery);
-    assertNoError(jsonNode);
-
-    assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").size(), 1);
-    assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "STRING");
-    assertEquals(jsonNode.get("numRowsResultSet").asLong(), DEFAULT_COUNT_STAR_RESULT);
-    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asText(), "test");
+    return inputs.toArray(new Object[0][]);
   }
 
   @Test
