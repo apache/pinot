@@ -245,7 +245,7 @@
     <jetbrains.annotations.version>24.1.0</jetbrains.annotations.version>
     <kotlin.stdlib.version>2.0.10</kotlin.stdlib.version>
     <okio.version>3.9.0</okio.version>
-    <kerby.version>2.0.3</kerby.version>
+    <kerby.version>2.1.0</kerby.version>
     <jline.version>3.26.3</jline.version>
     <wildfly.version>2.0.0</wildfly.version>
     <jettison.version>1.5.4</jettison.version>
