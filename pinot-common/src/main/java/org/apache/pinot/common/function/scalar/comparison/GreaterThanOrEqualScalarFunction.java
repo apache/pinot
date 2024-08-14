@@ -22,7 +22,7 @@ import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.common.function.FunctionInfo;
-import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
 
@@ -32,29 +32,29 @@ import org.apache.pinot.spi.annotations.ScalarFunction;
 @ScalarFunction
 public class GreaterThanOrEqualScalarFunction extends PolymorphicComparisonScalarFunction {
 
-  private static final Map<DataSchema.ColumnDataType, FunctionInfo> TYPE_FUNCTION_INFO_MAP = new HashMap<>();
+  private static final Map<ColumnDataType, FunctionInfo> TYPE_FUNCTION_INFO_MAP = new HashMap<>();
 
   static {
     try {
       // Set nullable parameters to false for each function because the return value should be null if any argument
       // is null
-      TYPE_FUNCTION_INFO_MAP.put(DataSchema.ColumnDataType.INT, new FunctionInfo(
+      TYPE_FUNCTION_INFO_MAP.put(ColumnDataType.INT, new FunctionInfo(
           GreaterThanOrEqualScalarFunction.class.getMethod("intGreaterThanOrEqual", int.class, int.class),
           GreaterThanOrEqualScalarFunction.class, false));
-      TYPE_FUNCTION_INFO_MAP.put(DataSchema.ColumnDataType.LONG, new FunctionInfo(
+      TYPE_FUNCTION_INFO_MAP.put(ColumnDataType.LONG, new FunctionInfo(
           GreaterThanOrEqualScalarFunction.class.getMethod("longGreaterThanOrEqual", long.class, long.class),
           GreaterThanOrEqualScalarFunction.class, false));
-      TYPE_FUNCTION_INFO_MAP.put(DataSchema.ColumnDataType.FLOAT, new FunctionInfo(
+      TYPE_FUNCTION_INFO_MAP.put(ColumnDataType.FLOAT, new FunctionInfo(
           GreaterThanOrEqualScalarFunction.class.getMethod("floatGreaterThanOrEqual", float.class, float.class),
           GreaterThanOrEqualScalarFunction.class, false));
-      TYPE_FUNCTION_INFO_MAP.put(DataSchema.ColumnDataType.DOUBLE, new FunctionInfo(
+      TYPE_FUNCTION_INFO_MAP.put(ColumnDataType.DOUBLE, new FunctionInfo(
           GreaterThanOrEqualScalarFunction.class.getMethod("doubleGreaterThanOrEqual", double.class, double.class),
           GreaterThanOrEqualScalarFunction.class, false));
-      TYPE_FUNCTION_INFO_MAP.put(DataSchema.ColumnDataType.BIG_DECIMAL, new FunctionInfo(
+      TYPE_FUNCTION_INFO_MAP.put(ColumnDataType.BIG_DECIMAL, new FunctionInfo(
           GreaterThanOrEqualScalarFunction.class.getMethod("bigDecimalGreaterThanOrEqual",
               BigDecimal.class, BigDecimal.class),
           GreaterThanOrEqualScalarFunction.class, false));
-      TYPE_FUNCTION_INFO_MAP.put(DataSchema.ColumnDataType.STRING, new FunctionInfo(
+      TYPE_FUNCTION_INFO_MAP.put(ColumnDataType.STRING, new FunctionInfo(
           GreaterThanOrEqualScalarFunction.class.getMethod("stringGreaterThanOrEqual", String.class, String.class),
           GreaterThanOrEqualScalarFunction.class, false));
     } catch (NoSuchMethodException e) {
@@ -63,7 +63,7 @@ public class GreaterThanOrEqualScalarFunction extends PolymorphicComparisonScala
   }
 
   @Override
-  protected FunctionInfo functionInfoForType(DataSchema.ColumnDataType argumentType) {
+  protected FunctionInfo functionInfoForType(ColumnDataType argumentType) {
     return TYPE_FUNCTION_INFO_MAP.get(argumentType);
   }
 

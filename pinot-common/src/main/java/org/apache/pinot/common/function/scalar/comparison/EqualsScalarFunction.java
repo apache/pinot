@@ -24,7 +24,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import org.apache.pinot.common.function.FunctionInfo;
-import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
 /**
@@ -33,52 +33,52 @@ import org.apache.pinot.spi.annotations.ScalarFunction;
 @ScalarFunction
 public class EqualsScalarFunction extends PolymorphicComparisonScalarFunction {
 
-  private static final Map<DataSchema.ColumnDataType, FunctionInfo> TYPE_FUNCTION_INFO_MAP = new HashMap<>();
+  private static final Map<ColumnDataType, FunctionInfo> TYPE_FUNCTION_INFO_MAP = new HashMap<>();
 
   static {
     try {
       // Set nullable parameters to false for each function because the return value should be null if any argument
       // is null
-      TYPE_FUNCTION_INFO_MAP.put(DataSchema.ColumnDataType.INT, new FunctionInfo(
+      TYPE_FUNCTION_INFO_MAP.put(ColumnDataType.INT, new FunctionInfo(
           EqualsScalarFunction.class.getMethod("intEquals", int.class, int.class),
           EqualsScalarFunction.class, false));
-      TYPE_FUNCTION_INFO_MAP.put(DataSchema.ColumnDataType.LONG, new FunctionInfo(
+      TYPE_FUNCTION_INFO_MAP.put(ColumnDataType.LONG, new FunctionInfo(
           EqualsScalarFunction.class.getMethod("longEquals", long.class, long.class),
           EqualsScalarFunction.class, false));
-      TYPE_FUNCTION_INFO_MAP.put(DataSchema.ColumnDataType.FLOAT, new FunctionInfo(
+      TYPE_FUNCTION_INFO_MAP.put(ColumnDataType.FLOAT, new FunctionInfo(
           EqualsScalarFunction.class.getMethod("floatEquals", float.class, float.class),
           EqualsScalarFunction.class, false));
-      TYPE_FUNCTION_INFO_MAP.put(DataSchema.ColumnDataType.DOUBLE, new FunctionInfo(
+      TYPE_FUNCTION_INFO_MAP.put(ColumnDataType.DOUBLE, new FunctionInfo(
           EqualsScalarFunction.class.getMethod("doubleEquals", double.class, double.class),
           EqualsScalarFunction.class, false));
-      TYPE_FUNCTION_INFO_MAP.put(DataSchema.ColumnDataType.BIG_DECIMAL, new FunctionInfo(
+      TYPE_FUNCTION_INFO_MAP.put(ColumnDataType.BIG_DECIMAL, new FunctionInfo(
           EqualsScalarFunction.class.getMethod("bigDecimalEquals", BigDecimal.class, BigDecimal.class),
           EqualsScalarFunction.class, false));
-      TYPE_FUNCTION_INFO_MAP.put(DataSchema.ColumnDataType.STRING, new FunctionInfo(
+      TYPE_FUNCTION_INFO_MAP.put(ColumnDataType.STRING, new FunctionInfo(
           EqualsScalarFunction.class.getMethod("stringEquals", String.class, String.class),
           EqualsScalarFunction.class, false));
-      TYPE_FUNCTION_INFO_MAP.put(DataSchema.ColumnDataType.BYTES, new FunctionInfo(
+      TYPE_FUNCTION_INFO_MAP.put(ColumnDataType.BYTES, new FunctionInfo(
           EqualsScalarFunction.class.getMethod("bytesEquals", byte[].class, byte[].class),
           EqualsScalarFunction.class, false));
-      TYPE_FUNCTION_INFO_MAP.put(DataSchema.ColumnDataType.OBJECT, new FunctionInfo(
+      TYPE_FUNCTION_INFO_MAP.put(ColumnDataType.OBJECT, new FunctionInfo(
           EqualsScalarFunction.class.getMethod("objectEquals", Object.class, Object.class),
           EqualsScalarFunction.class, false));
-      TYPE_FUNCTION_INFO_MAP.put(DataSchema.ColumnDataType.INT_ARRAY, new FunctionInfo(
+      TYPE_FUNCTION_INFO_MAP.put(ColumnDataType.INT_ARRAY, new FunctionInfo(
           EqualsScalarFunction.class.getMethod("intArrayEquals", int[].class, int[].class),
           EqualsScalarFunction.class, false));
-      TYPE_FUNCTION_INFO_MAP.put(DataSchema.ColumnDataType.LONG_ARRAY, new FunctionInfo(
+      TYPE_FUNCTION_INFO_MAP.put(ColumnDataType.LONG_ARRAY, new FunctionInfo(
           EqualsScalarFunction.class.getMethod("longArrayEquals", long[].class, long[].class),
           EqualsScalarFunction.class, false));
-      TYPE_FUNCTION_INFO_MAP.put(DataSchema.ColumnDataType.FLOAT_ARRAY, new FunctionInfo(
+      TYPE_FUNCTION_INFO_MAP.put(ColumnDataType.FLOAT_ARRAY, new FunctionInfo(
           EqualsScalarFunction.class.getMethod("floatArrayEquals", float[].class, float[].class),
           EqualsScalarFunction.class, false));
-      TYPE_FUNCTION_INFO_MAP.put(DataSchema.ColumnDataType.DOUBLE_ARRAY, new FunctionInfo(
+      TYPE_FUNCTION_INFO_MAP.put(ColumnDataType.DOUBLE_ARRAY, new FunctionInfo(
           EqualsScalarFunction.class.getMethod("doubleArrayEquals", double[].class, double[].class),
           EqualsScalarFunction.class, false));
-      TYPE_FUNCTION_INFO_MAP.put(DataSchema.ColumnDataType.STRING_ARRAY, new FunctionInfo(
+      TYPE_FUNCTION_INFO_MAP.put(ColumnDataType.STRING_ARRAY, new FunctionInfo(
           EqualsScalarFunction.class.getMethod("stringArrayEquals", String[].class, String[].class),
           EqualsScalarFunction.class, false));
-      TYPE_FUNCTION_INFO_MAP.put(DataSchema.ColumnDataType.BYTES_ARRAY, new FunctionInfo(
+      TYPE_FUNCTION_INFO_MAP.put(ColumnDataType.BYTES_ARRAY, new FunctionInfo(
           EqualsScalarFunction.class.getMethod("bytesArrayEquals", byte[][].class, byte[][].class),
           EqualsScalarFunction.class, false));
     } catch (NoSuchMethodException e) {
@@ -87,7 +87,7 @@ public class EqualsScalarFunction extends PolymorphicComparisonScalarFunction {
   }
 
   @Override
-  protected FunctionInfo functionInfoForType(DataSchema.ColumnDataType argumentType) {
+  protected FunctionInfo functionInfoForType(ColumnDataType argumentType) {
     return TYPE_FUNCTION_INFO_MAP.get(argumentType);
   }
 

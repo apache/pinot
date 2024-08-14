@@ -22,7 +22,7 @@ import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.common.function.FunctionInfo;
-import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
 
@@ -32,28 +32,28 @@ import org.apache.pinot.spi.annotations.ScalarFunction;
 @ScalarFunction
 public class LessThanScalarFunction extends PolymorphicComparisonScalarFunction {
 
-  private static final Map<DataSchema.ColumnDataType, FunctionInfo> TYPE_FUNCTION_INFO_MAP = new HashMap<>();
+  private static final Map<ColumnDataType, FunctionInfo> TYPE_FUNCTION_INFO_MAP = new HashMap<>();
 
   static {
     try {
       // Set nullable parameters to false for each function because the return value should be null if any argument
       // is null
-      TYPE_FUNCTION_INFO_MAP.put(DataSchema.ColumnDataType.INT, new FunctionInfo(
+      TYPE_FUNCTION_INFO_MAP.put(ColumnDataType.INT, new FunctionInfo(
           LessThanScalarFunction.class.getMethod("intLessThan", int.class, int.class),
           LessThanScalarFunction.class, false));
-      TYPE_FUNCTION_INFO_MAP.put(DataSchema.ColumnDataType.LONG, new FunctionInfo(
+      TYPE_FUNCTION_INFO_MAP.put(ColumnDataType.LONG, new FunctionInfo(
           LessThanScalarFunction.class.getMethod("longLessThan", long.class, long.class),
           LessThanScalarFunction.class, false));
-      TYPE_FUNCTION_INFO_MAP.put(DataSchema.ColumnDataType.FLOAT, new FunctionInfo(
+      TYPE_FUNCTION_INFO_MAP.put(ColumnDataType.FLOAT, new FunctionInfo(
           LessThanScalarFunction.class.getMethod("floatLessThan", float.class, float.class),
           LessThanScalarFunction.class, false));
-      TYPE_FUNCTION_INFO_MAP.put(DataSchema.ColumnDataType.DOUBLE, new FunctionInfo(
+      TYPE_FUNCTION_INFO_MAP.put(ColumnDataType.DOUBLE, new FunctionInfo(
           LessThanScalarFunction.class.getMethod("doubleLessThan", double.class, double.class),
           LessThanScalarFunction.class, false));
-      TYPE_FUNCTION_INFO_MAP.put(DataSchema.ColumnDataType.BIG_DECIMAL, new FunctionInfo(
+      TYPE_FUNCTION_INFO_MAP.put(ColumnDataType.BIG_DECIMAL, new FunctionInfo(
           LessThanScalarFunction.class.getMethod("bigDecimalLessThan", BigDecimal.class, BigDecimal.class),
           LessThanScalarFunction.class, false));
-      TYPE_FUNCTION_INFO_MAP.put(DataSchema.ColumnDataType.STRING, new FunctionInfo(
+      TYPE_FUNCTION_INFO_MAP.put(ColumnDataType.STRING, new FunctionInfo(
           LessThanScalarFunction.class.getMethod("stringLessThan", String.class, String.class),
           LessThanScalarFunction.class, false));
     } catch (NoSuchMethodException e) {
@@ -62,7 +62,7 @@ public class LessThanScalarFunction extends PolymorphicComparisonScalarFunction 
   }
 
   @Override
-  protected FunctionInfo functionInfoForType(DataSchema.ColumnDataType argumentType) {
+  protected FunctionInfo functionInfoForType(ColumnDataType argumentType) {
     return TYPE_FUNCTION_INFO_MAP.get(argumentType);
   }
 

@@ -24,7 +24,7 @@ import org.apache.calcite.sql.type.SameOperandTypeChecker;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.PinotScalarFunction;
 import org.apache.pinot.common.function.sql.PinotSqlFunction;
-import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 
 
 /**
@@ -42,7 +42,7 @@ public abstract class PolymorphicComparisonScalarFunction implements PinotScalar
 
   @Nullable
   @Override
-  public FunctionInfo getFunctionInfo(DataSchema.ColumnDataType[] argumentTypes) {
+  public FunctionInfo getFunctionInfo(ColumnDataType[] argumentTypes) {
     if (argumentTypes.length != 2) {
       return null;
     }
@@ -50,7 +50,7 @@ public abstract class PolymorphicComparisonScalarFunction implements PinotScalar
     // In case of heterogeneous argument types, fall back to double based comparison and allow FunctionInvoker to
     // convert argument types for v1 engine support.
     if (argumentTypes[0] != argumentTypes[1]) {
-      return functionInfoForType(DataSchema.ColumnDataType.DOUBLE);
+      return functionInfoForType(ColumnDataType.DOUBLE);
     }
 
     return functionInfoForType(argumentTypes[0].getStoredType());
@@ -64,12 +64,12 @@ public abstract class PolymorphicComparisonScalarFunction implements PinotScalar
     }
 
     // For backward compatibility
-    return functionInfoForType(DataSchema.ColumnDataType.DOUBLE);
+    return functionInfoForType(ColumnDataType.DOUBLE);
   }
 
   /**
    * Get the comparison scalar function's {@link FunctionInfo} for the given argument type. Comparison scalar functions
    * take two arguments of the same type.
    */
-  protected abstract FunctionInfo functionInfoForType(DataSchema.ColumnDataType argumentType);
+  protected abstract FunctionInfo functionInfoForType(ColumnDataType argumentType);
 }
