@@ -63,6 +63,16 @@ import org.testng.Assert;
  *
  * Use {@link #withBaseDir(File)} to start a new test.
  *
+ * This test framework is intended to be used in a way to write semantically rich tests that are easy to read.
+ * They are more useful when small amount of data is needed to test a specific query.
+ *
+ * By default, this framework creates a single broker and a single server.
+ * This should be enough for most tests.
+ * But some tests may need to create more than one server.
+ * The framework is able to create up to two servers, internally called <em>instances</em>.
+ * The DSL force the user to create the first instance before executing a query, but the second instance can be created
+ * by calling {@link OnFirstInstance#andOnSecondInstance(Object[]...)}.
+ *
  * @see org.apache.pinot.core.query.aggregation.function.CountAggregationFunctionTest
  */
 public class FluentQueryTest {
@@ -184,7 +194,7 @@ public class FluentQueryTest {
     }
 
     /**
-     * Creates one segment on the first instance with the given content.
+     * Creates one segment on the first instance (aka server) with the given content.
      *
      * @param content the content of the segment.
      * @see OnFirstInstance#andSegment(String...) to learn more about the content syntax
@@ -195,7 +205,7 @@ public class FluentQueryTest {
     }
 
     /**
-     * Creates one segment on the first instance with the given content.
+     * Creates one segment on the first instance (aka server) with the given content.
      * @param content the content of the segment. Each element of the array is a row. Each row is an array of objects
      *                that should be compatible with the table definition.
      */
@@ -349,7 +359,7 @@ public class FluentQueryTest {
     }
 
     /**
-     * Creates one segment on a second instance.
+     * Creates one segment on a second instance (aka server).
      *
      * @param content the content of the segment. Each element of the array is a row. Each row is an array of objects
      *                that should be compatible with the table definition.
@@ -362,7 +372,7 @@ public class FluentQueryTest {
     }
 
     /**
-     * Creates one segment on a second instance.
+     * Creates one segment on a second instance (aka server).
      *
      * @param content the content of the segment.
      * @see OnFirstInstance#andSegment(String...) to learn more about the content syntax
