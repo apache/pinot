@@ -178,6 +178,7 @@ public class MmapMemory implements Memory {
             break;
           default:
             LOGGER.warn("posix_madvise returned an unknown error code: {}", errno);
+            break;
         }
       }
     }
