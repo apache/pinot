@@ -55,6 +55,7 @@ public class NonAggregationGroupByToDistinctQueryRewriterTest {
   public void testUnsupportedQueries() {
     testUnsupportedQuery("SELECT col1, col2 FROM foo GROUP BY col1");
     testUnsupportedQuery("SELECT concat(col1, col2) FROM foo GROUP BY col1");
+    testUnsupportedQuery("SELECT col1+col2*5 FROM foo GROUP BY col1");
   }
 
   private void testUnsupportedQuery(String query) {
@@ -66,6 +67,7 @@ public class NonAggregationGroupByToDistinctQueryRewriterTest {
   public void testSkipQueryRewrite() {
     testSkipQueryRewrite("SELECT col1 FROM foo GROUP BY col1, col2");
     testSkipQueryRewrite("SELECT col1 + col2 FROM foo GROUP BY col1, col2");
+    testSkipQueryRewrite("SELECT col1+col2*5 FROM foo GROUP BY col1, col2");
   }
 
   private void testSkipQueryRewrite(String query) {
