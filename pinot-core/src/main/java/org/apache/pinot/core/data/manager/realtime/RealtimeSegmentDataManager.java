@@ -48,7 +48,7 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.common.utils.LLCSegmentName;
-import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager.ConsumptionRateLimiter;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
@@ -1060,9 +1060,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           TimeUnit.MILLISECONDS.toSeconds(waitTimeMillis));
 
       if (forCommit) {
-        File segmentTarFile = new File(dataDir, _segmentNameStr + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
+        File segmentTarFile = new File(dataDir, _segmentNameStr + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);
         try {
-          TarGzCompressionUtils.createTarGzFile(indexDir, segmentTarFile);
+          TarCompressionUtils.createCompressedTarFile(indexDir, segmentTarFile);
         } catch (IOException e) {
           String errorMessage =
               String.format("Caught exception while taring index directory from: %s to: %s", indexDir, segmentTarFile);

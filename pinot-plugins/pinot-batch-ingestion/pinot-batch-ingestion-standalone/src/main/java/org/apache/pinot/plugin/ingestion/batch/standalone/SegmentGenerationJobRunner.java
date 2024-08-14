@@ -35,7 +35,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.segment.generation.SegmentGenerationUtils;
-import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationJobUtils;
 import org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationTaskRunner;
@@ -268,7 +268,7 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
         String segmentTarFileName = URIUtils.encode(segmentName + Constants.TAR_GZ_FILE_EXT);
         localSegmentTarFile = new File(localOutputTempDir, segmentTarFileName);
         LOGGER.info("Tarring segment from: {} to: {}", localSegmentDir, localSegmentTarFile);
-        TarGzCompressionUtils.createTarGzFile(localSegmentDir, localSegmentTarFile);
+        TarCompressionUtils.createCompressedTarFile(localSegmentDir, localSegmentTarFile);
         long uncompressedSegmentSize = FileUtils.sizeOf(localSegmentDir);
         long compressedSegmentSize = FileUtils.sizeOf(localSegmentTarFile);
         LOGGER.info("Size for segment: {}, uncompressed: {}, compressed: {}", segmentName,
