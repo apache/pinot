@@ -975,6 +975,6 @@ public class TablesResource {
       throw new WebApplicationException(e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR);
     }
     return ResourceUtils.convertToJsonString(
-        new SegmentsReloadCheckResponse(needReload, tableDataManager.getInstanceId()));
+        new SegmentsReloadCheckResponse(needReload));
   }
 }

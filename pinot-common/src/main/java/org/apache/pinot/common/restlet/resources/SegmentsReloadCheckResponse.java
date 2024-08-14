@@ -28,21 +28,13 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * It has details of server id and returns true/false if there are any segments to be reloaded or not.
  */
 public class SegmentsReloadCheckResponse {
-  private final boolean _isReload;
-  private final String _serverInstanceId;
+  private final boolean _needReload;
 
   @JsonCreator
-  public SegmentsReloadCheckResponse(@JsonProperty("needReload") boolean needReload,
-      @JsonProperty("serverInstanceId") String serverInstanceId) {
-    _isReload = needReload;
-    _serverInstanceId = serverInstanceId;
+  public SegmentsReloadCheckResponse(@JsonProperty("needReload") boolean needReload) {
+    _needReload = needReload;
   }
-
-  public String getServerInstanceId() {
-    return _serverInstanceId;
-  }
-
-  public boolean getReload() {
-    return _isReload;
+  public boolean getNeedReload() {
+    return _needReload;
   }
 }
