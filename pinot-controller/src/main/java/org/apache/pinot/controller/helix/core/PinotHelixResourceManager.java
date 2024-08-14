@@ -2866,6 +2866,26 @@ public class PinotHelixResourceManager {
   }
 
   /**
+   * Returns a map from server instance to count of segments it serves for the given table. Ignore OFFLINE segments from
+   * the ideal state because they are not supposed to be served.
+   */
+  public Map<String, Integer> getServerToSegmentsCountMap(String tableNameWithType) {
+    Map<String, Integer> serverToSegmentCountMap = new TreeMap<>();
+    IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableNameWithType);
+    if (idealState == null) {
+      throw new IllegalStateException("Ideal state does not exist for table: " + tableNameWithType);
+    }
+    for (Map.Entry<String, Map<String, String>> entry : idealState.getRecord().getMapFields().entrySet()) {
+      for (Map.Entry<String, String> instanceStateEntry : entry.getValue().entrySet()) {
+        if (!instanceStateEntry.getValue().equals(SegmentStateModel.OFFLINE)) {
+          serverToSegmentCountMap.merge(instanceStateEntry.getKey(), 1, Integer::sum);
+        }
+      }
+    }
+    return serverToSegmentCountMap;
+  }
+
+  /**
    * Returns a set of server instances for a given table and segment. Ignore OFFLINE segments from the ideal state
    * because they are not supposed to be served.
    */

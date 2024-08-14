@@ -17,6 +17,7 @@
  * under the License.
  */
 package org.apache.pinot.controller.api.resources;
+
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import io.swagger.annotations.Api;
