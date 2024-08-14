@@ -3048,7 +3048,12 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   public void testExplainPlanQueryV2()
       throws Exception {
     setUseMultiStageQueryEngine(true);
-    String query1 = "EXPLAIN PLAN FOR SELECT count(*) AS count, Carrier AS name FROM mytable GROUP BY name ORDER BY 1";
+    // language=sql
+    String query1 = "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR "
+        + "SELECT count(*) AS count, Carrier AS name "
+        + "FROM mytable "
+        + "GROUP BY name "
+        + "ORDER BY 1";
     String response1 = postQuery(query1).get("resultTable").toString();
 
     // Replace string "docs:[0-9]+" with "docs:*" so that test doesn't fail when number of documents change. This is
@@ -3060,7 +3065,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(response1, "{"
         + "\"dataSchema\":{\"columnNames\":[\"SQL\",\"PLAN\"],\"columnDataTypes\":[\"STRING\",\"STRING\"]},"
         + "\"rows\":[["
-        + "\"EXPLAIN PLAN FOR SELECT count(*) AS count, Carrier AS name FROM mytable GROUP BY name ORDER BY 1\","
+        + "\"EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT count(*) AS count, Carrier AS name FROM mytable "
+        + "GROUP BY name ORDER BY 1\","
         + "\"Execution Plan\\n"
         + "LogicalSort(sort0=[$0], dir0=[ASC])\\n"
         + "  PinotLogicalSortExchange("
