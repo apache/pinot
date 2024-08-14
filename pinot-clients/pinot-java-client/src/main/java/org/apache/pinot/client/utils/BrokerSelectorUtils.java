@@ -57,7 +57,8 @@ public class BrokerSelectorUtils {
       return null;
     }
 
-    // Make a copy of the brokersList for the first table. retainAll does inplace modifications corrupting brokerData.
+    // Make a copy of the brokersList of the first table. retainAll does inplace modifications.
+    // So lists from brokerData should not be used directly.
     List<String> commonBrokers = new ArrayList<>(tablesBrokersList.get(0));
     for (int i = 1; i < tablesBrokersList.size(); i++) {
       commonBrokers.retainAll(tablesBrokersList.get(i));
