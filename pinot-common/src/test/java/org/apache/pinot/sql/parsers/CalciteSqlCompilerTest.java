@@ -2624,8 +2624,6 @@ public class CalciteSqlCompilerTest {
         () -> compileToPinotQuery("SELECT col1 + col2 FROM foo GROUP BY col1"));
   }
 
-
-
   @Test
   public void testFlattenAndOr() {
     {
