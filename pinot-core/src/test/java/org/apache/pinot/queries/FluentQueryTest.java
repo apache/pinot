@@ -19,6 +19,7 @@
 
 package org.apache.pinot.queries;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.FileWriter;
@@ -32,6 +33,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.commons.csv.CSVFormat;
@@ -56,34 +58,113 @@ import org.intellij.lang.annotations.Language;
 import org.testng.Assert;
 
 
+/**
+ * A fluent API for testing queries.
+ *
+ * Use {@link #withBaseDir(File)} to start a new test.
+ *
+ * @see org.apache.pinot.core.query.aggregation.function.CountAggregationFunctionTest
+ */
 public class FluentQueryTest {
 
   private final FluentBaseQueriesTest _baseQueriesTest;
-  private final File _baseDir;
+  final File _baseDir;
   private final Map<String, String> _extraQueryOptions = new HashMap<>();
 
-  private FluentQueryTest(FluentBaseQueriesTest baseQueriesTest, File baseDir) {
+  FluentQueryTest(FluentBaseQueriesTest baseQueriesTest, File baseDir) {
     _baseQueriesTest = baseQueriesTest;
     _baseDir = baseDir;
   }
 
+  /**
+   * Start a new test with the given base directory.
+   *
+   * Usually the base directory will be created before every test and destroyed after that using lifecycle testing
+   * hooks like {@link org.testng.annotations.BeforeClass} and {@link org.testng.annotations.AfterClass}.
+   *
+   * Each test will create its own subdirectory in the base directory, so multiple tests may use the same base
+   * directory.
+   *
+   * @param baseDir the base directory for the test. It must exist, be a directory and be writable.
+   * @return The fluent API for testing queries, where eventually {@link #givenTable(Schema, TableConfig)} will be
+   * called.
+   */
   public static FluentQueryTest withBaseDir(File baseDir) {
+    Preconditions.checkArgument(baseDir.exists(), "Base directory must exist");
+    Preconditions.checkArgument(baseDir.isDirectory(), "Base directory must be a directory");
+    Preconditions.checkArgument(baseDir.canWrite(), "Base directory must be writable");
     return new FluentQueryTest(new FluentBaseQueriesTest(), baseDir);
   }
 
+  /**
+   * Creates a new test with a temporary directory.
+   *
+   * @param consumer the test to run. The received FluentQueryTest will use a temporary directory that will be removed
+   *                 after the consumer is executed, even if a throwable is thrown.
+   */
+  public static void test(Consumer<FluentQueryTest> consumer) {
+    StackWalker walker = StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE);
+    try (Closeable test = new Closeable(walker.getCallerClass().getName())) {
+      consumer.accept(test);
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
+  }
+
+  /**
+   * Creates a new test with a temporary directory.
+   *
+   * The returned object is intended to be used in a try-with-resources manner.
+   * Its close method will remove the temporary directory.
+   */
+  public static FluentQueryTest.Closeable open() {
+    StackWalker walker = StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE);
+    try {
+      return new FluentQueryTest.Closeable(walker.getCallerClass().getName());
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
+  }
+
+  /**
+   * Sets the given extra query options to the queries that will be executed on this test.
+   *
+   * Older properties (including null handling) will be removed.
+   */
   public FluentQueryTest withExtraQueryOptions(Map<String, String> extraQueryOptions) {
     _extraQueryOptions.clear();
     _extraQueryOptions.putAll(extraQueryOptions);
     return this;
   }
 
+  /**
+   * Sets the null handling to the queries that will be executed on this test.
+   */
   public FluentQueryTest withNullHandling(boolean enabled) {
     _extraQueryOptions.put("enableNullHandling", Boolean.toString(enabled));
     return this;
   }
 
+  /**
+   * Declares a table with the given schema and table configuration.
+   *
+   * @return a {@link DeclaringTable} object to declare the segments of the table.
+   */
   public DeclaringTable givenTable(Schema schema, TableConfig tableConfig) {
     return new DeclaringTable(_baseQueriesTest, tableConfig, schema, _baseDir, _extraQueryOptions);
+  }
+
+  public static class Closeable extends FluentQueryTest implements AutoCloseable {
+
+    private Closeable(String testBaseName)
+        throws IOException {
+      super(new FluentBaseQueriesTest(), Files.createTempDirectory(testBaseName).toFile());
+    }
+
+    @Override
+    public void close() {
+      _baseDir.delete();
+    }
   }
 
   public static class DeclaringTable {
@@ -102,11 +183,22 @@ public class FluentQueryTest {
       _extraQueryOptions = extraQueryOptions;
     }
 
+    /**
+     * Creates one segment on the first instance with the given content.
+     *
+     * @param content the content of the segment.
+     * @see OnFirstInstance#andSegment(String...) to learn more about the content syntax
+     */
     public OnFirstInstance onFirstInstance(String... content) {
       return new OnFirstInstance(_tableConfig, _schema, _baseDir, false, _baseQueriesTest, _extraQueryOptions)
           .andSegment(content);
     }
 
+    /**
+     * Creates one segment on the first instance with the given content.
+     * @param content the content of the segment. Each element of the array is a row. Each row is an array of objects
+     *                that should be compatible with the table definition.
+     */
     public OnFirstInstance onFirstInstance(Object[]... content) {
       return new OnFirstInstance(_tableConfig, _schema, _baseDir, false, _baseQueriesTest, _extraQueryOptions)
           .andSegment(content);
@@ -193,13 +285,22 @@ public class FluentQueryTest {
       _segmentContents.clear();
     }
 
+    /**
+     * Executes the given query and returns an object that can be used to assert the results.
+     */
     public QueryExecuted whenQuery(@Language("sql") String query) {
       processSegments();
       BrokerResponseNative brokerResponse = _baseQueriesTest.getBrokerResponse(query, _extraQueryOptions);
       return new QueryExecuted(_baseQueriesTest, brokerResponse, _extraQueryOptions);
     }
 
+    /**
+     * Creates another table.
+     *
+     * The older tables can still be used.
+     */
     public DeclaringTable givenTable(Schema schema, TableConfig tableConfig) {
+      processSegments();
       return new DeclaringTable(_baseQueriesTest, tableConfig, schema, _indexDir.getParentFile(), _extraQueryOptions);
     }
   }
@@ -210,16 +311,49 @@ public class FluentQueryTest {
       super(tableConfig, schema, baseDir, onSecondInstance, baseQueriesTest, extraQueryOptions);
     }
 
+    /**
+     * Adds a new segment to the table in this instance.
+     * @param content the content of the segment. Each element of the array is a row. Each row is an array of objects
+     *                that should be compatible with the table definition.
+     */
     public OnFirstInstance andSegment(Object[]... content) {
       _segmentContents.add(new FakeSegmentContent(content));
       return this;
     }
 
+    /**
+     * Adds a new segment to the table in this instance.
+     *
+     * The content is a table in text format. The first row is the header, and the rest of the rows are the data.
+     * Each column must be separated by pipes ({@code |}).
+     * The header must be the name of the column (as declared in the schema).
+     * The order of the columns doesn't have to match the order of the columns in the schema.
+     *
+     * After the header, each row must have the same number of columns as the header and will contain the data.
+     * Each entry in the row must be a valid value for the column type.
+     * The rules to parse these values are:
+     * <ol>
+     *   <li>First, the value will be trimmed</li>
+     *   <li>{@code null} will always be treated as null</li>
+     *   <li>{@code "null"} will be parsed as
+     *   {@link PinotDataType#convert(Object, PinotDataType) PinotDataType.convert("null", type)}</li>
+     *   <li>Any other value will be parsed as
+     *   {@link PinotDataType#convert(Object, PinotDataType) PinotDataType.convert(value, type)}</li>
+     * </ol>
+     *
+     * @param tableText the content of the segment, as explained above.
+     */
     public OnFirstInstance andSegment(String... tableText) {
       super.andSegment(tableText);
       return this;
     }
 
+    /**
+     * Creates one segment on a second instance.
+     *
+     * @param content the content of the segment. Each element of the array is a row. Each row is an array of objects
+     *                that should be compatible with the table definition.
+     */
     public OnSecondInstance andOnSecondInstance(Object[]... content) {
       processSegments();
       return new OnSecondInstance(
@@ -227,6 +361,12 @@ public class FluentQueryTest {
           .andSegment(content);
     }
 
+    /**
+     * Creates one segment on a second instance.
+     *
+     * @param content the content of the segment.
+     * @see OnFirstInstance#andSegment(String...) to learn more about the content syntax
+     */
     public OnSecondInstance andOnSecondInstance(String... content) {
       processSegments();
       return new OnSecondInstance(
@@ -241,11 +381,21 @@ public class FluentQueryTest {
       super(tableConfig, schema, baseDir, onSecondInstance, baseQueriesTest, extraQueryOptions);
     }
 
+    /**
+     * Adds a new segment to the table in this instance.
+     * @param content the content of the segment. Each element of the array is a row. Each row is an array of objects
+     *                that should be compatible with the table definition.
+     */
     public OnSecondInstance andSegment(Object[]... content) {
       _segmentContents.add(new FakeSegmentContent(content));
       return this;
     }
 
+    /**
+     * Adds a new segment to the table in this instance.
+     * @param tableText the content of the segment.
+     * @see OnFirstInstance#andSegment(String...) to learn more about the
+     */
     public OnSecondInstance andSegment(String... tableText) {
       super.andSegment(tableText);
       return this;
@@ -264,6 +414,26 @@ public class FluentQueryTest {
       _extraQueryOptions = extraQueryOptions;
     }
 
+    /**
+     * Asserts that the result of the query is the given table.
+     *
+     * The table is a text table. The first row is the header, and the rest of the rows are the data.
+     * Each column must be separated by pipes ({@code |}).
+     * The header must be a valid column type (as defined by {@link PinotDataType}, although it will be trimmed and
+     * uppercased).
+     *
+     * After the header, each row must have the same number of columns as the header and will contain the data.
+     * Each entry in the row must be a valid value for the column type.
+     * The rules to parse these values are:
+     * <ol>
+     *   <li>First, the value will be trimmed</li>
+     *   <li>{@code null} will always be treated as null</li>
+     *   <li>{@code "null"} will be parsed as
+     *   {@link PinotDataType#convert(Object, PinotDataType) PinotDataType.convert("null", type)}</li>
+     *   <li>Any other value will be parsed as
+     *   {@link PinotDataType#convert(Object, PinotDataType) PinotDataType.convert(value, type)}</li>
+     * </ol>
+     */
     public QueryExecuted thenResultIs(String... tableText) {
       Object[][] rows = tableAsRows(
           headerCells -> Arrays.stream(headerCells)
@@ -278,6 +448,9 @@ public class FluentQueryTest {
       return this;
     }
 
+    /**
+     * Asserts that the result of the query is the given table.
+     */
     public QueryExecuted thenResultIs(Object[]... expectedResult) {
       if (_brokerResponse.getExceptionsSize() > 0) {
         Assert.fail("Query failed with " + _brokerResponse.getExceptions());
@@ -309,17 +482,30 @@ public class FluentQueryTest {
       return this;
     }
 
+    /**
+     * Sets the given extra query options to the queries that will be executed on this test.
+     *
+     * Older properties (including null handling) will be removed.
+     */
     public QueryExecuted withExtraQueryOptions(Map<String, String> extraQueryOptions) {
       _extraQueryOptions.clear();
       _extraQueryOptions.putAll(extraQueryOptions);
       return this;
     }
 
+    /**
+     * Sets the null handling to the queries that will be executed on this test.
+     */
     public QueryExecuted withNullHandling(boolean enabled) {
       _extraQueryOptions.put("enableNullHandling", Boolean.toString(enabled));
       return this;
     }
 
+    /**
+     * Executes the given query and returns an object that can be used to assert the results.
+     *
+     * The tables and segments already created can still be used.
+     */
     public QueryExecuted whenQuery(@Language("sql") String query) {
       BrokerResponseNative brokerResponse = _baseQueriesTest.getBrokerResponse(query);
       return new QueryExecuted(_baseQueriesTest, brokerResponse, _extraQueryOptions);
