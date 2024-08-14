@@ -64,7 +64,8 @@ class ConcurrentMapPartitionDedupMetadataManager extends BasePartitionDedupMetad
       DedupRecordInfo dedupRecordInfo = dedupRecordInfoIterator.next();
       _primaryKeyToSegmentAndTimeMap.computeIfPresent(
           HashUtils.hashPrimaryKey(dedupRecordInfo.getPrimaryKey(), _hashFunction), (primaryKey, segmentAndTime) -> {
-            if (segmentAndTime.getLeft() == segment && segmentAndTime.getRight() == dedupRecordInfo.getDedupTime()) {
+            // do not need to compare dedup time because we are removing the segment
+            if (segmentAndTime.getLeft() == segment) {
               return null;
             } else {
               return segmentAndTime;
