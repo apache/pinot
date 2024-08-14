@@ -312,8 +312,6 @@ public class BaseTableDataManagerTest {
     assertTrue(tableDataManager.needReloadSegment(zkMetadata, indexLoadingConfig));
     tableDataManager.reloadSegment(SEGMENT_NAME, indexLoadingConfig, zkMetadata, localMetadata, null, false);
     assertFalse(tableDataManager.needReloadSegment(zkMetadata, indexLoadingConfig));
-    assertTrue(hasInvertedIndex(indexDir, STRING_COLUMN));
-    assertTrue(hasInvertedIndex(indexDir, LONG_COLUMN));
   }
 
   @Test

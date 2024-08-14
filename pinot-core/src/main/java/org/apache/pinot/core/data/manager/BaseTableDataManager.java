@@ -1013,7 +1013,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     }
   }
 
-  private boolean needReloadSegment(SegmentZKMetadata zkMetadata, IndexLoadingConfig indexLoadingConfig)
+  boolean needReloadSegment(SegmentZKMetadata zkMetadata, IndexLoadingConfig indexLoadingConfig)
       throws Exception {
     String segmentName = zkMetadata.getSegmentName();
     SegmentDirectory segmentDirectory =
