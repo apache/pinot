@@ -19,11 +19,9 @@
 package org.apache.pinot.client.utils;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import org.apache.pinot.client.ExternalViewReader;
 
 
@@ -60,12 +58,11 @@ public class BrokerSelectorUtils {
     }
 
     // Make a copy of the brokersList for the first table. retainAll does inplace modifications corrupting brokerData.
-    Set<String> commonBrokers = tablesBrokersList.stream()
-        .skip(1) // skip because the HashSet is initialized with the first list.
-        .collect(() -> new HashSet<>(tablesBrokersList.get(0)), Set::retainAll, Set::retainAll);
-    List<String> commonBrokerList = new ArrayList<>(commonBrokers.size());
-    commonBrokerList.addAll(commonBrokers);
-    return commonBrokerList;
+    List<String> commonBrokers = new ArrayList<>(tablesBrokersList.get(0));
+    for (int i = 1; i < tablesBrokersList.size(); i++) {
+      commonBrokers.retainAll(tablesBrokersList.get(i));
+    }
+    return commonBrokers;
   }
 
   private static String getTableNameWithoutSuffix(String tableName) {
