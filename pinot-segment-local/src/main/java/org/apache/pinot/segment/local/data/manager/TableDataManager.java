@@ -127,13 +127,15 @@ public interface TableDataManager {
    * Checks for a particular segment, reload is needed or not
    * @return true if the reload is needed on the segment
    */
-  boolean checkReloadSegment(SegmentZKMetadata zkMetadata, IndexLoadingConfig indexLoadingConfig);
+  boolean needReloadSegment(SegmentZKMetadata zkMetadata, IndexLoadingConfig indexLoadingConfig)
+      throws Exception;
 
   /**
    * Check if reload is needed for any of the segments of a table
    * @return true if reload is needed for any of the segments and false otherwise
    */
-  boolean needReloadSegments();
+  boolean needReloadSegments()
+      throws Exception;
 
   /**
    * Downloads a segment and loads it into the table.

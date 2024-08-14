@@ -1019,7 +1019,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
    * True if reload is needed and false if no reload is needed.
    */
   @Override
-  public boolean checkReloadSegment(SegmentZKMetadata zkMetadata, IndexLoadingConfig indexLoadingConfig) {
+  public boolean needReloadSegment(SegmentZKMetadata zkMetadata, IndexLoadingConfig indexLoadingConfig)
+      throws Exception {
     String segmentName = zkMetadata.getSegmentName();
     SegmentDirectory segmentDirectory =
         tryInitSegmentDirectory(segmentName, String.valueOf(zkMetadata.getCrc()), indexLoadingConfig);
@@ -1031,12 +1032,12 @@ public abstract class BaseTableDataManager implements TableDataManager {
     } catch (Exception e) {
       _logger.error("Failed to check if reload is needed for a segment {}", segmentName, e);
       closeSegmentDirectoryQuietly(segmentDirectory);
-      return false;
+      throw new Exception(String.format("Failed to perform reload check on the segment: %s", segmentName), e);
     }
   }
 
   @Nullable
-  SegmentDirectory tryInitSegmentDirectory(String segmentName, String segmentCrc,
+  private SegmentDirectory tryInitSegmentDirectory(String segmentName, String segmentCrc,
       IndexLoadingConfig indexLoadingConfig) {
     try {
       return initSegmentDirectory(segmentName, segmentCrc, indexLoadingConfig);
@@ -1047,15 +1048,16 @@ public abstract class BaseTableDataManager implements TableDataManager {
   }
 
   @Override
-  public boolean needReloadSegments() {
+  public boolean needReloadSegments()
+      throws Exception {
     IndexLoadingConfig indexLoadingConfig = fetchIndexLoadingConfig();
     List<SegmentDataManager> segmentDataManagers = acquireAllSegments();
-    boolean segmentsReloadCheck = false;
+    boolean needReload = false;
     try {
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
         SegmentZKMetadata segmentZKMetadata = fetchZKMetadata(segmentDataManager.getSegmentName());
-        if (checkReloadSegment(segmentZKMetadata, indexLoadingConfig)) {
-          segmentsReloadCheck = true;
+        if (needReloadSegment(segmentZKMetadata, indexLoadingConfig)) {
+          needReload = true;
           break;
         }
       }
@@ -1064,7 +1066,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
         releaseSegment(segmentDataManager);
       }
     }
-    return segmentsReloadCheck;
+    return needReload;
   }
 
   private SegmentDirectory initSegmentDirectory(String segmentName, String segmentCrc,

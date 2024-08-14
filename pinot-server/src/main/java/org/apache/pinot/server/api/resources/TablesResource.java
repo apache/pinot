@@ -965,11 +965,12 @@ public class TablesResource {
   })
   public String checkSegmentsReload(
       @ApiParam(value = "Table Name with type", required = true) @PathParam("tableName") String tableName,
-      @Context HttpHeaders headers) {
+      @Context HttpHeaders headers)
+      throws Exception {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     TableDataManager tableDataManager = ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableName);
-    boolean isSegmentsReload = tableDataManager.needReloadSegments();
+    boolean needReload = tableDataManager.needReloadSegments();
     return ResourceUtils.convertToJsonString(
-        new SegmentsReloadCheckResponse(isSegmentsReload, tableDataManager.getInstanceId()));
+        new SegmentsReloadCheckResponse(needReload, tableDataManager.getInstanceId()));
   }
 }

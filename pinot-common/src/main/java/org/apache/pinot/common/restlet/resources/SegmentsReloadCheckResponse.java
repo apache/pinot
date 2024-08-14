@@ -32,9 +32,9 @@ public class SegmentsReloadCheckResponse {
   private final String _serverInstanceId;
 
   @JsonCreator
-  public SegmentsReloadCheckResponse(@JsonProperty("isReload") boolean isReload,
+  public SegmentsReloadCheckResponse(@JsonProperty("needReload") boolean needReload,
       @JsonProperty("serverInstanceId") String serverInstanceId) {
-    _isReload = isReload;
+    _isReload = needReload;
     _serverInstanceId = serverInstanceId;
   }
 
