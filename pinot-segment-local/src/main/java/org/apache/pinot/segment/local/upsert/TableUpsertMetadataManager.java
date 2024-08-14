@@ -41,6 +41,8 @@ public interface TableUpsertMetadataManager extends Closeable {
 
   UpsertConfig.Mode getUpsertMode();
 
+  boolean isEnablePreload();
+
   /**
    * Stops the metadata manager. After invoking this method, no access to the metadata will be accepted.
    */

@@ -223,4 +223,15 @@ public class BaseSingleStageBrokerRequestHandlerTest {
     Assert.assertEquals(servers.iterator().next().getAdminEndpoint(), "http://server01:8097");
     latch.countDown();
   }
+
+  @Test
+  public void testAddRoutingPolicyInErrMsg() {
+    Assert.assertEquals(BaseSingleStageBrokerRequestHandler.addRoutingPolicyInErrMsg("error1", null, null), "error1");
+    Assert.assertEquals(BaseSingleStageBrokerRequestHandler.addRoutingPolicyInErrMsg("error1", "rt_rp", null),
+        "error1, with routing policy: rt_rp [realtime]");
+    Assert.assertEquals(BaseSingleStageBrokerRequestHandler.addRoutingPolicyInErrMsg("error1", null, "off_rp"),
+        "error1, with routing policy: off_rp [offline]");
+    Assert.assertEquals(BaseSingleStageBrokerRequestHandler.addRoutingPolicyInErrMsg("error1", "rt_rp", "off_rp"),
+        "error1, with routing policy: rt_rp [realtime], off_rp [offline]");
+  }
 }

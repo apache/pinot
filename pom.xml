@@ -147,7 +147,7 @@
     <zkclient.version>0.11</zkclient.version>
     <jackson.version>2.17.2</jackson.version>
     <zookeeper.version>3.9.2</zookeeper.version>
-    <async-http-client.version>2.12.3</async-http-client.version>
+    <async-http-client.version>3.0.0</async-http-client.version>
     <jersey.version>2.42</jersey.version>
     <hk2.version>2.6.1</hk2.version>
     <javassist.version>3.30.2-GA</javassist.version>
@@ -161,39 +161,42 @@
     <immutables.version>2.10.1</immutables.version>
     <lucene.version>9.11.1</lucene.version>
     <reflections.version>0.10.2</reflections.version>
-    <dynatrace.hash4j.version>0.17.0</dynatrace.hash4j.version>
+    <dynatrace.hash4j.version>0.18.0</dynatrace.hash4j.version>
+    <yammer-metrics.version>2.2.0</yammer-metrics.version>
     <!-- helix-core, spark-core use libraries from io.dropwizard.metrics -->
     <dropwizard-metrics.version>4.2.26</dropwizard-metrics.version>
-    <snappy-java.version>1.1.10.5</snappy-java.version>
+    <snappy-java.version>1.1.10.6</snappy-java.version>
     <zstd-jni.version>1.5.6-4</zstd-jni.version>
     <lz4-java.version>1.8.0</lz4-java.version>
     <libthrift.verion>0.18.1</libthrift.verion>
     <log4j.version>2.23.1</log4j.version>
-    <slf4j.version>2.0.13</slf4j.version>
+    <slf4j.version>2.0.16</slf4j.version>
     <netty.version>4.1.112.Final</netty.version>
     <reactivestreams.version>1.0.4</reactivestreams.version>
     <jts.version>1.19.0</jts.version>
     <h3.version>4.1.1</h3.version>
     <jmh.version>1.37</jmh.version>
     <audienceannotations.version>0.15.0</audienceannotations.version>
-    <clp-ffi.version>0.4.4</clp-ffi.version>
+    <clp-ffi.version>0.4.5</clp-ffi.version>
     <stax2-api.version>4.2.2</stax2-api.version>
-    <aws.sdk.version>2.26.21</aws.sdk.version>
+    <aws.sdk.version>2.27.3</aws.sdk.version>
+    <azure.sdk.version>1.2.26</azure.sdk.version>
+    <azure.msal4j.version>1.16.2</azure.msal4j.version>
     <joda-time.version>2.12.7</joda-time.version>
     <janino.version>3.1.12</janino.version>
-    <testng.version>7.10.2</testng.version>
     <woodstox.version>7.0.0</woodstox.version>
     <sslcontext.kickstart.version>8.3.6</sslcontext.kickstart.version>
+    <jbcrypt.version>0.4</jbcrypt.version>
 
     <confluent.version>7.7.0</confluent.version>
     <pulsar.version>3.3.1</pulsar.version>
     <flink.version>1.20.0</flink.version>
 
     <!-- Apache Commons Libraries -->
-    <commons-lang3.version>3.15.0</commons-lang3.version>
+    <commons-lang3.version>3.16.0</commons-lang3.version>
     <commons-collections4.version>4.4</commons-collections4.version>
     <commons-text.version>1.12.0</commons-text.version>
-    <commons-compress.version>1.26.2</commons-compress.version>
+    <commons-compress.version>1.27.0</commons-compress.version>
     <commons-math3.version>3.6.1</commons-math3.version>
     <commons-csv.version>1.11.0</commons-csv.version>
     <commons-configuration2.version>2.11.0</commons-configuration2.version>
@@ -226,10 +229,11 @@
 
     <!-- Google Libraries -->
     <protobuf.version>3.25.3</protobuf.version>
-    <grpc.version>1.65.1</grpc.version>
-    <google.cloud.libraries.version>26.43.0</google.cloud.libraries.version>
+    <grpc.version>1.66.0</grpc.version>
+    <google.cloud.libraries.version>26.44.0</google.cloud.libraries.version>
     <google.auto-service.version>1.1.1</google.auto-service.version>
-    <google.errorprone.version>2.29.2</google.errorprone.version>
+    <google.re2j.version>1.7</google.re2j.version>
+    <google.errorprone.version>2.30.0</google.errorprone.version>
     <google.j2objc.version>3.0.0</google.j2objc.version>
     <google.jsr305.version>3.0.2</google.jsr305.version>
 
@@ -239,7 +243,7 @@
 
     <!-- Solve conflict across dependencies -->
     <jetbrains.annotations.version>24.1.0</jetbrains.annotations.version>
-    <kotlin.stdlib.version>2.0.0</kotlin.stdlib.version>
+    <kotlin.stdlib.version>2.0.10</kotlin.stdlib.version>
     <okio.version>3.9.0</okio.version>
     <kerby.version>2.0.3</kerby.version>
     <jline.version>3.26.3</jline.version>
@@ -250,6 +254,13 @@
     <bouncycastle.version>1.78.1</bouncycastle.version>
     <aircompressor.version>0.27</aircompressor.version>
     <jna.version>5.14.0</jna.version>
+    <paranamer.version>2.8</paranamer.version>
+
+    <!-- Test Libraries -->
+    <testng.version>7.10.2</testng.version>
+    <mockito-core.version>5.12.0</mockito-core.version>
+    <equalsverifier.version>3.16.1</equalsverifier.version>
+    <testcontainers.version>1.20.1</testcontainers.version>
   </properties>
 
   <profiles>
@@ -346,16 +357,7 @@
 
   <dependencyManagement>
     <dependencies>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-common</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-avro</artifactId>
-        <version>${project.version}</version>
-      </dependency>
+      <!-- Pinot Modules -->
       <dependency>
         <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-spi</artifactId>
@@ -368,27 +370,27 @@
       </dependency>
       <dependency>
         <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-common</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-segment-local</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-yammer</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-java-client</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-jdbc-client</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-core</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-query-planner</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-query-runtime</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
@@ -413,22 +415,87 @@
       </dependency>
       <dependency>
         <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-java-client</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-jdbc-client</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-tools</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-spark-common</artifactId>
+        <artifactId>pinot-perf</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+
+      <!-- Pinot Plug-in Modules -->
+      <!-- Batch Ingestion -->
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-batch-ingestion-common</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-hdfs</artifactId>
+        <artifactId>pinot-batch-ingestion-hadoop</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-azure</artifactId>
+        <artifactId>pinot-batch-ingestion-spark-2.4</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-batch-ingestion-spark-3</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-batch-ingestion-standalone</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <!-- Stream Ingestion -->
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-kafka-base</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-kafka-2.0</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-kinesis</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-pulsar</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <!-- Input Format -->
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-avro-base</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-avro</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-confluent-avro</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
@@ -438,8 +505,167 @@
       </dependency>
       <dependency>
         <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-perf</artifactId>
+        <artifactId>pinot-parquet</artifactId>
         <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-json</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-csv</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-thrift</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-protobuf</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-clp-log</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <!-- File System -->
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-hdfs</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-s3</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-gcs</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-adls</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <!-- Environment -->
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-azure</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <!-- Metrics -->
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-yammer</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-dropwizard</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <!-- Minion Tasks -->
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-minion-builtin-tasks</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <!-- Segment Writer -->
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-segment-writer-file-based</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <!-- Segment Uploader -->
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-segment-uploader-default</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+
+      <!-- Pinot Connector Modules -->
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-spark-common</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-spark-2-connector</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-spark-3-connector</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-flink-connector</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+
+      <!-- Pinot Test Jars -->
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-spi</artifactId>
+        <version>${project.version}</version>
+        <type>test-jar</type>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-common</artifactId>
+        <version>${project.version}</version>
+        <type>test-jar</type>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-segment-local</artifactId>
+        <version>${project.version}</version>
+        <type>test-jar</type>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-core</artifactId>
+        <version>${project.version}</version>
+        <type>test-jar</type>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-query-planner</artifactId>
+        <version>${project.version}</version>
+        <type>test-jar</type>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-controller</artifactId>
+        <version>${project.version}</version>
+        <type>test-jar</type>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-broker</artifactId>
+        <version>${project.version}</version>
+        <type>test-jar</type>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-server</artifactId>
+        <version>${project.version}</version>
+        <type>test-jar</type>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-minion</artifactId>
+        <version>${project.version}</version>
+        <type>test-jar</type>
       </dependency>
       <dependency>
         <groupId>org.apache.pinot</groupId>
@@ -449,27 +675,11 @@
       </dependency>
       <dependency>
         <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-query-planner</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-query-planner</artifactId>
+        <artifactId>pinot-integration-tests</artifactId>
         <version>${project.version}</version>
         <type>test-jar</type>
       </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-query-runtime</artifactId>
-        <version>${project.version}</version>
-      </dependency>
 
-      <dependency>
-        <groupId>nl.jqno.equalsverifier</groupId>
-        <artifactId>equalsverifier</artifactId>
-        <version>3.16.1</version>
-        <scope>test</scope>
-      </dependency>
       <dependency>
         <groupId>org.checkerframework</groupId>
         <artifactId>checker-qual</artifactId>
@@ -484,11 +694,6 @@
         <groupId>xml-apis</groupId>
         <artifactId>xml-apis</artifactId>
         <version>2.0.2</version>
-      </dependency>
-      <dependency>
-        <groupId>org.testng</groupId>
-        <artifactId>testng</artifactId>
-        <version>${testng.version}</version>
       </dependency>
       <dependency>
         <groupId>org.roaringbitmap</groupId>
@@ -693,11 +898,6 @@
           </exclusion>
         </exclusions>
       </dependency>
-      <dependency>
-        <groupId>com.thoughtworks.paranamer</groupId>
-        <artifactId>paranamer</artifactId>
-        <version>2.8</version>
-      </dependency>
 
       <!-- Jackson -->
       <dependency>
@@ -891,6 +1091,11 @@
         <artifactId>auto-service</artifactId>
         <version>${google.auto-service.version}</version>
         <optional>true</optional> <!-- This is only needed at compilation time as an annotation processor -->
+      </dependency>
+      <dependency>
+        <groupId>com.google.re2j</groupId>
+        <artifactId>re2j</artifactId>
+        <version>${google.re2j.version}</version>
       </dependency>
       <!-- Solve the dependency converge issue between guava and calcite-core -->
       <dependency>
@@ -1215,6 +1420,11 @@
 
       <!-- Metrics -->
       <dependency>
+        <groupId>com.yammer.metrics</groupId>
+        <artifactId>metrics-core</artifactId>
+        <version>${yammer-metrics.version}</version>
+      </dependency>
+      <dependency>
         <groupId>io.dropwizard.metrics</groupId>
         <artifactId>metrics-core</artifactId>
         <version>${dropwizard-metrics.version}</version>
@@ -1397,15 +1607,9 @@
         <version>${surefire.version}</version>
       </dependency>
       <dependency>
-        <groupId>org.mockito</groupId>
-        <artifactId>mockito-core</artifactId>
-        <version>5.12.0</version>
-        <scope>test</scope>
-      </dependency>
-      <dependency>
         <groupId>com.h2database</groupId>
         <artifactId>h2</artifactId>
-        <version>2.3.230</version>
+        <version>2.3.232</version>
       </dependency>
       <dependency>
         <groupId>com.github.jnr</groupId>
@@ -1485,6 +1689,11 @@
         <artifactId>jna</artifactId>
         <version>${jna.version}</version>
       </dependency>
+      <dependency>
+        <groupId>com.thoughtworks.paranamer</groupId>
+        <artifactId>paranamer</artifactId>
+        <version>${paranamer.version}</version>
+      </dependency>
 
       <dependency>
         <groupId>com.yscope.clp</groupId>
@@ -1498,14 +1707,27 @@
         <version>${stax2-api.version}</version>
       </dependency>
 
-      <!-- This configures all aws sdk dependencies. -->
-      <!-- See https://reflectoring.io/maven-bom/ to understand how this work -->
+      <!-- AWS SDK -->
       <dependency>
         <groupId>software.amazon.awssdk</groupId>
         <artifactId>bom</artifactId>
         <version>${aws.sdk.version}</version>
         <type>pom</type>
         <scope>import</scope>
+      </dependency>
+
+      <!-- Azure SDK -->
+      <dependency>
+        <groupId>com.azure</groupId>
+        <artifactId>azure-sdk-bom</artifactId>
+        <version>${azure.sdk.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>com.microsoft.azure</groupId>
+        <artifactId>msal4j</artifactId>
+        <version>${azure.msal4j.version}</version>
       </dependency>
 
       <dependency>
@@ -1518,7 +1740,6 @@
         <groupId>org.apache.flink</groupId>
         <artifactId>flink-clients</artifactId>
         <version>${flink.version}</version>
-        <scope>test</scope>
       </dependency>
       <dependency>
         <groupId>org.apache.flink</groupId>
@@ -1601,6 +1822,11 @@
         <artifactId>sslcontext-kickstart-for-netty</artifactId>
         <version>${sslcontext.kickstart.version}</version>
       </dependency>
+      <dependency>
+        <groupId>org.mindrot</groupId>
+        <artifactId>jbcrypt</artifactId>
+        <version>${jbcrypt.version}</version>
+      </dependency>
 
       <!-- Bouncy Castle libraries are used by Kafka and Pulsar plugins -->
       <dependency>
@@ -1630,6 +1856,45 @@
         <artifactId>aircompressor</artifactId>
         <version>${aircompressor.version}</version>
       </dependency>
+
+      <!-- Test Libraries -->
+      <dependency>
+        <groupId>org.testng</groupId>
+        <artifactId>testng</artifactId>
+        <version>${testng.version}</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.mockito</groupId>
+        <artifactId>mockito-core</artifactId>
+        <version>${mockito-core.version}</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>nl.jqno.equalsverifier</groupId>
+        <artifactId>equalsverifier</artifactId>
+        <version>${equalsverifier.version}</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.testcontainers</groupId>
+        <artifactId>testcontainers</artifactId>
+        <version>${testcontainers.version}</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.testcontainers</groupId>
+        <artifactId>kafka</artifactId>
+        <version>${testcontainers.version}</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.testcontainers</groupId>
+        <artifactId>pulsar</artifactId>
+        <version>${testcontainers.version}</version>
+        <scope>test</scope>
+      </dependency>
+
     </dependencies>
   </dependencyManagement>
 

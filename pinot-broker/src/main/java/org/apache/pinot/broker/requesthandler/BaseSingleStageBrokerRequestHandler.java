@@ -91,6 +91,7 @@ import org.apache.pinot.query.parser.utils.ParserUtils;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
+import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
@@ -679,6 +680,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         } else {
           errorMessage = String.format("%d segments unavailable: %s", numUnavailableSegments, unavailableSegments);
         }
+        String realtimeRoutingPolicy = realtimeBrokerRequest != null ? getRoutingPolicy(realtimeTableConfig) : null;
+        String offlineRoutingPolicy = offlineBrokerRequest != null ? getRoutingPolicy(offlineTableConfig) : null;
+        errorMessage = addRoutingPolicyInErrMsg(errorMessage, realtimeRoutingPolicy, offlineRoutingPolicy);
         exceptions.add(QueryException.getException(QueryException.BROKER_SEGMENT_UNAVAILABLE_ERROR, errorMessage));
         _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_UNAVAILABLE_SEGMENTS, 1);
       }
@@ -834,6 +838,31 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     } finally {
       Tracing.ThreadAccountantOps.clear();
     }
+  }
+
+  @VisibleForTesting
+  static String addRoutingPolicyInErrMsg(String errorMessage, String realtimeRoutingPolicy,
+      String offlineRoutingPolicy) {
+    if (realtimeRoutingPolicy != null && offlineRoutingPolicy != null) {
+      return errorMessage + ", with routing policy: " + realtimeRoutingPolicy + " [realtime], " + offlineRoutingPolicy
+          + " [offline]";
+    }
+    if (realtimeRoutingPolicy != null) {
+      return errorMessage + ", with routing policy: " + realtimeRoutingPolicy + " [realtime]";
+    }
+    if (offlineRoutingPolicy != null) {
+      return errorMessage + ", with routing policy: " + offlineRoutingPolicy + " [offline]";
+    }
+    return errorMessage;
+  }
+
+  private static String getRoutingPolicy(TableConfig tableConfig) {
+    RoutingConfig routingConfig = tableConfig.getRoutingConfig();
+    if (routingConfig == null) {
+      return RoutingConfig.DEFAULT_INSTANCE_SELECTOR_TYPE;
+    }
+    String selectorType = routingConfig.getInstanceSelectorType();
+    return selectorType != null ? selectorType : RoutingConfig.DEFAULT_INSTANCE_SELECTOR_TYPE;
   }
 
   private BrokerResponseNative getEmptyBrokerOnlyResponse(PinotQuery pinotQuery, RequestContext requestContext,

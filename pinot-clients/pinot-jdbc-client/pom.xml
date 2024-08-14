@@ -52,12 +52,6 @@
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-java-client</artifactId>
-      <version>${project.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>org.testng</groupId>
-      <artifactId>testng</artifactId>
-      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
