@@ -520,11 +520,22 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
         }
       }
     } finally {
-      for (SingleValueUnsortedForwardIndexCreator dimensionIndexCreator : dimensionIndexCreators) {
-        dimensionIndexCreator.close();
+      for (int i = 0; i < dimensionIndexCreators.length; i++) {
+        try {
+          dimensionIndexCreators[i].close();
+        } catch (Throwable e) {
+          LOGGER.warn("Caught throwable while closing dimension index creator for dimension: {}",
+              _dimensionsSplitOrder[i], e);
+          throw e;
+        }
       }
-      for (ForwardIndexCreator metricIndexCreator : metricIndexCreators) {
-        metricIndexCreator.close();
+      for (int i = 0; i < metricIndexCreators.length; i++) {
+        try {
+          metricIndexCreators[i].close();
+        } catch (Throwable e) {
+          LOGGER.warn("Caught throwable while closing metric index creator for metric: {}", _metrics[i], e);
+          throw e;
+        }
       }
     }
   }
