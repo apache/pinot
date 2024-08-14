@@ -59,7 +59,7 @@ import org.testng.Assert;
 
 
 /**
- * A fluent API for testing queries.
+ * A fluent API for testing V1 queries.
  *
  * Use {@link #withBaseDir(File)} to start a new test.
  *
@@ -114,7 +114,7 @@ public class FluentQueryTest {
    */
   public static void test(Consumer<FluentQueryTest> consumer) {
     StackWalker walker = StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE);
-    try (Closeable test = new Closeable(walker.getCallerClass().getName())) {
+    try (Closeable test = new Closeable(walker.getCallerClass().getSimpleName())) {
       consumer.accept(test);
     } catch (IOException e) {
       throw new UncheckedIOException(e);
@@ -130,7 +130,7 @@ public class FluentQueryTest {
   public static FluentQueryTest.Closeable open() {
     StackWalker walker = StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE);
     try {
-      return new FluentQueryTest.Closeable(walker.getCallerClass().getName());
+      return new FluentQueryTest.Closeable(walker.getCallerClass().getSimpleName());
     } catch (IOException e) {
       throw new UncheckedIOException(e);
     }
@@ -191,6 +191,7 @@ public class FluentQueryTest {
       _schema = schema;
       _baseDir = baseDir;
       _extraQueryOptions = extraQueryOptions;
+      Preconditions.checkArgument(_schema.getSchemaName() != null, "Schema must have a name");
     }
 
     /**
@@ -471,7 +472,8 @@ public class FluentQueryTest {
       for (int i = 0; i < rowsToAnalyze; i++) {
         Object[] actualRow = actualRows.get(i);
         Object[] expectedRow = expectedResult[i];
-        for (int j = 0; j < actualRow.length; j++) {
+        int colsToAnalyze = Math.min(actualRow.length, expectedRow.length);
+        for (int j = 0; j < colsToAnalyze; j++) {
           Object actualCell = actualRow[j];
           Object expectedCell = expectedRow[j];
           if (actualCell != null && expectedCell != null) {
@@ -487,6 +489,7 @@ public class FluentQueryTest {
             Assert.assertEquals(actualCell, expectedCell, "On row " + i + " and column " + j);
           }
         }
+        Assert.assertEquals(actualRow.length, expectedRow.length, "Unexpected number of columns on row " + i);
       }
       Assert.assertEquals(actualRows.size(), expectedResult.length, "Unexpected number of rows");
       return this;
@@ -505,6 +508,8 @@ public class FluentQueryTest {
 
     /**
      * Sets the null handling to the queries that will be executed on this test.
+     *
+     * <strong>Important:</strong> This change will only affect new queries.
      */
     public QueryExecuted withNullHandling(boolean enabled) {
       _extraQueryOptions.put("enableNullHandling", Boolean.toString(enabled));
@@ -517,7 +522,7 @@ public class FluentQueryTest {
      * The tables and segments already created can still be used.
      */
     public QueryExecuted whenQuery(@Language("sql") String query) {
-      BrokerResponseNative brokerResponse = _baseQueriesTest.getBrokerResponse(query);
+      BrokerResponseNative brokerResponse = _baseQueriesTest.getBrokerResponse(query, _extraQueryOptions);
       return new QueryExecuted(_baseQueriesTest, brokerResponse, _extraQueryOptions);
     }
   }
