@@ -66,18 +66,15 @@ public class TarCompressionUtils {
    * It is also sufficient for HDDs
    */
 
-
   private TarCompressionUtils() {
   }
 
   public static final String TAR_GZ_FILE_EXTENSION = ".tar.gz";
   public static final String TAR_LZ4_FILE_EXTENSION = ".tar.lz4";
   public static final String TAR_ZST_FILE_EXTENSION = ".tar.zst";
-  public static final Map<String, String> COMPRESSOR_NAME_BY_FILE_EXTENSIONS = Map.of(
-      TAR_GZ_FILE_EXTENSION, CompressorStreamFactory.GZIP,
-      TAR_LZ4_FILE_EXTENSION, CompressorStreamFactory.LZ4_FRAMED,
-      TAR_ZST_FILE_EXTENSION, CompressorStreamFactory.ZSTANDARD
-  );
+  public static final Map<String, String> COMPRESSOR_NAME_BY_FILE_EXTENSIONS =
+      Map.of(TAR_GZ_FILE_EXTENSION, CompressorStreamFactory.GZIP, TAR_LZ4_FILE_EXTENSION,
+          CompressorStreamFactory.LZ4_FRAMED, TAR_ZST_FILE_EXTENSION, CompressorStreamFactory.ZSTANDARD);
   private static final CompressorStreamFactory COMPRESSOR_STREAM_FACTORY = new CompressorStreamFactory();
   private static final char ENTRY_NAME_SEPARATOR = '/';
 
@@ -180,8 +177,8 @@ public class TarCompressionUtils {
     }
     List<File> untarredFiles = new ArrayList<>();
     try (InputStream bufferedIn = new BufferedInputStream(inputStream);
-         InputStream compressorIn = COMPRESSOR_STREAM_FACTORY.createCompressorInputStream(bufferedIn);
-         ArchiveInputStream tarIn = new TarArchiveInputStream(compressorIn)) {
+        InputStream compressorIn = COMPRESSOR_STREAM_FACTORY.createCompressorInputStream(bufferedIn);
+        ArchiveInputStream tarIn = new TarArchiveInputStream(compressorIn)) {
       ArchiveEntry entry;
       while ((entry = tarIn.getNextEntry()) != null) {
         String entryName = entry.getName();
@@ -192,8 +189,9 @@ public class TarCompressionUtils {
         }
         if (entry.isDirectory()) {
           if (!outputFile.getCanonicalPath().startsWith(outputDirCanonicalPath)) {
-            throw new IOException(String
-                .format("Trying to create directory: %s outside of the output directory: %s", outputFile, outputDir));
+            throw new IOException(
+                String.format("Trying to create directory: %s outside of the output directory: %s", outputFile,
+                    outputDir));
           }
           if (!outputFile.isDirectory() && !outputFile.mkdirs()) {
             throw new IOException(String.format("Failed to create directory: %s", outputFile));
@@ -207,8 +205,9 @@ public class TarCompressionUtils {
             parentFileCanonicalPath += File.separator;
           }
           if (!parentFileCanonicalPath.startsWith(outputDirCanonicalPath)) {
-            throw new IOException(String
-                .format("Trying to create directory: %s outside of the output directory: %s", parentFile, outputDir));
+            throw new IOException(
+                String.format("Trying to create directory: %s outside of the output directory: %s", parentFile,
+                    outputDir));
           }
           if (!parentFile.isDirectory() && !parentFile.mkdirs()) {
             throw new IOException(String.format("Failed to create directory: %s", parentFile));

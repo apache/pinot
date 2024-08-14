@@ -466,8 +466,8 @@ public class TablesResource {
           tableNameWithType + "_" + segmentName + "_" + UUID.randomUUID() + TarCompressionUtils.TAR_GZ_FILE_EXTENSION,
           "Invalid table / segment name: %s , %s", tableNameWithType, segmentName);
 
-      TarCompressionUtils.createCompressedTarFile(
-          new File(tableDataManager.getTableDataDir(), segmentName), segmentTarFile);
+      TarCompressionUtils.createCompressedTarFile(new File(tableDataManager.getTableDataDir(), segmentName),
+          segmentTarFile);
       Response.ResponseBuilder builder = Response.ok();
       builder.entity((StreamingOutput) output -> {
         try {
@@ -821,8 +821,8 @@ public class TablesResource {
           tableNameWithType + "_" + segmentName + "_" + UUID.randomUUID() + TarCompressionUtils.TAR_GZ_FILE_EXTENSION,
           "Invalid table / segment name: %s, %s", tableNameWithType, segmentName);
 
-      TarCompressionUtils.createCompressedTarFile(
-          new File(tableDataManager.getTableDataDir(), segmentName), segmentTarFile);
+      TarCompressionUtils.createCompressedTarFile(new File(tableDataManager.getTableDataDir(), segmentName),
+          segmentTarFile);
 
       // Use segment uploader to upload the segment tar file to segment store and return the segment download url.
       SegmentUploader segmentUploader = _serverInstance.getInstanceDataManager().getSegmentUploader();

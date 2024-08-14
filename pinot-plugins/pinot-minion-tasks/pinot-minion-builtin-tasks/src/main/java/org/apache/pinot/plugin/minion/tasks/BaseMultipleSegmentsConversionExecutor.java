@@ -244,8 +244,8 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
         reportSegmentUploadMetrics(convertedSegmentDir, tableNameWithType, taskType);
 
         // Tar the converted segment
-        _eventObserver.notifyProgress(_pinotTaskConfig, String
-            .format("Compressing segment: %s (%d out of %d)", segmentConversionResult.getSegmentName(), count++,
+        _eventObserver.notifyProgress(_pinotTaskConfig,
+            String.format("Compressing segment: %s (%d out of %d)", segmentConversionResult.getSegmentName(), count++,
                 numOutputSegments));
         File convertedSegmentTarFile = new File(convertedTarredSegmentDir,
             segmentConversionResult.getSegmentName() + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);

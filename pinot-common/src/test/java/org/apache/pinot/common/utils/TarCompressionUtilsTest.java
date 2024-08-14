@@ -202,7 +202,7 @@ public class TarCompressionUtilsTest {
   }
 
   public void testSubDirectories(String compressedTarFileExtension)
-      throws IOException, CompressorException {
+      throws IOException {
     String dirName = "dir";
     File dir = new File(DATA_DIR, dirName);
     String subDirName1 = "subDir1";
@@ -263,7 +263,7 @@ public class TarCompressionUtilsTest {
   }
 
   public void testEmptyDirectory(String compressedTarFileExtension)
-      throws IOException, CompressorException {
+      throws IOException {
     String dirName = "dir";
     File dir = new File(DATA_DIR, dirName);
     FileUtils.forceMkdir(dir);
@@ -290,14 +290,14 @@ public class TarCompressionUtilsTest {
 
   @Test
   public void testBadFilePath()
-      throws IOException, CompressorException {
+      throws IOException {
     for (Map.Entry<String, String> entry : TarCompressionUtils.COMPRESSOR_NAME_BY_FILE_EXTENSIONS.entrySet()) {
       testBadFilePath(entry.getKey(), entry.getValue());
     }
   }
 
   public void testBadFilePath(String compressedTarFileExtension, String compressorName)
-      throws IOException, CompressorException {
+      throws IOException {
     String fileName = "data";
     String fileContent = "fileContent";
     File dataFile = new File(DATA_DIR, fileName);
@@ -314,6 +314,8 @@ public class TarCompressionUtilsTest {
         IOUtils.copy(in, tarOut);
       }
       tarOut.closeArchiveEntry();
+    } catch (CompressorException e) {
+      throw new IOException(e);
     }
 
     try {
