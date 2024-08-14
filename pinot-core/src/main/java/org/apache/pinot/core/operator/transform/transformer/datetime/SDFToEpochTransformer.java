@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.core.operator.transform.transformer.datetime;
 
-import javax.annotation.Nonnull;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.DateTimeGranularitySpec;
+import org.jspecify.annotations.NonNull;
 
 
 /**
@@ -34,7 +34,7 @@ public class SDFToEpochTransformer extends BaseDateTimeTransformer<String[], lon
   }
 
   @Override
-  public void transform(@Nonnull String[] input, @Nonnull long[] output, int length) {
+  public void transform(@NonNull String[] input, @NonNull long[] output, int length) {
     for (int i = 0; i < length; i++) {
       output[i] = transformMillisToEpoch(transformToOutputGranularity(transformSDFToMillis(input[i])));
     }

@@ -20,7 +20,7 @@ package org.apache.pinot.spi.data.readers;
 
 import java.io.File;
 import java.util.Set;
-import javax.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 
 /**

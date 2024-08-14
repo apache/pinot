@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.common.utils.config;
 
-import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TagOverrideConfig;
 import org.apache.pinot.spi.config.table.TenantConfig;
 import org.apache.pinot.spi.config.tenant.TenantRole;
+import org.jspecify.annotations.Nullable;
 
 
 /**

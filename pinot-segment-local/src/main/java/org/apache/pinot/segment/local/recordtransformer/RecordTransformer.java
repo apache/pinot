@@ -19,8 +19,8 @@
 package org.apache.pinot.segment.local.recordtransformer;
 
 import java.io.Serializable;
-import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.jspecify.annotations.Nullable;
 
 
 /**

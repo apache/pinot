@@ -25,7 +25,6 @@ import com.yscope.clp.compressorfrontend.EightByteClpEncodedSubquery;
 import com.yscope.clp.compressorfrontend.EightByteClpWildcardQueryEncoder;
 import java.util.ArrayList;
 import java.util.List;
-import javax.annotation.Nullable;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.request.Expression;
@@ -36,6 +35,7 @@ import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.sql.parsers.SqlCompilationException;
+import org.jspecify.annotations.Nullable;
 
 
 /**

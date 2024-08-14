@@ -21,10 +21,10 @@ package org.apache.pinot.segment.spi.creator;
 import java.io.Serializable;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nullable;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
+import org.jspecify.annotations.Nullable;
 
 
 public class ColumnIndexCreationInfo implements Serializable {

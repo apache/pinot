@@ -20,11 +20,11 @@ package org.apache.pinot.controller.helix.core.realtime.segment;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.time.Clock;
-import javax.annotation.Nullable;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.TimeUtils;
+import org.jspecify.annotations.Nullable;
 
 
 class SegmentFlushThresholdComputer {

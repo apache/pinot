@@ -22,8 +22,8 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
-import javax.annotation.Nullable;
 import org.apache.pinot.spi.utils.EqualityUtils;
+import org.jspecify.annotations.Nullable;
 
 
 @SuppressWarnings("unused")

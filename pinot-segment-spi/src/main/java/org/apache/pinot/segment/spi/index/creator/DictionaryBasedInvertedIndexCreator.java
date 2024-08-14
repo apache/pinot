@@ -19,8 +19,8 @@
 package org.apache.pinot.segment.spi.index.creator;
 
 import com.google.common.base.Preconditions;
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 
 /**
@@ -59,13 +59,13 @@ import javax.annotation.Nullable;
  */
 public interface DictionaryBasedInvertedIndexCreator extends InvertedIndexCreator {
   @Override
-  default void add(@Nonnull Object value, int dictId) {
+  default void add(@NonNull Object value, int dictId) {
     Preconditions.checkArgument(dictId >= 0, "A dictionary id is required");
     add(dictId);
   }
 
   @Override
-  default void add(@Nonnull Object[] values, @Nullable int[] dictIds) {
+  default void add(@NonNull Object[] values, @Nullable int[] dictIds) {
     Preconditions.checkArgument(dictIds != null, "A dictionary id is required");
     add(dictIds, dictIds.length);
   }

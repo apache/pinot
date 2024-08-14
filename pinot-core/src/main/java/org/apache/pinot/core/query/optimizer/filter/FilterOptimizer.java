@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.core.query.optimizer.filter;
 
-import javax.annotation.Nullable;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.spi.data.Schema;
+import org.jspecify.annotations.Nullable;
 
 
 /**

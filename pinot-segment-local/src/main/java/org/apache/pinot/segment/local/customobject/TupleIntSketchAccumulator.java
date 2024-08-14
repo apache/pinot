@@ -19,11 +19,11 @@
 package org.apache.pinot.segment.local.customobject;
 
 import java.util.Comparator;
-import javax.annotation.Nonnull;
 import org.apache.datasketches.tuple.Sketch;
 import org.apache.datasketches.tuple.Union;
 import org.apache.datasketches.tuple.aninteger.IntegerSummary;
 import org.apache.datasketches.tuple.aninteger.IntegerSummarySetOperations;
+import org.jspecify.annotations.NonNull;
 
 
 /**
@@ -62,7 +62,7 @@ public class TupleIntSketchAccumulator extends CustomObjectAccumulator<Sketch<In
     _nominalEntries = nominalEntries;
   }
 
-  @Nonnull
+  @NonNull
   @Override
   public Sketch<IntegerSummary> getResult() {
     return unionAll();

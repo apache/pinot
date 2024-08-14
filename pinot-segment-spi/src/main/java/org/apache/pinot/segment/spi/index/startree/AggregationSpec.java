@@ -19,12 +19,12 @@
 package org.apache.pinot.segment.spi.index.startree;
 
 import java.util.Objects;
-import javax.annotation.Nullable;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
 import org.apache.pinot.spi.config.table.StarTreeAggregationConfig;
+import org.jspecify.annotations.Nullable;
 
 
 public class AggregationSpec {

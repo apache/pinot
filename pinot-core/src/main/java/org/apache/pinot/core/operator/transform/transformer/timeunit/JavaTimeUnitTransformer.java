@@ -19,7 +19,7 @@
 package org.apache.pinot.core.operator.transform.transformer.timeunit;
 
 import java.util.concurrent.TimeUnit;
-import javax.annotation.Nonnull;
+import org.jspecify.annotations.NonNull;
 
 
 /**
@@ -29,13 +29,13 @@ public class JavaTimeUnitTransformer implements TimeUnitTransformer {
   private final TimeUnit _inputTimeUnit;
   private final TimeUnit _outputTimeUnit;
 
-  public JavaTimeUnitTransformer(@Nonnull TimeUnit inputTimeUnit, @Nonnull TimeUnit outputTimeUnit) {
+  public JavaTimeUnitTransformer(@NonNull TimeUnit inputTimeUnit, @NonNull TimeUnit outputTimeUnit) {
     _inputTimeUnit = inputTimeUnit;
     _outputTimeUnit = outputTimeUnit;
   }
 
   @Override
-  public void transform(@Nonnull long[] input, @Nonnull long[] output, int length) {
+  public void transform(@NonNull long[] input, @NonNull long[] output, int length) {
     for (int i = 0; i < length; i++) {
       output[i] = _outputTimeUnit.convert(input[i], _inputTimeUnit);
     }

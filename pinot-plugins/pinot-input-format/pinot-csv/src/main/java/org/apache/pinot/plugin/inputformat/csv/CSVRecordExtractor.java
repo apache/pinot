@@ -20,12 +20,12 @@ package org.apache.pinot.plugin.inputformat.csv;
 
 import com.google.common.collect.ImmutableSet;
 import java.util.Set;
-import javax.annotation.Nullable;
 import org.apache.commons.csv.CSVRecord;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.data.readers.BaseRecordExtractor;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
+import org.jspecify.annotations.Nullable;
 
 
 /**

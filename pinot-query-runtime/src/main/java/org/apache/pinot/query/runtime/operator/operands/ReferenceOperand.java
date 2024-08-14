@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.query.runtime.operator.operands;
 
-import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.jspecify.annotations.Nullable;
 
 
 public class ReferenceOperand implements TransformOperand {

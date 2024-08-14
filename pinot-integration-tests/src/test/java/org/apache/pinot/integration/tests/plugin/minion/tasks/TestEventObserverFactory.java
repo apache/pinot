@@ -18,13 +18,13 @@
  */
 package org.apache.pinot.integration.tests.plugin.minion.tasks;
 
-import javax.annotation.Nullable;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.integration.tests.SimpleMinionClusterIntegrationTest;
 import org.apache.pinot.minion.event.MinionEventObserver;
 import org.apache.pinot.minion.event.MinionEventObserverFactory;
 import org.apache.pinot.minion.executor.MinionTaskZkMetadataManager;
 import org.apache.pinot.spi.annotations.minion.EventObserverFactory;
+import org.jspecify.annotations.Nullable;
 
 import static org.testng.Assert.assertTrue;
 

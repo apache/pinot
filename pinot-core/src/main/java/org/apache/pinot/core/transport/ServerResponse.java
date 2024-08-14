@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.core.transport;
 
-import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.datatable.DataTable;
+import org.jspecify.annotations.Nullable;
 
 
 /**

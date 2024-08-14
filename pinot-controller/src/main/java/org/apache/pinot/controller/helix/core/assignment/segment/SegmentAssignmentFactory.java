@@ -18,12 +18,12 @@
  */
 package org.apache.pinot.controller.helix.core.assignment.segment;
 
-import javax.annotation.Nullable;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.UpsertConfig;
+import org.jspecify.annotations.Nullable;
 
 
 /**

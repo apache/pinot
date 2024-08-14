@@ -19,10 +19,10 @@
 package org.apache.pinot.controller.helix.core.assignment.instance;
 
 import java.util.Arrays;
-import javax.annotation.Nullable;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceReplicaGroupPartitionConfig;
+import org.jspecify.annotations.Nullable;
 
 
 public class InstancePartitionSelectorFactory {

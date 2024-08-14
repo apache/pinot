@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.core.segment.processing.timehandler;
 
-import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.jspecify.annotations.Nullable;
 
 
 /**

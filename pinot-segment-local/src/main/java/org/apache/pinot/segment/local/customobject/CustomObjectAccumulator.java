@@ -20,7 +20,7 @@ package org.apache.pinot.segment.local.customobject;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import javax.annotation.Nonnull;
+import org.jspecify.annotations.NonNull;
 
 
 /**
@@ -76,7 +76,7 @@ public abstract class CustomObjectAccumulator<T> {
     return _numInputs == 0;
   }
 
-  @Nonnull
+  @NonNull
   /**
    * Forces the item T in internal state to be merged with all pending items in the accumulator state
    * and returns the result.  This should not result in the accumulator state being updated or cleared.

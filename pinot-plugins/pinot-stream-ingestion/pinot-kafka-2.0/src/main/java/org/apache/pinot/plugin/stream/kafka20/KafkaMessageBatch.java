@@ -19,12 +19,12 @@
 package org.apache.pinot.plugin.stream.kafka20;
 
 import java.util.List;
-import javax.annotation.Nullable;
 import org.apache.pinot.spi.stream.BytesStreamMessage;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
+import org.jspecify.annotations.Nullable;
 
 
 public class KafkaMessageBatch implements MessageBatch<byte[]> {

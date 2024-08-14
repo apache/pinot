@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.plugin.filesystem;
 
-import javax.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;

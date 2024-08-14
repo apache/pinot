@@ -19,12 +19,12 @@
 package org.apache.pinot.core.operator.docidsets;
 
 import java.util.Map;
-import javax.annotation.Nullable;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.operator.dociditerators.ExpressionScanDocIdIterator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.jspecify.annotations.Nullable;
 
 
 public final class ExpressionDocIdSet implements BlockDocIdSet {

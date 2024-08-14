@@ -23,8 +23,6 @@ import java.io.IOException;
 import java.net.URL;
 import java.nio.charset.Charset;
 import java.util.concurrent.TimeUnit;
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import org.apache.commons.io.IOUtils;
 import org.apache.hc.client5.http.classic.methods.HttpDelete;
 import org.apache.hc.client5.http.classic.methods.HttpGet;
@@ -40,6 +38,8 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,7 +58,7 @@ public class SchemaUtils {
   /**
    * Fetch {@link Schema} from a {@link ZNRecord}.
    */
-  public static Schema fromZNRecord(@Nonnull ZNRecord record)
+  public static Schema fromZNRecord(@NonNull ZNRecord record)
       throws IOException {
     String schemaJSON = record.getSimpleField("schemaJSON");
     return Schema.fromString(schemaJSON);
@@ -67,7 +67,7 @@ public class SchemaUtils {
   /**
    * Wrap {@link Schema} into a {@link ZNRecord}.
    */
-  public static ZNRecord toZNRecord(@Nonnull Schema schema) {
+  public static ZNRecord toZNRecord(@NonNull Schema schema) {
     ZNRecord record = new ZNRecord(schema.getSchemaName());
     record.setSimpleField("schemaJSON", schema.toSingleLineJsonString());
     return record;
@@ -79,7 +79,7 @@ public class SchemaUtils {
    * @return schema on success.
    * <P><code>null</code> on failure.
    */
-  public static @Nullable Schema getSchema(@Nonnull String host, int port, @Nonnull String schemaName) {
+  public static @Nullable Schema getSchema(@NonNull String host, int port, @NonNull String schemaName) {
     Preconditions.checkNotNull(host);
     Preconditions.checkNotNull(schemaName);
 
@@ -112,7 +112,7 @@ public class SchemaUtils {
    * @return <code>true</code> on success.
    * <P><code>false</code> on failure.
    */
-  public static boolean postSchema(@Nonnull String host, int port, @Nonnull Schema schema) {
+  public static boolean postSchema(@NonNull String host, int port, @NonNull Schema schema) {
     Preconditions.checkNotNull(host);
     Preconditions.checkNotNull(schema);
 
@@ -144,7 +144,7 @@ public class SchemaUtils {
    * @return <code>true</code> on success.
    * <P><code>false</code> on failure.
    */
-  public static boolean deleteSchema(@Nonnull String host, int port, @Nonnull String schemaName) {
+  public static boolean deleteSchema(@NonNull String host, int port, @NonNull String schemaName) {
     Preconditions.checkNotNull(host);
     Preconditions.checkNotNull(schemaName);
 
@@ -172,7 +172,7 @@ public class SchemaUtils {
    * @return <code>true</code> if two schemas equal to each other.
    * <p><code>false</code>if two schemas do not equal to each other.
    */
-  public static boolean equalsIgnoreVersion(@Nonnull Schema schema1, @Nonnull Schema schema2) {
+  public static boolean equalsIgnoreVersion(@NonNull Schema schema1, @NonNull Schema schema2) {
     Preconditions.checkNotNull(schema1);
     Preconditions.checkNotNull(schema2);
 

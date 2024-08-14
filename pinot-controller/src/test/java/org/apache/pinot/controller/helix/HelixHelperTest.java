@@ -19,10 +19,10 @@
 package org.apache.pinot.controller.helix;
 
 import com.google.common.base.Function;
-import javax.annotation.Nullable;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
+import org.jspecify.annotations.Nullable;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;

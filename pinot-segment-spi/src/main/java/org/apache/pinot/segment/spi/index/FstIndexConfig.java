@@ -22,9 +22,9 @@ package org.apache.pinot.segment.spi.index;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.Objects;
-import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.config.table.IndexConfig;
+import org.jspecify.annotations.Nullable;
 
 
 public class FstIndexConfig extends IndexConfig {

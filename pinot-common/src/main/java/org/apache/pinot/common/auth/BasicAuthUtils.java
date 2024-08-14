@@ -19,9 +19,9 @@
 package org.apache.pinot.common.auth;
 
 import java.util.Base64;
-import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.utils.BcryptUtils;
+import org.jspecify.annotations.Nullable;
 
 
 /**

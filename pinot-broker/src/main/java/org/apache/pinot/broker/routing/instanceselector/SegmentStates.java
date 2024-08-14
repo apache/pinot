@@ -21,8 +21,8 @@ package org.apache.pinot.broker.routing.instanceselector;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nullable;
 import javax.annotation.concurrent.Immutable;
+import org.jspecify.annotations.Nullable;
 
 
 /**

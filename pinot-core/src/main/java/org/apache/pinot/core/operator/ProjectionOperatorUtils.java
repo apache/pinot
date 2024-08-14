@@ -19,9 +19,9 @@
 package org.apache.pinot.core.operator;
 
 import java.util.Map;
-import javax.annotation.Nullable;
 import org.apache.pinot.core.operator.blocks.DocIdSetBlock;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.jspecify.annotations.Nullable;
 
 
 public class ProjectionOperatorUtils {

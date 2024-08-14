@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.operator.transform.transformer;
 
-import javax.annotation.Nonnull;
+import org.jspecify.annotations.NonNull;
 
 
 /**
@@ -36,5 +36,5 @@ public interface DataTransformer<I, O> {
    * @param output Output array
    * @param length Number of values to transform
    */
-  void transform(@Nonnull I input, @Nonnull O output, int length);
+  void transform(@NonNull I input, @NonNull O output, int length);
 }

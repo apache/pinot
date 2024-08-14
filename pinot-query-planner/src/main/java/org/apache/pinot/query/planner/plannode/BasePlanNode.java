@@ -21,8 +21,8 @@ package org.apache.pinot.query.planner.plannode;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.DataSchema;
+import org.jspecify.annotations.Nullable;
 
 
 public abstract class BasePlanNode implements PlanNode {

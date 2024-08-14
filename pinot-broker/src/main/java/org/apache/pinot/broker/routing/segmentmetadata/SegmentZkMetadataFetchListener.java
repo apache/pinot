@@ -20,11 +20,11 @@ package org.apache.pinot.broker.routing.segmentmetadata;
 
 import java.util.List;
 import java.util.Set;
-import javax.annotation.Nullable;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.broker.routing.segmentpreselector.SegmentPreSelector;
+import org.jspecify.annotations.Nullable;
 
 
 /**

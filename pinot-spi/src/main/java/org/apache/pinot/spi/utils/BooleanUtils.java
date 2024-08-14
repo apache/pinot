@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.spi.utils;
 
-import javax.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 
 public class BooleanUtils {

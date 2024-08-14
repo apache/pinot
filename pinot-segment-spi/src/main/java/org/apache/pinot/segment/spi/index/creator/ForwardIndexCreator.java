@@ -20,10 +20,10 @@ package org.apache.pinot.segment.spi.index.creator;
 
 import java.io.IOException;
 import java.math.BigDecimal;
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.IndexCreator;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 
 /**
@@ -37,7 +37,7 @@ public interface ForwardIndexCreator extends IndexCreator {
   }
 
   @Override
-  default void add(@Nonnull Object cellValue, int dictId) {
+  default void add(@NonNull Object cellValue, int dictId) {
     if (dictId >= 0) {
       putDictId(dictId);
     } else {
@@ -77,7 +77,7 @@ public interface ForwardIndexCreator extends IndexCreator {
   }
 
   @Override
-  default void add(@Nonnull Object[] cellValues, @Nullable int[] dictIds)
+  default void add(@NonNull Object[] cellValues, @Nullable int[] dictIds)
       throws IOException {
     if (dictIds != null) {
       putDictIdMV(dictIds);

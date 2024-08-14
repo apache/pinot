@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.controller.helix.core.realtime.segment;
 
-import javax.annotation.Nullable;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.spi.stream.StreamConfig;
+import org.jspecify.annotations.Nullable;
 
 
 public class FixedFlushThresholdUpdater implements FlushThresholdUpdater {

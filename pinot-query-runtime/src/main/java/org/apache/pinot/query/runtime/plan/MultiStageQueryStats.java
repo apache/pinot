@@ -37,7 +37,6 @@ import java.util.Objects;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
-import javax.annotation.Nullable;
 import org.apache.avro.util.ByteBufferInputStream;
 import org.apache.commons.io.output.UnsynchronizedByteArrayOutputStream;
 import org.apache.pinot.common.datatable.StatMap;
@@ -47,6 +46,7 @@ import org.apache.pinot.query.runtime.operator.LiteralValueOperator;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -182,8 +182,7 @@ public class MultiStageQueryStats {
    * <p>
    * This method returns null in case the stage id is unknown by this stage or no stats are stored for it.
    */
-  @Nullable
-  public StageStats.Closed getUpstreamStageStats(int stageId) {
+  public StageStats.@Nullable Closed getUpstreamStageStats(int stageId) {
     if (stageId <= _currentStageId) {
       throw new IllegalArgumentException("Stage " + stageId + " cannot be upstream of current stage "
           + _currentStageId);

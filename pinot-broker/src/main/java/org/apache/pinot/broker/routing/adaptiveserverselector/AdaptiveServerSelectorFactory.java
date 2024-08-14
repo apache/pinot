@@ -19,10 +19,10 @@
 package org.apache.pinot.broker.routing.adaptiveserverselector;
 
 import com.google.common.base.Preconditions;
-import javax.annotation.Nullable;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

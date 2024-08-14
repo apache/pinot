@@ -23,10 +23,10 @@ import com.google.common.collect.Ordering;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.IntPredicate;
-import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
+import org.jspecify.annotations.Nullable;
 
 
 /**

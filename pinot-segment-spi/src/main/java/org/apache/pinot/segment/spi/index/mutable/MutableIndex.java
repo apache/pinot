@@ -19,9 +19,9 @@
 
 package org.apache.pinot.segment.spi.index.mutable;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.IndexReader;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Implementations of this interface can be used to create indexes in realtime tables and at the same time to read them.
@@ -47,7 +47,7 @@ public interface MutableIndex extends IndexReader {
    * @param dictId An optional dictionary value of the cell. If there is no dictionary, -1 is received
    * @param docId The document id of the given row. A non-negative value.
    */
-  void add(@Nonnull Object value, int dictId, int docId);
+  void add(@NonNull Object value, int dictId, int docId);
 
   /**
    * Adds the given multi value cell to the index.
@@ -59,7 +59,7 @@ public interface MutableIndex extends IndexReader {
    * @param dictIds An optional array of dictionary values. If there is no dictionary, null is received.
    * @param docId The document id of the given row. A non-negative value.
    */
-  void add(@Nonnull Object[] values, @Nullable int[] dictIds, int docId);
+  void add(@NonNull Object[] values, @Nullable int[] dictIds, int docId);
 
   /**
    * Commits the mutable index artifacts to disk. This is used in preparation for realtime segment conversion.

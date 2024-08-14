@@ -21,10 +21,10 @@ package org.apache.pinot.common.utils;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import java.util.Objects;
-import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
+import org.jspecify.annotations.Nullable;
 
 
 /**

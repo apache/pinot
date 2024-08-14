@@ -22,7 +22,6 @@ import java.io.File;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Supplier;
-import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.helix.HelixManager;
@@ -34,6 +33,7 @@ import org.apache.pinot.core.util.SegmentRefreshSemaphore;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.jspecify.annotations.Nullable;
 
 
 /**

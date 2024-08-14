@@ -31,13 +31,13 @@ import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import javax.annotation.Nullable;
 import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLContext;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.hc.core5.http.Header;
 import org.apache.pinot.tools.AbstractBaseCommand;
 import org.apache.pinot.tools.utils.PinotConfigUtils;
+import org.jspecify.annotations.Nullable;
 
 
 /**

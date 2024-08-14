@@ -20,7 +20,6 @@ package org.apache.pinot.sql.parsers.rewriter;
 
 import java.util.Arrays;
 import java.util.List;
-import javax.annotation.Nullable;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionInvoker;
 import org.apache.pinot.common.function.FunctionRegistry;
@@ -29,6 +28,7 @@ import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.sql.parsers.SqlCompilationException;
+import org.jspecify.annotations.Nullable;
 
 
 public class CompileTimeFunctionsInvoker implements QueryRewriter {

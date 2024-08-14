@@ -20,11 +20,11 @@ package org.apache.pinot.core.query.reduce.filter;
 
 import java.math.BigDecimal;
 import java.sql.Timestamp;
-import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.jspecify.annotations.Nullable;
 
 
 /**

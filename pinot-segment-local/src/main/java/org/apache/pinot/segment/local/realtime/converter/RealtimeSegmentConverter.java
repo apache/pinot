@@ -21,7 +21,6 @@ package org.apache.pinot.segment.local.realtime.converter;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.Collection;
 import java.util.Map;
-import javax.annotation.Nullable;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
@@ -43,6 +42,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.recordenricher.RecordEnricherPipeline;
+import org.jspecify.annotations.Nullable;
 
 
 public class RealtimeSegmentConverter {

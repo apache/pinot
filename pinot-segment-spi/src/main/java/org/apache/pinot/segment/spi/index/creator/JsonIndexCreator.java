@@ -19,9 +19,9 @@
 package org.apache.pinot.segment.spi.index.creator;
 
 import java.io.IOException;
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.IndexCreator;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 
 /**
@@ -32,13 +32,13 @@ public interface JsonIndexCreator extends IndexCreator {
   char KEY_VALUE_SEPARATOR_NEXT_CHAR = KEY_VALUE_SEPARATOR + 1;
 
   @Override
-  default void add(@Nonnull Object value, int dictId)
+  default void add(@NonNull Object value, int dictId)
       throws IOException {
     add((String) value);
   }
 
   @Override
-  default void add(@Nonnull Object[] values, @Nullable int[] dictIds) {
+  default void add(@NonNull Object[] values, @Nullable int[] dictIds) {
   }
 
   /**

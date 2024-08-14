@@ -22,8 +22,8 @@ package org.apache.pinot.common.utils;
 import com.google.common.base.Preconditions;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The {@code ExponentialMovingAverage} is the implementation of the utility Exponential Weighted Moving Average

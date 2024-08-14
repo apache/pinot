@@ -21,8 +21,6 @@ package org.apache.pinot.controller.util;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import org.apache.helix.PropertyPathBuilder;
 import org.apache.helix.manager.zk.ZKHelixAdmin;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -36,6 +34,8 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -73,7 +73,7 @@ public class TableRetentionValidator {
   private String _tableNamePattern = null;
   private long _durationInDaysThreshold = DEFAULT_DURATION_IN_DAYS_THRESHOLD;
 
-  public TableRetentionValidator(@Nonnull String zkAddress, @Nonnull String clusterName) {
+  public TableRetentionValidator(@NonNull String zkAddress, @NonNull String clusterName) {
     _clusterName = clusterName;
     _helixAdmin = new ZKHelixAdmin(zkAddress);
     _propertyStore =

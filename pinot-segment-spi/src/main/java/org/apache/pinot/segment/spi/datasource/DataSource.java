@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.spi.datasource;
 
-import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.IndexReader;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
@@ -31,6 +30,7 @@ import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.segment.spi.index.reader.RangeIndexReader;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.index.reader.VectorIndexReader;
+import org.jspecify.annotations.Nullable;
 
 
 /**

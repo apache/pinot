@@ -20,7 +20,7 @@ package org.apache.pinot.spi.accounting;
 
 import java.util.Collection;
 import java.util.Map;
-import javax.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 
 public interface ThreadResourceUsageAccountant {

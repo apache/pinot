@@ -19,7 +19,7 @@
 package org.apache.pinot.segment.local.customobject;
 
 import java.nio.ByteBuffer;
-import javax.annotation.Nonnull;
+import org.jspecify.annotations.NonNull;
 
 
 public class AvgPair implements Comparable<AvgPair> {
@@ -36,7 +36,7 @@ public class AvgPair implements Comparable<AvgPair> {
     _count += count;
   }
 
-  public void apply(@Nonnull AvgPair avgPair) {
+  public void apply(@NonNull AvgPair avgPair) {
     _sum += avgPair._sum;
     _count += avgPair._count;
   }
@@ -49,7 +49,7 @@ public class AvgPair implements Comparable<AvgPair> {
     return _count;
   }
 
-  @Nonnull
+  @NonNull
   public byte[] toBytes() {
     ByteBuffer byteBuffer = ByteBuffer.allocate(Double.BYTES + Long.BYTES);
     byteBuffer.putDouble(_sum);
@@ -57,18 +57,18 @@ public class AvgPair implements Comparable<AvgPair> {
     return byteBuffer.array();
   }
 
-  @Nonnull
+  @NonNull
   public static AvgPair fromBytes(byte[] bytes) {
     return fromByteBuffer(ByteBuffer.wrap(bytes));
   }
 
-  @Nonnull
+  @NonNull
   public static AvgPair fromByteBuffer(ByteBuffer byteBuffer) {
     return new AvgPair(byteBuffer.getDouble(), byteBuffer.getLong());
   }
 
   @Override
-  public int compareTo(@Nonnull AvgPair avgPair) {
+  public int compareTo(@NonNull AvgPair avgPair) {
     if (_count == 0) {
       if (avgPair._count == 0) {
         return 0;

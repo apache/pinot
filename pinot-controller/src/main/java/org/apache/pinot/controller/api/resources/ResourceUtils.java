@@ -19,7 +19,6 @@
 package org.apache.pinot.controller.api.resources;
 
 import java.util.List;
-import javax.annotation.Nullable;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.pinot.common.exception.TableNotFoundException;
@@ -32,6 +31,7 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.spi.config.table.TableType;
 import org.glassfish.grizzly.http.server.Request;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 
 

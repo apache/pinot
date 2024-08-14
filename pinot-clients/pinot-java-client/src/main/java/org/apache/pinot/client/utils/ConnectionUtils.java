@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.Properties;
 import java.util.stream.Collectors;
-import javax.annotation.Nullable;
 import javax.net.ssl.SSLContext;
 import org.apache.commons.configuration2.MapConfiguration;
 import org.apache.commons.lang3.StringUtils;
@@ -30,6 +29,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.segment.local.function;
 
-import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.utils.SchemaUtils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
+import org.jspecify.annotations.Nullable;
 
 
 /**

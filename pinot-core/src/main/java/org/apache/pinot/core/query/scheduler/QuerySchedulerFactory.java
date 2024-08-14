@@ -21,7 +21,6 @@ package org.apache.pinot.core.query.scheduler;
 import com.google.common.base.Preconditions;
 import java.lang.reflect.Constructor;
 import java.util.concurrent.atomic.LongAccumulator;
-import javax.annotation.Nullable;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.scheduler.fcfs.BoundedFCFSScheduler;
@@ -29,6 +28,7 @@ import org.apache.pinot.core.query.scheduler.fcfs.FCFSQueryScheduler;
 import org.apache.pinot.core.query.scheduler.tokenbucket.TokenPriorityScheduler;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.plugin.PluginManager;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

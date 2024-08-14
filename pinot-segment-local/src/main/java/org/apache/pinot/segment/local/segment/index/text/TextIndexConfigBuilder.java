@@ -20,12 +20,12 @@
 package org.apache.pinot.segment.local.segment.index.text;
 
 import java.util.Map;
-import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.apache.pinot.segment.spi.utils.CsvParser;
 import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.jspecify.annotations.Nullable;
 
 
 public class TextIndexConfigBuilder extends TextIndexConfig.AbstractBuilder {

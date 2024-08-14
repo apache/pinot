@@ -20,8 +20,8 @@ package org.apache.pinot.core.query.pruner;
 
 import java.util.HashMap;
 import java.util.Map;
-import javax.annotation.Nullable;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.jspecify.annotations.Nullable;
 
 
 /**

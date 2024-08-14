@@ -19,21 +19,21 @@
 package org.apache.pinot.segment.spi.index.creator;
 
 import java.io.IOException;
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.IndexCreator;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 
 public interface FSTIndexCreator extends IndexCreator {
 
   @Override
-  default void add(@Nonnull Object value, int dictId)
+  default void add(@NonNull Object value, int dictId)
       throws IOException {
     // FST indexes should do nothing when called for each row
   }
 
   @Override
-  default void add(@Nonnull Object[] values, @Nullable int[] dictIds)
+  default void add(@NonNull Object[] values, @Nullable int[] dictIds)
       throws IOException {
     // FST indexes should do nothing when called for each row
   }

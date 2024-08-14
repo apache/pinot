@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.core.plan;
 
-import javax.annotation.Nullable;
 import org.apache.pinot.core.operator.DocIdSetOperator;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.SegmentContext;
+import org.jspecify.annotations.Nullable;
 
 
 public class DocIdSetPlanNode implements PlanNode {

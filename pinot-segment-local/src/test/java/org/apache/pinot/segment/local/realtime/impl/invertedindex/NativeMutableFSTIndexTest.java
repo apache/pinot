@@ -21,7 +21,7 @@ package org.apache.pinot.segment.local.realtime.impl.invertedindex;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
-import javax.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;

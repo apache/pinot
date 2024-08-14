@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.spi.stream;
 
-import javax.annotation.Nullable;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
+import org.jspecify.annotations.Nullable;
 
 
 /**

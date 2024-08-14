@@ -30,8 +30,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -46,6 +44,8 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.metrics.PinotMeter;
 import org.apache.pinot.spi.stream.StreamDataDecoderImpl;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -177,8 +177,8 @@ public class SchemaConformingTransformerV2 implements RecordTransformer {
   /**
    * Validates the schema against the given transformer's configuration.
    */
-  public static void validateSchema(@Nonnull Schema schema,
-      @Nonnull SchemaConformingTransformerV2Config transformerConfig) {
+  public static void validateSchema(@NonNull Schema schema,
+      @NonNull SchemaConformingTransformerV2Config transformerConfig) {
     validateSchemaFieldNames(schema.getPhysicalColumnNames(), transformerConfig);
 
     String indexableExtrasFieldName = transformerConfig.getIndexableExtrasField();
@@ -236,8 +236,8 @@ public class SchemaConformingTransformerV2 implements RecordTransformer {
    *   with an empty sub-key. E.g., the field name "a..b" corresponds to the JSON {"a": {"": {"b": ...}}}</li>
    * </ul>
    */
-  private static SchemaTreeNode validateSchemaAndCreateTree(@Nonnull Schema schema,
-      @Nonnull SchemaConformingTransformerV2Config transformerConfig)
+  private static SchemaTreeNode validateSchemaAndCreateTree(@NonNull Schema schema,
+      @NonNull SchemaConformingTransformerV2Config transformerConfig)
       throws IllegalArgumentException {
     Set<String> schemaFields = schema.getPhysicalColumnNames();
     Map<String, String> jsonKeyPathToColumnNameMap = new HashMap<>();
@@ -642,7 +642,7 @@ class SchemaTreeNode {
   // Taking the example of key "x.y.z", the keyName will be "z" and the parentPath will be "x.y"
   // Root node would have keyName as "" and parentPath as null
   // Root node's children will have keyName as the first level key and parentPath as ""
-  @Nonnull
+  @NonNull
   private String _keyName;
   @Nullable
   private String _columnName;
