@@ -1013,18 +1013,11 @@ public abstract class BaseTableDataManager implements TableDataManager {
     }
   }
 
-  /**
-   * This method checks if any reload is needed on a segment.
-   * Scans through indices, columns, startree index and min max values to achieve the result
-   * True if reload is needed and false if no reload is needed.
-   */
-  @Override
-  public boolean needReloadSegment(SegmentZKMetadata zkMetadata, IndexLoadingConfig indexLoadingConfig)
+  private boolean needReloadSegment(SegmentZKMetadata zkMetadata, IndexLoadingConfig indexLoadingConfig)
       throws Exception {
     String segmentName = zkMetadata.getSegmentName();
     SegmentDirectory segmentDirectory =
         tryInitSegmentDirectory(segmentName, String.valueOf(zkMetadata.getCrc()), indexLoadingConfig);
-
     try {
       Schema schema = indexLoadingConfig.getSchema();
       //if re processing or reload is needed on a segment then return true

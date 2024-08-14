@@ -123,14 +123,6 @@ public interface TableDataManager {
   boolean tryLoadExistingSegment(SegmentZKMetadata zkMetadata, IndexLoadingConfig indexLoadingConfig);
 
   /**
-   *
-   * Checks for a particular segment, reload is needed or not
-   * @return true if the reload is needed on the segment
-   */
-  boolean needReloadSegment(SegmentZKMetadata zkMetadata, IndexLoadingConfig indexLoadingConfig)
-      throws Exception;
-
-  /**
    * Check if reload is needed for any of the segments of a table
    * @return true if reload is needed for any of the segments and false otherwise
    */
