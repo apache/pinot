@@ -81,7 +81,8 @@ public abstract class NullableSingleInputAggregationFunction<I, F extends Compar
       return;
     }
 
-    if (roaringBitmap.getCardinality() < length) {
+    // Skip if entire block is null
+    if (!roaringBitmap.contains(0, length)) {
       forEachNotNull(length, roaringBitmap.getIntIterator(), consumer);
     }
   }
@@ -122,7 +123,8 @@ public abstract class NullableSingleInputAggregationFunction<I, F extends Compar
   public <A> A foldNotNull(int length, @Nullable RoaringBitmap roaringBitmap, A initialAcum, Reducer<A> reducer) {
     IntIterator intIterator = roaringBitmap == null ? null : roaringBitmap.getIntIterator();
 
-    if (_nullHandlingEnabled && roaringBitmap != null && roaringBitmap.getCardinality() >= length) {
+    // Exit early if entire block is null
+    if (_nullHandlingEnabled && roaringBitmap != null && roaringBitmap.contains(0, length)) {
       return initialAcum;
     }
 
