@@ -38,7 +38,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.function.BooleanSupplier;
 import javax.annotation.Nullable;
-import org.apache.commons.compress.compressors.CompressorException;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.Utils;
@@ -1063,7 +1062,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         File segmentTarFile = new File(dataDir, _segmentNameStr + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);
         try {
           TarCompressionUtils.createCompressedTarFile(indexDir, segmentTarFile);
-        } catch (IOException | CompressorException e) {
+        } catch (IOException e) {
           String errorMessage =
               String.format("Caught exception while taring index directory from: %s to: %s", indexDir, segmentTarFile);
           _segmentLogger.error(errorMessage, e);

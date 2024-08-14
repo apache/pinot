@@ -106,7 +106,7 @@ public class TarCompressionUtilsTest {
     File dir1 = new File(DATA_DIR, dirToTarName1);
     File dir2 = new File(DATA_DIR, dirToTarName2);
 
-    File[] dirsToTar = new File[] {dir1, dir2};
+    File[] dirsToTar = new File[]{dir1, dir2};
 
     String fileName1 = "data1";
     String fileContent1 = "fileContent1";
@@ -141,7 +141,6 @@ public class TarCompressionUtilsTest {
     assertNotNull(filesDir1);
     assertEquals(filesDir1.length, 1);
     assertEquals(FileUtils.readFileToString(new File(untarredFileDir1, fileName1)), fileContent1);
-
 
     File[] filesDir2 = untarredFileDir2.listFiles();
     assertNotNull(filesDir2);
@@ -298,7 +297,7 @@ public class TarCompressionUtilsTest {
   }
 
   public void testBadFilePath(String compressedTarFileExtension, String compressorName)
-          throws IOException, CompressorException {
+      throws IOException, CompressorException {
     String fileName = "data";
     String fileContent = "fileContent";
     File dataFile = new File(DATA_DIR, fileName);
@@ -306,8 +305,8 @@ public class TarCompressionUtilsTest {
 
     File badCompressedTarFile = new File(TAR_DIR, "bad" + compressedTarFileExtension);
     try (OutputStream fileOut = Files.newOutputStream(badCompressedTarFile.toPath());
-         OutputStream compressorOut = COMPRESSOR_STREAM_FACTORY.createCompressorOutputStream(compressorName, fileOut);
-         TarArchiveOutputStream tarOut = new TarArchiveOutputStream(compressorOut)) {
+        OutputStream compressorOut = COMPRESSOR_STREAM_FACTORY.createCompressorOutputStream(compressorName, fileOut);
+        TarArchiveOutputStream tarOut = new TarArchiveOutputStream(compressorOut)) {
       tarOut.setLongFileMode(TarArchiveOutputStream.LONGFILE_GNU);
       TarArchiveEntry entry = new TarArchiveEntry(dataFile, "../bad/path/data");
       tarOut.putArchiveEntry(entry);
@@ -320,7 +319,7 @@ public class TarCompressionUtilsTest {
     try {
       TarCompressionUtils.untar(badCompressedTarFile, UNTAR_DIR);
       fail();
-    } catch (IOException | CompressorException e) {
+    } catch (IOException e) {
       // Expected
     }
 

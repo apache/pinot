@@ -30,7 +30,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import org.apache.commons.compress.compressors.CompressorException;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.segment.generation.SegmentGenerationUtils;
 import org.apache.pinot.common.utils.TarCompressionUtils;
@@ -371,7 +370,7 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
     try {
       File[] files = validPluginDirectories.toArray(new File[0]);
       TarCompressionUtils.createCompressedTarFile(files, pluginsTarGzFile);
-    } catch (IOException | CompressorException e) {
+    } catch (IOException e) {
       LOGGER.error("Failed to tar plugins directories", e);
     }
     sparkContext.addFile(pluginsTarGzFile.getAbsolutePath());

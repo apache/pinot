@@ -41,7 +41,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
-import org.apache.commons.compress.compressors.CompressorException;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -843,7 +842,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   }
 
   private File untarSegment(String segmentName, File segmentTarFile, File tempRootDir)
-      throws IOException, CompressorException {
+      throws IOException {
     File untarDir = new File(tempRootDir, segmentName);
     _logger.info("Untarring segment: {} from: {} to: {}", segmentName, segmentTarFile, untarDir);
     try {
@@ -873,7 +872,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
   @VisibleForTesting
   File untarAndMoveSegment(String segmentName, File segmentTarFile, File tempRootDir)
-      throws IOException, CompressorException {
+      throws IOException {
     return moveSegment(segmentName, untarSegment(segmentName, segmentTarFile, tempRootDir));
   }
 

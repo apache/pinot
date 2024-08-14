@@ -86,7 +86,7 @@ public class TarCompressionUtils {
    * a supported compressed tar file extension as the file extension such as ".tar.gz" or ".tar.zst"
    */
   public static void createCompressedTarFile(File inputFile, File outputFile)
-      throws IOException, CompressorException {
+      throws IOException {
     createCompressedTarFile(new File[]{inputFile}, outputFile);
   }
 
@@ -95,7 +95,7 @@ public class TarCompressionUtils {
    * a supported file extension such as "tar.gz" or "tar.zst"
    */
   public static void createCompressedTarFile(File[] inputFiles, File outputFile)
-      throws IOException, CompressorException {
+      throws IOException {
     String compressorName = null;
     for (String supportedCompressorExtension : COMPRESSOR_NAME_BY_FILE_EXTENSIONS.keySet()) {
       if (outputFile.getName().endsWith(supportedCompressorExtension)) {
@@ -106,16 +106,17 @@ public class TarCompressionUtils {
     Preconditions.checkState(null != compressorName,
         "Output file: %s does not have a supported compressed tar file extension", outputFile);
     try (OutputStream fileOut = Files.newOutputStream(outputFile.toPath());
-         BufferedOutputStream bufferedOut = new BufferedOutputStream(fileOut);
-         OutputStream compressorOut =
-             COMPRESSOR_STREAM_FACTORY.createCompressorOutputStream(compressorName, bufferedOut);
-         TarArchiveOutputStream tarOut = new TarArchiveOutputStream(compressorOut)) {
+        BufferedOutputStream bufferedOut = new BufferedOutputStream(fileOut);
+        OutputStream compressorOut = COMPRESSOR_STREAM_FACTORY.createCompressorOutputStream(compressorName,
+            bufferedOut); TarArchiveOutputStream tarOut = new TarArchiveOutputStream(compressorOut)) {
       tarOut.setBigNumberMode(TarArchiveOutputStream.BIGNUMBER_STAR);
       tarOut.setLongFileMode(TarArchiveOutputStream.LONGFILE_GNU);
 
       for (File inputFile : inputFiles) {
         addFileToCompressedTar(tarOut, inputFile, "");
       }
+    } catch (CompressorException e) {
+      throw new IOException(e);
     }
   }
 
@@ -150,7 +151,7 @@ public class TarCompressionUtils {
    * <p>For security reason, the untarred files must reside in the output directory.
    */
   public static List<File> untar(File inputFile, File outputDir)
-      throws IOException, CompressorException {
+      throws IOException {
     try (InputStream fileIn = Files.newInputStream(inputFile.toPath())) {
       return untar(fileIn, outputDir);
     }
@@ -161,7 +162,7 @@ public class TarCompressionUtils {
    * <p>For security reason, the untarred files must reside in the output directory.
    */
   public static List<File> untar(InputStream inputStream, File outputDir)
-      throws IOException, CompressorException {
+      throws IOException {
     return untarWithRateLimiter(inputStream, outputDir, NO_DISK_WRITE_RATE_LIMIT);
   }
 
@@ -171,7 +172,7 @@ public class TarCompressionUtils {
    * <p>For security reason, the untarred files must reside in the output directory.
    */
   public static List<File> untarWithRateLimiter(InputStream inputStream, File outputDir, long maxStreamRateInByte)
-      throws IOException, CompressorException {
+      throws IOException {
     String outputDirCanonicalPath = outputDir.getCanonicalPath();
     // Prevent partial path traversal
     if (!outputDirCanonicalPath.endsWith(File.separator)) {
@@ -222,6 +223,8 @@ public class TarCompressionUtils {
         }
         untarredFiles.add(outputFile);
       }
+    } catch (CompressorException e) {
+      throw new IOException(e);
     }
     return untarredFiles;
   }
@@ -230,11 +233,11 @@ public class TarCompressionUtils {
    * Un-tars one single file with the given file name from a compressed tar file.
    */
   public static void untarOneFile(File inputFile, String fileName, File outputFile)
-      throws IOException, CompressorException {
+      throws IOException {
     try (InputStream fileIn = Files.newInputStream(inputFile.toPath());
-         InputStream bufferedIn = new BufferedInputStream(fileIn);
-         InputStream compressorIn = COMPRESSOR_STREAM_FACTORY.createCompressorInputStream(bufferedIn);
-         ArchiveInputStream tarIn = new TarArchiveInputStream(compressorIn)) {
+        InputStream bufferedIn = new BufferedInputStream(fileIn);
+        InputStream compressorIn = COMPRESSOR_STREAM_FACTORY.createCompressorInputStream(bufferedIn);
+        ArchiveInputStream tarIn = new TarArchiveInputStream(compressorIn)) {
       ArchiveEntry entry;
       while ((entry = tarIn.getNextEntry()) != null) {
         if (!entry.isDirectory()) {
@@ -249,6 +252,8 @@ public class TarCompressionUtils {
         }
       }
       throw new IOException(String.format("Failed to find file: %s in: %s", fileName, inputFile));
+    } catch (CompressorException e) {
+      throw new IOException(e);
     }
   }
 

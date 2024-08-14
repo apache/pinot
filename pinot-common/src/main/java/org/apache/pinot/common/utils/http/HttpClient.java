@@ -34,7 +34,6 @@ import javax.annotation.Nullable;
 import javax.net.ssl.SSLContext;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.collections4.MapUtils;
-import org.apache.commons.compress.compressors.CompressorException;
 import org.apache.commons.io.IOUtils;
 import org.apache.hc.client5.http.classic.methods.HttpPost;
 import org.apache.hc.client5.http.classic.methods.HttpPut;
@@ -442,7 +441,7 @@ public class HttpClient implements AutoCloseable {
    */
   public File downloadUntarFileStreamed(URI uri, int socketTimeoutMs, File dest, AuthProvider authProvider,
       List<Header> httpHeaders, long maxStreamRateInByte)
-      throws IOException, HttpErrorStatusException, CompressorException {
+      throws IOException, HttpErrorStatusException {
     ClassicHttpRequest request = getDownloadFileRequest(uri, authProvider, httpHeaders);
     File ret;
 

@@ -26,7 +26,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import org.apache.commons.compress.compressors.CompressorException;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import org.apache.pinot.common.segment.generation.SegmentGenerationUtils;
@@ -252,7 +251,7 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
   }
 
   private File tarSegmentDir(SegmentGenerationTaskSpec taskSpec, String segmentName)
-      throws IOException, CompressorException {
+      throws IOException {
     File localOutputTempDir = new File(taskSpec.getOutputDirectoryPath());
     File localSegmentDir = new File(localOutputTempDir, segmentName);
     String segmentTarFileName = segmentName + Constants.TAR_GZ_FILE_EXT;

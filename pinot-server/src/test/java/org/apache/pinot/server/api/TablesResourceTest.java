@@ -27,7 +27,6 @@ import java.util.List;
 import java.util.Map;
 import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Response;
-import org.apache.commons.compress.compressors.CompressorException;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.server.TableIndexMetadataResponse;
@@ -352,7 +351,7 @@ public class TablesResourceTest extends BaseResourceTest {
 
   // Verify metadata file from segments.
   private void downLoadAndVerifySegmentContent(String tableNameWithType, IndexSegment segment)
-      throws IOException, ConfigurationException, CompressorException {
+      throws IOException, ConfigurationException {
     String segmentPath = "/segments/" + tableNameWithType + "/" + segment.getSegmentName();
 
     // Download the segment and save to a temp local file.

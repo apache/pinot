@@ -29,7 +29,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.compress.compressors.CompressorException;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
@@ -603,7 +602,7 @@ public class BaseTableDataManagerTest {
 
   @Test
   public void testUntarAndMoveSegment()
-      throws IOException, CompressorException {
+      throws IOException {
     BaseTableDataManager tableDataManager = createTableManager();
     File tempRootDir = tableDataManager.getTmpSegmentDataDir("test-untar-move");
 

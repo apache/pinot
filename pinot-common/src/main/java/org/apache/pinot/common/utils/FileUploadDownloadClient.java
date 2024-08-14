@@ -35,7 +35,6 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import javax.net.ssl.SSLContext;
 import javax.ws.rs.core.Response;
-import org.apache.commons.compress.compressors.CompressorException;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hc.client5.http.classic.methods.HttpPost;
 import org.apache.hc.client5.http.classic.methods.HttpPut;
@@ -1210,7 +1209,7 @@ public class FileUploadDownloadClient implements AutoCloseable {
    */
   public File downloadUntarFileStreamed(URI uri, File dest, AuthProvider authProvider, List<Header> httpHeaders,
       long maxStreamRateInByte)
-      throws IOException, CompressorException, HttpErrorStatusException {
+      throws IOException, HttpErrorStatusException {
     return _httpClient.downloadUntarFileStreamed(uri, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS, dest, authProvider,
         httpHeaders, maxStreamRateInByte);
   }
