@@ -41,6 +41,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
+import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.core.Response;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -1025,7 +1027,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     } catch (Exception e) {
       _logger.error("Failed to check if reload is needed for a segment {}", segmentName, e);
       closeSegmentDirectoryQuietly(segmentDirectory);
-      throw new Exception(String.format("Failed to perform reload check on the segment: %s", segmentName), e);
+      throw new Exception(String.format("Failed to perform reload check on the segment %s", segmentName));
     }
   }
 

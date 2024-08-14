@@ -961,15 +961,19 @@ public class TablesResource {
       + " any segment in this server")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success", response = TableSegments.class), @ApiResponse(code = 500,
-      message = "Server initialization error", response = ErrorInfo.class)
+      message = "Internal Server error", response = ErrorInfo.class)
   })
   public String checkSegmentsReload(
       @ApiParam(value = "Table Name with type", required = true) @PathParam("tableName") String tableName,
-      @Context HttpHeaders headers)
-      throws Exception {
+      @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     TableDataManager tableDataManager = ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableName);
-    boolean needReload = tableDataManager.needReloadSegments();
+    boolean needReload = false;
+    try {
+      needReload = tableDataManager.needReloadSegments();
+    } catch (Exception e) {
+      throw new WebApplicationException(e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR);
+    }
     return ResourceUtils.convertToJsonString(
         new SegmentsReloadCheckResponse(needReload, tableDataManager.getInstanceId()));
   }
