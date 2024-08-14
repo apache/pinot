@@ -81,7 +81,7 @@ public class FixedByteSVMutableForwardIndex implements MutableForwardIndex {
       _valueSizeInBytes = storedType.size();
     }
     _numRowsPerChunk = numRowsPerChunk;
-    _chunkSizeInBytes = numRowsPerChunk * _valueSizeInBytes;
+    _chunkSizeInBytes = (long) numRowsPerChunk * _valueSizeInBytes;
     _memoryManager = memoryManager;
     _allocationContext = allocationContext;
     addBuffer();

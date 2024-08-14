@@ -35,6 +35,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
+import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.io.FileUtils;
@@ -74,6 +75,8 @@ import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.stream.RowMetadata;
+import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
@@ -262,57 +265,63 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     }
   }
 
-  /*
-   * Method used by RealtimeSegmentManagers to update their partition delays
+  /**
+   * Updates the ingestion metrics for the given partition.
    *
-   * @param ingestionTimeMs Ingestion delay being reported.
-   * @param firstStreamIngestionTimeMs Ingestion time of the first message in the stream.
-   * @param partitionGroupId Partition ID for which delay is being updated.
-   * @param offset last offset received for the partition.
-   * @param latestOffset latest upstream offset for the partition.
+   * @param segmentName name of the consuming segment
+   * @param partitionId partition id of the consuming segment (directly passed in to avoid parsing the segment name)
+   * @param ingestionTimeMs ingestion time of the last consumed message (from {@link RowMetadata})
+   * @param firstStreamIngestionTimeMs ingestion time of the last consumed message in the first stream (from
+   *                                   {@link RowMetadata})
+   * @param currentOffset offset of the last consumed message (from {@link RowMetadata})
+   * @param latestOffset offset of the latest message in the partition (from {@link StreamMetadataProvider})
    */
-  public void updateIngestionMetrics(long ingestionTimeMs, long firstStreamIngestionTimeMs,
-      StreamPartitionMsgOffset offset, StreamPartitionMsgOffset latestOffset, int partitionGroupId) {
-    _ingestionDelayTracker.updateIngestionMetrics(ingestionTimeMs, firstStreamIngestionTimeMs, offset, latestOffset,
-        partitionGroupId);
+  public void updateIngestionMetrics(String segmentName, int partitionId, long ingestionTimeMs,
+      long firstStreamIngestionTimeMs, @Nullable StreamPartitionMsgOffset currentOffset,
+      @Nullable StreamPartitionMsgOffset latestOffset) {
+    _ingestionDelayTracker.updateIngestionMetrics(segmentName, partitionId, ingestionTimeMs, firstStreamIngestionTimeMs,
+        currentOffset, latestOffset);
   }
 
-  /*
-   * Method used during query execution (ServerQueryExecutorV1Impl) to get the current timestamp for the ingestion
-   * delay for a partition
-   *
-   * @param segmentNameStr name of segment for which we want the ingestion delay timestamp.
-   * @return timestamp of the ingestion delay for the partition.
+  /**
+   * Returns the ingestion time of the last consumed message for the partition of the given segment. Returns
+   * {@code Long.MIN_VALUE} when it is not available.
    */
-  public long getPartitionIngestionTimeMs(String segmentNameStr) {
-    LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
-    int partitionGroupId = segmentName.getPartitionGroupId();
-    return _ingestionDelayTracker.getPartitionIngestionTimeMs(partitionGroupId);
+  public long getPartitionIngestionTimeMs(String segmentName) {
+    return _ingestionDelayTracker.getPartitionIngestionTimeMs(new LLCSegmentName(segmentName).getPartitionGroupId());
   }
 
-  /*
+  /**
+   * Removes the ingestion metrics for the partition of the given segment, and also ignores the updates from the given
+   * segment. This is useful when we want to stop tracking the ingestion delay for a partition when the segment might
+   * still be consuming, e.g. when the new consuming segment is created on a different server.
+   */
+  public void removeIngestionMetrics(String segmentName) {
+    _ingestionDelayTracker.stopTrackingPartitionIngestionDelay(segmentName);
+  }
+
+  /**
    * Method to handle CONSUMING -> DROPPED segment state transitions:
    * We stop tracking partitions whose segments are dropped.
    *
-   * @param segmentNameStr name of segment which is transitioning state.
+   * @param segmentName name of segment which is transitioning state.
    */
   @Override
-  public void onConsumingToDropped(String segmentNameStr) {
-    LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
-    _ingestionDelayTracker.stopTrackingPartitionIngestionDelay(segmentName.getPartitionGroupId());
+  public void onConsumingToDropped(String segmentName) {
+    // NOTE: No need to mark segment ignored here because it should have already been dropped.
+    _ingestionDelayTracker.stopTrackingPartitionIngestionDelay(new LLCSegmentName(segmentName).getPartitionGroupId());
   }
 
-  /*
+  /**
    * Method to handle CONSUMING -> ONLINE segment state transitions:
    * We mark partitions for verification against ideal state when we do not see a consuming segment for some time
    * for that partition. The idea is to remove the related metrics when the partition moves from the current server.
    *
-   * @param segmentNameStr name of segment which is transitioning state.
+   * @param segmentName name of segment which is transitioning state.
    */
   @Override
-  public void onConsumingToOnline(String segmentNameStr) {
-    LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
-    _ingestionDelayTracker.markPartitionForVerification(segmentName.getPartitionGroupId());
+  public void onConsumingToOnline(String segmentName) {
+    _ingestionDelayTracker.markPartitionForVerification(segmentName);
   }
 
   @Override
@@ -383,17 +392,11 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
         && _tableUpsertMetadataManager.getUpsertMode() == UpsertConfig.Mode.PARTIAL;
   }
 
-  private boolean isUpsertPreloadEnabled() {
-    UpsertConfig upsertConfig = _tableConfig.getUpsertConfig();
-    return _tableUpsertMetadataManager != null && _segmentPreloadExecutor != null && upsertConfig != null
-        && upsertConfig.isEnableSnapshot() && upsertConfig.isEnablePreload();
-  }
-
   /**
-   * Handles upsert preload, and returns whether the upsert preload is enabled.
+   * Handles upsert preload if the upsert preload is enabled.
    */
   private void handleUpsertPreload(SegmentZKMetadata zkMetadata, IndexLoadingConfig indexLoadingConfig) {
-    if (!isUpsertPreloadEnabled()) {
+    if (_tableUpsertMetadataManager == null || !_tableUpsertMetadataManager.isEnablePreload()) {
       return;
     }
     String segmentName = zkMetadata.getSegmentName();

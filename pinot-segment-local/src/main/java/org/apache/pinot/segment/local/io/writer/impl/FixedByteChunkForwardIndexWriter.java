@@ -49,7 +49,7 @@ public class FixedByteChunkForwardIndexWriter extends BaseChunkForwardIndexWrite
       int numDocsPerChunk, int sizeOfEntry, int writerVersion)
       throws IOException {
     super(file, compressionType, totalDocs, normalizeDocsPerChunk(writerVersion, numDocsPerChunk),
-        (sizeOfEntry * normalizeDocsPerChunk(writerVersion, numDocsPerChunk)), sizeOfEntry, writerVersion, true);
+        (long) sizeOfEntry * normalizeDocsPerChunk(writerVersion, numDocsPerChunk), sizeOfEntry, writerVersion, true);
     _chunkDataOffset = 0;
   }
 

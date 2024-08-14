@@ -172,11 +172,11 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
       PrimaryKey primaryKey = primaryKeyIterator.next();
       _primaryKeyToRecordLocationMap.computeIfPresent(HashUtils.hashPrimaryKey(primaryKey, _hashFunction),
           (pk, recordLocation) -> {
-        if (recordLocation.getSegment() == segment) {
-          return null;
-        }
-        return recordLocation;
-      });
+            if (recordLocation.getSegment() == segment) {
+              return null;
+            }
+            return recordLocation;
+          });
     }
   }
 

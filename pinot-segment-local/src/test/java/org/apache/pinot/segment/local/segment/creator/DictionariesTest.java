@@ -29,7 +29,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import net.openhft.chronicle.core.Jvm;
 import org.apache.avro.Schema.Field;
 import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericRecord;
@@ -69,7 +68,6 @@ import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
-import org.testng.SkipException;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -539,12 +537,6 @@ public class DictionariesTest {
 
   @Test
   public void clpStatsCollectorTest() {
-    //skip this test if the underlying architecture is aarch64. See: https://github.com/y-scope/clp-ffi-java/issues/46.
-    // Note that an x86 JVM might be running in emulated mode on macs. In that case, this will return a false. This is
-    // okay as in that case the x86 version of CLP would be used.
-    if (Jvm.isArm()) {
-      throw new SkipException("CLP is not supported yet on arm/aarch. Skipping this test");
-    }
     Schema schema = new Schema();
     schema.addField(new DimensionFieldSpec("column1", DataType.STRING, true));
     List<FieldConfig> fieldConfigList = new ArrayList<>();

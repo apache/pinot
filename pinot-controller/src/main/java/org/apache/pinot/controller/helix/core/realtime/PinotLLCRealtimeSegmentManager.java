@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -36,12 +37,11 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.AccessOption;
+import org.apache.helix.ClusterMessagingService;
 import org.apache.helix.Criteria;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
@@ -52,6 +52,7 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.common.messages.ForceCommitMessage;
+import org.apache.pinot.common.messages.IngestionMetricsRemoveMessage;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
@@ -168,8 +169,6 @@ public class PinotLLCRealtimeSegmentManager {
   private final ControllerConf _controllerConf;
   private final ControllerMetrics _controllerMetrics;
   private final MetadataEventNotifierFactory _metadataEventNotifierFactory;
-  private final int _numIdealStateUpdateLocks;
-  private final Lock[] _idealStateUpdateLocks;
   private final FlushThresholdUpdateManager _flushThresholdUpdateManager;
   private final boolean _isDeepStoreLLCSegmentUploadRetryEnabled;
   private final boolean _isTmpSegmentAsyncDeletionEnabled;
@@ -193,11 +192,6 @@ public class PinotLLCRealtimeSegmentManager {
     _metadataEventNotifierFactory =
         MetadataEventNotifierFactory.loadFactory(controllerConf.subset(METADATA_EVENT_NOTIFIER_PREFIX),
             helixResourceManager);
-    _numIdealStateUpdateLocks = controllerConf.getRealtimeSegmentMetadataCommitNumLocks();
-    _idealStateUpdateLocks = new Lock[_numIdealStateUpdateLocks];
-    for (int i = 0; i < _numIdealStateUpdateLocks; i++) {
-      _idealStateUpdateLocks[i] = new ReentrantLock();
-    }
     _flushThresholdUpdateManager = new FlushThresholdUpdateManager();
     _isDeepStoreLLCSegmentUploadRetryEnabled = controllerConf.isDeepStoreRetryUploadLLCSegmentEnabled();
     _isTmpSegmentAsyncDeletionEnabled = controllerConf.isTmpSegmentAsyncDeletionEnabled();
@@ -584,15 +578,10 @@ public class PinotLLCRealtimeSegmentManager {
     // the idealstate update fails due to contention. We serialize the updates to the idealstate
     // to reduce this contention. We may still contend with RetentionManager, or other updates
     // to idealstate from other controllers, but then we have the retry mechanism to get around that.
-    // hash code can be negative, so make sure we are getting a positive lock index
-    int lockIndex = (realtimeTableName.hashCode() & Integer.MAX_VALUE) % _numIdealStateUpdateLocks;
-    Lock lock = _idealStateUpdateLocks[lockIndex];
-    try {
-      lock.lock();
-      updateIdealStateOnSegmentCompletion(realtimeTableName, committingSegmentName, newConsumingSegmentName,
-          segmentAssignment, instancePartitionsMap);
-    } finally {
-      lock.unlock();
+    synchronized (_helixResourceManager.getIdealStateUpdaterLock(realtimeTableName)) {
+      idealState =
+          updateIdealStateOnSegmentCompletion(realtimeTableName, committingSegmentName, newConsumingSegmentName,
+              segmentAssignment, instancePartitionsMap);
     }
 
     long endTimeNs = System.nanoTime();
@@ -613,6 +602,12 @@ public class PinotLLCRealtimeSegmentManager {
 
     // Trigger the metadata event notifier
     _metadataEventNotifierFactory.create().notifyOnSegmentFlush(tableConfig);
+
+    // Handle segment movement if necessary
+    if (newConsumingSegmentName != null) {
+      handleSegmentMovement(realtimeTableName, idealState.getRecord().getMapFields(), committingSegmentName,
+          newConsumingSegmentName);
+    }
   }
 
   /**
@@ -952,10 +947,10 @@ public class PinotLLCRealtimeSegmentManager {
    * Updates ideal state after completion of a realtime segment
    */
   @VisibleForTesting
-  void updateIdealStateOnSegmentCompletion(String realtimeTableName, String committingSegmentName,
+  IdealState updateIdealStateOnSegmentCompletion(String realtimeTableName, String committingSegmentName,
       String newSegmentName, SegmentAssignment segmentAssignment,
       Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap) {
-    HelixHelper.updateIdealState(_helixManager, realtimeTableName, idealState -> {
+    return HelixHelper.updateIdealState(_helixManager, realtimeTableName, idealState -> {
       assert idealState != null;
       // When segment completion begins, the zk metadata is updated, followed by ideal state.
       // We allow only {@link PinotLLCRealtimeSegmentManager::MAX_SEGMENT_COMPLETION_TIME_MILLIS} ms for a segment to
@@ -1027,6 +1022,47 @@ public class PinotLLCRealtimeSegmentManager {
           SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentStateModel.CONSUMING));
       LOGGER.info("Adding new CONSUMING segment: {} to instances: {}", newSegmentName, instancesAssigned);
     }
+  }
+
+  /**
+   * Handles segment movement between instances.
+   * If the new consuming segment is served by a different set of servers than the committed segment, notify the
+   * servers no longer serving the stream partition to remove the ingestion metrics. This can prevent servers from
+   * emitting high ingestion delay alerts on stream partitions no longer served.
+   */
+  private void handleSegmentMovement(String realtimeTableName, Map<String, Map<String, String>> instanceStatesMap,
+      String committedSegment, String newConsumingSegment) {
+    Set<String> oldInstances = instanceStatesMap.get(committedSegment).keySet();
+    Set<String> newInstances = instanceStatesMap.get(newConsumingSegment).keySet();
+    if (newInstances.containsAll(oldInstances)) {
+      return;
+    }
+    Set<String> instancesNoLongerServe = new HashSet<>(oldInstances);
+    instancesNoLongerServe.removeAll(newInstances);
+    LOGGER.info("Segment movement detected for committed segment: {} (served by: {}), "
+            + "consuming segment: {} (served by: {}) in table: {}, "
+            + "sending message to instances: {} to remove ingestion metrics", committedSegment, oldInstances,
+        newConsumingSegment, newInstances, realtimeTableName, instancesNoLongerServe);
+
+    ClusterMessagingService messagingService = _helixManager.getMessagingService();
+    List<String> instancesSent = new ArrayList<>(instancesNoLongerServe.size());
+    for (String instance : instancesNoLongerServe) {
+      Criteria recipientCriteria = new Criteria();
+      recipientCriteria.setInstanceName(instance);
+      recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
+      recipientCriteria.setResource(realtimeTableName);
+      recipientCriteria.setPartition(committedSegment);
+      recipientCriteria.setSessionSpecific(true);
+      IngestionMetricsRemoveMessage message = new IngestionMetricsRemoveMessage();
+      if (messagingService.send(recipientCriteria, message, null, -1) > 0) {
+        instancesSent.add(instance);
+      } else {
+        LOGGER.warn("Failed to send ingestion metrics remove message for table: {} segment: {} to instance: {}",
+            realtimeTableName, committedSegment, instance);
+      }
+    }
+    LOGGER.info("Sent ingestion metrics remove message for table: {} segment: {} to instances: {}", realtimeTableName,
+        committedSegment, instancesSent);
   }
 
   /*

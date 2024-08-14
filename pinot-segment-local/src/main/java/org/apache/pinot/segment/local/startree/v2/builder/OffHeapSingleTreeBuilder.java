@@ -172,7 +172,7 @@ public class OffHeapSingleTreeBuilder extends BaseSingleTreeBuilder {
   int getDimensionValue(int docId, int dimensionId)
       throws IOException {
     ensureBufferReadable(docId);
-    return _starTreeRecordBuffer.getInt(_starTreeRecordOffsets.get(docId) + dimensionId * Integer.BYTES);
+    return _starTreeRecordBuffer.getInt(_starTreeRecordOffsets.get(docId) + (long) dimensionId * Integer.BYTES);
   }
 
   private void ensureBufferReadable(int docId)
@@ -219,8 +219,8 @@ public class OffHeapSingleTreeBuilder extends BaseSingleTreeBuilder {
         long offset1 = (long) sortedDocIds[i1] * _numDimensions * Integer.BYTES;
         long offset2 = (long) sortedDocIds[i2] * _numDimensions * Integer.BYTES;
         for (int i = 0; i < _numDimensions; i++) {
-          int dimension1 = dataBuffer.getInt(offset1 + i * Integer.BYTES);
-          int dimension2 = dataBuffer.getInt(offset2 + i * Integer.BYTES);
+          int dimension1 = dataBuffer.getInt(offset1 + (long) i * Integer.BYTES);
+          int dimension2 = dataBuffer.getInt(offset2 + (long) i * Integer.BYTES);
           if (dimension1 != dimension2) {
             return dimension1 - dimension2;
           }
@@ -282,8 +282,8 @@ public class OffHeapSingleTreeBuilder extends BaseSingleTreeBuilder {
       long offset1 = _starTreeRecordOffsets.get(sortedDocIds[i1]);
       long offset2 = _starTreeRecordOffsets.get(sortedDocIds[i2]);
       for (int i = dimensionId + 1; i < _numDimensions; i++) {
-        int dimension1 = _starTreeRecordBuffer.getInt(offset1 + i * Integer.BYTES);
-        int dimension2 = _starTreeRecordBuffer.getInt(offset2 + i * Integer.BYTES);
+        int dimension1 = _starTreeRecordBuffer.getInt(offset1 + (long) i * Integer.BYTES);
+        int dimension2 = _starTreeRecordBuffer.getInt(offset2 + (long) i * Integer.BYTES);
         if (dimension1 != dimension2) {
           return dimension1 - dimension2;
         }

@@ -131,7 +131,7 @@ public abstract class BaseTaskExecutor implements PinotTaskExecutor {
                   segmentName, peerDownloadScheme);
           Collections.shuffle(uris);
           return uris;
-          }, tarredSegmentFile, crypterName);
+        }, tarredSegmentFile, crypterName);
       } else {
         throw e;
       }
