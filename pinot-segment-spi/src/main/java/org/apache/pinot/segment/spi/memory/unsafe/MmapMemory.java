@@ -165,7 +165,20 @@ public class MmapMemory implements Memory {
      */
     protected void madvise(long size, int advice) {
       if (LIB_C != null) {
-        LIB_C.posix_madvise(_address, size, advice);
+        int errno = LIB_C.posix_madvise(_address, size, advice);
+        switch (errno) {
+          case 0:
+            // 0 indicates a successful call
+            break;
+          case 22:
+            LOGGER.warn("posix_madvise failed with EINVAL, either addr is not aligned or advice was invalid");
+            break;
+          case 12:
+            LOGGER.warn("posix_madvise failed with ENOMEM, indicating a bad address or size");
+            break;
+          default:
+            LOGGER.warn("posix_madvise returned an unknown error code: {}", errno);
+        }
       }
     }
 
