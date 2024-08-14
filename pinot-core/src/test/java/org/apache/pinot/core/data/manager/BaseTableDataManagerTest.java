@@ -49,6 +49,7 @@ import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -285,6 +286,32 @@ public class BaseTableDataManagerTest {
     assertEquals(tableDataManager.getSegmentDataDir(SEGMENT_NAME), indexDir);
     assertTrue(indexDir.exists());
     assertEquals(new SegmentMetadataImpl(indexDir).getTotalDocs(), 5);
+    assertTrue(hasInvertedIndex(indexDir, STRING_COLUMN));
+    assertTrue(hasInvertedIndex(indexDir, LONG_COLUMN));
+  }
+
+  @Test
+  public void testNeedReloadSegmentAddIndex()
+      throws Exception {
+    File indexDir = createSegment(SegmentVersion.v3, 5);
+    long crc = getCRC(indexDir);
+    assertFalse(hasInvertedIndex(indexDir, STRING_COLUMN));
+    assertFalse(hasInvertedIndex(indexDir, LONG_COLUMN));
+
+    // Same CRCs so load the local segment directory directly.
+    SegmentZKMetadata zkMetadata = mock(SegmentZKMetadata.class);
+    when(zkMetadata.getCrc()).thenReturn(crc);
+    when(zkMetadata.getSegmentName()).thenReturn(SEGMENT_NAME);
+    SegmentMetadata localMetadata = mock(SegmentMetadata.class);
+    when(localMetadata.getCrc()).thenReturn(Long.toString(crc));
+    SegmentDirectory segmentDirectory = mock(SegmentDirectory.class);
+    // Require to add indices.
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
+    indexLoadingConfig.setInvertedIndexColumns(new HashSet<>(Arrays.asList(STRING_COLUMN, LONG_COLUMN)));
+    BaseTableDataManager tableDataManager = createTableManager();
+    assertTrue(tableDataManager.needReloadSegment(zkMetadata, indexLoadingConfig));
+    tableDataManager.reloadSegment(SEGMENT_NAME, indexLoadingConfig, zkMetadata, localMetadata, null, false);
+    assertFalse(tableDataManager.needReloadSegment(zkMetadata, indexLoadingConfig));
     assertTrue(hasInvertedIndex(indexDir, STRING_COLUMN));
     assertTrue(hasInvertedIndex(indexDir, LONG_COLUMN));
   }
