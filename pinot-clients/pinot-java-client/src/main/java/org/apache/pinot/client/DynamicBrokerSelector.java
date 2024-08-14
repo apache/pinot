@@ -45,11 +45,11 @@ public class DynamicBrokerSelector implements BrokerSelector, IZkDataListener {
   private static final Logger LOGGER = LoggerFactory.getLogger(DynamicBrokerSelector.class);
   private static final Random RANDOM = new Random();
 
-  private final AtomicReference<Map<String, List<String>>> _tableToBrokerListMapRef = new AtomicReference<>();
-  private final AtomicReference<List<String>> _allBrokerListRef = new AtomicReference<>();
-  private final ZkClient _zkClient;
-  private final ExternalViewReader _evReader;
-  private final List<String> _brokerList;
+  protected final AtomicReference<Map<String, List<String>>> _tableToBrokerListMapRef = new AtomicReference<>();
+  protected final AtomicReference<List<String>> _allBrokerListRef = new AtomicReference<>();
+  protected final ZkClient _zkClient;
+  protected final ExternalViewReader _evReader;
+  protected final List<String> _brokerList;
   //The preferTlsPort will be mapped to client config in the future, when we support full TLS
   public DynamicBrokerSelector(String zkServers, boolean preferTlsPort) {
     _zkClient = getZkClient(zkServers);
@@ -112,7 +112,7 @@ public class DynamicBrokerSelector implements BrokerSelector, IZkDataListener {
 
   @Override
   public List<String> getBrokers() {
-    return _brokerList;
+    return _allBrokerListRef.get();
   }
 
   @Override
