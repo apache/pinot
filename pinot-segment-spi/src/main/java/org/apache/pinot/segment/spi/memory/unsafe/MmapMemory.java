@@ -132,7 +132,7 @@ public class MmapMemory implements Memory {
       try {
         libC = LibraryLoader.create(LibC.class).failImmediately().load("c");
       } catch (Throwable ignored) {
-        LOGGER.info("Could not load JNR C Library, madvise will not be used for mmap memory.");
+        LOGGER.warn("Could not load JNR C Library, madvise will not be used for mmap memory.");
       }
       LIB_C = libC;
     }
