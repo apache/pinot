@@ -45,7 +45,7 @@ public class TarCompressionUtilsTest {
   private static final File DATA_DIR = new File(TEMP_DIR, "dataDir");
   private static final File TAR_DIR = new File(TEMP_DIR, "tarDir");
   private static final File UNTAR_DIR = new File(TEMP_DIR, "untarDir");
-  private static final CompressorStreamFactory COMPRESSOR_STREAM_FACTORY = new CompressorStreamFactory();
+  private static final CompressorStreamFactory COMPRESSOR_STREAM_FACTORY = CompressorStreamFactory.getSingleton();
 
   @BeforeMethod
   public void setUp()

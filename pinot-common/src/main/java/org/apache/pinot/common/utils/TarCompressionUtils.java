@@ -75,7 +75,7 @@ public class TarCompressionUtils {
   public static final Map<String, String> COMPRESSOR_NAME_BY_FILE_EXTENSIONS =
       Map.of(TAR_GZ_FILE_EXTENSION, CompressorStreamFactory.GZIP, TAR_LZ4_FILE_EXTENSION,
           CompressorStreamFactory.LZ4_FRAMED, TAR_ZST_FILE_EXTENSION, CompressorStreamFactory.ZSTANDARD);
-  private static final CompressorStreamFactory COMPRESSOR_STREAM_FACTORY = new CompressorStreamFactory();
+  private static final CompressorStreamFactory COMPRESSOR_STREAM_FACTORY = CompressorStreamFactory.getSingleton();
   private static final char ENTRY_NAME_SEPARATOR = '/';
 
   /**
