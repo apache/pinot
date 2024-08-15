@@ -66,7 +66,7 @@ public class ConcurrentMapPartitionDedupMetadataManagerWithoutTTLTest {
     DedupUtils.DedupRecordInfoReader dedupRecordInfoReader = generateDedupRecordInfoReader();
     Iterator<DedupRecordInfo> dedupRecordInfoIterator = DedupUtils.getDedupRecordInfoIterator(dedupRecordInfoReader, 6);
     ImmutableSegmentImpl segment1 = DedupTestUtils.mockSegment(1, 6);
-    _metadataManager.doAddSegment(segment1, dedupRecordInfoIterator);
+    _metadataManager.doAddOrReplaceSegment(null, segment1, dedupRecordInfoIterator);
     Assert.assertEquals(_metadataManager._primaryKeyToSegmentAndTimeMap.size(), 3);
     checkRecordLocation(_metadataManager._primaryKeyToSegmentAndTimeMap, 0, segment1, hashFunction);
     checkRecordLocation(_metadataManager._primaryKeyToSegmentAndTimeMap, 1, segment1, hashFunction);
@@ -86,7 +86,7 @@ public class ConcurrentMapPartitionDedupMetadataManagerWithoutTTLTest {
     DedupUtils.DedupRecordInfoReader dedupRecordInfoReader = generateDedupRecordInfoReader();
     Iterator<DedupRecordInfo> dedupRecordInfoIterator = DedupUtils.getDedupRecordInfoIterator(dedupRecordInfoReader, 6);
     ImmutableSegmentImpl segment1 = DedupTestUtils.mockSegment(1, 6);
-    _metadataManager.doAddSegment(segment1, dedupRecordInfoIterator);
+    _metadataManager.doAddOrReplaceSegment(null, segment1, dedupRecordInfoIterator);
 
     // Remove another segment with same PK rows
     // reset the iterator
@@ -109,7 +109,7 @@ public class ConcurrentMapPartitionDedupMetadataManagerWithoutTTLTest {
     DedupUtils.DedupRecordInfoReader dedupRecordInfoReader = generateDedupRecordInfoReader();
     Iterator<DedupRecordInfo> dedupRecordInfoIterator = DedupUtils.getDedupRecordInfoIterator(dedupRecordInfoReader, 6);
     ImmutableSegmentImpl segment1 = DedupTestUtils.mockSegment(1, 6);
-    _metadataManager.doAddSegment(segment1, dedupRecordInfoIterator);
+    _metadataManager.doAddOrReplaceSegment(null, segment1, dedupRecordInfoIterator);
 
     // Same PK exists
     // reset the iterator

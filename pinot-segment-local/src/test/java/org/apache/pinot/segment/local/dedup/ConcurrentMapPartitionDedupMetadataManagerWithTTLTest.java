@@ -95,7 +95,7 @@ public class ConcurrentMapPartitionDedupMetadataManagerWithTTLTest {
     Iterator<DedupRecordInfo> dedupRecordInfoIterator =
         DedupUtils.getDedupRecordInfoIterator(dedupRecordInfoReader, 10);
     IndexSegment segment = DedupTestUtils.mockSegment(1, 10);
-    _metadataManager.doAddSegment(segment, dedupRecordInfoIterator);
+    _metadataManager.doAddOrReplaceSegment(null, segment, dedupRecordInfoIterator);
     verifyInitialSegmentAddition(segment);
 
     dedupRecordInfoIterator = DedupUtils.getDedupRecordInfoIterator(dedupRecordInfoReader, 10);
@@ -110,12 +110,12 @@ public class ConcurrentMapPartitionDedupMetadataManagerWithTTLTest {
     IndexSegment segment = DedupTestUtils.mockSegment(1, 10);
     Iterator<DedupRecordInfo> dedupRecordInfoIterator =
         DedupUtils.getDedupRecordInfoIterator(dedupRecordInfoReader, 10);
-    _metadataManager.doAddSegment(segment, dedupRecordInfoIterator);
+    _metadataManager.doAddOrReplaceSegment(null, segment, dedupRecordInfoIterator);
     verifyInitialSegmentAddition(segment);
 
     IndexSegment segment2 = DedupTestUtils.mockSegment(2, 10);
     dedupRecordInfoIterator = DedupUtils.getDedupRecordInfoIterator(dedupRecordInfoReader, 10);
-    _metadataManager.doAddSegment(segment2, dedupRecordInfoIterator);
+    _metadataManager.doAddOrReplaceSegment(segment, segment2, dedupRecordInfoIterator);
     verifyInitialSegmentAddition(segment2);
   }
 
@@ -125,7 +125,7 @@ public class ConcurrentMapPartitionDedupMetadataManagerWithTTLTest {
     IndexSegment segment = DedupTestUtils.mockSegment(1, 10);
     Iterator<DedupRecordInfo> dedupRecordInfoIterator =
         DedupUtils.getDedupRecordInfoIterator(dedupRecordInfoReader, 10);
-    _metadataManager.doAddSegment(segment, dedupRecordInfoIterator);
+    _metadataManager.doAddOrReplaceSegment(null, segment, dedupRecordInfoIterator);
     verifyInitialSegmentAddition(segment);
 
     IndexSegment segment2 = DedupTestUtils.mockSegment(2, 10);
@@ -154,14 +154,14 @@ public class ConcurrentMapPartitionDedupMetadataManagerWithTTLTest {
     IndexSegment segment1 = DedupTestUtils.mockSegment(1, 10);
     Iterator<DedupRecordInfo> dedupRecordInfoIterator1 =
         DedupUtils.getDedupRecordInfoIterator(dedupRecordInfoReader1, 10);
-    _metadataManager.doAddSegment(segment1, dedupRecordInfoIterator1);
+    _metadataManager.doAddOrReplaceSegment(null, segment1, dedupRecordInfoIterator1);
     verifyInitialSegmentAddition(segment1);
 
     DedupUtils.DedupRecordInfoReader dedupRecordInfoReader2 = generateDedupRecordInfoReader(10, 10);
     IndexSegment segment2 = DedupTestUtils.mockSegment(2, 10);
     Iterator<DedupRecordInfo> dedupRecordInfoIterator2 =
         DedupUtils.getDedupRecordInfoIterator(dedupRecordInfoReader2, 10);
-    _metadataManager.doAddSegment(segment2, dedupRecordInfoIterator2);
+    _metadataManager.doAddOrReplaceSegment(null, segment2, dedupRecordInfoIterator2);
     _metadataManager.removeExpiredPrimaryKeys();
     assertEquals(_metadataManager.getNumPrimaryKeys(), 11);
     assertEquals(_metadataManager._primaryKeyToSegmentAndTimeMap.size(), 11);
@@ -187,14 +187,14 @@ public class ConcurrentMapPartitionDedupMetadataManagerWithTTLTest {
     IndexSegment segment1 = DedupTestUtils.mockSegment(1, 10);
     Iterator<DedupRecordInfo> dedupRecordInfoIterator1 =
         DedupUtils.getDedupRecordInfoIterator(dedupRecordInfoReader1, 10);
-    _metadataManager.doAddSegment(segment1, dedupRecordInfoIterator1);
+    _metadataManager.doAddOrReplaceSegment(null, segment1, dedupRecordInfoIterator1);
     verifyInitialSegmentAddition(segment1);
 
     DedupUtils.DedupRecordInfoReader dedupRecordInfoReader2 = generateDedupRecordInfoReader(10, 10);
     IndexSegment segment2 = DedupTestUtils.mockSegment(2, 10);
     Iterator<DedupRecordInfo> dedupRecordInfoIterator2 =
         DedupUtils.getDedupRecordInfoIterator(dedupRecordInfoReader2, 10);
-    _metadataManager.doAddSegment(segment2, dedupRecordInfoIterator2);
+    _metadataManager.doAddOrReplaceSegment(null, segment2, dedupRecordInfoIterator2);
     _metadataManager.removeExpiredPrimaryKeys();
     assertEquals(_metadataManager.getNumPrimaryKeys(), 11);
     assertEquals(_metadataManager._primaryKeyToSegmentAndTimeMap.size(), 11);
@@ -230,7 +230,7 @@ public class ConcurrentMapPartitionDedupMetadataManagerWithTTLTest {
 
     ImmutableSegmentImpl immutableSegment = DedupTestUtils.mockSegment(1, 3);
     Iterator<DedupRecordInfo> dedupRecordInfoIterator = DedupUtils.getDedupRecordInfoIterator(dedupRecordInfoReader, 3);
-    _metadataManager.doAddSegment(immutableSegment, dedupRecordInfoIterator);
+    _metadataManager.doAddOrReplaceSegment(null, immutableSegment, dedupRecordInfoIterator);
     assertEquals(_metadataManager._primaryKeyToSegmentAndTimeMap.size(), 1);
     Object primaryKeyHash = HashUtils.hashPrimaryKey(primaryKey, HashFunction.NONE);
     assertEquals(_metadataManager._primaryKeyToSegmentAndTimeMap.size(), 1);

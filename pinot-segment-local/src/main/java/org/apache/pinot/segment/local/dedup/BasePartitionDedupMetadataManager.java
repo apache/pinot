@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerTimer;
@@ -49,8 +50,7 @@ public abstract class BasePartitionDedupMetadataManager implements PartitionDedu
   private int _numPendingOperations = 1;
   private boolean _closed;
 
-  protected BasePartitionDedupMetadataManager(String tableNameWithType, int partitionId,
-      DedupContext dedupContext) {
+  protected BasePartitionDedupMetadataManager(String tableNameWithType, int partitionId, DedupContext dedupContext) {
     _tableNameWithType = tableNameWithType;
     _partitionId = partitionId;
     _primaryKeyColumns = dedupContext.getPrimaryKeyColumns();
@@ -68,31 +68,62 @@ public abstract class BasePartitionDedupMetadataManager implements PartitionDedu
 
   @Override
   public boolean checkRecordPresentOrUpdate(PrimaryKey pk, IndexSegment indexSegment) {
-    throw new UnsupportedOperationException("checkRecordPresentOrUpdate(PrimaryKey pk, IndexSegment indexSegment) is "
-        + "deprecated!");
+    throw new UnsupportedOperationException(
+        "checkRecordPresentOrUpdate(PrimaryKey pk, IndexSegment indexSegment) is " + "deprecated!");
   }
 
   @Override
   public void addSegment(IndexSegment segment) {
+    addOrReplaceSegment(null, segment);
+  }
+
+  @Override
+  public void replaceSegment(IndexSegment oldSegment, IndexSegment newSegment) {
+    addOrReplaceSegment(oldSegment, newSegment);
+  }
+
+  private void addOrReplaceSegment(@Nullable IndexSegment oldSegment, IndexSegment newSegment) {
     if (!startOperation()) {
-      _logger.info("Skip adding segment: {} because metadata manager is already stopped", segment.getSegmentName());
+      if (oldSegment == null) {
+        _logger.info("Skip adding segment: {} because dedup metadata manager is already stopped",
+            newSegment.getSegmentName());
+      } else {
+        _logger.info("Skip replacing segment: {} with segment: {} because dedup metadata manager is already stopped",
+            oldSegment.getSegmentName(), newSegment.getSegmentName());
+      }
       return;
     }
-    try (DedupUtils.DedupRecordInfoReader dedupRecordInfoReader = new DedupUtils.DedupRecordInfoReader(segment,
+    try (DedupUtils.DedupRecordInfoReader dedupRecordInfoReader = new DedupUtils.DedupRecordInfoReader(newSegment,
         _primaryKeyColumns, _dedupTimeColumn)) {
       Iterator<DedupRecordInfo> dedupRecordInfoIterator =
-          DedupUtils.getDedupRecordInfoIterator(dedupRecordInfoReader, segment.getSegmentMetadata().getTotalDocs());
-      doAddSegment(segment, dedupRecordInfoIterator);
+          DedupUtils.getDedupRecordInfoIterator(dedupRecordInfoReader, newSegment.getSegmentMetadata().getTotalDocs());
+      doAddOrReplaceSegment(oldSegment, newSegment, dedupRecordInfoIterator);
       updatePrimaryKeyGauge();
     } catch (Exception e) {
-      throw new RuntimeException(String.format("Caught exception while adding segment: %s of table: %s to %s",
-          segment.getSegmentName(), _tableNameWithType, this.getClass().getSimpleName()), e);
+      if (oldSegment == null) {
+        throw new RuntimeException(
+            String.format("Caught exception while adding segment: %s of table: %s to %s", newSegment.getSegmentName(),
+                _tableNameWithType, this.getClass().getSimpleName()), e);
+      } else {
+        throw new RuntimeException(
+            String.format("Caught exception while replacing segment: %s with segment: %s of table: %s in %s",
+                oldSegment.getSegmentName(), newSegment.getSegmentName(), _tableNameWithType,
+                this.getClass().getSimpleName()), e);
+      }
     } finally {
       finishOperation();
     }
   }
 
-  protected abstract void doAddSegment(IndexSegment segment, Iterator<DedupRecordInfo> dedupRecordInfoIterator);
+  /**
+   * Adds the dedup metadata for the new segment if old segment is null; or replaces the dedup metadata for the given
+   * old segment with the new segment if the old segment is not null.
+   * @param oldSegment The old segment to replace. If null, add the new segment.
+   * @param newSegment The new segment to add or replace.
+   * @param dedupRecordInfoIteratorOfNewSegment The iterator of dedup record info of the new segment.
+   */
+  protected abstract void doAddOrReplaceSegment(@Nullable IndexSegment oldSegment, IndexSegment newSegment,
+      Iterator<DedupRecordInfo> dedupRecordInfoIteratorOfNewSegment);
 
   @Override
   public void removeSegment(IndexSegment segment) {
@@ -107,8 +138,9 @@ public abstract class BasePartitionDedupMetadataManager implements PartitionDedu
       doRemoveSegment(segment, dedupRecordInfoIterator);
       updatePrimaryKeyGauge();
     } catch (Exception e) {
-      throw new RuntimeException(String.format("Caught exception while removing segment: %s of table: %s from %s",
-          segment.getSegmentName(), _tableNameWithType, this.getClass().getSimpleName()), e);
+      throw new RuntimeException(
+          String.format("Caught exception while removing segment: %s of table: %s from %s", segment.getSegmentName(),
+              _tableNameWithType, this.getClass().getSimpleName()), e);
     } finally {
       finishOperation();
     }
@@ -137,7 +169,6 @@ public abstract class BasePartitionDedupMetadataManager implements PartitionDedu
    * Removes all primary keys that have dedup time smaller than (largestSeenDedupTime - TTL).
    */
   protected abstract void doRemoveExpiredPrimaryKeys();
-
 
   protected synchronized boolean startOperation() {
     if (_stopped || _numPendingOperations == 0) {

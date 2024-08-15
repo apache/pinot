@@ -33,7 +33,6 @@ public interface PartitionDedupMetadataManager extends Closeable {
    * Replaces the dedup metadata for the given old segment with the new segment.
    */
   default void replaceSegment(IndexSegment oldSegment, IndexSegment newSegment) {
-    removeSegment(oldSegment);
     addSegment(newSegment);
   }
 
