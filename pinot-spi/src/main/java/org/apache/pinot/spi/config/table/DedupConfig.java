@@ -39,8 +39,8 @@ public class DedupConfig extends BaseJsonConfig {
       + "minus metadata TTL. Notice that the metadata may not be cleaned up immediately after the TTL, it depends on "
       + "the cleanup schedule.")
   private final double _metadataTTL;
-  @JsonPropertyDescription("Time column used to calculate dedup metadata TTL. When it is not specified, the time column "
-      + "from the table config will be used.")
+  @JsonPropertyDescription("Time column used to calculate dedup metadata TTL. When it is not specified, the time column"
+      + " from the table config will be used.")
   private final String _dedupTimeColumn;
 
   public DedupConfig(@JsonProperty(value = "dedupEnabled", required = true) boolean dedupEnabled,
