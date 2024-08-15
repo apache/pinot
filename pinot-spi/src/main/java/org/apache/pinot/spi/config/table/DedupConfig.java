@@ -29,16 +29,18 @@ public class DedupConfig extends BaseJsonConfig {
   private final boolean _dedupEnabled;
   @JsonPropertyDescription("Function to hash the primary key.")
   private final HashFunction _hashFunction;
-  @JsonPropertyDescription("Custom class for dedup metadata manager.")
+  @JsonPropertyDescription("Custom class for dedup metadata manager. If not specified, the default implementation "
+      + "ConcurrentMapTableDedupMetadataManager will be used.")
   private final String _metadataManagerClass;
-  @JsonPropertyDescription("Custom configs for dedup metadata manager")
+  @JsonPropertyDescription("Custom configs for dedup metadata manager.")
   private final Map<String, String> _metadataManagerConfigs;
   @JsonPropertyDescription("When larger than 0, use it for dedup metadata cleanup, it uses the same unit as the "
       + "dedup time column. The metadata will be cleaned up when the dedup time is older than the current time "
       + "minus metadata TTL. Notice that the metadata may not be cleaned up immediately after the TTL, it depends on "
       + "the cleanup schedule.")
   private final double _metadataTTL;
-  @JsonPropertyDescription("Time column used to calculate dedup metadata TTL.")
+  @JsonPropertyDescription("Time column used to calculate dedup metadata TTL. When it is not specified, the time column "
+      + "from the table config will be used.")
   private final String _dedupTimeColumn;
 
   public DedupConfig(@JsonProperty(value = "dedupEnabled", required = true) boolean dedupEnabled,
