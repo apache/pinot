@@ -43,6 +43,7 @@ class ConcurrentMapPartitionDedupMetadataManager extends BasePartitionDedupMetad
 
   @Override
   protected void doAddSegment(IndexSegment segment, Iterator<DedupRecordInfo> dedupRecordInfoIterator) {
+    String segmentName = segment.getSegmentName();
     while (dedupRecordInfoIterator.hasNext()) {
       DedupRecordInfo dedupRecordInfo = dedupRecordInfoIterator.next();
       double dedupTime = dedupRecordInfo.getDedupTime();
@@ -52,10 +53,17 @@ class ConcurrentMapPartitionDedupMetadataManager extends BasePartitionDedupMetad
             // When dedup time is the same, we always keep the latest segment
             // This will handle segment replacement case correctly - a typical case is when a mutable segment is
             // replaced by an immutable segment
-            if (segmentAndTime == null || segmentAndTime.getRight() <= dedupTime) {
+            if (segmentAndTime == null) {
               return Pair.of(segment, dedupTime);
             } else {
-              return segmentAndTime;
+              _logger.warn("Dedup record in segment: {} with primary key: {} and dedup time: {} already exists in "
+                      + "segment: {} with dedup time: {}", segmentName, dedupRecordInfo.getPrimaryKey(), dedupTime,
+                  segmentAndTime.getLeft().getSegmentName(), segmentAndTime.getRight());
+              if (segmentAndTime.getRight() <= dedupTime) {
+                return Pair.of(segment, dedupTime);
+              } else {
+                return segmentAndTime;
+              }
             }
           });
     }

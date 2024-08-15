@@ -573,7 +573,12 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     PartitionDedupMetadataManager partitionDedupMetadataManager =
         _tableDedupMetadataManager.getOrCreatePartitionManager(partitionGroupId);
     immutableSegment.enableDedup(partitionDedupMetadataManager);
-    partitionDedupMetadataManager.addSegment(immutableSegment);
+    SegmentDataManager oldSegmentManager = _segmentDataManagerMap.get(segmentName);
+    if (oldSegmentManager != null) {
+      partitionDedupMetadataManager.replaceSegment(oldSegmentManager.getSegment(), immutableSegment);
+    } else {
+      partitionDedupMetadataManager.addSegment(immutableSegment);
+    }
   }
 
   private void handleUpsert(ImmutableSegment immutableSegment) {
