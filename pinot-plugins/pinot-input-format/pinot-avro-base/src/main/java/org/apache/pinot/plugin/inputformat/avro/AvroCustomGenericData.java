@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.plugin.inputformat.avro;
 
+import java.util.Collection;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericArray;
 import org.apache.avro.generic.GenericData;
-import java.util.Collection;
 
 public class AvroCustomGenericData extends GenericData {
 
