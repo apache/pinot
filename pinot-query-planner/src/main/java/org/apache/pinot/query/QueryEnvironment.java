@@ -198,10 +198,11 @@ public class QueryEnvironment {
           DispatchableSubPlan dispatchableSubPlan =
               toDispatchableSubPlan(relRoot, plannerContext, requestId, nodeTracker);
 
-          MultiStageExplainAskingServersUtils.modifyRel(relRoot.rel, dispatchableSubPlan.getQueryStageList(),
-              nodeTracker, fragmentToPlanNodes, RelBuilder.create(_config), explainPlanVerbose);
+          RelNode explainedNode = MultiStageExplainAskingServersUtils.modifyRel(relRoot.rel,
+              dispatchableSubPlan.getQueryStageList(), nodeTracker, fragmentToPlanNodes, RelBuilder.create(_config),
+              explainPlanVerbose);
 
-          String explainStr = PlannerUtils.explainPlan(relRoot.rel, format, level);
+          String explainStr = PlannerUtils.explainPlan(explainedNode, format, level);
 
           return new QueryPlannerResult(null, explainStr, dispatchableSubPlan.getTableNames());
         }

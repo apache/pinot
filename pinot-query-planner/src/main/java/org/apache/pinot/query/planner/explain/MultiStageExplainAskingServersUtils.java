@@ -43,13 +43,14 @@ public class MultiStageExplainAskingServersUtils {
   }
 
   /**
-   * Modifies the given {@link RelNode} by replacing the leaf nodes with other RelNodes that contain physical
-   * information (like indexes used, etc).
+   * Returns a node where the leaf nodes are replaced with other nodes that contain physical information.
+   *
+   * <strong>notice:</strong>The receiving node may be modified.
    *
    * Some of the new nodes may be {@link org.apache.pinot.core.plan.PinotExplainedRelNode}, so once this method is
    * called the received RelNode should not be used for execution.
    *
-   * @param rootNode the root {@link RelNode} of the query plan, which may be modified.
+   * @param rootNode the root {@link RelNode} of the query plan, <strong>which may be modified</strong>.
    * @param queryStages a collection of {@link DispatchablePlanFragment}s that represent the stages of the query.
    * @param tracker a {@link TransformationTracker} that keeps track of the creator of each {@link PlanNode}.
    *                This is used to find the RelNodes that need to be substituted.
@@ -57,7 +58,7 @@ public class MultiStageExplainAskingServersUtils {
    *                          {@link PlanNode PlanNodes}.
    *                          This function may for example ask each server to explain its own plan.
    */
-  public static void modifyRel(RelNode rootNode, Collection<DispatchablePlanFragment> queryStages,
+  public static RelNode modifyRel(RelNode rootNode, Collection<DispatchablePlanFragment> queryStages,
       TransformationTracker<PlanNode, RelNode> tracker,
       Function<DispatchablePlanFragment, Collection<PlanNode>> fragmentToPlanNodes,
       RelBuilder relBuilder, boolean verbose) {
@@ -71,7 +72,7 @@ public class MultiStageExplainAskingServersUtils {
         createSubstitutionMap(leafNodes, tracker, fragmentToPlanNodes, relBuilder, verbose);
 
     // replace leaf operator with explain nodes
-    replaceRecursive(rootNode, leafToRel);
+    return replace(rootNode, leafToRel);
   }
 
   private static Map<RelNode, RelNode> createSubstitutionMap(Map<DispatchablePlanFragment, PlanNode> leafNodes,
@@ -94,6 +95,16 @@ public class MultiStageExplainAskingServersUtils {
       explainNodes.put(stageRootNode, explainNode);
     }
     return explainNodes;
+  }
+
+  private static RelNode replace(RelNode node, Map<RelNode, RelNode> substitutionMap) {
+    RelNode newInput = substitutionMap.get(node);
+    if (newInput != null) {
+      return newInput;
+    } else {
+      replaceRecursive(node, substitutionMap);
+      return node;
+    }
   }
 
   private static void replaceRecursive(RelNode node, Map<RelNode, RelNode> substitutionMap) {
