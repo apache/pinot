@@ -126,29 +126,29 @@ public class ExplainNodeSimplifier {
 
     @Override
     public PlanNode visitExplained(ExplainedNode node, Void context) {
-      if (node.getType().contains(ExplainPlanDataTableReducer.COMBINE) && node.getInputs().size() > 1) {
-        List<PlanNode> simplifiedChildren = simplifyChildren(node.getInputs());
-        PlanNode child1 = simplifiedChildren.get(0);
-
-        for (int i = 1; i < simplifiedChildren.size(); i++) {
-          PlanNode child2 = simplifiedChildren.get(i);
-          PlanNode merged = PlanNodeMerger.mergePlans(child1, child2, false);
-          if (merged == null) {
-            LOGGER.info("Found unmergeable inputs on node of type {}: {} and {}", node, child1, child2);
-            assert false : "Unmergeable inputs found";
-            return defaultNode(node);
-          }
-          child1 = merged;
-        }
-        Map<String, Plan.ExplainNode.AttributeValue> attributes = new HashMap<>(node.getAttributes());
-        Plan.ExplainNode.AttributeValue repeatedValue = Plan.ExplainNode.AttributeValue.newBuilder()
-            .setLong(simplifiedChildren.size())
-            .build();
-        attributes.put(REPEAT_ATTRIBUTE_KEY, repeatedValue);
-        return new ExplainedNode(node.getStageId(), node.getDataSchema(), node.getNodeHint(),
-            Collections.singletonList(child1), node.getType(), attributes);
+      if (!node.getType().contains(ExplainPlanDataTableReducer.COMBINE) || node.getInputs().size() <= 1) {
+        return defaultNode(node);
       }
-      return defaultNode(node);
+      List<PlanNode> simplifiedChildren = simplifyChildren(node.getInputs());
+      PlanNode child1 = simplifiedChildren.get(0);
+
+      for (int i = 1; i < simplifiedChildren.size(); i++) {
+        PlanNode child2 = simplifiedChildren.get(i);
+        PlanNode merged = PlanNodeMerger.mergePlans(child1, child2, false);
+        if (merged == null) {
+          LOGGER.info("Found unmergeable inputs on node of type {}: {} and {}", node, child1, child2);
+          assert false : "Unmergeable inputs found";
+          return defaultNode(node);
+        }
+        child1 = merged;
+      }
+      Map<String, Plan.ExplainNode.AttributeValue> attributes = new HashMap<>(node.getAttributes());
+      Plan.ExplainNode.AttributeValue repeatedValue = Plan.ExplainNode.AttributeValue.newBuilder()
+          .setLong(simplifiedChildren.size())
+          .build();
+      attributes.put(REPEAT_ATTRIBUTE_KEY, repeatedValue);
+      return new ExplainedNode(node.getStageId(), node.getDataSchema(), node.getNodeHint(),
+          Collections.singletonList(child1), node.getType(), attributes);
     }
 
     private List<PlanNode> simplifyChildren(List<PlanNode> children) {

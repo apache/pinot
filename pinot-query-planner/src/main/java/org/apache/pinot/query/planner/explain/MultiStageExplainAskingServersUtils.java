@@ -127,7 +127,9 @@ public class MultiStageExplainAskingServersUtils {
     HashMap<PlanNode, Integer> planNodesMap = new HashMap<>();
     planNodes.forEach(planNode -> {
       PlanNode simplifiedPlan = !verbose ? ExplainNodeSimplifier.simplifyNode(planNode) : planNode;
-      mergePlans(planNodesMap, simplifiedPlan, verbose);
+      PlanNode sortedPlan = PlanNodeSorter.sort(simplifiedPlan);
+
+      mergePlans(planNodesMap, sortedPlan, verbose);
     });
 
     PlanNode mergedNode;

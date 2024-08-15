@@ -85,6 +85,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private final WorkerManager _workerManager;
   private final QueryDispatcher _queryDispatcher;
   private final PinotCatalog _catalog;
+  private final boolean _explainAskingServerDefault;
 
   public MultiStageBrokerRequestHandler(PinotConfiguration config, String brokerId, BrokerRoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache) {
@@ -97,6 +98,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     LOGGER.info("Initialized MultiStageBrokerRequestHandler on host: {}, port: {} with broker id: {}, timeout: {}ms, "
             + "query log max length: {}, query log max rate: {}", hostname, port, _brokerId, _brokerTimeoutMs,
         _queryLogger.getMaxQueryLengthToLog(), _queryLogger.getLogRateLimit());
+    _explainAskingServerDefault = _config.getProperty(
+        CommonConstants.MultiStageQueryRunner.ASK_SERVERS_FOR_EXPLAIN_PLAN,
+        CommonConstants.MultiStageQueryRunner.DEFAULT_ASK_SERVERS_FOR_EXPLAIN_PLAN);
   }
 
   @Override
@@ -142,8 +146,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
           Function<DispatchablePlanFragment, Collection<PlanNode>> fragmentToPlanNode = fragment ->
               requestPhysicalPlan(fragment, requestContext, queryTimeoutMs, queryOptions);
 
-          boolean askServers = _config.getProperty(CommonConstants.MultiStageQueryRunner.ASK_SERVERS_FOR_EXPLAIN_PLAN,
-                  CommonConstants.MultiStageQueryRunner.DEFAULT_ASK_SERVERS_FOR_EXPLAIN_PLAN);
+          boolean askServers = QueryOptionsUtils.isExplainAskingServers(queryOptions)
+              .orElse(_explainAskingServerDefault);
 
           queryPlanResult = queryEnvironment.explainQuery(
               query, sqlNodeAndOptions, requestId, fragmentToPlanNode, askServers);
