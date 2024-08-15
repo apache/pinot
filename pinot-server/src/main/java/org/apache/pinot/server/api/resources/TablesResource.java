@@ -955,7 +955,7 @@ public class TablesResource {
   }
 
   @GET
-  @Path("/tables/{tableName}/segments/reload")
+  @Path("/tables/{tableName}/segments/needReload")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Checks if reload is needed on any segment", notes = "Returns true if reload is required on"
       + " any segment in this server")
@@ -975,6 +975,6 @@ public class TablesResource {
       throw new WebApplicationException(e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR);
     }
     return ResourceUtils.convertToJsonString(
-        new SegmentsReloadCheckResponse(needReload));
+        new SegmentsReloadCheckResponse(needReload, tableDataManager.getInstanceId()));
   }
 }
