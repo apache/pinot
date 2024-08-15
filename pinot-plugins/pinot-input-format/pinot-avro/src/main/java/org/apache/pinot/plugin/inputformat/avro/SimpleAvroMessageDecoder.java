@@ -58,7 +58,7 @@ public class SimpleAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
       throws Exception {
     Preconditions.checkState(props.containsKey(SCHEMA), "Avro schema must be provided");
     _avroSchema = new org.apache.avro.Schema.Parser().parse(props.get(SCHEMA));
-    _datumReader = new GenericDatumReader<>(_avroSchema);
+    _datumReader = new GenericDatumReader<>(_avroSchema, _avroSchema, new AvroCustomGenericData());
     String recordExtractorClass = props.get(RECORD_EXTRACTOR_CONFIG_KEY);
     String recordExtractorConfigClass = props.get(RECORD_EXTRACTOR_CONFIG_CONFIG_KEY);
     // Backward compatibility to support Avro by default

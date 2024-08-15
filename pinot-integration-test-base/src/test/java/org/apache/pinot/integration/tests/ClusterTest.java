@@ -56,6 +56,7 @@ import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.minion.BaseMinionStarter;
 import org.apache.pinot.minion.MinionStarter;
+import org.apache.pinot.plugin.inputformat.avro.AvroCustomGenericData;
 import org.apache.pinot.plugin.inputformat.avro.AvroRecordExtractor;
 import org.apache.pinot.plugin.inputformat.avro.AvroRecordExtractorConfig;
 import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
@@ -480,7 +481,7 @@ public abstract class ClusterTest extends ControllerTest {
       config.init(props);
       _recordExtractor = new AvroRecordExtractor();
       _recordExtractor.init(fieldsToRead, config);
-      _reader = new GenericDatumReader<>(avroSchema);
+      _reader = new GenericDatumReader<>(avroSchema, avroSchema, new AvroCustomGenericData());
     }
 
     @Override

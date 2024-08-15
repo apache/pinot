@@ -187,7 +187,7 @@ public class AvroSchemaUtilTest {
   private GenericRecord readAndConvertRecord(File avroFile, Schema schema)
       throws IOException {
     try (DataFileStream<GenericRecord> avroReader = new DataFileStream<>(new FileInputStream(avroFile),
-        new GenericDatumReader<>(schema))) {
+        new GenericDatumReader<>(schema, schema, new AvroCustomGenericData()))) {
       if (avroReader.hasNext()) {
         GenericRecord record = avroReader.next();
         return AvroSchemaUtil.convertLogicalType(record);

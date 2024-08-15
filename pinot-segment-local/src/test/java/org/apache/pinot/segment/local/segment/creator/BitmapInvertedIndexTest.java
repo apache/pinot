@@ -28,6 +28,7 @@ import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.plugin.inputformat.avro.AvroCustomGenericData;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
@@ -95,7 +96,7 @@ public class BitmapInvertedIndexTest {
 
     // Compare the loaded inverted index with the record in avro file
     try (DataFileStream<GenericRecord> reader = new DataFileStream<>(new FileInputStream(_avroFile),
-        new GenericDatumReader<>())) {
+        new GenericDatumReader<>(null, null, new AvroCustomGenericData()))) {
       // Check the first 1000 records
       for (int docId = 0; docId < 1000; docId++) {
         GenericRecord record = reader.next();

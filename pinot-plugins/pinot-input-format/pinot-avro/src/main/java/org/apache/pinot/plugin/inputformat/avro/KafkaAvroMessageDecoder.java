@@ -170,7 +170,7 @@ public class KafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
         }
       }
     }
-    DatumReader<Record> reader = new GenericDatumReader<Record>(schema);
+    DatumReader<Record> reader = new GenericDatumReader<>(schema, schema, new AvroCustomGenericData());
     try {
       GenericData.Record avroRecord = reader.read(null,
           _decoderFactory.createBinaryDecoder(payload, HEADER_LENGTH + offset, length - HEADER_LENGTH, null));

@@ -30,6 +30,7 @@ import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.plugin.inputformat.avro.AvroCustomGenericData;
 import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentCreationDriverFactory;
@@ -165,7 +166,8 @@ public class DictionaryOptimiserTest {
   public static Schema extractSchemaFromAvroWithoutTime(File avroFile)
       throws IOException {
     DataFileStream<GenericRecord> dataStream =
-        new DataFileStream<GenericRecord>(new FileInputStream(avroFile), new GenericDatumReader<GenericRecord>());
+        new DataFileStream<GenericRecord>(new FileInputStream(avroFile),
+            new GenericDatumReader<>(null, null, new AvroCustomGenericData()));
     Schema schema = new Schema();
 
     for (final org.apache.avro.Schema.Field field : dataStream.getSchema().getFields()) {

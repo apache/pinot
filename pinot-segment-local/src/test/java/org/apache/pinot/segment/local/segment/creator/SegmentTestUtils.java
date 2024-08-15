@@ -34,6 +34,7 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.util.Utf8;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.Predicate;
+import org.apache.pinot.plugin.inputformat.avro.AvroCustomGenericData;
 import org.apache.pinot.plugin.inputformat.avro.AvroSchemaUtil;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
@@ -124,7 +125,8 @@ public class SegmentTestUtils {
   public static Schema extractSchemaFromAvroWithoutTime(File avroFile)
       throws IOException {
     DataFileStream<GenericRecord> dataStream =
-        new DataFileStream<GenericRecord>(new FileInputStream(avroFile), new GenericDatumReader<GenericRecord>());
+        new DataFileStream<GenericRecord>(new FileInputStream(avroFile),
+            new GenericDatumReader<>(null, null, new AvroCustomGenericData()));
     Schema schema = new Schema();
 
     for (final Field field : dataStream.getSchema().getFields()) {

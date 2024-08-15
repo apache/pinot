@@ -33,6 +33,7 @@ import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.parquet.Strings;
+import org.apache.pinot.plugin.inputformat.avro.AvroCustomGenericData;
 import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -131,7 +132,8 @@ public class AvroFileSourceGenerator implements PinotSourceDataGenerator {
         _avroDataStream = null;
       }
       if (_avroDataStream == null) {
-        _avroDataStream = new DataFileStream<>(new FileInputStream(_avroFile.getPath()), new GenericDatumReader<>());
+        _avroDataStream = new DataFileStream<>(new FileInputStream(_avroFile.getPath()),
+            new GenericDatumReader<>(null, null, new AvroCustomGenericData()));
       }
     } catch (IOException ex) {
       LOGGER.error("Failed to open/close {}", _avroFile.getPath(), ex);

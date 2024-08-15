@@ -39,6 +39,7 @@ import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.plugin.inputformat.avro.AvroCustomGenericData;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
@@ -121,7 +122,7 @@ public class QueryGenerator {
 
     // Read Avro schema and initialize storage.
     File schemaAvroFile = avroFiles.get(0);
-    GenericDatumReader<GenericRecord> datumReader = new GenericDatumReader<>();
+    GenericDatumReader<GenericRecord> datumReader = new GenericDatumReader<>(null, null, new AvroCustomGenericData());
     try (DataFileReader<GenericRecord> fileReader = new DataFileReader<>(schemaAvroFile, datumReader)) {
       Schema schema = fileReader.getSchema();
       for (Schema.Field field : schema.getFields()) {
@@ -242,7 +243,7 @@ public class QueryGenerator {
    */
   private void addAvroData(File avroFile) {
     // Read in records and update the values stored.
-    GenericDatumReader<GenericRecord> datumReader = new GenericDatumReader<>();
+    GenericDatumReader<GenericRecord> datumReader = new GenericDatumReader<>(null, null, new AvroCustomGenericData());
     try (DataFileReader<GenericRecord> fileReader = new DataFileReader<>(avroFile, datumReader)) {
       for (GenericRecord genericRecord : fileReader) {
         for (String columnName : _columnNames) {
