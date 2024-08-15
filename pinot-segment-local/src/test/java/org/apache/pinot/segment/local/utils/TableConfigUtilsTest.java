@@ -1961,6 +1961,83 @@ public class TableConfigUtilsTest {
     } catch (IllegalStateException e) {
       Assert.assertEquals(e.getMessage(), "The outOfOrderRecordColumn must be a single-valued BOOLEAN column");
     }
+
+    // test enableDeletedKeysCompactionConsistency shouldn't exist with metadataTTL
+    upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfig.setEnableDeletedKeysCompactionConsistency(true);
+    upsertConfig.setMetadataTTL(1.0);
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setStreamConfigs(streamConfigs)
+        .setUpsertConfig(upsertConfig).setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .build();
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
+    } catch (IllegalStateException e) {
+      Assert.assertEquals(e.getMessage(),
+          "enableDeletedKeysCompactionConsistency and metadataTTL shouldn't exist together for upsert table");
+    }
+
+    // test enableDeletedKeysCompactionConsistency shouldn't exist with enablePreload
+    upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfig.setEnableDeletedKeysCompactionConsistency(true);
+    upsertConfig.setEnablePreload(true);
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setStreamConfigs(streamConfigs)
+        .setUpsertConfig(upsertConfig).setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .build();
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
+    } catch (IllegalStateException e) {
+      Assert.assertEquals(e.getMessage(),
+          "enableDeletedKeysCompactionConsistency and enablePreload shouldn't exist together for upsert table");
+    }
+
+    // test enableDeletedKeysCompactionConsistency should exist with deletedKeysTTL
+    upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfig.setEnableDeletedKeysCompactionConsistency(true);
+    upsertConfig.setDeletedKeysTTL(0);
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setStreamConfigs(streamConfigs)
+        .setUpsertConfig(upsertConfig).setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .build();
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
+    } catch (IllegalStateException e) {
+      Assert.assertEquals(e.getMessage(),
+          "enableDeletedKeysCompactionConsistency should exist with deletedKeysTTL for upsert table");
+    }
+
+    // test enableDeletedKeysCompactionConsistency should exist with enableSnapshot
+    upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfig.setEnableDeletedKeysCompactionConsistency(true);
+    upsertConfig.setDeletedKeysTTL(100);
+    upsertConfig.setEnableSnapshot(false);
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setStreamConfigs(streamConfigs)
+        .setUpsertConfig(upsertConfig).setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .build();
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
+    } catch (IllegalStateException e) {
+      Assert.assertEquals(e.getMessage(),
+          "enableDeletedKeysCompactionConsistency should exist with enableSnapshot for upsert table");
+    }
+
+    // test enableDeletedKeysCompactionConsistency should exist with UpsertCompactionTask
+    upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfig.setEnableDeletedKeysCompactionConsistency(true);
+    upsertConfig.setDeletedKeysTTL(100);
+    upsertConfig.setEnableSnapshot(true);
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setStreamConfigs(streamConfigs)
+        .setUpsertConfig(upsertConfig).setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .build();
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
+    } catch (IllegalStateException e) {
+      Assert.assertEquals(e.getMessage(),
+          "enableDeletedKeysCompactionConsistency should exist with UpsertCompactionTask for upsert table");
+    }
   }
 
   @Test
