@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.controller.helix;
 
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -531,8 +530,6 @@ public class SegmentStatusCheckerTest {
     TableViews.TableView tableViewIdeal = new TableViews.TableView();
     Map<String, Map<String, String>> tableViewExternalOffline = new TreeMap<>();
     Map<String, Map<String, String>> tableViewIdealOffline = new TreeMap<>();
-    Map<String, Map<String, String>> tableViewExternalRealtime = new TreeMap<>();
-    Map<String, Map<String, String>> tableViewIdealRealtime = new TreeMap<>();
     Map<String, String> testSegment1MapExternal = new LinkedHashMap<>();
     testSegment1MapExternal.put("Server1", "ONLINE");
     tableViewExternalOffline.put("TestSegment1", testSegment1MapExternal);
@@ -557,8 +554,6 @@ public class SegmentStatusCheckerTest {
     TableViews.TableView tableViewIdeal = new TableViews.TableView();
     Map<String, Map<String, String>> tableViewExternalOffline = new TreeMap<>();
     Map<String, Map<String, String>> tableViewIdealOffline = new TreeMap<>();
-    Map<String, Map<String, String>> tableViewExternalRealtime = new TreeMap<>();
-    Map<String, Map<String, String>> tableViewIdealRealtime = new TreeMap<>();
     Map<String, String> testSegment1MapExternal = new LinkedHashMap<>();
     testSegment1MapExternal.put("Server1", "CONSUMING");
     tableViewExternalOffline.put("TestSegment1", testSegment1MapExternal);
@@ -583,8 +578,6 @@ public class SegmentStatusCheckerTest {
     TableViews.TableView tableViewIdeal = new TableViews.TableView();
     Map<String, Map<String, String>> tableViewExternalOffline = new TreeMap<>();
     Map<String, Map<String, String>> tableViewIdealOffline = new TreeMap<>();
-    Map<String, Map<String, String>> tableViewExternalRealtime = new TreeMap<>();
-    Map<String, Map<String, String>> tableViewIdealRealtime = new TreeMap<>();
     Map<String, String> testSegment1MapExternal = new LinkedHashMap<>();
     testSegment1MapExternal.put("Server1", "ERROR");
     tableViewExternalOffline.put("TestSegment1", testSegment1MapExternal);
@@ -609,8 +602,6 @@ public class SegmentStatusCheckerTest {
     TableViews.TableView tableViewIdeal = new TableViews.TableView();
     Map<String, Map<String, String>> tableViewExternalOffline = new TreeMap<>();
     Map<String, Map<String, String>> tableViewIdealOffline = new TreeMap<>();
-    Map<String, Map<String, String>> tableViewExternalRealtime = new TreeMap<>();
-    Map<String, Map<String, String>> tableViewIdealRealtime = new TreeMap<>();
     Map<String, String> testSegment1MapExternal = new LinkedHashMap<>();
     testSegment1MapExternal.put("Server1", "OFFLINE");
     tableViewExternalOffline.put("TestSegment1", testSegment1MapExternal);
