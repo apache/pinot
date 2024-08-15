@@ -712,7 +712,9 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
       Object expectedValue) throws Exception {
 
     // Queries written this way will trigger the PinotEvaluateLiteralRule which will call the scalar comparison function
-    // on the literals
+    // on the literals. Simpler queries like SELECT ... WHERE 'test' = 'test' will not trigger the optimization rule
+    // because the filter will be removed by Calcite in the SQL to Rel conversion phase even before the optimization
+    // rules are fired.
     String sqlQueryPrefix = "WITH data as (SELECT " + literal + " as \"foo\" FROM mytable) "
         + "SELECT * FROM data ";
 
