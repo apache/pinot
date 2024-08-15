@@ -34,7 +34,7 @@ public class DedupConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Custom configs for dedup metadata manager")
   private final Map<String, String> _metadataManagerConfigs;
   @JsonPropertyDescription("When larger than 0, use it for dedup metadata cleanup, it uses the same unit as the "
-      + "metadata time column. The metadata will be cleaned up when the metadata time is older than the current time "
+      + "dedup time column. The metadata will be cleaned up when the dedup time is older than the current time "
       + "minus metadata TTL. Notice that the metadata may not be cleaned up immediately after the TTL, it depends on "
       + "the cleanup schedule.")
   private final double _metadataTTL;

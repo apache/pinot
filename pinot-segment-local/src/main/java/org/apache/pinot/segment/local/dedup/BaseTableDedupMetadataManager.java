@@ -49,10 +49,10 @@ public abstract class BaseTableDedupMetadataManager implements TableDedupMetadat
     Preconditions.checkArgument(dedupConfig != null, "Dedup must be enabled for table: %s", _tableNameWithType);
     double metadataTTL = dedupConfig.getMetadataTTL();
     String dedupTimeColumn = dedupConfig.getDedupTimeColumn();
+    if (dedupTimeColumn == null) {
+      dedupTimeColumn = tableConfig.getValidationConfig().getTimeColumnName();
+    }
     if (metadataTTL > 0) {
-      if (dedupTimeColumn == null) {
-        dedupTimeColumn = tableConfig.getValidationConfig().getTimeColumnName();
-      }
       Preconditions.checkArgument(dedupTimeColumn != null,
           "When metadataTTL is configured, metadata time column or time column must be configured for "
               + "dedup enabled table: %s", _tableNameWithType);

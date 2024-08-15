@@ -48,8 +48,11 @@ class ConcurrentMapPartitionDedupMetadataManager extends BasePartitionDedupMetad
       double dedupTime = dedupRecordInfo.getDedupTime();
       _largestSeenTime.getAndUpdate(time -> Math.max(time, dedupTime));
       _primaryKeyToSegmentAndTimeMap.compute(HashUtils.hashPrimaryKey(dedupRecordInfo.getPrimaryKey(), _hashFunction),
-            (primaryKey, segmentAndTime) -> {
-            if (segmentAndTime == null || segmentAndTime.getRight() < dedupTime) {
+          (primaryKey, segmentAndTime) -> {
+            // When dedup time is the same, we always keep the latest segment
+            // This will handle segment replacement case correctly - a typical case is when a mutable segment is
+            // replaced by an immutable segment
+            if (segmentAndTime == null || segmentAndTime.getRight() <= dedupTime) {
               return Pair.of(segment, dedupTime);
             } else {
               return segmentAndTime;
