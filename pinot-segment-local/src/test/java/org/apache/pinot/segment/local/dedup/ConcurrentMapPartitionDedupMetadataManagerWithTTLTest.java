@@ -116,7 +116,7 @@ public class ConcurrentMapPartitionDedupMetadataManagerWithTTLTest {
     IndexSegment segment2 = DedupTestUtils.mockSegment(2, 10);
     dedupRecordInfoIterator = DedupUtils.getDedupRecordInfoIterator(dedupRecordInfoReader, 10);
     _metadataManager.doAddSegment(segment2, dedupRecordInfoIterator);
-    verifyInitialSegmentAddition(segment);
+    verifyInitialSegmentAddition(segment2);
   }
 
   @Test
