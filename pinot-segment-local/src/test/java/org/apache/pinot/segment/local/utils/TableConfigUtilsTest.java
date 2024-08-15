@@ -1962,7 +1962,7 @@ public class TableConfigUtilsTest {
       Assert.assertEquals(e.getMessage(), "The outOfOrderRecordColumn must be a single-valued BOOLEAN column");
     }
 
-    // test enableConsistentDeletes shouldn't exist with metadataTTL
+    // test enableDeletedKeysCompactionConsistency shouldn't exist with metadataTTL
     upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
     upsertConfig.setEnableDeletedKeysCompactionConsistency(true);
     upsertConfig.setMetadataTTL(1.0);
@@ -1974,10 +1974,10 @@ public class TableConfigUtilsTest {
       TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
     } catch (IllegalStateException e) {
       Assert.assertEquals(e.getMessage(),
-          "enableConsistentDeletes and metadataTTL shouldn't exist together for upsert table");
+          "enableDeletedKeysCompactionConsistency and metadataTTL shouldn't exist together for upsert table");
     }
 
-    // test enableConsistentDeletes shouldn't exist with enablePreload
+    // test enableDeletedKeysCompactionConsistency shouldn't exist with enablePreload
     upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
     upsertConfig.setEnableDeletedKeysCompactionConsistency(true);
     upsertConfig.setEnablePreload(true);
@@ -1989,10 +1989,10 @@ public class TableConfigUtilsTest {
       TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
     } catch (IllegalStateException e) {
       Assert.assertEquals(e.getMessage(),
-          "enableConsistentDeletes and enablePreload shouldn't exist together for upsert table");
+          "enableDeletedKeysCompactionConsistency and enablePreload shouldn't exist together for upsert table");
     }
 
-    // test enableConsistentDeletes should exist with deletedKeysTTL
+    // test enableDeletedKeysCompactionConsistency should exist with deletedKeysTTL
     upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
     upsertConfig.setEnableDeletedKeysCompactionConsistency(true);
     upsertConfig.setDeletedKeysTTL(0);
@@ -2004,10 +2004,10 @@ public class TableConfigUtilsTest {
       TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
     } catch (IllegalStateException e) {
       Assert.assertEquals(e.getMessage(),
-          "enableConsistentDeletes should exist with deletedKeysTTL for upsert table");
+          "enableDeletedKeysCompactionConsistency should exist with deletedKeysTTL for upsert table");
     }
 
-    // test enableConsistentDeletes should exist with enableSnapshot
+    // test enableDeletedKeysCompactionConsistency should exist with enableSnapshot
     upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
     upsertConfig.setEnableDeletedKeysCompactionConsistency(true);
     upsertConfig.setDeletedKeysTTL(100);
@@ -2020,10 +2020,10 @@ public class TableConfigUtilsTest {
       TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
     } catch (IllegalStateException e) {
       Assert.assertEquals(e.getMessage(),
-          "enableConsistentDeletes should exist with enableSnapshot for upsert table");
+          "enableDeletedKeysCompactionConsistency should exist with enableSnapshot for upsert table");
     }
 
-    // test enableConsistentDeletes should exist with UpsertCompactionTask
+    // test enableDeletedKeysCompactionConsistency should exist with UpsertCompactionTask
     upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
     upsertConfig.setEnableDeletedKeysCompactionConsistency(true);
     upsertConfig.setDeletedKeysTTL(100);
@@ -2036,7 +2036,7 @@ public class TableConfigUtilsTest {
       TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
     } catch (IllegalStateException e) {
       Assert.assertEquals(e.getMessage(),
-          "enableConsistentDeletes should exist with UpsertCompactionTask for upsert table");
+          "enableDeletedKeysCompactionConsistency should exist with UpsertCompactionTask for upsert table");
     }
   }
 
