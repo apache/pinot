@@ -23,6 +23,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.annotations.ScalarFunction;
@@ -34,9 +35,14 @@ import org.apache.pinot.spi.annotations.ScalarFunction;
 public class EqualsScalarFunction extends PolymorphicComparisonScalarFunction {
 
   private static final Map<ColumnDataType, FunctionInfo> TYPE_FUNCTION_INFO_MAP = new HashMap<>();
+  private static final FunctionInfo DOUBLE_EQUALS_WITH_TOLERANCE;
 
   static {
     try {
+       DOUBLE_EQUALS_WITH_TOLERANCE = new FunctionInfo(
+           EqualsScalarFunction.class.getMethod("doubleEqualsWithTolerance", double.class, double.class),
+           EqualsScalarFunction.class, false);
+
       // Set nullable parameters to false for each function because the return value should be null if any argument
       // is null
       TYPE_FUNCTION_INFO_MAP.put(ColumnDataType.INT, new FunctionInfo(
@@ -91,6 +97,17 @@ public class EqualsScalarFunction extends PolymorphicComparisonScalarFunction {
     return TYPE_FUNCTION_INFO_MAP.get(argumentType);
   }
 
+  @Nullable
+  @Override
+  public FunctionInfo getFunctionInfo(int numArguments) {
+    if (numArguments != 2) {
+      return null;
+    }
+
+    // For backward compatibility
+    return DOUBLE_EQUALS_WITH_TOLERANCE;
+  }
+
   @Override
   public String getName() {
     return "equals";
@@ -105,10 +122,15 @@ public class EqualsScalarFunction extends PolymorphicComparisonScalarFunction {
   }
 
   public static boolean floatEquals(float a, float b) {
-    return Math.abs(a - b) < DOUBLE_COMPARISON_TOLERANCE;
+    return a == b;
   }
 
   public static boolean doubleEquals(double a, double b) {
+    return a == b;
+  }
+
+  public static boolean doubleEqualsWithTolerance(double a, double b) {
+    // To avoid approximation errors
     return Math.abs(a - b) < DOUBLE_COMPARISON_TOLERANCE;
   }
 
