@@ -32,7 +32,7 @@ import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
-import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
+import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumn;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -199,8 +199,8 @@ public class SegmentMetadataFetcher {
       starTreeIndexMap.put(STAR_TREE_DIMENSION_COLUMNS, starTreeDimensions);
 
       List<String> starTreeMetricAggregations = new ArrayList<>();
-      for (AggregationFunctionColumnPair functionColumnPair : starTreeMetadata.getFunctionColumnPairs()) {
-        starTreeMetricAggregations.add(functionColumnPair.toColumnName());
+      for (AggregationFunctionColumn functionColumn : starTreeMetadata.getFunctionColumns()) {
+        starTreeMetricAggregations.add(functionColumn.toColumnName());
       }
       starTreeIndexMap.put(STAR_TREE_METRIC_AGGREGATIONS, starTreeMetricAggregations);
       starTreeIndexMap.put(STAR_TREE_MAX_LEAF_RECORDS, starTreeMetadata.getMaxLeafRecords());

@@ -24,4 +24,11 @@ public class Constants {
 
   public static final int EOF = Integer.MIN_VALUE;
   public static final int UNKNOWN_CARDINALITY = Integer.MIN_VALUE;
+
+  public static final String HLL_LOG2M_KEY = "log2m";
+  public static final String HLLPLUS_ULL_P_KEY = "p";
+  public static final String HLLPLUS_SP_KEY = "sp";
+  public static final String CPCSKETCH_LGK_KEY = "lgK";
+  public static final String PERCENTILETDIGEST_COMPRESSION_FACTOR_KEY = "compressionFactor";
+  public static final String SUMPRECISION_FIXED_SIZE_KEY = "fixedSize";
 }

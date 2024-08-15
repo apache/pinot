@@ -53,7 +53,7 @@ import org.apache.pinot.segment.spi.index.DictionaryIndexConfig;
 import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
-import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
+import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumn;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
 import org.apache.pinot.spi.config.table.FieldConfig.EncodingType;
@@ -1179,42 +1179,42 @@ public final class TableConfigUtils {
         List<StarTreeAggregationConfig> aggregationConfigs = starTreeIndexConfig.getAggregationConfigs();
         Preconditions.checkState(functionColumnPairs == null || aggregationConfigs == null,
             "Only one of 'functionColumnPairs' or 'aggregationConfigs' can be specified in StarTreeIndexConfig");
-        Set<AggregationFunctionColumnPair> storedTypes = new HashSet<>();
+        Set<AggregationFunctionColumn> storedTypes = new HashSet<>();
         if (functionColumnPairs != null) {
           for (String functionColumnPair : functionColumnPairs) {
-            AggregationFunctionColumnPair columnPair;
+            AggregationFunctionColumn columnPair;
             try {
-              columnPair = AggregationFunctionColumnPair.fromColumnName(functionColumnPair);
+              columnPair = AggregationFunctionColumn.fromColumnName(functionColumnPair);
             } catch (Exception e) {
               throw new IllegalStateException("Invalid StarTreeIndex config: " + functionColumnPair + ". Must be"
                   + "in the form <Aggregation function>__<Column name>");
             }
-            AggregationFunctionColumnPair storedType = AggregationFunctionColumnPair.resolveToStoredType(columnPair);
+            AggregationFunctionColumn storedType = AggregationFunctionColumn.resolveToStoredType(columnPair);
             if (!storedTypes.add(storedType)) {
               LOGGER.warn("StarTreeIndex config duplication: {} already matches existing function column pair: {}. ",
                   columnPair, storedType);
             }
             String columnName = columnPair.getColumn();
-            if (!columnName.equals(AggregationFunctionColumnPair.STAR)) {
+            if (!columnName.equals(AggregationFunctionColumn.STAR)) {
               columnNameToConfigMap.put(columnName, STAR_TREE_CONFIG_NAME);
             }
           }
         }
         if (aggregationConfigs != null) {
           for (StarTreeAggregationConfig aggregationConfig : aggregationConfigs) {
-            AggregationFunctionColumnPair columnPair;
+            AggregationFunctionColumn columnPair;
             try {
-              columnPair = AggregationFunctionColumnPair.fromAggregationConfig(aggregationConfig);
+              columnPair = AggregationFunctionColumn.fromAggregationConfig(aggregationConfig);
             } catch (Exception e) {
               throw new IllegalStateException("Invalid StarTreeIndex config: " + aggregationConfig);
             }
-            AggregationFunctionColumnPair storedType = AggregationFunctionColumnPair.resolveToStoredType(columnPair);
+            AggregationFunctionColumn storedType = AggregationFunctionColumn.resolveToStoredType(columnPair);
             if (!storedTypes.add(storedType)) {
               LOGGER.warn("StarTreeIndex config duplication: {} already matches existing function column pair: {}. ",
                   columnPair, storedType);
             }
             String columnName = columnPair.getColumn();
-            if (!columnName.equals(AggregationFunctionColumnPair.STAR)) {
+            if (!columnName.equals(AggregationFunctionColumn.STAR)) {
               columnNameToConfigMap.put(columnName, STAR_TREE_CONFIG_NAME);
             }
           }

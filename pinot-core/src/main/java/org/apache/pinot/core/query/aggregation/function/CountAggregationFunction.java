@@ -29,7 +29,7 @@ import org.apache.pinot.core.query.aggregation.DoubleAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.DoubleGroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
-import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
+import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumn;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -38,7 +38,7 @@ public class CountAggregationFunction extends NullableSingleInputAggregationFunc
   private static final double DEFAULT_INITIAL_VALUE = 0.0;
   // Special expression used by star-tree to pass in BlockValSet
   private static final ExpressionContext STAR_TREE_COUNT_STAR_EXPRESSION =
-      ExpressionContext.forIdentifier(AggregationFunctionColumnPair.STAR);
+      ExpressionContext.forIdentifier(AggregationFunctionColumn.STAR);
 
 
   public CountAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {

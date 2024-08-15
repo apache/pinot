@@ -31,6 +31,7 @@ import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -56,6 +57,11 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
 
   public int getLog2m() {
     return _log2m;
+  }
+
+  @Override
+  public Map<String, Object> getConfigurations() {
+    return Map.of(Constants.HLL_LOG2M_KEY, _log2m);
   }
 
   @Override

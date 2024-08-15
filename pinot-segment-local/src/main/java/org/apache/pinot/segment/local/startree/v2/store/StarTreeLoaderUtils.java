@@ -33,7 +33,7 @@ import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
-import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
+import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumn;
 import org.apache.pinot.segment.spi.index.startree.StarTree;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
@@ -78,10 +78,10 @@ public class StarTreeLoaderUtils {
       }
 
       // Load metric (function-column pair) forward indexes
-      for (AggregationFunctionColumnPair functionColumnPair : starTreeMetadata.getFunctionColumnPairs()) {
-        String metric = functionColumnPair.toColumnName();
+      for (AggregationFunctionColumn functionColumn : starTreeMetadata.getFunctionColumns()) {
+        String metric = functionColumn.toColumnName();
         PinotDataBuffer forwardIndexDataBuffer = indexReader.getIndexFor(metric, StandardIndexes.forward());
-        DataType dataType = ValueAggregatorFactory.getAggregatedValueType(functionColumnPair.getFunctionType());
+        DataType dataType = ValueAggregatorFactory.getAggregatedValueType(functionColumn.getFunctionType());
         FieldSpec fieldSpec = new MetricFieldSpec(metric, dataType);
         ForwardIndexReader<?> forwardIndex =
             ForwardIndexReaderFactory.createRawIndexReader(forwardIndexDataBuffer, dataType.getStoredType(), true);

@@ -22,7 +22,7 @@ import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.query.aggregation.DefaultAggregationExecutor;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
-import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
+import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumn;
 
 
 /**
@@ -34,16 +34,16 @@ import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair
  * </ul>
  */
 public class StarTreeAggregationExecutor extends DefaultAggregationExecutor {
-  private final AggregationFunctionColumnPair[] _aggregationFunctionColumnPairs;
+  private final AggregationFunctionColumn[] _aggregationFunctionColumns;
 
   public StarTreeAggregationExecutor(AggregationFunction[] aggregationFunctions) {
     super(aggregationFunctions);
 
     int numAggregationFunctions = aggregationFunctions.length;
-    _aggregationFunctionColumnPairs = new AggregationFunctionColumnPair[numAggregationFunctions];
+    _aggregationFunctionColumns = new AggregationFunctionColumn[numAggregationFunctions];
     for (int i = 0; i < numAggregationFunctions; i++) {
-      _aggregationFunctionColumnPairs[i] =
-          AggregationFunctionUtils.getStoredFunctionColumnPair(aggregationFunctions[i]);
+      _aggregationFunctionColumns[i] =
+          AggregationFunctionUtils.getStoredFunctionColumn(aggregationFunctions[i]);
     }
   }
 
@@ -53,7 +53,7 @@ public class StarTreeAggregationExecutor extends DefaultAggregationExecutor {
     int length = valueBlock.getNumDocs();
     for (int i = 0; i < numAggregationFunctions; i++) {
       _aggregationFunctions[i].aggregate(length, _aggregationResultHolders[i],
-          AggregationFunctionUtils.getBlockValSetMap(_aggregationFunctionColumnPairs[i], valueBlock));
+          AggregationFunctionUtils.getBlockValSetMap(_aggregationFunctionColumns[i], valueBlock));
     }
   }
 }

@@ -42,7 +42,7 @@ import org.apache.pinot.core.startree.plan.StarTreeProjectPlanNode;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
-import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
+import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumn;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
 
@@ -53,26 +53,26 @@ public class StarTreeUtils {
   }
 
   /**
-   * Extracts the {@link AggregationFunctionColumnPair}s from the given {@link AggregationFunction}s. Returns
-   * {@code null} if any {@link AggregationFunction} cannot be represented as an {@link AggregationFunctionColumnPair}
+   * Extracts the {@link AggregationFunctionColumn}s from the given {@link AggregationFunction}s. Returns
+   * {@code null} if any {@link AggregationFunction} cannot be represented as an {@link AggregationFunctionColumn}
    * (e.g. has multiple arguments, argument is not column etc.).
    */
   @Nullable
-  public static AggregationFunctionColumnPair[] extractAggregationFunctionPairs(
+  public static AggregationFunctionColumn[] extractAggregationFunctionPairs(
       AggregationFunction[] aggregationFunctions) {
     int numAggregationFunctions = aggregationFunctions.length;
-    AggregationFunctionColumnPair[] aggregationFunctionColumnPairs =
-        new AggregationFunctionColumnPair[numAggregationFunctions];
+    AggregationFunctionColumn[] aggregationFunctionColumns =
+        new AggregationFunctionColumn[numAggregationFunctions];
     for (int i = 0; i < numAggregationFunctions; i++) {
-      AggregationFunctionColumnPair aggregationFunctionColumnPair =
-          AggregationFunctionUtils.getStoredFunctionColumnPair(aggregationFunctions[i]);
-      if (aggregationFunctionColumnPair != null) {
-        aggregationFunctionColumnPairs[i] = aggregationFunctionColumnPair;
+      AggregationFunctionColumn aggregationFunctionColumn =
+          AggregationFunctionUtils.getStoredFunctionColumn(aggregationFunctions[i]);
+      if (aggregationFunctionColumn != null) {
+        aggregationFunctionColumns[i] = aggregationFunctionColumn;
       } else {
         return null;
       }
     }
-    return aggregationFunctionColumnPairs;
+    return aggregationFunctionColumns;
   }
 
   /**
@@ -176,11 +176,11 @@ public class StarTreeUtils {
    * </ul>
    */
   public static boolean isFitForStarTree(StarTreeV2Metadata starTreeV2Metadata,
-      AggregationFunctionColumnPair[] aggregationFunctionColumnPairs, @Nullable ExpressionContext[] groupByExpressions,
+      AggregationFunctionColumn[] aggregationFunctionColumns, @Nullable ExpressionContext[] groupByExpressions,
       Set<String> predicateColumns) {
     // Check aggregations
-    for (AggregationFunctionColumnPair aggregationFunctionColumnPair : aggregationFunctionColumnPairs) {
-      if (!starTreeV2Metadata.containsFunctionColumnPair(aggregationFunctionColumnPair)) {
+    for (AggregationFunctionColumn aggregationFunctionColumn : aggregationFunctionColumns) {
+      if (!starTreeV2Metadata.containsFunctionColumn(aggregationFunctionColumn)) {
         return false;
       }
     }
@@ -350,9 +350,9 @@ public class StarTreeUtils {
     if (starTrees == null || queryContext.isSkipStarTree() || queryContext.isNullHandlingEnabled()) {
       return null;
     }
-    AggregationFunctionColumnPair[] aggregationFunctionColumnPairs =
-        extractAggregationFunctionPairs(aggregationFunctions);
-    if (aggregationFunctionColumnPairs == null) {
+
+    AggregationFunctionColumn[] aggregationFunctionColumns = extractAggregationFunctionPairs(aggregationFunctions);
+    if (aggregationFunctionColumns == null) {
       return null;
     }
     Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap =
@@ -364,9 +364,9 @@ public class StarTreeUtils {
         queryContext.getGroupByExpressions() != null ? queryContext.getGroupByExpressions()
             .toArray(new ExpressionContext[0]) : null;
     for (StarTreeV2 starTreeV2 : starTrees) {
-      if (isFitForStarTree(starTreeV2.getMetadata(), aggregationFunctionColumnPairs, groupByExpressions,
+      if (isFitForStarTree(starTreeV2.getMetadata(), aggregationFunctionColumns, groupByExpressions,
           predicateEvaluatorsMap.keySet())) {
-        return new StarTreeProjectPlanNode(queryContext, starTreeV2, aggregationFunctionColumnPairs, groupByExpressions,
+        return new StarTreeProjectPlanNode(queryContext, starTreeV2, aggregationFunctionColumns, groupByExpressions,
             predicateEvaluatorsMap).run();
       }
     }

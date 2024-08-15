@@ -54,7 +54,7 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
-import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
+import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumn;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
 import org.apache.pinot.spi.config.table.StarTreeAggregationConfig;
@@ -176,7 +176,7 @@ abstract class BaseStarTreeV2Test<R, A> {
 
     StarTreeIndexConfig starTreeIndexConfig = new StarTreeIndexConfig(Arrays.asList(DIMENSION1, DIMENSION2), null, null,
         Collections.singletonList(new StarTreeAggregationConfig(METRIC, _valueAggregator.getAggregationType().getName(),
-            getCompressionCodec(), true, getIndexVersion(), null, null)), MAX_LEAF_RECORDS);
+            null, getCompressionCodec(), true, getIndexVersion(), null, null)), MAX_LEAF_RECORDS);
     File indexDir = new File(TEMP_DIR, SEGMENT_NAME);
     // Randomly build star-tree using on-heap or off-heap mode
     MultipleTreesBuilder.BuildMode buildMode =
@@ -260,9 +260,9 @@ abstract class BaseStarTreeV2Test<R, A> {
     AggregationFunction[] aggregationFunctions = queryContext.getAggregationFunctions();
     assertNotNull(aggregationFunctions);
     int numAggregations = aggregationFunctions.length;
-    AggregationFunctionColumnPair[] aggregationFunctionColumnPairs =
+    AggregationFunctionColumn[] aggregationFunctionColumns =
         StarTreeUtils.extractAggregationFunctionPairs(aggregationFunctions);
-    assertNotNull(aggregationFunctionColumnPairs);
+    assertNotNull(aggregationFunctionColumns);
 
     // Group-by columns
     Set<String> groupByColumnSet = new HashSet<>();
@@ -287,9 +287,9 @@ abstract class BaseStarTreeV2Test<R, A> {
     StarTreeFilterPlanNode starTreeFilterPlanNode =
         new StarTreeFilterPlanNode(queryContext, _starTreeV2, predicateEvaluatorsMap, groupByColumnSet);
     List<ForwardIndexReader> starTreeAggregationColumnReaders = new ArrayList<>(numAggregations);
-    for (AggregationFunctionColumnPair aggregationFunctionColumnPair : aggregationFunctionColumnPairs) {
+    for (AggregationFunctionColumn aggregationFunctionColumn : aggregationFunctionColumns) {
       starTreeAggregationColumnReaders.add(
-          _starTreeV2.getDataSource(aggregationFunctionColumnPair.toColumnName()).getForwardIndex());
+          _starTreeV2.getDataSource(aggregationFunctionColumn.toColumnName()).getForwardIndex());
     }
     List<ForwardIndexReader> starTreeGroupByColumnReaders = new ArrayList<>(numGroupByColumns);
     for (String groupByColumn : groupByColumns) {
@@ -302,12 +302,12 @@ abstract class BaseStarTreeV2Test<R, A> {
     FilterPlanNode nonStarTreeFilterPlanNode = new FilterPlanNode(new SegmentContext(_indexSegment), queryContext);
     List<ForwardIndexReader> nonStarTreeAggregationColumnReaders = new ArrayList<>(numAggregations);
     List<Dictionary> nonStarTreeAggregationColumnDictionaries = new ArrayList<>(numAggregations);
-    for (AggregationFunctionColumnPair aggregationFunctionColumnPair : aggregationFunctionColumnPairs) {
-      if (aggregationFunctionColumnPair.getFunctionType() == AggregationFunctionType.COUNT) {
+    for (AggregationFunctionColumn aggregationFunctionColumn : aggregationFunctionColumns) {
+      if (aggregationFunctionColumn.getFunctionType() == AggregationFunctionType.COUNT) {
         nonStarTreeAggregationColumnReaders.add(null);
         nonStarTreeAggregationColumnDictionaries.add(null);
       } else {
-        DataSource dataSource = _indexSegment.getDataSource(aggregationFunctionColumnPair.getColumn());
+        DataSource dataSource = _indexSegment.getDataSource(aggregationFunctionColumn.getColumn());
         nonStarTreeAggregationColumnReaders.add(dataSource.getForwardIndex());
         nonStarTreeAggregationColumnDictionaries.add(dataSource.getDictionary());
       }

@@ -31,7 +31,7 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
-import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
+import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumn;
 import org.apache.pinot.segment.spi.index.startree.AggregationSpec;
 import org.apache.pinot.spi.config.table.StarTreeAggregationConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
@@ -92,9 +92,9 @@ public class StarTreeV2BuilderConfigTest {
     // No column should be skipped for star-node creation
     assertTrue(defaultConfig.getSkipStarNodeCreationForDimensions().isEmpty());
     // Should have COUNT(*) and SUM(m1) as the function column pairs
-    assertEquals(defaultConfig.getFunctionColumnPairs(), new HashSet<>(
-        Arrays.asList(AggregationFunctionColumnPair.COUNT_STAR,
-            new AggregationFunctionColumnPair(AggregationFunctionType.SUM, "m1"))));
+    assertEquals(defaultConfig.getFunctionColumns(), new HashSet<>(
+        Arrays.asList(AggregationFunctionColumn.COUNT_STAR,
+            new AggregationFunctionColumn(AggregationFunctionType.SUM, "m1"))));
     assertEquals(defaultConfig.getMaxLeafRecords(), StarTreeV2BuilderConfig.DEFAULT_MAX_LEAF_RECORDS);
   }
 
@@ -125,9 +125,9 @@ public class StarTreeV2BuilderConfigTest {
     // No column should be skipped for star-node creation
     assertTrue(defaultConfig.getSkipStarNodeCreationForDimensions().isEmpty());
     // Should have COUNT(*) and SUM(m1) as the function column pairs
-    assertEquals(defaultConfig.getFunctionColumnPairs(), new HashSet<>(
-        Arrays.asList(AggregationFunctionColumnPair.COUNT_STAR,
-            new AggregationFunctionColumnPair(AggregationFunctionType.SUM, "m1"))));
+    assertEquals(defaultConfig.getFunctionColumns(), new HashSet<>(
+        Arrays.asList(AggregationFunctionColumn.COUNT_STAR,
+            new AggregationFunctionColumn(AggregationFunctionType.SUM, "m1"))));
     assertEquals(defaultConfig.getMaxLeafRecords(), StarTreeV2BuilderConfig.DEFAULT_MAX_LEAF_RECORDS);
   }
 
@@ -139,7 +139,7 @@ public class StarTreeV2BuilderConfigTest {
     assertEquals(builderConfig.getDimensionsSplitOrder(), List.of("d1"));
     assertTrue(builderConfig.getSkipStarNodeCreationForDimensions().isEmpty());
     assertEquals(builderConfig.getAggregationSpecs(),
-        Map.of(new AggregationFunctionColumnPair(AggregationFunctionType.SUM, "m1"), AggregationSpec.DEFAULT));
+        Map.of(new AggregationFunctionColumn(AggregationFunctionType.SUM, "m1"), AggregationSpec.DEFAULT));
     assertEquals(builderConfig.getMaxLeafRecords(), 1);
   }
 
@@ -153,7 +153,7 @@ public class StarTreeV2BuilderConfigTest {
     assertEquals(builderConfig.getDimensionsSplitOrder(), List.of("d1"));
     assertTrue(builderConfig.getSkipStarNodeCreationForDimensions().isEmpty());
     assertEquals(builderConfig.getAggregationSpecs(),
-        Map.of(new AggregationFunctionColumnPair(AggregationFunctionType.DISTINCTCOUNTTHETASKETCH, "m1"),
+        Map.of(new AggregationFunctionColumn(AggregationFunctionType.DISTINCTCOUNTTHETASKETCH, "m1"),
             AggregationSpec.DEFAULT));
     assertEquals(builderConfig.getMaxLeafRecords(), 1);
   }
@@ -167,7 +167,7 @@ public class StarTreeV2BuilderConfigTest {
     assertEquals(builderConfig.getDimensionsSplitOrder(), List.of("d1"));
     assertTrue(builderConfig.getSkipStarNodeCreationForDimensions().isEmpty());
     assertEquals(builderConfig.getAggregationSpecs(),
-        Map.of(new AggregationFunctionColumnPair(AggregationFunctionType.DISTINCTCOUNTTHETASKETCH, "m1"),
+        Map.of(new AggregationFunctionColumn(AggregationFunctionType.DISTINCTCOUNTTHETASKETCH, "m1"),
             AggregationSpec.DEFAULT));
     assertEquals(builderConfig.getMaxLeafRecords(), 1);
   }

@@ -40,7 +40,7 @@ public interface StarTreeV2 extends Closeable {
 
   /**
    * Returns the data source for the given column name, where the column name could be dimension name or from
-   * {@link AggregationFunctionColumnPair#toColumnName()}.
+   * {@link AggregationFunctionColumn#toColumnName()}.
    */
   DataSource getDataSource(String columnName);
 }

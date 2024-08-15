@@ -35,69 +35,69 @@ public class StarTreeV2MetadataTest {
 
   @Test
   public void testUniqueAggregationSpecs() {
-    TreeMap<AggregationFunctionColumnPair, AggregationSpec> expected = new TreeMap<>();
-    expected.put(AggregationFunctionColumnPair.fromColumnName("count__*"), AggregationSpec.DEFAULT);
-    expected.put(AggregationFunctionColumnPair.fromColumnName("sum__dimX"), AggregationSpec.DEFAULT);
+    TreeMap<AggregationFunctionColumn, AggregationSpec> expected = new TreeMap<>();
+    expected.put(AggregationFunctionColumn.fromColumnName("count__*"), AggregationSpec.DEFAULT);
+    expected.put(AggregationFunctionColumn.fromColumnName("sum__dimX"), AggregationSpec.DEFAULT);
 
     Configuration metadataProperties = createMetadata(List.of("dimX"), expected);
     StarTreeV2Metadata starTreeV2Metadata = new StarTreeV2Metadata(metadataProperties);
-    TreeMap<AggregationFunctionColumnPair, AggregationSpec> actual = starTreeV2Metadata.getAggregationSpecs();
+    TreeMap<AggregationFunctionColumn, AggregationSpec> actual = starTreeV2Metadata.getAggregationSpecs();
     assertEquals(expected, actual);
   }
 
   @Test
   public void testDuplicateAggregationSpecs() {
-    AggregationFunctionColumnPair thetaColumnPair =
-        AggregationFunctionColumnPair.fromColumnName("distinctCountThetaSketch__dimX");
-    AggregationFunctionColumnPair rawThetaColumnPair =
-        AggregationFunctionColumnPair.fromColumnName("distinctCountRawThetaSketch__dimX");
+    AggregationFunctionColumn thetaColumnPair =
+        AggregationFunctionColumn.fromColumnName("distinctCountThetaSketch__dimX");
+    AggregationFunctionColumn rawThetaColumnPair =
+        AggregationFunctionColumn.fromColumnName("distinctCountRawThetaSketch__dimX");
 
-    TreeMap<AggregationFunctionColumnPair, AggregationSpec> expected = new TreeMap<>();
+    TreeMap<AggregationFunctionColumn, AggregationSpec> expected = new TreeMap<>();
     expected.put(thetaColumnPair, AggregationSpec.DEFAULT);
     expected.put(rawThetaColumnPair, AggregationSpec.DEFAULT);
 
     Configuration metadataProperties = createMetadata(List.of("dimX"), expected);
     StarTreeV2Metadata starTreeV2Metadata = new StarTreeV2Metadata(metadataProperties);
-    TreeMap<AggregationFunctionColumnPair, AggregationSpec> actual = starTreeV2Metadata.getAggregationSpecs();
+    TreeMap<AggregationFunctionColumn, AggregationSpec> actual = starTreeV2Metadata.getAggregationSpecs();
     expected.remove(rawThetaColumnPair);
     assertEquals(expected, actual);
-    assertTrue(starTreeV2Metadata.containsFunctionColumnPair(thetaColumnPair));
+    assertTrue(starTreeV2Metadata.containsFunctionColumn(thetaColumnPair));
   }
 
   @Test
   public void testUniqueFunctionColumnPairs() {
-    Set<AggregationFunctionColumnPair> expected = new HashSet<>();
-    expected.add(AggregationFunctionColumnPair.fromColumnName("count__*"));
-    expected.add(AggregationFunctionColumnPair.fromColumnName("sum__dimX"));
+    Set<AggregationFunctionColumn> expected = new HashSet<>();
+    expected.add(AggregationFunctionColumn.fromColumnName("count__*"));
+    expected.add(AggregationFunctionColumn.fromColumnName("sum__dimX"));
 
     Configuration metadataProperties = createMetadata(List.of("dimX"), expected);
     StarTreeV2Metadata starTreeV2Metadata = new StarTreeV2Metadata(metadataProperties);
-    Set<AggregationFunctionColumnPair> actual = starTreeV2Metadata.getFunctionColumnPairs();
+    Set<AggregationFunctionColumn> actual = starTreeV2Metadata.getFunctionColumns();
     assertEquals(expected, actual);
   }
 
   @Test
   public void testDuplicateFunctionColumnPairs() {
-    AggregationFunctionColumnPair thetaColumnPair =
-        AggregationFunctionColumnPair.fromColumnName("distinctCountThetaSketch__dimX");
-    AggregationFunctionColumnPair rawThetaColumnPair =
-        AggregationFunctionColumnPair.fromColumnName("distinctCountRawThetaSketch__dimX");
+    AggregationFunctionColumn thetaColumnPair =
+        AggregationFunctionColumn.fromColumnName("distinctCountThetaSketch__dimX");
+    AggregationFunctionColumn rawThetaColumnPair =
+        AggregationFunctionColumn.fromColumnName("distinctCountRawThetaSketch__dimX");
 
-    Set<AggregationFunctionColumnPair> expected = new HashSet<>();
+    Set<AggregationFunctionColumn> expected = new HashSet<>();
     expected.add(thetaColumnPair);
     expected.add(rawThetaColumnPair);
 
     Configuration metadataProperties = createMetadata(Collections.singletonList("dimX"), expected);
     StarTreeV2Metadata starTreeV2Metadata = new StarTreeV2Metadata(metadataProperties);
-    Set<AggregationFunctionColumnPair> actual = starTreeV2Metadata.getFunctionColumnPairs();
+    Set<AggregationFunctionColumn> actual = starTreeV2Metadata.getFunctionColumns();
 
     expected.remove(rawThetaColumnPair);
     assertEquals(expected, actual);
-    assertTrue(starTreeV2Metadata.containsFunctionColumnPair(thetaColumnPair));
+    assertTrue(starTreeV2Metadata.containsFunctionColumn(thetaColumnPair));
   }
 
   private static Configuration createMetadata(List<String> dimensionsSplitOrder,
-      TreeMap<AggregationFunctionColumnPair, AggregationSpec> aggregationSpecs) {
+      TreeMap<AggregationFunctionColumn, AggregationSpec> aggregationSpecs) {
     Configuration metadataProperties = new PropertiesConfiguration();
     StarTreeV2Metadata.writeMetadata(metadataProperties, 1, dimensionsSplitOrder, aggregationSpecs, 10000, Set.of());
     return metadataProperties;
@@ -105,11 +105,11 @@ public class StarTreeV2MetadataTest {
 
   // This is the old star-tree metadata format
   private static Configuration createMetadata(List<String> dimensionsSplitOrder,
-      Set<AggregationFunctionColumnPair> functionColumnPairs) {
+      Set<AggregationFunctionColumn> functionColumns) {
     Configuration metadataProperties = new PropertiesConfiguration();
     metadataProperties.setProperty(StarTreeV2Constants.MetadataKey.TOTAL_DOCS, 1);
     metadataProperties.setProperty(StarTreeV2Constants.MetadataKey.DIMENSIONS_SPLIT_ORDER, dimensionsSplitOrder);
-    metadataProperties.setProperty(StarTreeV2Constants.MetadataKey.FUNCTION_COLUMN_PAIRS, functionColumnPairs);
+    metadataProperties.setProperty(StarTreeV2Constants.MetadataKey.FUNCTION_COLUMN_PAIRS, functionColumns);
     metadataProperties.setProperty(StarTreeV2Constants.MetadataKey.MAX_LEAF_RECORDS, 10000);
     metadataProperties.setProperty(StarTreeV2Constants.MetadataKey.SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS, Set.of());
     return metadataProperties;

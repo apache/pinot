@@ -32,6 +32,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration2.Configuration;
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.segment.local.aggregator.ValueAggregator;
 import org.apache.pinot.segment.local.aggregator.ValueAggregatorFactory;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueFixedByteRawIndexCreator;
@@ -44,7 +45,7 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
-import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
+import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumn;
 import org.apache.pinot.segment.spi.index.startree.AggregationSpec;
 import org.apache.pinot.segment.spi.index.startree.StarTreeNode;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants;
@@ -133,7 +134,7 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
           "Dimension: " + dimension + " does not have dictionary");
     }
 
-    TreeMap<AggregationFunctionColumnPair, AggregationSpec> aggregationSpecs = builderConfig.getAggregationSpecs();
+    TreeMap<AggregationFunctionColumn, AggregationSpec> aggregationSpecs = builderConfig.getAggregationSpecs();
     _numMetrics = aggregationSpecs.size();
     _metrics = new String[_numMetrics];
     _valueAggregators = new ValueAggregator[_numMetrics];
@@ -141,16 +142,21 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
     _aggregationSpecs = new AggregationSpec[_numMetrics];
 
     int index = 0;
-    for (Map.Entry<AggregationFunctionColumnPair, AggregationSpec> entry : aggregationSpecs.entrySet()) {
-      AggregationFunctionColumnPair functionColumnPair = entry.getKey();
-      _metrics[index] = functionColumnPair.toColumnName();
-      // TODO: Allow extra arguments in star-tree (e.g. log2m, precision)
+    for (Map.Entry<AggregationFunctionColumn, AggregationSpec> entry : aggregationSpecs.entrySet()) {
+      AggregationFunctionColumn functionColumn = entry.getKey();
+      _metrics[index] = functionColumn.toColumnName();
+      List<ExpressionContext> arguments = Collections.emptyList();
+      if (functionColumn.getFunctionParameters() != null) {
+        arguments = StarTreeBuilderUtils.expressionContextFromFunctionParameters(
+            functionColumn.getFunctionType(), functionColumn.getFunctionParameters());
+      }
+
       _valueAggregators[index] =
-          ValueAggregatorFactory.getValueAggregator(functionColumnPair.getFunctionType(), Collections.emptyList());
+          ValueAggregatorFactory.getValueAggregator(functionColumn.getFunctionType(), arguments);
       _aggregationSpecs[index] = entry.getValue();
       // Ignore the column for COUNT aggregation function
       if (_valueAggregators[index].getAggregationType() != AggregationFunctionType.COUNT) {
-        String column = functionColumnPair.getColumn();
+        String column = functionColumn.getColumn();
         _metricReaders[index] = new PinotSegmentColumnReader(segment, column);
       }
 

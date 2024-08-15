@@ -47,7 +47,9 @@ import org.apache.hc.core5.http.HttpStatus;
 import org.apache.hc.core5.http.NameValuePair;
 import org.apache.hc.core5.http.message.BasicHeader;
 import org.apache.hc.core5.http.message.BasicNameValuePair;
+import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.IdealState;
+import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.pinot.client.PinotConnection;
 import org.apache.pinot.client.PinotDriver;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
@@ -60,7 +62,7 @@ import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.core.operator.query.NonScanBasedAggregationOperator;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
-import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
+import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumn;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
@@ -127,13 +129,13 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   // For star-tree triggering test
   private static final StarTreeIndexConfig STAR_TREE_INDEX_CONFIG_1 =
       new StarTreeIndexConfig(Collections.singletonList("Carrier"), null,
-          Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
+          Collections.singletonList(AggregationFunctionColumn.COUNT_STAR.toColumnName()), null, 100);
   private static final String TEST_STAR_TREE_QUERY_1 = "SELECT COUNT(*) FROM mytable WHERE Carrier = 'UA'";
   private static final String TEST_STAR_TREE_QUERY_1_FILTER_INVERT =
       "SELECT COUNT(*) FILTER (WHERE Carrier = 'UA') FROM mytable";
   private static final StarTreeIndexConfig STAR_TREE_INDEX_CONFIG_2 =
       new StarTreeIndexConfig(Collections.singletonList("DestState"), null,
-          Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
+          Collections.singletonList(AggregationFunctionColumn.COUNT_STAR.toColumnName()), null, 100);
   private static final String TEST_STAR_TREE_QUERY_2 = "SELECT COUNT(*) FROM mytable WHERE DestState = 'CA'";
 
   // For default columns test
@@ -185,6 +187,12 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // Start the Pinot cluster
     startZk();
     startController();
+    // Set hyperloglog log2m value to 12.
+    HelixConfigScope scope =
+        new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(getHelixClusterName())
+            .build();
+    _helixManager.getConfigAccessor().set(scope, CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY,
+        Integer.toString(12));
     startBrokers();
     startServers();
 

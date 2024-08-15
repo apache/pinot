@@ -58,6 +58,13 @@ public interface AggregationFunction<IntermediateResult, FinalResult extends Com
   List<ExpressionContext> getInputExpressions();
 
   /**
+   * Returns the configuration map for this aggregation function.
+   */
+  default Map<String, Object> getConfigurations() {
+    return Map.of();
+  }
+
+  /**
    * Returns an aggregation result holder for this function (aggregation only).
    */
   AggregationResultHolder createAggregationResultHolder();

@@ -31,6 +31,7 @@ import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -68,6 +69,11 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
 
   public int getSp() {
     return _sp;
+  }
+
+  @Override
+  public Map<String, Object> getConfigurations() {
+    return Map.of(Constants.HLLPLUS_ULL_P_KEY, _p, Constants.HLLPLUS_SP_KEY, _sp);
   }
 
   @Override
@@ -343,7 +349,7 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
 
   @Override
   public HyperLogLogPlus merge(HyperLogLogPlus intermediateResult1, HyperLogLogPlus intermediateResult2) {
-    // Can happen when aggregating serialized HyperLogLogPlus with non-default p, sp values
+    // Cannot merge HyperLogLogPlus with different p values
     if (intermediateResult1.sizeof() != intermediateResult2.sizeof()) {
       if (intermediateResult1.cardinality() == 0) {
         return intermediateResult2;

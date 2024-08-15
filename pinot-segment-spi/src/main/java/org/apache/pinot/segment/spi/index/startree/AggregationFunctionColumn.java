@@ -19,26 +19,35 @@
 package org.apache.pinot.segment.spi.index.startree;
 
 import java.util.Comparator;
+import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.config.table.StarTreeAggregationConfig;
 
 
-public class AggregationFunctionColumnPair implements Comparable<AggregationFunctionColumnPair> {
+public class AggregationFunctionColumn implements Comparable<AggregationFunctionColumn> {
   public static final String DELIMITER = "__";
   public static final String STAR = "*";
-  public static final AggregationFunctionColumnPair COUNT_STAR =
-      new AggregationFunctionColumnPair(AggregationFunctionType.COUNT, STAR);
+  public static final AggregationFunctionColumn COUNT_STAR =
+      new AggregationFunctionColumn(AggregationFunctionType.COUNT, STAR);
 
   private final AggregationFunctionType _functionType;
   private final String _column;
+  private final Map<String, Object> _functionParameters;
 
-  public AggregationFunctionColumnPair(AggregationFunctionType functionType, String column) {
+  public AggregationFunctionColumn(AggregationFunctionType functionType, String column) {
+    this(functionType, column, Map.of());
+  }
+
+  public AggregationFunctionColumn(AggregationFunctionType functionType, String column,
+      Map<String, Object> functionParameters) {
     _functionType = functionType;
     if (functionType == AggregationFunctionType.COUNT) {
       _column = STAR;
     } else {
       _column = column;
     }
+    _functionParameters = functionParameters;
   }
 
   public AggregationFunctionType getFunctionType() {
@@ -49,6 +58,11 @@ public class AggregationFunctionColumnPair implements Comparable<AggregationFunc
     return _column;
   }
 
+  @Nullable
+  public Map<String, Object> getFunctionParameters() {
+    return _functionParameters;
+  }
+
   public String toColumnName() {
     return toColumnName(_functionType, _column);
   }
@@ -57,24 +71,32 @@ public class AggregationFunctionColumnPair implements Comparable<AggregationFunc
     return functionType.getName() + DELIMITER + column;
   }
 
-  public static AggregationFunctionColumnPair fromColumnName(String columnName) {
+  public static AggregationFunctionColumn fromColumnName(String columnName) {
     String[] parts = columnName.split(DELIMITER, 2);
     return fromFunctionAndColumnName(parts[0], parts[1]);
   }
 
-  public static AggregationFunctionColumnPair fromAggregationConfig(StarTreeAggregationConfig aggregationConfig) {
-    return fromFunctionAndColumnName(aggregationConfig.getAggregationFunction(), aggregationConfig.getColumnName());
+  public static AggregationFunctionColumn fromAggregationConfig(StarTreeAggregationConfig aggregationConfig) {
+    AggregationFunctionType functionType = AggregationFunctionType.getAggregationFunctionType(
+        aggregationConfig.getAggregationFunction());
+    if (functionType == AggregationFunctionType.COUNT) {
+      return COUNT_STAR;
+    } else {
+      return new AggregationFunctionColumn(functionType, aggregationConfig.getColumnName(),
+          aggregationConfig.getFunctionParameters());
+    }
   }
 
   /**
-   * Return a new {@code AggregationFunctionColumnPair} from an existing functionColumnPair where the new pair
+   * Return a new {@code AggregationFunctionColumn} from an existing functionColumn where the new pair
    * has the {@link AggregationFunctionType} set to the underlying stored type used in the segment or indexes.
-   * @param functionColumnPair the existing functionColumnPair
-   * @return the new functionColumnPair
+   * @param functionColumn the existing AggregationFunctionColumn
+   * @return the new AggregationFunctionColumn with the stored type
    */
-  public static AggregationFunctionColumnPair resolveToStoredType(AggregationFunctionColumnPair functionColumnPair) {
-    AggregationFunctionType storedType = getStoredType(functionColumnPair.getFunctionType());
-    return new AggregationFunctionColumnPair(storedType, functionColumnPair.getColumn());
+  public static AggregationFunctionColumn resolveToStoredType(AggregationFunctionColumn functionColumn) {
+    AggregationFunctionType storedType = getStoredType(functionColumn.getFunctionType());
+    return new AggregationFunctionColumn(storedType, functionColumn.getColumn(),
+        functionColumn.getFunctionParameters());
   }
 
   /**
@@ -108,12 +130,12 @@ public class AggregationFunctionColumnPair implements Comparable<AggregationFunc
     }
   }
 
-  private static AggregationFunctionColumnPair fromFunctionAndColumnName(String functionName, String columnName) {
+  private static AggregationFunctionColumn fromFunctionAndColumnName(String functionName, String columnName) {
     AggregationFunctionType functionType = AggregationFunctionType.getAggregationFunctionType(functionName);
     if (functionType == AggregationFunctionType.COUNT) {
       return COUNT_STAR;
     } else {
-      return new AggregationFunctionColumnPair(functionType, columnName);
+      return new AggregationFunctionColumn(functionType, columnName);
     }
   }
 
@@ -127,9 +149,14 @@ public class AggregationFunctionColumnPair implements Comparable<AggregationFunc
     if (this == obj) {
       return true;
     }
-    if (obj instanceof AggregationFunctionColumnPair) {
-      AggregationFunctionColumnPair anotherPair = (AggregationFunctionColumnPair) obj;
-      return _functionType == anotherPair._functionType && _column.equals(anotherPair._column);
+    if (obj instanceof AggregationFunctionColumn) {
+      AggregationFunctionColumn other = (AggregationFunctionColumn) obj;
+      // TODO: Revisit this since it means that for aggregation functions where a certain config parameter need not be
+      // checked to determine whether a query can be served by a star-tree index, we won't rebuild a star-tree index
+      // if the parameter value is changed in the index configuration.
+      return _functionType == other._functionType && _column.equals(other._column)
+          && AggregationFunctionType.compareFunctionParametersForStarTree(_functionType, _functionParameters,
+          other._functionParameters) == 0;
     }
     return false;
   }
@@ -140,8 +167,17 @@ public class AggregationFunctionColumnPair implements Comparable<AggregationFunc
   }
 
   @Override
-  public int compareTo(AggregationFunctionColumnPair other) {
-    return Comparator.comparing((AggregationFunctionColumnPair o) -> o._column)
-        .thenComparing((AggregationFunctionColumnPair o) -> o._functionType).compare(this, other);
+  public int compareTo(AggregationFunctionColumn other) {
+    int compareValue = Comparator.comparing((AggregationFunctionColumn o) -> o._column)
+        .thenComparing((AggregationFunctionColumn o) -> o._functionType)
+        .compare(this, other);
+
+    // Only equal if configurations match
+    if (compareValue != 0) {
+      return compareValue;
+    } else {
+      return AggregationFunctionType.compareFunctionParametersForStarTree(_functionType, _functionParameters,
+          other._functionParameters);
+    }
   }
 }

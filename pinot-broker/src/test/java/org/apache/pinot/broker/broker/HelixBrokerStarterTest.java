@@ -22,7 +22,9 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.IdealState;
+import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
 import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
@@ -38,6 +40,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
@@ -71,6 +74,12 @@ public class HelixBrokerStarterTest extends ControllerTest {
       throws Exception {
     startZk();
     startController();
+    // Set hyperloglog log2m value to 12.
+    HelixConfigScope scope =
+        new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(getHelixClusterName())
+            .build();
+    _helixManager.getConfigAccessor().set(scope, CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY,
+        Integer.toString(12));
 
     Map<String, Object> properties = new HashMap<>();
     properties.put(Helix.KEY_OF_BROKER_QUERY_PORT, 18099);

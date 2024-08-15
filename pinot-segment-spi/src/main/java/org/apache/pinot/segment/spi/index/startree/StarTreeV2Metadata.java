@@ -19,12 +19,15 @@
 package org.apache.pinot.segment.spi.index.startree;
 
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import org.apache.commons.configuration2.Configuration;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants.MetadataKey;
 import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
@@ -36,7 +39,7 @@ import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
 public class StarTreeV2Metadata {
   private final int _numDocs;
   private final List<String> _dimensionsSplitOrder;
-  private final TreeMap<AggregationFunctionColumnPair, AggregationSpec> _aggregationSpecs;
+  private final TreeMap<AggregationFunctionColumn, AggregationSpec> _aggregationSpecs;
 
   // The following properties are useful for generating the builder config
   private final int _maxLeafRecords;
@@ -53,10 +56,17 @@ public class StarTreeV2Metadata {
         AggregationFunctionType functionType =
             AggregationFunctionType.getAggregationFunctionType(aggregationConfig.getString(MetadataKey.FUNCTION_TYPE));
         String columnName = aggregationConfig.getString(MetadataKey.COLUMN_NAME);
-        AggregationFunctionColumnPair functionColumnPair = new AggregationFunctionColumnPair(functionType, columnName);
+        Map<String, Object> functionParameters = new HashMap<>();
+        for (Iterator<String> it = aggregationConfig.getKeys(MetadataKey.FUNCTION_PARAMETERS); it.hasNext(); ) {
+          String key = it.next();
+          functionParameters.put(StringUtils.removeStart(key, MetadataKey.FUNCTION_PARAMETERS + '.'),
+              aggregationConfig.getProperty(key));
+        }
+        AggregationFunctionColumn functionColumn = new AggregationFunctionColumn(functionType, columnName,
+            functionParameters);
         // Lookup the stored aggregation type
-        AggregationFunctionColumnPair storedType =
-            AggregationFunctionColumnPair.resolveToStoredType(functionColumnPair);
+        AggregationFunctionColumn storedType =
+            AggregationFunctionColumn.resolveToStoredType(functionColumn);
         AggregationSpec aggregationSpec =
             new AggregationSpec(aggregationConfig.getEnum(MetadataKey.COMPRESSION_CODEC, CompressionCodec.class, null),
                 aggregationConfig.getBoolean(MetadataKey.DERIVE_NUM_DOCS_PER_CHUNK, null),
@@ -69,11 +79,11 @@ public class StarTreeV2Metadata {
     } else {
       // Backward compatibility with columnName format
       for (String functionColumnPairName : metadataProperties.getStringArray(MetadataKey.FUNCTION_COLUMN_PAIRS)) {
-        AggregationFunctionColumnPair functionColumnPair =
-            AggregationFunctionColumnPair.fromColumnName(functionColumnPairName);
+        AggregationFunctionColumn functionColumn =
+            AggregationFunctionColumn.fromColumnName(functionColumnPairName);
         // Lookup the stored aggregation type
-        AggregationFunctionColumnPair storedType =
-            AggregationFunctionColumnPair.resolveToStoredType(functionColumnPair);
+        AggregationFunctionColumn storedType =
+            AggregationFunctionColumn.resolveToStoredType(functionColumn);
         // If there is already an equivalent functionColumnPair in the map for the stored type, do not load another.
         _aggregationSpecs.putIfAbsent(storedType, AggregationSpec.DEFAULT);
       }
@@ -91,16 +101,16 @@ public class StarTreeV2Metadata {
     return _dimensionsSplitOrder;
   }
 
-  public TreeMap<AggregationFunctionColumnPair, AggregationSpec> getAggregationSpecs() {
+  public TreeMap<AggregationFunctionColumn, AggregationSpec> getAggregationSpecs() {
     return _aggregationSpecs;
   }
 
-  public Set<AggregationFunctionColumnPair> getFunctionColumnPairs() {
+  public Set<AggregationFunctionColumn> getFunctionColumns() {
     return _aggregationSpecs.keySet();
   }
 
-  public boolean containsFunctionColumnPair(AggregationFunctionColumnPair functionColumnPair) {
-    return _aggregationSpecs.containsKey(functionColumnPair);
+  public boolean containsFunctionColumn(AggregationFunctionColumn functionColumn) {
+    return _aggregationSpecs.containsKey(functionColumn);
   }
 
   public int getMaxLeafRecords() {
@@ -112,20 +122,26 @@ public class StarTreeV2Metadata {
   }
 
   public static void writeMetadata(Configuration metadataProperties, int totalDocs, List<String> dimensionsSplitOrder,
-      TreeMap<AggregationFunctionColumnPair, AggregationSpec> aggregationSpecs, int maxLeafRecords,
+      TreeMap<AggregationFunctionColumn, AggregationSpec> aggregationSpecs, int maxLeafRecords,
       Set<String> skipStarNodeCreationForDimensions) {
     metadataProperties.setProperty(MetadataKey.TOTAL_DOCS, totalDocs);
     metadataProperties.setProperty(MetadataKey.DIMENSIONS_SPLIT_ORDER, dimensionsSplitOrder);
     metadataProperties.setProperty(MetadataKey.FUNCTION_COLUMN_PAIRS, aggregationSpecs.keySet());
     metadataProperties.setProperty(MetadataKey.AGGREGATION_COUNT, aggregationSpecs.size());
     int index = 0;
-    for (Map.Entry<AggregationFunctionColumnPair, AggregationSpec> entry : aggregationSpecs.entrySet()) {
-      AggregationFunctionColumnPair functionColumnPair = entry.getKey();
+    for (Map.Entry<AggregationFunctionColumn, AggregationSpec> entry : aggregationSpecs.entrySet()) {
+      AggregationFunctionColumn functionColumn = entry.getKey();
       AggregationSpec aggregationSpec = entry.getValue();
       String prefix = MetadataKey.AGGREGATION_PREFIX + index + '.';
       metadataProperties.setProperty(prefix + MetadataKey.FUNCTION_TYPE,
-          functionColumnPair.getFunctionType().getName());
-      metadataProperties.setProperty(prefix + MetadataKey.COLUMN_NAME, functionColumnPair.getColumn());
+          functionColumn.getFunctionType().getName());
+      if (functionColumn.getFunctionParameters() != null) {
+        for (Map.Entry<String, Object> parameters : functionColumn.getFunctionParameters().entrySet()) {
+          metadataProperties.setProperty(prefix + MetadataKey.FUNCTION_PARAMETERS + '.' + parameters.getKey(),
+              parameters.getValue());
+        }
+      }
+      metadataProperties.setProperty(prefix + MetadataKey.COLUMN_NAME, functionColumn.getColumn());
       metadataProperties.setProperty(prefix + MetadataKey.COMPRESSION_CODEC, aggregationSpec.getCompressionCodec());
       metadataProperties.setProperty(prefix + MetadataKey.DERIVE_NUM_DOCS_PER_CHUNK,
           aggregationSpec.isDeriveNumDocsPerChunk());

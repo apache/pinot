@@ -34,7 +34,7 @@ import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
+import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumn;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 
@@ -205,8 +205,8 @@ public class StarTreeIndexMapUtils {
         }
         // Convert metric (function-column pair) to stored name for backward-compatibility
         if (!dimensionSet.contains(column)) {
-          AggregationFunctionColumnPair functionColumnPair = AggregationFunctionColumnPair.fromColumnName(column);
-          column = AggregationFunctionColumnPair.resolveToStoredType(functionColumnPair).toColumnName();
+          AggregationFunctionColumn functionColumn = AggregationFunctionColumn.fromColumnName(column);
+          column = AggregationFunctionColumn.resolveToStoredType(functionColumn).toColumnName();
         }
         indexKey = new IndexKey(IndexType.FORWARD_INDEX, column);
       }

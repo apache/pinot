@@ -33,7 +33,7 @@ import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.startree.v2.store.StarTreeIndexMapUtils;
 import org.apache.pinot.segment.spi.V1Constants;
-import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
+import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumn;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
 import org.slf4j.Logger;
@@ -110,7 +110,7 @@ public class StarTreeIndexSeparator implements Closeable {
           writeIndexToFile(destIndexFile, indexMap.get(key));
           break;
         case FORWARD_INDEX:
-          String suffix = key._column.contains(AggregationFunctionColumnPair.DELIMITER)
+          String suffix = key._column.contains(AggregationFunctionColumn.DELIMITER)
               ? V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION
               : V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION;
           destIndexFile = new File(starTreeOutputDir, key._column + suffix);

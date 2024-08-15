@@ -35,7 +35,7 @@ import org.apache.commons.lang3.builder.ToStringStyle;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.SegmentMetadata;
-import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
+import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumn;
 import org.apache.pinot.segment.spi.index.startree.AggregationSpec;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
 import org.apache.pinot.spi.config.table.StarTreeAggregationConfig;
@@ -56,7 +56,7 @@ public class StarTreeV2BuilderConfig {
 
   private final List<String> _dimensionsSplitOrder;
   private final Set<String> _skipStarNodeCreationForDimensions;
-  private final TreeMap<AggregationFunctionColumnPair, AggregationSpec> _aggregationSpecs;
+  private final TreeMap<AggregationFunctionColumn, AggregationSpec> _aggregationSpecs;
   private final int _maxLeafRecords;
 
   public static StarTreeV2BuilderConfig fromIndexConfig(StarTreeIndexConfig indexConfig) {
@@ -71,13 +71,13 @@ public class StarTreeV2BuilderConfig {
     } else {
       skipStarNodeCreationForDimensions = Collections.emptySet();
     }
-    TreeMap<AggregationFunctionColumnPair, AggregationSpec> aggregationSpecs = new TreeMap<>();
+    TreeMap<AggregationFunctionColumn, AggregationSpec> aggregationSpecs = new TreeMap<>();
     if (indexConfig.getFunctionColumnPairs() != null) {
       for (String functionColumnPair : indexConfig.getFunctionColumnPairs()) {
-        AggregationFunctionColumnPair aggregationFunctionColumnPair =
-            AggregationFunctionColumnPair.fromColumnName(functionColumnPair);
-        AggregationFunctionColumnPair storedType =
-            AggregationFunctionColumnPair.resolveToStoredType(aggregationFunctionColumnPair);
+        AggregationFunctionColumn aggregationFunctionColumn =
+            AggregationFunctionColumn.fromColumnName(functionColumnPair);
+        AggregationFunctionColumn storedType =
+            AggregationFunctionColumn.resolveToStoredType(aggregationFunctionColumn);
         // If there is already an equivalent functionColumnPair in the map, do not load another.
         // This prevents the duplication of the aggregation when the StarTree is constructed.
         aggregationSpecs.putIfAbsent(storedType, AggregationSpec.DEFAULT);
@@ -85,10 +85,10 @@ public class StarTreeV2BuilderConfig {
     }
     if (indexConfig.getAggregationConfigs() != null) {
       for (StarTreeAggregationConfig aggregationConfig : indexConfig.getAggregationConfigs()) {
-        AggregationFunctionColumnPair aggregationFunctionColumnPair =
-            AggregationFunctionColumnPair.fromAggregationConfig(aggregationConfig);
-        AggregationFunctionColumnPair storedType =
-            AggregationFunctionColumnPair.resolveToStoredType(aggregationFunctionColumnPair);
+        AggregationFunctionColumn aggregationFunctionColumn =
+            AggregationFunctionColumn.fromAggregationConfig(aggregationConfig);
+        AggregationFunctionColumn storedType =
+            AggregationFunctionColumn.resolveToStoredType(aggregationFunctionColumn);
         // If there is already an equivalent functionColumnPair in the map, do not load another.
         // This prevents the duplication of the aggregation when the StarTree is constructed.
         aggregationSpecs.putIfAbsent(storedType, new AggregationSpec(aggregationConfig));
@@ -176,10 +176,10 @@ public class StarTreeV2BuilderConfig {
     }
     Preconditions.checkState(!dimensionsSplitOrder.isEmpty(), "No qualified dimension found for star-tree split order");
 
-    TreeMap<AggregationFunctionColumnPair, AggregationSpec> aggregationSpecs = new TreeMap<>();
-    aggregationSpecs.put(AggregationFunctionColumnPair.COUNT_STAR, AggregationSpec.DEFAULT);
+    TreeMap<AggregationFunctionColumn, AggregationSpec> aggregationSpecs = new TreeMap<>();
+    aggregationSpecs.put(AggregationFunctionColumn.COUNT_STAR, AggregationSpec.DEFAULT);
     for (String numericMetric : numericMetrics) {
-      aggregationSpecs.put(new AggregationFunctionColumnPair(AggregationFunctionType.SUM, numericMetric),
+      aggregationSpecs.put(new AggregationFunctionColumn(AggregationFunctionType.SUM, numericMetric),
           AggregationSpec.DEFAULT);
     }
 
@@ -242,10 +242,10 @@ public class StarTreeV2BuilderConfig {
     }
     Preconditions.checkState(!dimensionsSplitOrder.isEmpty(), "No qualified dimension found for star-tree split order");
 
-    TreeMap<AggregationFunctionColumnPair, AggregationSpec> aggregationSpecs = new TreeMap<>();
-    aggregationSpecs.put(AggregationFunctionColumnPair.COUNT_STAR, AggregationSpec.DEFAULT);
+    TreeMap<AggregationFunctionColumn, AggregationSpec> aggregationSpecs = new TreeMap<>();
+    aggregationSpecs.put(AggregationFunctionColumn.COUNT_STAR, AggregationSpec.DEFAULT);
     for (String numericMetric : numericMetrics) {
-      aggregationSpecs.put(new AggregationFunctionColumnPair(AggregationFunctionType.SUM, numericMetric),
+      aggregationSpecs.put(new AggregationFunctionColumn(AggregationFunctionType.SUM, numericMetric),
           AggregationSpec.DEFAULT);
     }
 
@@ -263,7 +263,7 @@ public class StarTreeV2BuilderConfig {
   }
 
   private StarTreeV2BuilderConfig(List<String> dimensionsSplitOrder, Set<String> skipStarNodeCreationForDimensions,
-      TreeMap<AggregationFunctionColumnPair, AggregationSpec> aggregationSpecs, int maxLeafRecords) {
+      TreeMap<AggregationFunctionColumn, AggregationSpec> aggregationSpecs, int maxLeafRecords) {
     _dimensionsSplitOrder = dimensionsSplitOrder;
     _skipStarNodeCreationForDimensions = skipStarNodeCreationForDimensions;
     _aggregationSpecs = aggregationSpecs;
@@ -278,11 +278,11 @@ public class StarTreeV2BuilderConfig {
     return _skipStarNodeCreationForDimensions;
   }
 
-  public TreeMap<AggregationFunctionColumnPair, AggregationSpec> getAggregationSpecs() {
+  public TreeMap<AggregationFunctionColumn, AggregationSpec> getAggregationSpecs() {
     return _aggregationSpecs;
   }
 
-  public Set<AggregationFunctionColumnPair> getFunctionColumnPairs() {
+  public Set<AggregationFunctionColumn> getFunctionColumns() {
     return _aggregationSpecs.keySet();
   }
 
