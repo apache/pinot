@@ -19,8 +19,11 @@
 package org.apache.pinot.common.function.scalar.comparison;
 
 import javax.annotation.Nullable;
+import org.apache.calcite.sql.type.ReturnTypes;
+import org.apache.calcite.sql.type.SameOperandTypeChecker;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.PinotScalarFunction;
+import org.apache.pinot.common.function.sql.PinotSqlFunction;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 
 
@@ -30,6 +33,12 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 public abstract class PolymorphicComparisonScalarFunction implements PinotScalarFunction {
 
   protected static final double DOUBLE_COMPARISON_TOLERANCE = 1e-7d;
+
+  @Nullable
+  @Override
+  public PinotSqlFunction toPinotSqlFunction() {
+    return new PinotSqlFunction(getName(), ReturnTypes.BOOLEAN_FORCE_NULLABLE, new SameOperandTypeChecker(2));
+  }
 
   @Nullable
   @Override

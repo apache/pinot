@@ -40,9 +40,7 @@ public interface PinotScalarFunction {
    * doesn't need to be registered (e.g. standard SqlFunction).
    */
   @Nullable
-  default PinotSqlFunction toPinotSqlFunction() {
-    return null;
-  }
+  PinotSqlFunction toPinotSqlFunction();
 
   /**
    * Returns the {@link FunctionInfo} for the given argument types, or {@code null} if there is no matching.
