@@ -196,7 +196,6 @@ public class PinotHelixResourceManager {
   private static final int DEFAULT_IDEAL_STATE_UPDATER_LOCKERS_SIZE = 500;
   private static final int DEFAULT_LINEAGE_UPDATER_LOCKERS_SIZE = 500;
   private static final String API_REQUEST_ID_PREFIX = "api-";
-  private Map<String, Integer> _serverToSegmentCountMap;
 
   private enum LineageUpdateType {
     START, END, REVERT
@@ -453,13 +452,6 @@ public class PinotHelixResourceManager {
    */
   public List<InstanceConfig> getAllHelixInstanceConfigs() {
     return HelixHelper.getInstanceConfigs(_helixZkManager);
-  }
-
-  /**
-   * returns server to segments count
-   */
-  public Map<String, Integer> getServerToSegmentCountMap() {
-    return _serverToSegmentCountMap;
   }
 
   /**
@@ -2858,7 +2850,6 @@ public class PinotHelixResourceManager {
    */
   public Map<String, List<String>> getServerToSegmentsMap(String tableNameWithType) {
     Map<String, List<String>> serverToSegmentsMap = new TreeMap<>();
-    _serverToSegmentCountMap = new TreeMap<>();
     IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableNameWithType);
     if (idealState == null) {
       throw new IllegalStateException("Ideal state does not exist for table: " + tableNameWithType);
@@ -2868,7 +2859,6 @@ public class PinotHelixResourceManager {
       for (Map.Entry<String, String> instanceStateEntry : entry.getValue().entrySet()) {
         if (!instanceStateEntry.getValue().equals(SegmentStateModel.OFFLINE)) {
           serverToSegmentsMap.computeIfAbsent(instanceStateEntry.getKey(), key -> new ArrayList<>()).add(segmentName);
-          _serverToSegmentCountMap.merge(instanceStateEntry.getKey(), 1, Integer::sum);
         }
       }
     }

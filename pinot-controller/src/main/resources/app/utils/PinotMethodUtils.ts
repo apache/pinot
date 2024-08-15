@@ -386,9 +386,9 @@ const getAllSchemaDetails = async (schemaList) => {
   schemaDetails = results.map((obj)=>{
     let schemaObj = [];
     schemaObj.push(obj.schemaName);
-    schemaObj.push(obj.dimensionFieldSpecsCount);
-    schemaObj.push(obj.dateTimeFieldSpecsCount);
-    schemaObj.push(obj.metricFieldSpecsCount);
+    schemaObj.push(obj.numDimensionFields);
+    schemaObj.push(obj.numDateTimeFields);
+    schemaObj.push(obj.numMetricFields);
     schemaObj.push(schemaObj[1] + schemaObj[2] + schemaObj[3]);
     return schemaObj;
   })

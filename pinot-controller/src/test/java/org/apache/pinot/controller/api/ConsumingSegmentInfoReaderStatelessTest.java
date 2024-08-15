@@ -186,15 +186,6 @@ public class ConsumingSegmentInfoReaderStatelessTest {
     return subset;
   }
 
-  private Map<String, Integer> subsetOfServerSegmentsCount(String... servers) {
-    Map<String, Integer> subset = new HashMap<>();
-    for (String server : servers) {
-      subset.put(server, _serverMap.get(server)._consumerInfos.stream().map(SegmentConsumerInfo::getSegmentName)
-          .collect(Collectors.toList()).size());
-    }
-    return subset;
-  }
-
   private BiMap<String, String> serverEndpoints(String... servers) {
     BiMap<String, String> endpoints = HashBiMap.create(servers.length);
     for (String server : servers) {

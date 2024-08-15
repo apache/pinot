@@ -130,11 +130,10 @@ public class PinotSchemaRestletResource {
   public List<SchemaInfo> getSchemaInfo(@Context HttpHeaders headers) {
     List<SchemaInfo> schemasInfo = new ArrayList<>();
     TableCache tableCache = _pinotHelixResourceManager.getTableCache();
-    Map<String, TableCache.SchemaInfo> schemaInfomap = tableCache.getSchemaInfoMap();
-    for (Map.Entry<String, TableCache.SchemaInfo> entry : schemaInfomap.entrySet()) {
-      TableCache.SchemaInfo schemaInfoEntry = entry.getValue();
-      schemasInfo.add(new SchemaInfo(entry.getKey(), schemaInfoEntry.getDimensionFieldSpecsCount(),
-          schemaInfoEntry.getDateTimeFieldSpecsCount(), schemaInfoEntry.getMetricFieldSpecsCount()));
+    List<Schema> schemaList = tableCache.getSchemas();
+    for (Schema schema : schemaList) {
+      schemasInfo.add(new SchemaInfo(schema.getSchemaName(), schema.getDimensionFieldSpecs().size() - 3,
+          schema.getDateTimeFieldSpecs().size(), schema.getMetricFieldSpecs().size()));
     }
     return schemasInfo;
   }

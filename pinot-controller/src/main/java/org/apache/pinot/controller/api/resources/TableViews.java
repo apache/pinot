@@ -144,18 +144,27 @@ public class TableViews {
     for (Map.Entry<String, Map<String, String>> entry : externalViewMap.entrySet()) {
       String segment = entry.getKey();
       Map<String, String> externalViewEntryValue = entry.getValue();
+      Map<String, String> idealViewEntryValue = idealStateMap.get(segment);
       if (isErrorSegment(externalViewEntryValue)) {
         segmentStatusInfoList.add(
             new SegmentStatusInfo(segment, CommonConstants.Helix.StateModel.DisplaySegmentStatus.BAD));
-      } else if (isOnlineOrConsumingSegment(externalViewEntryValue) && externalViewMap.equals(idealStateMap)) {
-        segmentStatusInfoList.add(
-            new SegmentStatusInfo(segment, CommonConstants.Helix.StateModel.DisplaySegmentStatus.GOOD));
-      } else if (isOfflineSegment(externalViewEntryValue) && externalViewMap.equals(idealStateMap)) {
-        segmentStatusInfoList.add(
-            new SegmentStatusInfo(segment, CommonConstants.Helix.StateModel.DisplaySegmentStatus.GOOD));
       } else {
-        segmentStatusInfoList.add(
-            new SegmentStatusInfo(segment, CommonConstants.Helix.StateModel.DisplaySegmentStatus.UPDATING));
+        boolean isViewsEqual = externalViewEntryValue.equals(idealViewEntryValue);
+        if (isViewsEqual) {
+          if (isOnlineOrConsumingSegment(externalViewEntryValue)) {
+            segmentStatusInfoList.add(
+                new SegmentStatusInfo(segment, CommonConstants.Helix.StateModel.DisplaySegmentStatus.GOOD));
+          } else if (isOfflineSegment(externalViewEntryValue)) {
+            segmentStatusInfoList.add(
+                new SegmentStatusInfo(segment, CommonConstants.Helix.StateModel.DisplaySegmentStatus.GOOD));
+          } else {
+            segmentStatusInfoList.add(
+                new SegmentStatusInfo(segment, CommonConstants.Helix.StateModel.DisplaySegmentStatus.UPDATING));
+          }
+        } else {
+          segmentStatusInfoList.add(
+              new SegmentStatusInfo(segment, CommonConstants.Helix.StateModel.DisplaySegmentStatus.UPDATING));
+        }
       }
     }
     return segmentStatusInfoList;

@@ -84,14 +84,14 @@ public class TableSize {
   public TableSizeReader.TableSizeDetails getTableSize(
       @ApiParam(value = "Table name without type", required = true, example = "myTable | myTable_OFFLINE")
       @PathParam("tableName") String tableName,
-      @ApiParam(value = "Provide detailed information") @DefaultValue("true") @QueryParam("detailed") boolean detailed,
+      @ApiParam(value = "Provide detailed information") @DefaultValue("true") @QueryParam("verbose") boolean verbose,
       @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     TableSizeReader.TableSizeDetails tableSizeDetails = null;
     try {
       tableSizeDetails =
           _tableSizeReader.getTableSizeDetails(tableName, _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
-      if (!detailed) {
+      if (!verbose) {
         if (tableSizeDetails._offlineSegments != null) {
           tableSizeDetails._offlineSegments._segments = new HashMap<>();
         }

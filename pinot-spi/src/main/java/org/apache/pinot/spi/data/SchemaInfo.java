@@ -31,20 +31,19 @@ public class SchemaInfo {
   @JsonProperty("schemaName")
   private String _schemaName;
 
-  @JsonProperty("dimensionFieldSpecsCount")
-  private int _dimensionFieldSpecsCount;
+  @JsonProperty("numDimensionFields")
+  private int _numDimensionFields;
 
-  @JsonProperty("dateTimeFieldSpecsCount")
-  private int _dateTimeFieldSpecsCount;
+  @JsonProperty("numDateTimeFields")
+  private int _numDateTimeFields;
 
-  @JsonProperty("metricFieldSpecsCount")
-  private int _metricFieldSpecsCount;
+  @JsonProperty("numMetricFields")
+  private int _numMetricFields;
 
-  public SchemaInfo(String schemaName, int dimensionFieldSpecsCount, int dateTimeFieldSpecsCount,
-      int metricFieldSpecsCount) {
+  public SchemaInfo(String schemaName, int numDimensionFields, int numDateTimeFields, int numMetricFields) {
     _schemaName = schemaName;
-    _dimensionFieldSpecsCount = dimensionFieldSpecsCount;
-    _dateTimeFieldSpecsCount = dateTimeFieldSpecsCount;
-    _metricFieldSpecsCount = metricFieldSpecsCount;
+    _numDimensionFields = numDimensionFields;
+    _numDateTimeFields = numDateTimeFields;
+    _numMetricFields = numMetricFields;
   }
 }
