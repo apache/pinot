@@ -105,8 +105,7 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
                 if (comparisonResult >= 0) {
                   if (validDocIdsForOldSegment == null && oldSegment != null && oldSegment.getValidDocIds() != null) {
                     // Update the old segment's bitmap in place if a copy of the bitmap was not provided.
-                    replaceDocId(segment, validDocIds, queryableDocIds, oldSegment, currentDocId, recordInfo.getDocId(),
-                        recordInfo);
+                    replaceDocId(segment, validDocIds, queryableDocIds, oldSegment, currentDocId, newDocId, recordInfo);
                   } else {
                     addDocId(segment, validDocIds, queryableDocIds, newDocId, recordInfo);
                     if (validDocIdsForOldSegment != null) {
