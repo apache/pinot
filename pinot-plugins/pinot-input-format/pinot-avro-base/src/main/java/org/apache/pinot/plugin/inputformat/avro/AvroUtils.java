@@ -32,6 +32,7 @@ import org.apache.avro.SchemaBuilder;
 import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
+import org.apache.avro.io.DatumReader;
 import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
@@ -215,10 +216,11 @@ public class AvroUtils {
    */
   public static DataFileStream<GenericRecord> getAvroReader(File avroFile)
       throws IOException {
+    DatumReader<GenericRecord> datumReader = new GenericDatumReader<>(null, null, new AvroCustomGenericData());
     if (RecordReaderUtils.isGZippedFile(avroFile)) {
-      return new DataFileStream<>(new GZIPInputStream(new FileInputStream(avroFile)), new GenericDatumReader<>());
+      return new DataFileStream<>(new GZIPInputStream(new FileInputStream(avroFile)), datumReader);
     } else {
-      return new DataFileStream<>(new FileInputStream(avroFile), new GenericDatumReader<>());
+      return new DataFileStream<>(new FileInputStream(avroFile), datumReader);
     }
   }
 
