@@ -202,7 +202,7 @@
     <commons-configuration2.version>2.11.0</commons-configuration2.version>
     <commons-io.version>2.16.1</commons-io.version>
     <commons-codec.version>1.17.1</commons-codec.version>
-    <commons-cli.version>1.8.0</commons-cli.version>
+    <commons-cli.version>1.9.0</commons-cli.version>
     <commons-net.version>3.11.1</commons-net.version>
     <commons-validator.version>1.9.0</commons-validator.version>
 
