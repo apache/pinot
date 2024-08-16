@@ -1,10 +1,6 @@
 package org.apache.pinot.common.utils;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import io.grpc.internal.JsonUtil;
-import java.io.IOException;
 import org.apache.pinot.common.restlet.resources.ResourceUtils;
 import org.apache.pinot.common.restlet.resources.SegmentsReloadCheckResponse;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -16,11 +12,9 @@ import static org.testng.Assert.assertTrue;
 
 
 public class SerializerResponseTest {
-  private final ObjectMapper objectMapper = new ObjectMapper();
 
   @Test
-  public void testSerialization()
-      throws JsonProcessingException {
+  public void testSerialization() {
     // Given
     boolean needReload = true;
     String instanceId = "instance123";
