@@ -248,12 +248,22 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     // Make sure we do metric cleanup when we shut down the table.
     // Do this first, so we do not show ingestion lag during shutdown.
     _ingestionDelayTracker.shutdown();
-    if (_tableUpsertMetadataManager != null) {
+    if (_tableUpsertMetadataManager != null || _tableDedupMetadataManager != null) {
       // Stop the upsert metadata manager first to prevent removing metadata when destroying segments
-      _tableUpsertMetadataManager.stop();
+      if (_tableUpsertMetadataManager != null) {
+        _tableUpsertMetadataManager.stop();
+      }
+      if (_tableDedupMetadataManager != null) {
+        _tableDedupMetadataManager.stop();
+      }
       releaseAndRemoveAllSegments();
       try {
-        _tableUpsertMetadataManager.close();
+        if (_tableUpsertMetadataManager != null) {
+          _tableUpsertMetadataManager.close();
+        }
+        if (_tableDedupMetadataManager != null) {
+          _tableDedupMetadataManager.close();
+        }
       } catch (IOException e) {
         _logger.warn("Caught exception while closing upsert metadata manager", e);
       }
@@ -545,14 +555,13 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       return;
     }
 
-    // TODO: Change dedup handling to handle segment replacement
     if (isDedupEnabled() && immutableSegment instanceof ImmutableSegmentImpl) {
-      buildDedupMeta((ImmutableSegmentImpl) immutableSegment);
+      handleDedup((ImmutableSegmentImpl) immutableSegment);
     }
     super.addSegment(immutableSegment);
   }
 
-  private void buildDedupMeta(ImmutableSegmentImpl immutableSegment) {
+  private void handleDedup(ImmutableSegmentImpl immutableSegment) {
     // TODO(saurabh) refactor commons code with handleUpsert
     String segmentName = immutableSegment.getSegmentName();
     Integer partitionGroupId =
@@ -563,7 +572,15 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     PartitionDedupMetadataManager partitionDedupMetadataManager =
         _tableDedupMetadataManager.getOrCreatePartitionManager(partitionGroupId);
     immutableSegment.enableDedup(partitionDedupMetadataManager);
-    partitionDedupMetadataManager.addSegment(immutableSegment);
+    SegmentDataManager oldSegmentManager = _segmentDataManagerMap.get(segmentName);
+    if (oldSegmentManager != null) {
+      LOGGER.info("Replacing mutable segment: {} with immutable segment: {} in partition dedup metadata manager",
+          oldSegmentManager.getSegment().getSegmentName(), segmentName);
+      partitionDedupMetadataManager.replaceSegment(oldSegmentManager.getSegment(), immutableSegment);
+    } else {
+      LOGGER.info("Adding immutable segment: {} to partition dedup metadata manager", segmentName);
+      partitionDedupMetadataManager.addSegment(immutableSegment);
+    }
   }
 
   private void handleUpsert(ImmutableSegment immutableSegment) {

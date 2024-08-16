@@ -250,6 +250,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private final AtomicBoolean _acquiredConsumerSemaphore;
   private final ServerMetrics _serverMetrics;
   private final PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
+  private final PartitionDedupMetadataManager _partitionDedupMetadataManager;
   private final BooleanSupplier _isReadyToConsumeData;
   private final MutableSegmentImpl _realtimeSegment;
   private volatile StreamPartitionMsgOffset _currentOffset; // Next offset to be consumed
@@ -720,6 +721,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
             _partitionUpsertMetadataManager.removeExpiredPrimaryKeys();
             _partitionUpsertMetadataManager.takeSnapshot();
           }
+        }
+
+        if (_partitionDedupMetadataManager != null && _tableConfig.getDedupMetadataTTL() > 0) {
+          _partitionDedupMetadataManager.removeExpiredPrimaryKeys();
         }
 
         while (!_state.isFinal()) {
@@ -1441,6 +1446,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     _schema = schema;
     _serverMetrics = serverMetrics;
     _partitionUpsertMetadataManager = partitionUpsertMetadataManager;
+    _partitionDedupMetadataManager = partitionDedupMetadataManager;
     _isReadyToConsumeData = isReadyToConsumeData;
     _segmentVersion = indexLoadingConfig.getSegmentVersion();
     _instanceId = _realtimeTableDataManager.getInstanceId();
@@ -1560,11 +1566,12 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
             .setNullHandlingEnabled(_nullHandlingEnabled)
             .setConsumerDir(consumerDir).setUpsertMode(tableConfig.getUpsertMode())
             .setPartitionUpsertMetadataManager(partitionUpsertMetadataManager)
-            .setPartitionDedupMetadataManager(partitionDedupMetadataManager)
             .setUpsertComparisonColumns(tableConfig.getUpsertComparisonColumns())
             .setUpsertDeleteRecordColumn(tableConfig.getUpsertDeleteRecordColumn())
             .setUpsertOutOfOrderRecordColumn(tableConfig.getOutOfOrderRecordColumn())
             .setUpsertDropOutOfOrderRecord(tableConfig.isDropOutOfOrderRecord())
+            .setPartitionDedupMetadataManager(partitionDedupMetadataManager)
+            .setDedupTimeColumn(tableConfig.getDedupTimeColumn())
             .setFieldConfigList(tableConfig.getFieldConfigList());
 
     // Create message decoder

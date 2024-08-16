@@ -395,6 +395,16 @@ public class TableConfig extends BaseJsonConfig {
   }
 
   @JsonIgnore
+  public String getDedupTimeColumn() {
+    return _dedupConfig == null ? null : _dedupConfig.getDedupTimeColumn();
+  }
+
+  @JsonIgnore
+  public double getDedupMetadataTTL() {
+    return _dedupConfig == null ? 0 : _dedupConfig.getMetadataTTL();
+  }
+
+  @JsonIgnore
   @Nullable
   public String getUpsertDeleteRecordColumn() {
     return _upsertConfig == null ? null : _upsertConfig.getDeleteRecordColumn();
