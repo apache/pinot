@@ -23,6 +23,7 @@ import com.google.common.collect.BiMap;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -32,8 +33,12 @@ import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.restlet.resources.TableMetadataInfo;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsMetadataInfo;
+import org.apache.pinot.controller.api.resources.ResourceUtils;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -44,6 +49,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
  * the column indexes available.
  */
 public class TableMetadataReader {
+  private static final Logger LOGGER = LoggerFactory.getLogger(TableMetadataReader.class);
   private final Executor _executor;
   private final HttpClientConnectionManager _connectionManager;
   private final PinotHelixResourceManager _pinotHelixResourceManager;
@@ -53,6 +59,26 @@ public class TableMetadataReader {
     _executor = executor;
     _connectionManager = connectionManager;
     _pinotHelixResourceManager = helixResourceManager;
+  }
+
+  public Map<String, JsonNode> getServerCheckSegmentsReloadMetadata(String tableName, TableType tableType, int timeoutMs)
+      throws InvalidConfigException, IOException {
+    String tableNameWithType =
+        ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER).get(0);
+    List<String> serverInstances = _pinotHelixResourceManager.getServerInstancesForTable(tableName, tableType);
+    Set<String> serverInstanceSet = new HashSet<>(serverInstances);
+    BiMap<String, String> endpoints = _pinotHelixResourceManager.getDataInstanceAdminEndpoints(serverInstanceSet);
+    ServerSegmentMetadataReader serverSegmentMetadataReader =
+        new ServerSegmentMetadataReader(_executor, _connectionManager);
+    List<String> segmentsMetadata =
+        serverSegmentMetadataReader.getCheckReloadSegmentsFromServer(tableNameWithType, serverInstanceSet, endpoints,
+            timeoutMs);
+    Map<String, JsonNode> response = new HashMap<>();
+    for (String segmentMetadata : segmentsMetadata) {
+      JsonNode responseJson = JsonUtils.stringToJsonNode(segmentMetadata);
+      response.put(responseJson.get("instanceId").asText(), responseJson);
+    }
+    return response;
   }
 
   /**

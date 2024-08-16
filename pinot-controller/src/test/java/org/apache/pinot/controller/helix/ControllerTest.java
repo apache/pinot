@@ -721,6 +721,11 @@ public class ControllerTest {
     return getControllerRequestClient().reloadTable(tableName, TableType.OFFLINE, forceDownload);
   }
 
+  public String needReloadOfflineTable(String tableNameWithType)
+      throws IOException {
+    return getControllerRequestClient().needReloadTable(tableNameWithType);
+  }
+
   public void reloadOfflineSegment(String tableName, String segmentName, boolean forceDownload)
       throws IOException {
     getControllerRequestClient().reloadSegment(tableName, segmentName, forceDownload);

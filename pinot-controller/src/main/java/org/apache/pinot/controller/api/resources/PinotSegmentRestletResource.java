@@ -69,6 +69,8 @@ import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.restlet.resources.SegmentsReloadCheckResponse;
+import org.apache.pinot.common.restlet.resources.TableSegmentsReloadCheckResponse;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.URIUtils;
@@ -820,6 +822,53 @@ public class PinotSegmentRestletResource {
           Status.INTERNAL_SERVER_ERROR, ioe);
     }
     return segmentsMetadata;
+  }
+
+  @GET
+  @Path("segments/{tableNameWithType}/needReload")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableNameWithType", action = Actions.Table.GET_METADATA)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Get the metadata of reload segments information from the servers", notes = "Returns true if "
+      + "reload is needed on the table from any one of the servers")
+  public String getTableReloadMetadata(
+      @ApiParam(value = "Table name with type", required = true, example = "myTable_REALTIME")
+      @PathParam("tableNameWithType") String tableNameWithType,
+      @QueryParam("verbose") @DefaultValue("false") boolean verbose, @Context HttpHeaders headers) {
+    String tableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
+    LOGGER.info("Received a request to fetch metadata for all segments for table {}", tableName);
+    try {
+      TableMetadataReader tableMetadataReader =
+          new TableMetadataReader(_executor, _connectionManager, _pinotHelixResourceManager);
+      Map<String, JsonNode> needReloadMetadata =
+          tableMetadataReader.getServerCheckSegmentsReloadMetadata(tableName, tableType,
+              _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
+      boolean needReload = false;
+      for (Map.Entry<String, JsonNode> entry : needReloadMetadata.entrySet()) {
+        if (entry.getValue().get("needReload").booleanValue()) {
+          needReload = true;
+          break;
+        }
+      }
+      Map<String, SegmentsReloadCheckResponse> serverResponses = new HashMap<>();
+      TableSegmentsReloadCheckResponse tableNeedReloadResponse;
+      if (verbose) {
+        for (Map.Entry<String, JsonNode> entry : needReloadMetadata.entrySet()) {
+          serverResponses.put(entry.getKey(),
+              new SegmentsReloadCheckResponse(entry.getValue().get("needReload").booleanValue(),
+                  entry.getValue().get("instanceId").asText()));
+        }
+        tableNeedReloadResponse = new TableSegmentsReloadCheckResponse(needReload, serverResponses);
+      } else {
+        tableNeedReloadResponse = new TableSegmentsReloadCheckResponse(needReload, serverResponses);
+      }
+      return JsonUtils.objectToPrettyString(tableNeedReloadResponse);
+    } catch (InvalidConfigException e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Status.BAD_REQUEST);
+    } catch (IOException ioe) {
+      throw new ControllerApplicationException(LOGGER, "Error parsing Pinot server response: " + ioe.getMessage(),
+          Status.INTERNAL_SERVER_ERROR, ioe);
+    }
   }
 
   @GET

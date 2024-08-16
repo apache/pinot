@@ -215,6 +215,45 @@ public class ServerSegmentMetadataReader {
   }
 
   /**
+   * This method is called when the API request is to fetch data about segment reload of the table.
+   * This method makes a MultiGet call to all servers that host their respective segments and gets the results.
+   * This method will return metadata of all the servers along with need reload flag.
+   * In future additional details can also be added
+   * @return list of servers and the boolean check if reload is needed.
+   */
+  public List<String> getCheckReloadSegmentsFromServer(String tableNameWithType, Set<String> serverInstances,
+      BiMap<String, String> endpoints, int timeoutMs) {
+    LOGGER.debug("Checking if reload is needed on segments from servers for table {}.", tableNameWithType);
+    List<String> serverURLs = new ArrayList<>();
+    for (String serverInstance : serverInstances) {
+      serverURLs.add(generateCheckReloadSegmentsServerURL(tableNameWithType, endpoints.get(serverInstance)));
+    }
+    BiMap<String, String> endpointsToServers = endpoints.inverse();
+    CompletionServiceHelper completionServiceHelper =
+        new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers);
+    CompletionServiceHelper.CompletionServiceResponse serviceResponse =
+        completionServiceHelper.doMultiGetRequest(serverURLs, tableNameWithType, true, timeoutMs);
+    List<String> serversNeedReloadResponses = new ArrayList<>();
+
+    int failedParses = 0;
+    for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
+      try {
+        String needReloadSegmentsMetadata = streamResponse.getValue();
+        serversNeedReloadResponses.add(needReloadSegmentsMetadata);
+      } catch (Exception e) {
+        failedParses++;
+        LOGGER.error("Unable to parse server {} response due to an error: ", streamResponse.getKey(), e);
+      }
+    }
+    if (failedParses != 0) {
+      LOGGER.error("Unable to parse server {} / {} response due to an error: ", failedParses, serverURLs.size());
+    }
+
+    LOGGER.debug("Retrieved metadata of reload check from servers.");
+    return serversNeedReloadResponses;
+  }
+
+  /**
    * This method is called when the API request is to fetch validDocId metadata for a list segments of the given table.
    * This method will pick one server randomly that hosts the target segment and fetch the segment metadata result.
    *
@@ -373,6 +412,11 @@ public class ServerSegmentMetadataReader {
     segmentName = URLEncoder.encode(segmentName, StandardCharsets.UTF_8);
     String paramsStr = generateColumnsParam(columns);
     return String.format("%s/tables/%s/segments/%s/metadata?%s", endpoint, tableNameWithType, segmentName, paramsStr);
+  }
+
+  private String generateCheckReloadSegmentsServerURL(String tableNameWithType, String endpoint) {
+    tableNameWithType = URLEncoder.encode(tableNameWithType, StandardCharsets.UTF_8);
+    return String.format("%s/tables/%s/segments/needReload", endpoint, tableNameWithType);
   }
 
   @Deprecated

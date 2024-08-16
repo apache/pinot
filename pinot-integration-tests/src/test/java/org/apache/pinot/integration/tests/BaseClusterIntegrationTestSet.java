@@ -732,9 +732,14 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
 
     // Upload the schema with extra columns
     addSchema(schema);
-
+    String tableNameWithType = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(rawTableName);
     // Reload the table
     if (includeOfflineTable) {
+      //test controller api which gives responses if reload is needed on any of the server segments when default columns are added.
+      String needBeforeReloadResponse = needReloadOfflineTable(tableNameWithType);
+      JsonNode jsonNeedReloadResponse = JsonUtils.stringToJsonNode(needBeforeReloadResponse);
+      //test to check if reload is needed i.e true
+      assertEquals(jsonNeedReloadResponse.get("needReload").asBoolean(), true);
       reloadOfflineTable(rawTableName);
     }
     reloadRealtimeTable(rawTableName);
@@ -762,7 +767,6 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     JsonNode resultTable = queryResponse.get("resultTable");
     assertEquals(resultTable.get("dataSchema").get("columnNames").size(), schema.size());
     assertEquals(resultTable.get("rows").size(), 10);
-
     // Test aggregation query to include querying all segemnts (including realtime)
     String aggregationQuery = "SELECT SUMMV(NewIntMVDimension) FROM " + rawTableName;
     queryResponse = postQuery(aggregationQuery);
@@ -778,6 +782,10 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     queryResponse = postQuery(countStarQuery);
     assertEquals(queryResponse.get("exceptions").size(), 0);
     assertEquals(queryResponse.get("resultTable").get("rows").get(0).get(0).asLong(), countStarResult);
+    String needAfterReloadResponse = needReloadOfflineTable(tableNameWithType);
+    JsonNode jsonNeedReloadResponseAfter = JsonUtils.stringToJsonNode(needAfterReloadResponse);
+    //test to check if reload is needed i.e false after reload is finished
+    assertEquals(jsonNeedReloadResponseAfter.get("needReload").asBoolean(), false);
   }
 
   private DimensionFieldSpec constructNewDimension(FieldSpec.DataType dataType, boolean singleValue) {
