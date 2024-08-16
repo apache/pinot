@@ -23,8 +23,25 @@ import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericArray;
 import org.apache.avro.generic.GenericData;
 
+/**
+ * AvroCustomGenericData is a custom implementation of GenericData that overrides the newArray method.
+ * This class provides a custom way to create new array instances based on the provided schema.
+ * Reason for custom implementation: when creating a new array instance, Avro's default implementation uses
+ * {@link org.apache.avro.generic.PrimitivesArrays} for primitive types which results into boxing/unboxing value issue.
+ */
 public class AvroCustomGenericData extends GenericData {
 
+  /**
+   * Creates a new array instance based on the provided schema.
+   * If the old object is an instance of {@link org.apache.avro.generic.GenericArray} or {@link java.util.Collection}, it clears and reuses it.
+   * Otherwise, it creates a new {@link org.apache.avro.generic.GenericData.Array} instance.
+   * This is the old implementation of avro, which is changed in version 1.12.0
+   *
+   * @param old the old array object to reuse if possible
+   * @param size the size of the new array
+   * @param schema the schema of the array items
+   * @return a new or reused array instance
+   */
   @Override
   public Object newArray(Object old, int size, Schema schema) {
     if (old instanceof GenericArray) {
