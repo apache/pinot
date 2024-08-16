@@ -53,31 +53,29 @@ class ConcurrentMapPartitionDedupMetadataManager extends BasePartitionDedupMetad
           (primaryKey, segmentAndTime) -> {
             if (segmentAndTime == null) {
               return Pair.of(newSegment, dedupTime);
-            } else {
-              // when oldSegment is null, it means we are adding a new segment
-              // when oldSegment is not null, it means we are replacing an existing segment
-              if (oldSegment == null) {
-                _logger.warn("When adding a new segment: record in segment: {} with primary key: {} and dedup "
-                        + "time: {} already exists in segment: {} with dedup time: {}", segmentName,
-                    dedupRecordInfo.getPrimaryKey(), dedupTime, segmentAndTime.getLeft().getSegmentName(),
-                    segmentAndTime.getRight());
-              } else {
-                if (segmentAndTime.getLeft() != oldSegment) {
-                  _logger.warn("When replacing a segment: dedup record in segment: {} with primary key: {} and dedup "
-                          + "time: {} exists in segment: {} (but not the segment: {} to replace) with dedup time: {}",
-                      segmentName, dedupRecordInfo.getPrimaryKey(), dedupTime,
-                      segmentAndTime.getLeft().getSegmentName(), oldSegment.getSegmentName(),
-                      segmentAndTime.getRight());
-                }
-              }
-              // When dedup time is the same, we always keep the latest segment
-              // This will handle segment replacement case correctly - a typical case is when a mutable segment is
-              // replaced by an immutable segment
-              if (segmentAndTime.getRight() <= dedupTime) {
-                return Pair.of(newSegment, dedupTime);
-              }
-              return segmentAndTime;
             }
+            // when oldSegment is null, it means we are adding a new segment
+            // when oldSegment is not null, it means we are replacing an existing segment
+            if (oldSegment == null) {
+              _logger.warn("When adding a new segment: record in segment: {} with primary key: {} and dedup "
+                      + "time: {} already exists in segment: {} with dedup time: {}", segmentName,
+                  dedupRecordInfo.getPrimaryKey(), dedupTime, segmentAndTime.getLeft().getSegmentName(),
+                  segmentAndTime.getRight());
+            } else {
+              if (segmentAndTime.getLeft() != oldSegment) {
+                _logger.warn("When replacing a segment: dedup record in segment: {} with primary key: {} and dedup "
+                        + "time: {} exists in segment: {} (but not the segment: {} to replace) with dedup time: {}",
+                    segmentName, dedupRecordInfo.getPrimaryKey(), dedupTime, segmentAndTime.getLeft().getSegmentName(),
+                    oldSegment.getSegmentName(), segmentAndTime.getRight());
+              }
+            }
+            // When dedup time is the same, we always keep the latest segment
+            // This will handle segment replacement case correctly - a typical case is when a mutable segment is
+            // replaced by an immutable segment
+            if (segmentAndTime.getRight() <= dedupTime) {
+              return Pair.of(newSegment, dedupTime);
+            }
+            return segmentAndTime;
           });
     }
   }
