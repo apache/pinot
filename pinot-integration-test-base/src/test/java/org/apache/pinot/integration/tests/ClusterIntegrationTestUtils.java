@@ -66,7 +66,7 @@ import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
-import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
@@ -356,8 +356,8 @@ public class ClusterIntegrationTestUtils {
     // Tar the segment
     String segmentName = driver.getSegmentName();
     File indexDir = new File(segmentDir, segmentName);
-    File segmentTarFile = new File(tarDir, segmentName + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
-    TarGzCompressionUtils.createTarGzFile(indexDir, segmentTarFile);
+    File segmentTarFile = new File(tarDir, segmentName + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);
+    TarCompressionUtils.createCompressedTarFile(indexDir, segmentTarFile);
   }
 
   /**

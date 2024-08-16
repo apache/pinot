@@ -27,21 +27,34 @@ import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import javax.inject.Inject;
+import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
+import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
+import org.apache.helix.HelixAdmin;
+import org.apache.helix.model.HelixConfigScope;
+import org.apache.helix.model.builder.HelixConfigScopeBuilder;
+import org.apache.pinot.common.utils.DatabaseUtils;
+import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
+import org.apache.pinot.spi.config.DatabaseConfig;
+import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,9 +63,14 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
 
 
 @Api(tags = Constants.DATABASE_TAG, authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY)})
-@SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = @ApiKeyAuthDefinition(name =
-    HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = SWAGGER_AUTHORIZATION_KEY,
-    description = "The format of the key is  ```\"Basic <token>\" or \"Bearer <token>\"```")))
+@SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = {
+    @ApiKeyAuthDefinition(name = HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER,
+        key = SWAGGER_AUTHORIZATION_KEY,
+        description = "The format of the key is  ```\"Basic <token>\" or \"Bearer <token>\"```"),
+    @ApiKeyAuthDefinition(name = CommonConstants.DATABASE, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER,
+        key = CommonConstants.DATABASE,
+        description = "Database context passed through http header. If no context is provided 'default' database "
+            + "context will be considered.")}))
 @Path("/")
 public class PinotDatabaseRestletResource {
   public static final Logger LOGGER = LoggerFactory.getLogger(PinotDatabaseRestletResource.class);
@@ -107,6 +125,67 @@ public class PinotDatabaseRestletResource {
       }
     }
     return new DeleteDatabaseResponse(deletedTables, failedTables, dryRun);
+  }
+
+  /**
+   * API to update the quota configs for database
+   * If database config is not present it will be created implicitly
+   */
+  @POST
+  @Produces(MediaType.APPLICATION_JSON)
+  @Consumes(MediaType.APPLICATION_JSON)
+  @Path("/databases/{databaseName}/quotas")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.UPDATE_DATABASE_QUOTA)
+  @ApiOperation(value = "Update database quotas", notes = "Update database quotas")
+  public SuccessResponse addTable(
+      @PathParam("databaseName") String databaseName, @QueryParam("maxQueriesPerSecond") String queryQuota,
+      @Context HttpHeaders httpHeaders) {
+    if (!databaseName.equals(DatabaseUtils.extractDatabaseFromHttpHeaders(httpHeaders))) {
+      throw new ControllerApplicationException(LOGGER, "Database config name and request context does not match",
+          Response.Status.BAD_REQUEST);
+    }
+    try {
+      DatabaseConfig databaseConfig = _pinotHelixResourceManager.getDatabaseConfig(databaseName);
+      QuotaConfig quotaConfig = new QuotaConfig(null, queryQuota);
+      if (databaseConfig == null) {
+         databaseConfig = new DatabaseConfig(databaseName, quotaConfig);
+        _pinotHelixResourceManager.addDatabaseConfig(databaseConfig);
+      } else {
+        databaseConfig.setQuotaConfig(quotaConfig);
+        _pinotHelixResourceManager.updateDatabaseConfig(databaseConfig);
+      }
+      return new SuccessResponse("Database quotas for database config " + databaseName + " successfully updated");
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
+    }
+  }
+
+  /**
+   * API to get database quota configs.
+   * Will return null if database config is not defined or database quotas are not defined
+   */
+  @GET
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/databases/{databaseName}/quotas")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_DATABASE_QUOTA)
+  @ApiOperation(value = "Get database quota configs", notes = "Get database quota configs")
+  public QuotaConfig getDatabaseQuota(
+      @PathParam("databaseName") String databaseName, @Context HttpHeaders httpHeaders) {
+    if (!databaseName.equals(DatabaseUtils.extractDatabaseFromHttpHeaders(httpHeaders))) {
+      throw new ControllerApplicationException(LOGGER, "Database config name and request context does not match",
+          Response.Status.BAD_REQUEST);
+    }
+    DatabaseConfig databaseConfig = _pinotHelixResourceManager.getDatabaseConfig(databaseName);
+    if (databaseConfig != null) {
+      return databaseConfig.getQuotaConfig();
+    }
+    HelixAdmin helixAdmin = _pinotHelixResourceManager.getHelixAdmin();
+    HelixConfigScope configScope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER)
+        .forCluster(_pinotHelixResourceManager.getHelixClusterName()).build();
+    String defaultQueryQuota = helixAdmin.getConfig(configScope,
+            Collections.singletonList(CommonConstants.Helix.DATABASE_MAX_QUERIES_PER_SECOND))
+            .getOrDefault(CommonConstants.Helix.DATABASE_MAX_QUERIES_PER_SECOND, null);
+    return new QuotaConfig(null, defaultQueryQuota);
   }
 }
 

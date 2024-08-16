@@ -42,6 +42,7 @@ import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLucene
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndexSearcherPool;
 import org.apache.pinot.segment.local.segment.index.column.PhysicalColumnIndexContainer;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
 import org.apache.pinot.segment.local.segment.store.SegmentLocalFSDirectory;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProviderFactory;
 import org.apache.pinot.segment.spi.ColumnMetadata;
@@ -480,9 +481,11 @@ public class RealtimeSegmentConverterTest {
     String tableNameWithType = tableConfig.getTableName();
     String segmentName = "testTable__0__0__123456";
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
-    TextIndexConfig textIndexConfig =
-        new TextIndexConfig(false, null, null, false, false, Collections.emptyList(), Collections.emptyList(), false,
-            500, null, false, reuseMutableIndex, luceneNRTCachingDirectoryMaxBufferSizeMB);
+    TextIndexConfig textIndexConfig = new TextIndexConfigBuilder()
+            .withUseANDForMultiTermQueries(false)
+            .withReuseMutableIndex(reuseMutableIndex)
+            .withLuceneNRTCachingDirectoryMaxBufferSizeMB(luceneNRTCachingDirectoryMaxBufferSizeMB)
+            .build();
 
     RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder =
         new RealtimeSegmentConfig.Builder().setTableNameWithType(tableNameWithType).setSegmentName(segmentName)

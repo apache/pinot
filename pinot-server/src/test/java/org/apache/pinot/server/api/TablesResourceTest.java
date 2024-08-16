@@ -36,7 +36,7 @@ import org.apache.pinot.common.restlet.resources.TablesList;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsBitmapResponse;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
 import org.apache.pinot.common.utils.RoaringBitmapUtils;
-import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.spi.ImmutableSegment;
@@ -363,11 +363,11 @@ public class TablesResourceTest extends BaseResourceTest {
     FileUtils.forceMkdir(tempMetadataDir);
 
     // Extract metadata.properties
-    TarGzCompressionUtils.untarOneFile(segmentFile, V1Constants.MetadataKeys.METADATA_FILE_NAME,
+    TarCompressionUtils.untarOneFile(segmentFile, V1Constants.MetadataKeys.METADATA_FILE_NAME,
         new File(tempMetadataDir, V1Constants.MetadataKeys.METADATA_FILE_NAME));
 
     // Extract creation.meta
-    TarGzCompressionUtils.untarOneFile(segmentFile, V1Constants.SEGMENT_CREATION_META,
+    TarCompressionUtils.untarOneFile(segmentFile, V1Constants.SEGMENT_CREATION_META,
         new File(tempMetadataDir, V1Constants.SEGMENT_CREATION_META));
 
     // Load segment metadata

@@ -28,7 +28,9 @@ import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
+import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 
@@ -48,6 +50,16 @@ public class MmapMemoryManagerTest {
   @AfterClass
   public void tearDown() {
     new File(_tmpDir).delete();
+  }
+
+  @BeforeMethod
+  public void beforeMethodAssertions() {
+    Assert.assertEquals(PinotDataBuffer.getAllocationFailureCount(), 0);
+  }
+
+  @AfterMethod
+  public void afterMethodAssertions() {
+    Assert.assertEquals(PinotDataBuffer.getAllocationFailureCount(), 0);
   }
 
   @Test

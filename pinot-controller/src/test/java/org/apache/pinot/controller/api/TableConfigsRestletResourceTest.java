@@ -299,7 +299,7 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
     TableConfig replicaTestOfflineTableConfig = createOfflineTableConfig(tableName);
     TableConfig replicaTestRealtimeTableConfig = createRealtimeTableConfig(tableName);
     replicaTestOfflineTableConfig.getValidationConfig().setReplication("1");
-    replicaTestRealtimeTableConfig.getValidationConfig().setReplicasPerPartition("1");
+    replicaTestRealtimeTableConfig.getValidationConfig().setReplication("1");
     tableConfigs = new TableConfigs(tableName, createDummySchema(tableName), replicaTestOfflineTableConfig,
         replicaTestRealtimeTableConfig);
     sendPostRequest(_createTableConfigsUrl, tableConfigs.toPrettyJsonString());

@@ -38,7 +38,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.flink.metrics.Counter;
 import org.apache.flink.metrics.Gauge;
 import org.apache.flink.metrics.MetricGroup;
-import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.core.util.SegmentProcessorAvroUtils;
 import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
 import org.apache.pinot.segment.local.recordtransformer.RecordTransformer;
@@ -241,7 +241,7 @@ public class FlinkSegmentWriter implements SegmentWriter {
         segmentTarFile = new File(_outputDirURI,
             String.format("%s_%d%s", segmentName, System.currentTimeMillis(), Constants.TAR_GZ_FILE_EXT));
       }
-      TarGzCompressionUtils.createTarGzFile(new File(segmentDir, segmentName), segmentTarFile);
+      TarCompressionUtils.createCompressedTarFile(new File(segmentDir, segmentName), segmentTarFile);
       LOGGER.info("Created segment tar: {} for segment: {} of Pinot table: {}", segmentTarFile.getAbsolutePath(),
           segmentName, _tableNameWithType);
 

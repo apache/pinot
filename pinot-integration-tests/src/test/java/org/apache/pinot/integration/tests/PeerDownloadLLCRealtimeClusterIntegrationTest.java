@@ -138,6 +138,7 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends BaseRealtimeC
         new SegmentsValidationAndRetentionConfig();
     CompletionConfig completionConfig = new CompletionConfig("DOWNLOAD");
     segmentsValidationAndRetentionConfig.setCompletionConfig(completionConfig);
+    segmentsValidationAndRetentionConfig.setReplication(String.valueOf(NUM_SERVERS));
     segmentsValidationAndRetentionConfig.setReplicasPerPartition(String.valueOf(NUM_SERVERS));
     // Important: enable peer to peer download.
     segmentsValidationAndRetentionConfig.setPeerSegmentDownloadScheme("http");

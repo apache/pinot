@@ -234,8 +234,8 @@ public class ProtoBufCodeGenMessageDecoderTest {
         new Object[] {FLOAT_FIELD, 0f, 0f},
         new Object[] {NULLABLE_FLOAT_FIELD, 0f, 0f},
 
-        new Object[] {BYTES_FIELD, ByteString.empty(), new byte[] {}},
-        new Object[] {NULLABLE_BYTES_FIELD, ByteString.empty(), new byte[] {}},
+        new Object[] {BYTES_FIELD, ByteString.EMPTY, new byte[] {}},
+        new Object[] {NULLABLE_BYTES_FIELD, ByteString.EMPTY, new byte[] {}},
 
         new Object[] {BOOL_FIELD, false, "false"},
         new Object[] {NULLABLE_BOOL_FIELD, false, "false"}

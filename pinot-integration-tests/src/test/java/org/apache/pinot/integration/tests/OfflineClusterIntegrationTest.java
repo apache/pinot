@@ -135,14 +135,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       new StarTreeIndexConfig(Collections.singletonList("DestState"), null,
           Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
   private static final String TEST_STAR_TREE_QUERY_2 = "SELECT COUNT(*) FROM mytable WHERE DestState = 'CA'";
-  private static final String TEST_STAR_TREE_QUERY_FILTERED_AGG =
-      "SELECT COUNT(*), COUNT(*) FILTER (WHERE Carrier = 'UA') FROM mytable WHERE DestState = 'CA'";
-  // This query contains a filtered aggregation which cannot be solved with startree, but the COUNT(*) still should be
-  private static final String TEST_STAR_TREE_QUERY_FILTERED_AGG_MIXED =
-      "SELECT COUNT(*), AVG(ArrDelay) FILTER (WHERE Carrier = 'UA') FROM mytable WHERE DestState = 'CA'";
-  private static final StarTreeIndexConfig STAR_TREE_INDEX_CONFIG_3 =
-      new StarTreeIndexConfig(List.of("Carrier", "DestState"), null,
-          Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
 
   // For default columns test
   private static final String TEST_EXTRA_COLUMNS_QUERY = "SELECT COUNT(*) FROM mytable WHERE NewAddedIntMetric = 1";
@@ -1482,6 +1474,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
    *   <li>"NewAddedRawDerivedStringDimension", DIMENSION, STRING, single-value, reverse(DestCityName)</li>
    *   <li>"NewAddedRawDerivedMVIntDimension", DIMENSION, INT, multi-value, array(ActualElapsedTime)</li>
    *   <li>"NewAddedDerivedMVDoubleDimension", DIMENSION, DOUBLE, multi-value, array(ArrDelayMinutes)</li>
+   *   <li>"NewAddedDerivedNullString", DIMENSION, STRING, single-value, caseWhen(true, null, null)</li>
    * </ul>
    */
   @Test(dependsOnMethods = "testAggregateMetadataAPI", dataProvider = "useBothQueryEngines")
@@ -1493,7 +1486,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     reloadWithExtraColumns();
     JsonNode queryResponse = postQuery(SELECT_STAR_QUERY);
     assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
-    assertEquals(queryResponse.get("resultTable").get("dataSchema").get("columnNames").size(), 103);
+    assertEquals(queryResponse.get("resultTable").get("dataSchema").get("columnNames").size(), 104);
 
     testNewAddedColumns();
 
@@ -1578,6 +1571,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     schema.addField(new DimensionFieldSpec("NewAddedRawDerivedStringDimension", DataType.STRING, true));
     schema.addField(new DimensionFieldSpec("NewAddedRawDerivedMVIntDimension", DataType.INT, false));
     schema.addField(new DimensionFieldSpec("NewAddedDerivedMVDoubleDimension", DataType.DOUBLE, false));
+    schema.addField(new DimensionFieldSpec("NewAddedDerivedNullString", DataType.STRING, true, "nil"));
+    schema.setEnableColumnBasedNullHandling(true);
     addSchema(schema);
 
     TableConfig tableConfig = getOfflineTableConfig();
@@ -1590,7 +1585,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
             new TransformConfig("NewAddedDerivedDivAirportSeqIDsString", "DivAirportSeqIDs"),
             new TransformConfig("NewAddedRawDerivedStringDimension", "reverse(DestCityName)"),
             new TransformConfig("NewAddedRawDerivedMVIntDimension", "array(ActualElapsedTime)"),
-            new TransformConfig("NewAddedDerivedMVDoubleDimension", "array(ArrDelayMinutes)"));
+            new TransformConfig("NewAddedDerivedMVDoubleDimension", "array(ArrDelayMinutes)"),
+            new TransformConfig("NewAddedDerivedNullString", "caseWhen(true, null, null)"));
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setTransformConfigs(transformConfigs);
     tableConfig.setIngestionConfig(ingestionConfig);
@@ -1615,30 +1611,38 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     JsonNode columnIndexSizeMap = JsonUtils.stringToJsonNode(sendGetRequest(
             getControllerBaseApiUrl() + "/tables/mytable/metadata?columns=DivAirportSeqIDs"
                 + "&columns=NewAddedDerivedDivAirportSeqIDs&columns=NewAddedDerivedDivAirportSeqIDsString"
-                + "&columns=NewAddedRawDerivedStringDimension&columns=NewAddedRawDerivedMVIntDimension"))
+                + "&columns=NewAddedRawDerivedStringDimension&columns=NewAddedRawDerivedMVIntDimension"
+                + "&columns=NewAddedDerivedNullString"))
         .get("columnIndexSizeMap");
-    assertEquals(columnIndexSizeMap.size(), 5);
+    assertEquals(columnIndexSizeMap.size(), 6);
     JsonNode originalColumnIndexSizes = columnIndexSizeMap.get("DivAirportSeqIDs");
     JsonNode derivedColumnIndexSizes = columnIndexSizeMap.get("NewAddedDerivedDivAirportSeqIDs");
     JsonNode derivedStringColumnIndexSizes = columnIndexSizeMap.get("NewAddedDerivedDivAirportSeqIDsString");
     JsonNode derivedRawStringColumnIndex = columnIndexSizeMap.get("NewAddedRawDerivedStringDimension");
     JsonNode derivedRawMVIntColumnIndex = columnIndexSizeMap.get("NewAddedRawDerivedMVIntDimension");
+    JsonNode derivedNullStringColumnIndex = columnIndexSizeMap.get("NewAddedDerivedNullString");
 
     // Derived int column should have the same dictionary size as the original column
-    double originalColumnDictionarySize = originalColumnIndexSizes.get("dictionary").asDouble();
-    assertEquals(derivedColumnIndexSizes.get("dictionary").asDouble(), originalColumnDictionarySize);
+    double originalColumnDictionarySize = originalColumnIndexSizes.get(StandardIndexes.DICTIONARY_ID).asDouble();
+    assertEquals(derivedColumnIndexSizes.get(StandardIndexes.DICTIONARY_ID).asDouble(), originalColumnDictionarySize);
+
     // Derived string column should have larger dictionary size than the original column
-    assertTrue(derivedStringColumnIndexSizes.get("dictionary").asDouble() > originalColumnDictionarySize);
+    assertTrue(
+        derivedStringColumnIndexSizes.get(StandardIndexes.DICTIONARY_ID).asDouble() > originalColumnDictionarySize);
+
     // Both derived columns should have smaller forward index size than the original column because of compression
-    double derivedColumnForwardIndexSize = derivedColumnIndexSizes.get("forward_index").asDouble();
-    assertTrue(derivedColumnForwardIndexSize < originalColumnIndexSizes.get("forward_index").asDouble());
-    assertEquals(derivedStringColumnIndexSizes.get("forward_index").asDouble(), derivedColumnForwardIndexSize);
+    double derivedColumnForwardIndexSize = derivedColumnIndexSizes.get(StandardIndexes.FORWARD_ID).asDouble();
+    assertTrue(derivedColumnForwardIndexSize < originalColumnIndexSizes.get(StandardIndexes.FORWARD_ID).asDouble());
+    assertEquals(derivedStringColumnIndexSizes.get(StandardIndexes.FORWARD_ID).asDouble(),
+        derivedColumnForwardIndexSize);
 
-    assertTrue(derivedRawStringColumnIndex.has("forward_index"));
-    assertFalse(derivedRawStringColumnIndex.has("dictionary"));
+    assertTrue(derivedRawStringColumnIndex.has(StandardIndexes.FORWARD_ID));
+    assertFalse(derivedRawStringColumnIndex.has(StandardIndexes.DICTIONARY_ID));
 
-    assertTrue(derivedRawMVIntColumnIndex.has("forward_index"));
-    assertFalse(derivedRawMVIntColumnIndex.has("dictionary"));
+    assertTrue(derivedRawMVIntColumnIndex.has(StandardIndexes.FORWARD_ID));
+    assertFalse(derivedRawMVIntColumnIndex.has(StandardIndexes.DICTIONARY_ID));
+
+    assertTrue(derivedNullStringColumnIndex.has(StandardIndexes.NULL_VALUE_VECTOR_ID));
   }
 
   private void reloadWithMissingColumns()
@@ -1748,6 +1752,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedSVBytesDimension = "
         + (useMultiStageQueryEngine() ? "X''" : "''");
+    testQuery(pinotQuery, h2Query);
+
+    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedDerivedNullString = 'nil'";
     testQuery(pinotQuery, h2Query);
 
     pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedDerivedHoursSinceEpoch = 392232";
@@ -3460,6 +3467,17 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     testQuery("SELECT Origin, SUM(ArrDelay) FROM mytable GROUP BY Origin LIMIT 0");
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testFilteredAggregationWithGroupByOrdering(boolean useMultiStageQueryEngine)
+    throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+
+    // Test the ordering is correctly applied to the correct aggregation (the one without FILTER clause)
+    // See https://github.com/apache/pinot/pull/13784
+    testQuery("SELECT DestCityName, COUNT(*) AS c1, COUNT(*) FILTER (WHERE AirTime = 0) AS c2 FROM mytable "
+        + "GROUP BY DestCityName ORDER BY c1 DESC LIMIT 10");
   }
 
   private String buildSkipIndexesOption(String columnsAndIndexes) {

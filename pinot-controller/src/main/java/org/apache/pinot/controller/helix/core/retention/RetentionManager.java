@@ -191,50 +191,52 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
 
   private void manageSegmentLineageCleanupForTable(TableConfig tableConfig) {
     String tableNameWithType = tableConfig.getTableName();
-    try {
-      DEFAULT_RETRY_POLICY.attempt(() -> {
-        // Fetch segment lineage
-        ZNRecord segmentLineageZNRecord =
-            SegmentLineageAccessHelper.getSegmentLineageZNRecord(_pinotHelixResourceManager.getPropertyStore(),
+    List<String> segmentsToDelete = new ArrayList<>();
+    long cleanupStartTime = System.currentTimeMillis();
+    synchronized (_pinotHelixResourceManager.getLineageUpdaterLock(tableNameWithType)) {
+      try {
+        DEFAULT_RETRY_POLICY.attempt(() -> {
+          // Fetch segment lineage
+          ZNRecord segmentLineageZNRecord =
+              SegmentLineageAccessHelper.getSegmentLineageZNRecord(_pinotHelixResourceManager.getPropertyStore(),
+                  tableNameWithType);
+          if (segmentLineageZNRecord == null) {
+            return true;
+          }
+          LOGGER.info("Start cleaning up segment lineage for table: {}", tableNameWithType);
+          SegmentLineage segmentLineage = SegmentLineage.fromZNRecord(segmentLineageZNRecord);
+          int expectedVersion = segmentLineageZNRecord.getVersion();
+
+          List<String> segmentsForTable = _pinotHelixResourceManager.getSegmentsFor(tableNameWithType, false);
+          _pinotHelixResourceManager.getLineageManager()
+              .updateLineageForRetention(tableConfig, segmentLineage, segmentsForTable, segmentsToDelete,
+                  _pinotHelixResourceManager.getConsumingSegments(tableNameWithType));
+
+          // Write back to the lineage entry
+          if (SegmentLineageAccessHelper.writeSegmentLineage(_pinotHelixResourceManager.getPropertyStore(),
+              segmentLineage, expectedVersion)) {
+            return true;
+          } else {
+            LOGGER.warn("Failed to write segment lineage back when cleaning up segment lineage for table: {}",
                 tableNameWithType);
-        if (segmentLineageZNRecord == null) {
-          return true;
-        }
-        LOGGER.info("Start cleaning up segment lineage for table: {}", tableNameWithType);
-        long cleanupStartTime = System.currentTimeMillis();
-        SegmentLineage segmentLineage = SegmentLineage.fromZNRecord(segmentLineageZNRecord);
-        int expectedVersion = segmentLineageZNRecord.getVersion();
-
-        List<String> segmentsForTable = _pinotHelixResourceManager.getSegmentsFor(tableNameWithType, false);
-        List<String> segmentsToDelete = new ArrayList<>();
-        _pinotHelixResourceManager.getLineageManager()
-            .updateLineageForRetention(tableConfig, segmentLineage, segmentsForTable, segmentsToDelete,
-                _pinotHelixResourceManager.getConsumingSegments(tableNameWithType));
-
-        // Write back to the lineage entry
-        if (SegmentLineageAccessHelper.writeSegmentLineage(_pinotHelixResourceManager.getPropertyStore(),
-            segmentLineage, expectedVersion)) {
-          // Remove last sealed segments such that the table can still create new consuming segments if it's paused
-          if (TableNameBuilder.isRealtimeTableResource(tableNameWithType)) {
-            segmentsToDelete.removeAll(_pinotHelixResourceManager.getLastLLCCompletedSegments(tableNameWithType));
+            return false;
           }
-          // Delete segments based on the segment lineage
-          if (!segmentsToDelete.isEmpty()) {
-            _pinotHelixResourceManager.deleteSegments(tableNameWithType, segmentsToDelete);
-            LOGGER.info("Finished cleaning up segment lineage for table: {} in {}ms, deleted segments: {}",
-                tableNameWithType, (System.currentTimeMillis() - cleanupStartTime), segmentsToDelete);
-          }
-          return true;
-        } else {
-          LOGGER.warn("Failed to write segment lineage back when cleaning up segment lineage for table: {}",
-              tableNameWithType);
-          return false;
-        }
-      });
-    } catch (Exception e) {
-      String errorMsg = String.format("Failed to clean up the segment lineage. (tableName = %s)", tableNameWithType);
-      LOGGER.error(errorMsg, e);
-      throw new RuntimeException(errorMsg, e);
+        });
+      } catch (Exception e) {
+        String errorMsg = String.format("Failed to clean up the segment lineage. (tableName = %s)", tableNameWithType);
+        LOGGER.error(errorMsg, e);
+        throw new RuntimeException(errorMsg, e);
+      }
+    }
+    // Remove last sealed segments such that the table can still create new consuming segments if it's paused
+    if (TableNameBuilder.isRealtimeTableResource(tableNameWithType)) {
+      segmentsToDelete.removeAll(_pinotHelixResourceManager.getLastLLCCompletedSegments(tableNameWithType));
+    }
+    // Delete segments based on the segment lineage
+    if (!segmentsToDelete.isEmpty()) {
+      _pinotHelixResourceManager.deleteSegments(tableNameWithType, segmentsToDelete);
+      LOGGER.info("Finished cleaning up segment lineage for table: {} in {}ms, deleted segments: {}",
+          tableNameWithType, (System.currentTimeMillis() - cleanupStartTime), segmentsToDelete);
     }
     LOGGER.info("Segment lineage metadata clean-up is successfully processed for table: {}", tableNameWithType);
   }

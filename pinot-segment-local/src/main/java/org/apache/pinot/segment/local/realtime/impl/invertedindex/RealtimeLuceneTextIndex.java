@@ -19,18 +19,20 @@
 package org.apache.pinot.segment.local.realtime.impl.invertedindex;
 
 import java.io.File;
+import java.lang.reflect.Constructor;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.index.IndexWriter;
-import org.apache.lucene.queryparser.classic.QueryParser;
+import org.apache.lucene.queryparser.classic.QueryParserBase;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.SearcherManager;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
+import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
 import org.apache.pinot.segment.local.utils.LuceneTextIndexUtils;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.apache.pinot.segment.spi.index.mutable.MutableTextIndex;
@@ -53,6 +55,7 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
   private final LuceneTextIndexCreator _indexCreator;
   private SearcherManager _searcherManager;
   private Analyzer _analyzer;
+  private Constructor<QueryParserBase> _queryParserClassConstructor;
   private final String _column;
   private final String _segmentName;
   private final boolean _reuseMutableIndex;
@@ -91,6 +94,8 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
           llcSegmentName.getPartitionGroupId(), _indexCreator::getNumDocs);
       _searcherManager.addListener(_refreshListener);
       _analyzer = _indexCreator.getIndexWriter().getConfig().getAnalyzer();
+      _queryParserClassConstructor =
+          TextIndexUtils.getQueryParserWithStringAndAnalyzerTypeConstructor(config.getLuceneQueryParserClass());
       _enablePrefixSuffixMatchingInPhraseQueries = config.isEnablePrefixSuffixMatchingInPhraseQueries();
       _reuseMutableIndex = config.isReuseMutableIndex();
 
@@ -137,12 +142,23 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
     Callable<MutableRoaringBitmap> searchCallable = () -> {
       IndexSearcher indexSearcher = null;
       try {
-        QueryParser parser = new QueryParser(_column, _analyzer);
+        // Lucene query parsers are generally stateful and a new instance must be created per query.
+        QueryParserBase parser = _queryParserClassConstructor.newInstance(_column, _analyzer);
         if (_enablePrefixSuffixMatchingInPhraseQueries) {
+          // Note: Lucene's built-in QueryParser has limited wildcard functionality in phrase queries. It does not use
+          // the provided analyzer when wildcards are present, defaulting to the default analyzer for tokenization.
+          // Additionally, it does not support wildcards that span across terms.
+          // For more details, see: https://github.com/elastic/elasticsearch/issues/22540
+          // Workaround: Use a custom query parser that correctly implements wildcard searches.
           parser.setAllowLeadingWildcard(true);
         }
         Query query = parser.parse(searchQuery);
         if (_enablePrefixSuffixMatchingInPhraseQueries) {
+          // Note: Lucene's built-in QueryParser has limited wildcard functionality in phrase queries. It does not use
+          // the provided analyzer when wildcards are present, defaulting to the default analyzer for tokenization.
+          // Additionally, it does not support wildcards that span across terms.
+          // For more details, see: https://github.com/elastic/elasticsearch/issues/22540
+          // Workaround: Use a custom query parser that correctly implements wildcard searches.
           query = LuceneTextIndexUtils.convertToMultiTermSpanQuery(query);
         }
         indexSearcher = _searcherManager.acquire();
@@ -193,6 +209,27 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
       throw new RuntimeException(e);
     }
     return actualDocIDs;
+  }
+
+  private Constructor<QueryParserBase> getQueryParserWithStringAndAnalyzerTypeConstructor(String queryParserClassName)
+          throws ReflectiveOperationException {
+    // Fail-fast if the query parser is specified class is not QueryParseBase class
+    final Class<?> queryParserClass = Class.forName(queryParserClassName);
+    if (!QueryParserBase.class.isAssignableFrom(queryParserClass)) {
+      throw new ReflectiveOperationException("The specified lucene query parser class " + queryParserClassName
+              + " is not assignable from " + QueryParserBase.class.getName());
+    }
+    // Fail-fast if the query parser does not have the required constructor used by this class
+    try {
+      queryParserClass.getConstructor(String.class, Analyzer.class);
+    } catch (NoSuchMethodException ex) {
+      throw new NoSuchMethodException("The specified lucene query parser class " + queryParserClassName
+              + " is not assignable because the class does not have the required constructor method with parameter "
+              + "type [String.class, Analyzer.class]"
+      );
+    }
+
+    return (Constructor<QueryParserBase>) queryParserClass.getConstructor(String.class, Analyzer.class);
   }
 
   @Override

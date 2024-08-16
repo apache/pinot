@@ -107,6 +107,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   protected String _instanceId;
   private volatile boolean _isStarting = false;
   private volatile boolean _isShuttingDown = false;
+
+  protected final List<ClusterChangeHandler> _clusterConfigChangeHandlers = new ArrayList<>();
   protected final List<ClusterChangeHandler> _idealStateChangeHandlers = new ArrayList<>();
   protected final List<ClusterChangeHandler> _externalViewChangeHandlers = new ArrayList<>();
   protected final List<ClusterChangeHandler> _instanceConfigChangeHandlers = new ArrayList<>();
@@ -212,6 +214,15 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
    */
   public void addInstanceConfigChangeHandler(ClusterChangeHandler instanceConfigChangeHandler) {
     _instanceConfigChangeHandlers.add(instanceConfigChangeHandler);
+  }
+
+  /**
+   * Adds a cluster config change handler to handle Helix cluster config change callbacks.
+   * <p>NOTE: all change handlers will be run in a single thread, so any slow change handler can block other change
+   * handlers from running. For slow change handler, make it asynchronous.
+   */
+  public void addClusterConfigChangeHandler(ClusterChangeHandler clusterConfigChangeHandler) {
+    _clusterConfigChangeHandlers.add(clusterConfigChangeHandler);
   }
 
   /**
@@ -350,6 +361,10 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     _brokerAdminApplication.start(_listenerConfigs);
 
     LOGGER.info("Initializing cluster change mediator");
+    for (ClusterChangeHandler clusterConfigChangeHandler : _clusterConfigChangeHandlers) {
+      clusterConfigChangeHandler.init(_spectatorHelixManager);
+    }
+    _clusterConfigChangeHandlers.add(queryQuotaManager);
     for (ClusterChangeHandler idealStateChangeHandler : _idealStateChangeHandlers) {
       idealStateChangeHandler.init(_spectatorHelixManager);
     }
@@ -368,6 +383,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       liveInstanceChangeHandler.init(_spectatorHelixManager);
     }
     Map<ChangeType, List<ClusterChangeHandler>> clusterChangeHandlersMap = new HashMap<>();
+    clusterChangeHandlersMap.put(ChangeType.CLUSTER_CONFIG, _clusterConfigChangeHandlers);
     clusterChangeHandlersMap.put(ChangeType.IDEAL_STATE, _idealStateChangeHandlers);
     clusterChangeHandlersMap.put(ChangeType.EXTERNAL_VIEW, _externalViewChangeHandlers);
     clusterChangeHandlersMap.put(ChangeType.INSTANCE_CONFIG, _instanceConfigChangeHandlers);
@@ -379,6 +395,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     _spectatorHelixManager.addIdealStateChangeListener(_clusterChangeMediator);
     _spectatorHelixManager.addExternalViewChangeListener(_clusterChangeMediator);
     _spectatorHelixManager.addInstanceConfigChangeListener(_clusterChangeMediator);
+    _spectatorHelixManager.addClusterfigChangeListener(_clusterChangeMediator);
     if (!_liveInstanceChangeHandlers.isEmpty()) {
       _spectatorHelixManager.addLiveInstanceChangeListener(_clusterChangeMediator);
     }

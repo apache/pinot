@@ -19,13 +19,12 @@
     under the License.
 
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <artifactId>pinot-connectors</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>1.2.0-SNAPSHOT</version>
+    <version>1.3.0-SNAPSHOT</version>
     <relativePath>..</relativePath>
   </parent>
   <artifactId>pinot-spark-3-connector</artifactId>
@@ -33,7 +32,7 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/../..</pinot.root>
-    <spark.version>3.5.1</spark.version>
+    <spark.version>3.5.2</spark.version>
     <scalatest.version>3.2.18</scalatest.version>
     <shadeBase>org.apache.pinot.\$internal</shadeBase>
   </properties>
@@ -54,10 +53,6 @@
             <exclusion>
               <groupId>org.apache.curator</groupId>
               <artifactId>curator-recipes</artifactId>
-            </exclusion>
-            <exclusion>
-              <groupId>com.thoughtworks.paranamer</groupId>
-              <artifactId>paranamer</artifactId>
             </exclusion>
             <exclusion>
               <groupId>org.scala-lang.modules</groupId>
@@ -148,7 +143,7 @@
              Thus, explicitly adding this plugin to a new profile to sign the files at the end all at once. -->
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-gpg-plugin</artifactId>
-            <version>3.2.4</version>
+            <version>3.2.5</version>
           </plugin>
         </plugins>
       </build>

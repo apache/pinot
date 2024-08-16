@@ -108,6 +108,26 @@ public class UpsertUtils {
     };
   }
 
+  /**
+   * Returns an iterator of {@link PrimaryKey} for all the documents from the segment.
+   */
+  public static Iterator<PrimaryKey> getPrimaryKeyIterator(PrimaryKeyReader primaryKeyReader,
+      int numDocs) {
+    return new Iterator<>() {
+      private int _docId = 0;
+
+      @Override
+      public boolean hasNext() {
+        return _docId < numDocs;
+      }
+
+      @Override
+      public PrimaryKey next() {
+        return primaryKeyReader.getPrimaryKey(_docId++);
+      }
+    };
+  }
+
   public static class RecordInfoReader implements Closeable {
     private final PrimaryKeyReader _primaryKeyReader;
     private final ComparisonColumnReader _comparisonColumnReader;
@@ -131,8 +151,8 @@ public class UpsertUtils {
     public RecordInfo getRecordInfo(int docId) {
       PrimaryKey primaryKey = _primaryKeyReader.getPrimaryKey(docId);
       Comparable comparisonValue = _comparisonColumnReader.getComparisonValue(docId);
-      boolean deleteRecord = _deleteRecordColumnReader != null
-          && BooleanUtils.toBoolean(_deleteRecordColumnReader.getValue(docId));
+      boolean deleteRecord =
+          _deleteRecordColumnReader != null && BooleanUtils.toBoolean(_deleteRecordColumnReader.getValue(docId));
       return new RecordInfo(primaryKey, docId, comparisonValue, deleteRecord);
     }
 

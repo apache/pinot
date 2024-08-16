@@ -202,7 +202,7 @@ public class PinotQueryResource {
     // Validate data access
     // we don't have a cross table access control rule so only ADMIN can make request to multi-stage engine.
     AccessControl accessControl = _accessControlFactory.create();
-    if (!accessControl.hasAccess(null, AccessType.READ, httpHeaders, endpointUrl)) {
+    if (!accessControl.hasAccess(AccessType.READ, httpHeaders, endpointUrl)) {
       throw new WebApplicationException("Permission denied", Response.Status.FORBIDDEN);
     }
 

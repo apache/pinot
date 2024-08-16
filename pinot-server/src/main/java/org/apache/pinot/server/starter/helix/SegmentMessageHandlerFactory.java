@@ -30,6 +30,7 @@ import org.apache.helix.messaging.handling.MessageHandlerFactory;
 import org.apache.helix.model.Message;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.messages.ForceCommitMessage;
+import org.apache.pinot.common.messages.IngestionMetricsRemoveMessage;
 import org.apache.pinot.common.messages.SegmentRefreshMessage;
 import org.apache.pinot.common.messages.SegmentReloadMessage;
 import org.apache.pinot.common.messages.TableDeletionMessage;
@@ -39,7 +40,9 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerQueryPhase;
 import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
+import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.core.util.SegmentRefreshSemaphore;
+import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -72,6 +75,8 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
         return new TableDeletionMessageHandler(new TableDeletionMessage(message), _metrics, context);
       case ForceCommitMessage.FORCE_COMMIT_MSG_SUB_TYPE:
         return new ForceCommitMessageHandler(new ForceCommitMessage(message), _metrics, context);
+      case IngestionMetricsRemoveMessage.INGESTION_METRICS_REMOVE_MSG_SUB_TYPE:
+        return new IngestionMetricsRemoveMessageHandler(new IngestionMetricsRemoveMessage(message), _metrics, context);
       default:
         LOGGER.warn("Unsupported user defined message sub type: {} for segment: {}", msgSubType,
             message.getPartitionName());
@@ -225,6 +230,27 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
         _metrics.addMeteredTableValue(_tableNameWithType, ServerMeter.DELETE_TABLE_FAILURES, 1);
         Utils.rethrowException(e);
       }
+      return helixTaskResult;
+    }
+  }
+
+  private class IngestionMetricsRemoveMessageHandler extends DefaultMessageHandler {
+
+    IngestionMetricsRemoveMessageHandler(IngestionMetricsRemoveMessage message, ServerMetrics metrics,
+        NotificationContext context) {
+      super(message, metrics, context);
+    }
+
+    @Override
+    public HelixTaskResult handleMessage() {
+      _logger.info("Handling ingestion metrics remove message for table: {}, segment: {}", _tableNameWithType,
+          _segmentName);
+      TableDataManager tableDataManager = _instanceDataManager.getTableDataManager(_tableNameWithType);
+      if (tableDataManager instanceof RealtimeTableDataManager) {
+        ((RealtimeTableDataManager) tableDataManager).removeIngestionMetrics(_segmentName);
+      }
+      HelixTaskResult helixTaskResult = new HelixTaskResult();
+      helixTaskResult.setSuccess(true);
       return helixTaskResult;
     }
   }

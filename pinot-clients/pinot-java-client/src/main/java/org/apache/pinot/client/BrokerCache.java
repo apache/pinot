@@ -22,6 +22,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.core.type.TypeReference;
 import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.JdkSslContext;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -113,8 +114,8 @@ public class BrokerCache {
         DEFAULT_CONTROLLER_TLS_V10_ENABLED));
 
     TlsProtocols tlsProtocols = TlsProtocols.defaultProtocols(tlsV10Enabled);
-    builder.setReadTimeout(readTimeoutMs)
-        .setConnectTimeout(connectTimeoutMs)
+    builder.setReadTimeout(Duration.ofMillis(readTimeoutMs))
+        .setConnectTimeout(Duration.ofMillis(connectTimeoutMs))
         .setHandshakeTimeout(handshakeTimeoutMs)
         .setUserAgent(ConnectionUtils.getUserAgentVersionFromClassPath("ua_broker_cache", appId))
         .setEnabledProtocols(tlsProtocols.getEnabledProtocols().toArray(new String[0]));

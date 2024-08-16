@@ -23,11 +23,16 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
+import org.apache.pinot.segment.spi.utils.CsvParser;
 import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.config.table.FieldConfig;
 
 
 public class TextIndexConfigBuilder extends TextIndexConfig.AbstractBuilder {
+  public TextIndexConfigBuilder() {
+    super((FSTType) null);
+  }
+
   public TextIndexConfigBuilder(@Nullable FSTType fstType) {
     super(fstType);
   }
@@ -65,6 +70,23 @@ public class TextIndexConfigBuilder extends TextIndexConfig.AbstractBuilder {
 
       if (textIndexProperties.get(FieldConfig.TEXT_INDEX_LUCENE_ANALYZER_CLASS) != null) {
         _luceneAnalyzerClass = textIndexProperties.get(FieldConfig.TEXT_INDEX_LUCENE_ANALYZER_CLASS);
+      }
+
+      // Note that we cannot depend on jackson's default behavior to automatically coerce the comma delimited args to
+      // List<String>. This is because the args may contain comma and other special characters such as space. Therefore,
+      // we use our own csv parser to parse the values directly.
+      if (textIndexProperties.get(FieldConfig.TEXT_INDEX_LUCENE_ANALYZER_CLASS_ARGS) != null) {
+        _luceneAnalyzerClassArgs = CsvParser.parse(
+                textIndexProperties.get(FieldConfig.TEXT_INDEX_LUCENE_ANALYZER_CLASS_ARGS), true, false);
+      }
+
+      if (textIndexProperties.get(FieldConfig.TEXT_INDEX_LUCENE_ANALYZER_CLASS_ARG_TYPES) != null) {
+        _luceneAnalyzerClassArgTypes = CsvParser.parse(
+                textIndexProperties.get(FieldConfig.TEXT_INDEX_LUCENE_ANALYZER_CLASS_ARG_TYPES), false, true);
+      }
+
+      if (textIndexProperties.get(FieldConfig.TEXT_INDEX_LUCENE_QUERY_PARSER_CLASS) != null) {
+        _luceneQueryParserClass = textIndexProperties.get(FieldConfig.TEXT_INDEX_LUCENE_QUERY_PARSER_CLASS);
       }
 
       for (Map.Entry<String, String> entry : textIndexProperties.entrySet()) {
