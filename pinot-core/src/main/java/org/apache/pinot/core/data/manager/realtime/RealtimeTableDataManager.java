@@ -555,14 +555,13 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       return;
     }
 
-    // TODO: Change dedup handling to handle segment replacement
     if (isDedupEnabled() && immutableSegment instanceof ImmutableSegmentImpl) {
-      buildDedupMeta((ImmutableSegmentImpl) immutableSegment);
+      handleDedup((ImmutableSegmentImpl) immutableSegment);
     }
     super.addSegment(immutableSegment);
   }
 
-  private void buildDedupMeta(ImmutableSegmentImpl immutableSegment) {
+  private void handleDedup(ImmutableSegmentImpl immutableSegment) {
     // TODO(saurabh) refactor commons code with handleUpsert
     String segmentName = immutableSegment.getSegmentName();
     Integer partitionGroupId =
@@ -575,8 +574,11 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     immutableSegment.enableDedup(partitionDedupMetadataManager);
     SegmentDataManager oldSegmentManager = _segmentDataManagerMap.get(segmentName);
     if (oldSegmentManager != null) {
+      LOGGER.info("Replacing mutable segment: {} with immutable segment: {} in partition dedup metadata manager",
+          oldSegmentManager.getSegment().getSegmentName(), segmentName);
       partitionDedupMetadataManager.replaceSegment(oldSegmentManager.getSegment(), immutableSegment);
     } else {
+      LOGGER.info("Adding immutable segment: {} to partition dedup metadata manager", segmentName);
       partitionDedupMetadataManager.addSegment(immutableSegment);
     }
   }

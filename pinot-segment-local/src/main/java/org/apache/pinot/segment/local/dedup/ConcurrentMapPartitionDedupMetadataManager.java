@@ -57,7 +57,7 @@ class ConcurrentMapPartitionDedupMetadataManager extends BasePartitionDedupMetad
               // when oldSegment is null, it means we are adding a new segment
               // when oldSegment is not null, it means we are replacing an existing segment
               if (oldSegment == null) {
-                _logger.warn("When adding a new segment: dedup record in segment: {} with primary key: {} and dedup "
+                _logger.warn("When adding a new segment: record in segment: {} with primary key: {} and dedup "
                         + "time: {} already exists in segment: {} with dedup time: {}", segmentName,
                     dedupRecordInfo.getPrimaryKey(), dedupTime, segmentAndTime.getLeft().getSegmentName(),
                     segmentAndTime.getRight());
@@ -75,9 +75,8 @@ class ConcurrentMapPartitionDedupMetadataManager extends BasePartitionDedupMetad
               // replaced by an immutable segment
               if (segmentAndTime.getRight() <= dedupTime) {
                 return Pair.of(newSegment, dedupTime);
-              } else {
-                return segmentAndTime;
               }
+              return segmentAndTime;
             }
           });
     }

@@ -74,44 +74,49 @@ public abstract class BasePartitionDedupMetadataManager implements PartitionDedu
 
   @Override
   public void addSegment(IndexSegment segment) {
-    addOrReplaceSegment(null, segment);
+    if (!startOperation()) {
+      _logger.info("Skip adding segment: {} because dedup metadata manager is already stopped",
+          segment.getSegmentName());
+      return;
+    }
+    try {
+      addOrReplaceSegment(null, segment);
+    } catch (Exception e) {
+      throw new RuntimeException(
+          String.format("Caught exception while adding segment: %s of table: %s to %s", segment.getSegmentName(),
+              _tableNameWithType, this.getClass().getSimpleName()), e);
+    } finally {
+      finishOperation();
+    }
   }
 
   @Override
   public void replaceSegment(IndexSegment oldSegment, IndexSegment newSegment) {
-    addOrReplaceSegment(oldSegment, newSegment);
-  }
-
-  private void addOrReplaceSegment(@Nullable IndexSegment oldSegment, IndexSegment newSegment) {
     if (!startOperation()) {
-      if (oldSegment == null) {
-        _logger.info("Skip adding segment: {} because dedup metadata manager is already stopped",
-            newSegment.getSegmentName());
-      } else {
-        _logger.info("Skip replacing segment: {} with segment: {} because dedup metadata manager is already stopped",
-            oldSegment.getSegmentName(), newSegment.getSegmentName());
-      }
+      _logger.info("Skip replacing segment: {} with segment: {} because dedup metadata manager is already stopped",
+          oldSegment.getSegmentName(), newSegment.getSegmentName());
       return;
     }
+    try {
+      addOrReplaceSegment(oldSegment, newSegment);
+    } catch (Exception e) {
+      throw new RuntimeException(
+          String.format("Caught exception while replacing segment: %s with segment: %s of table: %s in %s",
+              oldSegment.getSegmentName(), newSegment.getSegmentName(), _tableNameWithType,
+              this.getClass().getSimpleName()), e);
+    } finally {
+      finishOperation();
+    }
+  }
+
+  private void addOrReplaceSegment(@Nullable IndexSegment oldSegment, IndexSegment newSegment)
+      throws IOException {
     try (DedupUtils.DedupRecordInfoReader dedupRecordInfoReader = new DedupUtils.DedupRecordInfoReader(newSegment,
         _primaryKeyColumns, _dedupTimeColumn)) {
       Iterator<DedupRecordInfo> dedupRecordInfoIterator =
           DedupUtils.getDedupRecordInfoIterator(dedupRecordInfoReader, newSegment.getSegmentMetadata().getTotalDocs());
       doAddOrReplaceSegment(oldSegment, newSegment, dedupRecordInfoIterator);
       updatePrimaryKeyGauge();
-    } catch (Exception e) {
-      if (oldSegment == null) {
-        throw new RuntimeException(
-            String.format("Caught exception while adding segment: %s of table: %s to %s", newSegment.getSegmentName(),
-                _tableNameWithType, this.getClass().getSimpleName()), e);
-      } else {
-        throw new RuntimeException(
-            String.format("Caught exception while replacing segment: %s with segment: %s of table: %s in %s",
-                oldSegment.getSegmentName(), newSegment.getSegmentName(), _tableNameWithType,
-                this.getClass().getSimpleName()), e);
-      }
-    } finally {
-      finishOperation();
     }
   }
 
