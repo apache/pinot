@@ -22,6 +22,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.segment.readers.PrimaryKeyReader;
@@ -41,12 +42,48 @@ public class UpsertUtils {
 
   @Nullable
   public static MutableRoaringBitmap getQueryableDocIdsSnapshotFromSegment(IndexSegment segment) {
+    return getQueryableDocIdsSnapshotFromSegment(segment, false);
+  }
+
+  public static MutableRoaringBitmap getQueryableDocIdsSnapshotFromSegment(IndexSegment segment,
+      boolean useEmptyForNull) {
     ThreadSafeMutableRoaringBitmap queryableDocIds = segment.getQueryableDocIds();
     if (queryableDocIds != null) {
       return queryableDocIds.getMutableRoaringBitmap();
     }
     ThreadSafeMutableRoaringBitmap validDocIds = segment.getValidDocIds();
-    return validDocIds != null ? validDocIds.getMutableRoaringBitmap() : null;
+    return validDocIds != null ? validDocIds.getMutableRoaringBitmap()
+        : (useEmptyForNull ? new MutableRoaringBitmap() : null);
+  }
+
+
+  public static void doReplaceDocId(ThreadSafeMutableRoaringBitmap validDocIds,
+      @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, int oldDocId, int newDocId, RecordInfo recordInfo) {
+    validDocIds.replace(oldDocId, newDocId);
+    if (queryableDocIds != null) {
+      if (recordInfo.isDeleteRecord()) {
+        queryableDocIds.remove(oldDocId);
+      } else {
+        queryableDocIds.replace(oldDocId, newDocId);
+      }
+    }
+  }
+
+  public static void doAddDocId(ThreadSafeMutableRoaringBitmap validDocIds,
+      @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, int docId, RecordInfo recordInfo) {
+    validDocIds.add(docId);
+    if (queryableDocIds != null && !recordInfo.isDeleteRecord()) {
+      queryableDocIds.add(docId);
+    }
+  }
+
+
+  public static void doRemoveDocId(IndexSegment segment, int docId) {
+    Objects.requireNonNull(segment.getValidDocIds()).remove(docId);
+    ThreadSafeMutableRoaringBitmap currentQueryableDocIds = segment.getQueryableDocIds();
+    if (currentQueryableDocIds != null) {
+      currentQueryableDocIds.remove(docId);
+    }
   }
 
   /**
