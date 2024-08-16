@@ -114,7 +114,7 @@ public abstract class NullableSingleInputAggregationFunction<I, F extends Compar
    * @param <A> The type of the accumulator
    */
   public <A> A foldNotNull(int length, BlockValSet blockValSet, A initialAcum, Reducer<A> reducer) {
-    return foldNotNull(length, blockValSet.getNullBitmap(), initialAcum, reducer);
+    return foldNotNull(length, _nullHandlingEnabled ? blockValSet.getNullBitmap() : null, initialAcum, reducer);
   }
 
   /**

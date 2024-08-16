@@ -30,7 +30,9 @@ import org.openjdk.jmh.annotations.Level;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.infra.Blackhole;
 
-
+/**
+ * Base class for aggregation function benchmarks.
+ */
 public abstract class AbstractAggregationFunctionBenchmark {
 
   /**

@@ -127,7 +127,7 @@ public class SumAggregationFunction extends NullableSingleInputAggregationFuncti
       case BIG_DECIMAL: {
         BigDecimal[] values = blockValSet.getBigDecimalValuesSV();
 
-        BigDecimal decimalSum = foldNotNull(length, blockValSet.getNullBitmap(), null, (acum, from, to) -> {
+        BigDecimal decimalSum = foldNotNull(length, blockValSet, null, (acum, from, to) -> {
           BigDecimal innerSum = BigDecimal.ZERO;
           for (int i = from; i < to; i++) {
             innerSum = innerSum.add(values[i]);

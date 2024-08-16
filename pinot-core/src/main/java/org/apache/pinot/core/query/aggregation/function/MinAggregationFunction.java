@@ -130,7 +130,7 @@ public class MinAggregationFunction extends NullableSingleInputAggregationFuncti
       case BIG_DECIMAL: {
         BigDecimal[] values = blockValSet.getBigDecimalValuesSV();
 
-        BigDecimal min = foldNotNull(length, blockValSet.getNullBitmap(), null, (acum, from, to) -> {
+        BigDecimal min = foldNotNull(length, blockValSet, null, (acum, from, to) -> {
           BigDecimal innerMin = values[from];
           for (int i = from; i < to; i++) {
             innerMin = innerMin.min(values[i]);

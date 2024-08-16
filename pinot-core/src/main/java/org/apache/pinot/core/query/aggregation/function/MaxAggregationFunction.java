@@ -130,7 +130,7 @@ public class MaxAggregationFunction extends NullableSingleInputAggregationFuncti
       case BIG_DECIMAL: {
         BigDecimal[] values = blockValSet.getBigDecimalValuesSV();
 
-        BigDecimal max = foldNotNull(length, blockValSet.getNullBitmap(), null, (acum, from, to) -> {
+        BigDecimal max = foldNotNull(length, blockValSet, null, (acum, from, to) -> {
           BigDecimal innerMax = values[from];
           for (int i = from; i < to; i++) {
             innerMax = innerMax.max(values[i]);
