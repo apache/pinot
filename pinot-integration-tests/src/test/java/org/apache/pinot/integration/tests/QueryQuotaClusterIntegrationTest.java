@@ -51,6 +51,8 @@ import static org.testng.Assert.assertTrue;
  */
 public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest {
   private PinotClientTransport _pinotClientTransport;
+  private String _brokerHostPort;
+
   @BeforeClass
   public void setUp()
       throws Exception {
@@ -61,6 +63,7 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
     startController();
     startBrokers(1);
     startServers(1);
+    _brokerHostPort = LOCAL_HOST + ":" + _brokerPorts.get(0);
 
     // Create and upload the schema and table config
     Schema schema = createSchema();
@@ -83,6 +86,8 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
     addQueryQuotaToClusterConfig(null);
     addQueryQuotaToDatabaseConfig(null);
     addQueryQuotaToTableConfig(null);
+    _brokerHostPort = LOCAL_HOST + ":" + _brokerPorts.get(0);
+    verifyQuotaUpdate(0);
   }
 
   @Test
@@ -132,9 +137,8 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
       addQueryQuotaToTableConfig(10);
       // Add one more broker such that quota gets distributed equally among them
       brokerStarter = startOneBroker(2);
-      _brokerBaseApiUrl = LOCAL_HOST + ":" + brokerStarter.getPort();
+      _brokerHostPort = LOCAL_HOST + ":" + brokerStarter.getPort();
       // to allow change propagation to QueryQuotaManager
-      Thread.sleep(1000);
       // query only one broker across the divided quota
       testQueryRateOnBroker(5);
       // drop table level quota so that database quota comes into effect
@@ -155,6 +159,7 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
    */
   void testQueryRate(int maxRate)
       throws Exception {
+    verifyQuotaUpdate(maxRate);
     runQueries(maxRate, false);
     //increase the qps and some of the queries should be throttled.
     runQueries(maxRate * 2, true);
@@ -162,6 +167,7 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
 
   void testQueryRateOnBroker(int maxRate)
       throws Exception {
+    verifyQuotaUpdate(maxRate);
     runQueriesOnBroker(maxRate, false);
     //increase the qps and some of the queries should be throttled.
     runQueriesOnBroker(maxRate * 2, true);
@@ -173,6 +179,7 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
       throws Exception {
     int failCount = 0;
     long sleepMillis = (long) (1000 / qps);
+    Thread.sleep(sleepMillis);
     for (int i = 0; i < qps * 2; i++) {
       ResultSetGroup resultSetGroup = _pinotConnection.execute("SELECT COUNT(*) FROM " + getTableName());
       for (PinotClientException exception : resultSetGroup.getExceptions()) {
@@ -186,13 +193,42 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
     assertTrue((failCount == 0 && !shouldFail) || (failCount != 0 && shouldFail));
   }
 
+  private void verifyQuotaUpdate(long quotaQps) {
+    String query = "SELECT COUNT(*) FROM " + getTableName();
+    if (quotaQps == 0) {
+      TestUtils.waitForCondition(aVoid -> !executeQueryOnBroker(query).getExceptions().elements().hasNext()
+          && !executeQueryOnBroker(query).getExceptions().elements().hasNext(), 1000, "Failed to unset quota");
+      return;
+    }
+    long lockMillis = (1000 / quotaQps);
+    TestUtils.waitForCondition(aVoid -> {
+      long beforeLock = System.currentTimeMillis();
+      while (executeQueryOnBroker(query).getExceptions().elements().hasNext()) {
+        beforeLock = System.currentTimeMillis();
+      }
+      long afterRequest = System.currentTimeMillis();
+      long beforeNextRequest = System.currentTimeMillis();
+      while (executeQueryOnBroker(query).getExceptions().elements().hasNext()) {
+        if (beforeNextRequest > afterRequest + (lockMillis * 1.2)) {
+          return false;
+        }
+        beforeNextRequest = System.currentTimeMillis();
+      }
+      return System.currentTimeMillis() > beforeLock + (lockMillis * 0.8);
+    }, lockMillis, 5000, "Failed to get lock in 5s");
+  }
+
+  private BrokerResponse executeQueryOnBroker(String query) {
+    return _pinotClientTransport.executeQuery(_brokerHostPort, query);
+  }
+
   private void runQueriesOnBroker(double qps, boolean shouldFail)
       throws Exception {
     int failCount = 0;
     long sleepMillis = (long) (1000 / qps);
+    Thread.sleep(sleepMillis);
     for (int i = 0; i < qps * 2; i++) {
-      BrokerResponse resultSetGroup = _pinotClientTransport.executeQuery(_brokerBaseApiUrl,
-          "SELECT COUNT(*) FROM " + getTableName());
+      BrokerResponse resultSetGroup = executeQueryOnBroker("SELECT COUNT(*) FROM " + getTableName());
       for (Iterator<JsonNode> it = resultSetGroup.getExceptions().elements(); it.hasNext(); ) {
         JsonNode exception = it.next();
         if (exception.toPrettyString().contains("QuotaExceededError")) {
@@ -211,7 +247,6 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
     tableConfig.setQuotaConfig(new QuotaConfig(null, maxQps == null ? null : maxQps.toString()));
     updateTableConfig(tableConfig);
     // to allow change propagation to QueryQuotaManager
-    Thread.sleep(1000);
   }
 
   public void addQueryQuotaToDatabaseConfig(Integer maxQps)
@@ -222,7 +257,6 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
     }
     HttpClient.wrapAndThrowHttpException(_httpClient.sendPostRequest(new URI(url), null, null));
     // to allow change propagation to QueryQuotaManager
-    Thread.sleep(1000);
   }
 
   public void addQueryQuotaToClusterConfig(Integer maxQps)
@@ -237,6 +271,5 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
           _httpClient.sendJsonPostRequest(new URI(_controllerRequestURLBuilder.forClusterConfigs()), payload));
     }
     // to allow change propagation to QueryQuotaManager
-    Thread.sleep(1000);
   }
 }
