@@ -225,7 +225,6 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
     int nettyTlsPort = NetUtils.findOpenPort(internalAdminPort + 1);
     serverConf.setProperty("pinot.server.nettytls.port", nettyTlsPort);
     _nextServerPort = nettyTlsPort + 1;
-    _serverBaseApiUrl = "http://localhost:" + _nextServerPort;
     serverConf.setProperty("pinot.server.segment.uploader.protocol", "https");
   }
 

@@ -49,7 +49,6 @@ import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
-import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -290,7 +289,6 @@ public class BaseTableDataManagerTest {
     assertTrue(hasInvertedIndex(indexDir, LONG_COLUMN));
   }
 
-  @Test
   @Test
   public void testReloadSegmentForceDownload()
       throws Exception {
