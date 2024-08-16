@@ -63,7 +63,7 @@ class ConcurrentMapPartitionDedupMetadataManager extends BasePartitionDedupMetad
                   segmentAndTime.getRight());
             } else {
               if (segmentAndTime.getLeft() != oldSegment) {
-                _logger.warn("When replacing a segment: dedup record in segment: {} with primary key: {} and dedup "
+                _logger.warn("When replacing a segment: record in segment: {} with primary key: {} and dedup "
                         + "time: {} exists in segment: {} (but not the segment: {} to replace) with dedup time: {}",
                     segmentName, dedupRecordInfo.getPrimaryKey(), dedupTime, segmentAndTime.getLeft().getSegmentName(),
                     oldSegment.getSegmentName(), segmentAndTime.getRight());
