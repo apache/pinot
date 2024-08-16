@@ -19,11 +19,11 @@
 package org.apache.pinot.calcite.rel.hint;
 
 import java.util.List;
-import javax.annotation.Nullable;
 import org.apache.calcite.rel.hint.HintPredicates;
 import org.apache.calcite.rel.hint.HintStrategyTable;
 import org.apache.calcite.rel.hint.RelHint;
 import org.apache.pinot.spi.utils.BooleanUtils;
+import org.jspecify.annotations.Nullable;
 
 
 /**

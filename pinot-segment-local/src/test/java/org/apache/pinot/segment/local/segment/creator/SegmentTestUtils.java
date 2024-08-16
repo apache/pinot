@@ -23,7 +23,6 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.concurrent.TimeUnit;
-import javax.annotation.Nonnull;
 import org.apache.avro.Schema.Field;
 import org.apache.avro.Schema.Type;
 import org.apache.avro.file.DataFileStream;
@@ -49,6 +48,7 @@ import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,9 +59,9 @@ public class SegmentTestUtils {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentTestUtils.class);
 
-  @Nonnull
-  public static SegmentGeneratorConfig getSegmentGeneratorConfigWithoutTimeColumn(@Nonnull File avroFile,
-      @Nonnull File outputDir, @Nonnull String tableName)
+  @NonNull
+  public static SegmentGeneratorConfig getSegmentGeneratorConfigWithoutTimeColumn(@NonNull File avroFile,
+      @NonNull File outputDir, @NonNull String tableName)
       throws IOException {
     SegmentGeneratorConfig segmentGeneratorConfig =
         new SegmentGeneratorConfig(new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).build(),

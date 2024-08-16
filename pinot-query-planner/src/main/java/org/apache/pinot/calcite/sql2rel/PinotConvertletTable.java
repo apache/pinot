@@ -19,7 +19,6 @@
 package org.apache.pinot.calcite.sql2rel;
 
 import java.util.List;
-import javax.annotation.Nullable;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.SqlCall;
@@ -28,6 +27,7 @@ import org.apache.calcite.sql2rel.SqlRexContext;
 import org.apache.calcite.sql2rel.SqlRexConvertlet;
 import org.apache.calcite.sql2rel.SqlRexConvertletTable;
 import org.apache.calcite.sql2rel.StandardConvertletTable;
+import org.jspecify.annotations.Nullable;
 
 
 /**

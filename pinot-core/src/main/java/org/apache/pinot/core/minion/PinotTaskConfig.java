@@ -20,10 +20,10 @@ package org.apache.pinot.core.minion;
 
 import java.util.HashMap;
 import java.util.Map;
-import javax.annotation.Nullable;
 import org.apache.helix.task.TaskConfig;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.spi.utils.EqualityUtils;
+import org.jspecify.annotations.Nullable;
 
 
 public class PinotTaskConfig {

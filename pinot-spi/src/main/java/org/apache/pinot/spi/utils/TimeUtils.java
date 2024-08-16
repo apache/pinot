@@ -20,7 +20,6 @@ package org.apache.pinot.spi.utils;
 
 import java.time.Instant;
 import java.util.concurrent.TimeUnit;
-import javax.annotation.Nullable;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Duration;
@@ -28,6 +27,7 @@ import org.joda.time.Interval;
 import org.joda.time.Period;
 import org.joda.time.format.PeriodFormatter;
 import org.joda.time.format.PeriodFormatterBuilder;
+import org.jspecify.annotations.Nullable;
 
 
 public class TimeUtils {

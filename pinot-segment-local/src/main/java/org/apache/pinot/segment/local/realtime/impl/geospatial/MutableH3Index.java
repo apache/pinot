@@ -22,14 +22,14 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.segment.local.utils.H3Utils;
 import org.apache.pinot.segment.spi.index.mutable.MutableIndex;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.segment.spi.index.reader.H3IndexReader;
 import org.apache.pinot.segment.spi.index.reader.H3IndexResolution;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.Point;
@@ -54,7 +54,7 @@ public class MutableH3Index implements H3IndexReader, MutableIndex {
   }
 
   @Override
-  public void add(@Nonnull Object value, int dictId, int docId) {
+  public void add(@NonNull Object value, int dictId, int docId) {
     try {
       Geometry geometry = GeometrySerializer.deserialize((byte[]) value);
       add(geometry);
@@ -64,7 +64,7 @@ public class MutableH3Index implements H3IndexReader, MutableIndex {
   }
 
   @Override
-  public void add(@Nonnull Object[] values, @Nullable int[] dictIds, int docId) {
+  public void add(@NonNull Object[] values, @Nullable int[] dictIds, int docId) {
     throw new UnsupportedOperationException("Mutable H3 indexes are not supported for multi-valued columns");
   }
 

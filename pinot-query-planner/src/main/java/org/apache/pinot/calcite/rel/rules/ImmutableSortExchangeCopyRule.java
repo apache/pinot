@@ -22,10 +22,10 @@ import com.google.common.base.MoreObjects;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import javax.annotation.Nullable;
 import javax.annotation.concurrent.NotThreadSafe;
 import org.apache.calcite.plan.RelRule;
 import org.apache.calcite.tools.RelBuilderFactory;
+import org.jspecify.annotations.Nullable;
 
 
 /**
@@ -323,7 +323,7 @@ final class ImmutableSortExchangeCopyRule {
     public static final class Builder {
       private @Nullable RelBuilderFactory relBuilderFactory;
       private @Nullable String description;
-      private @Nullable RelRule.OperandTransform operandSupplier;
+      private RelRule.@Nullable OperandTransform operandSupplier;
 
       private Builder() {
       }

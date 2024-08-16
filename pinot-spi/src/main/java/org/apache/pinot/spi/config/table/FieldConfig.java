@@ -26,9 +26,9 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.util.List;
 import java.util.Map;
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 
 public class FieldConfig extends BaseJsonConfig {
@@ -203,7 +203,7 @@ public class FieldConfig extends BaseJsonConfig {
   }
 
   public static class Builder {
-    @Nonnull
+    @NonNull
     private String _name;
     private EncodingType _encodingType;
     private List<IndexType> _indexTypes;
@@ -213,7 +213,7 @@ public class FieldConfig extends BaseJsonConfig {
     private TimestampConfig _timestampConfig;
     private JsonNode _tierOverwrites;
 
-    public Builder(@Nonnull String name) {
+    public Builder(@NonNull String name) {
       _name = name;
     }
 

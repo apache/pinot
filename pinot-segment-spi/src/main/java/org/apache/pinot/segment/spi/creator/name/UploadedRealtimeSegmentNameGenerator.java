@@ -20,8 +20,8 @@ package org.apache.pinot.segment.spi.creator.name;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
-import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
+import org.jspecify.annotations.Nullable;
 
 
 /**

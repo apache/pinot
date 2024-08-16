@@ -19,10 +19,10 @@
 package org.apache.pinot.core.transport;
 
 import java.util.Map;
-import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
+import org.jspecify.annotations.Nullable;
 
 
 /**

@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.segment.spi.index.reader;
 
-import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.IndexReader;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Interface for indexed range queries

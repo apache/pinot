@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import java.util.Collection;
 import java.util.Set;
 import java.util.stream.Collectors;
-import javax.annotation.Nullable;
 import org.apache.calcite.linq4j.tree.Expression;
 import org.apache.calcite.rel.type.RelProtoDataType;
 import org.apache.calcite.schema.Function;
@@ -34,6 +33,7 @@ import org.apache.calcite.schema.Table;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.jspecify.annotations.Nullable;
 
 import static java.util.Objects.requireNonNull;
 

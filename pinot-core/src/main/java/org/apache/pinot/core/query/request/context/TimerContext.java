@@ -19,9 +19,9 @@
 package org.apache.pinot.core.query.request.context;
 
 import java.util.concurrent.TimeUnit;
-import javax.annotation.Nullable;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerQueryPhase;
+import org.jspecify.annotations.Nullable;
 
 
 public class TimerContext {

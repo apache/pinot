@@ -21,7 +21,6 @@ package org.apache.pinot.segment.local.segment.readers;
 import com.google.common.base.Preconditions;
 import java.io.Closeable;
 import java.io.IOException;
-import javax.annotation.Nullable;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
@@ -30,6 +29,7 @@ import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.jspecify.annotations.Nullable;
 
 
 @SuppressWarnings({"rawtypes", "unchecked"})

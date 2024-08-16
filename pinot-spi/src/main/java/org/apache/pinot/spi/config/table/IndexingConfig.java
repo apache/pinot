@@ -21,9 +21,9 @@ package org.apache.pinot.spi.config.table;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.List;
 import java.util.Map;
-import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.jspecify.annotations.Nullable;
 
 
 public class IndexingConfig extends BaseJsonConfig {

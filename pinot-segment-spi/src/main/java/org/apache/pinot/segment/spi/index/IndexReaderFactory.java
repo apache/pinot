@@ -20,11 +20,11 @@
 package org.apache.pinot.segment.spi.index;
 
 import java.io.IOException;
-import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.IndexConfig;
+import org.jspecify.annotations.Nullable;
 
 
 public interface IndexReaderFactory<R extends IndexReader> {

@@ -19,9 +19,9 @@
 package org.apache.pinot.query.service.dispatch;
 
 import io.grpc.stub.StreamObserver;
-import javax.annotation.Nullable;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.query.routing.QueryServerInstance;
+import org.jspecify.annotations.Nullable;
 
 
 /**
@@ -34,7 +34,7 @@ class AsyncQueryDispatchResponse {
   private final Worker.QueryResponse _queryResponse;
   private final Throwable _throwable;
 
-  public AsyncQueryDispatchResponse(QueryServerInstance serverInstance, @Nullable Worker.QueryResponse queryResponse,
+  public AsyncQueryDispatchResponse(QueryServerInstance serverInstance, Worker.@Nullable QueryResponse queryResponse,
       @Nullable Throwable throwable) {
     _serverInstance = serverInstance;
     _queryResponse = queryResponse;
@@ -45,8 +45,7 @@ class AsyncQueryDispatchResponse {
     return _serverInstance;
   }
 
-  @Nullable
-  public Worker.QueryResponse getQueryResponse() {
+  public Worker.@Nullable QueryResponse getQueryResponse() {
     return _queryResponse;
   }
 

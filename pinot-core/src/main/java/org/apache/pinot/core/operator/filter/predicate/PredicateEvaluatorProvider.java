@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.operator.filter.predicate;
 
-import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.predicate.EqPredicate;
 import org.apache.pinot.common.request.context.predicate.InPredicate;
 import org.apache.pinot.common.request.context.predicate.NotEqPredicate;
@@ -31,6 +30,7 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.jspecify.annotations.Nullable;
 
 
 public class PredicateEvaluatorProvider {

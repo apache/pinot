@@ -20,7 +20,7 @@ package org.apache.pinot.segment.spi.creator.name;
 
 import com.google.common.base.Joiner;
 import java.io.Serializable;
-import javax.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 
 /**

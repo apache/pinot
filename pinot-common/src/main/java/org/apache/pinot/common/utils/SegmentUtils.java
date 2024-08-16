@@ -20,12 +20,12 @@ package org.apache.pinot.common.utils;
 
 import com.google.common.base.Preconditions;
 import java.util.Map;
-import javax.annotation.Nullable;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
+import org.jspecify.annotations.Nullable;
 
 
 // Util functions related to segments.

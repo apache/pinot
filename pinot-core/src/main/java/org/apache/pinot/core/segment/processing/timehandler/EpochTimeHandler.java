@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.core.segment.processing.timehandler;
 
-import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.jspecify.annotations.Nullable;
 
 
 /**

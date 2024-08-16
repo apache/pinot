@@ -21,12 +21,12 @@ package org.apache.pinot.segment.spi.index.reader;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Objects;
-import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.DictIdCompressionType;
 import org.apache.pinot.segment.spi.index.IndexReader;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
+import org.jspecify.annotations.Nullable;
 
 
 /**

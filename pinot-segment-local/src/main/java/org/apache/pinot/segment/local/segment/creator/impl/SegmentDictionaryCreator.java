@@ -28,8 +28,6 @@ import java.io.File;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.ByteOrder;
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.io.util.FixedByteValueReaderWriter;
 import org.apache.pinot.segment.local.io.util.VarLengthValueWriter;
@@ -40,6 +38,8 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -86,13 +86,13 @@ public class SegmentDictionaryCreator implements IndexCreator {
   }
 
   @Override
-  public void add(@Nonnull Object value, int dictId)
+  public void add(@NonNull Object value, int dictId)
       throws IOException {
     throw new UnsupportedOperationException("Dictionaries should not be built as a normal index");
   }
 
   @Override
-  public void add(@Nonnull Object[] values, @Nullable int[] dictIds)
+  public void add(@NonNull Object[] values, @Nullable int[] dictIds)
       throws IOException {
     throw new UnsupportedOperationException("Dictionaries should not be built as a normal index");
   }

@@ -19,7 +19,6 @@
 package org.apache.pinot.core.query.optimizer.statement;
 
 import java.util.List;
-import javax.annotation.Nullable;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.request.Expression;
@@ -30,6 +29,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.sql.FilterKind;
+import org.jspecify.annotations.Nullable;
 
 
 /**

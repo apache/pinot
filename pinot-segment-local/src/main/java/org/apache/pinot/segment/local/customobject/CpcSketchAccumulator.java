@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.segment.local.customobject;
 
-import javax.annotation.Nonnull;
 import org.apache.datasketches.cpc.CpcSketch;
 import org.apache.datasketches.cpc.CpcUnion;
+import org.jspecify.annotations.NonNull;
 
 
 /**
@@ -48,7 +48,7 @@ public class CpcSketchAccumulator extends CustomObjectAccumulator<CpcSketch> {
     _lgNominalEntries = lgNominalEntries;
   }
 
-  @Nonnull
+  @NonNull
   @Override
   public CpcSketch getResult() {
     return unionAll();

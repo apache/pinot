@@ -28,8 +28,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
 import javax.annotation.Nonnegative;
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
@@ -41,6 +39,8 @@ import org.apache.pinot.controller.api.resources.ServerTableSizeReader;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -79,7 +79,7 @@ public class TableSizeReader {
    * @return
    */
   @Nullable
-  public TableSizeDetails getTableSizeDetails(@Nonnull String tableName, @Nonnegative int timeoutMsec)
+  public TableSizeDetails getTableSizeDetails(@NonNull String tableName, @Nonnegative int timeoutMsec)
       throws InvalidConfigException {
     Preconditions.checkNotNull(tableName, "Table name should not be null");
     Preconditions.checkArgument(timeoutMsec > 0, "Timeout value must be greater than 0");

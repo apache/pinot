@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.core.operator.blocks;
 
-import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.BlockValSet;
+import org.jspecify.annotations.Nullable;
 
 
 /**

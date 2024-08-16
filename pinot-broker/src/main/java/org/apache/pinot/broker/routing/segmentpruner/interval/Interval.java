@@ -19,7 +19,7 @@
 package org.apache.pinot.broker.routing.segmentpruner.interval;
 
 import com.google.common.base.Preconditions;
-import javax.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 
 /**

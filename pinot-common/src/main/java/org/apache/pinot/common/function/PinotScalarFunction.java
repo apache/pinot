@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.common.function;
 
-import javax.annotation.Nullable;
 import org.apache.pinot.common.function.sql.PinotSqlFunction;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.annotations.ScalarFunction;
+import org.jspecify.annotations.Nullable;
 
 
 /**

@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.local.startree.v2.store;
 
 import java.util.Set;
-import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.segment.index.datasource.BaseDataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
@@ -28,6 +27,7 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.jspecify.annotations.Nullable;
 
 
 public class StarTreeDataSource extends BaseDataSource {

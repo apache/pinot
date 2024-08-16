@@ -23,7 +23,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import java.util.Map;
-import javax.annotation.Nonnull;
+import org.jspecify.annotations.NonNull;
 
 
 /**
@@ -60,7 +60,7 @@ public final class ComplexFieldSpec extends FieldSpec {
     _childFieldSpecs = new HashMap<>();
   }
 
-  public ComplexFieldSpec(@Nonnull String name, DataType dataType, boolean isSingleValueField) {
+  public ComplexFieldSpec(@NonNull String name, DataType dataType, boolean isSingleValueField) {
     super(name, dataType, isSingleValueField);
     Preconditions.checkArgument(dataType == DataType.STRUCT || dataType == DataType.MAP || dataType == DataType.LIST);
     _childFieldSpecs = new HashMap<>();
@@ -79,7 +79,7 @@ public final class ComplexFieldSpec extends FieldSpec {
   }
 
   @JsonIgnore
-  @Nonnull
+  @NonNull
   @Override
   public FieldType getFieldType() {
     return FieldType.COMPLEX;

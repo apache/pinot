@@ -26,8 +26,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.SchemaConformingTransformerConfig;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -36,6 +34,8 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.stream.StreamDataDecoderImpl;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -134,8 +134,8 @@ public class SchemaConformingTransformer implements RecordTransformer {
   /**
    * Validates the schema against the given transformer's configuration.
    */
-  public static void validateSchema(@Nonnull Schema schema,
-      @Nonnull SchemaConformingTransformerConfig transformerConfig) {
+  public static void validateSchema(@NonNull Schema schema,
+      @NonNull SchemaConformingTransformerConfig transformerConfig) {
     validateSchemaFieldNames(schema.getPhysicalColumnNames(), transformerConfig);
 
     String indexableExtrasFieldName = transformerConfig.getIndexableExtrasField();
@@ -174,7 +174,7 @@ public class SchemaConformingTransformer implements RecordTransformer {
   /**
    * @return The field type for the given extras field
    */
-  static DataType getAndValidateExtrasFieldType(Schema schema, @Nonnull String extrasFieldName) {
+  static DataType getAndValidateExtrasFieldType(Schema schema, @NonNull String extrasFieldName) {
     FieldSpec fieldSpec = schema.getFieldSpecFor(extrasFieldName);
     Preconditions.checkState(null != fieldSpec, "Field '%s' doesn't exist in schema", extrasFieldName);
     DataType fieldDataType = fieldSpec.getDataType();
@@ -195,7 +195,7 @@ public class SchemaConformingTransformer implements RecordTransformer {
    *   the field names "a.b" and "a.b.c" are considered invalid since "a.b.c" is a child of "a.b".</li>
    * </ul>
    */
-  private static Map<String, Object> validateSchemaAndCreateTree(@Nonnull Schema schema)
+  private static Map<String, Object> validateSchemaAndCreateTree(@NonNull Schema schema)
       throws IllegalArgumentException {
     Set<String> schemaFields = schema.getPhysicalColumnNames();
 

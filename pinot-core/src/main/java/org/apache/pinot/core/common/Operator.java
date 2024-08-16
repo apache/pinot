@@ -19,11 +19,11 @@
 package org.apache.pinot.core.common;
 
 import java.util.List;
-import javax.annotation.Nullable;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
+import org.jspecify.annotations.Nullable;
 
 
 @InterfaceAudience.Private

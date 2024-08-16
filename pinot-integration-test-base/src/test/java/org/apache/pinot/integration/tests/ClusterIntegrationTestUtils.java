@@ -47,7 +47,6 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import javax.annotation.Nullable;
 import org.apache.avro.Schema;
 import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericData;
@@ -83,6 +82,7 @@ import org.apache.pinot.spi.utils.StringUtil;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.tools.utils.ExplainPlanUtils;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
+import org.jspecify.annotations.Nullable;
 import org.testng.Assert;
 
 

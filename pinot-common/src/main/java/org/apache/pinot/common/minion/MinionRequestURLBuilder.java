@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.common.minion;
 
-import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.utils.StringUtil;
+import org.jspecify.annotations.Nullable;
 
 
 /**

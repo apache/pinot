@@ -19,11 +19,11 @@
 package org.apache.pinot.core.operator.blocks;
 
 import java.util.Map;
-import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.docvalsets.TransformBlockValSet;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
+import org.jspecify.annotations.Nullable;
 
 
 /**

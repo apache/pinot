@@ -20,14 +20,14 @@ package org.apache.pinot.segment.spi.index.mutable;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 
 public interface MutableJsonIndex extends JsonIndexReader, MutableIndex {
   @Override
-  default void add(@Nonnull Object value, int dictId, int docId) {
+  default void add(@NonNull Object value, int dictId, int docId) {
     try {
       add((String) value);
     } catch (IOException ex) {
@@ -36,7 +36,7 @@ public interface MutableJsonIndex extends JsonIndexReader, MutableIndex {
   }
 
   @Override
-  default void add(@Nonnull Object[] values, @Nullable int[] dictIds, int docId) {
+  default void add(@NonNull Object[] values, @Nullable int[] dictIds, int docId) {
     throw new UnsupportedOperationException("Mutable JSON indexes are not supported for multi-valued columns");
   }
 

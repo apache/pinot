@@ -19,11 +19,11 @@
 package org.apache.pinot.controller.tuner;
 
 import java.util.Map;
-import javax.annotation.Nullable;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.yetus.audience.InterfaceStability;
+import org.jspecify.annotations.Nullable;
 
 
 /**

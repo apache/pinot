@@ -20,7 +20,7 @@ package org.apache.pinot.segment.spi.partition;
 
 import java.io.Serializable;
 import java.util.Map;
-import javax.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 
 /**

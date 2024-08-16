@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.core.operator.transform.transformer.datetime;
 
-import javax.annotation.Nonnull;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.DateTimeGranularitySpec;
+import org.jspecify.annotations.NonNull;
 
 
 /**
@@ -34,7 +34,7 @@ public class EpochToSDFTransformer extends BaseDateTimeTransformer<long[], Strin
   }
 
   @Override
-  public void transform(@Nonnull long[] input, @Nonnull String[] output, int length) {
+  public void transform(@NonNull long[] input, @NonNull String[] output, int length) {
     for (int i = 0; i < length; i++) {
       // NOTE: No need to bucket time because it's implicit in the output simple date format
       output[i] = transformMillisToSDF(transformEpochToMillis(input[i]));

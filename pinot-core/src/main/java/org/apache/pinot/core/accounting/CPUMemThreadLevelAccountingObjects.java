@@ -20,11 +20,11 @@ package org.apache.pinot.core.accounting;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.util.concurrent.atomic.AtomicReference;
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.accounting.ThreadResourceTracker;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 
 /**
@@ -103,7 +103,7 @@ public class CPUMemThreadLevelAccountingObjects {
       return taskEntry == null ? -1 : taskEntry.getTaskId();
     }
 
-    public void setThreadTaskStatus(@Nonnull String queryId, int taskId, @Nonnull Thread anchorThread) {
+    public void setThreadTaskStatus(@NonNull String queryId, int taskId, @NonNull Thread anchorThread) {
       _currentThreadTaskStatus.set(new TaskEntry(queryId, taskId, anchorThread));
     }
   }

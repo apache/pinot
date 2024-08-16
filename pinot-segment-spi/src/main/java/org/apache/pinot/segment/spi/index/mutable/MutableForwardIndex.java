@@ -19,10 +19,10 @@
 package org.apache.pinot.segment.spi.index.mutable;
 
 import java.math.BigDecimal;
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 
 /**
@@ -32,7 +32,7 @@ import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 public interface MutableForwardIndex extends ForwardIndexReader<ForwardIndexReaderContext>, MutableIndex {
 
   @Override
-  default void add(@Nonnull Object value, int dictId, int docId) {
+  default void add(@NonNull Object value, int dictId, int docId) {
     if (dictId >= 0) {
       setDictId(docId, dictId);
     } else {
@@ -82,7 +82,7 @@ public interface MutableForwardIndex extends ForwardIndexReader<ForwardIndexRead
   }
 
   @Override
-  default void add(@Nonnull Object[] value, @Nullable int[] dictIds, int docId) {
+  default void add(@NonNull Object[] value, @Nullable int[] dictIds, int docId) {
     if (dictIds != null) {
       setDictIdMV(docId, dictIds);
     } else {

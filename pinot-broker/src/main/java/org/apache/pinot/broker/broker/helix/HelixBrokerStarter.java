@@ -20,10 +20,10 @@ package org.apache.pinot.broker.broker.helix;
 
 import java.util.HashMap;
 import java.util.Map;
-import javax.annotation.Nullable;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
+import org.jspecify.annotations.Nullable;
 
 
 /**

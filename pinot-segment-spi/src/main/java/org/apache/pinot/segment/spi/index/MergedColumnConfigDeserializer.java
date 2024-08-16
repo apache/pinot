@@ -21,9 +21,9 @@ package org.apache.pinot.segment.spi.index;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
-import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.jspecify.annotations.Nullable;
 
 
 public class MergedColumnConfigDeserializer<C> implements ColumnConfigDeserializer<C> {

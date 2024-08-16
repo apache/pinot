@@ -36,7 +36,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nonnull;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -46,6 +45,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.jspecify.annotations.NonNull;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -779,7 +779,7 @@ public class SchemaConformingTransformerV2Test {
   /**
    * @return A map representing the given JSON string
    */
-  @Nonnull
+  @NonNull
   private Map<String, Object> jsonStringToMap(String jsonString) {
     try {
       TypeReference<Map<String, Object>> typeRef = new TypeReference<>() {

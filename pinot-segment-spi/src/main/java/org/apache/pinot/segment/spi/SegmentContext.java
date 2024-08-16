@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.segment.spi;
 
-import javax.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 

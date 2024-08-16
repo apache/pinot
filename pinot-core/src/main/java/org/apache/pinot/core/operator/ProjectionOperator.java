@@ -22,7 +22,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.common.DataBlockCache;
@@ -32,6 +31,7 @@ import org.apache.pinot.core.operator.blocks.DocIdSetBlock;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.trace.Tracing;
+import org.jspecify.annotations.Nullable;
 
 
 public class ProjectionOperator extends BaseProjectOperator<ProjectionBlock> {

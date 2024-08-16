@@ -27,12 +27,12 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import javax.annotation.Nonnull;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.datablock.DataBlockBuilder;
 import org.apache.pinot.core.query.aggregation.utils.ParentAggregationFunctionResultObject;
+import org.jspecify.annotations.NonNull;
 
 
 public class ExprMinMaxObject implements ParentAggregationFunctionResultObject {
@@ -121,7 +121,7 @@ public class ExprMinMaxObject implements ParentAggregationFunctionResultObject {
   }
 
   // used for result serialization
-  @Nonnull
+  @NonNull
   public byte[] toBytes()
       throws IOException {
     ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();

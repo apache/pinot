@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.segment.index.datasource;
 
-import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.index.IndexReader;
@@ -35,6 +34,7 @@ import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.segment.spi.index.reader.RangeIndexReader;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.index.reader.VectorIndexReader;
+import org.jspecify.annotations.Nullable;
 
 
 public abstract class BaseDataSource implements DataSource {

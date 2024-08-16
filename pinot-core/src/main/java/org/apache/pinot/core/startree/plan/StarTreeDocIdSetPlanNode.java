@@ -21,13 +21,13 @@ package org.apache.pinot.core.startree.plan;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nullable;
 import org.apache.pinot.core.operator.DocIdSetOperator;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.core.plan.PlanNode;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.CompositePredicateEvaluator;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
+import org.jspecify.annotations.Nullable;
 
 
 public class StarTreeDocIdSetPlanNode implements PlanNode {

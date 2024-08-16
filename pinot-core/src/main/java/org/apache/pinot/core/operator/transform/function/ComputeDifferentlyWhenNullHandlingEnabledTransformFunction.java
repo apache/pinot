@@ -19,9 +19,9 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import java.math.BigDecimal;
-import javax.annotation.Nullable;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.jspecify.annotations.Nullable;
 import org.roaringbitmap.RoaringBitmap;
 
 

@@ -19,7 +19,6 @@
 package org.apache.pinot.core.query.executor;
 
 import java.util.concurrent.ExecutorService;
-import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -27,6 +26,7 @@ import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.jspecify.annotations.Nullable;
 
 
 @ThreadSafe

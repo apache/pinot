@@ -19,13 +19,13 @@
 package org.apache.pinot.core.operator.transform.transformer.datetime;
 
 import java.util.concurrent.TimeUnit;
-import javax.annotation.Nonnull;
 import org.apache.pinot.core.operator.transform.transformer.DataTransformer;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.DateTimeFormatUnitSpec.DateTimeTransformUnit;
 import org.apache.pinot.spi.data.DateTimeGranularitySpec;
 import org.joda.time.DateTime;
 import org.joda.time.format.DateTimeFormatter;
+import org.jspecify.annotations.NonNull;
 
 
 /**
@@ -48,8 +48,8 @@ public abstract class BaseDateTimeTransformer<I, O> implements DataTransformer<I
     String truncate(DateTime dateTime);
   }
 
-  public BaseDateTimeTransformer(@Nonnull DateTimeFormatSpec inputFormat, @Nonnull DateTimeFormatSpec outputFormat,
-      @Nonnull DateTimeGranularitySpec outputGranularity) {
+  public BaseDateTimeTransformer(@NonNull DateTimeFormatSpec inputFormat, @NonNull DateTimeFormatSpec outputFormat,
+      @NonNull DateTimeGranularitySpec outputGranularity) {
     _inputTimeSize = inputFormat.getColumnSize();
     _inputTimeUnit = inputFormat.getColumnUnit();
     _inputDateTimeFormatter = inputFormat.getDateTimeFormatter();
@@ -93,7 +93,7 @@ public abstract class BaseDateTimeTransformer<I, O> implements DataTransformer<I
     return _inputTimeUnit.toMillis(epochTime * _inputTimeSize);
   }
 
-  protected long transformSDFToMillis(@Nonnull String sdfTime) {
+  protected long transformSDFToMillis(@NonNull String sdfTime) {
     return _inputDateTimeFormatter.parseMillis(sdfTime);
   }
 

@@ -21,7 +21,6 @@ package org.apache.pinot.common.minion;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import javax.annotation.Nullable;
 import org.apache.helix.AccessOption;
 import org.apache.helix.store.HelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
@@ -30,6 +29,7 @@ import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.StringUtil;
 import org.apache.zookeeper.data.Stat;
+import org.jspecify.annotations.Nullable;
 
 
 /**

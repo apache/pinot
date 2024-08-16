@@ -23,7 +23,6 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import javax.annotation.Nullable;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -42,6 +41,7 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.operator.groupby.GroupIdGenerator;
 import org.apache.pinot.query.runtime.operator.groupby.GroupIdGeneratorFactory;
 import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
+import org.jspecify.annotations.Nullable;
 import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -69,7 +69,7 @@ public class MultistageGroupByExecutor {
 
   public MultistageGroupByExecutor(int[] groupKeyIds, AggregationFunction[] aggFunctions, int[] filterArgIds,
       int maxFilterArgId, AggType aggType, DataSchema resultSchema, Map<String, String> opChainMetadata,
-      @Nullable PlanNode.NodeHint nodeHint) {
+      PlanNode.@Nullable NodeHint nodeHint) {
     _groupKeyIds = groupKeyIds;
     _aggFunctions = aggFunctions;
     _filterArgIds = filterArgIds;
@@ -97,7 +97,7 @@ public class MultistageGroupByExecutor {
             _numGroupsLimit);
   }
 
-  private int getNumGroupsLimit(Map<String, String> opChainMetadata, @Nullable PlanNode.NodeHint nodeHint) {
+  private int getNumGroupsLimit(Map<String, String> opChainMetadata, PlanNode.@Nullable NodeHint nodeHint) {
     if (nodeHint != null) {
       Map<String, String> aggregateOptions = nodeHint.getHintOptions().get(PinotHintOptions.AGGREGATE_HINT_OPTIONS);
       if (aggregateOptions != null) {
@@ -112,7 +112,7 @@ public class MultistageGroupByExecutor {
   }
 
   private int getMaxInitialResultHolderCapacity(Map<String, String> opChainMetadata,
-      @Nullable PlanNode.NodeHint nodeHint) {
+      PlanNode.@Nullable NodeHint nodeHint) {
     if (nodeHint != null) {
       Map<String, String> aggregateOptions = nodeHint.getHintOptions().get(PinotHintOptions.AGGREGATE_HINT_OPTIONS);
       if (aggregateOptions != null) {

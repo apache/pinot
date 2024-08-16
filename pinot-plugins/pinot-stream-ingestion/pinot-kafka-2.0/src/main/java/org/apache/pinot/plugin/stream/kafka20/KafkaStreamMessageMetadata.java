@@ -19,9 +19,9 @@
 package org.apache.pinot.plugin.stream.kafka20;
 
 import java.util.Map;
-import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
+import org.jspecify.annotations.Nullable;
 
 // TODO: Make it a util class
 public class KafkaStreamMessageMetadata extends StreamMessageMetadata {

@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.controller.api.access;
 
-import javax.annotation.Nullable;
 import javax.ws.rs.core.HttpHeaders;
 import org.apache.pinot.core.auth.FineGrainedAccessControl;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
+import org.jspecify.annotations.Nullable;
 
 
 @InterfaceAudience.Public

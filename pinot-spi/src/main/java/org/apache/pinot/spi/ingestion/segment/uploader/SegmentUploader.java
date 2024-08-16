@@ -20,10 +20,10 @@ package org.apache.pinot.spi.ingestion.segment.uploader;
 
 import java.net.URI;
 import java.util.Map;
-import javax.annotation.Nullable;
 import org.apache.pinot.spi.annotations.InterfaceStability;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.jspecify.annotations.Nullable;
 
 
 /**

@@ -19,9 +19,9 @@
 package org.apache.pinot.segment.spi.datasource;
 
 import java.util.Set;
-import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.jspecify.annotations.Nullable;
 
 
 /**

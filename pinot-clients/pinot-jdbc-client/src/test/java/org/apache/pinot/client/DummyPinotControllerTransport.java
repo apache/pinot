@@ -20,11 +20,11 @@ package org.apache.pinot.client;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.Map;
-import javax.annotation.Nullable;
 import javax.net.ssl.SSLContext;
 import org.apache.pinot.client.controller.PinotControllerTransport;
 import org.apache.pinot.client.controller.response.ControllerTenantBrokerResponse;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.jspecify.annotations.Nullable;
 
 
 public class DummyPinotControllerTransport extends PinotControllerTransport {

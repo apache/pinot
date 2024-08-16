@@ -20,12 +20,12 @@ package org.apache.pinot.segment.spi;
 
 import java.util.List;
 import java.util.Set;
-import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.jspecify.annotations.Nullable;
 
 
 @InterfaceAudience.Private

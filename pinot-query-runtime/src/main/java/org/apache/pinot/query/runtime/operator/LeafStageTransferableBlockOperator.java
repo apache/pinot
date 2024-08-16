@@ -33,7 +33,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import javax.annotation.Nullable;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.datatable.DataTable;
@@ -58,6 +57,7 @@ import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionValue;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -581,15 +581,14 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
     };
 
     private final StatMap.Type _type;
-    @Nullable
-    private final BrokerResponseNativeV2.StatKey _brokerKey;
+    private final BrokerResponseNativeV2.@Nullable StatKey _brokerKey;
 
     StatKey(StatMap.Type type) {
       _type = type;
       _brokerKey = BrokerResponseNativeV2.StatKey.valueOf(name());
     }
 
-    StatKey(StatMap.Type type, @Nullable BrokerResponseNativeV2.StatKey brokerKey) {
+    StatKey(StatMap.Type type, BrokerResponseNativeV2.@Nullable StatKey brokerKey) {
       _type = type;
       _brokerKey = brokerKey;
     }

@@ -20,7 +20,7 @@ package org.apache.pinot.segment.spi.creator.name;
 
 import com.google.common.base.Preconditions;
 import java.util.UUID;
-import javax.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 
 /**

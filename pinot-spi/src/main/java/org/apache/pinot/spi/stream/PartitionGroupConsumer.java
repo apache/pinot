@@ -20,7 +20,7 @@ package org.apache.pinot.spi.stream;
 
 import java.io.Closeable;
 import java.util.concurrent.TimeoutException;
-import javax.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 
 /**

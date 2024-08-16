@@ -19,11 +19,11 @@
 package org.apache.pinot.plugin.inputformat.parquet;
 
 import java.util.Set;
-import javax.annotation.Nullable;
 import org.apache.avro.Schema;
 import org.apache.parquet.schema.PrimitiveType;
 import org.apache.pinot.plugin.inputformat.avro.AvroRecordExtractor;
 import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
+import org.jspecify.annotations.Nullable;
 
 
 public class ParquetAvroRecordExtractor extends AvroRecordExtractor {

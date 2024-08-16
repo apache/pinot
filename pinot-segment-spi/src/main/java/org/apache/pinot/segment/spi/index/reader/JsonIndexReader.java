@@ -19,8 +19,8 @@
 package org.apache.pinot.segment.spi.index.reader;
 
 import java.util.Map;
-import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.IndexReader;
+import org.jspecify.annotations.Nullable;
 import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 

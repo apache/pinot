@@ -20,8 +20,8 @@ package org.apache.pinot.segment.spi.index.creator;
 
 import com.google.common.base.Preconditions;
 import java.util.Map;
-import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.table.IndexConfig;
+import org.jspecify.annotations.Nullable;
 
 
 /**

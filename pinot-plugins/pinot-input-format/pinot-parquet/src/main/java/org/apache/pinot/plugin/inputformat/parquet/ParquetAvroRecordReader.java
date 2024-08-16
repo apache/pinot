@@ -21,7 +21,6 @@ package org.apache.pinot.plugin.inputformat.parquet;
 import java.io.File;
 import java.io.IOException;
 import java.util.Set;
-import javax.annotation.Nullable;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.hadoop.fs.Path;
 import org.apache.parquet.hadoop.ParquetReader;
@@ -29,6 +28,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.apache.pinot.spi.data.readers.RecordReaderUtils;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Avro Record reader for Parquet file. This reader doesn't read parquet file with incompatible Avro schemas,

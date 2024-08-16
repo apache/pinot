@@ -21,7 +21,6 @@ package org.apache.pinot.common.assignment;
 import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.List;
-import javax.annotation.Nullable;
 import org.apache.helix.AccessOption;
 import org.apache.helix.HelixManager;
 import org.apache.helix.store.HelixPropertyStore;
@@ -36,6 +35,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TenantConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.jspecify.annotations.Nullable;
 
 
 /**

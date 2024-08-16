@@ -22,11 +22,11 @@ import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
 import java.util.function.DoubleSupplier;
 import java.util.function.LongSupplier;
-import javax.annotation.Nullable;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.jspecify.annotations.Nullable;
 import org.roaringbitmap.RoaringBitmap;
 
 /**

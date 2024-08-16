@@ -19,7 +19,6 @@
 package org.apache.pinot.core.operator.filter;
 
 import java.util.Arrays;
-import javax.annotation.Nullable;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.operator.docidsets.AndDocIdSet;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
@@ -27,6 +26,7 @@ import org.apache.pinot.core.operator.docidsets.EmptyDocIdSet;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
+import org.jspecify.annotations.Nullable;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 

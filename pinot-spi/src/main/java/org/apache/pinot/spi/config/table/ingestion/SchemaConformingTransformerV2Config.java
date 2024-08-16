@@ -27,8 +27,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
+import org.jspecify.annotations.Nullable;
 
 public class SchemaConformingTransformerV2Config extends BaseJsonConfig {
   @JsonPropertyDescription("Enable indexable extras")

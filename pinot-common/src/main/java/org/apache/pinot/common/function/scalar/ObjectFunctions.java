@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.common.function.scalar;
 
-import javax.annotation.Nullable;
 import org.apache.pinot.spi.annotations.ScalarFunction;
+import org.jspecify.annotations.Nullable;
 
 
 public class ObjectFunctions {

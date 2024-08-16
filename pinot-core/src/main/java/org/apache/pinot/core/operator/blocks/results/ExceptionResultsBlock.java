@@ -19,7 +19,6 @@
 package org.apache.pinot.core.operator.blocks.results;
 
 import java.util.List;
-import javax.annotation.Nullable;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.ProcessingException;
@@ -27,6 +26,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.spi.exception.QueryCancelledException;
+import org.jspecify.annotations.Nullable;
 
 
 public class ExceptionResultsBlock extends BaseResultsBlock {

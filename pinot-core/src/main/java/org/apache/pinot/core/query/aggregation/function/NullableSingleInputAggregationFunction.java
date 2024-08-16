@@ -19,9 +19,9 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import java.util.NoSuchElementException;
-import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
+import org.jspecify.annotations.Nullable;
 import org.roaringbitmap.IntIterator;
 import org.roaringbitmap.RoaringBitmap;
 

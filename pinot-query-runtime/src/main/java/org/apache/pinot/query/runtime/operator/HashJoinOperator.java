@@ -25,7 +25,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nullable;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.common.datablock.DataBlock;
@@ -48,6 +47,7 @@ import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.JoinOverFlowMode;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -165,7 +165,7 @@ public class HashJoinOperator extends MultiStageOperator {
     return LOGGER;
   }
 
-  private int getMaxRowInJoin(Map<String, String> opChainMetadata, @Nullable PlanNode.NodeHint nodeHint) {
+  private int getMaxRowInJoin(Map<String, String> opChainMetadata, PlanNode.@Nullable NodeHint nodeHint) {
     if (nodeHint != null) {
       Map<String, String> joinOptions = nodeHint.getHintOptions().get(PinotHintOptions.JOIN_HINT_OPTIONS);
       if (joinOptions != null) {
@@ -180,7 +180,7 @@ public class HashJoinOperator extends MultiStageOperator {
   }
 
   private JoinOverFlowMode getJoinOverflowMode(Map<String, String> contextMetadata,
-      @Nullable PlanNode.NodeHint nodeHint) {
+      PlanNode.@Nullable NodeHint nodeHint) {
     if (nodeHint != null) {
       Map<String, String> joinOptions = nodeHint.getHintOptions().get(PinotHintOptions.JOIN_HINT_OPTIONS);
       if (joinOptions != null) {

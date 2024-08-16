@@ -23,8 +23,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.jspecify.annotations.Nullable;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

@@ -21,8 +21,8 @@ package org.apache.pinot.core.query.scheduler;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
-import javax.annotation.Nullable;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
+import org.jspecify.annotations.Nullable;
 
 
 /**

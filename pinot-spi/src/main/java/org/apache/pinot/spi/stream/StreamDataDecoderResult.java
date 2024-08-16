@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.spi.stream;
 
-import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.jspecify.annotations.Nullable;
 
 
 /**

@@ -19,10 +19,10 @@
 package org.apache.pinot.spi.stream;
 
 import java.util.Map;
-import javax.annotation.Nullable;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.jspecify.annotations.Nullable;
 
 
 /**

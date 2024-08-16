@@ -21,11 +21,11 @@ package org.apache.pinot.common.utils;
 import com.google.common.base.Preconditions;
 import java.util.Map;
 import java.util.Objects;
-import javax.annotation.Nullable;
 import javax.ws.rs.core.HttpHeaders;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.exception.DatabaseConflictException;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.jspecify.annotations.Nullable;
 
 
 public class DatabaseUtils {

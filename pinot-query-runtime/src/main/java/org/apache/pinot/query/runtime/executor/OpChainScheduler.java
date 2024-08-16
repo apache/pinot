@@ -19,10 +19,10 @@
 package org.apache.pinot.query.runtime.executor;
 
 import java.util.concurrent.TimeUnit;
-import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.operator.OpChainId;
+import org.jspecify.annotations.Nullable;
 
 
 /**

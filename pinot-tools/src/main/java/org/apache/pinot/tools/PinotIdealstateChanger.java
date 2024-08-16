@@ -19,11 +19,11 @@
 package org.apache.pinot.tools;
 
 import com.google.common.base.Function;
-import javax.annotation.Nullable;
 import org.apache.helix.HelixManager;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
+import org.jspecify.annotations.Nullable;
 
 
 public class PinotIdealstateChanger extends PinotZKChanger {

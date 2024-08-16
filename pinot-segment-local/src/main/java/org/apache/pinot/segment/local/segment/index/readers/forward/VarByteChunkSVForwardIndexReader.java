@@ -21,11 +21,11 @@ package org.apache.pinot.segment.local.segment.index.readers.forward;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.util.List;
-import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriter;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
+import org.jspecify.annotations.Nullable;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 

@@ -24,8 +24,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 
 /**
@@ -161,7 +161,7 @@ public class EqualityUtils {
     return left == right;
   }
 
-  public static boolean isNullOrNotSameClass(@Nonnull Object left, @Nullable Object right) {
+  public static boolean isNullOrNotSameClass(@NonNull Object left, @Nullable Object right) {
     return right == null || left.getClass() != right.getClass();
   }
 

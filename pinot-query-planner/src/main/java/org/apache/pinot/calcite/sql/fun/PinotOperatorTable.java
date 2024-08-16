@@ -24,7 +24,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
-import javax.annotation.Nullable;
 import org.apache.calcite.sql.SqlFunction;
 import org.apache.calcite.sql.SqlFunctionCategory;
 import org.apache.calcite.sql.SqlIdentifier;
@@ -45,6 +44,7 @@ import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.function.sql.PinotSqlAggFunction;
 import org.apache.pinot.common.function.sql.PinotSqlFunction;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.jspecify.annotations.Nullable;
 
 
 /**

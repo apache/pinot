@@ -22,7 +22,6 @@ import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.dynatrace.hash4j.distinctcount.UltraLogLog;
 import java.math.BigDecimal;
 import java.util.Base64;
-import javax.annotation.Nullable;
 import org.apache.datasketches.cpc.CpcSketch;
 import org.apache.datasketches.cpc.CpcUnion;
 import org.apache.datasketches.memory.Memory;
@@ -40,6 +39,7 @@ import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.segment.local.utils.UltraLogLogUtils;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.jspecify.annotations.Nullable;
 
 
 /**

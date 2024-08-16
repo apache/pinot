@@ -19,9 +19,9 @@
 package org.apache.pinot.core.operator.transform.transformer.timeunit;
 
 import java.util.concurrent.TimeUnit;
-import javax.annotation.Nonnull;
 import org.joda.time.DurationFieldType;
 import org.joda.time.chrono.ISOChronology;
+import org.jspecify.annotations.NonNull;
 
 
 /**
@@ -58,13 +58,13 @@ public class CustomTimeUnitTransformer implements TimeUnitTransformer {
     abstract long fromMillis(long millisSinceEpoch);
   }
 
-  public CustomTimeUnitTransformer(@Nonnull TimeUnit inputTimeUnit, @Nonnull String outputTimeUnitName) {
+  public CustomTimeUnitTransformer(@NonNull TimeUnit inputTimeUnit, @NonNull String outputTimeUnitName) {
     _inputTimeUnit = inputTimeUnit;
     _outputTimeUnit = CustomTimeUnit.valueOf(outputTimeUnitName);
   }
 
   @Override
-  public void transform(@Nonnull long[] input, @Nonnull long[] output, int length) {
+  public void transform(@NonNull long[] input, @NonNull long[] output, int length) {
     for (int i = 0; i < length; i++) {
       output[i] = _outputTimeUnit.fromMillis(_inputTimeUnit.toMillis(input[i]));
     }

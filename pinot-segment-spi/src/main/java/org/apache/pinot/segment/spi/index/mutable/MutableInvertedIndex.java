@@ -18,20 +18,20 @@
  */
 package org.apache.pinot.segment.spi.index.mutable;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 public interface MutableInvertedIndex extends InvertedIndexReader<MutableRoaringBitmap>, MutableIndex {
   @Override
-  default void add(@Nonnull Object value, int dictId, int docId) {
+  default void add(@NonNull Object value, int dictId, int docId) {
     add(dictId, docId);
   }
 
   @Override
-  default void add(@Nonnull Object[] values, @Nullable int[] dictIds, int docId) {
+  default void add(@NonNull Object[] values, @Nullable int[] dictIds, int docId) {
     for (int dictId : dictIds) {
       add(dictId, docId);
     }

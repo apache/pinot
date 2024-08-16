@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.query.runtime.operator.utils;
 
-import javax.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 
 /**

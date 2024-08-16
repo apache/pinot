@@ -21,12 +21,12 @@ package org.apache.pinot.segment.spi.creator.name;
 import com.google.common.base.Preconditions;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
-import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFieldSpec.TimeFormat;
 import org.apache.pinot.spi.data.DateTimeFormatPatternSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.joda.time.DateTime;
+import org.jspecify.annotations.Nullable;
 
 
 /**

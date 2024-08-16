@@ -21,10 +21,10 @@ package org.apache.pinot.core.operator.filter;
 
 import java.util.Collections;
 import java.util.List;
-import javax.annotation.Nullable;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.docidsets.MatchAllDocIdSet;
+import org.jspecify.annotations.Nullable;
 
 
 public class NotFilterOperator extends BaseFilterOperator {
