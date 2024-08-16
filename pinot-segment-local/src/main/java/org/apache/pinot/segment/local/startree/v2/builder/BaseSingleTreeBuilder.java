@@ -489,6 +489,7 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
       }
     }
 
+    Exception t = null;
     try {
       for (int docId = 0; docId < _numDocs; docId++) {
         Record record = getStarTreeRecord(docId);
@@ -519,24 +520,34 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
           }
         }
       }
+    } catch (Exception e) {
+      LOGGER.error("Caught exception while creating forward indexes", e);
+      t = e;
     } finally {
       for (int i = 0; i < dimensionIndexCreators.length; i++) {
         try {
           dimensionIndexCreators[i].close();
-        } catch (Throwable e) {
-          LOGGER.warn("Caught throwable while closing dimension index creator for dimension: {}",
+        } catch (Exception e) {
+          LOGGER.warn("Caught exception while closing dimension index creator for dimension: {}",
               _dimensionsSplitOrder[i], e);
-          throw e;
+          if (t == null) {
+            t = e;
+          }
         }
       }
       for (int i = 0; i < metricIndexCreators.length; i++) {
         try {
           metricIndexCreators[i].close();
-        } catch (Throwable e) {
-          LOGGER.warn("Caught throwable while closing metric index creator for metric: {}", _metrics[i], e);
-          throw e;
+        } catch (Exception e) {
+          LOGGER.warn("Caught exception while closing metric index creator for metric: {}", _metrics[i], e);
+          if (t == null) {
+            t = e;
+          }
         }
       }
+    }
+    if (t != null) {
+      throw t;
     }
   }
 
