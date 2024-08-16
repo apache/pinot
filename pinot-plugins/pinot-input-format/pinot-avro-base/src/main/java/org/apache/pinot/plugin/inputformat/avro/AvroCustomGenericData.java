@@ -33,7 +33,8 @@ public class AvroCustomGenericData extends GenericData {
 
   /**
    * Creates a new array instance based on the provided schema.
-   * If the old object is an instance of {@link org.apache.avro.generic.GenericArray} or {@link java.util.Collection}, it clears and reuses it.
+   * If the old object is an instance of {@link org.apache.avro.generic.GenericArray}
+   * or {@link java.util.Collection}, it clears and reuses it.
    * Otherwise, it creates a new {@link org.apache.avro.generic.GenericData.Array} instance.
    * This is the old implementation of avro, which is changed in version 1.12.0
    *
