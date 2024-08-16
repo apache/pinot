@@ -29,20 +29,21 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  */
 public class SegmentsReloadCheckResponse {
   private final boolean _needReload;
-  private final String _serverInstanceId;
+  private final String _instanceId;
 
-  public String getServerInstanceId() {
-    return _serverInstanceId;
+  public String getInstanceId() {
+    return _instanceId;
   }
 
-  public boolean getReload() {
+  @JsonProperty("needReload")
+  public boolean getNeedReload() {
     return _needReload;
   }
 
   @JsonCreator
   public SegmentsReloadCheckResponse(@JsonProperty("needReload") boolean needReload,
-      @JsonProperty("serverInstanceId") String serverInstanceId) {
+      @JsonProperty("instanceId") String instanceId) {
     _needReload = needReload;
-    _serverInstanceId = serverInstanceId;
+    _instanceId = instanceId;
   }
 }

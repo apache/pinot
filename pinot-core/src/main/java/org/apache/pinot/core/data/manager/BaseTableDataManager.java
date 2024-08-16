@@ -61,6 +61,7 @@ import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.util.PeerServerSegmentFinder;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
@@ -1013,15 +1014,16 @@ public abstract class BaseTableDataManager implements TableDataManager {
     }
   }
 
-  boolean needReloadSegment(SegmentZKMetadata zkMetadata, IndexLoadingConfig indexLoadingConfig)
+  private boolean needReloadSegment(String segmentName, String crc, IndexLoadingConfig indexLoadingConfig)
       throws Exception {
-    String segmentName = zkMetadata.getSegmentName();
-    SegmentDirectory segmentDirectory =
-        tryInitSegmentDirectory(segmentName, String.valueOf(zkMetadata.getCrc()), indexLoadingConfig);
+    SegmentDirectory segmentDirectory = tryInitSegmentDirectory(segmentName, crc, indexLoadingConfig);
     try {
       Schema schema = indexLoadingConfig.getSchema();
       //if re processing or reload is needed on a segment then return true
-      return ImmutableSegmentLoader.needPreprocess(segmentDirectory, indexLoadingConfig, schema);
+      if (segmentDirectory != null) {
+        return ImmutableSegmentLoader.needPreprocess(segmentDirectory, indexLoadingConfig, schema);
+      }
+      return false;
     } catch (Exception e) {
       _logger.error("Failed to check if reload is needed for a segment {}", segmentName, e);
       closeSegmentDirectoryQuietly(segmentDirectory);
@@ -1048,8 +1050,10 @@ public abstract class BaseTableDataManager implements TableDataManager {
     boolean needReload = false;
     try {
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
-        SegmentZKMetadata segmentZKMetadata = fetchZKMetadata(segmentDataManager.getSegmentName());
-        if (needReloadSegment(segmentZKMetadata, indexLoadingConfig)) {
+        String crcData = segmentDataManager.getSegment().getSegmentMetadata().getCrc();
+        IndexSegment segment = segmentDataManager.getSegment();
+        if (segment instanceof ImmutableSegmentImpl && needReloadSegment(segment.getSegmentName(), crcData,
+            indexLoadingConfig)) {
           needReload = true;
           break;
         }

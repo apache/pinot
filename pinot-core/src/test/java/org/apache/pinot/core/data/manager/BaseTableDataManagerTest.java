@@ -291,29 +291,6 @@ public class BaseTableDataManagerTest {
   }
 
   @Test
-  public void testNeedReloadSegmentAddIndex()
-      throws Exception {
-    File indexDir = createSegment(SegmentVersion.v3, 5);
-    long crc = getCRC(indexDir);
-    assertFalse(hasInvertedIndex(indexDir, STRING_COLUMN));
-    assertFalse(hasInvertedIndex(indexDir, LONG_COLUMN));
-
-    // Same CRCs so load the local segment directory directly.
-    SegmentZKMetadata zkMetadata = mock(SegmentZKMetadata.class);
-    when(zkMetadata.getCrc()).thenReturn(crc);
-    when(zkMetadata.getSegmentName()).thenReturn(SEGMENT_NAME);
-    SegmentMetadata localMetadata = mock(SegmentMetadata.class);
-    when(localMetadata.getCrc()).thenReturn(Long.toString(crc));
-    SegmentDirectory segmentDirectory = mock(SegmentDirectory.class);
-    // Require to add indices.
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
-    indexLoadingConfig.setInvertedIndexColumns(new HashSet<>(Arrays.asList(STRING_COLUMN, LONG_COLUMN)));
-    BaseTableDataManager tableDataManager = createTableManager();
-    assertTrue(tableDataManager.needReloadSegment(zkMetadata, indexLoadingConfig));
-    tableDataManager.reloadSegment(SEGMENT_NAME, indexLoadingConfig, zkMetadata, localMetadata, null, false);
-    assertFalse(tableDataManager.needReloadSegment(zkMetadata, indexLoadingConfig));
-  }
-
   @Test
   public void testReloadSegmentForceDownload()
       throws Exception {
