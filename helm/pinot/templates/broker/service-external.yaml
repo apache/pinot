@@ -29,7 +29,7 @@ metadata:
     {{- include "pinot.brokerLabels" . | nindent 4 }}
 spec:
   type: {{ .Values.broker.external.type }}
-  publishNotReadyAddresses: true
+  publishNotReadyAddresses: false
   ports:
     - name: external-broker
       port: {{ .Values.broker.external.port }}
