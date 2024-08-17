@@ -19,8 +19,10 @@
 package org.apache.pinot.common.utils;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.util.HashMap;
 import org.apache.pinot.common.restlet.resources.ResourceUtils;
 import org.apache.pinot.common.restlet.resources.SegmentsReloadCheckResponse;
+import org.apache.pinot.common.restlet.resources.TableSegmentsReloadCheckResponse;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.Test;
 
@@ -41,9 +43,14 @@ public class SerializerResponseTest {
     boolean needReload = true;
     String instanceId = "instance123";
     SegmentsReloadCheckResponse response = new SegmentsReloadCheckResponse(needReload, instanceId);
+    TableSegmentsReloadCheckResponse tableResponse = new TableSegmentsReloadCheckResponse(needReload, new HashMap<>());
     String responseString = ResourceUtils.convertToJsonString(response);
+    String tableResponseString = ResourceUtils.convertToJsonString(tableResponse);
 
     assertNotNull(responseString);
+    assertNotNull(tableResponseString);
+    assertEquals("{\n" + "  \"needReload\" : true,\n" + "  \"serverToSegmentsReloadList\" : { }\n" + "}",
+        tableResponseString);
     assertEquals("{\n" + "  \"needReload\" : true,\n" + "  \"instanceId\" : \"instance123\"\n" + "}", responseString);
   }
 
@@ -51,13 +58,18 @@ public class SerializerResponseTest {
   public void testDeserialization()
       throws Exception {
     // Given
-    String json = "{\"needReload\":true,\"instanceId\":\"instance123\"}";
-
-    // When
-    JsonNode jsonNode = JsonUtils.stringToJsonNode(json);
-
+    boolean needReload = true;
+    String instanceId = "instance123";
+    SegmentsReloadCheckResponse response = new SegmentsReloadCheckResponse(needReload, instanceId);
+    TableSegmentsReloadCheckResponse tableResponse = new TableSegmentsReloadCheckResponse(needReload, new HashMap<>());
+    String responseString = ResourceUtils.convertToJsonString(response);
+    JsonNode jsonNode = JsonUtils.stringToJsonNode(responseString);
+    String jsonResponse = JsonUtils.objectToPrettyString(tableResponse);
+    JsonNode jsonNodeTableResponse = JsonUtils.stringToJsonNode(jsonResponse);
     // Then
     assertNotNull(jsonNode);
+    assertNotNull(jsonNodeTableResponse);
+    assertTrue(jsonNodeTableResponse.get("needReload").asBoolean());
     assertTrue(jsonNode.get("needReload").asBoolean());
     assertEquals("instance123", jsonNode.get("instanceId").asText());
   }

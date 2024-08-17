@@ -218,8 +218,7 @@ public class ServerSegmentMetadataReader {
    * This method is called when the API request is to fetch data about segment reload of the table.
    * This method makes a MultiGet call to all servers that host their respective segments and gets the results.
    * This method will return metadata of all the servers along with need reload flag.
-   * In future additional details can also be added
-   * @return list of servers and the boolean check if reload is needed.
+   * In future additional details like segments list can also be added
    */
   public List<String> getCheckReloadSegmentsFromServer(String tableNameWithType, Set<String> serverInstances,
       BiMap<String, String> endpoints, int timeoutMs) {
@@ -238,8 +237,7 @@ public class ServerSegmentMetadataReader {
     int failedParses = 0;
     for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
       try {
-        String needReloadSegmentsMetadata = streamResponse.getValue();
-        serversNeedReloadResponses.add(needReloadSegmentsMetadata);
+        serversNeedReloadResponses.add(streamResponse.getValue());
       } catch (Exception e) {
         failedParses++;
         LOGGER.error("Unable to parse server {} response due to an error: ", streamResponse.getKey(), e);
