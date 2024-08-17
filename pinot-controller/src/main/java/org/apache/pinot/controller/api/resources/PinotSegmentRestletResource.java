@@ -828,8 +828,8 @@ public class PinotSegmentRestletResource {
   @Path("segments/{tableNameWithType}/needReload")
   @Authorize(targetType = TargetType.TABLE, paramName = "tableNameWithType", action = Actions.Table.GET_METADATA)
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Gets the metadata of reload segments check from servers hosting the table", notes = "Returns true if "
-      + "reload is needed on the table from any one of the servers")
+  @ApiOperation(value = "Gets the metadata of reload segments check from servers hosting the table", notes =
+      "Returns true if " + "reload is needed on the table from any one of the servers")
   public String getTableReloadMetadata(
       @ApiParam(value = "Table name with type", required = true, example = "myTable_REALTIME")
       @PathParam("tableNameWithType") String tableNameWithType,
@@ -843,8 +843,8 @@ public class PinotSegmentRestletResource {
       Map<String, JsonNode> needReloadMetadata =
           tableMetadataReader.getServerCheckSegmentsReloadMetadata(tableName, tableType,
               _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
-      boolean needReload = needReloadMetadata.values().stream()
-          .anyMatch(value -> value.get("needReload").booleanValue());
+      boolean needReload =
+          needReloadMetadata.values().stream().anyMatch(value -> value.get("needReload").booleanValue());
       Map<String, SegmentsReloadCheckResponse> serverResponses = new HashMap<>();
       TableSegmentsReloadCheckResponse tableNeedReloadResponse;
       if (verbose) {

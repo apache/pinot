@@ -61,7 +61,8 @@ public class TableMetadataReader {
     _pinotHelixResourceManager = helixResourceManager;
   }
 
-  public Map<String, JsonNode> getServerCheckSegmentsReloadMetadata(String tableName, TableType tableType, int timeoutMs)
+  public Map<String, JsonNode> getServerCheckSegmentsReloadMetadata(String tableName, TableType tableType,
+      int timeoutMs)
       throws InvalidConfigException, IOException {
     String tableNameWithType =
         ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER).get(0);
