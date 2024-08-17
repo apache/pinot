@@ -132,9 +132,9 @@ declare module 'Models' {
 
   export type SchemaInfo = {
     schemaName: string
-    dimensionFieldSpecsCount: number
-    dateTimeFieldSpecsCount: number
-    metricFieldSpecsCount: number
+    numDimensionFields: number
+    numDateTimeFields: number
+    numMetricFields: number
   };
 
   export type SQLResult = {
