@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.common.restlet.resources;
 
-import com.fasterxml.jackson.annotation.JsonCreaoadotor;
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
 import java.util.Map;
