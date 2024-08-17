@@ -186,7 +186,8 @@ public abstract class BaseChunkForwardIndexWriter implements Closeable {
     }
 
     if (_headerEntryChunkOffsetSize == Integer.BYTES) {
-      Preconditions.checkState(_dataOffset <= Integer.MAX_VALUE, "Integer overflow detected");
+      Preconditions.checkState(_dataOffset <= Integer.MAX_VALUE, "Integer overflow detected. "
+          + "Try to use raw version 3 or 4, reduce targetDocsPerChunk or targetMaxChunkSize");
       _header.putInt((int) _dataOffset);
     } else if (_headerEntryChunkOffsetSize == Long.BYTES) {
       _header.putLong(_dataOffset);
