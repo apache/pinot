@@ -1052,10 +1052,12 @@ public abstract class BaseTableDataManager implements TableDataManager {
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
         String crcData = segmentDataManager.getSegment().getSegmentMetadata().getCrc();
         IndexSegment segment = segmentDataManager.getSegment();
-        if (segment instanceof ImmutableSegmentImpl && needReloadSegment(segment.getSegmentName(), crcData,
-            indexLoadingConfig)) {
-          needReload = true;
-          break;
+        if (segment instanceof ImmutableSegmentImpl) {
+          ImmutableSegmentImpl immutableSegment = (ImmutableSegmentImpl) segment;
+          if (immutableSegment.needReloadSegment(segment.getSegmentName(), crcData, indexLoadingConfig)) {
+            needReload = true;
+            break;
+          }
         }
       }
     } finally {

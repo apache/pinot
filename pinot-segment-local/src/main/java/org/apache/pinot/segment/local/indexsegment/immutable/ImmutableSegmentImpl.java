@@ -33,6 +33,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
 import org.apache.pinot.segment.local.segment.index.datasource.ImmutableDataSource;
+import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.local.startree.v2.store.StarTreeIndexContainer;
@@ -54,6 +55,7 @@ import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
@@ -171,6 +173,16 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   private File getValidDocIdsSnapshotFile() {
     return new File(SegmentDirectoryPaths.findSegmentDirectory(_segmentMetadata.getIndexDir()),
         V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME);
+  }
+
+  public boolean needReloadSegment(String segmentName, String crc, IndexLoadingConfig indexLoadingConfig)
+      throws Exception {
+    Schema schema = indexLoadingConfig.getSchema();
+    //if re processing or reload is needed on a segment then return true
+    if (_segmentDirectory != null) {
+      return ImmutableSegmentLoader.needPreprocess(_segmentDirectory, indexLoadingConfig, schema);
+    }
+    return false;
   }
 
   @Override

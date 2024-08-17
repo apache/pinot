@@ -732,17 +732,24 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
 
     // Upload the schema with extra columns
     addSchema(schema);
-    String tableNameWithType = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(rawTableName);
+    String tableNameWithTypeOffline = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(rawTableName);
+    String tableNameWithTypeRealtime = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(rawTableName);
     // Reload the table
     if (includeOfflineTable) {
       //test controller api which gives responses if reload is needed on any of the server segments when default
-      // columns are added.
-      String needBeforeReloadResponse = needReloadOfflineTable(tableNameWithType);
+      // columns are added
+      String needBeforeReloadResponse = needReloadOfflineTable(tableNameWithTypeOffline);
       JsonNode jsonNeedReloadResponse = JsonUtils.stringToJsonNode(needBeforeReloadResponse);
       //test to check if reload is needed i.e true
       assertEquals(jsonNeedReloadResponse.get("needReload").asBoolean(), true);
       reloadOfflineTable(rawTableName);
     }
+    //test controller api which gives responses if reload is needed on any of the server segments when default
+    // columns are added
+    String needBeforeReloadResponseRealtime = needReloadOfflineTable(tableNameWithTypeRealtime);
+    JsonNode jsonNeedReloadResponseRealTime = JsonUtils.stringToJsonNode(needBeforeReloadResponseRealtime);
+    //test to check if reload is needed i.e true
+    assertTrue(jsonNeedReloadResponseRealTime.get("needReload").asBoolean());
     reloadRealtimeTable(rawTableName);
 
     // Wait for all segments to finish reloading, and test querying the new columns
@@ -783,10 +790,16 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     queryResponse = postQuery(countStarQuery);
     assertEquals(queryResponse.get("exceptions").size(), 0);
     assertEquals(queryResponse.get("resultTable").get("rows").get(0).get(0).asLong(), countStarResult);
-    String needAfterReloadResponse = needReloadOfflineTable(tableNameWithType);
-    JsonNode jsonNeedReloadResponseAfter = JsonUtils.stringToJsonNode(needAfterReloadResponse);
-    //test to check if reload is needed i.e false after reload is finished
-    assertEquals(jsonNeedReloadResponseAfter.get("needReload").asBoolean(), false);
+    if (includeOfflineTable) {
+      String needAfterReloadResponse = needReloadOfflineTable(tableNameWithTypeOffline);
+      JsonNode jsonNeedReloadResponseAfter = JsonUtils.stringToJsonNode(needAfterReloadResponse);
+      //test to check if reload on offline table is needed i.e false after reload is finished
+      assertFalse(jsonNeedReloadResponseAfter.get("needReload").asBoolean());
+    }
+    String needAfterReloadResponseRealtime = needReloadOfflineTable(tableNameWithTypeRealtime);
+    JsonNode jsonNeedReloadResponseRealtimeAfter = JsonUtils.stringToJsonNode(needAfterReloadResponseRealtime);
+    //test to check if reload on real time table is needed i.e false after reload is finished
+    assertFalse(jsonNeedReloadResponseRealtimeAfter.get("needReload").asBoolean());
   }
 
   private DimensionFieldSpec constructNewDimension(FieldSpec.DataType dataType, boolean singleValue) {
