@@ -735,7 +735,8 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     String tableNameWithType = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(rawTableName);
     // Reload the table
     if (includeOfflineTable) {
-      //test controller api which gives responses if reload is needed on any of the server segments when default columns are added.
+      //test controller api which gives responses if reload is needed on any of the server segments when default
+      // columns are added.
       String needBeforeReloadResponse = needReloadOfflineTable(tableNameWithType);
       JsonNode jsonNeedReloadResponse = JsonUtils.stringToJsonNode(needBeforeReloadResponse);
       //test to check if reload is needed i.e true
