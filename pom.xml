@@ -196,7 +196,7 @@
     <commons-lang3.version>3.16.0</commons-lang3.version>
     <commons-collections4.version>4.4</commons-collections4.version>
     <commons-text.version>1.12.0</commons-text.version>
-    <commons-compress.version>1.27.1</commons-compress.version>
+    <commons-compress.version>1.27.0</commons-compress.version>
     <commons-math3.version>3.6.1</commons-math3.version>
     <commons-csv.version>1.11.0</commons-csv.version>
     <commons-configuration2.version>2.11.0</commons-configuration2.version>
@@ -818,24 +818,27 @@
         <version>${helix.version}</version>
         <exclusions>
           <exclusion>
-            <groupId>org.jboss.netty</groupId>
-            <artifactId>netty</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>log4j</groupId>
-            <artifactId>log4j</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-log4j12</artifactId>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-slf4j-impl</artifactId>
           </exclusion>
         </exclusions>
+      </dependency>
+      <dependency>
+        <groupId>org.openjdk.jmh</groupId>
+        <artifactId>jmh-generator-annprocess</artifactId>
+        <version>${jmh.version}</version>
+        <scope>provided</scope>
       </dependency>
 
       <!-- log4j2 related dependencies -->
       <dependency>
         <groupId>org.slf4j</groupId>
         <artifactId>jcl-over-slf4j</artifactId>
+        <version>${slf4j.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.slf4j</groupId>
+        <artifactId>jul-to-slf4j</artifactId>
         <version>${slf4j.version}</version>
       </dependency>
       <dependency>
@@ -859,17 +862,6 @@
         <version>${log4j.version}</version>
       </dependency>
       <dependency>
-        <!--
-         We don't use slf4j but slf4j2, so we can just ignore this dependency.
-         Instead of just remove this dependency, we set the scope as provided.
-         We cannot just remove the dependency because that would create conflicts in the enforcer
-        -->
-        <groupId>org.apache.logging.log4j</groupId>
-        <artifactId>log4j-slf4j-impl</artifactId>
-        <version>${log4j.version}</version>
-        <scope>provided</scope>
-      </dependency>
-      <dependency>
         <groupId>org.apache.logging.log4j</groupId>
         <artifactId>log4j-1.2-api</artifactId>
         <version>${log4j.version}</version>
@@ -879,6 +871,7 @@
         <artifactId>disruptor</artifactId>
         <version>4.0.0</version>
       </dependency>
+
       <dependency>
         <groupId>org.asynchttpclient</groupId>
         <artifactId>async-http-client</artifactId>
@@ -899,16 +892,6 @@
         <groupId>org.apache.zookeeper</groupId>
         <artifactId>zookeeper</artifactId>
         <version>${zookeeper.version}</version>
-        <exclusions>
-          <exclusion>
-            <groupId>log4j</groupId>
-            <artifactId>log4j</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-log4j12</artifactId>
-          </exclusion>
-        </exclusions>
       </dependency>
 
       <!-- Jackson -->
@@ -1136,48 +1119,28 @@
         <scope>provided</scope>
         <exclusions>
           <exclusion>
-            <groupId>org.eclipse.jetty</groupId>
-            <artifactId>jetty-server</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>org.eclipse.jetty</groupId>
-            <artifactId>jetty-servlet</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>org.eclipse.jetty</groupId>
-            <artifactId>jetty-util</artifactId>
-          </exclusion>
-          <exclusion>
             <groupId>com.sun.jersey</groupId>
             <artifactId>jersey-core</artifactId>
           </exclusion>
           <exclusion>
             <groupId>com.sun.jersey</groupId>
-            <artifactId>jersey-json</artifactId>
+            <artifactId>jersey-servlet</artifactId>
           </exclusion>
           <exclusion>
             <groupId>com.sun.jersey</groupId>
             <artifactId>jersey-server</artifactId>
           </exclusion>
           <exclusion>
-            <groupId>log4j</groupId>
-            <artifactId>log4j</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-log4j12</artifactId>
-          </exclusion>
-          <exclusion>
             <groupId>commons-logging</groupId>
             <artifactId>commons-logging</artifactId>
           </exclusion>
           <exclusion>
-            <groupId>org.apache.hadoop.thirdparty</groupId>
-            <artifactId>hadoop-shaded-protobuf_3_7</artifactId>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-reload4j</artifactId>
           </exclusion>
           <exclusion>
-            <groupId>org.jboss.xnio</groupId>
-            <artifactId>xnio-api</artifactId>
+            <groupId>ch.qos.reload4j</groupId>
+            <artifactId>reload4j</artifactId>
           </exclusion>
         </exclusions>
       </dependency>
@@ -1188,22 +1151,6 @@
         <scope>provided</scope>
         <exclusions>
           <exclusion>
-            <groupId>xml-apis</groupId>
-            <artifactId>xml-apis</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>org.eclipse.jetty</groupId>
-            <artifactId>jetty-server</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>org.eclipse.jetty</groupId>
-            <artifactId>jetty-util-ajax</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>org.eclipse.jetty</groupId>
-            <artifactId>jetty-util</artifactId>
-          </exclusion>
-          <exclusion>
             <groupId>com.sun.jersey</groupId>
             <artifactId>jersey-core</artifactId>
           </exclusion>
@@ -1212,20 +1159,8 @@
             <artifactId>jersey-server</artifactId>
           </exclusion>
           <exclusion>
-            <groupId>log4j</groupId>
-            <artifactId>log4j</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-log4j12</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>commons-logging</groupId>
-            <artifactId>commons-logging</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>io.netty</groupId>
-            <artifactId>netty</artifactId>
+            <groupId>ch.qos.reload4j</groupId>
+            <artifactId>reload4j</artifactId>
           </exclusion>
         </exclusions>
       </dependency>
@@ -1236,36 +1171,8 @@
         <scope>provided</scope>
         <exclusions>
           <exclusion>
-            <groupId>com.zaxxer</groupId>
-            <artifactId>HikariCP-java7</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>com.sun.jersey</groupId>
-            <artifactId>jersey-core</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>com.sun.jersey</groupId>
-            <artifactId>jersey-json</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>com.sun.jersey</groupId>
-            <artifactId>jersey-server</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>com.sun.jersey</groupId>
-            <artifactId>jersey-client</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>log4j</groupId>
-            <artifactId>log4j</artifactId>
-          </exclusion>
-          <exclusion>
             <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-log4j12</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>commons-logging</groupId>
-            <artifactId>commons-logging</artifactId>
+            <artifactId>slf4j-reload4j</artifactId>
           </exclusion>
         </exclusions>
       </dependency>
@@ -1276,32 +1183,12 @@
         <scope>compile</scope>
         <exclusions>
           <exclusion>
-            <groupId>org.codehaus.jackson</groupId>
-            <artifactId>jackson-core-asl</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>org.codehaus.jackson</groupId>
-            <artifactId>jackson-jaxrs</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>org.codehaus.jackson</groupId>
-            <artifactId>jackson-mapper-asl</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>org.codehaus.jackson</groupId>
-            <artifactId>jackson-xc</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>com.google.inject.extensions</groupId>
-            <artifactId>guice-servlet</artifactId>
-          </exclusion>
-          <exclusion>
             <groupId>com.google.inject</groupId>
             <artifactId>guice</artifactId>
           </exclusion>
           <exclusion>
-            <groupId>org.eclipse.jetty</groupId>
-            <artifactId>jetty-util</artifactId>
+            <groupId>com.google.inject.extensions</groupId>
+            <artifactId>guice-servlet</artifactId>
           </exclusion>
           <exclusion>
             <groupId>com.sun.jersey</groupId>
@@ -1320,12 +1207,12 @@
             <artifactId>jersey-guice</artifactId>
           </exclusion>
           <exclusion>
-            <groupId>commons-logging</groupId>
-            <artifactId>commons-logging</artifactId>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-reload4j</artifactId>
           </exclusion>
           <exclusion>
-            <groupId>io.netty</groupId>
-            <artifactId>netty</artifactId>
+            <groupId>ch.qos.reload4j</groupId>
+            <artifactId>reload4j</artifactId>
           </exclusion>
         </exclusions>
       </dependency>
@@ -1353,11 +1240,10 @@
         <version>${hadoop.version}</version>
         <scope>provided</scope>
       </dependency>
-      <!-- Solve the dependency converge issue within hadoop libraries -->
       <dependency>
-        <groupId>ch.qos.reload4j</groupId>
-        <artifactId>reload4j</artifactId>
-        <version>1.2.25</version>
+        <groupId>org.apache.hadoop.thirdparty</groupId>
+        <artifactId>hadoop-shaded-protobuf_3_21</artifactId>
+        <version>1.2.0</version>
       </dependency>
       <!-- The following dependencies are added to solve the vulnerabilities of the old version -->
       <dependency>
@@ -1421,13 +1307,6 @@
         <groupId>org.eclipse.jetty</groupId>
         <artifactId>jetty-webapp</artifactId>
         <version>${eclipse.jetty.version}</version>
-      </dependency>
-
-      <!-- Upgrade hadoop-common dependency from hadoop-shaded-protobuf_3_7 to hadoop-shaded-protobuf_3_21 -->
-      <dependency>
-        <groupId>org.apache.hadoop.thirdparty</groupId>
-        <artifactId>hadoop-shaded-protobuf_3_21</artifactId>
-        <version>1.2.0</version>
       </dependency>
 
       <!-- Metrics -->
@@ -1752,6 +1631,11 @@
         <artifactId>scala-library</artifactId>
         <version>${scala.version}</version>
       </dependency>
+      <dependency>
+        <groupId>org.scala-lang</groupId>
+        <artifactId>scala-reflect</artifactId>
+        <version>${scala.version}</version>
+      </dependency>
 
       <dependency>
         <groupId>org.apache.flink</groupId>
@@ -1768,7 +1652,7 @@
         <artifactId>flink-java</artifactId>
         <version>${flink.version}</version>
         <exclusions>
-          <!-- excluding Kryo library due to Maven Enforcer convergence error -->
+          <!-- Resolve conflict with flink-streaming-java -->
           <exclusion>
             <groupId>com.esotericsoftware.kryo</groupId>
             <artifactId>kryo</artifactId>
@@ -1810,6 +1694,16 @@
         <artifactId>woodstox-core</artifactId>
         <version>${woodstox.version}</version>
       </dependency>
+      <dependency>
+        <groupId>io.github.hakky54</groupId>
+        <artifactId>sslcontext-kickstart-for-netty</artifactId>
+        <version>${sslcontext.kickstart.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.mindrot</groupId>
+        <artifactId>jbcrypt</artifactId>
+        <version>${jbcrypt.version}</version>
+      </dependency>
 
       <!-- Lucene dependencies -->
       <dependency>
@@ -1833,17 +1727,6 @@
         <version>${lucene.version}</version>
       </dependency>
       <!-- Lucene dependencies end -->
-
-      <dependency>
-        <groupId>io.github.hakky54</groupId>
-        <artifactId>sslcontext-kickstart-for-netty</artifactId>
-        <version>${sslcontext.kickstart.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.mindrot</groupId>
-        <artifactId>jbcrypt</artifactId>
-        <version>${jbcrypt.version}</version>
-      </dependency>
 
       <!-- Bouncy Castle libraries are used by Kafka and Pulsar plugins -->
       <dependency>
@@ -2112,6 +1995,17 @@
                     <excludes>
                       <!-- Use org.slf4j:jcl-over-slf4j -->
                       <exclude>commons-logging:commons-logging</exclude>
+                      <!-- Use org.apache.logging.log4j:log4j-core -->
+                      <exclude>log4j:log4j</exclude>
+                      <!-- Use org.apache.logging.log4j:log4j-slf4j2-impl -->
+                      <exclude>org.apache.logging.log4j:log4j-slf4j-impl</exclude>
+                      <exclude>org.slf4j:slf4j-log4j12</exclude>
+                      <exclude>org.slf4j:slf4j-reload4j</exclude>
+                      <exclude>ch.qos.reload4j:reload4j</exclude>
+                      <!-- Use org.glassfish.jersey -->
+                      <exclude>com.sun.jersey</exclude>
+                      <!-- Use hadoop-shaded-protobuf_3_21 -->
+                      <exclude>org.apache.hadoop.thirdparty:hadoop-shaded-protobuf_3_7</exclude>
                     </excludes>
                   </bannedDependencies>
                 </rules>
@@ -2626,6 +2520,13 @@
       <plugin>
         <artifactId>maven-shade-plugin</artifactId>
         <version>${maven-shade-plugin.version}</version>
+        <dependencies>
+          <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-transform-maven-shade-plugin-extensions</artifactId>
+            <version>0.1.0</version>
+          </dependency>
+        </dependencies>
         <executions>
           <execution>
             <phase>${shade.phase.prop}</phase>
@@ -2638,6 +2539,8 @@
           <shadedArtifactAttached>true</shadedArtifactAttached>
           <createDependencyReducedPom>false</createDependencyReducedPom>
           <transformers>
+            <!-- See https://logging.apache.org/log4j/transform for details -->
+            <transformer implementation="org.apache.logging.log4j.maven.plugins.shade.transformer.Log4j2PluginCacheFileTransformer"/>
             <transformer implementation="org.apache.maven.plugins.shade.resource.ApacheLicenseResourceTransformer" />
             <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
             <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
@@ -2647,15 +2550,20 @@
               </manifestEntries>
             </transformer>
           </transformers>
-          <!-- exclude signed Manifests -->
           <filters>
             <filter>
               <artifact>*:*</artifact>
               <excludes>
-                <exclude>module-info.class</exclude>
+                <!-- Exclude signed manifests -->
                 <exclude>META-INF/*.SF</exclude>
                 <exclude>META-INF/*.DSA</exclude>
                 <exclude>META-INF/*.RSA</exclude>
+
+                <!-- See https://github.com/apache/pinot/issues/11974 for details -->
+                <exclude>module-info.class</exclude>
+
+                <!-- Solve NoClassDefFoundError. Borrowed from https://github.com/prometheus/jmx_exporter/issues/802 -->
+                <exclude>META-INF/versions/9/org/yaml/snakeyaml/internal/**</exclude>
               </excludes>
             </filter>
           </filters>
