@@ -36,6 +36,8 @@ import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
 
 @SuppressWarnings("rawtypes")
 public class ResultsBlockUtils {
+
+  // TODO: Remove all util functions except buildEmptyAggregationQueryResults as they are not used.
   private ResultsBlockUtils() {
   }
 
@@ -54,7 +56,7 @@ public class ResultsBlockUtils {
     return buildEmptyDistinctQueryResults(queryContext);
   }
 
-  private static SelectionResultsBlock buildEmptySelectionQueryResults(QueryContext queryContext) {
+  public static SelectionResultsBlock buildEmptySelectionQueryResults(QueryContext queryContext) {
     List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
     int numSelectExpressions = selectExpressions.size();
     String[] columnNames = new String[numSelectExpressions];
@@ -68,7 +70,7 @@ public class ResultsBlockUtils {
     return new SelectionResultsBlock(dataSchema, Collections.emptyList(), queryContext);
   }
 
-  private static AggregationResultsBlock buildEmptyAggregationQueryResults(QueryContext queryContext) {
+  public static AggregationResultsBlock buildEmptyAggregationQueryResults(QueryContext queryContext) {
     AggregationFunction[] aggregationFunctions = queryContext.getAggregationFunctions();
     assert aggregationFunctions != null;
     int numAggregations = aggregationFunctions.length;
@@ -79,7 +81,7 @@ public class ResultsBlockUtils {
     return new AggregationResultsBlock(aggregationFunctions, results, queryContext);
   }
 
-  private static GroupByResultsBlock buildEmptyGroupByQueryResults(QueryContext queryContext) {
+  public static GroupByResultsBlock buildEmptyGroupByQueryResults(QueryContext queryContext) {
     List<Pair<AggregationFunction, FilterContext>> filteredAggregationFunctions =
         queryContext.getFilteredAggregationFunctions();
     List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
@@ -103,7 +105,7 @@ public class ResultsBlockUtils {
     return new GroupByResultsBlock(new DataSchema(columnNames, columnDataTypes), queryContext);
   }
 
-  private static DistinctResultsBlock buildEmptyDistinctQueryResults(QueryContext queryContext) {
+  public static DistinctResultsBlock buildEmptyDistinctQueryResults(QueryContext queryContext) {
     List<ExpressionContext> expressions = queryContext.getSelectExpressions();
     int numExpressions = expressions.size();
     String[] columns = new String[numExpressions];

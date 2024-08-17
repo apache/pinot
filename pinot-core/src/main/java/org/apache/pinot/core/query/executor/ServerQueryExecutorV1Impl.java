@@ -63,6 +63,7 @@ import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.TimerContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
+import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
 import org.apache.pinot.core.query.utils.idset.IdSet;
 import org.apache.pinot.core.util.trace.TraceContext;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
@@ -374,13 +375,21 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     int numSelectedSegments = selectedSegments.size();
     LOGGER.debug("Matched {} segments after pruning", numSelectedSegments);
     InstanceResponseBlock instanceResponse;
-    if (numSelectedSegments == 0) {
-      if (queryContext.isExplain()) {
-        instanceResponse = getExplainResponseForNoMatchingSegment(numTotalSegments, queryContext);
-      } else {
-        instanceResponse = new InstanceResponseBlock(ResultsBlockUtils.buildEmptyQueryResults(queryContext));
-      }
+
+    if (numSelectedSegments == 0 && queryContext.isExplain()) {
+      instanceResponse = getExplainResponseForNoMatchingSegment(numTotalSegments, queryContext);
+    } else if (numSelectedSegments == 0 && QueryContextUtils.isAggregationQuery(queryContext)
+        && queryContext.getGroupByExpressions() == null) {
+      // For Aggregation queries, column datatype can be inferred from the aggregation function. Short-circuit to get
+      // the results.
+      instanceResponse = new InstanceResponseBlock(ResultsBlockUtils.buildEmptyAggregationQueryResults(queryContext));
     } else {
+      // If numSelectedSegments is empty, process only a single segment by setting LIMIT 0 to get the data schema.
+      if (numSelectedSegments == 0) {
+        queryContext.setLimit(0);
+        selectedSegments = indexSegments.subList(0, 1);
+      }
+
       TimerContext.Timer planBuildTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.BUILD_QUERY_PLAN);
       List<SegmentContext> selectedSegmentContexts =
           tableDataManager.getSegmentContexts(selectedSegments, queryContext.getQueryOptions());

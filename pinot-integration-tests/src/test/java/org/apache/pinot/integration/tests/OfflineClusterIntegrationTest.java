@@ -3025,6 +3025,41 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test
+  public void testDataSchemaForFullyPrunedEmptyResults()
+      throws Exception {
+    String query;
+
+    // Select query
+    query = "Select DestAirportID, Carrier from myTable WHERE FlightNum < -1231231";
+
+    // Parse the Json response. Assert if DestAirportID has columnDatatype INT and Carrier has columnDatatype STRING.
+    JsonNode queryResponse = postQuery(query);
+    JsonNode columnTypes = queryResponse.get("resultTable").get("dataSchema").get("columnDataTypes");
+    assertEquals(columnTypes.get(0).asText(), "INT");
+    assertEquals(columnTypes.get(1).asText(), "STRING");
+
+    // Aggregation query
+    query = "Select sum(FlightNum) from myTable WHERE FlightNum < -1231231";
+    queryResponse = postQuery(query);
+    columnTypes = queryResponse.get("resultTable").get("dataSchema").get("columnDataTypes");
+    assertEquals(columnTypes.get(0).asText(), "DOUBLE");
+
+    // GroupBy query
+    query = "SELECT carrier, sum(FlightNum) FROM mytable WHERE FlightNum < -1231231 group by carrier";
+    queryResponse = postQuery(query);
+    columnTypes = queryResponse.get("resultTable").get("dataSchema").get("columnDataTypes");
+    assertEquals(columnTypes.get(0).asText(), "STRING");
+    assertEquals(columnTypes.get(1).asText(), "DOUBLE");
+
+    // Distinct query
+    query = "SELECT distinct(DestAirportID) FROM mytable WHERE FlightNum < -1231231";
+    queryResponse = postQuery(query);
+    columnTypes = queryResponse.get("resultTable").get("dataSchema").get("columnDataTypes");
+    assertEquals(columnTypes.get(0).asText(), "INT");
+  }
+
+
+  @Test
   public void testExplainPlanQueryV1()
       throws Exception {
     String query1 = "EXPLAIN PLAN FOR SELECT count(*) AS count, Carrier AS name FROM mytable GROUP BY name ORDER BY 1";
