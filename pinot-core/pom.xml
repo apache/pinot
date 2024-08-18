@@ -151,6 +151,11 @@
       <artifactId>pinot-yammer</artifactId>
       <scope>test</scope>
     </dependency>
+    <dependency>
+      <groupId>org.jetbrains</groupId>
+      <artifactId>annotations</artifactId>
+      <scope>test</scope>
+    </dependency>
 
     <!-- Lucene dependencies -->
     <dependency>

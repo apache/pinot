@@ -40,6 +40,7 @@ import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.intellij.lang.annotations.Language;
 
 
 /**
@@ -376,16 +377,16 @@ public class QueryGenerator {
 
   public interface Query {
 
-    String generatePinotQuery();
+    @Language("sql") String generatePinotQuery();
 
-    String generateH2Query();
+    @Language("sql") String generateH2Query();
   }
 
   private interface QueryFragment {
 
-    String generatePinotQuery();
+    @Language("sql") String generatePinotQuery();
 
-    String generateH2Query();
+    @Language("sql") String generateH2Query();
   }
 
   /**
@@ -574,13 +575,15 @@ public class QueryGenerator {
    * Most basic query fragment.
    */
   private static class StringQueryFragment implements QueryFragment {
+    @Language("sql")
     final String _pinotQuery;
+    @Language("sql")
     final String _h2Query;
 
     /**
      * Constructor with same Pinot and H2 query fragment.
      */
-    StringQueryFragment(String query) {
+    StringQueryFragment(@Language("sql") String query) {
       _pinotQuery = query;
       _h2Query = query;
     }
@@ -588,7 +591,7 @@ public class QueryGenerator {
     /**
      * Constructor for <code>StringQueryFragment</code> with different Pinot and H2 query fragment.
      */
-    StringQueryFragment(String pinotQuery, String h2Query) {
+    StringQueryFragment(@Language("sql") String pinotQuery, @Language("sql") String h2Query) {
       _pinotQuery = pinotQuery;
       _h2Query = h2Query;
     }
