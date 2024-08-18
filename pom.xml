@@ -2651,30 +2651,6 @@
               <pattern>com.google.common</pattern>
               <shadedPattern>${shade.prefix}.com.google.common</shadedPattern>
             </relocation>
-            <relocation>
-              <pattern>io.netty</pattern>
-              <shadedPattern>${shade.prefix}.io.netty</shadedPattern>
-            </relocation>
-            <relocation>
-              <pattern>org.apache.http</pattern>
-              <shadedPattern>${shade.prefix}.org.apache.http</shadedPattern>
-            </relocation>
-            <relocation>
-              <pattern>org.apache.kafka</pattern>
-              <shadedPattern>${shade.prefix}.org.apache.kafka</shadedPattern>
-            </relocation>
-            <relocation>
-              <pattern>org.apache.parquet</pattern>
-              <shadedPattern>${shade.prefix}.org.apache.parquet</shadedPattern>
-            </relocation>
-            <relocation>
-              <pattern>org.reflections</pattern>
-              <shadedPattern>${shade.prefix}.org.reflections</shadedPattern>
-            </relocation>
-            <relocation>
-              <pattern>software.amazon</pattern>
-              <shadedPattern>${shade.prefix}.software.amazon</shadedPattern>
-            </relocation>
           </relocations>
         </configuration>
       </plugin>
