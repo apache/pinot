@@ -24,13 +24,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.integration.tests.startree.SegmentInfoProvider;
 import org.apache.pinot.integration.tests.startree.StarTreeQueryGenerator;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
-import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
 import org.apache.pinot.spi.config.table.StarTreeAggregationConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
@@ -63,6 +61,7 @@ import static org.testng.Assert.assertTrue;
  * </ul>
  */
 public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
+  public static final String FILTER_STARTREE_INDEX = "FILTER_STARTREE_INDEX";
   private static final String SCHEMA_FILE_NAME =
       "On_Time_On_Time_Performance_2014_100k_subset_nonulls_single_value_columns.schema";
   private static final int NUM_STAR_TREE_DIMENSIONS = 5;
@@ -72,15 +71,12 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
           AggregationFunctionType.SUM, AggregationFunctionType.AVG, AggregationFunctionType.MINMAXRANGE,
           AggregationFunctionType.DISTINCTCOUNTBITMAP);
   private static final int NUM_QUERIES_TO_GENERATE = 100;
-  private static final String FILTER_STARTREE_INDEX = "FILTER_STARTREE_INDEX";
 
   private final long _randomSeed = System.currentTimeMillis();
   private final Random _random = new Random(_randomSeed);
 
   private StarTreeQueryGenerator _starTree1QueryGenerator;
   private StarTreeQueryGenerator _starTree2QueryGenerator;
-
-  private TableConfig _tableConfig;
 
   @Override
   protected String getSchemaFileName() {
@@ -124,18 +120,17 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
     List<String> starTree2Metrics = allMetrics.subList(0, NUM_STAR_TREE_METRICS);
     int starTree2MaxLeafRecords = 100;
 
-    _tableConfig = createOfflineTableConfig();
-    _tableConfig.getIndexingConfig().setEnableDynamicStarTreeCreation(true);
-    _tableConfig.getIndexingConfig().setStarTreeIndexConfigs(
-        new ArrayList<>(List.of(getStarTreeIndexConfig(starTree1Dimensions, starTree1Metrics, starTree1MaxLeafRecords),
-            getStarTreeIndexConfig(starTree2Dimensions, starTree2Metrics, starTree2MaxLeafRecords))));
-    addTableConfig(_tableConfig);
+    TableConfig tableConfig = createOfflineTableConfig();
+    tableConfig.getIndexingConfig().setStarTreeIndexConfigs(
+        Arrays.asList(getStarTreeIndexConfig(starTree1Dimensions, starTree1Metrics, starTree1MaxLeafRecords),
+            getStarTreeIndexConfig(starTree2Dimensions, starTree2Metrics, starTree2MaxLeafRecords)));
+    addTableConfig(tableConfig);
 
     // Unpack the Avro files
     List<File> avroFiles = unpackAvroData(_tempDir);
 
     // Create and upload segments
-    ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, _tableConfig, schema, 0, _segmentDir, _tarDir);
+    ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, tableConfig, schema, 0, _segmentDir, _tarDir);
     uploadSegments(DEFAULT_TABLE_NAME, _tarDir);
 
     // Set up the query generators
@@ -238,175 +233,6 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
         "Query comparison failed for: \n"
             + "Star Query: %s\nStar Response: %s\nReference Query: %s\nReference Response: %s\nRandom Seed: %d",
         starQuery, starResponse, referenceQuery, referenceResponse, _randomSeed));
-  }
-
-  @Test
-  public void testStarTreeWithDistinctCountHllConfigurations() throws Exception {
-    List<StarTreeIndexConfig> starTreeIndexConfigs = _tableConfig.getIndexingConfig().getStarTreeIndexConfigs();
-    StarTreeAggregationConfig aggregationConfig = new StarTreeAggregationConfig("OriginCityName", "DISTINCTCOUNTHLL",
-        Map.of(Constants.HLL_LOG2M_KEY, 4), null, null, null, null, null);
-
-    starTreeIndexConfigs.add(new StarTreeIndexConfig(Collections.singletonList("CRSDepTime"), null,
-        null, List.of(aggregationConfig), 1));
-    updateTableConfig(_tableConfig);
-
-    // Wait for table config to be updated
-    TestUtils.waitForCondition(
-        (aVoid) -> {
-          TableConfig tableConfig = getOfflineTableConfig();
-          return tableConfig.getIndexingConfig().getStarTreeIndexConfigs().size() == starTreeIndexConfigs.size();
-        }, 5_000L, "Failed to update table config"
-    );
-
-    reloadOfflineTable(DEFAULT_TABLE_NAME);
-
-    // Wait for the star-tree indexes to be built
-    TestUtils.waitForCondition(
-        (aVoid) -> {
-          JsonNode result;
-          try {
-            result = postQuery("EXPLAIN PLAN FOR SELECT DISTINCTCOUNTHLL(OriginCityName, 4) FROM mytable "
-                + "WHERE CRSDepTime = 35");
-          } catch (Exception e) {
-            throw new RuntimeException(e);
-          }
-          return result.toString().contains(FILTER_STARTREE_INDEX);
-        }, 1000L, 120_000L, "Failed to use star-tree index for query"
-    );
-
-    JsonNode explainPlan = postQuery("EXPLAIN PLAN FOR SELECT DISTINCTCOUNTHLL(OriginCityName, 8) FROM mytable "
-        + "WHERE CRSDepTime = 35");
-    assertFalse(explainPlan.toString().contains(FILTER_STARTREE_INDEX));
-
-    explainPlan = postQuery("EXPLAIN PLAN FOR SELECT DISTINCTCOUNTHLL(OriginCityName) FROM mytable "
-        + "WHERE CRSDepTime = 35");
-    assertFalse(explainPlan.toString().contains(FILTER_STARTREE_INDEX));
-
-
-    // Remove the star-tree index for DISTINCTCOUNTHLL with log2m = 4 and add new star-tree index with default log2m
-
-    aggregationConfig = new StarTreeAggregationConfig("OriginCityName", "DISTINCTCOUNTHLL",
-        null, null, null, null, null, null);
-    starTreeIndexConfigs.remove(starTreeIndexConfigs.size() - 1);
-    starTreeIndexConfigs.add(new StarTreeIndexConfig(Collections.singletonList("CRSDepTime"), null,
-        null, List.of(aggregationConfig), 1));
-
-    updateTableConfig(_tableConfig);
-
-    // Wait for table config to be updated
-    TestUtils.waitForCondition(
-        (aVoid) -> {
-          TableConfig tableConfig = getOfflineTableConfig();
-          return tableConfig.getIndexingConfig().getStarTreeIndexConfigs().get(starTreeIndexConfigs.size() - 1)
-              .getAggregationConfigs().get(0).getFunctionParameters() == null;
-        }, 5_000L, "Failed to update table config"
-    );
-
-    reloadOfflineTable(DEFAULT_TABLE_NAME);
-
-    // Wait for the star-tree indexes to be built
-    TestUtils.waitForCondition(
-        (aVoid) -> {
-          JsonNode result;
-          try {
-            result = postQuery("EXPLAIN PLAN FOR SELECT DISTINCTCOUNTHLL(OriginCityName) FROM mytable "
-                + "WHERE CRSDepTime = 35");
-          } catch (Exception e) {
-            throw new RuntimeException(e);
-          }
-          return result.toString().contains(FILTER_STARTREE_INDEX);
-        }, 1000L, 120_000L, "Failed to use star-tree index for query"
-    );
-
-    explainPlan = postQuery("EXPLAIN PLAN FOR SELECT DISTINCTCOUNTHLL(OriginCityName, 8) FROM mytable "
-        + "WHERE CRSDepTime = 35");
-    assertTrue(explainPlan.toString().contains(FILTER_STARTREE_INDEX));
-
-    explainPlan = postQuery("EXPLAIN PLAN FOR SELECT DISTINCTCOUNTHLL(OriginCityName, 4) FROM mytable "
-        + "WHERE CRSDepTime = 35");
-    assertFalse(explainPlan.toString().contains(FILTER_STARTREE_INDEX));
-
-
-    // Add the star-tree index for DISTINCTCOUNTHLL with log2m = 4 again to ensure that two star-tree indexes can
-    // be created for the same function / column pair with different configurations.
-
-    aggregationConfig = new StarTreeAggregationConfig("OriginCityName", "DISTINCTCOUNTHLL",
-        Map.of(Constants.HLL_LOG2M_KEY, "4"), null, null, null, null, null);
-    starTreeIndexConfigs.add(new StarTreeIndexConfig(Collections.singletonList("CRSDepTime"), null,
-        null, List.of(aggregationConfig), 1));
-    updateTableConfig(_tableConfig);
-
-    // Wait for table config to be updated
-    TestUtils.waitForCondition(
-        (aVoid) -> {
-          TableConfig tableConfig = getOfflineTableConfig();
-          return tableConfig.getIndexingConfig().getStarTreeIndexConfigs().size() == starTreeIndexConfigs.size();
-        }, 5_000L, "Failed to update table config"
-    );
-
-    reloadOfflineTable(DEFAULT_TABLE_NAME);
-
-    // Wait for the star-tree indexes to be built
-    TestUtils.waitForCondition(
-        (aVoid) -> {
-          JsonNode result;
-          try {
-            result = postQuery("EXPLAIN PLAN FOR SELECT DISTINCTCOUNTHLL(OriginCityName, 4) FROM mytable "
-                + "WHERE CRSDepTime = 35");
-          } catch (Exception e) {
-            throw new RuntimeException(e);
-          }
-          return result.toString().contains(FILTER_STARTREE_INDEX);
-        }, 1000L, 120_000L, "Failed to use star-tree index for query"
-    );
-
-    explainPlan = postQuery("EXPLAIN PLAN FOR SELECT DISTINCTCOUNTHLL(OriginCityName, 8) FROM mytable "
-        + "WHERE CRSDepTime = 35");
-    assertTrue(explainPlan.toString().contains(FILTER_STARTREE_INDEX));
-
-    // Update the previously added star-tree index to ensure that the star-tree index is rebuilt with new config
-    // parameters
-    aggregationConfig = new StarTreeAggregationConfig("OriginCityName", "DISTINCTCOUNTHLL",
-        Map.of(Constants.HLL_LOG2M_KEY, "6"), null, null, null, null, null);
-    starTreeIndexConfigs.remove(starTreeIndexConfigs.size() - 1);
-    starTreeIndexConfigs.add(new StarTreeIndexConfig(Collections.singletonList("CRSDepTime"), null,
-        null, List.of(aggregationConfig), 1));
-    updateTableConfig(_tableConfig);
-
-    // Wait for table config to be updated
-    TestUtils.waitForCondition(
-        (aVoid) -> {
-          TableConfig tableConfig = getOfflineTableConfig();
-          return tableConfig.getIndexingConfig().getStarTreeIndexConfigs().get(starTreeIndexConfigs.size() - 1)
-              .getAggregationConfigs().get(0).getFunctionParameters().get(Constants.HLL_LOG2M_KEY).equals("6");
-        }, 5_000L, "Failed to update table config"
-    );
-
-    reloadOfflineTable(DEFAULT_TABLE_NAME);
-
-    // Wait for the new star-tree indexes to be built
-    TestUtils.waitForCondition(
-        (aVoid) -> {
-          JsonNode result;
-          try {
-            result = postQuery("EXPLAIN PLAN FOR SELECT DISTINCTCOUNTHLL(OriginCityName, 6) FROM mytable "
-                + "WHERE CRSDepTime = 35");
-          } catch (Exception e) {
-            throw new RuntimeException(e);
-          }
-          return result.toString().contains(FILTER_STARTREE_INDEX);
-        }, 1000L, 120_000L, "Failed to use star-tree index for query"
-    );
-
-    // Ensure that the previous star-tree index was removed
-    explainPlan = postQuery("EXPLAIN PLAN FOR SELECT DISTINCTCOUNTHLL(OriginCityName, 4) FROM mytable "
-        + "WHERE CRSDepTime = 35");
-    assertFalse(explainPlan.toString().contains(FILTER_STARTREE_INDEX));
-
-    // Check that the other star-tree isn't affected
-    explainPlan = postQuery("EXPLAIN PLAN FOR SELECT DISTINCTCOUNTHLL(OriginCityName) FROM mytable "
-        + "WHERE CRSDepTime = 35");
-    assertTrue(explainPlan.toString().contains(FILTER_STARTREE_INDEX));
   }
 
   @AfterClass
