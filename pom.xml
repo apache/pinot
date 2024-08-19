@@ -252,7 +252,7 @@
     <eclipse.jetty.version>9.4.55.v20240627</eclipse.jetty.version>
     <nimbus-jose-jwt.version>9.40</nimbus-jose-jwt.version>
     <bouncycastle.version>1.78.1</bouncycastle.version>
-    <aircompressor.version>0.27</aircompressor.version>
+    <aircompressor.version>2.0.2</aircompressor.version>
     <jna.version>5.14.0</jna.version>
     <paranamer.version>2.8</paranamer.version>
 
