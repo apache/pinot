@@ -259,12 +259,22 @@ public class TableConfigSerDeTest {
       checkTableConfigWithUpsertConfig(TableConfigUtils.fromZNRecord(TableConfigUtils.toZNRecord(tableConfig)));
     }
     {
-      // with dedup config
+      // with dedup config - without metadata ttl and metadata time column
       DedupConfig dedupConfig = new DedupConfig(true, HashFunction.MD5);
       TableConfig tableConfig = tableConfigBuilder.setDedupConfig(dedupConfig).build();
       // Serialize then de-serialize
-      checkTableConfigWithDedupConfig(JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class));
-      checkTableConfigWithDedupConfig(TableConfigUtils.fromZNRecord(TableConfigUtils.toZNRecord(tableConfig)));
+      checkTableConfigWithDedupConfigWithoutTTL(
+          JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class));
+      checkTableConfigWithDedupConfigWithoutTTL(
+          TableConfigUtils.fromZNRecord(TableConfigUtils.toZNRecord(tableConfig)));
+    }
+    {
+      // with dedup config - with metadata ttl and metadata time column
+      DedupConfig dedupConfig = new DedupConfig(true, HashFunction.MD5, null, null, 10, "dedupTimeColumn");
+      TableConfig tableConfig = tableConfigBuilder.setDedupConfig(dedupConfig).build();
+      // Serialize then de-serialize
+      checkTableConfigWithDedupConfigWithTTL(JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class));
+      checkTableConfigWithDedupConfigWithTTL(TableConfigUtils.fromZNRecord(TableConfigUtils.toZNRecord(tableConfig)));
     }
     {
       // with SegmentsValidationAndRetentionConfig
@@ -556,11 +566,23 @@ public class TableConfigSerDeTest {
     assertEquals(upsertConfig.getMode(), UpsertConfig.Mode.FULL);
   }
 
-  private void checkTableConfigWithDedupConfig(TableConfig tableConfig) {
+  private void checkTableConfigWithDedupConfigWithoutTTL(TableConfig tableConfig) {
     DedupConfig dedupConfig = tableConfig.getDedupConfig();
     assertNotNull(dedupConfig);
 
     assertTrue(dedupConfig.isDedupEnabled());
     assertEquals(dedupConfig.getHashFunction(), HashFunction.MD5);
+    assertEquals(dedupConfig.getMetadataTTL(), 0);
+    assertNull(dedupConfig.getDedupTimeColumn());
+  }
+
+  private void checkTableConfigWithDedupConfigWithTTL(TableConfig tableConfig) {
+    DedupConfig dedupConfig = tableConfig.getDedupConfig();
+    assertNotNull(dedupConfig);
+
+    assertTrue(dedupConfig.isDedupEnabled());
+    assertEquals(dedupConfig.getHashFunction(), HashFunction.MD5);
+    assertEquals(dedupConfig.getMetadataTTL(), 10);
+    assertEquals(dedupConfig.getDedupTimeColumn(), "dedupTimeColumn");
   }
 }

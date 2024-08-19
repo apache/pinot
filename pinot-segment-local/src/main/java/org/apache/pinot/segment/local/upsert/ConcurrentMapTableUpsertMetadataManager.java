@@ -20,14 +20,19 @@ package org.apache.pinot.segment.local.upsert;
 
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
+import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.spi.config.table.UpsertConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -35,18 +40,22 @@ import org.apache.pinot.spi.config.table.UpsertConfig;
  */
 @ThreadSafe
 public class ConcurrentMapTableUpsertMetadataManager extends BaseTableUpsertMetadataManager {
-  private final Map<Integer, ConcurrentMapPartitionUpsertMetadataManager> _partitionMetadataManagerMap =
+  private static final Logger LOGGER = LoggerFactory.getLogger(ConcurrentMapTableUpsertMetadataManager.class);
+
+  private final Map<Integer, BasePartitionUpsertMetadataManager> _partitionMetadataManagerMap =
       new ConcurrentHashMap<>();
 
   @Override
-  public ConcurrentMapPartitionUpsertMetadataManager getOrCreatePartitionManager(int partitionId) {
+  public BasePartitionUpsertMetadataManager getOrCreatePartitionManager(int partitionId) {
     return _partitionMetadataManagerMap.computeIfAbsent(partitionId,
-        k -> new ConcurrentMapPartitionUpsertMetadataManager(_tableNameWithType, k, _context));
+        k -> _enableDeletedKeysCompactionConsistency
+            ? new ConcurrentMapPartitionUpsertMetadataManager(_tableNameWithType, k, _context)
+            : new ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes(_tableNameWithType, k, _context));
   }
 
   @Override
   public void stop() {
-    for (ConcurrentMapPartitionUpsertMetadataManager metadataManager : _partitionMetadataManagerMap.values()) {
+    for (BasePartitionUpsertMetadataManager metadataManager : _partitionMetadataManagerMap.values()) {
       metadataManager.stop();
     }
   }
@@ -61,20 +70,52 @@ public class ConcurrentMapTableUpsertMetadataManager extends BaseTableUpsertMeta
   }
 
   @Override
+  public void lockForSegmentContexts() {
+    _partitionMetadataManagerMap.forEach(
+        (partitionID, upsertMetadataManager) -> upsertMetadataManager.getUpsertViewManager().lockTrackedSegments());
+  }
+
+  @Override
+  public void unlockForSegmentContexts() {
+    _partitionMetadataManagerMap.forEach(
+        (partitionID, upsertMetadataManager) -> upsertMetadataManager.getUpsertViewManager().unlockTrackedSegments());
+  }
+
+  @Override
+  public Set<String> getOptionalSegments() {
+    Set<String> optionalSegments = new HashSet<>();
+    _partitionMetadataManagerMap.forEach((partitionID, upsertMetadataManager) -> optionalSegments.addAll(
+        upsertMetadataManager.getUpsertViewManager().getOptionalSegments()));
+    return optionalSegments;
+  }
+
+  @Override
   public void setSegmentContexts(List<SegmentContext> segmentContexts, Map<String, String> queryOptions) {
-    if (_consistencyMode != UpsertConfig.ConsistencyMode.NONE && !QueryOptionsUtils.isSkipUpsertView(queryOptions)) {
-      // Get queryableDocIds bitmaps from partitionMetadataManagers if any consistency mode is used.
-      _partitionMetadataManagerMap.forEach(
-          (partitionID, upsertMetadataManager) -> upsertMetadataManager.setSegmentContexts(segmentContexts,
-              queryOptions));
-    }
-    // If no consistency mode is used, we get queryableDocIds bitmaps as kept by the segment objects directly.
-    // Even if consistency mode is used, we should still check if any segment doesn't get its validDocIds bitmap,
-    // because partitionMetadataManagers may not track all segments of the table, like those out of the metadata TTL.
-    for (SegmentContext segmentContext : segmentContexts) {
-      if (segmentContext.getQueryableDocIdsSnapshot() == null) {
+    // Get queryableDocIds bitmaps from partitionMetadataManagers if any consistency mode is used.
+    // Otherwise, get queryableDocIds bitmaps as kept by the segment objects directly as before.
+    if (_consistencyMode == UpsertConfig.ConsistencyMode.NONE || QueryOptionsUtils.isSkipUpsertView(queryOptions)) {
+      for (SegmentContext segmentContext : segmentContexts) {
         IndexSegment segment = segmentContext.getIndexSegment();
         segmentContext.setQueryableDocIdsSnapshot(UpsertUtils.getQueryableDocIdsSnapshotFromSegment(segment));
+      }
+      return;
+    }
+    // All segments should have been tracked by partitionMetadataManagers to provide queries consistent upsert view.
+    _partitionMetadataManagerMap.forEach(
+        (partitionID, upsertMetadataManager) -> upsertMetadataManager.getUpsertViewManager()
+            .setSegmentContexts(segmentContexts, queryOptions));
+    if (LOGGER.isDebugEnabled()) {
+      for (SegmentContext segmentContext : segmentContexts) {
+        IndexSegment segment = segmentContext.getIndexSegment();
+        if (segmentContext.getQueryableDocIdsSnapshot() == null) {
+          LOGGER.debug("No upsert view for segment: {}, type: {}, total: {}", segment.getSegmentName(),
+              (segment instanceof ImmutableSegment ? "imm" : "mut"), segment.getSegmentMetadata().getTotalDocs());
+        } else {
+          int cardCnt = segmentContext.getQueryableDocIdsSnapshot().getCardinality();
+          LOGGER.debug("Got upsert view of segment: {}, type: {}, total: {}, valid: {}", segment.getSegmentName(),
+              (segment instanceof ImmutableSegment ? "imm" : "mut"), segment.getSegmentMetadata().getTotalDocs(),
+              cardCnt);
+        }
       }
     }
   }
@@ -82,7 +123,7 @@ public class ConcurrentMapTableUpsertMetadataManager extends BaseTableUpsertMeta
   @Override
   public void close()
       throws IOException {
-    for (ConcurrentMapPartitionUpsertMetadataManager metadataManager : _partitionMetadataManagerMap.values()) {
+    for (BasePartitionUpsertMetadataManager metadataManager : _partitionMetadataManagerMap.values()) {
       metadataManager.close();
     }
   }

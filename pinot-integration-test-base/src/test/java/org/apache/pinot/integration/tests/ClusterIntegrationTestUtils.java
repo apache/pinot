@@ -66,7 +66,7 @@ import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
-import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
@@ -83,6 +83,7 @@ import org.apache.pinot.spi.utils.StringUtil;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.tools.utils.ExplainPlanUtils;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
+import org.intellij.lang.annotations.Language;
 import org.testng.Assert;
 
 
@@ -356,8 +357,8 @@ public class ClusterIntegrationTestUtils {
     // Tar the segment
     String segmentName = driver.getSegmentName();
     File indexDir = new File(segmentDir, segmentName);
-    File segmentTarFile = new File(tarDir, segmentName + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
-    TarGzCompressionUtils.createTarGzFile(indexDir, segmentTarFile);
+    File segmentTarFile = new File(tarDir, segmentName + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);
+    TarCompressionUtils.createCompressedTarFile(indexDir, segmentTarFile);
   }
 
   /**
@@ -657,8 +658,8 @@ public class ClusterIntegrationTestUtils {
   /**
    * Run equivalent Pinot and H2 query and compare the results.
    */
-  static void testQuery(String pinotQuery, String queryResourceUrl, org.apache.pinot.client.Connection pinotConnection,
-      String h2Query, Connection h2Connection)
+  static void testQuery(@Language("sql") String pinotQuery, String queryResourceUrl,
+      org.apache.pinot.client.Connection pinotConnection, @Language("sql") String h2Query, Connection h2Connection)
       throws Exception {
     testQuery(pinotQuery, queryResourceUrl, pinotConnection, h2Query, h2Connection, null);
   }
@@ -666,8 +667,9 @@ public class ClusterIntegrationTestUtils {
   /**
    * Run equivalent Pinot and H2 query and compare the results.
    */
-  static void testQuery(String pinotQuery, String queryResourceUrl, org.apache.pinot.client.Connection pinotConnection,
-      String h2Query, Connection h2Connection, @Nullable Map<String, String> headers)
+  static void testQuery(@Language("sql") String pinotQuery, String queryResourceUrl,
+      org.apache.pinot.client.Connection pinotConnection, @Language("sql") String h2Query, Connection h2Connection,
+      @Nullable Map<String, String> headers)
       throws Exception {
     testQuery(pinotQuery, queryResourceUrl, pinotConnection, h2Query, h2Connection, headers, null, false);
   }
@@ -676,8 +678,8 @@ public class ClusterIntegrationTestUtils {
    * Compare # of rows in pinot and H2 only. Succeed if # of rows matches. Note this only applies to non-aggregation
    * query.
    */
-  static void testQueryWithMatchingRowCount(String pinotQuery, String queryResourceUrl,
-      org.apache.pinot.client.Connection pinotConnection, String h2Query, Connection h2Connection,
+  static void testQueryWithMatchingRowCount(@Language("sql") String pinotQuery, String queryResourceUrl,
+      org.apache.pinot.client.Connection pinotConnection, @Language("sql") String h2Query, Connection h2Connection,
       @Nullable Map<String, String> headers, @Nullable Map<String, String> extraJsonProperties,
       boolean useMultiStageQueryEngine)
       throws Exception {
@@ -689,9 +691,10 @@ public class ClusterIntegrationTestUtils {
     }
   }
 
-  static void testQuery(String pinotQuery, String queryResourceUrl, org.apache.pinot.client.Connection pinotConnection,
-      String h2Query, Connection h2Connection, @Nullable Map<String, String> headers,
-      @Nullable Map<String, String> extraJsonProperties, boolean useMultiStageQueryEngine) {
+  static void testQuery(@Language("sql") String pinotQuery, String queryResourceUrl,
+      org.apache.pinot.client.Connection pinotConnection, @Language("sql") String h2Query, Connection h2Connection,
+      @Nullable Map<String, String> headers, @Nullable Map<String, String> extraJsonProperties,
+      boolean useMultiStageQueryEngine) {
     try {
       testQueryInternal(pinotQuery, queryResourceUrl, pinotConnection, h2Query, h2Connection, headers,
           extraJsonProperties, useMultiStageQueryEngine, false, false);
@@ -700,8 +703,8 @@ public class ClusterIntegrationTestUtils {
     }
   }
 
-  static void testQueryViaController(String pinotQuery, String queryResourceUrl,
-      org.apache.pinot.client.Connection pinotConnection, String h2Query, Connection h2Connection,
+  static void testQueryViaController(@Language("sql") String pinotQuery, String queryResourceUrl,
+      org.apache.pinot.client.Connection pinotConnection, @Language("sql") String h2Query, Connection h2Connection,
       @Nullable Map<String, String> headers, @Nullable Map<String, String> extraJsonProperties,
       boolean useMultiStageQueryEngine) {
     try {
@@ -712,7 +715,7 @@ public class ClusterIntegrationTestUtils {
     }
   }
 
-  private static void testQueryInternal(String pinotQuery, String queryResourceUrl,
+  private static void testQueryInternal(@Language("sql") String pinotQuery, String queryResourceUrl,
       org.apache.pinot.client.Connection pinotConnection, String h2Query, Connection h2Connection,
       @Nullable Map<String, String> headers, @Nullable Map<String, String> extraJsonProperties,
       boolean useMultiStageQueryEngine, boolean matchingRowCount, boolean viaController)
@@ -843,8 +846,8 @@ public class ClusterIntegrationTestUtils {
     }
   }
 
-  private static String getExplainPlan(String pinotQuery, String brokerUrl, @Nullable Map<String, String> headers,
-      @Nullable Map<String, String> extraJsonProperties)
+  private static String getExplainPlan(@Language("sql") String pinotQuery, String brokerUrl,
+      @Nullable Map<String, String> headers, @Nullable Map<String, String> extraJsonProperties)
       throws Exception {
     JsonNode explainPlanForResponse =
         ClusterTest.postQuery("explain plan for " + pinotQuery, getBrokerQueryApiUrl(brokerUrl, false), headers,
@@ -917,7 +920,7 @@ public class ClusterIntegrationTestUtils {
 
   private static void comparePinotResultsWithExpectedValues(Set<String> expectedValues,
       List<String> expectedOrderByValues, org.apache.pinot.client.ResultSet connectionResultSet,
-      Set<String> orderByColumns, String pinotQuery, int h2NumRows, long pinotNumRecordsSelected) {
+      Set<String> orderByColumns, @Language("sql") String pinotQuery, int h2NumRows, long pinotNumRecordsSelected) {
 
     int pinotNumRows = connectionResultSet.getRowCount();
     // No record selected in H2
@@ -1025,7 +1028,7 @@ public class ClusterIntegrationTestUtils {
     }
   }
 
-  public static boolean fuzzyCompare(String h2Value, String brokerValue, String connectionValue) {
+  public static boolean fuzzyCompare(@Language("sql") String h2Value, String brokerValue, String connectionValue) {
     if (("null".equals(h2Value) || h2Value == null)
         && ("null".equals(brokerValue) || brokerValue == null)
         && ("null".equals(connectionValue) || connectionValue == null)) {
@@ -1055,7 +1058,8 @@ public class ClusterIntegrationTestUtils {
     return error;
   }
 
-  private static void failure(String pinotQuery, String h2Query, @Nullable Exception e) {
+  private static void failure(@Language("sql") String pinotQuery, @Language("sql") String h2Query,
+      @Nullable Exception e) {
     String failureMessage = "Caught exception while testing query!";
     failure(pinotQuery, h2Query, failureMessage, e);
   }
@@ -1068,7 +1072,8 @@ public class ClusterIntegrationTestUtils {
    * @param failureMessage Failure message
    * @param e Exception
    */
-  private static void failure(String pinotQuery, String h2Query, String failureMessage, @Nullable Exception e) {
+  private static void failure(@Language("sql") String pinotQuery, @Language("sql") String h2Query,
+      String failureMessage, @Nullable Exception e) {
     failureMessage += "\nPinot query: " + pinotQuery + "\nH2 query: " + h2Query;
     if (e == null) {
       Assert.fail(failureMessage);

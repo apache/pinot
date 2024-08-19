@@ -73,7 +73,7 @@ import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.RoaringBitmapUtils;
-import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
@@ -463,10 +463,11 @@ public class TablesResource {
       tmpSegmentTarDir.mkdir();
 
       File segmentTarFile = org.apache.pinot.common.utils.FileUtils.concatAndValidateFile(tmpSegmentTarDir,
-          tableNameWithType + "_" + segmentName + "_" + UUID.randomUUID() + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION,
+          tableNameWithType + "_" + segmentName + "_" + UUID.randomUUID() + TarCompressionUtils.TAR_GZ_FILE_EXTENSION,
           "Invalid table / segment name: %s , %s", tableNameWithType, segmentName);
 
-      TarGzCompressionUtils.createTarGzFile(new File(tableDataManager.getTableDataDir(), segmentName), segmentTarFile);
+      TarCompressionUtils.createCompressedTarFile(new File(tableDataManager.getTableDataDir(), segmentName),
+          segmentTarFile);
       Response.ResponseBuilder builder = Response.ok();
       builder.entity((StreamingOutput) output -> {
         try {
@@ -817,10 +818,11 @@ public class TablesResource {
       segmentTarUploadDir.mkdir();
 
       segmentTarFile = org.apache.pinot.common.utils.FileUtils.concatAndValidateFile(segmentTarUploadDir,
-          tableNameWithType + "_" + segmentName + "_" + UUID.randomUUID() + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION,
+          tableNameWithType + "_" + segmentName + "_" + UUID.randomUUID() + TarCompressionUtils.TAR_GZ_FILE_EXTENSION,
           "Invalid table / segment name: %s, %s", tableNameWithType, segmentName);
 
-      TarGzCompressionUtils.createTarGzFile(new File(tableDataManager.getTableDataDir(), segmentName), segmentTarFile);
+      TarCompressionUtils.createCompressedTarFile(new File(tableDataManager.getTableDataDir(), segmentName),
+          segmentTarFile);
 
       // Use segment uploader to upload the segment tar file to segment store and return the segment download url.
       SegmentUploader segmentUploader = _serverInstance.getInstanceDataManager().getSegmentUploader();

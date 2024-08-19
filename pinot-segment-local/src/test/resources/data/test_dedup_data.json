@@ -2,21 +2,25 @@
   {
     "event_id": "aa",
     "description" : "first",
-    "secondsSinceEpoch": 1567205394
+    "dedupTime": 5000,
+    "secondsSinceEpoch": 5000
   },
   {
     "event_id": "bb",
     "description" : "first",
-    "secondsSinceEpoch": 1567205396
+    "dedupTime": 6000,
+    "secondsSinceEpoch": 1000
   },
   {
     "event_id": "aa",
     "description" : "second",
-    "secondsSinceEpoch": 1567205397
+    "dedupTime": 3000,
+    "secondsSinceEpoch": 5500
   },
   {
     "event_id": "bb",
     "description" : "second",
-    "secondsSinceEpoch": 1567205392
+    "dedupTime": 1000,
+    "secondsSinceEpoch": 7000
   }
 ]

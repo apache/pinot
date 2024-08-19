@@ -28,7 +28,7 @@ import java.nio.file.SimpleFileVisitor;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
@@ -78,7 +78,7 @@ public class SegmentGenerationJobUtils implements Serializable {
       }
     });
     LOGGER.info("Tarring metadata files from: [{}] to: {}", metadataFiles, localMetadataTarFile);
-    TarGzCompressionUtils.createTarGzFile(metadataFiles.toArray(new File[0]), localMetadataTarFile);
+    TarCompressionUtils.createCompressedTarFile(metadataFiles.toArray(new File[0]), localMetadataTarFile);
   }
 
   public static void moveLocalTarFileToRemote(File localMetadataTarFile, URI outputMetadataTarURI, boolean overwrite)

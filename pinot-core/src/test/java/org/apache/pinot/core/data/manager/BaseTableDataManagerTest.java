@@ -34,7 +34,7 @@ import org.apache.helix.HelixManager;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.tier.TierFactory;
-import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.fetcher.BaseSegmentFetcher;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
@@ -294,7 +294,7 @@ public class BaseTableDataManagerTest {
       throws Exception {
     File indexDir = createSegment(SegmentVersion.v3, 5);
     SegmentZKMetadata zkMetadata =
-        makeRawSegment(indexDir, new File(TEMP_DIR, SEGMENT_NAME + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION), false);
+        makeRawSegment(indexDir, new File(TEMP_DIR, SEGMENT_NAME + TarCompressionUtils.TAR_GZ_FILE_EXTENSION), false);
 
     // Same CRC but force to download.
     BaseTableDataManager tableDataManager = createTableManager();
@@ -567,9 +567,9 @@ public class BaseTableDataManagerTest {
     File tempDir = new File(TEMP_DIR, "testDownloadAndDecrypt");
     String fileName = "tmp.txt";
     FileUtils.write(new File(tempDir, fileName), "this is from somewhere remote");
-    String tarFileName = SEGMENT_NAME + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION;
+    String tarFileName = SEGMENT_NAME + TarCompressionUtils.TAR_GZ_FILE_EXTENSION;
     File tempTarFile = new File(TEMP_DIR, tarFileName);
-    TarGzCompressionUtils.createTarGzFile(tempDir, tempTarFile);
+    TarCompressionUtils.createCompressedTarFile(tempDir, tempTarFile);
 
     SegmentZKMetadata zkMetadata = mock(SegmentZKMetadata.class);
     when(zkMetadata.getSegmentName()).thenReturn(SEGMENT_NAME);
@@ -607,10 +607,10 @@ public class BaseTableDataManagerTest {
     File tempRootDir = tableDataManager.getTmpSegmentDataDir("test-untar-move");
 
     // All input and intermediate files are put in the tempRootDir.
-    File tempTar = new File(tempRootDir, SEGMENT_NAME + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
+    File tempTar = new File(tempRootDir, SEGMENT_NAME + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);
     File tempInputDir = new File(tempRootDir, "input");
     FileUtils.write(new File(tempInputDir, "tmp.txt"), "this is in segment dir");
-    TarGzCompressionUtils.createTarGzFile(tempInputDir, tempTar);
+    TarCompressionUtils.createCompressedTarFile(tempInputDir, tempTar);
     FileUtils.deleteQuietly(tempInputDir);
 
     // The destination is the segment directory at the same level of tempRootDir.
@@ -687,15 +687,14 @@ public class BaseTableDataManagerTest {
   private static SegmentZKMetadata createRawSegment(SegmentVersion segmentVersion, int numRows)
       throws Exception {
     File indexDir = createSegment(segmentVersion, numRows);
-    return makeRawSegment(indexDir, new File(TEMP_DIR, SEGMENT_NAME + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION),
-        true);
+    return makeRawSegment(indexDir, new File(TEMP_DIR, SEGMENT_NAME + TarCompressionUtils.TAR_GZ_FILE_EXTENSION), true);
   }
 
   private static SegmentZKMetadata makeRawSegment(File indexDir, File rawSegmentFile, boolean deleteIndexDir)
       throws Exception {
     long crc = getCRC(indexDir);
     SegmentZKMetadata zkMetadata = new SegmentZKMetadata(SEGMENT_NAME);
-    TarGzCompressionUtils.createTarGzFile(indexDir, rawSegmentFile);
+    TarCompressionUtils.createCompressedTarFile(indexDir, rawSegmentFile);
     zkMetadata.setDownloadUrl("file://" + rawSegmentFile.getAbsolutePath());
     zkMetadata.setCrc(crc);
     if (deleteIndexDir) {

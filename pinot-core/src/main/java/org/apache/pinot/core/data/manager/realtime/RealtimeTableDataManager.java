@@ -49,6 +49,7 @@ import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.SegmentUtils;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.data.manager.BaseTableDataManager;
+import org.apache.pinot.core.data.manager.DuoSegmentDataManager;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
@@ -98,7 +99,6 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   // The semaphores will stay in the hash map even if the consuming partitions move to a different host.
   // We expect that there will be a small number of semaphores, but that may be ok.
   private final Map<Integer, Semaphore> _partitionGroupIdToSemaphoreMap = new ConcurrentHashMap<>();
-
   // The old name of the stats file used to be stats.ser which we changed when we moved all packages
   // from com.linkedin to org.apache because of not being able to deserialize the old files using the newer classes
   private static final String STATS_FILE_NAME = "segment-stats.ser";
@@ -248,12 +248,22 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     // Make sure we do metric cleanup when we shut down the table.
     // Do this first, so we do not show ingestion lag during shutdown.
     _ingestionDelayTracker.shutdown();
-    if (_tableUpsertMetadataManager != null) {
+    if (_tableUpsertMetadataManager != null || _tableDedupMetadataManager != null) {
       // Stop the upsert metadata manager first to prevent removing metadata when destroying segments
-      _tableUpsertMetadataManager.stop();
+      if (_tableUpsertMetadataManager != null) {
+        _tableUpsertMetadataManager.stop();
+      }
+      if (_tableDedupMetadataManager != null) {
+        _tableDedupMetadataManager.stop();
+      }
       releaseAndRemoveAllSegments();
       try {
-        _tableUpsertMetadataManager.close();
+        if (_tableUpsertMetadataManager != null) {
+          _tableUpsertMetadataManager.close();
+        }
+        if (_tableDedupMetadataManager != null) {
+          _tableDedupMetadataManager.close();
+        }
       } catch (IOException e) {
         _logger.warn("Caught exception while closing upsert metadata manager", e);
       }
@@ -497,9 +507,9 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
         new RealtimeSegmentDataManager(zkMetadata, tableConfig, this, _indexDir.getAbsolutePath(), indexLoadingConfig,
             schema, llcSegmentName, semaphore, _serverMetrics, partitionUpsertMetadataManager,
             partitionDedupMetadataManager, _isTableReadyToConsumeData);
+    registerSegment(segmentName, realtimeSegmentDataManager, partitionUpsertMetadataManager);
     realtimeSegmentDataManager.startConsumption();
     _serverMetrics.addValueToTableGauge(_tableNameWithType, ServerGauge.SEGMENT_COUNT, 1);
-    registerSegment(segmentName, realtimeSegmentDataManager);
 
     _logger.info("Added new CONSUMING segment: {}", segmentName);
   }
@@ -545,14 +555,13 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       return;
     }
 
-    // TODO: Change dedup handling to handle segment replacement
     if (isDedupEnabled() && immutableSegment instanceof ImmutableSegmentImpl) {
-      buildDedupMeta((ImmutableSegmentImpl) immutableSegment);
+      handleDedup((ImmutableSegmentImpl) immutableSegment);
     }
     super.addSegment(immutableSegment);
   }
 
-  private void buildDedupMeta(ImmutableSegmentImpl immutableSegment) {
+  private void handleDedup(ImmutableSegmentImpl immutableSegment) {
     // TODO(saurabh) refactor commons code with handleUpsert
     String segmentName = immutableSegment.getSegmentName();
     Integer partitionGroupId =
@@ -563,7 +572,15 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     PartitionDedupMetadataManager partitionDedupMetadataManager =
         _tableDedupMetadataManager.getOrCreatePartitionManager(partitionGroupId);
     immutableSegment.enableDedup(partitionDedupMetadataManager);
-    partitionDedupMetadataManager.addSegment(immutableSegment);
+    SegmentDataManager oldSegmentManager = _segmentDataManagerMap.get(segmentName);
+    if (oldSegmentManager != null) {
+      LOGGER.info("Replacing mutable segment: {} with immutable segment: {} in partition dedup metadata manager",
+          oldSegmentManager.getSegment().getSegmentName(), segmentName);
+      partitionDedupMetadataManager.replaceSegment(oldSegmentManager.getSegment(), immutableSegment);
+    } else {
+      LOGGER.info("Adding immutable segment: {} to partition dedup metadata manager", segmentName);
+      partitionDedupMetadataManager.addSegment(immutableSegment);
+    }
   }
 
   private void handleUpsert(ImmutableSegment immutableSegment) {
@@ -586,7 +603,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       // Preloading segment is ensured to be handled by a single thread, so no need to take the segment upsert lock.
       // Besides, preloading happens before the table partition is made ready for any queries.
       partitionUpsertMetadataManager.preloadSegment(immutableSegment);
-      registerSegment(segmentName, newSegmentManager);
+      registerSegment(segmentName, newSegmentManager, partitionUpsertMetadataManager);
       _logger.info("Preloaded immutable segment: {} with upsert enabled", segmentName);
       return;
     }
@@ -597,24 +614,52 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       // segments may be invalidated, making the queries see less valid docs than expected. We should let query
       // access the new segment asap even though its validDocId bitmap is still being filled by
       // partitionUpsertMetadataManager.
-      registerSegment(segmentName, newSegmentManager);
+      registerSegment(segmentName, newSegmentManager, partitionUpsertMetadataManager);
       partitionUpsertMetadataManager.addSegment(immutableSegment);
       _logger.info("Added new immutable segment: {} with upsert enabled", segmentName);
     } else {
-      // When replacing a segment, we should register the new segment 'after' it is fully initialized by
-      // partitionUpsertMetadataManager to fill up its validDocId bitmap. Otherwise, the queries will lose the access
-      // to the valid docs in the old segment immediately, but the validDocId bitmap of the new segment is still
-      // being filled by partitionUpsertMetadataManager, making the queries see less valid docs than expected.
-      // When replacing a segment, the new and old segments are assumed to have same set of valid docs for data
-      // consistency, otherwise the new segment should be named differently to go through the addSegment flow above.
-      IndexSegment oldSegment = oldSegmentManager.getSegment();
-      partitionUpsertMetadataManager.replaceSegment(immutableSegment, oldSegment);
-      registerSegment(segmentName, newSegmentManager);
-      _logger.info("Replaced {} segment: {} with upsert enabled",
-          oldSegment instanceof ImmutableSegment ? "immutable" : "mutable", segmentName);
-      oldSegmentManager.offload();
-      releaseSegment(oldSegmentManager);
+      replaceUpsertSegment(segmentName, oldSegmentManager, newSegmentManager, partitionUpsertMetadataManager);
     }
+  }
+
+  private void replaceUpsertSegment(String segmentName, SegmentDataManager oldSegmentManager,
+      ImmutableSegmentDataManager newSegmentManager, PartitionUpsertMetadataManager partitionUpsertMetadataManager) {
+    // When replacing a segment, we should register the new segment 'after' it is fully initialized by
+    // partitionUpsertMetadataManager to fill up its validDocId bitmap. Otherwise, the queries will lose the access
+    // to the valid docs in the old segment immediately, but the validDocId bitmap of the new segment is still
+    // being filled by partitionUpsertMetadataManager, making the queries see less valid docs than expected.
+    IndexSegment oldSegment = oldSegmentManager.getSegment();
+    ImmutableSegment immutableSegment = newSegmentManager.getSegment();
+    UpsertConfig.ConsistencyMode consistencyMode = _tableUpsertMetadataManager.getUpsertConsistencyMode();
+    if (consistencyMode == UpsertConfig.ConsistencyMode.NONE) {
+      partitionUpsertMetadataManager.replaceSegment(immutableSegment, oldSegment);
+      registerSegment(segmentName, newSegmentManager, partitionUpsertMetadataManager);
+    } else {
+      // By default, when replacing a segment, the old segment is kept intact and visible to query until the new
+      // segment is registered as in the if-branch above. But the newly ingested records will invalidate valid
+      // docs in the new segment as the upsert metadata gets updated during replacement, so the query will miss the
+      // new updates in the new segment, until it's registered after the replacement is done.
+      // For consistent data view, we make both old and new segment visible to the query and update both in place
+      // when segment replacement and new data ingestion are happening in parallel.
+      SegmentDataManager duoSegmentDataManager = new DuoSegmentDataManager(newSegmentManager, oldSegmentManager);
+      registerSegment(segmentName, duoSegmentDataManager, partitionUpsertMetadataManager);
+      partitionUpsertMetadataManager.replaceSegment(immutableSegment, oldSegment);
+      registerSegment(segmentName, newSegmentManager, partitionUpsertMetadataManager);
+    }
+    _logger.info("Replaced {} segment: {} with upsert enabled and consistency mode: {}",
+        oldSegment instanceof ImmutableSegment ? "immutable" : "mutable", segmentName, consistencyMode);
+    oldSegmentManager.offload();
+    releaseSegment(oldSegmentManager);
+  }
+
+  private void registerSegment(String segmentName, SegmentDataManager segmentDataManager,
+      @Nullable PartitionUpsertMetadataManager partitionUpsertMetadataManager) {
+    if (partitionUpsertMetadataManager != null) {
+      // Register segment to the upsert metadata manager before registering it to table manager, so that the upsert
+      // metadata manger can update the upsert view before the segment becomes visible to queries.
+      partitionUpsertMetadataManager.trackSegmentForUpsertView(segmentDataManager.getSegment());
+    }
+    registerSegment(segmentName, segmentDataManager);
   }
 
   /**
