@@ -227,7 +227,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   }
 
   private boolean isNullable(FieldSpec fieldSpec) {
-    return _schema.isEnableColumnBasedNullHandling() ? fieldSpec.isNullable() : _config.isNullHandlingEnabled();
+    return _schema.isEnableColumnBasedNullHandling() ? fieldSpec.isNullable() : _config.isDefaultNullHandlingEnabled();
   }
 
   private FieldIndexConfigs adaptConfig(String columnName, FieldIndexConfigs config,

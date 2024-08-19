@@ -139,7 +139,7 @@ public class MutableSegmentImpl implements MutableSegment {
   private final String _partitionColumn;
   private final PartitionFunction _partitionFunction;
   private final int _mainPartitionId; // partition id designated for this consuming segment
-  private final boolean _nullHandlingEnabled;
+  private final boolean _defaultNullHandlingEnabled;
   private final File _consumerDir;
 
   private final Map<String, IndexContainer> _indexContainerMap = new HashMap<>();
@@ -216,7 +216,7 @@ public class MutableSegmentImpl implements MutableSegment {
     _partitionColumn = config.getPartitionColumn();
     _partitionFunction = config.getPartitionFunction();
     _mainPartitionId = config.getPartitionId();
-    _nullHandlingEnabled = config.isNullHandlingEnabled();
+    _defaultNullHandlingEnabled = config.isNullHandlingEnabled();
     _consumerDir = new File(config.getConsumerDir());
 
     Collection<FieldSpec> allFieldSpecs = _schema.getAllFieldSpecs();
@@ -392,7 +392,7 @@ public class MutableSegmentImpl implements MutableSegment {
   }
 
   private boolean isNullable(FieldSpec fieldSpec) {
-    return _schema.isEnableColumnBasedNullHandling() ? fieldSpec.isNullable() : _nullHandlingEnabled;
+    return _schema.isEnableColumnBasedNullHandling() ? fieldSpec.isNullable() : _defaultNullHandlingEnabled;
   }
 
   private <C extends IndexConfig> void addMutableIndex(Map<IndexType, MutableIndex> mutableIndexes,
