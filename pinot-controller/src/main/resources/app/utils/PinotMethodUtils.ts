@@ -96,7 +96,8 @@ import {
   getTaskProgress,
   getSegmentReloadStatus,
   getTaskRuntimeConfig,
-  getSchemaInfo
+  getSchemaInfo,
+  getSegmentsStatus
 } from '../requests';
 import { baseApi } from './axios-config';
 import Utils, { getDisplaySegmentStatus } from './Utils';
@@ -504,31 +505,27 @@ const getTableSummaryData = (tableName) => {
   });
 };
 
-// This method is used to display segment list of a particular tenant table
-// API: /tables/:tableName/idealstate
-//      /tables/:tableName/externalview
-// Expected Output: {columns: [], records: [], externalViewObject: {}}
-const getSegmentList = (tableName) => {
-  const promiseArr = [];
-  promiseArr.push(getIdealState(tableName));
-  promiseArr.push(getExternalView(tableName));
+// This method is used to display segment list of a particular table with segment name and it's status
+// API: /tables/${name}/segmentsStatus
+// Expected Output: {columns: [], records: []}
+  const getSegmentList = (tableName) => {
+    return getSegmentsStatus(tableName).then((results) => {
+      const segmentsArray = results.data; // assuming the array is inside `segments` property
+      return {
+        columns: ['Segment Name', 'Status'],
+        records: segmentsArray.map((segment) => [
+          segment.segmentName,
+          segment.segmentStatus
+        ])
+      };
+    });
+  };
 
-  return Promise.all(promiseArr).then((results) => {
-    const idealStateObj = results[0].data.OFFLINE || results[0].data.REALTIME;
-    const externalViewObj = results[1].data.OFFLINE || results[1].data.REALTIME;
-
-    return {
-      columns: ['Segment Name', 'Status'],
-      records: Object.keys(idealStateObj).map((key) => {
-        return [
-          key,
-          getDisplaySegmentStatus(idealStateObj[key], externalViewObj[key])
-        ];
-      }),
-      externalViewObj
-    };
+const getExternalViewObj = (tableName) => {
+  return getExternalView(tableName).then((result) => {
+    return result.data.OFFLINE || result.data.REALTIME;
   });
-};
+}; 
 
 const getSegmentStatus = (idealSegment, externalViewSegment) => {
   if(isEqual(idealSegment, externalViewSegment)){
@@ -1250,6 +1247,7 @@ export default {
   getAllTableDetails,
   getTableSummaryData,
   getSegmentList,
+  getExternalViewObj,
   getSegmentStatus,
   getTableDetails,
   getSegmentDetails,

@@ -46,7 +46,8 @@ import {
   QuerySchemas,
   TableType,
   InstanceState, SegmentMetadata,
-  SchemaInfo
+  SchemaInfo,
+  SegmentStatusInfo
 } from 'Models';
 
 const headers = {
@@ -101,6 +102,9 @@ export const getIdealState = (name: string): Promise<AxiosResponse<IdealState>> 
 
 export const getExternalView = (name: string): Promise<AxiosResponse<IdealState>> =>
   baseApi.get(`/tables/${name}/externalview`);
+
+export const getSegmentsStatus = (name: string): Promise<AxiosResponse<SegmentStatusInfo[]>> =>
+  baseApi.get(`/tables/${name}/segmentsStatus`);
 
 export const getInstances = (): Promise<AxiosResponse<Instances>> =>
   baseApi.get('/instances');

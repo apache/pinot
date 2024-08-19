@@ -186,7 +186,8 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
 
   const fetchSegmentData = async () => {
     const result = await PinotMethodUtils.getSegmentList(tableName);
-    const {columns, records, externalViewObj} = result;
+    const externalViewObj = await PinotMethodUtils.getExternalViewObj(tableName);
+    const {columns, records} = result;
     const instanceObj = {};
     externalViewObj && Object.keys(externalViewObj).map((segmentName)=>{
       const instanceKeys = Object.keys(externalViewObj[segmentName]);
@@ -221,7 +222,6 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
         },
       ])
     );
-
     setSegmentList({columns, records: segmentTableRows});
   };
 

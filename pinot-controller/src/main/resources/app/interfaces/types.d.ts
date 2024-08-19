@@ -110,6 +110,11 @@ declare module 'Models' {
     error?: string;
   };
 
+  export type SegmentStatusInfo = {
+    segmentName: string;
+    segmentStatus: DISPLAY_SEGMENT_STATUS;
+  };
+
   export type QueryTables = {
     tables: Array<string>;
   };
