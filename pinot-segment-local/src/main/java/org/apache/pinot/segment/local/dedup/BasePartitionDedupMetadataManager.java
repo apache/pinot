@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.dedup;
 
 import com.google.common.base.Preconditions;
+import com.google.common.util.concurrent.AtomicDouble;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
@@ -42,8 +43,8 @@ public abstract class BasePartitionDedupMetadataManager implements PartitionDedu
   protected final HashFunction _hashFunction;
   protected final double _metadataTTL;
   protected final String _dedupTimeColumn;
+  protected final AtomicDouble _largestSeenTime = new AtomicDouble(0);
   protected final Logger _logger;
-
   // The following variables are always accessed within synchronized block
   private boolean _stopped;
   // Initialize with 1 pending operation to indicate the metadata manager can take more operations
@@ -227,6 +228,10 @@ public abstract class BasePartitionDedupMetadataManager implements PartitionDedu
     // the primary key count. So, we set the primary key count to 0 here.
     updatePrimaryKeyGauge(0);
     _logger.info("Closed the metadata manager");
+  }
+
+  protected boolean isOutOfMetadataTTL(double dedupTime) {
+    return _metadataTTL > 0 && dedupTime < _largestSeenTime.get() - _metadataTTL;
   }
 
   protected abstract long getNumPrimaryKeys();

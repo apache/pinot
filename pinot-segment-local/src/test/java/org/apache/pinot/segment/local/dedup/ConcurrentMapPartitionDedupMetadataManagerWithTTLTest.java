@@ -252,17 +252,17 @@ public class ConcurrentMapPartitionDedupMetadataManagerWithTTLTest {
 
     Object primaryKeyHash = HashUtils.hashPrimaryKey(primaryKey, HashFunction.NONE);
     dedupRecordInfo = new DedupRecordInfo(primaryKey, 15000);
-    assertTrue(_metadataManager.checkRecordPresentOrUpdate(dedupRecordInfo, immutableSegment));
+    assertFalse(_metadataManager.checkRecordPresentOrUpdate(dedupRecordInfo, immutableSegment));
     assertEquals(_metadataManager._primaryKeyToSegmentAndTimeMap.size(), 1);
     assertEquals(_metadataManager._primaryKeyToSegmentAndTimeMap.get(primaryKeyHash),
-        Pair.of(immutableSegment, 1000.0));
+        Pair.of(immutableSegment, 15000.0));
     assertEquals(_metadataManager._largestSeenTime.get(), 20000);
 
     dedupRecordInfo = new DedupRecordInfo(primaryKey, 25000);
     assertTrue(_metadataManager.checkRecordPresentOrUpdate(dedupRecordInfo, immutableSegment));
     assertEquals(_metadataManager._primaryKeyToSegmentAndTimeMap.size(), 1);
     assertEquals(_metadataManager._primaryKeyToSegmentAndTimeMap.get(primaryKeyHash),
-        Pair.of(immutableSegment, 1000.0));
+        Pair.of(immutableSegment, 15000.0));
     assertEquals(_metadataManager._largestSeenTime.get(), 25000);
   }
 
