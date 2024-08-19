@@ -52,7 +52,9 @@ public class BatchConfig {
   private final boolean _excludeSequenceId;
   private final boolean _appendUUIDToSegmentName;
   private final boolean _excludeTimeInSegmentName;
+  private final String _partitionId;
   private final String _sequenceId;
+  private final long _segmentCreationTimeMs;
 
   private final String _pushMode;
   private final int _pushAttempts;
@@ -97,12 +99,14 @@ public class BatchConfig {
     _segmentNamePrefix = segmentNameGeneratorProps.get(BatchConfigProperties.SEGMENT_NAME_PREFIX);
     _segmentNamePostfix = segmentNameGeneratorProps.get(BatchConfigProperties.SEGMENT_NAME_POSTFIX);
     _excludeSequenceId = Boolean.parseBoolean(segmentNameGeneratorProps.get(BatchConfigProperties.EXCLUDE_SEQUENCE_ID));
+    _partitionId = batchConfigsMap.get(BatchConfigProperties.PARTITION_ID);
     _sequenceId = batchConfigsMap.get(BatchConfigProperties.SEQUENCE_ID);
     _appendUUIDToSegmentName =
         Boolean.parseBoolean(segmentNameGeneratorProps.get(BatchConfigProperties.APPEND_UUID_TO_SEGMENT_NAME));
     _excludeTimeInSegmentName =
         Boolean.parseBoolean(segmentNameGeneratorProps.get(BatchConfigProperties.EXCLUDE_TIME_IN_SEGMENT_NAME));
-
+    _segmentCreationTimeMs = Long.parseLong(batchConfigsMap.getOrDefault(BatchConfigProperties.SEGMENT_CREATION_TIME_MS,
+        String.valueOf(System.currentTimeMillis())));
     _pushMode = IngestionConfigUtils.getPushMode(batchConfigsMap);
     _pushAttempts = IngestionConfigUtils.getPushAttempts(batchConfigsMap);
     _pushParallelism = IngestionConfigUtils.getPushParallelism(batchConfigsMap);
@@ -183,6 +187,14 @@ public class BatchConfig {
 
   public boolean isExcludeSequenceId() {
     return _excludeSequenceId;
+  }
+
+  public String getPartitionId() {
+    return _partitionId;
+  }
+
+  public long getSegmentCreationTimeMs() {
+    return _segmentCreationTimeMs;
   }
 
   public String getSequenceId() {

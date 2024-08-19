@@ -41,6 +41,7 @@ import org.apache.pinot.segment.spi.creator.name.FixedSegmentNameGenerator;
 import org.apache.pinot.segment.spi.creator.name.NormalizedDateSegmentNameGenerator;
 import org.apache.pinot.segment.spi.creator.name.SegmentNameGenerator;
 import org.apache.pinot.segment.spi.creator.name.SimpleSegmentNameGenerator;
+import org.apache.pinot.segment.spi.creator.name.UploadedRealtimeSegmentNameGenerator;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
@@ -169,6 +170,9 @@ public final class IngestionUtils {
       case BatchConfigProperties.SegmentNameGeneratorType.SIMPLE:
         return new SimpleSegmentNameGenerator(rawTableName, batchConfig.getSegmentNamePostfix(),
             batchConfig.isAppendUUIDToSegmentName(), batchConfig.isExcludeTimeInSegmentName());
+      case BatchConfigProperties.SegmentNameGeneratorType.UPLOADED_REALTIME:
+        return new UploadedRealtimeSegmentNameGenerator(rawTableName, Integer.parseInt(batchConfig.getPartitionId()),
+            batchConfig.getSegmentCreationTimeMs(), batchConfig.getSegmentNamePrefix(), batchConfig.getSequenceId());
       default:
         throw new IllegalStateException(String
             .format("Unsupported segmentNameGeneratorType: %s for table: %s", segmentNameGeneratorType,

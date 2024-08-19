@@ -22,6 +22,7 @@ import java.net.URI;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.runtime.state.FunctionInitializationContext;
 import org.apache.flink.runtime.state.FunctionSnapshotContext;
@@ -49,6 +50,8 @@ public class PinotSinkFunction<T> extends RichSinkFunction<T> implements Checkpo
   public static final int DEFAULT_EXECUTOR_POOL_SIZE = 5;
   public static final long DEFAULT_EXECUTOR_SHUTDOWN_WAIT_MS = 3000;
 
+  public static final String DEFAULT_UPLOADED_REALTIME_SEGMENT_PREFIX = "flink";
+
   private static final long serialVersionUID = 1L;
   private static final Logger LOG = LoggerFactory.getLogger(PinotSinkFunction.class);
 
@@ -60,6 +63,9 @@ public class PinotSinkFunction<T> extends RichSinkFunction<T> implements Checkpo
   private TableConfig _tableConfig;
   private Schema _schema;
 
+  private String _segmentNamePrefix;
+  @Nullable private Long _overriddenSegmentCreationTimeMs;
+
   private transient SegmentWriter _segmentWriter;
   private transient SegmentUploader _segmentUploader;
   private transient ExecutorService _executor;
@@ -67,6 +73,7 @@ public class PinotSinkFunction<T> extends RichSinkFunction<T> implements Checkpo
 
   public PinotSinkFunction(PinotGenericRowConverter<T> recordConverter, TableConfig tableConfig, Schema schema) {
     this(recordConverter, tableConfig, schema, DEFAULT_SEGMENT_FLUSH_MAX_NUM_RECORDS, DEFAULT_EXECUTOR_POOL_SIZE);
+    _segmentNamePrefix = DEFAULT_UPLOADED_REALTIME_SEGMENT_PREFIX;
   }
 
   public PinotSinkFunction(PinotGenericRowConverter<T> recordConverter, TableConfig tableConfig, Schema schema,
@@ -76,13 +83,25 @@ public class PinotSinkFunction<T> extends RichSinkFunction<T> implements Checkpo
     _schema = schema;
     _segmentFlushMaxNumRecords = segmentFlushMaxNumRecords;
     _executorPoolSize = executorPoolSize;
+    _segmentNamePrefix = DEFAULT_UPLOADED_REALTIME_SEGMENT_PREFIX;
+  }
+
+  public PinotSinkFunction(PinotGenericRowConverter<T> recordConverter, TableConfig tableConfig, Schema schema,
+      long segmentFlushMaxNumRecords, int executorPoolSize, String segmentNamePrefix,
+      @Nullable Long overriddenSegmentCreationTimeMs) {
+    this(recordConverter, tableConfig, schema, segmentFlushMaxNumRecords, executorPoolSize);
+    if (!segmentNamePrefix.isBlank()) {
+      _segmentNamePrefix = segmentNamePrefix;
+    }
+    _overriddenSegmentCreationTimeMs = overriddenSegmentCreationTimeMs;
   }
 
   @Override
   public void open(Configuration parameters)
       throws Exception {
     int indexOfSubtask = this.getRuntimeContext().getIndexOfThisSubtask();
-    _segmentWriter = new FlinkSegmentWriter(indexOfSubtask, getRuntimeContext().getMetricGroup());
+    _segmentWriter = new FlinkSegmentWriter(indexOfSubtask, getRuntimeContext().getMetricGroup(), _segmentNamePrefix,
+        _overriddenSegmentCreationTimeMs);
     _segmentWriter.init(_tableConfig, _schema);
     _segmentUploader = new SegmentUploaderDefault();
     _segmentUploader.init(_tableConfig);
