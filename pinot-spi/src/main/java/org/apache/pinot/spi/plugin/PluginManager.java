@@ -33,7 +33,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
-
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.codehaus.plexus.classworlds.ClassWorld;
@@ -123,7 +122,7 @@ public class PluginManager {
         }
       };
 
-  private final ClassWorld classWorld;
+  private final ClassWorld _classWorld;
   private final Map<Plugin, PluginClassLoader> _registry;
 
   private String _pluginsDirectories;
@@ -131,18 +130,17 @@ public class PluginManager {
   private boolean _initialized = false;
 
   private PluginManager() {
-    if(useLegacyPluginClassloader()) {
+    if (useLegacyPluginClassloader()) {
       _registry = new HashMap<>();
       _registry.put(new Plugin(DEFAULT_PLUGIN_NAME), createClassLoader(Collections.emptyList()));
-      classWorld = null;
-    }
-    else {
+      _classWorld = null;
+    } else {
       try {
-        this.classWorld = new ClassWorld();
+        _classWorld = new ClassWorld();
         // to simulate behavior of legacy code, however every plugin should have a dedicated realm
-        this.classWorld.newRealm(DEFAULT_PLUGIN_NAME);
-        this.classWorld.newRealm("pinot", ClassLoader.getSystemClassLoader());
-        this._registry = null;
+        _classWorld.newRealm(DEFAULT_PLUGIN_NAME);
+        _classWorld.newRealm("pinot", ClassLoader.getSystemClassLoader());
+        _registry = null;
       } catch (DuplicateRealmException e) {
         throw new RuntimeException(e);
       }
@@ -275,15 +273,16 @@ public class PluginManager {
       }
     }
 
-    if(useLegacyPluginClassloader()) {
+    if (useLegacyPluginClassloader()) {
       PluginClassLoader classLoader = createClassLoader(urlList);
       _registry.put(new Plugin(pluginName), classLoader);
-    }
-    else {
+    } else {
       try {
-        ClassRealm pluginRealm = classWorld.newRealm(pluginName, new URLClassLoader(urlList.toArray(new URL[0]), ClassLoader.getPlatformClassLoader()));
+        ClassRealm pluginRealm = _classWorld.newRealm(
+                pluginName,
+                new URLClassLoader(urlList.toArray(new URL[0]), ClassLoader.getPlatformClassLoader()));
 
-        ClassLoader pinotLoader = classWorld.getClassRealm("pinot");
+        ClassLoader pinotLoader = _classWorld.getClassRealm("pinot");
 
         // All exported packages
         Stream.of("org.apache.pinot.spi.accounting",
@@ -371,15 +370,15 @@ public class PluginManager {
   public Class<?> loadClass(String pluginName, String className)
       throws ClassNotFoundException {
     // Backward compatible check.
-    if(useLegacyPluginClassloader()) {
-      return _registry.get(new Plugin(pluginName)).loadClass(loadClassWithBackwardCompatibleCheck(className), true);
-    }
-    else {
-        try {
-            return Class.forName(loadClassWithBackwardCompatibleCheck(className), false, classWorld.getRealm(pluginName));
-        } catch (NoSuchRealmException e) {
-            throw new RuntimeException(e);
-        }
+    String name = loadClassWithBackwardCompatibleCheck(className);
+    if (useLegacyPluginClassloader()) {
+      return _registry.get(new Plugin(pluginName)).loadClass(name, true);
+    } else {
+      try {
+          return Class.forName(name, false, _classWorld.getRealm(pluginName));
+      } catch (NoSuchRealmException e) {
+          throw new RuntimeException(e);
+      }
     }
   }
 
@@ -443,12 +442,12 @@ public class PluginManager {
   public <T> T createInstance(String pluginName, String className, Class[] argTypes, Object[] argValues)
       throws Exception {
     Class<T> loadedClass;
-    if(useLegacyPluginClassloader()) {
+    String name = loadClassWithBackwardCompatibleCheck(className);
+    if (useLegacyPluginClassloader()) {
       PluginClassLoader pluginClassLoader = PLUGIN_MANAGER._registry.get(new Plugin(pluginName));
-      loadedClass = (Class<T>) pluginClassLoader.loadClass(loadClassWithBackwardCompatibleCheck(className), true);
-    }
-    else {
-      loadedClass = (Class<T>) Class.forName(loadClassWithBackwardCompatibleCheck(className), true, classWorld.getRealm(pluginName));
+      loadedClass = (Class<T>) pluginClassLoader.loadClass(name, true);
+    } else {
+      loadedClass = (Class<T>) Class.forName(name, true, _classWorld.getRealm(pluginName));
     }
     Constructor<?> constructor;
     constructor = loadedClass.getConstructor(argTypes);
