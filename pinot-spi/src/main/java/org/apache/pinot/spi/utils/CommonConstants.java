@@ -617,6 +617,8 @@ public class CommonConstants {
           CONFIG_PREFIX + ".stats.manager.threadpool.size";
       public static final int DEFAULT_STATS_MANAGER_THREADPOOL_SIZE = 2;
     }
+
+    public static final String PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY = "pinot.broker.storage.factory";
   }
 
   public static class Server {
@@ -1314,5 +1316,28 @@ public class CommonConstants {
     public static final String[] STRING_ARRAY = new String[0];
     public static final byte[][] BYTES_ARRAY = new byte[0][];
     public static final Object MAP = Collections.emptyMap();
+  }
+
+  public static class CursorConfigs {
+    public static final String DEFAULT_RESULT_STORE_TYPE = "file";
+    public static final String DEFAULT_RESULT_SERDE = "json";
+    public static final int MAX_QUERY_RESULT_SIZE = 100000;
+    public static final int DEFAULT_QUERY_RESULT_SIZE = 10000;
+    public static final String DEFAULT_TEMP_DIR = "/tmp/pinot/broker/result_store/tmp";
+    public static final String DEFAULT_DATA_DIR = "/tmp/pinot/broker/result_store/data";
+    public static final String DEFAULT_RESULTS_EXPIRATION_INTERVAL = "1h"; // 1 hour.
+    public static final String PREFIX_OF_CONFIG_OF_CURSOR = "pinot.broker.cursor";
+    public static final String PREFIX_OF_CONFIG_OF_RESULT_STORE = "pinot.broker.cursor.result.store";
+    public static final String RESULT_STORE_TYPE = "type";
+    public static final String RESULT_STORE_SERDE = "serde";
+    public static final String QUERY_RESULT_SIZE = "result.size";
+    public static final String TEMP_DIR = "temp.dir";
+    public static final String DATA_DIR = "data.dir";
+    public static final String RESULTS_EXPIRATION_INTERVAL = "expiration";
+
+    public static final String RESULT_STORE_CLEANER_FREQUENCY_PERIOD =
+        "controller.cluster.result.store.cleaner.frequencyPeriod";
+    public static final String RESULT_STORE_CLEANER_INITIAL_DELAY =
+        "controller.cluster.result.store.cleaner.initialDelay";
   }
 }

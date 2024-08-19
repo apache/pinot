@@ -76,7 +76,7 @@ public interface BrokerResponse {
   /**
    * Returns the processing exceptions encountered during the query execution.
    */
-  List<QueryProcessingException> getExceptions();
+   List<QueryProcessingException> getExceptions();
 
   @Deprecated
   @JsonIgnore

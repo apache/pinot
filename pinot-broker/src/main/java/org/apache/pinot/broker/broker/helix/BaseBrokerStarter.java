@@ -46,6 +46,7 @@ import org.apache.pinot.broker.queryquota.HelixExternalViewBasedQueryQuotaManage
 import org.apache.pinot.broker.requesthandler.BaseSingleStageBrokerRequestHandler;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandlerDelegate;
+import org.apache.pinot.broker.requesthandler.CursorRequestHandlerDelegate;
 import org.apache.pinot.broker.requesthandler.GrpcBrokerRequestHandler;
 import org.apache.pinot.broker.requesthandler.MultiStageBrokerRequestHandler;
 import org.apache.pinot.broker.requesthandler.MultiStageQueryThrottler;
@@ -56,6 +57,7 @@ import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.config.NettyConfig;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.common.cursors.AbstractResultStore;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.BrokerGauge;
@@ -78,8 +80,14 @@ import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
+import org.apache.pinot.spi.cursors.ResponseSerde;
+import org.apache.pinot.spi.cursors.ResponseSerdeFactory;
+import org.apache.pinot.spi.cursors.ResponseSerdeService;
+import org.apache.pinot.spi.cursors.ResultStoreFactory;
+import org.apache.pinot.spi.cursors.ResultStoreService;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListenerFactory;
+import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 import org.apache.pinot.spi.services.ServiceRole;
@@ -139,6 +147,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   protected ServerRoutingStatsManager _serverRoutingStatsManager;
   protected HelixExternalViewBasedQueryQuotaManager _queryQuotaManager;
   protected MultiStageQueryThrottler _multiStageQueryThrottler;
+  protected AbstractResultStore _resultStore;
+  protected CursorRequestHandlerDelegate _cursorRequestHandlerDelegate;
 
   @Override
   public void init(PinotConfiguration brokerConf)
@@ -357,6 +367,38 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
         new BrokerRequestHandlerDelegate(singleStageBrokerRequestHandler, multiStageBrokerRequestHandler,
             timeSeriesRequestHandler);
     _brokerRequestHandler.start();
+
+    LOGGER.info("Initializing PinotFSFactory");
+    PinotFSFactory.init(_brokerConf.subset(CommonConstants.Broker.PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY));
+
+    LOGGER.info("Initialize ResultStore");
+    PinotConfiguration resultStoreConfiguration =
+        _brokerConf.subset(CommonConstants.CursorConfigs.PREFIX_OF_CONFIG_OF_RESULT_STORE);
+    try {
+      ResponseSerdeFactory responseSerdeFactory = ResponseSerdeService.getInstance().getResponseSerdeFactory(
+          resultStoreConfiguration.getProperty(CommonConstants.CursorConfigs.RESULT_STORE_SERDE,
+              CommonConstants.CursorConfigs.DEFAULT_RESULT_SERDE));
+      ResponseSerde responseSerde = responseSerdeFactory.create(
+          resultStoreConfiguration.subset(CommonConstants.CursorConfigs.RESULT_STORE_SERDE));
+
+      String expirationTime = getConfig().getProperty(CommonConstants.CursorConfigs.RESULTS_EXPIRATION_INTERVAL,
+          CommonConstants.CursorConfigs.DEFAULT_RESULTS_EXPIRATION_INTERVAL);
+
+      ResultStoreFactory resultStoreFactory = ResultStoreService.getInstance().getResultStoreFactory(
+          resultStoreConfiguration.getProperty(CommonConstants.CursorConfigs.RESULT_STORE_TYPE,
+              CommonConstants.CursorConfigs.DEFAULT_RESULT_STORE_TYPE));
+      _resultStore = (AbstractResultStore) resultStoreFactory.create(resultStoreConfiguration);
+      _resultStore.init(resultStoreConfiguration, responseSerde);
+    } catch (Exception e) {
+      LOGGER.error("Exception when create Cursor ResultStore. Creating default result store. {}", e.getMessage());
+      // TODO: Exit ?
+    }
+
+    String expirationTime = getConfig().getProperty(CommonConstants.CursorConfigs.RESULTS_EXPIRATION_INTERVAL,
+        CommonConstants.CursorConfigs.DEFAULT_RESULTS_EXPIRATION_INTERVAL);
+
+    _cursorRequestHandlerDelegate =
+        new CursorRequestHandlerDelegate(_hostname, _port, _resultStore, _brokerRequestHandler, expirationTime);
 
     // Enable/disable thread CPU time measurement through instance config.
     ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(
@@ -650,7 +692,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     BrokerAdminApiApplication brokerAdminApiApplication =
         new BrokerAdminApiApplication(_routingManager, _brokerRequestHandler, _brokerMetrics, _brokerConf,
             _sqlQueryExecutor, _serverRoutingStatsManager, _accessControlFactory, _spectatorHelixManager,
-            _queryQuotaManager);
+            _queryQuotaManager, _cursorRequestHandlerDelegate, _resultStore);
     registerExtraComponents(brokerAdminApiApplication);
     return brokerAdminApiApplication;
   }
