@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.URL;
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.jar.JarEntry;
@@ -206,11 +207,10 @@ public class PluginManagerTest {
     final String originalLegacyPluginLoader = System.getProperty(PLUGINS_LOADER_LEGACY_PROPERTY_NAME);
 
     try {
-      System.setProperty(PLUGINS_DIR_PROPERTY_NAME, "src/test/resources/plugins");
+      System.setProperty(PLUGINS_DIR_PROPERTY_NAME, Path.of("src/test/resources/plugins").toAbsolutePath().toString());
       System.setProperty(PLUGINS_LOADER_LEGACY_PROPERTY_NAME, "false");
 
-      PluginManager pluginManager = PluginManager.get();
-      pluginManager.init();
+      PluginManager pluginManager = new PluginManager();
 
       Assert.assertNotNull(ClassLoader.getSystemClassLoader().loadClass("org.apache.commons.math3.util.MathUtils"));
 

@@ -129,7 +129,7 @@ public class PluginManager {
   private String _pluginsInclude;
   private boolean _initialized = false;
 
-  private PluginManager() {
+  PluginManager() {
     if (useLegacyPluginClassloader()) {
       _registry = new HashMap<>();
       _registry.put(new Plugin(DEFAULT_PLUGIN_NAME), createClassLoader(Collections.emptyList()));
