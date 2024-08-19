@@ -3407,6 +3407,19 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     Assert.assertTrue(connection.isClosed());
   }
 
+  @Test
+  public void testNoTableQueryThroughJDBCClient()
+      throws Exception {
+    String query = "SELECT 1";
+    java.sql.Connection connection = getJDBCConnectionFromController(getControllerPort());
+    Statement statement = connection.createStatement();
+    ResultSet resultSet = statement.executeQuery(query);
+    resultSet.first();
+    Assert.assertTrue(resultSet.getLong(1) > 0);
+    connection.close();
+    Assert.assertTrue(connection.isClosed());
+  }
+
   private java.sql.Connection getJDBCConnectionFromController(int controllerPort)
       throws Exception {
     PinotDriver pinotDriver = new PinotDriver();
