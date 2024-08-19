@@ -125,6 +125,8 @@ public class RealtimeQuickStart extends QuickStartBase {
     printStatus(Color.YELLOW, "***** Realtime quickstart setup complete *****");
     runSampleQueries(runner);
 
-    printStatus(Color.GREEN, "You can always go to http://localhost:9000 to play around in the query console");
+    printStatus(Color.GREEN,
+        String.format("You can always go to http://localhost:%d to play around in the query console",
+            QuickstartRunner.DEFAULT_CONTROLLER_PORT));
   }
 }

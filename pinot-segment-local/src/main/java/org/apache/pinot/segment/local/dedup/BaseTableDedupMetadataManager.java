@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.dedup;
 
 import com.google.common.base.Preconditions;
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -26,32 +27,51 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.spi.config.table.DedupConfig;
-import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 
 
-abstract class BaseTableDedupMetadataManager implements TableDedupMetadataManager {
+public abstract class BaseTableDedupMetadataManager implements TableDedupMetadataManager {
   protected final Map<Integer, PartitionDedupMetadataManager> _partitionMetadataManagerMap = new ConcurrentHashMap<>();
   protected String _tableNameWithType;
-  protected List<String> _primaryKeyColumns;
-  protected ServerMetrics _serverMetrics;
-  protected HashFunction _hashFunction;
+  protected DedupContext _dedupContext;
 
   @Override
   public void init(TableConfig tableConfig, Schema schema, TableDataManager tableDataManager,
       ServerMetrics serverMetrics) {
     _tableNameWithType = tableConfig.getTableName();
 
-    _primaryKeyColumns = schema.getPrimaryKeyColumns();
-    Preconditions.checkArgument(!CollectionUtils.isEmpty(_primaryKeyColumns),
+    List<String> primaryKeyColumns = schema.getPrimaryKeyColumns();
+    Preconditions.checkArgument(!CollectionUtils.isEmpty(primaryKeyColumns),
         "Primary key columns must be configured for dedup enabled table: %s", _tableNameWithType);
-
-    _serverMetrics = serverMetrics;
 
     DedupConfig dedupConfig = tableConfig.getDedupConfig();
     Preconditions.checkArgument(dedupConfig != null, "Dedup must be enabled for table: %s", _tableNameWithType);
-    _hashFunction = dedupConfig.getHashFunction();
+    double metadataTTL = dedupConfig.getMetadataTTL();
+    String dedupTimeColumn = dedupConfig.getDedupTimeColumn();
+    if (dedupTimeColumn == null) {
+      dedupTimeColumn = tableConfig.getValidationConfig().getTimeColumnName();
+    }
+    if (metadataTTL > 0) {
+      Preconditions.checkArgument(dedupTimeColumn != null,
+          "When metadataTTL is configured, metadata time column or time column must be configured for "
+              + "dedup enabled table: %s", _tableNameWithType);
+    }
+
+    DedupContext.Builder dedupContextBuider = new DedupContext.Builder();
+    dedupContextBuider
+        .setTableConfig(tableConfig)
+        .setSchema(schema)
+        .setPrimaryKeyColumns(primaryKeyColumns)
+        .setHashFunction(dedupConfig.getHashFunction())
+        .setMetadataTTL(metadataTTL)
+        .setDedupTimeColumn(dedupTimeColumn)
+        .setTableIndexDir(tableDataManager.getTableDataDir())
+        .setTableDataManager(tableDataManager)
+        .setServerMetrics(serverMetrics);
+    _dedupContext = dedupContextBuider.build();
+
+    initCustomVariables();
   }
 
   public PartitionDedupMetadataManager getOrCreatePartitionManager(int partitionId) {
@@ -62,4 +82,25 @@ abstract class BaseTableDedupMetadataManager implements TableDedupMetadataManage
    * Create PartitionDedupMetadataManager for given partition id.
    */
   abstract protected PartitionDedupMetadataManager createPartitionDedupMetadataManager(Integer partitionId);
+
+  /**
+   * Can be overridden to initialize custom variables after other variables are set
+   */
+  protected void initCustomVariables() {
+  }
+
+  @Override
+  public void stop() {
+    for (PartitionDedupMetadataManager metadataManager : _partitionMetadataManagerMap.values()) {
+      metadataManager.stop();
+    }
+  }
+
+  @Override
+  public void close()
+      throws IOException {
+    for (PartitionDedupMetadataManager metadataManager : _partitionMetadataManagerMap.values()) {
+      metadataManager.close();
+    }
+  }
 }

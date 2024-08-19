@@ -25,7 +25,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
@@ -102,7 +102,7 @@ public class FakeStreamConfigUtils {
       FileUtils.deleteDirectory(outputDir);
     }
     File avroTarFile = getResourceFile(AVRO_TAR_FILE);
-    return TarGzCompressionUtils.untar(avroTarFile, outputDir);
+    return TarCompressionUtils.untar(avroTarFile, outputDir);
   }
 
   /**

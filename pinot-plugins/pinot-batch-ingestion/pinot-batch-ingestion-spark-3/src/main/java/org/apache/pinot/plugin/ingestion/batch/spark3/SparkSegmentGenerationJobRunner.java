@@ -32,7 +32,7 @@ import java.util.Map;
 import java.util.UUID;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.segment.generation.SegmentGenerationUtils;
-import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationJobUtils;
 import org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationTaskRunner;
@@ -227,7 +227,7 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
           if (localPluginsTarFile.exists()) {
             File pluginsDirFile = new File(PINOT_PLUGINS_DIR + "-" + idx);
             try {
-              TarGzCompressionUtils.untar(localPluginsTarFile, pluginsDirFile);
+              TarCompressionUtils.untar(localPluginsTarFile, pluginsDirFile);
             } catch (Exception e) {
               LOGGER.error("Failed to untar local Pinot plugins tarball file [{}]", localPluginsTarFile, e);
               throw new RuntimeException(e);
@@ -284,7 +284,7 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
           String segmentTarFileName = URIUtils.encode(segmentName + Constants.TAR_GZ_FILE_EXT);
           File localSegmentTarFile = new File(localOutputTempDir, segmentTarFileName);
           LOGGER.info("Tarring segment from: {} to: {}", localSegmentDir, localSegmentTarFile);
-          TarGzCompressionUtils.createTarGzFile(localSegmentDir, localSegmentTarFile);
+          TarCompressionUtils.createCompressedTarFile(localSegmentDir, localSegmentTarFile);
           long uncompressedSegmentSize = FileUtils.sizeOf(localSegmentDir);
           long compressedSegmentSize = FileUtils.sizeOf(localSegmentTarFile);
           LOGGER.info("Size for segment: {}, uncompressed: {}, compressed: {}", segmentName,
@@ -369,7 +369,7 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
     File pluginsTarGzFile = new File(PINOT_PLUGINS_TAR_GZ);
     try {
       File[] files = validPluginDirectories.toArray(new File[0]);
-      TarGzCompressionUtils.createTarGzFile(files, pluginsTarGzFile);
+      TarCompressionUtils.createCompressedTarFile(files, pluginsTarGzFile);
     } catch (IOException e) {
       LOGGER.error("Failed to tar plugins directories", e);
     }

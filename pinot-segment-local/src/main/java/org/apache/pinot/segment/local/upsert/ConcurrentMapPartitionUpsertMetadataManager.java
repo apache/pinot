@@ -103,9 +103,14 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
               // snapshot for the old segment, which can be updated and used to track the docs not replaced yet.
               if (currentSegment == oldSegment) {
                 if (comparisonResult >= 0) {
-                  addDocId(segment, validDocIds, queryableDocIds, newDocId, recordInfo);
-                  if (validDocIdsForOldSegment != null) {
-                    validDocIdsForOldSegment.remove(currentDocId);
+                  if (validDocIdsForOldSegment == null && oldSegment != null && oldSegment.getValidDocIds() != null) {
+                    // Update the old segment's bitmap in place if a copy of the bitmap was not provided.
+                    replaceDocId(segment, validDocIds, queryableDocIds, oldSegment, currentDocId, newDocId, recordInfo);
+                  } else {
+                    addDocId(segment, validDocIds, queryableDocIds, newDocId, recordInfo);
+                    if (validDocIdsForOldSegment != null) {
+                      validDocIdsForOldSegment.remove(currentDocId);
+                    }
                   }
                   return new RecordLocation(segment, newDocId, newComparisonValue);
                 } else {
@@ -172,11 +177,11 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
       PrimaryKey primaryKey = primaryKeyIterator.next();
       _primaryKeyToRecordLocationMap.computeIfPresent(HashUtils.hashPrimaryKey(primaryKey, _hashFunction),
           (pk, recordLocation) -> {
-        if (recordLocation.getSegment() == segment) {
-          return null;
-        }
-        return recordLocation;
-      });
+            if (recordLocation.getSegment() == segment) {
+              return null;
+            }
+            return recordLocation;
+          });
     }
   }
 

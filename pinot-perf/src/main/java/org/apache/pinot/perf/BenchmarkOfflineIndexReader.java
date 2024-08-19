@@ -27,7 +27,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.integration.tests.ClusterTest;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -109,7 +109,7 @@ public class BenchmarkOfflineIndexReader {
     FileUtils.deleteQuietly(TEMP_DIR);
 
     File avroDir = new File(TEMP_DIR, "avro");
-    TarGzCompressionUtils.untar(new File(TestUtils.getFileFromResourceUrl(RESOURCE_URL)), avroDir);
+    TarCompressionUtils.untar(new File(TestUtils.getFileFromResourceUrl(RESOURCE_URL)), avroDir);
     File avroFile = new File(avroDir, AVRO_FILE_NAME);
 
     File dataDir = new File(TEMP_DIR, "index");

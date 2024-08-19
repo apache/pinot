@@ -32,7 +32,7 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/../..</pinot.root>
-    <spark.version>3.5.1</spark.version>
+    <spark.version>3.5.2</spark.version>
     <scalatest.version>3.2.18</scalatest.version>
     <shadeBase>org.apache.pinot.\$internal</shadeBase>
   </properties>
@@ -143,7 +143,7 @@
              Thus, explicitly adding this plugin to a new profile to sign the files at the end all at once. -->
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-gpg-plugin</artifactId>
-            <version>3.2.4</version>
+            <version>3.2.5</version>
           </plugin>
         </plugins>
       </build>

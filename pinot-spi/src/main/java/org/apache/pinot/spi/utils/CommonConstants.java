@@ -662,6 +662,7 @@ public class CommonConstants {
     public static final double DEFAULT_SERVER_CONSUMPTION_RATE_LIMIT = 0.0;
 
     public static final String DEFAULT_READ_MODE = "mmap";
+    public static final String CONFIG_OF_MMAP_DEFAULT_ADVICE = "pinot.server.mmap.advice.default";
     // Whether to reload consuming segment on scheme update
     public static final boolean DEFAULT_RELOAD_CONSUMING_SEGMENT = true;
     public static final String DEFAULT_INSTANCE_BASE_DIR =

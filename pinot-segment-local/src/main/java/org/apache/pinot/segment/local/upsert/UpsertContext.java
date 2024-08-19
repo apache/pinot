@@ -45,13 +45,16 @@ public class UpsertContext {
   private final UpsertConfig.ConsistencyMode _consistencyMode;
   private final long _upsertViewRefreshIntervalMs;
   private final File _tableIndexDir;
+  private final boolean _dropOutOfOrderRecord;
+  private final boolean _enableDeletedKeysCompactionConsistency;
   private final TableDataManager _tableDataManager;
 
   private UpsertContext(TableConfig tableConfig, Schema schema, List<String> primaryKeyColumns,
       List<String> comparisonColumns, @Nullable String deleteRecordColumn, HashFunction hashFunction,
       @Nullable PartialUpsertHandler partialUpsertHandler, boolean enableSnapshot, boolean enablePreload,
       double metadataTTL, double deletedKeysTTL, UpsertConfig.ConsistencyMode consistencyMode,
-      long upsertViewRefreshIntervalMs, File tableIndexDir, @Nullable TableDataManager tableDataManager) {
+      long upsertViewRefreshIntervalMs, File tableIndexDir, boolean dropOutOfOrderRecord,
+      boolean enableDeletedKeysCompactionConsistency, @Nullable TableDataManager tableDataManager) {
     _tableConfig = tableConfig;
     _schema = schema;
     _primaryKeyColumns = primaryKeyColumns;
@@ -66,6 +69,8 @@ public class UpsertContext {
     _consistencyMode = consistencyMode;
     _upsertViewRefreshIntervalMs = upsertViewRefreshIntervalMs;
     _tableIndexDir = tableIndexDir;
+    _dropOutOfOrderRecord = dropOutOfOrderRecord;
+    _enableDeletedKeysCompactionConsistency = enableDeletedKeysCompactionConsistency;
     _tableDataManager = tableDataManager;
   }
 
@@ -125,6 +130,14 @@ public class UpsertContext {
     return _tableIndexDir;
   }
 
+  public boolean isDropOutOfOrderRecord() {
+    return _dropOutOfOrderRecord;
+  }
+
+  public boolean isEnableDeletedKeysCompactionConsistency() {
+    return _enableDeletedKeysCompactionConsistency;
+  }
+
   public TableDataManager getTableDataManager() {
     return _tableDataManager;
   }
@@ -144,6 +157,8 @@ public class UpsertContext {
     private UpsertConfig.ConsistencyMode _consistencyMode;
     private long _upsertViewRefreshIntervalMs;
     private File _tableIndexDir;
+    private boolean _dropOutOfOrderRecord;
+    private boolean _enableDeletedKeysCompactionConsistency;
     private TableDataManager _tableDataManager;
 
     public Builder setTableConfig(TableConfig tableConfig) {
@@ -216,6 +231,16 @@ public class UpsertContext {
       return this;
     }
 
+    public Builder setDropOutOfOrderRecord(boolean dropOutOfOrderRecord) {
+      _dropOutOfOrderRecord = dropOutOfOrderRecord;
+      return this;
+    }
+
+    public Builder setEnableDeletedKeysCompactionConsistency(boolean enableDeletedKeysCompactionConsistency) {
+      _enableDeletedKeysCompactionConsistency = enableDeletedKeysCompactionConsistency;
+      return this;
+    }
+
     public Builder setTableDataManager(TableDataManager tableDataManager) {
       _tableDataManager = tableDataManager;
       return this;
@@ -230,7 +255,8 @@ public class UpsertContext {
       Preconditions.checkState(_tableIndexDir != null, "Table index directory must be set");
       return new UpsertContext(_tableConfig, _schema, _primaryKeyColumns, _comparisonColumns, _deleteRecordColumn,
           _hashFunction, _partialUpsertHandler, _enableSnapshot, _enablePreload, _metadataTTL, _deletedKeysTTL,
-          _consistencyMode, _upsertViewRefreshIntervalMs, _tableIndexDir, _tableDataManager);
+          _consistencyMode, _upsertViewRefreshIntervalMs, _tableIndexDir, _dropOutOfOrderRecord,
+          _enableDeletedKeysCompactionConsistency, _tableDataManager);
     }
   }
 }

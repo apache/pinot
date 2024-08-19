@@ -126,7 +126,7 @@
     <!-- Sets the VM argument line used when unit tests are run. -->
     <argLine>-Xms4g -Xmx4g</argLine>
     <SKIP_INTEGRATION_TESTS>true</SKIP_INTEGRATION_TESTS>
-    <surefire.version>3.3.1</surefire.version>
+    <surefire.version>3.4.0</surefire.version>
     <maven-enforcer-plugin.version>3.5.0</maven-enforcer-plugin.version>
 
     <!-- Checkstyle violation prop.-->
@@ -164,13 +164,13 @@
     <dynatrace.hash4j.version>0.18.0</dynatrace.hash4j.version>
     <yammer-metrics.version>2.2.0</yammer-metrics.version>
     <!-- helix-core, spark-core use libraries from io.dropwizard.metrics -->
-    <dropwizard-metrics.version>4.2.26</dropwizard-metrics.version>
+    <dropwizard-metrics.version>4.2.27</dropwizard-metrics.version>
     <snappy-java.version>1.1.10.6</snappy-java.version>
     <zstd-jni.version>1.5.6-4</zstd-jni.version>
     <lz4-java.version>1.8.0</lz4-java.version>
     <libthrift.verion>0.18.1</libthrift.verion>
     <log4j.version>2.23.1</log4j.version>
-    <slf4j.version>2.0.15</slf4j.version>
+    <slf4j.version>2.0.16</slf4j.version>
     <netty.version>4.1.112.Final</netty.version>
     <reactivestreams.version>1.0.4</reactivestreams.version>
     <jts.version>1.19.0</jts.version>
@@ -179,7 +179,7 @@
     <audienceannotations.version>0.15.0</audienceannotations.version>
     <clp-ffi.version>0.4.5</clp-ffi.version>
     <stax2-api.version>4.2.2</stax2-api.version>
-    <aws.sdk.version>2.27.1</aws.sdk.version>
+    <aws.sdk.version>2.27.7</aws.sdk.version>
     <azure.sdk.version>1.2.26</azure.sdk.version>
     <azure.msal4j.version>1.16.2</azure.msal4j.version>
     <joda-time.version>2.12.7</joda-time.version>
@@ -202,7 +202,7 @@
     <commons-configuration2.version>2.11.0</commons-configuration2.version>
     <commons-io.version>2.16.1</commons-io.version>
     <commons-codec.version>1.17.1</commons-codec.version>
-    <commons-cli.version>1.8.0</commons-cli.version>
+    <commons-cli.version>1.9.0</commons-cli.version>
     <commons-net.version>3.11.1</commons-net.version>
     <commons-validator.version>1.9.0</commons-validator.version>
 
@@ -230,10 +230,10 @@
     <!-- Google Libraries -->
     <protobuf.version>3.25.3</protobuf.version>
     <grpc.version>1.66.0</grpc.version>
-    <google.cloud.libraries.version>26.43.0</google.cloud.libraries.version>
+    <google.cloud.libraries.version>26.44.0</google.cloud.libraries.version>
     <google.auto-service.version>1.1.1</google.auto-service.version>
     <google.re2j.version>1.7</google.re2j.version>
-    <google.errorprone.version>2.29.2</google.errorprone.version>
+    <google.errorprone.version>2.30.0</google.errorprone.version>
     <google.j2objc.version>3.0.0</google.j2objc.version>
     <google.jsr305.version>3.0.2</google.jsr305.version>
 
@@ -245,7 +245,7 @@
     <jetbrains.annotations.version>24.1.0</jetbrains.annotations.version>
     <kotlin.stdlib.version>2.0.10</kotlin.stdlib.version>
     <okio.version>3.9.0</okio.version>
-    <kerby.version>2.0.3</kerby.version>
+    <kerby.version>2.1.0</kerby.version>
     <jline.version>3.26.3</jline.version>
     <wildfly.version>2.0.0</wildfly.version>
     <jettison.version>1.5.4</jettison.version>
@@ -1607,9 +1607,14 @@
         <version>${surefire.version}</version>
       </dependency>
       <dependency>
+        <groupId>org.jetbrains</groupId>
+        <artifactId>annotations</artifactId>
+        <version>24.1.0</version>
+      </dependency>
+      <dependency>
         <groupId>com.h2database</groupId>
         <artifactId>h2</artifactId>
-        <version>2.3.230</version>
+        <version>2.3.232</version>
       </dependency>
       <dependency>
         <groupId>com.github.jnr</groupId>
@@ -2650,30 +2655,6 @@
             <relocation>
               <pattern>com.google.common</pattern>
               <shadedPattern>${shade.prefix}.com.google.common</shadedPattern>
-            </relocation>
-            <relocation>
-              <pattern>io.netty</pattern>
-              <shadedPattern>${shade.prefix}.io.netty</shadedPattern>
-            </relocation>
-            <relocation>
-              <pattern>org.apache.http</pattern>
-              <shadedPattern>${shade.prefix}.org.apache.http</shadedPattern>
-            </relocation>
-            <relocation>
-              <pattern>org.apache.kafka</pattern>
-              <shadedPattern>${shade.prefix}.org.apache.kafka</shadedPattern>
-            </relocation>
-            <relocation>
-              <pattern>org.apache.parquet</pattern>
-              <shadedPattern>${shade.prefix}.org.apache.parquet</shadedPattern>
-            </relocation>
-            <relocation>
-              <pattern>org.reflections</pattern>
-              <shadedPattern>${shade.prefix}.org.reflections</shadedPattern>
-            </relocation>
-            <relocation>
-              <pattern>software.amazon</pattern>
-              <shadedPattern>${shade.prefix}.software.amazon</shadedPattern>
             </relocation>
           </relocations>
         </configuration>
