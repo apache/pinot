@@ -532,7 +532,9 @@ public class RequestUtils {
   }
 
   private static Set<String> getTableNames(DataSource dataSource) {
-    if (dataSource.getSubquery() != null) {
+    if (dataSource == null) {
+      return null;
+    } else if (dataSource.getSubquery() != null) {
       return getTableNames(dataSource.getSubquery());
     } else if (dataSource.isSetJoin()) {
       return ImmutableSet.<String>builder().addAll(getTableNames(dataSource.getJoin().getLeft()))
