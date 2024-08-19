@@ -36,6 +36,8 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.spi.plugin.PluginManager.*;
+
 
 public class PluginManagerTest {
 
@@ -196,6 +198,49 @@ public class PluginManagerTest {
     Assert.assertEquals(PluginManager
             .loadClassWithBackwardCompatibleCheck("org.apache.pinot.core.realtime.impl.kafka2.KafkaConsumerFactory"),
         "org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory");
+  }
+
+  @Test
+  public void classRealms() throws Exception {
+    final String originalPluginDir = System.getProperty(PLUGINS_DIR_PROPERTY_NAME);
+    final String originalLegacyPluginLoader = System.getProperty(PLUGINS_LOADER_LEGACY_PROPERTY_NAME);
+
+    try {
+      System.setProperty(PLUGINS_DIR_PROPERTY_NAME, "src/test/resources/plugins");
+      System.setProperty(PLUGINS_LOADER_LEGACY_PROPERTY_NAME, "false");
+
+      PluginManager pluginManager = PluginManager.get();
+      pluginManager.init();
+
+      Assert.assertNotNull(ClassLoader.getSystemClassLoader().loadClass("org.apache.commons.math3.util.MathUtils"));
+
+      Assert.assertNotNull(pluginManager.loadClass("pinot-dropwizard", "org.apache.pinot.plugin.metrics.dropwizard.DropwizardMetricsRegistry"));
+      Assert.assertNotNull(pluginManager.createInstance("pinot-dropwizard", "org.apache.pinot.plugin.metrics.dropwizard.DropwizardMetricsRegistry"));
+      Assert.assertNotNull(pluginManager.loadClass("pinot-dropwizard", "org.apache.pinot.spi.utils.StringUtil"));
+      Assert.assertThrows("Class is part of a different plugin, so should not be accessible", ClassNotFoundException.class, () -> pluginManager.loadClass("pinot-dropwizard", "org.apache.pinot.plugin.metrics.yammer.YammerMetricsRegistry"));
+      Assert.assertThrows( "Class is dependency of pinot-spi, but is not an exported package", ClassNotFoundException.class, () -> pluginManager.loadClass("pinot-dropwizard", "org.apache.commons.math3.util.MathUtils"));
+
+      Assert.assertNotNull(pluginManager.loadClass("pinot-yammer", "org.apache.pinot.plugin.metrics.yammer.YammerMetricsRegistry"));
+      Assert.assertNotNull(pluginManager.createInstance("pinot-yammer", "org.apache.pinot.plugin.metrics.yammer.YammerMetricsRegistry"));
+      Assert.assertNotNull(pluginManager.loadClass("pinot-yammer", "org.apache.pinot.spi.utils.StringUtil"));
+      Assert.assertThrows("Class is part of a different plugin, so should not be accessible", ClassNotFoundException.class, () -> pluginManager.loadClass("pinot-yammer", "org.apache.pinot.plugin.metrics.dropwizard.DropwizardMetricsRegistry"));
+      Assert.assertThrows( "Class is dependency of pinot-spi, but is not an exported package", ClassNotFoundException.class, () -> pluginManager.loadClass("pinot-yammer", "org.apache.commons.math3.util.MathUtils"));
+    }
+    finally {
+      if(originalPluginDir != null) {
+        System.setProperty(PLUGINS_DIR_PROPERTY_NAME, originalPluginDir);
+      }
+      else {
+        System.clearProperty(PLUGINS_DIR_PROPERTY_NAME);
+      }
+
+      if(originalLegacyPluginLoader != null) {
+        System.setProperty(PLUGINS_LOADER_LEGACY_PROPERTY_NAME, originalLegacyPluginLoader);
+      }
+      else {
+        System.clearProperty(PLUGINS_LOADER_LEGACY_PROPERTY_NAME);
+      }
+    }
   }
 
   @AfterClass

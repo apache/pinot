@@ -23,6 +23,7 @@ import java.io.File;
 import java.lang.reflect.Constructor;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.net.URLClassLoader;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -31,8 +32,14 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
+
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.codehaus.plexus.classworlds.ClassWorld;
+import org.codehaus.plexus.classworlds.realm.ClassRealm;
+import org.codehaus.plexus.classworlds.realm.DuplicateRealmException;
+import org.codehaus.plexus.classworlds.realm.NoSuchRealmException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,10 +48,15 @@ public class PluginManager {
 
   public static final String PLUGINS_DIR_PROPERTY_NAME = "plugins.dir";
   public static final String PLUGINS_INCLUDE_PROPERTY_NAME = "plugins.include";
+  public static final String PLUGINS_LOADER_LEGACY_PROPERTY_NAME = "pinot.plugins.loader.legacy";
   public static final String DEFAULT_PLUGIN_NAME = "DEFAULT";
   private static final Logger LOGGER = LoggerFactory.getLogger(PluginManager.class);
   private static final String JAR_FILE_EXTENSION = "jar";
   private static final PluginManager PLUGIN_MANAGER = new PluginManager();
+
+  private static boolean useLegacyPluginClassloader() {
+    return Boolean.getBoolean(PLUGINS_LOADER_LEGACY_PROPERTY_NAME);
+  }
 
   // For backward compatibility, this map holds a mapping from old plugins class name to its new class name.
   private static final Map<String, String> PLUGINS_BACKWARD_COMPATIBLE_CLASS_NAME_MAP = new HashMap<String, String>() {
@@ -111,13 +123,31 @@ public class PluginManager {
         }
       };
 
-  private Map<Plugin, PluginClassLoader> _registry = new HashMap<>();
+  private final ClassWorld classWorld;
+  private final Map<Plugin, PluginClassLoader> _registry;
+
   private String _pluginsDirectories;
   private String _pluginsInclude;
   private boolean _initialized = false;
 
   private PluginManager() {
-    _registry.put(new Plugin(DEFAULT_PLUGIN_NAME), createClassLoader(Collections.emptyList()));
+    if(useLegacyPluginClassloader()) {
+      _registry = new HashMap<>();
+      _registry.put(new Plugin(DEFAULT_PLUGIN_NAME), createClassLoader(Collections.emptyList()));
+      classWorld = null;
+    }
+    else {
+      try {
+        this.classWorld = new ClassWorld();
+        // to simulate behavior of legacy code, however every plugin should have a dedicated realm
+        this.classWorld.newRealm(DEFAULT_PLUGIN_NAME);
+        this.classWorld.newRealm("pinot", ClassLoader.getSystemClassLoader());
+        this._registry = null;
+      } catch (DuplicateRealmException e) {
+        throw new RuntimeException(e);
+      }
+    }
+
     init();
   }
 
@@ -244,9 +274,63 @@ public class PluginManager {
         LOGGER.error("Unable to load plugin [{}] jar file [{}]", pluginName, jarFile, e);
       }
     }
-    PluginClassLoader classLoader = createClassLoader(urlList);
+
+    if(useLegacyPluginClassloader()) {
+      PluginClassLoader classLoader = createClassLoader(urlList);
+      _registry.put(new Plugin(pluginName), classLoader);
+    }
+    else {
+      try {
+        ClassRealm pluginRealm = classWorld.newRealm(pluginName, new URLClassLoader(urlList.toArray(new URL[0]), ClassLoader.getPlatformClassLoader()));
+
+        ClassLoader pinotLoader = classWorld.getClassRealm("pinot");
+
+        // All exported packages
+        Stream.of("org.apache.pinot.spi.accounting",
+                "org.apache.pinot.spi.annotations",
+                "org.apache.pinot.spi.annotations.metrics",
+                "org.apache.pinot.spi.annotations.minion",
+                "org.apache.pinot.spi.auth",
+                "org.apache.pinot.spi.config",
+                "org.apache.pinot.spi.config.instance",
+                "org.apache.pinot.spi.config.provider",
+                "org.apache.pinot.spi.config.table",
+                "org.apache.pinot.spi.config.table.assignment",
+                "org.apache.pinot.spi.config.table.ingestion",
+                "org.apache.pinot.spi.config.task",
+                "org.apache.pinot.spi.config.tenant",
+                "org.apache.pinot.spi.config.user",
+                "org.apache.pinot.spi.crypt",
+                "org.apache.pinot.spi.data",
+                "org.apache.pinot.spi.data.readers",
+                "org.apache.pinot.spi.env",
+                "org.apache.pinot.spi.environmentprovider",
+                "org.apache.pinot.spi.eventlistener.query",
+                "org.apache.pinot.spi.exception",
+                "org.apache.pinot.spi.filesystem",
+                "org.apache.pinot.spi.ingestion",
+                "org.apache.pinot.spi.ingestion.batch",
+                "org.apache.pinot.spi.ingestion.batch.runner",
+                "org.apache.pinot.spi.ingestion.batch.spec",
+                "org.apache.pinot.spi.ingestion.segment",
+                "org.apache.pinot.spi.ingestion.segment.uploader",
+                "org.apache.pinot.spi.ingestion.segment.writer",
+                "org.apache.pinot.spi.metrics",
+                "org.apache.pinot.spi.plugin",
+                "org.apache.pinot.spi.recordenricher",
+                "org.apache.pinot.spi.services",
+                "org.apache.pinot.spi.stream",
+                "org.apache.pinot.spi.trace",
+                "org.apache.pinot.spi.utils",
+                "org.apache.pinot.spi.utils.builder",
+                "org.apache.pinot.spi.utils.retry"
+                ).forEach(p -> pluginRealm.importFrom(pinotLoader, p));
+      } catch (DuplicateRealmException e) {
+        throw new RuntimeException(e);
+      }
+    }
+
     LOGGER.info("Successfully loaded plugin [{}] from jar files: {}", pluginName, Arrays.toString(urlList.toArray()));
-    _registry.put(new Plugin(pluginName), classLoader);
   }
 
   private PluginClassLoader createClassLoader(Collection<URL> urlList) {
@@ -287,7 +371,16 @@ public class PluginManager {
   public Class<?> loadClass(String pluginName, String className)
       throws ClassNotFoundException {
     // Backward compatible check.
-    return _registry.get(new Plugin(pluginName)).loadClass(loadClassWithBackwardCompatibleCheck(className), true);
+    if(useLegacyPluginClassloader()) {
+      return _registry.get(new Plugin(pluginName)).loadClass(loadClassWithBackwardCompatibleCheck(className), true);
+    }
+    else {
+        try {
+            return Class.forName(loadClassWithBackwardCompatibleCheck(className), false, classWorld.getRealm(pluginName));
+        } catch (NoSuchRealmException e) {
+            throw new RuntimeException(e);
+        }
+    }
   }
 
   public static String loadClassWithBackwardCompatibleCheck(String className) {
@@ -349,9 +442,14 @@ public class PluginManager {
    */
   public <T> T createInstance(String pluginName, String className, Class[] argTypes, Object[] argValues)
       throws Exception {
-    PluginClassLoader pluginClassLoader = PLUGIN_MANAGER._registry.get(new Plugin(pluginName));
-    Class<T> loadedClass =
-        (Class<T>) pluginClassLoader.loadClass(loadClassWithBackwardCompatibleCheck(className), true);
+    Class<T> loadedClass;
+    if(useLegacyPluginClassloader()) {
+      PluginClassLoader pluginClassLoader = PLUGIN_MANAGER._registry.get(new Plugin(pluginName));
+      loadedClass = (Class<T>) pluginClassLoader.loadClass(loadClassWithBackwardCompatibleCheck(className), true);
+    }
+    else {
+      loadedClass = (Class<T>) Class.forName(loadClassWithBackwardCompatibleCheck(className), true, classWorld.getRealm(pluginName));
+    }
     Constructor<?> constructor;
     constructor = loadedClass.getConstructor(argTypes);
     Object instance = constructor.newInstance(argValues);
