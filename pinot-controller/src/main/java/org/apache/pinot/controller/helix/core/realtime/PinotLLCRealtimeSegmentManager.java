@@ -975,6 +975,8 @@ public class PinotLLCRealtimeSegmentManager {
       return pauseStatus.isPaused();
     }
     // backward compatibility
+    // TODO : remove this handling after next release.
+    //  Expectation is that all table IS are migrated to the newer representation.
     return Boolean.parseBoolean(idealState.getRecord().getSimpleField(IS_TABLE_PAUSED));
   }
 
@@ -1669,9 +1671,10 @@ public class PinotLLCRealtimeSegmentManager {
     IdealState updatedIdealState = updatePauseStatusInIdealState(tableNameWithType, true, reasonCode, comment);
     Set<String> consumingSegments = findConsumingSegments(updatedIdealState);
     sendForceCommitMessageToServers(tableNameWithType, consumingSegments);
-    return new PauseStatus(true, consumingSegments, reasonCode, comment,
-        consumingSegments.isEmpty() ? null : "Pause flag is set. Consuming segments are being committed."
-        + " Use /pauseStatus endpoint in a few moments to check if all consuming segments have been committed.");
+    return new PauseStatus(true, consumingSegments.size(), reasonCode, comment != null ? comment
+        : "Pause flag is set. Consuming segments are being committed."
+        + " Use /pauseStatus endpoint in a few moments to check if all consuming segments have been committed.",
+        System.currentTimeMillis());
   }
 
   /**
@@ -1692,8 +1695,9 @@ public class PinotLLCRealtimeSegmentManager {
     _helixResourceManager
         .invokeControllerPeriodicTask(tableNameWithType, Constants.REALTIME_SEGMENT_VALIDATION_MANAGER, taskProperties);
 
-    return new PauseStatus(false, findConsumingSegments(updatedIdealState), reasonCode, comment, "Pause flag is cleared"
-        + ". Consuming segments are being created. Use /pauseStatus endpoint in a few moments to double check.");
+    return new PauseStatus(false, findConsumingSegments(updatedIdealState).size(), reasonCode, comment != null ? comment
+        : "Pause flag is cleared. Consuming segments are being created. "
+            + "Use /pauseStatus endpoint in a few moments to double check.", System.currentTimeMillis());
   }
 
   private IdealState updatePauseStatusInIdealState(String tableNameWithType, boolean pause,
@@ -1754,11 +1758,12 @@ public class PinotLLCRealtimeSegmentManager {
     Set<String> consumingSegments = findConsumingSegments(idealState);
     TablePauseStatus pauseStatus = extractTablePauseStatus(idealState);
     if (pauseStatus != null) {
-      return new PauseStatus(pauseStatus.isPaused(), consumingSegments, pauseStatus.getReasonCode(),
-          pauseStatus.getComment(), null);
+      return new PauseStatus(pauseStatus.isPaused(), consumingSegments.size(), pauseStatus.getReasonCode(),
+          pauseStatus.getComment(), pauseStatus.getTimeInMillis());
     }
     String isTablePausedStr = idealState.getRecord().getSimpleField(IS_TABLE_PAUSED);
-    return new PauseStatus(Boolean.parseBoolean(isTablePausedStr), consumingSegments, null, null, null);
+    return new PauseStatus(Boolean.parseBoolean(isTablePausedStr), consumingSegments.size(),
+        TablePauseStatus.ReasonCode.ADMINISTRATIVE, null, System.currentTimeMillis());
   }
 
   @VisibleForTesting
