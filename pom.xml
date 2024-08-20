@@ -325,6 +325,41 @@
         <argLine>-Xms4g -Xmx4g -Dlog4j2.configurationFile=log4j2.xml</argLine>
       </properties>
     </profile>
+    <profile>
+      <id>codecoverage</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.jacoco</groupId>
+            <artifactId>jacoco-maven-plugin</artifactId>
+            <version>0.8.12</version>
+            <executions>
+              <execution>
+                <goals>
+                  <goal>prepare-agent</goal>
+                </goals>
+              </execution>
+              <execution>
+                <id>report</id>
+                <phase>test</phase>
+                <goals>
+                  <goal>report-aggregate</goal>
+                </goals>
+                <configuration>
+                  <includeCurrentProject>true</includeCurrentProject>
+                </configuration>
+              </execution>
+            </executions>
+            <configuration>
+              <append>true</append>
+              <includes>
+                <include>org/apache/pinot/**/*</include>
+              </includes>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
     <!-- Disable source release assembly for 'apache-release' profile. -->
     <profile>
       <id>apache-release</id>
