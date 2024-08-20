@@ -28,6 +28,8 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerTimer;
+import org.apache.pinot.segment.local.indexsegment.immutable.EmptyIndexSegment;
+import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
@@ -75,6 +77,25 @@ public abstract class BasePartitionDedupMetadataManager implements PartitionDedu
 
   @Override
   public void addSegment(IndexSegment segment) {
+    String segmentName = segment.getSegmentName();
+    if (segment instanceof EmptyIndexSegment) {
+      _logger.info("Skip adding empty segment: {}", segmentName);
+      return;
+    }
+    Preconditions.checkArgument(segment instanceof ImmutableSegmentImpl,
+        "Got unsupported segment implementation: %s for segment: %s, table: %s", segment.getClass(), segmentName,
+        _tableNameWithType);
+    // If metadataTTL is enabled, we can skip adding segment that's already getting out of the TTL.
+    if (_metadataTTL > 0) {
+      double maxDedupTime = ((Number) segment.getSegmentMetadata().getColumnMetadataMap().get(_dedupTimeColumn)
+          .getMaxValue()).doubleValue();
+      _largestSeenTime.getAndUpdate(time -> Math.max(time, maxDedupTime));
+      if (isOutOfMetadataTTL(maxDedupTime)) {
+        _logger.info("Skip adding segment: {} as max dedupTime: {} is out of metadataTTL: {}", segmentName,
+            _dedupTimeColumn, _metadataTTL);
+        return;
+      }
+    }
     if (!startOperation()) {
       _logger.info("Skip adding segment: {} because dedup metadata manager is already stopped",
           segment.getSegmentName());
