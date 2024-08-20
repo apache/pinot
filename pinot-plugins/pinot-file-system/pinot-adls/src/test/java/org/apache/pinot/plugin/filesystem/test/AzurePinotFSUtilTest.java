@@ -20,7 +20,6 @@ package org.apache.pinot.plugin.filesystem.test;
 
 import com.azure.storage.common.Utility;
 import java.io.File;
-import java.io.IOException;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -35,19 +34,10 @@ public class AzurePinotFSUtilTest {
   @Test
   public void testConvertUriToAzureStylePath()
       throws Exception {
-    testUriToAzureStylePath("table_0", "segment_1", false);
-    testUriToAzureStylePath("table_0", "segment %", false);
-    testUriToAzureStylePath("table %", "segment_1", false);
-    testUriToAzureStylePath("table %", "segment %", false);
-  }
-
-  @Test
-  public void testConvertUriToUrlEncodedAzureStylePath()
-      throws Exception {
-    testUriToAzureStylePath("table_0", "segment_1", true);
-    testUriToAzureStylePath("table_0", "segment %", true);
-    testUriToAzureStylePath("table %", "segment_1", true);
-    testUriToAzureStylePath("table %", "segment %", true);
+    testUriToAzureStylePath("table_0", "segment_1");
+    testUriToAzureStylePath("table_0", "segment %");
+    testUriToAzureStylePath("table %", "segment_1");
+    testUriToAzureStylePath("table %", "segment %");
   }
 
   @Test
@@ -64,36 +54,31 @@ public class AzurePinotFSUtilTest {
     Assert.assertEquals(AzurePinotFSUtil.convertAzureStylePathToUriStylePath("/table/segment %/"), "/table/segment %");
   }
 
-  public void testUriToAzureStylePath(String tableName, String segmentName, boolean urlEncoded)
+  public void testUriToAzureStylePath(String tableName, String segmentName)
       throws Exception {
     // "/encode(dir)/encode(segment)"
     String expectedPath = String.join(File.separator, tableName, segmentName);
     URI uri = createUri(URLEncoder.encode(tableName, StandardCharsets.UTF_8), URLEncoder.encode(segmentName,
         StandardCharsets.UTF_8));
-    checkUri(uri, expectedPath, urlEncoded);
+    checkUri(uri, expectedPath);
 
     // "/encode(dir/segment)"
     uri = createUri(URLEncoder.encode(String.join(File.separator, tableName, segmentName), StandardCharsets.UTF_8));
-    checkUri(uri, expectedPath, urlEncoded);
+    checkUri(uri, expectedPath);
 
     // "/encode(dir/segment)"
     uri = createUri(Utility.urlEncode(String.join(File.separator, tableName, segmentName)));
-    checkUri(uri, expectedPath, urlEncoded);
+    checkUri(uri, expectedPath);
 
     // Using a URI constructor. In this case, we don't need to encode
     // /dir/segment
     uri = new URI(uri.getScheme(), uri.getHost(), File.separator + String.join(File.separator, tableName, segmentName),
         null);
-    checkUri(uri, expectedPath, urlEncoded);
+    checkUri(uri, expectedPath);
   }
 
-  private void checkUri(URI uri, String expectedPath, boolean urlEncoded)
-      throws IOException {
-    if (urlEncoded) {
-      Assert.assertEquals(AzurePinotFSUtil.convertUriToUrlEncodedAzureStylePath(uri), Utility.urlEncode(expectedPath));
-    } else {
-      Assert.assertEquals(AzurePinotFSUtil.convertUriToAzureStylePath(uri), expectedPath);
-    }
+  private void checkUri(URI uri, String expectedPath) {
+    Assert.assertEquals(AzurePinotFSUtil.convertUriToAzureStylePath(uri), expectedPath);
   }
 
   private URI createUri(String tableName, String segmentName) {
