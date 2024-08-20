@@ -30,6 +30,12 @@
   </parent>
 
   <artifactId>assembly-descriptor</artifactId>
+  <name>Pinot Plugin Assembly Descriptor</name>
+  <description>By adding this descriptor to the maven-assembly-plugin of your project an extra artifact will be created.
+    It will be a zip, classified with plugin, putting all classes under PINOT-INF/classes
+    and all runtime dependencies under PINOT-INF/lib.
+    See also https://maven.apache.org/plugins/maven-assembly-plugin/examples/sharing-descriptors.html
+  </description>
 
   <properties>
     <pinot.root>${basedir}/../..</pinot.root>

@@ -8,8 +8,9 @@ def expected = [
 def entries = new File(basedir,'target/simple-assembly-0.0.1-SNAPSHOT-plugin.zip').with {
   f ->
     def archive = new ZipFile(f)
-    archive.entries().findAll{ !it.directory }.collect { it.name } as Set
+    def result = archive.entries().findAll{ !it.directory }.collect { it.name } as Set
     archive.close()
+    return result
 }
 
 assert entries == expected

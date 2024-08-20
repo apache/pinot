@@ -50,6 +50,39 @@
     <module>assembly-descriptor</module>
   </modules>
 
+  <build>
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-assembly-plugin</artifactId>
+          <version>3.7.1</version>
+          <dependencies>
+            <dependency>
+              <groupId>org.apache.pinot</groupId>
+              <artifactId>assembly-descriptor</artifactId>
+              <version>${project.version}</version>
+            </dependency>
+          </dependencies>
+          <executions>
+            <execution>
+              <id>make-assembly</id>
+              <phase>package</phase>
+              <goals>
+                <goal>single</goal>
+              </goals>
+              <configuration>
+                <descriptorRefs>
+                  <descriptorRef>pinot-plugin</descriptorRef>
+                </descriptorRefs>
+              </configuration>
+            </execution>
+          </executions>
+        </plugin>
+      </plugins>
+    </pluginManagement>
+  </build>
+
   <dependencies>
     <dependency>
       <groupId>org.apache.pinot</groupId>
