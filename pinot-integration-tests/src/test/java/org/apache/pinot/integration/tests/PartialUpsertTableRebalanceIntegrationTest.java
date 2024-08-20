@@ -193,7 +193,7 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
     TestUtils.waitForCondition((aVoid) -> {
       try {
         PauseStatusDetails pauseStatus = getControllerRequestClient().getPauseStatus(realtimeTableName);
-        return pauseStatus.getConsumingSegmentsCount() == 0;
+        return pauseStatus.getConsumingSegments().isEmpty();
       } catch (IOException e) {
         throw new RuntimeException(e);
       }

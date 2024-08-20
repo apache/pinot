@@ -1672,7 +1672,7 @@ public class PinotLLCRealtimeSegmentManager {
     IdealState updatedIdealState = updatePauseStatusInIdealState(tableNameWithType, true, reasonCode, comment);
     Set<String> consumingSegments = findConsumingSegments(updatedIdealState);
     sendForceCommitMessageToServers(tableNameWithType, consumingSegments);
-    return new PauseStatusDetails(true, consumingSegments.size(), reasonCode, comment != null ? comment
+    return new PauseStatusDetails(true, consumingSegments, reasonCode, comment != null ? comment
         : "Pause flag is set. Consuming segments are being committed."
         + " Use /pauseStatus endpoint in a few moments to check if all consuming segments have been committed.",
         new Timestamp(System.currentTimeMillis()).toString());
@@ -1696,7 +1696,7 @@ public class PinotLLCRealtimeSegmentManager {
     _helixResourceManager
         .invokeControllerPeriodicTask(tableNameWithType, Constants.REALTIME_SEGMENT_VALIDATION_MANAGER, taskProperties);
 
-    return new PauseStatusDetails(false, findConsumingSegments(updatedIdealState).size(), reasonCode,
+    return new PauseStatusDetails(false, findConsumingSegments(updatedIdealState), reasonCode,
         comment != null ? comment : "Pause flag is cleared. Consuming segments are being created. Use /pauseStatus "
             + "endpoint in a few moments to double check.", new Timestamp(System.currentTimeMillis()).toString());
   }
@@ -1760,11 +1760,11 @@ public class PinotLLCRealtimeSegmentManager {
     Set<String> consumingSegments = findConsumingSegments(idealState);
     PauseState pauseStatus = extractTablePauseStatus(idealState);
     if (pauseStatus != null) {
-      return new PauseStatusDetails(pauseStatus.isPaused(), consumingSegments.size(), pauseStatus.getReasonCode(),
+      return new PauseStatusDetails(pauseStatus.isPaused(), consumingSegments, pauseStatus.getReasonCode(),
           pauseStatus.getComment(), pauseStatus.getTimeInMillis());
     }
     String isTablePausedStr = idealState.getRecord().getSimpleField(IS_TABLE_PAUSED);
-    return new PauseStatusDetails(Boolean.parseBoolean(isTablePausedStr), consumingSegments.size(),
+    return new PauseStatusDetails(Boolean.parseBoolean(isTablePausedStr), consumingSegments,
         PauseState.ReasonCode.ADMINISTRATIVE, null, new Timestamp(System.currentTimeMillis()).toString());
   }
 
