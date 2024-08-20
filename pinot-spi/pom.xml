@@ -38,6 +38,38 @@
     <plugins>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <version>3.7.1</version>
+        <executions>
+          <execution>
+            <id>copy-pinot-plugins</id>
+            <phase>process-test-resources</phase>
+            <goals>
+              <goal>copy</goal>
+            </goals>
+            <configuration>
+              <artifactItems>
+                <artifactItem>
+                  <groupId>org.apache.pinot</groupId>
+                  <artifactId>pinot-dropwizard</artifactId>
+                  <version>0.10.0</version>
+                  <classifier>shaded</classifier>
+                  <outputDirectory>${project.build.testOutputDirectory}/plugins/pinot-dropwizard</outputDirectory>
+                </artifactItem>
+                <artifactItem>
+                  <groupId>org.apache.pinot</groupId>
+                  <artifactId>pinot-yammer</artifactId>
+                  <version>0.10.0</version>
+                  <classifier>shaded</classifier>
+                  <outputDirectory>${project.build.testOutputDirectory}/plugins/pinot-yammer</outputDirectory>
+                </artifactItem>
+              </artifactItems>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
         <configuration>
           <forkCount>1</forkCount>
