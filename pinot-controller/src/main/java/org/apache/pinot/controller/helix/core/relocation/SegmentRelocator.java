@@ -169,6 +169,8 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
     rebalanceConfig.setExternalViewCheckIntervalInMs(_externalViewCheckIntervalInMs);
     rebalanceConfig.setExternalViewStabilizationTimeoutInMs(_externalViewStabilizationTimeoutInMs);
     rebalanceConfig.setUpdateTargetTier(TierConfigUtils.shouldRelocateToTiers(tableConfig));
+    //Do not fail the rebalance when the no-downtime contract cannot be achieved
+    rebalanceConfig.setBestEfforts(true);
 
     try {
       // Relocating segments to new tiers needs two sequential actions: table rebalance and local tier migration.
