@@ -21,28 +21,28 @@ package org.apache.pinot.controller.api.resources;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import org.apache.pinot.spi.config.table.TablePauseStatus;
+import org.apache.pinot.spi.config.table.PauseState;
 
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public class PauseStatus {
+public class PauseStatusDetails {
   private boolean _pauseFlag;
   private int _consumingSegmentsCount;
-  private TablePauseStatus.ReasonCode _reasonCode;
+  private PauseState.ReasonCode _reasonCode;
   private String _comment;
-  private long _timeInMillis;
+  private String _timestamp;
 
   @JsonCreator
-  public PauseStatus(@JsonProperty("pauseFlag") boolean pauseFlag,
+  public PauseStatusDetails(@JsonProperty("pauseFlag") boolean pauseFlag,
       @JsonProperty("consumingSegmentsCount") int consumingSegmentsCount,
-      @JsonProperty("reasonCode") TablePauseStatus.ReasonCode reasonCode,
+      @JsonProperty("reasonCode") PauseState.ReasonCode reasonCode,
       @JsonProperty("comment") String comment,
-      @JsonProperty("timeInMillis") long timeInMillis) {
+      @JsonProperty("timestamp") String timestamp) {
     _pauseFlag = pauseFlag;
     _consumingSegmentsCount = consumingSegmentsCount;
     _reasonCode = reasonCode;
     _comment = comment != null ? comment : pauseFlag ? "Table is paused." : "Table is unpaused.";
-    _timeInMillis = timeInMillis;
+    _timestamp = timestamp;
   }
 
   public boolean getPauseFlag() {
@@ -53,7 +53,7 @@ public class PauseStatus {
     return _consumingSegmentsCount;
   }
 
-  public TablePauseStatus.ReasonCode getReasonCode() {
+  public PauseState.ReasonCode getReasonCode() {
     return _reasonCode;
   }
 
@@ -61,7 +61,7 @@ public class PauseStatus {
     return _comment;
   }
 
-  public long getTimeInMillis() {
-    return _timeInMillis;
+  public String getTimestamp() {
+    return _timestamp;
   }
 }

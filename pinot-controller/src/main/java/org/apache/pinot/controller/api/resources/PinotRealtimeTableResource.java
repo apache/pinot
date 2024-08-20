@@ -57,7 +57,7 @@ import org.apache.pinot.controller.util.ConsumingSegmentInfoReader;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
-import org.apache.pinot.spi.config.table.TablePauseStatus;
+import org.apache.pinot.spi.config.table.PauseState;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -111,7 +111,7 @@ public class PinotRealtimeTableResource {
     validateTable(tableNameWithType);
     try {
       return Response.ok(_pinotLLCRealtimeSegmentManager.pauseConsumption(tableNameWithType,
-          TablePauseStatus.ReasonCode.ADMINISTRATIVE, comment)).build();
+          PauseState.ReasonCode.ADMINISTRATIVE, comment)).build();
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
@@ -148,7 +148,7 @@ public class PinotRealtimeTableResource {
     }
     try {
       return Response.ok(_pinotLLCRealtimeSegmentManager.resumeConsumption(tableNameWithType, consumeFrom,
-          TablePauseStatus.ReasonCode.ADMINISTRATIVE, comment)).build();
+          PauseState.ReasonCode.ADMINISTRATIVE, comment)).build();
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }

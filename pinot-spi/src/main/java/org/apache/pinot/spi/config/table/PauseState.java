@@ -21,20 +21,20 @@ package org.apache.pinot.spi.config.table;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
-public class TablePauseStatus extends BaseJsonConfig {
+public class PauseState extends BaseJsonConfig {
   private boolean _paused;
   private ReasonCode _reasonCode;
   private String _comment;
-  private long _timeInMillis;
+  private String _timestamp;
 
-  public TablePauseStatus() {
+  public PauseState() {
   }
 
-  public TablePauseStatus(boolean paused, ReasonCode reasonCode, String comment, long timeInMillis) {
+  public PauseState(boolean paused, ReasonCode reasonCode, String comment, String timestamp) {
     _paused = paused;
     _reasonCode = reasonCode;
     _comment = comment;
-    _timeInMillis = timeInMillis;
+    _timestamp = timestamp;
   }
 
   public boolean isPaused() {
@@ -49,8 +49,8 @@ public class TablePauseStatus extends BaseJsonConfig {
     return _comment;
   }
 
-  public long getTimeInMillis() {
-    return _timeInMillis;
+  public String getTimeInMillis() {
+    return _timestamp;
   }
 
   public void setPaused(boolean paused) {
@@ -65,8 +65,8 @@ public class TablePauseStatus extends BaseJsonConfig {
     _comment = comment;
   }
 
-  public void setTimeInMillis(long timeInMillis) {
-    _timeInMillis = timeInMillis;
+  public void setTimeInMillis(String timestamp) {
+    _timestamp = timestamp;
   }
 
   public enum ReasonCode {

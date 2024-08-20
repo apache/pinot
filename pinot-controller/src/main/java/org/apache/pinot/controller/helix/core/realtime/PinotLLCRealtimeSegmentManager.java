@@ -23,6 +23,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.net.URI;
+import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -65,7 +66,7 @@ import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.events.MetadataEventNotifierFactory;
 import org.apache.pinot.controller.api.resources.Constants;
-import org.apache.pinot.controller.api.resources.PauseStatus;
+import org.apache.pinot.controller.api.resources.PauseStatusDetails;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotTableIdealStateBuilder;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignment;
@@ -88,7 +89,7 @@ import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.TablePauseStatus;
+import org.apache.pinot.spi.config.table.PauseState;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
@@ -970,7 +971,7 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   public static boolean isTablePaused(IdealState idealState) {
-    TablePauseStatus pauseStatus = extractTablePauseStatus(idealState);
+    PauseState pauseStatus = extractTablePauseStatus(idealState);
     if (pauseStatus != null) {
       return pauseStatus.isPaused();
     }
@@ -980,11 +981,11 @@ public class PinotLLCRealtimeSegmentManager {
     return Boolean.parseBoolean(idealState.getRecord().getSimpleField(IS_TABLE_PAUSED));
   }
 
-  private static TablePauseStatus extractTablePauseStatus(IdealState idealState) {
+  private static PauseState extractTablePauseStatus(IdealState idealState) {
     String pauseStatusStr = idealState.getRecord().getSimpleField(PinotLLCRealtimeSegmentManager.PAUSE_STATUS);
     try {
       if (pauseStatusStr != null) {
-          return JsonUtils.stringToObject(pauseStatusStr, TablePauseStatus.class);
+          return JsonUtils.stringToObject(pauseStatusStr, PauseState.class);
       }
     } catch (JsonProcessingException e) {
       LOGGER.warn("Unable to parse the pause status from ideal state : {}", pauseStatusStr);
@@ -1666,15 +1667,15 @@ public class PinotLLCRealtimeSegmentManager {
    *   1) update TablePauseStatus in the table ideal state and
    *   2) sending force commit messages to servers
    */
-  public PauseStatus pauseConsumption(String tableNameWithType, TablePauseStatus.ReasonCode reasonCode,
+  public PauseStatusDetails pauseConsumption(String tableNameWithType, PauseState.ReasonCode reasonCode,
       @Nullable String comment) {
     IdealState updatedIdealState = updatePauseStatusInIdealState(tableNameWithType, true, reasonCode, comment);
     Set<String> consumingSegments = findConsumingSegments(updatedIdealState);
     sendForceCommitMessageToServers(tableNameWithType, consumingSegments);
-    return new PauseStatus(true, consumingSegments.size(), reasonCode, comment != null ? comment
+    return new PauseStatusDetails(true, consumingSegments.size(), reasonCode, comment != null ? comment
         : "Pause flag is set. Consuming segments are being committed."
         + " Use /pauseStatus endpoint in a few moments to check if all consuming segments have been committed.",
-        System.currentTimeMillis());
+        new Timestamp(System.currentTimeMillis()).toString());
   }
 
   /**
@@ -1682,8 +1683,8 @@ public class PinotLLCRealtimeSegmentManager {
    *   1) update TablePauseStatus by clearing all pause reasons in the table ideal state and
    *   2) triggering segment validation job to create new consuming segments in ideal states
    */
-  public PauseStatus resumeConsumption(String tableNameWithType, @Nullable String offsetCriteria,
-      TablePauseStatus.ReasonCode reasonCode, @Nullable String comment) {
+  public PauseStatusDetails resumeConsumption(String tableNameWithType, @Nullable String offsetCriteria,
+      PauseState.ReasonCode reasonCode, @Nullable String comment) {
     IdealState updatedIdealState = updatePauseStatusInIdealState(tableNameWithType, false, reasonCode, comment);
 
     // trigger realtime segment validation job to resume consumption
@@ -1695,14 +1696,15 @@ public class PinotLLCRealtimeSegmentManager {
     _helixResourceManager
         .invokeControllerPeriodicTask(tableNameWithType, Constants.REALTIME_SEGMENT_VALIDATION_MANAGER, taskProperties);
 
-    return new PauseStatus(false, findConsumingSegments(updatedIdealState).size(), reasonCode, comment != null ? comment
-        : "Pause flag is cleared. Consuming segments are being created. "
-            + "Use /pauseStatus endpoint in a few moments to double check.", System.currentTimeMillis());
+    return new PauseStatusDetails(false, findConsumingSegments(updatedIdealState).size(), reasonCode,
+        comment != null ? comment : "Pause flag is cleared. Consuming segments are being created. Use /pauseStatus "
+            + "endpoint in a few moments to double check.", new Timestamp(System.currentTimeMillis()).toString());
   }
 
   private IdealState updatePauseStatusInIdealState(String tableNameWithType, boolean pause,
-      TablePauseStatus.ReasonCode reasonCode, @Nullable String comment) {
-    TablePauseStatus pauseStatus = new TablePauseStatus(pause, reasonCode, comment, System.currentTimeMillis());
+      PauseState.ReasonCode reasonCode, @Nullable String comment) {
+    PauseState pauseStatus = new PauseState(pause, reasonCode, comment,
+        new Timestamp(System.currentTimeMillis()).toString());
     IdealState updatedIdealState = HelixHelper.updateIdealState(_helixManager, tableNameWithType, idealState -> {
       ZNRecord znRecord = idealState.getRecord();
       znRecord.setSimpleField(PAUSE_STATUS, pauseStatus.toJsonString());
@@ -1753,17 +1755,17 @@ public class PinotLLCRealtimeSegmentManager {
    *   - the value of `isTablePaused` flag in ideal state
    *   - list of consuming segments
    */
-  public PauseStatus getPauseStatus(String tableNameWithType) {
+  public PauseStatusDetails getPauseStatus(String tableNameWithType) {
     IdealState idealState = getIdealState(tableNameWithType);
     Set<String> consumingSegments = findConsumingSegments(idealState);
-    TablePauseStatus pauseStatus = extractTablePauseStatus(idealState);
+    PauseState pauseStatus = extractTablePauseStatus(idealState);
     if (pauseStatus != null) {
-      return new PauseStatus(pauseStatus.isPaused(), consumingSegments.size(), pauseStatus.getReasonCode(),
+      return new PauseStatusDetails(pauseStatus.isPaused(), consumingSegments.size(), pauseStatus.getReasonCode(),
           pauseStatus.getComment(), pauseStatus.getTimeInMillis());
     }
     String isTablePausedStr = idealState.getRecord().getSimpleField(IS_TABLE_PAUSED);
-    return new PauseStatus(Boolean.parseBoolean(isTablePausedStr), consumingSegments.size(),
-        TablePauseStatus.ReasonCode.ADMINISTRATIVE, null, System.currentTimeMillis());
+    return new PauseStatusDetails(Boolean.parseBoolean(isTablePausedStr), consumingSegments.size(),
+        PauseState.ReasonCode.ADMINISTRATIVE, null, new Timestamp(System.currentTimeMillis()).toString());
   }
 
   @VisibleForTesting
