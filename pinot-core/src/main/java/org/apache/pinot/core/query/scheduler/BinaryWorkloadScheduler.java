@@ -100,7 +100,6 @@ public class BinaryWorkloadScheduler extends QueryScheduler {
       return queryTask;
     }
 
-    LOGGER.info("Received secondary workload query. requestId={}", queryRequest.getRequestId());
     final SchedulerQueryContext schedQueryContext = new SchedulerQueryContext(queryRequest);
     try {
       // Update metrics
@@ -124,7 +123,16 @@ public class BinaryWorkloadScheduler extends QueryScheduler {
   @Override
   public void start() {
     super.start();
-    _scheduler = new Thread(new Runnable() {
+    _scheduler = getScheduler();
+    _scheduler.setName("scheduler");
+    // TODO: Considering setting a lower priority to avoid busy loop when all threads are busy processing queries.
+    _scheduler.setPriority(Thread.MAX_PRIORITY);
+    _scheduler.setDaemon(true);
+    _scheduler.start();
+  }
+
+  private Thread getScheduler() {
+    return new Thread(new Runnable() {
       @Override
       public void run() {
         while (_isRunning) {
@@ -158,11 +166,7 @@ public class BinaryWorkloadScheduler extends QueryScheduler {
             }, MoreExecutors.directExecutor());
 
             // Update metrics
-            long timeInQMs = System.currentTimeMillis() - queryRequest.getTimerContext().getQueryArrivalTimeMs();
-            _serverMetrics.addTimedTableValue(queryRequest.getTableNameWithType(), ServerTimer.SECONDARY_Q_WAIT_TIME_MS,
-                timeInQMs, TimeUnit.MILLISECONDS);
-            _serverMetrics.addMeteredTableValue(queryRequest.getTableNameWithType(),
-                ServerMeter.NUM_SECONDARY_QUERIES_SCHEDULED, 1L);
+            updateSecondaryWorkloadMetrics(queryRequest);
 
             request.setResultFuture(queryFutureTask);
             request.getSchedulerGroup().startQuery();
@@ -180,11 +184,14 @@ public class BinaryWorkloadScheduler extends QueryScheduler {
         }
       }
     });
-    _scheduler.setName("scheduler");
-    // TODO: Considering setting a lower priority to avoid busy loop when all threads are busy processing queries.
-    _scheduler.setPriority(Thread.MAX_PRIORITY);
-    _scheduler.setDaemon(true);
-    _scheduler.start();
+  }
+
+  private void updateSecondaryWorkloadMetrics(ServerQueryRequest queryRequest) {
+    long timeInQMs = System.currentTimeMillis() - queryRequest.getTimerContext().getQueryArrivalTimeMs();
+    _serverMetrics.addTimedTableValue(queryRequest.getTableNameWithType(), ServerTimer.SECONDARY_Q_WAIT_TIME_MS,
+        timeInQMs, TimeUnit.MILLISECONDS);
+    _serverMetrics.addMeteredTableValue(queryRequest.getTableNameWithType(),
+        ServerMeter.NUM_SECONDARY_QUERIES_SCHEDULED, 1L);
   }
 
   @Override
