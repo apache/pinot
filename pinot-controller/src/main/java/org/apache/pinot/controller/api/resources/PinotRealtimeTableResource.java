@@ -251,7 +251,7 @@ public class PinotRealtimeTableResource {
     String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
     validateTable(tableNameWithType);
     try {
-      return Response.ok().entity(_pinotLLCRealtimeSegmentManager.getPauseStatus(tableNameWithType)).build();
+      return Response.ok().entity(_pinotLLCRealtimeSegmentManager.getPauseStatusDetails(tableNameWithType)).build();
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }

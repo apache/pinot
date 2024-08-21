@@ -277,7 +277,7 @@ public class ControllerRequestClient {
     }
   }
 
-  public PauseStatusDetails getPauseStatus(String tableName)
+  public PauseStatusDetails getPauseStatusDetails(String tableName)
       throws IOException {
     try {
       SimpleHttpResponse response = HttpClient.wrapAndThrowHttpException(
