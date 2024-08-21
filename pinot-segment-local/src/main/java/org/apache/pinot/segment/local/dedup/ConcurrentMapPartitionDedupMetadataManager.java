@@ -19,19 +19,16 @@
 package org.apache.pinot.segment.local.dedup;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.util.concurrent.AtomicDouble;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.segment.local.utils.HashUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
 
 
 class ConcurrentMapPartitionDedupMetadataManager extends BasePartitionDedupMetadataManager {
-  @VisibleForTesting
-  final AtomicDouble _largestSeenTime = new AtomicDouble(0);
   @VisibleForTesting
   final ConcurrentHashMap<Object, Pair<IndexSegment, Double>> _primaryKeyToSegmentAndTimeMap =
       new ConcurrentHashMap<>();
@@ -51,7 +48,8 @@ class ConcurrentMapPartitionDedupMetadataManager extends BasePartitionDedupMetad
       _largestSeenTime.getAndUpdate(time -> Math.max(time, dedupTime));
       _primaryKeyToSegmentAndTimeMap.compute(HashUtils.hashPrimaryKey(dedupRecordInfo.getPrimaryKey(), _hashFunction),
           (primaryKey, segmentAndTime) -> {
-            if (segmentAndTime == null) {
+            // Stale metadata is treated as not existing when checking for deduplicates.
+            if (segmentAndTime == null || isOutOfMetadataTTL(segmentAndTime.getRight())) {
               return Pair.of(newSegment, dedupTime);
             }
             // when oldSegment is null, it means we are adding a new segment
@@ -61,13 +59,11 @@ class ConcurrentMapPartitionDedupMetadataManager extends BasePartitionDedupMetad
                       + "time: {} already exists in segment: {} with dedup time: {}", segmentName,
                   dedupRecordInfo.getPrimaryKey(), dedupTime, segmentAndTime.getLeft().getSegmentName(),
                   segmentAndTime.getRight());
-            } else {
-              if (segmentAndTime.getLeft() != oldSegment) {
-                _logger.warn("When replacing a segment: record in segment: {} with primary key: {} and dedup "
-                        + "time: {} exists in segment: {} (but not the segment: {} to replace) with dedup time: {}",
-                    segmentName, dedupRecordInfo.getPrimaryKey(), dedupTime, segmentAndTime.getLeft().getSegmentName(),
-                    oldSegment.getSegmentName(), segmentAndTime.getRight());
-              }
+            } else if (segmentAndTime.getLeft() != oldSegment) {
+              _logger.warn("When replacing a segment: record in segment: {} with primary key: {} and dedup "
+                      + "time: {} exists in segment: {} with dedup time: {} (but not the segment: {} to replace)",
+                  segmentName, dedupRecordInfo.getPrimaryKey(), dedupTime, segmentAndTime.getLeft().getSegmentName(),
+                  segmentAndTime.getRight(), oldSegment.getSegmentName());
             }
             // When dedup time is the same, we always keep the latest segment
             // This will handle segment replacement case correctly - a typical case is when a mutable segment is
@@ -113,14 +109,22 @@ class ConcurrentMapPartitionDedupMetadataManager extends BasePartitionDedupMetad
     }
     try {
       _largestSeenTime.getAndUpdate(time -> Math.max(time, dedupRecordInfo.getDedupTime()));
-      boolean present = _primaryKeyToSegmentAndTimeMap.putIfAbsent(
-          HashUtils.hashPrimaryKey(dedupRecordInfo.getPrimaryKey(), _hashFunction),
-          Pair.of(indexSegment, dedupRecordInfo.getDedupTime())) != null;
-      if (!present) {
-        _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.DEDUP_PRIMARY_KEYS_COUNT,
-            _primaryKeyToSegmentAndTimeMap.size());
+      AtomicBoolean present = new AtomicBoolean(false);
+      _primaryKeyToSegmentAndTimeMap.compute(HashUtils.hashPrimaryKey(dedupRecordInfo.getPrimaryKey(), _hashFunction),
+          (primaryKey, segmentAndTime) -> {
+            // The dedup metadata out of TTL is cleaned up when starting the next consuming segment, so it's possible
+            // when ingesting records into current segment, some dedup metadata is already becoming stale. The stale
+            // metadata is treated as not existing when checking for deduplicates.
+            if (segmentAndTime == null || isOutOfMetadataTTL(segmentAndTime.getRight())) {
+              return Pair.of(indexSegment, dedupRecordInfo.getDedupTime());
+            }
+            present.set(true);
+            return segmentAndTime;
+          });
+      if (!present.get()) {
+        updatePrimaryKeyGauge();
       }
-      return present;
+      return present.get();
     } finally {
       finishOperation();
     }

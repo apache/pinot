@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.dedup;
 import java.io.File;
 import java.util.Iterator;
 import java.util.List;
+import java.util.TreeMap;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
@@ -28,7 +29,9 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImp
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.segment.readers.PrimaryKeyReader;
 import org.apache.pinot.segment.local.utils.HashUtils;
+import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -38,11 +41,13 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.*;
 
 
 public class ConcurrentMapPartitionDedupMetadataManagerWithTTLTest {
   private static final int METADATA_TTL = 10000;
+  private static final String DEDUP_TIME_COLUMN_NAME = "dedupTimeColumn";
   private ConcurrentMapPartitionDedupMetadataManager _metadataManager;
 
   @BeforeMethod
@@ -50,7 +55,7 @@ public class ConcurrentMapPartitionDedupMetadataManagerWithTTLTest {
     DedupContext.Builder dedupContextBuider = new DedupContext.Builder();
     dedupContextBuider.setTableConfig(mock(TableConfig.class)).setSchema(mock(Schema.class))
         .setPrimaryKeyColumns(List.of("primaryKeyColumn")).setHashFunction(HashFunction.NONE)
-        .setMetadataTTL(METADATA_TTL).setDedupTimeColumn("dedupTimeColumn")
+        .setMetadataTTL(METADATA_TTL).setDedupTimeColumn(DEDUP_TIME_COLUMN_NAME)
         .setTableIndexDir(mock(File.class)).setTableDataManager(mock(TableDataManager.class))
         .setServerMetrics(mock(ServerMetrics.class));
     DedupContext dedupContext = dedupContextBuider.build();
@@ -252,17 +257,17 @@ public class ConcurrentMapPartitionDedupMetadataManagerWithTTLTest {
 
     Object primaryKeyHash = HashUtils.hashPrimaryKey(primaryKey, HashFunction.NONE);
     dedupRecordInfo = new DedupRecordInfo(primaryKey, 15000);
-    assertTrue(_metadataManager.checkRecordPresentOrUpdate(dedupRecordInfo, immutableSegment));
+    assertFalse(_metadataManager.checkRecordPresentOrUpdate(dedupRecordInfo, immutableSegment));
     assertEquals(_metadataManager._primaryKeyToSegmentAndTimeMap.size(), 1);
     assertEquals(_metadataManager._primaryKeyToSegmentAndTimeMap.get(primaryKeyHash),
-        Pair.of(immutableSegment, 1000.0));
+        Pair.of(immutableSegment, 15000.0));
     assertEquals(_metadataManager._largestSeenTime.get(), 20000);
 
     dedupRecordInfo = new DedupRecordInfo(primaryKey, 25000);
     assertTrue(_metadataManager.checkRecordPresentOrUpdate(dedupRecordInfo, immutableSegment));
     assertEquals(_metadataManager._primaryKeyToSegmentAndTimeMap.size(), 1);
     assertEquals(_metadataManager._primaryKeyToSegmentAndTimeMap.get(primaryKeyHash),
-        Pair.of(immutableSegment, 1000.0));
+        Pair.of(immutableSegment, 15000.0));
     assertEquals(_metadataManager._largestSeenTime.get(), 25000);
   }
 
@@ -282,6 +287,13 @@ public class ConcurrentMapPartitionDedupMetadataManagerWithTTLTest {
   @Test
   public void testAddSegmentAfterStop() {
     IndexSegment segment = DedupTestUtils.mockSegment(1, 10);
+    SegmentMetadataImpl segmentMetadata = mock(SegmentMetadataImpl.class);
+    ColumnMetadata columnMetadata = mock(ColumnMetadata.class);
+    when(segmentMetadata.getColumnMetadataMap()).thenReturn(new TreeMap<>() {{
+      this.put(DEDUP_TIME_COLUMN_NAME, columnMetadata);
+    }});
+    when(columnMetadata.getMaxValue()).thenReturn(System.currentTimeMillis());
+    when(segment.getSegmentMetadata()).thenReturn(segmentMetadata);
     // throws when not stopped
     assertThrows(RuntimeException.class, () -> _metadataManager.addSegment(segment));
     _metadataManager.stop();
