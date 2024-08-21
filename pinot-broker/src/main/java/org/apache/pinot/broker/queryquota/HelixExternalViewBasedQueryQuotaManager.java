@@ -527,11 +527,6 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
   }
 
   @VisibleForTesting
-  public QueryQuotaEntity getRateLimiterForTable(String tableNameWithType) {
-    return _rateLimiterMap.get(tableNameWithType);
-  }
-
-  @VisibleForTesting
   public void cleanUpRateLimiterMap() {
     _rateLimiterMap.clear();
   }
