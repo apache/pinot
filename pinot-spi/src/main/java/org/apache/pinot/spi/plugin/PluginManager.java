@@ -20,10 +20,16 @@ package org.apache.pinot.spi.plugin;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
+import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.nio.file.FileVisitResult;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -32,8 +38,10 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.codehaus.plexus.classworlds.ClassWorld;
 import org.codehaus.plexus.classworlds.realm.ClassRealm;
@@ -219,22 +227,24 @@ public class PluginManager {
         throw new IllegalArgumentException(String.format("Plugins dir [%s] doesn't exist.", pluginsDirectory));
       }
 
-      Collection<File> jarFiles = FileUtils.listFiles(
-          new File(pluginsDirectory),
-          new String[]{JAR_FILE_EXTENSION},
-          true);
+      PluginsDirectoryVisitor visitor = new PluginsDirectoryVisitor();
+      try {
+        Files.walkFileTree(Path.of(pluginsDirectory), Set.of(), 2, visitor);
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+
       List<String> pluginsToLoad = null;
       if (!StringUtils.isEmpty(pluginsInclude)) {
         pluginsToLoad = Arrays.asList(pluginsInclude.split(";"));
         LOGGER.info("Potential plugins to load: [{}]", Arrays.toString(pluginsToLoad.toArray()));
       } else {
         LOGGER.info("Please use env variable '{}' to customize plugins to load. Loading all plugins: {}",
-            PLUGINS_INCLUDE_PROPERTY_NAME, Arrays.toString(jarFiles.toArray()));
+            PLUGINS_INCLUDE_PROPERTY_NAME, Arrays.toString(visitor.getPluginDirs().toArray()));
       }
 
-      for (File jarFile : jarFiles) {
-        File pluginDir = jarFile.getParentFile();
-        String pluginName = pluginDir.getName();
+      for (Path pluginDir : visitor.getPluginDirs()) {
+        String pluginName = pluginDir.getFileName().toString();
         LOGGER.info("Found plugin, pluginDir: {}, pluginName: {}", pluginDir, pluginName);
         if (pluginsToLoad != null) {
           if (!pluginsToLoad.contains(pluginName)) {
@@ -244,7 +254,7 @@ public class PluginManager {
         }
 
         if (!finalPluginsToLoad.containsKey(pluginName)) {
-          finalPluginsToLoad.put(pluginName, pluginDir);
+          finalPluginsToLoad.put(pluginName, pluginDir.toFile());
           LOGGER.info("Added [{}] from dir [{}] to final list of plugins to load", pluginName, pluginDir);
         }
       }
@@ -262,15 +272,16 @@ public class PluginManager {
    * @param directory
    */
   public void load(String pluginName, File directory) {
-    LOGGER.info("Trying to load plugin [{}] from location [{}]", pluginName, directory);
-    Collection<File> jarFiles = FileUtils.listFiles(directory, new String[]{"jar"}, true);
-    Collection<URL> urlList = new ArrayList<>();
-    for (File jarFile : jarFiles) {
-      try {
-        urlList.add(jarFile.toURI().toURL());
-      } catch (MalformedURLException e) {
-        LOGGER.error("Unable to load plugin [{}] jar file [{}]", pluginName, jarFile, e);
-      }
+    Collection<URL> urlList;
+
+    if(new File(directory, "classes").exists()) {
+      PinotPluginHandler pluginHandler = new PinotPluginHandler();
+
+      urlList = pluginHandler.toURLs(pluginName, directory);
+    } else {
+      LegacyPluginHandler pluginHandler = new LegacyPluginHandler();
+
+      urlList = pluginHandler.toURLs(pluginName, directory);
     }
 
     if (useLegacyPluginClassloader()) {
