@@ -2432,7 +2432,6 @@
                 <!-- Auto-generated target directories -->
                 <exclude>target/**</exclude>
                 <exclude>pinot-*/target/**</exclude>
-                <exclude>build/**</exclude> <!-- symbolic link pointing to pinot/pinot-distribution/target/apache-pinot-1.3.0-SNAPSHOT-bin/apache-pinot-1.3.0-SNAPSHOT-bin -->
 
                 <!-- Docker and Kubernetes (not part of the distribution) -->
                 <exclude>docker/**</exclude>
