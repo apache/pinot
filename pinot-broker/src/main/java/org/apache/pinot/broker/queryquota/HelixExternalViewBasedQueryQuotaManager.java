@@ -428,6 +428,20 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
     return tryAcquireToken(databaseName, queryQuota);
   }
 
+  @Override
+  public double getTableQueryQuota(String tableNameWithType) {
+    return getQueryQuota(_rateLimiterMap.get(tableNameWithType));
+  }
+
+  @Override
+  public double getDatabaseQueryQuota(String databaseName) {
+    return getQueryQuota(_databaseRateLimiterMap.get(databaseName));
+  }
+
+  private double getQueryQuota(QueryQuotaEntity quotaEntity) {
+    return quotaEntity == null || quotaEntity.getRateLimiter() == null ? 0 : quotaEntity.getRateLimiter().getRate();
+  }
+
   /**
    * {@inheritDoc}
    * <p>Acquires a token from rate limiter based on the table name.

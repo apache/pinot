@@ -71,6 +71,7 @@ public class Actions {
     public static final String GET_VERSION = "GetVersion";
     public static final String GET_ZNODE = "GetZnode";
     public static final String GET_DATABASE_QUOTA = "GetDatabaseQuota";
+    public static final String GET_DATABASE_QUERY_QUOTA = "GetDatabaseQueryQuota";
     public static final String INGEST_FILE = "IngestFile";
     public static final String RECOMMEND_CONFIG = "RecommendConfig";
     public static final String RESET_SEGMENT = "ResetSegment";
@@ -133,6 +134,7 @@ public class Actions {
     public static final String GET_TABLE_CONFIG = "GetTableConfig";
     public static final String GET_TABLE_CONFIGS = "GetTableConfigs";
     public static final String GET_TABLE_LEADER = "GetTableLeader";
+    public static final String GET_TABLE_QUERY_QUOTA = "GetTableQueryQuota";
     public static final String GET_TIME_BOUNDARY = "GetTimeBoundary";
     public static final String GET_SCHEDULER_JOB_DETAILS = "GetSchedulerJobDetails";
     public static final String PAUSE_CONSUMPTION = "PauseConsumption";
