@@ -264,6 +264,18 @@
   </properties>
 
   <profiles>
+    <profile>
+      <id>pinot-fastdev</id>
+      <!-- disable verifying plugins that can be easily fixed after a successful implementation -->
+      <properties>
+        <checkstyle.skip>true</checkstyle.skip>
+        <!-- This plugin slows down the builds, most likely caused by an issue in the deprecated org.apache.maven.shared.utils.io.DirectoryScanner -->
+        <license.skip>true</license.skip>
+        <!-- This plugin slows down the builds, most likely caused by an issue in the deprecated org.apache.maven.shared.utils.io.DirectoryScanner -->
+        <rat.skip>true</rat.skip>
+        <spotless.check.skip>true</spotless.check.skip>
+      </properties>
+    </profile>
     <!--build profile for linux-aarch64. We exclude certain tests as they use runtime JNI bindings not supported for linux-aarch64-->
     <profile>
       <id>linux-aarch64</id>
