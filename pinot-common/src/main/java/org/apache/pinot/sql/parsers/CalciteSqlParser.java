@@ -188,7 +188,8 @@ public class CalciteSqlParser {
         aggregateExprCount++;
       } else if (hasGroupByClause && expressionOutsideGroupByList(selectExpression, groupByExprs)) {
         throw new SqlCompilationException(
-            "'" + RequestUtils.prettyPrint(selectExpression) + "' should be functionally dependent on the columns used in GROUP BY clause.");
+            "'" + RequestUtils.prettyPrint(selectExpression) + "' should be functionally dependent on the columns "
+                + "used in GROUP BY clause.");
       }
     }
 
