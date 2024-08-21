@@ -203,11 +203,10 @@ public class Tracing {
     public final void createExecutionContext(String queryId, int taskId, ThreadExecutionContext.TaskType taskType,
         ThreadExecutionContext parentContext) {
       _anchorThread.set(parentContext == null ? Thread.currentThread() : parentContext.getAnchorThread());
-      createExecutionContextInner(queryId, taskId, taskType, parentContext);
+      createExecutionContextInner(queryId, taskId, parentContext);
     }
 
-    public void createExecutionContextInner(String queryId, int taskId, ThreadExecutionContext.TaskType taskType,
-        ThreadExecutionContext parentContext) {
+    public void createExecutionContextInner(String queryId, int taskId, ThreadExecutionContext parentContext) {
     }
 
     @Override
