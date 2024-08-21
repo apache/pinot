@@ -184,10 +184,7 @@ public class ControllerConf extends PinotConfiguration {
     //For no-downtime rebalance, minimum number of replicas to keep alive during rebalance, or maximum number of
     // replicas allowed to be unavailable if value is negative. Default value is -1
     public static final String SEGMENT_RELOCATOR_MIN_AVAIL_REPLICAS = "controller.segment.relocator.minAvailReplicas";
-
     public static final String SEGMENT_RELOCATOR_REASSIGN_INSTANCES = "controller.segment.relocator.reassignInstances";
-    //For no-downtime rebalance, minimum number of replicas to keep alive during rebalance, or maximum number of
-    // replicas allowed to be unavailable if value is negative. Default value is -1
     public static final String SEGMENT_RELOCATOR_BOOTSTRAP_SERVERS = "controller.segment.relocator.bootstrapServers";
 
     public static final String REBALANCE_CHECKER_FREQUENCY_PERIOD = "controller.rebalance.checker.frequencyPeriod";
