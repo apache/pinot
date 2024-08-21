@@ -433,7 +433,7 @@ public class PinotTableRestletResource {
         }
       }
       if (!tablesDeleted.isEmpty()) {
-        LOGGER.info("Successfully deleted tables: {}", tablesDeleted);
+        tablesDeleted.forEach(deletedTableName -> LOGGER.info("Successfully deleted table: {}", deletedTableName));
         return new SuccessResponse("Tables: " + tablesDeleted + " deleted");
       }
     } catch (Exception e) {
