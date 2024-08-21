@@ -338,7 +338,14 @@ public class MutableSegmentImpl implements MutableSegment {
       }
 
       // Null value vector
-      MutableNullValueVector nullValueVector = isNullable(fieldSpec) ? new MutableNullValueVector() : null;
+      MutableNullValueVector nullValueVector;
+      if (isNullable(fieldSpec)) {
+        _logger.info("Column: {} is nullable", column);
+        nullValueVector = new MutableNullValueVector();
+      } else {
+        _logger.info("Column: {} is not nullable", column);
+        nullValueVector = null;
+      }
 
       Map<IndexType, MutableIndex> mutableIndexes = new HashMap<>();
       for (IndexType<?, ?, ?> indexType : IndexService.getInstance().getAllIndexes()) {
