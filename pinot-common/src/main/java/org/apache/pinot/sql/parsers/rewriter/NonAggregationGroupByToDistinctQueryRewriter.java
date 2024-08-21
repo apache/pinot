@@ -75,7 +75,7 @@ public class NonAggregationGroupByToDistinctQueryRewriter implements QueryRewrit
       }
     }
     Set<Expression> groupByExpressions = new HashSet<>(pinotQuery.getGroupByList());
-    //If SELECT and GROUP BY set are equal, rewrite the query as DISTINCT
+    // If SELECT and GROUP BY set are equal, rewrite the query as DISTINCT
     if (selectExpressions.equals(groupByExpressions)) {
       Expression distinct = RequestUtils.getFunctionExpression("distinct", pinotQuery.getSelectList());
       // NOTE: Create an ArrayList because we might need to modify the list later
