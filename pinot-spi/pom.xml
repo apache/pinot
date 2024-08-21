@@ -43,6 +43,10 @@
         <executions>
           <execution>
             <id>copy-pinot-plugins</id>
+            <!-- The org.apache.pinot.spi.plugin.PluginManagerTest has tests that requires plugin jars.
+                 These jars could have been added to src/test/resources/plugins, but that would increase the size of
+                 source repository a lot. Instead, let Maven download these jars and put them at the expected location.
+            -->
             <phase>process-test-resources</phase>
             <goals>
               <goal>copy</goal>
