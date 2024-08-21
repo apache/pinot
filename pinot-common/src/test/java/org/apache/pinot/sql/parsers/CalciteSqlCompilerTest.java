@@ -1379,7 +1379,8 @@ public class CalciteSqlCompilerTest {
       Assert.fail("Query should have failed compilation");
     } catch (Exception e) {
       Assert.assertTrue(e instanceof SqlCompilationException);
-      Assert.assertTrue(e.getMessage().contains("'group_city' should appear in GROUP BY clause."));
+      Assert.assertTrue(e.getMessage().contains("'group_city' should be functionally dependent on the columns "
+          + "used in GROUP BY clause."));
     }
 
     // Valid groupBy non-aggregate function should pass.
@@ -1397,7 +1398,8 @@ public class CalciteSqlCompilerTest {
       Assert.fail("Query should have failed compilation");
     } catch (Exception e) {
       Assert.assertTrue(e instanceof SqlCompilationException);
-      Assert.assertTrue(e.getMessage().contains("'secondsSinceEpoch' should appear in GROUP BY clause."));
+      Assert.assertTrue(e.getMessage().contains("'secondsSinceEpoch' should be functionally dependent on the columns "
+          + "used in GROUP BY clause."));
     }
 
     // Invalid groupBy clause shouldn't contain aggregate expression, like sum(rsvp_count), count(*).
@@ -2593,15 +2595,35 @@ public class CalciteSqlCompilerTest {
   }
 
   @Test
+  public void testNonAggregationGroupByQueryNoRewrites() {
+    String query = "SELECT col1 FROM foo GROUP BY col1, col2";
+    PinotQuery pinotQuery = compileToPinotQuery(query);
+    Assert.assertEquals(pinotQuery.getSelectListSize(), 1);
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(0).getIdentifier().getName(), "col1");
+    Assert.assertEquals(
+        pinotQuery.getGroupByList().get(0).getIdentifier().getName(), "col1");
+    Assert.assertEquals(
+        pinotQuery.getGroupByList().get(1).getIdentifier().getName(), "col2");
+
+    query = "SELECT col1+col2 FROM foo GROUP BY col1,col2";
+    pinotQuery = compileToPinotQuery(query);
+    Assert.assertEquals(pinotQuery.getSelectListSize(), 1);
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(),
+        "plus");
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "col1");
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(1).getIdentifier().getName(), "col2");
+  }
+
+  @Test
   public void testInvalidNonAggregationGroupBy() {
-    Assert.assertThrows(SqlCompilationException.class,
-        () -> compileToPinotQuery("SELECT col1 FROM foo GROUP BY col1, col2"));
     Assert.assertThrows(SqlCompilationException.class,
         () -> compileToPinotQuery("SELECT col1, col2 FROM foo GROUP BY col1"));
     Assert.assertThrows(SqlCompilationException.class,
         () -> compileToPinotQuery("SELECT col1 + col2 FROM foo GROUP BY col1"));
-    Assert.assertThrows(SqlCompilationException.class,
-        () -> compileToPinotQuery("SELECT col1+col2 FROM foo GROUP BY col1,col2"));
   }
 
   @Test
