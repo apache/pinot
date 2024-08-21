@@ -47,8 +47,8 @@ public class ControllerConfTest {
           DEPRECATED_REALTIME_SEGMENT_RELOCATION_INITIAL_DELAY_IN_SECONDS,
           DEPRECATED_STATUS_CHECKER_WAIT_FOR_PUSH_TIME_IN_SECONDS);
 
-  private static final List<String> NEW_CONFIGS = Arrays
-      .asList(RETENTION_MANAGER_FREQUENCY_PERIOD, OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_PERIOD,
+  private static final List<String> NEW_CONFIGS =
+      Arrays.asList(RETENTION_MANAGER_FREQUENCY_PERIOD, OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_PERIOD,
           REALTIME_SEGMENT_VALIDATION_FREQUENCY_PERIOD, BROKER_RESOURCE_VALIDATION_FREQUENCY_PERIOD,
           STATUS_CHECKER_FREQUENCY_PERIOD, TASK_MANAGER_FREQUENCY_PERIOD,
           MINION_INSTANCES_CLEANUP_TASK_FREQUENCY_PERIOD,
@@ -139,6 +139,32 @@ public class ControllerConfTest {
     //execution and assertion
     assertOnDurations(conf, TimeUnit.SECONDS.convert(TimeUtils.convertPeriodToMillis(period), TimeUnit.MILLISECONDS),
         controllerConfig);
+  }
+
+  @Test
+  public void validateSegmentRelocatorRebalanceDefaultConfigs() {
+    //setup
+    Map<String, Object> controllerConfig = new HashMap<>();
+    ControllerConf conf = new ControllerConf(controllerConfig);
+    Assert.assertFalse(conf.getSegmentRelocatorRebalanceConfigBootstrapServers());
+    Assert.assertFalse(conf.getSegmentRelocatorRebalanceConfigReassignInstances());
+    Assert.assertTrue(conf.getSegmentRelocatorRebalanceConfigBestEfforts());
+    Assert.assertEquals(-1, conf.getSegmentRelocatorRebalanceConfigMinAvailReplicas());
+  }
+
+  @Test
+  public void validateSegmentRelocatorRebalanceConfigs() {
+    //setup
+    Map<String, Object> controllerConfig = new HashMap<>();
+    controllerConfig.put(SEGMENT_RELOCATOR_BEST_EFFORTS, true);
+    controllerConfig.put(SEGMENT_RELOCATOR_REASSIGN_INSTANCES, true);
+    controllerConfig.put(SEGMENT_RELOCATOR_MIN_AVAIL_REPLICAS, -2);
+    controllerConfig.put(SEGMENT_RELOCATOR_BOOTSTRAP_SERVERS, false);
+    ControllerConf conf = new ControllerConf(controllerConfig);
+    Assert.assertFalse(conf.getSegmentRelocatorRebalanceConfigBootstrapServers());
+    Assert.assertTrue(conf.getSegmentRelocatorRebalanceConfigReassignInstances());
+    Assert.assertTrue(conf.getSegmentRelocatorRebalanceConfigBestEfforts());
+    Assert.assertEquals(-2, conf.getSegmentRelocatorRebalanceConfigMinAvailReplicas());
   }
 
   @Test

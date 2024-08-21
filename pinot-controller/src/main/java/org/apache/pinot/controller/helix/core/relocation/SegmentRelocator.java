@@ -66,6 +66,12 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
   private final boolean _enableLocalTierMigration;
   private final int _serverAdminRequestTimeoutMs;
   private final long _externalViewCheckIntervalInMs;
+
+  private final boolean _bestEffortsRebalance;
+  private final int _minAvailReplicasDuringRebalance;
+  private final boolean _reassignInstancesDuringRebalance;
+  private final boolean _bootstrapServersDuringRebalance;
+
   private final long _externalViewStabilizationTimeoutInMs;
   private final Set<String> _waitingTables;
   private final BlockingQueue<String> _waitingQueue;
@@ -86,6 +92,10 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
         Math.min(taskIntervalInMs, config.getSegmentRelocatorExternalViewCheckIntervalInMs());
     _externalViewStabilizationTimeoutInMs =
         Math.min(taskIntervalInMs, config.getSegmentRelocatorExternalViewStabilizationTimeoutInMs());
+    _bestEffortsRebalance = config.getSegmentRelocatorRebalanceConfigBestEfforts();
+    _minAvailReplicasDuringRebalance = config.getSegmentRelocatorRebalanceConfigMinAvailReplicas();
+    _reassignInstancesDuringRebalance = config.getSegmentRelocatorRebalanceConfigReassignInstances();
+    _bootstrapServersDuringRebalance = config.getSegmentRelocatorRebalanceConfigBootstrapServers();
     if (config.isSegmentRelocatorRebalanceTablesSequentially()) {
       _waitingTables = ConcurrentHashMap.newKeySet();
       _waitingQueue = new LinkedBlockingQueue<>();
@@ -170,7 +180,9 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
     rebalanceConfig.setExternalViewStabilizationTimeoutInMs(_externalViewStabilizationTimeoutInMs);
     rebalanceConfig.setUpdateTargetTier(TierConfigUtils.shouldRelocateToTiers(tableConfig));
     //Do not fail the rebalance when the no-downtime contract cannot be achieved
-    rebalanceConfig.setBestEfforts(true);
+    rebalanceConfig.setBestEfforts(_bestEffortsRebalance);
+    rebalanceConfig.setReassignInstances(_reassignInstancesDuringRebalance);
+    rebalanceConfig.setBootstrap(_bootstrapServersDuringRebalance);
 
     try {
       // Relocating segments to new tiers needs two sequential actions: table rebalance and local tier migration.
