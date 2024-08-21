@@ -131,10 +131,12 @@ public class PluginManager {
 
   PluginManager() {
     if (useLegacyPluginClassloader()) {
+      LOGGER.info("Using legacy PluginClassloader");
       _registry = new HashMap<>();
       _registry.put(new Plugin(DEFAULT_PLUGIN_NAME), createClassLoader(Collections.emptyList()));
       _classWorld = null;
     } else {
+      LOGGER.info("Using Plexus ClassWorld classloader");
       try {
         _classWorld = new ClassWorld();
         // to simulate behavior of legacy code, however every plugin should have a dedicated realm
