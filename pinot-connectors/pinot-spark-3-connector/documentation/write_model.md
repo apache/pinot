@@ -1,8 +1,7 @@
 # Write Model
 
-<Warning>
-This feature is experimental and the API may change in future releases.
-</Warning>
+> [!CAUTION]
+> This feature is experimental and the API may change in future releases.
 
 Spark Connector also has experimental support for writing Pinot segments from Spark DataFrames.
 Currently, only append mode is supported and the schema of the DataFrame should match the schema of the Pinot table.
