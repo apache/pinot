@@ -388,7 +388,7 @@ public class PinotSchemaRestletResource {
       // Best effort notification. If controller fails at this point, no notification is given.
       LOGGER.info("Notifying metadata event for adding new schema {}", schemaName);
       _metadataEventNotifierFactory.create().notifyOnSchemaEvents(schema, SchemaEventType.CREATE);
-      LOGGER.info("Successfully created schema: {} with value: {}", schemaName, schema);
+      LOGGER.info("Successfully added schema: {} with value: {}", schemaName, schema);
       return new SuccessResponse(schemaName + " successfully added");
     } catch (SchemaAlreadyExistsException e) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SCHEMA_UPLOAD_ERROR, 1L);
