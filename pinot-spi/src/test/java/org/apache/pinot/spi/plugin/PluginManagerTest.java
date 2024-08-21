@@ -207,7 +207,7 @@ public class PluginManagerTest {
     final String originalLegacyPluginLoader = System.getProperty(PLUGINS_LOADER_LEGACY_PROPERTY_NAME);
 
     try {
-      System.setProperty(PLUGINS_DIR_PROPERTY_NAME, Path.of("src/test/resources/plugins").toAbsolutePath().toString());
+      System.setProperty(PLUGINS_DIR_PROPERTY_NAME, Path.of("target/test-classes/plugins").toAbsolutePath().toString());
       System.setProperty(PLUGINS_LOADER_LEGACY_PROPERTY_NAME, "false");
 
       PluginManager pluginManager = new PluginManager();
