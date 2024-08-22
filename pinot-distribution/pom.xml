@@ -50,7 +50,6 @@
       <plugin>
         <groupId>net.nicoulaj.maven.plugins</groupId>
         <artifactId>checksum-maven-plugin</artifactId>
-        <version>1.11</version>
         <executions>
           <execution>
             <goals>
@@ -132,7 +131,6 @@
           <plugin>
             <groupId>org.codehaus.mojo</groupId>
             <artifactId>exec-maven-plugin</artifactId>
-            <version>3.4.1</version>
             <executions>
               <execution>
                 <id>remove-build-directory</id>
