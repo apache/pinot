@@ -45,7 +45,8 @@ public class TableSegmentsReloadCheckResponse {
 
   @JsonCreator
   public TableSegmentsReloadCheckResponse(@JsonProperty("needReload") boolean needReload,
-      @JsonProperty("serverToSegmentsCheckReloadList") Map<String, ServerSegmentsReloadCheckResponse> serverToSegmentsCheckReloadList) {
+      @JsonProperty("serverToSegmentsCheckReloadList")
+      Map<String, ServerSegmentsReloadCheckResponse> serverToSegmentsCheckReloadList) {
     _needReload = needReload;
     _serverToSegmentsCheckReloadList = serverToSegmentsCheckReloadList;
   }
