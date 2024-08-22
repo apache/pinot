@@ -69,7 +69,7 @@ import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
-import org.apache.pinot.common.restlet.resources.SegmentsReloadCheckResponse;
+import org.apache.pinot.common.restlet.resources.ServerSegmentsReloadCheckResponse;
 import org.apache.pinot.common.restlet.resources.TableSegmentsReloadCheckResponse;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.LLCSegmentName;
@@ -836,7 +836,7 @@ public class PinotSegmentRestletResource {
       @QueryParam("verbose") @DefaultValue("false") boolean verbose, @Context HttpHeaders headers) {
     String tableName = TableNameBuilder.extractRawTableName(tableNameWithType);
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
-    LOGGER.info("Received a request to fetch metadata for all segments for table {}", tableName);
+    LOGGER.info("Received a request to check reload for all servers hosting segments for table {}", tableName);
     try {
       TableMetadataReader tableMetadataReader =
           new TableMetadataReader(_executor, _connectionManager, _pinotHelixResourceManager);
@@ -845,12 +845,12 @@ public class PinotSegmentRestletResource {
               _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
       boolean needReload =
           needReloadMetadata.values().stream().anyMatch(value -> value.get("needReload").booleanValue());
-      Map<String, SegmentsReloadCheckResponse> serverResponses = new HashMap<>();
+      Map<String, ServerSegmentsReloadCheckResponse> serverResponses = new HashMap<>();
       TableSegmentsReloadCheckResponse tableNeedReloadResponse;
       if (verbose) {
         for (Map.Entry<String, JsonNode> entry : needReloadMetadata.entrySet()) {
           serverResponses.put(entry.getKey(),
-              new SegmentsReloadCheckResponse(entry.getValue().get("needReload").booleanValue(),
+              new ServerSegmentsReloadCheckResponse(entry.getValue().get("needReload").booleanValue(),
                   entry.getValue().get("instanceId").asText()));
         }
         tableNeedReloadResponse = new TableSegmentsReloadCheckResponse(needReload, serverResponses);

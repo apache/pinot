@@ -19,6 +19,7 @@
 package org.apache.pinot.common.restlet.resources;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 
@@ -27,7 +28,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  *
  * It has details of server id and returns true/false if there are any segments to be reloaded or not.
  */
-public class SegmentsReloadCheckResponse {
+@JsonIgnoreProperties(ignoreUnknown = true)
+public class ServerSegmentsReloadCheckResponse {
   private final boolean _needReload;
   private final String _instanceId;
 
@@ -41,7 +43,7 @@ public class SegmentsReloadCheckResponse {
   }
 
   @JsonCreator
-  public SegmentsReloadCheckResponse(@JsonProperty("needReload") boolean needReload,
+  public ServerSegmentsReloadCheckResponse(@JsonProperty("needReload") boolean needReload,
       @JsonProperty("instanceId") String instanceId) {
     _needReload = needReload;
     _instanceId = instanceId;

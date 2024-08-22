@@ -18,15 +18,18 @@
  */
 package org.apache.pinot.common.utils;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
+import java.io.IOException;
 import java.util.HashMap;
-import org.apache.pinot.common.restlet.resources.ResourceUtils;
-import org.apache.pinot.common.restlet.resources.SegmentsReloadCheckResponse;
+import java.util.Map;
+import org.apache.pinot.common.restlet.resources.ServerSegmentsReloadCheckResponse;
 import org.apache.pinot.common.restlet.resources.TableSegmentsReloadCheckResponse;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
@@ -38,39 +41,53 @@ import static org.testng.Assert.assertTrue;
 public class SerializerResponseTest {
 
   @Test
-  public void testSerialization() {
+  public void testSerialization()
+      throws IOException {
     // Given
     boolean needReload = true;
     String instanceId = "instance123";
-    SegmentsReloadCheckResponse response = new SegmentsReloadCheckResponse(needReload, instanceId);
-    TableSegmentsReloadCheckResponse tableResponse = new TableSegmentsReloadCheckResponse(needReload, new HashMap<>());
-    String responseString = ResourceUtils.convertToJsonString(response);
-    String tableResponseString = ResourceUtils.convertToJsonString(tableResponse);
+    ServerSegmentsReloadCheckResponse response = new ServerSegmentsReloadCheckResponse(needReload, instanceId);
+    Map<String, ServerSegmentsReloadCheckResponse> serversResponse = new HashMap<>();
+    serversResponse.put(instanceId, response);
+    TableSegmentsReloadCheckResponse tableResponse = new TableSegmentsReloadCheckResponse(needReload, serversResponse);
+    String responseString = JsonUtils.objectToPrettyString(response);
+    String tableResponseString = JsonUtils.objectToPrettyString(tableResponse);
 
     assertNotNull(responseString);
     assertNotNull(tableResponseString);
-    assertEquals("{\n" + "  \"needReload\" : true,\n" + "  \"serverToSegmentsReloadList\" : { }\n" + "}",
+    JsonNode tableResponseJsonNode = JsonUtils.stringToJsonNode(tableResponseString);
+    assertTrue(tableResponseJsonNode.get("needReload").asBoolean());
+
+    JsonNode serversList =
+        tableResponseJsonNode.get("serverToSegmentsCheckReloadList");
+    JsonNode serverResp = serversList.get("instance123");
+    assertEquals(serverResp.get("instanceId").asText(), "instance123");
+    assertTrue(serverResp.get("needReload").asBoolean());
+
+    assertEquals("{\n" + "  \"needReload\" : true,\n" + "  \"serverToSegmentsCheckReloadList\" : {\n"
+            + "    \"instance123\" : {\n" + "      \"needReload\" : true,\n" + "      \"instanceId\" : \"instance123\"\n"
+            + "    }\n" + "  }\n" + "}",
         tableResponseString);
     assertEquals("{\n" + "  \"needReload\" : true,\n" + "  \"instanceId\" : \"instance123\"\n" + "}", responseString);
+
   }
 
   @Test
   public void testDeserialization()
       throws Exception {
-    // Given
-    boolean needReload = true;
-    String instanceId = "instance123";
-    SegmentsReloadCheckResponse response = new SegmentsReloadCheckResponse(needReload, instanceId);
-    TableSegmentsReloadCheckResponse tableResponse = new TableSegmentsReloadCheckResponse(needReload, new HashMap<>());
-    String responseString = ResourceUtils.convertToJsonString(response);
-    JsonNode jsonNode = JsonUtils.stringToJsonNode(responseString);
-    String jsonResponse = JsonUtils.objectToPrettyString(tableResponse);
-    JsonNode jsonNodeTableResponse = JsonUtils.stringToJsonNode(jsonResponse);
+    String jsonResponse = "{\n" + "  \"needReload\": false,\n" + "  \"serverToSegmentsCheckReloadList\": {\n"
+        + "    \"Server_10.0.0.215_7050\": {\n" + "      \"needReload\": false,\n"
+        + "      \"instanceId\": \"Server_10.0.0.215_7050\"\n" + "    }\n" + "  }\n" + "}";
+    JsonNode jsonNode = JsonUtils.stringToJsonNode(jsonResponse);
+    TableSegmentsReloadCheckResponse tableReloadResponse = JsonUtils.stringToObject(
+        jsonResponse,
+        new TypeReference<TableSegmentsReloadCheckResponse>() {}
+    );
     // Then
     assertNotNull(jsonNode);
-    assertNotNull(jsonNodeTableResponse);
-    assertTrue(jsonNodeTableResponse.get("needReload").asBoolean());
-    assertTrue(jsonNode.get("needReload").asBoolean());
-    assertEquals("instance123", jsonNode.get("instanceId").asText());
+    assertFalse(tableReloadResponse.isNeedReload());
+    assertNotNull(tableReloadResponse.getServerToSegmentsCheckReloadList());
+    Map<String, ServerSegmentsReloadCheckResponse> serverSegmentReloadResp = tableReloadResponse.getServerToSegmentsCheckReloadList();
+    assertEquals(serverSegmentReloadResp.get("Server_10.0.0.215_7050").getNeedReload(), false);
   }
 }

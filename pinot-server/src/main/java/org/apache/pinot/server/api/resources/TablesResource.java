@@ -64,7 +64,7 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.response.server.TableIndexMetadataResponse;
 import org.apache.pinot.common.restlet.resources.ResourceUtils;
 import org.apache.pinot.common.restlet.resources.SegmentConsumerInfo;
-import org.apache.pinot.common.restlet.resources.SegmentsReloadCheckResponse;
+import org.apache.pinot.common.restlet.resources.ServerSegmentsReloadCheckResponse;
 import org.apache.pinot.common.restlet.resources.TableMetadataInfo;
 import org.apache.pinot.common.restlet.resources.TableSegmentValidationInfo;
 import org.apache.pinot.common.restlet.resources.TableSegments;
@@ -977,6 +977,6 @@ public class TablesResource {
       throw new WebApplicationException(e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR);
     }
     return ResourceUtils.convertToJsonString(
-        new SegmentsReloadCheckResponse(needReload, tableDataManager.getInstanceId()));
+        new ServerSegmentsReloadCheckResponse(needReload, tableDataManager.getInstanceId()));
   }
 }

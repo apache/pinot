@@ -19,6 +19,7 @@
 package org.apache.pinot.common.restlet.resources;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.Map;
 
@@ -29,12 +30,13 @@ import java.util.Map;
  * It has details of reload flag which returns true if reload is needed on table and additional details of the
  * respective servers.
  */
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class TableSegmentsReloadCheckResponse {
   boolean _needReload;
-  Map<String, SegmentsReloadCheckResponse> _serverToSegmentsReloadList;
+  Map<String, ServerSegmentsReloadCheckResponse> _serverToSegmentsCheckReloadList;
 
-  public Map<String, SegmentsReloadCheckResponse> getServerToSegmentsReloadList() {
-    return _serverToSegmentsReloadList;
+  public Map<String, ServerSegmentsReloadCheckResponse> getServerToSegmentsCheckReloadList() {
+    return _serverToSegmentsCheckReloadList;
   }
 
   public boolean isNeedReload() {
@@ -43,8 +45,8 @@ public class TableSegmentsReloadCheckResponse {
 
   @JsonCreator
   public TableSegmentsReloadCheckResponse(@JsonProperty("needReload") boolean needReload,
-      @JsonProperty("serverToSegmentsReloadList") Map<String, SegmentsReloadCheckResponse> serverToSegmentsReloadList) {
+      @JsonProperty("serverToSegmentsCheckReloadList") Map<String, ServerSegmentsReloadCheckResponse> serverToSegmentsCheckReloadList) {
     _needReload = needReload;
-    _serverToSegmentsReloadList = serverToSegmentsReloadList;
+    _serverToSegmentsCheckReloadList = serverToSegmentsCheckReloadList;
   }
 }
