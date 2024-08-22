@@ -134,7 +134,7 @@ public class FlinkSegmentWriter implements SegmentWriter {
 
     Map<String, String> batchConfigMap = _batchIngestionConfig.getBatchConfigMaps().get(0);
     batchConfigMap.put(BatchConfigProperties.PARTITION_ID, Integer.toString(_indexOfSubtask));
-    batchConfigMap.put(BatchConfigProperties.SEGMENT_CREATION_TIME_MS, String.valueOf(_segmentUploadTimeMs));
+    batchConfigMap.put(BatchConfigProperties.SEGMENT_UPLOAD_TIME_MS, String.valueOf(_segmentUploadTimeMs));
     batchConfigMap.put(
         BatchConfigProperties.SEGMENT_NAME_GENERATOR_PROP_PREFIX + "." + BatchConfigProperties.SEGMENT_NAME_PREFIX,
         _segmentNamePrefix);

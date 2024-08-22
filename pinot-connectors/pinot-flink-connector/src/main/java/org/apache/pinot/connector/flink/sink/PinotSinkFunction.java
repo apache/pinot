@@ -75,7 +75,6 @@ public class PinotSinkFunction<T> extends RichSinkFunction<T> implements Checkpo
 
   public PinotSinkFunction(PinotGenericRowConverter<T> recordConverter, TableConfig tableConfig, Schema schema) {
     this(recordConverter, tableConfig, schema, DEFAULT_SEGMENT_FLUSH_MAX_NUM_RECORDS, DEFAULT_EXECUTOR_POOL_SIZE);
-    _segmentNamePrefix = DEFAULT_UPLOADED_REALTIME_SEGMENT_PREFIX;
   }
 
   public PinotSinkFunction(PinotGenericRowConverter<T> recordConverter, TableConfig tableConfig, Schema schema,

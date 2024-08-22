@@ -172,7 +172,7 @@ public final class IngestionUtils {
             batchConfig.isAppendUUIDToSegmentName(), batchConfig.isExcludeTimeInSegmentName());
       case BatchConfigProperties.SegmentNameGeneratorType.UPLOADED_REALTIME:
         return new UploadedRealtimeSegmentNameGenerator(rawTableName, Integer.parseInt(batchConfig.getPartitionId()),
-            batchConfig.getSegmentCreationTimeMs(), batchConfig.getSegmentNamePrefix(), batchConfig.getSequenceId());
+            batchConfig.getSegmentUploadTimeMs(), batchConfig.getSegmentNamePrefix(), batchConfig.getSequenceId());
       default:
         throw new IllegalStateException(String
             .format("Unsupported segmentNameGeneratorType: %s for table: %s", segmentNameGeneratorType,

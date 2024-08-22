@@ -45,7 +45,7 @@ public class BatchConfigProperties {
   public static final String SCHEMA_URI = "schemaURI";
   public static final String PARTITION_ID = "partitionId";
   public static final String SEQUENCE_ID = "sequenceId";
-  public static final String SEGMENT_CREATION_TIME_MS = "segmentCreationTimeMs";
+  public static final String SEGMENT_UPLOAD_TIME_MS = "segmentUploadTimeMs";
   public static final String SEGMENT_NAME_GENERATOR_TYPE = "segmentNameGenerator.type";
   public static final String SEGMENT_NAME_GENERATOR_PROP_PREFIX = "segmentNameGenerator.configs";
   public static final String SEGMENT_NAME = "segment.name";
