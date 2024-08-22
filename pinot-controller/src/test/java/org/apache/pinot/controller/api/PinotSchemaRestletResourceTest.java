@@ -265,9 +265,13 @@ public class PinotSchemaRestletResourceTest {
     DimensionFieldSpec dimensionFieldSpec1 = new DimensionFieldSpec("dim1", FieldSpec.DataType.STRING, true);
     DimensionFieldSpec dimensionFieldSpec2 = new DimensionFieldSpec("dim2", FieldSpec.DataType.INT, true);
     DimensionFieldSpec dimensionFieldSpec3 = new DimensionFieldSpec("dim2", FieldSpec.DataType.INT, true);
-    DimensionFieldSpec dimensionFieldSpec4 = new DimensionFieldSpec(CommonConstants.Segment.BuiltInVirtualColumn.DOCID, FieldSpec.DataType.INT, true);
-    DimensionFieldSpec dimensionFieldSpec5 = new DimensionFieldSpec(CommonConstants.Segment.BuiltInVirtualColumn.HOSTNAME, FieldSpec.DataType.STRING, true);
-    DimensionFieldSpec dimensionFieldSpec6 = new DimensionFieldSpec(CommonConstants.Segment.BuiltInVirtualColumn.SEGMENTNAME, FieldSpec.DataType.STRING, true);
+    DimensionFieldSpec dimensionFieldSpec4 =
+        new DimensionFieldSpec(CommonConstants.Segment.BuiltInVirtualColumn.DOCID, FieldSpec.DataType.INT, true);
+    DimensionFieldSpec dimensionFieldSpec5 =
+        new DimensionFieldSpec(CommonConstants.Segment.BuiltInVirtualColumn.HOSTNAME, FieldSpec.DataType.STRING, true);
+    DimensionFieldSpec dimensionFieldSpec6 =
+        new DimensionFieldSpec(CommonConstants.Segment.BuiltInVirtualColumn.SEGMENTNAME, FieldSpec.DataType.STRING,
+            true);
     List<DimensionFieldSpec> dimensionFieldSpecs = new ArrayList<>();
     dimensionFieldSpecs.add(dimensionFieldSpec1);
     dimensionFieldSpecs.add(dimensionFieldSpec2);
@@ -276,9 +280,10 @@ public class PinotSchemaRestletResourceTest {
     dimensionFieldSpecs.add(dimensionFieldSpec5);
     dimensionFieldSpecs.add(dimensionFieldSpec6);
     when(schemaMock.getDimensionFieldSpecs()).thenReturn(dimensionFieldSpecs);
-    DateTimeFieldSpec
-        dateTimeFieldSpec1 = new DateTimeFieldSpec("dt1", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS");
-    DateTimeFieldSpec dateTimeFieldSpec2 = new DateTimeFieldSpec("dt2", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS");
+    DateTimeFieldSpec dateTimeFieldSpec1 =
+        new DateTimeFieldSpec("dt1", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS");
+    DateTimeFieldSpec dateTimeFieldSpec2 =
+        new DateTimeFieldSpec("dt2", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS");
     List<DateTimeFieldSpec> dateTimeFieldSpecs = new ArrayList<>();
     dateTimeFieldSpecs.add(dateTimeFieldSpec1);
     dateTimeFieldSpecs.add(dateTimeFieldSpec2);
@@ -288,7 +293,6 @@ public class PinotSchemaRestletResourceTest {
     metricFieldSpecs.add(metricFieldSpec1);
     when(schemaMock.getMetricFieldSpecs()).thenReturn(metricFieldSpecs);
     SchemaInfo schemaInfo = new SchemaInfo(schemaMock);
-
 
     assertEquals("TestSchema", schemaInfo.getSchemaName());
     assertEquals(3, schemaInfo.getNumDimensionFields());  // 6 - 3 virtual columns = 3

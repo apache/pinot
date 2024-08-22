@@ -168,7 +168,7 @@ public class TableViewsTest extends ControllerTest {
   }
 
   @Test
-  public void testJsonDeserialization_SegmentStatusInfo()
+  public void testJsonDeserializationSegmentStatusInfo()
       throws Exception {
     // JSON string representing SchemaInfo
     String json = "[\n" + "  {\n" + "    \"segmentStatus\": \"GOOD\",\n"
@@ -194,7 +194,7 @@ public class TableViewsTest extends ControllerTest {
   }
 
   @Test
-  public void testJsonSerialization_SegmentStatusInfo()
+  public void testJsonSerializationSegmentStatusInfo()
       throws Exception {
     SegmentStatusInfo statusInfo1 = new SegmentStatusInfo("airlineStats_OFFLINE_16071_16071_0",
         CommonConstants.Helix.StateModel.DisplaySegmentStatus.GOOD);
