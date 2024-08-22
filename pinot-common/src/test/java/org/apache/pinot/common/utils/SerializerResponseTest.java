@@ -58,18 +58,15 @@ public class SerializerResponseTest {
     JsonNode tableResponseJsonNode = JsonUtils.stringToJsonNode(tableResponseString);
     assertTrue(tableResponseJsonNode.get("needReload").asBoolean());
 
-    JsonNode serversList =
-        tableResponseJsonNode.get("serverToSegmentsCheckReloadList");
+    JsonNode serversList = tableResponseJsonNode.get("serverToSegmentsCheckReloadList");
     JsonNode serverResp = serversList.get("instance123");
     assertEquals(serverResp.get("instanceId").asText(), "instance123");
     assertTrue(serverResp.get("needReload").asBoolean());
 
     assertEquals("{\n" + "  \"needReload\" : true,\n" + "  \"serverToSegmentsCheckReloadList\" : {\n"
-            + "    \"instance123\" : {\n" + "      \"needReload\" : true,\n" + "      \"instanceId\" : \"instance123\"\n"
-            + "    }\n" + "  }\n" + "}",
-        tableResponseString);
+        + "    \"instance123\" : {\n" + "      \"needReload\" : true,\n" + "      \"instanceId\" : \"instance123\"\n"
+        + "    }\n" + "  }\n" + "}", tableResponseString);
     assertEquals("{\n" + "  \"needReload\" : true,\n" + "  \"instanceId\" : \"instance123\"\n" + "}", responseString);
-
   }
 
   @Test
@@ -79,15 +76,15 @@ public class SerializerResponseTest {
         + "    \"Server_10.0.0.215_7050\": {\n" + "      \"needReload\": false,\n"
         + "      \"instanceId\": \"Server_10.0.0.215_7050\"\n" + "    }\n" + "  }\n" + "}";
     JsonNode jsonNode = JsonUtils.stringToJsonNode(jsonResponse);
-    TableSegmentsReloadCheckResponse tableReloadResponse = JsonUtils.stringToObject(
-        jsonResponse,
-        new TypeReference<TableSegmentsReloadCheckResponse>() {}
-    );
+    TableSegmentsReloadCheckResponse tableReloadResponse =
+        JsonUtils.stringToObject(jsonResponse, new TypeReference<TableSegmentsReloadCheckResponse>() {
+        });
     // Then
     assertNotNull(jsonNode);
     assertFalse(tableReloadResponse.isNeedReload());
     assertNotNull(tableReloadResponse.getServerToSegmentsCheckReloadList());
-    Map<String, ServerSegmentsReloadCheckResponse> serverSegmentReloadResp = tableReloadResponse.getServerToSegmentsCheckReloadList();
+    Map<String, ServerSegmentsReloadCheckResponse> serverSegmentReloadResp =
+        tableReloadResponse.getServerToSegmentsCheckReloadList();
     assertEquals(serverSegmentReloadResp.get("Server_10.0.0.215_7050").getNeedReload(), false);
   }
 }
