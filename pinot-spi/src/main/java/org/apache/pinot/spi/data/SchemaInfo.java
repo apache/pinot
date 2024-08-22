@@ -18,12 +18,13 @@
  */
 package org.apache.pinot.spi.data;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 
 /**
- * This class gives the details of a particular schema and the corresponding column metrics
+ * This class gives the details of a particular schema and the corresponding column count metrics
  *
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -56,10 +57,13 @@ public class SchemaInfo {
     return _numMetricFields;
   }
 
-  public SchemaInfo(String schemaName, int numDimensionFields, int numDateTimeFields, int numMetricFields) {
-    _schemaName = schemaName;
-    _numDimensionFields = numDimensionFields;
-    _numDateTimeFields = numDateTimeFields;
-    _numMetricFields = numMetricFields;
+  @JsonCreator
+  public SchemaInfo(Schema schema) {
+    _schemaName = schema.getSchemaName();
+
+    //Removed virtual columns($docId, $hostName, $segmentName) from dimension fields count
+    _numDimensionFields = schema.getDimensionFieldSpecs().size() - 3;
+    _numDateTimeFields = schema.getDateTimeFieldSpecs().size();
+    _numMetricFields = schema.getMetricFieldSpecs().size();
   }
 }

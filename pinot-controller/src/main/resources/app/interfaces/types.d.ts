@@ -110,6 +110,11 @@ declare module 'Models' {
     error?: string;
   };
 
+  export type ServerToSegmentsCount = {
+    tableName: string;
+    serverToSegmentsCountMap: number;
+  };
+
   export type SegmentStatusInfo = {
     segmentName: string;
     segmentStatus: DISPLAY_SEGMENT_STATUS;

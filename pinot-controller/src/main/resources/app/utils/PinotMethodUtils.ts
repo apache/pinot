@@ -97,7 +97,8 @@ import {
   getSegmentReloadStatus,
   getTaskRuntimeConfig,
   getSchemaInfo,
-  getSegmentsStatus
+  getSegmentsStatus,
+  getServerToSegmentsCount
 } from '../requests';
 import { baseApi } from './axios-config';
 import Utils, { getDisplaySegmentStatus } from './Utils';
@@ -526,6 +527,20 @@ const getExternalViewObj = (tableName) => {
     return result.data.OFFLINE || result.data.REALTIME;
   });
 }; 
+
+const fetchServerToSegmentsCountData = (tableName, tableType) => {
+  return getServerToSegmentsCount(tableName, tableType).then((results) => {
+    const segmentsArray = results.data; 
+    return {
+      records: segmentsArray.flatMap((server) =>
+        Object.entries(server.serverToSegmentsCountMap).map(([serverName, segmentsCount]) => [ 
+          serverName,       
+          segmentsCount    
+        ])
+      )
+    };
+  });
+};
 
 const getSegmentStatus = (idealSegment, externalViewSegment) => {
   if(isEqual(idealSegment, externalViewSegment)){
@@ -1320,5 +1335,6 @@ export default {
   deleteUser,
   updateUser,
   getAuthUserNameFromAccessToken,
-  getAuthUserEmailFromAccessToken
+  getAuthUserEmailFromAccessToken,
+  fetchServerToSegmentsCountData
 };

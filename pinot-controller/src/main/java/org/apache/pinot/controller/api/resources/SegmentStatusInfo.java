@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.api.resources;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
@@ -39,7 +40,9 @@ public class SegmentStatusInfo {
     return _segmentStatus;
   }
 
-  public SegmentStatusInfo(String segmentName, String segmentStatus) {
+  @JsonCreator
+  public SegmentStatusInfo(@JsonProperty("segmentName") String segmentName,
+      @JsonProperty("segmentStatus") String segmentStatus) {
     _segmentName = segmentName;
     _segmentStatus = segmentStatus;
   }

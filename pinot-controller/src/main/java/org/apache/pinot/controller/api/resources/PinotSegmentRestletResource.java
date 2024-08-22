@@ -231,8 +231,8 @@ public class PinotSegmentRestletResource {
   @Path("segments/{tableName}/servers")
   @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_SERVER_MAP)
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Get a map from server to segments hosted by the server", notes = "Get a map from server to "
-      + "segments hosted by the server")
+  @ApiOperation(value = "Get a map from server to segments hosted by the server",
+      notes = "Get a map from server to segments hosted by the server")
   public List<Map<String, Object>> getServerToSegmentsMap(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
