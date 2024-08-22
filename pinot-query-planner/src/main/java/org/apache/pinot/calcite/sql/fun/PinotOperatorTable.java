@@ -217,7 +217,13 @@ public class PinotOperatorTable implements SqlOperatorTable {
 
   private static final List<Pair<SqlOperator, List<String>>> STANDARD_OPERATORS_WITH_ALIASES = List.of(
       Pair.of(SqlStdOperatorTable.CASE, List.of("CASE", "CASE_WHEN")),
-      Pair.of(SqlStdOperatorTable.LN, List.of("LN", "LOG"))
+      Pair.of(SqlStdOperatorTable.LN, List.of("LN", "LOG")),
+      Pair.of(SqlStdOperatorTable.EQUALS, List.of("EQUALS")),
+      Pair.of(SqlStdOperatorTable.NOT_EQUALS, List.of("NOT_EQUALS")),
+      Pair.of(SqlStdOperatorTable.GREATER_THAN, List.of("GREATER_THAN")),
+      Pair.of(SqlStdOperatorTable.GREATER_THAN_OR_EQUAL, List.of("GREATER_THAN_OR_EQUAL")),
+      Pair.of(SqlStdOperatorTable.LESS_THAN, List.of("LESS_THAN")),
+      Pair.of(SqlStdOperatorTable.LESS_THAN_OR_EQUAL, List.of("LESS_THAN_OR_EQUAL"))
   );
 
   /**

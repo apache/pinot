@@ -31,9 +31,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
-import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.Future;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 import javax.net.ssl.SSLContext;
 import org.apache.pinot.client.utils.BrokerSelectorUtils;
@@ -86,7 +86,6 @@ public class BrokerCache {
   private static final String DEFAULT_CONTROLLER_TLS_V10_ENABLED = "false";
   private static final String SCHEME = "scheme";
 
-  private final Random _random = new Random();
   private final AsyncHttpClient _client;
   private final String _address;
   private final Map<String, String> _headers;
@@ -204,7 +203,7 @@ public class BrokerCache {
     if (brokers == null || brokers.isEmpty()) {
       brokers = _brokerData.getBrokers();
     }
-    return brokers.get(_random.nextInt(brokers.size()));
+    return brokers.get(ThreadLocalRandom.current().nextInt(brokers.size()));
   }
 
   public List<String> getBrokers() {

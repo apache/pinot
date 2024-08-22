@@ -57,6 +57,7 @@ import org.apache.pinot.controller.util.ConsumingSegmentInfoReader;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
+import org.apache.pinot.spi.config.table.PauseState;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -103,12 +104,14 @@ public class PinotRealtimeTableResource {
   @ApiOperation(value = "Pause consumption of a realtime table", notes = "Pause the consumption of a realtime table")
   public Response pauseConsumption(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "Comment on pausing the consumption") @QueryParam("comment") String comment,
       @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
     validateTable(tableNameWithType);
     try {
-      return Response.ok(_pinotLLCRealtimeSegmentManager.pauseConsumption(tableNameWithType)).build();
+      return Response.ok(_pinotLLCRealtimeSegmentManager.pauseConsumption(tableNameWithType,
+          PauseState.ReasonCode.ADMINISTRATIVE, comment)).build();
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
@@ -125,6 +128,7 @@ public class PinotRealtimeTableResource {
           + "available offsets are picked to minimize the data loss.")
   public Response resumeConsumption(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "Comment on pausing the consumption") @QueryParam("comment") String comment,
       @ApiParam(
           value = "lastConsumed (safer) | smallest (repeat rows) | largest (miss rows)",
           allowableValues = "lastConsumed, smallest, largest",
@@ -143,7 +147,8 @@ public class PinotRealtimeTableResource {
                   + "'largest'.", consumeFrom), Response.Status.BAD_REQUEST);
     }
     try {
-      return Response.ok(_pinotLLCRealtimeSegmentManager.resumeConsumption(tableNameWithType, consumeFrom)).build();
+      return Response.ok(_pinotLLCRealtimeSegmentManager.resumeConsumption(tableNameWithType, consumeFrom,
+          PauseState.ReasonCode.ADMINISTRATIVE, comment)).build();
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
@@ -246,7 +251,7 @@ public class PinotRealtimeTableResource {
     String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
     validateTable(tableNameWithType);
     try {
-      return Response.ok().entity(_pinotLLCRealtimeSegmentManager.getPauseStatus(tableNameWithType)).build();
+      return Response.ok().entity(_pinotLLCRealtimeSegmentManager.getPauseStatusDetails(tableNameWithType)).build();
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }

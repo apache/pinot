@@ -49,30 +49,7 @@
           <artifactId>spark-sql_${scala.compat.version}</artifactId>
           <version>${spark.version}</version>
           <scope>provided</scope>
-          <exclusions>
-            <exclusion>
-              <groupId>org.apache.curator</groupId>
-              <artifactId>curator-recipes</artifactId>
-            </exclusion>
-            <exclusion>
-              <groupId>org.scala-lang.modules</groupId>
-              <artifactId>scala-xml_${scala.compat.version}</artifactId>
-            </exclusion>
-            <exclusion>
-              <groupId>org.scala-lang</groupId>
-              <artifactId>scala-library</artifactId>
-            </exclusion>
-            <exclusion>
-              <groupId>com.zaxxer</groupId>
-              <artifactId>HikariCP-java7</artifactId>
-            </exclusion>
-            <exclusion>
-              <groupId>commons-logging</groupId>
-              <artifactId>commons-logging</artifactId>
-            </exclusion>
-          </exclusions>
         </dependency>
-
         <dependency>
           <groupId>org.scala-lang</groupId>
           <artifactId>scala-library</artifactId>
@@ -84,20 +61,6 @@
           <artifactId>scalatest_${scala.compat.version}</artifactId>
           <version>${scalatest.version}</version>
           <scope>test</scope>
-          <exclusions>
-            <exclusion>
-              <groupId>org.scala-lang.modules</groupId>
-              <artifactId>scala-xml_${scala.compat.version}</artifactId>
-            </exclusion>
-            <exclusion>
-              <groupId>org.scala-lang</groupId>
-              <artifactId>scala-library</artifactId>
-            </exclusion>
-            <exclusion>
-              <groupId>org.scala-lang</groupId>
-              <artifactId>scala-reflect</artifactId>
-            </exclusion>
-          </exclusions>
         </dependency>
       </dependencies>
       <build>
