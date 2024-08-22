@@ -633,8 +633,8 @@ public class ControllerConf extends PinotConfiguration {
 
   public int getRebalanceCheckerFrequencyInSeconds() {
     return Optional.ofNullable(getProperty(ControllerPeriodicTasksConf.REBALANCE_CHECKER_FREQUENCY_PERIOD))
-        .map(period -> (int) convertPeriodToSeconds(period))
-        .orElse(ControllerPeriodicTasksConf.DEFAULT_REBALANCE_CHECKER_FREQUENCY_IN_SECONDS);
+        .map(period -> (int) convertPeriodToSeconds(period)).orElse(
+            ControllerPeriodicTasksConf.DEFAULT_REBALANCE_CHECKER_FREQUENCY_IN_SECONDS);
   }
 
   public long getRebalanceCheckerInitialDelayInSeconds() {
@@ -644,8 +644,8 @@ public class ControllerConf extends PinotConfiguration {
 
   public int getRealtimeConsumerMonitorRunFrequency() {
     return Optional.ofNullable(getProperty(ControllerPeriodicTasksConf.RT_CONSUMER_MONITOR_FREQUENCY_PERIOD))
-        .map(period -> (int) convertPeriodToSeconds(period))
-        .orElse(ControllerPeriodicTasksConf.DEFAULT_RT_CONSUMER_MONITOR_FREQUENCY_IN_SECONDS);
+        .map(period -> (int) convertPeriodToSeconds(period)).orElse(
+            ControllerPeriodicTasksConf.DEFAULT_RT_CONSUMER_MONITOR_FREQUENCY_IN_SECONDS);
   }
 
   public long getRealtimeConsumerMonitorInitialDelayInSeconds() {
@@ -819,10 +819,12 @@ public class ControllerConf extends PinotConfiguration {
   @Deprecated
   public int getMinionInstancesCleanupTaskMinOfflineTimeBeforeDeletionInSeconds() {
     return Optional.ofNullable(
-            getProperty(ControllerPeriodicTasksConf.MINION_INSTANCES_CLEANUP_TASK_MIN_OFFLINE_TIME_BEFORE_DELETION_PERIOD))
+        getProperty(ControllerPeriodicTasksConf.MINION_INSTANCES_CLEANUP_TASK_MIN_OFFLINE_TIME_BEFORE_DELETION_PERIOD))
         .map(period -> (int) convertPeriodToSeconds(period)).orElseGet(() -> getProperty(
-            ControllerPeriodicTasksConf.DEPRECATED_MINION_INSTANCES_CLEANUP_TASK_MIN_OFFLINE_TIME_BEFORE_DELETION_SECONDS,
-            ControllerPeriodicTasksConf.DEFAULT_MINION_INSTANCES_CLEANUP_TASK_MIN_OFFLINE_TIME_BEFORE_DELETION_IN_SECONDS));
+            ControllerPeriodicTasksConf.
+                DEPRECATED_MINION_INSTANCES_CLEANUP_TASK_MIN_OFFLINE_TIME_BEFORE_DELETION_SECONDS,
+            ControllerPeriodicTasksConf.
+                DEFAULT_MINION_INSTANCES_CLEANUP_TASK_MIN_OFFLINE_TIME_BEFORE_DELETION_IN_SECONDS));
   }
 
   @Deprecated
@@ -1057,8 +1059,8 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   public int getLeadControllerResourceRebalanceDelayMs() {
-    return getProperty(LEAD_CONTROLLER_RESOURCE_REBALANCE_DELAY_MS,
-        DEFAULT_LEAD_CONTROLLER_RESOURCE_REBALANCE_DELAY_MS);
+    return getProperty(
+        LEAD_CONTROLLER_RESOURCE_REBALANCE_DELAY_MS, DEFAULT_LEAD_CONTROLLER_RESOURCE_REBALANCE_DELAY_MS);
   }
 
   public boolean getHLCTablesAllowed() {
