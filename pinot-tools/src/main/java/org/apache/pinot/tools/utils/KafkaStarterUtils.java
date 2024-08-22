@@ -37,7 +37,8 @@ public class KafkaStarterUtils {
 
   public static final int DEFAULT_BROKER_ID = 0;
   public static final int DEFAULT_KAFKA_PORT = 19092;
-  public static final String DEFAULT_KAFKA_BROKER = "localhost:" + DEFAULT_KAFKA_PORT;
+  public static final String DEFAULT_KAFKA_HOST = "localhost";
+  public static final String DEFAULT_KAFKA_BROKER = DEFAULT_KAFKA_HOST + ":" + DEFAULT_KAFKA_PORT;
 
   public static final String PORT = "port";
   public static final String BROKER_ID = "broker.id";
@@ -78,7 +79,7 @@ public class KafkaStarterUtils {
     configuration.put("transaction.state.log.min.isr", 1);
 
     // Set host name
-    configureHostName(configuration, "localhost");
+    configureHostName(configuration, DEFAULT_KAFKA_HOST);
     configureOffsetsTopicReplicationFactor(configuration, (short) 1);
     configuration.put(PORT, DEFAULT_KAFKA_PORT);
     configuration.put(BROKER_ID, DEFAULT_BROKER_ID);

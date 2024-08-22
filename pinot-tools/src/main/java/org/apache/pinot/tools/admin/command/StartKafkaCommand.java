@@ -37,6 +37,9 @@ import picocli.CommandLine;
 public class StartKafkaCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(StartKafkaCommand.class);
 
+  @CommandLine.Option(names = {"-host"}, required = false, description = "Host to start Kafka server on.")
+  private String _host = KafkaStarterUtils.DEFAULT_KAFKA_HOST;
+
   @CommandLine.Option(names = {"-port"}, required = false, description = "Port to start Kafka server on.")
   private int _port = KafkaStarterUtils.DEFAULT_KAFKA_PORT;
 
@@ -49,6 +52,7 @@ public class StartKafkaCommand extends AbstractBaseAdminCommand implements Comma
 
   @CommandLine.Option(names = {"-zkAddress"}, required = false, description = "Address of Zookeeper.")
   private String _zkAddress = KafkaStarterUtils.getDefaultKafkaZKAddress();
+
   private StreamDataServerStartable _kafkaStarter;
 
   @Override
@@ -63,7 +67,7 @@ public class StartKafkaCommand extends AbstractBaseAdminCommand implements Comma
 
   @Override
   public String toString() {
-    return "StartKafka -port " + _port + " -brokerId " + _brokerId + " -zkAddress " + _zkAddress;
+    return "StartKafka -host " + _host + " -port " + _port + " -brokerId " + _brokerId + " -zkAddress " + _zkAddress;
   }
 
   @Override
@@ -78,6 +82,7 @@ public class StartKafkaCommand extends AbstractBaseAdminCommand implements Comma
     kafkaConfiguration.put(KafkaStarterUtils.BROKER_ID, _brokerId);
     kafkaConfiguration.put(KafkaStarterUtils.PORT, _port);
     kafkaConfiguration.put(KafkaStarterUtils.ZOOKEEPER_CONNECT, _zkAddress);
+    KafkaStarterUtils.configureHostName(kafkaConfiguration, _host);
     try {
       _kafkaStarter = StreamDataProvider
           .getServerDataStartable(KafkaStarterUtils.KAFKA_SERVER_STARTABLE_CLASS_NAME, kafkaConfiguration);
@@ -85,7 +90,7 @@ public class StartKafkaCommand extends AbstractBaseAdminCommand implements Comma
       throw new RuntimeException("Failed to start " + KafkaStarterUtils.KAFKA_SERVER_STARTABLE_CLASS_NAME, e);
     }
     _kafkaStarter.start();
-    LOGGER.info("Start kafka at localhost:{} in thread {}", _port, Thread.currentThread().getName());
+    LOGGER.info("Start kafka at {}:{} in thread {}", _host, _port, Thread.currentThread().getName());
     savePID(System.getProperty("java.io.tmpdir") + File.separator + ".kafka.pid");
     return true;
   }
