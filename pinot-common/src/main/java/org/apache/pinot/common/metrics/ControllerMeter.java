@@ -49,6 +49,7 @@ public enum ControllerMeter implements AbstractMetrics.Meter {
   CONTROLLER_PERIODIC_TASK_ERROR("periodicTaskError", false),
   CONTROLLER_TABLE_SEGMENT_UPLOAD_ERROR("TableSegmentUploadError", false),
   PERIODIC_TASK_ERROR("periodicTaskError", false),
+  CONTROLLER_TIME_RETENTION_ERROR("segmentTimeRetentionError", false),
   NUMBER_TIMES_SCHEDULE_TASKS_CALLED("tasks", true),
   NUMBER_TASKS_SUBMITTED("tasks", false),
   NUMBER_SEGMENT_UPLOAD_TIMEOUT_EXCEEDED("SegmentUploadTimeouts", true),
