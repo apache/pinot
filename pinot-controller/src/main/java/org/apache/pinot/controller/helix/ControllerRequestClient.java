@@ -31,7 +31,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.http.HttpClient;
-import org.apache.pinot.controller.api.resources.PauseStatus;
+import org.apache.pinot.controller.api.resources.PauseStatusDetails;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.tenant.Tenant;
@@ -253,36 +253,36 @@ public class ControllerRequestClient {
     }
   }
 
-  public PauseStatus pauseConsumption(String tableName)
+  public PauseStatusDetails pauseConsumption(String tableName)
       throws IOException {
     try {
       SimpleHttpResponse response = HttpClient.wrapAndThrowHttpException(
           _httpClient.sendJsonPostRequest(new URI(_controllerRequestURLBuilder.forPauseConsumption(tableName)), null,
               _headers));
-      return JsonUtils.stringToObject(response.getResponse(), PauseStatus.class);
+      return JsonUtils.stringToObject(response.getResponse(), PauseStatusDetails.class);
     } catch (HttpErrorStatusException | URISyntaxException e) {
       throw new IOException(e);
     }
   }
 
-  public PauseStatus resumeConsumption(String tableName)
+  public PauseStatusDetails resumeConsumption(String tableName)
       throws IOException {
     try {
       SimpleHttpResponse response = HttpClient.wrapAndThrowHttpException(
           _httpClient.sendJsonPostRequest(new URI(_controllerRequestURLBuilder.forResumeConsumption(tableName)), null,
               _headers));
-      return JsonUtils.stringToObject(response.getResponse(), PauseStatus.class);
+      return JsonUtils.stringToObject(response.getResponse(), PauseStatusDetails.class);
     } catch (HttpErrorStatusException | URISyntaxException e) {
       throw new IOException(e);
     }
   }
 
-  public PauseStatus getPauseStatus(String tableName)
+  public PauseStatusDetails getPauseStatusDetails(String tableName)
       throws IOException {
     try {
       SimpleHttpResponse response = HttpClient.wrapAndThrowHttpException(
           _httpClient.sendGetRequest(new URI(_controllerRequestURLBuilder.forPauseStatus(tableName)), _headers));
-      return JsonUtils.stringToObject(response.getResponse(), PauseStatus.class);
+      return JsonUtils.stringToObject(response.getResponse(), PauseStatusDetails.class);
     } catch (HttpErrorStatusException | URISyntaxException e) {
       throw new IOException(e);
     }

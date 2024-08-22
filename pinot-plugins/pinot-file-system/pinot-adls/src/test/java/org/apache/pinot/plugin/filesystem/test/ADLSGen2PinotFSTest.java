@@ -441,7 +441,7 @@ public class ADLSGen2PinotFSTest {
     InputStream actual = _adlsGen2PinotFsUnderTest.open(_mockURI);
     Assert.assertEquals(actual, _mockInputStream);
 
-    verify(_mockFileSystemClient).getFileClient(AzurePinotFSUtil.convertUriToUrlEncodedAzureStylePath(_mockURI));
+    verify(_mockFileSystemClient).getFileClient(AzurePinotFSUtil.convertUriToAzureStylePath(_mockURI));
     verify(_mockFileClient).openInputStream();
     verify(_mockFileOpenInputStreamResult).getInputStream();
   }

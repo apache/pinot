@@ -47,45 +47,21 @@
         <dependency>
           <groupId>com.fasterxml.jackson.module</groupId>
           <artifactId>jackson-module-scala_${scala.compat.version}</artifactId>
-          <exclusions>
-            <exclusion>
-              <groupId>org.scala-lang</groupId>
-              <artifactId>scala-library</artifactId>
-            </exclusion>
-          </exclusions>
         </dependency>
         <dependency>
           <groupId>org.scala-lang.modules</groupId>
           <artifactId>scala-xml_${scala.compat.version}</artifactId>
           <version>${scalaxml.version}</version>
-          <exclusions>
-            <exclusion>
-              <groupId>org.scala-lang</groupId>
-              <artifactId>scala-library</artifactId>
-            </exclusion>
-          </exclusions>
         </dependency>
         <dependency>
           <groupId>io.circe</groupId>
           <artifactId>circe-parser_${scala.compat.version}</artifactId>
           <version>${circe.version}</version>
-          <exclusions>
-            <exclusion>
-              <groupId>org.scala-lang</groupId>
-              <artifactId>scala-library</artifactId>
-            </exclusion>
-          </exclusions>
         </dependency>
         <dependency>
           <groupId>io.circe</groupId>
           <artifactId>circe-generic_${scala.compat.version}</artifactId>
           <version>${circe.version}</version>
-          <exclusions>
-            <exclusion>
-              <groupId>org.scala-lang</groupId>
-              <artifactId>scala-library</artifactId>
-            </exclusion>
-          </exclusions>
         </dependency>
         <dependency>
           <groupId>org.scala-lang</groupId>
@@ -98,20 +74,6 @@
           <artifactId>scalatest_${scala.compat.version}</artifactId>
           <version>${scalatest.version}</version>
           <scope>test</scope>
-          <exclusions>
-            <exclusion>
-              <groupId>org.scala-lang.modules</groupId>
-              <artifactId>scala-xml_${scala.compat.version}</artifactId>
-            </exclusion>
-            <exclusion>
-              <groupId>org.scala-lang</groupId>
-              <artifactId>scala-library</artifactId>
-            </exclusion>
-            <exclusion>
-              <groupId>org.scala-lang</groupId>
-              <artifactId>scala-reflect</artifactId>
-            </exclusion>
-          </exclusions>
         </dependency>
       </dependencies>
       <build>
@@ -206,20 +168,13 @@
   <dependencies>
     <dependency>
       <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-spi</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-common</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-core</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-yammer</artifactId>
     </dependency>
+
     <dependency>
       <groupId>io.grpc</groupId>
       <artifactId>grpc-netty-shaded</artifactId>
