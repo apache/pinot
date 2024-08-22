@@ -71,6 +71,7 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
   private final int _minAvailReplicasDuringRebalance;
   private final boolean _reassignInstancesDuringRebalance;
   private final boolean _bootstrapServersDuringRebalance;
+  private final boolean _downtime;
 
   private final long _externalViewStabilizationTimeoutInMs;
   private final Set<String> _waitingTables;
@@ -96,6 +97,7 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
     _minAvailReplicasDuringRebalance = config.getSegmentRelocatorRebalanceConfigMinAvailReplicas();
     _reassignInstancesDuringRebalance = config.getSegmentRelocatorRebalanceConfigReassignInstances();
     _bootstrapServersDuringRebalance = config.getSegmentRelocatorRebalanceConfigBootstrapServers();
+    _downtime = config.getSegmentRelocatorRebalanceConfigDowntime();
     if (config.isSegmentRelocatorRebalanceTablesSequentially()) {
       _waitingTables = ConcurrentHashMap.newKeySet();
       _waitingQueue = new LinkedBlockingQueue<>();
@@ -183,6 +185,8 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
     rebalanceConfig.setBestEfforts(_bestEffortsRebalance);
     rebalanceConfig.setReassignInstances(_reassignInstancesDuringRebalance);
     rebalanceConfig.setBootstrap(_bootstrapServersDuringRebalance);
+    rebalanceConfig.setMinAvailableReplicas(_minAvailReplicasDuringRebalance);
+    rebalanceConfig.setDowntime(_downtime);
 
     try {
       // Relocating segments to new tiers needs two sequential actions: table rebalance and local tier migration.

@@ -150,6 +150,7 @@ public class ControllerConfTest {
     Assert.assertFalse(conf.getSegmentRelocatorRebalanceConfigReassignInstances());
     Assert.assertTrue(conf.getSegmentRelocatorRebalanceConfigBestEfforts());
     Assert.assertEquals(-1, conf.getSegmentRelocatorRebalanceConfigMinAvailReplicas());
+    Assert.assertFalse(conf.getSegmentRelocatorRebalanceConfigDowntime());
   }
 
   @Test
@@ -160,11 +161,13 @@ public class ControllerConfTest {
     controllerConfig.put(SEGMENT_RELOCATOR_REASSIGN_INSTANCES, true);
     controllerConfig.put(SEGMENT_RELOCATOR_MIN_AVAIL_REPLICAS, -2);
     controllerConfig.put(SEGMENT_RELOCATOR_BOOTSTRAP_SERVERS, false);
+    controllerConfig.put(SEGMENT_RELOCATOR_DOWNTIME, true);
     ControllerConf conf = new ControllerConf(controllerConfig);
     Assert.assertFalse(conf.getSegmentRelocatorRebalanceConfigBootstrapServers());
     Assert.assertTrue(conf.getSegmentRelocatorRebalanceConfigReassignInstances());
     Assert.assertTrue(conf.getSegmentRelocatorRebalanceConfigBestEfforts());
     Assert.assertEquals(-2, conf.getSegmentRelocatorRebalanceConfigMinAvailReplicas());
+    Assert.assertTrue(conf.getSegmentRelocatorRebalanceConfigDowntime());
   }
 
   @Test
