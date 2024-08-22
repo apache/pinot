@@ -40,7 +40,7 @@ public abstract class PolymorphicComparisonScalarFunction implements PinotScalar
 
     // In case of heterogeneous argument types, fall back to double based comparison and allow FunctionInvoker to
     // convert argument types for v1 engine support.
-    if (argumentTypes[0] != argumentTypes[1]) {
+    if (argumentTypes[0].getStoredType() != argumentTypes[1].getStoredType()) {
       return functionInfoForType(ColumnDataType.DOUBLE);
     }
 
