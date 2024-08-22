@@ -52,6 +52,9 @@ execEnv.setParallelism(2); // mandatory for upsert tables wi
 DataStream<Row> srcDs = execEnv.fromCollection(data).returns(TEST_TYPE_INFO)
 
 // Create a ControllerRequestClient to fetch Pinot schema and table config
+HttpClient httpClient = HttpClient.getInstance();
+ControllerRequestClient client = new ControllerRequestClient(
+ControllerRequestURLBuilder.baseUrl(DEFAULT_CONTROLLER_URL), httpClient);
 
 // fetch Pinot schema
 Schema schema = PinotConnectionUtils.getSchema(client, "starbucksStores");

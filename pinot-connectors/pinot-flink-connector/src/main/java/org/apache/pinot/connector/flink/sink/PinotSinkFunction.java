@@ -64,7 +64,9 @@ public class PinotSinkFunction<T> extends RichSinkFunction<T> implements Checkpo
   private Schema _schema;
 
   private String _segmentNamePrefix;
-  @Nullable private Long _overriddenSegmentCreationTimeMs;
+
+  // Used to set creation time in segment name, if not provided, current time is used
+  @Nullable private Long _segmentUploadTimeMs;
 
   private transient SegmentWriter _segmentWriter;
   private transient SegmentUploader _segmentUploader;
@@ -88,12 +90,12 @@ public class PinotSinkFunction<T> extends RichSinkFunction<T> implements Checkpo
 
   public PinotSinkFunction(PinotGenericRowConverter<T> recordConverter, TableConfig tableConfig, Schema schema,
       long segmentFlushMaxNumRecords, int executorPoolSize, String segmentNamePrefix,
-      @Nullable Long overriddenSegmentCreationTimeMs) {
+      @Nullable Long segmentUploadTimeMs) {
     this(recordConverter, tableConfig, schema, segmentFlushMaxNumRecords, executorPoolSize);
     if (!segmentNamePrefix.isBlank()) {
       _segmentNamePrefix = segmentNamePrefix;
     }
-    _overriddenSegmentCreationTimeMs = overriddenSegmentCreationTimeMs;
+    _segmentUploadTimeMs = segmentUploadTimeMs;
   }
 
   @Override
@@ -101,7 +103,7 @@ public class PinotSinkFunction<T> extends RichSinkFunction<T> implements Checkpo
       throws Exception {
     int indexOfSubtask = this.getRuntimeContext().getIndexOfThisSubtask();
     _segmentWriter = new FlinkSegmentWriter(indexOfSubtask, getRuntimeContext().getMetricGroup(), _segmentNamePrefix,
-        _overriddenSegmentCreationTimeMs);
+        _segmentUploadTimeMs);
     _segmentWriter.init(_tableConfig, _schema);
     _segmentUploader = new SegmentUploaderDefault();
     _segmentUploader.init(_tableConfig);
@@ -138,7 +140,7 @@ public class PinotSinkFunction<T> extends RichSinkFunction<T> implements Checkpo
       throws Exception {
     _segmentWriter.collect(_recordConverter.convertToRow(value));
     _segmentNumRecord++;
-    if (_segmentNumRecord > _segmentFlushMaxNumRecords) {
+    if (_segmentNumRecord >= _segmentFlushMaxNumRecords) {
       flush();
     }
   }

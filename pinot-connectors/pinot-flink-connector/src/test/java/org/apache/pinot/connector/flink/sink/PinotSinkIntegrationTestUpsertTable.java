@@ -21,15 +21,20 @@ package org.apache.pinot.connector.flink.sink;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.flink.api.common.functions.Partitioner;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.api.java.typeutils.RowTypeInfo;
+import org.apache.flink.configuration.Configuration;
+import org.apache.flink.configuration.HeartbeatManagerOptions;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.types.Row;
@@ -51,6 +56,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 public class PinotSinkIntegrationTestUpsertTable extends BaseClusterIntegrationTest {
@@ -88,7 +94,7 @@ public class PinotSinkIntegrationTestUpsertTable extends BaseClusterIntegrationT
     assertEquals(getCurrentCountStarResult(), getCountStarResult());
 
     // Create partial upsert table schema
-    Schema partialUpsertSchema = createSchema("partial_upsert_table_test.schema");
+    Schema partialUpsertSchema = createSchema("upsert_table_test.schema");
     addSchema(partialUpsertSchema);
     _taskManager = _controllerStarter.getTaskManager();
     _helixTaskResourceManager = _controllerStarter.getHelixTaskResourceManager();
@@ -101,7 +107,9 @@ public class PinotSinkIntegrationTestUpsertTable extends BaseClusterIntegrationT
         new TypeInformation[]{Types.INT, Types.STRING, Types.STRING, Types.FLOAT, Types.LONG, Types.BOOLEAN},
         new String[]{"playerId", "name", "game", "score", "timestampInEpoch", "deleted"});
     _data = Arrays.asList(Row.of(1, "Alice", "Football", 55F, 1571037400000L, false),
-        Row.of(2, "BOB", "Tennis", 100F, 1571038400000L, false));
+        Row.of(2, "BOB", "Tennis", 100F, 1571038400000L, false),
+        Row.of(3, "Carl", "Cricket", 100F, 1571039400000L, false),
+        Row.of(2, "BOB", "Badminton", 100F, 1571040400000L, false));
 
     Map<String, String> batchConfigs = new HashMap<>();
     batchConfigs.put(BatchConfigProperties.OUTPUT_DIR_URI, _tarDir.getAbsolutePath());
@@ -117,8 +125,12 @@ public class PinotSinkIntegrationTestUpsertTable extends BaseClusterIntegrationT
   @Test
   public void testPinotSinkWrite()
       throws Exception {
+    Configuration config = new Configuration();
+    config.set(HeartbeatManagerOptions.HEARTBEAT_TIMEOUT,
+        Duration.ofMillis(120000)); // Set heartbeat timeout to 60 seconds
+    StreamExecutionEnvironment execEnv = StreamExecutionEnvironment.getExecutionEnvironment(config);
+
     // Single-thread write
-    StreamExecutionEnvironment execEnv = StreamExecutionEnvironment.getExecutionEnvironment();
     execEnv.setParallelism(1);
     DataStream<Row> srcDs = execEnv.fromCollection(_data).returns(_typeInfo);
     srcDs.addSink(new PinotSinkFunction<>(new FlinkRowGenericRowConverter(_typeInfo), _tableConfig, _schema,
@@ -126,7 +138,7 @@ public class PinotSinkIntegrationTestUpsertTable extends BaseClusterIntegrationT
         1724045185L));
     execEnv.execute();
     // 1 uploaded, 2 realtime in progress segment
-    verifySegments(3, 2);
+    verifySegments(3, 4);
 
     // Parallel write with partitioned segments
     execEnv = StreamExecutionEnvironment.getExecutionEnvironment();
@@ -138,7 +150,34 @@ public class PinotSinkIntegrationTestUpsertTable extends BaseClusterIntegrationT
         PinotSinkFunction.DEFAULT_SEGMENT_FLUSH_MAX_NUM_RECORDS, PinotSinkFunction.DEFAULT_EXECUTOR_POOL_SIZE, "batch",
         1724045186L));
     execEnv.execute();
-    verifySegments(5, 4);
+    verifySegments(5, 8);
+
+    // Generate next sequence segments in partitioned segments
+    srcDs = execEnv.fromCollection(_data).returns(_typeInfo)
+        .partitionCustom((Partitioner<Integer>) (key, partitions) -> key % partitions, r -> (Integer) r.getField(0));
+    srcDs.addSink(new PinotSinkFunction<>(new FlinkRowGenericRowConverter(_typeInfo), _tableConfig, _schema, 1,
+        PinotSinkFunction.DEFAULT_EXECUTOR_POOL_SIZE, "batch", 1724045187L));
+    execEnv.execute();
+    verifySegments(9, 12);
+    verifyContainsSegments(Arrays.asList("batch__mytable__0__1724045187__0", "batch__mytable__0__1724045187__1",
+        "batch__mytable__1__1724045187__0", "batch__mytable__1__1724045187__1"));
+  }
+
+  private void verifyContainsSegments(List<String> segmentsToCheck)
+      throws IOException {
+    String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(_rawTableName);
+    JsonNode segments = JsonUtils.stringToJsonNode(sendGetRequest(
+            _controllerRequestURLBuilder.forSegmentListAPI(tableNameWithType, TableType.REALTIME.toString()))).get(0)
+        .get("REALTIME");
+    Set<String> segmentNames = new HashSet<>();
+    for (int i = 0; i < segments.size(); i++) {
+      String segmentName = segments.get(i).asText();
+      segmentNames.add(segmentName);
+    }
+
+    for (String segmentName : segmentsToCheck) {
+      assertTrue(segmentNames.contains(segmentName));
+    }
   }
 
   private void verifySegments(int numSegments, int numTotalDocs)
