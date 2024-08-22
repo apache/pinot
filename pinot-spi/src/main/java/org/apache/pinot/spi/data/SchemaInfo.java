@@ -57,7 +57,6 @@ public class SchemaInfo {
     return _numMetricFields;
   }
 
-  @JsonCreator
   public SchemaInfo(Schema schema) {
     _schemaName = schema.getSchemaName();
 

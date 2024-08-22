@@ -167,55 +167,6 @@ public class TableViewsTest extends ControllerTest {
     assertEquals(tableView._realtime.size(), DEFAULT_NUM_SERVER_INSTANCES);
   }
 
-  @Test
-  public void testJsonDeserializationSegmentStatusInfo()
-      throws Exception {
-    // JSON string representing SchemaInfo
-    String json = "[\n" + "  {\n" + "    \"segmentStatus\": \"GOOD\",\n"
-        + "    \"segmentName\": \"airlineStats_OFFLINE_16071_16071_0\"\n" + "  },\n" + "  {\n"
-        + "    \"segmentStatus\": \"BAD\",\n" + "    \"segmentName\": \"airlineStats_OFFLINE_16072_16072_0\"\n"
-        + "  },\n" + "  {\n" + "    \"segmentStatus\": \"UPDATING\",\n"
-        + "    \"segmentName\": \"airlineStats_OFFLINE_16073_16073_0\"\n" + "  }\n" + "]";
-    JsonNode jsonNode = JsonUtils.stringToJsonNode(json);
-    List<SegmentStatusInfo> segmentStatusInfos =
-        JsonUtils.jsonNodeToObject(jsonNode, new TypeReference<List<SegmentStatusInfo>>() {
-        });
-    // Assertions
-    assertEquals(segmentStatusInfos.size(), 3);
-    assertEquals(segmentStatusInfos.get(0).getSegmentStatus(),
-        CommonConstants.Helix.StateModel.DisplaySegmentStatus.GOOD);
-    assertEquals(segmentStatusInfos.get(0).getSegmentName(), "airlineStats_OFFLINE_16071_16071_0");
-    assertEquals(segmentStatusInfos.get(1).getSegmentStatus(),
-        CommonConstants.Helix.StateModel.DisplaySegmentStatus.BAD);
-    assertEquals(segmentStatusInfos.get(1).getSegmentName(), "airlineStats_OFFLINE_16072_16072_0");
-    assertEquals(segmentStatusInfos.get(2).getSegmentStatus(),
-        CommonConstants.Helix.StateModel.DisplaySegmentStatus.UPDATING);
-    assertEquals(segmentStatusInfos.get(2).getSegmentName(), "airlineStats_OFFLINE_16073_16073_0");
-  }
-
-  @Test
-  public void testJsonSerializationSegmentStatusInfo()
-      throws Exception {
-    SegmentStatusInfo statusInfo1 = new SegmentStatusInfo("airlineStats_OFFLINE_16071_16071_0",
-        CommonConstants.Helix.StateModel.DisplaySegmentStatus.GOOD);
-    SegmentStatusInfo statusInfo2 = new SegmentStatusInfo("airlineStats_OFFLINE_16072_16072_0",
-        CommonConstants.Helix.StateModel.DisplaySegmentStatus.BAD);
-    SegmentStatusInfo statusInfo3 = new SegmentStatusInfo("airlineStats_OFFLINE_16073_16073_0",
-        CommonConstants.Helix.StateModel.DisplaySegmentStatus.UPDATING);
-    List<SegmentStatusInfo> segmentStatusInfoList = new ArrayList<>();
-    segmentStatusInfoList.add(statusInfo1);
-    segmentStatusInfoList.add(statusInfo2);
-    segmentStatusInfoList.add(statusInfo3);
-    String json =
-        "[ {\n" + "  \"segmentName\" : \"airlineStats_OFFLINE_16071_16071_0\",\n" + "  \"segmentStatus\" : \"GOOD\"\n"
-            + "}, {\n" + "  \"segmentName\" : \"airlineStats_OFFLINE_16072_16072_0\",\n"
-            + "  \"segmentStatus\" : \"BAD\"\n" + "}, {\n"
-            + "  \"segmentName\" : \"airlineStats_OFFLINE_16073_16073_0\",\n" + "  \"segmentStatus\" : \"UPDATING\"\n"
-            + "} ]";
-    String jsonString = JsonUtils.objectToPrettyString(segmentStatusInfoList);
-    assertEquals(jsonString, json);
-  }
-
   private TableViews.TableView getTableView(String tableName, String view, String tableType)
       throws Exception {
     return JsonUtils.stringToObject(
