@@ -35,6 +35,7 @@ import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.data.TimeGranularitySpec.TimeFormat;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -512,5 +513,26 @@ public class SchemaTest {
     Assert.assertTrue(newSchema.isBackwardCompatibleWith(oldSchema));
     Assert.assertEquals(newSchema.getFieldSpecFor("svBoolean").getDataType(), FieldSpec.DataType.BOOLEAN);
     Assert.assertEquals(newSchema.getFieldSpecFor("svBooleanWithDefault").getDataType(), FieldSpec.DataType.BOOLEAN);
+  }
+
+  @Test
+  public void testWithoutVirtualColumns() {
+    DimensionFieldSpec virtualField = new DimensionFieldSpec(
+        CommonConstants.Segment.BuiltInVirtualColumn.DOCID, FieldSpec.DataType.INT, true, Integer.class);
+
+    Schema schema = new Schema.SchemaBuilder()
+        .setSchemaName("testSchema")
+        .setEnableColumnBasedNullHandling(true)
+        .addMetricField("metric", FieldSpec.DataType.INT)
+        .addField(virtualField)
+        .build();
+
+    Schema withoutVirtualColumns = schema.withoutVirtualColumns();
+    Assert.assertTrue(withoutVirtualColumns.getAllFieldSpecs().stream()
+        .noneMatch(field -> field.getName().equals(CommonConstants.Segment.BuiltInVirtualColumn.DOCID)),
+        "Virtual column " + CommonConstants.Segment.BuiltInVirtualColumn.DOCID + " should be removed");
+
+    withoutVirtualColumns.addField(virtualField);
+    Assert.assertEquals(withoutVirtualColumns, schema, "After adding the virtual field both schemas should be equal");
   }
 }

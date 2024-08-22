@@ -39,13 +39,15 @@ import static java.nio.charset.StandardCharsets.UTF_8;
  * A simple random generator that fakes RSVP
  */
 public class RsvpSourceGenerator implements PinotSourceDataGenerator {
+  private final int _nullProbability;
   private final KeyColumn _keyColumn;
   public static final DateTimeFormatter DATE_TIME_FORMATTER =
       new DateTimeFormatterBuilder().parseCaseInsensitive().append(DateTimeFormatter.ISO_LOCAL_DATE).appendLiteral(' ')
           .append(DateTimeFormatter.ISO_LOCAL_TIME).toFormatter();
 
-  public RsvpSourceGenerator(KeyColumn keyColumn) {
+  public RsvpSourceGenerator(KeyColumn keyColumn, int nullProbability) {
     _keyColumn = keyColumn;
+    _nullProbability = nullProbability;
   }
 
   public RSVP createMessage() {
@@ -67,7 +69,8 @@ public class RsvpSourceGenerator implements PinotSourceDataGenerator {
     json.put("event_name", eventName);
 
     json.put("event_id", eventId);
-    json.put("event_time", DATE_TIME_FORMATTER.format(LocalDateTime.now().plusDays(10)));
+    boolean isNull = ThreadLocalRandom.current().nextInt(100) < _nullProbability;
+    json.put("event_time", isNull ? null : DATE_TIME_FORMATTER.format(LocalDateTime.now().plusDays(10)));
 
     ArrayNode groupTopicsJson = JsonUtils.newArrayNode();
     groupJson.set("group_topics", groupTopicsJson);

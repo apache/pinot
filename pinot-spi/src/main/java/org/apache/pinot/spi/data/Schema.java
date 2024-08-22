@@ -353,6 +353,24 @@ public final class Schema implements Serializable {
   }
 
   /**
+   * Returns a new schema containing only physical columns.
+   *
+   * All properties but the fields are the same.
+   * All field attributes are a shallow copy without the virtual column.
+   */
+  public Schema withoutVirtualColumns() {
+    Schema newSchema = new Schema();
+    newSchema.setSchemaName(getSchemaName());
+    newSchema.setEnableColumnBasedNullHandling(isEnableColumnBasedNullHandling());
+    for (FieldSpec fieldSpec : getAllFieldSpecs()) {
+      if (!fieldSpec.isVirtualColumn()) {
+        newSchema.addField(fieldSpec);
+      }
+    }
+    return newSchema;
+  }
+
+  /**
    * NOTE: The returned FieldSpecs are sorted with the column name alphabetically.
    */
   @JsonIgnore
@@ -524,6 +542,14 @@ public final class Schema implements Serializable {
 
     public SchemaBuilder() {
       _schema = new Schema();
+    }
+
+    public static SchemaBuilder copyWithoutFields(Schema other) {
+      SchemaBuilder schemaBuilder = new SchemaBuilder();
+      schemaBuilder._schema.setSchemaName(other.getSchemaName());
+      schemaBuilder._schema.setEnableColumnBasedNullHandling(other.isEnableColumnBasedNullHandling());
+
+      return schemaBuilder;
     }
 
     public SchemaBuilder setSchemaName(String schemaName) {
@@ -801,10 +827,17 @@ public final class Schema implements Serializable {
     return result;
   }
 
+  /**
+   * @deprecated this method is not correctly implemented. ie doesn't call super.clone and does not create a deep copy
+   * of the fieldSpecs.
+   */
+  @Deprecated
+  @Override
   public Schema clone() {
     Schema cloned = new SchemaBuilder()
         .setSchemaName(getSchemaName())
         .setPrimaryKeyColumns(getPrimaryKeyColumns())
+        .setEnableColumnBasedNullHandling(isEnableColumnBasedNullHandling())
         .build();
     getAllFieldSpecs().forEach(fieldSpec -> cloned.addField(fieldSpec));
     return cloned;
