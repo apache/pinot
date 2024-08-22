@@ -75,11 +75,18 @@ public class SchemaInfoTest {
     schemaInfoList.add(schemaInfo);
     String response = JsonUtils.objectToPrettyString(schemaInfoList);
     JsonNode jsonNodeResp = JsonUtils.stringToJsonNode(response);
+    //test serialization
+    assertEquals("[ {\n" + "  \"schemaName\" : \"TestSchema\",\n" + "  \"numDimensionFields\" : 3,\n"
+        + "  \"numDateTimeFields\" : 2,\n" + "  \"numMetricFields\" : 1\n" + "} ]", response);
+
+    //test deserialization
     assertEquals(jsonNodeResp.get(0).get("schemaName").asText(), "TestSchema");
     assertEquals(jsonNodeResp.get(0).get("numDimensionFields").asInt(), 3);
     assertEquals(jsonNodeResp.get(0).get("numDateTimeFields").asInt(), 2);
     assertEquals(jsonNodeResp.get(0).get("numMetricFields").asInt(), 1);
     assertEquals("TestSchema", schemaInfo.getSchemaName());
+
+    //test column count
     assertEquals(3, schemaInfo.getNumDimensionFields());  // 6 - 3 virtual columns = 3
     assertEquals(2, schemaInfo.getNumDateTimeFields());
     assertEquals(1, schemaInfo.getNumMetricFields());
