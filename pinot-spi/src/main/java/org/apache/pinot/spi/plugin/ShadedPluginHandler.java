@@ -19,18 +19,22 @@
 package org.apache.pinot.spi.plugin;
 
 import java.io.File;
+import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-class LegacyPluginHandler {
+class ShadedPluginHandler {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(LegacyPluginHandler.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(ShadedPluginHandler.class);
 
   Collection<URL> toURLs(String pluginName, File directory) {
     LOGGER.info("Trying to load plugin [{}] from location [{}]", pluginName, directory);
@@ -44,5 +48,18 @@ class LegacyPluginHandler {
       }
     }
     return urlList;
+  }
+
+  /**
+   * @param p the directory to test
+   * @return true is this directory contains jars files, otherwise false
+   */
+  boolean isPluginDirectory(Path p) {
+    try(Stream<Path> stream = Files.find(p, 1, (f,a) -> Files.isRegularFile(f))) {
+      return stream.anyMatch(f -> f.getFileName().toString().endsWith(".jar"));
+    } catch (IOException e) {
+      LOGGER.warn("Failed to check if plugin directory [{}]", p, e);
+      return false;
+    }
   }
 }

@@ -28,6 +28,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import org.slf4j.Logger;
@@ -37,21 +38,26 @@ import static java.util.function.Predicate.not;
 
 
 /**
+ * This handler assumes the following:
+ * Packed:
+ * [plugins-directory]/[plugin-name]/[plugin].zip
  *
- *
+ * Unpacked
+ * [plugins-directory]/[plugin-name]/classes/[**]/*.class
+ * [plugins-directory]/[plugin-name]/lib/*.jar
  */
 class PinotPluginHandler {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotPluginHandler.class);
 
-  Collection<URL> toURLs(String pluginName, File directory)  {
+  Collection<URL> toURLs(String pluginName, File directory) {
     LOGGER.info("Trying to load plugin [{}] from location [{}]", pluginName, directory);
 
     Collection<URL> urlList = new ArrayList<>();
 
     // classes directory always has to go first
     Path classes = directory.toPath().resolve("classes");
-    if(Files.isDirectory(classes)) {
+    if (Files.isDirectory(classes)) {
       try {
         urlList.add(classes.toUri().toURL());
       } catch (MalformedURLException e) {
@@ -59,8 +65,8 @@ class PinotPluginHandler {
       }
     }
 
-    try (var stream = Files.newDirectoryStream(directory.toPath(), e -> e.getFileName().toString().endsWith(".jar"))) {
-        stream.forEach(f -> {
+    try (var stream = Files.newDirectoryStream(directory.toPath().resolve("lib"), e -> e.getFileName().toString().endsWith(".jar"))) {
+      stream.forEach(f -> {
         try {
           urlList.add(f.toUri().toURL());
         } catch (MalformedURLException e) {
@@ -73,42 +79,55 @@ class PinotPluginHandler {
     return urlList;
   }
 
-  void unpack(File pluginDir, File pluginZip)
-      throws IOException {
-    try (ZipFile zipFile = new ZipFile(pluginZip)) {
-      zipFile.stream()
-          .filter(not(ZipEntry::isDirectory))
-          .filter(e -> e.getName().startsWith("PINOT-INF/"))
+  boolean isPluginDirectory(Path p) {
+    // if there's a zip, first unpack it
+    try (Stream<Path> stream = Files.find(p, 1, (f,a) -> (Files.isRegularFile(f) && p.getFileName().toString().endsWith(".zip")))) {
+      stream
+          .findFirst()
+          .ifPresent(f -> unpack(f.getParent(), f));
+    } catch (IOException e) {
+      LOGGER.warn("Failed to decide if plugin directory exists", e);
+      return false;
+    }
+
+    return Files.isDirectory(p.resolve("classes")) || Files.isDirectory(p.resolve("lib"));
+  }
+
+  // THIS UNPACKS BASED ON pinot-plugins/assembly-descriptor/src/main/resources/assemblies/pinot-plugin.xml
+  void unpack(Path pluginDirectory, Path pluginZip) {
+    try (ZipFile zipFile = new ZipFile(pluginZip.toFile())) {
+      zipFile.stream().filter(not(ZipEntry::isDirectory)).filter(e -> e.getName().startsWith("PINOT-INF/"))
           .forEach(e -> {
-        String newPath = e.getName().substring("PINOT-INF/".length());
+            String newPath = e.getName().substring("PINOT-INF/".length());
 
-        Path pluginDirectory = pluginDir.toPath();
-        Path targetPath = pluginDirectory.resolve(newPath).normalize();
+            Path targetPath = pluginDirectory.resolve(newPath).normalize();
 
-        // prevent zipslip!!
-        if (targetPath.startsWith(pluginDirectory)) {
-          if(!Files.exists(targetPath.getParent())) {
-            try {
-              Files.createDirectories(targetPath.getParent());
-            } catch (IOException ex) {
-              throw new RuntimeException(ex);
+            // prevent zipslip!!
+            if (targetPath.startsWith(pluginDirectory)) {
+              if (!Files.exists(targetPath.getParent())) {
+                try {
+                  Files.createDirectories(targetPath.getParent());
+                } catch (IOException ex) {
+                  throw new RuntimeException(ex);
+                }
+              }
+              if (!Files.exists(targetPath)) {
+                try {
+                  Files.createFile(targetPath);
+                } catch (IOException ex) {
+                  LOGGER.warn("Failed to create file [{}]", targetPath, ex);
+                }
+              }
+
+              try (InputStream in = zipFile.getInputStream(e); OutputStream out = Files.newOutputStream(targetPath)) {
+                in.transferTo(out);
+              } catch (IOException ex) {
+                LOGGER.warn("Unable to unpack plugin [{}] [{}]", pluginDirectory, newPath, ex);
+              }
             }
-          }
-          if(!Files.exists(targetPath)) {
-            try {
-              Files.createFile(targetPath.getParent());
-            } catch (IOException ex) {
-              throw new RuntimeException(ex);
-            }
-          }
-
-          try (InputStream in = zipFile.getInputStream(e); OutputStream out = Files.newOutputStream(targetPath)) {
-            in.transferTo(out);
-          } catch (IOException ex) {
-            LOGGER.error("Unable to unpack plugin [{}] [{}]", pluginDir.getName(), newPath, ex);
-          }
-        }
-      });
+          });
+    } catch (IOException e) {
+      LOGGER.warn("Failed to unpack plugin [{}]", pluginDirectory, e);
     }
   }
 }

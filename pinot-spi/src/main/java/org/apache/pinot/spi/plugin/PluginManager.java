@@ -22,15 +22,10 @@ import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
-import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
-import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.SimpleFileVisitor;
-import java.nio.file.attribute.BasicFileAttributes;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -40,8 +35,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Stream;
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.codehaus.plexus.classworlds.ClassWorld;
 import org.codehaus.plexus.classworlds.realm.ClassRealm;
@@ -58,7 +51,6 @@ public class PluginManager {
   public static final String PLUGINS_LOADER_LEGACY_PROPERTY_NAME = "pinot.plugins.loader.legacy";
   public static final String DEFAULT_PLUGIN_NAME = "DEFAULT";
   private static final Logger LOGGER = LoggerFactory.getLogger(PluginManager.class);
-  private static final String JAR_FILE_EXTENSION = "jar";
   private static final PluginManager PLUGIN_MANAGER = new PluginManager();
 
   private static boolean useLegacyPluginClassloader() {
@@ -222,14 +214,17 @@ public class PluginManager {
 
     HashMap<String, File> finalPluginsToLoad = new HashMap<>();
 
+    PinotPluginHandler pluginHandler = new PinotPluginHandler();
+    ShadedPluginHandler shadedPluginHandler = new ShadedPluginHandler();
+
     for (String pluginsDirectory : directories) {
       if (!new File(pluginsDirectory).exists()) {
         throw new IllegalArgumentException(String.format("Plugins dir [%s] doesn't exist.", pluginsDirectory));
       }
 
-      PluginsDirectoryVisitor visitor = new PluginsDirectoryVisitor();
+      PluginsDirectoryVisitor visitor = new PluginsDirectoryVisitor(pluginHandler, shadedPluginHandler);
       try {
-        Files.walkFileTree(Path.of(pluginsDirectory), Set.of(), 2, visitor);
+        Files.walkFileTree(Path.of(pluginsDirectory), Set.of(), 1, visitor);
       } catch (IOException e) {
         throw new RuntimeException(e);
       }
@@ -279,7 +274,7 @@ public class PluginManager {
 
       urlList = pluginHandler.toURLs(pluginName, directory);
     } else {
-      LegacyPluginHandler pluginHandler = new LegacyPluginHandler();
+      ShadedPluginHandler pluginHandler = new ShadedPluginHandler();
 
       urlList = pluginHandler.toURLs(pluginName, directory);
     }
