@@ -388,7 +388,7 @@ public class PinotSchemaRestletResource {
       // Best effort notification. If controller fails at this point, no notification is given.
       LOGGER.info("Notifying metadata event for adding new schema {}", schemaName);
       _metadataEventNotifierFactory.create().notifyOnSchemaEvents(schema, SchemaEventType.CREATE);
-
+      LOGGER.info("Successfully added schema: {} with value: {}", schemaName, schema);
       return new SuccessResponse(schemaName + " successfully added");
     } catch (SchemaAlreadyExistsException e) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SCHEMA_UPLOAD_ERROR, 1L);
@@ -425,6 +425,7 @@ public class PinotSchemaRestletResource {
       // Best effort notification. If controller fails at this point, no notification is given.
       LOGGER.info("Notifying metadata event for updating schema: {}", schemaName);
       _metadataEventNotifierFactory.create().notifyOnSchemaEvents(schema, SchemaEventType.UPDATE);
+      LOGGER.info("Successfully updated schema: {} with new value: {}", schemaName, schema);
       return new SuccessResponse(schema.getSchemaName() + " successfully added");
     } catch (SchemaNotFoundException e) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SCHEMA_UPLOAD_ERROR, 1L);
@@ -524,7 +525,7 @@ public class PinotSchemaRestletResource {
     if (_pinotHelixResourceManager.deleteSchema(schemaName)) {
       LOGGER.info("Notifying metadata event for deleting schema: {}", schemaName);
       _metadataEventNotifierFactory.create().notifyOnSchemaEvents(schema, SchemaEventType.DELETE);
-      LOGGER.info("Success: Deleted schema {}", schemaName);
+      LOGGER.info("Successfully deleted schema: {}", schemaName);
     } else {
       throw new ControllerApplicationException(LOGGER, String.format("Failed to delete schema %s", schemaName),
           Response.Status.INTERNAL_SERVER_ERROR);
