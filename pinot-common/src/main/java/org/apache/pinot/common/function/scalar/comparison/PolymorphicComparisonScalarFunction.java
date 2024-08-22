@@ -41,7 +41,7 @@ public abstract class PolymorphicComparisonScalarFunction implements PinotScalar
     // In case of heterogeneous argument types, fall back to double based comparison and allow FunctionInvoker to
     // convert argument types for v1 engine support.
     if (argumentTypes[0].getStoredType() != argumentTypes[1].getStoredType()) {
-      return functionInfoForType(ColumnDataType.DOUBLE);
+      return defaultFunctionInfo();
     }
 
     return functionInfoForType(argumentTypes[0].getStoredType());
@@ -55,7 +55,7 @@ public abstract class PolymorphicComparisonScalarFunction implements PinotScalar
     }
 
     // For backward compatibility
-    return functionInfoForType(ColumnDataType.DOUBLE);
+    return defaultFunctionInfo();
   }
 
   /**
@@ -63,4 +63,13 @@ public abstract class PolymorphicComparisonScalarFunction implements PinotScalar
    * take two arguments of the same type.
    */
   protected abstract FunctionInfo functionInfoForType(ColumnDataType argumentType);
+
+  /**
+   * Get the comparison scalar function's default {@link FunctionInfo}. The default function is used when the argument
+   * types are mismatched or when the function info is retrieved based on the number of arguments rather than the
+   * argument types. This is in order to maintain backward compatibility.
+   */
+  protected FunctionInfo defaultFunctionInfo() {
+    return functionInfoForType(ColumnDataType.DOUBLE);
+  }
 }
