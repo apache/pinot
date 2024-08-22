@@ -243,7 +243,7 @@
 
     <!-- Solve conflict across dependencies -->
     <jetbrains.annotations.version>24.1.0</jetbrains.annotations.version>
-    <kotlin.stdlib.version>2.0.10</kotlin.stdlib.version>
+    <kotlin.stdlib.version>2.0.20</kotlin.stdlib.version>
     <okio.version>3.9.0</okio.version>
     <kerby.version>2.1.0</kerby.version>
     <jline.version>3.26.3</jline.version>
