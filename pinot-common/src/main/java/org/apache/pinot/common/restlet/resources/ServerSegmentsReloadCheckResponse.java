@@ -30,14 +30,16 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class ServerSegmentsReloadCheckResponse {
+  @JsonProperty("needReload")
   private final boolean _needReload;
+
+  @JsonProperty("instanceId")
   private final String _instanceId;
 
   public String getInstanceId() {
     return _instanceId;
   }
 
-  @JsonProperty("needReload")
   public boolean getNeedReload() {
     return _needReload;
   }

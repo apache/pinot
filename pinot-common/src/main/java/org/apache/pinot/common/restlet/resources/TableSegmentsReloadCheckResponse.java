@@ -32,7 +32,9 @@ import java.util.Map;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class TableSegmentsReloadCheckResponse {
+  @JsonProperty("needReload")
   boolean _needReload;
+  @JsonProperty("serverToSegmentsCheckReloadList")
   Map<String, ServerSegmentsReloadCheckResponse> _serverToSegmentsCheckReloadList;
 
   public Map<String, ServerSegmentsReloadCheckResponse> getServerToSegmentsCheckReloadList() {
