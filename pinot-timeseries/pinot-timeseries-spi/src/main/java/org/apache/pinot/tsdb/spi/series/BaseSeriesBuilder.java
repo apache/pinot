@@ -1,0 +1,75 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.pinot.tsdb.spi.series;
+
+import java.util.List;
+import java.util.Objects;
+import javax.annotation.Nullable;
+import org.apache.pinot.tsdb.spi.TimeBuckets;
+
+
+/**
+ * BaseSeriesBuilder allows language implementations to build their own aggregation and other time-series functions.
+ * Each time-series operator would typically call either of {@link #addValue} or {@link #addValueAtIndex}. When
+ * the operator is done, it will call {@link #build()} to allow the builder to compute the final {@link Series}.
+ */
+public abstract class BaseSeriesBuilder {
+  protected final String _id;
+  @Nullable
+  protected final Long[] _timeValues;
+  @Nullable
+  protected final TimeBuckets _timeBuckets;
+  protected final List<String> _tagNames;
+  protected final Object[] _tagValues;
+
+  public BaseSeriesBuilder(String id, @Nullable Long[] timeValues, @Nullable TimeBuckets timeBuckets,
+      List<String> tagNames, Object[] tagValues) {
+    _id = id;
+    _timeValues = timeValues;
+    _timeBuckets = timeBuckets;
+    _tagNames = tagNames;
+    _tagValues = tagValues;
+  }
+
+  public abstract void addValueAtIndex(int timeBucketIndex, Double value);
+
+  public void addValueAtIndex(int timeBucketIndex, String value) {
+    throw new IllegalStateException("This aggregation function does not support string input");
+  }
+
+  public abstract void addValue(long timeValue, Double value);
+
+  public void mergeSeries(Series series) {
+    int numDataPoints = series.getValues().length;
+    Long[] timeValues = Objects.requireNonNull(series.getTimeValues(),
+        "Cannot merge series: found null timeValues");
+    for (int i = 0; i < numDataPoints; i++) {
+      addValue(timeValues[i], series.getValues()[i]);
+    }
+  }
+
+  public void mergeAlignedSeries(Series series) {
+    int numDataPoints = series.getValues().length;
+    for (int i = 0; i < numDataPoints; i++) {
+      addValueAtIndex(i, series.getValues()[i]);
+    }
+  }
+
+  public abstract Series build();
+}
