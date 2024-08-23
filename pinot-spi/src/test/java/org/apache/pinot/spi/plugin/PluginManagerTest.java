@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.URL;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
@@ -207,13 +208,17 @@ public class PluginManagerTest {
     final String originalLegacyPluginLoader = System.getProperty(PLUGINS_LOADER_LEGACY_PROPERTY_NAME);
 
     try {
-      System.setProperty(PLUGINS_DIR_PROPERTY_NAME, Path.of("target/test-classes/plugins").toAbsolutePath().toString());
+      Path pluginsDirectory = Path.of("target/test-classes/plugins").toAbsolutePath();
+      System.setProperty(PLUGINS_DIR_PROPERTY_NAME, pluginsDirectory.toString());
       System.setProperty(PLUGINS_LOADER_LEGACY_PROPERTY_NAME, "false");
 
       PluginManager pluginManager = new PluginManager();
 
       Assert.assertNotNull(ClassLoader.getSystemClassLoader().loadClass("org.apache.commons.math3.util.MathUtils"));
 
+      Assert.assertTrue(
+          Files.exists(pluginsDirectory.resolve("pinot-dropwizard/pinot-dropwizard-0.10.0-shaded.jar")),
+          "Plugin not found. Run 'mvn -f pinot-spi/pom.xml process-test-resources' once to prepare this artifact");
       Assert.assertNotNull(pluginManager.loadClass(
               "pinot-dropwizard",
               "org.apache.pinot.plugin.metrics.dropwizard.DropwizardMetricsRegistry"));
@@ -232,6 +237,9 @@ public class PluginManagerTest {
                       "pinot-dropwizard",
                       "org.apache.commons.math3.util.MathUtils"));
 
+      Assert.assertTrue(
+          Files.exists(pluginsDirectory.resolve("pinot-yammer/pinot-yammer-0.10.0-shaded.jar")),
+          "Plugin not found. Run 'mvn -f pinot-spi/pom.xml process-test-resources' once to prepare this artifact");
       Assert.assertNotNull(pluginManager.loadClass(
               "pinot-yammer",
               "org.apache.pinot.plugin.metrics.yammer.YammerMetricsRegistry"));
