@@ -479,7 +479,7 @@ public class PluginManager {
     Class<T> loadedClass;
     String name = loadClassWithBackwardCompatibleCheck(className);
     if (useLegacyPluginClassloader()) {
-      PluginClassLoader pluginClassLoader = PLUGIN_MANAGER._registry.get(new Plugin(pluginName));
+      PluginClassLoader pluginClassLoader = _registry.get(new Plugin(pluginName));
       loadedClass = (Class<T>) pluginClassLoader.loadClass(name, true);
     } else {
       loadedClass = (Class<T>) Class.forName(name, true, _classWorld.getRealm(pluginName));

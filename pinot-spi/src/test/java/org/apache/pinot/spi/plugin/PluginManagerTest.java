@@ -214,7 +214,17 @@ public class PluginManagerTest {
 
       PluginManager pluginManager = new PluginManager();
 
-      Assert.assertNotNull(ClassLoader.getSystemClassLoader().loadClass("org.apache.commons.math3.util.MathUtils"));
+      // MathUtils is only used in pinot framework, should not be available in plugins
+      String commonsMathUtils = "org.apache.commons.math3.util.MathUtils";
+
+      // IOUtils exists in all realms, they should use their own version
+      String commonsIOUtils = "org.apache.commons.io.IOUtils";
+
+      // StringUtils is imported from pinot classloader
+      String spiStringUtils = "org.apache.pinot.spi.utils.StringUtil";
+
+      Assert.assertNotNull(ClassLoader.getSystemClassLoader().loadClass(commonsMathUtils));
+      Assert.assertNotNull(ClassLoader.getSystemClassLoader().loadClass(commonsIOUtils));
 
       Assert.assertTrue(
           Files.exists(pluginsDirectory.resolve("pinot-dropwizard/pinot-dropwizard-0.10.0-shaded.jar")),
@@ -226,16 +236,16 @@ public class PluginManagerTest {
               "pinot-dropwizard",
               "org.apache.pinot.plugin.metrics.dropwizard.DropwizardMetricsRegistry"));
       Assert.assertNotNull(pluginManager.loadClass(
-              "pinot-dropwizard",
-              "org.apache.pinot.spi.utils.StringUtil"));
+              "pinot-dropwizard", spiStringUtils));
       Assert.assertThrows("Class is part of a different plugin, so should not be accessible",
               ClassNotFoundException.class, () -> pluginManager.loadClass(
                       "pinot-dropwizard",
                       "org.apache.pinot.plugin.metrics.yammer.YammerMetricsRegistry"));
       Assert.assertThrows("Class is dependency of pinot-spi, but is not an exported package",
               ClassNotFoundException.class, () -> pluginManager.loadClass(
-                      "pinot-dropwizard",
-                      "org.apache.commons.math3.util.MathUtils"));
+                      "pinot-dropwizard", commonsMathUtils));
+      Assert.assertTrue(pluginManager.loadClass("pinot-dropwizard", commonsIOUtils).getProtectionDomain()
+          .getCodeSource().getLocation().getPath().endsWith("pinot-dropwizard-0.10.0-shaded.jar"));
 
       Assert.assertTrue(
           Files.exists(pluginsDirectory.resolve("pinot-yammer/pinot-yammer-0.10.0-shaded.jar")),
@@ -247,16 +257,16 @@ public class PluginManagerTest {
               "pinot-yammer",
               "org.apache.pinot.plugin.metrics.yammer.YammerMetricsRegistry"));
       Assert.assertNotNull(pluginManager.loadClass(
-              "pinot-yammer",
-              "org.apache.pinot.spi.utils.StringUtil"));
+              "pinot-yammer", spiStringUtils));
       Assert.assertThrows("Class is part of a different plugin, so should not be accessible",
               ClassNotFoundException.class, () -> pluginManager.loadClass(
                       "pinot-yammer",
                       "org.apache.pinot.plugin.metrics.dropwizard.DropwizardMetricsRegistry"));
       Assert.assertThrows("Class is dependency of pinot-spi, but is not an exported package",
               ClassNotFoundException.class, () -> pluginManager.loadClass(
-                      "pinot-yammer",
-                      "org.apache.commons.math3.util.MathUtils"));
+                      "pinot-yammer", commonsMathUtils));
+      Assert.assertTrue(pluginManager.loadClass("pinot-yammer", commonsIOUtils).getProtectionDomain()
+          .getCodeSource().getLocation().getPath().endsWith("pinot-yammer-0.10.0-shaded.jar"));
     } finally {
       if (originalPluginDir != null) {
         System.setProperty(PLUGINS_DIR_PROPERTY_NAME, originalPluginDir);
