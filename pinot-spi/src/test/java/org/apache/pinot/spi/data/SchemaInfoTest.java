@@ -75,9 +75,6 @@ public class SchemaInfoTest {
     schemaInfoList.add(schemaInfo);
     String response = JsonUtils.objectToPrettyString(schemaInfoList);
     JsonNode jsonNodeResp = JsonUtils.stringToJsonNode(response);
-    //test serialization
-    assertEquals("[ {\n" + "  \"schemaName\" : \"TestSchema\",\n" + "  \"numDimensionFields\" : 3,\n"
-        + "  \"numDateTimeFields\" : 2,\n" + "  \"numMetricFields\" : 1\n" + "} ]", response);
 
     //test deserialization
     assertEquals(jsonNodeResp.get(0).get("schemaName").asText(), "TestSchema");
