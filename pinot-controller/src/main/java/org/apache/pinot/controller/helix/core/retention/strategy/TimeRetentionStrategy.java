@@ -50,7 +50,7 @@ public class TimeRetentionStrategy implements RetentionStrategy {
       LOGGER.warn("Segment: {} of table: {} has invalid end time in millis: {}", segmentZKMetadata.getSegmentName(),
           tableNameWithType, endTimeMs);
       _controllerMetrics.addMeteredTableValue(tableNameWithType,
-          ControllerMeter.CONTROLLER_TIME_RETENTION_ERROR, 1L);
+          ControllerMeter.CONTROLLER_SEGMENT_TIME_RETENTION_ERROR, 1L);
       return false;
     }
 
