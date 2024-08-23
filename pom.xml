@@ -126,8 +126,6 @@
     <!-- Sets the VM argument line used when unit tests are run. -->
     <argLine>-Xms4g -Xmx4g</argLine>
     <SKIP_INTEGRATION_TESTS>true</SKIP_INTEGRATION_TESTS>
-    <surefire.version>3.4.0</surefire.version>
-    <maven-enforcer-plugin.version>3.5.0</maven-enforcer-plugin.version>
 
     <!-- Checkstyle violation prop.-->
     <checkstyle.violation.severity>warning</checkstyle.violation.severity>
@@ -135,8 +133,6 @@
 
     <!-- Configuration for Packaging -->
     <shade.prefix>org.apache.pinot.shaded</shade.prefix>
-    <maven-jar-plugin.version>3.4.2</maven-jar-plugin.version>
-    <maven-shade-plugin.version>3.6.0</maven-shade-plugin.version>
     <shade.phase.prop>none</shade.phase.prop>
 
     <avro.version>1.11.3</avro.version>
@@ -1800,6 +1796,7 @@
 
   <build>
     <defaultGoal>clean install</defaultGoal>
+
     <extensions>
       <extension>
         <groupId>kr.motd.maven</groupId>
@@ -1807,6 +1804,7 @@
         <version>1.7.1</version>
       </extension>
     </extensions>
+
     <pluginManagement>
       <plugins>
         <plugin>
@@ -1869,27 +1867,17 @@
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
-          <artifactId>maven-assembly-plugin</artifactId>
-          <version>3.7.1</version>
-        </plugin>
-        <plugin>
-          <artifactId>maven-resources-plugin</artifactId>
-          <version>3.3.1</version>
-        </plugin>
-        <plugin>
-          <groupId>org.apache.maven.plugins</groupId>
-          <artifactId>maven-dependency-plugin</artifactId>
-          <version>3.7.1</version>
-        </plugin>
-        <plugin>
-          <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-javadoc-plugin</artifactId>
-          <version>3.8.0</version>
           <configuration>
             <!-- Remove this after fixing all javadoc warnings -->
             <doclint>none</doclint>
             <source>${jdk.version}</source>
           </configuration>
+        </plugin>
+        <plugin>
+          <groupId>org.jacoco</groupId>
+          <artifactId>jacoco-maven-plugin</artifactId>
+          <version>0.8.12</version>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
@@ -1905,17 +1893,7 @@
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
-          <artifactId>maven-eclipse-plugin</artifactId>
-          <version>2.10</version>
-          <configuration>
-            <downloadSources>true</downloadSources>
-            <downloadJavadocs>true</downloadJavadocs>
-          </configuration>
-        </plugin>
-        <plugin>
-          <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-jar-plugin</artifactId>
-          <version>${maven-jar-plugin.version}</version>
           <executions>
             <execution>
               <goals>
@@ -1939,7 +1917,6 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-surefire-plugin</artifactId>
-          <version>${surefire.version}</version>
           <configuration>
             <forkCount>1</forkCount>
             <reuseForks>false</reuseForks>
@@ -1974,8 +1951,6 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-enforcer-plugin</artifactId>
-          <!-- Note that 3.0.0, while newer, has bugs w/provided transitive dependencies -->
-          <version>${maven-enforcer-plugin.version}</version>
           <executions>
             <execution>
               <id>enforce-dependency-convergence</id>
@@ -2025,9 +2000,18 @@
           <version>4.5</version>
         </plugin>
         <plugin>
+          <groupId>org.codehaus.mojo</groupId>
+          <artifactId>buildnumber-maven-plugin</artifactId>
+          <version>3.2.0</version>
+        </plugin>
+        <plugin>
+          <groupId>org.codehaus.mojo</groupId>
+          <artifactId>versions-maven-plugin</artifactId>
+          <version>2.17.1</version>
+        </plugin>
+        <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-release-plugin</artifactId>
-          <version>3.1.1</version>
           <dependencies>
             <dependency>
               <groupId>org.apache.maven.scm</groupId>
@@ -2044,8 +2028,7 @@
           <artifactId>protobuf-maven-plugin</artifactId>
           <version>0.6.1</version>
           <configuration>
-            <protocArtifact>com.google.protobuf:protoc:${protobuf.version}:exe:${os.detected.classifier}
-            </protocArtifact>
+            <protocArtifact>com.google.protobuf:protoc:${protobuf.version}:exe:${os.detected.classifier}</protocArtifact>
             <pluginId>grpc-java</pluginId>
             <pluginArtifact>io.grpc:protoc-gen-grpc-java:${grpc.version}:exe:${os.detected.classifier}</pluginArtifact>
           </configuration>
@@ -2063,7 +2046,6 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-compiler-plugin</artifactId>
-          <version>3.13.0</version>
           <configuration>
             <release>${jdk.version}</release>
             <source>${jdk.version}</source>
@@ -2071,11 +2053,6 @@
             <fork>true</fork>
             <encoding>${project.build.sourceEncoding}</encoding>
           </configuration>
-        </plugin>
-        <plugin>
-          <groupId>org.apache.maven.plugins</groupId>
-          <artifactId>maven-remote-resources-plugin</artifactId>
-          <version>3.2.0</version>
         </plugin>
         <plugin>
           <groupId>com.googlecode.fmpp-maven-plugin</groupId>
@@ -2151,13 +2128,46 @@
             </javacArgs>
           </configuration>
         </plugin>
+        <plugin>
+          <groupId>org.scalatest</groupId>
+          <artifactId>scalatest-maven-plugin</artifactId>
+          <version>2.2.0</version>
+          <configuration>
+            <reportsDirectory>${project.build.directory}/surefire-reports</reportsDirectory>
+            <junitxml>.</junitxml>
+            <parallel>false</parallel>
+          </configuration>
+          <executions>
+            <execution>
+              <id>test</id>
+              <goals>
+                <goal>test</goal>
+              </goals>
+            </execution>
+          </executions>
+        </plugin>
+        <plugin>
+          <groupId>com.github.eirslett</groupId>
+          <artifactId>frontend-maven-plugin</artifactId>
+          <version>1.15.0</version>
+        </plugin>
+        <plugin>
+          <groupId>net.nicoulaj.maven.plugins</groupId>
+          <artifactId>checksum-maven-plugin</artifactId>
+          <version>1.11</version>
+        </plugin>
+        <plugin>
+          <groupId>org.codehaus.mojo</groupId>
+          <artifactId>exec-maven-plugin</artifactId>
+          <version>3.4.1</version>
+        </plugin>
       </plugins>
     </pluginManagement>
+
     <plugins>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-checkstyle-plugin</artifactId>
-        <version>3.4.0</version>
         <configuration>
           <configLocation>${pinot.root}/config/checkstyle.xml</configLocation>
           <suppressionsLocation>${pinot.root}/config/suppressions.xml</suppressionsLocation>
@@ -2248,7 +2258,6 @@
       <plugin>
         <groupId>org.jacoco</groupId>
         <artifactId>jacoco-maven-plugin</artifactId>
-        <version>0.8.12</version>
         <executions>
           <execution>
             <goals>
@@ -2274,18 +2283,12 @@
         </configuration>
       </plugin>
       <plugin>
-        <groupId>org.codehaus.mojo</groupId>
-        <artifactId>sonar-maven-plugin</artifactId>
-        <version>2.7.1</version>
-      </plugin>
-      <plugin>
         <groupId>com.diffplug.spotless</groupId>
         <artifactId>spotless-maven-plugin</artifactId>
       </plugin>
       <plugin>
         <groupId>com.mycila</groupId>
         <artifactId>license-maven-plugin</artifactId>
-        <version>4.5</version>
         <configuration>
           <licenseSets>
             <licenseSet>
@@ -2405,7 +2408,6 @@
       <plugin>
         <groupId>org.apache.rat</groupId>
         <artifactId>apache-rat-plugin</artifactId>
-        <version>0.16.1</version>
         <executions>
           <execution>
             <phase>verify</phase>
@@ -2502,7 +2504,6 @@
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>buildnumber-maven-plugin</artifactId>
-        <version>3.2.0</version>
         <executions>
           <execution>
             <phase>validate</phase>
@@ -2515,11 +2516,10 @@
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>versions-maven-plugin</artifactId>
-        <version>2.17.1</version>
       </plugin>
       <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-shade-plugin</artifactId>
-        <version>${maven-shade-plugin.version}</version>
         <dependencies>
           <dependency>
             <groupId>org.apache.logging.log4j</groupId>
@@ -2601,6 +2601,8 @@
       </plugin>
     </plugins>
   </build>
+
+  <!-- TODO: Revisit if we need reporting -->
   <reporting>
     <plugins>
       <plugin>
@@ -2614,7 +2616,6 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-project-info-reports-plugin</artifactId>
-        <version>3.6.2</version>
         <configuration>
           <dependencyLocationsEnabled>false</dependencyLocationsEnabled>
         </configuration>

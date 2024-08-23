@@ -106,7 +106,6 @@
              Thus, explicitly adding this plugin to a new profile to sign the files at the end all at once. -->
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-gpg-plugin</artifactId>
-            <version>3.2.5</version>
           </plugin>
         </plugins>
       </build>
@@ -139,20 +138,6 @@
       <plugin>
         <groupId>org.scalatest</groupId>
         <artifactId>scalatest-maven-plugin</artifactId>
-        <version>2.2.0</version>
-        <configuration>
-          <reportsDirectory>${project.build.directory}/surefire-reports</reportsDirectory>
-          <junitxml>.</junitxml>
-          <parallel>false</parallel>
-        </configuration>
-        <executions>
-          <execution>
-            <id>test</id>
-            <goals>
-              <goal>test</goal>
-            </goals>
-          </execution>
-        </executions>
       </plugin>
     </plugins>
   </build>
