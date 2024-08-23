@@ -65,7 +65,7 @@ public class PinotSinkFunction<T> extends RichSinkFunction<T> implements Checkpo
 
   private String _segmentNamePrefix;
 
-  // Used to set creation time in segment name, if not provided, current time is used
+  // Used to set upload time in segment name, if not provided, current time is used
   @Nullable private Long _segmentUploadTimeMs;
 
   private transient SegmentWriter _segmentWriter;
