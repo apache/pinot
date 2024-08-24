@@ -30,22 +30,14 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  */
 public class AggInfo {
   private final String _aggFunction;
-  // TODO: This flag is unused right now. It might make more sense to have this in the physical plans.
-  private final boolean _isPartial;
 
   @JsonCreator
   public AggInfo(
-      @JsonProperty("aggFunction") String aggFunction,
-      @JsonProperty("isPartial") boolean isPartial) {
+      @JsonProperty("aggFunction") String aggFunction) {
     _aggFunction = aggFunction;
-    _isPartial = isPartial;
   }
 
   public String getAggFunction() {
     return _aggFunction;
-  }
-
-  public boolean isPartial() {
-    return _isPartial;
   }
 }
