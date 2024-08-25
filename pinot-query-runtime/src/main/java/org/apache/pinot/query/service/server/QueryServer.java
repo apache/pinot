@@ -91,12 +91,7 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     try {
       if (_server == null) {
         if (_tlsConfig == null) {
-          try {
-            _server =
-                ServerBuilder.forPort(_port).addService(this).maxInboundMessageSize(MAX_INBOUND_MESSAGE_SIZE).build();
-          } catch (Exception e) {
-            throw new RuntimeException("Failed to start  QueryServer", e);
-          }
+          _server = ServerBuilder.forPort(_port).addService(this).maxInboundMessageSize(MAX_INBOUND_MESSAGE_SIZE).build();
         } else {
           _server = NettyServerBuilder.forPort(_port).addService(this).sslContext(buildGRpcSslContext(_tlsConfig))
               .maxInboundMessageSize(MAX_INBOUND_MESSAGE_SIZE).build();

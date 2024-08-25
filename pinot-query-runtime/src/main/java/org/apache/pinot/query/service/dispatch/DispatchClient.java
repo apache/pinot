@@ -66,12 +66,10 @@ class DispatchClient {
   }
   public DispatchClient(String host, int port, GrpcConfig grpcConfig) {
     if (grpcConfig.isUsePlainText()) {
-      _channel =
-          ManagedChannelBuilder.forAddress(host, port).maxInboundMessageSize(grpcConfig.getMaxInboundMessageSizeBytes())
-              .usePlaintext().build();
+      _channel = ManagedChannelBuilder.forAddress(host, port).usePlaintext().build();
     } else {
       _channel =
-          NettyChannelBuilder.forAddress(host, port).maxInboundMessageSize(grpcConfig.getMaxInboundMessageSizeBytes())
+          NettyChannelBuilder.forAddress(host, port)
               .sslContext(buildSslContext(grpcConfig.getTlsConfig())).build();
     }
     _dispatchStub = PinotQueryWorkerGrpc.newStub(_channel);
