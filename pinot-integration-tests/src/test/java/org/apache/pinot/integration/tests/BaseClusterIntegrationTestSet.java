@@ -738,8 +738,8 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     if (includeOfflineTable) {
       //test controller api which gives responses if reload is needed on any of the server segments when default
       // columns are added
-      String needBeforeReloadResponseWithNoVerbose = needReloadTable(tableNameWithTypeOffline, false);
-      String needBeforeReloadResponseWithVerbose = needReloadTable(tableNameWithTypeOffline, true);
+      String needBeforeReloadResponseWithNoVerbose = checkIfReloadIsNeeded(tableNameWithTypeOffline, false);
+      String needBeforeReloadResponseWithVerbose = checkIfReloadIsNeeded(tableNameWithTypeOffline, true);
       JsonNode jsonNeedReloadResponseWithNoVerbose = JsonUtils.stringToJsonNode(needBeforeReloadResponseWithNoVerbose);
       JsonNode jsonNeedReloadResponseWithVerbose = JsonUtils.stringToJsonNode(needBeforeReloadResponseWithVerbose);
       //test to check if reload is needed i.e true
@@ -750,8 +750,8 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     }
     //test controller api which gives responses if reload is needed on any of the server segments when default
     // columns are added
-    String needBeforeReloadResponseRealtimeWithNoVerbose = needReloadTable(tableNameWithTypeRealtime, false);
-    String needBeforeReloadResponseRealtimeWithVerbose = needReloadTable(tableNameWithTypeRealtime, true);
+    String needBeforeReloadResponseRealtimeWithNoVerbose = checkIfReloadIsNeeded(tableNameWithTypeRealtime, false);
+    String needBeforeReloadResponseRealtimeWithVerbose = checkIfReloadIsNeeded(tableNameWithTypeRealtime, true);
     JsonNode jsonNeedReloadResponseRealTimeWithNoVerbose =
         JsonUtils.stringToJsonNode(needBeforeReloadResponseRealtimeWithNoVerbose);
     JsonNode jsonNeedReloadResponseRealTimeWithVerbose =
@@ -801,8 +801,8 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     assertEquals(queryResponse.get("exceptions").size(), 0);
     assertEquals(queryResponse.get("resultTable").get("rows").get(0).get(0).asLong(), countStarResult);
     if (includeOfflineTable) {
-      String needAfterReloadResponseWithNoVerbose = needReloadTable(tableNameWithTypeOffline, false);
-      String needAfterReloadResponseWithVerbose = needReloadTable(tableNameWithTypeOffline, true);
+      String needAfterReloadResponseWithNoVerbose = checkIfReloadIsNeeded(tableNameWithTypeOffline, false);
+      String needAfterReloadResponseWithVerbose = checkIfReloadIsNeeded(tableNameWithTypeOffline, true);
       JsonNode jsonNeedReloadResponseAfterWithNoVerbose =
           JsonUtils.stringToJsonNode(needAfterReloadResponseWithNoVerbose);
       JsonNode jsonNeedReloadResponseAfterWithVerbose = JsonUtils.stringToJsonNode(needAfterReloadResponseWithVerbose);
@@ -811,8 +811,8 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
       assertFalse(jsonNeedReloadResponseAfterWithVerbose.get("needReload").asBoolean());
       assertFalse(jsonNeedReloadResponseRealTimeWithVerbose.get("serverToSegmentsCheckReloadList").isEmpty());
     }
-    String needAfterReloadResponseRealtimeWithNoVerbose = needReloadTable(tableNameWithTypeRealtime, false);
-    String needAfterReloadResponseRealTimeWithVerbose = needReloadTable(tableNameWithTypeRealtime, true);
+    String needAfterReloadResponseRealtimeWithNoVerbose = checkIfReloadIsNeeded(tableNameWithTypeRealtime, false);
+    String needAfterReloadResponseRealTimeWithVerbose = checkIfReloadIsNeeded(tableNameWithTypeRealtime, true);
     JsonNode jsonNeedReloadResponseRealtimeAfterWithNoVerbose =
         JsonUtils.stringToJsonNode(needAfterReloadResponseRealtimeWithNoVerbose);
     JsonNode jsonNeedReloadResponseRealtimeAfterWithVerbose =

@@ -201,7 +201,7 @@ public class ControllerRequestClient {
     }
   }
 
-  public String checkIfReloadIsNeeded(String tableNameWithType, Boolean verbose)
+  public String checkIfTableReloadIsNeeded(String tableNameWithType, Boolean verbose)
       throws IOException {
     try {
       SimpleHttpResponse simpleHttpResponse = HttpClient.wrapAndThrowHttpException(_httpClient.sendGetRequest(
