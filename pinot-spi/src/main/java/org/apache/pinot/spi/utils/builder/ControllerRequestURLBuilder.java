@@ -239,8 +239,8 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "segments", tableName, query);
   }
 
-  public String forTableNeedReload(String tableNameWithType) {
-    String query = String.format("needReload?verbose=%s", "false");
+  public String forTableNeedReload(String tableNameWithType, Boolean verbose) {
+    String query = String.format("needReload?verbose=%s", verbose);
     return StringUtil.join("/", _baseUrl, "segments", tableNameWithType, query);
   }
 

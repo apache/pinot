@@ -721,9 +721,9 @@ public class ControllerTest {
     return getControllerRequestClient().reloadTable(tableName, TableType.OFFLINE, forceDownload);
   }
 
-  public String needReloadOfflineTable(String tableNameWithType)
+  public String needReloadTable(String tableNameWithType, Boolean verbose)
       throws IOException {
-    return getControllerRequestClient().needReloadTable(tableNameWithType);
+    return getControllerRequestClient().checkIfReloadIsNeeded(tableNameWithType, verbose);
   }
 
   public void reloadOfflineSegment(String tableName, String segmentName, boolean forceDownload)

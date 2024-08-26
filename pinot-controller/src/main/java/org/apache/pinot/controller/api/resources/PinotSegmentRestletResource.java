@@ -829,19 +829,18 @@ public class PinotSegmentRestletResource {
   @Authorize(targetType = TargetType.TABLE, paramName = "tableNameWithType", action = Actions.Table.GET_METADATA)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Gets the metadata of reload segments check from servers hosting the table", notes =
-      "Returns true if " + "reload is needed on the table from any one of the servers")
+      "Returns true if reload is needed on the table from any one of the servers")
   public String getTableReloadMetadata(
       @ApiParam(value = "Table name with type", required = true, example = "myTable_REALTIME")
       @PathParam("tableNameWithType") String tableNameWithType,
       @QueryParam("verbose") @DefaultValue("false") boolean verbose, @Context HttpHeaders headers) {
-    String tableName = TableNameBuilder.extractRawTableName(tableNameWithType);
-    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
-    LOGGER.info("Received a request to check reload for all servers hosting segments for table {}", tableName);
+    tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
+    LOGGER.info("Received a request to check reload for all servers hosting segments for table {}", tableNameWithType);
     try {
       TableMetadataReader tableMetadataReader =
           new TableMetadataReader(_executor, _connectionManager, _pinotHelixResourceManager);
       Map<String, JsonNode> needReloadMetadata =
-          tableMetadataReader.getServerCheckSegmentsReloadMetadata(tableName, tableType,
+          tableMetadataReader.getServerCheckSegmentsReloadMetadata(tableNameWithType,
               _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
       boolean needReload =
           needReloadMetadata.values().stream().anyMatch(value -> value.get("needReload").booleanValue());

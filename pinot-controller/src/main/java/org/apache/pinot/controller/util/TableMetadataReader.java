@@ -33,10 +33,10 @@ import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.restlet.resources.TableMetadataInfo;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsMetadataInfo;
-import org.apache.pinot.controller.api.resources.ResourceUtils;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -61,12 +61,10 @@ public class TableMetadataReader {
     _pinotHelixResourceManager = helixResourceManager;
   }
 
-  public Map<String, JsonNode> getServerCheckSegmentsReloadMetadata(String tableName, TableType tableType,
-      int timeoutMs)
+  public Map<String, JsonNode> getServerCheckSegmentsReloadMetadata(String tableNameWithType, int timeoutMs)
       throws InvalidConfigException, IOException {
-    String tableNameWithType =
-        ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER).get(0);
-    List<String> serverInstances = _pinotHelixResourceManager.getServerInstancesForTable(tableName, tableType);
+    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
+    List<String> serverInstances = _pinotHelixResourceManager.getServerInstancesForTable(tableNameWithType, tableType);
     Set<String> serverInstanceSet = new HashSet<>(serverInstances);
     BiMap<String, String> endpoints = _pinotHelixResourceManager.getDataInstanceAdminEndpoints(serverInstanceSet);
     ServerSegmentMetadataReader serverSegmentMetadataReader =

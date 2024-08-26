@@ -37,12 +37,12 @@ public class TableSegmentsReloadCheckResponse {
   @JsonProperty("serverToSegmentsCheckReloadList")
   Map<String, ServerSegmentsReloadCheckResponse> _serverToSegmentsCheckReloadList;
 
-  public Map<String, ServerSegmentsReloadCheckResponse> getServerToSegmentsCheckReloadList() {
-    return _serverToSegmentsCheckReloadList;
-  }
-
   public boolean isNeedReload() {
     return _needReload;
+  }
+
+  public Map<String, ServerSegmentsReloadCheckResponse> getServerToSegmentsCheckReloadList() {
+    return _serverToSegmentsCheckReloadList;
   }
 
   @JsonCreator

@@ -38,7 +38,7 @@ import static org.testng.Assert.assertTrue;
  * Tests some of the serializer and deserialization responses from SegmentsReloadCheckResponse class
  * needReload will have to be carefully evaluated
  */
-public class SerializerResponseTest {
+public class SegmentsReloadCheckResponseTest {
 
   @Test
   public void testSerialization()
@@ -85,6 +85,6 @@ public class SerializerResponseTest {
     assertNotNull(tableReloadResponse.getServerToSegmentsCheckReloadList());
     Map<String, ServerSegmentsReloadCheckResponse> serverSegmentReloadResp =
         tableReloadResponse.getServerToSegmentsCheckReloadList();
-    assertEquals(serverSegmentReloadResp.get("Server_10.0.0.215_7050").getNeedReload(), false);
+    assertEquals(serverSegmentReloadResp.get("Server_10.0.0.215_7050").isNeedReload(), false);
   }
 }

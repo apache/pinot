@@ -201,12 +201,11 @@ public class ControllerRequestClient {
     }
   }
 
-  public String needReloadTable(String tableNameWithType)
+  public String checkIfReloadIsNeeded(String tableNameWithType, Boolean verbose)
       throws IOException {
     try {
-      SimpleHttpResponse simpleHttpResponse = HttpClient.wrapAndThrowHttpException(
-          _httpClient.sendGetRequest(new URI(_controllerRequestURLBuilder.forTableNeedReload(tableNameWithType)),
-              _headers, null));
+      SimpleHttpResponse simpleHttpResponse = HttpClient.wrapAndThrowHttpException(_httpClient.sendGetRequest(
+          new URI(_controllerRequestURLBuilder.forTableNeedReload(tableNameWithType, verbose)), _headers, null));
       return simpleHttpResponse.getResponse();
     } catch (HttpErrorStatusException | URISyntaxException e) {
       throw new IOException(e);

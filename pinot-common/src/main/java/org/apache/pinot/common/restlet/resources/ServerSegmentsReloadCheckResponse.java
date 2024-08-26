@@ -36,12 +36,12 @@ public class ServerSegmentsReloadCheckResponse {
   @JsonProperty("instanceId")
   private final String _instanceId;
 
-  public String getInstanceId() {
-    return _instanceId;
+  public boolean isNeedReload() {
+    return _needReload;
   }
 
-  public boolean getNeedReload() {
-    return _needReload;
+  public String getInstanceId() {
+    return _instanceId;
   }
 
   @JsonCreator
