@@ -1,8 +1,9 @@
 import java.util.zip.ZipFile
 
 def expected = [
-    'PINOT-INF/classes/org/apache/pinot/it/Simple.class',
-    "PINOT-INF/lib/commons-lang3-${commonslang3_version}.jar"
+    'pinot-plugin.properties',
+    'classes/org/apache/pinot/it/Simple.class',
+    "commons-lang3-${commonslang3_version}.jar"
 ] as Set
 
 def entries = new File(basedir,'target/simple-assembly-0.0.1-SNAPSHOT-plugin.zip').with {

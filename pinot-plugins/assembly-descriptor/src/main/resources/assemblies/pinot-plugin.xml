@@ -28,16 +28,27 @@
   </formats>
   <includeBaseDirectory>false</includeBaseDirectory>
   <fileSets>
+    <!-- the pinot-plugin.properties is the plugin metadata file and is moved to the root of the zip -->
     <fileSet>
       <directory>${project.build.outputDirectory}</directory>
-      <outputDirectory>PINOT-INF/classes</outputDirectory>
+      <excludes>
+        <exclude>pinot-plugin.properties</exclude>
+      </excludes>
+      <outputDirectory>classes</outputDirectory>
+    </fileSet>
+    <fileSet>
+      <directory>${project.build.outputDirectory}</directory>
+      <includes>
+        <include>pinot-plugin.properties</include>
+      </includes>
+      <outputDirectory>./</outputDirectory>
     </fileSet>
   </fileSets>
   <dependencySets>
     <dependencySet>
       <useProjectArtifact>false</useProjectArtifact>
       <scope>runtime</scope>
-      <outputDirectory>PINOT-INF/lib</outputDirectory>
+      <outputDirectory>./</outputDirectory>
     </dependencySet>
   </dependencySets>
 </assembly>
