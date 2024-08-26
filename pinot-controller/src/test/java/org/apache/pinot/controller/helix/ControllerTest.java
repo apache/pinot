@@ -723,7 +723,7 @@ public class ControllerTest {
 
   public String checkIfReloadIsNeeded(String tableNameWithType, Boolean verbose)
       throws IOException {
-    return getControllerRequestClient().checkIfTableReloadIsNeeded(tableNameWithType, verbose);
+    return getControllerRequestClient().checkIfReloadIsNeeded(tableNameWithType, verbose);
   }
 
   public void reloadOfflineSegment(String tableName, String segmentName, boolean forceDownload)
