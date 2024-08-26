@@ -30,7 +30,7 @@ import static org.testng.Assert.*;
 
 public class TimeSeriesPlanSerdeTest {
   @Test
-  public void testFoo() {
+  public void testSerdeForScanFilterProjectNode() {
     ScanFilterAndProjectPlanNode scanFilterAndProjectPlanNode = new ScanFilterAndProjectPlanNode(
         "sfp#0", new ArrayList<>(), "myTable", "myTimeColumn", TimeUnit.MILLISECONDS,
         0L, "myFilterExpression", "myValueExpression",
@@ -46,7 +46,7 @@ public class TimeSeriesPlanSerdeTest {
     assertEquals(deserializedNode.getOffset(), 0L);
     assertEquals(deserializedNode.getFilterExpression(), "myFilterExpression");
     assertEquals(deserializedNode.getValueExpression(), "myValueExpression");
-    assertNull(deserializedNode.getAggInfo());
+    assertNotNull(deserializedNode.getAggInfo());
     assertEquals(deserializedNode.getGroupByColumns().size(), 0);
   }
 }
