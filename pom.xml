@@ -177,7 +177,7 @@
     <stax2-api.version>4.2.2</stax2-api.version>
     <aws.sdk.version>2.27.11</aws.sdk.version>
     <azure.sdk.version>1.2.26</azure.sdk.version>
-    <azure.msal4j.version>1.16.2</azure.msal4j.version>
+    <azure.msal4j.version>1.17.0</azure.msal4j.version>
     <joda-time.version>2.12.7</joda-time.version>
     <janino.version>3.1.12</janino.version>
     <woodstox.version>7.0.0</woodstox.version>
