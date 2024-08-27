@@ -49,8 +49,8 @@ public class ConcurrentMapTableUpsertMetadataManager extends BaseTableUpsertMeta
   public BasePartitionUpsertMetadataManager getOrCreatePartitionManager(int partitionId) {
     return _partitionMetadataManagerMap.computeIfAbsent(partitionId,
         k -> _enableDeletedKeysCompactionConsistency
-            ? new ConcurrentMapPartitionUpsertMetadataManager(_tableNameWithType, k, _context)
-            : new ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes(_tableNameWithType, k, _context));
+            ? new ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes(_tableNameWithType, k, _context)
+            : new ConcurrentMapPartitionUpsertMetadataManager(_tableNameWithType, k, _context));
   }
 
   @Override
