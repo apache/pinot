@@ -23,10 +23,10 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 
 /**
- * AggInfo is used to represent the aggregation function, and whether it is a partial aggregation or not.
- * Aggregation functions are simply stored as a string, since time-series languages are allowed to implement their own
- * aggregation functions. We don't need the partial flag most likely, but keeping it here for now so we don't forget
- * to account for this.
+ * AggInfo is used to represent the aggregation function. Aggregation functions are simply stored as a string,
+ * since time-series languages are allowed to implement their own aggregation functions.
+ * TODO: We will likely be adding more parameters to this. One candidate is partial/full aggregation information or
+ *   aggregation result type to allow for intermediate result types.
  */
 public class AggInfo {
   private final String _aggFunction;
