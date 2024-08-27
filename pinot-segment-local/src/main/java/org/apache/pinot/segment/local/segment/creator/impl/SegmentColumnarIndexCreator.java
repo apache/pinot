@@ -618,7 +618,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       Object min = columnIndexCreationInfo.getMin();
       Object max = columnIndexCreationInfo.getMax();
       if (min != null && max != null) {
-        addColumnMinMaxValueInfo(properties, column, min, max, dataType.getStoredType());
+        addColumnMinMaxValueInfo(properties, column, min, max, dataType.getStoredType(), fieldSpec.getMaxLength());
       }
     }
 
@@ -634,12 +634,12 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   }
 
   public static void addColumnMinMaxValueInfo(PropertiesConfiguration properties, String column,
-      @Nullable Object minValue, @Nullable Object maxValue, DataType storedType) {
-    String validMinValue = minValue != null ? getValidPropertyValue(minValue.toString(), storedType) : null;
+      @Nullable Object minValue, @Nullable Object maxValue, DataType storedType, int maxLength) {
+    String validMinValue = minValue != null ? getValidPropertyValue(minValue.toString(), storedType, maxLength) : null;
     if (validMinValue != null) {
       properties.setProperty(getKeyFor(column, MIN_VALUE), validMinValue);
     }
-    String validMaxValue = maxValue != null ? getValidPropertyValue(maxValue.toString(), storedType) : null;
+    String validMaxValue = maxValue != null ? getValidPropertyValue(maxValue.toString(), storedType, maxLength) : null;
     if (validMaxValue != null) {
       properties.setProperty(getKeyFor(column, MAX_VALUE), validMaxValue);
     }
@@ -654,8 +654,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
    * surrogate.
    */
   @Nullable
-  private static String getValidPropertyValue(String value, DataType storedType) {
-    if (value.length() > METADATA_PROPERTY_LENGTH_LIMIT) {
+  private static String getValidPropertyValue(String value, DataType storedType, int maxLength) {
+    if (value.length() > maxLength) {
       return null;
     }
     return storedType == DataType.STRING ? CommonsConfigurationUtils.replaceSpecialCharacterInPropertyValue(value)

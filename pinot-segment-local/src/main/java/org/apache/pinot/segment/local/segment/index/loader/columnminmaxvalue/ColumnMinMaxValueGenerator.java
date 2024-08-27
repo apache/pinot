@@ -166,7 +166,7 @@ public class ColumnMinMaxValueGenerator {
     try (Dictionary dictionary = getDictionaryForColumn(columnMetadata)) {
       SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnMetadata.getColumnName(),
           dictionary.getInternal(0), dictionary.getInternal(dictionary.length() - 1),
-          columnMetadata.getDataType().getStoredType());
+          columnMetadata.getDataType().getStoredType(), columnMetadata.getColumnMaxLength());
     }
   }
 
@@ -379,7 +379,7 @@ public class ColumnMinMaxValueGenerator {
           throw new IllegalStateException("Unsupported data type: " + dataType + " for column: " + columnName);
       }
       SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName, minValue, maxValue,
-          storedType);
+          storedType, columnMetadata.getColumnMaxLength());
     }
   }
 }

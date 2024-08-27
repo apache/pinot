@@ -28,6 +28,7 @@ import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -42,6 +43,7 @@ import org.testng.annotations.Test;
  */
 public class SegmentGenerationWithMinMaxTest {
   private static final String STRING_COLUMN = "col1";
+
   private static final String[] STRING_VALUES_WITH_COMMA_CHARACTER = {"A,,", ",B,", "C,Z,", "D,", "E,"};
   private static final String[] STRING_VALUES_WITH_WHITESPACE_CHARACTERS = {"A ", " B ", "  Z ", "  \r D", "E"};
   private static final String[] STRING_VALUES_VALID = {"A", "B", "C", "D", "E"};
@@ -61,6 +63,39 @@ public class SegmentGenerationWithMinMaxTest {
     _tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
     _schema = new Schema.SchemaBuilder().addSingleValueDimension(STRING_COLUMN, FieldSpec.DataType.STRING)
         .addMetric(LONG_COLUMN, FieldSpec.DataType.LONG).build();
+  }
+
+  @Test
+  public void testMinMaxlength() throws Exception {
+    //Test1: Min String length is greater than default 512
+    DimensionFieldSpec d = new DimensionFieldSpec(STRING_COLUMN, FieldSpec.DataType.STRING, true, 15000, "null");
+    _schema = new Schema.SchemaBuilder().addField(d)
+        .addMetric(LONG_COLUMN, FieldSpec.DataType.LONG).build();
+
+    FileUtils.deleteQuietly(new File(SEGMENT_DIR_NAME));
+    //minLong stRING
+    String longString = generateLongString(15000, true);
+    String[] longValues = {"{}", "dd", "ff", "ee", longString};
+    File segmentDir = buildSegment(_tableConfig, _schema, longValues);
+    SegmentMetadataImpl metadata = new SegmentMetadataImpl(segmentDir);
+    Assert.assertEquals(metadata.getTotalDocs(), 5);
+    Assert.assertFalse(metadata.getColumnMetadataFor("col1").isMinMaxValueInvalid());
+    Assert.assertEquals(metadata.getColumnMetadataFor("col1").getMinValue(), longString);
+    Assert.assertEquals(metadata.getColumnMetadataFor("col1").getMaxValue(), "{}");
+
+    FileUtils.deleteQuietly(new File(SEGMENT_DIR_NAME));
+
+    //maxLong String
+    longString = generateLongString(15000, false);
+    longValues = new String[]{"aa", "dd", "ff", "ee", longString};
+    segmentDir = buildSegment(_tableConfig, _schema, longValues);
+    metadata = new SegmentMetadataImpl(segmentDir);
+    Assert.assertEquals(metadata.getTotalDocs(), 5);
+    Assert.assertFalse(metadata.getColumnMetadataFor("col1").isMinMaxValueInvalid());
+    Assert.assertEquals(metadata.getColumnMetadataFor("col1").getMinValue(), "aa");
+    Assert.assertEquals(metadata.getColumnMetadataFor("col1").getMaxValue(), longString);
+
+    FileUtils.deleteQuietly(new File(SEGMENT_DIR_NAME));
   }
 
   @Test
@@ -110,5 +145,14 @@ public class SegmentGenerationWithMinMaxTest {
     driver.build();
     driver.getOutputDirectory().deleteOnExit();
     return driver.getOutputDirectory();
+  }
+
+  private String generateLongString(int length, boolean isMin) {
+    char repeatingChar = isMin ? 'a' : 'z';
+    StringBuilder sb = new StringBuilder(length);
+    for (int i = 0; i < length; i++) {
+      sb.append(repeatingChar);
+    }
+    return sb.toString();
   }
 }
