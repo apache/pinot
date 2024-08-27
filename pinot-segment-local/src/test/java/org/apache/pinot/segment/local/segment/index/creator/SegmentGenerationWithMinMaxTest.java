@@ -80,7 +80,7 @@ public class SegmentGenerationWithMinMaxTest {
     SegmentMetadataImpl metadata = new SegmentMetadataImpl(segmentDir);
     Assert.assertEquals(metadata.getTotalDocs(), 5);
     Assert.assertFalse(metadata.getColumnMetadataFor("col1").isMinMaxValueInvalid());
-    Assert.assertEquals(metadata.getColumnMetadataFor("col1").getMinValue(), longString);
+    Assert.assertNull(metadata.getColumnMetadataFor("col1").getMinValue());
     Assert.assertEquals(metadata.getColumnMetadataFor("col1").getMaxValue(), "{}");
 
     FileUtils.deleteQuietly(new File(SEGMENT_DIR_NAME));
@@ -93,7 +93,7 @@ public class SegmentGenerationWithMinMaxTest {
     Assert.assertEquals(metadata.getTotalDocs(), 5);
     Assert.assertFalse(metadata.getColumnMetadataFor("col1").isMinMaxValueInvalid());
     Assert.assertEquals(metadata.getColumnMetadataFor("col1").getMinValue(), "aa");
-    Assert.assertEquals(metadata.getColumnMetadataFor("col1").getMaxValue(), longString);
+    Assert.assertNull(metadata.getColumnMetadataFor("col1").getMaxValue());
 
     FileUtils.deleteQuietly(new File(SEGMENT_DIR_NAME));
   }
