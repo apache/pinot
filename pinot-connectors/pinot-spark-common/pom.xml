@@ -32,9 +32,6 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/../..</pinot.root>
-    <circe.version>0.14.9</circe.version>
-    <scalaxml.version>2.3.0</scalaxml.version>
-    <scalatest.version>3.2.18</scalatest.version>
   </properties>
 
   <profiles>
@@ -51,17 +48,14 @@
         <dependency>
           <groupId>org.scala-lang.modules</groupId>
           <artifactId>scala-xml_${scala.compat.version}</artifactId>
-          <version>${scalaxml.version}</version>
         </dependency>
         <dependency>
           <groupId>io.circe</groupId>
           <artifactId>circe-parser_${scala.compat.version}</artifactId>
-          <version>${circe.version}</version>
         </dependency>
         <dependency>
           <groupId>io.circe</groupId>
           <artifactId>circe-generic_${scala.compat.version}</artifactId>
-          <version>${circe.version}</version>
         </dependency>
         <dependency>
           <groupId>org.scala-lang</groupId>
@@ -72,7 +66,6 @@
         <dependency>
           <groupId>org.scalatest</groupId>
           <artifactId>scalatest_${scala.compat.version}</artifactId>
-          <version>${scalatest.version}</version>
           <scope>test</scope>
         </dependency>
       </dependencies>

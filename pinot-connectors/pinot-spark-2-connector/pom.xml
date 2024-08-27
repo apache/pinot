@@ -32,9 +32,6 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/../..</pinot.root>
-    <spark.version>2.4.8</spark.version>
-    <scalaxml.version>2.3.0</scalaxml.version>
-    <scalatest.version>3.2.18</scalatest.version>
     <shadeBase>org.apache.pinot.\$internal</shadeBase>
   </properties>
 
@@ -48,14 +45,18 @@
         <dependency>
           <groupId>org.scala-lang.modules</groupId>
           <artifactId>scala-xml_${scala.compat.version}</artifactId>
-          <version>${scalaxml.version}</version>
         </dependency>
         <dependency>
           <groupId>org.apache.spark</groupId>
           <artifactId>spark-sql_${scala.compat.version}</artifactId>
-          <version>${spark.version}</version>
+          <version>${spark2.version}</version>
           <scope>provided</scope>
           <exclusions>
+            <!-- Exclude it here and include explicitly because it has "hadoop2" classifier -->
+            <exclusion>
+              <groupId>org.apache.avro</groupId>
+              <artifactId>avro-mapred</artifactId>
+            </exclusion>
             <exclusion>
               <groupId>log4j</groupId>
               <artifactId>log4j</artifactId>
@@ -67,6 +68,16 @@
           </exclusions>
         </dependency>
         <dependency>
+          <groupId>org.apache.avro</groupId>
+          <artifactId>avro-mapred</artifactId>
+          <scope>provided</scope>
+        </dependency>
+        <dependency>
+          <groupId>org.apache.logging.log4j</groupId>
+          <artifactId>log4j-slf4j-impl</artifactId>
+          <scope>provided</scope>
+        </dependency>
+        <dependency>
           <groupId>org.scala-lang</groupId>
           <artifactId>scala-library</artifactId>
           <scope>provided</scope>
@@ -75,7 +86,6 @@
         <dependency>
           <groupId>org.scalatest</groupId>
           <artifactId>scalatest_${scala.compat.version}</artifactId>
-          <version>${scalatest.version}</version>
           <scope>test</scope>
         </dependency>
       </dependencies>
