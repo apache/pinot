@@ -52,7 +52,7 @@ public class BatchConfig {
   private final boolean _excludeSequenceId;
   private final boolean _appendUUIDToSegmentName;
   private final boolean _excludeTimeInSegmentName;
-  private final String _partitionId;
+  private final String _uploadedRealtimePartitionId;
   private final String _sequenceId;
   private final long _segmentUploadTimeMs;
 
@@ -99,7 +99,7 @@ public class BatchConfig {
     _segmentNamePrefix = segmentNameGeneratorProps.get(BatchConfigProperties.SEGMENT_NAME_PREFIX);
     _segmentNamePostfix = segmentNameGeneratorProps.get(BatchConfigProperties.SEGMENT_NAME_POSTFIX);
     _excludeSequenceId = Boolean.parseBoolean(segmentNameGeneratorProps.get(BatchConfigProperties.EXCLUDE_SEQUENCE_ID));
-    _partitionId = batchConfigsMap.get(BatchConfigProperties.PARTITION_ID);
+    _uploadedRealtimePartitionId = batchConfigsMap.get(BatchConfigProperties.UPLOADED_REALTIME_PARTITION_ID);
     _sequenceId = batchConfigsMap.get(BatchConfigProperties.SEQUENCE_ID);
     _appendUUIDToSegmentName =
         Boolean.parseBoolean(segmentNameGeneratorProps.get(BatchConfigProperties.APPEND_UUID_TO_SEGMENT_NAME));
@@ -189,16 +189,16 @@ public class BatchConfig {
     return _excludeSequenceId;
   }
 
-  public String getPartitionId() {
-    return _partitionId;
-  }
-
-  public long getSegmentUploadTimeMs() {
-    return _segmentUploadTimeMs;
+  public String getUploadedRealtimePartitionId() {
+    return _uploadedRealtimePartitionId;
   }
 
   public String getSequenceId() {
     return _sequenceId;
+  }
+
+  public long getSegmentUploadTimeMs() {
+    return _segmentUploadTimeMs;
   }
 
   public boolean isAppendUUIDToSegmentName() {

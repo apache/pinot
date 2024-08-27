@@ -43,7 +43,7 @@ public class BatchConfigProperties {
   public static final String TABLE_CONFIGS_URI = "tableConfigsURI";
   public static final String SCHEMA = "schema";
   public static final String SCHEMA_URI = "schemaURI";
-  public static final String PARTITION_ID = "partitionId";
+  public static final String UPLOADED_REALTIME_PARTITION_ID = "uploadedRealtimePartitionId";
   public static final String SEQUENCE_ID = "sequenceId";
   public static final String SEGMENT_UPLOAD_TIME_MS = "segmentUploadTimeMs";
   public static final String SEGMENT_NAME_GENERATOR_TYPE = "segmentNameGenerator.type";

@@ -71,6 +71,8 @@ public class FlinkSegmentWriter implements SegmentWriter {
   private static final Logger LOGGER = LoggerFactory.getLogger(FlinkSegmentWriter.class);
   private static final FileFormat BUFFER_FILE_FORMAT = FileFormat.AVRO;
 
+  public static final String DEFAULT_UPLOADED_REALTIME_SEGMENT_PREFIX = "flink";
+
   private final int _indexOfSubtask;
 
   private TableConfig _tableConfig;
@@ -133,11 +135,12 @@ public class FlinkSegmentWriter implements SegmentWriter {
         "batchConfigMaps must contain only 1 BatchConfig for table: %s", _tableNameWithType);
 
     Map<String, String> batchConfigMap = _batchIngestionConfig.getBatchConfigMaps().get(0);
-    batchConfigMap.put(BatchConfigProperties.PARTITION_ID, Integer.toString(_indexOfSubtask));
+    batchConfigMap.put(BatchConfigProperties.UPLOADED_REALTIME_PARTITION_ID, Integer.toString(_indexOfSubtask));
     batchConfigMap.put(BatchConfigProperties.SEGMENT_UPLOAD_TIME_MS, String.valueOf(_segmentUploadTimeMs));
-    batchConfigMap.put(
+    batchConfigMap.computeIfAbsent(
         BatchConfigProperties.SEGMENT_NAME_GENERATOR_PROP_PREFIX + "." + BatchConfigProperties.SEGMENT_NAME_PREFIX,
-        _segmentNamePrefix);
+        key -> StringUtils.isNotBlank(_segmentNamePrefix) ? _segmentNamePrefix
+            : DEFAULT_UPLOADED_REALTIME_SEGMENT_PREFIX);
 
     // generate segment name for simple segment name generator type(non upsert tables)
     String segmentNamePostfixProp = String.format("%s.%s", BatchConfigProperties.SEGMENT_NAME_GENERATOR_PROP_PREFIX,

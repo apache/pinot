@@ -50,8 +50,6 @@ public class PinotSinkFunction<T> extends RichSinkFunction<T> implements Checkpo
   public static final int DEFAULT_EXECUTOR_POOL_SIZE = 5;
   public static final long DEFAULT_EXECUTOR_SHUTDOWN_WAIT_MS = 3000;
 
-  public static final String DEFAULT_UPLOADED_REALTIME_SEGMENT_PREFIX = "flink";
-
   private static final long serialVersionUID = 1L;
   private static final Logger LOG = LoggerFactory.getLogger(PinotSinkFunction.class);
 
@@ -84,16 +82,13 @@ public class PinotSinkFunction<T> extends RichSinkFunction<T> implements Checkpo
     _schema = schema;
     _segmentFlushMaxNumRecords = segmentFlushMaxNumRecords;
     _executorPoolSize = executorPoolSize;
-    _segmentNamePrefix = DEFAULT_UPLOADED_REALTIME_SEGMENT_PREFIX;
   }
 
   public PinotSinkFunction(PinotGenericRowConverter<T> recordConverter, TableConfig tableConfig, Schema schema,
       long segmentFlushMaxNumRecords, int executorPoolSize, String segmentNamePrefix,
       @Nullable Long segmentUploadTimeMs) {
     this(recordConverter, tableConfig, schema, segmentFlushMaxNumRecords, executorPoolSize);
-    if (!segmentNamePrefix.isBlank()) {
-      _segmentNamePrefix = segmentNamePrefix;
-    }
+    _segmentNamePrefix = segmentNamePrefix;
     _segmentUploadTimeMs = segmentUploadTimeMs;
   }
 
