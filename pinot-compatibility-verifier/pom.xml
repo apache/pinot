@@ -34,7 +34,6 @@
 
   <properties>
     <pinot.root>${basedir}/..</pinot.root>
-    <kafka.lib.version>2.8.2</kafka.lib.version>
   </properties>
 
   <build>
