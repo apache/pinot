@@ -302,16 +302,25 @@ public class PinotClientRequest {
       @Context HttpHeaders httpHeaders) {
     try {
       JsonNode requestJson = JsonUtils.stringToJsonNode(query);
-      // TODO: Support inputting different v1 and v2 SQL queries
-      if (!requestJson.has(Request.SQL)) {
-        throw new IllegalStateException("Payload is missing the query string field 'sql'");
+      String v1Query;
+      String v2Query;
+      if (requestJson.has(Request.SQL)) {
+        v1Query = requestJson.get(Request.SQL).asText();
+        v2Query = v1Query;
+      } else if (requestJson.has(Request.V1SQL) && requestJson.has(Request.V2SQL)) {
+        v1Query = requestJson.get(Request.V1SQL).asText();
+        v2Query = requestJson.get(Request.V2SQL).asText();
+      } else {
+        throw new IllegalStateException("Payload should either contain the query string field '" + Request.SQL + "' "
+            + "or both of '" + Request.V1SQL + "' and '" + Request.V2SQL + "'");
       }
 
+      ObjectNode v1RequestJson = requestJson.deepCopy();
+      v1RequestJson.put(Request.SQL, v1Query);
       CompletableFuture<BrokerResponse> v1Response = CompletableFuture.supplyAsync(
           () -> {
             try {
-              return executeSqlQuery((ObjectNode) requestJson, makeHttpIdentity(requestContext),
-                  true, httpHeaders, false);
+              return executeSqlQuery(v1RequestJson, makeHttpIdentity(requestContext), true, httpHeaders, false);
             } catch (Exception e) {
               throw new RuntimeException(e);
             }
@@ -319,11 +328,12 @@ public class PinotClientRequest {
           _executor
       );
 
+      ObjectNode v2RequestJson = requestJson.deepCopy();
+      v2RequestJson.put(Request.SQL, v2Query);
       CompletableFuture<BrokerResponse> v2Response = CompletableFuture.supplyAsync(
           () -> {
             try {
-              return executeSqlQuery((ObjectNode) requestJson, makeHttpIdentity(requestContext),
-                  true, httpHeaders, true);
+              return executeSqlQuery(v2RequestJson, makeHttpIdentity(requestContext), true, httpHeaders, true);
             } catch (Exception e) {
               throw new RuntimeException(e);
             }
@@ -333,8 +343,7 @@ public class PinotClientRequest {
 
       CompletableFuture.allOf(v1Response, v2Response).join();
 
-      asyncResponse.resume(getPinotQueryComparisonResponse(requestJson.get(Request.SQL).asText(), v1Response.get(),
-          v2Response.get()));
+      asyncResponse.resume(getPinotQueryComparisonResponse(v1Query, v1Response.get(), v2Response.get()));
     } catch (WebApplicationException wae) {
       asyncResponse.resume(wae);
     } catch (Exception e) {
@@ -497,6 +506,7 @@ public class PinotClientRequest {
         .build();
   }
 
+  @VisibleForTesting
   static Response getPinotQueryComparisonResponse(String query, BrokerResponse v1Response, BrokerResponse v2Response) {
     ObjectNode response = JsonUtils.newObjectNode();
     response.set("v1Response", JsonUtils.objectToJsonNode(v1Response));
@@ -514,6 +524,20 @@ public class PinotClientRequest {
 
     if (v1Response.getExceptionsSize() != 0 || v2Response.getExceptionsSize() != 0) {
       differences.add("Exception encountered while running the query on one or both query engines");
+      return differences;
+    }
+
+    if (v1Response.getResultTable() == null && v2Response.getResultTable() == null) {
+      return differences;
+    }
+
+    if (v1Response.getResultTable() == null) {
+      differences.add("v1 response has an empty result table");
+      return differences;
+    }
+
+    if (v2Response.getResultTable() == null) {
+      differences.add("v2 response has an empty result table");
       return differences;
     }
 
