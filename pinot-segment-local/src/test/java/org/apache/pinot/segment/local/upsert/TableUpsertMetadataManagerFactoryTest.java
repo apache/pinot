@@ -18,13 +18,20 @@
  */
 package org.apache.pinot.segment.local.upsert;
 
+import com.google.common.collect.Lists;
+import java.io.File;
+import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.UpsertConfig;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
@@ -37,12 +44,21 @@ public class TableUpsertMetadataManagerFactoryTest {
   public void testCreateForDefaultManagerClass() {
     UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
     upsertConfig.setHashFunction(HashFunction.NONE);
+    Schema schema =
+        new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
+            .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+            .setPrimaryKeyColumns(Lists.newArrayList("myCol")).build();
+    TableDataManager tableDataManager = mock(TableDataManager.class);
+    when(tableDataManager.getTableDataDir()).thenReturn(new File(RAW_TABLE_NAME));
     _tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setUpsertConfig(upsertConfig).build();
     TableUpsertMetadataManager tableUpsertMetadataManager =
         TableUpsertMetadataManagerFactory.create(_tableConfig, null);
     assertNotNull(tableUpsertMetadataManager);
     assertTrue(tableUpsertMetadataManager instanceof ConcurrentMapTableUpsertMetadataManager);
+    tableUpsertMetadataManager.init(_tableConfig, schema, tableDataManager);
+    assertTrue(tableUpsertMetadataManager.getOrCreatePartitionManager(0)
+        instanceof ConcurrentMapPartitionUpsertMetadataManager);
   }
 
   @Test
@@ -50,11 +66,20 @@ public class TableUpsertMetadataManagerFactoryTest {
     UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
     upsertConfig.setHashFunction(HashFunction.NONE);
     upsertConfig.setEnableDeletedKeysCompactionConsistency(true);
+    Schema schema =
+        new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
+            .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+            .setPrimaryKeyColumns(Lists.newArrayList("myCol")).build();
+    TableDataManager tableDataManager = mock(TableDataManager.class);
+    when(tableDataManager.getTableDataDir()).thenReturn(new File(RAW_TABLE_NAME));
     _tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setUpsertConfig(upsertConfig).build();
     TableUpsertMetadataManager tableUpsertMetadataManager =
         TableUpsertMetadataManagerFactory.create(_tableConfig, null);
     assertNotNull(tableUpsertMetadataManager);
-    assertTrue(tableUpsertMetadataManager instanceof BaseTableUpsertMetadataManager);
+    assertTrue(tableUpsertMetadataManager instanceof ConcurrentMapTableUpsertMetadataManager);
+    tableUpsertMetadataManager.init(_tableConfig, schema, tableDataManager);
+    assertTrue(tableUpsertMetadataManager.getOrCreatePartitionManager(0)
+        instanceof ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes);
   }
 }
