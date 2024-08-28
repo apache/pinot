@@ -669,6 +669,10 @@ public class SegmentGeneratorConfig implements Serializable {
     return getQualifyingFields(FieldType.DATE_TIME, true);
   }
 
+  public List<String> getComplexColumnNames() {
+    return getQualifyingFields(FieldType.COMPLEX, true);
+  }
+
   public void setSegmentPartitionConfig(SegmentPartitionConfig segmentPartitionConfig) {
     _segmentPartitionConfig = segmentPartitionConfig;
   }
