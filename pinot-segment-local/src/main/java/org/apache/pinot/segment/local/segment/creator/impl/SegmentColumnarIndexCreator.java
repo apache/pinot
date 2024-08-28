@@ -223,8 +223,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         // Initialize Null value vector map
         LOGGER.info("Column: {} is nullable", columnName);
         _nullValueVectorCreatorMap.put(columnName, new NullValueVectorCreator(_indexDir, columnName));
-      } else if (LOGGER.isInfoEnabled()) {
-        LOGGER.info("Column: {} is nullable", columnName);
+      } else {
+        LOGGER.info("Column: {} is not nullable", columnName);
       }
     }
   }
