@@ -52,7 +52,7 @@ public class SchemaInfoTest {
     String response = JsonUtils.objectToPrettyString(schemaInfoList);
     JsonNode jsonNodeResp = JsonUtils.stringToJsonNode(response);
 
-// Test deserialization
+    // Test deserialization
     assertEquals(jsonNodeResp.get(0).get("schemaName").asText(), "TestSchema");
     assertEquals(jsonNodeResp.get(0).get("numDimensionFields").asInt(), 3);
     assertEquals(jsonNodeResp.get(0).get("numDateTimeFields").asInt(), 2);
@@ -69,7 +69,7 @@ public class SchemaInfoTest {
     schemaInfoListSer = JsonUtils.jsonNodeToObject(jsonNodeResp, new TypeReference<List<SchemaInfo>>() {
     });
     SchemaInfo schemaInfo1 = schemaInfoListSer.get(0);
-    // Verify the deserialized object matches the original object
+    // Verify the deserialized object match
     assertEquals("TestSchema", schemaInfo1.getSchemaName());
     assertEquals(3, schemaInfo1.getNumDimensionFields());
     assertEquals(2, schemaInfo1.getNumDateTimeFields());
