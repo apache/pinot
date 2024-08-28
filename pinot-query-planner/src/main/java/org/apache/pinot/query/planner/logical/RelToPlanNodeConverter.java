@@ -331,6 +331,8 @@ public final class RelToPlanNodeConverter {
       case BINARY:
       case VARBINARY:
         return isArray ? ColumnDataType.BYTES_ARRAY : ColumnDataType.BYTES;
+      case MAP:
+        return ColumnDataType.MAP;
       case OTHER:
       case ANY:
         return ColumnDataType.OBJECT;

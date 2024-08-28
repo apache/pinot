@@ -53,6 +53,7 @@ import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.JsonIndexConfig;
+import org.apache.pinot.spi.config.table.MapIndexConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
@@ -84,6 +85,7 @@ public class IndexLoadingConfig {
   private Set<String> _fstIndexColumns = new HashSet<>();
   private FSTType _fstIndexType = FSTType.LUCENE;
   private Map<String, JsonIndexConfig> _jsonIndexConfigs = new HashMap<>();
+  private Map<String, MapIndexConfig> _mapIndexConfigs = new HashMap<>();
   private Map<String, H3IndexConfig> _h3IndexConfigs = new HashMap<>();
   private Map<String, VectorIndexConfig> _vectorIndexConfigs = new HashMap<>();
   private Set<String> _noDictionaryColumns = new HashSet<>(); // TODO: replace this by _noDictionaryConfig.
@@ -546,6 +548,10 @@ public class IndexLoadingConfig {
     return unmodifiable(_jsonIndexConfigs);
   }
 
+  public Map<String, MapIndexConfig> getMapIndexConfigs() {
+    return unmodifiable(_mapIndexConfigs);
+  }
+
   public Map<String, H3IndexConfig> getH3IndexConfigs() {
     return unmodifiable(_h3IndexConfigs);
   }
@@ -717,6 +723,12 @@ public class IndexLoadingConfig {
     } else {
       _jsonIndexConfigs = null;
     }
+    _dirty = true;
+  }
+
+  @VisibleForTesting
+  public void setMapIndexColumns(Map<String, MapIndexConfig> mapIndexConfigs) {
+    _mapIndexConfigs = new HashMap<>(mapIndexConfigs);
     _dirty = true;
   }
 
