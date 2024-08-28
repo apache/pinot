@@ -237,19 +237,35 @@ public class PinotSegmentRestletResource {
       notes = "Get a map from server to segments hosted by the server")
   public List<Map<String, Object>> getServerToSegmentsMap(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr, @Context HttpHeaders headers) {
+      @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
+      @QueryParam("verbose") @DefaultValue("true") boolean verbose, @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
-    List<String> tableNamesWithType = ResourceUtils
-        .getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, Constants.validateTableType(tableTypeStr),
-            LOGGER);
+    List<String> tableNamesWithType = ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName,
+        Constants.validateTableType(tableTypeStr), LOGGER);
     List<Map<String, Object>> resultList = new ArrayList<>(tableNamesWithType.size());
     for (String tableNameWithType : tableNamesWithType) {
       Map<String, Object> resultForTable = new LinkedHashMap<>();
       resultForTable.put("tableName", tableNameWithType);
-      resultForTable.put("serverToSegmentsMap", _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType));
+      if (!verbose) {
+        resultForTable.put("serverToSegmentsCountMap",
+            _pinotHelixResourceManager.getServerToSegmentsCountMap(tableNameWithType));
+      } else {
+        Map<String, List<String>> serverToSegmentsMap =
+            _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType);
+        resultForTable.put("serverToSegmentsMap", serverToSegmentsMap);
+        resultForTable.put("serverToSegmentsCountMap", getServerToSegmentCountMap(serverToSegmentsMap));
+      }
       resultList.add(resultForTable);
     }
     return resultList;
+  }
+
+  private Map<String, Integer> getServerToSegmentCountMap(Map<String, List<String>> serverToSegmentsMap) {
+    Map<String, Integer> serverToSegmentCount = new TreeMap<>();
+    for (Map.Entry<String, List<String>> entry : serverToSegmentsMap.entrySet()) {
+      serverToSegmentCount.put(entry.getKey(), entry.getValue().size());
+    }
+    return serverToSegmentCount;
   }
 
   @GET

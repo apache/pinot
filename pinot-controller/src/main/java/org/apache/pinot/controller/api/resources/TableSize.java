@@ -27,11 +27,14 @@ import io.swagger.annotations.ApiResponses;
 import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
+import java.util.HashMap;
 import javax.inject.Inject;
+import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
@@ -80,12 +83,22 @@ public class TableSize {
   })
   public TableSizeReader.TableSizeDetails getTableSize(
       @ApiParam(value = "Table name without type", required = true, example = "myTable | myTable_OFFLINE")
-      @PathParam("tableName") String tableName, @Context HttpHeaders headers) {
+      @PathParam("tableName") String tableName,
+      @ApiParam(value = "Provide detailed information") @DefaultValue("true") @QueryParam("verbose") boolean verbose,
+      @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     TableSizeReader.TableSizeDetails tableSizeDetails = null;
     try {
       tableSizeDetails =
           _tableSizeReader.getTableSizeDetails(tableName, _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
+      if (!verbose) {
+        if (tableSizeDetails._offlineSegments != null) {
+          tableSizeDetails._offlineSegments._segments = new HashMap<>();
+        }
+        if (tableSizeDetails._realtimeSegments != null) {
+          tableSizeDetails._realtimeSegments._segments = new HashMap<>();
+        }
+      }
     } catch (Throwable t) {
       throw new ControllerApplicationException(LOGGER, String.format("Failed to read table size for %s", tableName),
           Response.Status.INTERNAL_SERVER_ERROR, t);
