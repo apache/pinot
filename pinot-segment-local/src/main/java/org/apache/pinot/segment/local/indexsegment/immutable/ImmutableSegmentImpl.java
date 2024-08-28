@@ -174,7 +174,9 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
         V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME);
   }
 
-  //if re processing or reload is needed on a segment then return true
+  /**
+   * if re processing or reload is needed on a segment then return true
+   */
   public boolean isReloadNeeded(IndexLoadingConfig indexLoadingConfig)
       throws Exception {
     return ImmutableSegmentLoader.needPreprocess(_segmentDirectory, indexLoadingConfig, indexLoadingConfig.getSchema());
