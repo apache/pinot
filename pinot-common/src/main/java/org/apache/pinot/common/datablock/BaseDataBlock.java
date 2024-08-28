@@ -24,12 +24,10 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.commons.io.output.UnsynchronizedByteArrayOutputStream;
 import org.apache.pinot.common.CustomObject;
@@ -91,6 +89,7 @@ public abstract class BaseDataBlock implements DataBlock, DataBlock.Raw {
 
   protected final int _numRows;
   protected final int _numColumns;
+  @Nullable
   protected final DataSchema _dataSchema;
   protected final String[] _stringDictionary;
   protected final DataBuffer _fixedSizeData;
@@ -145,6 +144,7 @@ public abstract class BaseDataBlock implements DataBlock, DataBlock.Raw {
     return Collections.emptyMap();
   }
 
+  @Nullable
   @Override
   public DataSchema getDataSchema() {
     return _dataSchema;
@@ -442,149 +442,5 @@ public abstract class BaseDataBlock implements DataBlock, DataBlock.Raw {
   @Override
   public Raw asRaw() {
     return this;
-  }
-
-  @Override
-  public final boolean equals(Object o) {
-    if (this == o) {
-      return true;
-    }
-    if (!(o instanceof DataBlock)) {
-      return false;
-    }
-    DataBlock that = (DataBlock) o;
-    if (getDataBlockType() != that.getDataBlockType()) {
-      return false;
-    }
-    switch (getDataBlockType()) {
-      case ROW:
-      case COLUMNAR:
-        assert _dataSchema != null;
-        if (!_dataSchema.equals(that.getDataSchema())) {
-          return false;
-        }
-        if (_numRows != that.getNumberOfRows() || _numColumns != that.getNumberOfColumns()) {
-          return false;
-        }
-        DataSchema.ColumnDataType[] colTypes = _dataSchema.getColumnDataTypes();
-        String[] colNames = _dataSchema.getColumnNames();
-        for (int colId = 0; colId < colNames.length; colId++) {
-          switch (colTypes[colId]) {
-            case INT:
-            case BOOLEAN:
-              for (int did = 0; did < _numRows; did++) {
-                if (getInt(did, colId) != that.getInt(did, colId)) {
-                  return false;
-                }
-              }
-              break;
-            case LONG:
-            case TIMESTAMP:
-              for (int did = 0; did < _numRows; did++) {
-                if (getLong(did, colId) != that.getLong(did, colId)) {
-                  return false;
-                }
-              }
-              break;
-            case FLOAT:
-              for (int did = 0; did < _numRows; did++) {
-                if (getFloat(did, colId) != that.getFloat(did, colId)) {
-                  return false;
-                }
-              }
-              break;
-            case DOUBLE:
-              for (int did = 0; did < _numRows; did++) {
-                if (getDouble(did, colId) != that.getDouble(did, colId)) {
-                  return false;
-                }
-              }
-              break;
-            case STRING:
-            case JSON:
-              for (int did = 0; did < _numRows; did++) {
-                if (!getString(did, colId).equals(that.getString(did, colId))) {
-                  return false;
-                }
-              }
-              break;
-            case BYTES:
-              for (int did = 0; did < _numRows; did++) {
-                if (!getBytes(did, colId).equals(that.getBytes(did, colId))) {
-                  return false;
-                }
-              }
-              break;
-            case BIG_DECIMAL:
-              for (int did = 0; did < _numRows; did++) {
-                if (!getBigDecimal(did, colId).equals(that.getBigDecimal(did, colId))) {
-                  return false;
-                }
-              }
-              break;
-            case OBJECT:
-              for (int did = 0; did < _numRows; did++) {
-                if (!Objects.equals(getCustomObject(did, colId), that.getCustomObject(did, colId))) {
-                  return false;
-                }
-              }
-              break;
-            case INT_ARRAY:
-              for (int did = 0; did < _numRows; did++) {
-                if (!Arrays.equals(getIntArray(did, colId), that.getIntArray(did, colId))) {
-                  return false;
-                }
-              }
-              break;
-            case LONG_ARRAY:
-            case TIMESTAMP_ARRAY:
-              for (int did = 0; did < _numRows; did++) {
-                if (!Arrays.equals(getLongArray(did, colId), that.getLongArray(did, colId))) {
-                  return false;
-                }
-              }
-              break;
-            case FLOAT_ARRAY:
-              for (int did = 0; did < _numRows; did++) {
-                if (!Arrays.equals(getFloatArray(did, colId), that.getFloatArray(did, colId))) {
-                  return false;
-                }
-              }
-              break;
-            case DOUBLE_ARRAY:
-              for (int did = 0; did < _numRows; did++) {
-                if (!Arrays.equals(getDoubleArray(did, colId), that.getDoubleArray(did, colId))) {
-                  return false;
-                }
-              }
-              break;
-            case STRING_ARRAY:
-              for (int did = 0; did < _numRows; did++) {
-                if (!Arrays.equals(getStringArray(did, colId), that.getStringArray(did, colId))) {
-                  return false;
-                }
-              }
-              break;
-            case BYTES_ARRAY:
-            case BOOLEAN_ARRAY:
-            case UNKNOWN:
-              throw new UnsupportedOperationException("Check how to read " + colTypes[colId] + " from data block");
-            default:
-              throw new UnsupportedOperationException("Unsupported column type: " + colTypes[colId]);
-          }
-        }
-        return true;
-      case METADATA: {
-        return Objects.equals(_errCodeToExceptionMap, that.getExceptions())
-            && Objects.equals(getStatsByStage(), that.asRaw().getStatsByStage());
-      }
-      default:
-        throw new UnsupportedOperationException("Unsupported data block type: " + getDataBlockType());
-    }
-  }
-
-  @Override
-  public final int hashCode() {
-    return Objects.hash(_errCodeToExceptionMap, _numRows, _dataSchema);
   }
 }

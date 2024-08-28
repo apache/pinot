@@ -91,6 +91,6 @@ public class ZeroCopyDataBlockSerdeTest {
     assertEquals(deserialized.getNumberOfRows(), block.getNumberOfRows(), "Unexpected number of rows");
     assertEquals(deserialized.getNumberOfColumns(), block.getNumberOfColumns(), "Unexpected number of columns");
     assertEquals(deserialized.getExceptions(), block.getExceptions(), "Unexpected exceptions");
-    assertEquals(deserialized, block, "Unexpected data");
+    DataBlockEquals.checkSameContent(deserialized, block, "Unexpected data");
   }
 }

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.datablock;
 
+import javax.validation.constraints.NotNull;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
 
@@ -30,12 +31,6 @@ public class ColumnarDataBlock extends BaseDataBlock {
   protected int[] _cumulativeColumnOffsetSizeInBytes;
   protected int[] _columnSizeInBytes;
   private int _fixDataSize;
-
-  public ColumnarDataBlock(int numRows, DataSchema dataSchema, String[] stringDictionary,
-      byte[] fixedSizeDataBytes, byte[] variableSizeDataBytes) {
-    super(numRows, dataSchema, stringDictionary, fixedSizeDataBytes, variableSizeDataBytes);
-    computeBlockObjectConstants();
-  }
 
   public ColumnarDataBlock(int numRows, DataSchema dataSchema, String[] stringDictionary,
       DataBuffer fixedSizeDataBytes, DataBuffer variableSizeDataBytes) {
@@ -71,6 +66,12 @@ public class ColumnarDataBlock extends BaseDataBlock {
   @Override
   protected int getFixDataSize() {
     return _fixDataSize;
+  }
+
+  @NotNull // the method is override just to override its nullability annotation
+  @Override
+  public DataSchema getDataSchema() {
+    return super.getDataSchema();
   }
 
 // TODO: add whole-column access methods.
