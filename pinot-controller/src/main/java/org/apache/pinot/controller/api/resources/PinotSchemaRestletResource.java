@@ -127,7 +127,7 @@ public class PinotSchemaRestletResource {
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_SCHEMA_INFO)
   @ApiOperation(value = "List all schemas info with count of field specs", notes = "Lists all schemas with field "
       + "count details")
-  public String getSchemaInfo(@Context HttpHeaders headers)
+  public String getSchemasInfo(@Context HttpHeaders headers)
       throws JsonProcessingException {
     List<SchemaInfo> schemasInfo = new ArrayList<>();
     TableCache cache = _pinotHelixResourceManager.getTableCache();
