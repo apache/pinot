@@ -552,14 +552,6 @@ public final class Schema implements Serializable {
       _schema = new Schema();
     }
 
-    public static SchemaBuilder copyWithoutFields(Schema other) {
-      SchemaBuilder schemaBuilder = new SchemaBuilder();
-      schemaBuilder._schema.setSchemaName(other.getSchemaName());
-      schemaBuilder._schema.setEnableColumnBasedNullHandling(other.isEnableColumnBasedNullHandling());
-
-      return schemaBuilder;
-    }
-
     public SchemaBuilder setSchemaName(String schemaName) {
       _schema.setSchemaName(schemaName);
       return this;
