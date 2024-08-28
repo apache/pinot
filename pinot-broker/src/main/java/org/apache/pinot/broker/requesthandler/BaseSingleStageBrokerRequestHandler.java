@@ -1513,18 +1513,18 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   // TODO(xiangfu): Move Literal function computation here from Calcite Parser.
   private void computeResultsForExpression(Expression expression, String[] columnNames, ColumnDataType[] columnTypes,
       Object[] values, int index) {
-    if (expression.getType() == ExpressionType.LITERAL) {
+    ExpressionType type = expression.getType();
+    if (type == ExpressionType.LITERAL) {
       computeResultsForLiteral(expression.getLiteral(), columnNames, columnTypes, values, index);
-    }
-    if (expression.getType() == ExpressionType.FUNCTION) {
-      if (expression.getFunctionCall().getOperator().equals("as")) {
-        String columnName = expression.getFunctionCall().getOperands().get(1).getIdentifier().getName();
-        computeResultsForExpression(expression.getFunctionCall().getOperands().get(0), columnNames, columnTypes, values,
-            index);
-        columnNames[index] = columnName;
+    } else if (type == ExpressionType.FUNCTION) {
+      Function function = expression.getFunctionCall();
+      String operator = function.getOperator();
+      if (operator.equals("as")) {
+        List<Expression> operands = function.getOperands();
+        computeResultsForExpression(operands.get(0), columnNames, columnTypes, values, index);
+        columnNames[index] = operands.get(1).getIdentifier().getName();
       } else {
-        throw new IllegalStateException(
-            "No able to compute results for function - " + expression.getFunctionCall().getOperator());
+        throw new IllegalStateException("No able to compute results for function - " + operator);
       }
     }
   }
