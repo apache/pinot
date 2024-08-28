@@ -817,6 +817,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
         JsonUtils.stringToJsonNode(needAfterReloadResponseRealtimeWithNoVerbose);
     JsonNode jsonNeedReloadResponseRealtimeAfterWithVerbose =
         JsonUtils.stringToJsonNode(needAfterReloadResponseRealTimeWithVerbose);
+
     //test to check if reload on real time table is needed i.e false after reload is finished
     assertFalse(jsonNeedReloadResponseRealtimeAfterWithNoVerbose.get("needReload").asBoolean());
     assertFalse(jsonNeedReloadResponseRealtimeAfterWithVerbose.get("needReload").asBoolean());
