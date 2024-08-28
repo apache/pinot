@@ -48,8 +48,8 @@ public interface DataBlock {
   Map<Integer, String> getExceptions();
 
   /**
-   * This is basically a wrap on top of {@link DataBlockUtils#serialize(DataBlock)} but implementations can catch
-   * the result so messages sent to more than one receiving mailbox don't need to be serialized as many times.
+   * This is a wrapper on top of {@link DataBlockUtils#serialize(DataBlock)} but implementations can cache
+   * the result so messages that are sent to more than one receiving mailbox don't need to be serialized as many times.
    */
   List<ByteBuffer> serialize()
       throws IOException;
