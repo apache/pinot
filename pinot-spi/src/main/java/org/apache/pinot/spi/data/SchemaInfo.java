@@ -40,9 +40,6 @@ public class SchemaInfo {
   @JsonProperty("numMetricFields")
   private int _numMetricFields;
 
-  public SchemaInfo() {
-  }
-
   public String getSchemaName() {
     return _schemaName;
   }
@@ -57,6 +54,9 @@ public class SchemaInfo {
 
   public int getNumMetricFields() {
     return _numMetricFields;
+  }
+
+  public SchemaInfo() {
   }
 
   public SchemaInfo(Schema schema) {
