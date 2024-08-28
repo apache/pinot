@@ -201,11 +201,25 @@ public final class DataBlockUtils {
       throws IOException {
     int versionAndSubVersion = buffer.getInt(offset);
     int version = getVersion(versionAndSubVersion);
-    DataBlockSerde dataBlockSerde = SERDES.get(DataBlockSerde.Version.fromInt(version));
+    DataBlockSerde dataBlockSerde;
+    try {
+      dataBlockSerde = SERDES.get(DataBlockSerde.Version.fromInt(version));
+    } catch (Exception e) {
+      throw new IOException("Failed to get serde for version: " + version, e);
+    }
 
-    DataBlock.Type type = getType(versionAndSubVersion);
+    DataBlock.Type type;
+    try {
+      type = getType(versionAndSubVersion);
+    } catch (Exception e) {
+      throw new IOException("Failed to get type for version: " + version, e);
+    }
 
-    return dataBlockSerde.deserialize(buffer, 0, type, finalOffsetConsumer);
+    try {
+      return dataBlockSerde.deserialize(buffer, 0, type, finalOffsetConsumer);
+    } catch (Exception e) {
+      throw new IOException("Failed to deserialize data block with serde " + dataBlockSerde.getClass(), e);
+    }
   }
 
   /**
