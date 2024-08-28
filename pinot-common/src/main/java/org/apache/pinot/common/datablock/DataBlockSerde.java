@@ -76,7 +76,7 @@ public interface DataBlockSerde {
     /**
      * The version used Pinot 1.0, 1.1 and 1.2.
      * <p>
-     * Older Pinot version name the version with id 1.
+     * Older Pinot versions use id 1 to identify their version.
      */
     V1_V2(2);
 
