@@ -21,6 +21,7 @@ package org.apache.pinot.spi.plugin;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Properties;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -29,6 +30,8 @@ import java.util.stream.Stream;
 class PinotPluginConfiguration {
 
   private final Map<String, List<String>> _importsFromRealm;
+
+  private final Optional<String> parentRealmId;
 
   /**
    * Expose plugin configuration based on Properties
@@ -50,9 +53,14 @@ class PinotPluginConfiguration {
       }
     });
     _importsFromRealm = Map.copyOf(importsFromRealm);
+    parentRealmId = Optional.ofNullable(properties.getProperty("parent.realmId"));
   }
 
   public Map<String, List<String>> getImportsFromPerRealm() {
     return _importsFromRealm;
+  }
+
+  public Optional<String> getParentRealmId() {
+    return parentRealmId;
   }
 }

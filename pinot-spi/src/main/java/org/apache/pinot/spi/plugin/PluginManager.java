@@ -288,65 +288,83 @@ public class PluginManager {
       _registry.put(new Plugin(pluginName), classLoader);
     } else {
       try {
-        ClassRealm pluginRealm = _classWorld.newRealm(
-                pluginName,
-                new URLClassLoader(urlList.toArray(new URL[0]), ClassLoader.getPlatformClassLoader()));
-
-        ClassLoader pinotLoader = _classWorld.getClassRealm(PINOT_REALMID);
-
-        // All exported packages
-        Stream<String> importedPinotPackages =
-        Stream.of("org.apache.pinot.spi.accounting",
-                "org.apache.pinot.spi.annotations",
-                "org.apache.pinot.spi.annotations.metrics",
-                "org.apache.pinot.spi.annotations.minion",
-                "org.apache.pinot.spi.auth",
-                "org.apache.pinot.spi.config",
-                "org.apache.pinot.spi.config.instance",
-                "org.apache.pinot.spi.config.provider",
-                "org.apache.pinot.spi.config.table",
-                "org.apache.pinot.spi.config.table.assignment",
-                "org.apache.pinot.spi.config.table.ingestion",
-                "org.apache.pinot.spi.config.task",
-                "org.apache.pinot.spi.config.tenant",
-                "org.apache.pinot.spi.config.user",
-                "org.apache.pinot.spi.crypt",
-                "org.apache.pinot.spi.data",
-                "org.apache.pinot.spi.data.readers",
-                "org.apache.pinot.spi.env",
-                "org.apache.pinot.spi.environmentprovider",
-                "org.apache.pinot.spi.eventlistener.query",
-                "org.apache.pinot.spi.exception",
-                "org.apache.pinot.spi.filesystem",
-                "org.apache.pinot.spi.ingestion",
-                "org.apache.pinot.spi.ingestion.batch",
-                "org.apache.pinot.spi.ingestion.batch.runner",
-                "org.apache.pinot.spi.ingestion.batch.spec",
-                "org.apache.pinot.spi.ingestion.segment",
-                "org.apache.pinot.spi.ingestion.segment.uploader",
-                "org.apache.pinot.spi.ingestion.segment.writer",
-                "org.apache.pinot.spi.metrics",
-                "org.apache.pinot.spi.plugin",
-                "org.apache.pinot.spi.recordenricher",
-                "org.apache.pinot.spi.services",
-                "org.apache.pinot.spi.stream",
-                "org.apache.pinot.spi.trace",
-                "org.apache.pinot.spi.utils",
-                "org.apache.pinot.spi.utils.builder",
-                "org.apache.pinot.spi.utils.retry"
-                );
-        importedPinotPackages.forEach(p -> pluginRealm.importFrom(pinotLoader, p));
-
-        // Additional importForm as specified by the plugin itself
+        PinotPluginConfiguration config = null;
         Path pluginPropertiesPath = directory.toPath().resolve(PINOUT_PLUGIN_PROPERTIES_FILE_NAME);
         if (Files.isRegularFile(pluginPropertiesPath)) {
-          PinotPluginConfiguration config;
           Properties pluginProperties = new Properties();
           try (Reader reader = Files.newBufferedReader(pluginPropertiesPath)) {
             pluginProperties.load(reader);
             config = new PinotPluginConfiguration(pluginProperties);
+          } catch (IOException e) {
+            LOGGER.warn("Failed to load plugin properties from {}", pluginPropertiesPath, e);
+          }
+        }
 
-            config.getImportsFromPerRealm().forEach((r, ifs) -> {
+        ClassLoader parentClassLoader;
+        String parentRealmId;
+        if (config != null && config.getParentRealmId().isPresent()) {
+          parentRealmId = config.getParentRealmId().get();
+
+          parentClassLoader = _classWorld.getClassRealm(config.getParentRealmId().get());
+        } else {
+          parentRealmId = null;
+          parentClassLoader = ClassLoader.getPlatformClassLoader();
+        }
+
+        ClassRealm pluginRealm = _classWorld.newRealm(
+                pluginName,
+                new URLClassLoader(urlList.toArray(new URL[0]), parentClassLoader));
+
+        if(!"pinot".equals(parentRealmId)) {
+          ClassLoader pinotLoader = _classWorld.getClassRealm(PINOT_REALMID);
+
+          // All exported packages
+          Stream<String> importedPinotPackages =
+              Stream.of("org.apache.pinot.spi.accounting",
+                  "org.apache.pinot.spi.annotations",
+                  "org.apache.pinot.spi.annotations.metrics",
+                  "org.apache.pinot.spi.annotations.minion",
+                  "org.apache.pinot.spi.auth",
+                  "org.apache.pinot.spi.config",
+                  "org.apache.pinot.spi.config.instance",
+                  "org.apache.pinot.spi.config.provider",
+                  "org.apache.pinot.spi.config.table",
+                  "org.apache.pinot.spi.config.table.assignment",
+                  "org.apache.pinot.spi.config.table.ingestion",
+                  "org.apache.pinot.spi.config.task",
+                  "org.apache.pinot.spi.config.tenant",
+                  "org.apache.pinot.spi.config.user",
+                  "org.apache.pinot.spi.crypt",
+                  "org.apache.pinot.spi.data",
+                  "org.apache.pinot.spi.data.readers",
+                  "org.apache.pinot.spi.env",
+                  "org.apache.pinot.spi.environmentprovider",
+                  "org.apache.pinot.spi.eventlistener.query",
+                  "org.apache.pinot.spi.exception",
+                  "org.apache.pinot.spi.filesystem",
+                  "org.apache.pinot.spi.ingestion",
+                  "org.apache.pinot.spi.ingestion.batch",
+                  "org.apache.pinot.spi.ingestion.batch.runner",
+                  "org.apache.pinot.spi.ingestion.batch.spec",
+                  "org.apache.pinot.spi.ingestion.segment",
+                  "org.apache.pinot.spi.ingestion.segment.uploader",
+                  "org.apache.pinot.spi.ingestion.segment.writer",
+                  "org.apache.pinot.spi.metrics",
+                  "org.apache.pinot.spi.plugin",
+                  "org.apache.pinot.spi.recordenricher",
+                  "org.apache.pinot.spi.services",
+                  "org.apache.pinot.spi.stream",
+                  "org.apache.pinot.spi.trace",
+                  "org.apache.pinot.spi.utils",
+                  "org.apache.pinot.spi.utils.builder",
+                  "org.apache.pinot.spi.utils.retry"
+              );
+          importedPinotPackages.forEach(p -> pluginRealm.importFrom(pinotLoader, p));
+        }
+
+        // Additional importForm as specified by the plugin itself
+        if(config != null) {
+          config.getImportsFromPerRealm().forEach((r, ifs) -> {
                 try {
                   ClassRealm cr = _classWorld.getRealm(r);
                   ifs.forEach(i -> pluginRealm.importFrom(cr, i));
@@ -354,11 +372,9 @@ public class PluginManager {
                   LOGGER.warn("{} realm does not exist", r);
                 }
               }
-            );
-          } catch (IOException e) {
-            LOGGER.warn("Failed to load plugin properties from {}", pluginPropertiesPath, e);
-          }
+          );
         }
+
       } catch (DuplicateRealmException e) {
         throw new RuntimeException(e);
       }
