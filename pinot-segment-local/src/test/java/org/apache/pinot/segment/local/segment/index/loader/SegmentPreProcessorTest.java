@@ -3008,4 +3008,39 @@ public class SegmentPreProcessorTest {
     _indexLoadingConfig.removeNoDictionaryColumns(EXISTING_FORWARD_INDEX_DISABLED_COL_SV,
         EXISTING_FORWARD_INDEX_DISABLED_COL_MV, EXISTING_STRING_COL_DICT);
   }
+
+  @Test
+  public void testNeedAddMinMaxLength()
+      throws Exception {
+
+    String longString = generateLongString(15000, true);
+    String[] stringValuesValid = {"B", "C", "D", "E", longString};
+    long[] longValues = {1588316400000L, 1588489200000L, 1588662000000L, 1588834800000L, 1589007600000L};
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("stringCol", FieldSpec.DataType.STRING)
+        .addMetric("longCol", FieldSpec.DataType.LONG).build();
+
+    FileUtils.deleteQuietly(INDEX_DIR);
+
+    // build good segment, no needPreprocess
+    File segment = buildTestSegment(tableConfig, schema, "validSegment", stringValuesValid, longValues);
+    SegmentDirectory segmentDirectory = SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader()
+        .load(segment.toURI(),
+            new SegmentDirectoryLoaderContext.Builder().setSegmentDirectoryConfigs(_configuration).build());
+    IndexLoadingConfig indexLoadingConfig = getDefaultIndexLoadingConfig();
+    indexLoadingConfig.setColumnMinMaxValueGeneratorMode(ColumnMinMaxValueGeneratorMode.ALL);
+    SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, indexLoadingConfig, schema);
+    assertFalse(processor.needProcess());
+
+    FileUtils.deleteQuietly(INDEX_DIR);
+  }
+
+  private String generateLongString(int length, boolean isMin) {
+    char repeatingChar = isMin ? 'a' : 'z';
+    StringBuilder sb = new StringBuilder(length);
+    for (int i = 0; i < length; i++) {
+      sb.append(repeatingChar);
+    }
+    return sb.toString();
+  }
 }
