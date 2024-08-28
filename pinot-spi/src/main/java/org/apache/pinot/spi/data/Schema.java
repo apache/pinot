@@ -38,6 +38,7 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -362,6 +363,13 @@ public final class Schema implements Serializable {
     Schema newSchema = new Schema();
     newSchema.setSchemaName(getSchemaName());
     newSchema.setEnableColumnBasedNullHandling(isEnableColumnBasedNullHandling());
+    newSchema.setPrimaryKeyColumns(getPrimaryKeyColumns().stream()
+        .filter(primaryKey -> {
+          FieldSpec fieldSpec = _fieldSpecMap.get(primaryKey);
+          return fieldSpec != null && !fieldSpec.isVirtualColumn();
+        })
+        .collect(Collectors.toList())
+    );
     for (FieldSpec fieldSpec : getAllFieldSpecs()) {
       if (!fieldSpec.isVirtualColumn()) {
         newSchema.addField(fieldSpec);

@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.net.URL;
 import java.sql.Timestamp;
+import java.util.Collections;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.utils.SchemaUtils;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
@@ -525,6 +526,7 @@ public class SchemaTest {
         .setEnableColumnBasedNullHandling(true)
         .addMetricField("metric", FieldSpec.DataType.INT)
         .addField(virtualField)
+        .setPrimaryKeyColumns(Lists.newArrayList("metric"))
         .build();
 
     Schema withoutVirtualColumns = schema.withoutVirtualColumns();
@@ -532,7 +534,31 @@ public class SchemaTest {
         .noneMatch(field -> field.getName().equals(CommonConstants.Segment.BuiltInVirtualColumn.DOCID)),
         "Virtual column " + CommonConstants.Segment.BuiltInVirtualColumn.DOCID + " should be removed");
 
+    Assert.assertEquals(withoutVirtualColumns.getPrimaryKeyColumns(), schema.getPrimaryKeyColumns(),
+        "Primary key columns should be equal");
+    Assert.assertNotSame(withoutVirtualColumns.getPrimaryKeyColumns(), schema.getPrimaryKeyColumns(),
+        "Primary key columns should not be the same object");
+
     withoutVirtualColumns.addField(virtualField);
     Assert.assertEquals(withoutVirtualColumns, schema, "After adding the virtual field both schemas should be equal");
+  }
+
+  @Test
+  public void testWithoutVirtualColumnsRemoveVirtualPrimaryKeys() {
+    DimensionFieldSpec virtualField = new DimensionFieldSpec(
+        CommonConstants.Segment.BuiltInVirtualColumn.DOCID, FieldSpec.DataType.INT, true, Integer.class);
+
+    Schema schema = new Schema.SchemaBuilder()
+        .setSchemaName("testSchema")
+        .setEnableColumnBasedNullHandling(true)
+        .addMetricField("metric", FieldSpec.DataType.INT)
+        .addField(virtualField)
+        .setPrimaryKeyColumns(Lists.newArrayList("metric", virtualField.getName()))
+        .build();
+
+    Schema withoutVirtualColumns = schema.withoutVirtualColumns();
+
+    Assert.assertEquals(withoutVirtualColumns.getPrimaryKeyColumns(), Collections.singletonList("metric"),
+        "Unexpected primary key columns");
   }
 }
