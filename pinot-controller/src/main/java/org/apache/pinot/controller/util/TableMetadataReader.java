@@ -49,7 +49,6 @@ import org.slf4j.LoggerFactory;
  * the column indexes available.
  */
 public class TableMetadataReader {
-  private static final Logger LOGGER = LoggerFactory.getLogger(TableMetadataReader.class);
   private final Executor _executor;
   private final HttpClientConnectionManager _connectionManager;
   private final PinotHelixResourceManager _pinotHelixResourceManager;
