@@ -76,7 +76,7 @@ export const putTable = (name: string, params: string): Promise<AxiosResponse<Op
 export const getSchemaList = (): Promise<AxiosResponse<QuerySchemas>> =>
   baseApi.get(`/schemas`);
 
-export const getSchemaInfo = (): Promise<AxiosResponse<SchemaInfo[]>> =>
+export const getSchemaInfo = (): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.get(`/schemas/info`);
 
 export const getSchema = (name: string): Promise<AxiosResponse<OperationResponse>> =>
