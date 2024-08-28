@@ -287,7 +287,13 @@ public class PluginManager {
       PluginClassLoader classLoader = createClassLoader(urlList);
       _registry.put(new Plugin(pluginName), classLoader);
     } else {
+      final ClassLoader baseClassLoader = ClassLoader.getPlatformClassLoader();
+
       try {
+        ClassRealm pluginRealm = _classWorld.newRealm(
+            pluginName,
+            new URLClassLoader(urlList.toArray(new URL[0]), baseClassLoader));
+
         PinotPluginConfiguration config = null;
         Path pluginPropertiesPath = directory.toPath().resolve(PINOUT_PLUGIN_PROPERTIES_FILE_NAME);
         if (Files.isRegularFile(pluginPropertiesPath)) {
@@ -300,22 +306,22 @@ public class PluginManager {
           }
         }
 
-        ClassLoader parentClassLoader;
+        // Important: parent is not the same as baseclassloader (see pluginRealm above)
+        // baseClassLoader is ALWAYS BEFORE self classloader
+        // parentClassLoader is AFTER self classloader
+        // if there are no importsFromParent defined, everything is accepted
+        // import from another must always match a set om imports
         String parentRealmId;
         if (config != null && config.getParentRealmId().isPresent()) {
+          //
           parentRealmId = config.getParentRealmId().get();
 
-          parentClassLoader = _classWorld.getClassRealm(config.getParentRealmId().get());
+          pluginRealm.setParentRealm(_classWorld.getClassRealm(config.getParentRealmId().get()));
         } else {
           parentRealmId = null;
-          parentClassLoader = ClassLoader.getPlatformClassLoader();
         }
 
-        ClassRealm pluginRealm = _classWorld.newRealm(
-                pluginName,
-                new URLClassLoader(urlList.toArray(new URL[0]), parentClassLoader));
-
-        if(!"pinot".equals(parentRealmId)) {
+        if (!"pinot".equals(parentRealmId)) {
           ClassLoader pinotLoader = _classWorld.getClassRealm(PINOT_REALMID);
 
           // All exported packages
@@ -363,7 +369,7 @@ public class PluginManager {
         }
 
         // Additional importForm as specified by the plugin itself
-        if(config != null) {
+        if (config != null) {
           config.getImportsFromPerRealm().forEach((r, ifs) -> {
                 try {
                   ClassRealm cr = _classWorld.getRealm(r);
@@ -374,7 +380,6 @@ public class PluginManager {
               }
           );
         }
-
       } catch (DuplicateRealmException e) {
         throw new RuntimeException(e);
       }

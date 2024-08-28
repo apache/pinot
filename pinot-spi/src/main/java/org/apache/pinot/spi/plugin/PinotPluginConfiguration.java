@@ -31,7 +31,7 @@ class PinotPluginConfiguration {
 
   private final Map<String, List<String>> _importsFromRealm;
 
-  private final Optional<String> parentRealmId;
+  private final String _parentRealmId;
 
   /**
    * Expose plugin configuration based on Properties
@@ -39,8 +39,10 @@ class PinotPluginConfiguration {
    * Possible entries:
    * key: importFrom.[realmId]
    *  value: comma-separated list of packages
+   * key: parent.realmId
+   *  value: pinot, in case you want to make use of all pinot-framework classes first
    *
-   * @param properties
+   * @param properties properties-based configuration
    */
   PinotPluginConfiguration(Properties properties) {
     Map<String, List<String>> importsFromRealm = new HashMap<>();
@@ -53,7 +55,7 @@ class PinotPluginConfiguration {
       }
     });
     _importsFromRealm = Map.copyOf(importsFromRealm);
-    parentRealmId = Optional.ofNullable(properties.getProperty("parent.realmId"));
+    _parentRealmId = properties.getProperty("parent.realmId");
   }
 
   public Map<String, List<String>> getImportsFromPerRealm() {
@@ -61,6 +63,6 @@ class PinotPluginConfiguration {
   }
 
   public Optional<String> getParentRealmId() {
-    return parentRealmId;
+    return Optional.ofNullable(_parentRealmId);
   }
 }

@@ -266,10 +266,9 @@ public class PluginManagerTest {
               ClassNotFoundException.class, () -> pluginManager.loadClass(
                       "pinot-yammer",
                       "org.apache.pinot.plugin.metrics.dropwizard.DropwizardMetricsRegistry"));
-      Assert.assertFalse(pluginManager.loadClass("pinot-yammer", commonsIOUtils).getProtectionDomain()
+      Assert.assertTrue(pluginManager.loadClass("pinot-yammer", commonsIOUtils).getProtectionDomain()
           .getCodeSource().getLocation().getPath().endsWith("pinot-yammer-0.10.0-shaded.jar"),
-          "This is parent-first, so class should come from pinot-realm");
-      Assert.assertNotNull(pluginManager.loadClass("pinot-yammer",commonsIOUtils));
+          "This is self-first, so class should come from pinot-yammer realm");
     } finally {
       if (originalPluginDir != null) {
         System.setProperty(PLUGINS_DIR_PROPERTY_NAME, originalPluginDir);
