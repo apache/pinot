@@ -22,7 +22,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.tsdb.spi.PinotTimeSeriesConfigs;
+import org.apache.pinot.tsdb.spi.PinotTimeSeriesConfiguration;
 
 
 /**
@@ -35,11 +35,11 @@ public class SeriesBuilderFactoryProvider {
   }
 
   public static void init(PinotConfiguration pinotConfiguration) {
-    String[] engines = pinotConfiguration.getProperty(PinotTimeSeriesConfigs.getEnabledLanguagesSuffix(), "")
+    String[] languages = pinotConfiguration.getProperty(PinotTimeSeriesConfiguration.getEnabledLanguagesConfigKey(), "")
         .split(",");
-    for (String engine : engines) {
+    for (String language : languages) {
       String seriesBuilderClass = pinotConfiguration
-          .getProperty(PinotTimeSeriesConfigs.getSeriesBuilderClass(engine));
+          .getProperty(PinotTimeSeriesConfiguration.getSeriesBuilderFactoryConfigKey(language));
       try {
         Object untypedSeriesBuilderFactory = Class.forName(seriesBuilderClass).getConstructor().newInstance();
         if (!(untypedSeriesBuilderFactory instanceof SeriesBuilderFactory)) {
@@ -48,8 +48,8 @@ public class SeriesBuilderFactoryProvider {
         }
         SeriesBuilderFactory seriesBuilderFactory = (SeriesBuilderFactory) untypedSeriesBuilderFactory;
         seriesBuilderFactory.init(pinotConfiguration.subset(
-            PinotTimeSeriesConfigs.CONFIG_PREFIX + "." + engine));
-        FACTORY_MAP.put(engine, seriesBuilderFactory);
+            PinotTimeSeriesConfiguration.CONFIG_PREFIX + "." + language));
+        FACTORY_MAP.put(language, seriesBuilderFactory);
       } catch (Exception e) {
         throw new RuntimeException(e);
       }

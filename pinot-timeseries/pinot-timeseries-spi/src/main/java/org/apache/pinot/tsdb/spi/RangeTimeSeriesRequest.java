@@ -29,7 +29,12 @@ import java.time.Duration;
  * <b>Notes:</b>
  * <ul>
  *   <li>[start, end] are both inclusive.</li>
- *   <li>The result need not contain time values that are in [start, end]</li>
+ *   <li>
+ *     The result can contain time values outside [start, end], though we generally recommend to keep your results
+ *     within the requested range. This decision is left to the time-series query language implementations. In some
+ *     cases, returning data outside the requested time-range can help (e.g. for debugging purposes when you are
+ *     computing moving 1d sum but are only looking at data for the last 12 hours).
+ *   </li>
  *   <li>stepSeconds is used to define the default resolution for the query</li>
  *   <li>
  *     Some query languages allow users to change the resolution via a function, and in those cases the returned

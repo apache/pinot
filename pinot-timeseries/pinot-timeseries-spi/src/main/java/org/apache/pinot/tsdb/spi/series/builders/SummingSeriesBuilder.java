@@ -24,6 +24,11 @@ import org.apache.pinot.tsdb.spi.series.BaseSeriesBuilder;
 import org.apache.pinot.tsdb.spi.series.Series;
 
 
+/**
+ * SummingSeriesBuilder is a series builder that computes the sum of all values in each time bucket.
+ * <b>Context:</b>We provide some ready to use implementations for some of the most common use-cases in the SPI. This
+ * reduces redundancy and also serves as a reference implementation for language developers.
+ */
 public class SummingSeriesBuilder extends BaseSeriesBuilder {
   private final Double[] _values;
 
