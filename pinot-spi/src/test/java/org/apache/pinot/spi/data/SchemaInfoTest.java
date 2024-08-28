@@ -57,12 +57,12 @@ public class SchemaInfoTest {
     assertEquals(jsonNodeResp.get(0).get("numDimensionFields").asInt(), 3);
     assertEquals(jsonNodeResp.get(0).get("numDateTimeFields").asInt(), 2);
     assertEquals(jsonNodeResp.get(0).get("numMetricFields").asInt(), 1);
-    assertEquals("TestSchema", schemaInfo.getSchemaName());
+    assertEquals(schemaInfo.getSchemaName(), "TestSchema");
 
     // Test column count
-    assertEquals(3, schemaInfo.getNumDimensionFields());  // 6 - 3 virtual columns = 3
-    assertEquals(2, schemaInfo.getNumDateTimeFields());
-    assertEquals(1, schemaInfo.getNumMetricFields());
+    assertEquals(schemaInfo.getNumDimensionFields(), 3);  // 6 - 3 virtual columns = 3
+    assertEquals(schemaInfo.getNumDateTimeFields(), 2);
+    assertEquals(schemaInfo.getNumMetricFields(), 1);
 
     // Serialize JsonNode back to SchemaInfo
     List<SchemaInfo> schemaInfoListSer = new ArrayList<>();
@@ -70,9 +70,9 @@ public class SchemaInfoTest {
     });
     SchemaInfo schemaInfo1 = schemaInfoListSer.get(0);
     // Verify the deserialized object match
-    assertEquals("TestSchema", schemaInfo1.getSchemaName());
-    assertEquals(3, schemaInfo1.getNumDimensionFields());
-    assertEquals(2, schemaInfo1.getNumDateTimeFields());
-    assertEquals(1, schemaInfo1.getNumMetricFields());
+    assertEquals(schemaInfo1.getSchemaName(), "TestSchema");
+    assertEquals(schemaInfo1.getNumDimensionFields(), 3);
+    assertEquals(schemaInfo1.getNumDateTimeFields(), 2);
+    assertEquals(schemaInfo1.getNumMetricFields(), 1);
   }
 }
