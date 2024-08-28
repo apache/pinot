@@ -123,7 +123,7 @@ public final class DataBlockUtils {
     DataBlock.Type dataBlockType = dataBlock.getDataBlockType();
     int firstInt = version.getVersion() + (dataBlockType.ordinal() << DataBlockUtils.VERSION_TYPE_SHIFT);
 
-    DataBuffer dataBuffer = dataBlockSerde.serialize(dataBlock.asRaw(), firstInt);
+    DataBuffer dataBuffer = dataBlockSerde.serialize(dataBlock, firstInt);
 
     int readFirstByte;
     if (dataBuffer.order() != ByteOrder.BIG_ENDIAN) {

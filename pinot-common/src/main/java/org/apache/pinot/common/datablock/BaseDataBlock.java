@@ -82,7 +82,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
  * difference is the data layout in FIXED_SIZE_DATA and VARIABLE_SIZE_DATA section, see each impl for details.
  */
 @SuppressWarnings("DuplicatedCode")
-public abstract class BaseDataBlock implements DataBlock, DataBlock.Raw {
+public abstract class BaseDataBlock implements DataBlock {
   protected static final int HEADER_SIZE = Integer.BYTES * 13;
   // _errCodeToExceptionMap stores exceptions as a map of errorCode->errorMessage
   protected Map<Integer, String> _errCodeToExceptionMap;
@@ -426,21 +426,9 @@ public abstract class BaseDataBlock implements DataBlock, DataBlock.Raw {
     return _variableSizeData;
   }
 
-  /**
-   * Returns the list of serialized stats.
-   * <p>
-   * The returned list may contain nulls, which would mean that no stats were available for that stage.
-   * <p>
-   * The list itself may also be null.
-   */
   @Nullable
   @Override
   public List<DataBuffer> getStatsByStage() {
     return Collections.emptyList();
-  }
-
-  @Override
-  public Raw asRaw() {
-    return this;
   }
 }

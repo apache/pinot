@@ -165,10 +165,10 @@ public class DataBlockEquals {
           }
           return false;
         }
-        if (!Objects.equals(left.asRaw().getStatsByStage(), right.asRaw().getStatsByStage())) {
+        if (!Objects.equals(left.getStatsByStage(), right.getStatsByStage())) {
           if (_failOnFalse) {
-            throw new IllegalArgumentException("Different statsByStage: " + left.asRaw().getStatsByStage() + " and "
-                + right.asRaw().getStatsByStage());
+            throw new IllegalArgumentException("Different statsByStage: " + left.getStatsByStage() + " and "
+                + right.getStatsByStage());
           }
           return false;
         }

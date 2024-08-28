@@ -56,7 +56,7 @@ public class ZeroCopyDataBlockSerde implements DataBlockSerde {
     _allocator = allocator;
   }
 
-  public DataBuffer serialize(DataBlock.Raw dataBlock, int firstInt)
+  public DataBuffer serialize(DataBlock dataBlock, int firstInt)
       throws IOException {
     Header header = new Header(firstInt, dataBlock.getNumberOfRows(), dataBlock.getNumberOfColumns());
 
@@ -105,7 +105,7 @@ public class ZeroCopyDataBlockSerde implements DataBlockSerde {
    * <p>
    * the header object is modified to update {@link Header#_exceptionsLength}
    */
-  private void serializeExceptions(DataBlock.Raw dataBlock, PinotOutputStream into)
+  private void serializeExceptions(DataBlock dataBlock, PinotOutputStream into)
       throws IOException {
 
     Map<Integer, String> errCodeToExceptionMap = dataBlock.getExceptions();
@@ -120,7 +120,7 @@ public class ZeroCopyDataBlockSerde implements DataBlockSerde {
     }
   }
 
-  private static void serializeDictionary(DataBlock.Raw dataBlock, PinotOutputStream into)
+  private static void serializeDictionary(DataBlock dataBlock, PinotOutputStream into)
       throws IOException {
     String[] stringDictionary = dataBlock.getStringDictionary();
     if (stringDictionary == null) {
@@ -134,7 +134,7 @@ public class ZeroCopyDataBlockSerde implements DataBlockSerde {
     }
   }
 
-  private static void serializeDataSchema(DataBlock.Raw dataBlock, PinotOutputStream into)
+  private static void serializeDataSchema(DataBlock dataBlock, PinotOutputStream into)
       throws IOException {
     DataSchema dataSchema = dataBlock.getDataSchema();
     if (dataSchema == null) {
@@ -146,7 +146,7 @@ public class ZeroCopyDataBlockSerde implements DataBlockSerde {
     into.write(bytes);
   }
 
-  private static void serializeMetadata(DataBlock.Raw dataBlock, PinotOutputStream into, Header header)
+  private static void serializeMetadata(DataBlock dataBlock, PinotOutputStream into, Header header)
       throws IOException {
     header._metadataStart = (int) into.getCurrentOffset();
     if (!(dataBlock instanceof MetadataBlock)) {

@@ -43,7 +43,7 @@ public interface DataBlockSerde {
    *                 defined way. This integer must be written in the first 4 positions of the buffer in BIG_ENDIAN
    *                 order.
    */
-  DataBuffer serialize(DataBlock.Raw dataBlock, int firstInt)
+  DataBuffer serialize(DataBlock dataBlock, int firstInt)
       throws IOException;
 
   /**

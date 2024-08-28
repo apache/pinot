@@ -89,8 +89,6 @@ public interface DataBlock {
 
   Type getDataBlockType();
 
-  Raw asRaw();
-
   enum Type {
     ROW(0),
     COLUMNAR(1),
@@ -117,42 +115,37 @@ public interface DataBlock {
   }
 
   /**
-   * A raw representation of the block.
-   * <p>
-   * Do not confuse this with the serialized form of the block. This is a representation of the block in memory and
-   * it is completely dependent on the current Pinot version. That means that this representation can change between
-   * Pinot versions.
-   * <p>
-   * The {@link DataBlockSerde} is responsible for serializing and deserializing this raw representation into a binary
-   * format that is compatible with the other Pinot versions.
+   * Returns the dictionary for the given column.
+   *
+   * This is a break in the interface abstraction that assumes all implementations will use a dictionary only for
+   * string columns. This may change in the future.
    */
-  interface Raw {
-    int getNumberOfRows();
+  @Nullable
+  String[] getStringDictionary();
 
-    int getNumberOfColumns();
+  /**
+   * The actual content is different depending on whether this is a row-based or columnar data block.
+   *
+   * This is an abstraction leak that assumes all implementations derive from {@link BaseDataBlock}.
+   */
+  @Nullable
+  DataBuffer getFixedData();
 
-    @Nullable
-    Map<Integer, String> getExceptions();
+  /**
+   * The actual content is different depending on whether this is a row-based or columnar data block.
+   *
+   * This is an abstraction leak that assumes all implementations derive from {@link BaseDataBlock}.
+   */
+  @Nullable
+  DataBuffer getVarSizeData();
 
-    @Nullable
-    String[] getStringDictionary();
-
-    @Nullable
-    DataSchema getDataSchema();
-
-    /**
-     * The actual content is different depending on whether this is a row-based or columnar data block.
-     */
-    @Nullable
-    DataBuffer getFixedData();
-
-    /**
-     * The actual content is different depending on whether this is a row-based or columnar data block.
-     */
-    @Nullable
-    DataBuffer getVarSizeData();
-
-    @Nullable
-    List<DataBuffer> getStatsByStage();
-  }
+  /**
+   * Returns the list of serialized stats.
+   * <p>
+   * The returned list may contain nulls, which would mean that no stats were available for that stage.
+   * <p>
+   * The list itself may also be null.
+   */
+  @Nullable
+  List<DataBuffer> getStatsByStage();
 }
