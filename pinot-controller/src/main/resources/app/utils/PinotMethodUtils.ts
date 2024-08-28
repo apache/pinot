@@ -1019,7 +1019,7 @@ const getSchemaData = (schemaName) => {
 
 const getSchemaDataInfo = () => {
   return getSchemaInfo().then((response)=>{
-    return response.data;
+    return response.data.schemasInfo;
   });
 };
 

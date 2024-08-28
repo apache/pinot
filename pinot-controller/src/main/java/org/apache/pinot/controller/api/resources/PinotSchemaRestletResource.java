@@ -32,6 +32,7 @@ import io.swagger.annotations.SwaggerDefinition;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import javax.inject.Inject;
@@ -127,18 +128,26 @@ public class PinotSchemaRestletResource {
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_SCHEMA_INFO)
   @ApiOperation(value = "List all schemas info with count of field specs", notes = "Lists all schemas with field "
       + "count details")
-  public String getSchemaInfo(@Context HttpHeaders headers)
+  public String getSchemasInfo(@Context HttpHeaders headers)
       throws JsonProcessingException {
+    Map<String, Object> schemaInfoObjects = new LinkedHashMap<>();
     List<SchemaInfo> schemasInfo = new ArrayList<>();
+    List<String> uncachedSchemas = new ArrayList<>();
     TableCache cache = _pinotHelixResourceManager.getTableCache();
     List<String> schemas = _pinotHelixResourceManager.getSchemaNames(headers.getHeaderString(DATABASE));
     for (String schemaName : schemas) {
       Schema schema = cache.getSchema(schemaName);
       if (schema != null) {
         schemasInfo.add(new SchemaInfo(schema));
+      } else {
+        uncachedSchemas.add(schemaName);
       }
     }
-    return JsonUtils.objectToPrettyString(schemasInfo);
+    schemaInfoObjects.put("schemasInfo", schemasInfo);
+    if (!uncachedSchemas.isEmpty()) {
+      schemaInfoObjects.put("uncachedSchemas", uncachedSchemas);
+    }
+    return JsonUtils.objectToPrettyString(schemaInfoObjects);
   }
 
   @GET
