@@ -479,6 +479,7 @@ public abstract class BaseDataBlock implements DataBlock, DataBlock.Raw {
               }
               break;
             case LONG:
+            case TIMESTAMP:
               for (int did = 0; did < _numRows; did++) {
                 if (getLong(did, colId) != that.getLong(did, colId)) {
                   return false;
@@ -498,8 +499,6 @@ public abstract class BaseDataBlock implements DataBlock, DataBlock.Raw {
                   return false;
                 }
               }
-              break;
-            case TIMESTAMP:
               break;
             case STRING:
             case JSON:
