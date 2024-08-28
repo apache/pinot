@@ -67,7 +67,7 @@ public class Actions {
     public static final String GET_TABLE_CONFIG = "GetTableConfig";
     public static final String GET_TABLE_LEADER = "GetTableLeader";
     public static final String GET_TASK = "GetTask";
-    public static final String GET_TASK_COUNT = "GetTaskTypeCount";
+    public static final String GET_TASK_COUNT = "GetTaskCount";
     public static final String GET_TENANT = "GetTenant";
     public static final String GET_USER = "GetUser";
     public static final String GET_VERSION = "GetVersion";
