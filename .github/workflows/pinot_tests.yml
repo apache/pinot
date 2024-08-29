@@ -133,7 +133,7 @@ jobs:
           MAVEN_OPTS: >
             -Xmx2G -DskipShade -DfailIfNoTests=false -Dmaven.wagon.httpconnectionManager.ttlSeconds=25
             -Dmaven.wagon.http.retryHandler.count=30 -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false
-            -B -ntp -P codecoverage
+            -B -ntp
             -XX:+IgnoreUnrecognizedVMOptions
             --add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED
             --add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED
@@ -213,7 +213,7 @@ jobs:
           MAVEN_OPTS: >
             -Xmx2G -DskipShade -DfailIfNoTests=false -Dmaven.wagon.httpconnectionManager.ttlSeconds=25
             -Dmaven.wagon.http.retryHandler.count=30 -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false
-            -B -ntp -P codecoverage
+            -B -ntp
             -XX:+IgnoreUnrecognizedVMOptions
             --add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED
             --add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED
@@ -239,7 +239,7 @@ jobs:
           MAVEN_OPTS: >
             -Xmx2G -DskipShade -DfailIfNoTests=false -Dmaven.wagon.httpconnectionManager.ttlSeconds=25
             -Dmaven.wagon.http.retryHandler.count=30 -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false
-            -B -ntp -P codecoverage
+            -B -ntp
             -XX:+IgnoreUnrecognizedVMOptions
             --add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED
             --add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED
