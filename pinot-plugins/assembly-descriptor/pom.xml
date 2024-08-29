@@ -32,8 +32,8 @@
   <artifactId>assembly-descriptor</artifactId>
   <name>Pinot Plugin Assembly Descriptor</name>
   <description>By adding this descriptor to the maven-assembly-plugin of your project an extra artifact will be created.
-    It will be a zip, classified with plugin, putting all classes under PINOT-INF/classes
-    and all runtime dependencies under PINOT-INF/lib.
+    It will be a zip, classified with plugin, putting all classes under /classes/
+    and all runtime dependencies in the root of the zip
     See also https://maven.apache.org/plugins/maven-assembly-plugin/examples/sharing-descriptors.html
   </description>
 
@@ -46,8 +46,12 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-invoker-plugin</artifactId>
-        <version>3.7.0</version>
+        <version>3.8.0</version>
         <configuration>
+          <localRepositoryPath>${project.build.directory}/it-repo</localRepositoryPath>
+          <extraArtifacts>
+            <artifact>org.apache.pinot:pinot-spi:${project.version}:jar</artifact>
+          </extraArtifacts>
           <projectsDirectory>src/it/projects</projectsDirectory>
           <cloneProjectsTo>${project.build.directory}/it</cloneProjectsTo>
           <postBuildHookScript>verify</postBuildHookScript>
@@ -73,5 +77,4 @@
       </plugin>
     </plugins>
   </build>
-
 </project>
