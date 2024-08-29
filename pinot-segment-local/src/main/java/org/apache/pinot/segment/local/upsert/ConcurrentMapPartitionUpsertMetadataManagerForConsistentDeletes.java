@@ -234,7 +234,10 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
 
   @Override
   public void doRemoveExpiredPrimaryKeys() {
+    AtomicInteger numTotalKeysMarkForDeletion = new AtomicInteger();
     AtomicInteger numDeletedTTLKeysRemoved = new AtomicInteger();
+    AtomicInteger numDeletedKeysWithinTTLWindow = new AtomicInteger();
+    AtomicInteger numDeletedTTLKeysInMultipleSegments = new AtomicInteger();
     double largestSeenComparisonValue = _largestSeenComparisonValue.get();
     double deletedKeysThreshold;
     if (_deletedKeysTTL > 0) {
@@ -249,20 +252,44 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
       // an issue can arise where the upsert compaction might first process the segment containing the delete record
       // while the previous segment(s) are not compacted. Upon restart, this can inadvertently revive the key
       // that was originally marked for deletion.
-      if (_deletedKeysTTL > 0 && comparisonValue < deletedKeysThreshold
-          && recordLocation.getDistinctSegmentCount() <= 1) {
+      if (_deletedKeysTTL > 0) {
         ThreadSafeMutableRoaringBitmap currentQueryableDocIds = recordLocation.getSegment().getQueryableDocIds();
         // if key not part of queryable doc id, it means it is deleted
         if (currentQueryableDocIds != null && !currentQueryableDocIds.contains(recordLocation.getDocId())) {
-          _primaryKeyToRecordLocationMap.remove(primaryKey, recordLocation);
-          removeDocId(recordLocation.getSegment(), recordLocation.getDocId());
-          numDeletedTTLKeysRemoved.getAndIncrement();
+          numTotalKeysMarkForDeletion.getAndIncrement();
+          if (comparisonValue >= deletedKeysThreshold) {
+            // If key is within the TTL window, do not remove it from the primary hashmap
+            numDeletedKeysWithinTTLWindow.getAndIncrement();
+          } else if (recordLocation.getDistinctSegmentCount() > 1) {
+            // If key is part of multiple segments, do not remove it from the primary hashmap
+            numDeletedTTLKeysInMultipleSegments.getAndIncrement();
+          } else {
+            // delete key from primary hashmap
+            _primaryKeyToRecordLocationMap.remove(primaryKey, recordLocation);
+            removeDocId(recordLocation.getSegment(), recordLocation.getDocId());
+            numDeletedTTLKeysRemoved.getAndIncrement();
+          }
         }
       }
     });
 
     // Update metrics
     updatePrimaryKeyGauge();
+    int numTotalKeysMarkedForDeletion = numTotalKeysMarkForDeletion.get();
+    if (numTotalKeysMarkedForDeletion > 0) {
+      _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.TOTAL_KEYS_MARKED_FOR_DELETION,
+          numTotalKeysMarkedForDeletion);
+    }
+    int numDeletedKeysWithinTTLWindowValue = numDeletedKeysWithinTTLWindow.get();
+    if (numDeletedKeysWithinTTLWindowValue > 0) {
+      _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.DELETED_KEYS_WITHIN_TTL_WINDOW,
+          numDeletedKeysWithinTTLWindowValue);
+    }
+    int numDeletedTTLKeysInMultipleSegmentsValue = numDeletedTTLKeysInMultipleSegments.get();
+    if (numDeletedTTLKeysInMultipleSegmentsValue > 0) {
+      _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.DELETED_TTL_KEYS_IN_MULTIPLE_SEGMENTS,
+          numDeletedTTLKeysInMultipleSegmentsValue);
+    }
     int numDeletedTTLKeys = numDeletedTTLKeysRemoved.get();
     if (numDeletedTTLKeys > 0) {
       _logger.info("Deleted {} primary keys based on deletedKeysTTL", numDeletedTTLKeys);

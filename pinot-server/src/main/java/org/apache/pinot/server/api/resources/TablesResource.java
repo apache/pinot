@@ -64,6 +64,7 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.response.server.TableIndexMetadataResponse;
 import org.apache.pinot.common.restlet.resources.ResourceUtils;
 import org.apache.pinot.common.restlet.resources.SegmentConsumerInfo;
+import org.apache.pinot.common.restlet.resources.ServerSegmentsReloadCheckResponse;
 import org.apache.pinot.common.restlet.resources.TableMetadataInfo;
 import org.apache.pinot.common.restlet.resources.TableSegmentValidationInfo;
 import org.apache.pinot.common.restlet.resources.TableSegments;
@@ -953,5 +954,29 @@ public class TablesResource {
       }
     }
     return new TableSegmentValidationInfo(true, maxEndTimeMs);
+  }
+
+  @GET
+  @Path("/tables/{tableName}/segments/needReload")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Checks if reload is needed on any segment", notes = "Returns true if reload is required on"
+      + " any segment in this server")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success", response = TableSegments.class), @ApiResponse(code = 500,
+      message = "Internal Server error", response = ErrorInfo.class)
+  })
+  public String checkSegmentsReload(
+      @ApiParam(value = "Table Name with type", required = true) @PathParam("tableName") String tableName,
+      @Context HttpHeaders headers) {
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
+    TableDataManager tableDataManager = ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableName);
+    boolean needReload = false;
+    try {
+      needReload = tableDataManager.needReloadSegments();
+    } catch (Exception e) {
+      throw new WebApplicationException(e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR);
+    }
+    return ResourceUtils.convertToJsonString(
+        new ServerSegmentsReloadCheckResponse(needReload, tableDataManager.getInstanceId()));
   }
 }

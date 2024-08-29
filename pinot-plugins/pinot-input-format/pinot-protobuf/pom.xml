@@ -34,7 +34,6 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/../../..</pinot.root>
-    <kafka.lib.version>2.8.2</kafka.lib.version>
     <shade.phase.prop>package</shade.phase.prop>
   </properties>
   <repositories>
@@ -60,23 +59,14 @@
     <dependency>
       <groupId>org.apache.kafka</groupId>
       <artifactId>kafka-clients</artifactId>
-      <version>${kafka.lib.version}</version>
     </dependency>
     <dependency>
       <groupId>io.confluent</groupId>
       <artifactId>kafka-schema-registry-client</artifactId>
-      <version>${confluent.version}</version>
-      <exclusions>
-        <exclusion>
-          <groupId>org.apache.kafka</groupId>
-          <artifactId>kafka-clients</artifactId>
-        </exclusion>
-      </exclusions>
     </dependency>
     <dependency>
       <groupId>io.confluent</groupId>
       <artifactId>kafka-protobuf-serializer</artifactId>
-      <version>${confluent.version}</version>
     </dependency>
 
     <dependency>
@@ -95,9 +85,7 @@
       <plugin>
         <groupId>org.xolstice.maven.plugins</groupId>
         <artifactId>protobuf-maven-plugin</artifactId>
-        <version>0.6.1</version>
         <configuration>
-          <protocArtifact>com.google.protobuf:protoc:${protobuf.version}:exe:${os.detected.classifier}</protocArtifact>
           <protoTestSourceRoot>${basedir}/src/test/resources</protoTestSourceRoot>
         </configuration>
         <executions>

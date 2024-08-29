@@ -33,6 +33,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
 import org.apache.pinot.segment.local.segment.index.datasource.ImmutableDataSource;
+import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.local.startree.v2.store.StarTreeIndexContainer;
@@ -171,6 +172,14 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   private File getValidDocIdsSnapshotFile() {
     return new File(SegmentDirectoryPaths.findSegmentDirectory(_segmentMetadata.getIndexDir()),
         V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME);
+  }
+
+  /**
+   * if re processing or reload is needed on a segment then return true
+   */
+  public boolean isReloadNeeded(IndexLoadingConfig indexLoadingConfig)
+      throws Exception {
+    return ImmutableSegmentLoader.needPreprocess(_segmentDirectory, indexLoadingConfig, indexLoadingConfig.getSchema());
   }
 
   @Override

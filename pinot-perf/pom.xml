@@ -88,9 +88,13 @@
       <artifactId>testng</artifactId>
     </dependency>
     <dependency>
+      <groupId>org.mockito</groupId>
+      <artifactId>mockito-core</artifactId>
+      <scope>compile</scope>
+    </dependency>
+    <dependency>
       <groupId>org.openjdk.jmh</groupId>
       <artifactId>jmh-generator-annprocess</artifactId>
-      <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>net.sf.jopt-simple</groupId>

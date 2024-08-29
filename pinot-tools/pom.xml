@@ -32,7 +32,6 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/..</pinot.root>
-    <spark.version>3.5.2</spark.version>
   </properties>
   <dependencies>
     <dependency>
@@ -127,6 +126,11 @@
       <artifactId>hadoop-common</artifactId>
       <scope>compile</scope>
     </dependency>
+    <!-- Replace bcprov-jdk15on which is excluded from hadoop-common -->
+    <dependency>
+      <groupId>org.bouncycastle</groupId>
+      <artifactId>bcprov-jdk18on</artifactId>
+    </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-hdfs</artifactId>
@@ -135,7 +139,6 @@
     <dependency>
       <groupId>xml-apis</groupId>
       <artifactId>xml-apis</artifactId>
-      <scope>compile</scope>
     </dependency>
     <dependency>
       <groupId>software.amazon.awssdk</groupId>
@@ -167,7 +170,7 @@
     <dependency>
       <groupId>org.apache.spark</groupId>
       <artifactId>spark-launcher_${scala.compat.version}</artifactId>
-      <version>${spark.version}</version>
+      <version>${spark3.version}</version>
     </dependency>
 
     <dependency>
@@ -452,8 +455,8 @@
         </executions>
       </plugin>
       <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-resources-plugin</artifactId>
-        <version>3.3.1</version>
         <executions>
           <execution>
             <id>copy-kafka-resources</id>

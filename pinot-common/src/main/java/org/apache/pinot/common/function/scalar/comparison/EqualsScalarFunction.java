@@ -23,7 +23,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
-import javax.annotation.Nullable;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.annotations.ScalarFunction;
@@ -97,14 +96,8 @@ public class EqualsScalarFunction extends PolymorphicComparisonScalarFunction {
     return TYPE_FUNCTION_INFO_MAP.get(argumentType);
   }
 
-  @Nullable
   @Override
-  public FunctionInfo getFunctionInfo(int numArguments) {
-    if (numArguments != 2) {
-      return null;
-    }
-
-    // For backward compatibility
+  protected FunctionInfo defaultFunctionInfo() {
     return DOUBLE_EQUALS_WITH_TOLERANCE;
   }
 
