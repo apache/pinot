@@ -39,6 +39,10 @@
     https://github.com/jacoco/jacoco/wiki/MavenMultiModule
   </description>
 
+  <properties>
+    <pinot.root>${basedir}/..</pinot.root>
+  </properties>
+  
   <build>
     <plugins>
       <plugin>
