@@ -61,6 +61,7 @@ import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.util.PeerServerSegmentFinder;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
@@ -1022,6 +1023,31 @@ public abstract class BaseTableDataManager implements TableDataManager {
       _logger.warn("Failed to initialize SegmentDirectory for segment: {} with error: {}", segmentName, e.getMessage());
       return null;
     }
+  }
+
+  @Override
+  public boolean needReloadSegments()
+      throws Exception {
+    IndexLoadingConfig indexLoadingConfig = fetchIndexLoadingConfig();
+    List<SegmentDataManager> segmentDataManagers = acquireAllSegments();
+    boolean needReload = false;
+    try {
+      for (SegmentDataManager segmentDataManager : segmentDataManagers) {
+        IndexSegment segment = segmentDataManager.getSegment();
+        if (segment instanceof ImmutableSegmentImpl) {
+          ImmutableSegmentImpl immutableSegment = (ImmutableSegmentImpl) segment;
+          if (immutableSegment.isReloadNeeded(indexLoadingConfig)) {
+            needReload = true;
+            break;
+          }
+        }
+      }
+    } finally {
+      for (SegmentDataManager segmentDataManager : segmentDataManagers) {
+        releaseSegment(segmentDataManager);
+      }
+    }
+    return needReload;
   }
 
   private SegmentDirectory initSegmentDirectory(String segmentName, String segmentCrc,

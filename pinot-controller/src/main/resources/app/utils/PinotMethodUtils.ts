@@ -34,6 +34,7 @@ import {
   getTaskTypeDebug,
   getTables,
   getTaskTypeTasks,
+  getTaskTypeTasksCount,
   getTaskTypeState,
   stopTasks,
   resumeTasks,
@@ -94,7 +95,10 @@ import {
   requestUpdateUser,
   getTaskProgress,
   getSegmentReloadStatus,
-  getTaskRuntimeConfig
+  getTaskRuntimeConfig,
+  getSchemaInfo,
+  getSegmentsStatus,
+  getServerToSegmentsCount
 } from '../requests';
 import { baseApi } from './axios-config';
 import Utils, { getDisplaySegmentStatus } from './Utils';
@@ -380,17 +384,13 @@ const allSchemaDetailsColumnHeader = ["Schema Name", "Dimension Columns", "Date-
 
 const getAllSchemaDetails = async (schemaList) => {
   let schemaDetails:Array<any> = [];
-  let promiseArr = [];
-  promiseArr = schemaList.map(async (o)=>{
-    return await getSchema(o);
-  });
-  const results = await Promise.all(promiseArr);
+  const results = await getSchemaDataInfo();
   schemaDetails = results.map((obj)=>{
     let schemaObj = [];
-    schemaObj.push(obj.data.schemaName);
-    schemaObj.push(obj.data.dimensionFieldSpecs ? obj.data.dimensionFieldSpecs.length : 0);
-    schemaObj.push(obj.data.dateTimeFieldSpecs ? obj.data.dateTimeFieldSpecs.length : 0);
-    schemaObj.push(obj.data.metricFieldSpecs ? obj.data.metricFieldSpecs.length : 0);
+    schemaObj.push(obj.schemaName);
+    schemaObj.push(obj.numDimensionFields);
+    schemaObj.push(obj.numDateTimeFields);
+    schemaObj.push(obj.numMetricFields);
     schemaObj.push(schemaObj[1] + schemaObj[2] + schemaObj[3]);
     return schemaObj;
   })
@@ -506,28 +506,38 @@ const getTableSummaryData = (tableName) => {
   });
 };
 
-// This method is used to display segment list of a particular tenant table
-// API: /tables/:tableName/idealstate
-//      /tables/:tableName/externalview
-// Expected Output: {columns: [], records: [], externalViewObject: {}}
-const getSegmentList = (tableName) => {
-  const promiseArr = [];
-  promiseArr.push(getIdealState(tableName));
-  promiseArr.push(getExternalView(tableName));
+// This method is used to display segment list of a particular table with segment name and it's status
+// API: /tables/${name}/segmentsStatus
+// Expected Output: {columns: [], records: []}
+  const getSegmentList = (tableName) => {
+    return getSegmentsStatus(tableName).then((results) => {
+      const segmentsArray = results.data; // assuming the array is inside `segments` property
+      return {
+        columns: ['Segment Name', 'Status'],
+        records: segmentsArray.map((segment) => [
+          segment.segmentName,
+          segment.segmentStatus
+        ])
+      };
+    });
+  };
 
-  return Promise.all(promiseArr).then((results) => {
-    const idealStateObj = results[0].data.OFFLINE || results[0].data.REALTIME;
-    const externalViewObj = results[1].data.OFFLINE || results[1].data.REALTIME;
+const getExternalViewObj = (tableName) => {
+  return getExternalView(tableName).then((result) => {
+    return result.data.OFFLINE || result.data.REALTIME;
+  });
+}; 
 
+const fetchServerToSegmentsCountData = (tableName, tableType) => {
+  return getServerToSegmentsCount(tableName, tableType).then((results) => {
+    const segmentsArray = results.data; 
     return {
-      columns: ['Segment Name', 'Status'],
-      records: Object.keys(idealStateObj).map((key) => {
-        return [
-          key,
-          getDisplaySegmentStatus(idealStateObj[key], externalViewObj[key])
-        ];
-      }),
-      externalViewObj
+      records: segmentsArray.flatMap((server) =>
+        Object.entries(server.serverToSegmentsCountMap).map(([serverName, segmentsCount]) => [ 
+          serverName,       
+          segmentsCount    
+        ])
+      )
     };
   });
 };
@@ -806,7 +816,7 @@ const getAllTaskTypes = async () => {
 };
 
 const getTaskInfo = async (taskType) => {
-  const tasksRes = await getTaskTypeTasks(taskType);
+  const tasksResLength = await getTaskTypeTasksCount(taskType);
   const stateRes = await getTaskTypeState(taskType);
 
   let state = get(stateRes, 'data', '');
@@ -814,7 +824,7 @@ const getTaskInfo = async (taskType) => {
   if(typeof state !== "string") {
     state = "";
   }
-  return [tasksRes?.data?.length || 0, state];
+  return [tasksResLength.data || 0, state];
 };
 
 const stopAllTasks = (taskType) => {
@@ -1004,6 +1014,12 @@ const saveTableAction = (tableObj) => {
 const getSchemaData = (schemaName) => {
   return getSchema(schemaName).then((response)=>{
     return response.data;
+  });
+};
+
+const getSchemaDataInfo = () => {
+  return getSchemaInfo().then((response)=>{
+    return response.data.schemasInfo;
   });
 };
 
@@ -1246,6 +1262,7 @@ export default {
   getAllTableDetails,
   getTableSummaryData,
   getSegmentList,
+  getExternalViewObj,
   getSegmentStatus,
   getTableDetails,
   getSegmentDetails,
@@ -1318,5 +1335,6 @@ export default {
   deleteUser,
   updateUser,
   getAuthUserNameFromAccessToken,
-  getAuthUserEmailFromAccessToken
+  getAuthUserEmailFromAccessToken,
+  fetchServerToSegmentsCountData
 };

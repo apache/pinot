@@ -16,46 +16,34 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.stream;
+package org.apache.pinot.controller.api.resources;
 
-import java.util.Properties;
-
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
- * StreamDataServerStartable is the interface for stream data sources.
- * Each stream data connector should implement a mock/wrapper of the data server.
- *
- * E.g. KafkaDataServerStartable is a wrapper class of Kafka 2.x broker.
+ * This class gives the details of a particular segment and it's status
  *
  */
-public interface StreamDataServerStartable {
-  /**
-   * Init the server.
-   *
-   * @param props
-   */
-  void init(Properties props);
+public class SegmentStatusInfo {
+  @JsonProperty("segmentName")
+  String _segmentName;
 
-  /**
-   * Start the server
-   */
-  void start();
+  @JsonProperty("segmentStatus")
+  String _segmentStatus;
 
-  /**
-   * Stop the server
-   */
-  void stop();
+  public String getSegmentName() {
+    return _segmentName;
+  }
 
-  /**
-   * Create a data stream (e.g Kafka topic) in the server.
-   *
-   * @param topic
-   * @param topicProps
-   */
-  void createTopic(String topic, Properties topicProps);
+  public String getSegmentStatus() {
+    return _segmentStatus;
+  }
 
-  /**
-   * Get the port of the server.
-   */
-  int getPort();
+  @JsonCreator
+  public SegmentStatusInfo(@JsonProperty("segmentName") String segmentName,
+      @JsonProperty("segmentStatus") String segmentStatus) {
+    _segmentName = segmentName;
+    _segmentStatus = segmentStatus;
+  }
 }

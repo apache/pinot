@@ -186,24 +186,11 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
 
   const fetchSegmentData = async () => {
     const result = await PinotMethodUtils.getSegmentList(tableName);
-    const {columns, records, externalViewObj} = result;
-    const instanceObj = {};
-    externalViewObj && Object.keys(externalViewObj).map((segmentName)=>{
-      const instanceKeys = Object.keys(externalViewObj[segmentName]);
-      instanceKeys.map((instanceName)=>{
-        if(!instanceObj[instanceName]){
-          instanceObj[instanceName] = 0;
-        }
-        instanceObj[instanceName] += 1;
-      })
-    });
-    const instanceRecords = [];
-    Object.keys(instanceObj).map((instanceName)=>{
-      instanceRecords.push([instanceName, instanceObj[instanceName]]);
-    })
+    const data = await PinotMethodUtils.fetchServerToSegmentsCountData(tableName, tableType);
+    const {columns, records} = result;
     setInstanceCountData({
       columns: instanceColumns,
-      records: instanceRecords
+      records: data.records
     });
 
     const segmentTableRows = [];
@@ -221,9 +208,9 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
         },
       ])
     );
-
     setSegmentList({columns, records: segmentTableRows});
   };
+
 
   const fetchTableSchema = async () => {
     const result = await PinotMethodUtils.getTableSchemaData(tableName);

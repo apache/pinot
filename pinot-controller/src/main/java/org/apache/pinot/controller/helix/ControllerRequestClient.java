@@ -201,6 +201,17 @@ public class ControllerRequestClient {
     }
   }
 
+  public String checkIfReloadIsNeeded(String tableNameWithType, Boolean verbose)
+      throws IOException {
+    try {
+      SimpleHttpResponse simpleHttpResponse = HttpClient.wrapAndThrowHttpException(_httpClient.sendGetRequest(
+          new URI(_controllerRequestURLBuilder.forTableNeedReload(tableNameWithType, verbose)), _headers, null));
+      return simpleHttpResponse.getResponse();
+    } catch (HttpErrorStatusException | URISyntaxException e) {
+      throw new IOException(e);
+    }
+  }
+
   public void reloadSegment(String tableName, String segmentName, boolean forceReload)
       throws IOException {
     try {
